@@ -19,7 +19,7 @@ phasorClass::phasorClass() : ofxOceanodeNodeModel("Phasor")
     parameters->add(initPhase_Param.set("Initial Phase", 0, 0, 1));
     parameters->add(minVal_Param.set("Min Value", 0, 0, 1));
     parameters->add(maxVal_Param.set("Max Value", 1, 0, 1));
-    parameters->add(resetPhase_Param.set("Reset Phase", false));
+    parameters->add(resetPhase_Param.set("Reset Phase"));
     parameters->add(loop_Param.set("Loop", true));
     parameters->add(bounce_Param.set("Bounce", false));
     parameters->add(offlineMode_Param.set("Offline Mode", false));
@@ -54,12 +54,9 @@ float phasorClass::getPhasor(){
 //    return (float)ofMap(phasorMod, 0, 1, minVal_Param, maxVal_Param);
 }
 
-void phasorClass::resetPhasor(bool &reset){
-    if(reset){
-        phasor = 0;
-        phasorMod = ofMap(initPhase_Param, minVal_Param, maxVal_Param, 0, 1, true);;
-        resetPhase_Param = false;
-    }
+void phasorClass::resetPhasor(){
+    phasor = 0;
+    phasorMod = ofMap(initPhase_Param, minVal_Param, maxVal_Param, 0, 1, true);;
 }
 
 void phasorClass::threadedFunction(){

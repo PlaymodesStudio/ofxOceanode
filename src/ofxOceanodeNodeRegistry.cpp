@@ -12,6 +12,7 @@
 ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
     this->registerModel<baseOscillator>();
     this->registerModel<phasorClass>();
+    this->registerModel<mapper>();
 }
 
 std::unique_ptr<ofxOceanodeNodeModel> ofxOceanodeNodeRegistry::create(const string typeName){

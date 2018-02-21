@@ -10,5 +10,6 @@
 
 #include "baseOscillator.h"
 #include "phasorClass.h"
+#include "mapper.h"
 
 #endif /* defaultNodes_h */

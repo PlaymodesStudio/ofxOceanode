@@ -21,7 +21,7 @@ public:
     void update(ofEventArgs &e);
     
     float getPhasor();
-    void resetPhasor(bool &reset);
+    void resetPhasor();
     
     void audioIn(float * input, int bufferSize, int nChannels);
     void loopChanged(bool &val);
@@ -49,7 +49,7 @@ private:
     ofParameter<float>  maxVal_Param;
     ofParameter<bool>   loop_Param;
     ofParameter<bool>   bounce_Param;
-    ofParameter<bool>   resetPhase_Param;
+    ofParameter<void>   resetPhase_Param;
     ofParameter<bool>   offlineMode_Param;
 };
 
