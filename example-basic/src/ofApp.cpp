@@ -1,14 +1,16 @@
 #include "ofApp.h"
+#include "testNode.h"
 
 //--------------------------------------------------------------
 void ofApp::setup(){
     auto reg = make_shared<ofxOceanodeNodeRegistry>();
-    reg->registerType<testNode>();
+    reg->registerModel<testNode>();
+    
     
     container = new ofxOceanodeContainer(reg);
+    canvas.setContainer(container);
     
-    unique_ptr<ofxOceanodeNodeModel> type = reg->create("Test");
-    container->createNode(move(type));
+    canvas.setup();
 }
 
 //--------------------------------------------------------------

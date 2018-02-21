@@ -156,6 +156,7 @@
 		9BF163AD5F824DF0AD945222 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				9F6E2CE6203DE16100037764 /* Nodes */,
 				86F00AF8B1543076FA133A82 /* ofxOceanode.h */,
 				E6D9C99CB3351C4C5F81F3F5 /* ofxOceanodeCanvas.cpp */,
 				2962E309C94677B099CC4D46 /* ofxOceanodeCanvas.h */,
@@ -169,6 +170,29 @@
 				CA2FE8770C0FB435606C43BE /* ofxOceanodeNodeRegistry.h */,
 			);
 			name = src;
+			sourceTree = "<group>";
+		};
+		9F6E2CE6203DE16100037764 /* Nodes */ = {
+			isa = PBXGroup;
+			children = (
+				9F6E2CE8203DE17B00037764 /* Default Nodes */,
+				9F6E2CE7203DE17300037764 /* Base Nodes */,
+			);
+			name = Nodes;
+			sourceTree = "<group>";
+		};
+		9F6E2CE7203DE17300037764 /* Base Nodes */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = "Base Nodes";
+			sourceTree = "<group>";
+		};
+		9F6E2CE8203DE17B00037764 /* Default Nodes */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = "Default Nodes";
 			sourceTree = "<group>";
 		};
 		BB4B014C10F69532006C3DED /* addons */ = {

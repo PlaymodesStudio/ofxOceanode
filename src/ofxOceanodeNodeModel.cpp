@@ -10,6 +10,4 @@
 
 ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name){
     parameters = new ofParameterGroup(_name);
-//    parameters->setName(name);
-    
 }

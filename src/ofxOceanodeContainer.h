@@ -19,7 +19,9 @@ public:
                          make_shared<ofxOceanodeNodeRegistry>());
     ~ofxOceanodeContainer();
     
-    shared_ptr<ofxOceanodeNode> createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel);
+    ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel);
+    
+    ofxOceanodeNodeRegistry & getRegistry(){return *registry;};
     
 private:
     //NodeModel;

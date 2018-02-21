@@ -11,16 +11,37 @@
 
 #include "ofMain.h"
 #include "ofxDatGui.h"
+#include "ofxOceanodeContainer.h"
 
 class ofxOceanodeCanvas{
 public:
-//    ofxOceanodeCanvas(){};
+    //ofxOceanodeCanvas(){};
     ~ofxOceanodeCanvas(){};
     
     
+    void setup();
+    void update(ofEventArgs &args){};
+    void draw(ofEventArgs &args){};
+    
+    void keyPressed(ofKeyEventArgs &e){};
+    void keyReleased(ofKeyEventArgs &e){};
+    void mouseMoved(ofMouseEventArgs &e){};
+    void mouseDragged(ofMouseEventArgs &e){};
+    void mousePressed(ofMouseEventArgs &e);
+    void mouseReleased(ofMouseEventArgs &e){};
+    void mouseScrolled(ofMouseEventArgs &e){};
+    void mouseEntered(ofMouseEventArgs &e){};
+    void mouseExited(ofMouseEventArgs &e){};
+    
+    void setContainer(ofxOceanodeContainer* c){container = c;};
+    
+    
+    void newModuleListener(ofxDatGuiDropdownEvent e);
 private:
     
+    ofxOceanodeContainer* container;
     
+    ofxDatGui *popUpMenu;
     
 };
 

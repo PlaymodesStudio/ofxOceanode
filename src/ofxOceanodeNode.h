@@ -20,6 +20,8 @@ public:
     void createGuiFromParameters();
     bool updateGuiFromParameters();
     
+    void setPosition(glm::vec2 position);
+    
     ofParameterGroup* getParameters(){return nodeModel->getParameterGroup();};
     
 private:

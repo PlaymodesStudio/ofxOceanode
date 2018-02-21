@@ -9,7 +9,7 @@
 #include "ofxOceanodeNode.h"
 
 ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){
-//    nodeModel = move(_nodeModel);
+    
     color = ofColor::red;
     position = ofPoint(10, 10);
     
@@ -21,9 +21,6 @@ void ofxOceanodeNode::createGuiFromParameters(){
     
     ofxDatGuiLog::quiet();
     ofxDatGui::setAssetPath("");
-    
-    //Put parameterGroup into vector
-//    parameterGroups.push_back(parameters);
     
     gui = make_shared<ofxDatGui>();
 //        gui->setAutoDraw(false);
@@ -85,7 +82,6 @@ void ofxOceanodeNode::createGuiFromParameters(){
     gui->onButtonEvent(this, &ofxOceanodeNode::onGuiButtonEvent);
     gui->onToggleEvent(this, &ofxOceanodeNode::onGuiToggleEvent);
     gui->onDropdownEvent(this, &ofxOceanodeNode::onGuiDropdownEvent);
-//    //        gui->onSliderEvent(this, &ofxOceanodeNode::onGuiSliderEvent);
     gui->onTextInputEvent(this, &ofxOceanodeNode::onGuiTextInputEvent);
     gui->onColorPickerEvent(this, &ofxOceanodeNode::onGuiColorPickerEvent);
 //    gui->onRightClickEvent(this, &ofxOceanodeNode::onGuiRightClickEvent);
@@ -93,6 +89,10 @@ void ofxOceanodeNode::createGuiFromParameters(){
     
     //OF PARAMETERS LISTERENRS
     ofAddListener(parameters->parameterChangedE(), this, &ofxOceanodeNode::parameterListener);
+}
+
+void ofxOceanodeNode::setPosition(glm::vec2 position){
+    gui->setPosition(position.x, position.y);
 }
 
 void ofxOceanodeNode::parameterListener(ofAbstractParameter &parameter){

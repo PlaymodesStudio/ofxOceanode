@@ -9,9 +9,9 @@
 #include "ofxOceanodeNodeRegistry.h"
 
 std::unique_ptr<ofxOceanodeNodeModel> ofxOceanodeNodeRegistry::create(const string typeName){
-    auto it = registeredTypes.find(typeName);
+    auto it = registeredModels.find(typeName);
     
-    if (it != registeredTypes.end())
+    if (it != registeredModels.end())
     {
         return it->second->clone();
     }
@@ -20,6 +20,6 @@ std::unique_ptr<ofxOceanodeNodeModel> ofxOceanodeNodeRegistry::create(const stri
 }
 
 
-ofxOceanodeNodeRegistry::registeredTypesMap const &ofxOceanodeNodeRegistry::getRegisteredTypes(){
-    return registeredTypes;
+ofxOceanodeNodeRegistry::registeredModelsMap const &ofxOceanodeNodeRegistry::getRegisteredModels(){
+    return registeredModels;
 }

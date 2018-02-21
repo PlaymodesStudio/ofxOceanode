@@ -14,30 +14,30 @@
 class ofxOceanodeNodeRegistry{
 public:
     using registryItemPtr     = std::unique_ptr<ofxOceanodeNodeModel>;
-    using registeredTypesMap = std::unordered_map<string, registryItemPtr>;
+    using registeredModelsMap = std::unordered_map<string, registryItemPtr>;
     
     ofxOceanodeNodeRegistry(){};
     ~ofxOceanodeNodeRegistry(){};
     
     
-    template<typename NodeType>
-    void registerType(std::unique_ptr<NodeType> uniqueType = std::make_unique<NodeType>()){
-        static_assert(std::is_base_of<ofxOceanodeNodeModel, NodeType>::value,
+    template<typename ModelType>
+    void registerModel(std::unique_ptr<ModelType> uniqueModel = std::make_unique<ModelType>()){
+        static_assert(std::is_base_of<ofxOceanodeNodeModel, ModelType>::value,
                       "Must pass a subclass of ofxOceanodeNodeModel to registerType");
         
-        const string name = uniqueType->name();
+        const string name = uniqueModel->name();
         
-        if (registeredTypes.count(name) == 0)
+        if (registeredModels.count(name) == 0)
         {
-            registeredTypes[name] = std::move(uniqueType);
+            registeredModels[name] = std::move(uniqueModel);
         }
     }
     
     std::unique_ptr<ofxOceanodeNodeModel> create(const string typeName);
     
-    registeredTypesMap const & getRegisteredTypes();
+    registeredModelsMap const & getRegisteredModels();
 private:
-    registeredTypesMap registeredTypes;
+    registeredModelsMap registeredModels;
     
 };
 

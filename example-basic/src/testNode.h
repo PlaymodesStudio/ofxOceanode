@@ -18,7 +18,6 @@ public:
     ~testNode(){};
     
     std::unique_ptr<ofxOceanodeNodeModel> clone() const override {return make_unique<testNode>();};
-    
 private:
     ofEventListener listener;
     

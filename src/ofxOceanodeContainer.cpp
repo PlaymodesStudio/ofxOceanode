@@ -8,7 +8,7 @@
 
 #include "ofxOceanodeContainer.h"
 
-ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry) : registry(move(_registry)){
+ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry) : registry(_registry){
     
 }
 
@@ -17,8 +17,9 @@ ofxOceanodeContainer::~ofxOceanodeContainer(){
 }
 
 
-shared_ptr<ofxOceanodeNode> ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel){
+ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel){
     auto node = make_shared<ofxOceanodeNode>(move(nodeModel));
     
-    dynamicNodes.push_back(move(node));
+    dynamicNodes.push_back(node);
+    return *node.get();
 }
