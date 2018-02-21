@@ -21,7 +21,7 @@ public:
     
     //getters
     bool getIsDynamic(){return isDynamic;};
-    string name(){return nameIdentifier;};
+    string nodeName(){return nameIdentifier;};
     
     /// Function creates instances of a model stored in ofxOceanodeNodeRegistry
     virtual std::unique_ptr<ofxOceanodeNodeModel> clone() const = 0;

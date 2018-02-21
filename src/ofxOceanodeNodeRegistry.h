@@ -16,7 +16,7 @@ public:
     using registryItemPtr     = std::unique_ptr<ofxOceanodeNodeModel>;
     using registeredModelsMap = std::unordered_map<string, registryItemPtr>;
     
-    ofxOceanodeNodeRegistry(){};
+    ofxOceanodeNodeRegistry();
     ~ofxOceanodeNodeRegistry(){};
     
     
@@ -25,7 +25,7 @@ public:
         static_assert(std::is_base_of<ofxOceanodeNodeModel, ModelType>::value,
                       "Must pass a subclass of ofxOceanodeNodeModel to registerType");
         
-        const string name = uniqueModel->name();
+        const string name = uniqueModel->nodeName();
         
         if (registeredModels.count(name) == 0)
         {

@@ -32,7 +32,7 @@ void ofxOceanodeCanvas::setup(){
 }
 
 void ofxOceanodeCanvas::newModuleListener(ofxDatGuiDropdownEvent e){
-    unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry().create("Test");
+    unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry().create(e.target->getSelected()->getName());
     
     if (type)
     {
