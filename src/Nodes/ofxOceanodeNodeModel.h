@@ -11,6 +11,13 @@
 
 #include "ofMain.h"
 
+struct parameterInfo{
+    bool isSavePreset;
+    bool isSaveProject;
+    bool acceptInConnection;
+    bool acceptOutConnection;
+};
+
 class ofxOceanodeNodeModel {
 public:
     ofxOceanodeNodeModel(string _name);
@@ -28,7 +35,7 @@ public:
     
 protected:
     ofParameterGroup* parameters;
-    
+//    std::map<ofAbstractParameter&, parameterInfo> parametersInfo; //information about interaction of parameter
     
 private:
     bool isDynamic;
