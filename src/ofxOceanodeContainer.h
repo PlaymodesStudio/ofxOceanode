@@ -25,8 +25,8 @@ public:
     
 private:
     //NodeModel;
-    vector<shared_ptr<ofxOceanodeNode>> dynamicNodes;
-    vector<shared_ptr<ofxOceanodeNode>> persistentNodes;
+    vector<unique_ptr<ofxOceanodeNode>> dynamicNodes;
+    vector<unique_ptr<ofxOceanodeNode>> persistentNodes;
 
     
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;

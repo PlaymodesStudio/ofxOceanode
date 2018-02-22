@@ -37,7 +37,7 @@ void ofxOceanodeCanvas::newModuleListener(ofxDatGuiDropdownEvent e){
     if (type)
     {
         auto &node = container->createNode(std::move(type));
-        node.setPosition(glm::vec2(popUpMenu->getPosition().x, popUpMenu->getPosition().y));
+        node.getNodeGui().setPosition(glm::vec2(popUpMenu->getPosition().x, popUpMenu->getPosition().y));
     }
     popUpMenu->setVisible(false);
     popUpMenu->setPosition(-1, -1);

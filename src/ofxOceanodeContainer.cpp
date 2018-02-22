@@ -18,8 +18,12 @@ ofxOceanodeContainer::~ofxOceanodeContainer(){
 
 
 ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel){
-    auto node = make_shared<ofxOceanodeNode>(move(nodeModel));
+    auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
+    auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);
+    node->setGui(std::move(nodeGui));
     
-    dynamicNodes.push_back(node);
-    return *node.get();
+    auto nodePtr = node.get();
+    dynamicNodes.push_back(std::move(node));
+    
+    return *nodePtr;
 }
