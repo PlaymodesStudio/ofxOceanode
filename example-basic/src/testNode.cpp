@@ -17,14 +17,20 @@ testNode::testNode() : ofxOceanodeNodeModel("Test"){
     parameters->add(textParam.set("testInput", "adfas"));
     parameters->add(labelParam.set("testLabel", ' '));
     parameters->add(colorParam.set("Color", ofColor::red, ofColor::white, ofColor::black));
+    parameters->add(intModParam.set("Custom", nullptr));
     
     listener = voidParam.newListener([&](){
-        cout<<"Triggler"<<endl;
+        customClass* c = new customClass();
+        intModParam = c;
+    });
+    
+    listener2 = intModParam.newListener([&](customClass* &c){
+        ofLog()<<"received From custom class";
     });
 }
 
 void testNode::createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink){
-    if(source.type() == typeid(ofParameter<bool>).name()){
-        c.connectConnection(source.cast<bool>(), sink.cast<bool>());
+    if(source.type() == typeid(ofParameter<customClass*>).name()){
+        c.connectConnection(source.cast<customClass*>(), sink.cast<customClass*>());
     }
 }

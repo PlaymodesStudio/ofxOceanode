@@ -12,6 +12,14 @@
 #include "ofMain.h"
 #include "ofxOceanodeNodeModel.h"
 
+class customClass{
+public:
+    customClass(){value = 1;};
+    ~customClass(){};
+    
+    int value;
+};
+
 class testNode : public ofxOceanodeNodeModel {
 public:
     testNode();
@@ -23,7 +31,9 @@ public:
 
 private:
     ofEventListener listener;
+    ofEventListener listener2;
     
+    ofParameter<customClass*> intModParam;
     ofParameter<int> intParam;
     ofParameter<float>  floatParam;
     ofParameter<bool>   boolParam;
