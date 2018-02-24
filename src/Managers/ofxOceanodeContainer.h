@@ -36,8 +36,8 @@ private:
     vector<unique_ptr<ofxOceanodeNode>> dynamicNodes;
     vector<unique_ptr<ofxOceanodeNode>> persistentNodes;
 
-    shared_ptr<ofxOceanodeAbstractConnection> connectionTest;
-    unique_ptr<ofxOceanodeAbstractConnection>   temporalConnection;
+    string temporalConnectionTypeName;
+    unique_ptr<ofxOceanodeTemporalConnection>   temporalConnection;
     vector<shared_ptr<ofxOceanodeAbstractConnection>> connections;
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;
 };

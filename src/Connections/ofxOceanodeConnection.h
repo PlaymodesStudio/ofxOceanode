@@ -14,36 +14,31 @@
 class ofxOceanodeAbstractConnection{
 public:
     ofxOceanodeAbstractConnection(){};
-    ofxOceanodeAbstractConnection(ofAbstractParameter& p) : parameter(&p){
-        isTemporalConnection = true;
-    };
     ~ofxOceanodeAbstractConnection(){};
-    
-    ofAbstractParameter& getParameter(){return *parameter;};
     
     bool getIsTemporalConnection(){return isTemporalConnection;};
 protected:
     bool isTemporalConnection;
-    ofAbstractParameter* parameter;
     ofxOceanodeConnectionGraphics graphics;
 };
 
-//template<typename T>
-//class ofxOceanodeTemporalConnection: public ofxOceanodeAbstractConnection{
-//public:
-//    ofxOceanodeTemporalConnection(ofParameter<T>& p) : ofxOceanodeAbstractConnection(), parameter(p){
-//        isTemporalConnection = true;
-//    }
-//    ~ofxOceanodeTemporalConnection(){};
-//
-//private:
-//    ofParameter<T>& parameter;
-//};
+class ofxOceanodeTemporalConnection: public ofxOceanodeAbstractConnection{
+public:
+    ofxOceanodeTemporalConnection(ofAbstractParameter& p) : ofxOceanodeAbstractConnection(), sourceParameter(p){
+        isTemporalConnection = true;
+    }
+    ~ofxOceanodeTemporalConnection(){};
+
+    ofAbstractParameter& getParameter(){return sourceParameter;};
+    
+private:
+    ofAbstractParameter& sourceParameter;
+};
 
 template<typename Tsource, typename Tsink>
 class ofxOceanodeConnection: public ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeConnection(ofxOceanodeAbstractConnection& c, ofParameter<Tsink>& p) : ofxOceanodeAbstractConnection(), sourceParameter(c.getParameter().cast<Tsource>()), sinkParameter(p){
+    ofxOceanodeConnection(ofxOceanodeTemporalConnection& c, ofParameter<Tsink>& p) : ofxOceanodeAbstractConnection(), sourceParameter(c.getParameter().cast<Tsource>()), sinkParameter(p){
         sourceParameter.addListener(this, &ofxOceanodeConnection::parameterListener);
         sinkParameter = sourceParameter;
         isTemporalConnection = false;

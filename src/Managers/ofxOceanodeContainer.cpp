@@ -17,7 +17,7 @@ ofxOceanodeContainer::~ofxOceanodeContainer(){
 }
 
 void ofxOceanodeContainer::createConnection(ofAbstractParameter& p){
-    temporalConnection = make_unique<ofxOceanodeAbstractConnection>(p);
+    temporalConnection = make_unique<ofxOceanodeTemporalConnection>(p);
 }
 
 void ofxOceanodeContainer::connectConnection(ofAbstractParameter& p){
