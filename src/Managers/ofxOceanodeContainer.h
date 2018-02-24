@@ -12,6 +12,7 @@
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeNodeRegistry.h"
+#include "ofxOceanodeConnection.h"
 
 class ofxOceanodeContainer {
 public:
@@ -21,6 +22,13 @@ public:
     
     ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel);
     
+    void createConnection(ofAbstractParameter& p);
+    ofxOceanodeAbstractConnection& getOpenConnection(){
+        return *connections.back().get();
+    }
+    
+    void connectConnection(ofAbstractParameter &p);
+    
     ofxOceanodeNodeRegistry & getRegistry(){return *registry;};
     
 private:
@@ -28,7 +36,9 @@ private:
     vector<unique_ptr<ofxOceanodeNode>> dynamicNodes;
     vector<unique_ptr<ofxOceanodeNode>> persistentNodes;
 
-    
+    shared_ptr<ofxOceanodeAbstractConnection> connectionTest;
+    unique_ptr<ofxOceanodeAbstractConnection>   temporalConnection;
+    vector<shared_ptr<ofxOceanodeAbstractConnection>> connections;
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;
 };
 

@@ -16,6 +16,17 @@ ofxOceanodeContainer::~ofxOceanodeContainer(){
     
 }
 
+void ofxOceanodeContainer::createConnection(ofAbstractParameter& p){
+    temporalConnection = make_unique<ofxOceanodeAbstractConnection>(p);
+}
+
+void ofxOceanodeContainer::connectConnection(ofAbstractParameter& p){
+    if(p.type() == typeid(ofParameter<float>).name()){
+        connections.push_back(make_shared<ofxOceanodeConnection<float, float>>(*temporalConnection.get(),  p.cast<float>()));
+//        connectionTest = new ofxOceanodeConnection<float, float>(*temporalConnection.get(),  p.cast<float>());
+//        connectionTest = make_shared<ofxOceanodeConnection<float, float>>(*temporalConnection.get(),  p.cast<float>());
+    }
+}
 
 ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel){
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));

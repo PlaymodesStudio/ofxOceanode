@@ -7,6 +7,7 @@
 
 #include "ofxOceanodeNodeGui.h"
 #include "ofxOceanodeNode.h"
+#include "ofxOceanodeContainer.h"
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node) : container(_container), node(_node){
     color = ofColor::red;
@@ -83,7 +84,7 @@ void ofxOceanodeNodeGui::createGuiFromParameters(){
     gui->onDropdownEvent(this, &ofxOceanodeNodeGui::onGuiDropdownEvent);
     gui->onTextInputEvent(this, &ofxOceanodeNodeGui::onGuiTextInputEvent);
     gui->onColorPickerEvent(this, &ofxOceanodeNodeGui::onGuiColorPickerEvent);
-    //    gui->onRightClickEvent(this, &ofxOceanodeNode::onGuiRightClickEvent);
+    gui->onRightClickEvent(this, &ofxOceanodeNodeGui::onGuiRightClickEvent);
     
     
     //OF PARAMETERS LISTERENRS
@@ -139,7 +140,7 @@ void ofxOceanodeNodeGui::onGuiColorPickerEvent(ofxDatGuiColorPickerEvent e){
 }
 
 void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
-    //    if(e.down == 1){
+        if(e.down == 1){
     //        for (int i=0; i < datGuis.size() ; i++){
     //            if(datGuis[i]->getComponent(e.target->getType(), e.target->getName()) == e.target){
     //                ofAbstractParameter &parameter = parameterGroups[i]->get(e.target->getName());
@@ -216,12 +217,15 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
     //                        }
     //                    }
     //                    if(!foundParameter){
-    //                        connections.push_back(make_shared<nodeConnection>(e.target, datGuis[i], &parameter));
+//                            connections.push_back(make_shared<nodeConnection>(e.target, datGuis[i], &parameter));
+            container.createConnection(getParameters()->get(e.target->getName()));
     //                        ofAddListener(connections.back()->destroyEvent, this, &ofxOceanodeNode::destroyedConnection);
     //                    }
     //                }
     //            }
     //        }
+        }else{
+            container.connectConnection(getParameters()->get(e.target->getName()));
     //    }else if(connections.size() > 0){
     //        for (int i=0; i < datGuis.size() ; i++){
     //            if(datGuis[i]->getComponent(e.target->getType(), e.target->getName()) == e.target
@@ -236,6 +240,6 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
     //                }
     //            }
     //        }
-    //    }
+        }
 }
 
