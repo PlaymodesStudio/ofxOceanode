@@ -12,10 +12,27 @@
 
 class ofxOceanodeConnectionGraphics{
 public:
-    ofxOceanodeConnectionGraphics(){};
+    ofxOceanodeConnectionGraphics(){
+        points[0] = glm::vec2(-1, -1);
+        points[1] = glm::vec2(-1, -1);
+        
+        ofAddListener(ofEvents().draw, this , &ofxOceanodeConnectionGraphics::draw);
+    };
     ~ofxOceanodeConnectionGraphics(){};
-private:
     
+    void draw(ofEventArgs &args){
+        if(points[1] != glm::vec2(-1, -1)){
+            ofDrawLine(points[0], points[1]);
+        }
+    }
+    
+    void movePoint(int index, glm::vec2 point){
+        points[index] = point;
+    }
+    
+    glm::vec2 getPoint(int index){return points[index];};
+private:
+    glm::vec2 points[2];
 };
 
 #endif /* ofxOceanodeConnectionGraphics_h */

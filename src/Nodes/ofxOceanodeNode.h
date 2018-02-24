@@ -22,7 +22,7 @@ public:
     
     ofxOceanodeNodeGui& getNodeGui(){return *nodeGui.get();};
     
-    void makeConnection(ofxOceanodeContainer& container, int parameterIndex);
+    void makeConnection(ofxOceanodeContainer& container, int parameterIndex, glm::vec2 pos);
     
     ofParameterGroup* getParameters(){return nodeModel->getParameterGroup();};
 private:

@@ -35,7 +35,7 @@ public:
     /// Function creates instances of a model stored in ofxOceanodeNodeRegistry
     virtual std::unique_ptr<ofxOceanodeNodeModel> clone() const = 0;
     
-    virtual void createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink){};
+    virtual void createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink, glm::vec2 pos){};
     
 protected:
     ofParameterGroup* parameters;

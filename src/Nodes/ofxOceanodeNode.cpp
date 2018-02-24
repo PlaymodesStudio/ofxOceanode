@@ -18,19 +18,19 @@ void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     nodeGui = std::move(gui);
 }
 
-void ofxOceanodeNode::makeConnection(ofxOceanodeContainer& container, int parameterIndex){
+void ofxOceanodeNode::makeConnection(ofxOceanodeContainer& container, int parameterIndex, glm::vec2 pos){
     //Big function
     if(container.isOpenConnection()){
         ofAbstractParameter& source = container.getTemporalConnectionParameter();
         ofAbstractParameter& sink = nodeModel->getParameterGroup()->get(parameterIndex);
         if(source.type() == sink.type()){
             if(source.type() == typeid(ofParameter<int>).name()){
-                container.connectConnection(source.cast<int>(), sink.cast<int>());
+                container.connectConnection(source.cast<int>(), sink.cast<int>(), pos);
             }
             else if(source.type() == typeid(ofParameter<float>).name()){
-                container.connectConnection(source.cast<float>(), sink.cast<float>());
+                container.connectConnection(source.cast<float>(), sink.cast<float>(), pos);
             }
-            nodeModel->createConnectionFromCustomType(container, source, sink);
+            nodeModel->createConnectionFromCustomType(container, source, sink, pos);
         }
     }
 }
