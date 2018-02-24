@@ -22,6 +22,8 @@ public:
     
     ofxOceanodeNodeGui& getNodeGui(){return *nodeGui.get();};
     
+    void makeConnection(ofxOceanodeContainer& container, int parameterIndex);
+    
     ofParameterGroup* getParameters(){return nodeModel->getParameterGroup();};
 private:
     std::unique_ptr<ofxOceanodeNodeModel> nodeModel;

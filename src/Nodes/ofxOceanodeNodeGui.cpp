@@ -225,7 +225,8 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
     //            }
     //        }
         }else{
-            container.connectConnection(getParameters()->get(e.target->getName()));
+            node.makeConnection(container, getParameters()->getPosition(e.target->getName()));
+//            container.connectConnection(node, getParameters()->getPosition(e.target->getName()));
     //    }else if(connections.size() > 0){
     //        for (int i=0; i < datGuis.size() ; i++){
     //            if(datGuis[i]->getComponent(e.target->getType(), e.target->getName()) == e.target

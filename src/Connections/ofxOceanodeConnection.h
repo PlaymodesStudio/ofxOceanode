@@ -22,23 +22,26 @@ protected:
     ofxOceanodeConnectionGraphics graphics;
 };
 
+class ofxOceanodeNode;
+
 class ofxOceanodeTemporalConnection: public ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeTemporalConnection(ofAbstractParameter& p) : ofxOceanodeAbstractConnection(), sourceParameter(p){
+    ofxOceanodeTemporalConnection(ofAbstractParameter& _p) : ofxOceanodeAbstractConnection(), p(_p){
         isTemporalConnection = true;
     }
+    
+    ofAbstractParameter& getParameter(){return p;};
+    
     ~ofxOceanodeTemporalConnection(){};
-
-    ofAbstractParameter& getParameter(){return sourceParameter;};
     
 private:
-    ofAbstractParameter& sourceParameter;
+    ofAbstractParameter& p;
 };
 
 template<typename Tsource, typename Tsink>
 class ofxOceanodeConnection: public ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeConnection(ofxOceanodeTemporalConnection& c, ofParameter<Tsink>& p) : ofxOceanodeAbstractConnection(), sourceParameter(c.getParameter().cast<Tsource>()), sinkParameter(p){
+    ofxOceanodeConnection(ofParameter<Tsource>& pSource, ofParameter<Tsink>& pSink) : ofxOceanodeAbstractConnection(), sourceParameter(pSource), sinkParameter(pSink){
         sourceParameter.addListener(this, &ofxOceanodeConnection::parameterListener);
         sinkParameter = sourceParameter;
         isTemporalConnection = false;

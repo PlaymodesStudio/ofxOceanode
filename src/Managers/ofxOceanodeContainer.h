@@ -22,12 +22,23 @@ public:
     
     ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel);
     
-    void createConnection(ofAbstractParameter& p);
-    ofxOceanodeAbstractConnection& getOpenConnection(){
-        return *connections.back().get();
+    
+//    void createConnection(ofAbstractParameter& p);
+    
+    void createConnection(ofAbstractParameter& p){
+        temporalConnection = new ofxOceanodeTemporalConnection(p);
     }
     
-    void connectConnection(ofAbstractParameter &p);
+    ofAbstractParameter& getTemporalConnectionParameter(){return temporalConnection->getParameter();};
+    
+    bool isOpenConnection(){return temporalConnection != nullptr;}
+    
+    template<typename Tsource, typename Tsink>
+    void connectConnection(ofParameter<Tsource>& source, ofParameter<Tsink>& sink){
+        delete temporalConnection;
+        temporalConnection = nullptr;
+        connections.push_back(make_shared<ofxOceanodeConnection<Tsource, Tsink>>(source, sink));
+    }
     
     ofxOceanodeNodeRegistry & getRegistry(){return *registry;};
     
@@ -37,7 +48,7 @@ private:
     vector<unique_ptr<ofxOceanodeNode>> persistentNodes;
 
     string temporalConnectionTypeName;
-    unique_ptr<ofxOceanodeTemporalConnection>   temporalConnection;
+    ofxOceanodeTemporalConnection*   temporalConnection;
     vector<shared_ptr<ofxOceanodeAbstractConnection>> connections;
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;
 };

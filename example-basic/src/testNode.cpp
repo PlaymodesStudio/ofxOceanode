@@ -7,6 +7,7 @@
 //
 
 #include "testNode.h"
+#include "ofxOceanodeContainer.h"
 
 testNode::testNode() : ofxOceanodeNodeModel("Test"){
     parameters->add(intParam.set("int", 0, 0, 100));
@@ -20,4 +21,10 @@ testNode::testNode() : ofxOceanodeNodeModel("Test"){
     listener = voidParam.newListener([&](){
         cout<<"Triggler"<<endl;
     });
+}
+
+void testNode::createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink){
+    if(source.type() == typeid(ofParameter<bool>).name()){
+        c.connectConnection(source.cast<bool>(), sink.cast<bool>());
+    }
 }

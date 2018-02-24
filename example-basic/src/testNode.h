@@ -18,6 +18,9 @@ public:
     ~testNode(){};
     
     std::unique_ptr<ofxOceanodeNodeModel> clone() const override {return make_unique<testNode>();};
+    
+    void createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink) override;
+
 private:
     ofEventListener listener;
     
