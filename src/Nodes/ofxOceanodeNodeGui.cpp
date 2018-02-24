@@ -14,6 +14,7 @@ ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOcea
     position = glm::vec2(10, 10);
     
     createGuiFromParameters();
+    ofRegisterMouseEvents(this);
 }
 
 void ofxOceanodeNodeGui::createGuiFromParameters(){
@@ -96,12 +97,21 @@ ofParameterGroup* ofxOceanodeNodeGui::getParameters(){
     
 }
 
-void ofxOceanodeNodeGui::setPosition(glm::vec2 position){
-    gui->setPosition(position.x, position.y);
+void ofxOceanodeNodeGui::setPosition(glm::vec2 _position){
+    gui->setPosition(_position.x, _position.y);
+    position = _position;
 }
 
 void ofxOceanodeNodeGui::parameterListener(ofAbstractParameter &parameter){
     
+}
+
+void ofxOceanodeNodeGui::mouseDragged(ofMouseEventArgs &args){
+    glm::vec2 guiCurrentPos = glm::vec2(gui->getPosition().x, gui->getPosition().y);
+    if(guiCurrentPos != position){
+        node.moveConnections(guiCurrentPos - position);
+        position = guiCurrentPos;
+    }
 }
 
 void ofxOceanodeNodeGui::onGuiButtonEvent(ofxDatGuiButtonEvent e){
@@ -221,7 +231,7 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
             glm::vec2 point;
             point.x = e.target->getX() + e.target->getWidth();
             point.y = e.target->getY() + e.target->getHeight()/2;
-            container.createConnection(getParameters()->get(e.target->getName()), point);
+            container.createConnection(getParameters()->get(e.target->getName()), node, point);
     //                        ofAddListener(connections.back()->destroyEvent, this, &ofxOceanodeNode::destroyedConnection);
     //                    }
     //                }

@@ -16,6 +16,14 @@ public:
     ofxOceanodeAbstractConnection(){};
     ~ofxOceanodeAbstractConnection(){};
     
+    void moveSourcePoint(glm::vec2 moveVec){
+        graphics.movePoint(0, moveVec);
+    }
+    
+    void moveSinkePoint(glm::vec2 moveVec){
+        graphics.movePoint(1, moveVec);
+    }
+    
     bool getIsTemporalConnection(){return isTemporalConnection;};
 protected:
     bool isTemporalConnection;
@@ -26,9 +34,9 @@ class ofxOceanodeNode;
 
 class ofxOceanodeTemporalConnection: public ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeTemporalConnection(ofAbstractParameter& _p, glm::vec2 pos) : ofxOceanodeAbstractConnection(), p(_p){
+    ofxOceanodeTemporalConnection(ofAbstractParameter& _p, ofxOceanodeNode& _n, glm::vec2 pos) : ofxOceanodeAbstractConnection(), n(_n), p(_p){
         isTemporalConnection = true;
-        graphics.movePoint(0, pos);
+        graphics.setPoint(0, pos);
         
         ofRegisterMouseEvents(this);
     }
@@ -40,9 +48,11 @@ public:
     
     glm::vec2 getSourcePosition(){return graphics.getPoint(0);};
     
+    ofxOceanodeNode& getNode(){return n;};
+    
     void mouseMoved(ofMouseEventArgs &args){};
     void mouseDragged(ofMouseEventArgs &args){
-        graphics.movePoint(1, glm::vec2(args.x, args.y));
+        graphics.setPoint(1, glm::vec2(args.x, args.y));
     }
     void mousePressed(ofMouseEventArgs &args){};
     void mouseReleased(ofMouseEventArgs &args){};
@@ -51,7 +61,7 @@ public:
     void mouseExited(ofMouseEventArgs &args){};
     
 private:
-    
+    ofxOceanodeNode& n;
     ofAbstractParameter& p;
 };
 
@@ -62,8 +72,8 @@ public:
         sourceParameter.addListener(this, &ofxOceanodeConnection::parameterListener);
         sinkParameter = sourceParameter;
         isTemporalConnection = false;
-        graphics.movePoint(0, posSource);
-        graphics.movePoint(1, posSink);
+        graphics.setPoint(0, posSource);
+        graphics.setPoint(1, posSink);
     }
     ~ofxOceanodeConnection(){};
     

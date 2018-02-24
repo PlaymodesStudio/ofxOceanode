@@ -29,8 +29,8 @@ testNode::testNode() : ofxOceanodeNodeModel("Test"){
     });
 }
 
-void testNode::createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink, glm::vec2 pos){
+ofxOceanodeAbstractConnection* testNode::createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink, glm::vec2 pos){
     if(source.type() == typeid(ofParameter<customClass*>).name()){
-        c.connectConnection(source.cast<customClass*>(), sink.cast<customClass*>(), pos);
+        return c.connectConnection(source.cast<customClass*>(), sink.cast<customClass*>(), pos);
     }
 }

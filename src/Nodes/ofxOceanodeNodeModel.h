@@ -12,6 +12,7 @@
 #include "ofMain.h"
 
 class ofxOceanodeContainer;
+class ofxOceanodeAbstractConnection;
 
 struct parameterInfo{
     bool isSavePreset;
@@ -35,7 +36,7 @@ public:
     /// Function creates instances of a model stored in ofxOceanodeNodeRegistry
     virtual std::unique_ptr<ofxOceanodeNodeModel> clone() const = 0;
     
-    virtual void createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink, glm::vec2 pos){};
+    virtual ofxOceanodeAbstractConnection* createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink, glm::vec2 pos){return nullptr;};
     
 protected:
     ofParameterGroup* parameters;

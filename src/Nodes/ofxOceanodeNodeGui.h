@@ -25,6 +25,14 @@ public:
     
     ofParameterGroup* getParameters();
     
+    void mouseMoved(ofMouseEventArgs &args){};
+    void mouseDragged(ofMouseEventArgs &args);
+    void mousePressed(ofMouseEventArgs &args){};
+    void mouseReleased(ofMouseEventArgs &args){};
+    void mouseScrolled(ofMouseEventArgs &args){};
+    void mouseEntered(ofMouseEventArgs &args){};
+    void mouseExited(ofMouseEventArgs &args){};
+    
 private:
     void onGuiButtonEvent(ofxDatGuiButtonEvent e);
     void onGuiToggleEvent(ofxDatGuiToggleEvent e);

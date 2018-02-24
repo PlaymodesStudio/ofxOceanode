@@ -26,7 +26,11 @@ public:
         }
     }
     
-    void movePoint(int index, glm::vec2 point){
+    void movePoint(int index, glm::vec2 moveVec){
+        points[index] += moveVec;
+    }
+    
+    void setPoint(int index, glm::vec2 point){
         points[index] = point;
     }
     

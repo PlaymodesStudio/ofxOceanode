@@ -12,6 +12,7 @@
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeNodeGui.h"
 #include "ofxDatGui.h"
+#include "ofxOceanodeConnection.h"
 
 class ofxOceanodeNode {
 public:
@@ -24,10 +25,19 @@ public:
     
     void makeConnection(ofxOceanodeContainer& container, int parameterIndex, glm::vec2 pos);
     
+    void addOutputConnection(ofxOceanodeAbstractConnection* c){
+        outConnections.push_back(c);
+    }
+    
+    void moveConnections(glm::vec2 moveVector);
+    
     ofParameterGroup* getParameters(){return nodeModel->getParameterGroup();};
 private:
     std::unique_ptr<ofxOceanodeNodeModel> nodeModel;
     std::unique_ptr<ofxOceanodeNodeGui> nodeGui;
+    
+    std::vector<ofxOceanodeAbstractConnection*> inConnections;
+    std::vector<ofxOceanodeAbstractConnection*> outConnections;
 };
 
 #endif /* ofxOceanodeNode_h */

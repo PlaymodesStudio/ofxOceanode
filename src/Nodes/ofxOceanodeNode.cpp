@@ -21,16 +21,32 @@ void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
 void ofxOceanodeNode::makeConnection(ofxOceanodeContainer& container, int parameterIndex, glm::vec2 pos){
     //Big function
     if(container.isOpenConnection()){
+        ofxOceanodeAbstractConnection* connection = nullptr;
         ofAbstractParameter& source = container.getTemporalConnectionParameter();
         ofAbstractParameter& sink = nodeModel->getParameterGroup()->get(parameterIndex);
         if(source.type() == sink.type()){
             if(source.type() == typeid(ofParameter<int>).name()){
-                container.connectConnection(source.cast<int>(), sink.cast<int>(), pos);
+                connection = container.connectConnection(source.cast<int>(), sink.cast<int>(), pos);
             }
             else if(source.type() == typeid(ofParameter<float>).name()){
-                container.connectConnection(source.cast<float>(), sink.cast<float>(), pos);
+                connection = container.connectConnection(source.cast<float>(), sink.cast<float>(), pos);
             }
-            nodeModel->createConnectionFromCustomType(container, source, sink, pos);
+            else{
+                connection = nodeModel->createConnectionFromCustomType(container, source, sink, pos);
+            }
         }
+        
+        if(connection != nullptr){
+            inConnections.push_back(connection);
+        }
+    }
+}
+
+void ofxOceanodeNode::moveConnections(glm::vec2 moveVector){
+    for(auto c : inConnections){
+        c->moveSinkePoint(moveVector);
+    }
+    for(auto c : outConnections){
+        c->moveSourcePoint(moveVector);
     }
 }
