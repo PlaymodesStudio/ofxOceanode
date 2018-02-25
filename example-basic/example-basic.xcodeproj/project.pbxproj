@@ -7,27 +7,27 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		017F84499F348651B4CAD515 /* phasorClass.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C72E12C876E23B53255D0ED9 /* phasorClass.cpp */; };
+		201715816A8E0C2380C6CA9B /* oscillator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CEA66632C11B098EDB32207D /* oscillator.cpp */; };
 		4A277DA746402C76CE307770 /* ofxDatGuiComponent.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5D13EE4C64902574D9153447 /* ofxDatGuiComponent.cpp */; };
+		4C8024D8DD46223D43C514C0 /* ofxOceanodeNode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 63A44DC38599839305F1F4D3 /* ofxOceanodeNode.cpp */; };
+		4F63EFF3BAACF2B19051E336 /* ofxOceanodeNodeModel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 18902594A5884CA5CA6D3D9D /* ofxOceanodeNodeModel.cpp */; };
+		5769B6A6D79188D3D351933E /* ofxOceanodeContainer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5E65A0C39A6FDCA2888DDAF8 /* ofxOceanodeContainer.cpp */; };
 		646DF4D56CE728133610A7F6 /* ofxSmartFont.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A403D3D25D08FC7AF3B871D4 /* ofxSmartFont.cpp */; };
-		9F171587203F41F100EB3FFB /* ofxOceanodeConnectionGraphics.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F171585203F41F100EB3FFB /* ofxOceanodeConnectionGraphics.cpp */; };
-		9F501E8820423406000D5D70 /* baseIndexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F501E8520423406000D5D70 /* baseIndexer.cpp */; };
-		9F501E8920423406000D5D70 /* oscillatorBank.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F501E8620423406000D5D70 /* oscillatorBank.cpp */; };
-		9F501E8C20432276000D5D70 /* oscillator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F501E8A20432276000D5D70 /* oscillator.cpp */; };
-		9F6E2D00203DE80600037764 /* baseOscillator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F6E2CFB203DE80600037764 /* baseOscillator.cpp */; };
-		9F6E2D05203DEB3300037764 /* phasorClass.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F6E2D04203DEB3300037764 /* phasorClass.cpp */; };
-		9F6E2D0F203E187000037764 /* mapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F6E2D0D203E187000037764 /* mapper.cpp */; };
-		9F6E2D21203F181900037764 /* ofxOceanodeNodeGui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F6E2D1B203F181800037764 /* ofxOceanodeNodeGui.cpp */; };
-		9F6E2D22203F181900037764 /* ofxOceanodeNode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F6E2D1C203F181800037764 /* ofxOceanodeNode.cpp */; };
-		9F6E2D23203F181900037764 /* ofxOceanodeNodeModel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F6E2D1E203F181800037764 /* ofxOceanodeNodeModel.cpp */; };
-		9F6E2D2A203F182700037764 /* ofxOceanodeContainer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F6E2D24203F182700037764 /* ofxOceanodeContainer.cpp */; };
-		9F6E2D2B203F182700037764 /* ofxOceanodeNodeRegistry.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F6E2D26203F182700037764 /* ofxOceanodeNodeRegistry.cpp */; };
-		9F6E2D2C203F182700037764 /* ofxOceanodeCanvas.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F6E2D28203F182700037764 /* ofxOceanodeCanvas.cpp */; };
-		9F6E2D2F203F188000037764 /* ofxOceanodeConnection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F6E2D2D203F188000037764 /* ofxOceanodeConnection.cpp */; };
-		9F92A4E81EFC34D800F45483 /* testNode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F92A4E61EFC34D800F45483 /* testNode.cpp */; };
+		656E7EDB27697DE1D6419CD2 /* baseOscillator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 21F7AAAF4B49DDFC26309F29 /* baseOscillator.cpp */; };
+		88B25E219BAC2DF5129EBA2C /* oscillatorBank.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 01ACCF35B06321B6B9C3E940 /* oscillatorBank.cpp */; };
+		8EB5677652296BACF3A1C184 /* ofxOceanodeNodeGui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 170083BFE7EEC5851D5DF9E6 /* ofxOceanodeNodeGui.cpp */; };
+		A670837F6999677674A385D1 /* testNode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1C84792B71D7D5C105077DBF /* testNode.cpp */; };
+		B7559FEE382DBA7FB094D5E7 /* ofxOceanodeNodeRegistry.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F15C9896F6A32FCA280CD4B5 /* ofxOceanodeNodeRegistry.cpp */; };
 		BE7DAF3CB982C2BD0FE44648 /* ofxDatGui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DD8F81F7AAB5BA396231DD4C /* ofxDatGui.cpp */; };
+		C1EEF98E795AFB7BB33F94B1 /* ofxOceanodeConnectionGraphics.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 76AFF92A62D8AF4E498DB5C3 /* ofxOceanodeConnectionGraphics.cpp */; };
+		C6A203560BFBDA04C5746210 /* ofxOceanodeConnection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7C9B84BA3AF325F3D843633B /* ofxOceanodeConnection.cpp */; };
 		E4328149138ABC9F0047C5CB /* openFrameworksDebug.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E4328148138ABC890047C5CB /* openFrameworksDebug.a */; };
 		E4B69E200A3A1BDC003C02F2 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E4B69E1D0A3A1BDC003C02F2 /* main.cpp */; };
 		E4B69E210A3A1BDC003C02F2 /* ofApp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E4B69E1E0A3A1BDC003C02F2 /* ofApp.cpp */; };
+		EB5B77357A54C0E2DED32C3E /* baseIndexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9379E6001D7EB3C9ED6E3741 /* baseIndexer.cpp */; };
+		F11E47B208E163D56E3E2701 /* mapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 73ED5407785A82B2D86C90D2 /* mapper.cpp */; };
+		FE7602E65C7BA676951A37FB /* ofxOceanodeCanvas.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 69F09B1450CB3FF08A87D2FF /* ofxOceanodeCanvas.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,70 +60,70 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		01ACCF35B06321B6B9C3E940 /* oscillatorBank.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = oscillatorBank.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/oscillatorBank.cpp; sourceTree = SOURCE_ROOT; };
 		0795F21A2022A202F628BE94 /* ofxDatGuiColorPicker.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiColorPicker.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiColorPicker.h; sourceTree = SOURCE_ROOT; };
+		0B132B67A85D7B39FD97C7CA /* phasorClass.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = phasorClass.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/phasorClass.h; sourceTree = SOURCE_ROOT; };
 		0EA01AA404A74EE4BF1F46AD /* ofxDatGuiTheme.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiTheme.h; path = ../../../addons/ofxDatGui_PM/src/themes/ofxDatGuiTheme.h; sourceTree = SOURCE_ROOT; };
 		11021811865108C49AED9E1E /* ofxDatGuiScrollView.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiScrollView.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiScrollView.h; sourceTree = SOURCE_ROOT; };
 		149298D896FDA631EE81BEB9 /* ofxDatGuiSlider.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiSlider.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiSlider.h; sourceTree = SOURCE_ROOT; };
 		169D713735D46DFA03D4EBEB /* ofxDatGuiConstants.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiConstants.h; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiConstants.h; sourceTree = SOURCE_ROOT; };
+		170083BFE7EEC5851D5DF9E6 /* ofxOceanodeNodeGui.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxOceanodeNodeGui.cpp; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeGui.cpp; sourceTree = SOURCE_ROOT; };
+		18902594A5884CA5CA6D3D9D /* ofxOceanodeNodeModel.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxOceanodeNodeModel.cpp; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeModel.cpp; sourceTree = SOURCE_ROOT; };
+		1C84792B71D7D5C105077DBF /* testNode.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = testNode.cpp; path = src/testNode.cpp; sourceTree = SOURCE_ROOT; };
+		21F7AAAF4B49DDFC26309F29 /* baseOscillator.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = baseOscillator.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/baseOscillator.cpp; sourceTree = SOURCE_ROOT; };
 		29030CD02944F06F1DAC3E49 /* ofxDatGuiTextInput.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiTextInput.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiTextInput.h; sourceTree = SOURCE_ROOT; };
 		3F15C4313830F7C3C28E1FAE /* ofxDatGuiTextInputField.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiTextInputField.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiTextInputField.h; sourceTree = SOURCE_ROOT; };
 		407D7F7B6D3EDF97638DF661 /* ofxDatGuiEvents.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiEvents.h; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiEvents.h; sourceTree = SOURCE_ROOT; };
+		4549BA17D5F8FD6756221A74 /* baseOscillator.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = baseOscillator.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/baseOscillator.h; sourceTree = SOURCE_ROOT; };
+		4A76FE1EC14329064FDB60C7 /* ofxOceanodeNodeRegistry.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxOceanodeNodeRegistry.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeNodeRegistry.h; sourceTree = SOURCE_ROOT; };
 		4D832D586223B608C5420D29 /* ofxDatGui.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGui.h; path = ../../../addons/ofxDatGui_PM/src/ofxDatGui.h; sourceTree = SOURCE_ROOT; };
+		542B8A9AF130D0C5A3086539 /* ofxOceanodeConnectionGraphics.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxOceanodeConnectionGraphics.h; path = ../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnectionGraphics.h; sourceTree = SOURCE_ROOT; };
 		5D13EE4C64902574D9153447 /* ofxDatGuiComponent.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxDatGuiComponent.cpp; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiComponent.cpp; sourceTree = SOURCE_ROOT; };
+		5E65A0C39A6FDCA2888DDAF8 /* ofxOceanodeContainer.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxOceanodeContainer.cpp; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeContainer.cpp; sourceTree = SOURCE_ROOT; };
+		60A061F8C47B5624AE6C450E /* defaultNodes.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = defaultNodes.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/defaultNodes.h; sourceTree = SOURCE_ROOT; };
+		63A44DC38599839305F1F4D3 /* ofxOceanodeNode.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxOceanodeNode.cpp; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNode.cpp; sourceTree = SOURCE_ROOT; };
+		656EE12F1A05CB4841731C77 /* ofxOceanodeConnection.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxOceanodeConnection.h; path = ../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnection.h; sourceTree = SOURCE_ROOT; };
 		698855D874920D7A53525854 /* ofxDatGuiGroups.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiGroups.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiGroups.h; sourceTree = SOURCE_ROOT; };
+		69F09B1450CB3FF08A87D2FF /* ofxOceanodeCanvas.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxOceanodeCanvas.cpp; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeCanvas.cpp; sourceTree = SOURCE_ROOT; };
+		73ED5407785A82B2D86C90D2 /* mapper.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = mapper.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/mapper.cpp; sourceTree = SOURCE_ROOT; };
+		76AFF92A62D8AF4E498DB5C3 /* ofxOceanodeConnectionGraphics.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxOceanodeConnectionGraphics.cpp; path = ../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnectionGraphics.cpp; sourceTree = SOURCE_ROOT; };
 		771877A40D55CB5D6C1969C4 /* ofxDatGuiButton.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiButton.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiButton.h; sourceTree = SOURCE_ROOT; };
+		7839463FADC4E27D1C66C5FB /* ofxOceanodeNode.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxOceanodeNode.h; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNode.h; sourceTree = SOURCE_ROOT; };
+		7C9B84BA3AF325F3D843633B /* ofxOceanodeConnection.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxOceanodeConnection.cpp; path = ../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnection.cpp; sourceTree = SOURCE_ROOT; };
 		86F00AF8B1543076FA133A82 /* ofxOceanode.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxOceanode.h; path = ../../../addons/ofxOceanode/src/ofxOceanode.h; sourceTree = SOURCE_ROOT; };
 		8E922B504254FF844AF5505A /* ofxDatGuiIntObject.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiIntObject.h; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiIntObject.h; sourceTree = SOURCE_ROOT; };
 		92007C97134ED347908EA736 /* ofxDatGuiMatrix.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiMatrix.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiMatrix.h; sourceTree = SOURCE_ROOT; };
+		9379E6001D7EB3C9ED6E3741 /* baseIndexer.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = baseIndexer.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/baseIndexer.cpp; sourceTree = SOURCE_ROOT; };
 		9E034FA57FE251AC33904E82 /* ofxDatGuiThemes.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiThemes.h; path = ../../../addons/ofxDatGui_PM/src/themes/ofxDatGuiThemes.h; sourceTree = SOURCE_ROOT; };
-		9F171585203F41F100EB3FFB /* ofxOceanodeConnectionGraphics.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ofxOceanodeConnectionGraphics.cpp; path = ../src/Connections/ofxOceanodeConnectionGraphics.cpp; sourceTree = "<group>"; };
-		9F171586203F41F100EB3FFB /* ofxOceanodeConnectionGraphics.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ofxOceanodeConnectionGraphics.h; path = ../src/Connections/ofxOceanodeConnectionGraphics.h; sourceTree = "<group>"; };
-		9F501E8420423406000D5D70 /* oscillatorBank.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = oscillatorBank.h; path = ../src/Nodes/Default_Nodes/oscillatorBank.h; sourceTree = "<group>"; };
-		9F501E8520423406000D5D70 /* baseIndexer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = baseIndexer.cpp; path = ../src/Nodes/Default_Nodes/baseIndexer.cpp; sourceTree = "<group>"; };
-		9F501E8620423406000D5D70 /* oscillatorBank.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = oscillatorBank.cpp; path = ../src/Nodes/Default_Nodes/oscillatorBank.cpp; sourceTree = "<group>"; };
-		9F501E8720423406000D5D70 /* baseIndexer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = baseIndexer.h; path = ../src/Nodes/Default_Nodes/baseIndexer.h; sourceTree = "<group>"; };
-		9F501E8A20432276000D5D70 /* oscillator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = oscillator.cpp; path = ../src/Nodes/Default_Nodes/oscillator.cpp; sourceTree = "<group>"; };
-		9F501E8B20432276000D5D70 /* oscillator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = oscillator.h; path = ../src/Nodes/Default_Nodes/oscillator.h; sourceTree = "<group>"; };
-		9F6E2CFB203DE80600037764 /* baseOscillator.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = baseOscillator.cpp; path = ../src/Nodes/Default_Nodes/baseOscillator.cpp; sourceTree = "<group>"; };
-		9F6E2CFD203DE80600037764 /* baseOscillator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = baseOscillator.h; path = ../src/Nodes/Default_Nodes/baseOscillator.h; sourceTree = "<group>"; };
-		9F6E2D02203DE8C900037764 /* defaultNodes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = defaultNodes.h; path = ../src/Nodes/Default_Nodes/defaultNodes.h; sourceTree = "<group>"; };
-		9F6E2D03203DEB3300037764 /* phasorClass.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = phasorClass.h; path = ../src/Nodes/Default_Nodes/phasorClass.h; sourceTree = "<group>"; };
-		9F6E2D04203DEB3300037764 /* phasorClass.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = phasorClass.cpp; path = ../src/Nodes/Default_Nodes/phasorClass.cpp; sourceTree = "<group>"; };
-		9F6E2D0D203E187000037764 /* mapper.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = mapper.cpp; path = ../src/Nodes/Default_Nodes/mapper.cpp; sourceTree = "<group>"; };
-		9F6E2D0E203E187000037764 /* mapper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = mapper.h; path = ../src/Nodes/Default_Nodes/mapper.h; sourceTree = "<group>"; };
-		9F6E2D1B203F181800037764 /* ofxOceanodeNodeGui.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ofxOceanodeNodeGui.cpp; path = ../src/Nodes/ofxOceanodeNodeGui.cpp; sourceTree = "<group>"; };
-		9F6E2D1C203F181800037764 /* ofxOceanodeNode.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ofxOceanodeNode.cpp; path = ../src/Nodes/ofxOceanodeNode.cpp; sourceTree = "<group>"; };
-		9F6E2D1D203F181800037764 /* ofxOceanodeNodeGui.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ofxOceanodeNodeGui.h; path = ../src/Nodes/ofxOceanodeNodeGui.h; sourceTree = "<group>"; };
-		9F6E2D1E203F181800037764 /* ofxOceanodeNodeModel.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ofxOceanodeNodeModel.cpp; path = ../src/Nodes/ofxOceanodeNodeModel.cpp; sourceTree = "<group>"; };
-		9F6E2D1F203F181900037764 /* ofxOceanodeNodeModel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ofxOceanodeNodeModel.h; path = ../src/Nodes/ofxOceanodeNodeModel.h; sourceTree = "<group>"; };
-		9F6E2D20203F181900037764 /* ofxOceanodeNode.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ofxOceanodeNode.h; path = ../src/Nodes/ofxOceanodeNode.h; sourceTree = "<group>"; };
-		9F6E2D24203F182700037764 /* ofxOceanodeContainer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ofxOceanodeContainer.cpp; path = ../src/Managers/ofxOceanodeContainer.cpp; sourceTree = "<group>"; };
-		9F6E2D25203F182700037764 /* ofxOceanodeContainer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ofxOceanodeContainer.h; path = ../src/Managers/ofxOceanodeContainer.h; sourceTree = "<group>"; };
-		9F6E2D26203F182700037764 /* ofxOceanodeNodeRegistry.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ofxOceanodeNodeRegistry.cpp; path = ../src/Managers/ofxOceanodeNodeRegistry.cpp; sourceTree = "<group>"; };
-		9F6E2D27203F182700037764 /* ofxOceanodeNodeRegistry.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ofxOceanodeNodeRegistry.h; path = ../src/Managers/ofxOceanodeNodeRegistry.h; sourceTree = "<group>"; };
-		9F6E2D28203F182700037764 /* ofxOceanodeCanvas.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ofxOceanodeCanvas.cpp; path = ../src/Managers/ofxOceanodeCanvas.cpp; sourceTree = "<group>"; };
-		9F6E2D29203F182700037764 /* ofxOceanodeCanvas.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ofxOceanodeCanvas.h; path = ../src/Managers/ofxOceanodeCanvas.h; sourceTree = "<group>"; };
-		9F6E2D2D203F188000037764 /* ofxOceanodeConnection.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ofxOceanodeConnection.cpp; path = ../src/Connections/ofxOceanodeConnection.cpp; sourceTree = "<group>"; };
-		9F6E2D2E203F188000037764 /* ofxOceanodeConnection.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ofxOceanodeConnection.h; path = ../src/Connections/ofxOceanodeConnection.h; sourceTree = "<group>"; };
-		9F92A4E61EFC34D800F45483 /* testNode.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testNode.cpp; sourceTree = "<group>"; };
-		9F92A4E71EFC34D800F45483 /* testNode.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = testNode.h; sourceTree = "<group>"; };
 		A13853A1B21F20177F44EE37 /* ofxDatGuiLabel.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiLabel.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiLabel.h; sourceTree = SOURCE_ROOT; };
 		A403D3D25D08FC7AF3B871D4 /* ofxSmartFont.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxSmartFont.cpp; path = ../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont/ofxSmartFont.cpp; sourceTree = SOURCE_ROOT; };
 		A534F08B38B5C43917E2A9E4 /* ofxDatGuiComponent.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiComponent.h; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiComponent.h; sourceTree = SOURCE_ROOT; };
 		A7B61DF7F41316374CEEE8CA /* ofxDatGuiTimeGraph.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiTimeGraph.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiTimeGraph.h; sourceTree = SOURCE_ROOT; };
 		B11DB438E2A6EBD360F8BA50 /* ofxDatGuiFRM.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiFRM.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiFRM.h; sourceTree = SOURCE_ROOT; };
+		B5F05744A3B0EEFB13955304 /* mapper.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = mapper.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/mapper.h; sourceTree = SOURCE_ROOT; };
 		B7B623A02730497FBCEA4FF2 /* ofxDatGuiControls.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGuiControls.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiControls.h; sourceTree = SOURCE_ROOT; };
+		BFA88189469A37E0B53C6773 /* ofxOceanodeCanvas.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxOceanodeCanvas.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeCanvas.h; sourceTree = SOURCE_ROOT; };
 		C2BBB5BA515C82003E0EEB5E /* ofxDatGui2dPad.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxDatGui2dPad.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGui2dPad.h; sourceTree = SOURCE_ROOT; };
+		C72E12C876E23B53255D0ED9 /* phasorClass.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = phasorClass.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/phasorClass.cpp; sourceTree = SOURCE_ROOT; };
+		C8E2C1691E114A38E51BE494 /* oscillatorBank.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = oscillatorBank.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/oscillatorBank.h; sourceTree = SOURCE_ROOT; };
+		CB2D33B0415C67FA099C0516 /* oscillator.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = oscillator.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/oscillator.h; sourceTree = SOURCE_ROOT; };
+		CEA66632C11B098EDB32207D /* oscillator.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = oscillator.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/oscillator.cpp; sourceTree = SOURCE_ROOT; };
+		D11A82FE9732DAF8F599F2AB /* ofxOceanodeNodeGui.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxOceanodeNodeGui.h; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeGui.h; sourceTree = SOURCE_ROOT; };
 		DD8F81F7AAB5BA396231DD4C /* ofxDatGui.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxDatGui.cpp; path = ../../../addons/ofxDatGui_PM/src/ofxDatGui.cpp; sourceTree = SOURCE_ROOT; };
 		E4328143138ABC890047C5CB /* openFrameworksLib.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = openFrameworksLib.xcodeproj; path = ../../../libs/openFrameworksCompiled/project/osx/openFrameworksLib.xcodeproj; sourceTree = SOURCE_ROOT; };
 		E4B69B5B0A3A1756003C02F2 /* example-basicDebug.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "example-basicDebug.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		E4B69E1D0A3A1BDC003C02F2 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = main.cpp; path = src/main.cpp; sourceTree = SOURCE_ROOT; };
-		E4B69E1E0A3A1BDC003C02F2 /* ofApp.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofApp.cpp; path = src/ofApp.cpp; sourceTree = SOURCE_ROOT; };
-		E4B69E1F0A3A1BDC003C02F2 /* ofApp.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = ofApp.h; path = src/ofApp.h; sourceTree = SOURCE_ROOT; };
-		E4B6FCAD0C3E899E008CF71C /* openFrameworks-Info.plist */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = text.plist.xml; path = "openFrameworks-Info.plist"; sourceTree = "<group>"; };
+		E4B69E1D0A3A1BDC003C02F2 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = main.cpp; path = src/main.cpp; sourceTree = SOURCE_ROOT; };
+		E4B69E1E0A3A1BDC003C02F2 /* ofApp.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofApp.cpp; path = src/ofApp.cpp; sourceTree = SOURCE_ROOT; };
+		E4B69E1F0A3A1BDC003C02F2 /* ofApp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ofApp.h; path = src/ofApp.h; sourceTree = SOURCE_ROOT; };
+		E4B6FCAD0C3E899E008CF71C /* openFrameworks-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "openFrameworks-Info.plist"; sourceTree = "<group>"; };
 		E4EB691F138AFCF100A09F29 /* CoreOF.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = CoreOF.xcconfig; path = ../../../libs/openFrameworksCompiled/project/osx/CoreOF.xcconfig; sourceTree = SOURCE_ROOT; };
 		E4EB6923138AFD0F00A09F29 /* Project.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Project.xcconfig; sourceTree = "<group>"; };
+		EDEAD1332CEFCB6171498ADE /* ofxOceanodeNodeModel.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxOceanodeNodeModel.h; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeModel.h; sourceTree = SOURCE_ROOT; };
 		EFC799641CF7089DDBF2094B /* ofxSmartFont.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxSmartFont.h; path = ../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont/ofxSmartFont.h; sourceTree = SOURCE_ROOT; };
+		F15C9896F6A32FCA280CD4B5 /* ofxOceanodeNodeRegistry.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxOceanodeNodeRegistry.cpp; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeNodeRegistry.cpp; sourceTree = SOURCE_ROOT; };
+		F24887AB1BADDDBB829D94E1 /* testNode.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = testNode.h; path = src/testNode.h; sourceTree = SOURCE_ROOT; };
+		F5AEF5B3ACCE46DC3D82353C /* baseIndexer.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = baseIndexer.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/baseIndexer.h; sourceTree = SOURCE_ROOT; };
+		FC8E873E04A65764668D30AB /* ofxOceanodeContainer.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxOceanodeContainer.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeContainer.h; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -166,6 +166,26 @@
 			name = libs;
 			sourceTree = "<group>";
 		};
+		4A0C0B233C38AF6788F3CE7D /* Default_Nodes */ = {
+			isa = PBXGroup;
+			children = (
+				9379E6001D7EB3C9ED6E3741 /* baseIndexer.cpp */,
+				F5AEF5B3ACCE46DC3D82353C /* baseIndexer.h */,
+				21F7AAAF4B49DDFC26309F29 /* baseOscillator.cpp */,
+				4549BA17D5F8FD6756221A74 /* baseOscillator.h */,
+				60A061F8C47B5624AE6C450E /* defaultNodes.h */,
+				73ED5407785A82B2D86C90D2 /* mapper.cpp */,
+				B5F05744A3B0EEFB13955304 /* mapper.h */,
+				CEA66632C11B098EDB32207D /* oscillator.cpp */,
+				CB2D33B0415C67FA099C0516 /* oscillator.h */,
+				01ACCF35B06321B6B9C3E940 /* oscillatorBank.cpp */,
+				C8E2C1691E114A38E51BE494 /* oscillatorBank.h */,
+				C72E12C876E23B53255D0ED9 /* phasorClass.cpp */,
+				0B132B67A85D7B39FD97C7CA /* phasorClass.h */,
+			);
+			name = Default_Nodes;
+			sourceTree = "<group>";
+		};
 		643EB880A9E14DEF1DCC1AB4 /* ofxOceanode */ = {
 			isa = PBXGroup;
 			children = (
@@ -181,81 +201,40 @@
 			name = local_addons;
 			sourceTree = "<group>";
 		};
-		9BF163AD5F824DF0AD945222 /* src */ = {
+		6B8A921B73CC6BADD2D0E3A3 /* Nodes */ = {
 			isa = PBXGroup;
 			children = (
-				9F6E2D1A203F180500037764 /* Connections */,
-				9F6E2D19203F17FE00037764 /* Managers */,
-				9F6E2CE6203DE16100037764 /* Nodes */,
-				86F00AF8B1543076FA133A82 /* ofxOceanode.h */,
-			);
-			name = src;
-			sourceTree = "<group>";
-		};
-		9F6E2CE6203DE16100037764 /* Nodes */ = {
-			isa = PBXGroup;
-			children = (
-				9F6E2D1C203F181800037764 /* ofxOceanodeNode.cpp */,
-				9F6E2D20203F181900037764 /* ofxOceanodeNode.h */,
-				9F6E2D1B203F181800037764 /* ofxOceanodeNodeGui.cpp */,
-				9F6E2D1D203F181800037764 /* ofxOceanodeNodeGui.h */,
-				9F6E2D1E203F181800037764 /* ofxOceanodeNodeModel.cpp */,
-				9F6E2D1F203F181900037764 /* ofxOceanodeNodeModel.h */,
-				9F6E2CE8203DE17B00037764 /* Default Nodes */,
-				9F6E2CE7203DE17300037764 /* Base Nodes */,
+				4A0C0B233C38AF6788F3CE7D /* Default_Nodes */,
+				63A44DC38599839305F1F4D3 /* ofxOceanodeNode.cpp */,
+				7839463FADC4E27D1C66C5FB /* ofxOceanodeNode.h */,
+				170083BFE7EEC5851D5DF9E6 /* ofxOceanodeNodeGui.cpp */,
+				D11A82FE9732DAF8F599F2AB /* ofxOceanodeNodeGui.h */,
+				18902594A5884CA5CA6D3D9D /* ofxOceanodeNodeModel.cpp */,
+				EDEAD1332CEFCB6171498ADE /* ofxOceanodeNodeModel.h */,
 			);
 			name = Nodes;
 			sourceTree = "<group>";
 		};
-		9F6E2CE7203DE17300037764 /* Base Nodes */ = {
+		9BBF10547B078BE7A527677B /* Connections */ = {
 			isa = PBXGroup;
 			children = (
-			);
-			name = "Base Nodes";
-			sourceTree = "<group>";
-		};
-		9F6E2CE8203DE17B00037764 /* Default Nodes */ = {
-			isa = PBXGroup;
-			children = (
-				9F501E8520423406000D5D70 /* baseIndexer.cpp */,
-				9F501E8720423406000D5D70 /* baseIndexer.h */,
-				9F501E8620423406000D5D70 /* oscillatorBank.cpp */,
-				9F501E8420423406000D5D70 /* oscillatorBank.h */,
-				9F6E2D0D203E187000037764 /* mapper.cpp */,
-				9F6E2D0E203E187000037764 /* mapper.h */,
-				9F6E2D04203DEB3300037764 /* phasorClass.cpp */,
-				9F6E2D03203DEB3300037764 /* phasorClass.h */,
-				9F6E2CFB203DE80600037764 /* baseOscillator.cpp */,
-				9F6E2CFD203DE80600037764 /* baseOscillator.h */,
-				9F6E2D02203DE8C900037764 /* defaultNodes.h */,
-				9F501E8A20432276000D5D70 /* oscillator.cpp */,
-				9F501E8B20432276000D5D70 /* oscillator.h */,
-			);
-			name = "Default Nodes";
-			sourceTree = "<group>";
-		};
-		9F6E2D19203F17FE00037764 /* Managers */ = {
-			isa = PBXGroup;
-			children = (
-				9F6E2D28203F182700037764 /* ofxOceanodeCanvas.cpp */,
-				9F6E2D29203F182700037764 /* ofxOceanodeCanvas.h */,
-				9F6E2D24203F182700037764 /* ofxOceanodeContainer.cpp */,
-				9F6E2D25203F182700037764 /* ofxOceanodeContainer.h */,
-				9F6E2D26203F182700037764 /* ofxOceanodeNodeRegistry.cpp */,
-				9F6E2D27203F182700037764 /* ofxOceanodeNodeRegistry.h */,
-			);
-			name = Managers;
-			sourceTree = "<group>";
-		};
-		9F6E2D1A203F180500037764 /* Connections */ = {
-			isa = PBXGroup;
-			children = (
-				9F6E2D2D203F188000037764 /* ofxOceanodeConnection.cpp */,
-				9F6E2D2E203F188000037764 /* ofxOceanodeConnection.h */,
-				9F171585203F41F100EB3FFB /* ofxOceanodeConnectionGraphics.cpp */,
-				9F171586203F41F100EB3FFB /* ofxOceanodeConnectionGraphics.h */,
+				7C9B84BA3AF325F3D843633B /* ofxOceanodeConnection.cpp */,
+				656EE12F1A05CB4841731C77 /* ofxOceanodeConnection.h */,
+				76AFF92A62D8AF4E498DB5C3 /* ofxOceanodeConnectionGraphics.cpp */,
+				542B8A9AF130D0C5A3086539 /* ofxOceanodeConnectionGraphics.h */,
 			);
 			name = Connections;
+			sourceTree = "<group>";
+		};
+		9BF163AD5F824DF0AD945222 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				9BBF10547B078BE7A527677B /* Connections */,
+				F345CC31328F66B89F4BB079 /* Managers */,
+				6B8A921B73CC6BADD2D0E3A3 /* Nodes */,
+				86F00AF8B1543076FA133A82 /* ofxOceanode.h */,
+			);
+			name = src;
 			sourceTree = "<group>";
 		};
 		BB4B014C10F69532006C3DED /* addons */ = {
@@ -312,8 +291,8 @@
 				E4B69E1D0A3A1BDC003C02F2 /* main.cpp */,
 				E4B69E1E0A3A1BDC003C02F2 /* ofApp.cpp */,
 				E4B69E1F0A3A1BDC003C02F2 /* ofApp.h */,
-				9F92A4E61EFC34D800F45483 /* testNode.cpp */,
-				9F92A4E71EFC34D800F45483 /* testNode.h */,
+				1C84792B71D7D5C105077DBF /* testNode.cpp */,
+				F24887AB1BADDDBB829D94E1 /* testNode.h */,
 			);
 			path = src;
 			sourceTree = SOURCE_ROOT;
@@ -345,6 +324,19 @@
 				8E922B504254FF844AF5505A /* ofxDatGuiIntObject.h */,
 			);
 			name = core;
+			sourceTree = "<group>";
+		};
+		F345CC31328F66B89F4BB079 /* Managers */ = {
+			isa = PBXGroup;
+			children = (
+				69F09B1450CB3FF08A87D2FF /* ofxOceanodeCanvas.cpp */,
+				BFA88189469A37E0B53C6773 /* ofxOceanodeCanvas.h */,
+				5E65A0C39A6FDCA2888DDAF8 /* ofxOceanodeContainer.cpp */,
+				FC8E873E04A65764668D30AB /* ofxOceanodeContainer.h */,
+				F15C9896F6A32FCA280CD4B5 /* ofxOceanodeNodeRegistry.cpp */,
+				4A76FE1EC14329064FDB60C7 /* ofxOceanodeNodeRegistry.h */,
+			);
+			name = Managers;
 			sourceTree = "<group>";
 		};
 		FE3CA1F8648010DBA2401722 /* src */ = {
@@ -461,26 +453,26 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9F6E2D2B203F182700037764 /* ofxOceanodeNodeRegistry.cpp in Sources */,
 				E4B69E200A3A1BDC003C02F2 /* main.cpp in Sources */,
-				9F171587203F41F100EB3FFB /* ofxOceanodeConnectionGraphics.cpp in Sources */,
-				9F6E2D23203F181900037764 /* ofxOceanodeNodeModel.cpp in Sources */,
-				9F6E2D22203F181900037764 /* ofxOceanodeNode.cpp in Sources */,
 				E4B69E210A3A1BDC003C02F2 /* ofApp.cpp in Sources */,
-				9F6E2D2F203F188000037764 /* ofxOceanodeConnection.cpp in Sources */,
-				9F501E8920423406000D5D70 /* oscillatorBank.cpp in Sources */,
+				A670837F6999677674A385D1 /* testNode.cpp in Sources */,
 				4A277DA746402C76CE307770 /* ofxDatGuiComponent.cpp in Sources */,
 				646DF4D56CE728133610A7F6 /* ofxSmartFont.cpp in Sources */,
 				BE7DAF3CB982C2BD0FE44648 /* ofxDatGui.cpp in Sources */,
-				9F501E8C20432276000D5D70 /* oscillator.cpp in Sources */,
-				9F6E2D2C203F182700037764 /* ofxOceanodeCanvas.cpp in Sources */,
-				9F6E2D00203DE80600037764 /* baseOscillator.cpp in Sources */,
-				9F6E2D0F203E187000037764 /* mapper.cpp in Sources */,
-				9F6E2D2A203F182700037764 /* ofxOceanodeContainer.cpp in Sources */,
-				9F501E8820423406000D5D70 /* baseIndexer.cpp in Sources */,
-				9F92A4E81EFC34D800F45483 /* testNode.cpp in Sources */,
-				9F6E2D05203DEB3300037764 /* phasorClass.cpp in Sources */,
-				9F6E2D21203F181900037764 /* ofxOceanodeNodeGui.cpp in Sources */,
+				C6A203560BFBDA04C5746210 /* ofxOceanodeConnection.cpp in Sources */,
+				C1EEF98E795AFB7BB33F94B1 /* ofxOceanodeConnectionGraphics.cpp in Sources */,
+				FE7602E65C7BA676951A37FB /* ofxOceanodeCanvas.cpp in Sources */,
+				5769B6A6D79188D3D351933E /* ofxOceanodeContainer.cpp in Sources */,
+				B7559FEE382DBA7FB094D5E7 /* ofxOceanodeNodeRegistry.cpp in Sources */,
+				EB5B77357A54C0E2DED32C3E /* baseIndexer.cpp in Sources */,
+				656E7EDB27697DE1D6419CD2 /* baseOscillator.cpp in Sources */,
+				F11E47B208E163D56E3E2701 /* mapper.cpp in Sources */,
+				201715816A8E0C2380C6CA9B /* oscillator.cpp in Sources */,
+				88B25E219BAC2DF5129EBA2C /* oscillatorBank.cpp in Sources */,
+				017F84499F348651B4CAD515 /* phasorClass.cpp in Sources */,
+				4C8024D8DD46223D43C514C0 /* ofxOceanodeNode.cpp in Sources */,
+				8EB5677652296BACF3A1C184 /* ofxOceanodeNodeGui.cpp in Sources */,
+				4F63EFF3BAACF2B19051E336 /* ofxOceanodeNodeModel.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -526,6 +518,11 @@
 					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
 					../../../addons/ofxDatGui_PM/src/themes,
 					../../../addons/ofxOceanode/src,
+					../../../addons/ofxOceanode/src/Connections,
+					../../../addons/ofxOceanode/src/Managers,
+					../../../addons/ofxOceanode/src/Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.9;
 				OTHER_CPLUSPLUSFLAGS = (
@@ -556,6 +553,11 @@
 					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
 					../../../addons/ofxDatGui_PM/src/themes,
 					../../../addons/ofxOceanode/src,
+					../../../addons/ofxOceanode/src/Connections,
+					../../../addons/ofxOceanode/src/Managers,
+					../../../addons/ofxOceanode/src/Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
 				);
 				ICON = "$(ICON_NAME_RELEASE)";
 				ICON_FILE = "$(ICON_FILE_PATH)$(ICON)";
@@ -597,6 +599,11 @@
 					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
 					../../../addons/ofxDatGui_PM/src/themes,
 					../../../addons/ofxOceanode/src,
+					../../../addons/ofxOceanode/src/Connections,
+					../../../addons/ofxOceanode/src/Managers,
+					../../../addons/ofxOceanode/src/Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.9;
 				ONLY_ACTIVE_ARCH = YES;
@@ -638,6 +645,11 @@
 					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
 					../../../addons/ofxDatGui_PM/src/themes,
 					../../../addons/ofxOceanode/src,
+					../../../addons/ofxOceanode/src/Connections,
+					../../../addons/ofxOceanode/src/Managers,
+					../../../addons/ofxOceanode/src/Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.9;
 				OTHER_CPLUSPLUSFLAGS = (
@@ -668,6 +680,11 @@
 					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
 					../../../addons/ofxDatGui_PM/src/themes,
 					../../../addons/ofxOceanode/src,
+					../../../addons/ofxOceanode/src/Connections,
+					../../../addons/ofxOceanode/src/Managers,
+					../../../addons/ofxOceanode/src/Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
 				);
 				ICON = "$(ICON_NAME_DEBUG)";
 				ICON_FILE = "$(ICON_FILE_PATH)$(ICON)";
@@ -698,6 +715,11 @@
 					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
 					../../../addons/ofxDatGui_PM/src/themes,
 					../../../addons/ofxOceanode/src,
+					../../../addons/ofxOceanode/src/Connections,
+					../../../addons/ofxOceanode/src/Managers,
+					../../../addons/ofxOceanode/src/Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
 				);
 				ICON = "$(ICON_NAME_RELEASE)";
 				ICON_FILE = "$(ICON_FILE_PATH)$(ICON)";
