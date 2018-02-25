@@ -38,6 +38,8 @@ public:
     
     virtual ofxOceanodeAbstractConnection* createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink, glm::vec2 pos){return nullptr;};
     
+    ofEvent<string> parameterChangedMinMax;
+    
 protected:
     ofParameterGroup* parameters;
 //    std::map<ofAbstractParameter&, parameterInfo> parametersInfo; //information about interaction of parameter

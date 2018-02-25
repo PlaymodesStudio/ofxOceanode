@@ -19,7 +19,7 @@ public:
     ~ofxOceanodeNodeGui(){};
     
     void createGuiFromParameters();
-    bool updateGuiFromParameters();
+    void updateGuiForParameter(string &parameterName);
     
     void setPosition(glm::vec2 position);
     

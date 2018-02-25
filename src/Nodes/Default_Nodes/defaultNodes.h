@@ -8,7 +8,7 @@
 #ifndef defaultNodes_h
 #define defaultNodes_h
 
-#include "baseOscillator.h"
+#include "oscillator.h"
 #include "phasorClass.h"
 #include "mapper.h"
 #include "oscillatorBank.h"

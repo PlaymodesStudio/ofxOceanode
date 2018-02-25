@@ -20,7 +20,7 @@ void ofApp::update(){
 
 //--------------------------------------------------------------
 void ofApp::draw(){
-    
+    ofDrawBitmapString(ofToString(ofGetFrameRate()), glm::vec2(0,10));
 }
 
 //--------------------------------------------------------------

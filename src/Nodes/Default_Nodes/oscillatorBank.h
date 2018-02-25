@@ -13,18 +13,18 @@
 #include "baseOscillator.h"
 
 //This class will contain a set of oscillators and has to inherit the indexer class (or bank class)
-class oscillatorBank : public ofxOceanodeNodeModel, public baseIndexer{
+class oscillatorBank : public baseIndexer{
 public:
     oscillatorBank();
     ~oscillatorBank(){
-        for(auto i : oscillators) delete i;
     };
 
     
     std::unique_ptr<ofxOceanodeNodeModel> clone() const override {return make_unique<oscillatorBank>();};
     
 private:
-    vector<float>   computeBank(float phasor);
+    void computeBank(float phasor);
+    void indexCountChanged(int &newIndexCount);
 
     virtual void newIndexs();
     void newPhasorIn(float &f);
@@ -58,8 +58,8 @@ private:
     ofParameter<float>    skew_Param;
     ofParameter<vector<float>>      oscillatorOut;
     
-    vector<baseOscillator*> oscillators;
-    
+    vector<baseOscillator> oscillators;
+    vector<float> result;
 };
 
 #endif /* oscillatorBank_h */

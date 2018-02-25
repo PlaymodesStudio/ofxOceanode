@@ -10,25 +10,16 @@
 #define baseIndexer_h
 
 #include "ofMain.h"
+#include "ofxOceanodeNodeModel.h"
 
-class baseIndexer{
+class baseIndexer : public ofxOceanodeNodeModel{
 public:
-    baseIndexer(int numIndexs);
+    baseIndexer(int numIndexs, string name);
     ~baseIndexer(){
         if(reindexWindow != nullptr){
             reindexWindow->setWindowShouldClose();
         }
     };
-    
-    ofParameter<float>  numWaves_Param; //Desphase Quantity
-    ofParameter<float>   indexInvert_Param;
-    ofParameter<int>    symmetry_Param;
-    ofParameter<float>  indexRand_Param;
-    ofParameter<float>    indexOffset_Param;
-    ofParameter<int>    indexQuant_Param;
-    ofParameter<float>  combination_Param;
-    ofParameter<int>    modulo_Param;
-    ofParameter<bool>   manualReindex_Param;
     
     void draw(ofEventArgs &e);
     
@@ -47,12 +38,24 @@ public:
     };
     vector<float> getIndexs(){return indexs;};;
     
+    virtual void indexCountChanged(int &newIndexCount);
     
 protected:
     vector<float>       indexs;
     virtual void        newIndexs(){
         newIndexsFlag = true;
     };
+    
+    ofParameter<int>  indexCount;
+    ofParameter<float>  numWaves_Param; //Desphase Quantity
+    ofParameter<float>   indexInvert_Param;
+    ofParameter<int>    symmetry_Param;
+    ofParameter<float>  indexRand_Param;
+    ofParameter<float>    indexOffset_Param;
+    ofParameter<int>    indexQuant_Param;
+    ofParameter<float>  combination_Param;
+    ofParameter<int>    modulo_Param;
+    ofParameter<bool>   manualReindex_Param;
     
     ofParameter<vector<vector<bool>>> reindexGrid;
     bool    isReindexIdentity;
@@ -71,7 +74,9 @@ private:
     void indexRandChanged(float &val);
     
     
-    int                 indexCount; //The max number you will get from index
+
+    
+//    int                 indexCount; //The max number you will get from index
     
     vector<int>         indexRand;
     vector<vector<bool>>    identityReindexMatrix;

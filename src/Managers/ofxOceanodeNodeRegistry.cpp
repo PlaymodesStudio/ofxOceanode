@@ -10,7 +10,7 @@
 #include "defaultNodes.h"
 
 ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
-    this->registerModel<baseOscillator>();
+    this->registerModel<oscillator>();
     this->registerModel<phasorClass>();
     this->registerModel<mapper>();
     this->registerModel<oscillatorBank>();

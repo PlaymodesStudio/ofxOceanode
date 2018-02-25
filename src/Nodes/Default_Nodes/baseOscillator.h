@@ -9,7 +9,7 @@
 #ifndef baseOscillator_h
 #define baseOscillator_h
 
-#include "ofxOceanodeNodeModel.h"
+
 
 enum oscTypes{
     sinOsc = 1,
@@ -22,38 +22,31 @@ enum oscTypes{
     rand2Osc = 8
 };
 
-class baseOscillator : public ofxOceanodeNodeModel{
+class baseOscillator {
 public:
     baseOscillator();
-    ~baseOscillator(){
-        delete parameters;
-    };
+    ~baseOscillator(){};
     
     void setIndexNormalized(float index){indexNormalized = index;};
     
-    ofParameter<float>  phasorIn;
-    ofParameter<float>  pow_Param; //Pow of the funcion, working on sin, cos....
-    ofParameter<float>  pulseWidth_Param;
-    ofParameter<float>  holdTime_Param; //The duration of the hold in percentage (0.5) --> 50% of the cycle is the phase in initPhase
-    ofParameter<float>  phaseOffset_Param;
-    ofParameter<int>    quant_Param;
-    ofParameter<float>  scale_Param;
-    ofParameter<float>  offset_Param;
-    ofParameter<float>  randomAdd_Param;
-    ofParameter<float>  biPow_Param;
-    ofParameter<int>    waveSelect_Param;
-    ofParameter<float>  amplitude_Param;
-    ofParameter<float>  invert_Param;
-    ofParameter<float>  skew_Param;
-    ofParameter<float>  output;
+    float  phaseOffset_Param;
+    float  pow_Param;
+    float  pulseWidth_Param;
+    int    quant_Param;
+    float  scale_Param;
+    float  offset_Param;
+    float  randomAdd_Param;
+    float  biPow_Param;
+    int    waveSelect_Param;
+    float  amplitude_Param;
+    float  invert_Param;
+    float  skew_Param;
     
     float computeFunc(float phasor);
 
-    std::unique_ptr<ofxOceanodeNodeModel> clone() const override {return make_unique<baseOscillator>();};
 private:
-    void funcListener(float &phasor);
-    void computeMultiplyMod(float* value);
-
+    void computeMultiplyMod(float& value);
+    
     float oldPhasor;
     float oldValuePreMod;
     float indexNormalized;

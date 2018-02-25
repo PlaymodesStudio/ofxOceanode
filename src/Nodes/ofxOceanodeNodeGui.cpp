@@ -76,7 +76,7 @@ void ofxOceanodeNodeGui::createGuiFromParameters(){
             gui->addDropdown(parameters->getGroup(i).getName(), ofSplitString(parameters->getGroup(i).getString(0), "-|-"))->select(parameters->getGroup(i).getInt(1));
         }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
             gui->addMultiSlider(parameters->get(i).cast<vector<float>>());
-        }else{
+        }else {
             gui->addLabel(absParam.getName());
         }
     }
@@ -92,6 +92,26 @@ void ofxOceanodeNodeGui::createGuiFromParameters(){
     
     //OF PARAMETERS LISTERENRS
     ofAddListener(parameters->parameterChangedE(), this, &ofxOceanodeNodeGui::parameterListener);
+}
+
+void ofxOceanodeNodeGui::updateGuiForParameter(string &parameterName){
+    ofAbstractParameter &absParam = getParameters()->get(parameterName);
+    if(absParam.type() == typeid(ofParameter<float>).name()){
+        auto slider = gui->getSlider(absParam.getName());
+        slider->setMin(absParam.cast<float>().getMin());
+        slider->setMax(absParam.cast<float>().getMax());
+    }else if(absParam.type() == typeid(ofParameter<int>).name()){
+        auto slider = gui->getSlider(absParam.getName());
+        slider->setMin(absParam.cast<int>().getMin());
+        slider->setMax(absParam.cast<int>().getMax());
+//    }else if(absParam.type() == typeid(ofParameterGroup).name()){
+//        gui->addLabel(parameters->getGroup(i).getName());
+//        gui->addDropdown(parameters->getGroup(i).getName(), ofSplitString(parameters->getGroup(i).getString(0), "-|-"))->select(parameters->getGroup(i).getInt(1));
+    }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
+        auto slider = gui->getMultiSlider(absParam.getName());
+        slider->setMin(absParam.cast<vector<float>>().getMin()[0]);
+        slider->setMax(absParam.cast<vector<float>>().getMax()[0]);
+    }
 }
 
 ofParameterGroup* ofxOceanodeNodeGui::getParameters(){

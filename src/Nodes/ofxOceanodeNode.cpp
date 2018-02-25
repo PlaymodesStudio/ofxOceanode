@@ -16,6 +16,7 @@ ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel)
 
 void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     nodeGui = std::move(gui);
+    ofAddListener(nodeModel->parameterChangedMinMax, nodeGui.get(), &ofxOceanodeNodeGui::updateGuiForParameter);
 }
 
 void ofxOceanodeNode::makeConnection(ofxOceanodeContainer& container, int parameterIndex, glm::vec2 pos){

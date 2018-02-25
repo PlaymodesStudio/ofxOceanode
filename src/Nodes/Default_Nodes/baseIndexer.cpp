@@ -14,8 +14,8 @@ void window_no_close_indexer(GLFWwindow* window){
     //glfwSetWindowShouldClose(window, GL_FALSE);
 };
 
-baseIndexer::baseIndexer(int numIndexs){
-    indexCount = numIndexs;
+baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name){
+    indexCount.set("Size", numIndexs, 1, 50000);
     indexs.resize(indexCount, 0);
     indexRand.resize(indexCount , 0);
     for(int i = 0; i < indexRand.size(); i++)
@@ -40,8 +40,10 @@ baseIndexer::baseIndexer(int numIndexs){
         manualReindex_Param.set("Manual Reindex", false);
         reindexGrid.set("ReindexGrid", identityReindexMatrix);
     }
-
     
+    recomputeIndexs();
+
+    indexCount.addListener(this, &baseIndexer::indexCountChanged);
     numWaves_Param.addListener(this, &baseIndexer::parameterFloatListener);
     indexInvert_Param.addListener(this, &baseIndexer::parameterFloatListener);
     symmetry_Param.addListener(this, &baseIndexer::parameterIntListener);
@@ -59,12 +61,55 @@ baseIndexer::baseIndexer(int numIndexs){
 
     reindexWindowRect.setPosition(-1, -1);
     
-    recomputeIndexs();
-    
     identityStore.push_front(identityReindexMatrix);
 }
 
+void baseIndexer::indexCountChanged(int &indexCount){
+    indexs.resize(indexCount, 0);
+    indexRand.resize(indexCount , 0);
+    for(int i = 0; i < indexRand.size(); i++)
+        indexRand[i] = i-((float)indexRand.size()/2.f);
+    
+//    identityReindexMatrix.resize(indexCount, vector<bool>(indexCount, false));
+//    for(int i = 0; i < indexCount; i++){
+//        identityReindexMatrix[i][i] = true;
+//    }
+//    isReindexIdentity = true;
+    
+    numWaves_Param.setMax(indexCount);
+    string name1 = numWaves_Param.getName();
+    ofNotifyEvent(parameterChangedMinMax, name1);
+    
+//    symmetry_Param.set("Symmetry", 0, 0, 10);
+    indexOffset_Param.set("Index Offset", 0, -indexCount/2, indexCount/2);
+    indexOffset_Param.setMin(-indexCount/2);
+    indexOffset_Param.setMax(indexCount/2);
+    string name2 = indexOffset_Param.getName();
+    ofNotifyEvent(parameterChangedMinMax, name2);
+    
+    float indexQuantNormalized = (float)indexQuant_Param / (float)indexQuant_Param.getMax();
+    indexQuant_Param.setMax(indexCount);
+    string name3 = indexQuant_Param.getName();
+    ofNotifyEvent(parameterChangedMinMax, name3);
+    indexQuant_Param = indexQuantNormalized * indexCount;
+    
+    
+    float indexModuloNormalized = (float)modulo_Param / (float)modulo_Param.getMax();
+    modulo_Param.setMax(indexCount);
+    string name4 = modulo_Param.getName();
+    ofNotifyEvent(parameterChangedMinMax, name4);
+    modulo_Param.set(indexModuloNormalized * indexCount);
+
+//    if(indexCount < 100){
+//        manualReindex_Param.set("Manual Reindex", false);
+//        reindexGrid.set("ReindexGrid", identityReindexMatrix);
+//    }
+    
+    recomputeIndexs();
+}
+
 void baseIndexer::putParametersInParametersGroup(ofParameterGroup* parameters){
+    parameters->add(indexCount);
     parameters->add(numWaves_Param);
     parameters->add(indexInvert_Param);
     parameters->add(symmetry_Param);
