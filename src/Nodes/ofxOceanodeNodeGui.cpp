@@ -74,6 +74,8 @@ void ofxOceanodeNodeGui::createGuiFromParameters(){
         }else if(absParam.type() == typeid(ofParameterGroup).name()){
             gui->addLabel(parameters->getGroup(i).getName());
             gui->addDropdown(parameters->getGroup(i).getName(), ofSplitString(parameters->getGroup(i).getString(0), "-|-"))->select(parameters->getGroup(i).getInt(1));
+        }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
+            gui->addMultiSlider(parameters->get(i).cast<vector<float>>());
         }else{
             gui->addLabel(absParam.getName());
         }

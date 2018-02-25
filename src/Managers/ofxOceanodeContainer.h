@@ -35,7 +35,6 @@ public:
     
     template<typename Tsource, typename Tsink>
     ofxOceanodeAbstractConnection* connectConnection(ofParameter<Tsource>& source, ofParameter<Tsink>& sink, glm::vec2 pos){
-        ofLog()<<"cre<te Connectio";
         ofxOceanodeNode& n = temporalConnection->getNode();
         glm::vec2 posSource = temporalConnection->getSourcePosition();
         delete temporalConnection;

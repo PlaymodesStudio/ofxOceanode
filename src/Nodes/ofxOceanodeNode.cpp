@@ -31,6 +31,9 @@ void ofxOceanodeNode::makeConnection(ofxOceanodeContainer& container, int parame
             else if(source.type() == typeid(ofParameter<float>).name()){
                 connection = container.connectConnection(source.cast<float>(), sink.cast<float>(), pos);
             }
+            else if(source.type() == typeid(ofParameter<vector<float>>).name()){
+                connection = container.connectConnection(source.cast<vector<float>>(), sink.cast<vector<float>>(), pos);
+            }
             else{
                 connection = nodeModel->createConnectionFromCustomType(container, source, sink, pos);
             }

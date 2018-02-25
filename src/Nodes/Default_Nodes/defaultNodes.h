@@ -11,5 +11,6 @@
 #include "baseOscillator.h"
 #include "phasorClass.h"
 #include "mapper.h"
+#include "oscillatorBank.h"
 
 #endif /* defaultNodes_h */
