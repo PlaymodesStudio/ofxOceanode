@@ -32,7 +32,7 @@ public:
 private:
     ofTimer timer;
     
-    void threadedFunction();
+    void threadedFunction() override;
     void initPhaseChanged(float &f);
     
     double  phasor;

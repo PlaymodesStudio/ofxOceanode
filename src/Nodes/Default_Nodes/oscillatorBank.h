@@ -24,9 +24,9 @@ public:
     
 private:
     void computeBank(float phasor);
-    void indexCountChanged(int &newIndexCount);
+    void indexCountChanged(int &newIndexCount) override;
 
-    virtual void newIndexs();
+    virtual void newIndexs() override;
     void newPhasorIn(float &f);
     void newPowParam(float &f);
     void newpulseWidthParam(float &f);
