@@ -47,9 +47,8 @@ void phasorClass::update(ofEventArgs &e){
 float phasorClass::getPhasor(){
     if(!offlineMode_Param){
         double momentaryPhasor;
-        while(phasorToSend.tryReceive(momentaryPhasor)){
-            phasorMonitor = ofMap(momentaryPhasor, 0, 1, minVal_Param, maxVal_Param);
-        }
+        while(phasorToSend.tryReceive(momentaryPhasor));
+        phasorMonitor = ofMap(momentaryPhasor, 0, 1, minVal_Param, maxVal_Param);
     }
 //    return (float)ofMap(phasorMod, 0, 1, minVal_Param, maxVal_Param);
 }
