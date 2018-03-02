@@ -24,7 +24,6 @@ public:
     
     void recalculate(float& f);
 
-    std::unique_ptr<ofxOceanodeNodeModel> clone() const override {return make_unique<mapper>();};
 private:
     
     ofParameter<float>  Input;

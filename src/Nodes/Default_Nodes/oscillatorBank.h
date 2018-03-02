@@ -19,9 +19,6 @@ public:
     ~oscillatorBank(){
     };
 
-    
-    std::unique_ptr<ofxOceanodeNodeModel> clone() const override {return make_unique<oscillatorBank>();};
-    
 private:
     void computeBank(float phasor);
     void indexCountChanged(int &newIndexCount) override;

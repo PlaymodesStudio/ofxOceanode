@@ -27,8 +27,7 @@ public:
     void loopChanged(bool &val);
     
     void nextFrame();
-    
-    std::unique_ptr<ofxOceanodeNodeModel> clone() const override {return make_unique<phasorClass>();};
+
 private:
     ofTimer timer;
     

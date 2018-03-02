@@ -14,22 +14,25 @@
 class ofxOceanodeNodeRegistry{
 public:
     using registryItemPtr     = std::unique_ptr<ofxOceanodeNodeModel>;
-    using registeredModelsMap = std::unordered_map<string, registryItemPtr>;
+//    using registeredModelsMap = std::unordered_map<string, registryItemPtr>;
+    using registryItemCloner          = std::function<registryItemPtr()>;
+    using registeredModelsMap         = std::unordered_map<string, registryItemCloner>;
     
     ofxOceanodeNodeRegistry();
     ~ofxOceanodeNodeRegistry(){};
     
     
     template<typename ModelType>
-    void registerModel(std::unique_ptr<ModelType> uniqueModel = std::make_unique<ModelType>()){
+//    void registerModel(std::unique_ptr<ModelType> uniqueModel = std::make_unique<ModelType>()){
+    void registerModel(registryItemCloner cloner = [](){return std::make_unique<ModelType>();}){
         static_assert(std::is_base_of<ofxOceanodeNodeModel, ModelType>::value,
                       "Must pass a subclass of ofxOceanodeNodeModel to registerType");
         
-        const string name = uniqueModel->nodeName();
+        const string name = cloner()->nodeName();
         
-        if (registeredModels.count(name) == 0)
+        if (registeredModelCreators.count(name) == 0)
         {
-            registeredModels[name] = std::move(uniqueModel);
+            registeredModelCreators[name] = std::move(cloner);
         }
     }
     
@@ -37,7 +40,7 @@ public:
     
     registeredModelsMap const & getRegisteredModels();
 private:
-    registeredModelsMap registeredModels;
+    registeredModelsMap registeredModelCreators;
     
 };
 

@@ -24,7 +24,7 @@ struct parameterInfo{
 class ofxOceanodeNodeModel {
 public:
     ofxOceanodeNodeModel(string _name);
-    ~ofxOceanodeNodeModel(){};
+    virtual ~ofxOceanodeNodeModel(){};
     
     //get parameterGroup
     ofParameterGroup* getParameterGroup(){return parameters;};
@@ -32,9 +32,6 @@ public:
     //getters
     bool getIsDynamic(){return isDynamic;};
     string nodeName(){return nameIdentifier;};
-    
-    /// Function creates instances of a model stored in ofxOceanodeNodeRegistry
-    virtual std::unique_ptr<ofxOceanodeNodeModel> clone() const = 0;
     
     virtual ofxOceanodeAbstractConnection* createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink){return nullptr;};
     

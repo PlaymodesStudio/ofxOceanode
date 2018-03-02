@@ -24,9 +24,7 @@ class testNode : public ofxOceanodeNodeModel {
 public:
     testNode();
     ~testNode(){};
-    
-    std::unique_ptr<ofxOceanodeNodeModel> clone() const override {return make_unique<testNode>();};
-    
+        
     ofxOceanodeAbstractConnection* createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink) override;
 
 private:

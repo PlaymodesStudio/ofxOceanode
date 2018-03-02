@@ -17,11 +17,11 @@ ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
 }
 
 std::unique_ptr<ofxOceanodeNodeModel> ofxOceanodeNodeRegistry::create(const string typeName){
-    auto it = registeredModels.find(typeName);
+    auto it = registeredModelCreators.find(typeName);
     
-    if (it != registeredModels.end())
+    if (it != registeredModelCreators.end())
     {
-        return it->second->clone();
+        return it->second();
     }
     
     return nullptr;
@@ -29,5 +29,5 @@ std::unique_ptr<ofxOceanodeNodeModel> ofxOceanodeNodeRegistry::create(const stri
 
 
 ofxOceanodeNodeRegistry::registeredModelsMap const &ofxOceanodeNodeRegistry::getRegisteredModels(){
-    return registeredModels;
+    return registeredModelCreators;
 }

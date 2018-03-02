@@ -32,12 +32,16 @@ phasorClass::phasorClass() : ofxOceanodeNodeModel("Phasor")
     
     ofAddListener(ofEvents().update, this, &phasorClass::update);
     timer.setPeriodicEvent(1000000);
-
+    ofLog()<<"Object created";
     startThread();
 }
 
 phasorClass::~phasorClass(){
+    ofLog()<<"Destroy";
+    ofRemoveListener(ofEvents().update, this, &phasorClass::update);
     stopThread();
+    phasorToSend.close();
+    waitForThread(true);
 }
 
 void phasorClass::update(ofEventArgs &e){
@@ -60,6 +64,7 @@ void phasorClass::resetPhasor(){
 
 void phasorClass::threadedFunction(){
     while(isThreadRunning()){
+        ofLog()<<"Thread";
         timer.waitNext();
         if(loop_Param && !offlineMode_Param){
             //tue phasor that goes from 0 to 1 at desired frequency

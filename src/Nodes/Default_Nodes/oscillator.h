@@ -15,9 +15,7 @@ class oscillator : public ofxOceanodeNodeModel{
 public:
     oscillator();
     ~oscillator(){};
-    
-    std::unique_ptr<ofxOceanodeNodeModel> clone() const override {return make_unique<oscillator>();};
-    
+        
 private:
     void phasorInListener(float &phasor);
     baseOscillator baseOsc;
