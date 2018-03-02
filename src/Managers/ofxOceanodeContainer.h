@@ -25,9 +25,7 @@ public:
     
 //    void createConnection(ofAbstractParameter& p);
     
-    void createConnection(ofAbstractParameter& p, ofxOceanodeNode& n, glm::vec2 pos){
-        temporalConnection = new ofxOceanodeTemporalConnection(p, n, pos);
-    }
+    ofxOceanodeAbstractConnection* createConnection(ofAbstractParameter& p, ofxOceanodeNode& n, glm::vec2 pos);
     
     ofAbstractParameter& getTemporalConnectionParameter(){return temporalConnection->getParameter();};
     
@@ -35,23 +33,23 @@ public:
     
     template<typename Tsource, typename Tsink>
     ofxOceanodeAbstractConnection* connectConnection(ofParameter<Tsource>& source, ofParameter<Tsink>& sink, glm::vec2 pos){
-        ofxOceanodeNode& n = temporalConnection->getNode();
         glm::vec2 posSource = temporalConnection->getSourcePosition();
-        delete temporalConnection;
-        temporalConnection = nullptr;
         connections.push_back(make_shared<ofxOceanodeConnection<Tsource, Tsink>>(source, sink, posSource, pos));
-        n.addOutputConnection(connections.back().get());
+        temporalConnectionNode->addOutputConnection(connections.back().get());
         return connections.back().get();
     }
     
     ofxOceanodeNodeRegistry & getRegistry(){return *registry;};
     
 private:
+    void temporalConnectionDestructor();
+    
     //NodeModel;
     vector<unique_ptr<ofxOceanodeNode>> dynamicNodes;
     vector<unique_ptr<ofxOceanodeNode>> persistentNodes;
 
     string temporalConnectionTypeName;
+    ofxOceanodeNode* temporalConnectionNode;
     ofxOceanodeTemporalConnection*   temporalConnection;
     vector<shared_ptr<ofxOceanodeAbstractConnection>> connections;
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;

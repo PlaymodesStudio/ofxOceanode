@@ -253,7 +253,7 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
             glm::vec2 point;
             point.x = e.target->getX() + e.target->getWidth();
             point.y = e.target->getY() + e.target->getHeight()/2;
-            container.createConnection(getParameters()->get(e.target->getName()), node, point);
+            node.createConnection(container, getParameters()->get(e.target->getName()), point);
     //                        ofAddListener(connections.back()->destroyEvent, this, &ofxOceanodeNode::destroyedConnection);
     //                    }
     //                }

@@ -19,7 +19,11 @@ void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     ofAddListener(nodeModel->parameterChangedMinMax, nodeGui.get(), &ofxOceanodeNodeGui::updateGuiForParameter);
 }
 
-void ofxOceanodeNode::makeConnection(ofxOceanodeContainer& container, int parameterIndex, glm::vec2 pos){
+bool ofxOceanodeNode::createConnection(ofxOceanodeContainer& container, ofAbstractParameter& parameter, glm::vec2 pos){
+    container.createConnection(parameter, *this, pos);
+}
+
+bool ofxOceanodeNode::makeConnection(ofxOceanodeContainer& container, int parameterIndex, glm::vec2 pos){
     //Big function
     if(container.isOpenConnection()){
         ofxOceanodeAbstractConnection* connection = nullptr;

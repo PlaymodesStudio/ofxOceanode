@@ -16,6 +16,13 @@ ofxOceanodeContainer::~ofxOceanodeContainer(){
     
 }
 
+ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstractParameter& p, ofxOceanodeNode& n, glm::vec2 pos){
+    temporalConnectionNode = &n;
+    temporalConnection = new ofxOceanodeTemporalConnection(p, pos);
+    ofAddListener(temporalConnection->destroyConnection, this, &ofxOceanodeContainer::temporalConnectionDestructor);
+    return temporalConnection;
+}
+
 ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel){
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
     auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);
@@ -25,4 +32,9 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     dynamicNodes.push_back(std::move(node));
     
     return *nodePtr;
+}
+
+void ofxOceanodeContainer::temporalConnectionDestructor(){
+    delete temporalConnection;
+    temporalConnection = nullptr;
 }

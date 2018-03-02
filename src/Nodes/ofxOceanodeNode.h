@@ -23,7 +23,8 @@ public:
     
     ofxOceanodeNodeGui& getNodeGui(){return *nodeGui.get();};
     
-    void makeConnection(ofxOceanodeContainer& container, int parameterIndex, glm::vec2 pos);
+    bool createConnection(ofxOceanodeContainer& container, ofAbstractParameter& parameter, glm::vec2 pos);
+    bool makeConnection(ofxOceanodeContainer& container, int parameterIndex, glm::vec2 pos);
     
     void addOutputConnection(ofxOceanodeAbstractConnection* c){
         outConnections.push_back(c);
