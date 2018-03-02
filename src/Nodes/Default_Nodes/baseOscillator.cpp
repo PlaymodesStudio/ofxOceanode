@@ -139,15 +139,14 @@ void baseOscillator::computeMultiplyMod(float &value){
         value = (pow_Param < 0) ? pow(value, 1/(float)(-pow_Param+1)) : pow(value, pow_Param+1);
     
     //bipow
-    value = ofMap(value, 0.0, 1.0, -1.0, 1.0);
     if(biPow_Param != 0){
+        value = ofMap(value, 0.0, 1.0, -1.0, 1.0);
         if(value < 0)
             value = -((biPow_Param < 0) ? pow(abs(value), 1/(float)(-biPow_Param+1)) : pow(abs(value), biPow_Param+1));
         else
             value = (biPow_Param < 0) ? pow(value, 1/(float)(-biPow_Param+1)) : pow(value, biPow_Param+1);
+        value = ofMap(value, -1.0, 1.0, 0.0, 1.0);
     }
-    value = ofMap(value, -1.0, 1.0, 0.0, 1.0);
-    
     
     value = ofClamp(value, 0.0, 1.0);
     

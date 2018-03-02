@@ -15,7 +15,7 @@ void window_no_close_indexer(GLFWwindow* window){
 };
 
 baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name){
-    indexCount.set("Size", numIndexs, 1, 50000);
+    indexCount.set("Size", numIndexs, 1, 100000);
     indexs.resize(indexCount, 0);
     indexRand.resize(indexCount , 0);
     for(int i = 0; i < indexRand.size(); i++)
