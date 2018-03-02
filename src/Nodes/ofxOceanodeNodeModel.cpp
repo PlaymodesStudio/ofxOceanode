@@ -11,3 +11,8 @@
 ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name){
     parameters = new ofParameterGroup(_name);
 }
+
+void ofxOceanodeNodeModel::setNumIdentifier(uint num){
+    numIdentifier = num;
+    parameters->setName(nameIdentifier + " " + ofToString(num));
+}

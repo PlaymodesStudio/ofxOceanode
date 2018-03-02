@@ -16,6 +16,8 @@
 
 class ofxOceanodeContainer {
 public:
+    using nodeContainerWithId = std::unordered_map<int, unique_ptr<ofxOceanodeNode>>;
+    
     ofxOceanodeContainer(std::shared_ptr<ofxOceanodeNodeRegistry> _registry =
                          make_shared<ofxOceanodeNodeRegistry>());
     ~ofxOceanodeContainer();
@@ -47,7 +49,7 @@ private:
     void temporalConnectionDestructor();
     
     //NodeModel;
-    vector<unique_ptr<ofxOceanodeNode>> dynamicNodes;
+    std::unordered_map<string, nodeContainerWithId> dynamicNodes;
     vector<unique_ptr<ofxOceanodeNode>> persistentNodes;
 
     string temporalConnectionTypeName;

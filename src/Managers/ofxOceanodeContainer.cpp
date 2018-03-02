@@ -37,12 +37,17 @@ void ofxOceanodeContainer::disconnectConnection(ofxOceanodeAbstractConnection* c
 }
 
 ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel){
+    int lastId = 0;
+    string nodeToBeCreatedName = nodeModel->nodeName();
+    while (dynamicNodes[nodeToBeCreatedName].count(lastId) != 0) lastId++;
+    int toBeCreatedId = lastId;
+    nodeModel->setNumIdentifier(toBeCreatedId);
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
     auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);
     node->setGui(std::move(nodeGui));
     
     auto nodePtr = node.get();
-    dynamicNodes.push_back(std::move(node));
+    dynamicNodes[nodeToBeCreatedName][toBeCreatedId] = std::move(node);
     
     return *nodePtr;
 }
