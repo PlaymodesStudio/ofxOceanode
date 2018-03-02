@@ -55,44 +55,36 @@ public:
     ofxOceanodeTemporalConnection(ofAbstractParameter& _p, glm::vec2 pos) : ofxOceanodeAbstractConnection(_p){
         isTemporalConnection = true;
         graphics.setPoint(0, pos);
+        graphics.setPoint(1, glm::vec2(ofGetMouseX(), ofGetMouseY()));
         
-        ofRegisterMouseEvents(this);
+        mouseDraggedListener = ofEvents().mouseDragged.newListener([&](ofMouseEventArgs & mouse){
+            graphics.setPoint(1, mouse);
+        });
+        mouseReleasedListener = ofEvents().mouseReleased.newListener([&](ofMouseEventArgs & mouse){
+            graphics.deactivate();
+            ofNotifyEvent(destroyConnection);
+        });
     }
-    ~ofxOceanodeTemporalConnection(){
-        ofUnregisterMouseEvents(this);
-    };
+    ~ofxOceanodeTemporalConnection(){};
     
     glm::vec2 getSourcePosition(){return graphics.getPoint(0);};
     
-    void mouseMoved(ofMouseEventArgs &args){};
-    void mouseDragged(ofMouseEventArgs &args){
-        graphics.setPoint(1, glm::vec2(args.x, args.y));
-    }
-    void mousePressed(ofMouseEventArgs &args){};
-    void mouseReleased(ofMouseEventArgs &args){
-        graphics.deactivate();
-        ofNotifyEvent(destroyConnection);
-    };
-    void mouseScrolled(ofMouseEventArgs &args){};
-    void mouseEntered(ofMouseEventArgs &args){};
-    void mouseExited(ofMouseEventArgs &args){};
-    
 private:
-    
+    ofEventListener mouseDraggedListener;
+    ofEventListener mouseReleasedListener;
 };
 
 template<typename Tsource, typename Tsink>
 class ofxOceanodeConnection: public ofxOceanodeAbstractConnection{
 public:
     ofxOceanodeConnection(ofParameter<Tsource>& pSource, ofParameter<Tsink>& pSink, glm::vec2 posSource, glm::vec2 posSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
-        sourceParameter.addListener(this, &ofxOceanodeConnection::parameterListener);
+        parameterEventListener = sourceParameter.newListener(this, &ofxOceanodeConnection::parameterListener);
         sinkParameter = sourceParameter;
         isTemporalConnection = false;
         graphics.setPoint(0, posSource);
         graphics.setPoint(1, posSink);
     }
     ~ofxOceanodeConnection(){
-        sourceParameter.removeListener(this, &ofxOceanodeConnection::parameterListener);
         ofNotifyEvent(destroyConnection);
     };
     
@@ -102,6 +94,7 @@ private:
             sinkParameter = sourceParameter;
         }
     }
+    ofEventListener parameterEventListener;
     
     ofParameter<Tsource>& sourceParameter;
     ofParameter<Tsink>&  sinkParameter;

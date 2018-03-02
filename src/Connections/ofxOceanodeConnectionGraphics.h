@@ -16,11 +16,9 @@ public:
         points[0] = glm::vec2(-1, -1);
         points[1] = glm::vec2(-1, -1);
         
-        ofAddListener(ofEvents().draw, this , &ofxOceanodeConnectionGraphics::draw);
+        drawEventListener = ofEvents().draw.newListener(this , &ofxOceanodeConnectionGraphics::draw);
     };
-    ~ofxOceanodeConnectionGraphics(){
-        ofRemoveListener(ofEvents().draw, this , &ofxOceanodeConnectionGraphics::draw);
-    };
+    ~ofxOceanodeConnectionGraphics(){};
     
     void draw(ofEventArgs &args){
         if(points[1] != glm::vec2(-1, -1)){
@@ -41,6 +39,8 @@ public:
     glm::vec2 getPoint(int index){return points[index];};
 private:
     glm::vec2 points[2];
+    
+    ofEventListener drawEventListener;
 };
 
 #endif /* ofxOceanodeConnectionGraphics_h */
