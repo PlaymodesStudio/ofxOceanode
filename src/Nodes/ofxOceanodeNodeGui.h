@@ -50,8 +50,6 @@ private:
     void newModuleListener(ofxDatGuiDropdownEvent e);
     void newPresetListener(ofxDatGuiTextInputEvent e);
     
-    
-    void parameterListener(ofAbstractParameter &parameter);
     vector<ofEventListener> parameterChangedListeners;
     
     ofxOceanodeContainer& container;
