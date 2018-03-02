@@ -18,7 +18,9 @@ public:
         
         ofAddListener(ofEvents().draw, this , &ofxOceanodeConnectionGraphics::draw);
     };
-    ~ofxOceanodeConnectionGraphics(){};
+    ~ofxOceanodeConnectionGraphics(){
+        ofRemoveListener(ofEvents().draw, this , &ofxOceanodeConnectionGraphics::draw);
+    };
     
     void draw(ofEventArgs &args){
         if(points[1] != glm::vec2(-1, -1)){

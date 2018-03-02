@@ -23,6 +23,18 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstract
     return temporalConnection;
 }
 
+void ofxOceanodeContainer::disconnectConnection(ofxOceanodeAbstractConnection* connection){
+    for(auto c : connections){
+        if(c.second.get() == connection){
+            if(!ofGetKeyPressed(OF_KEY_ALT)){
+                connections.erase(std::remove(connections.begin(), connections.end(), c));
+            }
+            createConnection(connection->getSourceParameter(), *c.first, c.second->getPostion(0));
+            break;
+        }
+    }
+}
+
 ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel){
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
     auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);

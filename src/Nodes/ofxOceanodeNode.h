@@ -23,12 +23,12 @@ public:
     
     ofxOceanodeNodeGui& getNodeGui(){return *nodeGui.get();};
     
-    bool createConnection(ofxOceanodeContainer& container, ofAbstractParameter& parameter, glm::vec2 pos);
-    bool makeConnection(ofxOceanodeContainer& container, int parameterIndex, glm::vec2 pos);
+    bool parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter, glm::vec2 pos);
+    bool parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter, glm::vec2 pos);
     
-    void addOutputConnection(ofxOceanodeAbstractConnection* c){
-        outConnections.push_back(c);
-    }
+    void addOutputConnection(ofxOceanodeAbstractConnection* c);
+    
+    void addInputConnection(ofxOceanodeAbstractConnection* c);
     
     void moveConnections(glm::vec2 moveVector);
     
@@ -39,6 +39,9 @@ private:
     
     std::vector<ofxOceanodeAbstractConnection*> inConnections;
     std::vector<ofxOceanodeAbstractConnection*> outConnections;
+    
+    vector<ofEventListener> inConnectionsListeners;
+    vector<ofEventListener> outConnectionsListeners;
 };
 
 #endif /* ofxOceanodeNode_h */

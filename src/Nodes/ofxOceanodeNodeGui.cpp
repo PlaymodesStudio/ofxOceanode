@@ -253,7 +253,7 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
             glm::vec2 point;
             point.x = e.target->getX() + e.target->getWidth();
             point.y = e.target->getY() + e.target->getHeight()/2;
-            node.createConnection(container, getParameters()->get(e.target->getName()), point);
+            node.parameterConnectionPress(container, getParameters()->get(e.target->getName()), point);
     //                        ofAddListener(connections.back()->destroyEvent, this, &ofxOceanodeNode::destroyedConnection);
     //                    }
     //                }
@@ -263,7 +263,7 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
             glm::vec2 point;
             point.x = e.target->getX();
             point.y = e.target->getY() + e.target->getHeight()/2;
-            node.makeConnection(container, getParameters()->getPosition(e.target->getName()), point);
+            node.parameterConnectionRelease(container, getParameters()->get(e.target->getName()), point);
 //            container.connectConnection(node, getParameters()->getPosition(e.target->getName()));
     //    }else if(connections.size() > 0){
     //        for (int i=0; i < datGuis.size() ; i++){

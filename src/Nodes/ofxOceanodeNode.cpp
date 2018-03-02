@@ -19,16 +19,25 @@ void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     ofAddListener(nodeModel->parameterChangedMinMax, nodeGui.get(), &ofxOceanodeNodeGui::updateGuiForParameter);
 }
 
-bool ofxOceanodeNode::createConnection(ofxOceanodeContainer& container, ofAbstractParameter& parameter, glm::vec2 pos){
-    container.createConnection(parameter, *this, pos);
+bool ofxOceanodeNode::parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter, glm::vec2 pos){
+    bool foundConnection = false;
+    for(auto c : inConnections){
+        if(&c->getSinkParameter() == &parameter){
+            container.disconnectConnection(c);
+            foundConnection = true;
+        }
+    }
+    if(!foundConnection){
+        container.createConnection(parameter, *this, pos);
+    }
 }
 
-bool ofxOceanodeNode::makeConnection(ofxOceanodeContainer& container, int parameterIndex, glm::vec2 pos){
+bool ofxOceanodeNode::parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter, glm::vec2 pos){
     //Big function
     if(container.isOpenConnection()){
         ofxOceanodeAbstractConnection* connection = nullptr;
         ofAbstractParameter& source = container.getTemporalConnectionParameter();
-        ofAbstractParameter& sink = nodeModel->getParameterGroup()->get(parameterIndex);
+        ofAbstractParameter& sink = parameter;
         if(source.type() == sink.type()){
             if(source.type() == typeid(ofParameter<int>).name()){
                 connection = container.connectConnection(source.cast<int>(), sink.cast<int>(), pos);
@@ -45,7 +54,7 @@ bool ofxOceanodeNode::makeConnection(ofxOceanodeContainer& container, int parame
         }
         
         if(connection != nullptr){
-            inConnections.push_back(connection);
+            addInputConnection(connection);
         }
     }
 }
@@ -57,4 +66,18 @@ void ofxOceanodeNode::moveConnections(glm::vec2 moveVector){
     for(auto c : outConnections){
         c->moveSourcePoint(moveVector);
     }
+}
+
+void ofxOceanodeNode::addOutputConnection(ofxOceanodeAbstractConnection* c){
+    outConnections.push_back(c);
+    outConnectionsListeners.push_back(c->destroyConnection.newListener([&, c](){
+        outConnections.erase(std::remove(outConnections.begin(), outConnections.end(), c));
+    }));
+}
+
+void ofxOceanodeNode::addInputConnection(ofxOceanodeAbstractConnection* c){
+    inConnections.push_back(c);
+    inConnectionsListeners.push_back(c->destroyConnection.newListener([&, c](){
+        inConnections.erase(std::remove(inConnections.begin(), inConnections.end(), c));
+    }));
 }
