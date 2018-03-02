@@ -25,7 +25,7 @@ public:
     
 //    void createConnection(ofAbstractParameter& p);
     
-    ofxOceanodeAbstractConnection* createConnection(ofAbstractParameter& p, ofxOceanodeNode& n, glm::vec2 pos);
+    ofxOceanodeAbstractConnection* createConnection(ofAbstractParameter& p, ofxOceanodeNode& n);
     
     void disconnectConnection(ofxOceanodeAbstractConnection* c);
     
@@ -34,10 +34,10 @@ public:
     bool isOpenConnection(){return temporalConnection != nullptr;}
     
     template<typename Tsource, typename Tsink>
-    ofxOceanodeAbstractConnection* connectConnection(ofParameter<Tsource>& source, ofParameter<Tsink>& sink, glm::vec2 pos){
-        glm::vec2 posSource = temporalConnection->getSourcePosition();
-        connections.push_back(make_pair(temporalConnectionNode, make_shared<ofxOceanodeConnection<Tsource, Tsink>>(source, sink, posSource, pos)));
+    ofxOceanodeAbstractConnection* connectConnection(ofParameter<Tsource>& source, ofParameter<Tsink>& sink){
+        connections.push_back(make_pair(temporalConnectionNode, make_shared<ofxOceanodeConnection<Tsource, Tsink>>(source, sink)));
         temporalConnectionNode->addOutputConnection(connections.back().second.get());
+        connections.back().second->setSourcePosition(temporalConnectionNode->getNodeGui().getSourceConnectionPositionFromParameter(source));
         return connections.back().second.get();
     }
     

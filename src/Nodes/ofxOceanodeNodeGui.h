@@ -25,6 +25,9 @@ public:
     
     ofParameterGroup* getParameters();
     
+    glm::vec2 getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter);
+    glm::vec2 getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter);
+    
     void mouseMoved(ofMouseEventArgs &args){};
     void mouseDragged(ofMouseEventArgs &args);
     void mousePressed(ofMouseEventArgs &args){};

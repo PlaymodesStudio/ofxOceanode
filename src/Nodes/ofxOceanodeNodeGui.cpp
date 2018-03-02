@@ -172,113 +172,26 @@ void ofxOceanodeNodeGui::onGuiColorPickerEvent(ofxDatGuiColorPickerEvent e){
 }
 
 void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
-        if(e.down == 1){
-    //        for (int i=0; i < datGuis.size() ; i++){
-    //            if(datGuis[i]->getComponent(e.target->getType(), e.target->getName()) == e.target){
-    //                ofAbstractParameter &parameter = parameterGroups[i]->get(e.target->getName());
-    //                if(midiListenActive){
-    //                    if(parameter.type() == typeid(ofParameter<float>).name()){
-    //                        bool erasedConnection = false;
-    //                        if(ofGetKeyPressed(OF_KEY_SHIFT)){
-    //                            for(int i = 0 ; i < midiFloatConnections.size(); i++){
-    //                                if(midiFloatConnections[i].getParameter() == &parameter){
-    //                                    erasedConnection = true;
-    //                                    midiFloatConnections.erase(midiFloatConnections.begin()+i);
-    //                                    return;
-    //                                }
-    //                            }
-    //                        }
-    //                        if(!erasedConnection)
-    //                            midiFloatConnections.push_back(midiConnection<float>(&parameter.cast<float>()));
-    //                    }
-    //                    else if(parameter.type() == typeid(ofParameter<int>).name()){
-    //                        bool erasedConnection = false;
-    //                        if(ofGetKeyPressed(OF_KEY_SHIFT)){
-    //                            for(int i = 0 ; i < midiIntConnections.size(
-    //                                ); i++){
-    //                                if(midiIntConnections[i].getParameter() == &parameter){
-    //                                    erasedConnection = true;
-    //                                    midiIntConnections.erase(midiIntConnections.begin()+i);
-    //                                    return;
-    //                                }
-    //                            }
-    //                        }
-    //                        if(!erasedConnection)
-    //                            midiIntConnections.push_back(midiConnection<int>(&parameter.cast<int>()));
-    //                    }
-    //                    else if(parameter.type() == typeid(ofParameter<bool>).name()){
-    //                        bool erasedConnection = false;
-    //                        if(ofGetKeyPressed(OF_KEY_SHIFT)){
-    //                            for(int i = 0 ; i < midiBoolConnections.size(); i++){
-    //                                if(midiBoolConnections[i].getParameter() == &parameter){
-    //                                    erasedConnection = true;
-    //                                    midiBoolConnections.erase(midiBoolConnections.begin()+i);
-    //                                    return;
-    //                                }
-    //                            }
-    //                        }
-    //                        if(!erasedConnection)
-    //                            midiBoolConnections.push_back(midiConnection<bool>(&parameter.cast<bool>()));
-    //                    }
-    //                    else if(parameter.type() == typeid(ofParameterGroup).name()){
-    //                        parameter = parameterGroups[i]->getGroup(e.target->getName()).get(1);
-    //                        bool erasedConnection = false;
-    //                        if(ofGetKeyPressed(OF_KEY_SHIFT)){
-    //                            for(int i = 0 ; i < midiIntConnections.size(); i++){
-    //                                if(midiFloatConnections[i].getParameter() == &parameter){
-    //                                    erasedConnection = true;
-    //                                    midiIntConnections.erase(midiIntConnections.begin()+i);
-    //                                    return;
-    //                                }
-    //                            }
-    //                        }
-    //                        if(!erasedConnection)
-    //                            midiIntConnections.push_back(midiConnection<int>(&parameter.cast<int>()));
-    //                    }
-    //                    else
-    //                        ofLog() << "Cannot midi to parameter " << parameter.getName();
-    //                }
-    //                else{
-    //                    bool foundParameter = false;
-    //                    for(int j = 0 ; j < connections.size() ; j++){
-    //                        if(connections[j]->getSinkParameter() == &parameter){
-    //                            swap(connections[j], connections.back());
-    //                            connections.back()->disconnect();
-    //                            foundParameter = true;
-    //                            break;
-    //                        }
-    //                    }
-    //                    if(!foundParameter){
-//                            connections.push_back(make_shared<nodeConnection>(e.target, datGuis[i], &parameter));
-            glm::vec2 point;
-            point.x = e.target->getX() + e.target->getWidth();
-            point.y = e.target->getY() + e.target->getHeight()/2;
-            node.parameterConnectionPress(container, getParameters()->get(e.target->getName()), point);
-    //                        ofAddListener(connections.back()->destroyEvent, this, &ofxOceanodeNode::destroyedConnection);
-    //                    }
-    //                }
-    //            }
-    //        }
-        }else{
-            glm::vec2 point;
-            point.x = e.target->getX();
-            point.y = e.target->getY() + e.target->getHeight()/2;
-            node.parameterConnectionRelease(container, getParameters()->get(e.target->getName()), point);
-//            container.connectConnection(node, getParameters()->getPosition(e.target->getName()));
-    //    }else if(connections.size() > 0){
-    //        for (int i=0; i < datGuis.size() ; i++){
-    //            if(datGuis[i]->getComponent(e.target->getType(), e.target->getName()) == e.target
-    //               && !connections.back()->closedLine
-    //               && connections.back()->getSourceParameter() != &parameterGroups[i]->get(e.target->getName())){
-    //                connections.back()->connectTo(e.target, datGuis[i], &parameterGroups[i]->get(e.target->getName()));
-    //                for(int i = 0; i<connections.size()-1 ; i++){
-    //                    if(connections.back()->getSinkParameter() == connections[i]->getSourceParameter() ||
-    //                       connections.back()->getSinkParameter() == connections[i]->getSinkParameter() ||
-    //                       connections.back()->getSourceParameter() == connections[i]->getSinkParameter())
-    //                        connections.erase(connections.begin()+i);
-    //                }
-    //            }
-    //        }
-        }
+    if(e.down == 1){
+        node.parameterConnectionPress(container, getParameters()->get(e.target->getName()));
+    }else{
+        node.parameterConnectionRelease(container, getParameters()->get(e.target->getName()));
+    }
+}
+
+glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter){
+    auto component = gui->getComponent(parameter.getName());
+    glm::vec2 position;
+    position.x = component->getX() + component->getWidth();
+    position.y = component->getY() + component->getHeight()/2;
+    return position;
+}
+
+glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter){
+    auto component = gui->getComponent(parameter.getName());
+    glm::vec2 position;
+    position.x = component->getX();
+    position.y = component->getY() + component->getHeight()/2;
+    return position;
 }
 

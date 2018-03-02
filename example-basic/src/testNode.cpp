@@ -25,12 +25,12 @@ testNode::testNode() : ofxOceanodeNodeModel("Test"){
     });
     
     listener2 = intModParam.newListener([&](customClass* &c){
-        ofLog()<<"received From custom class";
+        ofLog()<<"received From custom class " << ofGetElapsedTimeMicros();
     });
 }
 
-ofxOceanodeAbstractConnection* testNode::createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink, glm::vec2 pos){
+ofxOceanodeAbstractConnection* testNode::createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink){
     if(source.type() == typeid(ofParameter<customClass*>).name()){
-        return c.connectConnection(source.cast<customClass*>(), sink.cast<customClass*>(), pos);
+        return c.connectConnection(source.cast<customClass*>(), sink.cast<customClass*>());
     }
 }

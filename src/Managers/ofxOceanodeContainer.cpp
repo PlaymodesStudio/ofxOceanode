@@ -16,9 +16,10 @@ ofxOceanodeContainer::~ofxOceanodeContainer(){
     
 }
 
-ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstractParameter& p, ofxOceanodeNode& n, glm::vec2 pos){
+ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstractParameter& p, ofxOceanodeNode& n){
     temporalConnectionNode = &n;
-    temporalConnection = new ofxOceanodeTemporalConnection(p, pos);
+    temporalConnection = new ofxOceanodeTemporalConnection(p);
+    temporalConnection->setSourcePosition(n.getNodeGui().getSourceConnectionPositionFromParameter(p));
     ofAddListener(temporalConnection->destroyConnection, this, &ofxOceanodeContainer::temporalConnectionDestructor);
     return temporalConnection;
 }
@@ -29,7 +30,7 @@ void ofxOceanodeContainer::disconnectConnection(ofxOceanodeAbstractConnection* c
             if(!ofGetKeyPressed(OF_KEY_ALT)){
                 connections.erase(std::remove(connections.begin(), connections.end(), c));
             }
-            createConnection(connection->getSourceParameter(), *c.first, c.second->getPostion(0));
+            createConnection(connection->getSourceParameter(), *c.first);
             break;
         }
     }

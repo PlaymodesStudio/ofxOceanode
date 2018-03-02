@@ -23,8 +23,9 @@ public:
     
     ofxOceanodeNodeGui& getNodeGui(){return *nodeGui.get();};
     
-    bool parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter, glm::vec2 pos);
-    bool parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter, glm::vec2 pos);
+    bool parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter);
+    bool parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter);
+    
     
     void addOutputConnection(ofxOceanodeAbstractConnection* c);
     
