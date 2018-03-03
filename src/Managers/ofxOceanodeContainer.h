@@ -57,6 +57,8 @@ private:
     ofxOceanodeTemporalConnection*   temporalConnection;
     vector<pair<ofxOceanodeNode*, shared_ptr<ofxOceanodeAbstractConnection>>> connections;
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;
+    
+    vector<ofEventListener> destroyNodeListeners;;
 };
 
 #endif /* ofxOceanodeContainer_h */

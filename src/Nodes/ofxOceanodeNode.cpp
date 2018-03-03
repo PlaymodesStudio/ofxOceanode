@@ -13,7 +13,6 @@ ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel)
     
 }
 
-
 void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     nodeGui = std::move(gui);
     ofAddListener(nodeModel->parameterChangedMinMax, nodeGui.get(), &ofxOceanodeNodeGui::updateGuiForParameter);
@@ -84,4 +83,9 @@ void ofxOceanodeNode::addInputConnection(ofxOceanodeAbstractConnection* c){
     inConnectionsListeners.push_back(c->destroyConnection.newListener([&, c](){
         inConnections.erase(std::remove(inConnections.begin(), inConnections.end(), c));
     }));
+}
+
+void ofxOceanodeNode::deleteSelf(){
+    inConnections.insert(inConnections.end(), outConnections.begin(), outConnections.end());
+    ofNotifyEvent(deleteModuleAndConnections, inConnections);
 }

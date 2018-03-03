@@ -12,9 +12,14 @@
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node) : container(_container), node(_node){
     color = ofColor::red;
     position = glm::vec2(10, 10);
+    isDraggingGui = false;
     
     createGuiFromParameters();
     ofRegisterMouseEvents(this);
+}
+
+ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
+    ofUnregisterMouseEvents(this);
 }
 
 void ofxOceanodeNodeGui::createGuiFromParameters(){
@@ -124,9 +129,19 @@ void ofxOceanodeNodeGui::setPosition(glm::vec2 _position){
 void ofxOceanodeNodeGui::mouseDragged(ofMouseEventArgs &args){
     glm::vec2 guiCurrentPos = glm::vec2(gui->getPosition().x, gui->getPosition().y);
     if(guiCurrentPos != position){
+        isDraggingGui = true;
         node.moveConnections(guiCurrentPos - position);
         position = guiCurrentPos;
+    }else{
+        isDraggingGui = false;
     }
+}
+
+void ofxOceanodeNodeGui::mouseReleased(ofMouseEventArgs &args){
+    if(isDraggingGui && !ofGetWindowRect().inside(args)){
+        node.deleteSelf();
+    }
+    isDraggingGui = false;
 }
 
 void ofxOceanodeNodeGui::onGuiButtonEvent(ofxDatGuiButtonEvent e){

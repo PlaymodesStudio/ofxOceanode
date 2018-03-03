@@ -16,7 +16,7 @@ class ofxOceanodeNode;
 class ofxOceanodeNodeGui{
 public:
     ofxOceanodeNodeGui(ofxOceanodeContainer &container, ofxOceanodeNode &node);
-    ~ofxOceanodeNodeGui(){};
+    ~ofxOceanodeNodeGui();
     
     void createGuiFromParameters();
     void updateGuiForParameter(string &parameterName);
@@ -31,7 +31,7 @@ public:
     void mouseMoved(ofMouseEventArgs &args){};
     void mouseDragged(ofMouseEventArgs &args);
     void mousePressed(ofMouseEventArgs &args){};
-    void mouseReleased(ofMouseEventArgs &args){};
+    void mouseReleased(ofMouseEventArgs &args);
     void mouseScrolled(ofMouseEventArgs &args){};
     void mouseEntered(ofMouseEventArgs &args){};
     void mouseExited(ofMouseEventArgs &args){};
@@ -59,6 +59,8 @@ private:
     unique_ptr<ofxDatGui> gui;
     ofColor color;
     glm::vec2 position;
+    
+    bool isDraggingGui;
 };
 
 #endif /* ofxOceanodeNodeGui_h */

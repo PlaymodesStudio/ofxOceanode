@@ -33,6 +33,10 @@ public:
     
     void moveConnections(glm::vec2 moveVector);
     
+    void deleteSelf();
+    
+    ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
+    
     ofParameterGroup* getParameters(){return nodeModel->getParameterGroup();};
 private:
     std::unique_ptr<ofxOceanodeNodeModel> nodeModel;
