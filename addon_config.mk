@@ -17,14 +17,14 @@
 meta:
 	ADDON_NAME = ofxOceanode
 	ADDON_DESCRIPTION = Addon for modulating parameters
-	ADDON_AUTHOR = Playmodes Studio
+	ADDON_AUTHOR = @PlaymodesStudio
 	ADDON_TAGS = "modulation"
-	ADDON_URL =
+	ADDON_URL = https://github.com/PlaymodesStudio/ofxOceanode
 
 common:
 	# dependencies with other addons, a list of them separated by spaces
 	# or use += in several lines
-	# ADDON_DEPENDENCIES =
+	ADDON_DEPENDENCIES = ofxDatGui_PM
 
 	# include search paths, this will be usually parsed from the file system
 	# but if the addon or addon libraries need special search paths they can be
