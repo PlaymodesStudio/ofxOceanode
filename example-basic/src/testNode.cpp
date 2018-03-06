@@ -33,4 +33,5 @@ ofxOceanodeAbstractConnection* testNode::createConnectionFromCustomType(ofxOcean
     if(source.type() == typeid(ofParameter<customClass*>).name()){
         return c.connectConnection(source.cast<customClass*>(), sink.cast<customClass*>());
     }
+    return nullptr;
 }
