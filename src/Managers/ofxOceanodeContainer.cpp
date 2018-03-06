@@ -37,7 +37,7 @@ void ofxOceanodeContainer::disconnectConnection(ofxOceanodeAbstractConnection* c
 }
 
 ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel){
-    int lastId = 0;
+    int lastId = 1;
     string nodeToBeCreatedName = nodeModel->nodeName();
     while (dynamicNodes[nodeToBeCreatedName].count(lastId) != 0) lastId++;
     int toBeCreatedId = lastId;
