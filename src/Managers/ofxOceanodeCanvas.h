@@ -23,7 +23,7 @@ public:
     void update(ofEventArgs &args){};
     void draw(ofEventArgs &args){};
     
-    void keyPressed(ofKeyEventArgs &e){};
+    void keyPressed(ofKeyEventArgs &e);
     void keyReleased(ofKeyEventArgs &e){};
     void mouseMoved(ofMouseEventArgs &e){};
     void mouseDragged(ofMouseEventArgs &e);

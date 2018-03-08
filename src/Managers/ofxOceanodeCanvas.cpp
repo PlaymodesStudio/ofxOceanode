@@ -49,6 +49,12 @@ void ofxOceanodeCanvas::newModuleListener(ofxDatGuiDropdownEvent e){
     drop->setLabel("Choose module");
 }
 
+void ofxOceanodeCanvas::keyPressed(ofKeyEventArgs &e){
+    if(e.key == ' '){
+        //glfwSetCursor((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), openedHandCursor);
+        if(ofGetMousePressed()) dragCanvasInitialPoint = glm::vec2(ofGetMouseX(), ofGetMouseY());
+    }
+}
 
 void ofxOceanodeCanvas::mouseDragged(ofMouseEventArgs &e){
     if(ofGetKeyPressed(' ')){
@@ -58,22 +64,16 @@ void ofxOceanodeCanvas::mouseDragged(ofMouseEventArgs &e){
 }
 
 void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
-    glm::vec2 transformedPos = transformationMatrix.get() * glm::vec4(e, 0, 0);
-//    ofVec4f transformedPos = e;
-//    transformedPos -= transformMatrix.getTranslation();
-//    transformedPos = transformMatrix.getInverse().postMult(transformedPos);
+    glm::vec2 transformedPos = screenToCanvas(e);
     if(ofGetKeyPressed(OF_KEY_COMMAND)){
         if(e.button == 0){
             popUpMenu->setPosition(e.x, e.y);
             popUpMenu->setVisible(true);
             popUpMenu->getDropdown("Choose module")->expand();
         }
-//        else if(e.button == 1){
-//            transformMatrix.translate(-transformedPos * (1-transformMatrix.getScale()));
-//            transformMatrix = ofMatrix4x4::newTranslationMatrix(transformMatrix.getTranslation());
-//            for(auto &gui : datGuis)
-//                gui->setTransformMatrix(transformMatrix);//gui->setTransformMatrix(ofMatrix4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
-//        }
+        else if(e.button == 2){
+            transformationMatrix = glm::mat4(1);
+        }
     }
     if(ofGetKeyPressed(' ')){
         dragCanvasInitialPoint = e;
@@ -102,6 +102,10 @@ void ofxOceanodeCanvas::mouseScrolled(ofMouseEventArgs &e){
 //        glfwSetCursor((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), zoomInCursor);
 //        else
 //        glfwSetCursor((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), zoomOutCursor);
+    }else if(ofGetKeyPressed(OF_KEY_ALT)){
+        transformationMatrix = translateMatrixWithoutScale(transformationMatrix.get(), glm::vec3(-e.scrollY*2, 0, 0));
+    }else{
+        transformationMatrix = translateMatrixWithoutScale(transformationMatrix.get(), glm::vec3(e.scrollX*2, e.scrollY*2, 0));
     }
 }
 
