@@ -27,6 +27,7 @@ public:
     
     glm::vec2 getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter);
     glm::vec2 getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter);
+    void setTransformationMatrix(ofParameter<glm::mat4> *mat);
     
     void mouseMoved(ofMouseEventArgs &args){};
     void mouseDragged(ofMouseEventArgs &args);
@@ -51,6 +52,7 @@ private:
     void newPresetListener(ofxDatGuiTextInputEvent e);
     
     vector<ofEventListener> parameterChangedListeners;
+    ofEventListener transformMatrixListener;
     
     ofxOceanodeContainer& container;
     
@@ -61,6 +63,8 @@ private:
     glm::vec2 position;
     
     bool isDraggingGui;
+    
+    ofParameter<glm::mat4> *transformationMatrix;
 };
 
 #endif /* ofxOceanodeNodeGui_h */

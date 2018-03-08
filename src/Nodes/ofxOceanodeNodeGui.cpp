@@ -29,7 +29,7 @@ void ofxOceanodeNodeGui::createGuiFromParameters(){
     gui = make_unique<ofxDatGui>();
     //        gui->setAutoDraw(false);
     
-    //    gui->setTransformMatrix(transformMatrix);
+    //gui->setTransformMatrix(ofMatrix4x4(transformationMatrix));
     
     ofxDatGuiTheme* theme = new ofxDatGuiThemeCharcoal;
     theme->color.slider.fill = color;
@@ -187,3 +187,10 @@ glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofAbstractP
     return position;
 }
 
+void ofxOceanodeNodeGui::setTransformationMatrix(ofParameter<glm::mat4> *mat){
+    transformationMatrix = mat;
+    gui->setTransformMatrix(ofMatrix4x4(mat->get()));
+    transformMatrixListener = transformationMatrix->newListener([&](glm::mat4 &m){
+        gui->setTransformMatrix(ofMatrix4x4(transformationMatrix->get()));
+    });
+}

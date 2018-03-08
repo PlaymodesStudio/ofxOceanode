@@ -45,6 +45,10 @@ public:
     
     ofxOceanodeNodeRegistry & getRegistry(){return *registry;};
     
+    void setTransformationMatrixToNodes(glm::mat4 m){
+        
+    }
+    
 private:
     void temporalConnectionDestructor();
     
