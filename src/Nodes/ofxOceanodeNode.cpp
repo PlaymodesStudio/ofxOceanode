@@ -30,6 +30,11 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionPress(ofxOcea
 ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter){
     //Big function
     if(container.isOpenConnection()){
+        for(auto c : inConnections){
+            if(&c->getSinkParameter() == &parameter){
+                return nullptr;
+            }
+        }
         ofxOceanodeAbstractConnection* connection = nullptr;
         ofAbstractParameter& source = container.getTemporalConnectionParameter();
         ofAbstractParameter& sink = parameter;
