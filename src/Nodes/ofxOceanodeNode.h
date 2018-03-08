@@ -23,8 +23,8 @@ public:
     
     ofxOceanodeNodeGui& getNodeGui(){return *nodeGui.get();};
     
-    bool parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter);
-    bool parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter);
+    ofxOceanodeAbstractConnection* parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter);
+    ofxOceanodeAbstractConnection* parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter);
     
     
     void addOutputConnection(ofxOceanodeAbstractConnection* c);

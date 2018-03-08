@@ -18,20 +18,16 @@ void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     ofAddListener(nodeModel->parameterChangedMinMax, nodeGui.get(), &ofxOceanodeNodeGui::updateGuiForParameter);
 }
 
-bool ofxOceanodeNode::parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter){
-    bool foundConnection = false;
+ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter){
     for(auto c : inConnections){
         if(&c->getSinkParameter() == &parameter){
-            container.disconnectConnection(c);
-            foundConnection = true;
+            return container.disconnectConnection(c);
         }
     }
-    if(!foundConnection){
-        auto connection = container.createConnection(parameter, *this);
-    }
+    return container.createConnection(parameter, *this);
 }
 
-bool ofxOceanodeNode::parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter){
+ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter){
     //Big function
     if(container.isOpenConnection()){
         ofxOceanodeAbstractConnection* connection = nullptr;
@@ -58,8 +54,10 @@ bool ofxOceanodeNode::parameterConnectionRelease(ofxOceanodeContainer& container
         if(connection != nullptr){
             connection->setSinkPosition(nodeGui->getSinkConnectionPositionFromParameter(parameter));
             addInputConnection(connection);
+            return connection;
         }
     }
+    return nullptr;
 }
 
 void ofxOceanodeNode::moveConnections(glm::vec2 moveVector){

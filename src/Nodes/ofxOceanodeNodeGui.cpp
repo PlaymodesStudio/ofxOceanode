@@ -165,9 +165,16 @@ void ofxOceanodeNodeGui::onGuiColorPickerEvent(ofxDatGuiColorPickerEvent e){
 
 void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
     if(e.down == 1){
-        node.parameterConnectionPress(container, getParameters()->get(e.target->getName()));
+        auto connection = node.parameterConnectionPress(container, getParameters()->get(e.target->getName()));
+        if(connection != nullptr){
+            connection->setTransformationMatrix(transformationMatrix);
+            connection->setSinkPosition(glm::inverse(transformationMatrix->get()) * glm::vec4(ofGetMouseX(), ofGetMouseY(), 0, 1));
+        }
     }else{
-        node.parameterConnectionRelease(container, getParameters()->get(e.target->getName()));
+        auto connection = node.parameterConnectionRelease(container, getParameters()->get(e.target->getName()));
+        if(connection != nullptr){
+            connection->setTransformationMatrix(transformationMatrix);
+        }
     }
 }
 

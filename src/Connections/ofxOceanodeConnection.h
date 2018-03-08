@@ -41,6 +41,7 @@ public:
     }
     
     glm::vec2 getPostion(int index){return graphics.getPoint(index);};
+    void setTransformationMatrix(ofParameter<glm::mat4> *m){graphics.setTransformationMatrix(m);};
     
     ofAbstractParameter& getSourceParameter(){return *sourceParameter;};
     ofAbstractParameter& getSinkParameter(){return *sinkParameter;};
@@ -62,7 +63,7 @@ public:
         graphics.setPoint(1, glm::vec2(ofGetMouseX(), ofGetMouseY()));
         
         mouseDraggedListener = ofEvents().mouseDragged.newListener([&](ofMouseEventArgs & mouse){
-            graphics.setPoint(1, mouse);
+            graphics.setPoint(1, glm::inverse(graphics.getTransformationMatrix()) * glm::vec4(mouse, 0, 1));
         });
         mouseReleasedListener = ofEvents().mouseReleased.newListener([&](ofMouseEventArgs & mouse){
             graphics.deactivate();
