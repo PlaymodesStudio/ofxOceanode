@@ -6,3 +6,11 @@
 //
 
 #include "ofxOceanodeConnection.h"
+
+template<>
+void ofxOceanodeConnection<void, void>::linkParameters(){
+    parameterEventListener = sourceParameter.newListener([&](){
+        sinkParameter.trigger();
+    });
+    sinkParameter.trigger();
+}

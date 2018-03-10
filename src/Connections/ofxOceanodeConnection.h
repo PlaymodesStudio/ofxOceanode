@@ -83,21 +83,23 @@ template<typename Tsource, typename Tsink>
 class ofxOceanodeConnection: public ofxOceanodeAbstractConnection{
 public:
     ofxOceanodeConnection(ofParameter<Tsource>& pSource, ofParameter<Tsink>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
-        parameterEventListener = sourceParameter.newListener(this, &ofxOceanodeConnection::parameterListener);
-        sinkParameter = sourceParameter;
+        linkParameters();
     }
     ~ofxOceanodeConnection(){
         ofNotifyEvent(destroyConnection);
     };
     
 private:
-    void parameterListener(Tsource &value){
-        if(typeid(Tsource).name() == typeid(Tsink).name()){
+    void linkParameters(){
+        sillyParameterGroup.add(sourceParameter);
+        parameterEventListener = sillyParameterGroup.parameterChangedE().newListener([&](ofAbstractParameter &p){
             sinkParameter = sourceParameter;
-        }
+        });
+        sinkParameter = sourceParameter;
     }
     ofEventListener parameterEventListener;
     
+    ofParameterGroup sillyParameterGroup;
     ofParameter<Tsource>& sourceParameter;
     ofParameter<Tsink>&  sinkParameter;
 };

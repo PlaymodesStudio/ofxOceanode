@@ -45,6 +45,12 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionRelease(ofxOc
             else if(source.type() == typeid(ofParameter<float>).name()){
                 connection = container.connectConnection(source.cast<float>(), sink.cast<float>());
             }
+            else if(source.type() == typeid(ofParameter<bool>).name()){
+                connection = container.connectConnection(source.cast<bool>(), sink.cast<bool>());
+            }
+            else if(source.type() == typeid(ofParameter<void>).name()){
+                connection = container.connectConnection(source.cast<void>(), sink.cast<void>());
+            }
             else if(source.type() == typeid(ofParameter<vector<float>>).name()){
                 connection = container.connectConnection(source.cast<vector<float>>(), sink.cast<vector<float>>());
             }
@@ -54,6 +60,20 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionRelease(ofxOc
             else{
                 connection = nodeModel->createConnectionFromCustomType(container, source, sink);
             }
+        }else if(source.type() == typeid(ofParameter<float>).name()){
+            if(sink.type() == typeid(ofParameter<int>).name()){
+                connection = container.connectConnection(source.cast<float>(), sink.cast<int>());
+//            }else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+//                connection = container.connectConnection(source.cast<float>(), sink.cast<vector<float>>());
+            }
+        }else if(source.type() == typeid(ofParameter<int>).name()){
+            if(sink.type() == typeid(ofParameter<float>).name()){
+                connection = container.connectConnection(source.cast<int>(), sink.cast<float>());
+            }
+//        }else if(source.type() == typeid(ofParameter<void>).name()){
+//            if(sink.type() == typeid(ofParameter<bool>).name()){
+//                connection = container.connectConnection(source.cast<void>(), sink.cast<bool>());
+//            }
         }
         
         if(connection != nullptr){
