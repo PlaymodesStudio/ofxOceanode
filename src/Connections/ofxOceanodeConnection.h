@@ -155,7 +155,11 @@ public:
     };
     
 private:
-    void linkParameters();
+    void linkParameters(){
+        parameterEventListener = sourceParameter.newListener([&](){
+            sinkParameter = sinkParameter;
+        });
+    }
     
     ofEventListener parameterEventListener;
     ofParameter<void>& sourceParameter;
