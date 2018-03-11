@@ -18,20 +18,17 @@ class mapper : public ofxOceanodeNodeModel{
 public:
     mapper();
     ~mapper(){};
-    void setup(int index = 0);
-    float getRange();    
-    void resetRange();
     
-    void recalculate(float& f);
+    void recalculate(vector<float>& vf);
 
 private:
     
-    ofParameter<float>  Input;
-    ofParameter<float>  MinInput;
-    ofParameter<float>  MaxInput;
-    ofParameter<float>  MinOutput;
-    ofParameter<float>  MaxOutput;
-    ofParameter<float>  Output;
+    ofParameter<vector<float>>  input;
+    ofParameter<float>  minInput;
+    ofParameter<float>  maxInput;
+    ofParameter<float>  minOutput;
+    ofParameter<float>  maxOutput;
+    ofParameter<vector<float>>  output;
 };
 
 

@@ -29,7 +29,7 @@ public:
     
     ofxOceanodeAbstractConnection* createConnection(ofAbstractParameter& p, ofxOceanodeNode& n);
     
-    void disconnectConnection(ofxOceanodeAbstractConnection* c);
+    ofxOceanodeAbstractConnection* disconnectConnection(ofxOceanodeAbstractConnection* c);
     
     ofAbstractParameter& getTemporalConnectionParameter(){return temporalConnection->getSourceParameter();};
     
@@ -44,6 +44,10 @@ public:
     }
     
     ofxOceanodeNodeRegistry & getRegistry(){return *registry;};
+    
+    void setTransformationMatrixToNodes(glm::mat4 m){
+        
+    }
     
 private:
     void temporalConnectionDestructor();

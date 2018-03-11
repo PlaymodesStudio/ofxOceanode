@@ -41,6 +41,7 @@ public:
     }
     
     glm::vec2 getPostion(int index){return graphics.getPoint(index);};
+    void setTransformationMatrix(ofParameter<glm::mat4> *m){graphics.setTransformationMatrix(m);};
     
     ofAbstractParameter& getSourceParameter(){return *sourceParameter;};
     ofAbstractParameter& getSinkParameter(){return *sinkParameter;};
@@ -62,7 +63,7 @@ public:
         graphics.setPoint(1, glm::vec2(ofGetMouseX(), ofGetMouseY()));
         
         mouseDraggedListener = ofEvents().mouseDragged.newListener([&](ofMouseEventArgs & mouse){
-            graphics.setPoint(1, mouse);
+            graphics.setPoint(1, glm::inverse(graphics.getTransformationMatrix()) * glm::vec4(mouse, 0, 1));
         });
         mouseReleasedListener = ofEvents().mouseReleased.newListener([&](ofMouseEventArgs & mouse){
             graphics.deactivate();
@@ -82,23 +83,89 @@ template<typename Tsource, typename Tsink>
 class ofxOceanodeConnection: public ofxOceanodeAbstractConnection{
 public:
     ofxOceanodeConnection(ofParameter<Tsource>& pSource, ofParameter<Tsink>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
-        parameterEventListener = sourceParameter.newListener(this, &ofxOceanodeConnection::parameterListener);
-        sinkParameter = sourceParameter;
+        linkParameters();
     }
     ~ofxOceanodeConnection(){
         ofNotifyEvent(destroyConnection);
     };
     
 private:
-    void parameterListener(Tsource &value){
-        if(typeid(Tsource).name() == typeid(Tsink).name()){
+    void linkParameters(){
+        parameterEventListener = sourceParameter.newListener([&](Tsource &p){
             sinkParameter = sourceParameter;
-        }
+        });
+        sinkParameter = sourceParameter;
     }
     ofEventListener parameterEventListener;
-    
     ofParameter<Tsource>& sourceParameter;
     ofParameter<Tsink>&  sinkParameter;
 };
+
+template<typename T>
+class ofxOceanodeConnection<T, vector<T>>: public ofxOceanodeAbstractConnection{
+public:
+    ofxOceanodeConnection(ofParameter<T>& pSource, ofParameter<vector<T>>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+        parameterEventListener = sourceParameter.newListener([&](T &f){
+            sinkParameter = vector<T>(1, f);
+        });
+        sinkParameter = vector<T>(1, sourceParameter);
+    }
+    ~ofxOceanodeConnection(){
+        ofNotifyEvent(destroyConnection);
+    };
+    
+private:
+    ofEventListener parameterEventListener;
+    ofParameter<T>& sourceParameter;
+    ofParameter<vector<T>>&  sinkParameter;
+};
+
+template<typename T>
+class ofxOceanodeConnection<vector<T>, T>: public ofxOceanodeAbstractConnection{
+public:
+    ofxOceanodeConnection(ofParameter<vector<T>>& pSource, ofParameter<T>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+        parameterEventListener = sourceParameter.newListener([&](vector<T> &vf){
+            if(vf.size() > 0){
+                sinkParameter = vf[0];
+            }
+        });
+        if(sourceParameter.get().size() > 0){
+            sinkParameter = sourceParameter.get()[0];
+        }
+    }
+    ~ofxOceanodeConnection(){
+        ofNotifyEvent(destroyConnection);
+    };
+    
+private:
+    ofEventListener parameterEventListener;
+    ofParameter<vector<T>>& sourceParameter;
+    ofParameter<T>&  sinkParameter;
+};
+
+
+template<typename T>
+class ofxOceanodeConnection<void, T>: public ofxOceanodeAbstractConnection{
+public:
+    ofxOceanodeConnection(ofParameter<void>& pSource, ofParameter<T>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+        linkParameters();
+    }
+    ~ofxOceanodeConnection(){
+        ofNotifyEvent(destroyConnection);
+    };
+    
+private:
+    void linkParameters(){
+        parameterEventListener = sourceParameter.newListener([&](){
+            sinkParameter = sinkParameter;
+        });
+    }
+    
+    ofEventListener parameterEventListener;
+    ofParameter<void>& sourceParameter;
+    ofParameter<T>&  sinkParameter;
+};
+
+
 
 #endif /* ofxOceanodeConnection_h */

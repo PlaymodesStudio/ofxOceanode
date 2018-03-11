@@ -22,7 +22,10 @@ public:
     
     void draw(ofEventArgs &args){
         if(points[1] != glm::vec2(-1, -1)){
+            ofPushMatrix();
+            ofMultMatrix(transformationMatrix->get());
             ofDrawLine(points[0], points[1]);
+            ofPopMatrix();
         }
     }
     
@@ -37,8 +40,12 @@ public:
     void deactivate(){points[1] = glm::vec2(-1, -1);};
     
     glm::vec2 getPoint(int index){return points[index];};
+    void setTransformationMatrix(ofParameter<glm::mat4> *m){transformationMatrix = m;};
+    glm::mat4 getTransformationMatrix(){return transformationMatrix->get();};
+    
 private:
     glm::vec2 points[2];
+    ofParameter<glm::mat4> *transformationMatrix;
     
     ofEventListener drawEventListener;
 };

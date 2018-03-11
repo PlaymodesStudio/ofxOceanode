@@ -24,20 +24,20 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstract
     return temporalConnection;
 }
 
-void ofxOceanodeContainer::disconnectConnection(ofxOceanodeAbstractConnection* connection){
+ofxOceanodeAbstractConnection* ofxOceanodeContainer::disconnectConnection(ofxOceanodeAbstractConnection* connection){
     for(auto c : connections){
         if(c.second.get() == connection){
             if(!ofGetKeyPressed(OF_KEY_ALT)){
                 connections.erase(std::remove(connections.begin(), connections.end(), c));
             }
-            createConnection(connection->getSourceParameter(), *c.first);
+            return createConnection(connection->getSourceParameter(), *c.first);
             break;
         }
     }
 }
 
 ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel){
-    int lastId = 0;
+    int lastId = 1;
     string nodeToBeCreatedName = nodeModel->nodeName();
     while (dynamicNodes[nodeToBeCreatedName].count(lastId) != 0) lastId++;
     int toBeCreatedId = lastId;
