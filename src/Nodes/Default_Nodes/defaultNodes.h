@@ -12,5 +12,6 @@
 #include "phasorClass.h"
 #include "mapper.h"
 #include "oscillatorBank.h"
+#include "ranger.h"
 
 #endif /* defaultNodes_h */

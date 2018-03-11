@@ -13,6 +13,7 @@ ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
     this->registerModel<oscillator>();
     this->registerModel<phasorClass>();
     this->registerModel<mapper>();
+    this->registerModel<ranger>();
     this->registerModel<oscillatorBank>();
 }
 
