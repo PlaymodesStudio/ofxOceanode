@@ -63,12 +63,16 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionRelease(ofxOc
         }else if(source.type() == typeid(ofParameter<float>).name()){
             if(sink.type() == typeid(ofParameter<int>).name()){
                 connection = container.connectConnection(source.cast<float>(), sink.cast<int>());
-//            }else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
-//                connection = container.connectConnection(source.cast<float>(), sink.cast<vector<float>>());
+            }else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+                connection = container.connectConnection(source.cast<float>(), sink.cast<vector<float>>());
             }
         }else if(source.type() == typeid(ofParameter<int>).name()){
             if(sink.type() == typeid(ofParameter<float>).name()){
                 connection = container.connectConnection(source.cast<int>(), sink.cast<float>());
+            }
+        }else if(source.type() == typeid(ofParameter<vector<float>>).name()){
+            if(sink.type() == typeid(ofParameter<float>).name()){
+                connection = container.connectConnection(source.cast<vector<float>>(), sink.cast<float>());
             }
 //        }else if(source.type() == typeid(ofParameter<void>).name()){
 //            if(sink.type() == typeid(ofParameter<bool>).name()){
