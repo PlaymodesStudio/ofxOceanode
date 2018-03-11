@@ -36,10 +36,8 @@ baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name
     indexQuant_Param.set("Index Quantization", indexCount, 1, indexCount);
     combination_Param.set("Index Combination", 0, 0, 1);
     modulo_Param.set("Index Modulo", indexCount, 1, indexCount);
-    if(indexCount < 100){
-        manualReindex_Param.set("Manual Reindex", false);
-        reindexGrid.set("ReindexGrid", identityReindexMatrix);
-    }
+    manualReindex_Param.set("Manual Reindex", false);
+    reindexGrid.set("ReindexGrid", identityReindexMatrix);
     
     recomputeIndexs();
 
@@ -70,11 +68,13 @@ void baseIndexer::indexCountChanged(int &indexCount){
     for(int i = 0; i < indexRand.size(); i++)
         indexRand[i] = i-((float)indexRand.size()/2.f);
     
-//    identityReindexMatrix.resize(indexCount, vector<bool>(indexCount, false));
-//    for(int i = 0; i < indexCount; i++){
-//        identityReindexMatrix[i][i] = true;
-//    }
-//    isReindexIdentity = true;
+    if(indexCount < 50){
+        identityReindexMatrix.resize(indexCount, vector<bool>(indexCount, false));
+        for(int i = 0; i < indexCount; i++){
+            identityReindexMatrix[i][i] = true;
+        }
+        isReindexIdentity = true;
+    }
     
     numWaves_Param.setMax(indexCount);
     string name1 = numWaves_Param.getName();
@@ -99,11 +99,6 @@ void baseIndexer::indexCountChanged(int &indexCount){
     string name4 = modulo_Param.getName();
     ofNotifyEvent(parameterChangedMinMax, name4);
     modulo_Param.set(indexModuloNormalized * indexCount);
-
-//    if(indexCount < 100){
-//        manualReindex_Param.set("Manual Reindex", false);
-//        reindexGrid.set("ReindexGrid", identityReindexMatrix);
-//    }
     
     recomputeIndexs();
 }
@@ -118,10 +113,9 @@ void baseIndexer::putParametersInParametersGroup(ofParameterGroup* parameters){
     parameters->add(indexQuant_Param);
     parameters->add(combination_Param);
     parameters->add(modulo_Param);
-    if(indexCount < 100){
-        parameters->add(manualReindex_Param);
-        parameters->add(reindexGrid);
-    }
+    //For reindexing, deactivated for the moment.
+//    parameters->add(manualReindex_Param);
+//    parameters->add(reindexGrid);
 }
 
 void baseIndexer::recomputeIndexs(){
@@ -288,37 +282,42 @@ void baseIndexer::mouseDragged(ofMouseEventArgs &a){
 }
 
 void baseIndexer::drawManualReindex(bool &b){
-    if(b){
-        ofAppBaseWindow* mainWindow = ofGetWindowPtr();
-        
-        ofGLFWWindowSettings prevSettings;
-        if(reindexWindowRect.getPosition() == glm::vec3(-1, -1, 0)){
-            prevSettings.setSize(1024, 1024);
-            prevSettings.setPosition(ofVec2f(ofGetScreenWidth()-1024, ofGetScreenHeight()-1024));
+    if(indexCount < 50){
+        if(b){
+            ofAppBaseWindow* mainWindow = ofGetWindowPtr();
+            
+            ofGLFWWindowSettings prevSettings;
+            if(reindexWindowRect.getPosition() == glm::vec3(-1, -1, 0)){
+                prevSettings.setSize(1024, 1024);
+                prevSettings.setPosition(ofVec2f(ofGetScreenWidth()-1024, ofGetScreenHeight()-1024));
+            }
+            else{
+                prevSettings.setSize(reindexWindowRect.width, reindexWindowRect.height);
+                prevSettings.setPosition(reindexWindowRect.position);
+            }
+            prevSettings.windowMode = OF_WINDOW;
+            prevSettings.resizable = true;
+            reindexWindow = ofCreateWindow(prevSettings);
+            reindexWindow->setWindowTitle("Reindex");
+            ofAddListener(reindexWindow->events().draw, this, &baseIndexer::draw);
+            ofAddListener(reindexWindow->events().keyPressed, this, &baseIndexer::keyPressed);
+            ofAddListener(reindexWindow->events().mouseMoved, this, &baseIndexer::mouseMoved);
+            ofAddListener(reindexWindow->events().mousePressed, this, &baseIndexer::mousePressed);
+            ofAddListener(reindexWindow->events().mouseReleased, this, &baseIndexer::mouseReleased);
+            ofAddListener(reindexWindow->events().mouseDragged, this, &baseIndexer::mouseDragged);
+            ofAppGLFWWindow * ofWindow = (ofAppGLFWWindow*)reindexWindow.get();
+            GLFWwindow * glfwWindow = ofWindow->getGLFWWindow();
+            //        glfwSetWindowCloseCallback(glfwWindow, window_no_close_indexer);
         }
-        else{
-            prevSettings.setSize(reindexWindowRect.width, reindexWindowRect.height);
-            prevSettings.setPosition(reindexWindowRect.position);
+        else if(reindexWindow != nullptr){
+            reindexWindowRect.setPosition(glm::vec3(reindexWindow->getWindowPosition(), 0));
+            reindexWindowRect.setSize(reindexWindow->getWidth(), reindexWindow->getHeight());
+            reindexWindow->setWindowShouldClose();
+            reindexWindow = nullptr;
         }
-        prevSettings.windowMode = OF_WINDOW;
-        prevSettings.resizable = true;
-        reindexWindow = ofCreateWindow(prevSettings);
-        reindexWindow->setWindowTitle("Reindex");
-        ofAddListener(reindexWindow->events().draw, this, &baseIndexer::draw);
-        ofAddListener(reindexWindow->events().keyPressed, this, &baseIndexer::keyPressed);
-        ofAddListener(reindexWindow->events().mouseMoved, this, &baseIndexer::mouseMoved);
-        ofAddListener(reindexWindow->events().mousePressed, this, &baseIndexer::mousePressed);
-        ofAddListener(reindexWindow->events().mouseReleased, this, &baseIndexer::mouseReleased);
-        ofAddListener(reindexWindow->events().mouseDragged, this, &baseIndexer::mouseDragged);
-        ofAppGLFWWindow * ofWindow = (ofAppGLFWWindow*)reindexWindow.get();
-        GLFWwindow * glfwWindow = ofWindow->getGLFWWindow();
-//        glfwSetWindowCloseCallback(glfwWindow, window_no_close_indexer);
     }
-    else if(reindexWindow != nullptr){
-        reindexWindowRect.setPosition(glm::vec3(reindexWindow->getWindowPosition(), 0));
-        reindexWindowRect.setSize(reindexWindow->getWidth(), reindexWindow->getHeight());
-        reindexWindow->setWindowShouldClose();
-        reindexWindow = nullptr;
+    else{
+        manualReindex_Param = false;
     }
 }
 
