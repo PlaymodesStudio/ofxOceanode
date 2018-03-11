@@ -15,4 +15,9 @@ void ofxOceanodeConnection<void, void>::linkParameters(){
     sinkParameter.trigger();
 }
 
-
+template<>
+void ofxOceanodeConnection<void, bool>::linkParameters(){
+    parameterEventListener = sourceParameter.newListener([&](){
+        sinkParameter = !sinkParameter;
+    });
+}
