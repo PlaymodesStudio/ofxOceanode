@@ -130,8 +130,5 @@ glm::vec3 ofxOceanodeCanvas::getMatrixScale(const glm::mat4 &m){
 }
 
 glm::mat4 ofxOceanodeCanvas::translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector){
-    glm::vec3 scale = getMatrixScale(m);
-    glm::mat4 mat = glm::scale(m, glm::vec3(1/scale.x, 1/scale.y, 1));
-    mat = glm::translate(mat, translationVector);
-    return glm::scale(mat, scale);
+    return glm::translate(glm::mat4(), translationVector) * m;
 }
