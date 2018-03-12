@@ -9,6 +9,7 @@
 #define ofxOceanodeControls_h
 
 #include "ofMain.h"
+#include "ofxOceanodeBaseController.h"
 
 class ofxOceanodeControls{
 public:
@@ -24,6 +25,9 @@ public:
     
 private:
     std::shared_ptr<ofAppBaseWindow> controlsWindow;
+    
+    vector<unique_ptr<ofxOceanodeBaseController>> controllers;
+    vector<ofRectangle> controllersButtons;
 };
 
 #endif /* ofxOceanodeControls_h */

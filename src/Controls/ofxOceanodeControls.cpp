@@ -34,11 +34,31 @@ ofxOceanodeControls::ofxOceanodeControls(){
     //        glfwSetWindowCloseCallback(glfwWindow, window_no_close_indexer);
     
     ofGetMainLoop()->setCurrentWindow((ofAppGLFWWindow*)mainWindow);
+    
+    controllers.push_back(make_unique<ofxOceanodeBaseController>("Presets"));
+    controllers.push_back(make_unique<ofxOceanodeBaseController>("BPM"));
+    controllers.push_back(make_unique<ofxOceanodeBaseController>("Midi"));
+    controllers.push_back(make_unique<ofxOceanodeBaseController>("Osc"));
+    controllers.push_back(make_unique<ofxOceanodeBaseController>("Artnet"));
+    
+    if(controllers.size() > 0){
+        controllers[0]->activate();
+    }
+    
+    int numControllers = controllers.size();
+    controllersButtons.resize(numControllers);
+    float itemSize = controlsWindow->getWidth()/numControllers;
+    for(int i = 0; i < numControllers; i++){
+        controllersButtons[i].setPosition(i*itemSize, 0);
+        controllersButtons[i].setSize(itemSize, 30);
+    }
 }
 
 
 void ofxOceanodeControls::draw(ofEventArgs &e){
-    ofDrawCircle(ofRandom(ofGetWidth()), ofRandom(ofGetHeight()), 50);
+    for(int i = 0; i < controllersButtons.size(); i++){
+        controllers[i]->getButton().draw(controllersButtons[i]);
+    }
 }
 
 
@@ -48,7 +68,17 @@ void ofxOceanodeControls::mouseMoved(ofMouseEventArgs &a){
 }
 
 void ofxOceanodeControls::mousePressed(ofMouseEventArgs &a){
- 
+    for(int i = 0; i < controllersButtons.size(); i++){
+        if(controllersButtons[i].inside(a)){
+            controllers[i]->activate();
+            for(int j = 0; j < controllers.size(); j++){
+                if(j != i){
+                    controllers[j]->deactivate();
+                }
+            }
+            break;
+        }
+    }
 }
 
 void ofxOceanodeControls::mouseReleased(ofMouseEventArgs &a){
