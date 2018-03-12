@@ -26,6 +26,7 @@ void ofxOceanodeCanvas::setup(){
     for(auto &model : models){
         options.push_back(model.first);
     }
+    std::sort(options.begin(), options.end());
     
     transformationMatrix = glm::mat4(1);
     
@@ -53,6 +54,8 @@ void ofxOceanodeCanvas::keyPressed(ofKeyEventArgs &e){
     if(e.key == ' '){
         //glfwSetCursor((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), openedHandCursor);
         if(ofGetMousePressed()) dragCanvasInitialPoint = glm::vec2(ofGetMouseX(), ofGetMouseY());
+    }else if(e.key == OF_KEY_BACKSPACE && popUpMenu->getVisible()){
+        popUpMenu->setVisible(false);
     }
 }
 
