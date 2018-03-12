@@ -11,6 +11,8 @@
 #include <glm/gtx/matrix_decompose.hpp>
 
 void ofxOceanodeCanvas::setup(){
+    ofSetWindowTitle("Canvas");
+    
     ofAddListener(ofEvents().update, this, &ofxOceanodeCanvas::update);
     ofAddListener(ofEvents().draw, this, &ofxOceanodeCanvas::draw);
     

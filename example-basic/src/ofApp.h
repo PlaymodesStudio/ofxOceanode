@@ -23,5 +23,6 @@ class ofApp : public ofBaseApp{
 		void gotMessage(ofMessage msg);
     
     ofxOceanodeCanvas canvas;
-    ofxOceanodeContainer* container;		
+    ofxOceanodeContainer* container;
+    ofxOceanodeControls* controls;
 };

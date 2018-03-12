@@ -9,8 +9,9 @@ void ofApp::setup(){
     
     container = new ofxOceanodeContainer(reg);
     canvas.setContainer(container);
-    
     canvas.setup();
+    
+    controls = new ofxOceanodeControls();
 }
 
 //--------------------------------------------------------------
