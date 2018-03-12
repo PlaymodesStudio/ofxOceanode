@@ -22,6 +22,9 @@ public:
     void mousePressed(ofMouseEventArgs &a);
     void mouseReleased(ofMouseEventArgs &a);
     void mouseDragged(ofMouseEventArgs &a);
+    void windowResized(ofResizeEventArgs &a);
+    
+    void resizeButtons();
     
 private:
     std::shared_ptr<ofAppBaseWindow> controlsWindow;

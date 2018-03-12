@@ -29,6 +29,7 @@ ofxOceanodeControls::ofxOceanodeControls(){
     ofAddListener(controlsWindow->events().mousePressed, this, &ofxOceanodeControls::mousePressed);
     ofAddListener(controlsWindow->events().mouseReleased, this, &ofxOceanodeControls::mouseReleased);
     ofAddListener(controlsWindow->events().mouseDragged, this, &ofxOceanodeControls::mouseDragged);
+    ofAddListener(controlsWindow->events().windowResized, this, &ofxOceanodeControls::windowResized);
 //    ofAppGLFWWindow * ofWindow = (ofAppGLFWWindow*)controlsWindow.get();
 //    GLFWwindow * glfwWindow = ofWindow->getGLFWWindow();
     //        glfwSetWindowCloseCallback(glfwWindow, window_no_close_indexer);
@@ -45,13 +46,7 @@ ofxOceanodeControls::ofxOceanodeControls(){
         controllers[0]->activate();
     }
     
-    int numControllers = controllers.size();
-    controllersButtons.resize(numControllers);
-    float itemSize = controlsWindow->getWidth()/numControllers;
-    for(int i = 0; i < numControllers; i++){
-        controllersButtons[i].setPosition(i*itemSize, 0);
-        controllersButtons[i].setSize(itemSize, 30);
-    }
+    resizeButtons();
 }
 
 
@@ -60,7 +55,6 @@ void ofxOceanodeControls::draw(ofEventArgs &e){
         controllers[i]->getButton().draw(controllersButtons[i]);
     }
 }
-
 
 
 void ofxOceanodeControls::mouseMoved(ofMouseEventArgs &a){
@@ -87,4 +81,18 @@ void ofxOceanodeControls::mouseReleased(ofMouseEventArgs &a){
 
 void ofxOceanodeControls::mouseDragged(ofMouseEventArgs &a){
     
+}
+
+void ofxOceanodeControls::windowResized(ofResizeEventArgs &a){
+    resizeButtons();
+}
+
+void ofxOceanodeControls::resizeButtons(){
+    int numControllers = controllers.size();
+    controllersButtons.resize(numControllers);
+    float itemSize = controlsWindow->getWidth()/numControllers;
+    for(int i = 0; i < numControllers; i++){
+        controllersButtons[i].setPosition(i*itemSize, 0);
+        controllersButtons[i].setSize(itemSize, 30);
+    }
 }
