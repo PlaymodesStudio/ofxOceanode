@@ -29,6 +29,8 @@ ofxOceanodePresetsController::ofxOceanodePresetsController() : ofxOceanodeBaseCo
     gui->setPosition(0, 30);
     gui->setWidth(ofGetWidth());
     
+    gui->setVisible(false);
+    
     //Preset Control
     ofDirectory dir;
     vector<string> banks;

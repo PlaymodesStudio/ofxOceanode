@@ -6,6 +6,8 @@
 //
 
 #include "ofxOceanodeControls.h"
+#include "ofxOceanodePresetsController.h"
+#include "ofxOceanodeBPMController.h"
 
 ofxOceanodeControls::ofxOceanodeControls(){
     ofAppBaseWindow* mainWindow = ofGetWindowPtr();
@@ -35,7 +37,7 @@ ofxOceanodeControls::ofxOceanodeControls(){
     //        glfwSetWindowCloseCallback(glfwWindow, window_no_close_indexer);
     
     controllers.push_back(make_unique<ofxOceanodePresetsController>());
-    controllers.push_back(make_unique<ofxOceanodeBaseController>("BPM"));
+    controllers.push_back(make_unique<ofxOceanodeBPMController>());
     controllers.push_back(make_unique<ofxOceanodeBaseController>("Midi"));
     controllers.push_back(make_unique<ofxOceanodeBaseController>("Osc"));
     controllers.push_back(make_unique<ofxOceanodeBaseController>("Artnet"));

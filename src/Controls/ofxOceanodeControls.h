@@ -9,7 +9,7 @@
 #define ofxOceanodeControls_h
 
 #include "ofMain.h"
-#include "ofxOceanodePresetsController.h"
+#include "ofxOceanodeBaseController.h"
 
 class ofxOceanodeControls{
 public:
