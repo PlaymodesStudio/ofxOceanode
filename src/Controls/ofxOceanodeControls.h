@@ -9,7 +9,7 @@
 #define ofxOceanodeControls_h
 
 #include "ofMain.h"
-#include "ofxOceanodeBaseController.h"
+#include "ofxOceanodePresetsController.h"
 
 class ofxOceanodeControls{
 public:
@@ -25,7 +25,6 @@ public:
     void windowResized(ofResizeEventArgs &a);
     
     void resizeButtons();
-    
 private:
     std::shared_ptr<ofAppBaseWindow> controlsWindow;
     

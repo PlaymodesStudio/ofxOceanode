@@ -15,10 +15,12 @@ public:
     ofxOceanodeControllerButton(){
         font.load(OF_TTF_SANS, 15);
         highlight = false;
+        int height = 0;
     };
     ~ofxOceanodeControllerButton(){};
     
     void draw(ofRectangle rect){
+        height = rect.getHeight();
         ofPushStyle();
         if(highlight){
             ofSetColor(ofColor::white);
@@ -42,11 +44,13 @@ public:
     void setName(string _name){name = _name;};
     void setColor(ofColor _color){color = _color;};
     void setHighlight(bool h){highlight = h;};
+    int getHeight(){return height;};
 private:
     ofTrueTypeFont font;
     string  name;
     ofColor color;
     bool highlight;
+    int height;
 };
 
 class ofxOceanodeBaseController{
@@ -57,8 +61,9 @@ public:
     string getControllerName(){return controllerName;};
     ofxOceanodeControllerButton& getButton(){return button;};
     
-    void activate();
-    void deactivate();
+    virtual void windowResized(ofResizeEventArgs &a){};
+    virtual void activate();
+    virtual void deactivate();
 private:
     string controllerName;
     bool isActive;

@@ -34,9 +34,7 @@ ofxOceanodeControls::ofxOceanodeControls(){
 //    GLFWwindow * glfwWindow = ofWindow->getGLFWWindow();
     //        glfwSetWindowCloseCallback(glfwWindow, window_no_close_indexer);
     
-    ofGetMainLoop()->setCurrentWindow((ofAppGLFWWindow*)mainWindow);
-    
-    controllers.push_back(make_unique<ofxOceanodeBaseController>("Presets"));
+    controllers.push_back(make_unique<ofxOceanodePresetsController>());
     controllers.push_back(make_unique<ofxOceanodeBaseController>("BPM"));
     controllers.push_back(make_unique<ofxOceanodeBaseController>("Midi"));
     controllers.push_back(make_unique<ofxOceanodeBaseController>("Osc"));
@@ -47,6 +45,8 @@ ofxOceanodeControls::ofxOceanodeControls(){
     }
     
     resizeButtons();
+    
+    ofGetMainLoop()->setCurrentWindow((ofAppGLFWWindow*)mainWindow);
 }
 
 
@@ -85,6 +85,9 @@ void ofxOceanodeControls::mouseDragged(ofMouseEventArgs &a){
 
 void ofxOceanodeControls::windowResized(ofResizeEventArgs &a){
     resizeButtons();
+    for(auto &controller : controllers){
+        controller->windowResized(a);
+    }
 }
 
 void ofxOceanodeControls::resizeButtons(){
