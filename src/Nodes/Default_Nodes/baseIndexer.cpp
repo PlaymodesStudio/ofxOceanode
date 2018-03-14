@@ -190,7 +190,7 @@ void baseIndexer::indexRandChanged(float &val){
 
 //Reindex
 
-void baseIndexer::draw(ofEventArgs &e){
+void baseIndexer::drawCustomWindow(ofEventArgs &e){
     ofBackground(127);
     ofSetColor(255);
     
@@ -299,7 +299,7 @@ void baseIndexer::drawManualReindex(bool &b){
             prevSettings.resizable = true;
             reindexWindow = ofCreateWindow(prevSettings);
             reindexWindow->setWindowTitle("Reindex");
-            ofAddListener(reindexWindow->events().draw, this, &baseIndexer::draw);
+            ofAddListener(reindexWindow->events().draw, this, &baseIndexer::drawCustomWindow);
             ofAddListener(reindexWindow->events().keyPressed, this, &baseIndexer::keyPressed);
             ofAddListener(reindexWindow->events().mouseMoved, this, &baseIndexer::mouseMoved);
             ofAddListener(reindexWindow->events().mousePressed, this, &baseIndexer::mousePressed);

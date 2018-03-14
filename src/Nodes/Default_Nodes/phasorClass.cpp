@@ -30,13 +30,11 @@ phasorClass::phasorClass() : ofxOceanodeNodeModel("Phasor")
     loop_Param.addListener(this, &phasorClass::loopChanged);
     initPhase_Param.addListener(this, &phasorClass::initPhaseChanged);
     
-    ofAddListener(ofEvents().update, this, &phasorClass::update);
     timer.setPeriodicEvent(1000000);
     startThread();
 }
 
 phasorClass::~phasorClass(){
-    ofRemoveListener(ofEvents().update, this, &phasorClass::update);
     stopThread();
     phasorToSend.close();
     waitForThread(true);
