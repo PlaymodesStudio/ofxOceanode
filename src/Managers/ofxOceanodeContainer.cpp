@@ -9,7 +9,8 @@
 #include "ofxOceanodeContainer.h"
 
 ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry) : registry(_registry){
-    
+    window = ofGetCurrentWindow();
+    transformationMatrix = glm::mat4(1);
 }
 
 ofxOceanodeContainer::~ofxOceanodeContainer(){
@@ -41,8 +42,11 @@ ofxOceanodeNode& ofxOceanodeContainer::createNodeFromName(string name, int ident
     
     if (type)
     {
-        return createNode(std::move(type), identifier);
+        auto &node =  createNode(std::move(type), identifier);
+        node.getNodeGui().setTransformationMatrix(&transformationMatrix);
+        return node;
     }
+    
 }
 
 ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier){
@@ -55,7 +59,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     }
     nodeModel->setNumIdentifier(toBeCreatedId);
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
-    auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);
+    auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node, window);
     node->setGui(std::move(nodeGui));
     
     auto nodePtr = node.get();
@@ -102,8 +106,8 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             ofLog()<< moduleName << " " << identifier;
             if(dynamicNodes[moduleName].count(identifier) == 0){
                 auto &node = createNodeFromName(moduleName, identifier);
-                node.getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
             }
+            dynamicNodes[moduleName][identifier]->getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
         }
     }
     

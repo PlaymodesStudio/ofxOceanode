@@ -46,8 +46,10 @@ private:
     shared_ptr<ofxOceanodeContainer> container;
     ofxDatGui *popUpMenu;
     
-    ofParameter<glm::mat4> transformationMatrix;
+    ofParameter<glm::mat4> *transformationMatrix;
     glm::vec2 dragCanvasInitialPoint;
+    
+    ofEventListener changedTransformationMatrix;
 };
 
 #endif /* ofxOceanodeCanvas_h */

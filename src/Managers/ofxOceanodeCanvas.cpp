@@ -30,7 +30,7 @@ void ofxOceanodeCanvas::setup(){
     }
     std::sort(options.begin(), options.end());
     
-    transformationMatrix = glm::mat4(1);
+    transformationMatrix = &container->getTransformationMatrix();
     
     popUpMenu->addDropdown("Choose module", options)->expand();
     popUpMenu->onDropdownEvent(this, &ofxOceanodeCanvas::newModuleListener);
@@ -44,7 +44,7 @@ void ofxOceanodeCanvas::newModuleListener(ofxDatGuiDropdownEvent e){
         auto &node = container->createNode(std::move(type));
         
         node.getNodeGui().setPosition(canvasToScreen(glm::vec2(popUpMenu->getPosition().x, popUpMenu->getPosition().y)));
-        node.getNodeGui().setTransformationMatrix(&transformationMatrix);
+        node.getNodeGui().setTransformationMatrix(transformationMatrix);
     }
     popUpMenu->setVisible(false);
     popUpMenu->setPosition(-1, -1);
@@ -63,7 +63,7 @@ void ofxOceanodeCanvas::keyPressed(ofKeyEventArgs &e){
 
 void ofxOceanodeCanvas::mouseDragged(ofMouseEventArgs &e){
     if(ofGetKeyPressed(' ')){
-        transformationMatrix = translateMatrixWithoutScale(transformationMatrix.get(), glm::vec3(e-dragCanvasInitialPoint, 0));
+        transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(e-dragCanvasInitialPoint, 0)));
         dragCanvasInitialPoint = e;
     }
 }
@@ -77,7 +77,7 @@ void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
             popUpMenu->getDropdown("Choose module")->expand();
         }
         else if(e.button == 2){
-            transformationMatrix = glm::mat4(1);
+            transformationMatrix->set(glm::mat4(1));
         }
     }
     if(ofGetKeyPressed(' ')){
@@ -101,26 +101,26 @@ void ofxOceanodeCanvas::mouseScrolled(ofMouseEventArgs &e){
     glm::vec2 transformedPos = canvasToScreen(e);
     if(ofGetKeyPressed(OF_KEY_COMMAND)){
         float scrollValue = e.scrollY/100.0;
-        transformationMatrix = translateMatrixWithoutScale(transformationMatrix.get(), glm::vec3(transformedPos, 0) * getMatrixScale(transformationMatrix.get()) * scrollValue);
-        transformationMatrix = glm::scale(transformationMatrix.get(), glm::vec3(1-(scrollValue), 1-(scrollValue), 1));
+        transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(transformedPos, 0) * getMatrixScale(transformationMatrix->get()) * scrollValue));
+        transformationMatrix->set(glm::scale(transformationMatrix->get(), glm::vec3(1-(scrollValue), 1-(scrollValue), 1)));
 //        if(e.scrollY < 0)
 //        glfwSetCursor((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), zoomInCursor);
 //        else
 //        glfwSetCursor((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), zoomOutCursor);
     }else if(ofGetKeyPressed(OF_KEY_ALT)){
-        transformationMatrix = translateMatrixWithoutScale(transformationMatrix.get(), glm::vec3(-e.scrollY*2, 0, 0));
+        transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(-e.scrollY*2, 0, 0)));
     }else{
-        transformationMatrix = translateMatrixWithoutScale(transformationMatrix.get(), glm::vec3(e.scrollX*2, e.scrollY*2, 0));
+        transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(e.scrollX*2, e.scrollY*2, 0)));
     }
 }
 
 glm::vec2 ofxOceanodeCanvas::screenToCanvas(glm::vec2 p){
-    glm::vec4 result = transformationMatrix.get() * glm::vec4(p, 0, 1);
+    glm::vec4 result = transformationMatrix->get() * glm::vec4(p, 0, 1);
     return result;
 }
 
 glm::vec2 ofxOceanodeCanvas::canvasToScreen(glm::vec2 p){
-    glm::vec4 result = glm::inverse(transformationMatrix.get()) * glm::vec4(p, 0, 1);
+    glm::vec4 result = glm::inverse(transformationMatrix->get()) * glm::vec4(p, 0, 1);
     return result;
 }
 

@@ -9,24 +9,34 @@
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeContainer.h"
 
-ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node) : container(_container), node(_node){
+ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node, shared_ptr<ofAppBaseWindow> window) : container(_container), node(_node){
     color = ofColor::red;
     position = glm::vec2(10, 10);
     isDraggingGui = false;
     
-    createGuiFromParameters();
-    ofRegisterMouseEvents(this);
+    createGuiFromParameters(window);
+    if(window == nullptr){
+        ofRegisterMouseEvents(this);
+    }else{
+        ofAddListener(window->events().mouseDragged, this,&ofxOceanodeNodeGui::mouseDragged);
+        ofAddListener(window->events().mouseMoved, this, &ofxOceanodeNodeGui::mouseMoved);
+        ofAddListener(window->events().mousePressed,this,&ofxOceanodeNodeGui::mousePressed);
+        ofAddListener(window->events().mouseReleased,this,&ofxOceanodeNodeGui::mouseReleased);
+        ofAddListener(window->events().mouseScrolled,this,&ofxOceanodeNodeGui::mouseScrolled);
+        ofAddListener(window->events().mouseEntered,this,&ofxOceanodeNodeGui::mouseEntered);
+        ofAddListener(window->events().mouseExited,this,&ofxOceanodeNodeGui::mouseExited);
+    }
 }
 
 ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
     ofUnregisterMouseEvents(this);
 }
 
-void ofxOceanodeNodeGui::createGuiFromParameters(){
+void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> window){
     ofxDatGuiLog::quiet();
     ofxDatGui::setAssetPath("");
     
-    gui = make_unique<ofxDatGui>();
+    gui = make_unique<ofxDatGui>(0, 0, window);
     //        gui->setAutoDraw(false);
     
     //gui->setTransformMatrix(ofMatrix4x4(transformationMatrix));

@@ -48,6 +48,7 @@ public:
     bool loadPreset(string presetFolderPath);
     bool savePreset(string presetFolderPath);
     
+    ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
     
 private:
     void temporalConnectionDestructor();
@@ -62,7 +63,11 @@ private:
     vector<pair<ofxOceanodeNode*, shared_ptr<ofxOceanodeAbstractConnection>>> connections;
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;
     
-    vector<ofEventListener> destroyNodeListeners;;
+    vector<ofEventListener> destroyNodeListeners;
+    
+    shared_ptr<ofAppBaseWindow> window;
+    
+    ofParameter<glm::mat4> transformationMatrix;
 };
 
 #endif /* ofxOceanodeContainer_h */

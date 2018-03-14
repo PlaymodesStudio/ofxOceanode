@@ -15,10 +15,10 @@ class ofxOceanodeNode;
 
 class ofxOceanodeNodeGui{
 public:
-    ofxOceanodeNodeGui(ofxOceanodeContainer &container, ofxOceanodeNode &node);
+    ofxOceanodeNodeGui(ofxOceanodeContainer &container, ofxOceanodeNode &node, shared_ptr<ofAppBaseWindow> window);
     ~ofxOceanodeNodeGui();
     
-    void createGuiFromParameters();
+    void createGuiFromParameters(shared_ptr<ofAppBaseWindow> window);
     void updateGuiForParameter(string &parameterName);
     
     void setPosition(glm::vec2 position);
