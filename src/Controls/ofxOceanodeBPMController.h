@@ -16,6 +16,9 @@ public:
     ofxOceanodeBPMController();
     ~ofxOceanodeBPMController(){};
     
+    void draw();
+    void update();
+    
     void onGuiDropdownEvent(ofxDatGuiDropdownEvent e);
     void onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e);
     void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);

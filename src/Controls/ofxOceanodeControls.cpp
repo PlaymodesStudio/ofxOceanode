@@ -10,7 +10,7 @@
 #include "ofxOceanodeBPMController.h"
 
 ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _container) : container(_container){
-    ofAppBaseWindow* mainWindow = ofGetWindowPtr();
+    shared_ptr<ofAppBaseWindow> mainWindow = shared_ptr<ofAppBaseWindow>(ofGetWindowPtr());
     
     ofGLFWWindowSettings prevSettings;
 //    if(reindexWindowRect.getPosition() == glm::vec3(-1, -1, 0)){
@@ -26,6 +26,7 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     controlsWindow = ofCreateWindow(prevSettings);
     controlsWindow->setWindowTitle("Controls");
     ofAddListener(controlsWindow->events().draw, this, &ofxOceanodeControls::draw);
+    ofAddListener(controlsWindow->events().update, this, &ofxOceanodeControls::update);
     ofAddListener(controlsWindow->events().keyPressed, this, &ofxOceanodeControls::keyPressed);
     ofAddListener(controlsWindow->events().mouseMoved, this, &ofxOceanodeControls::mouseMoved);
     ofAddListener(controlsWindow->events().mousePressed, this, &ofxOceanodeControls::mousePressed);
@@ -48,16 +49,22 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     
     resizeButtons();
     
-    ofGetMainLoop()->setCurrentWindow((ofAppGLFWWindow*)mainWindow);
+    ofGetMainLoop()->setCurrentWindow((ofAppGLFWWindow*)mainWindow.get());
 }
 
 
 void ofxOceanodeControls::draw(ofEventArgs &e){
     for(int i = 0; i < controllersButtons.size(); i++){
+        controllers[i]->draw();
         controllers[i]->getButton().draw(controllersButtons[i]);
     }
 }
 
+void ofxOceanodeControls::update(ofEventArgs &e){
+    for(auto &c : controllers){
+        c->update();
+    }
+}
 
 void ofxOceanodeControls::mouseMoved(ofMouseEventArgs &a){
     

@@ -58,15 +58,19 @@ public:
     ofxOceanodeBaseController(string name);
     ~ofxOceanodeBaseController(){};
     
+    virtual void draw(){};
+    virtual void update(){};
+    
     string getControllerName(){return controllerName;};
     ofxOceanodeControllerButton& getButton(){return button;};
     
     virtual void windowResized(ofResizeEventArgs &a){};
     virtual void activate();
     virtual void deactivate();
-private:
+protected:
     string controllerName;
     bool isActive;
+private:
     ofxOceanodeControllerButton button;
 };
 

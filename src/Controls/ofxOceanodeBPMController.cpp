@@ -28,7 +28,8 @@ ofxOceanodeBPMController::ofxOceanodeBPMController() : ofxOceanodeBaseController
     gui->setTheme(mainGuiTheme);
     gui->setPosition(0, 30);
     gui->setWidth(ofGetWidth());
-
+    gui->setAutoDraw(false);
+    
     gui->addSlider(bpm.set("BPM", 120, 0, 999));
     
     gui->setVisible(false);
@@ -39,6 +40,17 @@ ofxOceanodeBPMController::ofxOceanodeBPMController() : ofxOceanodeBaseController
 //    gui->onTextInputEvent(this, &ofxOceanodePresetsController::onGuiTextInputEvent);
     
 }
+
+void ofxOceanodeBPMController::draw(){
+    if(isActive)
+        gui->draw();
+}
+
+void ofxOceanodeBPMController::update(){
+    if(isActive)
+        gui->update();
+}
+
 
 void ofxOceanodeBPMController::activate(){
     ofxOceanodeBaseController::activate();

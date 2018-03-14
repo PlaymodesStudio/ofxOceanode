@@ -18,6 +18,9 @@ public:
     ofxOceanodePresetsController(shared_ptr<ofxOceanodeContainer> _container);
     ~ofxOceanodePresetsController(){};
     
+    void draw();
+    void update();
+    
     void onGuiDropdownEvent(ofxDatGuiDropdownEvent e);
     void onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e);
     void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);

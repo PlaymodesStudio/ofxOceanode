@@ -19,6 +19,8 @@ public:
     ~ofxOceanodeControls(){};
     
     void draw(ofEventArgs &e);
+    void update(ofEventArgs &e);
+    
     void keyPressed(ofKeyEventArgs &e){};
     void mouseMoved(ofMouseEventArgs &a);
     void mousePressed(ofMouseEventArgs &a);

@@ -29,7 +29,7 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
     gui->setTheme(mainGuiTheme);
     gui->setPosition(0, 30);
     gui->setWidth(ofGetWidth());
-    
+    gui->setAutoDraw(false);
     gui->setVisible(false);
     
     //Preset Control
@@ -69,6 +69,17 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
     
     oldPresetButton == nullptr;
 }
+
+void ofxOceanodePresetsController::draw(){
+    if(isActive)
+        gui->draw();
+}
+
+void ofxOceanodePresetsController::update(){
+    if(isActive)
+        gui->update();
+}
+
 
 void ofxOceanodePresetsController::activate(){
     ofxOceanodeBaseController::activate();
