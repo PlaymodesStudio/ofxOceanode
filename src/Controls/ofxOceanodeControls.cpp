@@ -10,7 +10,6 @@
 #include "ofxOceanodeBPMController.h"
 
 ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _container) : container(_container){
-    ofAppBaseWindow* mainWindow = ofGetWindowPtr();
     
     ofGLFWWindowSettings prevSettings;
 //    if(reindexWindowRect.getPosition() == glm::vec3(-1, -1, 0)){
@@ -23,6 +22,7 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
 //    }
     prevSettings.windowMode = OF_WINDOW;
     prevSettings.resizable = true;
+    prevSettings.shareContextWith = ofGetCurrentWindow();
     prevSettings.setGLVersion(ofGetGLRenderer()->getGLVersionMajor(), ofGetGLRenderer()->getGLVersionMinor());
     controlsWindow = ofCreateWindow(prevSettings);
     controlsWindow->setWindowTitle("Controls");
@@ -49,8 +49,6 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     }
     
     resizeButtons();
-    
-    ofGetMainLoop()->setCurrentWindow((ofAppGLFWWindow*)mainWindow);
 }
 
 
