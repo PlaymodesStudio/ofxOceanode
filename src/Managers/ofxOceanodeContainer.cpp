@@ -75,3 +75,11 @@ void ofxOceanodeContainer::temporalConnectionDestructor(){
     delete temporalConnection;
     temporalConnection = nullptr;
 }
+
+bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
+    ofLog()<<"Load Preset " << presetFolderPath;
+}
+
+bool ofxOceanodeContainer::savePreset(string presetFolderPath){
+    ofLog()<<"Save Preset " << presetFolderPath;
+}

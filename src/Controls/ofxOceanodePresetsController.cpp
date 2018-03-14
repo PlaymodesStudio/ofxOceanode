@@ -6,8 +6,9 @@
 //
 
 #include "ofxOceanodePresetsController.h"
+#include "ofxOceanodeContainer.h"
 
-ofxOceanodePresetsController::ofxOceanodePresetsController() : ofxOceanodeBaseController("Presets"){
+ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("Presets"){
     //DatGui
     
     ofxDatGuiLog::quiet();
@@ -82,7 +83,7 @@ void ofxOceanodePresetsController::deactivate(){
 void ofxOceanodePresetsController::onGuiDropdownEvent(ofxDatGuiDropdownEvent e){
     oldPresetButton = nullptr;
     if(e.child == bankSelect->getNumOptions()-1){
-        bankSelect->addOption("Bank " + ofGetTimestampString(), bankSelect->getNumOptions()-1);
+        bankSelect->addOption("Bank_" + ofGetTimestampString(), bankSelect->getNumOptions()-1);
         bankSelect->select(bankSelect->getNumOptions()-2);
         bankSelect->setTheme(mainGuiTheme);
     }
@@ -92,10 +93,10 @@ void ofxOceanodePresetsController::onGuiDropdownEvent(ofxDatGuiDropdownEvent e){
 void ofxOceanodePresetsController::onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e){
     if(ofGetKeyPressed(OF_KEY_SHIFT)){
         changePresetLabelHighliht(e.target);
-//        savePreset(e.target->getName(), bankSelect->getSelected()->getName());
+        savePreset(e.target->getName(), bankSelect->getSelected()->getName());
     }else{
         changePresetLabelHighliht(e.target);
-//        loadPresetWithFade(e.target->getName(), bankSelect->getSelected()->getName());
+        loadPreset(e.target->getName(), bankSelect->getSelected()->getName());
 //        if(autoPreset)
 //            presetChangedTimeStamp = ofGetElapsedTimef();
     }
@@ -112,7 +113,7 @@ void ofxOceanodePresetsController::onGuiTextInputEvent(ofxDatGuiTextInputEvent e
         
         presetsList->add(newPresetName);
         changePresetLabelHighliht(presetsList->get(presetsList->getNumItems()-1));
-        //savePreset(newPresetName, bankSelect->getSelected()->getName());
+        savePreset(newPresetName, bankSelect->getSelected()->getName());
         
         e.text = "";
     }
@@ -159,4 +160,12 @@ void ofxOceanodePresetsController::loadBank(){
     
     for(auto preset : presets)
         presetsList->add(preset.second);
+}
+
+void ofxOceanodePresetsController::loadPreset(string name, string bank){
+    container->loadPreset("Presets/" + bank + "/" + name);
+}
+
+void ofxOceanodePresetsController::savePreset(string name, string bank){
+    container->savePreset("Presets/" + bank + "/" + name);
 }

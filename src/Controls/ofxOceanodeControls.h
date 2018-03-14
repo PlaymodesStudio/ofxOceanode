@@ -11,9 +11,11 @@
 #include "ofMain.h"
 #include "ofxOceanodeBaseController.h"
 
+class ofxOceanodeContainer;
+
 class ofxOceanodeControls{
 public:
-    ofxOceanodeControls();
+    ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _container);
     ~ofxOceanodeControls(){};
     
     void draw(ofEventArgs &e);
@@ -27,6 +29,7 @@ public:
     void resizeButtons();
 private:
     std::shared_ptr<ofAppBaseWindow> controlsWindow;
+    std::shared_ptr<ofxOceanodeContainer> container;
     
     vector<unique_ptr<ofxOceanodeBaseController>> controllers;
     vector<ofRectangle> controllersButtons;

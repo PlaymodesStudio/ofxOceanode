@@ -45,9 +45,9 @@ public:
     
     ofxOceanodeNodeRegistry & getRegistry(){return *registry;};
     
-    void setTransformationMatrixToNodes(glm::mat4 m){
-        
-    }
+    bool loadPreset(string presetFolderPath);
+    bool savePreset(string presetFolderPath);
+    
     
 private:
     void temporalConnectionDestructor();

@@ -7,11 +7,11 @@ void ofApp::setup(){
     reg->registerModel<testNode>();
     
     
-    container = new ofxOceanodeContainer(reg);
+    container = make_shared<ofxOceanodeContainer>(reg);
     canvas.setContainer(container);
     canvas.setup();
     
-    controls = new ofxOceanodeControls();
+    controls = new ofxOceanodeControls(container);
 }
 
 //--------------------------------------------------------------
