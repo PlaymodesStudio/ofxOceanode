@@ -67,7 +67,7 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
     gui->onTextInputEvent(this, &ofxOceanodePresetsController::onGuiTextInputEvent);
     
     
-    oldPresetButton == nullptr;
+    oldPresetButton = nullptr;
 }
 
 void ofxOceanodePresetsController::draw(){

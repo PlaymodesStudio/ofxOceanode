@@ -35,6 +35,9 @@ public:
     
     void deleteSelf();
     
+    bool loadPreset(string presetFolderPath);
+    bool savePreset(string presetFolderPath);
+    
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
     
     ofParameterGroup* getParameters(){return nodeModel->getParameterGroup();};

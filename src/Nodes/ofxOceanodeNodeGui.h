@@ -29,6 +29,8 @@ public:
     glm::vec2 getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter);
     void setTransformationMatrix(ofParameter<glm::mat4> *mat);
     
+    glm::vec2 getPosition(){return glm::vec2(gui->getPosition().x, gui->getPosition().y);};
+    
     void mouseMoved(ofMouseEventArgs &args){};
     void mouseDragged(ofMouseEventArgs &args);
     void mousePressed(ofMouseEventArgs &args){};

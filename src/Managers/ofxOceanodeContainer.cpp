@@ -36,11 +36,23 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::disconnectConnection(ofxOce
     }
 }
 
-ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel){
-    int lastId = 1;
+ofxOceanodeNode& ofxOceanodeContainer::createNodeFromName(string name, int identifier){
+    unique_ptr<ofxOceanodeNodeModel> type = registry->create(name);
+    
+    if (type)
+    {
+        return createNode(std::move(type), identifier);
+    }
+}
+
+ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier){
+    int toBeCreatedId = identifier;
     string nodeToBeCreatedName = nodeModel->nodeName();
-    while (dynamicNodes[nodeToBeCreatedName].count(lastId) != 0) lastId++;
-    int toBeCreatedId = lastId;
+    if(identifier == -1){
+        int lastId = 1;
+        while (dynamicNodes[nodeToBeCreatedName].count(lastId) != 0) lastId++;
+        toBeCreatedId = lastId;
+    }
     nodeModel->setNumIdentifier(toBeCreatedId);
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
     auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);
@@ -78,8 +90,38 @@ void ofxOceanodeContainer::temporalConnectionDestructor(){
 
 bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     ofLog()<<"Load Preset " << presetFolderPath;
+    
+    //Read new nodes in preset
+    //Check if the nodes exists and update them, (or update all at the end)
+    //Create new modules and update them (or update at end)
+    ofJson json = ofLoadJson(presetFolderPath + "/modules.json");
+    for(auto &models : registry->getRegisteredModels()){
+        string moduleName = models.first;
+        for (ofJson::iterator it = json[moduleName].begin(); it != json[moduleName].end(); ++it) {
+            int identifier = ofToInt(it.key());
+            ofLog()<< moduleName << " " << identifier;
+            if(dynamicNodes[moduleName].count(identifier) == 0){
+                auto &node = createNodeFromName(moduleName, identifier);
+                node.getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
+            }
+        }
+    }
+    
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->loadPreset(presetFolderPath);
+        }
+    }
 }
 
 bool ofxOceanodeContainer::savePreset(string presetFolderPath){
     ofLog()<<"Save Preset " << presetFolderPath;
+    
+    ofJson json;
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            json[nodeTypeMap.first][ofToString(node.first)] = node.second->getNodeGui().getPosition();
+        }
+    }
+    ofSavePrettyJson(presetFolderPath + "/modules.json", json);
 }

@@ -122,3 +122,11 @@ void ofxOceanodeNode::deleteSelf(){
     inConnections.insert(inConnections.end(), outConnections.begin(), outConnections.end());
     ofNotifyEvent(deleteModuleAndConnections, inConnections);
 }
+
+bool ofxOceanodeNode::loadPreset(string presetFolderPath){
+    ofLog()<<"Load Preset " << presetFolderPath << " " << nodeModel->nodeName() << " " << nodeModel->getNumIdentifier();
+}
+
+bool ofxOceanodeNode::savePreset(string presetFolderPath){
+    ofLog()<<"Save Preset " << presetFolderPath;
+}
