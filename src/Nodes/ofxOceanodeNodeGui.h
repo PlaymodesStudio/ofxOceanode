@@ -53,6 +53,7 @@ private:
     void newModuleListener(ofxDatGuiDropdownEvent e);
     void newPresetListener(ofxDatGuiTextInputEvent e);
     
+    vector<ofEventListener> keyAndMouseListeners;
     vector<ofEventListener> parameterChangedListeners;
     ofEventListener transformMatrixListener;
     
