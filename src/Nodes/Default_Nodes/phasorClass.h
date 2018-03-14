@@ -18,7 +18,7 @@ public:
     phasorClass();
     ~phasorClass();
     
-    void update(ofEventArgs &e);
+    void update(ofEventArgs &e) override;
     
     float getPhasor();
     void resetPhasor();

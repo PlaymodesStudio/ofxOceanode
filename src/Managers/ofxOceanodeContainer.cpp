@@ -102,13 +102,28 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     ofJson json = ofLoadJson(presetFolderPath + "/modules.json");
     for(auto &models : registry->getRegisteredModels()){
         string moduleName = models.first;
+        vector<int>  vector_of_identifiers;
+        for(auto &nodes_of_a_give_type : dynamicNodes[moduleName]){
+            vector_of_identifiers.push_back(nodes_of_a_give_type.first);
+        }
+        for(auto identifier : vector_of_identifiers){
+            string stringIdentifier = ofToString(identifier);
+            if(json.find(moduleName) != json.end() && json[moduleName].find(stringIdentifier) != json[moduleName].end()){
+                vector<float> readArray = json[moduleName][stringIdentifier];
+                glm::vec2 position(readArray[0], readArray[1]);
+                dynamicNodes[moduleName][identifier]->getNodeGui().setPosition(position);
+                json[moduleName].erase(stringIdentifier);
+            }else{
+                dynamicNodes[moduleName][identifier]->deleteSelf();
+            }
+        }
         for (ofJson::iterator it = json[moduleName].begin(); it != json[moduleName].end(); ++it) {
             int identifier = ofToInt(it.key());
             ofLog()<< moduleName << " " << identifier;
             if(dynamicNodes[moduleName].count(identifier) == 0){
                 auto &node = createNodeFromName(moduleName, identifier);
+                node.getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
             }
-            dynamicNodes[moduleName][identifier]->getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
         }
     }
     

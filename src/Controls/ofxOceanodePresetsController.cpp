@@ -161,7 +161,7 @@ void ofxOceanodePresetsController::loadBank(){
     int numPresets = dir.listDir();
     ofLog() << "Dir size: " << ofToString(numPresets);
     for ( int i = 0 ; i < numPresets; i++)
-        presets.push_back(pair<int, string>(ofToInt(ofSplitString(dir.getName(i), "|")[0]), ofSplitString(dir.getName(i), ".")[0]));
+        presets.push_back(pair<int, string>(ofToInt(ofSplitString(dir.getName(i), "|")[0]), dir.getName(i)));
     
     std::sort(presets.begin(), presets.end(), [](pair<int, string> &left, pair<int, string> &right) {
         return left.first< right.first;
