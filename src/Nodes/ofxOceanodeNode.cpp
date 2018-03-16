@@ -95,6 +95,65 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionRelease(ofxOc
     return nullptr;
 }
 
+ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeContainer& container, ofAbstractParameter& sourceParameter, ofAbstractParameter& sinkParameter){
+    ofxOceanodeAbstractConnection* connection = nullptr;
+    ofAbstractParameter& source = sourceParameter;
+    ofAbstractParameter& sink = sinkParameter;
+    if(source.type() == sink.type()){
+        if(source.type() == typeid(ofParameter<int>).name()){
+            connection = container.connectConnection(source.cast<int>(), sink.cast<int>());
+        }
+        else if(source.type() == typeid(ofParameter<float>).name()){
+            connection = container.connectConnection(source.cast<float>(), sink.cast<float>());
+        }
+        else if(source.type() == typeid(ofParameter<bool>).name()){
+            connection = container.connectConnection(source.cast<bool>(), sink.cast<bool>());
+        }
+        else if(source.type() == typeid(ofParameter<void>).name()){
+            connection = container.connectConnection(source.cast<void>(), sink.cast<void>());
+        }
+        else if(source.type() == typeid(ofParameter<vector<float>>).name()){
+            connection = container.connectConnection(source.cast<vector<float>>(), sink.cast<vector<float>>());
+        }
+        else if(source.type() == typeid(ofParameterGroup).name()){
+            connection = container.connectConnection(source.castGroup().getInt(1), sink.castGroup().getInt(1));
+        }
+        else{
+            connection = nodeModel->createConnectionFromCustomType(container, source, sink);
+        }
+    }else if(source.type() == typeid(ofParameter<float>).name()){
+        if(sink.type() == typeid(ofParameter<int>).name()){
+            connection = container.connectConnection(source.cast<float>(), sink.cast<int>());
+        }else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+            connection = container.connectConnection(source.cast<float>(), sink.cast<vector<float>>());
+        }
+    }else if(source.type() == typeid(ofParameter<int>).name()){
+        if(sink.type() == typeid(ofParameter<float>).name()){
+            connection = container.connectConnection(source.cast<int>(), sink.cast<float>());
+        }
+    }else if(source.type() == typeid(ofParameter<vector<float>>).name()){
+        if(sink.type() == typeid(ofParameter<float>).name()){
+            connection = container.connectConnection(source.cast<vector<float>>(), sink.cast<float>());
+        }
+    }else if(source.type() == typeid(ofParameter<void>).name()){
+        if(sink.type() == typeid(ofParameter<bool>).name()){
+            connection = container.connectConnection(source.cast<void>(), sink.cast<bool>());
+        }else if(sink.type() == typeid(ofParameter<int>).name()){
+            connection = container.connectConnection(source.cast<void>(), sink.cast<int>());
+        }else if(sink.type() == typeid(ofParameter<float>).name()){
+            connection = container.connectConnection(source.cast<void>(), sink.cast<float>());
+        }else if(sink.type() == typeid(ofParameter<bool>).name()){
+            connection = container.connectConnection(source.cast<void>(), sink.cast<bool>());
+        }
+    }
+    
+    if(connection != nullptr){
+        connection->setSinkPosition(nodeGui->getSinkConnectionPositionFromParameter(sinkParameter));
+        addInputConnection(connection);
+    }
+    return connection;
+}
+
 void ofxOceanodeNode::moveConnections(glm::vec2 moveVector){
     for(auto c : inConnections){
         c->moveSinkPosition(moveVector);
@@ -124,7 +183,7 @@ void ofxOceanodeNode::deleteSelf(){
 }
 
 bool ofxOceanodeNode::loadPreset(string presetFolderPath){
-    ofLog()<<"Load Preset " << presetFolderPath << " " << nodeModel->nodeName() << " " << nodeModel->getNumIdentifier();
+    //ofLog()<<"Load Preset " << presetFolderPath << " " << nodeModel->nodeName() << " " << nodeModel->getNumIdentifier();
 }
 
 bool ofxOceanodeNode::savePreset(string presetFolderPath){

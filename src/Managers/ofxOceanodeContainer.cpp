@@ -21,6 +21,7 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstract
     temporalConnectionNode = &n;
     temporalConnection = new ofxOceanodeTemporalConnection(p);
     temporalConnection->setSourcePosition(n.getNodeGui().getSourceConnectionPositionFromParameter(p));
+    temporalConnection->getGraphics().subscribeToDrawEvent(window);
     ofAddListener(temporalConnection->destroyConnection, this, &ofxOceanodeContainer::temporalConnectionDestructor);
     return temporalConnection;
 }
@@ -119,13 +120,26 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         }
         for (ofJson::iterator it = json[moduleName].begin(); it != json[moduleName].end(); ++it) {
             int identifier = ofToInt(it.key());
-            ofLog()<< moduleName << " " << identifier;
             if(dynamicNodes[moduleName].count(identifier) == 0){
                 auto &node = createNodeFromName(moduleName, identifier);
                 node.getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
             }
         }
     }
+    
+    json.clear();
+    connections.clear();
+    json = ofLoadJson(presetFolderPath + "/connections.json");
+    for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
+        for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
+            for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
+                for (ofJson::iterator sinkParameter = sinkModule.value().begin(); sinkParameter != sinkModule.value().end(); ++sinkParameter) {
+                    createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key());
+                }
+            }
+        }
+    }
+    
     
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
@@ -144,4 +158,34 @@ bool ofxOceanodeContainer::savePreset(string presetFolderPath){
         }
     }
     ofSavePrettyJson(presetFolderPath + "/modules.json", json);
+    
+    json.clear();
+    for(auto &connection : connections){
+        string sourceName = connection.second->getSourceParameter().getName();
+        string sourceParentName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];
+        string sinkName = connection.second->getSinkParameter().getName();
+        string sinkParentName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];
+        json[sourceParentName][sourceName][sinkParentName][sinkName];
+    }
+    
+    ofSavePrettyJson(presetFolderPath + "/connections.json", json);
 }
+
+ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter){
+    string sourceModuleId = ofSplitString(sourceModule, "_").back();
+    sourceModule.erase(sourceModule.find(sourceModuleId)-1);
+    ofStringReplace(sourceModule, "_", " ");
+    
+    string sinkModuleId = ofSplitString(sinkModule, "_").back();
+    sinkModule.erase(sinkModule.find(sinkModuleId)-1);
+    ofStringReplace(sinkModule, "_", " ");
+    
+    ofAbstractParameter &source = dynamicNodes[sourceModule][ofToInt(sourceModuleId)]->getParameters()->get(sourceParameter);
+    ofAbstractParameter &sink = dynamicNodes[sinkModule][ofToInt(sinkModuleId)]->getParameters()->get(sinkParameter);
+    
+    temporalConnectionNode = dynamicNodes[sourceModule][ofToInt(sourceModuleId)].get();
+    auto connection = dynamicNodes[sinkModule][ofToInt(sinkModuleId)]->createConnection(*this, source, sink);
+    connection->setTransformationMatrix(&transformationMatrix);
+    temporalConnection = nullptr;
+}
+
