@@ -154,7 +154,8 @@ bool ofxOceanodeContainer::savePreset(string presetFolderPath){
     ofJson json;
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
-            json[nodeTypeMap.first][ofToString(node.first)] = node.second->getNodeGui().getPosition();
+            glm::vec2 pos = node.second->getNodeGui().getPosition();
+            json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y};
         }
     }
     ofSavePrettyJson(presetFolderPath + "/modules.json", json);
