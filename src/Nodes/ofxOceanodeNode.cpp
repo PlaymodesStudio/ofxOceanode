@@ -95,6 +95,65 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionRelease(ofxOc
     return nullptr;
 }
 
+ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeContainer& container, ofAbstractParameter& sourceParameter, ofAbstractParameter& sinkParameter){
+    ofxOceanodeAbstractConnection* connection = nullptr;
+    ofAbstractParameter& source = sourceParameter;
+    ofAbstractParameter& sink = sinkParameter;
+    if(source.type() == sink.type()){
+        if(source.type() == typeid(ofParameter<int>).name()){
+            connection = container.connectConnection(source.cast<int>(), sink.cast<int>());
+        }
+        else if(source.type() == typeid(ofParameter<float>).name()){
+            connection = container.connectConnection(source.cast<float>(), sink.cast<float>());
+        }
+        else if(source.type() == typeid(ofParameter<bool>).name()){
+            connection = container.connectConnection(source.cast<bool>(), sink.cast<bool>());
+        }
+        else if(source.type() == typeid(ofParameter<void>).name()){
+            connection = container.connectConnection(source.cast<void>(), sink.cast<void>());
+        }
+        else if(source.type() == typeid(ofParameter<vector<float>>).name()){
+            connection = container.connectConnection(source.cast<vector<float>>(), sink.cast<vector<float>>());
+        }
+        else if(source.type() == typeid(ofParameterGroup).name()){
+            connection = container.connectConnection(source.castGroup().getInt(1), sink.castGroup().getInt(1));
+        }
+        else{
+            connection = nodeModel->createConnectionFromCustomType(container, source, sink);
+        }
+    }else if(source.type() == typeid(ofParameter<float>).name()){
+        if(sink.type() == typeid(ofParameter<int>).name()){
+            connection = container.connectConnection(source.cast<float>(), sink.cast<int>());
+        }else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+            connection = container.connectConnection(source.cast<float>(), sink.cast<vector<float>>());
+        }
+    }else if(source.type() == typeid(ofParameter<int>).name()){
+        if(sink.type() == typeid(ofParameter<float>).name()){
+            connection = container.connectConnection(source.cast<int>(), sink.cast<float>());
+        }
+    }else if(source.type() == typeid(ofParameter<vector<float>>).name()){
+        if(sink.type() == typeid(ofParameter<float>).name()){
+            connection = container.connectConnection(source.cast<vector<float>>(), sink.cast<float>());
+        }
+    }else if(source.type() == typeid(ofParameter<void>).name()){
+        if(sink.type() == typeid(ofParameter<bool>).name()){
+            connection = container.connectConnection(source.cast<void>(), sink.cast<bool>());
+        }else if(sink.type() == typeid(ofParameter<int>).name()){
+            connection = container.connectConnection(source.cast<void>(), sink.cast<int>());
+        }else if(sink.type() == typeid(ofParameter<float>).name()){
+            connection = container.connectConnection(source.cast<void>(), sink.cast<float>());
+        }else if(sink.type() == typeid(ofParameter<bool>).name()){
+            connection = container.connectConnection(source.cast<void>(), sink.cast<bool>());
+        }
+    }
+    
+    if(connection != nullptr){
+        connection->setSinkPosition(nodeGui->getSinkConnectionPositionFromParameter(sinkParameter));
+        addInputConnection(connection);
+    }
+    return connection;
+}
+
 void ofxOceanodeNode::moveConnections(glm::vec2 moveVector){
     for(auto c : inConnections){
         c->moveSinkPosition(moveVector);
@@ -121,4 +180,59 @@ void ofxOceanodeNode::addInputConnection(ofxOceanodeAbstractConnection* c){
 void ofxOceanodeNode::deleteSelf(){
     inConnections.insert(inConnections.end(), outConnections.begin(), outConnections.end());
     ofNotifyEvent(deleteModuleAndConnections, inConnections);
+}
+
+bool ofxOceanodeNode::loadPreset(string presetFolderPath){
+    ofJson json = ofLoadJson(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json");
+    for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
+        ofAbstractParameter& p = getParameters()->get(it.key());
+        if(p.type() == typeid(ofParameter<float>).name()){
+            ofDeserialize(json, p);
+        }else if(p.type() == typeid(ofParameter<int>).name()){
+            ofDeserialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<bool>).name()){
+            ofDeserialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<ofColor>).name()){
+            ofDeserialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<vector<float>>).name()){
+            p.cast<vector<float>>() = vector<float>(1, it.value());
+        }
+        else if(p.type() == typeid(ofParameter<vector<int>>).name()){
+            p.cast<vector<int>>() = vector<int>(1, it.value());
+        }
+    }
+}
+
+bool ofxOceanodeNode::savePreset(string presetFolderPath){
+    ofJson json;
+    for(int i = 0; i < getParameters()->size(); i++){
+        ofAbstractParameter& p = getParameters()->get(i);
+        if(p.type() == typeid(ofParameter<float>).name()){
+            ofSerialize(json, p);
+        }else if(p.type() == typeid(ofParameter<int>).name()){
+            ofSerialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<bool>).name()){
+            ofSerialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<ofColor>).name()){
+            ofSerialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<vector<float>>).name()){
+            auto vecF = p.cast<vector<float>>().get();
+            if(vecF.size() == 1){
+                json[p.getEscapedName()] = vecF[0];
+            }
+        }
+        else if(p.type() == typeid(ofParameter<vector<int>>).name()){
+            auto vecI = p.cast<vector<float>>().get();
+            if(vecI.size() == 1){
+                json[p.getEscapedName()] = vecI[0];
+            }
+        }
+    }
+    ofSavePrettyJson(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json", json);
 }

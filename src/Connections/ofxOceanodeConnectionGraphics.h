@@ -17,8 +17,6 @@ public:
     ofxOceanodeConnectionGraphics(){
         points[0] = glm::vec2(-1, -1);
         points[1] = glm::vec2(-1, -1);
-        
-        drawEventListener = ofEvents().draw.newListener(this , &ofxOceanodeConnectionGraphics::draw);
     };
     ~ofxOceanodeConnectionGraphics(){};
     
@@ -72,6 +70,14 @@ public:
     }
     
     void deactivate(){points[1] = glm::vec2(-1, -1);};
+    
+    void subscribeToDrawEvent(shared_ptr<ofAppBaseWindow> w){
+        if(w == nullptr){
+            drawEventListener = ofEvents().draw.newListener(this , &ofxOceanodeConnectionGraphics::draw);
+        }else{
+            drawEventListener = w->events().draw.newListener(this , &ofxOceanodeConnectionGraphics::draw);
+        }
+    }
     
     glm::vec2 getPoint(int index){return points[index];};
     void setTransformationMatrix(ofParameter<glm::mat4> *m){transformationMatrix = m;};

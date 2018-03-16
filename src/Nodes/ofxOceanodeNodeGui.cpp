@@ -9,24 +9,40 @@
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeContainer.h"
 
-ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node) : container(_container), node(_node){
+ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node, shared_ptr<ofAppBaseWindow> window) : container(_container), node(_node){
     color = ofColor::red;
     position = glm::vec2(10, 10);
     isDraggingGui = false;
     
-    createGuiFromParameters();
-    ofRegisterMouseEvents(this);
+    createGuiFromParameters(window);
+    if(window == nullptr){
+        keyAndMouseListeners.push_back(ofEvents().mouseDragged.newListener(this,&ofxOceanodeNodeGui::mouseDragged));
+        keyAndMouseListeners.push_back(ofEvents().mouseMoved.newListener(this,&ofxOceanodeNodeGui::mouseMoved));
+        keyAndMouseListeners.push_back(ofEvents().mousePressed.newListener(this,&ofxOceanodeNodeGui::mousePressed));
+        keyAndMouseListeners.push_back(ofEvents().mouseReleased.newListener(this,&ofxOceanodeNodeGui::mouseReleased));
+        keyAndMouseListeners.push_back(ofEvents().mouseScrolled.newListener(this,&ofxOceanodeNodeGui::mouseScrolled));
+        keyAndMouseListeners.push_back(ofEvents().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
+        keyAndMouseListeners.push_back(ofEvents().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
+    }else{
+        keyAndMouseListeners.push_back(window->events().mouseDragged.newListener(this,&ofxOceanodeNodeGui::mouseDragged));
+        keyAndMouseListeners.push_back(window->events().mouseMoved.newListener(this,&ofxOceanodeNodeGui::mouseMoved));
+        keyAndMouseListeners.push_back(window->events().mousePressed.newListener(this,&ofxOceanodeNodeGui::mousePressed));
+        keyAndMouseListeners.push_back(window->events().mouseReleased.newListener(this,&ofxOceanodeNodeGui::mouseReleased));
+        keyAndMouseListeners.push_back(window->events().mouseScrolled.newListener(this,&ofxOceanodeNodeGui::mouseScrolled));
+        keyAndMouseListeners.push_back(window->events().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
+        keyAndMouseListeners.push_back(window->events().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
+    }
 }
 
 ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
-    ofUnregisterMouseEvents(this);
+    
 }
 
-void ofxOceanodeNodeGui::createGuiFromParameters(){
+void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> window){
     ofxDatGuiLog::quiet();
     ofxDatGui::setAssetPath("");
     
-    gui = make_unique<ofxDatGui>();
+    gui = make_unique<ofxDatGui>(0, 0, window);
     //        gui->setAutoDraw(false);
     
     //gui->setTransformMatrix(ofMatrix4x4(transformationMatrix));
@@ -123,6 +139,7 @@ ofParameterGroup* ofxOceanodeNodeGui::getParameters(){
 
 void ofxOceanodeNodeGui::setPosition(glm::vec2 _position){
     gui->setPosition(_position.x, _position.y);
+    node.moveConnections(_position - position);
     position = _position;
 }
 

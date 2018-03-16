@@ -15,10 +15,10 @@ class ofxOceanodeNode;
 
 class ofxOceanodeNodeGui{
 public:
-    ofxOceanodeNodeGui(ofxOceanodeContainer &container, ofxOceanodeNode &node);
+    ofxOceanodeNodeGui(ofxOceanodeContainer &container, ofxOceanodeNode &node, shared_ptr<ofAppBaseWindow> window);
     ~ofxOceanodeNodeGui();
     
-    void createGuiFromParameters();
+    void createGuiFromParameters(shared_ptr<ofAppBaseWindow> window);
     void updateGuiForParameter(string &parameterName);
     
     void setPosition(glm::vec2 position);
@@ -28,6 +28,8 @@ public:
     glm::vec2 getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter);
     glm::vec2 getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter);
     void setTransformationMatrix(ofParameter<glm::mat4> *mat);
+    
+    glm::vec2 getPosition(){return glm::vec2(gui->getPosition().x, gui->getPosition().y);};
     
     void mouseMoved(ofMouseEventArgs &args){};
     void mouseDragged(ofMouseEventArgs &args);
@@ -51,6 +53,7 @@ private:
     void newModuleListener(ofxDatGuiDropdownEvent e);
     void newPresetListener(ofxDatGuiTextInputEvent e);
     
+    vector<ofEventListener> keyAndMouseListeners;
     vector<ofEventListener> parameterChangedListeners;
     ofEventListener transformMatrixListener;
     

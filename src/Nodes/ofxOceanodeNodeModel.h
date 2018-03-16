@@ -26,6 +26,9 @@ public:
     ofxOceanodeNodeModel(string _name);
     virtual ~ofxOceanodeNodeModel(){};
     
+    virtual void update(ofEventArgs &e){};
+    virtual void draw(ofEventArgs &e){};
+    
     //get parameterGroup
     ofParameterGroup* getParameterGroup(){return parameters;};
     
@@ -39,11 +42,14 @@ public:
     
     ofEvent<string> parameterChangedMinMax;
     
+    void registerLoop(shared_ptr<ofAppBaseWindow> w = nullptr);
+    
 protected:
     ofParameterGroup* parameters;
 //    std::map<ofAbstractParameter&, parameterInfo> parametersInfo; //information about interaction of parameter
     
 private:
+    vector<ofEventListener> eventListeners;
     bool isDynamic;
     string nameIdentifier;
     uint numIdentifier;

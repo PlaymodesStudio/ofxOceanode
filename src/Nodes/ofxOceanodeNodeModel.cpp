@@ -16,3 +16,14 @@ void ofxOceanodeNodeModel::setNumIdentifier(uint num){
     numIdentifier = num;
     parameters->setName(nameIdentifier + " " + ofToString(num));
 }
+
+void ofxOceanodeNodeModel::registerLoop(shared_ptr<ofAppBaseWindow> w){
+    if(w == nullptr){
+        eventListeners.push_back(ofEvents().draw.newListener(this, &ofxOceanodeNodeModel::draw));
+        eventListeners.push_back(ofEvents().update.newListener(this, &ofxOceanodeNodeModel::update));
+    }else{
+        eventListeners.push_back(w->events().draw.newListener(this, &ofxOceanodeNodeModel::draw));
+        eventListeners.push_back(w->events().update.newListener(this, &ofxOceanodeNodeModel::update));
+    }
+    
+}

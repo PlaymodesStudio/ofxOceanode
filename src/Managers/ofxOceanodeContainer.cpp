@@ -9,7 +9,8 @@
 #include "ofxOceanodeContainer.h"
 
 ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry) : registry(_registry){
-    
+    window = ofGetCurrentWindow();
+    transformationMatrix = glm::mat4(1);
 }
 
 ofxOceanodeContainer::~ofxOceanodeContainer(){
@@ -20,6 +21,7 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstract
     temporalConnectionNode = &n;
     temporalConnection = new ofxOceanodeTemporalConnection(p);
     temporalConnection->setSourcePosition(n.getNodeGui().getSourceConnectionPositionFromParameter(p));
+    temporalConnection->getGraphics().subscribeToDrawEvent(window);
     ofAddListener(temporalConnection->destroyConnection, this, &ofxOceanodeContainer::temporalConnectionDestructor);
     return temporalConnection;
 }
@@ -36,14 +38,30 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::disconnectConnection(ofxOce
     }
 }
 
-ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel){
-    int lastId = 1;
+ofxOceanodeNode& ofxOceanodeContainer::createNodeFromName(string name, int identifier){
+    unique_ptr<ofxOceanodeNodeModel> type = registry->create(name);
+    
+    if (type)
+    {
+        auto &node =  createNode(std::move(type), identifier);
+        node.getNodeGui().setTransformationMatrix(&transformationMatrix);
+        return node;
+    }
+    
+}
+
+ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier){
+    int toBeCreatedId = identifier;
     string nodeToBeCreatedName = nodeModel->nodeName();
-    while (dynamicNodes[nodeToBeCreatedName].count(lastId) != 0) lastId++;
-    int toBeCreatedId = lastId;
+    if(identifier == -1){
+        int lastId = 1;
+        while (dynamicNodes[nodeToBeCreatedName].count(lastId) != 0) lastId++;
+        toBeCreatedId = lastId;
+    }
     nodeModel->setNumIdentifier(toBeCreatedId);
+    nodeModel->registerLoop(window);
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
-    auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);
+    auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node, window);
     node->setGui(std::move(nodeGui));
     
     auto nodePtr = node.get();
@@ -75,3 +93,106 @@ void ofxOceanodeContainer::temporalConnectionDestructor(){
     delete temporalConnection;
     temporalConnection = nullptr;
 }
+
+bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
+    ofLog()<<"Load Preset " << presetFolderPath;
+    
+    //Read new nodes in preset
+    //Check if the nodes exists and update them, (or update all at the end)
+    //Create new modules and update them (or update at end)
+    ofJson json = ofLoadJson(presetFolderPath + "/modules.json");
+    for(auto &models : registry->getRegisteredModels()){
+        string moduleName = models.first;
+        vector<int>  vector_of_identifiers;
+        for(auto &nodes_of_a_give_type : dynamicNodes[moduleName]){
+            vector_of_identifiers.push_back(nodes_of_a_give_type.first);
+        }
+        for(auto identifier : vector_of_identifiers){
+            string stringIdentifier = ofToString(identifier);
+            if(json.find(moduleName) != json.end() && json[moduleName].find(stringIdentifier) != json[moduleName].end()){
+                vector<float> readArray = json[moduleName][stringIdentifier];
+                glm::vec2 position(readArray[0], readArray[1]);
+                dynamicNodes[moduleName][identifier]->getNodeGui().setPosition(position);
+                json[moduleName].erase(stringIdentifier);
+            }else{
+                dynamicNodes[moduleName][identifier]->deleteSelf();
+            }
+        }
+        for (ofJson::iterator it = json[moduleName].begin(); it != json[moduleName].end(); ++it) {
+            int identifier = ofToInt(it.key());
+            if(dynamicNodes[moduleName].count(identifier) == 0){
+                auto &node = createNodeFromName(moduleName, identifier);
+                node.getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
+            }
+        }
+    }
+    
+    json.clear();
+    connections.clear();
+    json = ofLoadJson(presetFolderPath + "/connections.json");
+    for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
+        for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
+            for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
+                for (ofJson::iterator sinkParameter = sinkModule.value().begin(); sinkParameter != sinkModule.value().end(); ++sinkParameter) {
+                    createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key());
+                }
+            }
+        }
+    }
+    
+    
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->loadPreset(presetFolderPath);
+        }
+    }
+}
+
+bool ofxOceanodeContainer::savePreset(string presetFolderPath){
+    ofLog()<<"Save Preset " << presetFolderPath;
+    
+    ofJson json;
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            json[nodeTypeMap.first][ofToString(node.first)] = node.second->getNodeGui().getPosition();
+        }
+    }
+    ofSavePrettyJson(presetFolderPath + "/modules.json", json);
+    
+    json.clear();
+    for(auto &connection : connections){
+        string sourceName = connection.second->getSourceParameter().getName();
+        string sourceParentName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];
+        string sinkName = connection.second->getSinkParameter().getName();
+        string sinkParentName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];
+        json[sourceParentName][sourceName][sinkParentName][sinkName];
+    }
+    
+    ofSavePrettyJson(presetFolderPath + "/connections.json", json);
+    
+    
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->savePreset(presetFolderPath);
+        }
+    }
+}
+
+ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter){
+    string sourceModuleId = ofSplitString(sourceModule, "_").back();
+    sourceModule.erase(sourceModule.find(sourceModuleId)-1);
+    ofStringReplace(sourceModule, "_", " ");
+    
+    string sinkModuleId = ofSplitString(sinkModule, "_").back();
+    sinkModule.erase(sinkModule.find(sinkModuleId)-1);
+    ofStringReplace(sinkModule, "_", " ");
+    
+    ofAbstractParameter &source = dynamicNodes[sourceModule][ofToInt(sourceModuleId)]->getParameters()->get(sourceParameter);
+    ofAbstractParameter &sink = dynamicNodes[sinkModule][ofToInt(sinkModuleId)]->getParameters()->get(sinkParameter);
+    
+    temporalConnectionNode = dynamicNodes[sourceModule][ofToInt(sourceModuleId)].get();
+    auto connection = dynamicNodes[sinkModule][ofToInt(sinkModuleId)]->createConnection(*this, source, sink);
+    connection->setTransformationMatrix(&transformationMatrix);
+    temporalConnection = nullptr;
+}
+

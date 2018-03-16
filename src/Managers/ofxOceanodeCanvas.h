@@ -33,7 +33,7 @@ public:
     void mouseEntered(ofMouseEventArgs &e){};
     void mouseExited(ofMouseEventArgs &e){};
     
-    void setContainer(ofxOceanodeContainer* c){container = c;};
+    void setContainer(shared_ptr<ofxOceanodeContainer> c){container = c;};
     
     void newModuleListener(ofxDatGuiDropdownEvent e);
 private:
@@ -43,11 +43,13 @@ private:
     glm::vec2 screenToCanvas(glm::vec2 p);
     glm::vec2 canvasToScreen(glm::vec2 p);
     
-    ofxOceanodeContainer* container;
+    shared_ptr<ofxOceanodeContainer> container;
     ofxDatGui *popUpMenu;
     
-    ofParameter<glm::mat4> transformationMatrix;
+    ofParameter<glm::mat4> *transformationMatrix;
     glm::vec2 dragCanvasInitialPoint;
+    
+    ofEventListener changedTransformationMatrix;
 };
 
 #endif /* ofxOceanodeCanvas_h */

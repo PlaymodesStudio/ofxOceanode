@@ -12,5 +12,6 @@
 #include "ofxOceanodeCanvas.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeNode.h"
+#include "ofxOceanodeControls.h"
 
 #endif /* ofxOceanode_h */

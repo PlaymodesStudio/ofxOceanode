@@ -22,8 +22,8 @@ public:
                          make_shared<ofxOceanodeNodeRegistry>());
     ~ofxOceanodeContainer();
     
-    ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel);
-    
+    ofxOceanodeNode& createNodeFromName(string name, int identifier = -1);
+    ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier = -1);
     
 //    void createConnection(ofAbstractParameter& p);
     
@@ -40,14 +40,17 @@ public:
         connections.push_back(make_pair(temporalConnectionNode, make_shared<ofxOceanodeConnection<Tsource, Tsink>>(source, sink)));
         temporalConnectionNode->addOutputConnection(connections.back().second.get());
         connections.back().second->setSourcePosition(temporalConnectionNode->getNodeGui().getSourceConnectionPositionFromParameter(source));
+        connections.back().second->getGraphics().subscribeToDrawEvent(window);
         return connections.back().second.get();
     }
+    ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter);
     
     ofxOceanodeNodeRegistry & getRegistry(){return *registry;};
     
-    void setTransformationMatrixToNodes(glm::mat4 m){
-        
-    }
+    bool loadPreset(string presetFolderPath);
+    bool savePreset(string presetFolderPath);
+    
+    ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
     
 private:
     void temporalConnectionDestructor();
@@ -62,7 +65,11 @@ private:
     vector<pair<ofxOceanodeNode*, shared_ptr<ofxOceanodeAbstractConnection>>> connections;
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;
     
-    vector<ofEventListener> destroyNodeListeners;;
+    vector<ofEventListener> destroyNodeListeners;
+    
+    shared_ptr<ofAppBaseWindow> window;
+    
+    ofParameter<glm::mat4> transformationMatrix;
 };
 
 #endif /* ofxOceanodeContainer_h */

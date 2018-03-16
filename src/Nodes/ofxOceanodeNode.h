@@ -26,6 +26,7 @@ public:
     ofxOceanodeAbstractConnection* parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter);
     ofxOceanodeAbstractConnection* parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter);
     
+    ofxOceanodeAbstractConnection* createConnection(ofxOceanodeContainer& container, ofAbstractParameter& sourceParameter, ofAbstractParameter& sinkParameter);
     
     void addOutputConnection(ofxOceanodeAbstractConnection* c);
     
@@ -34,6 +35,9 @@ public:
     void moveConnections(glm::vec2 moveVector);
     
     void deleteSelf();
+    
+    bool loadPreset(string presetFolderPath);
+    bool savePreset(string presetFolderPath);
     
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
     

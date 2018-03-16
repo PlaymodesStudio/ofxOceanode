@@ -40,6 +40,8 @@ public:
         graphics.movePoint(1, moveVec);
     }
     
+    ofxOceanodeConnectionGraphics& getGraphics(){return graphics;};
+    
     glm::vec2 getPostion(int index){return graphics.getPoint(index);};
     void setTransformationMatrix(ofParameter<glm::mat4> *m){graphics.setTransformationMatrix(m);};
     

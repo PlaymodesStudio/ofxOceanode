@@ -21,7 +21,7 @@ public:
         }
     };
     
-    void draw(ofEventArgs &e);
+    void drawCustomWindow(ofEventArgs &e);
     
     void keyPressed(ofKeyEventArgs &a);
 //    void keyReleased(ofKeyEventArgs &a);
