@@ -183,9 +183,56 @@ void ofxOceanodeNode::deleteSelf(){
 }
 
 bool ofxOceanodeNode::loadPreset(string presetFolderPath){
-    //ofLog()<<"Load Preset " << presetFolderPath << " " << nodeModel->nodeName() << " " << nodeModel->getNumIdentifier();
+    ofJson json = ofLoadJson(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json");
+    for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
+        ofAbstractParameter& p = getParameters()->get(it.key());
+        if(p.type() == typeid(ofParameter<float>).name()){
+            ofDeserialize(json, p);
+        }else if(p.type() == typeid(ofParameter<int>).name()){
+            ofDeserialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<bool>).name()){
+            ofDeserialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<ofColor>).name()){
+            ofDeserialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<vector<float>>).name()){
+            p.cast<vector<float>>() = vector<float>(1, it.value());
+        }
+        else if(p.type() == typeid(ofParameter<vector<int>>).name()){
+            p.cast<vector<int>>() = vector<int>(1, it.value());
+        }
+    }
 }
 
 bool ofxOceanodeNode::savePreset(string presetFolderPath){
-    ofLog()<<"Save Preset " << presetFolderPath;
+    ofJson json;
+    for(int i = 0; i < getParameters()->size(); i++){
+        ofAbstractParameter& p = getParameters()->get(i);
+        if(p.type() == typeid(ofParameter<float>).name()){
+            ofSerialize(json, p);
+        }else if(p.type() == typeid(ofParameter<int>).name()){
+            ofSerialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<bool>).name()){
+            ofSerialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<ofColor>).name()){
+            ofSerialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<vector<float>>).name()){
+            auto vecF = p.cast<vector<float>>().get();
+            if(vecF.size() == 1){
+                json[p.getEscapedName()] = vecF[0];
+            }
+        }
+        else if(p.type() == typeid(ofParameter<vector<int>>).name()){
+            auto vecI = p.cast<vector<float>>().get();
+            if(vecI.size() == 1){
+                json[p.getEscapedName()] = vecI[0];
+            }
+        }
+    }
+    ofSavePrettyJson(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json", json);
 }

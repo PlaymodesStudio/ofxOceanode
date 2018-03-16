@@ -169,6 +169,13 @@ bool ofxOceanodeContainer::savePreset(string presetFolderPath){
     }
     
     ofSavePrettyJson(presetFolderPath + "/connections.json", json);
+    
+    
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->savePreset(presetFolderPath);
+        }
+    }
 }
 
 ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter){
