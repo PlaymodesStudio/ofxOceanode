@@ -11,6 +11,7 @@
 ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry) : registry(_registry){
     window = ofGetCurrentWindow();
     transformationMatrix = glm::mat4(1);
+    temporalConnection = nullptr;
 }
 
 ofxOceanodeContainer::~ofxOceanodeContainer(){
@@ -96,6 +97,8 @@ void ofxOceanodeContainer::temporalConnectionDestructor(){
 
 bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     ofLog()<<"Load Preset " << presetFolderPath;
+    
+    window->makeCurrent();
     
     //Read new nodes in preset
     //Check if the nodes exists and update them, (or update all at the end)
