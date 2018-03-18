@@ -96,7 +96,7 @@ private:
         parameterEventListener = sourceParameter.newListener([&](Tsource &p){
             sinkParameter = sourceParameter;
         });
-        sinkParameter = sourceParameter;
+        //sinkParameter = sourceParameter;
     }
     ofEventListener parameterEventListener;
     ofParameter<Tsource>& sourceParameter;
@@ -110,7 +110,7 @@ public:
         parameterEventListener = sourceParameter.newListener([&](T &f){
             sinkParameter = vector<T>(1, f);
         });
-        sinkParameter = vector<T>(1, sourceParameter);
+        //sinkParameter = vector<T>(1, sourceParameter);
     }
     ~ofxOceanodeConnection(){
         ofNotifyEvent(destroyConnection);
@@ -131,9 +131,9 @@ public:
                 sinkParameter = vf[0];
             }
         });
-        if(sourceParameter.get().size() > 0){
-            sinkParameter = sourceParameter.get()[0];
-        }
+//        if(sourceParameter.get().size() > 0){
+//            sinkParameter = sourceParameter.get()[0];
+//        }
     }
     ~ofxOceanodeConnection(){
         ofNotifyEvent(destroyConnection);
