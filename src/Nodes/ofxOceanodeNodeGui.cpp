@@ -10,7 +10,7 @@
 #include "ofxOceanodeContainer.h"
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node, shared_ptr<ofAppBaseWindow> window) : container(_container), node(_node){
-    color = ofColor::red;
+    color = ofColor(ofRandom(255), ofRandom(255), ofRandom(255));
     position = glm::vec2(10, 10);
     isDraggingGui = false;
     
@@ -43,24 +43,6 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
     ofxDatGui::setAssetPath("");
     
     gui = make_unique<ofxDatGui>(0, 0, window);
-    //        gui->setAutoDraw(false);
-    
-    //gui->setTransformMatrix(ofMatrix4x4(transformationMatrix));
-    
-    ofxDatGuiTheme* theme = new ofxDatGuiThemeCharcoal;
-    theme->color.slider.fill = color;
-    theme->color.textInput.text = color;
-    theme->color.icons = color;
-    gui->setTheme(theme);
-    
-    gui->setWidth(290);
-    gui->addHeader(getParameters()->getName());
-    gui->addFooter();
-    if(position == glm::vec2(-1, -1)){
-        gui->setPosition(0, 0);
-    }else{
-        gui->setPosition(position.x, position.y);
-    }
     
     for(int i=0 ; i<getParameters()->size(); i++){
         ofAbstractParameter &absParam = getParameters()->get(i);
@@ -102,6 +84,22 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
         }else {
             gui->addLabel(absParam.getName());
         }
+    }
+    
+    gui->addHeader(getParameters()->getName());
+    gui->addFooter();
+    
+    ofxDatGuiTheme* theme = new ofxDatGuiThemeCharcoal;
+    theme->color.slider.fill = color;
+    theme->color.textInput.text = color;
+    theme->color.icons = color;
+    theme->layout.width = 290;
+    gui->setTheme(theme, true);
+   
+    if(position == glm::vec2(-1, -1)){
+        gui->setPosition(0, 0);
+    }else{
+        gui->setPosition(position.x, position.y);
     }
     
     //GUIS EVENT LISTERNERS
