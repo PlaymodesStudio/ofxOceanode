@@ -22,7 +22,7 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
 //    }
     prevSettings.windowMode = OF_WINDOW;
     prevSettings.resizable = true;
-//    prevSettings.shareContextWith = ofGetCurrentWindow();
+    prevSettings.shareContextWith = ofGetCurrentWindow();
     prevSettings.setGLVersion(ofGetGLRenderer()->getGLVersionMajor(), ofGetGLRenderer()->getGLVersionMinor());
     controlsWindow = ofCreateWindow(prevSettings);
     controlsWindow->setWindowTitle("Controls");
