@@ -64,6 +64,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
     auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node, window);
     node->setGui(std::move(nodeGui));
+    node->setBpm(bpm);
     
     auto nodePtr = node.get();
     dynamicNodes[nodeToBeCreatedName][toBeCreatedId] = std::move(node);
@@ -178,6 +179,15 @@ bool ofxOceanodeContainer::savePreset(string presetFolderPath){
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->savePreset(presetFolderPath);
+        }
+    }
+}
+
+void ofxOceanodeContainer::setBpm(float _bpm){
+    bpm = _bpm;
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->setBpm(bpm);
         }
     }
 }

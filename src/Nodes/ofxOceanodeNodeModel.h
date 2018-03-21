@@ -44,10 +44,13 @@ public:
     
     void registerLoop(shared_ptr<ofAppBaseWindow> w = nullptr);
     
+    bool getAutoBPM(){return autoBPM;};
+    virtual void setBpm(float _bpm){};
+    
 protected:
     ofParameterGroup* parameters;
 //    std::map<ofAbstractParameter&, parameterInfo> parametersInfo; //information about interaction of parameter
-    
+    bool autoBPM;
 private:
     vector<ofEventListener> eventListeners;
     bool isDynamic;

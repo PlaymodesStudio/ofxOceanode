@@ -13,7 +13,7 @@ testNode::testNode() : ofxOceanodeNodeModel("Test"){
     parameters->add(intParam.set("int", 0, 0, 100));
     parameters->add(floatParam.set("float", 3, 0, 10));
     parameters->add(boolParam.set("bool", true));
-    parameters->add(voidParam.set("Button"));
+    parameters->add(voidParam.set("Request BPM"));
     parameters->add(textParam.set("testInput", "adfas"));
     parameters->add(labelParam.set("testLabel", ' '));
     parameters->add(colorParam.set("Color", ofColor::red, ofColor::white, ofColor::black));
@@ -22,6 +22,7 @@ testNode::testNode() : ofxOceanodeNodeModel("Test"){
     listener = voidParam.newListener([&](){
         customClass* c = new customClass();
         intModParam = c;
+        ofLog()<<"current BPM is " << bpm;
     });
     
     listener2 = intModParam.newListener([&](customClass* &c){

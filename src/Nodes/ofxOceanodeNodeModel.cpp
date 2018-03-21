@@ -10,6 +10,7 @@
 
 ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name){
     parameters = new ofParameterGroup(_name);
+    autoBPM = true;
 }
 
 void ofxOceanodeNodeModel::setNumIdentifier(uint num){
@@ -25,5 +26,4 @@ void ofxOceanodeNodeModel::registerLoop(shared_ptr<ofAppBaseWindow> w){
         eventListeners.push_back(w->events().draw.newListener(this, &ofxOceanodeNodeModel::draw));
         eventListeners.push_back(w->events().update.newListener(this, &ofxOceanodeNodeModel::update));
     }
-    
 }

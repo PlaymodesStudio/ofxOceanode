@@ -236,3 +236,11 @@ bool ofxOceanodeNode::savePreset(string presetFolderPath){
     }
     ofSavePrettyJson(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json", json);
 }
+
+void ofxOceanodeNode::setBpm(float bpm){
+    if(getParameters()->contains("BPM") && nodeModel->getAutoBPM()){
+        getParameters()->getFloat("BPM") = bpm;
+    }else{
+        nodeModel->setBpm(bpm);
+    }
+}

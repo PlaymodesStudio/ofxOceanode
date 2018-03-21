@@ -50,6 +50,8 @@ public:
     bool loadPreset(string presetFolderPath);
     bool savePreset(string presetFolderPath);
     
+    void setBpm(float _bpm);
+    
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
     
 private:
@@ -70,6 +72,7 @@ private:
     shared_ptr<ofAppBaseWindow> window;
     
     ofParameter<glm::mat4> transformationMatrix;
+    float bpm;
 };
 
 #endif /* ofxOceanodeContainer_h */

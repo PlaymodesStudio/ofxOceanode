@@ -27,6 +27,8 @@ public:
         
     ofxOceanodeAbstractConnection* createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink) override;
 
+    void setBpm(float _bpm) override {bpm = _bpm;};
+    
 private:
     ofEventListener listener;
     ofEventListener listener2;
@@ -39,6 +41,8 @@ private:
     ofParameter<string> textParam;
     ofParameter<char> labelParam;
     ofParameter<ofColor>  colorParam;
+    
+    float bpm;
 };
 
 #endif /* testNode_h */

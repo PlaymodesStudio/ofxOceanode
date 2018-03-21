@@ -39,7 +39,7 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     //        glfwSetWindowCloseCallback(glfwWindow, window_no_close_indexer);
     
     controllers.push_back(make_unique<ofxOceanodePresetsController>(container));
-    controllers.push_back(make_unique<ofxOceanodeBPMController>());
+    controllers.push_back(make_unique<ofxOceanodeBPMController>(container));
     controllers.push_back(make_unique<ofxOceanodeBaseController>("Midi"));
     controllers.push_back(make_unique<ofxOceanodeBaseController>("Osc"));
     controllers.push_back(make_unique<ofxOceanodeBaseController>("Artnet"));

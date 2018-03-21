@@ -39,6 +39,8 @@ public:
     bool loadPreset(string presetFolderPath);
     bool savePreset(string presetFolderPath);
     
+    void setBpm(float bpm);
+    
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
     
     ofParameterGroup* getParameters(){return nodeModel->getParameterGroup();};

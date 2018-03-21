@@ -11,9 +11,11 @@
 #include "ofxOceanodeBaseController.h"
 #include "ofxDatGui.h"
 
+class ofxOceanodeContainer;
+
 class ofxOceanodeBPMController: public ofxOceanodeBaseController{
 public:
-    ofxOceanodeBPMController();
+    ofxOceanodeBPMController(shared_ptr<ofxOceanodeContainer> _container);
     ~ofxOceanodeBPMController(){};
     
     void draw();
@@ -32,6 +34,9 @@ private:
     ofxDatGuiTheme* mainGuiTheme;
     
     ofParameter<float> bpm;
+    ofEventListener bpmListener;
+    
+    shared_ptr<ofxOceanodeContainer> container;
 };
 
 
