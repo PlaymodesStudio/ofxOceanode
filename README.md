@@ -1,7 +1,7 @@
 ofxOceanode
 =====================================
 
-Work in Progress. It is in a usable state. But a lot of things are missing (midi, osc, presets, infinite canvas...).
+Work in Progress. Base functionality implemented. Misses extensions (midi, osc, autoBPM...).
 
 Introduction
 ------------
