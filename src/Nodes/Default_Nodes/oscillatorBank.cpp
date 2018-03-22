@@ -53,6 +53,12 @@ oscillatorBank::oscillatorBank() : baseIndexer(100, "Oscillator Bank"){
     phasorIn.addListener(this, &oscillatorBank::newPhasorIn);
 }
 
+void oscillatorBank::presetRecallBeforeSettingParameters(ofJson &json){
+    if(json.count("Size") == 1){
+        parameters->getInt("Size") = ofToInt(json["Size"]);
+    }
+}
+
 void oscillatorBank::indexCountChanged(int &newIndexCount){
     baseIndexer::indexCountChanged(newIndexCount);
     oscillators.resize(newIndexCount);

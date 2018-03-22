@@ -10,6 +10,7 @@
 
 baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name){
     indexCount.set("Size", numIndexs, 1, 100000);
+    previousIndexCount = indexCount;
     indexs.resize(indexCount, 0);
     indexRand.resize(indexCount , 0);
     for(int i = 0; i < indexRand.size(); i++)
@@ -41,36 +42,39 @@ baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name
 }
 
 void baseIndexer::indexCountChanged(int &indexCount){
-    indexs.resize(indexCount, 0);
-    indexRand.resize(indexCount , 0);
-    for(int i = 0; i < indexRand.size(); i++)
-        indexRand[i] = i-((float)indexRand.size()/2.f);
-    
-    numWaves_Param.setMax(indexCount);
-    string name1 = numWaves_Param.getName();
-    ofNotifyEvent(parameterChangedMinMax, name1);
-    
-//    symmetry_Param.set("Symmetry", 0, 0, 10);
-    indexOffset_Param.set("Index Offset", 0, -indexCount/2, indexCount/2);
-    indexOffset_Param.setMin(-indexCount/2);
-    indexOffset_Param.setMax(indexCount/2);
-    string name2 = indexOffset_Param.getName();
-    ofNotifyEvent(parameterChangedMinMax, name2);
-    
-    float indexQuantNormalized = (float)indexQuant_Param / (float)indexQuant_Param.getMax();
-    indexQuant_Param.setMax(indexCount);
-    string name3 = indexQuant_Param.getName();
-    ofNotifyEvent(parameterChangedMinMax, name3);
-    indexQuant_Param = indexQuantNormalized * indexCount;
-    
-    
-    float indexModuloNormalized = (float)modulo_Param / (float)modulo_Param.getMax();
-    modulo_Param.setMax(indexCount);
-    string name4 = modulo_Param.getName();
-    ofNotifyEvent(parameterChangedMinMax, name4);
-    modulo_Param.set(indexModuloNormalized * indexCount);
-    
-    recomputeIndexs();
+    if(indexCount != previousIndexCount){
+        indexs.resize(indexCount, 0);
+        indexRand.resize(indexCount , 0);
+        for(int i = 0; i < indexRand.size(); i++)
+            indexRand[i] = i-((float)indexRand.size()/2.f);
+        
+        numWaves_Param.setMax(indexCount);
+        string name1 = numWaves_Param.getName();
+        ofNotifyEvent(parameterChangedMinMax, name1);
+        
+        //    symmetry_Param.set("Symmetry", 0, 0, 10);
+        indexOffset_Param.set("Index Offset", 0, -indexCount/2, indexCount/2);
+        indexOffset_Param.setMin(-indexCount/2);
+        indexOffset_Param.setMax(indexCount/2);
+        string name2 = indexOffset_Param.getName();
+        ofNotifyEvent(parameterChangedMinMax, name2);
+        
+        float indexQuantNormalized = (float)indexQuant_Param / (float)indexQuant_Param.getMax();
+        indexQuant_Param.setMax(indexCount);
+        string name3 = indexQuant_Param.getName();
+        ofNotifyEvent(parameterChangedMinMax, name3);
+        indexQuant_Param = indexQuantNormalized * indexCount;
+        
+        
+        float indexModuloNormalized = (float)modulo_Param / (float)modulo_Param.getMax();
+        modulo_Param.setMax(indexCount);
+        string name4 = modulo_Param.getName();
+        ofNotifyEvent(parameterChangedMinMax, name4);
+        modulo_Param.set(indexModuloNormalized * indexCount);
+        
+        recomputeIndexs();
+    }
+    previousIndexCount = indexCount;
 }
 
 void baseIndexer::putParametersInParametersGroup(ofParameterGroup* parameters){
