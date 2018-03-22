@@ -207,6 +207,9 @@ bool ofxOceanodeNode::loadPreset(string presetFolderPath){
             else if(p.type() == typeid(ofParameter<vector<int>>).name()){
                 p.cast<vector<int>>() = vector<int>(1, it.value());
             }
+            else if(p.type() == typeid(ofParameterGroup).name()){
+                ofDeserialize(json, p.castGroup().getInt(1));
+            }
         }
     }
     
@@ -239,6 +242,9 @@ bool ofxOceanodeNode::savePreset(string presetFolderPath){
             if(vecI.size() == 1){
                 json[p.getEscapedName()] = vecI[0];
             }
+        }
+        else if(p.type() == typeid(ofParameterGroup).name()){
+            ofSerialize(json, p.castGroup().getInt(1));
         }
     }
     nodeModel->presetSave(json);
