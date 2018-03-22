@@ -19,20 +19,34 @@ void ofxOceanodeCanvas::setup(){
     ofRegisterKeyEvents(this);
     ofRegisterMouseEvents(this);
     
+    transformationMatrix = &container->getTransformationMatrix();
+    
     ///POP UP MENuS
     popUpMenu = new ofxDatGui();
     popUpMenu->setVisible(false);
     popUpMenu->setPosition(-1, -1);
     auto const &models = container->getRegistry().getRegisteredModels();
-    vector<string> options;
-    for(auto &model : models){
-        options.push_back(model.first);
+    auto const &categories = container->getRegistry().getCategories();
+    auto const &categoriesModelsAssociation = container->getRegistry().getRegisteredModelsCategoryAssociation();
+    
+    vector<string> categoriesVector;
+    for(auto cat : categories){
+        categoriesVector.push_back(cat);
     }
-    std::sort(options.begin(), options.end());
     
-    transformationMatrix = &container->getTransformationMatrix();
+    vector<vector<string>> options = vector<vector<string>>(categories.size());
+    for(int i = 0; i < categories.size(); i++){
+        vector<string> options;
+        for(auto &model : models){
+            if(categoriesModelsAssociation.at(model.first) == categoriesVector[i]){
+                options.push_back(model.first);
+            }
+        }
+        std::sort(options.begin(), options.end());
+        modulesSelectors.push_back(popUpMenu->addDropdown(categoriesVector[i], options));
+        modulesSelectors.back()->expand();
+    }
     
-    popUpMenu->addDropdown("Choose module", options)->expand();
     popUpMenu->onDropdownEvent(this, &ofxOceanodeCanvas::newModuleListener);
 }
 
@@ -48,8 +62,10 @@ void ofxOceanodeCanvas::newModuleListener(ofxDatGuiDropdownEvent e){
     }
     popUpMenu->setVisible(false);
     popUpMenu->setPosition(-1, -1);
-    ofxDatGuiDropdown* drop = popUpMenu->getDropdown("Choose module");
-    drop->setLabel("Choose module");
+    for(auto drop : modulesSelectors){
+        drop->setLabel(drop->getName());
+        drop->expand();
+    }
 }
 
 void ofxOceanodeCanvas::keyPressed(ofKeyEventArgs &e){
@@ -74,7 +90,6 @@ void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
         if(e.button == 0){
             popUpMenu->setPosition(e.x, e.y);
             popUpMenu->setVisible(true);
-            popUpMenu->getDropdown("Choose module")->expand();
         }
         else if(e.button == 2){
             transformationMatrix->set(glm::mat4(1));

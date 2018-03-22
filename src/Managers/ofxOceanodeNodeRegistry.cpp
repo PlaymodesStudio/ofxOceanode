@@ -10,13 +10,13 @@
 #include "defaultNodes.h"
 
 ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
-    this->registerModel<oscillator>();
-    this->registerModel<phasorClass>();
-    this->registerModel<mapper>();
-    this->registerModel<ranger>();
-    this->registerModel<oscillatorBank>();
-    this->registerModel<reindexer>();
-    this->registerModel<smoother>();
+    this->registerModel<oscillator>("Generators");
+    this->registerModel<phasorClass>("Generators");
+    this->registerModel<mapper>("Modifiers");
+    this->registerModel<ranger>("Modifiers");
+    this->registerModel<oscillatorBank>("Generators");
+    this->registerModel<reindexer>("Modifiers");
+    this->registerModel<smoother>("Modifiers");
 }
 
 std::unique_ptr<ofxOceanodeNodeModel> ofxOceanodeNodeRegistry::create(const string typeName){
@@ -33,4 +33,13 @@ std::unique_ptr<ofxOceanodeNodeModel> ofxOceanodeNodeRegistry::create(const stri
 
 ofxOceanodeNodeRegistry::registeredModelsMap const &ofxOceanodeNodeRegistry::getRegisteredModels(){
     return registeredModelCreators;
+}
+
+ofxOceanodeNodeRegistry::registeredModelsCategoryMap const &ofxOceanodeNodeRegistry::getRegisteredModelsCategoryAssociation(){
+    return registeredModelsCategory;
+}
+
+
+ofxOceanodeNodeRegistry::categoriesSet const &ofxOceanodeNodeRegistry::getCategories(){
+    return categories;
 }

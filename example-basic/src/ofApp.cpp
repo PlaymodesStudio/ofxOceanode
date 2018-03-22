@@ -4,7 +4,7 @@
 //--------------------------------------------------------------
 void ofApp::setup(){
     auto reg = make_shared<ofxOceanodeNodeRegistry>();
-    reg->registerModel<testNode>();
+    reg->registerModel<testNode>("Custom Nodes");
     
     
     container = make_shared<ofxOceanodeContainer>(reg);

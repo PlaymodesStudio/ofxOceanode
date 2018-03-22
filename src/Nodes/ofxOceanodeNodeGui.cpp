@@ -11,6 +11,7 @@
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node, shared_ptr<ofAppBaseWindow> window) : container(_container), node(_node){
     color = ofColor(ofRandom(255), ofRandom(255), ofRandom(255));
+    color.setBrightness(255);
     position = glm::vec2(10, 10);
     isDraggingGui = false;
     

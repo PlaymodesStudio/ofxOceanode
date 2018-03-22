@@ -45,6 +45,7 @@ private:
     
     shared_ptr<ofxOceanodeContainer> container;
     ofxDatGui *popUpMenu;
+    vector<ofxDatGuiDropdown*> modulesSelectors;
     
     ofParameter<glm::mat4> *transformationMatrix;
     glm::vec2 dragCanvasInitialPoint;
