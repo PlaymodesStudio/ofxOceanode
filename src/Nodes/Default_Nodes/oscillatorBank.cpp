@@ -9,6 +9,7 @@
 #include "oscillatorBank.h"
 
 oscillatorBank::oscillatorBank() : baseIndexer(100, "Oscillator Bank"){
+    color = ofColor::blue;
     oscillators.resize(indexCount);
     for(int i=0 ; i < indexCount ; i++){
         oscillators[i].setIndexNormalized(indexs[i]);
@@ -53,6 +54,12 @@ oscillatorBank::oscillatorBank() : baseIndexer(100, "Oscillator Bank"){
     phasorIn.addListener(this, &oscillatorBank::newPhasorIn);
 }
 
+void oscillatorBank::presetRecallBeforeSettingParameters(ofJson &json){
+    if(json.count("Size") == 1){
+        parameters->getInt("Size") = ofToInt(json["Size"]);
+    }
+}
+
 void oscillatorBank::indexCountChanged(int &newIndexCount){
     baseIndexer::indexCountChanged(newIndexCount);
     oscillators.resize(newIndexCount);
@@ -83,18 +90,6 @@ void oscillatorBank::computeBank(float phasor){
         for(int i = 0 ; i < result.size() ; i++){
             int new_i = (floor(((float)i/((float)result.size())*(float)indexQuant_Param)) * floor(((float)result.size())/(float)indexQuant_Param));
             result[i] = resultCopy[new_i];
-        }
-    }
-    //Reindex
-    if(!isReindexIdentity && indexCount < 50){
-        vector<float>   resultNoReindex = result;
-        result = vector<float>(resultNoReindex.size(), 0);
-        for(int i = 0; i < result.size(); i++){
-            for(int j = 0; j < result.size(); j++){
-                if(reindexGrid.get()[j][i]){
-                    if(resultNoReindex[j] > result[i]) result[i] = resultNoReindex[j];
-                }
-            }
         }
     }
 }

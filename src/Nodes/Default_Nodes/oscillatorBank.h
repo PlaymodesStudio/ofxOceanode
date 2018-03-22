@@ -18,6 +18,8 @@ public:
     oscillatorBank();
     ~oscillatorBank(){
     };
+    
+    void presetRecallBeforeSettingParameters(ofJson &json) override;
 
 private:
     void computeBank(float phasor);

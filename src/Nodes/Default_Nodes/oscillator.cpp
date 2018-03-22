@@ -8,7 +8,7 @@
 #include "oscillator.h"
 
 oscillator::oscillator() : ofxOceanodeNodeModel("Oscillator"){
-    
+    color = ofColor::cyan;
     parameterAutoSettersListeners.push_back(phaseOffset_Param.newListener([&](float &val){
         baseOsc.phaseOffset_Param = val;
     }));

@@ -1,7 +1,7 @@
 ofxOceanode
 =====================================
 
-Work in Progress. It is in a usable state. But a lot of things are missing (midi, osc, presets, infinite canvas...).
+Work in Progress. Base functionality implemented. Misses extensions (midi, osc, autoBPM...).
 
 Introduction
 ------------
@@ -35,12 +35,18 @@ Known issues
 Version history
 ------------
 ### Version 0.1 (03/03/2018):
-· First working prototipe
-· Basic modulators (phasor, oscillator, oscillator bank, mapper)
-· Basic connections for parameters of same type (no min max matching by the moment).
-· Connection interaction (create, destroy, move connection when modules moved).
-· Module creation and destruction
+* First working prototipe
+* Basic modulators (phasor, oscillator, oscillator bank, mapper)
+* Basic connections for parameters of same type (no min max matching by the moment).
+* Connection interaction (create, destroy, move connection when modules moved).
+* Module creation and destruction
 
+### Version 0.2 (22/03/2018):
+* Infinite Canvas
+* More Connections (vector to float, float to vector, void to bool)
+* Controls window
+* Load save presets (modules, connections, modules params)
+* Master BPM control over modules
 
 Build Status
 ------------

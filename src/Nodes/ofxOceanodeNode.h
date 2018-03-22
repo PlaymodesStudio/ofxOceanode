@@ -22,6 +22,7 @@ public:
     void setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui);
     
     ofxOceanodeNodeGui& getNodeGui(){return *nodeGui.get();};
+    ofColor getColor(){return nodeModel->getColor();};
     
     ofxOceanodeAbstractConnection* parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter);
     ofxOceanodeAbstractConnection* parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter);

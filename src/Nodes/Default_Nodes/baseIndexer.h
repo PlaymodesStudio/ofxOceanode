@@ -15,20 +15,7 @@
 class baseIndexer : public ofxOceanodeNodeModel{
 public:
     baseIndexer(int numIndexs, string name);
-    ~baseIndexer(){
-        if(reindexWindow != nullptr){
-            reindexWindow->setWindowShouldClose();
-        }
-    };
-    
-    void drawCustomWindow(ofEventArgs &e);
-    
-    void keyPressed(ofKeyEventArgs &a);
-//    void keyReleased(ofKeyEventArgs &a);
-    void mouseMoved(ofMouseEventArgs &a);
-    void mousePressed(ofMouseEventArgs &a);
-    void mouseReleased(ofMouseEventArgs &a);
-    void mouseDragged(ofMouseEventArgs &a);
+    ~baseIndexer(){};
     
     void putParametersInParametersGroup(ofParameterGroup* pg);
     
@@ -55,18 +42,8 @@ protected:
     ofParameter<int>    indexQuant_Param;
     ofParameter<float>  combination_Param;
     ofParameter<int>    modulo_Param;
-    ofParameter<bool>   manualReindex_Param;
-    
-    ofParameter<vector<vector<bool>>> reindexGrid;
-    bool    isReindexIdentity;
     
 private:
-    void drawManualReindex(bool &b);
-    shared_ptr<ofAppBaseWindow> reindexWindow;
-    ofRectangle                 reindexWindowRect;
-    
-    void reindexChanged(vector<vector<bool>> &vb);
-    
     void parameterBoolListener(bool &b){recomputeIndexs();};
     void parameterFloatListener(float &f){recomputeIndexs();};
     void parameterIntListener(int &i){recomputeIndexs();};
@@ -74,15 +51,10 @@ private:
     void indexRandChanged(float &val);
     
     
-
-    
-//    int                 indexCount; //The max number you will get from index
-    
     vector<int>         indexRand;
-    vector<vector<bool>>    identityReindexMatrix;
-    deque<vector<vector<bool>>>   identityStore;
     int                 indexRand_Param_previous;
     bool newIndexsFlag;
+    int previousIndexCount;
 };
 
 #endif /* baseIndexer_h */

@@ -13,6 +13,7 @@
 #include "mapper.h"
 #include "oscillatorBank.h"
 #include "ranger.h"
-#include "phasor.h"
+#include "reindexer.h"
+#include "smoother.h"
 
 #endif /* defaultNodes_h */

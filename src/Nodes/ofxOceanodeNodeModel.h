@@ -47,10 +47,17 @@ public:
     bool getAutoBPM(){return autoBPM;};
     virtual void setBpm(float _bpm){};
     
+    virtual void presetSave(ofJson &json){};
+    virtual void presetRecallBeforeSettingParameters(ofJson &json){};
+    virtual void presetRecallAfterSettingParameters(ofJson &json){};
+    
+    ofColor getColor(){return color;};
+    
 protected:
     ofParameterGroup* parameters;
 //    std::map<ofAbstractParameter&, parameterInfo> parametersInfo; //information about interaction of parameter
     bool autoBPM;
+    ofColor color;
 private:
     vector<ofEventListener> eventListeners;
     bool isDynamic;
