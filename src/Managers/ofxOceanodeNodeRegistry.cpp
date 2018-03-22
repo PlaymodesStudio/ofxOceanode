@@ -10,11 +10,12 @@
 #include "defaultNodes.h"
 
 ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
-    this->registerModel<oscillator>();
     this->registerModel<phasorClass>();
+    this->registerModel<phasor>();
+    this->registerModel<oscillator>();
+    this->registerModel<oscillatorBank>();
     this->registerModel<mapper>();
     this->registerModel<ranger>();
-    this->registerModel<oscillatorBank>();
 }
 
 std::unique_ptr<ofxOceanodeNodeModel> ofxOceanodeNodeRegistry::create(const string typeName){
