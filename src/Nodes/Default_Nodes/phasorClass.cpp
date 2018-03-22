@@ -11,6 +11,7 @@
 
 phasorClass::phasorClass() : ofxOceanodeNodeModel("Phasor")
 {
+    color = ofColor::red;
     phasor = 0;
     parameters->add(bpm_Param.set("BPM", 120, 0, 999));
     parameters->add(beatsDiv_Param.set("Beats Div", 1, 1, 512));

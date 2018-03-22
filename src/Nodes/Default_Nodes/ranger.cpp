@@ -11,6 +11,7 @@ float maxRange =  10000.000;
 #include "ranger.h"
 
 ranger::ranger() : ofxOceanodeNodeModel("Ranger"){
+    color = ofColor::white;
     parameters->add(Input.set("Input", 0, minRange, maxRange));
     parameters->add(MinInput.set("MinInput", 0,  minRange, maxRange));
     parameters->add(MaxInput.set("MaxInput", 1.0,  minRange, maxRange));

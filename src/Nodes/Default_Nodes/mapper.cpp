@@ -9,6 +9,7 @@
 #include "mapper.h"
 
 mapper::mapper() : ofxOceanodeNodeModel("Mapper"){
+    color = ofColor::white;
     parameters->add(input.set("Input", {0}, {0}, {1}));
     parameters->add(minInput.set("MinInput", 0, 0.0, 1.0));
     parameters->add(maxInput.set("MaxInput", 1.0, 0.0, 1.0));

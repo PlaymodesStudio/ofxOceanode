@@ -8,6 +8,7 @@
 #include "smoother.h"
 
 smoother::smoother() : ofxOceanodeNodeModel("Smoother"){
+    color = ofColor::azure;
     parameters->add(input.set("Input", {0}, {0}, {1}));
     parameters->add(smoothing.set("Smoothing", 0.5, 0, 1));
     parameters->add(tension.set("Tension", 0, -1, 1));

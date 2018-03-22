@@ -15,6 +15,7 @@ void window_no_close_indexer(GLFWwindow* window){
 };
 
 reindexer::reindexer() : ofxOceanodeNodeModel("Reindexer"){
+    color = ofColor::orange;
     parameters->add(input.set("Input", {0}, {0}, {1}));
     parameters->add(showGui.set("Show Gui", false));
     parameters->add(outputSize.set("Output Size", 10, 1, 100));
