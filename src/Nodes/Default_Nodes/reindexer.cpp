@@ -29,6 +29,34 @@ reindexer::reindexer() : ofxOceanodeNodeModel("Reindexer"){
     reindexGrid.resize(1);
 }
 
+void reindexer::presetSave(ofJson &json){
+    string matrixInfo;
+    for(int i = 0; i < reindexGrid.size(); i++){
+        for(int j = 0; j < reindexGrid[i].size(); j++){
+            matrixInfo += ofToString(reindexGrid[i][j]);
+        }
+    }
+    json["reindexGridWidth"] = reindexGrid.size();
+    json["reindexGridHeight"] = reindexGrid[0].size();
+    json["reindexGrid"] = matrixInfo;
+}
+
+void reindexer::presetRecallAfterSettingParameters(ofJson &json){
+    if(json.count("reindexGrid") == 1){
+        int width = json["reindexGridWidth"];
+        int height = json["reindexGridHeight"];
+        string matrixInfo = json["reindexGrid"];
+        vector<vector<bool>> matrixCopy = vector<vector<bool>>(width, vector<bool>(height, false));
+        for(int i = 0; i < width; i++){
+            for(int j = 0; j < height; j++){
+                matrixCopy[i][j] = matrixInfo[(i*height) + j] == '1' ? true : false;
+            }
+        }
+        reindexGrid = matrixCopy;
+        reindexChanged();
+    }
+}
+
 void reindexer::inputListener(vector<float> &vf){
     if(vf.size() != reindexGrid[0].size()){
         outputSize = vf.size();

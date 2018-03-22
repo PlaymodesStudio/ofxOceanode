@@ -19,6 +19,9 @@ public:
         }
     };
     
+    void presetSave(ofJson &json) override;
+    void presetRecallAfterSettingParameters(ofJson &json) override;
+    
 private:
     void drawCustomWindow(ofEventArgs &e);
     void keyPressed(ofKeyEventArgs &a);
