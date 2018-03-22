@@ -24,17 +24,23 @@ public:
     void onGuiDropdownEvent(ofxDatGuiDropdownEvent e);
     void onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e);
     void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);
+    void tapTempoPress(ofxDatGuiButtonEvent e);
     
     void activate();
     void deactivate();
     
     void windowResized(ofResizeEventArgs &a);
 private:
+    
     ofxDatGui* gui;
     ofxDatGuiTheme* mainGuiTheme;
     
     ofParameter<float> bpm;
     ofEventListener bpmListener;
+    
+    float lastButtonPressTime;
+    vector<float> storedIntervals;
+    float averageInterval;
     
     shared_ptr<ofxOceanodeContainer> container;
 };

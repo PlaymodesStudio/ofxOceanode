@@ -7,6 +7,7 @@
 
 #include "ofxOceanodeBPMController.h"
 #include "ofxOceanodeContainer.h"
+#include <numeric>
 
 //DatGui
 
@@ -32,6 +33,7 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     gui->setAutoDraw(false);
     
     gui->addSlider(bpm.set("BPM", 120, 0, 999));
+    gui->addButton("Tap Tempo");
     container->setBpm(bpm);
     
     gui->setVisible(false);
@@ -40,10 +42,32 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     bpmListener = bpm.newListener([&](float &bpm){
         container->setBpm(bpm);
     });
-//    gui->onDropdownEvent(this, &ofxOceanodePresetsController::onGuiDropdownEvent);
-//    gui->onScrollViewEvent(this, &ofxOceanodePresetsController::onGuiScrollViewEvent);
-//    gui->onTextInputEvent(this, &ofxOceanodePresetsController::onGuiTextInputEvent);
     
+    gui->onButtonEvent(this, &ofxOceanodeBPMController::tapTempoPress);
+    lastButtonPressTime = -1;
+}
+
+void ofxOceanodeBPMController::tapTempoPress(ofxDatGuiButtonEvent e){
+    if(lastButtonPressTime == -1){
+        lastButtonPressTime = ofGetElapsedTimef();
+    }else{
+        float currentTime = ofGetElapsedTimef();
+        float lastInterval = currentTime - lastButtonPressTime;
+        lastButtonPressTime = currentTime;
+        storedIntervals.push_back(lastInterval);
+        if(storedIntervals.size() == 1){
+            averageInterval = lastInterval;
+        }
+        else{
+            averageInterval = (float)std::accumulate(storedIntervals.begin(), storedIntervals.end(), 0.0) / (float)storedIntervals.size();
+            if(lastInterval > averageInterval*2 || lastInterval < averageInterval/2){
+                storedIntervals.clear();
+            }
+            else{
+                bpm = 60.0/averageInterval;
+            }
+        }
+    }
 }
 
 void ofxOceanodeBPMController::draw(){
