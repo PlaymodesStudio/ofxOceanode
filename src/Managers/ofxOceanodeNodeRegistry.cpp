@@ -15,6 +15,7 @@ ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
     this->registerModel<mapper>();
     this->registerModel<ranger>();
     this->registerModel<oscillatorBank>();
+    this->registerModel<reindexer>();
 }
 
 std::unique_ptr<ofxOceanodeNodeModel> ofxOceanodeNodeRegistry::create(const string typeName){

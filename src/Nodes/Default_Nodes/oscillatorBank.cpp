@@ -85,18 +85,6 @@ void oscillatorBank::computeBank(float phasor){
             result[i] = resultCopy[new_i];
         }
     }
-    //Reindex
-    if(!isReindexIdentity && indexCount < 50){
-        vector<float>   resultNoReindex = result;
-        result = vector<float>(resultNoReindex.size(), 0);
-        for(int i = 0; i < result.size(); i++){
-            for(int j = 0; j < result.size(); j++){
-                if(reindexGrid.get()[j][i]){
-                    if(resultNoReindex[j] > result[i]) result[i] = resultNoReindex[j];
-                }
-            }
-        }
-    }
 }
 
 void oscillatorBank::newIndexs(){
