@@ -201,12 +201,17 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
     sinkModule.erase(sinkModule.find(sinkModuleId)-1);
     ofStringReplace(sinkModule, "_", " ");
     
-    ofAbstractParameter &source = dynamicNodes[sourceModule][ofToInt(sourceModuleId)]->getParameters()->get(sourceParameter);
-    ofAbstractParameter &sink = dynamicNodes[sinkModule][ofToInt(sinkModuleId)]->getParameters()->get(sinkParameter);
+    auto &sourceModuleRef = dynamicNodes[sourceModule][ofToInt(sourceModuleId)];
+    auto &sinkModuleRef = dynamicNodes[sinkModule][ofToInt(sinkModuleId)];
     
-    temporalConnectionNode = dynamicNodes[sourceModule][ofToInt(sourceModuleId)].get();
-    auto connection = dynamicNodes[sinkModule][ofToInt(sinkModuleId)]->createConnection(*this, source, sink);
-    connection->setTransformationMatrix(&transformationMatrix);
-    temporalConnection = nullptr;
+    if(sourceModuleRef->getParameters()->contains(sourceParameter) && sinkModuleRef->getParameters()->contains(sinkParameter)){
+        ofAbstractParameter &source = sourceModuleRef->getParameters()->get(sourceParameter);
+        ofAbstractParameter &sink = sinkModuleRef->getParameters()->get(sinkParameter);
+        
+        temporalConnectionNode = sourceModuleRef.get();
+        auto connection = sinkModuleRef->createConnection(*this, source, sink);
+        connection->setTransformationMatrix(&transformationMatrix);
+        temporalConnection = nullptr;
+    }
 }
 
