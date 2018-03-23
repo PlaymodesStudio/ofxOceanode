@@ -58,11 +58,12 @@ protected:
 //    std::map<ofAbstractParameter&, parameterInfo> parametersInfo; //information about interaction of parameter
     bool autoBPM;
     ofColor color;
-private:
-    vector<ofEventListener> eventListeners;
     bool isDynamic;
     string nameIdentifier;
     uint numIdentifier;
+    
+private:
+    vector<ofEventListener> eventListeners;
 };
 
 #endif /* ofxOceanodeNodeModel_h */

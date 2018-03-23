@@ -6,28 +6,20 @@
 //
 
 #include "reindexer.h"
-#include <GLFW/glfw3.h>
 
 #define REINDEX_UNDO_SIZE 20
 
-void window_no_close_indexer(GLFWwindow* window){
-    glfwSetWindowShouldClose(window, GL_FALSE);
-};
-
-reindexer::reindexer() : ofxOceanodeNodeModel("Reindexer"){
+reindexer::reindexer() : ofxOceanodeNodeModelExternalWindow("Reindexer"){
     color = ofColor::orange;
     parameters->add(input.set("Input", {0}, {0}, {1}));
-    parameters->add(showGui.set("Show Gui", false));
     parameters->add(outputSize.set("Output Size", 10, 1, 100));
-    parameters->add(output.set("Outpu", {0}, {0}, {1}));
+    parameters->add(output.set("Output", {0}, {0}, {1}));
     
     inputListenerEvent = input.newListener(this, &reindexer::inputListener);
     outputSizeListenerEvent = outputSize.newListener(this, &reindexer::outputSizeListener);
-    windowListenerEvents.push_back(showGui.newListener(this, &reindexer::showReindexWindow));
     
     isReindexIdentity = true;
-    reindexWindowRect.setPosition(-1, -1);
-    reindexGrid.resize(1);
+    reindexGrid.resize(10, vector<bool>(1, false));
 }
 
 void reindexer::presetSave(ofJson &json){
@@ -95,42 +87,6 @@ void reindexer::outputSizeListener(int &f){
     reindexChanged();
 }
 
-void reindexer::showReindexWindow(bool &b){
-    if(b){
-        ofAppBaseWindow* mainWindow = ofGetWindowPtr();
-        
-        ofGLFWWindowSettings prevSettings;
-        if(reindexWindowRect.getPosition() == glm::vec3(-1, -1, 0)){
-            prevSettings.setSize(1024, 1024);
-            prevSettings.setPosition(ofVec2f(ofGetScreenWidth()-1024, ofGetScreenHeight()-1024));
-        }
-        else{
-            prevSettings.setSize(reindexWindowRect.width, reindexWindowRect.height);
-            prevSettings.setPosition(reindexWindowRect.position);
-        }
-        prevSettings.windowMode = OF_WINDOW;
-        prevSettings.resizable = true;
-        reindexWindow = ofCreateWindow(prevSettings);
-        reindexWindow->setWindowTitle("Reindex");
-        windowListenerEvents.push_back(reindexWindow->events().draw.newListener(this, &reindexer::drawCustomWindow));
-        windowListenerEvents.push_back(reindexWindow->events().keyPressed.newListener(this, &reindexer::keyPressed));
-        windowListenerEvents.push_back(reindexWindow->events().mouseMoved.newListener(this, &reindexer::mouseMoved));
-        windowListenerEvents.push_back(reindexWindow->events().mousePressed.newListener(this, &reindexer::mousePressed));
-        windowListenerEvents.push_back(reindexWindow->events().mouseReleased.newListener(this, &reindexer::mouseReleased));
-        windowListenerEvents.push_back(reindexWindow->events().mouseDragged.newListener(this, &reindexer::mouseDragged));
-        
-        ofAppGLFWWindow * ofWindow = (ofAppGLFWWindow*)reindexWindow.get();
-        GLFWwindow * glfwWindow = ofWindow->getGLFWWindow();
-        glfwSetWindowCloseCallback(glfwWindow, window_no_close_indexer);
-    }
-    else if(reindexWindow != nullptr){
-        reindexWindowRect.setPosition(glm::vec3(reindexWindow->getWindowPosition(), 0));
-        reindexWindowRect.setSize(reindexWindow->getWidth(), reindexWindow->getHeight());
-        reindexWindow->setWindowShouldClose();
-        reindexWindow = nullptr;
-    }
-}
-
 void reindexer::reindexChanged(){
     identityStore.push_front(reindexGrid);
     if(identityStore.size() > REINDEX_UNDO_SIZE){
@@ -144,7 +100,7 @@ void reindexer::reindexChanged(){
     }
 }
 
-void reindexer::drawCustomWindow(ofEventArgs &e){
+void reindexer::drawInExternalWindow(ofEventArgs &e){
     ofBackground(127);
     ofSetColor(255);
     
@@ -203,12 +159,6 @@ void reindexer::drawCustomWindow(ofEventArgs &e){
     }
 }
 
-
-
-void reindexer::mouseMoved(ofMouseEventArgs &a){
-    
-}
-
 void reindexer::mousePressed(ofMouseEventArgs &a){
     int x_margin = 10;
     int y_margin = 10;
@@ -228,15 +178,6 @@ void reindexer::mousePressed(ofMouseEventArgs &a){
         }
     }
 }
-
-void reindexer::mouseReleased(ofMouseEventArgs &a){
-    
-}
-
-void reindexer::mouseDragged(ofMouseEventArgs &a){
-    
-}
-
 
 void reindexer::keyPressed(ofKeyEventArgs &a){
     if(a.key == 'c'){

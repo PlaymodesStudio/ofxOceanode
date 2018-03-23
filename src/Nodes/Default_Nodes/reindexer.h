@@ -8,27 +8,20 @@
 #ifndef reindexer_h
 #define reindexer_h
 
-#include "ofxOceanodeNodeModel.h"
+#include "ofxOceanodeNodeModelExternalWindow.h"
 
-class reindexer : public ofxOceanodeNodeModel{
+class reindexer : public ofxOceanodeNodeModelExternalWindow{
 public:
     reindexer();
-    ~reindexer(){
-        if(reindexWindow != nullptr){
-            reindexWindow->setWindowShouldClose();
-        }
-    };
+    ~reindexer(){};
     
     void presetSave(ofJson &json) override;
     void presetRecallAfterSettingParameters(ofJson &json) override;
     
 private:
-    void drawCustomWindow(ofEventArgs &e);
-    void keyPressed(ofKeyEventArgs &a);
-    void mouseMoved(ofMouseEventArgs &a);
-    void mousePressed(ofMouseEventArgs &a);
-    void mouseReleased(ofMouseEventArgs &a);
-    void mouseDragged(ofMouseEventArgs &a);
+    void drawInExternalWindow(ofEventArgs &e) override;
+    void keyPressed(ofKeyEventArgs &a) override;
+    void mousePressed(ofMouseEventArgs &a) override;
     
     void inputListener(vector<float> &vf);
     ofEventListener inputListenerEvent;
@@ -38,19 +31,11 @@ private:
     vector<vector<bool>> reindexGrid;
     vector<vector<bool>>    identityReindexMatrix;
     deque<vector<vector<bool>>>   identityStore;
-    bool    isReindexIdentity;
+    bool isReindexIdentity;
     void reindexChanged();
-    
-    void showReindexWindow(bool &b);
-    shared_ptr<ofAppBaseWindow> reindexWindow;
-    ofRectangle                 reindexWindowRect;
-    vector<ofEventListener>     windowListenerEvents;
-    
-    void reindexChanged(vector<vector<bool>> &vb);
     
     ofParameter<vector<float>> input;
     ofParameter<int>    outputSize;
-    ofParameter<bool>   showGui;
     ofParameter<vector<float>> output;
 };
 
