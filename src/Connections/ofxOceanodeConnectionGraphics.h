@@ -73,9 +73,9 @@ public:
     
     void subscribeToDrawEvent(shared_ptr<ofAppBaseWindow> w){
         if(w == nullptr){
-            drawEventListener = ofEvents().draw.newListener(this , &ofxOceanodeConnectionGraphics::draw);
+            drawEventListener = ofEvents().draw.newListener(this , &ofxOceanodeConnectionGraphics::draw, OF_EVENT_ORDER_BEFORE_APP);
         }else{
-            drawEventListener = w->events().draw.newListener(this , &ofxOceanodeConnectionGraphics::draw);
+            drawEventListener = w->events().draw.newListener(this , &ofxOceanodeConnectionGraphics::draw, OF_EVENT_ORDER_BEFORE_APP);
         }
     }
     
