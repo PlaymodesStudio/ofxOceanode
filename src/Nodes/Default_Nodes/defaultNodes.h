@@ -9,7 +9,6 @@
 #define defaultNodes_h
 
 #include "oscillator.h"
-#include "phasorClass.h"
 #include "phasor.h"
 #include "mapper.h"
 #include "oscillatorBank.h"

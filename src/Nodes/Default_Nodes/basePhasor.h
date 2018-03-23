@@ -19,25 +19,14 @@ public:
     int    beatsMult_Param;
     int    beatsDiv_Param;
     float  initPhase_Param;
-    int    quant_Param;
-    float  phasorMonitor;
     bool   loop_Param;
-    bool   bounce_Param;
-    //void   resetPhase_Param;
-    bool   offlineMode_Param;
 
-    void update(ofEventArgs &e);
     float getPhasor();
     void resetPhasor();
-    void initPhaseChanged(float &f);
-    void loopChanged(bool &val);
-
 private:
-
     ofTimer timer;
     
     void threadedFunction() override;
-    void nextFrame();
 
     double  phasor;
     double  phasorMod;

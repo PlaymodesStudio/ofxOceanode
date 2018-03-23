@@ -23,12 +23,9 @@ private:
     ofParameter<int>    beatsMult_Param;
     ofParameter<int>    beatsDiv_Param;
     ofParameter<float>  initPhase_Param;
-    ofParameter<int>    quant_Param;
     ofParameter<float>  phasorMonitor;
     ofParameter<bool>   loop_Param;
-    ofParameter<bool>   bounce_Param;
     ofParameter<void>   resetPhase_Param;
-    ofParameter<bool>   offlineMode_Param;
     
     vector<ofEventListener> parameterAutoSettersListeners;
     ofEventListener resetPhaseListener;
