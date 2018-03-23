@@ -19,6 +19,8 @@
 		8EB5677652296BACF3A1C184 /* ofxOceanodeNodeGui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 170083BFE7EEC5851D5DF9E6 /* ofxOceanodeNodeGui.cpp */; };
 		9F148A1E2063CD8E00D5A4B9 /* reindexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F148A1C2063CD8E00D5A4B9 /* reindexer.cpp */; };
 		9F148A212063EF5200D5A4B9 /* smoother.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F148A1F2063EF5200D5A4B9 /* smoother.cpp */; };
+		9F148A272064FEC100D5A4B9 /* phasor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F148A242064FEC100D5A4B9 /* phasor.cpp */; };
+		9F148A282064FEC100D5A4B9 /* basePhasor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F148A252064FEC100D5A4B9 /* basePhasor.cpp */; };
 		9F7B6CFD2055F7F100CE6CDA /* ranger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F7B6CFB2055F7F100CE6CDA /* ranger.cpp */; };
 		9F7B6D042056942000CE6CDA /* ofxOceanodeControls.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F7B6D022056942000CE6CDA /* ofxOceanodeControls.cpp */; };
 		9F7B6D07205695DA00CE6CDA /* ofxOceanodeBaseController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F7B6D05205695DA00CE6CDA /* ofxOceanodeBaseController.cpp */; };
@@ -106,6 +108,10 @@
 		9F148A1D2063CD8E00D5A4B9 /* reindexer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = reindexer.h; path = ../src/Nodes/Default_Nodes/reindexer.h; sourceTree = "<group>"; };
 		9F148A1F2063EF5200D5A4B9 /* smoother.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = smoother.cpp; path = ../src/Nodes/Default_Nodes/smoother.cpp; sourceTree = "<group>"; };
 		9F148A202063EF5200D5A4B9 /* smoother.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = smoother.h; path = ../src/Nodes/Default_Nodes/smoother.h; sourceTree = "<group>"; };
+		9F148A232064FEC100D5A4B9 /* phasor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = phasor.h; path = ../src/Nodes/Default_Nodes/phasor.h; sourceTree = "<group>"; };
+		9F148A242064FEC100D5A4B9 /* phasor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = phasor.cpp; path = ../src/Nodes/Default_Nodes/phasor.cpp; sourceTree = "<group>"; };
+		9F148A252064FEC100D5A4B9 /* basePhasor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = basePhasor.cpp; path = ../src/Nodes/Default_Nodes/basePhasor.cpp; sourceTree = "<group>"; };
+		9F148A262064FEC100D5A4B9 /* basePhasor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = basePhasor.h; path = ../src/Nodes/Default_Nodes/basePhasor.h; sourceTree = "<group>"; };
 		9F7B6CFB2055F7F100CE6CDA /* ranger.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ranger.cpp; path = ../src/Nodes/Default_Nodes/ranger.cpp; sourceTree = "<group>"; };
 		9F7B6CFC2055F7F100CE6CDA /* ranger.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ranger.h; path = ../src/Nodes/Default_Nodes/ranger.h; sourceTree = "<group>"; };
 		9F7B6D022056942000CE6CDA /* ofxOceanodeControls.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ofxOceanodeControls.cpp; path = ../src/Controls/ofxOceanodeControls.cpp; sourceTree = "<group>"; };
@@ -190,6 +196,10 @@
 		4A0C0B233C38AF6788F3CE7D /* Default_Nodes */ = {
 			isa = PBXGroup;
 			children = (
+				9F148A252064FEC100D5A4B9 /* basePhasor.cpp */,
+				9F148A262064FEC100D5A4B9 /* basePhasor.h */,
+				9F148A242064FEC100D5A4B9 /* phasor.cpp */,
+				9F148A232064FEC100D5A4B9 /* phasor.h */,
 				9F7B6CFB2055F7F100CE6CDA /* ranger.cpp */,
 				9F7B6CFC2055F7F100CE6CDA /* ranger.h */,
 				9379E6001D7EB3C9ED6E3741 /* baseIndexer.cpp */,
@@ -508,8 +518,10 @@
 				C6A203560BFBDA04C5746210 /* ofxOceanodeConnection.cpp in Sources */,
 				C1EEF98E795AFB7BB33F94B1 /* ofxOceanodeConnectionGraphics.cpp in Sources */,
 				FE7602E65C7BA676951A37FB /* ofxOceanodeCanvas.cpp in Sources */,
+				9F148A272064FEC100D5A4B9 /* phasor.cpp in Sources */,
 				5769B6A6D79188D3D351933E /* ofxOceanodeContainer.cpp in Sources */,
 				9F148A1E2063CD8E00D5A4B9 /* reindexer.cpp in Sources */,
+				9F148A282064FEC100D5A4B9 /* basePhasor.cpp in Sources */,
 				B7559FEE382DBA7FB094D5E7 /* ofxOceanodeNodeRegistry.cpp in Sources */,
 				EB5B77357A54C0E2DED32C3E /* baseIndexer.cpp in Sources */,
 				9F7B6D0F20584AD100CE6CDA /* ofxOceanodeBPMController.cpp in Sources */,
