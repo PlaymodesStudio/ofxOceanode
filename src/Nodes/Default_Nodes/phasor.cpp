@@ -52,6 +52,9 @@ phasor::phasor() : ofxOceanodeNodeModel("Phasor2")
     parameters->add(offlineMode_Param.set("Offline Mode", false));
     parameters->add(phasorMonitor.set("Phasor Output", 0, 0, 1));
     
+    resetPhaseListener = resetPhase_Param.newListener([&](){
+        basePh.resetPhasor();
+    });
     //resetPhase_Param.addListener(this, &basePhasor::resetPhasor);
     //loop_Param.addListener(this, &basePhasor::loopChanged);
     //initPhase_Param.addListener(this, &basePhasor::initPhaseChanged);

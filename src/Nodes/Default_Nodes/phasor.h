@@ -31,6 +31,7 @@ private:
     ofParameter<bool>   offlineMode_Param;
     
     vector<ofEventListener> parameterAutoSettersListeners;
+    ofEventListener resetPhaseListener;
 };
 
 #endif /* oscillator_h */
