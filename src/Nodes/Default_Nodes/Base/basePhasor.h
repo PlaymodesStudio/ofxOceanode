@@ -22,7 +22,7 @@ public:
     bool   loop_Param;
 
     float getPhasor();
-    void resetPhasor();
+    void  resetPhasor();
 private:
     ofTimer timer;
     
