@@ -14,7 +14,7 @@ class phasor : public ofxOceanodeNodeModel{
 public:
     phasor();
     ~phasor(){};
-    float getPhasor(){return phasorMonitor;};
+    float getPhasor(){return basePh.getPhasor();};
     void  resetPhasor(){basePh.resetPhasor();};
     
 private:
