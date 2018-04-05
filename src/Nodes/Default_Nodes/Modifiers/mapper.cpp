@@ -17,17 +17,26 @@ mapper::mapper() : ofxOceanodeNodeModel("Mapper"){
     parameters->add(maxOutput.set("MaxOutput", 1.0, 0.0, 1.0));
     addOutputParameterToGroupAndInfo(output.set("Output", {0}, {0}, {1}));
 
-    
-    input.addListener(this, &mapper::recalculate);
-//    MinInput.addListener(this, &mapper::recalculate);
-//    MaxInput.addListener(this, &mapper::recalculate);
-//    MinOutput.addListener(this, &mapper::recalculate);
-//    MaxOutput.addListener(this, &mapper::recalculate);
+    listeners.push_back(input.newListener([&](vector<float> &vf){
+        recalculate();
+    }));
+    listeners.push_back(minInput.newListener([&](float &f){
+        recalculate();
+    }));
+    listeners.push_back(maxInput.newListener([&](float &f){
+        recalculate();
+    }));
+    listeners.push_back(minOutput.newListener([&](float &f){
+        recalculate();
+    }));
+    listeners.push_back(maxOutput.newListener([&](float &f){
+        recalculate();
+    }));
 }
 
-void mapper::recalculate(vector<float>& vf)
+void mapper::recalculate()
 {
-    vector<float> tempOut = vf;
+    vector<float> tempOut = input.get();
     for(auto &f : tempOut){
        f = ofMap(f,minInput,maxInput,minOutput,maxOutput, true);
     }

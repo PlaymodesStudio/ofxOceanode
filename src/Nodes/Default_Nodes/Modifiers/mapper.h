@@ -19,9 +19,11 @@ public:
     mapper();
     ~mapper(){};
     
-    void recalculate(vector<float>& vf);
+    void recalculate();
 
 private:
+    
+    vector<ofEventListener> listeners;
     
     ofParameter<vector<float>>  input;
     ofParameter<float>  minInput;
