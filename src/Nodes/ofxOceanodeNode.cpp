@@ -219,7 +219,6 @@ bool ofxOceanodeNode::loadPreset(string presetFolderPath){
             }
         }
     }
-    
     nodeModel->presetRecallAfterSettingParameters(json);
 }
 
@@ -227,31 +226,33 @@ bool ofxOceanodeNode::savePreset(string presetFolderPath){
     ofJson json;
     for(int i = 0; i < getParameters()->size(); i++){
         ofAbstractParameter& p = getParameters()->get(i);
-        if(p.type() == typeid(ofParameter<float>).name()){
-            ofSerialize(json, p);
-        }else if(p.type() == typeid(ofParameter<int>).name()){
-            ofSerialize(json, p);
-        }
-        else if(p.type() == typeid(ofParameter<bool>).name()){
-            ofSerialize(json, p);
-        }
-        else if(p.type() == typeid(ofParameter<ofColor>).name()){
-            ofSerialize(json, p);
-        }
-        else if(p.type() == typeid(ofParameter<vector<float>>).name()){
-            auto vecF = p.cast<vector<float>>().get();
-            if(vecF.size() == 1){
-                json[p.getEscapedName()] = vecF[0];
+        if(nodeModel->getParameterInfo(p).isSavePreset){
+            if(p.type() == typeid(ofParameter<float>).name()){
+                ofSerialize(json, p);
+            }else if(p.type() == typeid(ofParameter<int>).name()){
+                ofSerialize(json, p);
             }
-        }
-        else if(p.type() == typeid(ofParameter<vector<int>>).name()){
-            auto vecI = p.cast<vector<float>>().get();
-            if(vecI.size() == 1){
-                json[p.getEscapedName()] = vecI[0];
+            else if(p.type() == typeid(ofParameter<bool>).name()){
+                ofSerialize(json, p);
             }
-        }
-        else if(p.type() == typeid(ofParameterGroup).name()){
-            ofSerialize(json, p.castGroup().getInt(1));
+            else if(p.type() == typeid(ofParameter<ofColor>).name()){
+                ofSerialize(json, p);
+            }
+            else if(p.type() == typeid(ofParameter<vector<float>>).name()){
+                auto vecF = p.cast<vector<float>>().get();
+                if(vecF.size() == 1){
+                    json[p.getEscapedName()] = vecF[0];
+                }
+            }
+            else if(p.type() == typeid(ofParameter<vector<int>>).name()){
+                auto vecI = p.cast<vector<float>>().get();
+                if(vecI.size() == 1){
+                    json[p.getEscapedName()] = vecI[0];
+                }
+            }
+            else if(p.type() == typeid(ofParameterGroup).name()){
+                ofSerialize(json, p.castGroup().getInt(1));
+            }
         }
     }
     nodeModel->presetSave(json);

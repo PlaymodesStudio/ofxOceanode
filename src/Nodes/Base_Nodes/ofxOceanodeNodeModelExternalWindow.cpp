@@ -8,7 +8,10 @@
 #include "ofxOceanodeNodeModelExternalWindow.h"
 
 ofxOceanodeNodeModelExternalWindow::ofxOceanodeNodeModelExternalWindow(string name)  : ofxOceanodeNodeModel(name){
-    parameters->add(showWindow.set("Show Window", false));
+    auto &info = addParameterToGroupAndInfo(showWindow.set("Show Window", false));
+    info.acceptInConnection = false;
+    info.acceptOutConnection = false;
+    info.isSavePreset = false;
     windowListenerEvents.push_back(showWindow.newListener(this, &ofxOceanodeNodeModelExternalWindow::showExternalWindow));
     externalWindowRect.setPosition(-1, -1);
     externalWindow = nullptr;
