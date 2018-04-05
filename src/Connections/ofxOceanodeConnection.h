@@ -85,9 +85,11 @@ template<typename Tsource, typename Tsink>
 class ofxOceanodeConnection: public ofxOceanodeAbstractConnection{
 public:
     ofxOceanodeConnection(ofParameter<Tsource>& pSource, ofParameter<Tsink>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+        beforeConnectionValue = sinkParameter.get();
         linkParameters();
     }
     ~ofxOceanodeConnection(){
+        sinkParameter.set(beforeConnectionValue);
         ofNotifyEvent(destroyConnection);
     };
     
@@ -101,18 +103,21 @@ private:
     ofEventListener parameterEventListener;
     ofParameter<Tsource>& sourceParameter;
     ofParameter<Tsink>&  sinkParameter;
+    Tsink beforeConnectionValue;
 };
 
 template<typename T>
 class ofxOceanodeConnection<T, vector<T>>: public ofxOceanodeAbstractConnection{
 public:
     ofxOceanodeConnection(ofParameter<T>& pSource, ofParameter<vector<T>>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+        beforeConnectionValue = sinkParameter.get();
         parameterEventListener = sourceParameter.newListener([&](T &f){
             sinkParameter = vector<T>(1, f);
         });
         //sinkParameter = vector<T>(1, sourceParameter);
     }
     ~ofxOceanodeConnection(){
+        sinkParameter.set(beforeConnectionValue);
         ofNotifyEvent(destroyConnection);
     };
     
@@ -120,12 +125,14 @@ private:
     ofEventListener parameterEventListener;
     ofParameter<T>& sourceParameter;
     ofParameter<vector<T>>&  sinkParameter;
+    vector<T> beforeConnectionValue;
 };
 
 template<typename T>
 class ofxOceanodeConnection<vector<T>, T>: public ofxOceanodeAbstractConnection{
 public:
     ofxOceanodeConnection(ofParameter<vector<T>>& pSource, ofParameter<T>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+        beforeConnectionValue = sinkParameter.get();
         parameterEventListener = sourceParameter.newListener([&](vector<T> &vf){
             if(vf.size() > 0){
                 sinkParameter = vf[0];
@@ -136,6 +143,7 @@ public:
 //        }
     }
     ~ofxOceanodeConnection(){
+        sinkParameter.set(beforeConnectionValue);
         ofNotifyEvent(destroyConnection);
     };
     
@@ -143,6 +151,7 @@ private:
     ofEventListener parameterEventListener;
     ofParameter<vector<T>>& sourceParameter;
     ofParameter<T>&  sinkParameter;
+    T beforeConnectionValue;
 };
 
 
