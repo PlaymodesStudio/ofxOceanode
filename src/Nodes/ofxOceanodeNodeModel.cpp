@@ -28,3 +28,21 @@ void ofxOceanodeNodeModel::registerLoop(shared_ptr<ofAppBaseWindow> w){
         eventListeners.push_back(w->events().update.newListener(this, &ofxOceanodeNodeModel::update));
     }
 }
+
+parameterInfo& ofxOceanodeNodeModel::addParameterToGroupAndInfo(ofAbstractParameter& p){
+    parameters->add(p);
+    parametersInfo[p.getName()] = parameterInfo();
+    return parametersInfo[p.getName()];
+}
+
+const parameterInfo ofxOceanodeNodeModel::getParameterInfo(ofAbstractParameter& p){
+    return getParameterInfo(p.getName());
+}
+
+const parameterInfo ofxOceanodeNodeModel::getParameterInfo(string parameterName){
+    if(parametersInfo.count(parameterName) != 0){
+        return parametersInfo[parameterName];
+    }else{
+        return parameterInfo();
+    }
+}

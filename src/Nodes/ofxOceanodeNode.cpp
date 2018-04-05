@@ -24,7 +24,11 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionPress(ofxOcea
             return container.disconnectConnection(c);
         }
     }
-    return container.createConnection(parameter, *this);
+    if(nodeModel->getParameterInfo(parameter).acceptOutConnection){
+        return container.createConnection(parameter, *this);
+    }else{
+        return nullptr;
+    }
 }
 
 ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter){
@@ -34,6 +38,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionRelease(ofxOc
             if(&c->getSinkParameter() == &parameter){
                 return nullptr;
             }
+        }
+        if(!nodeModel->getParameterInfo(parameter).acceptInConnection){
+            return nullptr;
         }
         ofxOceanodeAbstractConnection* connection = nullptr;
         ofAbstractParameter& source = container.getTemporalConnectionParameter();

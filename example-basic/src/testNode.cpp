@@ -10,7 +10,7 @@
 #include "ofxOceanodeContainer.h"
 
 testNode::testNode() : ofxOceanodeNodeModel("Test"){
-    parameters->add(intParam.set("int", 0, 0, 100));
+    addParameterToGroupAndInfo(intParam.set("int", 0, 0, 100)).acceptOutConnection = false;
     parameters->add(floatParam.set("float", 3, 0, 10));
     parameters->add(boolParam.set("bool", true));
     parameters->add(voidParam.set("Request BPM"));

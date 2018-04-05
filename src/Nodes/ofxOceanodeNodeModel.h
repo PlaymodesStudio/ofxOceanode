@@ -19,6 +19,7 @@ struct parameterInfo{
     bool isSaveProject;
     bool acceptInConnection;
     bool acceptOutConnection;
+    parameterInfo() : isSavePreset(true), isSaveProject(true), acceptInConnection(true), acceptOutConnection(true){};
 };
 
 class ofxOceanodeNodeModel {
@@ -53,9 +54,13 @@ public:
     
     ofColor getColor(){return color;};
     
+    parameterInfo& addParameterToGroupAndInfo(ofAbstractParameter& p);
+    const parameterInfo getParameterInfo(ofAbstractParameter& p);
+    const parameterInfo getParameterInfo(string parameterName);
+    
 protected:
     ofParameterGroup* parameters;
-//    std::map<ofAbstractParameter&, parameterInfo> parametersInfo; //information about interaction of parameter
+    std::map<string, parameterInfo> parametersInfo; //information about interaction of parameter
     bool autoBPM;
     ofColor color;
     bool isDynamic;

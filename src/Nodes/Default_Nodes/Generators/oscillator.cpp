@@ -64,7 +64,7 @@ oscillator::oscillator() : ofxOceanodeNodeModel("Oscillator"){
     waveDropDown.add(tempStrParam);
     waveDropDown.add(waveSelect_Param.set("Wave Select", 0, 0, 7));
     parameters->add(waveDropDown);
-    parameters->add(output.set("Output", 0, 0, 1));
+    addParameterToGroupAndInfo(output.set("Output", 0, 0, 1)).acceptInConnection = false;
     
     
     phasorIn.addListener(this, &oscillator::phasorInListener);
