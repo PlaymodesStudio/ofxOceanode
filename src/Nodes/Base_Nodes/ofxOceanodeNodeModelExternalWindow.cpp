@@ -37,6 +37,7 @@ void ofxOceanodeNodeModelExternalWindow::showExternalWindow(bool &b){
         prevSettings.setGLVersion(ofGetGLRenderer()->getGLVersionMajor(), ofGetGLRenderer()->getGLVersionMinor());
         externalWindow = ofCreateWindow(prevSettings);
         externalWindow->setWindowTitle(nameIdentifier + " " + ofToString(numIdentifier));
+        externalWindow->setVerticalSync(false);
         windowListenerEvents.push_back(externalWindow->events().draw.newListener(this, &ofxOceanodeNodeModelExternalWindow::drawInExternalWindow));
         windowListenerEvents.push_back(externalWindow->events().update.newListener(this, &ofxOceanodeNodeModelExternalWindow::updateForExternalWindow));
         windowListenerEvents.push_back(externalWindow->events().exit.newListener(this, &ofxOceanodeNodeModelExternalWindow::closeExternalWindow));

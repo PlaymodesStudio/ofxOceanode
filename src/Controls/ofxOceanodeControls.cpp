@@ -26,6 +26,7 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     prevSettings.setGLVersion(ofGetGLRenderer()->getGLVersionMajor(), ofGetGLRenderer()->getGLVersionMinor());
     controlsWindow = ofCreateWindow(prevSettings);
     controlsWindow->setWindowTitle("Controls");
+    controlsWindow->setVerticalSync(false);
     ofAddListener(controlsWindow->events().draw, this, &ofxOceanodeControls::draw);
     ofAddListener(controlsWindow->events().update, this, &ofxOceanodeControls::update);
     ofAddListener(controlsWindow->events().keyPressed, this, &ofxOceanodeControls::keyPressed);

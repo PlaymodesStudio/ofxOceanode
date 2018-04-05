@@ -3,6 +3,9 @@
 
 //--------------------------------------------------------------
 void ofApp::setup(){
+    ofSetVerticalSync(false);
+    ofSetFrameRate(120);
+    
     auto reg = make_shared<ofxOceanodeNodeRegistry>();
     reg->registerModel<testNode>("Custom Nodes");
     
