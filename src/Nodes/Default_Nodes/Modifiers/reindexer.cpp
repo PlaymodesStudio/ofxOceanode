@@ -13,7 +13,7 @@ reindexer::reindexer() : ofxOceanodeNodeModelExternalWindow("Reindexer"){
     color = ofColor::orange;
     parameters->add(input.set("Input", {0}, {0}, {1}));
     parameters->add(outputSize.set("Output Size", 10, 1, 100));
-    parameters->add(output.set("Output", {0}, {0}, {1}));
+    addOutputParameterToGroupAndInfo(output.set("Output", {0}, {0}, {1}));
     
     inputListenerEvent = input.newListener(this, &reindexer::inputListener);
     outputSizeListenerEvent = outputSize.newListener(this, &reindexer::outputSizeListener);

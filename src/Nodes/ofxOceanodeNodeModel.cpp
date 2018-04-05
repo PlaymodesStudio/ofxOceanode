@@ -35,6 +35,12 @@ parameterInfo& ofxOceanodeNodeModel::addParameterToGroupAndInfo(ofAbstractParame
     return parametersInfo[p.getName()];
 }
 
+parameterInfo& ofxOceanodeNodeModel::addOutputParameterToGroupAndInfo(ofAbstractParameter& p){
+    parameters->add(p);
+    parametersInfo[p.getName()] = parameterInfo(false, true, false, true);
+    return parametersInfo[p.getName()];
+}
+
 const parameterInfo ofxOceanodeNodeModel::getParameterInfo(ofAbstractParameter& p){
     return getParameterInfo(p.getName());
 }

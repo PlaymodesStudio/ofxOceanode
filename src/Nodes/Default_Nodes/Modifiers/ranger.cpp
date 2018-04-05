@@ -17,7 +17,7 @@ ranger::ranger() : ofxOceanodeNodeModel("Ranger"){
     parameters->add(MaxInput.set("MaxInput", 1.0,  minRange, maxRange));
     parameters->add(MinOutput.set("MinOutput", 0,  minRange, maxRange));
     parameters->add(MaxOutput.set("MaxOutput", 1.0,  minRange, maxRange));
-    parameters->add(Output.set("Output", 0, minRange, maxRange));
+    addOutputParameterToGroupAndInfo(Output.set("Output", 0, minRange, maxRange));
     
     
     Input.addListener(this, &ranger::recalculate);

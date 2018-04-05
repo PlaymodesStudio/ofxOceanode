@@ -15,7 +15,7 @@ mapper::mapper() : ofxOceanodeNodeModel("Mapper"){
     parameters->add(maxInput.set("MaxInput", 1.0, 0.0, 1.0));
     parameters->add(minOutput.set("MinOutput", 0, 0.0, 1.0));
     parameters->add(maxOutput.set("MaxOutput", 1.0, 0.0, 1.0));
-    parameters->add(output.set("Output", {0}, {0}, {1}));
+    addOutputParameterToGroupAndInfo(output.set("Output", {0}, {0}, {1}));
 
     
     input.addListener(this, &mapper::recalculate);

@@ -19,7 +19,8 @@ struct parameterInfo{
     bool isSaveProject;
     bool acceptInConnection;
     bool acceptOutConnection;
-    parameterInfo() : isSavePreset(true), isSaveProject(true), acceptInConnection(true), acceptOutConnection(true){};
+    parameterInfo(bool spres = true, bool sproj = true, bool inc = true, bool outc = true) : isSavePreset(spres), isSaveProject(sproj), acceptInConnection(inc), acceptOutConnection(outc){};
+    
 };
 
 class ofxOceanodeNodeModel {
@@ -55,6 +56,7 @@ public:
     ofColor getColor(){return color;};
     
     parameterInfo& addParameterToGroupAndInfo(ofAbstractParameter& p);
+    parameterInfo& addOutputParameterToGroupAndInfo(ofAbstractParameter& p);
     const parameterInfo getParameterInfo(ofAbstractParameter& p);
     const parameterInfo getParameterInfo(string parameterName);
     

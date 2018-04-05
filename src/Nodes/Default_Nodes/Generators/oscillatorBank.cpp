@@ -48,8 +48,7 @@ oscillatorBank::oscillatorBank() : baseIndexer(100, "Oscillator Bank"){
     waveDropDown.add(tempStrParam);
     waveDropDown.add(waveSelect_Param.set("Wave Select", 0, 0, 7));
     parameters->add(waveDropDown);
-    
-    parameters->add(oscillatorOut.set("Oscillator Out", {0}, {0}, {1}));
+    addOutputParameterToGroupAndInfo(oscillatorOut.set("Oscillator Out", {0}, {0}, {1}));
     
     phasorIn.addListener(this, &oscillatorBank::newPhasorIn);
 }

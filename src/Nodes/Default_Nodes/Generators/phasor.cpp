@@ -31,7 +31,7 @@ phasor::phasor() : ofxOceanodeNodeModel("Phasor")
     parameters->add(initPhase_Param.set("Initial Phase", 0, 0, 1));
     parameters->add(resetPhase_Param.set("Reset Phase"));
     parameters->add(loop_Param.set("Loop", true));
-    parameters->add(phasorMonitor.set("Phasor Output", 0, 0, 1));
+    addOutputParameterToGroupAndInfo(phasorMonitor.set("Phasor Output", 0, 0, 1));
     
     resetPhaseListener = resetPhase_Param.newListener([&](){
         basePh.resetPhasor();
