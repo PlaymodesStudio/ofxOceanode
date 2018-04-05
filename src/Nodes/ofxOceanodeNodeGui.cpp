@@ -82,6 +82,8 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
             }));
         }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
             gui->addMultiSlider(absParam.cast<vector<float>>());
+        }else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
+            gui->addMultiSlider(absParam.cast<vector<int>>());
         }else {
             gui->addLabel(absParam.getName());
         }
