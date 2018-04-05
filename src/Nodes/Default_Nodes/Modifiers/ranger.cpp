@@ -12,38 +12,39 @@ float maxRange =  10000.000;
 
 ranger::ranger() : ofxOceanodeNodeModel("Ranger"){
     color = ofColor::white;
-    parameters->add(Input.set("Input", 0, minRange, maxRange));
+    parameters->add(Input.set("Input", {0}, {minRange}, {maxRange}));
     parameters->add(MinInput.set("MinInput", 0,  minRange, maxRange));
     parameters->add(MaxInput.set("MaxInput", 1.0,  minRange, maxRange));
     parameters->add(MinOutput.set("MinOutput", 0,  minRange, maxRange));
     parameters->add(MaxOutput.set("MaxOutput", 1.0,  minRange, maxRange));
-    addOutputParameterToGroupAndInfo(Output.set("Output", 0, minRange, maxRange));
+    addOutputParameterToGroupAndInfo(Output.set("Output", {0}, {minRange}, {maxRange}));
     
     
-    Input.addListener(this, &ranger::recalculate);
-    MinInput.addListener(this, &ranger::recalculate);
-    MaxInput.addListener(this, &ranger::recalculate);
-    MinOutput.addListener(this, &ranger::recalculate);
-    MaxOutput.addListener(this, &ranger::recalculate);
+    listeners.push_back(Input.newListener([&](vector<float> &vf){
+        recalculate();
+    }));
+    listeners.push_back(MinInput.newListener([&](float &f){
+        recalculate();
+    }));
+    listeners.push_back(MaxInput.newListener([&](float &f){
+        recalculate();
+    }));
+    listeners.push_back(MinOutput.newListener([&](float &f){
+        recalculate();
+    }));
+    listeners.push_back(MaxOutput.newListener([&](float &f){
+        recalculate();
+    }));
 }
 
-//float ranger::getRange(){
-//    float f;
-//    recalculate(f);
-//    return(paramOutput);
-//}
-
-void ranger::recalculate(float& f)
+void ranger::recalculate()
 {
-    Output = ofMap(Input,MinInput,MaxInput,MinOutput,MaxOutput, true);
+    vector<float> vFloat;
+    vFloat.resize(Input.get().size());
+    for(int i = 0; i < Output.get().size(); i++){
+        vFloat[i] = ofMap(Input.get()[i],MinInput,MaxInput,MinOutput,MaxOutput, true);
+    }
+    Output = vFloat;
+    ofLog()<<"compute"<<ofGetTimestampString();
 }
-    
-//void ranger::resetRange()
-//{
-//    paramInput = 0.0;
-//    MinInput = 0.0;
-//    MaxInput = 1.0;
-//    MinOutput = 0.0;
-//    MaxOutput = 1.0;
-//}
 

@@ -22,17 +22,18 @@ public:
 //    float getRange();    
 //    void resetRange();
     
-    void recalculate(float& f);
+    void recalculate();
 
 private:
     
+    vector<ofEventListener> listeners;
     
-    ofParameter<float>  Input;
+    ofParameter<vector<float>>  Input;
     ofParameter<float>  MinInput;
     ofParameter<float>  MaxInput;
     ofParameter<float>  MinOutput;
     ofParameter<float>  MaxOutput;
-    ofParameter<float>  Output;
+    ofParameter<vector<float>>  Output;
 };
 
 
