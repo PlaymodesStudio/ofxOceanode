@@ -133,13 +133,19 @@ private:
     vector<_Tsink> beforeConnectionValue;
 };
 
-template<typename T>
-class ofxOceanodeConnection<T, vector<T>>: public ofxOceanodeAbstractConnection{
+template<typename>
+struct is_std_vector : std::false_type {};
+
+template<typename T, typename A>
+struct is_std_vector<std::vector<T,A>> : std::true_type {};
+
+template<typename _Tsource, typename _Tsink>
+class ofxOceanodeConnection<_Tsource, vector<_Tsink>, typename std::enable_if<!is_std_vector<_Tsource>::value>::type>: public ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeConnection(ofParameter<T>& pSource, ofParameter<vector<T>>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+    ofxOceanodeConnection(ofParameter<_Tsource>& pSource, ofParameter<vector<_Tsink>>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
         beforeConnectionValue = sinkParameter.get();
-        parameterEventListener = sourceParameter.newListener([&](T &f){
-            sinkParameter = vector<T>(1, f);
+        parameterEventListener = sourceParameter.newListener([&](_Tsource &f){
+            sinkParameter = vector<_Tsink>(1, f);
         });
         //sinkParameter = vector<T>(1, sourceParameter);
     }
@@ -150,17 +156,17 @@ public:
     
 private:
     ofEventListener parameterEventListener;
-    ofParameter<T>& sourceParameter;
-    ofParameter<vector<T>>&  sinkParameter;
-    vector<T> beforeConnectionValue;
+    ofParameter<_Tsource>& sourceParameter;
+    ofParameter<vector<_Tsink>>&  sinkParameter;
+    vector<_Tsink> beforeConnectionValue;
 };
 
-template<typename T>
-class ofxOceanodeConnection<vector<T>, T>: public ofxOceanodeAbstractConnection{
+template<typename _Tsource, typename _Tsink>
+class ofxOceanodeConnection<vector<_Tsource>, _Tsink, typename std::enable_if<!is_std_vector<_Tsink>::value>::type>: public ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeConnection(ofParameter<vector<T>>& pSource, ofParameter<T>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+    ofxOceanodeConnection(ofParameter<vector<_Tsource>>& pSource, ofParameter<_Tsink>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
         beforeConnectionValue = sinkParameter.get();
-        parameterEventListener = sourceParameter.newListener([&](vector<T> &vf){
+        parameterEventListener = sourceParameter.newListener([&](vector<_Tsource> &vf){
             if(vf.size() > 0){
                 sinkParameter = vf[0];
             }
@@ -176,9 +182,9 @@ public:
     
 private:
     ofEventListener parameterEventListener;
-    ofParameter<vector<T>>& sourceParameter;
-    ofParameter<T>&  sinkParameter;
-    T beforeConnectionValue;
+    ofParameter<vector<_Tsource>>& sourceParameter;
+    ofParameter<_Tsink>&  sinkParameter;
+    _Tsink beforeConnectionValue;
 };
 
 
