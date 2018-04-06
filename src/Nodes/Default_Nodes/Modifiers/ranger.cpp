@@ -45,6 +45,5 @@ void ranger::recalculate()
         vFloat[i] = ofMap(Input.get()[i],MinInput,MaxInput,MinOutput,MaxOutput, true);
     }
     Output = vFloat;
-    ofLog()<<"compute"<<ofGetTimestampString();
 }
 
