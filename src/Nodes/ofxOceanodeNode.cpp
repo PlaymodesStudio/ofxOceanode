@@ -81,6 +81,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionRelease(ofxOc
             if(sink.type() == typeid(ofParameter<float>).name()){
                 connection = container.connectConnection(source.cast<vector<float>>(), sink.cast<float>());
             }
+            if(sink.type() == typeid(ofParameter<vector<int>>).name()){
+                connection = container.connectConnection(source.cast<vector<float>>(), sink.cast<vector<int>>());
+            }
         }else if(source.type() == typeid(ofParameter<void>).name()){
             if(sink.type() == typeid(ofParameter<bool>).name()){
                 connection = container.connectConnection(source.cast<void>(), sink.cast<bool>());

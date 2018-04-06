@@ -81,7 +81,7 @@ private:
     ofEventListener mouseReleasedListener;
 };
 
-template<typename Tsource, typename Tsink>
+template<typename Tsource, typename Tsink, typename Enable = void>
 class ofxOceanodeConnection: public ofxOceanodeAbstractConnection{
 public:
     ofxOceanodeConnection(ofParameter<Tsource>& pSource, ofParameter<Tsink>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
@@ -104,6 +104,33 @@ private:
     ofParameter<Tsource>& sourceParameter;
     ofParameter<Tsink>&  sinkParameter;
     Tsink beforeConnectionValue;
+};
+
+template<typename _Tsource, typename _Tsink>
+class ofxOceanodeConnection<vector<_Tsource>, vector<_Tsink>, typename std::enable_if<!std::is_same<_Tsource, _Tsink>::value>::type>: public ofxOceanodeAbstractConnection{
+public:
+    ofxOceanodeConnection(ofParameter<vector<_Tsource>>& pSource, ofParameter<vector<_Tsink>>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+        beforeConnectionValue = sinkParameter.get();
+        parameterEventListener = sourceParameter.newListener([&](vector<_Tsource> &vf){
+            //            sinkParameter = vector<_Tsink>(1, f);
+            vector<_Tsink> vec(vf.size());
+            for(int i = 0; i < vf.size(); i ++){
+                vec[i] = vf[i];
+            }
+            sinkParameter = vec;
+        });
+        //sinkParameter = vector<T>(1, sourceParameter);
+    }
+    ~ofxOceanodeConnection(){
+        sinkParameter.set(beforeConnectionValue);
+        ofNotifyEvent(destroyConnection);
+    };
+    
+private:
+    ofEventListener parameterEventListener;
+    ofParameter<vector<_Tsource>>& sourceParameter;
+    ofParameter<vector<_Tsink>>&  sinkParameter;
+    vector<_Tsink> beforeConnectionValue;
 };
 
 template<typename T>
