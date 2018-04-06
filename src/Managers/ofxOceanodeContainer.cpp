@@ -100,6 +100,7 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     ofLog()<<"Load Preset " << presetFolderPath;
     
     window->makeCurrent();
+    ofGetMainLoop()->setCurrentWindow(window);
     
     //Read new nodes in preset
     //Check if the nodes exists and update them, (or update all at the end)
