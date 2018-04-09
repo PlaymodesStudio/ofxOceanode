@@ -233,7 +233,7 @@ bool ofxOceanodeNode::savePreset(string presetFolderPath){
                 }
             }
             else if(p.type() == typeid(ofParameter<vector<int>>).name()){
-                auto vecI = p.cast<vector<float>>().get();
+                auto vecI = p.cast<vector<int>>().get();
                 if(vecI.size() == 1){
                     json[p.getEscapedName()] = vecI[0];
                 }
