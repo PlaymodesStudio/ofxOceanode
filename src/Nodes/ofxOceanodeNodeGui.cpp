@@ -196,6 +196,10 @@ void ofxOceanodeNodeGui::updateGuiForParameter(string &parameterName){
         auto slider = gui->getMultiSlider(absParam.getName());
         slider->setMin(absParam.cast<vector<float>>().getMin()[0]);
         slider->setMax(absParam.cast<vector<float>>().getMax()[0]);
+    }else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
+        auto slider = gui->getMultiSlider(absParam.getName());
+        slider->setMin(absParam.cast<vector<int>>().getMin()[0]);
+        slider->setMax(absParam.cast<vector<int>>().getMax()[0]);
     }
 }
 
