@@ -19,6 +19,7 @@ public:
     ~ofxOceanodeNodeGui();
     
     void createGuiFromParameters(shared_ptr<ofAppBaseWindow> window);
+    void updateGui();
     void updateGuiForParameter(string &parameterName);
     
     void setPosition(glm::vec2 position);

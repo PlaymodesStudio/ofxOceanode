@@ -114,6 +114,71 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
     gui->onRightClickEvent(this, &ofxOceanodeNodeGui::onGuiRightClickEvent);
 }
 
+void ofxOceanodeNodeGui::updateGui(){
+    for(int i=0 ; i<getParameters()->size(); i++){
+        ofAbstractParameter &absParam = getParameters()->get(i);
+        if(gui->getComponent(absParam.getName()) == NULL){
+            if(absParam.type() == typeid(ofParameter<float>).name()){
+                gui->addSlider(absParam.cast<float>())->setPrecision(1000);
+            }else if(absParam.type() == typeid(ofParameter<int>).name()){
+                gui->addSlider(absParam.cast<int>());
+            }else if(absParam.type() == typeid(ofParameter<bool>).name()){
+                ofxDatGuiToggle* toggle =  gui->addToggle(absParam.getName());
+                toggle->setChecked(absParam.cast<bool>().get());
+                //Add a listener that automatically puts the parameter to the gui.
+                //Best will be to include this to datGui. But this way we can change the gui we use, independent of ofParameter
+                parameterChangedListeners.push_back(absParam.cast<bool>().newListener([&, toggle](bool &val){
+                    toggle->setChecked(val);
+                }));
+            }else if(absParam.type() == typeid(ofParameter<void>).name()){
+                gui->addButton(absParam.getName());
+            }else if(absParam.type() == typeid(ofParameter<string>).name()){
+                auto textInput = gui->addTextInput(absParam.getName(), absParam.cast<string>());
+                parameterChangedListeners.push_back(absParam.cast<string>().newListener([&, textInput](string &val){
+                    textInput->setText(val);
+                }));
+            }else if(absParam.type() == typeid(ofParameter<char>).name()){
+                gui->addLabel(absParam.getName());
+            }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
+                auto colorGui = gui->addColorPicker(absParam.getName(), absParam.cast<ofColor>());
+                parameterChangedListeners.push_back(absParam.cast<ofColor>().newListener([&, colorGui](ofColor &val){
+                    colorGui->setColor(val);
+                }));
+            }else if(absParam.type() == typeid(ofParameterGroup).name()){
+                gui->addLabel(absParam.castGroup().getName() + " Selector");
+                auto dropdown = gui->addDropdown(absParam.castGroup().getName(), ofSplitString(absParam.castGroup().getString(0), "-|-"));
+                dropdown->select(absParam.castGroup().getInt(1));
+                parameterChangedListeners.push_back(absParam.castGroup().getInt(1).newListener([&, dropdown](int &val){
+                    dropdown->select(val);
+                }));
+            }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
+                gui->addMultiSlider(absParam.cast<vector<float>>());
+            }else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
+                gui->addMultiSlider(absParam.cast<vector<int>>());
+            }else {
+                gui->addLabel(absParam.getName());
+            }
+        }
+    }
+    bool removedComponents = false;
+    for(int i = 0; i < gui->getNumComponents(); i++){
+        if(gui->getComponent(i) != nullptr){
+            if(!getParameters()->contains(gui->getComponent(i)->getName())){
+                gui->removeComponent(i);
+                removedComponents = true;
+            }
+        }
+    }
+    if(removedComponents){
+        for(int i = 0; i < getParameters()->size(); i++){
+            auto &p = getParameters()->get(i);
+            node.setInConnectionsPositionForParameter(p, getSinkConnectionPositionFromParameter(p));
+            node.setOutConnectionsPositionForParameter(p, getSourceConnectionPositionFromParameter(p));
+        }
+    }
+}
+
+
 void ofxOceanodeNodeGui::updateGuiForParameter(string &parameterName){
     ofAbstractParameter &absParam = getParameters()->get(parameterName);
     if(absParam.type() == typeid(ofParameter<float>).name()){

@@ -16,6 +16,7 @@ ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel)
 void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     nodeGui = std::move(gui);
     ofAddListener(nodeModel->parameterChangedMinMax, nodeGui.get(), &ofxOceanodeNodeGui::updateGuiForParameter);
+    ofAddListener(nodeModel->parameterGroupChanged, nodeGui.get(), &ofxOceanodeNodeGui::updateGui);
 }
 
 ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter){
@@ -138,6 +139,22 @@ void ofxOceanodeNode::moveConnections(glm::vec2 moveVector){
     }
     for(auto c : outConnections){
         c->moveSourcePosition(moveVector);
+    }
+}
+
+void ofxOceanodeNode::setInConnectionsPositionForParameter(ofAbstractParameter &p, glm::vec2 pos){
+    for(auto c : inConnections){
+        if(&c->getSinkParameter() == &p){
+            c->setSinkPosition(pos);
+        }
+    }
+}
+
+void ofxOceanodeNode::setOutConnectionsPositionForParameter(ofAbstractParameter &p, glm::vec2 pos){
+    for(auto c : outConnections){
+        if(&c->getSourceParameter() == &p){
+            c->setSourcePosition(pos);
+        }
     }
 }
 

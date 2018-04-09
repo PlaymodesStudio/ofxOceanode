@@ -43,6 +43,7 @@ public:
     virtual ofxOceanodeAbstractConnection* createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink){return nullptr;};
     
     ofEvent<string> parameterChangedMinMax;
+    ofEvent<void> parameterGroupChanged;
     
     void registerLoop(shared_ptr<ofAppBaseWindow> w = nullptr);
     
