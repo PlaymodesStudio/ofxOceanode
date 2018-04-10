@@ -53,15 +53,19 @@ void ofxOceanodeNodeModelExternalWindow::showExternalWindow(bool &b){
         windowListenerEvents.push_back(externalWindow->events().mouseScrolled.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseScrolled));
         windowListenerEvents.push_back(externalWindow->events().mouseEntered.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseEntered));
         windowListenerEvents.push_back(externalWindow->events().mouseExited.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseExited));
-        windowListenerEvents.push_back(externalWindow->events().windowResized.newListener(this, &ofxOceanodeNodeModelExternalWindow::windowResized));
+        windowListenerEvents.push_back(externalWindow->events().windowResized.newListener(this, &ofxOceanodeNodeModelExternalWindow::windowResizedOwnEvent));
         windowListenerEvents.push_back(externalWindow->events().fileDragEvent.newListener(this, &ofxOceanodeNodeModelExternalWindow::dragEvent));
     }
     else if(!b && externalWindow != nullptr){
-        externalWindowRect.setPosition(glm::vec3(externalWindow->getWindowPosition(), 0));
-        externalWindowRect.setSize(externalWindow->getWidth(), externalWindow->getHeight());
         externalWindow->setWindowShouldClose();
         externalWindow = nullptr;
     }
+}
+
+void ofxOceanodeNodeModelExternalWindow::windowResizedOwnEvent(ofResizeEventArgs &a){
+    externalWindowRect.setPosition(glm::vec3(externalWindow->getWindowPosition(), 0));
+    externalWindowRect.setSize(externalWindow->getWidth(), externalWindow->getHeight());
+    windowResized(a);
 }
 
 void ofxOceanodeNodeModelExternalWindow::closeExternalWindow(ofEventArgs &e){
@@ -69,3 +73,15 @@ void ofxOceanodeNodeModelExternalWindow::closeExternalWindow(ofEventArgs &e){
     externalWindowRect.setSize(externalWindow->getWidth(), externalWindow->getHeight());
     showWindow = false;
 }
+
+void ofxOceanodeNodeModelExternalWindow::presetSave(ofJson &json){
+    json["ExtWindowRect"] = {externalWindowRect.x, externalWindowRect.y, externalWindowRect.width, externalWindowRect.height};
+}
+
+void ofxOceanodeNodeModelExternalWindow::presetRecallBeforeSettingParameters(ofJson &json){
+    if(json.count("ExtWindowRect") == 1){
+        auto infoVec = json["ExtWindowRect"];
+        externalWindowRect = ofRectangle(infoVec[0], infoVec[1], infoVec[2], infoVec[3]);
+    }
+}
+
