@@ -6,12 +6,14 @@ void ofApp::setup(){
     ofSetFrameRate(120);
     
     auto reg = make_shared<ofxOceanodeNodeRegistry>();
-    container = make_shared<ofxOceanodeContainer>(reg);
+    container = make_shared<ofxOceanodeContainer>(reg, true);
+    container->loadPreset("Presets/Initial Bank/1|save");
+
 }
 
 //--------------------------------------------------------------
 void ofApp::update(){
-    ofLog()<<"FPS: " << ofGetFrameRate();
+    //ofLog()<<"FPS: " << ofGetFrameRate();
 }
 
 //--------------------------------------------------------------

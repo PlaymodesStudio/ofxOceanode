@@ -19,7 +19,7 @@ public:
     using nodeContainerWithId = std::unordered_map<int, unique_ptr<ofxOceanodeNode>>;
     
     ofxOceanodeContainer(std::shared_ptr<ofxOceanodeNodeRegistry> _registry =
-                         make_shared<ofxOceanodeNodeRegistry>());
+                         make_shared<ofxOceanodeNodeRegistry>(), bool _isHeadless = false);
     ~ofxOceanodeContainer();
     
     ofxOceanodeNode* createNodeFromName(string name, int identifier = -1);
@@ -39,8 +39,10 @@ public:
     ofxOceanodeAbstractConnection* connectConnection(ofParameter<Tsource>& source, ofParameter<Tsink>& sink){
         connections.push_back(make_pair(temporalConnectionNode, make_shared<ofxOceanodeConnection<Tsource, Tsink>>(source, sink)));
         temporalConnectionNode->addOutputConnection(connections.back().second.get());
-        connections.back().second->setSourcePosition(temporalConnectionNode->getNodeGui().getSourceConnectionPositionFromParameter(source));
-        connections.back().second->getGraphics().subscribeToDrawEvent(window);
+        if(!isHeadless){
+            connections.back().second->setSourcePosition(temporalConnectionNode->getNodeGui().getSourceConnectionPositionFromParameter(source));
+            connections.back().second->getGraphics().subscribeToDrawEvent(window);
+        }
         return connections.back().second.get();
     }
     ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter);
@@ -73,6 +75,8 @@ private:
     
     ofParameter<glm::mat4> transformationMatrix;
     float bpm;
+    
+    const bool isHeadless;
 };
 
 #endif /* ofxOceanodeContainer_h */

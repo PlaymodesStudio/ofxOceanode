@@ -127,7 +127,6 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeCont
     }
     
     if(connection != nullptr){
-        connection->setSinkPosition(nodeGui->getSinkConnectionPositionFromParameter(sinkParameter));
         addInputConnection(connection);
     }
     return connection;
