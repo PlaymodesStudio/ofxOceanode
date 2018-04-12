@@ -199,10 +199,12 @@ bool ofxOceanodeNode::loadPreset(string presetFolderPath){
                 ofDeserialize(json, p);
             }
             else if(p.type() == typeid(ofParameter<vector<float>>).name()){
-                p.cast<vector<float>>() = vector<float>(1, it.value());
+                float value = it.value();
+                p.cast<vector<float>>() = vector<float>(1, value);
             }
             else if(p.type() == typeid(ofParameter<vector<int>>).name()){
-                p.cast<vector<int>>() = vector<int>(1, it.value());
+                int value = it.value();
+                p.cast<vector<int>>() = vector<int>(1, value);
             }
             else if(p.type() == typeid(ofParameterGroup).name()){
                 ofDeserialize(json, p.castGroup().getInt(1));
