@@ -180,6 +180,8 @@ void ofxOceanodeNode::deleteSelf(){
 bool ofxOceanodeNode::loadPreset(string presetFolderPath){
     ofJson json = ofLoadJson(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json");
     
+    if(json.empty()) return false;
+    
     nodeModel->presetRecallBeforeSettingParameters(json);
     
     for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
@@ -208,9 +210,10 @@ bool ofxOceanodeNode::loadPreset(string presetFolderPath){
         }
     }
     nodeModel->presetRecallAfterSettingParameters(json);
+    return true;
 }
 
-bool ofxOceanodeNode::savePreset(string presetFolderPath){
+void ofxOceanodeNode::savePreset(string presetFolderPath){
     ofJson json;
     for(int i = 0; i < getParameters()->size(); i++){
         ofAbstractParameter& p = getParameters()->get(i);

@@ -48,7 +48,7 @@ public:
     ofxOceanodeNodeRegistry & getRegistry(){return *registry;};
     
     bool loadPreset(string presetFolderPath);
-    bool savePreset(string presetFolderPath);
+    void savePreset(string presetFolderPath);
     
     void setBpm(float _bpm);
     

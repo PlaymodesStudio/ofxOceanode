@@ -40,7 +40,7 @@ public:
     void deleteSelf();
     
     bool loadPreset(string presetFolderPath);
-    bool savePreset(string presetFolderPath);
+    void savePreset(string presetFolderPath);
     
     void setBpm(float bpm);
     

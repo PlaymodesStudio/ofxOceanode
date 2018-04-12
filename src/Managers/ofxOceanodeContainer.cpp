@@ -106,6 +106,7 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     //Check if the nodes exists and update them, (or update all at the end)
     //Create new modules and update them (or update at end)
     ofJson json = ofLoadJson(presetFolderPath + "/modules.json");
+    if(json.empty()) return false;
     for(auto &models : registry->getRegisteredModels()){
         string moduleName = models.first;
         vector<int>  vector_of_identifiers;
@@ -151,9 +152,10 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             node.second->loadPreset(presetFolderPath);
         }
     }
+    return true;
 }
 
-bool ofxOceanodeContainer::savePreset(string presetFolderPath){
+void ofxOceanodeContainer::savePreset(string presetFolderPath){
     ofLog()<<"Save Preset " << presetFolderPath;
     
     ofJson json;
