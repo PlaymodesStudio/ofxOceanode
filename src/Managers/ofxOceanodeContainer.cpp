@@ -37,18 +37,19 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::disconnectConnection(ofxOce
             break;
         }
     }
+    return nullptr;
 }
 
-ofxOceanodeNode& ofxOceanodeContainer::createNodeFromName(string name, int identifier){
+ofxOceanodeNode* ofxOceanodeContainer::createNodeFromName(string name, int identifier){
     unique_ptr<ofxOceanodeNodeModel> type = registry->create(name);
     
     if (type)
     {
         auto &node =  createNode(std::move(type), identifier);
         node.getNodeGui().setTransformationMatrix(&transformationMatrix);
-        return node;
+        return &node;
     }
-    
+    return nullptr;
 }
 
 ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier){
@@ -127,8 +128,8 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         for (ofJson::iterator it = json[moduleName].begin(); it != json[moduleName].end(); ++it) {
             int identifier = ofToInt(it.key());
             if(dynamicNodes[moduleName].count(identifier) == 0){
-                auto &node = createNodeFromName(moduleName, identifier);
-                node.getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
+                auto node = createNodeFromName(moduleName, identifier);
+                node->getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
             }
         }
     }
@@ -215,6 +216,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
         auto connection = sinkModuleRef->createConnection(*this, source, sink);
         connection->setTransformationMatrix(&transformationMatrix);
         temporalConnection = nullptr;
+        return connection;
     }
+    
+    return nullptr;
 }
 

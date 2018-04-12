@@ -22,7 +22,7 @@ public:
                          make_shared<ofxOceanodeNodeRegistry>());
     ~ofxOceanodeContainer();
     
-    ofxOceanodeNode& createNodeFromName(string name, int identifier = -1);
+    ofxOceanodeNode* createNodeFromName(string name, int identifier = -1);
     ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier = -1);
     
 //    void createConnection(ofAbstractParameter& p);
