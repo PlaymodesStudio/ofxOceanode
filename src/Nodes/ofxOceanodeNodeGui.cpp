@@ -260,6 +260,7 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
     }else{
         auto connection = node.parameterConnectionRelease(container, getParameters()->get(e.target->getName()));
         if(connection != nullptr){
+            connection->setSinkPosition(getSinkConnectionPositionFromParameter(getParameters()->get(e.target->getName())));
             connection->setTransformationMatrix(transformationMatrix);
         }
     }
