@@ -17,6 +17,12 @@ public:
     ofxOceanodeConnectionGraphics(){
         points[0] = glm::vec2(-1, -1);
         points[1] = glm::vec2(-1, -1);
+        
+        ofColor back = ofGetBackgroundColor();
+        if (back.getBrightness()>128)
+            wireColor = ofColor(0);
+        else
+            wireColor = ofColor(255);
     };
     ~ofxOceanodeConnectionGraphics(){};
     
@@ -32,7 +38,7 @@ public:
                 wirePath.setCurveResolution(64);
                 wirePath.setFilled(false);
                 wirePath.setStrokeWidth(2);
-                wirePath.setStrokeColor(ofColor::black);
+                wirePath.setStrokeColor(wireColor);
                 
                 glm::vec2  controlPoint;
                 glm::vec2  endControl;
@@ -51,7 +57,7 @@ public:
                                     points[1].x, points[1].y);
                 wirePath.moveTo(points[1].x,points[1].y);
                 
-                ofSetColor(0,0,0);
+                ofSetColor(255);
                 wirePath.draw();
 //                wirePath.translate(glm::vec2(0,-3));
 //                wirePath.draw();
@@ -88,6 +94,7 @@ private:
     ofParameter<glm::mat4> *transformationMatrix;
     
     ofEventListener drawEventListener;
+    ofColor wireColor;
 };
 
 #endif /* ofxOceanodeConnectionGraphics_h */

@@ -16,7 +16,11 @@ public:
     ~phasor(){};
     float getPhasor(){return basePh.getPhasor();};
     void  resetPhasor(){basePh.resetPhasor();};
-    
+    float getBpm(){return bpm_Param;};
+    int getBeatsMult(){return beatsMult_Param;};
+    int getBeatsDiv(){return beatsDiv_Param;};
+    void setBeatMult(int i){beatsMult_Param=i;};
+    void setBeatDiv(int i){beatsDiv_Param=i;};
 private:
     basePhasor basePh;
     void update(ofEventArgs &e);
