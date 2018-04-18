@@ -203,6 +203,14 @@ void ofxOceanodeNodeGui::updateGuiForParameter(string &parameterName){
     }
 }
 
+void ofxOceanodeNodeGui::updateDropdown(string &dropdownName){
+    auto dropdown = gui->getDropdown(dropdownName);
+    dropdown->clear();
+    for(auto option : ofSplitString(getParameters()->getGroup(dropdownName).getString(0), "-|-")){
+        dropdown->addOption(option);
+    }
+}
+
 ofParameterGroup* ofxOceanodeNodeGui::getParameters(){
     return node.getParameters();
 }

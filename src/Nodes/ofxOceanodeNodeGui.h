@@ -21,6 +21,7 @@ public:
     void createGuiFromParameters(shared_ptr<ofAppBaseWindow> window);
     void updateGui();
     void updateGuiForParameter(string &parameterName);
+    void updateDropdown(string &dropdownName);
     
     void setPosition(glm::vec2 position);
     
