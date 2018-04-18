@@ -43,6 +43,7 @@ public:
     virtual ofxOceanodeAbstractConnection* createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink){return nullptr;};
     
     ofEvent<string> parameterChangedMinMax;
+    ofEvent<string> dropdownChanged;
     ofEvent<void> parameterGroupChanged;
     
     void registerLoop(shared_ptr<ofAppBaseWindow> w = nullptr);
@@ -60,6 +61,22 @@ public:
     parameterInfo& addOutputParameterToGroupAndInfo(ofAbstractParameter& p);
     const parameterInfo getParameterInfo(ofAbstractParameter& p);
     const parameterInfo getParameterInfo(string parameterName);
+    
+    static ofAbstractParameter& createDropdownAbstractParameter(string name, vector<string> options, ofParameter<int> &dropdownSelector){
+        ofParameterGroup *tempDropdown = new ofParameterGroup();
+        tempDropdown->setName(name);
+        string  tempStr;
+        ofParameter<string> tempStrParam("Options");
+        for(auto opt : options)
+            tempStr += opt + "-|-";
+        
+        tempStr.erase(tempStr.end()-3, tempStr.end());
+        tempStrParam.set(tempStr);
+        
+        tempDropdown->add(tempStrParam);
+        tempDropdown->add(dropdownSelector.set(name, 0, 0, options.size()));
+        return *tempDropdown;
+    }
     
 protected:
     ofParameterGroup* parameters;

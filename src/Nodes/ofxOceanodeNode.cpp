@@ -16,6 +16,7 @@ ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel)
 void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     nodeGui = std::move(gui);
     ofAddListener(nodeModel->parameterChangedMinMax, nodeGui.get(), &ofxOceanodeNodeGui::updateGuiForParameter);
+    ofAddListener(nodeModel->dropdownChanged, nodeGui.get(), &ofxOceanodeNodeGui::updateDropdown);
     ofAddListener(nodeModel->parameterGroupChanged, nodeGui.get(), &ofxOceanodeNodeGui::updateGui);
 }
 
@@ -127,7 +128,6 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeCont
     }
     
     if(connection != nullptr){
-        connection->setSinkPosition(nodeGui->getSinkConnectionPositionFromParameter(sinkParameter));
         addInputConnection(connection);
     }
     return connection;
@@ -180,6 +180,8 @@ void ofxOceanodeNode::deleteSelf(){
 bool ofxOceanodeNode::loadPreset(string presetFolderPath){
     ofJson json = ofLoadJson(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json");
     
+    if(json.empty()) return false;
+    
     nodeModel->presetRecallBeforeSettingParameters(json);
     
     for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
@@ -197,10 +199,12 @@ bool ofxOceanodeNode::loadPreset(string presetFolderPath){
                 ofDeserialize(json, p);
             }
             else if(p.type() == typeid(ofParameter<vector<float>>).name()){
-                p.cast<vector<float>>() = vector<float>(1, it.value());
+                float value = it.value();
+                p.cast<vector<float>>() = vector<float>(1, value);
             }
             else if(p.type() == typeid(ofParameter<vector<int>>).name()){
-                p.cast<vector<int>>() = vector<int>(1, it.value());
+                int value = it.value();
+                p.cast<vector<int>>() = vector<int>(1, value);
             }
             else if(p.type() == typeid(ofParameterGroup).name()){
                 ofDeserialize(json, p.castGroup().getInt(1));
@@ -208,9 +212,10 @@ bool ofxOceanodeNode::loadPreset(string presetFolderPath){
         }
     }
     nodeModel->presetRecallAfterSettingParameters(json);
+    return true;
 }
 
-bool ofxOceanodeNode::savePreset(string presetFolderPath){
+void ofxOceanodeNode::savePreset(string presetFolderPath){
     ofJson json;
     for(int i = 0; i < getParameters()->size(); i++){
         ofAbstractParameter& p = getParameters()->get(i);

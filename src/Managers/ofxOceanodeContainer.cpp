@@ -8,10 +8,11 @@
 
 #include "ofxOceanodeContainer.h"
 
-ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry) : registry(_registry){
+ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry, bool _isHeadless) : registry(_registry), isHeadless(_isHeadless){
     window = ofGetCurrentWindow();
     transformationMatrix = glm::mat4(1);
     temporalConnection = nullptr;
+    bpm = 120;
 }
 
 ofxOceanodeContainer::~ofxOceanodeContainer(){
@@ -21,8 +22,10 @@ ofxOceanodeContainer::~ofxOceanodeContainer(){
 ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstractParameter& p, ofxOceanodeNode& n){
     temporalConnectionNode = &n;
     temporalConnection = new ofxOceanodeTemporalConnection(p);
-    temporalConnection->setSourcePosition(n.getNodeGui().getSourceConnectionPositionFromParameter(p));
-    temporalConnection->getGraphics().subscribeToDrawEvent(window);
+    if(!isHeadless){
+        temporalConnection->setSourcePosition(n.getNodeGui().getSourceConnectionPositionFromParameter(p));
+        temporalConnection->getGraphics().subscribeToDrawEvent(window);
+    }
     ofAddListener(temporalConnection->destroyConnection, this, &ofxOceanodeContainer::temporalConnectionDestructor);
     return temporalConnection;
 }
@@ -37,18 +40,21 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::disconnectConnection(ofxOce
             break;
         }
     }
+    return nullptr;
 }
 
-ofxOceanodeNode& ofxOceanodeContainer::createNodeFromName(string name, int identifier){
+ofxOceanodeNode* ofxOceanodeContainer::createNodeFromName(string name, int identifier){
     unique_ptr<ofxOceanodeNodeModel> type = registry->create(name);
     
     if (type)
     {
         auto &node =  createNode(std::move(type), identifier);
-        node.getNodeGui().setTransformationMatrix(&transformationMatrix);
-        return node;
+        if(!isHeadless){
+            node.getNodeGui().setTransformationMatrix(&transformationMatrix);
+        }
+        return &node;
     }
-    
+    return nullptr;
 }
 
 ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier){
@@ -62,8 +68,10 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     nodeModel->setNumIdentifier(toBeCreatedId);
     nodeModel->registerLoop(window);
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
-    auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node, window);
-    node->setGui(std::move(nodeGui));
+    if(!isHeadless){
+        auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node, window);
+        node->setGui(std::move(nodeGui));
+    }
     node->setBpm(bpm);
     
     auto nodePtr = node.get();
@@ -106,6 +114,7 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     //Check if the nodes exists and update them, (or update all at the end)
     //Create new modules and update them (or update at end)
     ofJson json = ofLoadJson(presetFolderPath + "/modules.json");
+    if(json.empty()) return false;
     for(auto &models : registry->getRegisteredModels()){
         string moduleName = models.first;
         vector<int>  vector_of_identifiers;
@@ -116,8 +125,10 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             string stringIdentifier = ofToString(identifier);
             if(json.find(moduleName) != json.end() && json[moduleName].find(stringIdentifier) != json[moduleName].end()){
                 vector<float> readArray = json[moduleName][stringIdentifier];
-                glm::vec2 position(readArray[0], readArray[1]);
-                dynamicNodes[moduleName][identifier]->getNodeGui().setPosition(position);
+                if(!isHeadless){
+                    glm::vec2 position(readArray[0], readArray[1]);
+                    dynamicNodes[moduleName][identifier]->getNodeGui().setPosition(position);
+                }
                 json[moduleName].erase(stringIdentifier);
             }else{
                 dynamicNodes[moduleName][identifier]->deleteSelf();
@@ -126,8 +137,10 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         for (ofJson::iterator it = json[moduleName].begin(); it != json[moduleName].end(); ++it) {
             int identifier = ofToInt(it.key());
             if(dynamicNodes[moduleName].count(identifier) == 0){
-                auto &node = createNodeFromName(moduleName, identifier);
-                node.getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
+                auto node = createNodeFromName(moduleName, identifier);
+                if(!isHeadless){
+                    node->getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
+                }
             }
         }
     }
@@ -151,15 +164,19 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             node.second->loadPreset(presetFolderPath);
         }
     }
+    return true;
 }
 
-bool ofxOceanodeContainer::savePreset(string presetFolderPath){
+void ofxOceanodeContainer::savePreset(string presetFolderPath){
     ofLog()<<"Save Preset " << presetFolderPath;
     
     ofJson json;
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
-            glm::vec2 pos = node.second->getNodeGui().getPosition();
+            glm::vec2 pos(0,0);
+            if(!isHeadless){
+                pos = node.second->getNodeGui().getPosition();
+            }
             json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y};
         }
     }
@@ -211,8 +228,14 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
         
         temporalConnectionNode = sourceModuleRef.get();
         auto connection = sinkModuleRef->createConnection(*this, source, sink);
-        connection->setTransformationMatrix(&transformationMatrix);
+        if(!isHeadless){
+            connection->setSinkPosition(sinkModuleRef->getNodeGui().getSinkConnectionPositionFromParameter(sink));
+            connection->setTransformationMatrix(&transformationMatrix);
+        }
         temporalConnection = nullptr;
+        return connection;
     }
+    
+    return nullptr;
 }
 

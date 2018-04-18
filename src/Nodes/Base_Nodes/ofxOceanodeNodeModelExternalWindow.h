@@ -15,6 +15,10 @@ public:
     ofxOceanodeNodeModelExternalWindow(string name);
     ~ofxOceanodeNodeModelExternalWindow();
     
+    
+    void presetSave(ofJson &json) override;
+    void presetRecallBeforeSettingParameters(ofJson &json) override;
+    
 protected:
     virtual void drawInExternalWindow(ofEventArgs &e){};
     virtual void updateForExternalWindow(ofEventArgs &e){};
@@ -30,6 +34,8 @@ protected:
     virtual void mouseExited(ofMouseEventArgs &a){};
     virtual void windowResized(ofResizeEventArgs &a){};
     virtual void dragEvent(ofDragInfo &dragInfo){};
+    
+    void windowResizedOwnEvent(ofResizeEventArgs &a);
     
     void showExternalWindow(bool &b);
     shared_ptr<ofAppBaseWindow> externalWindow;
