@@ -34,6 +34,9 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     
     gui->addSlider(bpm.set("BPM", 120, 0, 999));
     gui->addButton("Tap Tempo");
+#ifdef OFXOCEANODE_USE_BPM_DETECTION
+    useDetection = gui->addToggle("Auto BPM", false);
+#endif
     container->setBpm(bpm);
     
     gui->setVisible(false);
@@ -45,6 +48,34 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     
     gui->onButtonEvent(this, &ofxOceanodeBPMController::tapTempoPress);
     lastButtonPressTime = -1;
+    oldBpm = -1;
+    
+#ifdef OFXOCEANODE_USE_BPM_DETECTION
+    bpmDetection.setup();
+    ofSoundStreamSettings settings;
+    auto devices = soundStream.getMatchingDevices("default");
+    if(!devices.empty()){
+        settings.setInDevice(devices[0]);
+    }
+    settings.setInListener(this);
+    settings.sampleRate = 44100;
+    settings.numOutputChannels = 0;
+    settings.numInputChannels = 2;
+    settings.bufferSize = 512;
+    soundStream.setup(settings);
+#endif
+}
+
+void ofxOceanodeBPMController::audioIn(ofSoundBuffer &input){
+#ifdef OFXOCEANODE_USE_BPM_DETECTION
+    bpmDetection.audioIn(input.getBuffer().data(), input.size()/2, input.getNumChannels());
+    if(oldBpm != bpmDetection.bpm){
+        if(useDetection->getChecked()){
+            bpm = bpmDetection.bpm;
+        }
+    }
+    oldBpm = bpmDetection.bpm;
+#endif
 }
 
 void ofxOceanodeBPMController::tapTempoPress(ofxDatGuiButtonEvent e){
@@ -64,7 +95,10 @@ void ofxOceanodeBPMController::tapTempoPress(ofxDatGuiButtonEvent e){
                 storedIntervals.clear();
             }
             else{
-                bpm = 60.0/averageInterval;
+                float newBpm = 60.0/averageInterval;
+                if(newBpm != oldBpm)
+                    bpm = 60.0/averageInterval;
+                oldBpm = newBpm;
             }
         }
     }

@@ -11,6 +11,10 @@
 #include "ofxOceanodeBaseController.h"
 #include "ofxDatGui.h"
 
+#ifdef OFXOCEANODE_USE_BPM_DETECTION
+    #include "ofxAubio.h"
+#endif
+
 class ofxOceanodeContainer;
 
 class ofxOceanodeBPMController: public ofxOceanodeBaseController{
@@ -30,12 +34,14 @@ public:
     void deactivate();
     
     void windowResized(ofResizeEventArgs &a);
+    void audioIn(ofSoundBuffer &input);
 private:
     
     ofxDatGui* gui;
     ofxDatGuiTheme* mainGuiTheme;
     
     ofParameter<float> bpm;
+    float oldBpm;
     ofEventListener bpmListener;
     
     float lastButtonPressTime;
@@ -43,6 +49,12 @@ private:
     float averageInterval;
     
     shared_ptr<ofxOceanodeContainer> container;
+    
+#ifdef OFXOCEANODE_USE_BPM_DETECTION
+    ofxDatGuiToggle* useDetection;
+    ofxAubioBeat bpmDetection;
+    ofSoundStream soundStream;
+#endif
 };
 
 
