@@ -14,12 +14,15 @@
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeConnection.h"
 
+class ofxOceanodeTypesRegistry;
+
 class ofxOceanodeContainer {
 public:
     using nodeContainerWithId = std::unordered_map<int, unique_ptr<ofxOceanodeNode>>;
     
     ofxOceanodeContainer(std::shared_ptr<ofxOceanodeNodeRegistry> _registry =
-                         make_shared<ofxOceanodeNodeRegistry>(), bool _isHeadless = false);
+                         make_shared<ofxOceanodeNodeRegistry>(), std::shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry =
+                         make_shared<ofxOceanodeTypesRegistry>(), bool _isHeadless = false);
     ~ofxOceanodeContainer();
     
     ofxOceanodeNode* createNodeFromName(string name, int identifier = -1);
@@ -46,6 +49,7 @@ public:
         return connections.back().second.get();
     }
     ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter);
+    ofxOceanodeAbstractConnection* createConnectionFromCustomType(ofAbstractParameter &source, ofAbstractParameter &sink);
     
     ofxOceanodeNodeRegistry & getRegistry(){return *registry;};
     
@@ -68,6 +72,7 @@ private:
     ofxOceanodeTemporalConnection*   temporalConnection;
     vector<pair<ofxOceanodeNode*, shared_ptr<ofxOceanodeAbstractConnection>>> connections;
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;
+    std::shared_ptr<ofxOceanodeTypesRegistry>   typesRegistry;
     
     vector<ofEventListener> destroyNodeListeners;
     

@@ -7,7 +7,6 @@
 //
 
 #include "testNode.h"
-#include "ofxOceanodeContainer.h"
 
 testNode::testNode() : ofxOceanodeNodeModel("Test"){
     addParameterToGroupAndInfo(intParam.set("int", 0, 0, 100)).acceptOutConnection = false;
@@ -28,11 +27,4 @@ testNode::testNode() : ofxOceanodeNodeModel("Test"){
     listener2 = intModParam.newListener([&](customClass* &c){
         ofLog()<<"received From custom class " << ofGetElapsedTimeMicros();
     });
-}
-
-ofxOceanodeAbstractConnection* testNode::createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink){
-    if(source.type() == typeid(ofParameter<customClass*>).name()){
-        return c.connectConnection(source.cast<customClass*>(), sink.cast<customClass*>());
-    }
-    return nullptr;
 }

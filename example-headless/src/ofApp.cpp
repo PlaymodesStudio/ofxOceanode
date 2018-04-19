@@ -6,7 +6,7 @@ void ofApp::setup(){
     ofSetFrameRate(120);
     
     auto reg = make_shared<ofxOceanodeNodeRegistry>();
-    container = make_shared<ofxOceanodeContainer>(reg, true);
+    container = make_shared<ofxOceanodeContainer>(reg, make_shared<ofxOceanodeTypesRegistry>(), true);
     container->loadPreset("Presets/Initial Bank/1|save");
 
 }

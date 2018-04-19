@@ -7,10 +7,12 @@ void ofApp::setup(){
     ofSetFrameRate(120);
     
     auto reg = make_shared<ofxOceanodeNodeRegistry>();
+    auto treg = make_shared<ofxOceanodeTypesRegistry>();
     reg->registerModel<testNode>("Custom Nodes");
+    treg->registerType<customClass*>();
     
     
-    container = make_shared<ofxOceanodeContainer>(reg);
+    container = make_shared<ofxOceanodeContainer>(reg, treg);
     canvas.setContainer(container);
     canvas.setup();
     
