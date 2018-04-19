@@ -24,8 +24,6 @@ class testNode : public ofxOceanodeNodeModel {
 public:
     testNode();
     ~testNode(){};
-        
-    ofxOceanodeAbstractConnection* createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink) override;
 
     void setBpm(float _bpm) override {bpm = _bpm;};
     

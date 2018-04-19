@@ -74,6 +74,8 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeCont
         }
         else{
             connection = nodeModel->createConnectionFromCustomType(container, source, sink);
+            if(connection == nullptr)
+                connection = container.createConnectionFromCustomType(source, sink);
         }
     }else if(source.type() == typeid(ofParameter<float>).name()){
         if(sink.type() == typeid(ofParameter<int>).name()){

@@ -7,8 +7,9 @@
 //
 
 #include "ofxOceanodeContainer.h"
+#include "ofxOceanodeTypesRegistry.h"
 
-ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry, bool _isHeadless) : registry(_registry), isHeadless(_isHeadless){
+ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry, shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry, bool _isHeadless) : registry(_registry), typesRegistry(_typesRegistry), isHeadless(_isHeadless){
     window = ofGetCurrentWindow();
     transformationMatrix = glm::mat4(1);
     temporalConnection = nullptr;
@@ -237,5 +238,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
     }
     
     return nullptr;
+}
+
+ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromCustomType(ofAbstractParameter &source, ofAbstractParameter &sink){
+    return typesRegistry->createCustomTypeConnection(*this, source, sink);
 }
 
