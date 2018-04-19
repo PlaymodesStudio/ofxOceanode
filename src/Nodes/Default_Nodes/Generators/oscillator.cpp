@@ -53,7 +53,7 @@ oscillator::oscillator() : ofxOceanodeNodeModel("Oscillator"){
     parameters->add(offset_Param.set("Offset", 0, -1, 1));
     parameters->add(pow_Param.set("Pow", 0, -40, 40));
     parameters->add(biPow_Param.set("Bi Pow", 0, -40, 40));
-    parameters->add(quant_Param.set("Quantization", 255, 1, 255));
+    parameters->add(quant_Param.set("Quantization", 255, 2, 255));
     parameters->add(pulseWidth_Param.set("Pulse Width", 1, 0, 1));
     parameters->add(skew_Param.set("Skew", 0, -1, 1));
     parameters->add(amplitude_Param.set("Fader", 1, 0, 1));

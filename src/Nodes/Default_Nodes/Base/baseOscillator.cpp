@@ -151,8 +151,9 @@ void baseOscillator::computeMultiplyMod(float &value){
     value = ofClamp(value, 0.0, 1.0);
     
     //Quantization
-    if(quant_Param < 255)
-        value = (1/(float)quant_Param)*round(value*quant_Param);
+    if(quant_Param < 255){
+        value = (1.0/((float)quant_Param-1))*float(floor(value*quant_Param));
+    }
     
     value = ofClamp(value, 0.0, 1.0);
     
