@@ -43,7 +43,7 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
         banks.push_back(dir.getName(i));
     }
     if(dir.listDir() == 0){
-        banks.push_back("Inital Bank");
+        banks.push_back("Initial_Bank");
     }
     banks.push_back(" -- NEW BANK -- ");
     bankSelect = gui->addDropdown("Bank Select", banks);
