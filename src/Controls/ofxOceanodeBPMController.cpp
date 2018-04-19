@@ -51,7 +51,7 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     oldBpm = -1;
     
 #ifdef OFXOCEANODE_USE_BPM_DETECTION
-    bpmDetection.setup();
+    
     ofSoundStreamSettings settings;
     auto devices = soundStream.getMatchingDevices("default");
     if(!devices.empty()){
@@ -62,6 +62,9 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     settings.numOutputChannels = 0;
     settings.numInputChannels = 2;
     settings.bufferSize = 512;
+
+    bpmDetection.setup("default",settings.bufferSize,256,settings.sampleRate);
+
     soundStream.setup(settings);
 #endif
 }
