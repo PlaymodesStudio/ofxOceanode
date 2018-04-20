@@ -39,9 +39,7 @@ public:
     string nodeName(){return nameIdentifier;};
     uint getNumIdentifier(){return numIdentifier;};
     void setNumIdentifier(uint num);
-    
-    virtual ofxOceanodeAbstractConnection* createConnectionFromCustomType(ofxOceanodeContainer& c, ofAbstractParameter& source, ofAbstractParameter& sink){return nullptr;};
-    
+        
     ofEvent<string> parameterChangedMinMax;
     ofEvent<string> dropdownChanged;
     ofEvent<void> parameterGroupChanged;
