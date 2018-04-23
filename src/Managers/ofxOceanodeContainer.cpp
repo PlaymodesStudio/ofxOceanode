@@ -146,8 +146,15 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         }
     }
     
-    json.clear();
     connections.clear();
+    
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->loadPreset(presetFolderPath);
+        }
+    }
+    
+    json.clear();
     json = ofLoadJson(presetFolderPath + "/connections.json");
     for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
         for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
@@ -159,12 +166,6 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         }
     }
     
-    
-    for(auto &nodeTypeMap : dynamicNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->loadPreset(presetFolderPath);
-        }
-    }
     return true;
 }
 
