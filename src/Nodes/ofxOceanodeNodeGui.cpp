@@ -84,6 +84,11 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
             gui->addMultiSlider(absParam.cast<vector<float>>())->setPrecision(1000);
         }else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
             gui->addMultiSlider(absParam.cast<vector<int>>());
+        }else if(absParam.type() == typeid(ofParameter<pair<int, bool>>).name()){
+            auto pairParam = absParam.cast<pair<int, bool>>();
+            auto matrix = gui->addMatrix(absParam.getName(), pairParam.get().first, true);
+            matrix->setRadioMode(true);
+            matrix->setHoldMode(pairParam.get().second);
         }else {
             gui->addLabel(absParam.getName());
         }
@@ -111,6 +116,7 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
     gui->onDropdownEvent(this, &ofxOceanodeNodeGui::onGuiDropdownEvent);
     gui->onTextInputEvent(this, &ofxOceanodeNodeGui::onGuiTextInputEvent);
     gui->onColorPickerEvent(this, &ofxOceanodeNodeGui::onGuiColorPickerEvent);
+    gui->onMatrixEvent(this, &ofxOceanodeNodeGui::onGuiMatrixEvent);
     gui->onRightClickEvent(this, &ofxOceanodeNodeGui::onGuiRightClickEvent);
 }
 
@@ -256,6 +262,10 @@ void ofxOceanodeNodeGui::onGuiTextInputEvent(ofxDatGuiTextInputEvent e){
 
 void ofxOceanodeNodeGui::onGuiColorPickerEvent(ofxDatGuiColorPickerEvent e){
     getParameters()->getColor(e.target->getName()) = e.color;
+}
+
+void ofxOceanodeNodeGui::onGuiMatrixEvent(ofxDatGuiMatrixEvent e){
+    getParameters()->get(e.target->getName()).cast<pair<int, bool>>() = make_pair(e.child+1, e.enabled);
 }
 
 void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
