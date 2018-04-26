@@ -23,6 +23,9 @@ public:
 
     float getPhasor();
     void  resetPhasor();
+    
+    ofEvent<void> phasorCycle;
+    
 private:
     ofTimer timer;
     

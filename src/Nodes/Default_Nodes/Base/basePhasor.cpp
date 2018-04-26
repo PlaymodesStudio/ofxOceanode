@@ -13,6 +13,11 @@ basePhasor::basePhasor(){
     phasor = 0;    
     timer.setPeriodicEvent(1000000);
     startThread();
+    bpm_Param = 120.00;
+    beatsMult_Param = 1;
+    beatsDiv_Param = 1;
+    initPhase_Param = 0;
+    loop_Param = true;
 }
 
 basePhasor::~basePhasor(){
@@ -46,6 +51,9 @@ void basePhasor::threadedFunction(){
         double increment = (1.0f/(double)((double)(1000.0)/(double)freq));
         
         phasor = phasor + increment;
+        if(phasor > 1){
+            ofNotifyEvent(phasorCycle);
+        }
         phasor -= (int)phasor;
         
         //Assign a copy of the phasor to add initPhase
