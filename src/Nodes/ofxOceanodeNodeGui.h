@@ -69,7 +69,6 @@ private:
     ofColor color;
     glm::vec2 position;
     
-    bool isDraggingGui;
     bool guiToBeDestroyed;
     
     ofParameter<glm::mat4> *transformationMatrix;

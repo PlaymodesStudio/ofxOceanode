@@ -13,7 +13,7 @@ ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOcea
     color = node.getColor();
     color.setBrightness(255);
     position = glm::vec2(10, 10);
-    isDraggingGui = false;
+    guiToBeDestroyed = false;
     
     createGuiFromParameters(window);
     if(window == nullptr){
@@ -37,7 +37,6 @@ ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOcea
         keyAndMouseListeners.push(window->events().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
         keyAndMouseListeners.push(window->events().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
     }
-    guiToBeDestroyed = false;
 }
 
 ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
@@ -233,37 +232,35 @@ void ofxOceanodeNodeGui::setPosition(glm::vec2 _position){
 }
 
 void ofxOceanodeNodeGui::keyPressed(ofKeyEventArgs &args){
-//    if(args.key == 'r'){
-//        if(gui->hitTest(){
-//            guiToBeDestroyed = true;
-//        }
-//    }
+    if(args.key == 'r' && !args.isRepeat){
+        if(gui->hitTest(ofVec2f(ofGetMouseX(), ofGetMouseY()))){
+            guiToBeDestroyed = true;
+            gui->setOpacity(0.2);
+        }
+    }
 }
 
 void ofxOceanodeNodeGui::keyReleased(ofKeyEventArgs &args){
-//    if(args.key == 'r'){
-//        if(gui->hitTest(ofGetMousePosition()) && guiToBeDestroyed){
-//            node.deleteSelf();
-//        }
-//    }
+    if(args.key == 'r'){
+        if(gui->hitTest(ofVec2f(ofGetMouseX(), ofGetMouseY())) && guiToBeDestroyed){
+            node.deleteSelf();
+        }
+        else{
+            guiToBeDestroyed = false;
+            gui->setOpacity(1);
+        }
+    }
 }
 
 void ofxOceanodeNodeGui::mouseDragged(ofMouseEventArgs &args){
     glm::vec2 guiCurrentPos = glm::vec2(gui->getPosition().x, gui->getPosition().y);
     if(guiCurrentPos != position){
-        isDraggingGui = true;
         node.moveConnections(guiCurrentPos - position);
         position = guiCurrentPos;
-    }else{
-        isDraggingGui = false;
     }
 }
 
 void ofxOceanodeNodeGui::mouseReleased(ofMouseEventArgs &args){
-    if(isDraggingGui && !ofGetWindowRect().inside(args)){
-        node.deleteSelf();
-    }
-    isDraggingGui = false;
 }
 
 void ofxOceanodeNodeGui::onGuiButtonEvent(ofxDatGuiButtonEvent e){
