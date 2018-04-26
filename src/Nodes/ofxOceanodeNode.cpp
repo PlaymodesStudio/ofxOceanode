@@ -8,8 +8,15 @@
 
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeContainer.h"
+#include "ofxOceanodeNodeModel.h"
+#include "ofxOceanodeNodeGui.h"
+#include "ofxOceanodeConnection.h"
 
 ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){
+    
+}
+
+ofxOceanodeNode::~ofxOceanodeNode(){
     
 }
 
@@ -18,6 +25,15 @@ void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     ofAddListener(nodeModel->parameterChangedMinMax, nodeGui.get(), &ofxOceanodeNodeGui::updateGuiForParameter);
     ofAddListener(nodeModel->dropdownChanged, nodeGui.get(), &ofxOceanodeNodeGui::updateDropdown);
     ofAddListener(nodeModel->parameterGroupChanged, nodeGui.get(), &ofxOceanodeNodeGui::updateGui);
+}
+
+ofxOceanodeNodeGui& ofxOceanodeNode::getNodeGui(){
+    return *nodeGui.get();
+    
+}
+
+ofColor ofxOceanodeNode::getColor(){
+    return nodeModel->getColor();
 }
 
 ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter){
@@ -261,4 +277,8 @@ void ofxOceanodeNode::setBpm(float bpm){
     }else{
         nodeModel->setBpm(bpm);
     }
+}
+
+ofParameterGroup* ofxOceanodeNode::getParameters(){
+    return nodeModel->getParameterGroup();
 }

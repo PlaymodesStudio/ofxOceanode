@@ -231,6 +231,10 @@ void ofxOceanodeNodeGui::setPosition(glm::vec2 _position){
     position = _position;
 }
 
+glm::vec2 ofxOceanodeNodeGui::getPosition(){
+    return glm::vec2(gui->getPosition().x, gui->getPosition().y);
+}
+
 void ofxOceanodeNodeGui::keyPressed(ofKeyEventArgs &args){
     if(args.key == 'r' && !args.isRepeat){
         if(gui->hitTest(ofVec2f(ofGetMouseX(), ofGetMouseY()))){

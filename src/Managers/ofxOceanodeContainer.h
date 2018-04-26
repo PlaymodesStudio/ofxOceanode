@@ -9,11 +9,12 @@
 #ifndef ofxOceanodeContainer_h
 #define ofxOceanodeContainer_h
 
-#include "ofxOceanodeNode.h"
-#include "ofxOceanodeNodeModel.h"
-#include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeConnection.h"
+#include "ofxOceanodeNode.h"
+#include "ofxOceanodeNodeGui.h"
 
+class ofxOceanodeNodeModel;
+class ofxOceanodeNodeRegistry;
 class ofxOceanodeTypesRegistry;
 
 class ofxOceanodeContainer {

@@ -6,8 +6,11 @@
 //
 //
 
+
 #include "ofxOceanodeContainer.h"
+#include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeTypesRegistry.h"
+#include "ofxOceanodeNodeModel.h"
 
 ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry, shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry, bool _isHeadless) : registry(_registry), typesRegistry(_typesRegistry), isHeadless(_isHeadless){
     window = ofGetCurrentWindow();

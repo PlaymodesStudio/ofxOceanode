@@ -11,7 +11,10 @@
 
 #include "ofMain.h"
 #include "ofxDatGui.h"
-#include "ofxOceanodeContainer.h"
+
+class ofxOceanodeContainer;
+class ofxDatGui;
+class ofxDatGuiDropdown;
 
 class ofxOceanodeCanvas{
 public:

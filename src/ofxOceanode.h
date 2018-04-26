@@ -13,6 +13,7 @@
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeControls.h"
+#include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeTypesRegistry.h"
 
 #endif /* ofxOceanode_h */

@@ -12,6 +12,7 @@
 
 class ofxOceanodeContainer;
 class ofxOceanodeNode;
+class ofxDatGui;
 
 class ofxOceanodeNodeGui{
 public:
@@ -26,12 +27,13 @@ public:
     void setPosition(glm::vec2 position);
     
     ofParameterGroup* getParameters();
+    glm::vec2 getPosition();
     
     glm::vec2 getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter);
     glm::vec2 getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter);
     void setTransformationMatrix(ofParameter<glm::mat4> *mat);
     
-    glm::vec2 getPosition(){return glm::vec2(gui->getPosition().x, gui->getPosition().y);};
+    
     
     void keyPressed(ofKeyEventArgs &args);
     void keyReleased(ofKeyEventArgs &args);

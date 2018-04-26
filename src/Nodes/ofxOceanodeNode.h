@@ -9,20 +9,22 @@
 #ifndef ofxOceanodeNode_h
 #define ofxOceanodeNode_h
 
-#include "ofxOceanodeNodeModel.h"
-#include "ofxOceanodeNodeGui.h"
-#include "ofxDatGui.h"
-#include "ofxOceanodeConnection.h"
+#include "ofMain.h"
+
+class ofxOceanodeAbstractConnection;
+class ofxOceanodeNodeGui;
+class ofxOceanodeNodeModel;
+class ofxOceanodeContainer;
 
 class ofxOceanodeNode {
 public:
     ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel);
-    ~ofxOceanodeNode(){};
+    ~ofxOceanodeNode();
     
     void setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui);
     
-    ofxOceanodeNodeGui& getNodeGui(){return *nodeGui.get();};
-    ofColor getColor(){return nodeModel->getColor();};
+    ofxOceanodeNodeGui& getNodeGui();
+    ofColor getColor();
     
     ofxOceanodeAbstractConnection* parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter);
     ofxOceanodeAbstractConnection* parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter);
@@ -46,7 +48,7 @@ public:
     
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
     
-    ofParameterGroup* getParameters(){return nodeModel->getParameterGroup();};
+    ofParameterGroup* getParameters();
 private:
     std::unique_ptr<ofxOceanodeNodeModel> nodeModel;
     std::unique_ptr<ofxOceanodeNodeGui> nodeGui;
