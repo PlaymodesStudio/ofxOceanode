@@ -20,19 +20,19 @@ ranger::ranger() : ofxOceanodeNodeModel("Ranger"){
     addOutputParameterToGroupAndInfo(Output.set("Output", {0}, {minRange}, {maxRange}));
     
     
-    listeners.push_back(Input.newListener([&](vector<float> &vf){
+    listeners.push(Input.newListener([&](vector<float> &vf){
         recalculate();
     }));
-    listeners.push_back(MinInput.newListener([&](float &f){
+    listeners.push(MinInput.newListener([&](float &f){
         recalculate();
     }));
-    listeners.push_back(MaxInput.newListener([&](float &f){
+    listeners.push(MaxInput.newListener([&](float &f){
         recalculate();
     }));
-    listeners.push_back(MinOutput.newListener([&](float &f){
+    listeners.push(MinOutput.newListener([&](float &f){
         recalculate();
     }));
-    listeners.push_back(MaxOutput.newListener([&](float &f){
+    listeners.push(MaxOutput.newListener([&](float &f){
         recalculate();
     }));
 }

@@ -17,19 +17,19 @@ mapper::mapper() : ofxOceanodeNodeModel("Mapper"){
     parameters->add(maxOutput.set("MaxOutput", 1.0, 0.0, 1.0));
     addOutputParameterToGroupAndInfo(output.set("Output", {0}, {0}, {1}));
 
-    listeners.push_back(input.newListener([&](vector<float> &vf){
+    listeners.push(input.newListener([&](vector<float> &vf){
         recalculate();
     }));
-    listeners.push_back(minInput.newListener([&](float &f){
+    listeners.push(minInput.newListener([&](float &f){
         recalculate();
     }));
-    listeners.push_back(maxInput.newListener([&](float &f){
+    listeners.push(maxInput.newListener([&](float &f){
         recalculate();
     }));
-    listeners.push_back(minOutput.newListener([&](float &f){
+    listeners.push(minOutput.newListener([&](float &f){
         recalculate();
     }));
-    listeners.push_back(maxOutput.newListener([&](float &f){
+    listeners.push(maxOutput.newListener([&](float &f){
         recalculate();
     }));
 }

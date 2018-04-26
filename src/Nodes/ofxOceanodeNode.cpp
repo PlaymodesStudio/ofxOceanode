@@ -163,14 +163,14 @@ void ofxOceanodeNode::setOutConnectionsPositionForParameter(ofAbstractParameter 
 
 void ofxOceanodeNode::addOutputConnection(ofxOceanodeAbstractConnection* c){
     outConnections.push_back(c);
-    outConnectionsListeners.push_back(c->destroyConnection.newListener([&, c](){
+    outConnectionsListeners.push(c->destroyConnection.newListener([&, c](){
         outConnections.erase(std::remove(outConnections.begin(), outConnections.end(), c));
     }));
 }
 
 void ofxOceanodeNode::addInputConnection(ofxOceanodeAbstractConnection* c){
     inConnections.push_back(c);
-    inConnectionsListeners.push_back(c->destroyConnection.newListener([&, c](){
+    inConnectionsListeners.push(c->destroyConnection.newListener([&, c](){
         inConnections.erase(std::remove(inConnections.begin(), inConnections.end(), c));
     }));
 }

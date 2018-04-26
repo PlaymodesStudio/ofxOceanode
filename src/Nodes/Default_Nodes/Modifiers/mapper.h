@@ -23,7 +23,7 @@ public:
 
 private:
     
-    vector<ofEventListener> listeners;
+    ofEventListeners listeners;
     
     ofParameter<vector<float>>  input;
     ofParameter<float>  minInput;

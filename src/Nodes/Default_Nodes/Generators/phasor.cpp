@@ -9,19 +9,19 @@
 phasor::phasor() : ofxOceanodeNodeModel("Phasor")
 {
     color = ofColor::red;
-    parameterAutoSettersListeners.push_back(bpm_Param.newListener([&](float &val){
+    parameterAutoSettersListeners.push(bpm_Param.newListener([&](float &val){
         basePh.bpm_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(initPhase_Param.newListener([&](float &val){
+    parameterAutoSettersListeners.push(initPhase_Param.newListener([&](float &val){
         basePh.initPhase_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(beatsMult_Param.newListener([&](int &val){
+    parameterAutoSettersListeners.push(beatsMult_Param.newListener([&](int &val){
         basePh.beatsMult_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(beatsDiv_Param.newListener([&](int &val){
+    parameterAutoSettersListeners.push(beatsDiv_Param.newListener([&](int &val){
         basePh.beatsDiv_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(loop_Param.newListener([&](bool &val){
+    parameterAutoSettersListeners.push(loop_Param.newListener([&](bool &val){
         basePh.loop_Param = val;
     }));
 

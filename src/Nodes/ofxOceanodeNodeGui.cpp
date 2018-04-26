@@ -17,22 +17,27 @@ ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOcea
     
     createGuiFromParameters(window);
     if(window == nullptr){
-        keyAndMouseListeners.push_back(ofEvents().mouseDragged.newListener(this,&ofxOceanodeNodeGui::mouseDragged));
-        keyAndMouseListeners.push_back(ofEvents().mouseMoved.newListener(this,&ofxOceanodeNodeGui::mouseMoved));
-        keyAndMouseListeners.push_back(ofEvents().mousePressed.newListener(this,&ofxOceanodeNodeGui::mousePressed));
-        keyAndMouseListeners.push_back(ofEvents().mouseReleased.newListener(this,&ofxOceanodeNodeGui::mouseReleased));
-        keyAndMouseListeners.push_back(ofEvents().mouseScrolled.newListener(this,&ofxOceanodeNodeGui::mouseScrolled));
-        keyAndMouseListeners.push_back(ofEvents().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
-        keyAndMouseListeners.push_back(ofEvents().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
+        keyAndMouseListeners.push(ofEvents().keyPressed.newListener(this,&ofxOceanodeNodeGui::keyPressed));
+        keyAndMouseListeners.push(ofEvents().keyReleased.newListener(this,&ofxOceanodeNodeGui::keyReleased));
+        keyAndMouseListeners.push(ofEvents().mouseDragged.newListener(this,&ofxOceanodeNodeGui::mouseDragged));
+        keyAndMouseListeners.push(ofEvents().mouseMoved.newListener(this,&ofxOceanodeNodeGui::mouseMoved));
+        keyAndMouseListeners.push(ofEvents().mousePressed.newListener(this,&ofxOceanodeNodeGui::mousePressed));
+        keyAndMouseListeners.push(ofEvents().mouseReleased.newListener(this,&ofxOceanodeNodeGui::mouseReleased));
+        keyAndMouseListeners.push(ofEvents().mouseScrolled.newListener(this,&ofxOceanodeNodeGui::mouseScrolled));
+        keyAndMouseListeners.push(ofEvents().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
+        keyAndMouseListeners.push(ofEvents().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
     }else{
-        keyAndMouseListeners.push_back(window->events().mouseDragged.newListener(this,&ofxOceanodeNodeGui::mouseDragged));
-        keyAndMouseListeners.push_back(window->events().mouseMoved.newListener(this,&ofxOceanodeNodeGui::mouseMoved));
-        keyAndMouseListeners.push_back(window->events().mousePressed.newListener(this,&ofxOceanodeNodeGui::mousePressed));
-        keyAndMouseListeners.push_back(window->events().mouseReleased.newListener(this,&ofxOceanodeNodeGui::mouseReleased));
-        keyAndMouseListeners.push_back(window->events().mouseScrolled.newListener(this,&ofxOceanodeNodeGui::mouseScrolled));
-        keyAndMouseListeners.push_back(window->events().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
-        keyAndMouseListeners.push_back(window->events().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
+        keyAndMouseListeners.push(window->events().keyPressed.newListener(this,&ofxOceanodeNodeGui::keyPressed));
+        keyAndMouseListeners.push(window->events().keyReleased.newListener(this,&ofxOceanodeNodeGui::keyReleased));
+        keyAndMouseListeners.push(window->events().mouseDragged.newListener(this,&ofxOceanodeNodeGui::mouseDragged));
+        keyAndMouseListeners.push(window->events().mouseMoved.newListener(this,&ofxOceanodeNodeGui::mouseMoved));
+        keyAndMouseListeners.push(window->events().mousePressed.newListener(this,&ofxOceanodeNodeGui::mousePressed));
+        keyAndMouseListeners.push(window->events().mouseReleased.newListener(this,&ofxOceanodeNodeGui::mouseReleased));
+        keyAndMouseListeners.push(window->events().mouseScrolled.newListener(this,&ofxOceanodeNodeGui::mouseScrolled));
+        keyAndMouseListeners.push(window->events().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
+        keyAndMouseListeners.push(window->events().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
     }
+    guiToBeDestroyed = false;
 }
 
 ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
@@ -56,28 +61,28 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
             toggle->setChecked(absParam.cast<bool>().get());
             //Add a listener that automatically puts the parameter to the gui.
             //Best will be to include this to datGui. But this way we can change the gui we use, independent of ofParameter
-            parameterChangedListeners.push_back(absParam.cast<bool>().newListener([&, toggle](bool &val){
+            parameterChangedListeners.push(absParam.cast<bool>().newListener([&, toggle](bool &val){
                 toggle->setChecked(val);
             }));
         }else if(absParam.type() == typeid(ofParameter<void>).name()){
             gui->addButton(absParam.getName());
         }else if(absParam.type() == typeid(ofParameter<string>).name()){
             auto textInput = gui->addTextInput(absParam.getName(), absParam.cast<string>());
-            parameterChangedListeners.push_back(absParam.cast<string>().newListener([&, textInput](string &val){
+            parameterChangedListeners.push(absParam.cast<string>().newListener([&, textInput](string &val){
                 textInput->setText(val);
             }));
         }else if(absParam.type() == typeid(ofParameter<char>).name()){
             gui->addLabel(absParam.getName());
         }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
             auto colorGui = gui->addColorPicker(absParam.getName(), absParam.cast<ofColor>());
-            parameterChangedListeners.push_back(absParam.cast<ofColor>().newListener([&, colorGui](ofColor &val){
+            parameterChangedListeners.push(absParam.cast<ofColor>().newListener([&, colorGui](ofColor &val){
                 colorGui->setColor(val);
             }));
         }else if(absParam.type() == typeid(ofParameterGroup).name()){
             gui->addLabel(absParam.castGroup().getName() + " Selector");
             auto dropdown = gui->addDropdown(absParam.castGroup().getName(), ofSplitString(absParam.castGroup().getString(0), "-|-"));
             dropdown->select(absParam.castGroup().getInt(1));
-            parameterChangedListeners.push_back(absParam.castGroup().getInt(1).newListener([&, dropdown](int &val){
+            parameterChangedListeners.push(absParam.castGroup().getInt(1).newListener([&, dropdown](int &val){
                 dropdown->select(val);
             }));
         }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
@@ -133,28 +138,28 @@ void ofxOceanodeNodeGui::updateGui(){
                 toggle->setChecked(absParam.cast<bool>().get());
                 //Add a listener that automatically puts the parameter to the gui.
                 //Best will be to include this to datGui. But this way we can change the gui we use, independent of ofParameter
-                parameterChangedListeners.push_back(absParam.cast<bool>().newListener([&, toggle](bool &val){
+                parameterChangedListeners.push(absParam.cast<bool>().newListener([&, toggle](bool &val){
                     toggle->setChecked(val);
                 }));
             }else if(absParam.type() == typeid(ofParameter<void>).name()){
                 gui->addButton(absParam.getName());
             }else if(absParam.type() == typeid(ofParameter<string>).name()){
                 auto textInput = gui->addTextInput(absParam.getName(), absParam.cast<string>());
-                parameterChangedListeners.push_back(absParam.cast<string>().newListener([&, textInput](string &val){
+                parameterChangedListeners.push(absParam.cast<string>().newListener([&, textInput](string &val){
                     textInput->setText(val);
                 }));
             }else if(absParam.type() == typeid(ofParameter<char>).name()){
                 gui->addLabel(absParam.getName());
             }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
                 auto colorGui = gui->addColorPicker(absParam.getName(), absParam.cast<ofColor>());
-                parameterChangedListeners.push_back(absParam.cast<ofColor>().newListener([&, colorGui](ofColor &val){
+                parameterChangedListeners.push(absParam.cast<ofColor>().newListener([&, colorGui](ofColor &val){
                     colorGui->setColor(val);
                 }));
             }else if(absParam.type() == typeid(ofParameterGroup).name()){
                 gui->addLabel(absParam.castGroup().getName() + " Selector");
                 auto dropdown = gui->addDropdown(absParam.castGroup().getName(), ofSplitString(absParam.castGroup().getString(0), "-|-"));
                 dropdown->select(absParam.castGroup().getInt(1));
-                parameterChangedListeners.push_back(absParam.castGroup().getInt(1).newListener([&, dropdown](int &val){
+                parameterChangedListeners.push(absParam.castGroup().getInt(1).newListener([&, dropdown](int &val){
                     dropdown->select(val);
                 }));
             }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
@@ -225,6 +230,22 @@ void ofxOceanodeNodeGui::setPosition(glm::vec2 _position){
     gui->setPosition(_position.x, _position.y);
     node.moveConnections(_position - position);
     position = _position;
+}
+
+void ofxOceanodeNodeGui::keyPressed(ofKeyEventArgs &args){
+//    if(args.key == 'r'){
+//        if(gui->hitTest(){
+//            guiToBeDestroyed = true;
+//        }
+//    }
+}
+
+void ofxOceanodeNodeGui::keyReleased(ofKeyEventArgs &args){
+//    if(args.key == 'r'){
+//        if(gui->hitTest(ofGetMousePosition()) && guiToBeDestroyed){
+//            node.deleteSelf();
+//        }
+//    }
 }
 
 void ofxOceanodeNodeGui::mouseDragged(ofMouseEventArgs &args){

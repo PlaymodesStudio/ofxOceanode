@@ -33,7 +33,7 @@ private:
     ofParameter<bool>   loop_Param;
     ofParameter<void>   resetPhase_Param;
     
-    vector<ofEventListener> parameterAutoSettersListeners;
+    ofEventListeners parameterAutoSettersListeners;
     ofEventListener resetPhaseListener;
 };
 

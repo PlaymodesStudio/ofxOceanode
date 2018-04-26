@@ -74,7 +74,7 @@ private:
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;
     std::shared_ptr<ofxOceanodeTypesRegistry>   typesRegistry;
     
-    vector<ofEventListener> destroyNodeListeners;
+    ofEventListeners destroyNodeListeners;
     
     shared_ptr<ofAppBaseWindow> window;
     

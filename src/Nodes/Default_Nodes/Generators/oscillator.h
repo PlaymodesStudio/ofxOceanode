@@ -35,7 +35,7 @@ private:
     ofParameter<float>  skew_Param;
     ofParameter<float>  output;
     
-    vector<ofEventListener> parameterAutoSettersListeners;
+    ofEventListeners parameterAutoSettersListeners;
 };
 
 #endif /* oscillator_h */

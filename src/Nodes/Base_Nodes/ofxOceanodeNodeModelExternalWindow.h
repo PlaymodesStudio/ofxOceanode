@@ -40,7 +40,7 @@ protected:
     void showExternalWindow(bool &b);
     shared_ptr<ofAppBaseWindow> externalWindow;
     ofRectangle                 externalWindowRect;
-    vector<ofEventListener>     windowListenerEvents;
+    ofEventListeners            windowListenerEvents;
     ofParameter<bool>           showWindow;
 };
 

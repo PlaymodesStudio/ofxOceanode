@@ -78,7 +78,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     auto nodePtr = node.get();
     dynamicNodes[nodeToBeCreatedName][toBeCreatedId] = std::move(node);
     
-    destroyNodeListeners.push_back(nodePtr->deleteModuleAndConnections.newListener([this, nodeToBeCreatedName, toBeCreatedId](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
+    destroyNodeListeners.push(nodePtr->deleteModuleAndConnections.newListener([this, nodeToBeCreatedName, toBeCreatedId](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
         for(auto containerConnectionIterator = connections.begin(); containerConnectionIterator!=connections.end();){
             bool foundConnection = false;
             for(auto nodeConnection : connectionsToBeDeleted){

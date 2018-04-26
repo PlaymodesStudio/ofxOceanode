@@ -86,7 +86,7 @@ protected:
     uint numIdentifier;
     
 private:
-    vector<ofEventListener> eventListeners;
+    ofEventListeners eventListeners;
 };
 
 #endif /* ofxOceanodeNodeModel_h */

@@ -12,7 +12,7 @@ ofxOceanodeNodeModelExternalWindow::ofxOceanodeNodeModelExternalWindow(string na
     info.acceptInConnection = false;
     info.acceptOutConnection = false;
     info.isSavePreset = false;
-    windowListenerEvents.push_back(showWindow.newListener(this, &ofxOceanodeNodeModelExternalWindow::showExternalWindow));
+    windowListenerEvents.push(showWindow.newListener(this, &ofxOceanodeNodeModelExternalWindow::showExternalWindow));
     externalWindowRect.setPosition(-1, -1);
     externalWindow = nullptr;
 }
@@ -41,20 +41,20 @@ void ofxOceanodeNodeModelExternalWindow::showExternalWindow(bool &b){
         externalWindow = ofCreateWindow(prevSettings);
         externalWindow->setWindowTitle(nameIdentifier + " " + ofToString(numIdentifier));
         externalWindow->setVerticalSync(false);
-        windowListenerEvents.push_back(externalWindow->events().draw.newListener(this, &ofxOceanodeNodeModelExternalWindow::drawInExternalWindow));
-        windowListenerEvents.push_back(externalWindow->events().update.newListener(this, &ofxOceanodeNodeModelExternalWindow::updateForExternalWindow));
-        windowListenerEvents.push_back(externalWindow->events().exit.newListener(this, &ofxOceanodeNodeModelExternalWindow::closeExternalWindow));
-        windowListenerEvents.push_back(externalWindow->events().keyPressed.newListener(this, &ofxOceanodeNodeModelExternalWindow::keyPressed));
-        windowListenerEvents.push_back(externalWindow->events().keyReleased.newListener(this, &ofxOceanodeNodeModelExternalWindow::keyReleased));
-        windowListenerEvents.push_back(externalWindow->events().mouseMoved.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseMoved));
-        windowListenerEvents.push_back(externalWindow->events().mousePressed.newListener(this, &ofxOceanodeNodeModelExternalWindow::mousePressed));
-        windowListenerEvents.push_back(externalWindow->events().mouseReleased.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseReleased));
-        windowListenerEvents.push_back(externalWindow->events().mouseDragged.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseDragged));
-        windowListenerEvents.push_back(externalWindow->events().mouseScrolled.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseScrolled));
-        windowListenerEvents.push_back(externalWindow->events().mouseEntered.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseEntered));
-        windowListenerEvents.push_back(externalWindow->events().mouseExited.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseExited));
-        windowListenerEvents.push_back(externalWindow->events().windowResized.newListener(this, &ofxOceanodeNodeModelExternalWindow::windowResizedOwnEvent));
-        windowListenerEvents.push_back(externalWindow->events().fileDragEvent.newListener(this, &ofxOceanodeNodeModelExternalWindow::dragEvent));
+        windowListenerEvents.push(externalWindow->events().draw.newListener(this, &ofxOceanodeNodeModelExternalWindow::drawInExternalWindow));
+        windowListenerEvents.push(externalWindow->events().update.newListener(this, &ofxOceanodeNodeModelExternalWindow::updateForExternalWindow));
+        windowListenerEvents.push(externalWindow->events().exit.newListener(this, &ofxOceanodeNodeModelExternalWindow::closeExternalWindow));
+        windowListenerEvents.push(externalWindow->events().keyPressed.newListener(this, &ofxOceanodeNodeModelExternalWindow::keyPressed));
+        windowListenerEvents.push(externalWindow->events().keyReleased.newListener(this, &ofxOceanodeNodeModelExternalWindow::keyReleased));
+        windowListenerEvents.push(externalWindow->events().mouseMoved.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseMoved));
+        windowListenerEvents.push(externalWindow->events().mousePressed.newListener(this, &ofxOceanodeNodeModelExternalWindow::mousePressed));
+        windowListenerEvents.push(externalWindow->events().mouseReleased.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseReleased));
+        windowListenerEvents.push(externalWindow->events().mouseDragged.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseDragged));
+        windowListenerEvents.push(externalWindow->events().mouseScrolled.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseScrolled));
+        windowListenerEvents.push(externalWindow->events().mouseEntered.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseEntered));
+        windowListenerEvents.push(externalWindow->events().mouseExited.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseExited));
+        windowListenerEvents.push(externalWindow->events().windowResized.newListener(this, &ofxOceanodeNodeModelExternalWindow::windowResizedOwnEvent));
+        windowListenerEvents.push(externalWindow->events().fileDragEvent.newListener(this, &ofxOceanodeNodeModelExternalWindow::dragEvent));
     }
     else if(!b && externalWindow != nullptr){
         externalWindow->setWindowShouldClose();

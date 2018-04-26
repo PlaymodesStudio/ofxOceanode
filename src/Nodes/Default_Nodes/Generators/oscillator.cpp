@@ -9,40 +9,40 @@
 
 oscillator::oscillator() : ofxOceanodeNodeModel("Oscillator"){
     color = ofColor::cyan;
-    parameterAutoSettersListeners.push_back(phaseOffset_Param.newListener([&](float &val){
+    parameterAutoSettersListeners.push(phaseOffset_Param.newListener([&](float &val){
         baseOsc.phaseOffset_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(randomAdd_Param.newListener([&](float &val){
+    parameterAutoSettersListeners.push(randomAdd_Param.newListener([&](float &val){
         baseOsc.randomAdd_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(scale_Param.newListener([&](float &val){
+    parameterAutoSettersListeners.push(scale_Param.newListener([&](float &val){
         baseOsc.scale_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(offset_Param.newListener([&](float &val){
+    parameterAutoSettersListeners.push(offset_Param.newListener([&](float &val){
         baseOsc.offset_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(pow_Param.newListener([&](float &val){
+    parameterAutoSettersListeners.push(pow_Param.newListener([&](float &val){
         baseOsc.pow_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(biPow_Param.newListener([&](float &val){
+    parameterAutoSettersListeners.push(biPow_Param.newListener([&](float &val){
         baseOsc.biPow_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(quant_Param.newListener([&](int &val){
+    parameterAutoSettersListeners.push(quant_Param.newListener([&](int &val){
         baseOsc.quant_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(pulseWidth_Param.newListener([&](float &val){
+    parameterAutoSettersListeners.push(pulseWidth_Param.newListener([&](float &val){
         baseOsc.pulseWidth_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(skew_Param.newListener([&](float &val){
+    parameterAutoSettersListeners.push(skew_Param.newListener([&](float &val){
         baseOsc.skew_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(amplitude_Param.newListener([&](float &val){
+    parameterAutoSettersListeners.push(amplitude_Param.newListener([&](float &val){
         baseOsc.amplitude_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(invert_Param.newListener([&](float &val){
+    parameterAutoSettersListeners.push(invert_Param.newListener([&](float &val){
         baseOsc.invert_Param = val;
     }));
-    parameterAutoSettersListeners.push_back(waveSelect_Param.newListener([&](int &val){
+    parameterAutoSettersListeners.push(waveSelect_Param.newListener([&](int &val){
         baseOsc.waveSelect_Param = val;
     }));
     

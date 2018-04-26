@@ -54,8 +54,8 @@ private:
     std::vector<ofxOceanodeAbstractConnection*> inConnections;
     std::vector<ofxOceanodeAbstractConnection*> outConnections;
     
-    vector<ofEventListener> inConnectionsListeners;
-    vector<ofEventListener> outConnectionsListeners;
+    ofEventListeners inConnectionsListeners;
+    ofEventListeners outConnectionsListeners;
 };
 
 #endif /* ofxOceanodeNode_h */

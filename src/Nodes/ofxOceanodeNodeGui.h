@@ -33,6 +33,8 @@ public:
     
     glm::vec2 getPosition(){return glm::vec2(gui->getPosition().x, gui->getPosition().y);};
     
+    void keyPressed(ofKeyEventArgs &args);
+    void keyReleased(ofKeyEventArgs &args);
     void mouseMoved(ofMouseEventArgs &args){};
     void mouseDragged(ofMouseEventArgs &args);
     void mousePressed(ofMouseEventArgs &args){};
@@ -55,8 +57,8 @@ private:
     void newModuleListener(ofxDatGuiDropdownEvent e);
     void newPresetListener(ofxDatGuiTextInputEvent e);
     
-    vector<ofEventListener> keyAndMouseListeners;
-    vector<ofEventListener> parameterChangedListeners;
+    ofEventListeners keyAndMouseListeners;
+    ofEventListeners parameterChangedListeners;
     ofEventListener transformMatrixListener;
     
     ofxOceanodeContainer& container;
@@ -68,6 +70,7 @@ private:
     glm::vec2 position;
     
     bool isDraggingGui;
+    bool guiToBeDestroyed;
     
     ofParameter<glm::mat4> *transformationMatrix;
 };
