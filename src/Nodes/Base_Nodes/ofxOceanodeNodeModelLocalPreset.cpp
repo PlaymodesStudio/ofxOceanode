@@ -1,11 +1,11 @@
 //
-//  ofxOceanodeLocalPreset.cpp
+//  ofxOceanodeNodeModelLocalPreset.cpp
 //  VJYourself_OCEAN
 //
 //  Created by Eduard Frigola on 25/04/2018.
 //
 
-#include "ofxOceanodeLocalPreset.h"
+#include "ofxOceanodeNodeModelLocalPreset.h"
 
 
 ofxOceanodeNodeModelLocalPreset::ofxOceanodeNodeModelLocalPreset(string name) : ofxOceanodeNodeModel(name){
@@ -57,27 +57,29 @@ void ofxOceanodeNodeModelLocalPreset::presetListener(short int &preset){
         for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
             if(parameters->contains(it.key())){
                 ofAbstractParameter& p = parameters->get(it.key());
-                if(p.type() == typeid(ofParameter<float>).name()){
-                    ofDeserialize(json, p);
-                }else if(p.type() == typeid(ofParameter<int>).name()){
-                    ofDeserialize(json, p);
-                }
-                else if(p.type() == typeid(ofParameter<bool>).name()){
-                    ofDeserialize(json, p);
-                }
-                else if(p.type() == typeid(ofParameter<ofColor>).name()){
-                    ofDeserialize(json, p);
-                }
-                else if(p.type() == typeid(ofParameter<vector<float>>).name()){
-                    float value = it.value();
-                    p.cast<vector<float>>() = vector<float>(1, value);
-                }
-                else if(p.type() == typeid(ofParameter<vector<int>>).name()){
-                    int value = it.value();
-                    p.cast<vector<int>>() = vector<int>(1, value);
-                }
-                else if(p.type() == typeid(ofParameterGroup).name()){
-                    ofDeserialize(json, p.castGroup().getInt(1));
+                if(getParameterInfo(p).isSavePreset){
+                    if(p.type() == typeid(ofParameter<float>).name()){
+                        ofDeserialize(json, p);
+                    }else if(p.type() == typeid(ofParameter<int>).name()){
+                        ofDeserialize(json, p);
+                    }
+                    else if(p.type() == typeid(ofParameter<bool>).name()){
+                        ofDeserialize(json, p);
+                    }
+                    else if(p.type() == typeid(ofParameter<ofColor>).name()){
+                        ofDeserialize(json, p);
+                    }
+                    else if(p.type() == typeid(ofParameter<vector<float>>).name()){
+                        float value = it.value();
+                        p.cast<vector<float>>() = vector<float>(1, value);
+                    }
+                    else if(p.type() == typeid(ofParameter<vector<int>>).name()){
+                        int value = it.value();
+                        p.cast<vector<int>>() = vector<int>(1, value);
+                    }
+                    else if(p.type() == typeid(ofParameterGroup).name()){
+                        ofDeserialize(json, p.castGroup().getInt(1));
+                    }
                 }
             }
         }

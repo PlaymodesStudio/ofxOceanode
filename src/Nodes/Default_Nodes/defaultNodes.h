@@ -15,5 +15,6 @@
 #include "ranger.h"
 #include "reindexer.h"
 #include "smoother.h"
+#include "localPresetController.h"
 
 #endif /* defaultNodes_h */

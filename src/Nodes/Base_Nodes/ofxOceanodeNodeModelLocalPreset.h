@@ -1,19 +1,19 @@
 //
-//  ofxOceanodeLocalPreset.h
+//  ofxOceanodeNodeModelLocalPreset.h
 //  VJYourself_OCEAN
 //
 //  Created by Eduard Frigola on 25/04/2018.
 //
 
-#ifndef ofxOceanodeLocalPreset_h
-#define ofxOceanodeLocalPreset_h
+#ifndef ofxOceanodeNodeModelLocalPreset_h
+#define ofxOceanodeNodeModelLocalPreset_h
 
 #include "ofxOceanodeNodeModel.h"
 
 class ofxOceanodeNodeModelLocalPreset : public ofxOceanodeNodeModel{
 public:
     ofxOceanodeNodeModelLocalPreset(string name);
-    ofxOceanodeNodeModelLocalPreset(){};
+    ~ofxOceanodeNodeModelLocalPreset(){};
 
     
 private:
