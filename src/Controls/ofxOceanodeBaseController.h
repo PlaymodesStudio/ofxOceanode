@@ -56,7 +56,7 @@ private:
 class ofxOceanodeBaseController{
 public:
     ofxOceanodeBaseController(string name);
-    ~ofxOceanodeBaseController(){};
+    virtual ~ofxOceanodeBaseController(){};
     
     virtual void draw(){};
     virtual void update(){};

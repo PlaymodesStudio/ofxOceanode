@@ -17,7 +17,7 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
 }
 
 ofxOceanodeContainer::~ofxOceanodeContainer(){
-    
+    dynamicNodes.clear();
 }
 
 ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstractParameter& p, ofxOceanodeNode& n){
