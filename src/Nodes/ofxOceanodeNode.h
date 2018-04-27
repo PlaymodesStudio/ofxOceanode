@@ -47,6 +47,9 @@ public:
     void setBpm(float bpm);
     
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
+    ofEvent<glm::vec2> duplicateModule;
+    
+    void copyParametersFrom(ofParameterGroup* toCopyGroup);
     
     ofParameterGroup* getParameters();
 private:

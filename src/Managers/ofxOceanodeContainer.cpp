@@ -100,6 +100,12 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
         dynamicNodes[nodeToBeCreatedName].erase(toBeCreatedId);
     }));
     
+    duplicateNodeListeners.push(nodePtr->duplicateModule.newListener([this, nodeToBeCreatedName, nodePtr](glm::vec2 pos){
+        auto newNode = createNodeFromName(nodeToBeCreatedName);
+        newNode->getNodeGui().setPosition(pos);
+        newNode->copyParametersFrom(nodePtr->getParameters());
+    }));
+    
     return *nodePtr;
 }
 

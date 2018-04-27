@@ -279,6 +279,10 @@ void ofxOceanodeNode::setBpm(float bpm){
     }
 }
 
+void ofxOceanodeNode::copyParametersFrom(ofParameterGroup* toCopyGroup){
+    
+}
+
 ofParameterGroup* ofxOceanodeNode::getParameters(){
     return nodeModel->getParameterGroup();
 }

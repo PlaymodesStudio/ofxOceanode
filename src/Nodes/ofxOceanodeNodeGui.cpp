@@ -264,6 +264,13 @@ void ofxOceanodeNodeGui::mouseDragged(ofMouseEventArgs &args){
     }
 }
 
+void ofxOceanodeNodeGui::mousePressed(ofMouseEventArgs &args){
+    if(gui->hitTest(args) && args.hasModifier(OF_KEY_ALT)){
+        glm::vec2 sidepos = toGlm(gui->getPosition() + ofPoint(gui->getWidth() + 10, 0));
+        ofNotifyEvent(node.duplicateModule, sidepos);
+    }
+}
+
 void ofxOceanodeNodeGui::mouseReleased(ofMouseEventArgs &args){
 }
 
