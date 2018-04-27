@@ -40,16 +40,21 @@ public:
     void setOutConnectionsPositionForParameter(ofAbstractParameter &p, glm::vec2 pos);
     
     void deleteSelf();
+    void duplicateSelf(glm::vec2 posToDuplicate = glm::vec2(-1, -1));
     
     bool loadPreset(string presetFolderPath);
     void savePreset(string presetFolderPath);
+    
+    bool loadConfig(string filename);
+    void saveConfig(string filename);
+    
+    ofJson saveParametersToJson();
+    bool loadParametersFromJson(ofJson json);
     
     void setBpm(float bpm);
     
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
     ofEvent<glm::vec2> duplicateModule;
-    
-    void copyParametersFrom(ofParameterGroup* toCopyGroup);
     
     ofParameterGroup* getParameters();
 private:

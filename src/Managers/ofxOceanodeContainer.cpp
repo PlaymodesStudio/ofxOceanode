@@ -103,7 +103,9 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     duplicateNodeListeners.push(nodePtr->duplicateModule.newListener([this, nodeToBeCreatedName, nodePtr](glm::vec2 pos){
         auto newNode = createNodeFromName(nodeToBeCreatedName);
         newNode->getNodeGui().setPosition(pos);
-        newNode->copyParametersFrom(nodePtr->getParameters());
+        newNode->loadConfig("tempDuplicateGroup.json");
+        ofFile config("tempDuplicateGroup.json");
+        config.remove();
     }));
     
     return *nodePtr;

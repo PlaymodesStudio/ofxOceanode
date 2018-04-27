@@ -196,45 +196,40 @@ void ofxOceanodeNode::deleteSelf(){
     ofNotifyEvent(deleteModuleAndConnections, inConnections);
 }
 
+void ofxOceanodeNode::duplicateSelf(glm::vec2 posToDuplicate){
+    if(posToDuplicate == glm::vec2(-1, -1)){
+        posToDuplicate = toGlm(nodeGui->getPosition() + ofPoint(10, 10));
+    }
+    saveConfig("tempDuplicateGroup.json");
+    ofNotifyEvent(duplicateModule, posToDuplicate);
+}
+
 bool ofxOceanodeNode::loadPreset(string presetFolderPath){
-    ofJson json = ofLoadJson(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json");
+    loadConfig(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json");
+}
+
+void ofxOceanodeNode::savePreset(string presetFolderPath){
+    saveConfig(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json");
+}
+
+bool ofxOceanodeNode::loadConfig(string filename){
+    ofJson json = ofLoadJson(filename);
     
     if(json.empty()) return false;
     
     nodeModel->presetRecallBeforeSettingParameters(json);
-    
-    for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
-        if(getParameters()->contains(it.key())){
-            ofAbstractParameter& p = getParameters()->get(it.key());
-            if(p.type() == typeid(ofParameter<float>).name()){
-                ofDeserialize(json, p);
-            }else if(p.type() == typeid(ofParameter<int>).name()){
-                ofDeserialize(json, p);
-            }
-            else if(p.type() == typeid(ofParameter<bool>).name()){
-                ofDeserialize(json, p);
-            }
-            else if(p.type() == typeid(ofParameter<ofColor>).name()){
-                ofDeserialize(json, p);
-            }
-            else if(p.type() == typeid(ofParameter<vector<float>>).name()){
-                float value = it.value();
-                p.cast<vector<float>>() = vector<float>(1, value);
-            }
-            else if(p.type() == typeid(ofParameter<vector<int>>).name()){
-                int value = it.value();
-                p.cast<vector<int>>() = vector<int>(1, value);
-            }
-            else if(p.type() == typeid(ofParameterGroup).name()){
-                ofDeserialize(json, p.castGroup().getInt(1));
-            }
-        }
-    }
+    loadParametersFromJson(json);
     nodeModel->presetRecallAfterSettingParameters(json);
     return true;
 }
 
-void ofxOceanodeNode::savePreset(string presetFolderPath){
+void ofxOceanodeNode::saveConfig(string filename){
+    ofJson json = saveParametersToJson();
+    nodeModel->presetSave(json);
+    ofSavePrettyJson(filename, json);
+}
+
+ofJson ofxOceanodeNode::saveParametersToJson(){
     ofJson json;
     for(int i = 0; i < getParameters()->size(); i++){
         ofAbstractParameter& p = getParameters()->get(i);
@@ -267,8 +262,37 @@ void ofxOceanodeNode::savePreset(string presetFolderPath){
             }
         }
     }
-    nodeModel->presetSave(json);
-    ofSavePrettyJson(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json", json);
+    return json;
+}
+bool ofxOceanodeNode::loadParametersFromJson(ofJson json){
+    for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
+        if(getParameters()->contains(it.key())){
+            ofAbstractParameter& p = getParameters()->get(it.key());
+            if(p.type() == typeid(ofParameter<float>).name()){
+                ofDeserialize(json, p);
+            }else if(p.type() == typeid(ofParameter<int>).name()){
+                ofDeserialize(json, p);
+            }
+            else if(p.type() == typeid(ofParameter<bool>).name()){
+                ofDeserialize(json, p);
+            }
+            else if(p.type() == typeid(ofParameter<ofColor>).name()){
+                ofDeserialize(json, p);
+            }
+            else if(p.type() == typeid(ofParameter<vector<float>>).name()){
+                float value = it.value();
+                p.cast<vector<float>>() = vector<float>(1, value);
+            }
+            else if(p.type() == typeid(ofParameter<vector<int>>).name()){
+                int value = it.value();
+                p.cast<vector<int>>() = vector<int>(1, value);
+            }
+            else if(p.type() == typeid(ofParameterGroup).name()){
+                ofDeserialize(json, p.castGroup().getInt(1));
+            }
+        }
+    }
+    return true;
 }
 
 void ofxOceanodeNode::setBpm(float bpm){
@@ -277,10 +301,6 @@ void ofxOceanodeNode::setBpm(float bpm){
     }else{
         nodeModel->setBpm(bpm);
     }
-}
-
-void ofxOceanodeNode::copyParametersFrom(ofParameterGroup* toCopyGroup){
-    
 }
 
 ofParameterGroup* ofxOceanodeNode::getParameters(){
