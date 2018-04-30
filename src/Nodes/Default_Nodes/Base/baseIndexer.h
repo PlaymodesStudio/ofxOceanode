@@ -52,7 +52,7 @@ private:
     
     
     vector<int>         indexRand;
-    int                 indexRand_Param_previous;
+    float               indexRand_Param_previous;
     bool newIndexsFlag;
     int previousIndexCount;
 };
