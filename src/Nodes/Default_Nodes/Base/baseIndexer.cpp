@@ -47,6 +47,7 @@ void baseIndexer::indexCountChanged(int &indexCount){
         indexRand.resize(indexCount , 0);
         for(int i = 0; i < indexRand.size(); i++)
             indexRand[i] = i-((float)indexRand.size()/2.f);
+        random_shuffle(indexRand.begin(), indexRand.end());
         
         numWaves_Param.setMax(indexCount);
         string name1 = numWaves_Param.getName();
