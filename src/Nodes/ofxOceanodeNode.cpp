@@ -213,7 +213,10 @@ void ofxOceanodeNode::savePreset(string presetFolderPath){
 }
 
 bool ofxOceanodeNode::loadConfig(string filename){
-    ofJson json = ofLoadJson(filename);
+    string escapedFilename = filename;
+    ofStringReplace(escapedFilename, " ", "_");
+    ofJson json = ofLoadJson(escapedFilename);
+    if(json.empty()) json = ofLoadJson(filename);
     
     if(json.empty()) return false;
     
@@ -224,6 +227,7 @@ bool ofxOceanodeNode::loadConfig(string filename){
 }
 
 void ofxOceanodeNode::saveConfig(string filename){
+    ofStringReplace(filename, " ", "_");
     ofJson json = saveParametersToJson();
     nodeModel->presetSave(json);
     ofSavePrettyJson(filename, json);

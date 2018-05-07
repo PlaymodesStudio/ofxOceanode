@@ -122,6 +122,7 @@ void ofxOceanodePresetsController::onGuiTextInputEvent(ofxDatGuiTextInputEvent e
         }else
             newPresetName = "1|" + e.text;
         
+        ofStringReplace(newPresetName, " ", "_"); 
         presetsList->add(newPresetName);
         changePresetLabelHighliht(presetsList->get(presetsList->getNumItems()-1));
         savePreset(newPresetName, bankSelect->getSelected()->getName());
