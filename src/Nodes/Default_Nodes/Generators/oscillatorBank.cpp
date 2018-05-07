@@ -16,18 +16,18 @@ oscillatorBank::oscillatorBank() : baseIndexer(100, "Oscillator Bank"){
     }
     result.resize(oscillators.size());
     
-    phaseOffset_Param.addListener(this, &oscillatorBank::newPhaseOffsetParam);
-    randomAdd_Param.addListener(this, &oscillatorBank::newRandomAddParam);
-    scale_Param.addListener(this, &oscillatorBank::newScaleParam);
-    offset_Param.addListener(this, &oscillatorBank::newOffsetParam);
-    pow_Param.addListener(this, &oscillatorBank::newPowParam);
-    quant_Param.addListener(this, &oscillatorBank::newQuantParam);
-    amplitude_Param.addListener(this, &oscillatorBank::newAmplitudeParam);
-    invert_Param.addListener(this, &oscillatorBank::newInvertParam);
-    biPow_Param.addListener(this, &oscillatorBank::newBiPowParam);
-    waveSelect_Param.addListener(this, &oscillatorBank::newWaveSelectParam);
-    pulseWidth_Param.addListener(this, &oscillatorBank::newpulseWidthParam);
-    skew_Param.addListener(this, &oscillatorBank::newSkewParam);
+    paramListeners.push(phaseOffset_Param.newListener(this, &oscillatorBank::newPhaseOffsetParam));
+    paramListeners.push(randomAdd_Param.newListener(this, &oscillatorBank::newRandomAddParam));
+    paramListeners.push(scale_Param.newListener(this, &oscillatorBank::newScaleParam));
+    paramListeners.push(offset_Param.newListener(this, &oscillatorBank::newOffsetParam));
+    paramListeners.push(pow_Param.newListener(this, &oscillatorBank::newPowParam));
+    paramListeners.push(quant_Param.newListener(this, &oscillatorBank::newQuantParam));
+    paramListeners.push(amplitude_Param.newListener(this, &oscillatorBank::newAmplitudeParam));
+    paramListeners.push(invert_Param.newListener(this, &oscillatorBank::newInvertParam));
+    paramListeners.push(biPow_Param.newListener(this, &oscillatorBank::newBiPowParam));
+    paramListeners.push(waveSelect_Param.newListener(this, &oscillatorBank::newWaveSelectParam));
+    paramListeners.push(pulseWidth_Param.newListener(this, &oscillatorBank::newpulseWidthParam));
+    paramListeners.push(skew_Param.newListener(this, &oscillatorBank::newSkewParam));
 
     parameters->add(phasorIn.set("Phasor In", 0, 0, 1));
     putParametersInParametersGroup(parameters);
@@ -50,7 +50,7 @@ oscillatorBank::oscillatorBank() : baseIndexer(100, "Oscillator Bank"){
     parameters->add(waveDropDown);
     addOutputParameterToGroupAndInfo(oscillatorOut.set("Oscillator Out", {0}, {0}, {1}));
     
-    phasorIn.addListener(this, &oscillatorBank::newPhasorIn);
+    phasorInListener = phasorIn.newListener(this, &oscillatorBank::newPhasorIn);
 }
 
 void oscillatorBank::presetRecallBeforeSettingParameters(ofJson &json){

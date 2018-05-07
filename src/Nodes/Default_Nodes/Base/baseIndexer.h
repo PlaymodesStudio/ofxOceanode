@@ -50,6 +50,7 @@ private:
     void recomputeIndexs();
     void indexRandChanged(float &val);
     
+    ofEventListeners listeners;
     
     vector<int>         indexRand;
     float               indexRand_Param_previous;

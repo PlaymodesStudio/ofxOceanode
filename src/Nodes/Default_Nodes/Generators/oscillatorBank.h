@@ -59,6 +59,9 @@ private:
     
     vector<baseOscillator> oscillators;
     vector<float> result;
+    
+    ofEventListeners paramListeners;
+    ofEventListener phasorInListener;
 };
 
 #endif /* oscillatorBank_h */

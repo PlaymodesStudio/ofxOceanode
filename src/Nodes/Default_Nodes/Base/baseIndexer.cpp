@@ -28,17 +28,17 @@ baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name
     
     recomputeIndexs();
 
-    indexCount.addListener(this, &baseIndexer::indexCountChanged);
-    numWaves_Param.addListener(this, &baseIndexer::parameterFloatListener);
-    indexInvert_Param.addListener(this, &baseIndexer::parameterFloatListener);
-    symmetry_Param.addListener(this, &baseIndexer::parameterIntListener);
-    indexRand_Param.addListener(this, &baseIndexer::parameterFloatListener);
-    indexOffset_Param.addListener(this, &baseIndexer::parameterFloatListener);
-    indexQuant_Param.addListener(this, &baseIndexer::parameterIntListener);
-    combination_Param.addListener(this, &baseIndexer::parameterFloatListener);
-    modulo_Param.addListener(this, &baseIndexer::parameterIntListener);
+    listeners.push(indexCount.newListener(this, &baseIndexer::indexCountChanged));
+    listeners.push(numWaves_Param.newListener(this, &baseIndexer::parameterFloatListener));
+    listeners.push(indexInvert_Param.newListener(this, &baseIndexer::parameterFloatListener));
+    listeners.push(symmetry_Param.newListener(this, &baseIndexer::parameterIntListener));
+    listeners.push(indexRand_Param.newListener(this, &baseIndexer::parameterFloatListener));
+    listeners.push(indexOffset_Param.newListener(this, &baseIndexer::parameterFloatListener));
+    listeners.push(indexQuant_Param.newListener(this, &baseIndexer::parameterIntListener));
+    listeners.push(combination_Param.newListener(this, &baseIndexer::parameterFloatListener));
+    listeners.push(modulo_Param.newListener(this, &baseIndexer::parameterIntListener));
     
-    indexRand_Param.addListener(this, &baseIndexer::indexRandChanged);
+    listeners.push(indexRand_Param.newListener(this, &baseIndexer::indexRandChanged));
 }
 
 void baseIndexer::indexCountChanged(int &indexCount){

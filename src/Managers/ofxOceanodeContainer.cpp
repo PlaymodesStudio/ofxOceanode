@@ -30,7 +30,7 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstract
         temporalConnection->setSourcePosition(n.getNodeGui().getSourceConnectionPositionFromParameter(p));
         temporalConnection->getGraphics().subscribeToDrawEvent(window);
     }
-    ofAddListener(temporalConnection->destroyConnection, this, &ofxOceanodeContainer::temporalConnectionDestructor);
+    destroyConnectionListeners.push(temporalConnection->destroyConnection.newListener(this, &ofxOceanodeContainer::temporalConnectionDestructor));
     return temporalConnection;
 }
 

@@ -66,6 +66,7 @@ private:
     
     ofEventListeners inConnectionsListeners;
     ofEventListeners outConnectionsListeners;
+    ofEventListeners toChangeGuiListeners;
 };
 
 #endif /* ofxOceanodeNode_h */

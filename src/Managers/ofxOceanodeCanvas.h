@@ -53,6 +53,8 @@ private:
     ofParameter<glm::mat4> *transformationMatrix;
     glm::vec2 dragCanvasInitialPoint;
     
+    ofEventListeners listeners;
+    
     ofEventListener changedTransformationMatrix;
 };
 

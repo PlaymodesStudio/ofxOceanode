@@ -77,6 +77,7 @@ private:
     
     ofEventListeners destroyNodeListeners;
     ofEventListeners duplicateNodeListeners;
+    ofEventListeners destroyConnectionListeners;
     
     shared_ptr<ofAppBaseWindow> window;
     

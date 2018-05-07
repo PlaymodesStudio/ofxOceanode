@@ -22,9 +22,9 @@ ofxOceanodeNode::~ofxOceanodeNode(){
 
 void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     nodeGui = std::move(gui);
-    ofAddListener(nodeModel->parameterChangedMinMax, nodeGui.get(), &ofxOceanodeNodeGui::updateGuiForParameter);
-    ofAddListener(nodeModel->dropdownChanged, nodeGui.get(), &ofxOceanodeNodeGui::updateDropdown);
-    ofAddListener(nodeModel->parameterGroupChanged, nodeGui.get(), &ofxOceanodeNodeGui::updateGui);
+    toChangeGuiListeners.push(nodeModel->parameterChangedMinMax.newListener(nodeGui.get(), &ofxOceanodeNodeGui::updateGuiForParameter));
+    toChangeGuiListeners.push(nodeModel->dropdownChanged.newListener(nodeGui.get(), &ofxOceanodeNodeGui::updateDropdown));
+    toChangeGuiListeners.push(nodeModel->parameterGroupChanged.newListener(nodeGui.get(), &ofxOceanodeNodeGui::updateGui));
 }
 
 ofxOceanodeNodeGui& ofxOceanodeNode::getNodeGui(){

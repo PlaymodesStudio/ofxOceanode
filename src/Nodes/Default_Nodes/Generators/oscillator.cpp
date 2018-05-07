@@ -9,40 +9,40 @@
 
 oscillator::oscillator() : ofxOceanodeNodeModel("Oscillator"){
     color = ofColor::cyan;
-    parameterAutoSettersListeners.push(phaseOffset_Param.newListener([&](float &val){
+    listeners.push(phaseOffset_Param.newListener([&](float &val){
         baseOsc.phaseOffset_Param = val;
     }));
-    parameterAutoSettersListeners.push(randomAdd_Param.newListener([&](float &val){
+    listeners.push(randomAdd_Param.newListener([&](float &val){
         baseOsc.randomAdd_Param = val;
     }));
-    parameterAutoSettersListeners.push(scale_Param.newListener([&](float &val){
+    listeners.push(scale_Param.newListener([&](float &val){
         baseOsc.scale_Param = val;
     }));
-    parameterAutoSettersListeners.push(offset_Param.newListener([&](float &val){
+    listeners.push(offset_Param.newListener([&](float &val){
         baseOsc.offset_Param = val;
     }));
-    parameterAutoSettersListeners.push(pow_Param.newListener([&](float &val){
+    listeners.push(pow_Param.newListener([&](float &val){
         baseOsc.pow_Param = val;
     }));
-    parameterAutoSettersListeners.push(biPow_Param.newListener([&](float &val){
+    listeners.push(biPow_Param.newListener([&](float &val){
         baseOsc.biPow_Param = val;
     }));
-    parameterAutoSettersListeners.push(quant_Param.newListener([&](int &val){
+    listeners.push(quant_Param.newListener([&](int &val){
         baseOsc.quant_Param = val;
     }));
-    parameterAutoSettersListeners.push(pulseWidth_Param.newListener([&](float &val){
+    listeners.push(pulseWidth_Param.newListener([&](float &val){
         baseOsc.pulseWidth_Param = val;
     }));
-    parameterAutoSettersListeners.push(skew_Param.newListener([&](float &val){
+    listeners.push(skew_Param.newListener([&](float &val){
         baseOsc.skew_Param = val;
     }));
-    parameterAutoSettersListeners.push(amplitude_Param.newListener([&](float &val){
+    listeners.push(amplitude_Param.newListener([&](float &val){
         baseOsc.amplitude_Param = val;
     }));
-    parameterAutoSettersListeners.push(invert_Param.newListener([&](float &val){
+    listeners.push(invert_Param.newListener([&](float &val){
         baseOsc.invert_Param = val;
     }));
-    parameterAutoSettersListeners.push(waveSelect_Param.newListener([&](int &val){
+    listeners.push(waveSelect_Param.newListener([&](int &val){
         baseOsc.waveSelect_Param = val;
     }));
     
@@ -67,7 +67,7 @@ oscillator::oscillator() : ofxOceanodeNodeModel("Oscillator"){
     addOutputParameterToGroupAndInfo(output.set("Output", 0, 0, 1));
     
     
-    phasorIn.addListener(this, &oscillator::phasorInListener);
+    listeners.push(phasorIn.newListener(this, &oscillator::phasorInListener));
 }
 
 void oscillator::phasorInListener(float &phasor){

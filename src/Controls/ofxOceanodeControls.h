@@ -33,6 +33,8 @@ private:
     std::shared_ptr<ofAppBaseWindow> controlsWindow;
     std::shared_ptr<ofxOceanodeContainer> container;
     
+    ofEventListeners listeners;
+    
     vector<unique_ptr<ofxOceanodeBaseController>> controllers;
     vector<ofRectangle> controllersButtons;
 };

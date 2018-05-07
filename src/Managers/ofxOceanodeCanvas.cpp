@@ -15,8 +15,8 @@
 void ofxOceanodeCanvas::setup(){
     ofSetWindowTitle("Canvas");
     
-    ofAddListener(ofEvents().update, this, &ofxOceanodeCanvas::update);
-    ofAddListener(ofEvents().draw, this, &ofxOceanodeCanvas::draw);
+    listeners.push(ofEvents().update.newListener(this, &ofxOceanodeCanvas::update));
+    listeners.push(ofEvents().draw.newListener(this, &ofxOceanodeCanvas::draw));
     
     ofRegisterKeyEvents(this);
     ofRegisterMouseEvents(this);
