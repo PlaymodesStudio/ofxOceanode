@@ -17,6 +17,10 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     transformationMatrix = glm::mat4(1);
     temporalConnection = nullptr;
     bpm = 120;
+    
+#ifdef OFXOCEANODE_USE_OSC
+    updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
+#endif
 }
 
 ofxOceanodeContainer::~ofxOceanodeContainer(){
@@ -222,6 +226,91 @@ void ofxOceanodeContainer::setBpm(float _bpm){
         }
     }
 }
+
+#ifdef OFXOCEANODE_USE_OSC
+
+void ofxOceanodeContainer::setupOscSender(string host, int port){
+    oscSender.setup(host, port);
+}
+
+void ofxOceanodeContainer::setupOscReceiver(int port){
+    oscReceiver.setup(port);
+}
+
+void ofxOceanodeContainer::update(ofEventArgs &args){
+    while(oscReceiver.hasWaitingMessages()){
+        ofxOscMessage m;
+        oscReceiver.getNextMessage(m);
+        
+        vector<string> splitAddress = ofSplitString(m.getAddress(), "/");
+        if(splitAddress[0].size() == 0) splitAddress.erase(splitAddress.begin());
+        if(splitAddress.size() == 1){
+            if(splitAddress[0] == "phaseReset"){
+                //Reset Phase of all modules
+            }else if(splitAddress[0] == "bpm"){
+                setBpm(m.getArgAsFloat(0));
+            }
+        }else if(splitAddress.size() == 2){
+            if(splitAddress[0] == "presetLoad"){
+                if(splitAddress.size() == 3){
+                    string bankName = splitAddress[1];
+                    
+                    ofDirectory dir;
+                    map<int, string> presets;
+                    dir.open("Presets/" + bankName);
+                    if(!dir.exists())
+                        return;
+                    dir.sort();
+                    int numPresets = dir.listDir();
+                    for ( int i = 0 ; i < numPresets; i++){
+                        if(ofToInt(ofSplitString(dir.getName(i), "|")[0]) == m.getArgAsInt(1)){
+                            loadPreset("Presets/" + bankName + "/" + ofSplitString(dir.getName(i), ".")[0]);
+                            break;
+                        }
+                    }
+                }
+            }else if(splitAddress[0] == "presetSave"){
+                savePreset("Presets/" + splitAddress[1] + "/" + m.getArgAsString(0));
+            }else{
+                string moduleName = splitAddress[0];
+                string moduleId = ofSplitString(moduleName, "_").back();
+                moduleName.erase(moduleName.find(moduleId)-1);
+                ofStringReplace(moduleName, "_", " ");
+                if(dynamicNodes.count(moduleName) == 1){
+                    if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
+                        ofParameterGroup* groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                        if(groupParam->contains(splitAddress[1])){
+                            ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                            if(absParam.type() == typeid(ofParameter<float>).name()){
+                                ofParameter<float> castedParam = absParam.cast<float>();
+                                castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
+                            }else if(absParam.type() == typeid(ofParameter<int>).name()){
+                                ofParameter<int> castedParam = absParam.cast<int>();
+                                castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
+                            }else if(absParam.type() == typeid(ofParameter<bool>).name()){
+                                groupParam->getBool(splitAddress[2]) = m.getArgAsBool(0);
+                            }else if(absParam.type() == typeid(ofParameter<string>).name()){
+                                groupParam->getString(splitAddress[2]) = m.getArgAsString(0);
+                            }else if(absParam.type() == typeid(ofParameterGroup).name()){
+                                groupParam->getGroup(splitAddress[2]).getInt(1) = m.getArgAsInt(0);
+                            }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
+                                ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>();
+                                castedParam = vector<float>(1, ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin()[0], castedParam.getMax()[0], true));
+                            }
+                            else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
+                                ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>();
+                                castedParam = vector<int>(1, ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin()[0], castedParam.getMax()[0], true));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#endif
+
 
 ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter){
     string sourceModuleId = ofSplitString(sourceModule, "_").back();

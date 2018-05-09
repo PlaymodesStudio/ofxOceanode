@@ -13,6 +13,10 @@
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeNodeGui.h"
 
+#ifdef OFXOCEANODE_USE_OSC
+    #include "ofxOsc.h"
+#endif
+
 class ofxOceanodeNodeModel;
 class ofxOceanodeNodeRegistry;
 class ofxOceanodeTypesRegistry;
@@ -59,6 +63,12 @@ public:
     
     void setBpm(float _bpm);
     
+#ifdef OFXOCEANODE_USE_OSC
+    void setupOscSender(string host, int port);
+    void setupOscReceiver(int port);
+    void update(ofEventArgs &args);
+#endif
+    
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
     
 private:
@@ -79,12 +89,20 @@ private:
     ofEventListeners duplicateNodeListeners;
     ofEventListeners destroyConnectionListeners;
     
+    ofEventListener updateListener;
+    
     shared_ptr<ofAppBaseWindow> window;
     
     ofParameter<glm::mat4> transformationMatrix;
     float bpm;
     
     const bool isHeadless;
+    
+#ifdef OFXOCEANODE_USE_OSC
+    ofxOscSender oscSender;
+    ofxOscReceiver oscReceiver;
+#endif
+    
 };
 
 #endif /* ofxOceanodeContainer_h */
