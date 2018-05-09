@@ -52,6 +52,7 @@ public:
     bool loadParametersFromJson(ofJson json);
     
     void setBpm(float bpm);
+    void resetPhase();
     
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
     ofEvent<glm::vec2> duplicateModule;

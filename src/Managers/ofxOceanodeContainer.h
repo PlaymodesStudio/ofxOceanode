@@ -62,6 +62,7 @@ public:
     void savePreset(string presetFolderPath);
     
     void setBpm(float _bpm);
+    void resetPhase();
     
 #ifdef OFXOCEANODE_USE_OSC
     void setupOscSender(string host, int port);

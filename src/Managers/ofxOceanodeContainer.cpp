@@ -181,6 +181,8 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         }
     }
     
+    resetPhase();
+    
     return true;
 }
 
@@ -227,6 +229,14 @@ void ofxOceanodeContainer::setBpm(float _bpm){
     }
 }
 
+void ofxOceanodeContainer::resetPhase(){
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->resetPhase();
+        }
+    }
+}
+
 #ifdef OFXOCEANODE_USE_OSC
 
 void ofxOceanodeContainer::setupOscSender(string host, int port){
@@ -246,7 +256,7 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
         if(splitAddress[0].size() == 0) splitAddress.erase(splitAddress.begin());
         if(splitAddress.size() == 1){
             if(splitAddress[0] == "phaseReset"){
-                //Reset Phase of all modules
+                resetPhase();
             }else if(splitAddress[0] == "bpm"){
                 setBpm(m.getArgAsFloat(0));
             }

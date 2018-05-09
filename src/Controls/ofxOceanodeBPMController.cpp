@@ -33,6 +33,7 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     gui->setAutoDraw(false);
     
     gui->addSlider(bpm.set("BPM", 120, 0, 999));
+    gui->addButton("Reset Phase");
     gui->addButton("Tap Tempo");
 #ifdef OFXOCEANODE_USE_BPM_DETECTION
     useDetection = gui->addToggle("Auto BPM", false);
@@ -46,7 +47,7 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
         container->setBpm(bpm);
     });
     
-    gui->onButtonEvent(this, &ofxOceanodeBPMController::tapTempoPress);
+    gui->onButtonEvent(this, &ofxOceanodeBPMController::onButtonPress);
     lastButtonPressTime = -1;
     oldBpm = -1;
     
@@ -81,7 +82,8 @@ void ofxOceanodeBPMController::audioIn(ofSoundBuffer &input){
 #endif
 }
 
-void ofxOceanodeBPMController::tapTempoPress(ofxDatGuiButtonEvent e){
+void ofxOceanodeBPMController::onButtonPress(ofxDatGuiButtonEvent e){
+    if(e.target->getName() == "Tap Tempo"){
     if(lastButtonPressTime == -1){
         lastButtonPressTime = ofGetElapsedTimef();
     }else{
@@ -104,6 +106,9 @@ void ofxOceanodeBPMController::tapTempoPress(ofxDatGuiButtonEvent e){
                 oldBpm = newBpm;
             }
         }
+    }
+    }else if(e.target->getName() == "Reset Phase"){
+        container->resetPhase();
     }
 }
 

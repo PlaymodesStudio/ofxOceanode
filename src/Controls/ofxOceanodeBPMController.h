@@ -28,7 +28,7 @@ public:
     void onGuiDropdownEvent(ofxDatGuiDropdownEvent e);
     void onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e);
     void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);
-    void tapTempoPress(ofxDatGuiButtonEvent e);
+    void onButtonPress(ofxDatGuiButtonEvent e);
     
     void activate();
     void deactivate();
