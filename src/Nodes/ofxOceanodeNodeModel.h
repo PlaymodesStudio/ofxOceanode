@@ -62,7 +62,7 @@ public:
     
     static ofAbstractParameter& createDropdownAbstractParameter(string name, vector<string> options, ofParameter<int> &dropdownSelector){
         ofParameterGroup *tempDropdown = new ofParameterGroup();
-        tempDropdown->setName(name);
+        tempDropdown->setName(name + " Selector");
         string  tempStr;
         ofParameter<string> tempStrParam("Options");
         for(auto opt : options)
