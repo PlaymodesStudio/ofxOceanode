@@ -23,6 +23,8 @@ void ofxOceanodeCanvas::setup(){
     
     transformationMatrix = &container->getTransformationMatrix();
     
+    ofxDatGui::setAssetPath("");
+    
     ///POP UP MENuS
     popUpMenu = new ofxDatGui();
     popUpMenu->setVisible(false);
