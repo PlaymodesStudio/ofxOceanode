@@ -28,7 +28,6 @@ basePhasor::~basePhasor(){
 
 float basePhasor::getPhasor(){
     if(loop_Param){
-        double momentaryPhasor;
         while(phasorToSend.tryReceive(momentaryPhasor));
         return momentaryPhasor;
     }else{
@@ -51,7 +50,7 @@ void basePhasor::threadedFunction(){
         double increment = (1.0f/(double)((double)(1000.0)/(double)freq));
         
         phasor = phasor + increment;
-        if(phasor > 1){
+        if(phasor >= 1){
             ofNotifyEvent(phasorCycle);
         }
         phasor -= (int)phasor;

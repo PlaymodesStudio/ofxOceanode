@@ -26,6 +26,7 @@ public:
     
     ofEvent<void> phasorCycle;
     
+    
 private:
     ofTimer timer;
     
@@ -34,6 +35,7 @@ private:
     double  phasor;
     double  phasorMod;
     ofThreadChannel<double> phasorToSend;
+    double momentaryPhasor;
 };
 
 #endif /* basePhasor_h */
