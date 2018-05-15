@@ -78,7 +78,7 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
                 colorGui->setColor(val);
             }));
         }else if(absParam.type() == typeid(ofParameterGroup).name()){
-            gui->addLabel(absParam.castGroup().getName() + " Selector");
+            gui->addLabel(absParam.castGroup().getName());
             auto dropdown = gui->addDropdown(absParam.castGroup().getName(), ofSplitString(absParam.castGroup().getString(0), "-|-"));
             dropdown->select(absParam.castGroup().getInt(1));
             parameterChangedListeners.push(absParam.castGroup().getInt(1).newListener([&, dropdown](int &val){
@@ -155,7 +155,7 @@ void ofxOceanodeNodeGui::updateGui(){
                     colorGui->setColor(val);
                 }));
             }else if(absParam.type() == typeid(ofParameterGroup).name()){
-                gui->addLabel(absParam.castGroup().getName() + " Selector");
+                gui->addLabel(absParam.castGroup().getName());
                 auto dropdown = gui->addDropdown(absParam.castGroup().getName(), ofSplitString(absParam.castGroup().getString(0), "-|-"));
                 dropdown->select(absParam.castGroup().getInt(1));
                 parameterChangedListeners.push(absParam.castGroup().getInt(1).newListener([&, dropdown](int &val){
