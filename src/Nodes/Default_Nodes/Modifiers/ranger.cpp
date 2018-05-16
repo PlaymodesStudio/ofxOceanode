@@ -39,10 +39,9 @@ ranger::ranger() : ofxOceanodeNodeModel("Ranger"){
 
 void ranger::recalculate()
 {
-    vector<float> vFloat;
-    vFloat.resize(Input.get().size());
-    for(int i = 0; i < Output.get().size(); i++){
-        vFloat[i] = ofMap(Input.get()[i],MinInput,MaxInput,MinOutput,MaxOutput, true);
+    vector<float> vFloat = Input.get();
+    for(auto &f : vFloat){
+        f = ofMap(f,MinInput,MaxInput,MinOutput,MaxOutput, true);
     }
     Output = vFloat;
 }
