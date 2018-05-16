@@ -171,12 +171,17 @@ void ofxOceanodeNodeGui::updateGui(){
         }
     }
     bool removedComponents = false;
-    for(int i = 0; i < gui->getNumComponents(); i++){
+    for(int i = 0; i < gui->getNumComponents();){
         if(gui->getComponent(i) != nullptr){
             if(!getParameters()->contains(gui->getComponent(i)->getName())){
                 gui->removeComponent(i);
                 removedComponents = true;
             }
+            else{
+                i++;
+            }
+        }else{
+            i++;
         }
     }
     if(removedComponents){
