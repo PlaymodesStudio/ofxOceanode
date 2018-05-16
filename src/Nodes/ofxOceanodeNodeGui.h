@@ -72,6 +72,7 @@ private:
     glm::vec2 position;
     
     bool guiToBeDestroyed;
+    bool lastExpandedState;
     
     ofParameter<glm::mat4> *transformationMatrix;
 };

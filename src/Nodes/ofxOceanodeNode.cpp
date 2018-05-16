@@ -163,6 +163,24 @@ void ofxOceanodeNode::moveConnections(glm::vec2 moveVector){
     }
 }
 
+void ofxOceanodeNode::collapseConnections(glm::vec2 sinkPos, glm::vec2 sourcePos){
+    for(auto c : inConnections){
+        c->setSinkPosition(sinkPos);
+    }
+    for(auto c : outConnections){
+        c->setSourcePosition(sourcePos);
+    }
+}
+
+void ofxOceanodeNode::expandConnections(){
+    for(auto c : inConnections){
+        c->setSinkPosition(nodeGui->getSinkConnectionPositionFromParameter(c->getSinkParameter()));
+    }
+    for(auto c : outConnections){
+        c->setSourcePosition(nodeGui->getSourceConnectionPositionFromParameter(c->getSourceParameter()));
+    }
+}
+
 void ofxOceanodeNode::setInConnectionsPositionForParameter(ofAbstractParameter &p, glm::vec2 pos){
     for(auto c : inConnections){
         if(&c->getSinkParameter() == &p){

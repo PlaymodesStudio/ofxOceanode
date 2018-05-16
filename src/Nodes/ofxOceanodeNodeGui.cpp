@@ -14,6 +14,7 @@ ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOcea
     color.setBrightness(255);
     position = glm::vec2(10, 10);
     guiToBeDestroyed = false;
+    lastExpandedState = true;
     
     createGuiFromParameters(window);
     if(window == nullptr){
@@ -276,6 +277,17 @@ void ofxOceanodeNodeGui::mousePressed(ofMouseEventArgs &args){
 }
 
 void ofxOceanodeNodeGui::mouseReleased(ofMouseEventArgs &args){
+    if(gui->hitTest(args)){
+        if(!gui->getExpanded() && lastExpandedState){
+            auto header = gui->getHeader();
+            node.collapseConnections(glm::vec2(header->getX(), header->getY() + header->getHeight()/2), glm::vec2(header->getX() + header->getWidth(), header->getY() + header->getHeight()/2));
+            lastExpandedState = gui->getExpanded();
+        }
+        else if(gui->getExpanded() && !lastExpandedState){
+            node.expandConnections();
+            lastExpandedState = gui->getExpanded();
+        }
+    }
 }
 
 void ofxOceanodeNodeGui::onGuiButtonEvent(ofxDatGuiButtonEvent e){

@@ -36,6 +36,8 @@ public:
     void addInputConnection(ofxOceanodeAbstractConnection* c);
     
     void moveConnections(glm::vec2 moveVector);
+    void collapseConnections(glm::vec2 sinkPos, glm::vec2 sourcePos);
+    void expandConnections();
     void setInConnectionsPositionForParameter(ofAbstractParameter &p, glm::vec2 pos);
     void setOutConnectionsPositionForParameter(ofAbstractParameter &p, glm::vec2 pos);
     
