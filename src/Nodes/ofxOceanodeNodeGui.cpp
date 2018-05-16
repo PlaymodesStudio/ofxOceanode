@@ -270,7 +270,7 @@ void ofxOceanodeNodeGui::mouseDragged(ofMouseEventArgs &args){
 }
 
 void ofxOceanodeNodeGui::mousePressed(ofMouseEventArgs &args){
-    if(gui->hitTest(args) && args.hasModifier(OF_KEY_ALT)){
+    if(gui->hitTest(args) && args.hasModifier(OF_KEY_ALT) && args.button != OF_MOUSE_BUTTON_RIGHT){
         node.duplicateSelf(toGlm(gui->getPosition() + ofPoint(gui->getWidth() + 10, 0)));
     }
 }
