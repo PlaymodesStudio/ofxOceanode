@@ -48,7 +48,7 @@ void ofxOceanodeCanvas::setup(){
         }
         std::sort(options.begin(), options.end());
         modulesSelectors.push_back(popUpMenu->addDropdown(categoriesVector[i], options));
-        modulesSelectors.back()->expand();
+        //modulesSelectors.back()->expand();
     }
     
     popUpMenu->onDropdownEvent(this, &ofxOceanodeCanvas::newModuleListener);
@@ -68,7 +68,7 @@ void ofxOceanodeCanvas::newModuleListener(ofxDatGuiDropdownEvent e){
     popUpMenu->setPosition(-1, -1);
     for(auto drop : modulesSelectors){
         drop->setLabel(drop->getName());
-        drop->expand();
+        drop->collapse();
     }
 }
 
