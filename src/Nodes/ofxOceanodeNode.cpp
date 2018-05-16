@@ -60,7 +60,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionRelease(ofxOc
         if(!nodeModel->getParameterInfo(parameter).acceptInConnection){
             return nullptr;
         }
-        return createConnection(container, container.getTemporalConnectionParameter(), parameter);
+        if(&container.getTemporalConnectionParameter() != &parameter){
+            return createConnection(container, container.getTemporalConnectionParameter(), parameter);
+        }
     }
     return nullptr;
 }
