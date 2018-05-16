@@ -50,6 +50,7 @@ void baseIndexer::indexCountChanged(int &indexCount){
         random_shuffle(indexRand.begin(), indexRand.end());
         
         numWaves_Param.setMax(indexCount);
+        if(numWaves_Param > numWaves_Param.getMax()) numWaves_Param = numWaves_Param.getMax();
         string name1 = numWaves_Param.getName();
         ofNotifyEvent(parameterChangedMinMax, name1);
         
