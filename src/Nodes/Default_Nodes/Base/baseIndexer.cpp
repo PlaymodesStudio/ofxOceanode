@@ -19,7 +19,7 @@ baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name
     
     numWaves_Param.set("Num Waves", 1, 0, indexCount);
     indexInvert_Param.set("Index Invert", 0, 0, 1);
-    symmetry_Param.set("Symmetry", 0, 0, 10);
+    symmetry_Param.set("Symmetry", 0, 0, indexCount/2);
     indexRand_Param.set("Index Random", 0, 0, 1);
     indexOffset_Param.set("Index Offset", 0, -indexCount/2, indexCount/2);
     indexQuant_Param.set("Index Quantization", indexCount, 1, indexCount);
@@ -53,6 +53,10 @@ void baseIndexer::indexCountChanged(int &indexCount){
         string name1 = numWaves_Param.getName();
         ofNotifyEvent(parameterChangedMinMax, name1);
         
+        symmetry_Param.setMax(indexCount/2);
+        string name11 = symmetry_Param.getName();
+        ofNotifyEvent(parameterChangedMinMax, name11);
+
         //    symmetry_Param.set("Symmetry", 0, 0, 10);
         indexOffset_Param.set("Index Offset", 0, -indexCount/2, indexCount/2);
         indexOffset_Param.setMin(-indexCount/2);
