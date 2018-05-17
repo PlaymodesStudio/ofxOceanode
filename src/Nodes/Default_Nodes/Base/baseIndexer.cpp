@@ -50,18 +50,18 @@ void baseIndexer::indexCountChanged(int &indexCount){
         random_shuffle(indexRand.begin(), indexRand.end());
         
         numWaves_Param.setMax(indexCount);
-        if(numWaves_Param > numWaves_Param.getMax()) numWaves_Param = numWaves_Param.getMax();
+        numWaves_Param = ofClamp(numWaves_Param, numWaves_Param.getMin(), numWaves_Param.getMax());
         string name1 = numWaves_Param.getName();
         ofNotifyEvent(parameterChangedMinMax, name1);
         
         symmetry_Param.setMax(indexCount/2);
+        symmetry_Param = ofClamp(symmetry_Param, symmetry_Param.getMin(), symmetry_Param.getMax());
         string name11 = symmetry_Param.getName();
         ofNotifyEvent(parameterChangedMinMax, name11);
 
-        //    symmetry_Param.set("Symmetry", 0, 0, 10);
-        indexOffset_Param.set("Index Offset", 0, -indexCount/2, indexCount/2);
         indexOffset_Param.setMin(-indexCount/2);
         indexOffset_Param.setMax(indexCount/2);
+        indexOffset_Param = ofClamp(indexOffset_Param, indexOffset_Param.getMin(), indexOffset_Param.getMax());
         string name2 = indexOffset_Param.getName();
         ofNotifyEvent(parameterChangedMinMax, name2);
         
@@ -69,14 +69,14 @@ void baseIndexer::indexCountChanged(int &indexCount){
         indexQuant_Param.setMax(indexCount);
         string name3 = indexQuant_Param.getName();
         ofNotifyEvent(parameterChangedMinMax, name3);
-        indexQuant_Param = indexQuantNormalized * indexCount;
+        indexQuant_Param = ofClamp(indexQuantNormalized * indexCount, indexQuant_Param.getMin(), indexQuant_Param.getMax());
         
         
         float indexModuloNormalized = (float)modulo_Param / (float)modulo_Param.getMax();
         modulo_Param.setMax(indexCount);
         string name4 = modulo_Param.getName();
         ofNotifyEvent(parameterChangedMinMax, name4);
-        modulo_Param.set(indexModuloNormalized * indexCount);
+        modulo_Param = ofClamp(indexModuloNormalized * indexCount, modulo_Param.getMin(), modulo_Param.getMax());
         
         recomputeIndexs();
     }
