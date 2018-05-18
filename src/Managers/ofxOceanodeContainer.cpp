@@ -104,6 +104,23 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
         dynamicNodes[nodeToBeCreatedName].erase(toBeCreatedId);
     }));
     
+    destroyNodeListeners.push(nodePtr->deleteConnections.newListener([this](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
+        for(auto containerConnectionIterator = connections.begin(); containerConnectionIterator!=connections.end();){
+            bool foundConnection = false;
+            for(auto nodeConnection : connectionsToBeDeleted){
+                if(containerConnectionIterator->second.get() == nodeConnection){
+                    foundConnection = true;
+                    connections.erase(containerConnectionIterator);
+                    connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
+                    break;
+                }
+            }
+            if(!foundConnection){
+                containerConnectionIterator++;
+            }
+        }
+    }));
+    
     duplicateNodeListeners.push(nodePtr->duplicateModule.newListener([this, nodeToBeCreatedName, nodePtr](glm::vec2 pos){
         auto newNode = createNodeFromName(nodeToBeCreatedName);
         newNode->getNodeGui().setPosition(pos);

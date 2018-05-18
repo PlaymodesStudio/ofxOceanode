@@ -57,6 +57,7 @@ public:
     void resetPhase();
     
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
+    ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteConnections;
     ofEvent<glm::vec2> duplicateModule;
     
     ofParameterGroup* getParameters();
@@ -70,6 +71,7 @@ private:
     ofEventListeners inConnectionsListeners;
     ofEventListeners outConnectionsListeners;
     ofEventListeners toChangeGuiListeners;
+    ofEventListeners nodeModelListeners;
 };
 
 #endif /* ofxOceanodeNode_h */

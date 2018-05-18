@@ -13,7 +13,16 @@
 #include "ofxOceanodeConnection.h"
 
 ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){
-    
+    nodeModelListeners.push(nodeModel->disconnectConnectionsForParameter.newListener([&](string &parameter){
+        vector<ofxOceanodeAbstractConnection*> toDeleteConnections;
+        for(auto c : inConnections){
+            if(c->getSinkParameter().getName() == parameter) toDeleteConnections.push_back(c);
+        }
+        for(auto c : outConnections){
+            if(c->getSourceParameter().getName() == parameter) toDeleteConnections.push_back(c);
+        }
+        ofNotifyEvent(deleteConnections, toDeleteConnections);
+    }));
 }
 
 ofxOceanodeNode::~ofxOceanodeNode(){

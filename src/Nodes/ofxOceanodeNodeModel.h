@@ -43,6 +43,7 @@ public:
     ofEvent<string> parameterChangedMinMax;
     ofEvent<string> dropdownChanged;
     ofEvent<void> parameterGroupChanged;
+    ofEvent<string> disconnectConnectionsForParameter;
     
     void registerLoop(shared_ptr<ofAppBaseWindow> w = nullptr);
     
