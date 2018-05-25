@@ -37,8 +37,8 @@ public:
     //getters
     bool getIsDynamic(){return isDynamic;};
     string nodeName(){return nameIdentifier;};
-    uint getNumIdentifier(){return numIdentifier;};
-    void setNumIdentifier(uint num);
+    unsigned int getNumIdentifier(){return numIdentifier;};
+    void setNumIdentifier(unsigned int num);
         
     ofEvent<string> parameterChangedMinMax;
     ofEvent<string> dropdownChanged;
@@ -84,7 +84,7 @@ protected:
     ofColor color;
     bool isDynamic;
     string nameIdentifier;
-    uint numIdentifier;
+    unsigned int numIdentifier;
     
 private:
     ofEventListeners eventListeners;

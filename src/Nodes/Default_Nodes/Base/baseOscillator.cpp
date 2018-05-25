@@ -6,6 +6,8 @@
 //
 //
 
+#define _USE_MATH_DEFINES
+
 #include "baseOscillator.h"
 #include "ofMath.h"
 
