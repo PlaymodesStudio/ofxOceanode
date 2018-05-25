@@ -29,6 +29,10 @@ ofxOceanodeNode::~ofxOceanodeNode(){
     
 }
 
+void ofxOceanodeNode::setup(){
+    nodeModel->setup();
+}
+
 void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     nodeGui = std::move(gui);
     toChangeGuiListeners.push(nodeModel->parameterChangedMinMax.newListener(nodeGui.get(), &ofxOceanodeNodeGui::updateGuiForParameter));

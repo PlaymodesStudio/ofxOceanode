@@ -21,6 +21,7 @@ public:
     ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel);
     ~ofxOceanodeNode();
     
+    void setup();
     void setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui);
     
     ofxOceanodeNodeGui& getNodeGui();

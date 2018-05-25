@@ -28,6 +28,7 @@ public:
     ofxOceanodeNodeModel(string _name);
     virtual ~ofxOceanodeNodeModel(){};
     
+    virtual void setup(){};
     virtual void update(ofEventArgs &e){};
     virtual void draw(ofEventArgs &e){};
     

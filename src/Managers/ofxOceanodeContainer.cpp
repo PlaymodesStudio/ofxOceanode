@@ -76,6 +76,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     nodeModel->setNumIdentifier(toBeCreatedId);
     nodeModel->registerLoop(window);
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
+    node->setup();
     if(!isHeadless){
         auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node, window);
         node->setGui(std::move(nodeGui));
