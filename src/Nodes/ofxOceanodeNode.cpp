@@ -234,7 +234,7 @@ void ofxOceanodeNode::duplicateSelf(glm::vec2 posToDuplicate){
 }
 
 bool ofxOceanodeNode::loadPreset(string presetFolderPath){
-    loadConfig(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json");
+    return loadConfig(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json");
 }
 
 void ofxOceanodeNode::savePreset(string presetFolderPath){
