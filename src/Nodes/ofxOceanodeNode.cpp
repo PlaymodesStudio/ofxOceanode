@@ -305,27 +305,29 @@ bool ofxOceanodeNode::loadParametersFromJson(ofJson json){
     for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
         if(getParameters()->contains(it.key())){
             ofAbstractParameter& p = getParameters()->get(it.key());
-            if(p.type() == typeid(ofParameter<float>).name()){
-                ofDeserialize(json, p);
-            }else if(p.type() == typeid(ofParameter<int>).name()){
-                ofDeserialize(json, p);
-            }
-            else if(p.type() == typeid(ofParameter<bool>).name()){
-                ofDeserialize(json, p);
-            }
-            else if(p.type() == typeid(ofParameter<ofColor>).name()){
-                ofDeserialize(json, p);
-            }
-            else if(p.type() == typeid(ofParameter<vector<float>>).name()){
-                float value = it.value();
-                p.cast<vector<float>>() = vector<float>(1, value);
-            }
-            else if(p.type() == typeid(ofParameter<vector<int>>).name()){
-                int value = it.value();
-                p.cast<vector<int>>() = vector<int>(1, value);
-            }
-            else if(p.type() == typeid(ofParameterGroup).name()){
-                ofDeserialize(json, p.castGroup().getInt(1));
+            if(nodeModel->getParameterInfo(p).isSavePreset){
+                if(p.type() == typeid(ofParameter<float>).name()){
+                    ofDeserialize(json, p);
+                }else if(p.type() == typeid(ofParameter<int>).name()){
+                    ofDeserialize(json, p);
+                }
+                else if(p.type() == typeid(ofParameter<bool>).name()){
+                    ofDeserialize(json, p);
+                }
+                else if(p.type() == typeid(ofParameter<ofColor>).name()){
+                    ofDeserialize(json, p);
+                }
+                else if(p.type() == typeid(ofParameter<vector<float>>).name()){
+                    float value = it.value();
+                    p.cast<vector<float>>() = vector<float>(1, value);
+                }
+                else if(p.type() == typeid(ofParameter<vector<int>>).name()){
+                    int value = it.value();
+                    p.cast<vector<int>>() = vector<int>(1, value);
+                }
+                else if(p.type() == typeid(ofParameterGroup).name()){
+                    ofDeserialize(json, p.castGroup().getInt(1));
+                }
             }
         }
     }
