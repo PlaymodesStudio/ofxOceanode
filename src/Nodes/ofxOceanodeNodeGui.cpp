@@ -252,13 +252,8 @@ void ofxOceanodeNodeGui::keyPressed(ofKeyEventArgs &args){
 
 void ofxOceanodeNodeGui::keyReleased(ofKeyEventArgs &args){
     if(args.key == 'r'){
-        if(gui->hitTest(ofVec2f(ofGetMouseX(), ofGetMouseY())) && guiToBeDestroyed){
-            node.deleteSelf();
-        }
-        else{
-            guiToBeDestroyed = false;
-            gui->setOpacity(1);
-        }
+        guiToBeDestroyed = false;
+        gui->setOpacity(1);
     }
 }
 
@@ -271,8 +266,13 @@ void ofxOceanodeNodeGui::mouseDragged(ofMouseEventArgs &args){
 }
 
 void ofxOceanodeNodeGui::mousePressed(ofMouseEventArgs &args){
-    if(gui->hitTest(args) && args.hasModifier(OF_KEY_ALT) && args.button != OF_MOUSE_BUTTON_RIGHT){
-        node.duplicateSelf(toGlm(gui->getPosition() + ofPoint(gui->getWidth() + 10, 0)));
+    if(gui->hitTest(args) && args.button != OF_MOUSE_BUTTON_RIGHT){
+       if(args.hasModifier(OF_KEY_ALT)){
+           node.duplicateSelf(toGlm(gui->getPosition() + ofPoint(gui->getWidth() + 10, 0)));
+       }
+       else if(guiToBeDestroyed){
+           node.deleteSelf();
+       }
     }
 }
 
