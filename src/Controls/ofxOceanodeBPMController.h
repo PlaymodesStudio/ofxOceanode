@@ -33,6 +33,8 @@ public:
     void activate();
     void deactivate();
     
+    void setBPM(float _bpm){bpm = _bpm; oldBpm = bpm;};
+    
     void windowResized(ofResizeEventArgs &a);
     void audioIn(ofSoundBuffer &input);
 private:
