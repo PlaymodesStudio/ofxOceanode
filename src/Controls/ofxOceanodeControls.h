@@ -28,6 +28,15 @@ public:
     void mouseDragged(ofMouseEventArgs &a);
     void windowResized(ofResizeEventArgs &a);
     
+    template<class T>
+    shared_ptr<T> get(){
+        for(auto c : controllers){
+            if(dynamic_pointer_cast<T>(c) != nullptr){
+                return dynamic_pointer_cast<T>(c);
+            }
+        }
+    }
+    
     void resizeButtons();
 private:
     std::shared_ptr<ofAppBaseWindow> controlsWindow;
@@ -35,7 +44,7 @@ private:
     
     ofEventListeners listeners;
     
-    vector<unique_ptr<ofxOceanodeBaseController>> controllers;
+    vector<shared_ptr<ofxOceanodeBaseController>> controllers;
     vector<ofRectangle> controllersButtons;
 };
 
