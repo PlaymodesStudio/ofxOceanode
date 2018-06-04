@@ -318,12 +318,19 @@ bool ofxOceanodeNode::loadParametersFromJson(ofJson json){
                     ofDeserialize(json, p);
                 }
                 else if(p.type() == typeid(ofParameter<vector<float>>).name()){
-                    float value = it.value();
-                    p.cast<vector<float>>() = vector<float>(1, value);
+                    float value = 0;
+                    if(it.value().is_string()){
+                        p.cast<vector<float>>() = vector<float>(1, ofToFloat(it.value()));
+                    }else{
+                        p.cast<vector<float>>() = vector<float>(1, it.value());
+                    }
                 }
                 else if(p.type() == typeid(ofParameter<vector<int>>).name()){
-                    int value = it.value();
-                    p.cast<vector<int>>() = vector<int>(1, value);
+                    if(it.value().is_string()){
+                        p.cast<vector<int>>() = vector<int>(1, ofToInt(it.value()));
+                    }else{
+                        p.cast<vector<int>>() = vector<int>(1, it.value());
+                    }
                 }
                 else if(p.type() == typeid(ofParameterGroup).name()){
                     ofDeserialize(json, p.castGroup().getInt(1));
