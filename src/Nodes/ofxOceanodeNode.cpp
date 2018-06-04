@@ -322,14 +322,14 @@ bool ofxOceanodeNode::loadParametersFromJson(ofJson json){
                     if(it.value().is_string()){
                         p.cast<vector<float>>() = vector<float>(1, ofToFloat(it.value()));
                     }else{
-                        p.cast<vector<float>>() = vector<float>(1, it.value());
+                        p.cast<vector<float>>() = vector<float>(1, float(it.value()));
                     }
                 }
                 else if(p.type() == typeid(ofParameter<vector<int>>).name()){
                     if(it.value().is_string()){
                         p.cast<vector<int>>() = vector<int>(1, ofToInt(it.value()));
                     }else{
-                        p.cast<vector<int>>() = vector<int>(1, it.value());
+                        p.cast<vector<int>>() = vector<int>(1, int(it.value()));
                     }
                 }
                 else if(p.type() == typeid(ofParameterGroup).name()){
