@@ -20,10 +20,10 @@ private:
     ofEventListener inputEventListener;
     
     ofParameter<vector<float>>  input;
-    ofParameter<float>  smoothing;
-    ofParameter<float>  tension;
+    ofParameter<vector<float>> smoothing;
+    ofParameter<vector<float>> tension;
     ofParameter<vector<float>>  output;
-    vector<float> previousValue;
+    vector<float> previousInput;
 };
 
 #endif /* smoother_h */
