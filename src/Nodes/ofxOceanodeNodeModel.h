@@ -55,6 +55,9 @@ public:
     virtual void presetRecallBeforeSettingParameters(ofJson &json){};
     virtual void presetRecallAfterSettingParameters(ofJson &json){};
     
+    virtual void presetWillBeLoaded(){};
+    virtual void presetHasLoaded(){};
+    
     ofColor getColor(){return color;};
     
     parameterInfo& addParameterToGroupAndInfo(ofAbstractParameter& p);

@@ -48,6 +48,9 @@ public:
     bool loadPreset(string presetFolderPath);
     void savePreset(string presetFolderPath);
     
+    void presetWillBeLoaded();
+    void presetHasLoaded();
+    
     bool loadConfig(string filename);
     void saveConfig(string filename);
     

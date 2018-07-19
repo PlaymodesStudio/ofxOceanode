@@ -144,6 +144,12 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     window->makeCurrent();
     ofGetMainLoop()->setCurrentWindow(window);
     
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->presetWillBeLoaded();
+        }
+    }
+    
     //Read new nodes in preset
     //Check if the nodes exists and update them, (or update all at the end)
     //Create new modules and update them (or update at end)
@@ -201,6 +207,12 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
                     createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key());
                 }
             }
+        }
+    }
+    
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->presetHasLoaded();
         }
     }
     
