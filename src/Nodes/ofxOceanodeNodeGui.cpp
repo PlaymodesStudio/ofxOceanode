@@ -163,7 +163,7 @@ void ofxOceanodeNodeGui::updateGui(){
                     dropdown->select(val);
                 }));
             }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
-                gui->addMultiSlider(absParam.cast<vector<float>>());
+                gui->addMultiSlider(absParam.cast<vector<float>>())->setPrecision(1000);
             }else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
                 gui->addMultiSlider(absParam.cast<vector<int>>());
             }else {
