@@ -139,6 +139,7 @@ void ofxOceanodeContainer::temporalConnectionDestructor(){
 }
 
 bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
+    ofStringReplace(presetFolderPath, " ", "_");
     ofLog()<<"Load Preset " << presetFolderPath;
     
     window->makeCurrent();
@@ -222,6 +223,7 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
 }
 
 void ofxOceanodeContainer::savePreset(string presetFolderPath){
+    ofStringReplace(presetFolderPath, " ", "_");
     ofLog()<<"Save Preset " << presetFolderPath;
     
     ofJson json;
