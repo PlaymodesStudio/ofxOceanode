@@ -303,7 +303,7 @@ ofJson ofxOceanodeNode::saveParametersToJson(){
                 }
             }
             else if(p.type() == typeid(ofParameterGroup).name()){
-                ofSerialize(json, p.castGroup().getInt(1));
+                json[p.getEscapedName()] = p.castGroup().getInt(1).toString();
             }
         }
     }
@@ -341,7 +341,7 @@ bool ofxOceanodeNode::loadParametersFromJson(ofJson json){
                     }
                 }
                 else if(p.type() == typeid(ofParameterGroup).name()){
-                    ofDeserialize(json, p.castGroup().getInt(1));
+                    p.castGroup().getInt(1).fromString(json[p.getEscapedName()]);
                 }
             }
         }
