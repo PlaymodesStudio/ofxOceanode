@@ -42,12 +42,7 @@ oscillatorBank::oscillatorBank() : baseIndexer(100, "Oscillator Bank"){
     parameters->add(skew_Param.set("Skew", 0, -1, 1));
     parameters->add(amplitude_Param.set("Fader", 1, 0, 1));
     parameters->add(invert_Param.set("Invert", 0, 0, 1));
-    ofParameterGroup waveDropDown;
-    waveDropDown.setName("Wave Select");
-    ofParameter<string> tempStrParam("Options", "sin-|-cos-|-tri-|-square-|-saw-|-inverted saw-|-rand1-|-rand2");
-    waveDropDown.add(tempStrParam);
-    waveDropDown.add(waveSelect_Param.set("Wave Select", 0, 0, 7));
-    parameters->add(waveDropDown);
+    parameters->add(createDropdownAbstractParameter("Wave", {"sin", "cos", "tri", "square", "saw", "inverted saw", "rand1", "rand2"}, waveSelect_Param));
     addOutputParameterToGroupAndInfo(oscillatorOut.set("Oscillator Out", {0}, {0}, {1}));
     
     phasorInListener = phasorIn.newListener(this, &oscillatorBank::newPhasorIn);
