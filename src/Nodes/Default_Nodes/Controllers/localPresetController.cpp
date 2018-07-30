@@ -13,9 +13,7 @@ localPresetController::localPresetController() : ofxOceanodeNodeModel("Local Pre
     addOutputParameterToGroupAndInfo(on.set("On", false));
     addOutputParameterToGroupAndInfo(preset.set("Preset", 0));
     
-    listener = matrix.newListener([&](pair<int, bool> &val){
-        ofLog() << "First: " << val.first << "  Second: " << val.second;
-        
+    listener = matrix.newListener([&](pair<int, bool> &val){        
         if(!ofGetKeyPressed(OF_KEY_SHIFT)){
             if(val.second){
                 preset = val.first;
