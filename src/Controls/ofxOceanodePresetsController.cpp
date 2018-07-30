@@ -68,6 +68,25 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
     
     
     oldPresetButton = nullptr;
+    
+    presetListener = container->loadPresetEvent.newListener([this](string preset){
+        vector<string> presetInfo = ofSplitString(preset, "/");
+        oldPresetButton = nullptr;
+        bool foundBank = false;
+        for(int i = 0; i < bankSelect->getNumOptions(); i++){
+            if(bankSelect->getChildAt(i)->getName() == presetInfo[0]){
+                bankSelect->select(i);
+                foundBank = true;
+                break;
+            }
+        }
+        if(foundBank == true){
+            loadBank();
+            if(presetsList->get(presetInfo[1]) != nullptr)
+               changePresetLabelHighliht(presetsList->get(presetInfo[1]));
+               loadPreset(presetInfo[1], presetInfo[0]);
+        }
+    });
 }
 
 void ofxOceanodePresetsController::draw(){
@@ -145,9 +164,11 @@ void ofxOceanodePresetsController::windowResized(ofResizeEventArgs &a){
 }
 
 void ofxOceanodePresetsController::changePresetLabelHighliht(ofxDatGuiButton *presetToHighlight){
-    if(oldPresetButton != nullptr) oldPresetButton->setTheme(mainGuiTheme);
-    presetToHighlight->setLabelColor(ofColor::red);
-    oldPresetButton = presetToHighlight;
+    if(presetToHighlight != nullptr){
+        if(oldPresetButton != nullptr) oldPresetButton->setTheme(mainGuiTheme);
+        presetToHighlight->setLabelColor(ofColor::red);
+        oldPresetButton = presetToHighlight;
+    }
 }
 
 void ofxOceanodePresetsController::loadBank(){

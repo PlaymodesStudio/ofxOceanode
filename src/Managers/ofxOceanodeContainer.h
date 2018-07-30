@@ -64,6 +64,8 @@ public:
     void setBpm(float _bpm);
     void resetPhase();
     
+    ofEvent<string> loadPresetEvent;
+    
 #ifdef OFXOCEANODE_USE_OSC
     void setupOscSender(string host, int port);
     void setupOscReceiver(int port);

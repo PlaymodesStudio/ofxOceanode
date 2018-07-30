@@ -310,7 +310,8 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                 int numPresets = dir.listDir();
                 for ( int i = 0 ; i < numPresets; i++){
                     if(ofToInt(ofSplitString(dir.getName(i), "|")[0]) == m.getArgAsInt(1)){
-                        loadPreset("Presets/" + bankName + "/" + ofSplitString(dir.getName(i), ".")[0]);
+                        string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
+                        ofNotifyEvent(loadPresetEvent, bankAndPreset);
                         break;
                     }
                 }
@@ -353,7 +354,8 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
         }
         else if(splitAddress.size() == 3){
             if(splitAddress[0] == "presetLoad"){
-                loadPreset("Presets/" + splitAddress[1] + "/" + splitAddress[2]);
+                string bankAndPreset = splitAddress[1] + "/" + splitAddress[2];
+                ofNotifyEvent(loadPresetEvent, bankAndPreset);
             }
         }
     }

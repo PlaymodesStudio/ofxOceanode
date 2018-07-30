@@ -43,6 +43,8 @@ private:
     ofxDatGuiButton*    oldPresetButton;
     
     shared_ptr<ofxOceanodeContainer> container;
+    
+    ofEventListener presetListener;
 };
 
 #endif /* ofxOceanodePresetsController_h */
