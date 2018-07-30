@@ -299,21 +299,19 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
             }
         }else if(splitAddress.size() == 2){
             if(splitAddress[0] == "presetLoad"){
-                if(splitAddress.size() == 3){
-                    string bankName = splitAddress[1];
-                    
-                    ofDirectory dir;
-                    map<int, string> presets;
-                    dir.open("Presets/" + bankName);
-                    if(!dir.exists())
-                        return;
-                    dir.sort();
-                    int numPresets = dir.listDir();
-                    for ( int i = 0 ; i < numPresets; i++){
-                        if(ofToInt(ofSplitString(dir.getName(i), "|")[0]) == m.getArgAsInt(1)){
-                            loadPreset("Presets/" + bankName + "/" + ofSplitString(dir.getName(i), ".")[0]);
-                            break;
-                        }
+                string bankName = splitAddress[1];
+                
+                ofDirectory dir;
+                map<int, string> presets;
+                dir.open("Presets/" + bankName);
+                if(!dir.exists())
+                    return;
+                dir.sort();
+                int numPresets = dir.listDir();
+                for ( int i = 0 ; i < numPresets; i++){
+                    if(ofToInt(ofSplitString(dir.getName(i), "|")[0]) == m.getArgAsInt(1)){
+                        loadPreset("Presets/" + bankName + "/" + ofSplitString(dir.getName(i), ".")[0]);
+                        break;
                     }
                 }
             }else if(splitAddress[0] == "presetSave"){
@@ -351,6 +349,11 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                         }
                     }
                 }
+            }
+        }
+        else if(splitAddress.size() == 3){
+            if(splitAddress[0] == "presetLoad"){
+                loadPreset("Presets/" + splitAddress[1] + "/" + splitAddress[2]);
             }
         }
     }
