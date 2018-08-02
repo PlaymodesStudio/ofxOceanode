@@ -15,6 +15,8 @@ baseOscillator::baseOscillator(){
     oldPhasor = 0;
     oldValuePreMod = 0;
     indexNormalized = 0;
+    pastRandom = ofRandom(1);
+    newRandom = ofRandom(1);
 }
 
 float baseOscillator::computeFunc(float phasor){
