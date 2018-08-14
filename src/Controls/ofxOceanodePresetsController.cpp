@@ -195,8 +195,9 @@ void ofxOceanodePresetsController::loadBank(){
     for(auto preset : presets){
         presetsList->add(preset.second);
     }
-    
-    presetsList->resetScroll();
+    if(presets.size() > 0){
+        presetsList->resetScroll();
+    }
 }
 
 void ofxOceanodePresetsController::loadPreset(string name, string bank){
