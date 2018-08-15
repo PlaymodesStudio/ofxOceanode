@@ -326,7 +326,7 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                     if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
                         ofParameterGroup* groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
                         if(groupParam->contains(splitAddress[1])){
-                            ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                            ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
                             if(absParam.type() == typeid(ofParameter<float>).name()){
                                 ofParameter<float> castedParam = absParam.cast<float>();
                                 castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
@@ -334,11 +334,11 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                                 ofParameter<int> castedParam = absParam.cast<int>();
                                 castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
                             }else if(absParam.type() == typeid(ofParameter<bool>).name()){
-                                groupParam->getBool(splitAddress[2]) = m.getArgAsBool(0);
+                                absParam.cast<bool>() = m.getArgAsBool(0);
                             }else if(absParam.type() == typeid(ofParameter<string>).name()){
-                                groupParam->getString(splitAddress[2]) = m.getArgAsString(0);
+                                absParam.cast<string>() = m.getArgAsString(0);
                             }else if(absParam.type() == typeid(ofParameterGroup).name()){
-                                groupParam->getGroup(splitAddress[2]).getInt(1) = m.getArgAsInt(0);
+                                absParam.castGroup().getInt(1) = m.getArgAsInt(0);
                             }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
                                 ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>();
                                 castedParam = vector<float>(1, ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin()[0], castedParam.getMax()[0], true));
