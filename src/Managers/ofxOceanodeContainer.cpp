@@ -341,11 +341,28 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                                 absParam.castGroup().getInt(1) = m.getArgAsInt(0);
                             }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
                                 ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>();
-                                castedParam = vector<float>(1, ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin()[0], castedParam.getMax()[0], true));
+                                vector<float> tempVec;
+                                tempVec.resize(m.getNumArgs(), 0);
+                                for(int i = 0; i < tempVec.size(); i++){
+                                    tempVec[i] = ofMap(m.getArgAsFloat(i), 0, 1, castedParam.getMin()[0], castedParam.getMax()[0], true);
+                                }
+                                castedParam = tempVec;
                             }
                             else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
                                 ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>();
-                                castedParam = vector<int>(1, ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin()[0], castedParam.getMax()[0], true));
+                                vector<int> tempVec;
+                                tempVec.resize(m.getNumArgs(), 0);
+                                if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_FLOAT){
+                                    for(int i = 0; i < tempVec.size(); i++){
+                                        tempVec[i] = ofMap(m.getArgAsFloat(i), 0, 1, castedParam.getMin()[0], castedParam.getMax()[0], true);
+                                    }
+                                }
+                                else if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT32 || m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT64){
+                                    for(int i = 0; i < tempVec.size(); i++){
+                                        tempVec[i] = ofClamp(m.getArgAsInt(i), castedParam.getMin()[0], castedParam.getMax()[0]);
+                                    }
+                                }
+                                castedParam = tempVec;
                             }
                         }
                     }
