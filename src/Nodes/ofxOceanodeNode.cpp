@@ -119,6 +119,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeCont
         else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
             connection = container.connectConnection(source.cast<float>(), sink.cast<vector<int>>());
         }
+        else if(sink.type() == typeid(ofParameterGroup).name()){
+            connection = container.connectConnection(source.cast<float>(), sink.castGroup().getInt(1));
+        }
     }else if(source.type() == typeid(ofParameter<int>).name()){
         if(sink.type() == typeid(ofParameter<float>).name()){
             connection = container.connectConnection(source.cast<int>(), sink.cast<float>());
@@ -128,6 +131,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeCont
         }
         else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
             connection = container.connectConnection(source.cast<int>(), sink.cast<vector<int>>());
+        }
+        else if(sink.type() == typeid(ofParameterGroup).name()){
+            connection = container.connectConnection(source.cast<int>(), sink.castGroup().getInt(1));
         }
     }else if(source.type() == typeid(ofParameter<vector<float>>).name()){
         if(sink.type() == typeid(ofParameter<float>).name()){
@@ -139,6 +145,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeCont
         else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
             connection = container.connectConnection(source.cast<vector<float>>(), sink.cast<vector<int>>());
         }
+        else if(sink.type() == typeid(ofParameterGroup).name()){
+            connection = container.connectConnection(source.cast<vector<float>>(), sink.castGroup().getInt(1));
+        }
     }else if(source.type() == typeid(ofParameter<vector<int>>).name()){
         if(sink.type() == typeid(ofParameter<float>).name()){
             connection = container.connectConnection(source.cast<vector<int>>(), sink.cast<float>());
@@ -149,6 +158,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeCont
         else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
             connection = container.connectConnection(source.cast<vector<int>>(), sink.cast<vector<float>>());
         }
+        else if(sink.type() == typeid(ofParameterGroup).name()){
+            connection = container.connectConnection(source.cast<vector<int>>(), sink.castGroup().getInt(1));
+        }
     }else if(source.type() == typeid(ofParameter<void>).name()){
         if(sink.type() == typeid(ofParameter<bool>).name()){
             connection = container.connectConnection(source.cast<void>(), sink.cast<bool>());
@@ -158,6 +170,19 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeCont
             connection = container.connectConnection(source.cast<void>(), sink.cast<float>());
         }else if(sink.type() == typeid(ofParameter<bool>).name()){
             connection = container.connectConnection(source.cast<void>(), sink.cast<bool>());
+        }
+    }else if(source.type() == typeid(ofParameterGroup).name()){
+        if(sink.type() == typeid(ofParameter<float>).name()){
+            connection = container.connectConnection(source.castGroup().getInt(1), sink.cast<float>());
+        }
+        else if(sink.type() == typeid(ofParameter<int>).name()){
+            connection = container.connectConnection(source.castGroup().getInt(1), sink.cast<int>());
+        }
+        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+            connection = container.connectConnection(source.castGroup().getInt(1), sink.cast<vector<float>>());
+        }
+        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
+            connection = container.connectConnection(source.castGroup().getInt(1), sink.cast<vector<int>>());
         }
     }
     

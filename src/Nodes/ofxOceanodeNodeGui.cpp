@@ -314,14 +314,18 @@ void ofxOceanodeNodeGui::onGuiMatrixEvent(ofxDatGuiMatrixEvent e){
 }
 
 void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
+    ofAbstractParameter *p = &getParameters()->get(e.target->getName());
+    if(e.target->getType() == ofxDatGuiType::DROPDOWN){
+        p = &getParameters()->getGroup(e.target->getName()).getInt(1);
+    }
     if(e.down == 1){
-        auto connection = node.parameterConnectionPress(container, getParameters()->get(e.target->getName()));
+        auto connection = node.parameterConnectionPress(container, *p);
         if(connection != nullptr){
             connection->setTransformationMatrix(transformationMatrix);
             connection->setSinkPosition(glm::inverse(transformationMatrix->get()) * glm::vec4(ofGetMouseX(), ofGetMouseY(), 0, 1));
         }
     }else{
-        auto connection = node.parameterConnectionRelease(container, getParameters()->get(e.target->getName()));
+        auto connection = node.parameterConnectionRelease(container, *p);
         if(connection != nullptr){
             connection->setSinkPosition(getSinkConnectionPositionFromParameter(getParameters()->get(e.target->getName())));
             connection->setTransformationMatrix(transformationMatrix);
@@ -331,6 +335,9 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
 
 glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter){
     auto component = gui->getComponent(parameter.getName());
+    if(component == NULL){
+        component = gui->getComponent(parameter.getName() + " Selector");
+    }
     glm::vec2 position;
     position.x = component->getX() + component->getWidth();
     position.y = component->getY() + component->getHeight()/2;
@@ -339,6 +346,9 @@ glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofAbstrac
 
 glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter){
     auto component = gui->getComponent(parameter.getName());
+    if(component == NULL){
+        component = gui->getComponent(parameter.getName() + " Selector");
+    }
     glm::vec2 position;
     position.x = component->getX();
     position.y = component->getY() + component->getHeight()/2;
