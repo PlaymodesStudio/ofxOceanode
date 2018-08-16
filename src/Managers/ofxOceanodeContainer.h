@@ -31,7 +31,17 @@ public:
     ~ofxOceanodeContainer();
     
     ofxOceanodeNode* createNodeFromName(string name, int identifier = -1);
-    ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier = -1);
+    ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier = -1, bool isPersistent = false);
+    
+    template<typename ModelType>
+    ofxOceanodeNode& createPersistentNode(){
+        static_assert(std::is_base_of<ofxOceanodeNodeModel, ModelType>::value,
+                      "Must pass a subclass of ofxOceanodeNodeModel to registerType");
+        
+        auto &node = createNode(std::make_unique<ModelType>(), -1, true);
+        node.getNodeGui().setTransformationMatrix(&transformationMatrix);
+        return node;
+    }
     
 //    void createConnection(ofAbstractParameter& p);
     
@@ -79,7 +89,7 @@ private:
     
     //NodeModel;
     std::unordered_map<string, nodeContainerWithId> dynamicNodes;
-    vector<unique_ptr<ofxOceanodeNode>> persistentNodes;
+    std::unordered_map<string, nodeContainerWithId> persistentNodes;
 
     string temporalConnectionTypeName;
     ofxOceanodeNode* temporalConnectionNode;

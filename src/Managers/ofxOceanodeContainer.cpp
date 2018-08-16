@@ -25,6 +25,7 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
 
 ofxOceanodeContainer::~ofxOceanodeContainer(){
     dynamicNodes.clear();
+    persistentNodes.clear();
 }
 
 ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstractParameter& p, ofxOceanodeNode& n){
@@ -65,14 +66,16 @@ ofxOceanodeNode* ofxOceanodeContainer::createNodeFromName(string name, int ident
     return nullptr;
 }
 
-ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier){
+ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier, bool isPersistent){
+    auto &collection = !isPersistent ? dynamicNodes : persistentNodes;
     int toBeCreatedId = identifier;
     string nodeToBeCreatedName = nodeModel->nodeName();
     if(identifier == -1){
         int lastId = 1;
-        while (dynamicNodes[nodeToBeCreatedName].count(lastId) != 0) lastId++;
+        while (collection[nodeToBeCreatedName].count(lastId) != 0) lastId++;
         toBeCreatedId = lastId;
     }
+    nodeModel->setIsPersistent(isPersistent);
     nodeModel->setNumIdentifier(toBeCreatedId);
     nodeModel->registerLoop(window);
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
@@ -84,51 +87,53 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     node->setBpm(bpm);
     
     auto nodePtr = node.get();
-    dynamicNodes[nodeToBeCreatedName][toBeCreatedId] = std::move(node);
+    collection[nodeToBeCreatedName][toBeCreatedId] = std::move(node);
     
-    destroyNodeListeners.push(nodePtr->deleteModuleAndConnections.newListener([this, nodeToBeCreatedName, toBeCreatedId](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
-        for(auto containerConnectionIterator = connections.begin(); containerConnectionIterator!=connections.end();){
-            bool foundConnection = false;
-            for(auto nodeConnection : connectionsToBeDeleted){
-                if(containerConnectionIterator->second.get() == nodeConnection){
-                    foundConnection = true;
-                    connections.erase(containerConnectionIterator);
-                    connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
-                    break;
+    if(!isPersistent){
+        destroyNodeListeners.push(nodePtr->deleteModuleAndConnections.newListener([this, nodeToBeCreatedName, toBeCreatedId](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
+            for(auto containerConnectionIterator = connections.begin(); containerConnectionIterator!=connections.end();){
+                bool foundConnection = false;
+                for(auto nodeConnection : connectionsToBeDeleted){
+                    if(containerConnectionIterator->second.get() == nodeConnection){
+                        foundConnection = true;
+                        connections.erase(containerConnectionIterator);
+                        connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
+                        break;
+                    }
+                }
+                if(!foundConnection){
+                    containerConnectionIterator++;
                 }
             }
-            if(!foundConnection){
-                containerConnectionIterator++;
-            }
-        }
+            
+            dynamicNodes[nodeToBeCreatedName].erase(toBeCreatedId);
+        }));
         
-        dynamicNodes[nodeToBeCreatedName].erase(toBeCreatedId);
-    }));
-    
-    destroyNodeListeners.push(nodePtr->deleteConnections.newListener([this](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
-        for(auto containerConnectionIterator = connections.begin(); containerConnectionIterator!=connections.end();){
-            bool foundConnection = false;
-            for(auto nodeConnection : connectionsToBeDeleted){
-                if(containerConnectionIterator->second.get() == nodeConnection){
-                    foundConnection = true;
-                    connections.erase(containerConnectionIterator);
-                    connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
-                    break;
+        destroyNodeListeners.push(nodePtr->deleteConnections.newListener([this](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
+            for(auto containerConnectionIterator = connections.begin(); containerConnectionIterator!=connections.end();){
+                bool foundConnection = false;
+                for(auto nodeConnection : connectionsToBeDeleted){
+                    if(containerConnectionIterator->second.get() == nodeConnection){
+                        foundConnection = true;
+                        connections.erase(containerConnectionIterator);
+                        connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
+                        break;
+                    }
+                }
+                if(!foundConnection){
+                    containerConnectionIterator++;
                 }
             }
-            if(!foundConnection){
-                containerConnectionIterator++;
-            }
-        }
-    }));
-    
-    duplicateNodeListeners.push(nodePtr->duplicateModule.newListener([this, nodeToBeCreatedName, nodePtr](glm::vec2 pos){
-        auto newNode = createNodeFromName(nodeToBeCreatedName);
-        newNode->getNodeGui().setPosition(pos);
-        newNode->loadConfig("tempDuplicateGroup.json");
-        ofFile config("tempDuplicateGroup.json");
-        config.remove();
-    }));
+        }));
+        
+        duplicateNodeListeners.push(nodePtr->duplicateModule.newListener([this, nodeToBeCreatedName, nodePtr](glm::vec2 pos){
+            auto newNode = createNodeFromName(nodeToBeCreatedName);
+            newNode->getNodeGui().setPosition(pos);
+            newNode->loadConfig("tempDuplicateGroup.json");
+            ofFile config("tempDuplicateGroup.json");
+            config.remove();
+        }));
+    }
     
     return *nodePtr;
 }
@@ -146,6 +151,12 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     ofGetMainLoop()->setCurrentWindow(window);
     
     for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->presetWillBeLoaded();
+        }
+    }
+    
+    for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->presetWillBeLoaded();
         }
@@ -212,6 +223,12 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     }
     
     for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->presetHasLoaded();
+        }
+    }
+    
+    for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->presetHasLoaded();
         }
@@ -390,8 +407,22 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
     sinkModule.erase(sinkModule.find(sinkModuleId)-1);
     ofStringReplace(sinkModule, "_", " ");
     
-    auto &sourceModuleRef = dynamicNodes[sourceModule][ofToInt(sourceModuleId)];
-    auto &sinkModuleRef = dynamicNodes[sinkModule][ofToInt(sinkModuleId)];
+    bool sourceIsDynamic = false;
+    if(dynamicNodes.count(sourceModule) == 1){
+        if(dynamicNodes[sourceModule].count(ofToInt(sourceModuleId)) == 1){
+            sourceIsDynamic = true;
+        }
+    }
+    
+    bool sinkIsDynamic = false;
+    if(dynamicNodes.count(sinkModule) == 1){
+        if(dynamicNodes[sinkModule].count(ofToInt(sinkModuleId)) == 1){
+            sinkIsDynamic = true;
+        }
+    }
+    
+    auto &sourceModuleRef = sourceIsDynamic ? dynamicNodes[sourceModule][ofToInt(sourceModuleId)] : persistentNodes[sourceModule][ofToInt(sourceModuleId)];
+    auto &sinkModuleRef = sinkIsDynamic ? dynamicNodes[sinkModule][ofToInt(sinkModuleId)] : persistentNodes[sinkModule][ofToInt(sinkModuleId)];
     
     if(sourceModuleRef->getParameters()->contains(sourceParameter) && sinkModuleRef->getParameters()->contains(sinkParameter)){
         ofAbstractParameter &source = sourceModuleRef->getParameters()->get(sourceParameter);
