@@ -13,9 +13,10 @@
 class ofxOceanodeControllerButton{
 public:
     ofxOceanodeControllerButton(){
-        font.load(OF_TTF_SANS, 15);
+        font.load(OF_TTF_SANS, 10);
         highlight = false;
         int height = 0;
+        color = ofColor::blueSteel;
     };
     ~ofxOceanodeControllerButton(){};
     
@@ -23,18 +24,20 @@ public:
         height = rect.getHeight();
         ofPushStyle();
         if(highlight){
-            ofSetColor(ofColor::white);
-            ofDrawRectRounded(rect, 3);
+            // fondo highlighted
             ofSetColor(color);
-            ofRectangle rectCopy = rect;
-            rectCopy.scaleFromCenter(0.8);
-            ofDrawRectRounded(rectCopy, 3);
+            ofDrawRectangle(rect);
+//            ofSetColor(0,255,0);
+//            ofRectangle rectCopy = rect;
+//            rectCopy.scaleFromCenter(.5);
+//            ofDrawRectangle(rectCopy);
         }
         else{
-            ofSetColor(color);
-            ofDrawRectRounded(rect, 3);
+            // fondo not highlighted
+            ofSetColor(ofColor(32,32,32));
+            ofDrawRectangle(rect);
         }
-        ofSetColor(color.getInverted());
+        ofSetColor(ofColor::white);
         float xLabelPos = rect.getCenter().x - (font.stringWidth(name)/2);
         float yLabelPos = rect.getCenter().y + (font.stringHeight(name)/2);
         font.drawString(name, xLabelPos, yLabelPos);

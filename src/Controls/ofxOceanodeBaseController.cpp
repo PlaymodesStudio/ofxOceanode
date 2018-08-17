@@ -10,7 +10,7 @@
 ofxOceanodeBaseController::ofxOceanodeBaseController(string name) : controllerName(name){
     isActive = false;
     button.setHighlight(false);
-    button.setColor(ofColor(ofRandom(255), ofRandom(255), ofRandom(255)));
+    button.setColor(ofColor(0, 0,0));
     button.setName(name);
 }
 

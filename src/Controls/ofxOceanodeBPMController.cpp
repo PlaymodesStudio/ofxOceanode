@@ -16,12 +16,12 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     ofxDatGui::setAssetPath("");
     
     mainGuiTheme = new ofxDatGuiThemeCharcoal;
-    ofColor randColor =  ofColor::indianRed;
+    ofColor randColor =  ofColor::blueSteel;
     mainGuiTheme->color.slider.fill = randColor;
     mainGuiTheme->color.textInput.text = randColor;
     mainGuiTheme->color.icons = randColor;
     int layoutHeight = ofGetWidth()/15;
-    mainGuiTheme->font.size = ofGetWidth()/40;
+    mainGuiTheme->font.size = 11;
     mainGuiTheme->layout.height = layoutHeight;
     mainGuiTheme->layout.width = ofGetWidth();
     mainGuiTheme->init();
@@ -143,7 +143,7 @@ void ofxOceanodeBPMController::deactivate(){
 
 void ofxOceanodeBPMController::windowResized(ofResizeEventArgs &a){
     int layoutHeight = ofGetWidth()/15;
-    mainGuiTheme->font.size = ofGetWidth()/40;
+    mainGuiTheme->font.size = 11;
     mainGuiTheme->layout.height = layoutHeight;
     mainGuiTheme->layout.width = ofGetWidth();
     mainGuiTheme->init();
