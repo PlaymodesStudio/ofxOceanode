@@ -382,6 +382,10 @@ void ofxOceanodeNode::setBpm(float bpm){
     }
 }
 
+void ofxOceanodeNode::setPhase(float phase){
+    nodeModel->setPhase(phase);
+}
+
 void ofxOceanodeNode::resetPhase(){
     if(getParameters()->contains("Reset Phase")){
         getParameters()->getVoid("Reset Phase").trigger();

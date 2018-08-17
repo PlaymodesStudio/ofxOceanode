@@ -46,6 +46,9 @@ private:
     float oldBpm;
     ofEventListener bpmListener;
     
+    ofParameter<float> phase;
+    ofEventListener phaseListener;
+    
     float lastButtonPressTime;
     vector<float> storedIntervals;
     float averageInterval;

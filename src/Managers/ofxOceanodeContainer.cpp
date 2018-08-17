@@ -85,6 +85,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
         node->setGui(std::move(nodeGui));
     }
     node->setBpm(bpm);
+    node->setPhase(phase);
     
     auto nodePtr = node.get();
     collection[nodeToBeCreatedName][toBeCreatedId] = std::move(node);
@@ -279,6 +280,15 @@ void ofxOceanodeContainer::setBpm(float _bpm){
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->setBpm(bpm);
+        }
+    }
+}
+
+void ofxOceanodeContainer::setPhase(float _phase){
+    phase = _phase;
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->setPhase(phase);
         }
     }
 }

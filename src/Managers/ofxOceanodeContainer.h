@@ -72,6 +72,7 @@ public:
     void savePreset(string presetFolderPath);
     
     void setBpm(float _bpm);
+    void setPhase(float _phase);
     void resetPhase();
     
     ofEvent<string> loadPresetEvent;
@@ -108,6 +109,7 @@ private:
     
     ofParameter<glm::mat4> transformationMatrix;
     float bpm;
+    float phase;
     
     const bool isHeadless;
     

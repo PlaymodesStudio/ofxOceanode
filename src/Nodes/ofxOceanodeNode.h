@@ -58,6 +58,7 @@ public:
     bool loadParametersFromJson(ofJson json);
     
     void setBpm(float bpm);
+    void setPhase(float _phase);
     void resetPhase();
     
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;

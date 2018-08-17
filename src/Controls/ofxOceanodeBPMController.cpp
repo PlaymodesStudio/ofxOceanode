@@ -34,6 +34,7 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     
     gui->addSlider(bpm.set("BPM", 120, 0, 999));
     gui->addButton("Reset Phase");
+    gui->addSlider(phase.set("Phase", 0, 0, 1))->setPrecision(1000);
     gui->addButton("Tap Tempo");
 #ifdef OFXOCEANODE_USE_BPM_DETECTION
     useDetection = gui->addToggle("Auto BPM", false);
@@ -45,6 +46,10 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     //ControlGui Events
     bpmListener = bpm.newListener([&](float &bpm){
         container->setBpm(bpm);
+    });
+    
+    phaseListener = phase.newListener([&](float &ph){
+        container->setPhase(ph);
     });
     
     gui->onButtonEvent(this, &ofxOceanodeBPMController::onButtonPress);
