@@ -18,6 +18,9 @@ public:
     
     void presetSave(ofJson &json) override;
     void presetRecallBeforeSettingParameters(ofJson &json) override;
+    void setExternalWindowPosition(int px, int py);
+    void setExternalWindowShape(int w, int h);
+    void setExternalWindowFullScreen(bool b);
     
 protected:
     virtual void drawInExternalWindow(ofEventArgs &e){};
