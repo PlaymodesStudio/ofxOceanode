@@ -59,6 +59,9 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
 #ifdef OFXOCEANODE_USE_BPM_DETECTION
     
     ofSoundStreamSettings settings;
+    
+    soundStream.printDeviceList();
+    
     auto devices = soundStream.getMatchingDevices("default");
     if(!devices.empty()){
         settings.setInDevice(devices[0]);

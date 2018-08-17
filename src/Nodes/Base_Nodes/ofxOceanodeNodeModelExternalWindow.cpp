@@ -8,13 +8,14 @@
 #include "ofxOceanodeNodeModelExternalWindow.h"
 
 ofxOceanodeNodeModelExternalWindow::ofxOceanodeNodeModelExternalWindow(string name)  : ofxOceanodeNodeModel(name){
-    auto &info = addParameterToGroupAndInfo(showWindow.set("Show Window", false));
+    auto &info = addParameterToGroupAndInfo(showWindow.set("Show Window", true));
     info.acceptInConnection = false;
     info.acceptOutConnection = false;
-    info.isSavePreset = false;
+    info.isSavePreset = true;
     windowListenerEvents.push(showWindow.newListener(this, &ofxOceanodeNodeModelExternalWindow::showExternalWindow));
     externalWindowRect.setPosition(-1, -1);
     externalWindow = nullptr;
+    
 }
 
 ofxOceanodeNodeModelExternalWindow::~ofxOceanodeNodeModelExternalWindow(){
@@ -22,6 +23,22 @@ ofxOceanodeNodeModelExternalWindow::~ofxOceanodeNodeModelExternalWindow(){
         externalWindow->setWindowShouldClose();
     }
 }
+
+void ofxOceanodeNodeModelExternalWindow::setExternalWindowPosition(int px, int py)
+{
+    if(externalWindow != nullptr) externalWindow->setWindowPosition(px,py);
+}
+
+void ofxOceanodeNodeModelExternalWindow::setExternalWindowShape(int w, int h)
+{
+    if(externalWindow != nullptr) externalWindow->setWindowShape(w,h);
+}
+void ofxOceanodeNodeModelExternalWindow::setExternalWindowFullScreen(bool b)
+{
+    if(b && (externalWindow != nullptr)) externalWindow->setFullscreen(b);
+}
+
+
 
 void ofxOceanodeNodeModelExternalWindow::showExternalWindow(bool &b){
     if(b && externalWindow == nullptr){
@@ -38,9 +55,10 @@ void ofxOceanodeNodeModelExternalWindow::showExternalWindow(bool &b){
         prevSettings.resizable = true;
         prevSettings.shareContextWith = ofGetCurrentWindow();
         prevSettings.setGLVersion(ofGetGLRenderer()->getGLVersionMajor(), ofGetGLRenderer()->getGLVersionMinor());
+        prevSettings.monitor = 1;
         externalWindow = ofCreateWindow(prevSettings);
         externalWindow->setWindowTitle(nameIdentifier + " " + ofToString(numIdentifier));
-        externalWindow->setVerticalSync(false);
+        externalWindow->setVerticalSync(true);
         windowListenerEvents.push(externalWindow->events().draw.newListener(this, &ofxOceanodeNodeModelExternalWindow::drawInExternalWindow));
         windowListenerEvents.push(externalWindow->events().update.newListener(this, &ofxOceanodeNodeModelExternalWindow::updateForExternalWindow));
         windowListenerEvents.push(externalWindow->events().exit.newListener(this, &ofxOceanodeNodeModelExternalWindow::closeExternalWindow));

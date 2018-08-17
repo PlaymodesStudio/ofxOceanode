@@ -45,6 +45,11 @@ ofxOceanodeNodeGui& ofxOceanodeNode::getNodeGui(){
     
 }
 
+ofxOceanodeNodeModel& ofxOceanodeNode::getNodeModel(){
+    return *nodeModel.get();
+}
+
+
 ofColor ofxOceanodeNode::getColor(){
     return nodeModel->getColor();
 }
