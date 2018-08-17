@@ -75,7 +75,6 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
         while (collection[nodeToBeCreatedName].count(lastId) != 0) lastId++;
         toBeCreatedId = lastId;
     }
-    nodeModel->setIsPersistent(isPersistent);
     nodeModel->setNumIdentifier(toBeCreatedId);
     nodeModel->registerLoop(window);
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
@@ -86,6 +85,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     }
     node->setBpm(bpm);
     node->setPhase(phase);
+    node->setIsPersistent(isPersistent);
     
     auto nodePtr = node.get();
     collection[nodeToBeCreatedName][toBeCreatedId] = std::move(node);

@@ -36,8 +36,6 @@ public:
     ofParameterGroup* getParameterGroup(){return parameters;};
     
     //getters
-    bool getIsPersistent(){return isPersistent;};
-    bool setIsPersistent(bool p){isPersistent = p;};
     string nodeName(){return nameIdentifier;};
     unsigned int getNumIdentifier(){return numIdentifier;};
     void setNumIdentifier(unsigned int num);
@@ -88,7 +86,6 @@ protected:
     std::map<string, parameterInfo> parametersInfo; //information about interaction of parameter
     bool autoBPM;
     ofColor color;
-    bool isPersistent;
     string nameIdentifier;
     unsigned int numIdentifier;
     

@@ -63,6 +63,9 @@ public:
     void setPhase(float _phase);
     void resetPhase();
     
+    bool getIsPersistent(){return isPersistent;};
+    bool setIsPersistent(bool p){isPersistent = p;};
+    
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteConnections;
     ofEvent<glm::vec2> duplicateModule;
@@ -79,6 +82,8 @@ private:
     ofEventListeners outConnectionsListeners;
     ofEventListeners toChangeGuiListeners;
     ofEventListeners nodeModelListeners;
+    
+    bool isPersistent;
 };
 
 #endif /* ofxOceanodeNode_h */
