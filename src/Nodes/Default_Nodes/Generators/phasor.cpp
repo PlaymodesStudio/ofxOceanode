@@ -8,12 +8,13 @@
 
 phasor::phasor() : ofxOceanodeNodeModel("Phasor")
 {
+    phaseOffset = 0;
     color = ofColor::red;
     parameterAutoSettersListeners.push(bpm_Param.newListener([&](float &val){
         basePh.bpm_Param = val;
     }));
     parameterAutoSettersListeners.push(initPhase_Param.newListener([&](float &val){
-        basePh.initPhase_Param = val;
+        basePh.initPhase_Param = val+phaseOffset - int(val+phaseOffset);
     }));
     parameterAutoSettersListeners.push(beatsMult_Param.newListener([&](int &val){
         basePh.beatsMult_Param = val;
@@ -41,5 +42,10 @@ phasor::phasor() : ofxOceanodeNodeModel("Phasor")
 void phasor::update(ofEventArgs &e)
 {
     phasorMonitor = basePh.getPhasor();
+}
+
+void phasor::setPhase(float _phase){
+    phaseOffset = _phase;
+    basePh.initPhase_Param = initPhase_Param + phaseOffset - int(initPhase_Param+phaseOffset);
 }
 

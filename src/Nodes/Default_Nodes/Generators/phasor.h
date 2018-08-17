@@ -21,6 +21,8 @@ public:
     int getBeatsDiv(){return beatsDiv_Param;};
     void setBeatMult(int i){beatsMult_Param=i;};
     void setBeatDiv(int i){beatsDiv_Param=i;};
+    
+    void setPhase(float _phase) override;
 private:
     basePhasor basePh;
     void update(ofEventArgs &e);
@@ -32,6 +34,7 @@ private:
     ofParameter<float>  phasorMonitor;
     ofParameter<bool>   loop_Param;
     ofParameter<void>   resetPhase_Param;
+    float phaseOffset;
     
     ofEventListeners parameterAutoSettersListeners;
     ofEventListener resetPhaseListener;
