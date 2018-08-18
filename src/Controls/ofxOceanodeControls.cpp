@@ -59,6 +59,8 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
 
 
 void ofxOceanodeControls::draw(ofEventArgs &e){
+    ofSetColor(32,32,32);
+    ofDrawRectangle(0,0,ofGetWidth(),ofGetHeight());
     for(int i = 0; i < controllersButtons.size(); i++){
         controllers[i]->draw();
         controllers[i]->getButton().draw(controllersButtons[i]);
