@@ -11,8 +11,6 @@
 #include "ofxOceanodeBaseController.h"
 #include "ofxDatGui.h"
 
-class ofxOceanodeContainer;
-
 class ofxOceanodePresetsController: public ofxOceanodeBaseController{
 public:
     ofxOceanodePresetsController(shared_ptr<ofxOceanodeContainer> _container);

@@ -15,8 +15,6 @@
     #include "ofxAubio.h"
 #endif
 
-class ofxOceanodeContainer;
-
 class ofxOceanodeBPMController: public ofxOceanodeBaseController{
 public:
     ofxOceanodeBPMController(shared_ptr<ofxOceanodeContainer> _container);

@@ -13,8 +13,6 @@
 #include "ofxOceanodeBaseController.h"
 #include "ofxDatGui.h"
 
-class ofxOceanodeContainer;
-
 class ofxOceanodeOSCController : public ofxOceanodeBaseController{
 public:
     ofxOceanodeOSCController(shared_ptr<ofxOceanodeContainer> _container);
