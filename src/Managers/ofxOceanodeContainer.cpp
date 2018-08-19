@@ -52,12 +52,12 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::disconnectConnection(ofxOce
     return nullptr;
 }
 
-ofxOceanodeNode* ofxOceanodeContainer::createNodeFromName(string name, int identifier){
+ofxOceanodeNode* ofxOceanodeContainer::createNodeFromName(string name, int identifier, bool isPersistent){
     unique_ptr<ofxOceanodeNodeModel> type = registry->create(name);
     
     if (type)
     {
-        auto &node =  createNode(std::move(type), identifier);
+        auto &node =  createNode(std::move(type), identifier, isPersistent);
         if(!isHeadless){
             node.getNodeGui().setTransformationMatrix(&transformationMatrix);
         }
@@ -265,11 +265,13 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
     
     json.clear();
     for(auto &connection : connections){
-        string sourceName = connection.second->getSourceParameter().getName();
-        string sourceParentName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];
-        string sinkName = connection.second->getSinkParameter().getName();
-        string sinkParentName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];
-        json[sourceParentName][sourceName][sinkParentName][sinkName];
+        if(!connection.second->getIsPersistent()){
+            string sourceName = connection.second->getSourceParameter().getName();
+            string sourceParentName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];
+            string sinkName = connection.second->getSinkParameter().getName();
+            string sinkParentName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];
+            json[sourceParentName][sourceName][sinkParentName][sinkName];
+        }
     }
     
     ofSavePrettyJson(presetFolderPath + "/connections.json", json);
@@ -281,6 +283,132 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
         }
     }
 }
+
+void ofxOceanodeContainer::savePersistent(){
+    ofLog()<<"Save Persistent";
+    string persistentFolderPath = "Persistent";
+    
+    ofJson json;
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            glm::vec2 pos(0,0);
+            if(!isHeadless){
+                pos = node.second->getNodeGui().getPosition();
+            }
+            json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y};
+        }
+    }
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            glm::vec2 pos(0,0);
+            if(!isHeadless){
+                pos = node.second->getNodeGui().getPosition();
+            }
+            json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y};
+        }
+    }
+    ofSavePrettyJson(persistentFolderPath + "/modules.json", json);
+    
+    json.clear();
+    for(auto &connection : connections){
+        string sourceName = connection.second->getSourceParameter().getName();
+        string sourceParentName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];
+        string sinkName = connection.second->getSinkParameter().getName();
+        string sinkParentName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];
+        json[sourceParentName][sourceName][sinkParentName][sinkName];
+    }
+    
+    ofSavePrettyJson(persistentFolderPath + "/connections.json", json);
+    
+    
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->savePreset(persistentFolderPath);
+        }
+    }
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->savePreset(persistentFolderPath);
+        }
+    }
+}
+
+void ofxOceanodeContainer::loadPersistent(){
+    ofLog()<<"Load Persistent";
+    string persistentFolderPath = "Persistent";
+    
+    window->makeCurrent();
+    ofGetMainLoop()->setCurrentWindow(window);
+    
+    //Read new nodes in preset
+    //Check if the nodes exists and update them, (or update all at the end)
+    //Create new modules and update them (or update at end)
+    ofJson json = ofLoadJson(persistentFolderPath + "/modules.json");
+    if(!json.empty()){;
+        for(auto &models : registry->getRegisteredModels()){
+            string moduleName = models.first;
+            vector<int>  vector_of_identifiers;
+            if(persistentNodes.count(moduleName) != 0){
+                for(auto &nodes_of_a_give_type : persistentNodes[moduleName]){
+                    vector_of_identifiers.push_back(nodes_of_a_give_type.first);
+                }
+            }
+            for(auto identifier : vector_of_identifiers){
+                string stringIdentifier = ofToString(identifier);
+                if(json.find(moduleName) != json.end() && json[moduleName].find(stringIdentifier) != json[moduleName].end()){
+                    vector<float> readArray = json[moduleName][stringIdentifier];
+                    if(!isHeadless){
+                        glm::vec2 position(readArray[0], readArray[1]);
+                        persistentNodes[moduleName][identifier]->getNodeGui().setPosition(position);
+                    }
+                    json[moduleName].erase(stringIdentifier);
+                }else{
+                    persistentNodes[moduleName][identifier]->deleteSelf();
+                }
+            }
+            for (ofJson::iterator it = json[moduleName].begin(); it != json[moduleName].end(); ++it) {
+                int identifier = ofToInt(it.key());
+                if(persistentNodes[moduleName].count(identifier) == 0){
+                    auto node = createNodeFromName(moduleName, identifier, true);
+                    if(!isHeadless){
+                        node->getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
+                    }
+                }
+            }
+        }
+    }else{
+        persistentNodes.clear();
+    }
+    
+    //connections.clear();
+    for(int i = 0; i < connections.size();){
+        if(!connections[i].second->getIsPersistent()){
+            connections.erase(connections.begin()+i);
+        }else{
+            i++;
+        }
+    }
+    
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->loadPreset(persistentFolderPath);
+        }
+    }
+    
+    json.clear();
+    json = ofLoadJson(persistentFolderPath + "/connections.json");
+    for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
+        for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
+            for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
+                for (ofJson::iterator sinkParameter = sinkModule.value().begin(); sinkParameter != sinkModule.value().end(); ++sinkParameter) {
+                    auto connection = createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key());
+                    connection->setIsPersistent(true);
+                }
+            }
+        }
+    }
+}
+
 
 void ofxOceanodeContainer::setBpm(float _bpm){
     bpm = _bpm;

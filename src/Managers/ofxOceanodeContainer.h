@@ -30,7 +30,7 @@ public:
                          make_shared<ofxOceanodeTypesRegistry>(), bool _isHeadless = false);
     ~ofxOceanodeContainer();
     
-    ofxOceanodeNode* createNodeFromName(string name, int identifier = -1);
+    ofxOceanodeNode* createNodeFromName(string name, int identifier = -1, bool isPersistent = false);
     ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier = -1, bool isPersistent = false);
     
     template<typename ModelType>
@@ -71,6 +71,9 @@ public:
     
     bool loadPreset(string presetFolderPath);
     void savePreset(string presetFolderPath);
+    
+    void savePersistent();
+    void loadPersistent();
     
     void setBpm(float _bpm);
     void setPhase(float _phase);
