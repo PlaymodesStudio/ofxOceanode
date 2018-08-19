@@ -24,9 +24,6 @@ public:
     void onGuiDropdownEvent(ofxDatGuiDropdownEvent e);
     void onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e);
     void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);
-
-    void activate();
-    void deactivate();
     
     void windowResized(ofResizeEventArgs &a);
 private:
@@ -36,13 +33,10 @@ private:
     void loadPreset(string name, string bank);
     void savePreset(string name, string bank);
     
-    ofxDatGui* gui;
-    ofxDatGuiTheme* mainGuiTheme;
     ofxDatGuiDropdown* bankSelect;
     ofxDatGuiScrollView* presetsList;
     ofxDatGuiButton*    oldPresetButton;
     
-    shared_ptr<ofxOceanodeContainer> container;
     
     ofEventListener presetListener;
 };

@@ -20,27 +20,10 @@ public:
     ofxOceanodeOSCController(shared_ptr<ofxOceanodeContainer> _container);
     ~ofxOceanodeOSCController(){};
     
-    void draw();
-    void update();
-    
     void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);
     
-    void activate();
-    void deactivate();
-    
-    void windowResized(ofResizeEventArgs &a);
 private:
-    
-    ofxDatGui* gui;
-    ofxDatGuiTheme* mainGuiTheme;
-    
-    ofxDatGuiTextInput* host;
     ofxDatGuiTextInput* portIn;
-    ofxDatGuiTextInput* portOut;
-    
-    ofEventListeners listeners;
-    
-    shared_ptr<ofxOceanodeContainer> container;
 };
 
 #endif

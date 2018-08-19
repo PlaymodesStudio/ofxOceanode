@@ -11,27 +11,7 @@
 
 //DatGui
 
-ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("BPM"){
-    ofxDatGuiLog::quiet();
-    ofxDatGui::setAssetPath("");
-    
-    mainGuiTheme = new ofxDatGuiThemeCharcoal;
-    ofColor randColor =  ofColor::blueSteel;
-    mainGuiTheme->color.slider.fill = randColor;
-    mainGuiTheme->color.textInput.text = randColor;
-    mainGuiTheme->color.icons = randColor;
-    int layoutHeight = ofGetWidth()/15;
-    mainGuiTheme->font.size = 11;
-    mainGuiTheme->layout.height = layoutHeight;
-    mainGuiTheme->layout.width = ofGetWidth();
-    mainGuiTheme->init();
-    
-    gui = new ofxDatGui();
-    gui->setTheme(mainGuiTheme);
-    gui->setPosition(0, 30);
-    gui->setWidth(ofGetWidth());
-    gui->setAutoDraw(false);
-    
+ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContainer> _container) : ofxOceanodeBaseController(_container, "BPM"){
     gui->addSlider(bpm.set("BPM", 120, 0, 999));
     gui->addButton("Reset Phase");
     gui->addSlider(phase.set("Phase", 0, 0, 1))->setPrecision(1000);
@@ -40,8 +20,6 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     useDetection = gui->addToggle("Auto BPM", true);
 #endif
     container->setBpm(bpm);
-    
-    gui->setVisible(false);
     
     //ControlGui Events
     bpmListener = bpm.newListener([&](float &bpm){
@@ -118,36 +96,4 @@ void ofxOceanodeBPMController::onButtonPress(ofxDatGuiButtonEvent e){
     }else if(e.target->getName() == "Reset Phase"){
         container->resetPhase();
     }
-}
-
-void ofxOceanodeBPMController::draw(){
-    if(isActive)
-        gui->draw();
-}
-
-void ofxOceanodeBPMController::update(){
-    if(isActive)
-        gui->update();
-}
-
-
-void ofxOceanodeBPMController::activate(){
-    ofxOceanodeBaseController::activate();
-    gui->setVisible(true);
-}
-
-void ofxOceanodeBPMController::deactivate(){
-    ofxOceanodeBaseController::deactivate();
-    gui->setVisible(false);
-}
-
-void ofxOceanodeBPMController::windowResized(ofResizeEventArgs &a){
-    int layoutHeight = ofGetWidth()/15;
-    mainGuiTheme->font.size = 11;
-    mainGuiTheme->layout.height = layoutHeight;
-    mainGuiTheme->layout.width = ofGetWidth();
-    mainGuiTheme->init();
-    
-    gui->setTheme(mainGuiTheme);
-    gui->setWidth(ofGetWidth());
 }

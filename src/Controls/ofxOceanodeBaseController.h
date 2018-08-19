@@ -9,6 +9,9 @@
 #define ofxOceanodeBaseController_h
 
 #include "ofMain.h"
+#include "ofxDatGui.h"
+
+class ofxOceanodeContainer;
 
 class ofxOceanodeControllerButton{
 public:
@@ -58,21 +61,28 @@ private:
 
 class ofxOceanodeBaseController{
 public:
-    ofxOceanodeBaseController(string name);
+    ofxOceanodeBaseController(shared_ptr<ofxOceanodeContainer> _container, string name);
     virtual ~ofxOceanodeBaseController(){};
     
-    virtual void draw(){};
-    virtual void update(){};
+    virtual void draw();
+    virtual void update();
+    virtual void windowResized(ofResizeEventArgs &a);
     
     string getControllerName(){return controllerName;};
     ofxOceanodeControllerButton& getButton(){return button;};
     
-    virtual void windowResized(ofResizeEventArgs &a){};
     virtual void activate();
     virtual void deactivate();
 protected:
     string controllerName;
     bool isActive;
+    
+    ofxDatGui* gui;
+    ofxDatGuiTheme* mainGuiTheme;
+    
+    ofEventListeners listeners;
+    
+    shared_ptr<ofxOceanodeContainer> container;
 private:
     ofxOceanodeControllerButton button;
 };

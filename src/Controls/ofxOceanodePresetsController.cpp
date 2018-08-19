@@ -8,30 +8,7 @@
 #include "ofxOceanodePresetsController.h"
 #include "ofxOceanodeContainer.h"
 
-ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("Presets"){
-    //DatGui
-    
-    ofxDatGuiLog::quiet();
-    ofxDatGui::setAssetPath("");
-    
-    mainGuiTheme = new ofxDatGuiThemeCharcoal;
-    ofColor randColor =  ofColor::blueSteel;
-    mainGuiTheme->color.slider.fill = randColor;
-    mainGuiTheme->color.textInput.text = randColor;
-    mainGuiTheme->color.icons = randColor;
-    int layoutHeight = ofGetWidth()/15;
-    mainGuiTheme->font.size = 11;
-    mainGuiTheme->layout.height = layoutHeight;
-    mainGuiTheme->layout.width = ofGetWidth();
-    mainGuiTheme->init();
-    
-    gui = new ofxDatGui();
-    gui->setTheme(mainGuiTheme);
-    gui->setPosition(0, 30);
-    gui->setWidth(ofGetWidth());
-    gui->setAutoDraw(false);
-    gui->setVisible(false);
-    
+ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanodeContainer> _container) : ofxOceanodeBaseController(_container, "Presets"){
     //Preset Control
     ofDirectory dir;
     vector<string> banks;
@@ -50,22 +27,18 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
     bankSelect->select(0);
     gui->addLabel("<== Presets List ==>")->setStripe(ofColor::red, 10);
     
+    int layoutHeight = mainGuiTheme->layout.height;
     int numItemsInScrollView = floor((ofGetHeight()-((layoutHeight+1.5)*3))/(float)(layoutHeight+1.5));
     presetsList = gui->addScrollView("test", numItemsInScrollView);
     
     loadBank();
     
     gui->addTextInput("New Preset");
-    //gui("Automatic Preset");
-    //gui("Reload Sequence");
-    //gui->addSlider(fadeTime.set("Fade Time", 0, 0, 10));
-    //gui->addSlider(presetChangeBeatsPeriod.set("Beats Period", 4, 1, 120));
     
     //ControlGui Events
     gui->onDropdownEvent(this, &ofxOceanodePresetsController::onGuiDropdownEvent);
     gui->onScrollViewEvent(this, &ofxOceanodePresetsController::onGuiScrollViewEvent);
     gui->onTextInputEvent(this, &ofxOceanodePresetsController::onGuiTextInputEvent);
-    
     
     oldPresetButton = nullptr;
     
@@ -99,17 +72,6 @@ void ofxOceanodePresetsController::update(){
         gui->update();
 }
 
-
-void ofxOceanodePresetsController::activate(){
-    ofxOceanodeBaseController::activate();
-    gui->setVisible(true);
-}
-
-void ofxOceanodePresetsController::deactivate(){
-    ofxOceanodeBaseController::deactivate();
-    gui->setVisible(false);
-}
-
 void ofxOceanodePresetsController::onGuiDropdownEvent(ofxDatGuiDropdownEvent e){
     oldPresetButton = nullptr;
     if(e.child == bankSelect->getNumOptions()-1){
@@ -127,8 +89,6 @@ void ofxOceanodePresetsController::onGuiScrollViewEvent(ofxDatGuiScrollViewEvent
     }else{
         changePresetLabelHighliht(e.target);
         loadPreset(e.target->getName(), bankSelect->getSelected()->getName());
-//        if(autoPreset)
-//            presetChangedTimeStamp = ofGetElapsedTimef();
     }
 }
 
@@ -151,15 +111,8 @@ void ofxOceanodePresetsController::onGuiTextInputEvent(ofxDatGuiTextInputEvent e
 }
 
 void ofxOceanodePresetsController::windowResized(ofResizeEventArgs &a){
-    int layoutHeight = ofGetWidth()/15;
-    mainGuiTheme->font.size = 11;
-    mainGuiTheme->layout.height = layoutHeight;
-    mainGuiTheme->layout.width = ofGetWidth();
-    mainGuiTheme->init();
-    
-    gui->setTheme(mainGuiTheme);
-    gui->setWidth(ofGetWidth());
-    
+    ofxOceanodeBaseController::windowResized(a);
+    int layoutHeight = mainGuiTheme->layout.height;
     presetsList->setNumVisible(floor((ofGetHeight()-((layoutHeight+1.5)*3))/(float)(layoutHeight+1.5)));
 }
 
