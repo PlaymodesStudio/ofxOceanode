@@ -1,0 +1,9 @@
+{
+    "Static_Test_Module_1": {
+        "Float": {
+            "Static_Test_Module_2": {
+                "Float": null
+            }
+        }
+    }
+}

@@ -11,11 +11,13 @@ void ofApp::setup(){
     auto treg = make_shared<ofxOceanodeTypesRegistry>();
     
     container = make_shared<ofxOceanodeContainer>(reg, treg);
+    reg->registerModel<staticTestModule>();
     canvas.setContainer(container);
     canvas.setup();
     
-    container->createPersistentNode<staticTestModule>();
-    container->createPersistentNode<staticTestModule>();
+    container->loadPersistent();
+//    container->createPersistentNode<staticTestModule>();
+//    container->createPersistentNode<staticTestModule>();
 
     controls = make_shared<ofxOceanodeControls>(container);
 }
@@ -32,7 +34,9 @@ void ofApp::draw(){
 
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key){
-    
+    if(key == 's' && ofGetKeyPressed(OF_KEY_COMMAND)){
+        container->savePersistent();
+    }
 }
 
 //--------------------------------------------------------------
