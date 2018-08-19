@@ -16,11 +16,13 @@ public:
     ofxOceanodeAbstractConnection(ofAbstractParameter& _sourceParameter, ofAbstractParameter& _sinkParameter){
         sourceParameter = &_sourceParameter;
         sinkParameter = &_sinkParameter;
+        isPersistent = false;
     };
     
     ofxOceanodeAbstractConnection(ofAbstractParameter& _sourceParameter){
         sourceParameter = &_sourceParameter;
         sinkParameter = nullptr;
+        isPersistent = false;
     };
     virtual ~ofxOceanodeAbstractConnection(){};
     
@@ -47,6 +49,9 @@ public:
     
     ofAbstractParameter& getSourceParameter(){return *sourceParameter;};
     ofAbstractParameter& getSinkParameter(){return *sinkParameter;};
+    
+    bool getIsPersistent(){return isPersistent;};
+    void setIsPersistent(bool p){isPersistent = p;};
         
     ofEvent<void> destroyConnection;
 protected:
@@ -54,6 +59,9 @@ protected:
     
     ofAbstractParameter* sourceParameter;
     ofAbstractParameter* sinkParameter;
+    
+private:
+    bool isPersistent;
 };
 
 class ofxOceanodeNode;

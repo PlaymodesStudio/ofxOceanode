@@ -193,6 +193,7 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeCont
     
     if(connection != nullptr){
         addInputConnection(connection);
+        if(!this->isPersistent) connection->setIsPersistent(false);
     }
     return connection;
 }

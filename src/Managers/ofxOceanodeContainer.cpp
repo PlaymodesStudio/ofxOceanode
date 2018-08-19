@@ -203,7 +203,14 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         dynamicNodes.clear();
     }
     
-    connections.clear();
+    //connections.clear();
+    for(int i = 0; i < connections.size();){
+        if(!connections[i].second->getIsPersistent()){
+            connections.erase(connections.begin()+i);
+        }else{
+            i++;
+        }
+    }
     
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
