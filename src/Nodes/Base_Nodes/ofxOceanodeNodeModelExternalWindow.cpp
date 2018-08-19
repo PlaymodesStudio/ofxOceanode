@@ -11,7 +11,7 @@ ofxOceanodeNodeModelExternalWindow::ofxOceanodeNodeModelExternalWindow(string na
     auto &info = addParameterToGroupAndInfo(showWindow.set("Show Window", true));
     info.acceptInConnection = false;
     info.acceptOutConnection = false;
-    info.isSavePreset = true;
+    info.isSavePreset = false;
     windowListenerEvents.push(showWindow.newListener(this, &ofxOceanodeNodeModelExternalWindow::showExternalWindow));
     externalWindowRect.setPosition(-1, -1);
     externalWindow = nullptr;

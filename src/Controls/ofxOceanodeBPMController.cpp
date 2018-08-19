@@ -37,7 +37,7 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     gui->addSlider(phase.set("Phase", 0, 0, 1))->setPrecision(1000);
     gui->addButton("Tap Tempo");
 #ifdef OFXOCEANODE_USE_BPM_DETECTION
-    useDetection = gui->addToggle("Auto BPM", false);
+    useDetection = gui->addToggle("Auto BPM", true);
 #endif
     container->setBpm(bpm);
     
