@@ -13,13 +13,14 @@
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeNodeGui.h"
 
-#ifdef OFXOCEANODE_USE_OSC
-    #include "ofxOsc.h"
-#endif
-
 class ofxOceanodeNodeModel;
 class ofxOceanodeNodeRegistry;
 class ofxOceanodeTypesRegistry;
+
+#ifdef OFXOCEANODE_USE_OSC
+    class ofxOscSender;
+    class ofxOscReceiver;
+#endif
 
 class ofxOceanodeContainer {
 public:

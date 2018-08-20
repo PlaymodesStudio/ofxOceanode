@@ -12,6 +12,11 @@
 #include "ofxOceanodeTypesRegistry.h"
 #include "ofxOceanodeNodeModel.h"
 
+#ifdef OFXOCEANODE_USE_OSC
+    #include "ofxOsc.h"
+#endif
+
+
 ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry, shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry, bool _isHeadless) : registry(_registry), typesRegistry(_typesRegistry), isHeadless(_isHeadless){
     window = ofGetCurrentWindow();
     transformationMatrix = glm::mat4(1);
