@@ -18,9 +18,16 @@ class ofxOceanodeNodeRegistry;
 class ofxOceanodeTypesRegistry;
 
 #ifdef OFXOCEANODE_USE_OSC
-    class ofxOscSender;
-    class ofxOscReceiver;
+class ofxOscSender;
+class ofxOscReceiver;
 #endif
+
+#ifdef OFXOCEANODE_USE_MIDI
+class ofxOceanodeAbstractMidiBinding;
+class ofxMidiIn;
+class ofxMidiOut;
+#endif
+
 
 class ofxOceanodeContainer {
 public:
@@ -88,6 +95,11 @@ public:
     void update(ofEventArgs &args);
 #endif
     
+#ifdef OFXOCEANODE_USE_MIDI
+    void setIsListeningMidi(bool b);
+    bool createMidiBinding(ofAbstractParameter &p);
+#endif
+    
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
     
 private:
@@ -121,6 +133,16 @@ private:
 #ifdef OFXOCEANODE_USE_OSC
     ofxOscSender oscSender;
     ofxOscReceiver oscReceiver;
+#endif
+    
+#ifdef OFXOCEANODE_USE_MIDI
+    bool isListeningMidi;
+    map<string, unique_ptr<ofxOceanodeAbstractMidiBinding>> midiBindings;
+    map<string, ofxMidiIn> midiIns;
+    map<string, ofxMidiOut> midiOuts;
+    
+    ofEventListeners midiUnregisterlisteners;
+    void unregisterEventReceived(const void * sender, string &portName);
 #endif
     
 };

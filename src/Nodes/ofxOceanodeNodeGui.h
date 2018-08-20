@@ -33,7 +33,9 @@ public:
     glm::vec2 getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter);
     void setTransformationMatrix(ofParameter<glm::mat4> *mat);
     
-    
+#ifdef OFXOCEANODE_USE_MIDI
+    void setIsListeningMidi(bool b){isListeningMidi = b;};
+#endif
     
     void keyPressed(ofKeyEventArgs &args);
     void keyReleased(ofKeyEventArgs &args);
@@ -73,6 +75,10 @@ private:
     
     bool guiToBeDestroyed;
     bool lastExpandedState;
+    
+#ifdef OFXOCEANODE_USE_MIDI
+    bool isListeningMidi;
+#endif
     
     ofParameter<glm::mat4> *transformationMatrix;
 };
