@@ -45,10 +45,14 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     
     controllers.push_back(make_unique<ofxOceanodePresetsController>(container));
     controllers.push_back(make_unique<ofxOceanodeBPMController>(container));
+    
 #ifdef OFXOCEANODE_USE_OSC
     controllers.push_back(make_unique<ofxOceanodeOSCController>(container));
 #endif
-    controllers.push_back(make_unique<ofxOceanodeBaseController>("Midi"));
+    
+#ifdef OFXOCEANODE_USE_MIDI
+    controllers.push_back(make_unique<ofxOceanodeBaseController>(container, "MIDI"));
+#endif
     
     if(controllers.size() > 0){
         controllers[0]->activate();
