@@ -583,7 +583,7 @@ void ofxOceanodeContainer::setIsListeningMidi(bool b){
 }
 
 bool ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p){
-    if(midiBindings.count(p.getEscapedName()) == 0){
+    if(midiBindings.count(p.getGroupHierarchyNames().back() + "-|-" + p.getEscapedName()) == 0){
         unique_ptr<ofxOceanodeAbstractMidiBinding> midiBinding = nullptr;
         if(p.type() == typeid(ofParameter<float>).name()){
             midiBinding = make_unique<ofxOceanodeMidiBinding<float>>(p.cast<float>());
@@ -611,11 +611,24 @@ bool ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p){
                 midiInPair.second.addListener(midiBinding.get());
             }
             midiUnregisterlisteners.push(midiBinding->unregisterUnusedMidiIns.newListener(this, &ofxOceanodeContainer::unregisterEventReceived));
-            midiBindings[p.getEscapedName()] = move(midiBinding);
+            midiBindings[p.getGroupHierarchyNames().back() + "-|-" + p.getEscapedName()] = move(midiBinding);
+            return true;
         }
     }else{
         ofLog() << "Parameter \"" << p.getEscapedName() << "\" already binded";
     }
+    return false;
+}
+
+bool ofxOceanodeContainer::removeMidiBinding(ofAbstractParameter &p){
+    if(midiBindings.count(p.getGroupHierarchyNames().back() + "-|-" + p.getEscapedName()) != 0){
+        for(auto &midiInPair : midiIns){
+            midiInPair.second.removeListener(midiBindings[p.getGroupHierarchyNames().back() + "-|-" + p.getEscapedName()].get());
+        }
+        midiBindings.erase(p.getGroupHierarchyNames().back() + "-|-" + p.getEscapedName());
+        return true;
+    }
+    return false;
 }
 
 void ofxOceanodeContainer::unregisterEventReceived(const void * sender, string &portName){

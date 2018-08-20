@@ -321,7 +321,11 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
 #ifdef OFXOCEANODE_USE_MIDI
     if(isListeningMidi){
         if(e.down == 1){
-            container.createMidiBinding(*p);
+            if(ofGetKeyPressed(OF_KEY_SHIFT)){
+                container.removeMidiBinding(*p);
+            }else{
+                container.createMidiBinding(*p);
+            }
         }
     }
     else

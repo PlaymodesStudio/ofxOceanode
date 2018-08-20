@@ -98,6 +98,7 @@ public:
 #ifdef OFXOCEANODE_USE_MIDI
     void setIsListeningMidi(bool b);
     bool createMidiBinding(ofAbstractParameter &p);
+    bool removeMidiBinding(ofAbstractParameter &p);
 #endif
     
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
