@@ -412,6 +412,12 @@ void ofxOceanodeContainer::loadPersistent(){
             }
         }
     }
+    
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->presetHasLoaded();
+        }
+    }
 }
 
 

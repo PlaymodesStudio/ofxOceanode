@@ -8,7 +8,7 @@
 #include "ofxOceanodeNodeModelExternalWindow.h"
 
 ofxOceanodeNodeModelExternalWindow::ofxOceanodeNodeModelExternalWindow(string name)  : ofxOceanodeNodeModel(name){
-    auto &info = addParameterToGroupAndInfo(showWindow.set("Show Window", true));
+    auto &info = addParameterToGroupAndInfo(showWindow.set("Show Window", false));
     info.acceptInConnection = false;
     info.acceptOutConnection = false;
     info.isSavePreset = false;
