@@ -65,7 +65,7 @@ private:
     ofEventListener listener;
     ofParameter<T>& parameter;
     
-    std::mutex modifiyingParameter;
+    bool modifiyingParameter;
 };
 
 #endif
