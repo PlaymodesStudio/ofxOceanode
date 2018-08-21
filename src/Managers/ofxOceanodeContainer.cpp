@@ -621,11 +621,12 @@ bool ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p){
 }
 
 bool ofxOceanodeContainer::removeMidiBinding(ofAbstractParameter &p){
-    if(midiBindings.count(p.getGroupHierarchyNames().back() + "-|-" + p.getEscapedName()) != 0){
+    string midiBindingName = p.getGroupHierarchyNames().back() + "-|-" + p.getEscapedName();
+    if(midiBindings.count(midiBindingName) != 0){
         for(auto &midiInPair : midiIns){
-            midiInPair.second.removeListener(midiBindings[p.getGroupHierarchyNames().back() + "-|-" + p.getEscapedName()].get());
+            midiInPair.second.removeListener(midiBindings[midiBindingName].get());
         }
-        midiBindings.erase(p.getGroupHierarchyNames().back() + "-|-" + p.getEscapedName());
+        midiBindings.erase(midiBindingName);
         return true;
     }
     return false;
