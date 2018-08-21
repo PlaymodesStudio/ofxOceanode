@@ -18,9 +18,15 @@ class ofxOceanodeNodeRegistry;
 class ofxOceanodeTypesRegistry;
 
 #ifdef OFXOCEANODE_USE_OSC
-    class ofxOscSender;
-    class ofxOscReceiver;
+#include "ofxOsc.h"
 #endif
+
+#ifdef OFXOCEANODE_USE_MIDI
+class ofxOceanodeAbstractMidiBinding;
+class ofxMidiIn;
+class ofxMidiOut;
+#endif
+
 
 class ofxOceanodeContainer {
 public:
@@ -62,7 +68,6 @@ public:
             connections.back().second->setSourcePosition(temporalConnectionNode->getNodeGui().getSourceConnectionPositionFromParameter(source));
             connections.back().second->getGraphics().subscribeToDrawEvent(window);
         }
-        if(temporalConnectionNode->getIsPersistent()) connections.back().second->setIsPersistent(true); 
         return connections.back().second.get();
     }
     ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter);
@@ -86,6 +91,12 @@ public:
     void setupOscSender(string host, int port);
     void setupOscReceiver(int port);
     void update(ofEventArgs &args);
+#endif
+    
+#ifdef OFXOCEANODE_USE_MIDI
+    void setIsListeningMidi(bool b);
+    bool createMidiBinding(ofAbstractParameter &p);
+    bool removeMidiBinding(ofAbstractParameter &p);
 #endif
     
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
@@ -121,6 +132,17 @@ private:
 #ifdef OFXOCEANODE_USE_OSC
     ofxOscSender oscSender;
     ofxOscReceiver oscReceiver;
+#endif
+    
+#ifdef OFXOCEANODE_USE_MIDI
+    bool isListeningMidi;
+    map<string, unique_ptr<ofxOceanodeAbstractMidiBinding>> midiBindings;
+    map<string, ofxMidiIn> midiIns;
+    map<string, ofxMidiOut> midiOuts;
+    
+    ofEventListeners midiUnregisterlisteners;
+    ofEventListeners midiSenderListeners;
+    void midiBindingBound(const void * sender, string &portName);
 #endif
     
 };

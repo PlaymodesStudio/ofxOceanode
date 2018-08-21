@@ -13,6 +13,10 @@
     #include "ofxOceanodeOSCController.h"
 #endif
 
+#ifdef OFXOCEANODE_USE_MIDI
+    #include "ofxOceanodeMidiController.h"
+#endif
+
 ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _container) : container(_container){
     
     ofGLFWWindowSettings prevSettings;
@@ -51,7 +55,7 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
 #endif
     
 #ifdef OFXOCEANODE_USE_MIDI
-    controllers.push_back(make_unique<ofxOceanodeBaseController>(container, "MIDI"));
+    controllers.push_back(make_unique<ofxOceanodeMidiController>(container));
 #endif
     
     if(controllers.size() > 0){

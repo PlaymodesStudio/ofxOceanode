@@ -15,6 +15,10 @@ ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOcea
     position = glm::vec2(10, 10);
     guiToBeDestroyed = false;
     lastExpandedState = true;
+#ifdef OFXOCEANODE_USE_MIDI
+    isListeningMidi = false;
+#endif
+    
     
     createGuiFromParameters(window);
     if(window == nullptr){
@@ -318,17 +322,31 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
     if(e.target->getType() == ofxDatGuiType::DROPDOWN){
         p = &getParameters()->getGroup(e.target->getName()).getInt(1);
     }
-    if(e.down == 1){
-        auto connection = node.parameterConnectionPress(container, *p);
-        if(connection != nullptr){
-            connection->setTransformationMatrix(transformationMatrix);
-            connection->setSinkPosition(glm::inverse(transformationMatrix->get()) * glm::vec4(ofGetMouseX(), ofGetMouseY(), 0, 1));
+#ifdef OFXOCEANODE_USE_MIDI
+    if(isListeningMidi){
+        if(e.down == 1){
+            if(ofGetKeyPressed(OF_KEY_SHIFT)){
+                container.removeMidiBinding(*p);
+            }else{
+                container.createMidiBinding(*p);
+            }
         }
-    }else{
-        auto connection = node.parameterConnectionRelease(container, *p);
-        if(connection != nullptr){
-            connection->setSinkPosition(getSinkConnectionPositionFromParameter(getParameters()->get(e.target->getName())));
-            connection->setTransformationMatrix(transformationMatrix);
+    }
+    else
+#endif
+    {
+        if(e.down == 1){
+            auto connection = node.parameterConnectionPress(container, *p);
+            if(connection != nullptr){
+                connection->setTransformationMatrix(transformationMatrix);
+                connection->setSinkPosition(glm::inverse(transformationMatrix->get()) * glm::vec4(ofGetMouseX(), ofGetMouseY(), 0, 1));
+            }
+        }else{
+            auto connection = node.parameterConnectionRelease(container, *p);
+            if(connection != nullptr){
+                connection->setSinkPosition(getSinkConnectionPositionFromParameter(getParameters()->get(e.target->getName())));
+                connection->setTransformationMatrix(transformationMatrix);
+            }
         }
     }
 }
