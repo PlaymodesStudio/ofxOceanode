@@ -12,10 +12,6 @@
 #include "ofxOceanodeTypesRegistry.h"
 #include "ofxOceanodeNodeModel.h"
 
-#ifdef OFXOCEANODE_USE_OSC
-#include "ofxOsc.h"
-#endif
-
 #ifdef OFXOCEANODE_USE_MIDI
 #include "ofxOceanodeMidiBinding.h"
 #include "ofxMidiIn.h"

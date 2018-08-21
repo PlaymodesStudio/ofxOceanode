@@ -18,8 +18,7 @@ class ofxOceanodeNodeRegistry;
 class ofxOceanodeTypesRegistry;
 
 #ifdef OFXOCEANODE_USE_OSC
-class ofxOscSender;
-class ofxOscReceiver;
+#include "ofxOsc.h"
 #endif
 
 #ifdef OFXOCEANODE_USE_MIDI
