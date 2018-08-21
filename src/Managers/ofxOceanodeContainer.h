@@ -68,7 +68,6 @@ public:
             connections.back().second->setSourcePosition(temporalConnectionNode->getNodeGui().getSourceConnectionPositionFromParameter(source));
             connections.back().second->getGraphics().subscribeToDrawEvent(window);
         }
-        if(temporalConnectionNode->getIsPersistent()) connections.back().second->setIsPersistent(true); 
         return connections.back().second.get();
     }
     ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter);
