@@ -15,7 +15,10 @@ ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOcea
     position = glm::vec2(10, 10);
     guiToBeDestroyed = false;
     lastExpandedState = true;
+#ifdef OFXOCEANODE_USE_MIDI
     isListeningMidi = false;
+#endif
+    
     
     createGuiFromParameters(window);
     if(window == nullptr){
