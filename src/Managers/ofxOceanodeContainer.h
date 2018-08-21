@@ -143,7 +143,8 @@ private:
     map<string, ofxMidiOut> midiOuts;
     
     ofEventListeners midiUnregisterlisteners;
-    void unregisterEventReceived(const void * sender, string &portName);
+    ofEventListeners midiSenderListeners;
+    void midiBindingBound(const void * sender, string &portName);
 #endif
     
 };

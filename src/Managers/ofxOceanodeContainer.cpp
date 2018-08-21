@@ -610,7 +610,7 @@ bool ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p){
             for(auto &midiInPair : midiIns){
                 midiInPair.second.addListener(midiBinding.get());
             }
-            midiUnregisterlisteners.push(midiBinding->unregisterUnusedMidiIns.newListener(this, &ofxOceanodeContainer::unregisterEventReceived));
+            midiUnregisterlisteners.push(midiBinding->unregisterUnusedMidiIns.newListener(this, &ofxOceanodeContainer::midiBindingBound));
             midiBindings[p.getGroupHierarchyNames().back() + "-|-" + p.getEscapedName()] = move(midiBinding);
             return true;
         }
@@ -631,12 +631,26 @@ bool ofxOceanodeContainer::removeMidiBinding(ofAbstractParameter &p){
     return false;
 }
 
-void ofxOceanodeContainer::unregisterEventReceived(const void * sender, string &portName){
-    ofxOceanodeAbstractMidiBinding * binding = static_cast <ofxOceanodeAbstractMidiBinding *> (const_cast <void *> (sender));
+void ofxOceanodeContainer::midiBindingBound(const void * sender, string &portName){
+    ofxOceanodeAbstractMidiBinding * midiBinding = static_cast <ofxOceanodeAbstractMidiBinding *> (const_cast <void *> (sender));
     for(auto &midiInPair : midiIns){
         if(midiInPair.first != portName){
-            midiInPair.second.removeListener(binding);
+            midiInPair.second.removeListener(midiBinding);
         }
+    }
+    if(midiOuts.count(portName) != 0){
+        midiBinding->bindParameter();
+        midiSenderListeners.push(midiBinding->midiMessageSender.newListener([this, portName](ofxMidiMessage& message){
+            switch(message.status){
+                case MIDI_CONTROL_CHANGE:{
+                    midiOuts[portName].sendControlChange(message.channel, message.control, message.value);
+                    break;
+                }
+                default:{
+                    
+                }
+            }
+        }));
     }
 }
 

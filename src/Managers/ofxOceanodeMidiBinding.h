@@ -34,13 +34,17 @@ public:
     
     string getParameterName(){return parameterEscapedName;};
     
+    virtual ofxMidiMessage& sendMidiMessage(){};
+    virtual void bindParameter(){};
+    
     ofEvent<string> unregisterUnusedMidiIns;
+    ofEvent<ofxMidiMessage> midiMessageSender;
 protected:
     bool isListening;
     
     std::string portName;
     int midiChannel;
-
+    
     string parameterEscapedName;
     ofxMidiMessage firstMidiMessage;
 };
@@ -55,9 +59,13 @@ public:
     ~ofxOceanodeMidiBinding(){};
     
     void newMidiMessage(ofxMidiMessage& message){};
+    void bindParameter(){};
     
 private:
+    ofEventListener listener;
     ofParameter<T>& parameter;
+    
+    std::mutex modifiyingParameter;
 };
 
 #endif

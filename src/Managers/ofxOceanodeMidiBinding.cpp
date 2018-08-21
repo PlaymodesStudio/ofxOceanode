@@ -14,6 +14,23 @@ void ofxOceanodeMidiBinding<float>::newMidiMessage(ofxMidiMessage& message){
     if(message.portName == firstMidiMessage.portName &&
        message.channel == firstMidiMessage.channel &&
        message.control == firstMidiMessage.control){
+        modifiyingParameter.lock();
         parameter.set(ofMap(message.value, 0, 127, parameter.getMin(), parameter.getMax()));
+        modifiyingParameter.unlock();
     }
+}
+
+template<>
+void ofxOceanodeMidiBinding<float>::bindParameter(){
+    listener = parameter.newListener([this](float &f){
+        if(!modifiyingParameter.try_lock()){
+            ofxMidiMessage message;
+            message.status = firstMidiMessage.status;
+            message.channel = firstMidiMessage.channel;
+            message.control = firstMidiMessage.control;
+            message.value = ofMap(f, parameter.getMin(), parameter.getMax(), 0, 127);
+            midiMessageSender.notify(this, message);
+        }
+    });
+    
 }
