@@ -74,6 +74,8 @@ class ofxOceanodeMidiBinding<T, typename std::enable_if<std::is_same<T, int>::va
 public:
     ofxOceanodeMidiBinding(ofParameter<T>& _parameter) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
         parameterEscapedName = parameter.getEscapedName();
+        min.set(parameter.getName() + " Min", parameter.getMin(), parameter.getMin(), parameter.getMax());
+        max.set(parameter.getName() + " Max", parameter.getMax(), parameter.getMin(), parameter.getMax());
     }
 
     ~ofxOceanodeMidiBinding(){};
@@ -100,11 +102,15 @@ public:
             }
         });
     };
-    T getParameterMin(){return parameter.getMin();};
-    T getParameterMax(){return parameter.getMax();};
+    
+    ofParameter<T> &getMinParameter(){return min;};
+    ofParameter<T> &getMaxParameter(){return max;};
 
 private:
     ofParameter<T>& parameter;
+    ofParameter<T> min;
+    ofParameter<T> max;
+    
 };
 
 template<typename>
@@ -118,6 +124,8 @@ class ofxOceanodeMidiBinding<vector<T>> : public ofxOceanodeAbstractMidiBinding{
 public:
     ofxOceanodeMidiBinding(ofParameter<vector<T>>& _parameter) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
         parameterEscapedName = parameter.getEscapedName();
+        min.set(parameter.getName() + " Min", parameter.getMin()[0], parameter.getMin()[0], parameter.getMax()[0]);
+        max.set(parameter.getName() + " Max", parameter.getMax()[0], parameter.getMin()[0], parameter.getMax()[0]);
     }
     
     ~ofxOceanodeMidiBinding(){};
@@ -145,11 +153,14 @@ public:
             }
         });
     };
-    T getParameterMin(){return parameter.getMin()[0];};
-    T getParameterMax(){return parameter.getMax()[0];};
+    
+    ofParameter<T> &getMinParameter(){return min;};
+    ofParameter<T> &getMaxParameter(){return max;};
     
 private:
     ofParameter<vector<T>>& parameter;
+    ofParameter<T> min;
+    ofParameter<T> max;
 };
 
 #endif
