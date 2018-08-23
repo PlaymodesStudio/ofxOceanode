@@ -96,7 +96,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     string nodeToBeCreatedName = nodeModel->nodeName();
     if(identifier == -1){
         int lastId = 1;
-        while (collection[nodeToBeCreatedName].count(lastId) != 0) lastId++;
+        while (dynamicNodes[nodeToBeCreatedName].count(lastId) != 0 || persistentNodes[nodeToBeCreatedName].count(lastId) != 0) lastId++;
         toBeCreatedId = lastId;
     }
     nodeModel->setNumIdentifier(toBeCreatedId);
