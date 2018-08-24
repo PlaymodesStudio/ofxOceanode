@@ -31,6 +31,10 @@ public:
             unregisterUnusedMidiIns.notify(this, portName);
         }
     }
+    
+    string type() const{
+        return typeid(*this).name();
+    }
 
     string getParameterName(){return parameterEscapedName;};
     
@@ -74,8 +78,8 @@ class ofxOceanodeMidiBinding<T, typename std::enable_if<std::is_same<T, int>::va
 public:
     ofxOceanodeMidiBinding(ofParameter<T>& _parameter) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
         parameterEscapedName = parameter.getEscapedName();
-        min.set(parameter.getName() + " Min", parameter.getMin(), parameter.getMin(), parameter.getMax());
-        max.set(parameter.getName() + " Max", parameter.getMax(), parameter.getMin(), parameter.getMax());
+        min.set("Min", parameter.getMin(), parameter.getMin(), parameter.getMax());
+        max.set("Max", parameter.getMax(), parameter.getMin(), parameter.getMax());
     }
 
     ~ofxOceanodeMidiBinding(){};
@@ -86,7 +90,7 @@ public:
            message.channel == firstMidiMessage.channel &&
            message.control == firstMidiMessage.control){
             modifiyingParameter = true;
-            parameter.set(ofMap(message.value, 0, 127, parameter.getMin(), parameter.getMax()));
+            parameter.set(ofMap(message.value, 0, 127, min, max, true));
             modifiyingParameter = false;
         }
     };
@@ -97,7 +101,7 @@ public:
                 message.status = firstMidiMessage.status;
                 message.channel = firstMidiMessage.channel;
                 message.control = firstMidiMessage.control;
-                message.value = ofMap(f, parameter.getMin(), parameter.getMax(), 0, 127);
+                message.value = ofMap(f, min, max, 0, 127, true);
                 midiMessageSender.notify(this, message);
             }
         });
@@ -124,8 +128,8 @@ class ofxOceanodeMidiBinding<vector<T>> : public ofxOceanodeAbstractMidiBinding{
 public:
     ofxOceanodeMidiBinding(ofParameter<vector<T>>& _parameter) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
         parameterEscapedName = parameter.getEscapedName();
-        min.set(parameter.getName() + " Min", parameter.getMin()[0], parameter.getMin()[0], parameter.getMax()[0]);
-        max.set(parameter.getName() + " Max", parameter.getMax()[0], parameter.getMin()[0], parameter.getMax()[0]);
+        min.set("Min", parameter.getMin()[0], parameter.getMin()[0], parameter.getMax()[0]);
+        max.set("Max", parameter.getMax()[0], parameter.getMin()[0], parameter.getMax()[0]);
     }
     
     ~ofxOceanodeMidiBinding(){};

@@ -97,6 +97,8 @@ public:
     void setIsListeningMidi(bool b);
     bool createMidiBinding(ofAbstractParameter &p);
     bool removeMidiBinding(ofAbstractParameter &p);
+    ofEvent<ofxOceanodeAbstractMidiBinding> midiBindingCreated;
+    ofEvent<ofxOceanodeAbstractMidiBinding> midiBindingDestroyed;
 #endif
     
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};

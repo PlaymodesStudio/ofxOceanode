@@ -612,6 +612,7 @@ bool ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p){
             for(auto &midiInPair : midiIns){
                 midiInPair.second.addListener(midiBinding.get());
             }
+            midiBindingCreated.notify(this, *midiBinding.get());
             midiUnregisterlisteners.push(midiBinding->unregisterUnusedMidiIns.newListener(this, &ofxOceanodeContainer::midiBindingBound));
             midiBindings[p.getGroupHierarchyNames().back() + "-|-" + p.getEscapedName()] = move(midiBinding);
             return true;
@@ -628,6 +629,7 @@ bool ofxOceanodeContainer::removeMidiBinding(ofAbstractParameter &p){
         for(auto &midiInPair : midiIns){
             midiInPair.second.removeListener(midiBindings[midiBindingName].get());
         }
+        midiBindingDestroyed.notify(this, *midiBindings[midiBindingName].get());
         midiBindings.erase(midiBindingName);
         return true;
     }

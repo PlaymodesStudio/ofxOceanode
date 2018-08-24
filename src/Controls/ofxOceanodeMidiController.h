@@ -12,6 +12,8 @@
 
 #include "ofxOceanodeBaseController.h"
 
+class ofxOceanodeAbstractMidiBinding;
+
 class ofxOceanodeMidiController : public ofxOceanodeBaseController{
 public:
     ofxOceanodeMidiController(shared_ptr<ofxOceanodeContainer> _container);
@@ -19,8 +21,19 @@ public:
     
     void midiLearnPressed(ofxDatGuiToggleEvent e);
     
+    void newParameterBinding(ofxOceanodeAbstractMidiBinding &midiBinding);
+    void removeParameterBinding(ofxOceanodeAbstractMidiBinding &midiBinding);
+    
 private:
     ofxDatGuiToggle* midiLearn;
+    ofEventListeners listeners;
+
+    //midiBindingControls
+    ofxDatGuiLabel* label;
+    ofxDatGuiTextInput* control;
+    ofxDatGuiTextInput* value;
+    ofxDatGuiSlider* min;
+    ofxDatGuiSlider* max;
 };
 
 #endif
