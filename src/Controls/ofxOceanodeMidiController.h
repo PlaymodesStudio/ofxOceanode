@@ -29,11 +29,7 @@ private:
     ofEventListeners listeners;
 
     //midiBindingControls
-    ofxDatGuiLabel* label;
-    ofxDatGuiTextInput* control;
-    ofxDatGuiTextInput* value;
-    ofxDatGuiSlider* min;
-    ofxDatGuiSlider* max;
+    map<string, ofxDatGuiFolder*> folders;
 };
 
 #endif

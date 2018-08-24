@@ -36,7 +36,7 @@ public:
         return typeid(*this).name();
     }
 
-    string getParameterName(){return parameterEscapedName;};
+    string getName(){return name;};
     
     virtual ofxMidiMessage& sendMidiMessage(){};
     virtual void bindParameter(){};
@@ -49,7 +49,7 @@ protected:
     std::string portName;
     int midiChannel;
     
-    string parameterEscapedName;
+    string name;
     ofxMidiMessage firstMidiMessage;
     
     bool modifiyingParameter;
@@ -61,7 +61,7 @@ template<typename T, typename Enable = void>
 class ofxOceanodeMidiBinding : public ofxOceanodeAbstractMidiBinding{
 public:
     ofxOceanodeMidiBinding(ofParameter<T>& _parameter) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
-        parameterEscapedName = parameter.getEscapedName();
+        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName();
     }
     
     ~ofxOceanodeMidiBinding(){};
@@ -77,7 +77,7 @@ template<typename T>
 class ofxOceanodeMidiBinding<T, typename std::enable_if<std::is_same<T, int>::value || std::is_same<T, float>::value>::type>: public ofxOceanodeAbstractMidiBinding{
 public:
     ofxOceanodeMidiBinding(ofParameter<T>& _parameter) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
-        parameterEscapedName = parameter.getEscapedName();
+        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName();
         min.set("Min", parameter.getMin(), parameter.getMin(), parameter.getMax());
         max.set("Max", parameter.getMax(), parameter.getMin(), parameter.getMax());
     }
@@ -90,7 +90,7 @@ public:
            message.channel == firstMidiMessage.channel &&
            message.control == firstMidiMessage.control){
             modifiyingParameter = true;
-            parameter.set(ofMap(message.value, 0, 127, min, max, true));
+            parameter.set(ofMap(message.value, 1, 127, min, max, true));
             modifiyingParameter = false;
         }
     };
@@ -101,7 +101,7 @@ public:
                 message.status = firstMidiMessage.status;
                 message.channel = firstMidiMessage.channel;
                 message.control = firstMidiMessage.control;
-                message.value = ofMap(f, min, max, 0, 127, true);
+                message.value = ofMap(f, min, max, 1, 127, true);
                 midiMessageSender.notify(this, message);
             }
         });
@@ -127,7 +127,7 @@ template<typename T>
 class ofxOceanodeMidiBinding<vector<T>> : public ofxOceanodeAbstractMidiBinding{
 public:
     ofxOceanodeMidiBinding(ofParameter<vector<T>>& _parameter) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
-        parameterEscapedName = parameter.getEscapedName();
+        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName();
         min.set("Min", parameter.getMin()[0], parameter.getMin()[0], parameter.getMax()[0]);
         max.set("Max", parameter.getMax()[0], parameter.getMin()[0], parameter.getMax()[0]);
     }
@@ -140,7 +140,7 @@ public:
            message.channel == firstMidiMessage.channel &&
            message.control == firstMidiMessage.control){
             modifiyingParameter = true;
-            parameter.set(vector<T>(1, ofMap(message.value, 0, 127, parameter.getMin()[0], parameter.getMax()[0])));
+            parameter.set(vector<T>(1, ofMap(message.value, 1, 127, parameter.getMin()[0], parameter.getMax()[0])));
             modifiyingParameter = false;
         }
     };
@@ -152,7 +152,7 @@ public:
                 message.status = firstMidiMessage.status;
                 message.channel = firstMidiMessage.channel;
                 message.control = firstMidiMessage.control;
-                message.value = ofMap(vf[0], parameter.getMin()[0], parameter.getMax()[0], 0, 127);
+                message.value = ofMap(vf[0], parameter.getMin()[0], parameter.getMax()[0], 1, 127);
                 midiMessageSender.notify(this, message);
             }
         });

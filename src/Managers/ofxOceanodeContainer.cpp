@@ -588,7 +588,7 @@ void ofxOceanodeContainer::setIsListeningMidi(bool b){
 }
 
 bool ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p){
-    if(midiBindings.count(p.getGroupHierarchyNames().back() + "-|-" + p.getEscapedName()) == 0){
+    if(midiBindings.count(p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName()) == 0){
         unique_ptr<ofxOceanodeAbstractMidiBinding> midiBinding = nullptr;
         if(p.type() == typeid(ofParameter<float>).name()){
             midiBinding = make_unique<ofxOceanodeMidiBinding<float>>(p.cast<float>());
@@ -617,7 +617,7 @@ bool ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p){
             }
             midiBindingCreated.notify(this, *midiBinding.get());
             midiUnregisterlisteners.push(midiBinding->unregisterUnusedMidiIns.newListener(this, &ofxOceanodeContainer::midiBindingBound));
-            midiBindings[p.getGroupHierarchyNames().back() + "-|-" + p.getEscapedName()] = move(midiBinding);
+            midiBindings[p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName()] = move(midiBinding);
             return true;
         }
     }else{
@@ -627,7 +627,7 @@ bool ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p){
 }
 
 bool ofxOceanodeContainer::removeMidiBinding(ofAbstractParameter &p){
-    string midiBindingName = p.getGroupHierarchyNames().back() + "-|-" + p.getEscapedName();
+    string midiBindingName = p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName();
     if(midiBindings.count(midiBindingName) != 0){
         for(auto &midiInPair : midiIns){
             midiInPair.second.removeListener(midiBindings[midiBindingName].get());

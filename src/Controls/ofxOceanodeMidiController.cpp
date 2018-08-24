@@ -25,17 +25,20 @@ void ofxOceanodeMidiController::midiLearnPressed(ofxDatGuiToggleEvent e){
 }
 
 void ofxOceanodeMidiController::newParameterBinding(ofxOceanodeAbstractMidiBinding &binding){
-    ofLog() << "MidiBind Created " << binding.getParameterName();
-    label = gui->addLabel(binding.getParameterName());
-//    control = gui->addTextInput(control)
+    ofLog() << "MidiBind Created " << binding.getName();
+    for(auto folder : folders){
+        folder.second->collapse();
+    }
+    folders[binding.getName()] = gui->addFolder(binding.getName());
     if(binding.type() == typeid(ofxOceanodeMidiBinding<float>).name()){
         auto &midiBindingCasted = static_cast<ofxOceanodeMidiBinding<float> &>(binding);
-        min = gui->addSlider(midiBindingCasted.getMinParameter());
-        max = gui->addSlider(midiBindingCasted.getMaxParameter());
+        folders[binding.getName()]->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
+        folders[binding.getName()]->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
     }
+    folders[binding.getName()]->expand();
 }
 
 void ofxOceanodeMidiController::removeParameterBinding(ofxOceanodeAbstractMidiBinding &binding){
-    ofLog() << "MidiBind Removed " << binding.getParameterName();
-    
+    gui->removeComponent(folders[binding.getName()]->getName());
+    folders.erase(binding.getName());
 }
