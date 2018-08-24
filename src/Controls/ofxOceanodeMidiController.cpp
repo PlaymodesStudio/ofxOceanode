@@ -30,27 +30,45 @@ void ofxOceanodeMidiController::newParameterBinding(ofxOceanodeAbstractMidiBindi
         folder.second->collapse();
     }
     folders[binding.getName()] = gui->addFolder(binding.getName());
+    auto folder = folders[binding.getName()];
+    auto textInput = folder->addTextInput("MessageType", binding.getMessageType());
+    listeners.push(binding.getMessageType().newListener([&, textInput](string &val){
+        textInput->setText(val);
+    }));
+    
+    textInput = folder->addTextInput("Channel", ofToString(binding.getChannel()));
+    listeners.push(binding.getChannel().newListener([&, textInput](int &val){
+        textInput->setText(ofToString(val));
+    }));
+    
+    textInput = folder->addTextInput("Control", ofToString(binding.getControl()));
+    listeners.push(binding.getControl().newListener([&, textInput](int &val){
+        textInput->setText(ofToString(val));
+    }));
+    
+    folder->addSlider(binding.getValue());
+    
     if(binding.type() == typeid(ofxOceanodeMidiBinding<float>).name()){
         auto &midiBindingCasted = static_cast<ofxOceanodeMidiBinding<float> &>(binding);
-        folders[binding.getName()]->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
-        folders[binding.getName()]->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
+        folder->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
+        folder->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
     }
     else if(binding.type() == typeid(ofxOceanodeMidiBinding<int>).name()){
         auto &midiBindingCasted = static_cast<ofxOceanodeMidiBinding<int> &>(binding);
-        folders[binding.getName()]->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
-        folders[binding.getName()]->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
+        folder->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
+        folder->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
     }
     else if(binding.type() == typeid(ofxOceanodeMidiBinding<vector<float>>).name()){
         auto &midiBindingCasted = static_cast<ofxOceanodeMidiBinding<vector<float>> &>(binding);
-        folders[binding.getName()]->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
-        folders[binding.getName()]->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
+        folder->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
+        folder->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
     }
     else if(binding.type() == typeid(ofxOceanodeMidiBinding<vector<int>>).name()){
         auto &midiBindingCasted = static_cast<ofxOceanodeMidiBinding<vector<int>> &>(binding);
-        folders[binding.getName()]->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
-        folders[binding.getName()]->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
+        folder->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
+        folder->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
     }
-    folders[binding.getName()]->expand();
+    folder->expand();
 }
 
 void ofxOceanodeMidiController::removeParameterBinding(ofxOceanodeAbstractMidiBinding &binding){

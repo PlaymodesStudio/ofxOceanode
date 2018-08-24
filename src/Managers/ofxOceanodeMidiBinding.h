@@ -19,17 +19,26 @@ class ofxOceanodeAbstractMidiBinding : public ofxMidiListener{
 public:
     ofxOceanodeAbstractMidiBinding(){
         isListening = true;
+        messageType.set("Message Type", "Not Assigned");
+        channel.set("Channel", -1, 1, 16);
+        control.set("Control", -1, 0, 127);
+        value.set("Value", -1, 0, 127);
     };
     ~ofxOceanodeAbstractMidiBinding(){};
     
     virtual void newMidiMessage(ofxMidiMessage& message) {
-        if(isListening){
-            firstMidiMessage = message;
-            portName = firstMidiMessage.portName;
-            midiChannel = firstMidiMessage.channel;
-            isListening = false;
-            unregisterUnusedMidiIns.notify(this, portName);
+        portName = message.portName;
+        channel = message.channel;
+        status = message.status;
+        messageType = ofxMidiMessage::getStatusString(status);
+        if(message.status == MIDI_CONTROL_CHANGE){
+            control = message.control;
         }
+        if(message.status == MIDI_NOTE_ON || message.status == MIDI_NOTE_OFF){
+            control = message.pitch;
+        }
+        isListening = false;
+        unregisterUnusedMidiIns.notify(this, portName);
     }
     
     string type() const{
@@ -37,6 +46,11 @@ public:
     }
 
     string getName(){return name;};
+    
+    ofParameter<string> &getMessageType(){return messageType;};
+    ofParameter<int> &getChannel(){return channel;};
+    ofParameter<int> &getControl(){return control;};
+    ofParameter<int> &getValue(){return value;};
     
     virtual ofxMidiMessage& sendMidiMessage(){};
     virtual void bindParameter(){};
@@ -46,8 +60,12 @@ public:
 protected:
     bool isListening;
     
-    std::string portName;
-    int midiChannel;
+    string portName;
+    ofParameter<string> messageType;
+    MidiStatus status;
+    ofParameter<int> channel;
+    ofParameter<int> control;
+    ofParameter<int> value;
     
     string name;
     ofxMidiMessage firstMidiMessage;
@@ -85,23 +103,63 @@ public:
     ~ofxOceanodeMidiBinding(){};
 
     void newMidiMessage(ofxMidiMessage& message){
-        ofxOceanodeAbstractMidiBinding::newMidiMessage(message);
-        if(message.portName == firstMidiMessage.portName &&
-           message.channel == firstMidiMessage.channel &&
-           message.control == firstMidiMessage.control){
-            modifiyingParameter = true;
-            parameter.set(ofMap(message.value, 1, 127, min, max, true));
-            modifiyingParameter = false;
+        if(message.status == MIDI_NOTE_OFF){
+            message.status = MIDI_NOTE_ON;
+            message.velocity = 0;
         }
+        if(isListening) ofxOceanodeAbstractMidiBinding::newMidiMessage(message);
+        if(message.channel == channel && message.status == status){
+            bool validMessage = false;
+            switch(status){
+                case MIDI_CONTROL_CHANGE:
+                {
+                    if(message.control == control){
+                        value = message.value;
+                        validMessage = true;
+                    }
+                    break;
+                }
+                case MIDI_NOTE_ON:
+                {
+                    if(message.pitch == control){
+                        value = message.velocity;
+                        validMessage = true;
+                        
+                    }
+                    break;
+                }
+                default:
+                {
+                    ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type " << typeid(T).name();
+                }
+            }
+            if(validMessage){
+                modifiyingParameter = true;
+                parameter.set(ofMap(value, 1, 127, min, max, true));
+                modifiyingParameter = false;
+            }
+        }
+        
     };
     void bindParameter(){
         listener = parameter.newListener([this](T &f){
             if(!modifiyingParameter){
+                value = ofMap(f, min, max, 1, 127, true);
                 ofxMidiMessage message;
-                message.status = firstMidiMessage.status;
-                message.channel = firstMidiMessage.channel;
-                message.control = firstMidiMessage.control;
-                message.value = ofMap(f, min, max, 1, 127, true);
+                message.status = status;
+                message.channel = channel;
+                switch(status){
+                    case MIDI_CONTROL_CHANGE:
+                        message.control = control;
+                        message.value = value;
+                        break;
+                    case MIDI_NOTE_ON:
+                        message.pitch = control;
+                        message.velocity = value;
+                        break;
+                    default:
+                        ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type " << typeid(T).name();
+                }
                 midiMessageSender.notify(this, message);
             }
         });
@@ -135,24 +193,62 @@ public:
     ~ofxOceanodeMidiBinding(){};
     
     void newMidiMessage(ofxMidiMessage& message){
-        ofxOceanodeAbstractMidiBinding::newMidiMessage(message);
-        if(message.portName == firstMidiMessage.portName &&
-           message.channel == firstMidiMessage.channel &&
-           message.control == firstMidiMessage.control){
-            modifiyingParameter = true;
-            parameter.set(vector<T>(1, ofMap(message.value, 1, 127, min, max, true)));
-            modifiyingParameter = false;
+        if(message.status == MIDI_NOTE_OFF){
+            message.status = MIDI_NOTE_ON;
+            message.velocity = 0;
+        }
+        if(isListening) ofxOceanodeAbstractMidiBinding::newMidiMessage(message);
+        if(message.channel == channel && message.status == status){
+            bool validMessage = false;
+            switch(status){
+                case MIDI_CONTROL_CHANGE:
+                {
+                    if(message.control == control){
+                        value = message.value;
+                        validMessage = true;
+                    }
+                    break;
+                }
+                case MIDI_NOTE_ON:
+                {
+                    if(message.pitch == control){
+                        value = message.velocity;
+                        validMessage = true;
+                    }
+                    break;
+                }
+                default:
+                {
+                    ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type " << typeid(T).name();
+                }
+            }
+            if(validMessage){
+                modifiyingParameter = true;
+                    parameter.set(vector<T>(1, ofMap(value, 1, 127, min, max, true)));
+                modifiyingParameter = false;
+            }
         }
     };
     
     void bindParameter(){
         listener = parameter.newListener([this](vector<T> &vf){
             if(!modifiyingParameter && vf.size() == 1){
+                value = ofMap(vf[0], min, max, 1, 127, true);
                 ofxMidiMessage message;
-                message.status = firstMidiMessage.status;
-                message.channel = firstMidiMessage.channel;
-                message.control = firstMidiMessage.control;
-                message.value = ofMap(vf[0], min, max, 1, 127, true);
+                message.status = status;
+                message.channel = channel;
+                switch(status){
+                    case MIDI_CONTROL_CHANGE:
+                        message.control = control;
+                        message.value = value;
+                        break;
+                    case MIDI_NOTE_ON:
+                        message.pitch = control;
+                        message.velocity = value;
+                        break;
+                    default:
+                        ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type " << typeid(T).name();
+                }
                 midiMessageSender.notify(this, message);
             }
         });
