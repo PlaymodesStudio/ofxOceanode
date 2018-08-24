@@ -105,6 +105,9 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     node->setup();
     if(!isHeadless){
         auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node, window);
+#ifdef OFXOCEANODE_USE_MIDI
+        nodeGui->setIsListeningMidi(isListeningMidi);
+#endif
         node->setGui(std::move(nodeGui));
     }
     node->setBpm(bpm);
