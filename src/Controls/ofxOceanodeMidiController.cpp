@@ -35,6 +35,21 @@ void ofxOceanodeMidiController::newParameterBinding(ofxOceanodeAbstractMidiBindi
         folders[binding.getName()]->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
         folders[binding.getName()]->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
     }
+    else if(binding.type() == typeid(ofxOceanodeMidiBinding<int>).name()){
+        auto &midiBindingCasted = static_cast<ofxOceanodeMidiBinding<int> &>(binding);
+        folders[binding.getName()]->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
+        folders[binding.getName()]->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
+    }
+    else if(binding.type() == typeid(ofxOceanodeMidiBinding<vector<float>>).name()){
+        auto &midiBindingCasted = static_cast<ofxOceanodeMidiBinding<vector<float>> &>(binding);
+        folders[binding.getName()]->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
+        folders[binding.getName()]->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
+    }
+    else if(binding.type() == typeid(ofxOceanodeMidiBinding<vector<int>>).name()){
+        auto &midiBindingCasted = static_cast<ofxOceanodeMidiBinding<vector<int>> &>(binding);
+        folders[binding.getName()]->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
+        folders[binding.getName()]->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
+    }
     folders[binding.getName()]->expand();
 }
 

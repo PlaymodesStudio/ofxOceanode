@@ -140,7 +140,7 @@ public:
            message.channel == firstMidiMessage.channel &&
            message.control == firstMidiMessage.control){
             modifiyingParameter = true;
-            parameter.set(vector<T>(1, ofMap(message.value, 1, 127, parameter.getMin()[0], parameter.getMax()[0])));
+            parameter.set(vector<T>(1, ofMap(message.value, 1, 127, min, max, true)));
             modifiyingParameter = false;
         }
     };
@@ -152,7 +152,7 @@ public:
                 message.status = firstMidiMessage.status;
                 message.channel = firstMidiMessage.channel;
                 message.control = firstMidiMessage.control;
-                message.value = ofMap(vf[0], parameter.getMin()[0], parameter.getMax()[0], 1, 127);
+                message.value = ofMap(vf[0], min, max, 1, 127, true);
                 midiMessageSender.notify(this, message);
             }
         });
