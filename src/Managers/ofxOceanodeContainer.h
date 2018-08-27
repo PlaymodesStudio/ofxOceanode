@@ -95,9 +95,9 @@ public:
     
 #ifdef OFXOCEANODE_USE_MIDI
     void setIsListeningMidi(bool b);
-    ofxOceanodeAbstractMidiBinding* createMidiBinding(ofAbstractParameter &p);
+    ofxOceanodeAbstractMidiBinding* createMidiBinding(ofAbstractParameter &p, bool isPersistent = false);
     bool removeMidiBinding(ofAbstractParameter &p);
-    ofxOceanodeAbstractMidiBinding* createMidiBindingFromInfo(string module, string parameter);
+    ofxOceanodeAbstractMidiBinding* createMidiBindingFromInfo(string module, string parameter, bool isPersistent = false);
     ofEvent<ofxOceanodeAbstractMidiBinding> midiBindingCreated;
     ofEvent<ofxOceanodeAbstractMidiBinding> midiBindingDestroyed;
 #endif
@@ -140,6 +140,7 @@ private:
 #ifdef OFXOCEANODE_USE_MIDI
     bool isListeningMidi;
     map<string, unique_ptr<ofxOceanodeAbstractMidiBinding>> midiBindings;
+    map<string, unique_ptr<ofxOceanodeAbstractMidiBinding>> persistentMidiBindings;
     map<string, ofxMidiIn> midiIns;
     map<string, ofxMidiOut> midiOuts;
     

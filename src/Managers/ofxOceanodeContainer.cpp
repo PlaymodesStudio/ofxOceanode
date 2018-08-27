@@ -386,6 +386,14 @@ void ofxOceanodeContainer::savePersistent(){
             node.second->savePreset(persistentFolderPath);
         }
     }
+
+#ifdef OFXOCEANODE_USE_MIDI
+    json.clear();
+    for(auto &bindingPair : midiBindings){
+        bindingPair.second->savePreset(json[ofSplitString(bindingPair.first, "-|-")[0]][ofSplitString(bindingPair.first, "-|-")[1]]);
+    }
+    ofSavePrettyJson(persistentFolderPath + "/midi.json", json);
+#endif
 }
 
 void ofxOceanodeContainer::loadPersistent(){
@@ -462,6 +470,26 @@ void ofxOceanodeContainer::loadPersistent(){
             }
         }
     }
+    
+#ifdef OFXOCEANODE_USE_MIDI
+    json.clear();
+    for(auto &binding : persistentMidiBindings){
+        for(auto &midiInPair : midiIns){
+            midiInPair.second.removeListener(binding.second.get());
+        }
+        midiBindingDestroyed.notify(this, *binding.second.get());
+    }
+    persistentMidiBindings.clear();
+    json = ofLoadJson(persistentFolderPath + "/midi.json");
+    for (ofJson::iterator module = json.begin(); module != json.end(); ++module) {
+        for (ofJson::iterator parameter = module.value().begin(); parameter != module.value().end(); ++parameter) {
+            auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), true);
+            if(midiBinding != nullptr){
+                midiBinding->loadPreset(json[module.key()][parameter.key()]);
+            }
+        }
+    }
+#endif
     
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
@@ -615,8 +643,8 @@ void ofxOceanodeContainer::setIsListeningMidi(bool b){
     }
 }
 
-ofxOceanodeAbstractMidiBinding* ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p){
-    if(midiBindings.count(p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName()) == 0){
+ofxOceanodeAbstractMidiBinding* ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p, bool isPersistent){
+    if(midiBindings.count(p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName()) == 0 && persistentMidiBindings.count(p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName()) == 0){
         unique_ptr<ofxOceanodeAbstractMidiBinding> midiBinding = nullptr;
         if(p.type() == typeid(ofParameter<float>).name()){
             midiBinding = make_unique<ofxOceanodeMidiBinding<float>>(p.cast<float>());
@@ -646,7 +674,11 @@ ofxOceanodeAbstractMidiBinding* ofxOceanodeContainer::createMidiBinding(ofAbstra
             midiBindingCreated.notify(this, *midiBinding.get());
             midiUnregisterlisteners.push(midiBinding->unregisterUnusedMidiIns.newListener(this, &ofxOceanodeContainer::midiBindingBound));
             auto midiBindingPointer = midiBinding.get();
-            midiBindings[p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName()] = move(midiBinding);
+            if(!isPersistent){
+                midiBindings[p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName()] = move(midiBinding);
+            }else{
+                persistentMidiBindings[p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName()] = move(midiBinding);
+            }
             return midiBindingPointer;
         }
     }else{
@@ -691,13 +723,14 @@ void ofxOceanodeContainer::midiBindingBound(const void * sender, string &portNam
     }
 }
 
-ofxOceanodeAbstractMidiBinding* ofxOceanodeContainer::createMidiBindingFromInfo(string module, string parameter){
+ofxOceanodeAbstractMidiBinding* ofxOceanodeContainer::createMidiBindingFromInfo(string module, string parameter, bool isPersistent){
+    auto &collection = !isPersistent ? dynamicNodes : persistentNodes;
     string moduleId = ofSplitString(module, "_").back();
     module.erase(module.find(moduleId)-1);
     ofStringReplace(module, "_", " ");
-    if(dynamicNodes.count(module) != 0){
-        if(dynamicNodes[module].count(ofToInt(moduleId))){
-            return createMidiBinding(dynamicNodes[module][ofToInt(moduleId)]->getParameters()->get(parameter));
+    if(collection.count(module) != 0){
+        if(collection[module].count(ofToInt(moduleId))){
+            return createMidiBinding(collection[module][ofToInt(moduleId)]->getParameters()->get(parameter), isPersistent);
         }
     }
 }

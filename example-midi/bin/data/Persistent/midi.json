@@ -1,0 +1,11 @@
+{
+    "Mapper_1": {
+        "Input": {
+            "Channel": 1,
+            "Control": 16,
+            "Type": "Control Change",
+            "Min": 0,
+            "Max": 1
+        }
+    }
+}

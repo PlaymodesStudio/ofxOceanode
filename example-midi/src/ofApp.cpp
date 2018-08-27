@@ -13,10 +13,10 @@ void ofApp::setup(){
 
     canvas.setContainer(container);
     canvas.setup();
-    
-    container->loadPreset("Presets/Initial_Bank/1|Simple_preset");
-    
     controls = make_shared<ofxOceanodeControls>(container);
+    
+    //If we load before creating controls the persistent midi bindings will not be visible in midi gui
+    container->loadPersistent();
 }
 
 //--------------------------------------------------------------
