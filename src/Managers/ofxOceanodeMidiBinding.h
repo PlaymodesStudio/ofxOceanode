@@ -221,6 +221,18 @@ public:
     
     ~ofxOceanodeMidiBinding(){};
     
+    void savePreset(ofJson &json){
+        ofxOceanodeAbstractMidiBinding::savePreset(json);
+        json["Min"] = min.get();
+        json["Max"] = max.get();
+    }
+    
+    void loadPreset(ofJson &json){
+        ofxOceanodeAbstractMidiBinding::loadPreset(json);
+        min.set(json["Min"]);
+        max.set(json["Max"]);
+    }
+    
     void newMidiMessage(ofxMidiMessage& message){
         if(message.status == MIDI_NOTE_OFF){
             message.status = MIDI_NOTE_ON;
