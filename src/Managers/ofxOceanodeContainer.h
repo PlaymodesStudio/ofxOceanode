@@ -95,8 +95,9 @@ public:
     
 #ifdef OFXOCEANODE_USE_MIDI
     void setIsListeningMidi(bool b);
-    bool createMidiBinding(ofAbstractParameter &p);
+    ofxOceanodeAbstractMidiBinding* createMidiBinding(ofAbstractParameter &p);
     bool removeMidiBinding(ofAbstractParameter &p);
+    ofxOceanodeAbstractMidiBinding* createMidiBindingFromInfo(string module, string parameter);
     ofEvent<ofxOceanodeAbstractMidiBinding> midiBindingCreated;
     ofEvent<ofxOceanodeAbstractMidiBinding> midiBindingDestroyed;
 #endif

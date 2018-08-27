@@ -257,6 +257,26 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         }
     }
     
+#ifdef OFXOCEANODE_USE_MIDI
+    json.clear();
+    for(auto &binding : midiBindings){
+        for(auto &midiInPair : midiIns){
+            midiInPair.second.removeListener(binding.second.get());
+        }
+        midiBindingDestroyed.notify(this, *binding.second.get());
+    }
+    midiBindings.clear();
+    json = ofLoadJson(presetFolderPath + "/midi.json");
+    for (ofJson::iterator module = json.begin(); module != json.end(); ++module) {
+        for (ofJson::iterator parameter = module.value().begin(); parameter != module.value().end(); ++parameter) {
+            auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key());
+            if(midiBinding != nullptr){
+                midiBinding->loadPreset(json[module.key()][parameter.key()]);
+            }
+        }
+    }
+#endif
+    
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->presetHasLoaded();
@@ -309,6 +329,14 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
             node.second->savePreset(presetFolderPath);
         }
     }
+    
+#ifdef OFXOCEANODE_USE_MIDI
+    json.clear();
+    for(auto &bindingPair : midiBindings){
+        bindingPair.second->savePreset(json[ofSplitString(bindingPair.first, "-|-")[0]][ofSplitString(bindingPair.first, "-|-")[1]]);
+    }
+    ofSavePrettyJson(presetFolderPath + "/midi.json", json);
+#endif
 }
 
 void ofxOceanodeContainer::savePersistent(){
@@ -587,7 +615,7 @@ void ofxOceanodeContainer::setIsListeningMidi(bool b){
     }
 }
 
-bool ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p){
+ofxOceanodeAbstractMidiBinding* ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p){
     if(midiBindings.count(p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName()) == 0){
         unique_ptr<ofxOceanodeAbstractMidiBinding> midiBinding = nullptr;
         if(p.type() == typeid(ofParameter<float>).name()){
@@ -617,13 +645,14 @@ bool ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p){
             }
             midiBindingCreated.notify(this, *midiBinding.get());
             midiUnregisterlisteners.push(midiBinding->unregisterUnusedMidiIns.newListener(this, &ofxOceanodeContainer::midiBindingBound));
+            auto midiBindingPointer = midiBinding.get();
             midiBindings[p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName()] = move(midiBinding);
-            return true;
+            return midiBindingPointer;
         }
     }else{
         ofLog() << "Parameter \"" << p.getEscapedName() << "\" already binded";
     }
-    return false;
+    return nullptr;
 }
 
 bool ofxOceanodeContainer::removeMidiBinding(ofAbstractParameter &p){
@@ -659,6 +688,17 @@ void ofxOceanodeContainer::midiBindingBound(const void * sender, string &portNam
                 }
             }
         }));
+    }
+}
+
+ofxOceanodeAbstractMidiBinding* ofxOceanodeContainer::createMidiBindingFromInfo(string module, string parameter){
+    string moduleId = ofSplitString(module, "_").back();
+    module.erase(module.find(moduleId)-1);
+    ofStringReplace(module, "_", " ");
+    if(dynamicNodes.count(module) != 0){
+        if(dynamicNodes[module].count(ofToInt(moduleId))){
+            return createMidiBinding(dynamicNodes[module][ofToInt(moduleId)]->getParameters()->get(parameter));
+        }
     }
 }
 

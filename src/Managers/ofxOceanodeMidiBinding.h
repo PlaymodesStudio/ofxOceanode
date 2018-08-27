@@ -11,6 +11,7 @@
 #ifdef OFXOCEANODE_USE_MIDI
 
 #include "ofParameter.h"
+#include "ofJson.h"
 #include "ofxMidi.h"
 
 using namespace std;
@@ -39,6 +40,22 @@ public:
         }
         isListening = false;
         unregisterUnusedMidiIns.notify(this, portName);
+    }
+    
+    virtual void savePreset(ofJson &json){
+        json["Channel"] = channel.get();
+        json["Control"] = control.get();
+        json["Type"] = messageType.get();
+    }
+    
+    virtual void loadPreset(ofJson &json){
+        isListening = false;
+        channel.set(json["Channel"]);
+        control.set(json["Control"]);
+        messageType.set(json["Type"]);
+        if(messageType.get() == ofxMidiMessage::getStatusString(MIDI_CONTROL_CHANGE)) status = MIDI_CONTROL_CHANGE;
+        else if(messageType.get() == ofxMidiMessage::getStatusString(MIDI_NOTE_ON)) status = MIDI_NOTE_ON;
+        else ofLog() << "Type Error";
     }
     
     string type() const{
@@ -101,6 +118,18 @@ public:
     }
 
     ~ofxOceanodeMidiBinding(){};
+    
+    void savePreset(ofJson &json){
+        ofxOceanodeAbstractMidiBinding::savePreset(json);
+        json["Min"] = min.get();
+        json["Max"] = max.get();
+    }
+    
+    void loadPreset(ofJson &json){
+        ofxOceanodeAbstractMidiBinding::loadPreset(json);
+        min.set(json["Min"]);
+        max.set(json["Max"]);
+    }
 
     void newMidiMessage(ofxMidiMessage& message){
         if(message.status == MIDI_NOTE_OFF){
