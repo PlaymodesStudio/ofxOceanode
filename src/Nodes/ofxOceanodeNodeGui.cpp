@@ -98,6 +98,13 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
             auto matrix = gui->addMatrix(absParam.getName(), pairParam.get().first, true);
             matrix->setRadioMode(true);
             matrix->setHoldMode(pairParam.get().second);
+            parameterChangedListeners.push(pairParam.newListener([&, matrix](pair<int, bool> &pair){
+                if(pair.second){
+                    matrix->select(pair.first);
+                }else{
+                    matrix->deselect(pair.first);
+                }
+            }));
         }else {
             gui->addLabel(absParam.getName());
         }

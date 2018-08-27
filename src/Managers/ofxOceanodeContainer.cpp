@@ -667,6 +667,9 @@ ofxOceanodeAbstractMidiBinding* ofxOceanodeContainer::createMidiBinding(ofAbstra
         else if(p.type() == typeid(ofParameterGroup).name()){
             midiBinding = make_unique<ofxOceanodeMidiBinding<int>>(p.castGroup().getInt(1));
         }
+        else if(p.type() == typeid(ofParameter<pair<int, bool>>).name()){
+            midiBinding = make_unique<ofxOceanodeMidiBinding<pair<int, bool>>>(p.cast<pair<int, bool>>());
+        }
         if(midiBinding != nullptr){
             for(auto &midiInPair : midiIns){
                 midiInPair.second.addListener(midiBinding.get());
