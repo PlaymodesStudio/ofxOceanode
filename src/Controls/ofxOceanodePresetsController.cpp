@@ -97,9 +97,9 @@ void ofxOceanodePresetsController::onGuiTextInputEvent(ofxDatGuiTextInputEvent e
         string newPresetName;
         if(presetsList->getNumItems() != 0){
             string lastPreset = presetsList->get(presetsList->getNumItems()-1)->getName();
-            newPresetName = ofToString(ofToInt(ofSplitString(lastPreset, "|")[0])+1) + "|" + e.text;
+            newPresetName = ofToString(ofToInt(ofSplitString(lastPreset, "--")[0])+1) + "--" + e.text;
         }else
-            newPresetName = "1|" + e.text;
+            newPresetName = "1--" + e.text;
         
         ofStringReplace(newPresetName, " ", "_"); 
         presetsList->add(newPresetName);
@@ -136,7 +136,7 @@ void ofxOceanodePresetsController::loadBank(){
     int numPresets = dir.listDir();
     ofLog() << "Dir size: " << ofToString(numPresets);
     for ( int i = 0 ; i < numPresets; i++)
-        presets.push_back(pair<int, string>(ofToInt(ofSplitString(dir.getName(i), "|")[0]), dir.getName(i)));
+        presets.push_back(pair<int, string>(ofToInt(ofSplitString(dir.getName(i), "--")[0]), dir.getName(i)));
     
     std::sort(presets.begin(), presets.end(), [](pair<int, string> &left, pair<int, string> &right) {
         return left.first< right.first;
