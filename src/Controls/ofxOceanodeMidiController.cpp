@@ -81,6 +81,10 @@ void ofxOceanodeMidiController::newParameterBinding(ofxOceanodeAbstractMidiBindi
         folder->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
         folder->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
     }
+    else if(binding.type() == typeid(ofxOceanodeMidiBinding<bool>).name()){
+        auto &midiBindingCasted = static_cast<ofxOceanodeMidiBinding<bool> &>(binding);
+        folder->addSlider(midiBindingCasted.getToggleParameter());
+    }
     folder->expand();
 }
 

@@ -313,6 +313,101 @@ private:
     ofParameter<T> max;
 };
 
+template<>
+class ofxOceanodeMidiBinding<bool>: public ofxOceanodeAbstractMidiBinding{
+public:
+    ofxOceanodeMidiBinding(ofParameter<bool>& _parameter) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
+        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName();
+        toggle.set("Toggle", 0, 0, 1);
+    }
+    
+    ~ofxOceanodeMidiBinding(){};
+    
+    void savePreset(ofJson &json){
+        ofxOceanodeAbstractMidiBinding::savePreset(json);
+        json["Toggle"] = toggle.get();
+    }
+    
+    void loadPreset(ofJson &json){
+        ofxOceanodeAbstractMidiBinding::loadPreset(json);
+        toggle.set(json["Toggle"]);
+    }
+    
+    void newMidiMessage(ofxMidiMessage& message){
+        if(message.status == MIDI_NOTE_OFF){
+            message.status = MIDI_NOTE_ON;
+            message.velocity = 0;
+        }
+        if(isListening) ofxOceanodeAbstractMidiBinding::newMidiMessage(message);
+        if(message.channel == channel && message.status == status){
+            bool validMessage = false;
+            switch(status){
+                case MIDI_CONTROL_CHANGE:
+                {
+                    if(message.control == control){
+                        value = message.value;
+                        validMessage = true;
+                    }
+                    break;
+                }
+                case MIDI_NOTE_ON:
+                {
+                    if(message.pitch == control){
+                        value = message.velocity;
+                        validMessage = true;
+                    }
+                    break;
+                }
+                default:
+                {
+                    ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type Bool";
+                }
+            }
+            if(validMessage){
+                modifiyingParameter = true;
+                if(toggle == 1){
+                    if(value > 63){
+                        parameter.set(!parameter.get());
+                    }
+                }else{
+                    parameter.set(value > 63 ? true : false);
+                }
+                modifiyingParameter = false;
+            }
+        }
+        
+    };
+    void bindParameter(){
+        listener = parameter.newListener([this](bool &f){
+            if(!modifiyingParameter){
+                value = f ? 127 : 0;
+                ofxMidiMessage message;
+                message.status = status;
+                message.channel = channel;
+                switch(status){
+                    case MIDI_CONTROL_CHANGE:
+                        message.control = control;
+                        message.value = value;
+                        break;
+                    case MIDI_NOTE_ON:
+                        message.pitch = control;
+                        message.velocity = value;
+                        break;
+                    default:
+                        ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type Bool";
+                }
+                midiMessageSender.notify(this, message);
+            }
+        });
+    };
+
+    ofParameter<int> &getToggleParameter(){return toggle;};
+    
+private:
+    ofParameter<bool>& parameter;
+    ofParameter<int> toggle;
+};
+
 #endif
 
 #endif /* ofxOceanodeMidiBinding_h */
