@@ -269,7 +269,7 @@ public:
                 }
                 default:
                 {
-                    ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type " << typeid(T).name();
+                    ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type " << typeid(vector<T>).name();
                 }
             }
             if(validMessage){
@@ -297,7 +297,7 @@ public:
                         message.velocity = value;
                         break;
                     default:
-                        ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type " << typeid(T).name();
+                        ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type " << typeid(vector<T>).name();
                 }
                 midiMessageSender.notify(this, message);
             }
@@ -406,6 +406,112 @@ public:
 private:
     ofParameter<bool>& parameter;
     ofParameter<int> toggle;
+};
+
+template<>
+class ofxOceanodeMidiBinding<void>: public ofxOceanodeAbstractMidiBinding{
+public:
+    ofxOceanodeMidiBinding(ofParameter<void>& _parameter) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
+        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName();
+        mode.set("0:Any-1:Filter!=0", 0, 0, 1);
+    }
+    
+    ~ofxOceanodeMidiBinding(){};
+    
+    void savePreset(ofJson &json){
+        ofxOceanodeAbstractMidiBinding::savePreset(json);
+        json["Mode"] = mode.get();
+    }
+    
+    void loadPreset(ofJson &json){
+        ofxOceanodeAbstractMidiBinding::loadPreset(json);
+        mode.set(json["Mode"]);
+    }
+    
+    void newMidiMessage(ofxMidiMessage& message){
+        if(message.status == MIDI_NOTE_OFF){
+            message.status = MIDI_NOTE_ON;
+            message.velocity = 0;
+        }
+        if(isListening) ofxOceanodeAbstractMidiBinding::newMidiMessage(message);
+        if(message.channel == channel && message.status == status){
+            bool validMessage = false;
+            switch(status){
+                case MIDI_CONTROL_CHANGE:
+                {
+                    if(message.control == control){
+                        value = message.value;
+                        validMessage = true;
+                    }
+                    break;
+                }
+                case MIDI_NOTE_ON:
+                {
+                    if(message.pitch == control){
+                        value = message.velocity;
+                        validMessage = true;
+                    }
+                    break;
+                }
+                default:
+                {
+                    ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type Void";
+                }
+            }
+            if(validMessage){
+                modifiyingParameter = true;
+                if(mode == 1){
+                    if(value > 63){
+                        parameter.trigger();
+                    }
+                }else{
+                    parameter.trigger();
+                }
+                modifiyingParameter = false;
+            }
+        }
+        
+    };
+    void bindParameter(){
+        listener = parameter.newListener([this](){
+            if(!modifiyingParameter){
+                value = 127;
+                ofxMidiMessage message;
+                message.status = status;
+                message.channel = channel;
+                switch(status){
+                    case MIDI_CONTROL_CHANGE:
+                    {
+                        message.control = control;
+                        message.value = value;
+                        midiMessageSender.notify(this, message);
+                        ofxMidiMessage copyMessage = message;
+                        message.value = 0;
+                        midiMessageSender.notify(this, copyMessage);
+                        break;
+                    }
+                    case MIDI_NOTE_ON:
+                    {
+                        message.pitch = control;
+                        message.velocity = value;
+                        ofxMidiMessage copyMessage = message;
+                        message.pitch = 0;
+                        midiMessageSender.notify(this, copyMessage);
+                        break;
+                    }
+                    default:
+                        ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type Void";
+                }
+                
+            }
+        });
+    };
+    
+    ofParameter<int> &getModeParameter(){return mode;};
+    
+private:
+    ofParameter<void>& parameter;
+    ofParameter<int> mode;
 };
 
 #endif
