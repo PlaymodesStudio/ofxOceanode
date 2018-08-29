@@ -77,7 +77,7 @@ public:
         tempStrParam.set(tempStr);
         
         tempDropdown->add(tempStrParam);
-        tempDropdown->add(dropdownSelector.set(name, 0, 0, options.size()));
+        tempDropdown->add(dropdownSelector.set(name, 0, 0, options.size()-1));
         return *tempDropdown;
     }
     
