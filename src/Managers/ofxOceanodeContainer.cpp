@@ -719,6 +719,9 @@ void ofxOceanodeContainer::midiBindingBound(const void * sender, string &portNam
                     midiOuts[portName].sendControlChange(message.channel, message.control, message.value);
                     break;
                 }
+                case MIDI_NOTE_ON:{
+                    midiOuts[portName].sendNoteOn(message.channel, message.pitch, message.velocity);
+                }
                 default:{
                     
                 }
