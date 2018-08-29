@@ -29,7 +29,7 @@ public:
     void newMidiMessage(ofxMidiMessage &message){
         if(message.portName == midiDevice && (message.channel == channel || channel == 0)){
             if(message.status == MIDI_NOTE_ON && type == "Note On"){
-                presetsController->loadPresetFromNumber(message.pitch);
+                if(message.velocity!=0) presetsController->loadPresetFromNumber(message.pitch);
             }else if(message.status == MIDI_CONTROL_CHANGE && type == "Control Change"){
                 
             }else if(message.status == MIDI_PROGRAM_CHANGE && type == "Program Change"){
