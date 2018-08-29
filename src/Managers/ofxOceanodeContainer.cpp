@@ -44,6 +44,7 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     for(auto port : midiOutPortList){
         midiOuts[port].openPort(port);
     }
+    isListeningMidi = false;
 #endif
 }
 

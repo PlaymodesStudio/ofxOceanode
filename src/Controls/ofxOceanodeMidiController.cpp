@@ -12,6 +12,7 @@
 ofxOceanodeMidiController::ofxOceanodeMidiController(shared_ptr<ofxOceanodePresetsController> _presetsController, shared_ptr<ofxOceanodeContainer> _container) : ofxOceanodeBaseController(_container, "MIDI"){
     midiLearn = gui->addToggle("Midi Learn", false);
     midiDevices = container->getMidiDevices();
+    container->setIsListeningMidi(midiLearn->getChecked());
     presetsControl.setPresetsController(_presetsController);
     
     gui->addLabel("Presets");
