@@ -21,3 +21,12 @@ void ofxOceanodeConnection<void, bool>::linkParameters(){
         sinkParameter = !sinkParameter;
     });
 }
+
+template<>
+void ofxOceanodeConnection<float, bool>::linkParameters(){
+    parameterEventListener = sourceParameter.newListener([&](float &f){
+        bool newValue = (f > ((sourceParameter.getMax() - sourceParameter.getMin())/2.0 + sourceParameter.getMin())) ? true : false;
+        if(newValue != sinkParameter) sinkParameter = newValue;
+    });
+}
+
