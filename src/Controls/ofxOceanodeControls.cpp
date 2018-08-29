@@ -55,7 +55,7 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
 #endif
     
 #ifdef OFXOCEANODE_USE_MIDI
-    controllers.push_back(make_unique<ofxOceanodeMidiController>(container));
+    controllers.push_back(make_unique<ofxOceanodeMidiController>(get<ofxOceanodePresetsController>(), container));
 #endif
     
     if(controllers.size() > 0){

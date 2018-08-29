@@ -9,11 +9,24 @@
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeMidiBinding.h"
 
-ofxOceanodeMidiController::ofxOceanodeMidiController(shared_ptr<ofxOceanodeContainer> _container) : ofxOceanodeBaseController(_container, "MIDI"){
+ofxOceanodeMidiController::ofxOceanodeMidiController(shared_ptr<ofxOceanodePresetsController> _presetsController, shared_ptr<ofxOceanodeContainer> _container) : ofxOceanodeBaseController(_container, "MIDI"){
     midiLearn = gui->addToggle("Midi Learn", false);
+    midiDevices = container->getMidiDevices();
+    presetsControl.setPresetsController(_presetsController);
+    
+    gui->addLabel("Presets");
+    gui->addDropdown("Midi Device", midiDevices);
+    gui->addSlider(presetsControl.getChannel());
+    gui->addDropdown("Type", {"Note On", "Control Change", "Program Change"});
+    
+    gui->addLabel("===========Bindings===========");
     
     midiLearn->onToggleEvent(this, &ofxOceanodeMidiController::midiLearnPressed);
     
+    gui->onDropdownEvent(this, &ofxOceanodeMidiController::onGuiDropdownEvent);
+    gui->onTextInputEvent(this, &ofxOceanodeMidiController::onGuiTextInputEvent);
+    
+    container->addNewMidiMessageListener(&presetsControl);
     
     listeners.push(container->midiBindingCreated.newListener(this, &ofxOceanodeMidiController::newParameterBinding));
     listeners.push(container->midiBindingDestroyed.newListener(this, &ofxOceanodeMidiController::removeParameterBinding));
@@ -74,4 +87,17 @@ void ofxOceanodeMidiController::newParameterBinding(ofxOceanodeAbstractMidiBindi
 void ofxOceanodeMidiController::removeParameterBinding(ofxOceanodeAbstractMidiBinding &binding){
     gui->removeComponent(folders[binding.getName()]->getName());
     folders.erase(binding.getName());
+}
+
+void ofxOceanodeMidiController::onGuiDropdownEvent(ofxDatGuiDropdownEvent e){
+    if(e.target->getName() == "Midi Device"){
+        presetsControl.setMidiDevice(e.target->getSelected()->getName());
+    }
+    else if(e.target->getName() == "Type"){
+        presetsControl.setType(e.target->getSelected()->getName());
+    }
+}
+
+void ofxOceanodeMidiController::onGuiTextInputEvent(ofxDatGuiTextInputEvent e){
+    
 }

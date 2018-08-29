@@ -31,17 +31,17 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     
 #ifdef OFXOCEANODE_USE_MIDI
     ofxMidiIn* midiIn = new ofxMidiIn();
-    auto inPortList = midiIn->getInPortList();
+    midiInPortList = midiIn->getInPortList();
     delete midiIn;
-    for(auto port : inPortList){
+    for(auto port : midiInPortList){
         midiIns[port].openPort(port);
     }
     
     
     ofxMidiOut* midiOut = new ofxMidiOut();
-    auto outPortList = midiOut->getOutPortList();
+    midiOutPortList = midiOut->getOutPortList();
     delete midiOut;
-    for(auto port : outPortList){
+    for(auto port : midiOutPortList){
         midiOuts[port].openPort(port);
     }
 #endif
@@ -735,6 +735,12 @@ ofxOceanodeAbstractMidiBinding* ofxOceanodeContainer::createMidiBindingFromInfo(
         if(collection[module].count(ofToInt(moduleId))){
             return createMidiBinding(collection[module][ofToInt(moduleId)]->getParameters()->get(parameter), isPersistent);
         }
+    }
+}
+
+void ofxOceanodeContainer::addNewMidiMessageListener(ofxMidiListener* listener){
+    for(auto &midiInPair : midiIns){
+        midiInPair.second.addListener(listener);
     }
 }
 

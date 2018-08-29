@@ -60,6 +60,8 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
                loadPreset(presetInfo[1], presetInfo[0]);
         }
     });
+    
+    int loadPresetInNextUpdate = 0;
 }
 
 void ofxOceanodePresetsController::draw(){
@@ -68,8 +70,20 @@ void ofxOceanodePresetsController::draw(){
 }
 
 void ofxOceanodePresetsController::update(){
+    if(loadPresetInNextUpdate != 0){
+        if(currentBankPresets.count(loadPresetInNextUpdate) > 0){
+            changePresetLabelHighliht(presetsList->get(currentBankPresets[loadPresetInNextUpdate]));
+            loadPreset(currentBankPresets[loadPresetInNextUpdate], bankSelect->getSelected()->getName());
+        }
+        loadPresetInNextUpdate = 0;
+    }
     if(isActive)
         gui->update();
+}
+
+
+void ofxOceanodePresetsController::loadPresetFromNumber(int num){
+    loadPresetInNextUpdate = num;
 }
 
 void ofxOceanodePresetsController::onGuiDropdownEvent(ofxDatGuiDropdownEvent e){
@@ -95,14 +109,17 @@ void ofxOceanodePresetsController::onGuiScrollViewEvent(ofxDatGuiScrollViewEvent
 void ofxOceanodePresetsController::onGuiTextInputEvent(ofxDatGuiTextInputEvent e){
     if(e.text != ""){
         string newPresetName;
+        int newPresetNum;
         if(presetsList->getNumItems() != 0){
             string lastPreset = presetsList->get(presetsList->getNumItems()-1)->getName();
-            newPresetName = ofToString(ofToInt(ofSplitString(lastPreset, "--")[0])+1) + "--" + e.text;
+            newPresetNum = ofToInt(ofSplitString(lastPreset, "--")[0]) + 1;
+            newPresetName = ofToString(newPresetNum) + "--" + e.text;
         }else
             newPresetName = "1--" + e.text;
         
         ofStringReplace(newPresetName, " ", "_"); 
         presetsList->add(newPresetName);
+        currentBankPresets[newPresetNum] = newPresetName;
         changePresetLabelHighliht(presetsList->get(presetsList->getNumItems()-1));
         savePreset(newPresetName, bankSelect->getSelected()->getName());
         
@@ -135,8 +152,10 @@ void ofxOceanodePresetsController::loadBank(){
     dir.sort();
     int numPresets = dir.listDir();
     ofLog() << "Dir size: " << ofToString(numPresets);
-    for ( int i = 0 ; i < numPresets; i++)
+    for ( int i = 0 ; i < numPresets; i++){
         presets.push_back(pair<int, string>(ofToInt(ofSplitString(dir.getName(i), "--")[0]), dir.getName(i)));
+        currentBankPresets[ofToInt(ofSplitString(dir.getName(i), "--")[0])] = dir.getName(i);
+    }
     
     std::sort(presets.begin(), presets.end(), [](pair<int, string> &left, pair<int, string> &right) {
         return left.first< right.first;

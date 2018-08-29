@@ -25,6 +25,7 @@ class ofxOceanodeTypesRegistry;
 class ofxOceanodeAbstractMidiBinding;
 class ofxMidiIn;
 class ofxMidiOut;
+class ofxMidiListener;
 #endif
 
 
@@ -100,6 +101,8 @@ public:
     ofxOceanodeAbstractMidiBinding* createMidiBindingFromInfo(string module, string parameter, bool isPersistent = false);
     ofEvent<ofxOceanodeAbstractMidiBinding> midiBindingCreated;
     ofEvent<ofxOceanodeAbstractMidiBinding> midiBindingDestroyed;
+    vector<string> getMidiDevices(){return midiInPortList;};
+    void addNewMidiMessageListener(ofxMidiListener* listener);
 #endif
     
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
@@ -143,6 +146,9 @@ private:
     map<string, unique_ptr<ofxOceanodeAbstractMidiBinding>> persistentMidiBindings;
     map<string, ofxMidiIn> midiIns;
     map<string, ofxMidiOut> midiOuts;
+    
+    vector<string> midiInPortList;
+    vector<string> midiOutPortList;
     
     ofEventListeners midiUnregisterlisteners;
     ofEventListeners midiSenderListeners;
