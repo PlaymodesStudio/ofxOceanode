@@ -239,24 +239,6 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         }
     }
     
-    for(auto &nodeTypeMap : dynamicNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->loadPreset(presetFolderPath);
-        }
-    }
-    
-    json.clear();
-    json = ofLoadJson(presetFolderPath + "/connections.json");
-    for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
-        for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
-            for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
-                for (ofJson::iterator sinkParameter = sinkModule.value().begin(); sinkParameter != sinkModule.value().end(); ++sinkParameter) {
-                    createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key());
-                }
-            }
-        }
-    }
-    
 #ifdef OFXOCEANODE_USE_MIDI
     json.clear();
     for(auto &binding : midiBindings){
@@ -276,6 +258,24 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         }
     }
 #endif
+    
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->loadPreset(presetFolderPath);
+        }
+    }
+    
+    json.clear();
+    json = ofLoadJson(presetFolderPath + "/connections.json");
+    for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
+        for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
+            for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
+                for (ofJson::iterator sinkParameter = sinkModule.value().begin(); sinkParameter != sinkModule.value().end(); ++sinkParameter) {
+                    createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key());
+                }
+            }
+        }
+    }
     
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){

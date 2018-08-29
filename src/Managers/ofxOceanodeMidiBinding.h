@@ -24,6 +24,7 @@ public:
         channel.set("Channel", -1, 1, 16);
         control.set("Control", -1, 0, 127);
         value.set("Value", -1, 0, 127);
+        portName = "";
     };
     ~ofxOceanodeAbstractMidiBinding(){};
     
@@ -43,13 +44,19 @@ public:
     }
     
     virtual void savePreset(ofJson &json){
+        json["Port"] = portName;
         json["Channel"] = channel.get();
         json["Control"] = control.get();
         json["Type"] = messageType.get();
     }
     
     virtual void loadPreset(ofJson &json){
-        isListening = false;
+        if(json.count("Port") == 1){
+            portName = json["Port"];
+            isListening = false;
+            unregisterUnusedMidiIns.notify(this, portName);
+        }
+        
         channel.set(json["Channel"]);
         control.set(json["Control"]);
         messageType.set(json["Type"]);
@@ -68,6 +75,8 @@ public:
     ofParameter<int> &getChannel(){return channel;};
     ofParameter<int> &getControl(){return control;};
     ofParameter<int> &getValue(){return value;};
+    
+    string getPortName(){return portName;};
     
     virtual ofxMidiMessage& sendMidiMessage(){};
     virtual void bindParameter(){};
