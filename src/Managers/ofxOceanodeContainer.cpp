@@ -135,6 +135,24 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
                 }
             }
             
+#ifdef OFXOCEANODE_USE_MIDI
+            string toBeCreatedEscaped = nodeToBeCreatedName + " " + ofToString(toBeCreatedId);
+            ofStringReplace(toBeCreatedEscaped, " ", "_");
+            vector<string> midiBindingToBeRemoved;
+            for(auto &midiBind : midiBindings){
+                if(ofSplitString(midiBind.first, "-|-")[0] == toBeCreatedEscaped){
+                    for(auto &midiInPair : midiIns){
+                        midiInPair.second.removeListener(midiBind.second.get());
+                    }
+                    midiBindingDestroyed.notify(this, *midiBind.second.get());
+                    midiBindingToBeRemoved.push_back(midiBind.first);
+                }
+            }
+            for(auto &s : midiBindingToBeRemoved){
+                midiBindings.erase(s);
+            }
+#endif
+            
             dynamicNodes[nodeToBeCreatedName].erase(toBeCreatedId);
         }));
         
