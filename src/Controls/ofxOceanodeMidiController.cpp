@@ -5,6 +5,8 @@
 //  Created by Eduard Frigola Bagué on 19/08/2018.
 //
 
+#ifdef OFXOCEANODE_USE_MIDI
+
 #include "ofxOceanodeMidiController.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeMidiBinding.h"
@@ -110,3 +112,5 @@ void ofxOceanodeMidiController::onGuiDropdownEvent(ofxDatGuiDropdownEvent e){
 void ofxOceanodeMidiController::onGuiTextInputEvent(ofxDatGuiTextInputEvent e){
     
 }
+
+#endif

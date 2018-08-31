@@ -4,9 +4,11 @@
 //
 //  Created by Eduard Frigola Bagué on 20/08/2018.
 //
+#ifdef OFXOCEANODE_USE_MIDI
 
 #include "ofxOceanodeMidiBinding.h"
 
+#pragma mark pair<int, bool>
 template<>
 void ofxOceanodeMidiBinding<pair<int, bool>>::newMidiMessage(ofxMidiMessage& message){
     if(message.status == MIDI_NOTE_OFF){
@@ -59,3 +61,6 @@ void ofxOceanodeMidiBinding<pair<int, bool>>::bindParameter(){
         }
     });
 }
+
+#endif
+
