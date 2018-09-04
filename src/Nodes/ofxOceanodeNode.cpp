@@ -127,6 +127,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeCont
         else if(sink.type() == typeid(ofParameterGroup).name()){
             connection = container.connectConnection(source.cast<float>(), sink.castGroup().getInt(1));
         }
+        else if(sink.type() == typeid(ofParameter<bool>).name()){
+            connection = container.connectConnection(source.cast<float>(), sink.cast<bool>());
+        }
     }else if(source.type() == typeid(ofParameter<int>).name()){
         if(sink.type() == typeid(ofParameter<float>).name()){
             connection = container.connectConnection(source.cast<int>(), sink.cast<float>());

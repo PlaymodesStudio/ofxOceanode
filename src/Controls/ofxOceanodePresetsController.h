@@ -19,6 +19,8 @@ public:
     void draw();
     void update();
     
+    void loadPresetFromNumber(int num);
+    
     void onGuiDropdownEvent(ofxDatGuiDropdownEvent e);
     void onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e);
     void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);
@@ -35,6 +37,9 @@ private:
     ofxDatGuiScrollView* presetsList;
     ofxDatGuiButton*    oldPresetButton;
     
+    map<int, string> currentBankPresets;
+    
+    int loadPresetInNextUpdate;
     
     ofEventListener presetListener;
 };

@@ -5,15 +5,31 @@
 //  Created by Eduard Frigola Bagué on 19/08/2018.
 //
 
+#ifdef OFXOCEANODE_USE_MIDI
+
 #include "ofxOceanodeMidiController.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeMidiBinding.h"
 
-ofxOceanodeMidiController::ofxOceanodeMidiController(shared_ptr<ofxOceanodeContainer> _container) : ofxOceanodeBaseController(_container, "MIDI"){
+ofxOceanodeMidiController::ofxOceanodeMidiController(shared_ptr<ofxOceanodePresetsController> _presetsController, shared_ptr<ofxOceanodeContainer> _container) : ofxOceanodeBaseController(_container, "MIDI"){
     midiLearn = gui->addToggle("Midi Learn", false);
+    midiDevices = container->getMidiDevices();
+    container->setIsListeningMidi(midiLearn->getChecked());
+    presetsControl.setPresetsController(_presetsController);
+    
+    gui->addLabel("Presets");
+    gui->addDropdown("Midi Device", midiDevices);
+    gui->addSlider(presetsControl.getChannel());
+    gui->addDropdown("Type", {"Note On", "Control Change", "Program Change"});
+    
+    gui->addLabel("===========Bindings===========");
     
     midiLearn->onToggleEvent(this, &ofxOceanodeMidiController::midiLearnPressed);
     
+    gui->onDropdownEvent(this, &ofxOceanodeMidiController::onGuiDropdownEvent);
+    gui->onTextInputEvent(this, &ofxOceanodeMidiController::onGuiTextInputEvent);
+    
+    container->addNewMidiMessageListener(&presetsControl);
     
     listeners.push(container->midiBindingCreated.newListener(this, &ofxOceanodeMidiController::newParameterBinding));
     listeners.push(container->midiBindingDestroyed.newListener(this, &ofxOceanodeMidiController::removeParameterBinding));
@@ -68,6 +84,14 @@ void ofxOceanodeMidiController::newParameterBinding(ofxOceanodeAbstractMidiBindi
         folder->addSlider(midiBindingCasted.getMinParameter())->setPrecision(1000);
         folder->addSlider(midiBindingCasted.getMaxParameter())->setPrecision(1000);
     }
+    else if(binding.type() == typeid(ofxOceanodeMidiBinding<bool>).name()){
+        auto &midiBindingCasted = static_cast<ofxOceanodeMidiBinding<bool> &>(binding);
+        folder->addSlider(midiBindingCasted.getToggleParameter());
+    }
+    else if(binding.type() == typeid(ofxOceanodeMidiBinding<void>).name()){
+        auto &midiBindingCasted = static_cast<ofxOceanodeMidiBinding<void> &>(binding);
+        folder->addSlider(midiBindingCasted.getModeParameter());
+    }
     folder->expand();
 }
 
@@ -75,3 +99,18 @@ void ofxOceanodeMidiController::removeParameterBinding(ofxOceanodeAbstractMidiBi
     gui->removeComponent(folders[binding.getName()]->getName());
     folders.erase(binding.getName());
 }
+
+void ofxOceanodeMidiController::onGuiDropdownEvent(ofxDatGuiDropdownEvent e){
+    if(e.target->getName() == "Midi Device"){
+        presetsControl.setMidiDevice(e.target->getSelected()->getName());
+    }
+    else if(e.target->getName() == "Type"){
+        presetsControl.setType(e.target->getSelected()->getName());
+    }
+}
+
+void ofxOceanodeMidiController::onGuiTextInputEvent(ofxDatGuiTextInputEvent e){
+    
+}
+
+#endif
