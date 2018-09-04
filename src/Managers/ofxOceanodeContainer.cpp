@@ -24,6 +24,7 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     transformationMatrix = glm::mat4(1);
     temporalConnection = nullptr;
     bpm = 120;
+    collapseAll = false;
     
 #ifdef OFXOCEANODE_USE_OSC
     updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
@@ -105,6 +106,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     node->setup();
     if(!isHeadless){
         auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node, window);
+        if(collapseAll) nodeGui->collapse();
 #ifdef OFXOCEANODE_USE_MIDI
         nodeGui->setIsListeningMidi(isListeningMidi);
 #endif
@@ -525,6 +527,23 @@ void ofxOceanodeContainer::resetPhase(){
     }
 }
 
+void ofxOceanodeContainer::collapseGuis(){
+    collapseAll = true;
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->getNodeGui().collapse();
+        }
+    }
+}
+void ofxOceanodeContainer::expandGuis(){
+    collapseAll = false;
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->getNodeGui().expand();
+        }
+    }
+}
+
 #ifdef OFXOCEANODE_USE_OSC
 
 void ofxOceanodeContainer::setupOscSender(string host, int port){
@@ -586,6 +605,8 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                                 castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
                             }else if(absParam.type() == typeid(ofParameter<bool>).name()){
                                 absParam.cast<bool>() = m.getArgAsBool(0);
+                            }else if(absParam.type() == typeid(ofParameter<void>).name()){
+                                absParam.cast<void>().trigger();
                             }else if(absParam.type() == typeid(ofParameter<string>).name()){
                                 absParam.cast<string>() = m.getArgAsString(0);
                             }else if(absParam.type() == typeid(ofParameterGroup).name()){

@@ -85,6 +85,9 @@ public:
     void setPhase(float _phase);
     void resetPhase();
     
+    void collapseGuis();
+    void expandGuis();
+    
     ofEvent<string> loadPresetEvent;
     
 #ifdef OFXOCEANODE_USE_OSC
@@ -131,6 +134,7 @@ private:
     float phase;
     
     const bool isHeadless;
+    bool collapseAll;
     
 #ifdef OFXOCEANODE_USE_OSC
     ofxOscSender oscSender;

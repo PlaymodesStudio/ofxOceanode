@@ -245,6 +245,24 @@ glm::vec2 ofxOceanodeNodeGui::getPosition(){
     return glm::vec2(gui->getPosition().x, gui->getPosition().y);
 }
 
+void ofxOceanodeNodeGui::collapse(){
+    if(gui->getExpanded()){
+        gui->collapse();
+        auto header = gui->getHeader();
+        node.collapseConnections(glm::vec2(header->getX(), header->getY() + header->getHeight()/2), glm::vec2(header->getX() + header->getWidth(), header->getY() + header->getHeight()/2));
+        lastExpandedState = false;
+    }
+}
+
+void ofxOceanodeNodeGui::expand(){
+    if(!gui->getExpanded()){
+        gui->expand();
+        node.expandConnections();
+        lastExpandedState = true;
+    }
+}
+
+
 void ofxOceanodeNodeGui::keyPressed(ofKeyEventArgs &args){
     if(args.key == 'r' && !args.isRepeat){
         if(gui->hitTest(ofVec2f(ofGetMouseX(), ofGetMouseY()))){
@@ -352,7 +370,7 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
 }
 
 glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter){
-    auto component = gui->getComponent(parameter.getName());
+    auto component = gui->getExpanded() ? gui->getComponent(parameter.getName()) : gui->getHeader();
     if(component == NULL){
         component = gui->getComponent(parameter.getName() + " Selector");
     }
@@ -363,7 +381,7 @@ glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofAbstrac
 }
 
 glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter){
-    auto component = gui->getComponent(parameter.getName());
+    auto component = gui->getExpanded() ? gui->getComponent(parameter.getName()) : gui->getHeader();
     if(component == NULL){
         component = gui->getComponent(parameter.getName() + " Selector");
     }
