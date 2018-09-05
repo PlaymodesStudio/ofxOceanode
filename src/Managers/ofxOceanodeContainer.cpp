@@ -47,6 +47,10 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     }
     isListeningMidi = false;
 #endif
+    
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+    randomSeedValue = 0;
+#endif
 }
 
 ofxOceanodeContainer::~ofxOceanodeContainer(){
@@ -310,6 +314,21 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         }
     }
     
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+    json.clear();
+    json = ofLoadJson(presetFolderPath + "/randomseed.json");
+    if(json.count("RandomSeed") == 1){
+        randomSeedValue = json["RandomSeed"];
+    }
+    else{
+        randomSeedValue = 0;
+    }
+    randomSeedLoad.notify(this, randomSeedValue);
+    if(randomSeedValue != 0){
+        ofSeedRandom(randomSeedValue);
+    }
+#endif
+    
     resetPhase();
     
     return true;
@@ -357,6 +376,13 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
         bindingPair.second->savePreset(json[ofSplitString(bindingPair.first, "-|-")[0]][ofSplitString(bindingPair.first, "-|-")[1]]);
     }
     ofSavePrettyJson(presetFolderPath + "/midi.json", json);
+#endif
+    
+    
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+    json.clear();
+    json["RandomSeed"] = randomSeedValue;
+    ofSavePrettyJson(presetFolderPath + "/randomseed.json", json);
 #endif
 }
 

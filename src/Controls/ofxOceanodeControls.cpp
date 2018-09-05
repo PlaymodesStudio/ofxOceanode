@@ -17,6 +17,10 @@
     #include "ofxOceanodeMidiController.h"
 #endif
 
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+#include "ofxOceanodeRandomSeedController.h"
+#endif
+
 ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _container) : container(_container){
     
     ofGLFWWindowSettings prevSettings;
@@ -56,6 +60,10 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     
 #ifdef OFXOCEANODE_USE_MIDI
     controllers.push_back(make_unique<ofxOceanodeMidiController>(get<ofxOceanodePresetsController>(), container));
+#endif
+    
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+    controllers.push_back(make_unique<ofxOceanodeRandomSeedController>(container));
 #endif
     
     if(controllers.size() > 0){
