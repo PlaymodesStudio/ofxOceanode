@@ -108,11 +108,6 @@ public:
     void addNewMidiMessageListener(ofxMidiListener* listener);
 #endif
     
-#ifdef OFXOCEANODE_USE_RANDOMSEED
-    ofEvent<int> randomSeedLoad;
-    void setRandomSeed(int newSeed){randomSeedValue = newSeed;};
-#endif
-    
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
     
 private:
@@ -162,10 +157,6 @@ private:
     ofEventListeners midiUnregisterlisteners;
     ofEventListeners midiSenderListeners;
     void midiBindingBound(const void * sender, string &portName);
-#endif
-        
-#ifdef OFXOCEANODE_USE_RANDOMSEED
-    int randomSeedValue;
 #endif
     
 };

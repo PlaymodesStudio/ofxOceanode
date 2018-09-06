@@ -135,7 +135,7 @@ void baseIndexer::recomputeIndexs(){
         index = indexInvert_Param*invertedIndex + (1-indexInvert_Param)*nonInvertIndex;
         
         //random
-        index += indexRand[index-1]*indexRand_Param;
+        index += indexRand[index]*indexRand_Param;
         index %= indexCount;
         if(index < 0)
             index += indexCount;

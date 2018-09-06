@@ -9,7 +9,9 @@
 #ifndef baseOscillator_h
 #define baseOscillator_h
 
-
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+#include <random>
+#endif
 
 enum oscTypes{
     sinOsc = 1,
@@ -28,7 +30,10 @@ public:
     ~baseOscillator(){};
     
     void setIndexNormalized(float index){indexNormalized = index;};
-    
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+    void setSeed(int seed);
+    void deactivateSeed();
+#endif
     float  phaseOffset_Param;
     float  pow_Param;
     float  pulseWidth_Param;
@@ -52,6 +57,12 @@ private:
     float indexNormalized;
     float pastRandom;
     float newRandom;
+    
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+    int seed;
+    std::mt19937 mt;
+    std::uniform_real_distribution<float> dist;
+#endif
 };
 
 #endif /* baseOscillator_h */

@@ -20,6 +20,9 @@ public:
     };
     
     void presetRecallBeforeSettingParameters(ofJson &json) override;
+    void presetRecallAfterSettingParameters(ofJson &json) override;
+    
+    void presetHasLoaded() override;
 
 private:
     void computeBank(float phasor);
@@ -51,6 +54,7 @@ private:
     void newSkewParam(vector<float> &f);
     void newBiPowParam(vector<float> &f);
     
+
     ofParameter<float>    phasorIn;
     ofParameter<vector<float>>    pow_Param; //Pow of the funcion, working on sin, cos....
     ofParameter<vector<float>>    pulseWidth_Param;
@@ -66,6 +70,9 @@ private:
     ofParameter<vector<float>>    invert_Param;
     ofParameter<vector<float>>    skew_Param;
     ofParameter<vector<float>>      oscillatorOut;
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+    ofParameter<vector<int>> seed;
+#endif
     
     vector<baseOscillator> oscillators;
     vector<float> result;
