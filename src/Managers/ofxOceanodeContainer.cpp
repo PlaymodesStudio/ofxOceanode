@@ -216,13 +216,20 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     if(!json.empty()){;
         for(auto &models : registry->getRegisteredModels()){
             string moduleName = models.first;
-            vector<int>  vector_of_identifiers;
+            vector<int>  vector_of_dynamic_identifiers;
+            vector<int>  vector_of_persistent_identifiers;
             if(dynamicNodes.count(moduleName) != 0){
                 for(auto &nodes_of_a_give_type : dynamicNodes[moduleName]){
-                    vector_of_identifiers.push_back(nodes_of_a_give_type.first);
+                    vector_of_dynamic_identifiers.push_back(nodes_of_a_give_type.first);
                 }
             }
-            for(auto identifier : vector_of_identifiers){
+            if(persistentNodes.count(moduleName) != 0){
+                for(auto &nodes_of_a_give_type : persistentNodes[moduleName]){
+                    vector_of_persistent_identifiers.push_back(nodes_of_a_give_type.first);
+                }
+            }
+            
+            for(auto identifier : vector_of_dynamic_identifiers){
                 string stringIdentifier = ofToString(identifier);
                 if(json.find(moduleName) != json.end() && json[moduleName].find(stringIdentifier) != json[moduleName].end()){
                     vector<float> readArray = json[moduleName][stringIdentifier];
@@ -235,6 +242,19 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
                     dynamicNodes[moduleName][identifier]->deleteSelf();
                 }
             }
+            for(auto identifier : vector_of_persistent_identifiers){
+                string stringIdentifier = ofToString(identifier);
+                if(json.find(moduleName) != json.end() && json[moduleName].find(stringIdentifier) != json[moduleName].end()){
+                    vector<float> readArray = json[moduleName][stringIdentifier];
+                    if(!isHeadless){
+                        glm::vec2 position(readArray[0], readArray[1]);
+                        persistentNodes[moduleName][identifier]->getNodeGui().setPosition(position);
+                    }
+                    json[moduleName].erase(stringIdentifier);
+                }
+            }
+            
+            
             for (ofJson::iterator it = json[moduleName].begin(); it != json[moduleName].end(); ++it) {
                 int identifier = ofToInt(it.key());
                 if(dynamicNodes[moduleName].count(identifier) == 0){
@@ -279,6 +299,12 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
 #endif
     
     for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->loadPreset(presetFolderPath);
+        }
+    }
+    
+    for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->loadPreset(presetFolderPath);
         }
@@ -349,6 +375,12 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
         }
     }
     
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->savePreset(presetFolderPath);
+        }
+    }
+    
 #ifdef OFXOCEANODE_USE_MIDI
     json.clear();
     for(auto &bindingPair : midiBindings){
@@ -397,12 +429,12 @@ void ofxOceanodeContainer::savePersistent(){
     
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
-            node.second->savePreset(persistentFolderPath);
+            node.second->savePersistentPreset(persistentFolderPath);
         }
     }
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
-            node.second->savePreset(persistentFolderPath);
+            node.second->savePersistentPreset(persistentFolderPath);
         }
     }
 
@@ -473,7 +505,7 @@ void ofxOceanodeContainer::loadPersistent(){
     
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
-            node.second->loadPreset(persistentFolderPath);
+            node.second->loadPersistentPreset(persistentFolderPath);
         }
     }
     
@@ -517,6 +549,14 @@ void ofxOceanodeContainer::loadPersistent(){
     }
 }
 
+void ofxOceanodeContainer::updatePersistent(){
+    string persistentFolderPath = "Persistent";
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->savePersistentPreset(persistentFolderPath);
+        }
+    }
+}
 
 void ofxOceanodeContainer::setBpm(float _bpm){
     bpm = _bpm;
@@ -605,6 +645,8 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                                 castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
                             }else if(absParam.type() == typeid(ofParameter<bool>).name()){
                                 absParam.cast<bool>() = m.getArgAsBool(0);
+                            }else if(absParam.type() == typeid(ofParameter<void>).name()){
+                                    absParam.cast<void>().trigger();
                             }else if(absParam.type() == typeid(ofParameter<string>).name()){
                                 absParam.cast<string>() = m.getArgAsString(0);
                             }else if(absParam.type() == typeid(ofParameterGroup).name()){

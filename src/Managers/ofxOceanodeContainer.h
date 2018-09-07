@@ -81,6 +81,7 @@ public:
     
     void savePersistent();
     void loadPersistent();
+    void updatePersistent();
     
     void setBpm(float _bpm);
     void setPhase(float _phase);
