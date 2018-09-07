@@ -46,6 +46,7 @@ oscillator::oscillator() : ofxOceanodeNodeModel("Oscillator"){
         baseOsc.waveSelect_Param = val;
     }));
     
+
     parameters->add(phasorIn.set("Phasor In", 0, 0, 1));
     parameters->add(phaseOffset_Param.set("Phase Offset", 0, 0, 1));
     parameters->add(randomAdd_Param.set("Random Addition", 0, -.5, .5));
@@ -58,6 +59,16 @@ oscillator::oscillator() : ofxOceanodeNodeModel("Oscillator"){
     parameters->add(skew_Param.set("Skew", 0, -1, 1));
     parameters->add(amplitude_Param.set("Fader", 1, 0, 1));
     parameters->add(invert_Param.set("Invert", 0, 0, 1));
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+    parameters->add(seed.set("Seed", 0, INT_MIN, INT_MAX));
+    listeners.push(seed.newListener([this](int &s){
+        if(s == 0){
+            baseOsc.deactivateSeed();
+        }else{
+            baseOsc.setSeed(s);
+        }
+    }));
+#endif
     parameters->add(createDropdownAbstractParameter("Wave", {"sin", "cos", "tri", "square", "saw", "inverted saw", "rand1", "rand2"}, waveSelect_Param));
     addOutputParameterToGroupAndInfo(output.set("Output", 0, 0, 1));
     

@@ -34,6 +34,9 @@ private:
     ofParameter<float>  invert_Param;
     ofParameter<float>  skew_Param;
     ofParameter<float>  output;
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+    ofParameter<int> seed;
+#endif
     
     ofEventListeners listeners;
 };

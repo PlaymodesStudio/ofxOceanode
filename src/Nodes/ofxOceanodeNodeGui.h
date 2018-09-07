@@ -28,6 +28,8 @@ public:
     
     ofParameterGroup* getParameters();
     glm::vec2 getPosition();
+    void collapse();
+    void expand();
     
     glm::vec2 getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter);
     glm::vec2 getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter);
