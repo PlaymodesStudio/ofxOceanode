@@ -567,6 +567,11 @@ void ofxOceanodeContainer::setBpm(float _bpm){
             node.second->setBpm(bpm);
         }
     }
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->setBpm(bpm);
+        }
+    }
 }
 
 void ofxOceanodeContainer::setPhase(float _phase){
@@ -576,10 +581,20 @@ void ofxOceanodeContainer::setPhase(float _phase){
             node.second->setPhase(phase);
         }
     }
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->setPhase(phase);
+        }
+    }
 }
 
 void ofxOceanodeContainer::resetPhase(){
     for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->resetPhase();
+        }
+    }
+    for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->resetPhase();
         }
@@ -593,10 +608,20 @@ void ofxOceanodeContainer::collapseGuis(){
             node.second->getNodeGui().collapse();
         }
     }
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->getNodeGui().collapse();
+        }
+    }
 }
 void ofxOceanodeContainer::expandGuis(){
     collapseAll = false;
     for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->getNodeGui().expand();
+        }
+    }
+    for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->getNodeGui().expand();
         }
@@ -717,6 +742,11 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
 void ofxOceanodeContainer::setIsListeningMidi(bool b){
     isListeningMidi = b;
     for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->getNodeGui().setIsListeningMidi(b);
+        }
+    }
+    for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->getNodeGui().setIsListeningMidi(b);
         }
