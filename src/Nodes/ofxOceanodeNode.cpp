@@ -334,6 +334,9 @@ ofJson ofxOceanodeNode::saveParametersToJson(bool persistentPreset){
             else if(p.type() == typeid(ofParameter<ofColor>).name()){
                 ofSerialize(json, p);
             }
+            else if(p.type() == typeid(ofParameter<string>).name()){
+                ofSerialize(json, p);
+            }
             else if(p.type() == typeid(ofParameter<vector<float>>).name()){
                 auto vecF = p.cast<vector<float>>().get();
                 if(vecF.size() == 1){
@@ -367,6 +370,9 @@ bool ofxOceanodeNode::loadParametersFromJson(ofJson json, bool persistentPreset)
                     ofDeserialize(json, p);
                 }
                 else if(p.type() == typeid(ofParameter<ofColor>).name()){
+                    ofDeserialize(json, p);
+                }
+                else if(p.type() == typeid(ofParameter<string>).name()){
                     ofDeserialize(json, p);
                 }
                 else if(p.type() == typeid(ofParameter<vector<float>>).name()){
