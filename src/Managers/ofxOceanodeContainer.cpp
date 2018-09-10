@@ -209,6 +209,14 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         }
     }
     
+    for(int i = 0; i < connections.size();){
+        if(!connections[i].second->getIsPersistent()){
+            connections.erase(connections.begin()+i);
+        }else{
+            i++;
+        }
+    }
+    
     //Read new nodes in preset
     //Check if the nodes exists and update them, (or update all at the end)
     //Create new modules and update them (or update at end)
@@ -249,14 +257,6 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         dynamicNodes.clear();
     }
     
-    //connections.clear();
-    for(int i = 0; i < connections.size();){
-        if(!connections[i].second->getIsPersistent()){
-            connections.erase(connections.begin()+i);
-        }else{
-            i++;
-        }
-    }
     
 #ifdef OFXOCEANODE_USE_MIDI
     json.clear();
