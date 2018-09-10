@@ -78,6 +78,15 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::disconnectConnection(ofxOce
     return nullptr;
 }
 
+void ofxOceanodeContainer::destroyConnection(ofxOceanodeAbstractConnection* connection){
+    for(auto c : connections){
+        if(c.second.get() == connection){
+            connections.erase(std::remove(connections.begin(), connections.end(), c));
+            break;
+        }
+    }
+}
+
 ofxOceanodeNode* ofxOceanodeContainer::createNodeFromName(string name, int identifier, bool isPersistent){
     unique_ptr<ofxOceanodeNodeModel> type = registry->create(name);
     

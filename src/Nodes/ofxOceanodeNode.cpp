@@ -72,7 +72,7 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionRelease(ofxOc
     if(container.isOpenConnection()){
         for(auto c : inConnections){
             if(&c->getSinkParameter() == &parameter){
-                return nullptr;
+                container.destroyConnection(c);
             }
         }
         if(!nodeModel->getParameterInfo(parameter).acceptInConnection){

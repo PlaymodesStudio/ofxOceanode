@@ -56,6 +56,7 @@ public:
     ofxOceanodeAbstractConnection* createConnection(ofAbstractParameter& p, ofxOceanodeNode& n);
     
     ofxOceanodeAbstractConnection* disconnectConnection(ofxOceanodeAbstractConnection* c);
+    void destroyConnection(ofxOceanodeAbstractConnection* c);
     
     ofAbstractParameter& getTemporalConnectionParameter(){return temporalConnection->getSourceParameter();};
     
