@@ -236,6 +236,7 @@ void ofxOceanodeNodeGui::updateDropdown(string &dropdownName){
     for(auto option : ofSplitString(getParameters()->getGroup(dropdownName).getString(0), "-|-")){
         dropdown->addOption(option);
     }
+    dropdown->select(getParameters()->getGroup(dropdownName).getInt(1));
 }
 
 ofParameterGroup* ofxOceanodeNodeGui::getParameters(){
