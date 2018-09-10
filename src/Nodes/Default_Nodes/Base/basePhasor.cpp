@@ -10,7 +10,9 @@
 
 
 basePhasor::basePhasor(){
-    phasor = 0;    
+    phasor = 0;
+    phasorMod = 0;
+    momentaryPhasor = 0;
     timer.setPeriodicEvent(1000000);
     startThread();
     bpm_Param = 120.00;
