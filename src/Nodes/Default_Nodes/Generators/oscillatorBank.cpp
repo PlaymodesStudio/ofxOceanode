@@ -29,6 +29,7 @@ oscillatorBank::oscillatorBank() : baseIndexer(100, "Oscillator Bank"){
     paramListeners.push(pulseWidth_Param.newListener(this, &oscillatorBank::newpulseWidthParam));
     paramListeners.push(skew_Param.newListener(this, &oscillatorBank::newSkewParam));
 
+    
     parameters->add(phasorIn.set("Phasor In", 0, 0, 1));
     putParametersInParametersGroup(parameters);
     parameters->add(phaseOffset_Param.set("Phase Offset", {0}, {0}, {1}));
@@ -42,7 +43,28 @@ oscillatorBank::oscillatorBank() : baseIndexer(100, "Oscillator Bank"){
     parameters->add(skew_Param.set("Skew", {0}, {-1}, {1}));
     parameters->add(amplitude_Param.set("Fader", {1}, {0}, {1}));
     parameters->add(invert_Param.set("Invert", {0}, {0}, {1}));
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+    parameters->add(seed.set("Seed", {0}, {INT_MIN}, {INT_MAX}));
+    paramListeners.push(seed.newListener([this](vector<int> &s){
+        if(s.size() == 1){
+            if(s[0] == 0){
+                for(int i = 0; i < oscillators.size(); i++){
+                    oscillators[i].deactivateSeed();
+                }
+            }else{
+                for(int i = 0; i < oscillators.size(); i++){
+                    oscillators[i].setSeed(s[0] + i);
+                }
+            }
+        }else{
+            for(int i = 0; i < oscillators.size(); i++){
+                oscillators[i].setSeed(getValueForPosition(s, i));
+            }
+        }
+    }));
+#endif
     parameters->add(createDropdownAbstractParameter("Wave", {"sin", "cos", "tri", "square", "saw", "inverted saw", "rand1", "rand2"}, waveSelect_Param));
+
     addOutputParameterToGroupAndInfo(oscillatorOut.set("Oscillator Out", {0}, {0}, {1}));
     
     phasorInListener = phasorIn.newListener(this, &oscillatorBank::newPhasorIn);
@@ -52,6 +74,14 @@ void oscillatorBank::presetRecallBeforeSettingParameters(ofJson &json){
     if(json.count("Size") == 1){
         parameters->getInt("Size") = ofToInt(json["Size"]);
     }
+}
+
+void oscillatorBank::presetRecallAfterSettingParameters(ofJson &json){
+
+}
+
+void oscillatorBank::presetHasLoaded(){
+    phasorIn = phasorIn;
 }
 
 void oscillatorBank::indexCountChanged(int &newIndexCount){

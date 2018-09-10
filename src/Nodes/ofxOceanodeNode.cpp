@@ -72,7 +72,7 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionRelease(ofxOc
     if(container.isOpenConnection()){
         for(auto c : inConnections){
             if(&c->getSinkParameter() == &parameter){
-                return nullptr;
+                container.destroyConnection(c);
             }
         }
         if(!nodeModel->getParameterInfo(parameter).acceptInConnection){
@@ -107,6 +107,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeCont
         }
         else if(source.type() == typeid(ofParameterGroup).name()){
             connection = container.connectConnection(source.castGroup().getInt(1), sink.castGroup().getInt(1));
+        }
+        else if(source.type() == typeid(ofParameter<vector<int>>).name()){
+            connection = container.connectConnection(source.cast<vector<int>>(), sink.cast<vector<int>>());
         }
         else if(source.type() == typeid(ofParameter<short int>).name()){
             connection = container.connectConnection(source.cast<short int>(), sink.cast<short int>());
@@ -278,6 +281,14 @@ void ofxOceanodeNode::savePreset(string presetFolderPath){
     saveConfig(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json");
 }
 
+bool ofxOceanodeNode::loadPersistentPreset(string presetFolderPath){
+    return loadConfig(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json", true);
+}
+
+void ofxOceanodeNode::savePersistentPreset(string presetFolderPath){
+    saveConfig(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json", true);
+}
+
 void ofxOceanodeNode::presetWillBeLoaded(){
     nodeModel->presetWillBeLoaded();
 }
@@ -286,7 +297,7 @@ void ofxOceanodeNode::presetHasLoaded(){
     nodeModel->presetHasLoaded();
 }
 
-bool ofxOceanodeNode::loadConfig(string filename){
+bool ofxOceanodeNode::loadConfig(string filename, bool persistentPreset){
     string escapedFilename = filename;
     ofStringReplace(escapedFilename, " ", "_");
     ofJson json = ofLoadJson(escapedFilename);
@@ -295,23 +306,23 @@ bool ofxOceanodeNode::loadConfig(string filename){
     if(json.empty()) return false;
     
     nodeModel->presetRecallBeforeSettingParameters(json);
-    loadParametersFromJson(json);
+    loadParametersFromJson(json, persistentPreset);
     nodeModel->presetRecallAfterSettingParameters(json);
     return true;
 }
 
-void ofxOceanodeNode::saveConfig(string filename){
+void ofxOceanodeNode::saveConfig(string filename, bool persistentPreset){
     ofStringReplace(filename, " ", "_");
-    ofJson json = saveParametersToJson();
+    ofJson json = saveParametersToJson(persistentPreset);
     nodeModel->presetSave(json);
     ofSavePrettyJson(filename, json);
 }
 
-ofJson ofxOceanodeNode::saveParametersToJson(){
+ofJson ofxOceanodeNode::saveParametersToJson(bool persistentPreset){
     ofJson json;
     for(int i = 0; i < getParameters()->size(); i++){
         ofAbstractParameter& p = getParameters()->get(i);
-        if(nodeModel->getParameterInfo(p).isSavePreset){
+        if((!persistentPreset && nodeModel->getParameterInfo(p).isSavePreset) || (persistentPreset && nodeModel->getParameterInfo(p).isSaveProject)){
             if(p.type() == typeid(ofParameter<float>).name()){
                 ofSerialize(json, p);
             }else if(p.type() == typeid(ofParameter<int>).name()){
@@ -321,6 +332,9 @@ ofJson ofxOceanodeNode::saveParametersToJson(){
                 ofSerialize(json, p);
             }
             else if(p.type() == typeid(ofParameter<ofColor>).name()){
+                ofSerialize(json, p);
+            }
+            else if(p.type() == typeid(ofParameter<string>).name()){
                 ofSerialize(json, p);
             }
             else if(p.type() == typeid(ofParameter<vector<float>>).name()){
@@ -342,11 +356,11 @@ ofJson ofxOceanodeNode::saveParametersToJson(){
     }
     return json;
 }
-bool ofxOceanodeNode::loadParametersFromJson(ofJson json){
+bool ofxOceanodeNode::loadParametersFromJson(ofJson json, bool persistentPreset){
     for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
         if(getParameters()->contains(it.key())){
             ofAbstractParameter& p = getParameters()->get(it.key());
-            if(nodeModel->getParameterInfo(p).isSavePreset){
+            if((!persistentPreset && nodeModel->getParameterInfo(p).isSavePreset) || (persistentPreset && nodeModel->getParameterInfo(p).isSaveProject)){
                 if(p.type() == typeid(ofParameter<float>).name()){
                     ofDeserialize(json, p);
                 }else if(p.type() == typeid(ofParameter<int>).name()){
@@ -356,6 +370,9 @@ bool ofxOceanodeNode::loadParametersFromJson(ofJson json){
                     ofDeserialize(json, p);
                 }
                 else if(p.type() == typeid(ofParameter<ofColor>).name()){
+                    ofDeserialize(json, p);
+                }
+                else if(p.type() == typeid(ofParameter<string>).name()){
                     ofDeserialize(json, p);
                 }
                 else if(p.type() == typeid(ofParameter<vector<float>>).name()){

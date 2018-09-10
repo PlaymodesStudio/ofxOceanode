@@ -24,6 +24,7 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     transformationMatrix = glm::mat4(1);
     temporalConnection = nullptr;
     bpm = 120;
+    collapseAll = false;
     
 #ifdef OFXOCEANODE_USE_OSC
     updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
@@ -77,6 +78,15 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::disconnectConnection(ofxOce
     return nullptr;
 }
 
+void ofxOceanodeContainer::destroyConnection(ofxOceanodeAbstractConnection* connection){
+    for(auto c : connections){
+        if(c.second.get() == connection){
+            connections.erase(std::remove(connections.begin(), connections.end(), c));
+            break;
+        }
+    }
+}
+
 ofxOceanodeNode* ofxOceanodeContainer::createNodeFromName(string name, int identifier, bool isPersistent){
     unique_ptr<ofxOceanodeNodeModel> type = registry->create(name);
     
@@ -106,6 +116,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     node->setup();
     if(!isHeadless){
         auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node, window);
+        if(collapseAll) nodeGui->collapse();
 #ifdef OFXOCEANODE_USE_MIDI
         nodeGui->setIsListeningMidi(isListeningMidi);
 #endif
@@ -224,13 +235,20 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     if(!json.empty()){;
         for(auto &models : registry->getRegisteredModels()){
             string moduleName = models.first;
-            vector<int>  vector_of_identifiers;
+            vector<int>  vector_of_dynamic_identifiers;
+            vector<int>  vector_of_persistent_identifiers;
             if(dynamicNodes.count(moduleName) != 0){
                 for(auto &nodes_of_a_give_type : dynamicNodes[moduleName]){
-                    vector_of_identifiers.push_back(nodes_of_a_give_type.first);
+                    vector_of_dynamic_identifiers.push_back(nodes_of_a_give_type.first);
                 }
             }
-            for(auto identifier : vector_of_identifiers){
+            if(persistentNodes.count(moduleName) != 0){
+                for(auto &nodes_of_a_give_type : persistentNodes[moduleName]){
+                    vector_of_persistent_identifiers.push_back(nodes_of_a_give_type.first);
+                }
+            }
+            
+            for(auto identifier : vector_of_dynamic_identifiers){
                 string stringIdentifier = ofToString(identifier);
                 if(json.find(moduleName) != json.end() && json[moduleName].find(stringIdentifier) != json[moduleName].end()){
                     vector<float> readArray = json[moduleName][stringIdentifier];
@@ -243,6 +261,19 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
                     dynamicNodes[moduleName][identifier]->deleteSelf();
                 }
             }
+            for(auto identifier : vector_of_persistent_identifiers){
+                string stringIdentifier = ofToString(identifier);
+                if(json.find(moduleName) != json.end() && json[moduleName].find(stringIdentifier) != json[moduleName].end()){
+                    vector<float> readArray = json[moduleName][stringIdentifier];
+                    if(!isHeadless){
+                        glm::vec2 position(readArray[0], readArray[1]);
+                        persistentNodes[moduleName][identifier]->getNodeGui().setPosition(position);
+                    }
+                    json[moduleName].erase(stringIdentifier);
+                }
+            }
+            
+            
             for (ofJson::iterator it = json[moduleName].begin(); it != json[moduleName].end(); ++it) {
                 int identifier = ofToInt(it.key());
                 if(dynamicNodes[moduleName].count(identifier) == 0){
@@ -279,6 +310,12 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
 #endif
     
     for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->loadPreset(presetFolderPath);
+        }
+    }
+    
+    for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->loadPreset(presetFolderPath);
         }
@@ -349,6 +386,12 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
         }
     }
     
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->savePreset(presetFolderPath);
+        }
+    }
+    
 #ifdef OFXOCEANODE_USE_MIDI
     json.clear();
     for(auto &bindingPair : midiBindings){
@@ -397,12 +440,12 @@ void ofxOceanodeContainer::savePersistent(){
     
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
-            node.second->savePreset(persistentFolderPath);
+            node.second->savePersistentPreset(persistentFolderPath);
         }
     }
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
-            node.second->savePreset(persistentFolderPath);
+            node.second->savePersistentPreset(persistentFolderPath);
         }
     }
 
@@ -473,7 +516,7 @@ void ofxOceanodeContainer::loadPersistent(){
     
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
-            node.second->loadPreset(persistentFolderPath);
+            node.second->loadPersistentPreset(persistentFolderPath);
         }
     }
     
@@ -517,10 +560,23 @@ void ofxOceanodeContainer::loadPersistent(){
     }
 }
 
+void ofxOceanodeContainer::updatePersistent(){
+    string persistentFolderPath = "Persistent";
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->savePersistentPreset(persistentFolderPath);
+        }
+    }
+}
 
 void ofxOceanodeContainer::setBpm(float _bpm){
     bpm = _bpm;
     for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->setBpm(bpm);
+        }
+    }
+    for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->setBpm(bpm);
         }
@@ -534,12 +590,49 @@ void ofxOceanodeContainer::setPhase(float _phase){
             node.second->setPhase(phase);
         }
     }
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->setPhase(phase);
+        }
+    }
 }
 
 void ofxOceanodeContainer::resetPhase(){
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->resetPhase();
+        }
+    }
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->resetPhase();
+        }
+    }
+}
+
+void ofxOceanodeContainer::collapseGuis(){
+    collapseAll = true;
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->getNodeGui().collapse();
+        }
+    }
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->getNodeGui().collapse();
+        }
+    }
+}
+void ofxOceanodeContainer::expandGuis(){
+    collapseAll = false;
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->getNodeGui().expand();
+        }
+    }
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->getNodeGui().expand();
         }
     }
 }
@@ -605,6 +698,8 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                                 castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
                             }else if(absParam.type() == typeid(ofParameter<bool>).name()){
                                 absParam.cast<bool>() = m.getArgAsBool(0);
+                            }else if(absParam.type() == typeid(ofParameter<void>).name()){
+                                absParam.cast<void>().trigger();
                             }else if(absParam.type() == typeid(ofParameter<string>).name()){
                                 absParam.cast<string>() = m.getArgAsString(0);
                             }else if(absParam.type() == typeid(ofParameterGroup).name()){
@@ -656,6 +751,11 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
 void ofxOceanodeContainer::setIsListeningMidi(bool b){
     isListeningMidi = b;
     for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->getNodeGui().setIsListeningMidi(b);
+        }
+    }
+    for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->getNodeGui().setIsListeningMidi(b);
         }

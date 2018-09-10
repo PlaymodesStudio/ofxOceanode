@@ -17,7 +17,24 @@ baseOscillator::baseOscillator(){
     indexNormalized = 0;
     pastRandom = ofRandom(1);
     newRandom = ofRandom(1);
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+    seed = 0;
+    std::random_device rd;
+    mt.seed(rd());
+    dist = std::uniform_real_distribution<float>(0.0, 1.0);
+#endif
 }
+
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+void baseOscillator::setSeed(int seed){
+    mt.seed(seed);
+}
+
+void baseOscillator::deactivateSeed(){
+    std::random_device rd;
+    mt.seed(rd());
+}
+#endif
 
 float baseOscillator::computeFunc(float phasor){
     //get phasor to be w (radial freq)
@@ -90,9 +107,13 @@ float baseOscillator::computeFunc(float phasor){
         }
         case rand1Osc:
         {
-            if(linPhase < oldPhasor)
+            if(linPhase < oldPhasor){
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+                val = dist(mt);
+#else
                 val = ofRandom(1);
-            else
+#endif
+            }else
                 val = oldValuePreMod;
             
             break;
@@ -101,7 +122,11 @@ float baseOscillator::computeFunc(float phasor){
         {
             if(linPhase < oldPhasor){
                 pastRandom = newRandom;
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+                newRandom = dist(mt);
+#else
                 newRandom = ofRandom(1);
+#endif
                 val = pastRandom;
             }
             else

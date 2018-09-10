@@ -12,6 +12,7 @@ ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name)
     parameters = new ofParameterGroup(_name);
     autoBPM = true;
     color = ofColor(ofRandom(255), ofRandom(255), ofRandom(255));
+    numIdentifier = -1;
 }
 
 void ofxOceanodeNodeModel::setNumIdentifier(unsigned int num){

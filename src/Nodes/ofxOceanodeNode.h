@@ -50,14 +50,17 @@ public:
     bool loadPreset(string presetFolderPath);
     void savePreset(string presetFolderPath);
     
+    bool loadPersistentPreset(string presetFolderPath);
+    void savePersistentPreset(string presetFolderPath);
+    
     void presetWillBeLoaded();
     void presetHasLoaded();
     
-    bool loadConfig(string filename);
-    void saveConfig(string filename);
+    bool loadConfig(string filename, bool persistentPreset = false);
+    void saveConfig(string filename, bool persistentPreset = false);
     
-    ofJson saveParametersToJson();
-    bool loadParametersFromJson(ofJson json);
+    ofJson saveParametersToJson(bool persistentPreset = false);
+    bool loadParametersFromJson(ofJson json, bool persistentPreset = false);
     
     void setBpm(float bpm);
     void setPhase(float _phase);

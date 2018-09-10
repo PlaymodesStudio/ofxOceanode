@@ -20,7 +20,10 @@ struct parameterInfo{
     bool acceptInConnection;
     bool acceptOutConnection;
     parameterInfo(bool spres = true, bool sproj = true, bool inc = true, bool outc = true) : isSavePreset(spres), isSaveProject(sproj), acceptInConnection(inc), acceptOutConnection(outc){};
-    
+    void convertToProject(){
+        isSavePreset = false;
+        isSaveProject = true;
+    }
 };
 
 class ofxOceanodeNodeModel {

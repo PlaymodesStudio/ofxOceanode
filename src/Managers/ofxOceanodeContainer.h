@@ -56,6 +56,7 @@ public:
     ofxOceanodeAbstractConnection* createConnection(ofAbstractParameter& p, ofxOceanodeNode& n);
     
     ofxOceanodeAbstractConnection* disconnectConnection(ofxOceanodeAbstractConnection* c);
+    void destroyConnection(ofxOceanodeAbstractConnection* c);
     
     ofAbstractParameter& getTemporalConnectionParameter(){return temporalConnection->getSourceParameter();};
     
@@ -81,10 +82,14 @@ public:
     
     void savePersistent();
     void loadPersistent();
+    void updatePersistent();
     
     void setBpm(float _bpm);
     void setPhase(float _phase);
     void resetPhase();
+    
+    void collapseGuis();
+    void expandGuis();
     
     ofEvent<string> loadPresetEvent;
     
@@ -134,6 +139,7 @@ private:
     float phase;
     
     const bool isHeadless;
+    bool collapseAll;
     
 #ifdef OFXOCEANODE_USE_OSC
     ofxOscSender oscSender;
