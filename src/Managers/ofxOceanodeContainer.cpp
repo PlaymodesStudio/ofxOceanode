@@ -855,7 +855,14 @@ ofxOceanodeAbstractMidiBinding* ofxOceanodeContainer::createMidiBindingFromInfo(
     ofStringReplace(module, "_", " ");
     if(collection.count(module) != 0){
         if(collection[module].count(ofToInt(moduleId))){
-            return createMidiBinding(collection[module][ofToInt(moduleId)]->getParameters()->get(parameter), isPersistent);
+            ofAbstractParameter* p = nullptr;
+            if(collection[module][ofToInt(moduleId)]->getParameters()->contains(parameter)){
+                p = &collection[module][ofToInt(moduleId)]->getParameters()->get(parameter);
+            }
+            else{
+                p = &collection[module][ofToInt(moduleId)]->getParameters()->getGroup(parameter + " Selector").getInt(1);
+            }
+            return createMidiBinding(*p, isPersistent);
         }
     }
 }
