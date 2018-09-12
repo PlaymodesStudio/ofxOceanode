@@ -64,6 +64,8 @@ public:
     void onGuiDropdownEvent(ofxDatGuiDropdownEvent e);
     void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);
     
+    bool getIsMidiLearn(){return midiLearn->getChecked();};
+    
 private:
     ofxDatGuiToggle* midiLearn;
     ofEventListeners listeners;
