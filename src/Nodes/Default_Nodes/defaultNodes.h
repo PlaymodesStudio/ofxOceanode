@@ -16,5 +16,6 @@
 #include "reindexer.h"
 #include "smoother.h"
 #include "localPresetController.h"
+#include "switcher.h"
 
 #endif /* defaultNodes_h */
