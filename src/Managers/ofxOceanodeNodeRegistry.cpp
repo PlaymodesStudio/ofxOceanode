@@ -18,6 +18,7 @@ ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
     this->registerModel<reindexer>("Modifiers");
     this->registerModel<smoother>("Modifiers");
     this->registerModel<localPresetController>("Controllers");
+    this->registerModel<switcher>("Modifiers");
 }
 
 std::unique_ptr<ofxOceanodeNodeModel> ofxOceanodeNodeRegistry::create(const string typeName){
