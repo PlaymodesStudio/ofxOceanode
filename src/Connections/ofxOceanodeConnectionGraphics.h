@@ -88,7 +88,7 @@ public:
     glm::vec2 getPoint(int index){return points[index];};
     void setTransformationMatrix(ofParameter<glm::mat4> *m){transformationMatrix = m;};
     glm::mat4 getTransformationMatrix(){return transformationMatrix->get();};
-    
+    void setWireColor(ofColor c){wireColor = c;};
 private:
     glm::vec2 points[2];
     ofParameter<glm::mat4> *transformationMatrix;

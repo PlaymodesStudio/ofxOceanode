@@ -51,7 +51,7 @@ public:
     ofAbstractParameter& getSinkParameter(){return *sinkParameter;};
     
     bool getIsPersistent(){return isPersistent;};
-    void setIsPersistent(bool p){isPersistent = p;};
+    void setIsPersistent(bool p){isPersistent = p;graphics.setWireColor(ofColor(255,0,0));};
         
     ofEvent<void> destroyConnection;
 protected:
