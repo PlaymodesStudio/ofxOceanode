@@ -25,6 +25,7 @@ public:
         control.set("Control", -1, 0, 127);
         value.set("Value", -1, 0, 127);
         portName = "";
+        modifiyingParameter = false;
     };
     ~ofxOceanodeAbstractMidiBinding(){};
     
