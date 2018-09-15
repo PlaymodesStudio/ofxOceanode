@@ -55,6 +55,7 @@ ofxOceanodeContainer::~ofxOceanodeContainer(){
 }
 
 ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstractParameter& p, ofxOceanodeNode& n){
+    if(temporalConnection != nullptr) return nullptr;
     temporalConnectionNode = &n;
     temporalConnection = new ofxOceanodeTemporalConnection(p);
     if(!isHeadless){
