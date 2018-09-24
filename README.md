@@ -1,16 +1,14 @@
 ofxOceanode
 =====================================
 
-Work in Progress. Base functionality implemented. Misses extensions (midi, osc, autoBPM...).
+Oceanode is an openframeworks addon used to quickly create projects using "dataflow like" programming.
+The main idea of oceanode became a logic step as we wanted to export our LFO based control to everithing we could imagine.
 
 Introduction
 ------------
-ofxOceanode is an addon to be able to easily create modules and to be able to control it's parameters (with ofParameter) via other modules (modulators). For it's interconnection we use a node based system, that allows us flexibiliy and also easy of view of what is afecting what in realtime.
-Also these addon has a preset system, where you can store the combination of modules, parameters and connections. Giving you the abilty to completelly change the scene you are working with.
+The main idea is to be able to easily create modules and to be able to control it's parameters (with ofParameter) via other modules (modulators). For it's interconnection we use a node based system, that allows us flexibiliy and also easy of view of what is afecting what in realtime.
 
-This addon was developed becouse, when developing [MIRABCN_Generator](https://github.com/PlaymodesStudio/MIRABCN_Generator) we found that the system of modulators and nodes could be used to other projects. We used the node system for other projects, for controlling [ILDA laser](http://www.playmodes.com/home/espills/) and for controlling video buffers and video processors in [ofxPlaymodes](https://github.com/PlaymodesStudio/ofxPlaymodes2017).
-Due to the lack of planning, porting the interface to this projects was a pain in the ass, and we want it to be more easy to integrate to new projects and research.
-So thats when we realised we had to rebuild all the system to be more flexible, powerfull, expandable, and reusable. Taking some ideas from the opensource node based project [nodeeditor](https://github.com/paceholder/nodeeditor). We have created this addon.
+Another main characteristic is that the connections and nodes layout can be stored as scenes (we call them presets).
 
 License
 -------
@@ -24,13 +22,44 @@ Dependencies
 ------------
 [ofxDatGui_PM/of_master_brach](https://github.com/PlaymodesStudio/ofxDatGui_PM/tree/of_master_branch)
 
+Use
+------------
+- Copy `ofxBraitsch` folder into `data` folder.
+- Add  `#include "ofxOceanode.h"` into `ofApp.h`
+- Decalre a canvas, container and a controls in `ofApp.h` as:
+```cpp
+ofxOceanodeCanvas canvas;
+shared_ptr<ofxOceanodeContainer> container;
+unique_ptr<ofxOceanodeControls> controls;
+```
+
+- Create them in `ofApp.cpp` and assign container to canvas in the following way:
+```cpp
+container = make_shared<ofxOceanodeContainer>(reg, treg);
+canvas.setContainer(container);
+canvas.setup();
+    
+controls = new ofxOceanodeControls(container);
+```
+
+- For creating custom nodes, check out example-basic
+
+
 Compatibility
 ------------
-Only compatible woth openFrameworks master branch (of0.10)
+Only compatible with openFrameworks latest release (0.10) or github master branch.
+ - macOs
+ - Win
+ - Linux
+ - Rpi (only headless mode tested)
+ 
+We mainly work on macOs, and we are not testing every change into win/linux. So it's probable that something is broken for those platforms. Also control keystrokes are not optimized for those platforms.
 
 Known issues
 ------------
--
+- Threading done bad, all is done in the draw/update loop, so drawing the gui at 120fps if you want higer data rates it's not optimal.
+- Order of execution depends on order of connection created, no way to control them.
+- Loading presets is slow.
 
 Version history
 ------------
@@ -47,6 +76,53 @@ Version history
 * Controls window
 * Load save presets (modules, connections, modules params)
 * Master BPM control over modules
+
+### Version 0.3 (05/04/2018)
+* Upate Phasors and oscillators
+* Added methods for saving/loading custom data from nodeModel
+* You can define the category of a module, now dropdown for creating new nodes has folders with this categories
+* Add custom color to a module (all sliders same color)
+* Added external Window node model. Helper class to use nodes that can create a secondary window (for preview or custom guis)
+* Parameters can be choosen to be saved on preset or not.
+* Added smoother module.
+
+### Version 0.4 (12/04/2018)
+* Updated Mapper and Ranger
+* Improved connections templates to be able to create more connections (float to vector<int> or vector<float> to vector<int> for example)
+* Fix loading connections on preset.
+* Be able to update parameters from a nodeModel.
+* Json fixes
+* Multislider updates.
+
+### Version 0.5 (26/04/2018)
+* Added headless mode
+* Added BPM detection
+* Now we have a types registry to create connections from a custom type. No more need to declare "createConnectionFromCustomType"
+* Changed vector<ofEventListener> to ofEventListeners.
+
+
+### Version 0.6 (19/07/2018)
+* Updated remove of Nodes
+* Added dulplicate of modules via alt+click on top of a Node
+* revised includes to decrease compilation time.
+* Implemented Osc communication of parameters.
+* Move connections when gui collapse
+* Tested in windows
+* Implemented setup() method in nodemodel, called when node is created.
+* Added functions before loading a preset and after all things have been done when loading a preset.
+
+### Version 0.7 (15/07/2018)
+* Oscillator Banks can be modulated with vectors, crazy modulations ahead!
+* Dropdown fixes
+* Updated OSC.
+* Implemeted Persistent Nodes and connections (buggy)
+* Implemented Global Phase (Not working)
+* Midi Control
+* Added randomseed to oscillators/oscillator banks
+* string parameters are also saved in preset
+* Connection replace instead of new one disapearing
+* Fixed phantom connections
+
 
 Build Status
 ------------
