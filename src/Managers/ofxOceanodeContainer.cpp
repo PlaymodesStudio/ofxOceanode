@@ -221,13 +221,15 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         }
     }
     
-    for(int i = 0; i < connections.size();){
-        if(!connections[i].second->getIsPersistent()){
-            connections.erase(connections.begin()+i);
-        }else{
-            i++;
-        }
-    }
+//    for(int i = 0; i < connections.size();){
+//        if(!connections[i].second->getIsPersistent()){
+//            connections.erase(connections.begin()+i);
+//        }else{
+//            i++;
+//        }
+//    }
+//
+    ofLog() << "Before preset " << connections.size() << "connections";
     
     //Read new nodes in preset
     //Check if the nodes exists and update them, (or update all at the end)
@@ -259,6 +261,22 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
                     }
                     json[moduleName].erase(stringIdentifier);
                 }else{
+                    for(int i = 0; i < connections.size();){
+                        auto &connection = connections[i];
+                        string sourceName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];;
+                        string sourceModuleId = ofSplitString(sourceName, "_").back();
+                        sourceName.erase(sourceName.find(sourceModuleId)-1);
+                        ofStringReplace(sourceName, "_", " ");
+                        string sinkName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];;
+                        string sinkModuleId = ofSplitString(sinkName, "_").back();
+                        sinkName.erase(sinkName.find(sinkModuleId)-1);
+                        ofStringReplace(sinkName, "_", " ");
+                        if((sourceName == moduleName && ofToInt(sourceModuleId) == identifier) || (sinkName == moduleName && ofToInt(sinkModuleId) == identifier)){
+                            connections.erase(connections.begin()+i);
+                        }else{
+                            i++;
+                        }
+                    }
                     dynamicNodes[moduleName][identifier]->deleteSelf();
                 }
             }
@@ -289,6 +307,7 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         dynamicNodes.clear();
     }
     
+    ofLog() << "After nodes " << connections.size() << "connections";
     
 #ifdef OFXOCEANODE_USE_MIDI
     json.clear();
@@ -310,6 +329,58 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     }
 #endif
     
+    json.clear();
+    json = ofLoadJson(presetFolderPath + "/connections.json");
+    for(int i = 0; i < connections.size();){
+        string sourceParameter = connections[i].second->getSourceParameter().getName();
+        string sourceModule = connections[i].second->getSourceParameter().getGroupHierarchyNames()[0];
+        string sinkParameter = connections[i].second->getSinkParameter().getName();
+        string sinkModule = connections[i].second->getSinkParameter().getGroupHierarchyNames()[0];
+        
+        //        if(json.find(sourceModule) != json.end() &&
+        //           json[sourceModule].find(sourceParameter) != json[sourceModule].end() &&
+        //           json[sourceModule][sourceParameter].find(sinkModule) != json[sourceModule][sourceParameter].end() &&
+        //           json[sourceModule][sourceParameter][sinkModule].find(sinkParameter) != json[sourceModule][sourceParameter][sinkModule].end()){
+        //            json[sourceModule][sourceParameter][sinkModule].erase(sinkParameter);
+        //            if(json[sourceModule][sourceParameter][sinkModule].size() == 0){
+        //                json[sourceModule][sourceParameter].erase(sinkModule);
+        //                if(json[sourceModule][sourceParameter].size() == 0){
+        //                    json[sourceModule].erase(sourceParameter);
+        //                    if(json[sourceModule].size() == 0){
+        //                        json.erase(sourceModule);
+        //                    }
+        //                }
+        //            }
+        //            i++;
+        //        }
+        
+        if(json.find(sourceModule) != json.end()){
+            if(json[sourceModule].find(sourceParameter) != json[sourceModule].end()){
+                if(json[sourceModule][sourceParameter].find(sinkModule) != json[sourceModule][sourceParameter].end()){
+                    if(json[sourceModule][sourceParameter][sinkModule].find(sinkParameter) != json[sourceModule][sourceParameter][sinkModule].end()){
+                        json[sourceModule][sourceParameter][sinkModule].erase(sinkParameter);
+                        if(json[sourceModule][sourceParameter][sinkModule].size() == 0){
+                            json[sourceModule][sourceParameter].erase(sinkModule);
+                            if(json[sourceModule][sourceParameter].size() == 0){
+                                json[sourceModule].erase(sourceParameter);
+                                if(json[sourceModule].size() == 0){
+                                    json.erase(sourceModule);
+                                }
+                            }
+                        }
+                        i++;
+                    }
+                }
+            }
+        }
+        else{
+            connections.erase(connections.begin()+i);
+        }
+    }
+    
+    ofLog() << "After dup conncections " << connections.size() << "connections";
+    
+    
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->loadPreset(presetFolderPath);
@@ -322,17 +393,39 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         }
     }
     
-    json.clear();
-    json = ofLoadJson(presetFolderPath + "/connections.json");
+    vector<string> oldConnectionsInfo(connections.size());
+    for(int i = 0; i < connections.size(); i++){
+        oldConnectionsInfo[1] = connections[i].second->getSourceParameter().getName();
+        oldConnectionsInfo[0] = connections[i].second->getSourceParameter().getGroupHierarchyNames()[0];
+        oldConnectionsInfo[3] = connections[i].second->getSinkParameter().getName();
+        oldConnectionsInfo[2] = connections[i].second->getSinkParameter().getGroupHierarchyNames()[0];
+        
+    }
+    
     for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
         for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
             for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
                 for (ofJson::iterator sinkParameter = sinkModule.value().begin(); sinkParameter != sinkModule.value().end(); ++sinkParameter) {
-                    createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key());
+                    bool connectionExist = false;
+                    for(int i = 0; i < oldConnectionsInfo.size(); i++){
+                        if(!(oldConnectionsInfo[0] == sourceModule.key()
+                           && oldConnectionsInfo[1] == sourceParameter.key()
+                           && oldConnectionsInfo[2] == sinkModule.key()
+                           && oldConnectionsInfo[3] == sinkParameter.key())){
+                            oldConnectionsInfo.erase(oldConnectionsInfo.begin()+i);
+                            connectionExist = true;
+                            break;
+                        }
+                    }
+                    if(!connectionExist){
+                        createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key());
+                    }
                 }
             }
         }
     }
+    
+    ofLog() << "After creation " << connections.size() << "connections";
     
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
