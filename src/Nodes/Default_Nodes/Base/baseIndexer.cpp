@@ -51,11 +51,9 @@ baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name
 void baseIndexer::indexCountChanged(int &indexCount){
     if(indexCount != previousIndexCount){
         indexs.resize(indexCount, 0);
-#ifdef OFXOCEANODE_USE_OLDRANDOM
-        indexRand.resize(indexCount , 0);
-        for(int i = 0; i < indexRand.size(); i++)
-            indexRand[i] = i-((float)indexRand.size()/2.f);
-#else
+#ifdef OFXOCEANODE_USE_NRRANDOM
+        
+#endif
         indexRand.resize(indexCount);
         iota(indexRand.begin(), indexRand.end(), 0);
         randomizedIndexes.resize(indexCount);
@@ -64,7 +62,7 @@ void baseIndexer::indexCountChanged(int &indexCount){
         float indexRand_temp_store = indexRand_Param;
         indexRand_Param = 0;
         indexRand_Param = indexRand_temp_store;
-#endif
+
         random_shuffle(indexRand.begin(), indexRand.end());
 
         
@@ -154,13 +152,10 @@ void baseIndexer::recomputeIndexs(){
         index = indexInvert_Param*invertedIndex + (1-indexInvert_Param)*nonInvertIndex;
         
         //random
-#ifdef OFXOCEANODE_USE_OLDRANDOM
-        index += indexRand[index]*indexRand_Param;
-        index %= indexCount;
-        if(index < 0)
-            index += indexCount;
-#else
+#ifdef OFXOCEANODE_USE_NRRANDOM
         index = randomizedIndexes[index];
+#else
+        index = index*(1-indexRand_Param) + (indexRand[index]*indexRand_Param);
 #endif
         
         //COMB
@@ -184,12 +179,12 @@ void baseIndexer::indexRandChanged(float &val){
         random_shuffle(indexRand.begin(), indexRand.end());
     indexRand_Param_previous = val;
     
-#ifndef OFXOCEANODE_USE_OLDRANDOM
+#ifdef OFXOCEANODE_USE_NRRANDOM
     if(val != 0){
         for(int i = 0; i < indexCount; i++){
-            randPositions[i] = distance(indexRand.begin(), find(indexRand.begin(), indexRand.end(), i))*indexRand_Param + i*(1-indexRand_Param);
+            randPositions[i] = indexRand[i]*indexRand_Param + i*(1-indexRand_Param);
         }
-        
+
         std::sort(
                   randomizedIndexes.begin(), randomizedIndexes.end(),
                   [&](std::size_t a, std::size_t b) { return randPositions[a] < randPositions[b]; });
