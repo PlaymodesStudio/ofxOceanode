@@ -67,7 +67,7 @@ public:
     void resetPhase();
     
     bool getIsPersistent(){return isPersistent;};
-    bool setIsPersistent(bool p){isPersistent = p;};
+    void setIsPersistent(bool p){isPersistent = p;};
     
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteConnections;
