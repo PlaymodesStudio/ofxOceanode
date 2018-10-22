@@ -353,12 +353,14 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         //            }
         //            i++;
         //        }
-        
+
+        bool foundConnection = false;
         if(json.find(sourceModule) != json.end()){
             if(json[sourceModule].find(sourceParameter) != json[sourceModule].end()){
                 if(json[sourceModule][sourceParameter].find(sinkModule) != json[sourceModule][sourceParameter].end()){
                     if(json[sourceModule][sourceParameter][sinkModule].find(sinkParameter) != json[sourceModule][sourceParameter][sinkModule].end()){
                         json[sourceModule][sourceParameter][sinkModule].erase(sinkParameter);
+                        foundConnection = true;
                         if(json[sourceModule][sourceParameter][sinkModule].size() == 0){
                             json[sourceModule][sourceParameter].erase(sinkModule);
                             if(json[sourceModule][sourceParameter].size() == 0){
@@ -373,7 +375,7 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
                 }
             }
         }
-        else{
+        if(!foundConnection){
             connections.erase(connections.begin()+i);
         }
     }
@@ -393,25 +395,29 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         }
     }
     
-    vector<string> oldConnectionsInfo(connections.size());
-    for(int i = 0; i < connections.size(); i++){
-        oldConnectionsInfo[1] = connections[i].second->getSourceParameter().getName();
-        oldConnectionsInfo[0] = connections[i].second->getSourceParameter().getGroupHierarchyNames()[0];
-        oldConnectionsInfo[3] = connections[i].second->getSinkParameter().getName();
-        oldConnectionsInfo[2] = connections[i].second->getSinkParameter().getGroupHierarchyNames()[0];
         
+    vector<vector<string>> oldConnectionsInfo(connections.size(), vector<string>(4));
+    for(int i = 0; i < connections.size(); i++){
+        oldConnectionsInfo[i][1] = connections[i].second->getSourceParameter().getName();
+        oldConnectionsInfo[i][0] = connections[i].second->getSourceParameter().getGroupHierarchyNames()[0];
+        oldConnectionsInfo[i][3] = connections[i].second->getSinkParameter().getName();
+        oldConnectionsInfo[i][2] = connections[i].second->getSinkParameter().getGroupHierarchyNames()[0];
+
     }
     
+    
+
     for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
         for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
             for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
                 for (ofJson::iterator sinkParameter = sinkModule.value().begin(); sinkParameter != sinkModule.value().end(); ++sinkParameter) {
+                    ofLog() << sourceModule.key() << " " << sourceParameter.key() << " " << sinkModule.key() << " " << sinkParameter.key();
                     bool connectionExist = false;
                     for(int i = 0; i < oldConnectionsInfo.size(); i++){
-                        if(!(oldConnectionsInfo[0] == sourceModule.key()
-                           && oldConnectionsInfo[1] == sourceParameter.key()
-                           && oldConnectionsInfo[2] == sinkModule.key()
-                           && oldConnectionsInfo[3] == sinkParameter.key())){
+                        if(!(oldConnectionsInfo[i][0] != sourceModule.key()
+                           || oldConnectionsInfo[i][1] != sourceParameter.key()
+                           || oldConnectionsInfo[i][2] != sinkModule.key()
+                           || oldConnectionsInfo[i][3] != sinkParameter.key())){
                             oldConnectionsInfo.erase(oldConnectionsInfo.begin()+i);
                             connectionExist = true;
                             break;
