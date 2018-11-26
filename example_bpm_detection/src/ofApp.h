@@ -1,7 +1,5 @@
 #pragma once
 
-#define OFXOCEANODE_USE_BPM_DETECTION
-
 #include "ofMain.h"
 #include "ofxOceanode.h"
 
@@ -26,5 +24,5 @@ public:
     
     ofxOceanodeCanvas canvas;
     shared_ptr<ofxOceanodeContainer> container;
-    ofxOceanodeControls* controls;
+    unique_ptr<ofxOceanodeControls> controls;
 };

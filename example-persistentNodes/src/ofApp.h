@@ -24,5 +24,5 @@ public:
     
     ofxOceanodeCanvas canvas;
     shared_ptr<ofxOceanodeContainer> container;
-    shared_ptr<ofxOceanodeControls> controls;
+    unique_ptr<ofxOceanodeControls> controls;
 };

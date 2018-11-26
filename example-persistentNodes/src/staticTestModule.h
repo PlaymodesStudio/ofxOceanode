@@ -18,7 +18,7 @@ public:
     void setup() override{
         parameters->add(intParam.set("Int", 5, 0, 24));
         parameters->add(floatParam.set("Float", 0, 0, 1));
-        parameters->add(stringParam.set("String", "I'm a Static"));
+        addParameterToGroupAndInfo(stringParam.set("String", "I'm a Static")).isSavePreset = false;
     }
     
 private:
