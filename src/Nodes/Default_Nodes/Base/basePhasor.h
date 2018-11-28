@@ -16,8 +16,8 @@ public:
     ~basePhasor();
     
     float  bpm_Param;
-    int    beatsMult_Param;
-    int    beatsDiv_Param;
+    float    beatsMult_Param;
+    float    beatsDiv_Param;
     float  initPhase_Param;
     bool   loop_Param;
 

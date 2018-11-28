@@ -17,8 +17,8 @@ public:
     float getPhasor(){return basePh.getPhasor();};
     void  resetPhasor(){basePh.resetPhasor();};
     float getBpm(){return bpm_Param;};
-    int getBeatsMult(){return beatsMult_Param;};
-    int getBeatsDiv(){return beatsDiv_Param;};
+    float getBeatsMult(){return beatsMult_Param;};
+    float getBeatsDiv(){return beatsDiv_Param;};
     void setBeatMult(int i){beatsMult_Param=i;};
     void setBeatDiv(int i){beatsDiv_Param=i;};
     
@@ -28,8 +28,8 @@ private:
     void update(ofEventArgs &e);
 
     ofParameter<float>  bpm_Param;
-    ofParameter<int>    beatsMult_Param;
-    ofParameter<int>    beatsDiv_Param;
+    ofParameter<float>    beatsMult_Param;
+    ofParameter<float>    beatsDiv_Param;
     ofParameter<float>  initPhase_Param;
     ofParameter<float>  phasorMonitor;
     ofParameter<bool>   loop_Param;

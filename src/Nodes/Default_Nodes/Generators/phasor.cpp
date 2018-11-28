@@ -16,10 +16,10 @@ phasor::phasor() : ofxOceanodeNodeModel("Phasor")
     parameterAutoSettersListeners.push(initPhase_Param.newListener([&](float &val){
         basePh.initPhase_Param = val+phaseOffset - int(val+phaseOffset);
     }));
-    parameterAutoSettersListeners.push(beatsMult_Param.newListener([&](int &val){
+    parameterAutoSettersListeners.push(beatsMult_Param.newListener([&](float &val){
         basePh.beatsMult_Param = val;
     }));
-    parameterAutoSettersListeners.push(beatsDiv_Param.newListener([&](int &val){
+    parameterAutoSettersListeners.push(beatsDiv_Param.newListener([&](float &val){
         basePh.beatsDiv_Param = val;
     }));
     parameterAutoSettersListeners.push(loop_Param.newListener([&](bool &val){
