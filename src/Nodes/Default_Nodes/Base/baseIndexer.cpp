@@ -14,21 +14,16 @@ baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name
     previousIndexCount = indexCount;
     indexs.resize(indexCount, 0);
     indexRand.resize(indexCount , 0);
-#ifdef OFXOCEANODE_USE_OLDRANDOM
-    for(int i = 0; i < indexRand.size(); i++)
-        indexRand[i] = i-((float)indexRand.size()/2.f);
-#else
     iota(indexRand.begin(), indexRand.end(), 0);
     randPositions.resize(indexCount);
     randomizedIndexes.resize(indexCount);
     iota(randomizedIndexes.begin(), randomizedIndexes.end(), 0);
-#endif
     indexRand_Param_previous = 0;
     
     numWaves_Param.set("Num Waves", 1, 0, indexCount);
     indexInvert_Param.set("Index Invert", 0, 0, 1);
     symmetry_Param.set("Symmetry", 0, 0, indexCount/2);
-    indexRand_Param.set("Index Random", 0, 0, 1);
+    indexRand_Param.set("Index Random", 0, -1, 1);
     indexOffset_Param.set("Index Offset", 0, -indexCount/2, indexCount/2);
     indexQuant_Param.set("Index Quantization", indexCount, 1, indexCount);
     combination_Param.set("Index Combination", 0, 0, 1);
@@ -51,9 +46,6 @@ baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name
 void baseIndexer::indexCountChanged(int &indexCount){
     if(indexCount != previousIndexCount){
         indexs.resize(indexCount, 0);
-#ifdef OFXOCEANODE_USE_NRRANDOM
-        
-#endif
         indexRand.resize(indexCount);
         iota(indexRand.begin(), indexRand.end(), 0);
         randomizedIndexes.resize(indexCount);
@@ -152,11 +144,10 @@ void baseIndexer::recomputeIndexs(){
         index = indexInvert_Param*invertedIndex + (1-indexInvert_Param)*nonInvertIndex;
         
         //random
-#ifdef OFXOCEANODE_USE_NRRANDOM
-        index = randomizedIndexes[index];
-#else
-        index = index*(1-indexRand_Param) + (indexRand[index]*indexRand_Param);
-#endif
+        if(indexRand_Param < 0)
+            index = randomizedIndexes[index];
+        else if(indexRand_Param > 0)
+            index = index*(1-indexRand_Param) + (indexRand[index]*indexRand_Param);
         
         //COMB
         index = abs(((index%2)*indexCount*combination_Param)-index);
@@ -175,12 +166,13 @@ void baseIndexer::recomputeIndexs(){
 }
 
 void baseIndexer::indexRandChanged(float &val){
-    if(indexRand_Param_previous == 0)
+    if(indexRand_Param_previous == 0){
         random_shuffle(indexRand.begin(), indexRand.end());
+        iota(randomizedIndexes.begin(), randomizedIndexes.end(), 0);
+    }
     indexRand_Param_previous = val;
     
-#ifdef OFXOCEANODE_USE_NRRANDOM
-    if(val != 0){
+    if(val < 0){
         for(int i = 0; i < indexCount; i++){
             randPositions[i] = indexRand[i]*indexRand_Param + i*(1-indexRand_Param);
         }
@@ -189,8 +181,4 @@ void baseIndexer::indexRandChanged(float &val){
                   randomizedIndexes.begin(), randomizedIndexes.end(),
                   [&](std::size_t a, std::size_t b) { return randPositions[a] < randPositions[b]; });
     }
-    else{
-        iota(randomizedIndexes.begin(), randomizedIndexes.end(), 0);
-    }
-#endif
 }
