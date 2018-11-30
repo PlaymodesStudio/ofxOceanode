@@ -53,6 +53,8 @@ private:
     ofEventListeners listeners;
     
     vector<int>         indexRand;
+    vector<int>         randomizedIndexes;
+    vector<float>       randPositions;
     float               indexRand_Param_previous;
     bool newIndexsFlag;
     int previousIndexCount;
