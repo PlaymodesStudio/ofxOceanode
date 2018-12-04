@@ -16,10 +16,13 @@ switcher::switcher() : ofxOceanodeNodeModel("Switcher Float"){
     addOutputParameterToGroupAndInfo(output.set("Output", {0}, {0}, {1}));
 
     listeners.push(input1.newListener([&](vector<float> &vf){
-        changedInput(vf);
+        changedInput();
     }));
     listeners.push(input2.newListener([&](vector<float> &vf){
-        changedInput(vf);
+        changedInput();
+    }));
+    listeners.push(switchSelector.newListener([this](int &i){
+        changedInput();
     }));
 }
 
@@ -27,7 +30,7 @@ void switcher::changedSwitch(int &i)
 {
     
 }
-void switcher::changedInput(vector<float> &vf)
+void switcher::changedInput()
 {
     if(switchSelector==0)
     {
