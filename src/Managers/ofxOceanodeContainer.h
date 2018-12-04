@@ -115,6 +115,8 @@ public:
     
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
     
+    void moveModulesInRectangle(glm::vec2 moveVec, ofRectangle rect);
+    
 private:
     void temporalConnectionDestructor();
     

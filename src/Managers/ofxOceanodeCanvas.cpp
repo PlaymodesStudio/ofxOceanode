@@ -54,6 +54,7 @@ void ofxOceanodeCanvas::setup(){
     }
     
     popUpMenu->onDropdownEvent(this, &ofxOceanodeCanvas::newModuleListener);
+    selectingRect = ofRectangle(0, 0, 0, 0);
 }
 
 void ofxOceanodeCanvas::draw(ofEventArgs &args){
@@ -96,8 +97,10 @@ void ofxOceanodeCanvas::mouseDragged(ofMouseEventArgs &e){
     if(ofGetKeyPressed(' ')){
         transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(dragCanvasInitialPoint-e, 0)));
         dragCanvasInitialPoint = e;
-    }
-    selectEndPoint = screenToCanvas(e);
+    }else if(selectingRect != ofRectangle(0,0,0,0)){
+        container->moveModulesInRectangle(e - dragModulesInitialPoint, selectingRect);
+    }else if(selecting)
+        selectEndPoint = screenToCanvas(e);
 }
 
 void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
@@ -118,8 +121,6 @@ void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
     if(ofGetKeyPressed(' ')){
         dragCanvasInitialPoint = e;
     }
-    selectInitialPoint = e;
-    selectEndPoint = e;
 //    if(ofGetKeyPressed(OF_KEY_CONTROL)){
 //        bool cablePressed = false;
 //        for(auto connection : connections){
@@ -132,14 +133,18 @@ void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
 //            }
 //        }
 //    }
-    
+    dragModulesInitialPoint = e;
     selectInitialPoint = transformedPos;
-    selecting = true;
+    if(selectingRect == ofRectangle(0, 0, 0, 0))
+        selecting = true;
 }
 
 void ofxOceanodeCanvas::mouseReleased(ofMouseEventArgs &e){
+    if(selecting)
+        selectingRect = ofRectangle(selectInitialPoint, selectEndPoint);
+    else
+        selectingRect = ofRectangle(0, 0, 0, 0);
     selecting = false;
-    ofRectangle selectingRect(selectInitialPoint, selectEndPoint);
 }
 
 void ofxOceanodeCanvas::mouseScrolled(ofMouseEventArgs &e){

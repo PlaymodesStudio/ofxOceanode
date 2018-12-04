@@ -63,6 +63,8 @@ private:
     glm::vec2 selectInitialPoint;
     glm::vec2 selectEndPoint;
     bool selecting;
+    ofRectangle selectingRect;
+    glm::vec2 dragModulesInitialPoint;
 };
 
 #endif

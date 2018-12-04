@@ -907,6 +907,16 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
 #endif
 
 
+void ofxOceanodeContainer::moveModulesInRectangle(glm::vec2 moveVec, ofRectangle rect){
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            auto &nodeGui = node.second->getNodeGui();
+            if(rect.inside(nodeGui.getPosition()))
+                nodeGui.setPosition(nodeGui.getPosition() + moveVec);
+        }
+    }
+}
+
 #ifdef OFXOCEANODE_USE_MIDI
 
 void ofxOceanodeContainer::setIsListeningMidi(bool b){
