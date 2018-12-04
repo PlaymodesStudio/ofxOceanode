@@ -25,7 +25,7 @@ public:
     void presetHasLoaded() override;
 
 private:
-    void computeBank(float phasor);
+    void computeBank(vector<float> &phasor);
     void indexCountChanged(int &newIndexCount) override;
     
     template <typename T>
@@ -39,7 +39,7 @@ private:
     }
 
     virtual void newIndexs() override;
-    void newPhasorIn(float &f);
+    void newPhasorIn(vector<float> &f);
     void newPowParam(vector<float> &f);
     void newpulseWidthParam(vector<float> &f);
     void newHoldTimeParam(vector<float> &f);
@@ -55,7 +55,7 @@ private:
     void newBiPowParam(vector<float> &f);
     
 
-    ofParameter<float>    phasorIn;
+    ofParameter<vector<float>>    phasorIn;
     ofParameter<vector<float>>    pow_Param; //Pow of the funcion, working on sin, cos....
     ofParameter<vector<float>>    pulseWidth_Param;
     ofParameter<vector<float>>    holdTime_Param; //The duration of the hold in percentage (0.5) --> 50% of the cycle is the phase in initPhase

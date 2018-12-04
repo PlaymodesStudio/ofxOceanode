@@ -13,7 +13,7 @@ void ofApp::setup(){
 
     canvas.setContainer(container);
     canvas.setup();
-    controls = make_shared<ofxOceanodeControls>(container);
+    controls = make_unique<ofxOceanodeControls>(container);
     
     //If we load before creating controls the persistent midi bindings will not be visible in midi gui
     container->loadPersistent();

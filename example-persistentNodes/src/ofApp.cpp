@@ -19,7 +19,7 @@ void ofApp::setup(){
 //    container->createPersistentNode<staticTestModule>();
 //    container->createPersistentNode<staticTestModule>();
 
-    controls = make_shared<ofxOceanodeControls>(container);
+    controls = make_unique<ofxOceanodeControls>(container);
 }
 
 //--------------------------------------------------------------

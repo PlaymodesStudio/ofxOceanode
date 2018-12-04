@@ -15,12 +15,19 @@ public:
     phasor();
     ~phasor(){};
     float getPhasor(){return basePh.getPhasor();};
+    vector<float> getPhasors(){return basePh.getPhasors();};
     void  resetPhasor(){basePh.resetPhasor();};
     float getBpm(){return bpm_Param;};
-    int getBeatsMult(){return beatsMult_Param;};
-    int getBeatsDiv(){return beatsDiv_Param;};
-    void setBeatMult(int i){beatsMult_Param=i;};
-    void setBeatDiv(int i){beatsDiv_Param=i;};
+    float getBeatsMult(){return beatsMult_Param->at(0);};
+    float getBeatsDiv(){return beatsDiv_Param->at(0);};
+    
+    vector<float> getBeatsMults(){return beatsMult_Param;};
+    vector<float> getBeatsDivs(){return beatsDiv_Param;};
+    
+    void setBeatMult(vector<float> i){beatsMult_Param=i;};
+    void setBeatDiv(vector<float> i){beatsDiv_Param=i;};
+    void setBeatMult(float i){beatsMult_Param = vector<float>(1, i);};
+    void setBeatDiv(float i){beatsDiv_Param = vector<float>(1, i);};
     
     void setPhase(float _phase) override;
 private:
@@ -28,10 +35,10 @@ private:
     void update(ofEventArgs &e);
 
     ofParameter<float>  bpm_Param;
-    ofParameter<int>    beatsMult_Param;
-    ofParameter<int>    beatsDiv_Param;
+    ofParameter<vector<float>>    beatsMult_Param;
+    ofParameter<vector<float>>    beatsDiv_Param;
     ofParameter<float>  initPhase_Param;
-    ofParameter<float>  phasorMonitor;
+    ofParameter<vector<float>>  phasorMonitor;
     ofParameter<bool>   loop_Param;
     ofParameter<void>   resetPhase_Param;
     float phaseOffset;
