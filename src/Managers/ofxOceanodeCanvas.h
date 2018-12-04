@@ -15,6 +15,7 @@
 #include "ofxDatGui.h"
 
 class ofxOceanodeContainer;
+class ofxOceanodeNodeGui;
 class ofxDatGui;
 class ofxDatGuiDropdown;
 
@@ -26,14 +27,14 @@ public:
     
     void setup();
     void update(ofEventArgs &args){};
-    void draw(ofEventArgs &args){};
+    void draw(ofEventArgs &args);
     
     void keyPressed(ofKeyEventArgs &e);
     void keyReleased(ofKeyEventArgs &e){};
     void mouseMoved(ofMouseEventArgs &e){};
     void mouseDragged(ofMouseEventArgs &e);
     void mousePressed(ofMouseEventArgs &e);
-    void mouseReleased(ofMouseEventArgs &e){};
+    void mouseReleased(ofMouseEventArgs &e);
     void mouseScrolled(ofMouseEventArgs &e);
     void mouseEntered(ofMouseEventArgs &e){};
     void mouseExited(ofMouseEventArgs &e){};
@@ -58,6 +59,10 @@ private:
     ofEventListeners listeners;
     
     ofEventListener changedTransformationMatrix;
+    
+    glm::vec2 selectInitialPoint;
+    glm::vec2 selectEndPoint;
+    bool selecting;
 };
 
 #endif
