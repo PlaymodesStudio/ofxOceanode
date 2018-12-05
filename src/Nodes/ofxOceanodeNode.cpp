@@ -402,7 +402,8 @@ bool ofxOceanodeNode::loadParametersFromJson(ofJson json, bool persistentPreset)
 
 void ofxOceanodeNode::setBpm(float bpm){
     if(getParameters()->contains("BPM") && nodeModel->getAutoBPM()){
-        getParameters()->getFloat("BPM") = bpm;
+        if(!checkHasInConnection(getParameters()->getFloat("BPM")))
+            getParameters()->getFloat("BPM") = bpm;
     }else{
         nodeModel->setBpm(bpm);
     }
