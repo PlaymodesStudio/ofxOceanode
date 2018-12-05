@@ -801,7 +801,8 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
             if(splitAddress[0] == "phaseReset"){
                 resetPhase();
             }else if(splitAddress[0] == "bpm"){
-                setBpm(m.getArgAsFloat(0));
+                float newBpm = m.getArgAsFloat(0);
+                ofNotifyEvent(changedBpmEvent, newBpm);
             }
         }else if(splitAddress.size() == 2){
             if(splitAddress[0] == "presetLoad"){

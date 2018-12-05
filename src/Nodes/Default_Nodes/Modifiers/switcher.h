@@ -20,7 +20,7 @@ public:
     ~switcher(){};
     
     void changedSwitch(int &i);
-    void changedInput(vector<float> &f);
+    void changedInput();
 
 private:
     
