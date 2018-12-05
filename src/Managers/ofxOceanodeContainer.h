@@ -92,6 +92,7 @@ public:
     void expandGuis();
     
     ofEvent<string> loadPresetEvent;
+    ofEvent<float> changedBpmEvent;
     
 #ifdef OFXOCEANODE_USE_OSC
     void setupOscSender(string host, int port);
