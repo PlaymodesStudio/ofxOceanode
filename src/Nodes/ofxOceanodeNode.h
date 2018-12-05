@@ -69,6 +69,8 @@ public:
     bool getIsPersistent(){return isPersistent;};
     void setIsPersistent(bool p){isPersistent = p;};
     
+    bool checkHasInConnection(ofAbstractParameter &p);
+    
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteConnections;
     ofEvent<glm::vec2> duplicateModule;

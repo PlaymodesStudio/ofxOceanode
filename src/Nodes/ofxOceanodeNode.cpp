@@ -360,7 +360,8 @@ bool ofxOceanodeNode::loadParametersFromJson(ofJson json, bool persistentPreset)
     for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
         if(getParameters()->contains(it.key())){
             ofAbstractParameter& p = getParameters()->get(it.key());
-            if((!persistentPreset && nodeModel->getParameterInfo(p).isSavePreset) || (persistentPreset && nodeModel->getParameterInfo(p).isSaveProject)){
+            if(((!persistentPreset && nodeModel->getParameterInfo(p).isSavePreset) || (persistentPreset && nodeModel->getParameterInfo(p).isSaveProject))
+               && !checkHasInConnection(p)){
                 if(p.type() == typeid(ofParameter<float>).name()){
                     ofDeserialize(json, p);
                 }else if(p.type() == typeid(ofParameter<int>).name()){
@@ -426,6 +427,16 @@ void ofxOceanodeNode::resetPhase(){
         getParameters()->getVoid("Reset Phase").trigger();
     }
 }
+
+bool ofxOceanodeNode::checkHasInConnection(ofAbstractParameter &p){
+    for(auto &c : inConnections){
+        if(&c->getSinkParameter() == &p){
+            return true;
+        }
+    }
+    return false;
+}
+
 
 ofParameterGroup* ofxOceanodeNode::getParameters(){
     return nodeModel->getParameterGroup();
