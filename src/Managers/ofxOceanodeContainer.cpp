@@ -382,19 +382,6 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     
     ofLog() << "After dup conncections " << connections.size() << "connections";
     
-    
-    for(auto &nodeTypeMap : dynamicNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->loadPreset(presetFolderPath);
-        }
-    }
-    
-    for(auto &nodeTypeMap : persistentNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->loadPreset(presetFolderPath);
-        }
-    }
-    
         
     vector<vector<string>> oldConnectionsInfo(connections.size(), vector<string>(4));
     for(int i = 0; i < connections.size(); i++){
@@ -411,7 +398,6 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
             for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
                 for (ofJson::iterator sinkParameter = sinkModule.value().begin(); sinkParameter != sinkModule.value().end(); ++sinkParameter) {
-                    ofLog() << sourceModule.key() << " " << sourceParameter.key() << " " << sinkModule.key() << " " << sinkParameter.key();
                     bool connectionExist = false;
                     for(int i = 0; i < oldConnectionsInfo.size(); i++){
                         if(!(oldConnectionsInfo[i][0] != sourceModule.key()
@@ -432,6 +418,18 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     }
     
     ofLog() << "After creation " << connections.size() << "connections";
+    
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->loadPreset(presetFolderPath);
+        }
+    }
+    
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->loadPreset(presetFolderPath);
+        }
+    }
     
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
