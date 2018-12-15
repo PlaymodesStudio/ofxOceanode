@@ -308,6 +308,15 @@ bool ofxOceanodeNode::loadConfig(string filename, bool persistentPreset){
     if(persistentPreset)
         nodeModel->loadCustomPersistent(json);
     
+    //Hack Put all faders to 0;
+    if(getParameters()->contains("Fader")){
+        if(getParameters()->get("Fader").type() == typeid(ofParameter<float>()).name()){
+            getParameters()->getFloat("Fader") = 0;
+        }else{
+            getParameters()->get<vector<float>>("Fader") = {0};
+        }
+    }
+    
     nodeModel->presetRecallBeforeSettingParameters(json);
     loadParametersFromJson(json, persistentPreset);
     nodeModel->presetRecallAfterSettingParameters(json);
