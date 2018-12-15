@@ -57,6 +57,7 @@ public:
     virtual void presetSave(ofJson &json){};
     virtual void presetRecallBeforeSettingParameters(ofJson &json){};
     virtual void presetRecallAfterSettingParameters(ofJson &json){};
+    virtual void loadCustomPersistent(ofJson &json){};
     
     virtual void presetWillBeLoaded(){};
     virtual void presetHasLoaded(){};
