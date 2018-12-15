@@ -305,6 +305,9 @@ bool ofxOceanodeNode::loadConfig(string filename, bool persistentPreset){
     
     if(json.empty()) return false;
     
+    if(persistentPreset)
+        nodeModel->loadCustomPersistent(json);
+    
     nodeModel->presetRecallBeforeSettingParameters(json);
     loadParametersFromJson(json, persistentPreset);
     nodeModel->presetRecallAfterSettingParameters(json);
