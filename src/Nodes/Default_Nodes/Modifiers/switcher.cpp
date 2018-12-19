@@ -21,7 +21,7 @@ switcher::switcher() : ofxOceanodeNodeModel("Switcher Float"){
     listeners.push(input2.newListener([&](vector<float> &vf){
         changedInput();
     }));
-    listeners.push(switchSelector.newListener([this](int &i){
+    listeners.push(switchSelector.newListener([this](float &i){
         changedInput();
     }));
 }
@@ -32,22 +32,22 @@ void switcher::changedSwitch(int &i)
 }
 void switcher::changedInput()
 {
-    if(switchSelector==0)
-    {
-        output = input1;
+    if(input1->size() == input2->size()){
+        vector<float> tempOutput(input1->size());
+        for(int i = 0; i < tempOutput.size(); i++){
+            tempOutput[i] = (input1->at(i)*(1-switchSelector)) + (input2->at(i)*switchSelector);
+        }
+        output = tempOutput;
     }
-    else if(switchSelector==1)
-    {
-        output = input2;
+    else{
+        if(switchSelector < 0.5)
+        {
+            output = input1;
+        }
+        else if(switchSelector >= 0.5)
+        {
+            output = input2;
+        }
     }
 }
-
-//void switcher::recalculate()
-//{
-//    vector<float> tempOut = input.get();
-//    for(auto &f : tempOut){
-//       f = ofMap(f,minInput,maxInput,minOutput,maxOutput, true);
-//    }
-//    output = tempOut;
-//}
 
