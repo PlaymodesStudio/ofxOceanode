@@ -570,6 +570,10 @@ void ofxOceanodeContainer::updatePersistent(){
     }
 }
 
+void ofxOceanodeContainer::saveCurrentPreset(){
+    saveCurrentPresetEvent.notify();
+}
+
 void ofxOceanodeContainer::setBpm(float _bpm){
     bpm = _bpm;
     for(auto &nodeTypeMap : dynamicNodes){
