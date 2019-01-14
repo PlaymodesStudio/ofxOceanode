@@ -24,6 +24,7 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     transformationMatrix = glm::mat4(1);
     temporalConnection = nullptr;
     bpm = 120;
+    phase = 0;
     collapseAll = false;
     
 #ifdef OFXOCEANODE_USE_OSC
