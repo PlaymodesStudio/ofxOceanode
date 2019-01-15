@@ -21,6 +21,9 @@ public:
     void setExternalWindowPosition(int px, int py);
     void setExternalWindowShape(int w, int h);
     void setExternalWindowFullScreen(bool b);
+    void setShowWindow(bool b){
+        showWindow = b;
+    }
     
 protected:
     virtual void drawInExternalWindow(ofEventArgs &e){};
