@@ -722,7 +722,7 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                 dir.sort();
                 int numPresets = dir.listDir();
                 for ( int i = 0 ; i < numPresets; i++){
-                    if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(1)){
+                    if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(0)){
                         string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
                         ofNotifyEvent(loadPresetEvent, bankAndPreset);
                         break;
