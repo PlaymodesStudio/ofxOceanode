@@ -132,18 +132,22 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     
     if(!isPersistent){
         destroyNodeListeners.push(nodePtr->deleteModuleAndConnections.newListener([this, nodeToBeCreatedName, toBeCreatedId](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
-            for(auto containerConnectionIterator = connections.begin(); containerConnectionIterator!=connections.end();){
+            //for(auto &containerConnectionIterator = connections.begin(); containerConnectionIterator!= connections.end();){
+			for(int i = 0; i < connections.size();){
                 bool foundConnection = false;
-                for(auto nodeConnection : connectionsToBeDeleted){
-                    if(containerConnectionIterator->second.get() == nodeConnection){
+                for(auto &nodeConnection : connectionsToBeDeleted){
+                    //if(containerConnectionIterator->second.get() == nodeConnection){
+					if(connections[i].second.get() == nodeConnection){
                         foundConnection = true;
-                        connections.erase(containerConnectionIterator);
+                        //connections.erase(containerConnectionIterator);
+						connections.erase((connections.begin() + i));
                         connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
                         break;
                     }
                 }
                 if(!foundConnection){
-                    containerConnectionIterator++;
+                    //containerConnectionIterator++;
+					i++;
                 }
             }
             
