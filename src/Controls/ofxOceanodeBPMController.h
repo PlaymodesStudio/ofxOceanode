@@ -40,6 +40,8 @@ private:
     float lastButtonPressTime;
     vector<float> storedIntervals;
     float averageInterval;
+    
+    ofEventListener changedBpmListener;
 
     
 #ifdef OFXOCEANODE_USE_BPM_DETECTION

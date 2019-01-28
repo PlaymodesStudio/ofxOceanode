@@ -20,7 +20,7 @@ public:
     ~switcher(){};
     
     void changedSwitch(int &i);
-    void changedInput(vector<float> &f);
+    void changedInput();
 
 private:
     
@@ -28,7 +28,7 @@ private:
     
     ofParameter<vector<float>>  input1;
     ofParameter<vector<float>>  input2;
-    ofParameter<int>  switchSelector;
+    ofParameter<float>  switchSelector;
     ofParameter<vector<float>>  output;
 };
 

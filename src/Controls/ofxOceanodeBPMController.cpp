@@ -34,6 +34,12 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     lastButtonPressTime = -1;
     oldBpm = -1;
     
+     changedBpmListener = container->changedBpmEvent.newListener([this](float newBpm){
+#ifndef OFXOCEANODE_USE_BPM_DETECTION
+         bpm = newBpm;
+#endif
+     });
+    
 #ifdef OFXOCEANODE_USE_BPM_DETECTION
     
     ofSoundStreamSettings settings;

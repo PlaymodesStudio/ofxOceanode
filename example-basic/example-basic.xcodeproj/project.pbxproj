@@ -1,2739 +1,917 @@
-<?xml version="1.0"?>
-<plist version="1.0">
-	<dict>
-		<key>archiveVersion</key>
-		<string>1</string>
-		<key>classes</key>
-		<dict />
-		<key>objectVersion</key>
-		<string>46</string>
-		<key>objects</key>
-		<dict>
-			<key>86F00AF8B1543076FA133A82</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanode.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/ofxOceanode.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>EDEAD1332CEFCB6171498ADE</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeNodeModel.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeModel.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>4F63EFF3BAACF2B19051E336</key>
-			<dict>
-				<key>fileRef</key>
-				<string>18902594A5884CA5CA6D3D9D</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>18902594A5884CA5CA6D3D9D</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeNodeModel.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeModel.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>D11A82FE9732DAF8F599F2AB</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeNodeGui.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeGui.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>8EB5677652296BACF3A1C184</key>
-			<dict>
-				<key>fileRef</key>
-				<string>170083BFE7EEC5851D5DF9E6</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>170083BFE7EEC5851D5DF9E6</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeNodeGui.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeGui.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>7839463FADC4E27D1C66C5FB</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeNode.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNode.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>4C8024D8DD46223D43C514C0</key>
-			<dict>
-				<key>fileRef</key>
-				<string>63A44DC38599839305F1F4D3</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>63A44DC38599839305F1F4D3</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeNode.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNode.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>DCC77D1E228088A526604E34</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>smoother.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/smoother.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>BDE21E02C646BD31BEC13891</key>
-			<dict>
-				<key>fileRef</key>
-				<string>EA0730CA1A73FC90DCF8C770</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>EA0730CA1A73FC90DCF8C770</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>smoother.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/smoother.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>125FC7DF81918DE565891A92</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>reindexer.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/reindexer.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>E1E0C08A53EAFC4A088F5BDC</key>
-			<dict>
-				<key>fileRef</key>
-				<string>3D3CE3C79225FEEDD92A410A</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>3D3CE3C79225FEEDD92A410A</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>reindexer.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/reindexer.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>06F3C8FC2DD28E0B985BADB0</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ranger.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/ranger.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>4838368B3C8561AD76D56D69</key>
-			<dict>
-				<key>fileRef</key>
-				<string>959F4777E3902536DC81AC0A</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>959F4777E3902536DC81AC0A</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ranger.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/ranger.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>3B2B1469CBE279200D558FAB</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>mapper.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/mapper.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>C9E0C4F6A9698E8F0EF5E14C</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>D623E907C25C25D1AB411052</string>
-					<string>3B2B1469CBE279200D558FAB</string>
-					<string>959F4777E3902536DC81AC0A</string>
-					<string>06F3C8FC2DD28E0B985BADB0</string>
-					<string>3D3CE3C79225FEEDD92A410A</string>
-					<string>125FC7DF81918DE565891A92</string>
-					<string>EA0730CA1A73FC90DCF8C770</string>
-					<string>DCC77D1E228088A526604E34</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>Modifiers</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>47608E29666CD58C20E53408</key>
-			<dict>
-				<key>fileRef</key>
-				<string>D623E907C25C25D1AB411052</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>D623E907C25C25D1AB411052</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>mapper.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/mapper.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>E187B9F0640B673635B5ECDF</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>phasor.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/phasor.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>7416EB8AFDAB615D36EC3137</key>
-			<dict>
-				<key>fileRef</key>
-				<string>9C1A96A2891A3C36C7DCA0F7</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>9C1A96A2891A3C36C7DCA0F7</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>phasor.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/phasor.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>3C2190A2D726C8DCEF074E3C</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>oscillatorBank.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillatorBank.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>4C3192DB1EAE1CFF29580749</key>
-			<dict>
-				<key>fileRef</key>
-				<string>BE59ACA8A0510B61FD8647C6</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>BE59ACA8A0510B61FD8647C6</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>oscillatorBank.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillatorBank.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>96D838AC4E4260B0ABA07D05</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>oscillator.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillator.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>86C08C13FA71904D23256B02</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>0BE6AC32AE0E7C44E14DFE2F</string>
-					<string>96D838AC4E4260B0ABA07D05</string>
-					<string>BE59ACA8A0510B61FD8647C6</string>
-					<string>3C2190A2D726C8DCEF074E3C</string>
-					<string>9C1A96A2891A3C36C7DCA0F7</string>
-					<string>E187B9F0640B673635B5ECDF</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>Generators</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>842D4B1559D16CD55B1CF6DD</key>
-			<dict>
-				<key>fileRef</key>
-				<string>0BE6AC32AE0E7C44E14DFE2F</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>0BE6AC32AE0E7C44E14DFE2F</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>oscillator.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillator.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>60A061F8C47B5624AE6C450E</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>defaultNodes.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/defaultNodes.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>C1A3EDCC30D80C890BF10EC5</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>localPresetController.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers/localPresetController.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>550B846BFF2680933EE8B745</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>D9EC5C75C9CA92B4EFB78CFF</string>
-					<string>C1A3EDCC30D80C890BF10EC5</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>Controllers</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>124BB55C818D1F89450ED005</key>
-			<dict>
-				<key>fileRef</key>
-				<string>D9EC5C75C9CA92B4EFB78CFF</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>D9EC5C75C9CA92B4EFB78CFF</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>localPresetController.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers/localPresetController.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>C76BA1A770D742397939F7A7</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>basePhasor.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/basePhasor.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>BFBE6AEF801BA1F820867405</key>
-			<dict>
-				<key>fileRef</key>
-				<string>0538E73A948F5367828D0596</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>0538E73A948F5367828D0596</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>basePhasor.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/basePhasor.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>94ED70588667CA0E144E436E</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>baseOscillator.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/baseOscillator.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>9150F94721FE0E44D16DA0CC</key>
-			<dict>
-				<key>fileRef</key>
-				<string>F44449692EA3A4B7FBABCF29</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>F44449692EA3A4B7FBABCF29</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>baseOscillator.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/baseOscillator.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>85CA43E90443167538D06F3C</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>baseIndexer.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/baseIndexer.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>7122898CC63A863AD1DC1535</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>645C793F85B56EF720B10C7F</string>
-					<string>85CA43E90443167538D06F3C</string>
-					<string>F44449692EA3A4B7FBABCF29</string>
-					<string>94ED70588667CA0E144E436E</string>
-					<string>0538E73A948F5367828D0596</string>
-					<string>C76BA1A770D742397939F7A7</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>Base</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>4A0C0B233C38AF6788F3CE7D</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>7122898CC63A863AD1DC1535</string>
-					<string>550B846BFF2680933EE8B745</string>
-					<string>60A061F8C47B5624AE6C450E</string>
-					<string>86C08C13FA71904D23256B02</string>
-					<string>C9E0C4F6A9698E8F0EF5E14C</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>Default_Nodes</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>D925621F7F6146497318658A</key>
-			<dict>
-				<key>fileRef</key>
-				<string>645C793F85B56EF720B10C7F</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>645C793F85B56EF720B10C7F</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>baseIndexer.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/baseIndexer.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>027F095A0217A890F2B21761</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeNodeModelLocalPreset.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Base_Nodes/ofxOceanodeNodeModelLocalPreset.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>4B0881C0E4F3D037FA83C3E3</key>
-			<dict>
-				<key>fileRef</key>
-				<string>8AC0F166599AAFFA99CD14EF</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>8AC0F166599AAFFA99CD14EF</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeNodeModelLocalPreset.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Base_Nodes/ofxOceanodeNodeModelLocalPreset.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>16D50E04676F5AF6D586DD9B</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeNodeModelExternalWindow.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Base_Nodes/ofxOceanodeNodeModelExternalWindow.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>1611DA528262F51B8A4FBD22</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>03E42CA654A61594B6D8167F</string>
-					<string>16D50E04676F5AF6D586DD9B</string>
-					<string>8AC0F166599AAFFA99CD14EF</string>
-					<string>027F095A0217A890F2B21761</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>Base_Nodes</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>6B8A921B73CC6BADD2D0E3A3</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>1611DA528262F51B8A4FBD22</string>
-					<string>4A0C0B233C38AF6788F3CE7D</string>
-					<string>63A44DC38599839305F1F4D3</string>
-					<string>7839463FADC4E27D1C66C5FB</string>
-					<string>170083BFE7EEC5851D5DF9E6</string>
-					<string>D11A82FE9732DAF8F599F2AB</string>
-					<string>18902594A5884CA5CA6D3D9D</string>
-					<string>EDEAD1332CEFCB6171498ADE</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>Nodes</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>7CC1A4D669C6C1B3786CD384</key>
-			<dict>
-				<key>fileRef</key>
-				<string>03E42CA654A61594B6D8167F</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>03E42CA654A61594B6D8167F</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeNodeModelExternalWindow.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Nodes/Base_Nodes/ofxOceanodeNodeModelExternalWindow.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>3795AFB8EAAD641D6CA88D4A</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeTypesRegistry.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Managers/ofxOceanodeTypesRegistry.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>102C0035698294FDB36E6899</key>
-			<dict>
-				<key>fileRef</key>
-				<string>60A6750E6D5A48E6B4B69C0A</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>60A6750E6D5A48E6B4B69C0A</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeTypesRegistry.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Managers/ofxOceanodeTypesRegistry.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>4A76FE1EC14329064FDB60C7</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeNodeRegistry.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Managers/ofxOceanodeNodeRegistry.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>B7559FEE382DBA7FB094D5E7</key>
-			<dict>
-				<key>fileRef</key>
-				<string>F15C9896F6A32FCA280CD4B5</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>F15C9896F6A32FCA280CD4B5</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeNodeRegistry.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Managers/ofxOceanodeNodeRegistry.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>FC8E873E04A65764668D30AB</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeContainer.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Managers/ofxOceanodeContainer.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>5769B6A6D79188D3D351933E</key>
-			<dict>
-				<key>fileRef</key>
-				<string>5E65A0C39A6FDCA2888DDAF8</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>5E65A0C39A6FDCA2888DDAF8</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeContainer.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Managers/ofxOceanodeContainer.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>BFA88189469A37E0B53C6773</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeCanvas.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Managers/ofxOceanodeCanvas.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>F345CC31328F66B89F4BB079</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>69F09B1450CB3FF08A87D2FF</string>
-					<string>BFA88189469A37E0B53C6773</string>
-					<string>5E65A0C39A6FDCA2888DDAF8</string>
-					<string>FC8E873E04A65764668D30AB</string>
-					<string>F15C9896F6A32FCA280CD4B5</string>
-					<string>4A76FE1EC14329064FDB60C7</string>
-					<string>60A6750E6D5A48E6B4B69C0A</string>
-					<string>3795AFB8EAAD641D6CA88D4A</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>Managers</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>FE7602E65C7BA676951A37FB</key>
-			<dict>
-				<key>fileRef</key>
-				<string>69F09B1450CB3FF08A87D2FF</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>69F09B1450CB3FF08A87D2FF</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeCanvas.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Managers/ofxOceanodeCanvas.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>56FB03D9F622C9350A0AB8BC</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodePresetsController.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Controls/ofxOceanodePresetsController.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>026CF24E227F5DFC3C392E27</key>
-			<dict>
-				<key>fileRef</key>
-				<string>C27DB6A973A67BE0BF855933</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>C27DB6A973A67BE0BF855933</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodePresetsController.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Controls/ofxOceanodePresetsController.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>CA4B325D2EC75988A7F9E2CB</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeControls.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Controls/ofxOceanodeControls.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>7B8EE5B7F57088CD23B7934D</key>
-			<dict>
-				<key>fileRef</key>
-				<string>C3AD3B4C116407604DCFB986</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>C3AD3B4C116407604DCFB986</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeControls.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Controls/ofxOceanodeControls.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>E4F53B46D587F378DA43DF57</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeBPMController.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Controls/ofxOceanodeBPMController.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>717BCDD6091D90F262DC7860</key>
-			<dict>
-				<key>fileRef</key>
-				<string>A8150F1936B064445E99AF76</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>A8150F1936B064445E99AF76</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeBPMController.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Controls/ofxOceanodeBPMController.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>46ADAF0F6560879BAE3D1C61</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeBaseController.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Controls/ofxOceanodeBaseController.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>957575D61FEE61F5BA89C5CF</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>90D557700F1EECB9E9F8AEB9</string>
-					<string>46ADAF0F6560879BAE3D1C61</string>
-					<string>A8150F1936B064445E99AF76</string>
-					<string>E4F53B46D587F378DA43DF57</string>
-					<string>C3AD3B4C116407604DCFB986</string>
-					<string>CA4B325D2EC75988A7F9E2CB</string>
-					<string>C27DB6A973A67BE0BF855933</string>
-					<string>56FB03D9F622C9350A0AB8BC</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>Controls</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>7B5743F2E77F2D5AD9B436F0</key>
-			<dict>
-				<key>fileRef</key>
-				<string>90D557700F1EECB9E9F8AEB9</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>90D557700F1EECB9E9F8AEB9</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeBaseController.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Controls/ofxOceanodeBaseController.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>542B8A9AF130D0C5A3086539</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeConnectionGraphics.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnectionGraphics.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>C1EEF98E795AFB7BB33F94B1</key>
-			<dict>
-				<key>fileRef</key>
-				<string>76AFF92A62D8AF4E498DB5C3</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>76AFF92A62D8AF4E498DB5C3</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeConnectionGraphics.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnectionGraphics.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>656EE12F1A05CB4841731C77</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeConnection.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnection.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>9BBF10547B078BE7A527677B</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>7C9B84BA3AF325F3D843633B</string>
-					<string>656EE12F1A05CB4841731C77</string>
-					<string>76AFF92A62D8AF4E498DB5C3</string>
-					<string>542B8A9AF130D0C5A3086539</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>Connections</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>9BF163AD5F824DF0AD945222</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>9BBF10547B078BE7A527677B</string>
-					<string>957575D61FEE61F5BA89C5CF</string>
-					<string>F345CC31328F66B89F4BB079</string>
-					<string>6B8A921B73CC6BADD2D0E3A3</string>
-					<string>86F00AF8B1543076FA133A82</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>src</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>643EB880A9E14DEF1DCC1AB4</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>9BF163AD5F824DF0AD945222</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>ofxOceanode</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>C6A203560BFBDA04C5746210</key>
-			<dict>
-				<key>fileRef</key>
-				<string>7C9B84BA3AF325F3D843633B</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>7C9B84BA3AF325F3D843633B</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeConnection.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnection.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>9E034FA57FE251AC33904E82</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiThemes.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/themes/ofxDatGuiThemes.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>D9757BE1A5DFAE64198FF989</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>0EA01AA404A74EE4BF1F46AD</string>
-					<string>9E034FA57FE251AC33904E82</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>themes</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>0EA01AA404A74EE4BF1F46AD</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiTheme.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/themes/ofxDatGuiTheme.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>4D832D586223B608C5420D29</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGui.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/ofxDatGui.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>BE7DAF3CB982C2BD0FE44648</key>
-			<dict>
-				<key>fileRef</key>
-				<string>DD8F81F7AAB5BA396231DD4C</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>DD8F81F7AAB5BA396231DD4C</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGui.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/ofxDatGui.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>EFC799641CF7089DDBF2094B</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxSmartFont.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont/ofxSmartFont.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>D334E5DEE84D3F52FE9065DE</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>A403D3D25D08FC7AF3B871D4</string>
-					<string>EFC799641CF7089DDBF2094B</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>ofxSmartFont</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>49829C6AAEB884DF8A116E1D</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>D334E5DEE84D3F52FE9065DE</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>libs</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>646DF4D56CE728133610A7F6</key>
-			<dict>
-				<key>fileRef</key>
-				<string>A403D3D25D08FC7AF3B871D4</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>A403D3D25D08FC7AF3B871D4</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxSmartFont.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont/ofxSmartFont.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>8E922B504254FF844AF5505A</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiIntObject.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/core/ofxDatGuiIntObject.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>407D7F7B6D3EDF97638DF661</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiEvents.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/core/ofxDatGuiEvents.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>169D713735D46DFA03D4EBEB</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiConstants.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/core/ofxDatGuiConstants.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>A534F08B38B5C43917E2A9E4</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiComponent.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/core/ofxDatGuiComponent.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>EB0606B779510751DDA16A81</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>5D13EE4C64902574D9153447</string>
-					<string>A534F08B38B5C43917E2A9E4</string>
-					<string>169D713735D46DFA03D4EBEB</string>
-					<string>407D7F7B6D3EDF97638DF661</string>
-					<string>8E922B504254FF844AF5505A</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>core</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>4A277DA746402C76CE307770</key>
-			<dict>
-				<key>fileRef</key>
-				<string>5D13EE4C64902574D9153447</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>5D13EE4C64902574D9153447</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiComponent.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/core/ofxDatGuiComponent.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>A7B61DF7F41316374CEEE8CA</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiTimeGraph.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/components/ofxDatGuiTimeGraph.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>3F15C4313830F7C3C28E1FAE</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiTextInputField.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/components/ofxDatGuiTextInputField.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>29030CD02944F06F1DAC3E49</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiTextInput.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/components/ofxDatGuiTextInput.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>149298D896FDA631EE81BEB9</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiSlider.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/components/ofxDatGuiSlider.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>11021811865108C49AED9E1E</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiScrollView.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/components/ofxDatGuiScrollView.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>92007C97134ED347908EA736</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiMatrix.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/components/ofxDatGuiMatrix.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>A13853A1B21F20177F44EE37</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiLabel.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/components/ofxDatGuiLabel.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>698855D874920D7A53525854</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiGroups.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/components/ofxDatGuiGroups.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>B11DB438E2A6EBD360F8BA50</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiFRM.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/components/ofxDatGuiFRM.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>B7B623A02730497FBCEA4FF2</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiControls.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/components/ofxDatGuiControls.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>0795F21A2022A202F628BE94</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiColorPicker.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/components/ofxDatGuiColorPicker.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>771877A40D55CB5D6C1969C4</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGuiButton.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/components/ofxDatGuiButton.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>1D570521A53950659A74DE26</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>C2BBB5BA515C82003E0EEB5E</string>
-					<string>771877A40D55CB5D6C1969C4</string>
-					<string>0795F21A2022A202F628BE94</string>
-					<string>B7B623A02730497FBCEA4FF2</string>
-					<string>B11DB438E2A6EBD360F8BA50</string>
-					<string>698855D874920D7A53525854</string>
-					<string>A13853A1B21F20177F44EE37</string>
-					<string>92007C97134ED347908EA736</string>
-					<string>11021811865108C49AED9E1E</string>
-					<string>149298D896FDA631EE81BEB9</string>
-					<string>29030CD02944F06F1DAC3E49</string>
-					<string>3F15C4313830F7C3C28E1FAE</string>
-					<string>A7B61DF7F41316374CEEE8CA</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>components</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>FE3CA1F8648010DBA2401722</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>1D570521A53950659A74DE26</string>
-					<string>EB0606B779510751DDA16A81</string>
-					<string>49829C6AAEB884DF8A116E1D</string>
-					<string>DD8F81F7AAB5BA396231DD4C</string>
-					<string>4D832D586223B608C5420D29</string>
-					<string>D9757BE1A5DFAE64198FF989</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>src</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>E99400E5E21DFD21A45E2E82</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>FE3CA1F8648010DBA2401722</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>ofxDatGui_PM</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>C2BBB5BA515C82003E0EEB5E</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxDatGui2dPad.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxDatGui_PM/src/components/ofxDatGui2dPad.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>F24887AB1BADDDBB829D94E1</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>testNode.h</string>
-				<key>path</key>
-				<string>src/testNode.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>A670837F6999677674A385D1</key>
-			<dict>
-				<key>fileRef</key>
-				<string>1C84792B71D7D5C105077DBF</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>1C84792B71D7D5C105077DBF</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>testNode.cpp</string>
-				<key>path</key>
-				<string>src/testNode.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>6948EE371B920CB800B5AC1A</key>
-			<dict>
-				<key>children</key>
-				<array />
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>local_addons</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>8466F1851C04CA0E00918B1C</key>
-			<dict>
-				<key>buildActionMask</key>
-				<string>12</string>
-				<key>files</key>
-				<array />
-				<key>inputPaths</key>
-				<array />
-				<key>isa</key>
-				<string>PBXShellScriptBuildPhase</string>
-				<key>outputPaths</key>
-				<array />
-				<key>runOnlyForDeploymentPostprocessing</key>
-				<string>0</string>
-				<key>shellPath</key>
-				<string>/bin/sh</string>
-				<key>shellScript</key>
-				<string>echo "$GCC_PREPROCESSOR_DEFINITIONS";
-APPSTORE=`expr "$GCC_PREPROCESSOR_DEFINITIONS" : ".*APPSTORE=\([0-9]*\)"`
-if [ -z "$APPSTORE" ] ; then
-echo "Note: Not copying bin/data to App Package or doing App Code signing. Use AppStore target for AppStore distribution";
-else
-# Copy bin/data into App/Resources
-rsync -avz --exclude='.DS_Store' "${SRCROOT}/bin/data/" "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/data/"
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
 
-# ---- Code Sign App Package ----
+/* Begin PBXBuildFile section */
+		026CF24E227F5DFC3C392E27 /* ofxOceanodePresetsController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C27DB6A973A67BE0BF855933 /* ofxOceanodePresetsController.cpp */; };
+		102C0035698294FDB36E6899 /* ofxOceanodeTypesRegistry.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 60A6750E6D5A48E6B4B69C0A /* ofxOceanodeTypesRegistry.cpp */; };
+		124BB55C818D1F89450ED005 /* localPresetController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D9EC5C75C9CA92B4EFB78CFF /* localPresetController.cpp */; };
+		47608E29666CD58C20E53408 /* mapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D623E907C25C25D1AB411052 /* mapper.cpp */; };
+		4838368B3C8561AD76D56D69 /* ranger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 959F4777E3902536DC81AC0A /* ranger.cpp */; };
+		4A277DA746402C76CE307770 /* ofxDatGuiComponent.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5D13EE4C64902574D9153447 /* ofxDatGuiComponent.cpp */; };
+		4B0881C0E4F3D037FA83C3E3 /* ofxOceanodeNodeModelLocalPreset.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8AC0F166599AAFFA99CD14EF /* ofxOceanodeNodeModelLocalPreset.cpp */; };
+		4C3192DB1EAE1CFF29580749 /* oscillatorBank.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BE59ACA8A0510B61FD8647C6 /* oscillatorBank.cpp */; };
+		4C8024D8DD46223D43C514C0 /* ofxOceanodeNode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 63A44DC38599839305F1F4D3 /* ofxOceanodeNode.cpp */; };
+		4F63EFF3BAACF2B19051E336 /* ofxOceanodeNodeModel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 18902594A5884CA5CA6D3D9D /* ofxOceanodeNodeModel.cpp */; };
+		5769B6A6D79188D3D351933E /* ofxOceanodeContainer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5E65A0C39A6FDCA2888DDAF8 /* ofxOceanodeContainer.cpp */; };
+		646DF4D56CE728133610A7F6 /* ofxSmartFont.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A403D3D25D08FC7AF3B871D4 /* ofxSmartFont.cpp */; };
+		717BCDD6091D90F262DC7860 /* ofxOceanodeBPMController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8150F1936B064445E99AF76 /* ofxOceanodeBPMController.cpp */; };
+		7416EB8AFDAB615D36EC3137 /* phasor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C1A96A2891A3C36C7DCA0F7 /* phasor.cpp */; };
+		7B5743F2E77F2D5AD9B436F0 /* ofxOceanodeBaseController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 90D557700F1EECB9E9F8AEB9 /* ofxOceanodeBaseController.cpp */; };
+		7B8EE5B7F57088CD23B7934D /* ofxOceanodeControls.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C3AD3B4C116407604DCFB986 /* ofxOceanodeControls.cpp */; };
+		7CC1A4D669C6C1B3786CD384 /* ofxOceanodeNodeModelExternalWindow.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 03E42CA654A61594B6D8167F /* ofxOceanodeNodeModelExternalWindow.cpp */; };
+		842D4B1559D16CD55B1CF6DD /* oscillator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0BE6AC32AE0E7C44E14DFE2F /* oscillator.cpp */; };
+		8EB5677652296BACF3A1C184 /* ofxOceanodeNodeGui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 170083BFE7EEC5851D5DF9E6 /* ofxOceanodeNodeGui.cpp */; };
+		9150F94721FE0E44D16DA0CC /* baseOscillator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F44449692EA3A4B7FBABCF29 /* baseOscillator.cpp */; };
+		9FC5571B21AC6FAF009468E2 /* switcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9FC5571921AC6FAF009468E2 /* switcher.cpp */; };
+		A670837F6999677674A385D1 /* testNode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1C84792B71D7D5C105077DBF /* testNode.cpp */; };
+		B7559FEE382DBA7FB094D5E7 /* ofxOceanodeNodeRegistry.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F15C9896F6A32FCA280CD4B5 /* ofxOceanodeNodeRegistry.cpp */; };
+		BDE21E02C646BD31BEC13891 /* smoother.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EA0730CA1A73FC90DCF8C770 /* smoother.cpp */; };
+		BE7DAF3CB982C2BD0FE44648 /* ofxDatGui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DD8F81F7AAB5BA396231DD4C /* ofxDatGui.cpp */; };
+		BFBE6AEF801BA1F820867405 /* basePhasor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0538E73A948F5367828D0596 /* basePhasor.cpp */; };
+		C1EEF98E795AFB7BB33F94B1 /* ofxOceanodeConnectionGraphics.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 76AFF92A62D8AF4E498DB5C3 /* ofxOceanodeConnectionGraphics.cpp */; };
+		C6A203560BFBDA04C5746210 /* ofxOceanodeConnection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7C9B84BA3AF325F3D843633B /* ofxOceanodeConnection.cpp */; };
+		D925621F7F6146497318658A /* baseIndexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 645C793F85B56EF720B10C7F /* baseIndexer.cpp */; };
+		E1E0C08A53EAFC4A088F5BDC /* reindexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3D3CE3C79225FEEDD92A410A /* reindexer.cpp */; };
+		E4328149138ABC9F0047C5CB /* openFrameworksDebug.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E4328148138ABC890047C5CB /* openFrameworksDebug.a */; };
+		E4B69E200A3A1BDC003C02F2 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E4B69E1D0A3A1BDC003C02F2 /* main.cpp */; };
+		E4B69E210A3A1BDC003C02F2 /* ofApp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E4B69E1E0A3A1BDC003C02F2 /* ofApp.cpp */; };
+		FE7602E65C7BA676951A37FB /* ofxOceanodeCanvas.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 69F09B1450CB3FF08A87D2FF /* ofxOceanodeCanvas.cpp */; };
+/* End PBXBuildFile section */
 
-# WARNING: You may have to run Clean in Xcode after changing CODE_SIGN_IDENTITY!
+/* Begin PBXContainerItemProxy section */
+		E4328147138ABC890047C5CB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E4328143138ABC890047C5CB /* openFrameworksLib.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = E4B27C1510CBEB8E00536013;
+			remoteInfo = openFrameworks;
+		};
+		E4EEB9AB138B136A00A80321 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E4328143138ABC890047C5CB /* openFrameworksLib.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = E4B27C1410CBEB8E00536013;
+			remoteInfo = openFrameworks;
+		};
+/* End PBXContainerItemProxy section */
 
-# Verify that $CODE_SIGN_IDENTITY is set
-if [ -z "${CODE_SIGN_IDENTITY}" ] ; then
-echo "CODE_SIGN_IDENTITY needs to be set for framework code-signing"
-exit 0
-fi
+/* Begin PBXCopyFilesBuildPhase section */
+		E4C2427710CC5ABF004149E2 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
-if [ -z "${CODE_SIGN_ENTITLEMENTS}" ] ; then
-echo "CODE_SIGN_ENTITLEMENTS needs to be set for framework code-signing!"
+/* Begin PBXFileReference section */
+		027F095A0217A890F2B21761 /* ofxOceanodeNodeModelLocalPreset.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNodeModelLocalPreset.h; path = ../../../addons/ofxOceanode/src/Nodes/Base_Nodes/ofxOceanodeNodeModelLocalPreset.h; sourceTree = SOURCE_ROOT; };
+		03E42CA654A61594B6D8167F /* ofxOceanodeNodeModelExternalWindow.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeNodeModelExternalWindow.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Base_Nodes/ofxOceanodeNodeModelExternalWindow.cpp; sourceTree = SOURCE_ROOT; };
+		0538E73A948F5367828D0596 /* basePhasor.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = basePhasor.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/basePhasor.cpp; sourceTree = SOURCE_ROOT; };
+		06F3C8FC2DD28E0B985BADB0 /* ranger.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ranger.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/ranger.h; sourceTree = SOURCE_ROOT; };
+		0795F21A2022A202F628BE94 /* ofxDatGuiColorPicker.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiColorPicker.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiColorPicker.h; sourceTree = SOURCE_ROOT; };
+		0BE6AC32AE0E7C44E14DFE2F /* oscillator.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = oscillator.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillator.cpp; sourceTree = SOURCE_ROOT; };
+		0EA01AA404A74EE4BF1F46AD /* ofxDatGuiTheme.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiTheme.h; path = ../../../addons/ofxDatGui_PM/src/themes/ofxDatGuiTheme.h; sourceTree = SOURCE_ROOT; };
+		11021811865108C49AED9E1E /* ofxDatGuiScrollView.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiScrollView.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiScrollView.h; sourceTree = SOURCE_ROOT; };
+		125FC7DF81918DE565891A92 /* reindexer.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = reindexer.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/reindexer.h; sourceTree = SOURCE_ROOT; };
+		149298D896FDA631EE81BEB9 /* ofxDatGuiSlider.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiSlider.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiSlider.h; sourceTree = SOURCE_ROOT; };
+		169D713735D46DFA03D4EBEB /* ofxDatGuiConstants.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiConstants.h; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiConstants.h; sourceTree = SOURCE_ROOT; };
+		16D50E04676F5AF6D586DD9B /* ofxOceanodeNodeModelExternalWindow.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNodeModelExternalWindow.h; path = ../../../addons/ofxOceanode/src/Nodes/Base_Nodes/ofxOceanodeNodeModelExternalWindow.h; sourceTree = SOURCE_ROOT; };
+		170083BFE7EEC5851D5DF9E6 /* ofxOceanodeNodeGui.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeNodeGui.cpp; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeGui.cpp; sourceTree = SOURCE_ROOT; };
+		18902594A5884CA5CA6D3D9D /* ofxOceanodeNodeModel.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeNodeModel.cpp; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeModel.cpp; sourceTree = SOURCE_ROOT; };
+		1C84792B71D7D5C105077DBF /* testNode.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = testNode.cpp; path = src/testNode.cpp; sourceTree = SOURCE_ROOT; };
+		29030CD02944F06F1DAC3E49 /* ofxDatGuiTextInput.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiTextInput.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiTextInput.h; sourceTree = SOURCE_ROOT; };
+		3795AFB8EAAD641D6CA88D4A /* ofxOceanodeTypesRegistry.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeTypesRegistry.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeTypesRegistry.h; sourceTree = SOURCE_ROOT; };
+		3B2B1469CBE279200D558FAB /* mapper.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = mapper.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/mapper.h; sourceTree = SOURCE_ROOT; };
+		3C2190A2D726C8DCEF074E3C /* oscillatorBank.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = oscillatorBank.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillatorBank.h; sourceTree = SOURCE_ROOT; };
+		3D3CE3C79225FEEDD92A410A /* reindexer.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = reindexer.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/reindexer.cpp; sourceTree = SOURCE_ROOT; };
+		3F15C4313830F7C3C28E1FAE /* ofxDatGuiTextInputField.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiTextInputField.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiTextInputField.h; sourceTree = SOURCE_ROOT; };
+		407D7F7B6D3EDF97638DF661 /* ofxDatGuiEvents.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiEvents.h; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiEvents.h; sourceTree = SOURCE_ROOT; };
+		46ADAF0F6560879BAE3D1C61 /* ofxOceanodeBaseController.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeBaseController.h; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeBaseController.h; sourceTree = SOURCE_ROOT; };
+		4A76FE1EC14329064FDB60C7 /* ofxOceanodeNodeRegistry.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNodeRegistry.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeNodeRegistry.h; sourceTree = SOURCE_ROOT; };
+		4D832D586223B608C5420D29 /* ofxDatGui.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGui.h; path = ../../../addons/ofxDatGui_PM/src/ofxDatGui.h; sourceTree = SOURCE_ROOT; };
+		542B8A9AF130D0C5A3086539 /* ofxOceanodeConnectionGraphics.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeConnectionGraphics.h; path = ../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnectionGraphics.h; sourceTree = SOURCE_ROOT; };
+		56FB03D9F622C9350A0AB8BC /* ofxOceanodePresetsController.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodePresetsController.h; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodePresetsController.h; sourceTree = SOURCE_ROOT; };
+		5D13EE4C64902574D9153447 /* ofxDatGuiComponent.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxDatGuiComponent.cpp; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiComponent.cpp; sourceTree = SOURCE_ROOT; };
+		5E65A0C39A6FDCA2888DDAF8 /* ofxOceanodeContainer.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeContainer.cpp; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeContainer.cpp; sourceTree = SOURCE_ROOT; };
+		60A061F8C47B5624AE6C450E /* defaultNodes.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = defaultNodes.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/defaultNodes.h; sourceTree = SOURCE_ROOT; };
+		60A6750E6D5A48E6B4B69C0A /* ofxOceanodeTypesRegistry.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeTypesRegistry.cpp; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeTypesRegistry.cpp; sourceTree = SOURCE_ROOT; };
+		63A44DC38599839305F1F4D3 /* ofxOceanodeNode.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeNode.cpp; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNode.cpp; sourceTree = SOURCE_ROOT; };
+		645C793F85B56EF720B10C7F /* baseIndexer.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = baseIndexer.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/baseIndexer.cpp; sourceTree = SOURCE_ROOT; };
+		656EE12F1A05CB4841731C77 /* ofxOceanodeConnection.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeConnection.h; path = ../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnection.h; sourceTree = SOURCE_ROOT; };
+		698855D874920D7A53525854 /* ofxDatGuiGroups.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiGroups.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiGroups.h; sourceTree = SOURCE_ROOT; };
+		69F09B1450CB3FF08A87D2FF /* ofxOceanodeCanvas.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeCanvas.cpp; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeCanvas.cpp; sourceTree = SOURCE_ROOT; };
+		76AFF92A62D8AF4E498DB5C3 /* ofxOceanodeConnectionGraphics.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeConnectionGraphics.cpp; path = ../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnectionGraphics.cpp; sourceTree = SOURCE_ROOT; };
+		771877A40D55CB5D6C1969C4 /* ofxDatGuiButton.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiButton.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiButton.h; sourceTree = SOURCE_ROOT; };
+		7839463FADC4E27D1C66C5FB /* ofxOceanodeNode.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNode.h; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNode.h; sourceTree = SOURCE_ROOT; };
+		7C9B84BA3AF325F3D843633B /* ofxOceanodeConnection.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeConnection.cpp; path = ../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnection.cpp; sourceTree = SOURCE_ROOT; };
+		85CA43E90443167538D06F3C /* baseIndexer.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = baseIndexer.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/baseIndexer.h; sourceTree = SOURCE_ROOT; };
+		86F00AF8B1543076FA133A82 /* ofxOceanode.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanode.h; path = ../../../addons/ofxOceanode/src/ofxOceanode.h; sourceTree = SOURCE_ROOT; };
+		8AC0F166599AAFFA99CD14EF /* ofxOceanodeNodeModelLocalPreset.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeNodeModelLocalPreset.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Base_Nodes/ofxOceanodeNodeModelLocalPreset.cpp; sourceTree = SOURCE_ROOT; };
+		8E922B504254FF844AF5505A /* ofxDatGuiIntObject.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiIntObject.h; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiIntObject.h; sourceTree = SOURCE_ROOT; };
+		90D557700F1EECB9E9F8AEB9 /* ofxOceanodeBaseController.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeBaseController.cpp; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeBaseController.cpp; sourceTree = SOURCE_ROOT; };
+		92007C97134ED347908EA736 /* ofxDatGuiMatrix.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiMatrix.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiMatrix.h; sourceTree = SOURCE_ROOT; };
+		94ED70588667CA0E144E436E /* baseOscillator.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = baseOscillator.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/baseOscillator.h; sourceTree = SOURCE_ROOT; };
+		959F4777E3902536DC81AC0A /* ranger.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ranger.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/ranger.cpp; sourceTree = SOURCE_ROOT; };
+		96D838AC4E4260B0ABA07D05 /* oscillator.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = oscillator.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillator.h; sourceTree = SOURCE_ROOT; };
+		9C1A96A2891A3C36C7DCA0F7 /* phasor.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = phasor.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/phasor.cpp; sourceTree = SOURCE_ROOT; };
+		9E034FA57FE251AC33904E82 /* ofxDatGuiThemes.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiThemes.h; path = ../../../addons/ofxDatGui_PM/src/themes/ofxDatGuiThemes.h; sourceTree = SOURCE_ROOT; };
+		9FC5571921AC6FAF009468E2 /* switcher.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = switcher.cpp; path = ../src/Nodes/Default_Nodes/Modifiers/switcher.cpp; sourceTree = "<group>"; };
+		9FC5571A21AC6FAF009468E2 /* switcher.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = switcher.h; path = ../src/Nodes/Default_Nodes/Modifiers/switcher.h; sourceTree = "<group>"; };
+		A13853A1B21F20177F44EE37 /* ofxDatGuiLabel.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiLabel.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiLabel.h; sourceTree = SOURCE_ROOT; };
+		A403D3D25D08FC7AF3B871D4 /* ofxSmartFont.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxSmartFont.cpp; path = ../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont/ofxSmartFont.cpp; sourceTree = SOURCE_ROOT; };
+		A534F08B38B5C43917E2A9E4 /* ofxDatGuiComponent.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiComponent.h; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiComponent.h; sourceTree = SOURCE_ROOT; };
+		A7B61DF7F41316374CEEE8CA /* ofxDatGuiTimeGraph.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiTimeGraph.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiTimeGraph.h; sourceTree = SOURCE_ROOT; };
+		A8150F1936B064445E99AF76 /* ofxOceanodeBPMController.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeBPMController.cpp; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeBPMController.cpp; sourceTree = SOURCE_ROOT; };
+		B11DB438E2A6EBD360F8BA50 /* ofxDatGuiFRM.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiFRM.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiFRM.h; sourceTree = SOURCE_ROOT; };
+		B7B623A02730497FBCEA4FF2 /* ofxDatGuiControls.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiControls.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiControls.h; sourceTree = SOURCE_ROOT; };
+		BE59ACA8A0510B61FD8647C6 /* oscillatorBank.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = oscillatorBank.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillatorBank.cpp; sourceTree = SOURCE_ROOT; };
+		BFA88189469A37E0B53C6773 /* ofxOceanodeCanvas.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeCanvas.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeCanvas.h; sourceTree = SOURCE_ROOT; };
+		C1A3EDCC30D80C890BF10EC5 /* localPresetController.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = localPresetController.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers/localPresetController.h; sourceTree = SOURCE_ROOT; };
+		C27DB6A973A67BE0BF855933 /* ofxOceanodePresetsController.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodePresetsController.cpp; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodePresetsController.cpp; sourceTree = SOURCE_ROOT; };
+		C2BBB5BA515C82003E0EEB5E /* ofxDatGui2dPad.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGui2dPad.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGui2dPad.h; sourceTree = SOURCE_ROOT; };
+		C3AD3B4C116407604DCFB986 /* ofxOceanodeControls.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeControls.cpp; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeControls.cpp; sourceTree = SOURCE_ROOT; };
+		C76BA1A770D742397939F7A7 /* basePhasor.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = basePhasor.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/basePhasor.h; sourceTree = SOURCE_ROOT; };
+		CA4B325D2EC75988A7F9E2CB /* ofxOceanodeControls.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeControls.h; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeControls.h; sourceTree = SOURCE_ROOT; };
+		D11A82FE9732DAF8F599F2AB /* ofxOceanodeNodeGui.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNodeGui.h; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeGui.h; sourceTree = SOURCE_ROOT; };
+		D623E907C25C25D1AB411052 /* mapper.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = mapper.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/mapper.cpp; sourceTree = SOURCE_ROOT; };
+		D9EC5C75C9CA92B4EFB78CFF /* localPresetController.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = localPresetController.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers/localPresetController.cpp; sourceTree = SOURCE_ROOT; };
+		DCC77D1E228088A526604E34 /* smoother.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = smoother.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/smoother.h; sourceTree = SOURCE_ROOT; };
+		DD8F81F7AAB5BA396231DD4C /* ofxDatGui.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxDatGui.cpp; path = ../../../addons/ofxDatGui_PM/src/ofxDatGui.cpp; sourceTree = SOURCE_ROOT; };
+		E187B9F0640B673635B5ECDF /* phasor.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = phasor.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/phasor.h; sourceTree = SOURCE_ROOT; };
+		E4328143138ABC890047C5CB /* openFrameworksLib.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = openFrameworksLib.xcodeproj; path = ../../../libs/openFrameworksCompiled/project/osx/openFrameworksLib.xcodeproj; sourceTree = SOURCE_ROOT; };
+		E4B69B5B0A3A1756003C02F2 /* example-basicDebug.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "example-basicDebug.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E4B69E1D0A3A1BDC003C02F2 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = main.cpp; path = src/main.cpp; sourceTree = SOURCE_ROOT; };
+		E4B69E1E0A3A1BDC003C02F2 /* ofApp.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofApp.cpp; path = src/ofApp.cpp; sourceTree = SOURCE_ROOT; };
+		E4B69E1F0A3A1BDC003C02F2 /* ofApp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ofApp.h; path = src/ofApp.h; sourceTree = SOURCE_ROOT; };
+		E4B6FCAD0C3E899E008CF71C /* openFrameworks-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "openFrameworks-Info.plist"; sourceTree = "<group>"; };
+		E4EB691F138AFCF100A09F29 /* CoreOF.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = CoreOF.xcconfig; path = ../../../libs/openFrameworksCompiled/project/osx/CoreOF.xcconfig; sourceTree = SOURCE_ROOT; };
+		E4EB6923138AFD0F00A09F29 /* Project.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Project.xcconfig; sourceTree = "<group>"; };
+		E4F53B46D587F378DA43DF57 /* ofxOceanodeBPMController.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeBPMController.h; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeBPMController.h; sourceTree = SOURCE_ROOT; };
+		EA0730CA1A73FC90DCF8C770 /* smoother.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = smoother.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/smoother.cpp; sourceTree = SOURCE_ROOT; };
+		EDEAD1332CEFCB6171498ADE /* ofxOceanodeNodeModel.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNodeModel.h; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeModel.h; sourceTree = SOURCE_ROOT; };
+		EFC799641CF7089DDBF2094B /* ofxSmartFont.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxSmartFont.h; path = ../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont/ofxSmartFont.h; sourceTree = SOURCE_ROOT; };
+		F15C9896F6A32FCA280CD4B5 /* ofxOceanodeNodeRegistry.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeNodeRegistry.cpp; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeNodeRegistry.cpp; sourceTree = SOURCE_ROOT; };
+		F24887AB1BADDDBB829D94E1 /* testNode.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = testNode.h; path = src/testNode.h; sourceTree = SOURCE_ROOT; };
+		F44449692EA3A4B7FBABCF29 /* baseOscillator.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = baseOscillator.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/baseOscillator.cpp; sourceTree = SOURCE_ROOT; };
+		FC8E873E04A65764668D30AB /* ofxOceanodeContainer.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeContainer.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeContainer.h; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
 
-if [ "${CONFIGURATION}" = "Release" ] ; then
-exit 1
-else
-# Code-signing is optional for non-release builds.
-exit 0
-fi
-fi
+/* Begin PBXFrameworksBuildPhase section */
+		E4B69B590A3A1756003C02F2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E4328149138ABC9F0047C5CB /* openFrameworksDebug.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
-ITEMS=""
+/* Begin PBXGroup section */
+		1611DA528262F51B8A4FBD22 /* Base_Nodes */ = {
+			isa = PBXGroup;
+			children = (
+				03E42CA654A61594B6D8167F /* ofxOceanodeNodeModelExternalWindow.cpp */,
+				16D50E04676F5AF6D586DD9B /* ofxOceanodeNodeModelExternalWindow.h */,
+				8AC0F166599AAFFA99CD14EF /* ofxOceanodeNodeModelLocalPreset.cpp */,
+				027F095A0217A890F2B21761 /* ofxOceanodeNodeModelLocalPreset.h */,
+			);
+			name = Base_Nodes;
+			sourceTree = "<group>";
+		};
+		1D570521A53950659A74DE26 /* components */ = {
+			isa = PBXGroup;
+			children = (
+				C2BBB5BA515C82003E0EEB5E /* ofxDatGui2dPad.h */,
+				771877A40D55CB5D6C1969C4 /* ofxDatGuiButton.h */,
+				0795F21A2022A202F628BE94 /* ofxDatGuiColorPicker.h */,
+				B7B623A02730497FBCEA4FF2 /* ofxDatGuiControls.h */,
+				B11DB438E2A6EBD360F8BA50 /* ofxDatGuiFRM.h */,
+				698855D874920D7A53525854 /* ofxDatGuiGroups.h */,
+				A13853A1B21F20177F44EE37 /* ofxDatGuiLabel.h */,
+				92007C97134ED347908EA736 /* ofxDatGuiMatrix.h */,
+				11021811865108C49AED9E1E /* ofxDatGuiScrollView.h */,
+				149298D896FDA631EE81BEB9 /* ofxDatGuiSlider.h */,
+				29030CD02944F06F1DAC3E49 /* ofxDatGuiTextInput.h */,
+				3F15C4313830F7C3C28E1FAE /* ofxDatGuiTextInputField.h */,
+				A7B61DF7F41316374CEEE8CA /* ofxDatGuiTimeGraph.h */,
+			);
+			name = components;
+			sourceTree = "<group>";
+		};
+		49829C6AAEB884DF8A116E1D /* libs */ = {
+			isa = PBXGroup;
+			children = (
+				D334E5DEE84D3F52FE9065DE /* ofxSmartFont */,
+			);
+			name = libs;
+			sourceTree = "<group>";
+		};
+		4A0C0B233C38AF6788F3CE7D /* Default_Nodes */ = {
+			isa = PBXGroup;
+			children = (
+				7122898CC63A863AD1DC1535 /* Base */,
+				550B846BFF2680933EE8B745 /* Controllers */,
+				60A061F8C47B5624AE6C450E /* defaultNodes.h */,
+				86C08C13FA71904D23256B02 /* Generators */,
+				C9E0C4F6A9698E8F0EF5E14C /* Modifiers */,
+			);
+			name = Default_Nodes;
+			sourceTree = "<group>";
+		};
+		550B846BFF2680933EE8B745 /* Controllers */ = {
+			isa = PBXGroup;
+			children = (
+				D9EC5C75C9CA92B4EFB78CFF /* localPresetController.cpp */,
+				C1A3EDCC30D80C890BF10EC5 /* localPresetController.h */,
+			);
+			name = Controllers;
+			sourceTree = "<group>";
+		};
+		643EB880A9E14DEF1DCC1AB4 /* ofxOceanode */ = {
+			isa = PBXGroup;
+			children = (
+				9BF163AD5F824DF0AD945222 /* src */,
+			);
+			name = ofxOceanode;
+			sourceTree = "<group>";
+		};
+		6948EE371B920CB800B5AC1A /* local_addons */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = local_addons;
+			sourceTree = "<group>";
+		};
+		6B8A921B73CC6BADD2D0E3A3 /* Nodes */ = {
+			isa = PBXGroup;
+			children = (
+				1611DA528262F51B8A4FBD22 /* Base_Nodes */,
+				4A0C0B233C38AF6788F3CE7D /* Default_Nodes */,
+				63A44DC38599839305F1F4D3 /* ofxOceanodeNode.cpp */,
+				7839463FADC4E27D1C66C5FB /* ofxOceanodeNode.h */,
+				170083BFE7EEC5851D5DF9E6 /* ofxOceanodeNodeGui.cpp */,
+				D11A82FE9732DAF8F599F2AB /* ofxOceanodeNodeGui.h */,
+				18902594A5884CA5CA6D3D9D /* ofxOceanodeNodeModel.cpp */,
+				EDEAD1332CEFCB6171498ADE /* ofxOceanodeNodeModel.h */,
+			);
+			name = Nodes;
+			sourceTree = "<group>";
+		};
+		7122898CC63A863AD1DC1535 /* Base */ = {
+			isa = PBXGroup;
+			children = (
+				645C793F85B56EF720B10C7F /* baseIndexer.cpp */,
+				85CA43E90443167538D06F3C /* baseIndexer.h */,
+				F44449692EA3A4B7FBABCF29 /* baseOscillator.cpp */,
+				94ED70588667CA0E144E436E /* baseOscillator.h */,
+				0538E73A948F5367828D0596 /* basePhasor.cpp */,
+				C76BA1A770D742397939F7A7 /* basePhasor.h */,
+			);
+			name = Base;
+			sourceTree = "<group>";
+		};
+		86C08C13FA71904D23256B02 /* Generators */ = {
+			isa = PBXGroup;
+			children = (
+				0BE6AC32AE0E7C44E14DFE2F /* oscillator.cpp */,
+				96D838AC4E4260B0ABA07D05 /* oscillator.h */,
+				BE59ACA8A0510B61FD8647C6 /* oscillatorBank.cpp */,
+				3C2190A2D726C8DCEF074E3C /* oscillatorBank.h */,
+				9C1A96A2891A3C36C7DCA0F7 /* phasor.cpp */,
+				E187B9F0640B673635B5ECDF /* phasor.h */,
+			);
+			name = Generators;
+			sourceTree = "<group>";
+		};
+		957575D61FEE61F5BA89C5CF /* Controls */ = {
+			isa = PBXGroup;
+			children = (
+				90D557700F1EECB9E9F8AEB9 /* ofxOceanodeBaseController.cpp */,
+				46ADAF0F6560879BAE3D1C61 /* ofxOceanodeBaseController.h */,
+				A8150F1936B064445E99AF76 /* ofxOceanodeBPMController.cpp */,
+				E4F53B46D587F378DA43DF57 /* ofxOceanodeBPMController.h */,
+				C3AD3B4C116407604DCFB986 /* ofxOceanodeControls.cpp */,
+				CA4B325D2EC75988A7F9E2CB /* ofxOceanodeControls.h */,
+				C27DB6A973A67BE0BF855933 /* ofxOceanodePresetsController.cpp */,
+				56FB03D9F622C9350A0AB8BC /* ofxOceanodePresetsController.h */,
+			);
+			name = Controls;
+			sourceTree = "<group>";
+		};
+		9BBF10547B078BE7A527677B /* Connections */ = {
+			isa = PBXGroup;
+			children = (
+				7C9B84BA3AF325F3D843633B /* ofxOceanodeConnection.cpp */,
+				656EE12F1A05CB4841731C77 /* ofxOceanodeConnection.h */,
+				76AFF92A62D8AF4E498DB5C3 /* ofxOceanodeConnectionGraphics.cpp */,
+				542B8A9AF130D0C5A3086539 /* ofxOceanodeConnectionGraphics.h */,
+			);
+			name = Connections;
+			sourceTree = "<group>";
+		};
+		9BF163AD5F824DF0AD945222 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				9BBF10547B078BE7A527677B /* Connections */,
+				957575D61FEE61F5BA89C5CF /* Controls */,
+				F345CC31328F66B89F4BB079 /* Managers */,
+				6B8A921B73CC6BADD2D0E3A3 /* Nodes */,
+				86F00AF8B1543076FA133A82 /* ofxOceanode.h */,
+			);
+			name = src;
+			sourceTree = "<group>";
+		};
+		BB4B014C10F69532006C3DED /* addons */ = {
+			isa = PBXGroup;
+			children = (
+				E99400E5E21DFD21A45E2E82 /* ofxDatGui_PM */,
+				643EB880A9E14DEF1DCC1AB4 /* ofxOceanode */,
+			);
+			name = addons;
+			sourceTree = "<group>";
+		};
+		C9E0C4F6A9698E8F0EF5E14C /* Modifiers */ = {
+			isa = PBXGroup;
+			children = (
+				9FC5571921AC6FAF009468E2 /* switcher.cpp */,
+				9FC5571A21AC6FAF009468E2 /* switcher.h */,
+				D623E907C25C25D1AB411052 /* mapper.cpp */,
+				3B2B1469CBE279200D558FAB /* mapper.h */,
+				959F4777E3902536DC81AC0A /* ranger.cpp */,
+				06F3C8FC2DD28E0B985BADB0 /* ranger.h */,
+				3D3CE3C79225FEEDD92A410A /* reindexer.cpp */,
+				125FC7DF81918DE565891A92 /* reindexer.h */,
+				EA0730CA1A73FC90DCF8C770 /* smoother.cpp */,
+				DCC77D1E228088A526604E34 /* smoother.h */,
+			);
+			name = Modifiers;
+			sourceTree = "<group>";
+		};
+		D334E5DEE84D3F52FE9065DE /* ofxSmartFont */ = {
+			isa = PBXGroup;
+			children = (
+				A403D3D25D08FC7AF3B871D4 /* ofxSmartFont.cpp */,
+				EFC799641CF7089DDBF2094B /* ofxSmartFont.h */,
+			);
+			name = ofxSmartFont;
+			sourceTree = "<group>";
+		};
+		D9757BE1A5DFAE64198FF989 /* themes */ = {
+			isa = PBXGroup;
+			children = (
+				0EA01AA404A74EE4BF1F46AD /* ofxDatGuiTheme.h */,
+				9E034FA57FE251AC33904E82 /* ofxDatGuiThemes.h */,
+			);
+			name = themes;
+			sourceTree = "<group>";
+		};
+		E4328144138ABC890047C5CB /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E4328148138ABC890047C5CB /* openFrameworksDebug.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		E4B69B4A0A3A1720003C02F2 = {
+			isa = PBXGroup;
+			children = (
+				E4B6FCAD0C3E899E008CF71C /* openFrameworks-Info.plist */,
+				E4EB6923138AFD0F00A09F29 /* Project.xcconfig */,
+				E4B69E1C0A3A1BDC003C02F2 /* src */,
+				E4EEC9E9138DF44700A80321 /* openFrameworks */,
+				BB4B014C10F69532006C3DED /* addons */,
+				6948EE371B920CB800B5AC1A /* local_addons */,
+				E4B69B5B0A3A1756003C02F2 /* example-basicDebug.app */,
+			);
+			sourceTree = "<group>";
+		};
+		E4B69E1C0A3A1BDC003C02F2 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				E4B69E1D0A3A1BDC003C02F2 /* main.cpp */,
+				E4B69E1E0A3A1BDC003C02F2 /* ofApp.cpp */,
+				E4B69E1F0A3A1BDC003C02F2 /* ofApp.h */,
+				1C84792B71D7D5C105077DBF /* testNode.cpp */,
+				F24887AB1BADDDBB829D94E1 /* testNode.h */,
+			);
+			path = src;
+			sourceTree = SOURCE_ROOT;
+		};
+		E4EEC9E9138DF44700A80321 /* openFrameworks */ = {
+			isa = PBXGroup;
+			children = (
+				E4EB691F138AFCF100A09F29 /* CoreOF.xcconfig */,
+				E4328143138ABC890047C5CB /* openFrameworksLib.xcodeproj */,
+			);
+			name = openFrameworks;
+			sourceTree = "<group>";
+		};
+		E99400E5E21DFD21A45E2E82 /* ofxDatGui_PM */ = {
+			isa = PBXGroup;
+			children = (
+				FE3CA1F8648010DBA2401722 /* src */,
+			);
+			name = ofxDatGui_PM;
+			sourceTree = "<group>";
+		};
+		EB0606B779510751DDA16A81 /* core */ = {
+			isa = PBXGroup;
+			children = (
+				5D13EE4C64902574D9153447 /* ofxDatGuiComponent.cpp */,
+				A534F08B38B5C43917E2A9E4 /* ofxDatGuiComponent.h */,
+				169D713735D46DFA03D4EBEB /* ofxDatGuiConstants.h */,
+				407D7F7B6D3EDF97638DF661 /* ofxDatGuiEvents.h */,
+				8E922B504254FF844AF5505A /* ofxDatGuiIntObject.h */,
+			);
+			name = core;
+			sourceTree = "<group>";
+		};
+		F345CC31328F66B89F4BB079 /* Managers */ = {
+			isa = PBXGroup;
+			children = (
+				69F09B1450CB3FF08A87D2FF /* ofxOceanodeCanvas.cpp */,
+				BFA88189469A37E0B53C6773 /* ofxOceanodeCanvas.h */,
+				5E65A0C39A6FDCA2888DDAF8 /* ofxOceanodeContainer.cpp */,
+				FC8E873E04A65764668D30AB /* ofxOceanodeContainer.h */,
+				F15C9896F6A32FCA280CD4B5 /* ofxOceanodeNodeRegistry.cpp */,
+				4A76FE1EC14329064FDB60C7 /* ofxOceanodeNodeRegistry.h */,
+				60A6750E6D5A48E6B4B69C0A /* ofxOceanodeTypesRegistry.cpp */,
+				3795AFB8EAAD641D6CA88D4A /* ofxOceanodeTypesRegistry.h */,
+			);
+			name = Managers;
+			sourceTree = "<group>";
+		};
+		FE3CA1F8648010DBA2401722 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				1D570521A53950659A74DE26 /* components */,
+				EB0606B779510751DDA16A81 /* core */,
+				49829C6AAEB884DF8A116E1D /* libs */,
+				DD8F81F7AAB5BA396231DD4C /* ofxDatGui.cpp */,
+				4D832D586223B608C5420D29 /* ofxDatGui.h */,
+				D9757BE1A5DFAE64198FF989 /* themes */,
+			);
+			name = src;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
 
-FRAMEWORKS_DIR="${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}"
-echo "$FRAMEWORKS_DIR"
-if [ -d "$FRAMEWORKS_DIR" ] ; then
-FRAMEWORKS=$(find "${FRAMEWORKS_DIR}" -depth -type d -name "*.framework" -or -name "*.dylib" -or -name "*.bundle" | sed -e "s/\(.*framework\)/\1\/Versions\/A\//")
-RESULT=$?
-if [[ $RESULT != 0 ]] ; then
-exit 1
-fi
+/* Begin PBXNativeTarget section */
+		E4B69B5A0A3A1756003C02F2 /* example-basic */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E4B69B5F0A3A1757003C02F2 /* Build configuration list for PBXNativeTarget "example-basic" */;
+			buildPhases = (
+				E4B69B580A3A1756003C02F2 /* Sources */,
+				E4B69B590A3A1756003C02F2 /* Frameworks */,
+				E4B6FFFD0C3F9AB9008CF71C /* ShellScript */,
+				E4C2427710CC5ABF004149E2 /* CopyFiles */,
+				8466F1851C04CA0E00918B1C /* ShellScript */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E4EEB9AC138B136A00A80321 /* PBXTargetDependency */,
+			);
+			name = "example-basic";
+			productName = myOFApp;
+			productReference = E4B69B5B0A3A1756003C02F2 /* example-basicDebug.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
 
-ITEMS="${FRAMEWORKS}"
-fi
+/* Begin PBXProject section */
+		E4B69B4C0A3A1720003C02F2 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0600;
+			};
+			buildConfigurationList = E4B69B4D0A3A1720003C02F2 /* Build configuration list for PBXProject "example-basic" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				English,
+				Japanese,
+				French,
+				German,
+			);
+			mainGroup = E4B69B4A0A3A1720003C02F2;
+			productRefGroup = E4B69B4A0A3A1720003C02F2;
+			projectDirPath = "";
+			projectReferences = (
+				{
+					ProductGroup = E4328144138ABC890047C5CB /* Products */;
+					ProjectRef = E4328143138ABC890047C5CB /* openFrameworksLib.xcodeproj */;
+				},
+			);
+			projectRoot = "";
+			targets = (
+				E4B69B5A0A3A1756003C02F2 /* example-basic */,
+			);
+		};
+/* End PBXProject section */
 
-LOGINITEMS_DIR="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LoginItems/"
-if [ -d "$LOGINITEMS_DIR" ] ; then
-LOGINITEMS=$(find "${LOGINITEMS_DIR}" -depth -type d -name "*.app")
-RESULT=$?
-if [[ $RESULT != 0 ]] ; then
-exit 1
-fi
+/* Begin PBXReferenceProxy section */
+		E4328148138ABC890047C5CB /* openFrameworksDebug.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = openFrameworksDebug.a;
+			remoteRef = E4328147138ABC890047C5CB /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+/* End PBXReferenceProxy section */
 
-ITEMS="${ITEMS}"$'\n'"${LOGINITEMS}"
-fi
+/* Begin PBXShellScriptBuildPhase section */
+		8466F1851C04CA0E00918B1C /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 12;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "echo \"$GCC_PREPROCESSOR_DEFINITIONS\";\nAPPSTORE=`expr \"$GCC_PREPROCESSOR_DEFINITIONS\" : \".*APPSTORE=\\([0-9]*\\)\"`\nif [ -z \"$APPSTORE\" ] ; then\necho \"Note: Not copying bin/data to App Package or doing App Code signing. Use AppStore target for AppStore distribution\";\nelse\n# Copy bin/data into App/Resources\nrsync -avz --exclude='.DS_Store' \"${SRCROOT}/bin/data/\" \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/data/\"\n\n# ---- Code Sign App Package ----\n\n# WARNING: You may have to run Clean in Xcode after changing CODE_SIGN_IDENTITY!\n\n# Verify that $CODE_SIGN_IDENTITY is set\nif [ -z \"${CODE_SIGN_IDENTITY}\" ] ; then\necho \"CODE_SIGN_IDENTITY needs to be set for framework code-signing\"\nexit 0\nfi\n\nif [ -z \"${CODE_SIGN_ENTITLEMENTS}\" ] ; then\necho \"CODE_SIGN_ENTITLEMENTS needs to be set for framework code-signing!\"\n\nif [ \"${CONFIGURATION}\" = \"Release\" ] ; then\nexit 1\nelse\n# Code-signing is optional for non-release builds.\nexit 0\nfi\nfi\n\nITEMS=\"\"\n\nFRAMEWORKS_DIR=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\necho \"$FRAMEWORKS_DIR\"\nif [ -d \"$FRAMEWORKS_DIR\" ] ; then\nFRAMEWORKS=$(find \"${FRAMEWORKS_DIR}\" -depth -type d -name \"*.framework\" -or -name \"*.dylib\" -or -name \"*.bundle\" | sed -e \"s/\\(.*framework\\)/\\1\\/Versions\\/A\\//\")\nRESULT=$?\nif [[ $RESULT != 0 ]] ; then\nexit 1\nfi\n\nITEMS=\"${FRAMEWORKS}\"\nfi\n\nLOGINITEMS_DIR=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LoginItems/\"\nif [ -d \"$LOGINITEMS_DIR\" ] ; then\nLOGINITEMS=$(find \"${LOGINITEMS_DIR}\" -depth -type d -name \"*.app\")\nRESULT=$?\nif [[ $RESULT != 0 ]] ; then\nexit 1\nfi\n\nITEMS=\"${ITEMS}\"$'\\n'\"${LOGINITEMS}\"\nfi\n\n# Prefer the expanded name, if available.\nCODE_SIGN_IDENTITY_FOR_ITEMS=\"${EXPANDED_CODE_SIGN_IDENTITY_NAME}\"\nif [ \"${CODE_SIGN_IDENTITY_FOR_ITEMS}\" = \"\" ] ; then\n# Fall back to old behavior.\nCODE_SIGN_IDENTITY_FOR_ITEMS=\"${CODE_SIGN_IDENTITY}\"\nfi\n\necho \"Identity:\"\necho \"${CODE_SIGN_IDENTITY_FOR_ITEMS}\"\n\necho \"Entitlements:\"\necho \"${CODE_SIGN_ENTITLEMENTS}\"\n\necho \"Found:\"\necho \"${ITEMS}\"\n\n# Change the Internal Field Separator (IFS) so that spaces in paths will not cause problems below.\nSAVED_IFS=$IFS\nIFS=$(echo -en \"\\n\\b\")\n\n# Loop through all items.\nfor ITEM in $ITEMS;\ndo\necho \"Signing '${ITEM}'\"\ncodesign --force --verbose --sign \"${CODE_SIGN_IDENTITY_FOR_ITEMS}\" --entitlements \"${CODE_SIGN_ENTITLEMENTS}\" \"${ITEM}\"\nRESULT=$?\nif [[ $RESULT != 0 ]] ; then\necho \"Failed to sign '${ITEM}'.\"\nIFS=$SAVED_IFS\nexit 1\nfi\ndone\n\n# Restore $IFS.\nIFS=$SAVED_IFS\n\nfi\n";
+		};
+		E4B6FFFD0C3F9AB9008CF71C /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "mkdir -p \"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Resources/\"\n# Copy default icon file into App/Resources\nrsync -aved \"$ICON_FILE\" \"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Resources/\"\n# Copy libfmod and change install directory for fmod to run\nrsync -aved \"$OF_PATH/libs/fmodex/lib/osx/libfmodex.dylib\" \"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Frameworks/\";\ninstall_name_tool -change @executable_path/libfmodex.dylib @executable_path/../Frameworks/libfmodex.dylib \"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/MacOS/$PRODUCT_NAME\";\n\necho \"$GCC_PREPROCESSOR_DEFINITIONS\";\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
-# Prefer the expanded name, if available.
-CODE_SIGN_IDENTITY_FOR_ITEMS="${EXPANDED_CODE_SIGN_IDENTITY_NAME}"
-if [ "${CODE_SIGN_IDENTITY_FOR_ITEMS}" = "" ] ; then
-# Fall back to old behavior.
-CODE_SIGN_IDENTITY_FOR_ITEMS="${CODE_SIGN_IDENTITY}"
-fi
+/* Begin PBXSourcesBuildPhase section */
+		E4B69B580A3A1756003C02F2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E4B69E200A3A1BDC003C02F2 /* main.cpp in Sources */,
+				E4B69E210A3A1BDC003C02F2 /* ofApp.cpp in Sources */,
+				A670837F6999677674A385D1 /* testNode.cpp in Sources */,
+				4A277DA746402C76CE307770 /* ofxDatGuiComponent.cpp in Sources */,
+				646DF4D56CE728133610A7F6 /* ofxSmartFont.cpp in Sources */,
+				BE7DAF3CB982C2BD0FE44648 /* ofxDatGui.cpp in Sources */,
+				C6A203560BFBDA04C5746210 /* ofxOceanodeConnection.cpp in Sources */,
+				C1EEF98E795AFB7BB33F94B1 /* ofxOceanodeConnectionGraphics.cpp in Sources */,
+				7B5743F2E77F2D5AD9B436F0 /* ofxOceanodeBaseController.cpp in Sources */,
+				717BCDD6091D90F262DC7860 /* ofxOceanodeBPMController.cpp in Sources */,
+				7B8EE5B7F57088CD23B7934D /* ofxOceanodeControls.cpp in Sources */,
+				026CF24E227F5DFC3C392E27 /* ofxOceanodePresetsController.cpp in Sources */,
+				FE7602E65C7BA676951A37FB /* ofxOceanodeCanvas.cpp in Sources */,
+				5769B6A6D79188D3D351933E /* ofxOceanodeContainer.cpp in Sources */,
+				B7559FEE382DBA7FB094D5E7 /* ofxOceanodeNodeRegistry.cpp in Sources */,
+				102C0035698294FDB36E6899 /* ofxOceanodeTypesRegistry.cpp in Sources */,
+				7CC1A4D669C6C1B3786CD384 /* ofxOceanodeNodeModelExternalWindow.cpp in Sources */,
+				4B0881C0E4F3D037FA83C3E3 /* ofxOceanodeNodeModelLocalPreset.cpp in Sources */,
+				D925621F7F6146497318658A /* baseIndexer.cpp in Sources */,
+				9150F94721FE0E44D16DA0CC /* baseOscillator.cpp in Sources */,
+				BFBE6AEF801BA1F820867405 /* basePhasor.cpp in Sources */,
+				124BB55C818D1F89450ED005 /* localPresetController.cpp in Sources */,
+				842D4B1559D16CD55B1CF6DD /* oscillator.cpp in Sources */,
+				4C3192DB1EAE1CFF29580749 /* oscillatorBank.cpp in Sources */,
+				7416EB8AFDAB615D36EC3137 /* phasor.cpp in Sources */,
+				9FC5571B21AC6FAF009468E2 /* switcher.cpp in Sources */,
+				47608E29666CD58C20E53408 /* mapper.cpp in Sources */,
+				4838368B3C8561AD76D56D69 /* ranger.cpp in Sources */,
+				E1E0C08A53EAFC4A088F5BDC /* reindexer.cpp in Sources */,
+				BDE21E02C646BD31BEC13891 /* smoother.cpp in Sources */,
+				4C8024D8DD46223D43C514C0 /* ofxOceanodeNode.cpp in Sources */,
+				8EB5677652296BACF3A1C184 /* ofxOceanodeNodeGui.cpp in Sources */,
+				4F63EFF3BAACF2B19051E336 /* ofxOceanodeNodeModel.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
 
-echo "Identity:"
-echo "${CODE_SIGN_IDENTITY_FOR_ITEMS}"
+/* Begin PBXTargetDependency section */
+		E4EEB9AC138B136A00A80321 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = openFrameworks;
+			targetProxy = E4EEB9AB138B136A00A80321 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
-echo "Entitlements:"
-echo "${CODE_SIGN_ENTITLEMENTS}"
+/* Begin XCBuildConfiguration section */
+		99FA3DBB1C7456C400CFA0EE /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E4EB6923138AFD0F00A09F29 /* Project.xcconfig */;
+			buildSettings = {
+				CONFIGURATION_BUILD_DIR = "$(SRCROOT)/bin/";
+				COPY_PHASE_STRIP = YES;
+				DEAD_CODE_STRIPPING = YES;
+				GCC_AUTO_VECTORIZATION = YES;
+				GCC_ENABLE_SSE3_EXTENSIONS = YES;
+				GCC_ENABLE_SUPPLEMENTAL_SSE3_INSTRUCTIONS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				"GCC_PREPROCESSOR_DEFINITIONS[arch=*]" = "DISTRIBUTION=1";
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_UNROLL_LOOPS = YES;
+				GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS = YES;
+				GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO = NO;
+				GCC_WARN_ALLOW_INCOMPLETE_PROTOCOL = NO;
+				GCC_WARN_UNINITIALIZED_AUTOS = NO;
+				GCC_WARN_UNUSED_VALUE = NO;
+				GCC_WARN_UNUSED_VARIABLE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(OF_CORE_HEADERS)",
+					src,
+					../../../addons/ofxDatGui_PM/src,
+					../../../addons/ofxDatGui_PM/src/components,
+					../../../addons/ofxDatGui_PM/src/core,
+					../../../addons/ofxDatGui_PM/src/libs,
+					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
+					../../../addons/ofxDatGui_PM/src/themes,
+					../../../addons/ofxOceanode/src,
+					../../../addons/ofxOceanode/src/Connections,
+					../../../addons/ofxOceanode/src/Controls,
+					../../../addons/ofxOceanode/src/Managers,
+					../../../addons/ofxOceanode/src/Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers,
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				OTHER_CPLUSPLUSFLAGS = (
+					"-D__MACOSX_CORE__",
+					"-mtune=native",
+				);
+				SDKROOT = macosx;
+			};
+			name = AppStore;
+		};
+		99FA3DBC1C7456C400CFA0EE /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E4EB6923138AFD0F00A09F29 /* Project.xcconfig */;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = YES;
+				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_MODEL_TUNING = NONE;
+				"GCC_PREPROCESSOR_DEFINITIONS[arch=*]" = "APPSTORE=1";
+				HEADER_SEARCH_PATHS = (
+					"$(OF_CORE_HEADERS)",
+					src,
+					../../../addons/ofxDatGui_PM/src,
+					../../../addons/ofxDatGui_PM/src/components,
+					../../../addons/ofxDatGui_PM/src/core,
+					../../../addons/ofxDatGui_PM/src/libs,
+					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
+					../../../addons/ofxDatGui_PM/src/themes,
+					../../../addons/ofxOceanode/src,
+					../../../addons/ofxOceanode/src/Connections,
+					../../../addons/ofxOceanode/src/Controls,
+					../../../addons/ofxOceanode/src/Managers,
+					../../../addons/ofxOceanode/src/Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers,
+				);
+				ICON = "$(ICON_NAME_RELEASE)";
+				ICON_FILE = "$(ICON_FILE_PATH)$(ICON)";
+				INFOPLIST_FILE = "openFrameworks-Info.plist";
+				INSTALL_PATH = /Applications;
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				WRAPPER_EXTENSION = app;
+				baseConfigurationReference = E4EB6923138AFD0F00A09F29;
+			};
+			name = AppStore;
+		};
+		E4B69B4E0A3A1720003C02F2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E4EB6923138AFD0F00A09F29 /* Project.xcconfig */;
+			buildSettings = {
+				CONFIGURATION_BUILD_DIR = "$(SRCROOT)/bin/";
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				GCC_AUTO_VECTORIZATION = YES;
+				GCC_ENABLE_SSE3_EXTENSIONS = YES;
+				GCC_ENABLE_SUPPLEMENTAL_SSE3_INSTRUCTIONS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS = YES;
+				GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO = NO;
+				GCC_WARN_ALLOW_INCOMPLETE_PROTOCOL = NO;
+				GCC_WARN_UNINITIALIZED_AUTOS = NO;
+				GCC_WARN_UNUSED_VALUE = NO;
+				GCC_WARN_UNUSED_VARIABLE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(OF_CORE_HEADERS)",
+					src,
+					../../../addons/ofxDatGui_PM/src,
+					../../../addons/ofxDatGui_PM/src/components,
+					../../../addons/ofxDatGui_PM/src/core,
+					../../../addons/ofxDatGui_PM/src/libs,
+					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
+					../../../addons/ofxDatGui_PM/src/themes,
+					../../../addons/ofxOceanode/src,
+					../../../addons/ofxOceanode/src/Connections,
+					../../../addons/ofxOceanode/src/Controls,
+					../../../addons/ofxOceanode/src/Managers,
+					../../../addons/ofxOceanode/src/Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers,
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CPLUSPLUSFLAGS = (
+					"-D__MACOSX_CORE__",
+					"-mtune=native",
+				);
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		E4B69B4F0A3A1720003C02F2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E4EB6923138AFD0F00A09F29 /* Project.xcconfig */;
+			buildSettings = {
+				CONFIGURATION_BUILD_DIR = "$(SRCROOT)/bin/";
+				COPY_PHASE_STRIP = YES;
+				DEAD_CODE_STRIPPING = YES;
+				GCC_AUTO_VECTORIZATION = YES;
+				GCC_ENABLE_SSE3_EXTENSIONS = YES;
+				GCC_ENABLE_SUPPLEMENTAL_SSE3_INSTRUCTIONS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_UNROLL_LOOPS = YES;
+				GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS = YES;
+				GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO = NO;
+				GCC_WARN_ALLOW_INCOMPLETE_PROTOCOL = NO;
+				GCC_WARN_UNINITIALIZED_AUTOS = NO;
+				GCC_WARN_UNUSED_VALUE = NO;
+				GCC_WARN_UNUSED_VARIABLE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(OF_CORE_HEADERS)",
+					src,
+					../../../addons/ofxDatGui_PM/src,
+					../../../addons/ofxDatGui_PM/src/components,
+					../../../addons/ofxDatGui_PM/src/core,
+					../../../addons/ofxDatGui_PM/src/libs,
+					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
+					../../../addons/ofxDatGui_PM/src/themes,
+					../../../addons/ofxOceanode/src,
+					../../../addons/ofxOceanode/src/Connections,
+					../../../addons/ofxOceanode/src/Controls,
+					../../../addons/ofxOceanode/src/Managers,
+					../../../addons/ofxOceanode/src/Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers,
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				OTHER_CPLUSPLUSFLAGS = (
+					"-D__MACOSX_CORE__",
+					"-mtune=native",
+				);
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		E4B69B600A3A1757003C02F2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E4EB6923138AFD0F00A09F29 /* Project.xcconfig */;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = NO;
+				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_MODEL_TUNING = NONE;
+				HEADER_SEARCH_PATHS = (
+					"$(OF_CORE_HEADERS)",
+					src,
+					../../../addons/ofxDatGui_PM/src,
+					../../../addons/ofxDatGui_PM/src/components,
+					../../../addons/ofxDatGui_PM/src/core,
+					../../../addons/ofxDatGui_PM/src/libs,
+					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
+					../../../addons/ofxDatGui_PM/src/themes,
+					../../../addons/ofxOceanode/src,
+					../../../addons/ofxOceanode/src/Connections,
+					../../../addons/ofxOceanode/src/Controls,
+					../../../addons/ofxOceanode/src/Managers,
+					../../../addons/ofxOceanode/src/Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers,
+				);
+				ICON = "$(ICON_NAME_DEBUG)";
+				ICON_FILE = "$(ICON_FILE_PATH)$(ICON)";
+				INFOPLIST_FILE = "openFrameworks-Info.plist";
+				INSTALL_PATH = /Applications;
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
+				PRODUCT_NAME = "$(TARGET_NAME)Debug";
+				WRAPPER_EXTENSION = app;
+			};
+			name = Debug;
+		};
+		E4B69B610A3A1757003C02F2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E4EB6923138AFD0F00A09F29 /* Project.xcconfig */;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = YES;
+				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_MODEL_TUNING = NONE;
+				HEADER_SEARCH_PATHS = (
+					"$(OF_CORE_HEADERS)",
+					src,
+					../../../addons/ofxDatGui_PM/src,
+					../../../addons/ofxDatGui_PM/src/components,
+					../../../addons/ofxDatGui_PM/src/core,
+					../../../addons/ofxDatGui_PM/src/libs,
+					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
+					../../../addons/ofxDatGui_PM/src/themes,
+					../../../addons/ofxOceanode/src,
+					../../../addons/ofxOceanode/src/Connections,
+					../../../addons/ofxOceanode/src/Controls,
+					../../../addons/ofxOceanode/src/Managers,
+					../../../addons/ofxOceanode/src/Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators,
+					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers,
+				);
+				ICON = "$(ICON_NAME_RELEASE)";
+				ICON_FILE = "$(ICON_FILE_PATH)$(ICON)";
+				INFOPLIST_FILE = "openFrameworks-Info.plist";
+				INSTALL_PATH = /Applications;
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				WRAPPER_EXTENSION = app;
+				baseConfigurationReference = E4EB6923138AFD0F00A09F29;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
 
-echo "Found:"
-echo "${ITEMS}"
-
-# Change the Internal Field Separator (IFS) so that spaces in paths will not cause problems below.
-SAVED_IFS=$IFS
-IFS=$(echo -en "\n\b")
-
-# Loop through all items.
-for ITEM in $ITEMS;
-do
-echo "Signing '${ITEM}'"
-codesign --force --verbose --sign "${CODE_SIGN_IDENTITY_FOR_ITEMS}" --entitlements "${CODE_SIGN_ENTITLEMENTS}" "${ITEM}"
-RESULT=$?
-if [[ $RESULT != 0 ]] ; then
-echo "Failed to sign '${ITEM}'."
-IFS=$SAVED_IFS
-exit 1
-fi
-done
-
-# Restore $IFS.
-IFS=$SAVED_IFS
-
-fi
-</string>
-			</dict>
-			<key>99FA3DBB1C7456C400CFA0EE</key>
-			<dict>
-				<key>baseConfigurationReference</key>
-				<string>E4EB6923138AFD0F00A09F29</string>
-				<key>buildSettings</key>
-				<dict>
-					<key>HEADER_SEARCH_PATHS</key>
-					<array>
-						<string>$(OF_CORE_HEADERS)</string>
-						<string>src</string>
-						<string>../../../addons/ofxDatGui_PM/src</string>
-						<string>../../../addons/ofxDatGui_PM/src/components</string>
-						<string>../../../addons/ofxDatGui_PM/src/core</string>
-						<string>../../../addons/ofxDatGui_PM/src/libs</string>
-						<string>../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont</string>
-						<string>../../../addons/ofxDatGui_PM/src/themes</string>
-						<string>../../../addons/ofxOceanode/src</string>
-						<string>../../../addons/ofxOceanode/src/Connections</string>
-						<string>../../../addons/ofxOceanode/src/Controls</string>
-						<string>../../../addons/ofxOceanode/src/Managers</string>
-						<string>../../../addons/ofxOceanode/src/Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Base_Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers</string>
-					</array>
-					<key>CONFIGURATION_BUILD_DIR</key>
-					<string>$(SRCROOT)/bin/</string>
-					<key>COPY_PHASE_STRIP</key>
-					<string>YES</string>
-					<key>DEAD_CODE_STRIPPING</key>
-					<string>YES</string>
-					<key>GCC_AUTO_VECTORIZATION</key>
-					<string>YES</string>
-					<key>GCC_ENABLE_SSE3_EXTENSIONS</key>
-					<string>YES</string>
-					<key>GCC_ENABLE_SUPPLEMENTAL_SSE3_INSTRUCTIONS</key>
-					<string>YES</string>
-					<key>GCC_INLINES_ARE_PRIVATE_EXTERN</key>
-					<string>NO</string>
-					<key>GCC_OPTIMIZATION_LEVEL</key>
-					<string>3</string>
-					<key>GCC_PREPROCESSOR_DEFINITIONS[arch=*]</key>
-					<string>DISTRIBUTION=1</string>
-					<key>GCC_SYMBOLS_PRIVATE_EXTERN</key>
-					<string>NO</string>
-					<key>GCC_UNROLL_LOOPS</key>
-					<string>YES</string>
-					<key>GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS</key>
-					<string>YES</string>
-					<key>GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO</key>
-					<string>NO</string>
-					<key>GCC_WARN_ALLOW_INCOMPLETE_PROTOCOL</key>
-					<string>NO</string>
-					<key>GCC_WARN_UNINITIALIZED_AUTOS</key>
-					<string>NO</string>
-					<key>GCC_WARN_UNUSED_VALUE</key>
-					<string>NO</string>
-					<key>GCC_WARN_UNUSED_VARIABLE</key>
-					<string>NO</string>
-					<key>MACOSX_DEPLOYMENT_TARGET</key>
-					<string>10.9</string>
-					<key>OTHER_CPLUSPLUSFLAGS</key>
-					<array>
-						<string>-D__MACOSX_CORE__</string>
-						<string>-mtune=native</string>
-					</array>
-					<key>SDKROOT</key>
-					<string>macosx</string>
-				</dict>
-				<key>isa</key>
-				<string>XCBuildConfiguration</string>
-				<key>name</key>
-				<string>AppStore</string>
-			</dict>
-			<key>99FA3DBC1C7456C400CFA0EE</key>
-			<dict>
-				<key>baseConfigurationReference</key>
-				<string>E4EB6923138AFD0F00A09F29</string>
-				<key>buildSettings</key>
-				<dict>
-					<key>HEADER_SEARCH_PATHS</key>
-					<array>
-						<string>$(OF_CORE_HEADERS)</string>
-						<string>src</string>
-						<string>../../../addons/ofxDatGui_PM/src</string>
-						<string>../../../addons/ofxDatGui_PM/src/components</string>
-						<string>../../../addons/ofxDatGui_PM/src/core</string>
-						<string>../../../addons/ofxDatGui_PM/src/libs</string>
-						<string>../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont</string>
-						<string>../../../addons/ofxDatGui_PM/src/themes</string>
-						<string>../../../addons/ofxOceanode/src</string>
-						<string>../../../addons/ofxOceanode/src/Connections</string>
-						<string>../../../addons/ofxOceanode/src/Controls</string>
-						<string>../../../addons/ofxOceanode/src/Managers</string>
-						<string>../../../addons/ofxOceanode/src/Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Base_Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers</string>
-					</array>
-					<key>COMBINE_HIDPI_IMAGES</key>
-					<string>YES</string>
-					<key>COPY_PHASE_STRIP</key>
-					<string>YES</string>
-					<key>FRAMEWORK_SEARCH_PATHS</key>
-					<string>$(inherited)</string>
-					<key>GCC_GENERATE_DEBUGGING_SYMBOLS</key>
-					<string>YES</string>
-					<key>GCC_MODEL_TUNING</key>
-					<string>NONE</string>
-					<key>GCC_PREPROCESSOR_DEFINITIONS[arch=*]</key>
-					<string>APPSTORE=1</string>
-					<key>ICON</key>
-					<string>$(ICON_NAME_RELEASE)</string>
-					<key>ICON_FILE</key>
-					<string>$(ICON_FILE_PATH)$(ICON)</string>
-					<key>INFOPLIST_FILE</key>
-					<string>openFrameworks-Info.plist</string>
-					<key>INSTALL_PATH</key>
-					<string>/Applications</string>
-					<key>LIBRARY_SEARCH_PATHS</key>
-					<string>$(inherited)</string>
-					<key>PRODUCT_NAME</key>
-					<string>$(TARGET_NAME)</string>
-					<key>WRAPPER_EXTENSION</key>
-					<string>app</string>
-					<key>baseConfigurationReference</key>
-					<string>E4EB6923138AFD0F00A09F29</string>
-				</dict>
-				<key>isa</key>
-				<string>XCBuildConfiguration</string>
-				<key>name</key>
-				<string>AppStore</string>
-			</dict>
-			<key>BB4B014C10F69532006C3DED</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>E99400E5E21DFD21A45E2E82</string>
-					<string>643EB880A9E14DEF1DCC1AB4</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>addons</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>E4328143138ABC890047C5CB</key>
-			<dict>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>lastKnownFileType</key>
-				<string>wrapper.pb-project</string>
-				<key>name</key>
-				<string>openFrameworksLib.xcodeproj</string>
-				<key>path</key>
-				<string>../../../libs/openFrameworksCompiled/project/osx/openFrameworksLib.xcodeproj</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>E4328144138ABC890047C5CB</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>E4328148138ABC890047C5CB</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>Products</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>E4328147138ABC890047C5CB</key>
-			<dict>
-				<key>containerPortal</key>
-				<string>E4328143138ABC890047C5CB</string>
-				<key>isa</key>
-				<string>PBXContainerItemProxy</string>
-				<key>proxyType</key>
-				<string>2</string>
-				<key>remoteGlobalIDString</key>
-				<string>E4B27C1510CBEB8E00536013</string>
-				<key>remoteInfo</key>
-				<string>openFrameworks</string>
-			</dict>
-			<key>E4328148138ABC890047C5CB</key>
-			<dict>
-				<key>fileType</key>
-				<string>archive.ar</string>
-				<key>isa</key>
-				<string>PBXReferenceProxy</string>
-				<key>path</key>
-				<string>openFrameworksDebug.a</string>
-				<key>remoteRef</key>
-				<string>E4328147138ABC890047C5CB</string>
-				<key>sourceTree</key>
-				<string>BUILT_PRODUCTS_DIR</string>
-			</dict>
-			<key>E4328149138ABC9F0047C5CB</key>
-			<dict>
-				<key>fileRef</key>
-				<string>E4328148138ABC890047C5CB</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>E4B69B4A0A3A1720003C02F2</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>E4B6FCAD0C3E899E008CF71C</string>
-					<string>E4EB6923138AFD0F00A09F29</string>
-					<string>E4B69E1C0A3A1BDC003C02F2</string>
-					<string>E4EEC9E9138DF44700A80321</string>
-					<string>BB4B014C10F69532006C3DED</string>
-					<string>6948EE371B920CB800B5AC1A</string>
-					<string>E4B69B5B0A3A1756003C02F2</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>E4B69B4C0A3A1720003C02F2</key>
-			<dict>
-				<key>attributes</key>
-				<dict>
-					<key>LastUpgradeCheck</key>
-					<string>0600</string>
-				</dict>
-				<key>buildConfigurationList</key>
-				<string>E4B69B4D0A3A1720003C02F2</string>
-				<key>compatibilityVersion</key>
-				<string>Xcode 3.2</string>
-				<key>developmentRegion</key>
-				<string>English</string>
-				<key>hasScannedForEncodings</key>
-				<string>0</string>
-				<key>isa</key>
-				<string>PBXProject</string>
-				<key>knownRegions</key>
-				<array>
-					<string>English</string>
-					<string>Japanese</string>
-					<string>French</string>
-					<string>German</string>
-				</array>
-				<key>mainGroup</key>
-				<string>E4B69B4A0A3A1720003C02F2</string>
-				<key>productRefGroup</key>
-				<string>E4B69B4A0A3A1720003C02F2</string>
-				<key>projectDirPath</key>
-				<string />
-				<key>projectReferences</key>
-				<array>
-					<dict>
-						<key>ProductGroup</key>
-						<string>E4328144138ABC890047C5CB</string>
-						<key>ProjectRef</key>
-						<string>E4328143138ABC890047C5CB</string>
-					</dict>
-				</array>
-				<key>projectRoot</key>
-				<string />
-				<key>targets</key>
-				<array>
-					<string>E4B69B5A0A3A1756003C02F2</string>
-				</array>
-			</dict>
-			<key>E4B69B4D0A3A1720003C02F2</key>
-			<dict>
-				<key>buildConfigurations</key>
-				<array>
-					<string>E4B69B4E0A3A1720003C02F2</string>
-					<string>E4B69B4F0A3A1720003C02F2</string>
-					<string>99FA3DBB1C7456C400CFA0EE</string>
-				</array>
-				<key>defaultConfigurationIsVisible</key>
-				<string>0</string>
-				<key>defaultConfigurationName</key>
-				<string>Release</string>
-				<key>isa</key>
-				<string>XCConfigurationList</string>
-			</dict>
-			<key>E4B69B4E0A3A1720003C02F2</key>
-			<dict>
-				<key>baseConfigurationReference</key>
-				<string>E4EB6923138AFD0F00A09F29</string>
-				<key>buildSettings</key>
-				<dict>
-					<key>HEADER_SEARCH_PATHS</key>
-					<array>
-						<string>$(OF_CORE_HEADERS)</string>
-						<string>src</string>
-						<string>../../../addons/ofxDatGui_PM/src</string>
-						<string>../../../addons/ofxDatGui_PM/src/components</string>
-						<string>../../../addons/ofxDatGui_PM/src/core</string>
-						<string>../../../addons/ofxDatGui_PM/src/libs</string>
-						<string>../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont</string>
-						<string>../../../addons/ofxDatGui_PM/src/themes</string>
-						<string>../../../addons/ofxOceanode/src</string>
-						<string>../../../addons/ofxOceanode/src/Connections</string>
-						<string>../../../addons/ofxOceanode/src/Controls</string>
-						<string>../../../addons/ofxOceanode/src/Managers</string>
-						<string>../../../addons/ofxOceanode/src/Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Base_Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers</string>
-					</array>
-					<key>CONFIGURATION_BUILD_DIR</key>
-					<string>$(SRCROOT)/bin/</string>
-					<key>COPY_PHASE_STRIP</key>
-					<string>NO</string>
-					<key>DEAD_CODE_STRIPPING</key>
-					<string>YES</string>
-					<key>GCC_AUTO_VECTORIZATION</key>
-					<string>YES</string>
-					<key>GCC_ENABLE_SSE3_EXTENSIONS</key>
-					<string>YES</string>
-					<key>GCC_ENABLE_SUPPLEMENTAL_SSE3_INSTRUCTIONS</key>
-					<string>YES</string>
-					<key>GCC_INLINES_ARE_PRIVATE_EXTERN</key>
-					<string>NO</string>
-					<key>GCC_OPTIMIZATION_LEVEL</key>
-					<string>0</string>
-					<key>GCC_SYMBOLS_PRIVATE_EXTERN</key>
-					<string>NO</string>
-					<key>GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS</key>
-					<string>YES</string>
-					<key>GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO</key>
-					<string>NO</string>
-					<key>GCC_WARN_ALLOW_INCOMPLETE_PROTOCOL</key>
-					<string>NO</string>
-					<key>GCC_WARN_UNINITIALIZED_AUTOS</key>
-					<string>NO</string>
-					<key>GCC_WARN_UNUSED_VALUE</key>
-					<string>NO</string>
-					<key>GCC_WARN_UNUSED_VARIABLE</key>
-					<string>NO</string>
-					<key>MACOSX_DEPLOYMENT_TARGET</key>
-					<string>10.9</string>
-					<key>ONLY_ACTIVE_ARCH</key>
-					<string>YES</string>
-					<key>OTHER_CPLUSPLUSFLAGS</key>
-					<array>
-						<string>-D__MACOSX_CORE__</string>
-						<string>-mtune=native</string>
-					</array>
-					<key>SDKROOT</key>
-					<string>macosx</string>
-				</dict>
-				<key>isa</key>
-				<string>XCBuildConfiguration</string>
-				<key>name</key>
-				<string>Debug</string>
-			</dict>
-			<key>E4B69B4F0A3A1720003C02F2</key>
-			<dict>
-				<key>baseConfigurationReference</key>
-				<string>E4EB6923138AFD0F00A09F29</string>
-				<key>buildSettings</key>
-				<dict>
-					<key>HEADER_SEARCH_PATHS</key>
-					<array>
-						<string>$(OF_CORE_HEADERS)</string>
-						<string>src</string>
-						<string>../../../addons/ofxDatGui_PM/src</string>
-						<string>../../../addons/ofxDatGui_PM/src/components</string>
-						<string>../../../addons/ofxDatGui_PM/src/core</string>
-						<string>../../../addons/ofxDatGui_PM/src/libs</string>
-						<string>../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont</string>
-						<string>../../../addons/ofxDatGui_PM/src/themes</string>
-						<string>../../../addons/ofxOceanode/src</string>
-						<string>../../../addons/ofxOceanode/src/Connections</string>
-						<string>../../../addons/ofxOceanode/src/Controls</string>
-						<string>../../../addons/ofxOceanode/src/Managers</string>
-						<string>../../../addons/ofxOceanode/src/Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Base_Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers</string>
-					</array>
-					<key>CONFIGURATION_BUILD_DIR</key>
-					<string>$(SRCROOT)/bin/</string>
-					<key>COPY_PHASE_STRIP</key>
-					<string>YES</string>
-					<key>DEAD_CODE_STRIPPING</key>
-					<string>YES</string>
-					<key>GCC_AUTO_VECTORIZATION</key>
-					<string>YES</string>
-					<key>GCC_ENABLE_SSE3_EXTENSIONS</key>
-					<string>YES</string>
-					<key>GCC_ENABLE_SUPPLEMENTAL_SSE3_INSTRUCTIONS</key>
-					<string>YES</string>
-					<key>GCC_INLINES_ARE_PRIVATE_EXTERN</key>
-					<string>NO</string>
-					<key>GCC_OPTIMIZATION_LEVEL</key>
-					<string>3</string>
-					<key>GCC_SYMBOLS_PRIVATE_EXTERN</key>
-					<string>NO</string>
-					<key>GCC_UNROLL_LOOPS</key>
-					<string>YES</string>
-					<key>GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS</key>
-					<string>YES</string>
-					<key>GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO</key>
-					<string>NO</string>
-					<key>GCC_WARN_ALLOW_INCOMPLETE_PROTOCOL</key>
-					<string>NO</string>
-					<key>GCC_WARN_UNINITIALIZED_AUTOS</key>
-					<string>NO</string>
-					<key>GCC_WARN_UNUSED_VALUE</key>
-					<string>NO</string>
-					<key>GCC_WARN_UNUSED_VARIABLE</key>
-					<string>NO</string>
-					<key>MACOSX_DEPLOYMENT_TARGET</key>
-					<string>10.9</string>
-					<key>OTHER_CPLUSPLUSFLAGS</key>
-					<array>
-						<string>-D__MACOSX_CORE__</string>
-						<string>-mtune=native</string>
-					</array>
-					<key>SDKROOT</key>
-					<string>macosx</string>
-				</dict>
-				<key>isa</key>
-				<string>XCBuildConfiguration</string>
-				<key>name</key>
-				<string>Release</string>
-			</dict>
-			<key>E4B69B580A3A1756003C02F2</key>
-			<dict>
-				<key>buildActionMask</key>
-				<string>2147483647</string>
-				<key>files</key>
-				<array>
-					<string>E4B69E200A3A1BDC003C02F2</string>
-					<string>E4B69E210A3A1BDC003C02F2</string>
-					<string>A670837F6999677674A385D1</string>
-					<string>4A277DA746402C76CE307770</string>
-					<string>646DF4D56CE728133610A7F6</string>
-					<string>BE7DAF3CB982C2BD0FE44648</string>
-					<string>C6A203560BFBDA04C5746210</string>
-					<string>C1EEF98E795AFB7BB33F94B1</string>
-					<string>7B5743F2E77F2D5AD9B436F0</string>
-					<string>717BCDD6091D90F262DC7860</string>
-					<string>7B8EE5B7F57088CD23B7934D</string>
-					<string>026CF24E227F5DFC3C392E27</string>
-					<string>FE7602E65C7BA676951A37FB</string>
-					<string>5769B6A6D79188D3D351933E</string>
-					<string>B7559FEE382DBA7FB094D5E7</string>
-					<string>102C0035698294FDB36E6899</string>
-					<string>7CC1A4D669C6C1B3786CD384</string>
-					<string>4B0881C0E4F3D037FA83C3E3</string>
-					<string>D925621F7F6146497318658A</string>
-					<string>9150F94721FE0E44D16DA0CC</string>
-					<string>BFBE6AEF801BA1F820867405</string>
-					<string>124BB55C818D1F89450ED005</string>
-					<string>842D4B1559D16CD55B1CF6DD</string>
-					<string>4C3192DB1EAE1CFF29580749</string>
-					<string>7416EB8AFDAB615D36EC3137</string>
-					<string>47608E29666CD58C20E53408</string>
-					<string>4838368B3C8561AD76D56D69</string>
-					<string>E1E0C08A53EAFC4A088F5BDC</string>
-					<string>BDE21E02C646BD31BEC13891</string>
-					<string>4C8024D8DD46223D43C514C0</string>
-					<string>8EB5677652296BACF3A1C184</string>
-					<string>4F63EFF3BAACF2B19051E336</string>
-				</array>
-				<key>isa</key>
-				<string>PBXSourcesBuildPhase</string>
-				<key>runOnlyForDeploymentPostprocessing</key>
-				<string>0</string>
-			</dict>
-			<key>E4B69B590A3A1756003C02F2</key>
-			<dict>
-				<key>buildActionMask</key>
-				<string>2147483647</string>
-				<key>files</key>
-				<array>
-					<string>E4328149138ABC9F0047C5CB</string>
-				</array>
-				<key>isa</key>
-				<string>PBXFrameworksBuildPhase</string>
-				<key>runOnlyForDeploymentPostprocessing</key>
-				<string>0</string>
-			</dict>
-			<key>E4B69B5A0A3A1756003C02F2</key>
-			<dict>
-				<key>buildConfigurationList</key>
-				<string>E4B69B5F0A3A1757003C02F2</string>
-				<key>buildPhases</key>
-				<array>
-					<string>E4B69B580A3A1756003C02F2</string>
-					<string>E4B69B590A3A1756003C02F2</string>
-					<string>E4B6FFFD0C3F9AB9008CF71C</string>
-					<string>E4C2427710CC5ABF004149E2</string>
-					<string>8466F1851C04CA0E00918B1C</string>
-				</array>
-				<key>buildRules</key>
-				<array />
-				<key>dependencies</key>
-				<array>
-					<string>E4EEB9AC138B136A00A80321</string>
-				</array>
-				<key>isa</key>
-				<string>PBXNativeTarget</string>
-				<key>name</key>
-				<string>example-basic</string>
-				<key>productName</key>
-				<string>myOFApp</string>
-				<key>productReference</key>
-				<string>E4B69B5B0A3A1756003C02F2</string>
-				<key>productType</key>
-				<string>com.apple.product-type.application</string>
-			</dict>
-			<key>E4B69B5B0A3A1756003C02F2</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>wrapper.application</string>
-				<key>includeInIndex</key>
-				<string>0</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>path</key>
-				<string>example-basicDebug.app</string>
-				<key>sourceTree</key>
-				<string>BUILT_PRODUCTS_DIR</string>
-			</dict>
-			<key>E4B69B5F0A3A1757003C02F2</key>
-			<dict>
-				<key>buildConfigurations</key>
-				<array>
-					<string>E4B69B600A3A1757003C02F2</string>
-					<string>E4B69B610A3A1757003C02F2</string>
-					<string>99FA3DBC1C7456C400CFA0EE</string>
-				</array>
-				<key>defaultConfigurationIsVisible</key>
-				<string>0</string>
-				<key>defaultConfigurationName</key>
-				<string>Release</string>
-				<key>isa</key>
-				<string>XCConfigurationList</string>
-			</dict>
-			<key>E4B69B600A3A1757003C02F2</key>
-			<dict>
-				<key>baseConfigurationReference</key>
-				<string>E4EB6923138AFD0F00A09F29</string>
-				<key>buildSettings</key>
-				<dict>
-					<key>HEADER_SEARCH_PATHS</key>
-					<array>
-						<string>$(OF_CORE_HEADERS)</string>
-						<string>src</string>
-						<string>../../../addons/ofxDatGui_PM/src</string>
-						<string>../../../addons/ofxDatGui_PM/src/components</string>
-						<string>../../../addons/ofxDatGui_PM/src/core</string>
-						<string>../../../addons/ofxDatGui_PM/src/libs</string>
-						<string>../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont</string>
-						<string>../../../addons/ofxDatGui_PM/src/themes</string>
-						<string>../../../addons/ofxOceanode/src</string>
-						<string>../../../addons/ofxOceanode/src/Connections</string>
-						<string>../../../addons/ofxOceanode/src/Controls</string>
-						<string>../../../addons/ofxOceanode/src/Managers</string>
-						<string>../../../addons/ofxOceanode/src/Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Base_Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers</string>
-					</array>
-					<key>COMBINE_HIDPI_IMAGES</key>
-					<string>YES</string>
-					<key>COPY_PHASE_STRIP</key>
-					<string>NO</string>
-					<key>FRAMEWORK_SEARCH_PATHS</key>
-					<string>$(inherited)</string>
-					<key>GCC_DYNAMIC_NO_PIC</key>
-					<string>NO</string>
-					<key>GCC_GENERATE_DEBUGGING_SYMBOLS</key>
-					<string>YES</string>
-					<key>GCC_MODEL_TUNING</key>
-					<string>NONE</string>
-					<key>ICON</key>
-					<string>$(ICON_NAME_DEBUG)</string>
-					<key>ICON_FILE</key>
-					<string>$(ICON_FILE_PATH)$(ICON)</string>
-					<key>INFOPLIST_FILE</key>
-					<string>openFrameworks-Info.plist</string>
-					<key>INSTALL_PATH</key>
-					<string>/Applications</string>
-					<key>LIBRARY_SEARCH_PATHS</key>
-					<string>$(inherited)</string>
-					<key>PRODUCT_NAME</key>
-					<string>$(TARGET_NAME)Debug</string>
-					<key>WRAPPER_EXTENSION</key>
-					<string>app</string>
-				</dict>
-				<key>isa</key>
-				<string>XCBuildConfiguration</string>
-				<key>name</key>
-				<string>Debug</string>
-			</dict>
-			<key>E4B69B610A3A1757003C02F2</key>
-			<dict>
-				<key>baseConfigurationReference</key>
-				<string>E4EB6923138AFD0F00A09F29</string>
-				<key>buildSettings</key>
-				<dict>
-					<key>HEADER_SEARCH_PATHS</key>
-					<array>
-						<string>$(OF_CORE_HEADERS)</string>
-						<string>src</string>
-						<string>../../../addons/ofxDatGui_PM/src</string>
-						<string>../../../addons/ofxDatGui_PM/src/components</string>
-						<string>../../../addons/ofxDatGui_PM/src/core</string>
-						<string>../../../addons/ofxDatGui_PM/src/libs</string>
-						<string>../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont</string>
-						<string>../../../addons/ofxDatGui_PM/src/themes</string>
-						<string>../../../addons/ofxOceanode/src</string>
-						<string>../../../addons/ofxOceanode/src/Connections</string>
-						<string>../../../addons/ofxOceanode/src/Controls</string>
-						<string>../../../addons/ofxOceanode/src/Managers</string>
-						<string>../../../addons/ofxOceanode/src/Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Base_Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators</string>
-						<string>../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers</string>
-					</array>
-					<key>COMBINE_HIDPI_IMAGES</key>
-					<string>YES</string>
-					<key>COPY_PHASE_STRIP</key>
-					<string>YES</string>
-					<key>FRAMEWORK_SEARCH_PATHS</key>
-					<string>$(inherited)</string>
-					<key>GCC_GENERATE_DEBUGGING_SYMBOLS</key>
-					<string>YES</string>
-					<key>GCC_MODEL_TUNING</key>
-					<string>NONE</string>
-					<key>ICON</key>
-					<string>$(ICON_NAME_RELEASE)</string>
-					<key>ICON_FILE</key>
-					<string>$(ICON_FILE_PATH)$(ICON)</string>
-					<key>INFOPLIST_FILE</key>
-					<string>openFrameworks-Info.plist</string>
-					<key>INSTALL_PATH</key>
-					<string>/Applications</string>
-					<key>LIBRARY_SEARCH_PATHS</key>
-					<string>$(inherited)</string>
-					<key>PRODUCT_NAME</key>
-					<string>$(TARGET_NAME)</string>
-					<key>WRAPPER_EXTENSION</key>
-					<string>app</string>
-					<key>baseConfigurationReference</key>
-					<string>E4EB6923138AFD0F00A09F29</string>
-				</dict>
-				<key>isa</key>
-				<string>XCBuildConfiguration</string>
-				<key>name</key>
-				<string>Release</string>
-			</dict>
-			<key>E4B69E1C0A3A1BDC003C02F2</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>E4B69E1D0A3A1BDC003C02F2</string>
-					<string>E4B69E1E0A3A1BDC003C02F2</string>
-					<string>E4B69E1F0A3A1BDC003C02F2</string>
-					<string>1C84792B71D7D5C105077DBF</string>
-					<string>F24887AB1BADDDBB829D94E1</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>path</key>
-				<string>src</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>E4B69E1D0A3A1BDC003C02F2</key>
-			<dict>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>lastKnownFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>name</key>
-				<string>main.cpp</string>
-				<key>path</key>
-				<string>src/main.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>E4B69E1E0A3A1BDC003C02F2</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofApp.cpp</string>
-				<key>path</key>
-				<string>src/ofApp.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>E4B69E1F0A3A1BDC003C02F2</key>
-			<dict>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>lastKnownFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>name</key>
-				<string>ofApp.h</string>
-				<key>path</key>
-				<string>src/ofApp.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>E4B69E200A3A1BDC003C02F2</key>
-			<dict>
-				<key>fileRef</key>
-				<string>E4B69E1D0A3A1BDC003C02F2</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>E4B69E210A3A1BDC003C02F2</key>
-			<dict>
-				<key>fileRef</key>
-				<string>E4B69E1E0A3A1BDC003C02F2</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>E4B6FCAD0C3E899E008CF71C</key>
-			<dict>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>lastKnownFileType</key>
-				<string>text.plist.xml</string>
-				<key>path</key>
-				<string>openFrameworks-Info.plist</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>E4B6FFFD0C3F9AB9008CF71C</key>
-			<dict>
-				<key>buildActionMask</key>
-				<string>2147483647</string>
-				<key>files</key>
-				<array />
-				<key>inputPaths</key>
-				<array />
-				<key>isa</key>
-				<string>PBXShellScriptBuildPhase</string>
-				<key>outputPaths</key>
-				<array />
-				<key>runOnlyForDeploymentPostprocessing</key>
-				<string>0</string>
-				<key>shellPath</key>
-				<string>/bin/sh</string>
-				<key>shellScript</key>
-				<string>mkdir -p "$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Resources/"
-# Copy default icon file into App/Resources
-rsync -aved "$ICON_FILE" "$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Resources/"
-# Copy libfmod and change install directory for fmod to run
-rsync -aved "$OF_PATH/libs/fmodex/lib/osx/libfmodex.dylib" "$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Frameworks/";
-install_name_tool -change @executable_path/libfmodex.dylib @executable_path/../Frameworks/libfmodex.dylib "$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/MacOS/$PRODUCT_NAME";
-
-echo "$GCC_PREPROCESSOR_DEFINITIONS";
-</string>
-			</dict>
-			<key>E4C2427710CC5ABF004149E2</key>
-			<dict>
-				<key>buildActionMask</key>
-				<string>2147483647</string>
-				<key>dstPath</key>
-				<string />
-				<key>dstSubfolderSpec</key>
-				<string>10</string>
-				<key>files</key>
-				<array />
-				<key>isa</key>
-				<string>PBXCopyFilesBuildPhase</string>
-				<key>runOnlyForDeploymentPostprocessing</key>
-				<string>0</string>
-			</dict>
-			<key>E4EB691F138AFCF100A09F29</key>
-			<dict>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>lastKnownFileType</key>
-				<string>text.xcconfig</string>
-				<key>name</key>
-				<string>CoreOF.xcconfig</string>
-				<key>path</key>
-				<string>../../../libs/openFrameworksCompiled/project/osx/CoreOF.xcconfig</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>E4EB6923138AFD0F00A09F29</key>
-			<dict>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>lastKnownFileType</key>
-				<string>text.xcconfig</string>
-				<key>path</key>
-				<string>Project.xcconfig</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-			<key>E4EEB9AB138B136A00A80321</key>
-			<dict>
-				<key>containerPortal</key>
-				<string>E4328143138ABC890047C5CB</string>
-				<key>isa</key>
-				<string>PBXContainerItemProxy</string>
-				<key>proxyType</key>
-				<string>1</string>
-				<key>remoteGlobalIDString</key>
-				<string>E4B27C1410CBEB8E00536013</string>
-				<key>remoteInfo</key>
-				<string>openFrameworks</string>
-			</dict>
-			<key>E4EEB9AC138B136A00A80321</key>
-			<dict>
-				<key>isa</key>
-				<string>PBXTargetDependency</string>
-				<key>name</key>
-				<string>openFrameworks</string>
-				<key>targetProxy</key>
-				<string>E4EEB9AB138B136A00A80321</string>
-			</dict>
-			<key>E4EEC9E9138DF44700A80321</key>
-			<dict>
-				<key>children</key>
-				<array>
-					<string>E4EB691F138AFCF100A09F29</string>
-					<string>E4328143138ABC890047C5CB</string>
-				</array>
-				<key>isa</key>
-				<string>PBXGroup</string>
-				<key>name</key>
-				<string>openFrameworks</string>
-				<key>sourceTree</key>
-				<string>&lt;group&gt;</string>
-			</dict>
-		</dict>
-		<key>rootObject</key>
-		<string>E4B69B4C0A3A1720003C02F2</string>
-	</dict>
-</plist>
+/* Begin XCConfigurationList section */
+		E4B69B4D0A3A1720003C02F2 /* Build configuration list for PBXProject "example-basic" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E4B69B4E0A3A1720003C02F2 /* Debug */,
+				E4B69B4F0A3A1720003C02F2 /* Release */,
+				99FA3DBB1C7456C400CFA0EE /* AppStore */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E4B69B5F0A3A1757003C02F2 /* Build configuration list for PBXNativeTarget "example-basic" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E4B69B600A3A1757003C02F2 /* Debug */,
+				E4B69B610A3A1757003C02F2 /* Release */,
+				99FA3DBC1C7456C400CFA0EE /* AppStore */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E4B69B4C0A3A1720003C02F2 /* Project object */;
+}

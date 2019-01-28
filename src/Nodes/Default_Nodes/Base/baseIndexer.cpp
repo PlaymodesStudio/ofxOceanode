@@ -7,20 +7,23 @@
 //
 
 #include "baseIndexer.h"
+#include <numeric>
 
 baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name){
     indexCount.set("Size", numIndexs, 1, 100000);
     previousIndexCount = indexCount;
     indexs.resize(indexCount, 0);
     indexRand.resize(indexCount , 0);
-    for(int i = 0; i < indexRand.size(); i++)
-        indexRand[i] = i-((float)indexRand.size()/2.f);
+    iota(indexRand.begin(), indexRand.end(), 0);
+    randPositions.resize(indexCount);
+    randomizedIndexes.resize(indexCount);
+    iota(randomizedIndexes.begin(), randomizedIndexes.end(), 0);
     indexRand_Param_previous = 0;
     
     numWaves_Param.set("Num Waves", 1, 0, indexCount);
     indexInvert_Param.set("Index Invert", 0, 0, 1);
     symmetry_Param.set("Symmetry", 0, 0, indexCount/2);
-    indexRand_Param.set("Index Random", 0, 0, 1);
+    indexRand_Param.set("Index Random", 0, -1, 1);
     indexOffset_Param.set("Index Offset", 0, -indexCount/2, indexCount/2);
     indexQuant_Param.set("Index Quantization", indexCount, 1, indexCount);
     combination_Param.set("Index Combination", 0, 0, 1);
@@ -28,6 +31,7 @@ baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name
     
     recomputeIndexs();
 
+    listeners.push(indexRand_Param.newListener(this, &baseIndexer::indexRandChanged));
     listeners.push(indexCount.newListener(this, &baseIndexer::indexCountChanged));
     listeners.push(numWaves_Param.newListener(this, &baseIndexer::parameterFloatListener));
     listeners.push(indexInvert_Param.newListener(this, &baseIndexer::parameterFloatListener));
@@ -37,17 +41,22 @@ baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name
     listeners.push(indexQuant_Param.newListener(this, &baseIndexer::parameterIntListener));
     listeners.push(combination_Param.newListener(this, &baseIndexer::parameterFloatListener));
     listeners.push(modulo_Param.newListener(this, &baseIndexer::parameterIntListener));
-    
-    listeners.push(indexRand_Param.newListener(this, &baseIndexer::indexRandChanged));
 }
 
 void baseIndexer::indexCountChanged(int &indexCount){
     if(indexCount != previousIndexCount){
         indexs.resize(indexCount, 0);
-        indexRand.resize(indexCount , 0);
-        for(int i = 0; i < indexRand.size(); i++)
-            indexRand[i] = i-((float)indexRand.size()/2.f);
+        indexRand.resize(indexCount);
+        iota(indexRand.begin(), indexRand.end(), 0);
+        randomizedIndexes.resize(indexCount);
+        randPositions.resize(indexCount);
+        iota(randomizedIndexes.begin(), randomizedIndexes.end(), 0);
+        float indexRand_temp_store = indexRand_Param;
+        indexRand_Param = 0;
+        indexRand_Param = indexRand_temp_store;
+
         random_shuffle(indexRand.begin(), indexRand.end());
+
         
         numWaves_Param.setMax(indexCount);
         numWaves_Param = ofClamp(numWaves_Param, numWaves_Param.getMin(), numWaves_Param.getMax());
@@ -131,15 +140,14 @@ void baseIndexer::recomputeIndexs(){
         //INVERSE
         //Fisrt we invert the index to simulate the wave goes from left to right, inverting indexes, if we want to invertit we don't do this calc
         int nonInvertIndex = index-1;
-        int invertedIndex = ((float)indexCount-(float)index);
+        int invertedIndex = ((float)indexCount/(symmetry_Param+1))-(float)index;
         index = indexInvert_Param*invertedIndex + (1-indexInvert_Param)*nonInvertIndex;
         
         //random
-        index += indexRand[index]*indexRand_Param;
-        index %= indexCount;
-        if(index < 0)
-            index += indexCount;
-        
+        if(indexRand_Param < 0)
+            index = randomizedIndexes[index];
+        else if(indexRand_Param > 0)
+            index = index*(1-indexRand_Param) + (indexRand[index]*indexRand_Param);
         
         //COMB
         index = abs(((index%2)*indexCount*combination_Param)-index);
@@ -158,7 +166,19 @@ void baseIndexer::recomputeIndexs(){
 }
 
 void baseIndexer::indexRandChanged(float &val){
-    if(indexRand_Param_previous == 0)
+    if(indexRand_Param_previous == 0){
         random_shuffle(indexRand.begin(), indexRand.end());
+        iota(randomizedIndexes.begin(), randomizedIndexes.end(), 0);
+    }
     indexRand_Param_previous = val;
+    
+    if(val < 0){
+        for(int i = 0; i < indexCount; i++){
+            randPositions[i] = indexRand[i]*indexRand_Param + i*(1-indexRand_Param);
+        }
+
+        std::sort(
+                  randomizedIndexes.begin(), randomizedIndexes.end(),
+                  [&](std::size_t a, std::size_t b) { return randPositions[a] < randPositions[b]; });
+    }
 }

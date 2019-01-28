@@ -15,6 +15,10 @@ public:
     smoother();
     ~smoother(){};
     
+    void presetRecallBeforeSettingParameters(ofJson &json){
+        isFirstInput = true;
+    };
+    
 private:
     void inputListener(vector<float> &vf);
     ofEventListener inputEventListener;
@@ -24,6 +28,8 @@ private:
     ofParameter<vector<float>> tension;
     ofParameter<vector<float>>  output;
     vector<float> previousInput;
+    
+    bool isFirstInput;
 };
 
 #endif /* smoother_h */

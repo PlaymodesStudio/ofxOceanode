@@ -24,6 +24,7 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     transformationMatrix = glm::mat4(1);
     temporalConnection = nullptr;
     bpm = 120;
+    phase = 0;
     collapseAll = false;
     
 #ifdef OFXOCEANODE_USE_OSC
@@ -574,6 +575,10 @@ void ofxOceanodeContainer::updatePersistent(){
     }
 }
 
+void ofxOceanodeContainer::saveCurrentPreset(){
+    saveCurrentPresetEvent.notify();
+}
+
 void ofxOceanodeContainer::setBpm(float _bpm){
     bpm = _bpm;
     for(auto &nodeTypeMap : dynamicNodes){
@@ -706,7 +711,8 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
             if(splitAddress[0] == "phaseReset"){
                 resetPhase();
             }else if(splitAddress[0] == "bpm"){
-                setBpm(m.getArgAsFloat(0));
+                float newBpm = m.getArgAsFloat(0);
+                ofNotifyEvent(changedBpmEvent, newBpm);
             }
         }else if(splitAddress.size() == 2){
             if(splitAddress[0] == "presetLoad"){
@@ -720,7 +726,7 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                 dir.sort();
                 int numPresets = dir.listDir();
                 for ( int i = 0 ; i < numPresets; i++){
-                    if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(1)){
+                    if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(0)){
                         string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
                         ofNotifyEvent(loadPresetEvent, bankAndPreset);
                         break;

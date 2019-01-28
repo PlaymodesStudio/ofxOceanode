@@ -30,7 +30,7 @@ oscillatorBank::oscillatorBank() : baseIndexer(100, "Oscillator Bank"){
     paramListeners.push(skew_Param.newListener(this, &oscillatorBank::newSkewParam));
 
     
-    parameters->add(phasorIn.set("Phasor In", 0, 0, 1));
+    parameters->add(phasorIn.set("Phasor In", {0}, {0}, {1}));
     putParametersInParametersGroup(parameters);
     parameters->add(phaseOffset_Param.set("Phase Offset", {0}, {0}, {1}));
     parameters->add(randomAdd_Param.set("Random Addition", {0}, {-1}, {1}));
@@ -105,9 +105,9 @@ void oscillatorBank::indexCountChanged(int &newIndexCount){
     }
 }
 
-void oscillatorBank::computeBank(float phasor){
+void oscillatorBank::computeBank(vector<float> &phasor){
     for(int i = 0; i < oscillators.size(); i++){
-        result[i] = oscillators[i].computeFunc(phasor);
+        result[i] = oscillators[i].computeFunc(getValueForPosition(phasor, i));
     }
     if(waveSelect_Param == 6 || waveSelect_Param == 7){
         auto resultCopy = result;
@@ -124,7 +124,7 @@ void oscillatorBank::newIndexs(){
     }
 }
 
-void oscillatorBank::newPhasorIn(float &f){
+void oscillatorBank::newPhasorIn(vector<float> &f){
     computeBank(f);
     oscillatorOut = result;
 }

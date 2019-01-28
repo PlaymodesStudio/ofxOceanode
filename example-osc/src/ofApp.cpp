@@ -6,7 +6,7 @@ void ofApp::setup(){
     canvas.setContainer(container);
     canvas.setup();
     
-    controls = new ofxOceanodeControls(container);
+    controls = make_unique<ofxOceanodeControls>(container);
 }
 
 //--------------------------------------------------------------

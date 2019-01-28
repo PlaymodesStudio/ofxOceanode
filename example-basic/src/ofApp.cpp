@@ -4,7 +4,7 @@
 //--------------------------------------------------------------
 void ofApp::setup(){
     ofSetVerticalSync(false);
-    ofSetFrameRate(120);
+    //ofSetFrameRate(120);
     
     auto reg = make_shared<ofxOceanodeNodeRegistry>();
     auto treg = make_shared<ofxOceanodeTypesRegistry>();
@@ -16,7 +16,7 @@ void ofApp::setup(){
     canvas.setContainer(container);
     canvas.setup();
     
-    controls = new ofxOceanodeControls(container);
+    controls = make_unique<ofxOceanodeControls>(container);
 }
 
 //--------------------------------------------------------------
