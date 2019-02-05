@@ -47,6 +47,8 @@ void reindexer::presetRecallAfterSettingParameters(ofJson &json){
         }
         reindexGrid = matrixCopy;
         reindexChanged();
+        vector<float> tempInput = input.get();
+        inputListener(tempInput);
     }
 }
 
@@ -62,7 +64,7 @@ void reindexer::inputListener(vector<float> &vf){
     }
     if(isReindexIdentity){
         output = vf;
-    }else{
+    }else if(outputSize > 0){
         vector<float> tempOutput;
         tempOutput.resize(outputSize, 0);
         for(int i = 0; i < outputSize; i++){
@@ -85,6 +87,8 @@ void reindexer::outputSizeListener(int &f){
     }
     reindexGrid.resize(f, vector<bool>(input.get().size(), false));
     reindexChanged();
+    vector<float> tempInput = input.get();
+    inputListener(tempInput);
 }
 
 void reindexer::reindexChanged(){

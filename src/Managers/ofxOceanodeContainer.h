@@ -83,6 +83,7 @@ public:
     void savePersistent();
     void loadPersistent();
     void updatePersistent();
+    void saveCurrentPreset();
     
     void setBpm(float _bpm);
     void setPhase(float _phase);
@@ -93,6 +94,7 @@ public:
     
     ofEvent<string> loadPresetEvent;
     ofEvent<float> changedBpmEvent;
+    ofEvent<void> saveCurrentPresetEvent;
     
 #ifdef OFXOCEANODE_USE_OSC
     void setupOscSender(string host, int port);

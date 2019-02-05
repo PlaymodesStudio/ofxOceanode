@@ -39,9 +39,13 @@ private:
     
     map<int, string> currentBankPresets;
     
+    string currentBank;
+    string currentPreset;
+    
     int loadPresetInNextUpdate;
     
     ofEventListener presetListener;
+    ofEventListener saveCurrentPresetListener;
 };
 
 #endif /* ofxOceanodePresetsController_h */

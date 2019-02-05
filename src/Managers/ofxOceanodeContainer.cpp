@@ -24,6 +24,7 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     transformationMatrix = glm::mat4(1);
     temporalConnection = nullptr;
     bpm = 120;
+    phase = 0;
     collapseAll = false;
     
 #ifdef OFXOCEANODE_USE_OSC
@@ -132,18 +133,22 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     
     if(!isPersistent){
         destroyNodeListeners.push(nodePtr->deleteModuleAndConnections.newListener([this, nodeToBeCreatedName, toBeCreatedId](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
-            for(auto containerConnectionIterator = connections.begin(); containerConnectionIterator!=connections.end();){
+            //for(auto &containerConnectionIterator = connections.begin(); containerConnectionIterator!= connections.end();){
+			for(int i = 0; i < connections.size();){
                 bool foundConnection = false;
-                for(auto nodeConnection : connectionsToBeDeleted){
-                    if(containerConnectionIterator->second.get() == nodeConnection){
+                for(auto &nodeConnection : connectionsToBeDeleted){
+                    //if(containerConnectionIterator->second.get() == nodeConnection){
+					if(connections[i].second.get() == nodeConnection){
                         foundConnection = true;
-                        connections.erase(containerConnectionIterator);
+                        //connections.erase(containerConnectionIterator);
+						connections.erase((connections.begin() + i));
                         connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
                         break;
                     }
                 }
                 if(!foundConnection){
-                    containerConnectionIterator++;
+                    //containerConnectionIterator++;
+					i++;
                 }
             }
             
@@ -667,6 +672,10 @@ void ofxOceanodeContainer::updatePersistent(){
     }
 }
 
+void ofxOceanodeContainer::saveCurrentPreset(){
+    saveCurrentPresetEvent.notify();
+}
+
 void ofxOceanodeContainer::setBpm(float _bpm){
     bpm = _bpm;
     for(auto &nodeTypeMap : dynamicNodes){
@@ -814,7 +823,7 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                 dir.sort();
                 int numPresets = dir.listDir();
                 for ( int i = 0 ; i < numPresets; i++){
-                    if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(1)){
+                    if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(0)){
                         string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
                         ofNotifyEvent(loadPresetEvent, bankAndPreset);
                         break;
