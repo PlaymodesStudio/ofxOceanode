@@ -28,6 +28,7 @@ public:
     void  resetPhasor();
     
     ofEvent<void> phasorCycle;
+    ofEvent<int> phasorCycleIndex;
     
     void checkChangedSize(){
         if(beatsMult_Param.size() != 1 && beatsMult_Param.size() != numPhasors){
@@ -46,6 +47,7 @@ private:
         phasor.resize(n);
         phasorMod.resize(n);
         resetPhasor();
+        stopPhasor.resize(n, !loop_Param);
     }
     
     float getValueForIndex(vector<float> &vf, int i){
@@ -66,6 +68,7 @@ private:
     vector<double>  phasorMod;
     ofThreadChannel<vector<double>> phasorToSend;
     vector<double> momentaryPhasor;
+    vector<bool> stopPhasor;
 };
 
 #endif /* basePhasor_h */

@@ -17,10 +17,11 @@ basePhasor::basePhasor(){
     startThread();
     bpm_Param = 120.00;
     beatsMult_Param = vector<float>(1, 1);
-    beatsDiv_Param = vector<float>(1, 1);;
+    beatsDiv_Param = vector<float>(1, 1);
     initPhase_Param = 0;
     loop_Param = true;
     numPhasors = 1;
+    stopPhasor = vector<bool>(1, false);
 }
 
 basePhasor::~basePhasor(){
@@ -30,15 +31,12 @@ basePhasor::~basePhasor(){
 }
 
 vector<float> basePhasor::getPhasors(){
-    if(loop_Param){
-        while(phasorToSend.tryReceive(momentaryPhasor));
-        return vector<float>(momentaryPhasor.begin(), momentaryPhasor.end());
-    }else{
-        return vector<float>(numPhasors, initPhase_Param);
-    }
+    while(phasorToSend.tryReceive(momentaryPhasor));
+    return vector<float>(momentaryPhasor.begin(), momentaryPhasor.end());
 }
 
 void basePhasor::resetPhasor(){
+    fill(stopPhasor.begin(), stopPhasor.end(), false);
     fill(phasor.begin(), phasor.end(), 0);
 }
 
@@ -56,6 +54,18 @@ void basePhasor::threadedFunction(){
             if(i == 0 && phasor[0] >= 1){
                 ofNotifyEvent(phasorCycle);
             }
+            if(phasor[i] >= 1){
+                ofNotifyEvent(phasorCycleIndex, i);
+                if(!loop_Param){
+                    stopPhasor[i] = true;
+                }
+            }
+            if(loop_Param){
+                stopPhasor[i] = false;
+            }
+            
+            if(stopPhasor[i]) phasor[i] = 0;
+            
             phasor[i] -= (int)phasor[i];
             
             //Assign a copy of the phasor to add initPhase
@@ -66,9 +76,7 @@ void basePhasor::threadedFunction(){
             phasorMod[i] -= (int)phasorMod[i];
         }
         
-        if(loop_Param){
-            phasorToSend.send((phasorMod));
-        }
+        phasorToSend.send((phasorMod));
     }
 }
 
