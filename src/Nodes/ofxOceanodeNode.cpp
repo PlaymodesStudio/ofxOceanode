@@ -297,6 +297,18 @@ void ofxOceanodeNode::presetHasLoaded(){
     nodeModel->presetHasLoaded();
 }
 
+void ofxOceanodeNode::loadPresetBeforeConnections(string presetFolderPath){
+    string filename = presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json";
+    string escapedFilename = filename;
+    ofStringReplace(escapedFilename, " ", "_");
+    ofJson json = ofLoadJson(escapedFilename);
+    if(json.empty()) json = ofLoadJson(filename);
+    
+    if(json.empty()) return false;
+    
+    nodeModel->loadBeforeConnections(json);
+}
+
 bool ofxOceanodeNode::loadConfig(string filename, bool persistentPreset){
     string escapedFilename = filename;
     ofStringReplace(escapedFilename, " ", "_");

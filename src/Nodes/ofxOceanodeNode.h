@@ -55,6 +55,7 @@ public:
     
     void presetWillBeLoaded();
     void presetHasLoaded();
+    void loadPresetBeforeConnections(string presetFolderPath);
     
     bool loadConfig(string filename, bool persistentPreset = false);
     void saveConfig(string filename, bool persistentPreset = false);

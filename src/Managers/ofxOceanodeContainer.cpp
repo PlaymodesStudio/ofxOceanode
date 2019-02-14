@@ -226,16 +226,6 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         }
     }
     
-//    for(int i = 0; i < connections.size();){
-//        if(!connections[i].second->getIsPersistent()){
-//            connections.erase(connections.begin()+i);
-//        }else{
-//            i++;
-//        }
-//    }
-//
-    ofLog() << "Before preset " << connections.size() << "connections";
-    
     //Read new nodes in preset
     //Check if the nodes exists and update them, (or update all at the end)
     //Create new modules and update them (or update at end)
@@ -312,8 +302,6 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         dynamicNodes.clear();
     }
     
-    ofLog() << "After nodes " << connections.size() << "connections";
-    
 #ifdef OFXOCEANODE_USE_MIDI
     json.clear();
     for(auto &binding : midiBindings){
@@ -341,23 +329,6 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         string sourceModule = connections[i].second->getSourceParameter().getGroupHierarchyNames()[0];
         string sinkParameter = connections[i].second->getSinkParameter().getName();
         string sinkModule = connections[i].second->getSinkParameter().getGroupHierarchyNames()[0];
-        
-        //        if(json.find(sourceModule) != json.end() &&
-        //           json[sourceModule].find(sourceParameter) != json[sourceModule].end() &&
-        //           json[sourceModule][sourceParameter].find(sinkModule) != json[sourceModule][sourceParameter].end() &&
-        //           json[sourceModule][sourceParameter][sinkModule].find(sinkParameter) != json[sourceModule][sourceParameter][sinkModule].end()){
-        //            json[sourceModule][sourceParameter][sinkModule].erase(sinkParameter);
-        //            if(json[sourceModule][sourceParameter][sinkModule].size() == 0){
-        //                json[sourceModule][sourceParameter].erase(sinkModule);
-        //                if(json[sourceModule][sourceParameter].size() == 0){
-        //                    json[sourceModule].erase(sourceParameter);
-        //                    if(json[sourceModule].size() == 0){
-        //                        json.erase(sourceModule);
-        //                    }
-        //                }
-        //            }
-        //            i++;
-        //        }
 
         bool foundConnection = false;
         if(json.find(sourceModule) != json.end()){
@@ -384,9 +355,6 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             connections.erase(connections.begin()+i);
         }
     }
-    
-    ofLog() << "After dup conncections " << connections.size() << "connections";
-    
         
     vector<vector<string>> oldConnectionsInfo(connections.size(), vector<string>(4));
     for(int i = 0; i < connections.size(); i++){
@@ -397,6 +365,18 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
 
     }
     
+    
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->loadPresetBeforeConnections(presetFolderPath);
+        }
+    }
+    
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->loadPresetBeforeConnections(presetFolderPath);
+        }
+    }
     
 
     for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
@@ -421,8 +401,6 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             }
         }
     }
-    
-    ofLog() << "After creation " << connections.size() << "connections";
     
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){

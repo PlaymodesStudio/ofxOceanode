@@ -61,6 +61,7 @@ public:
     
     virtual void presetWillBeLoaded(){};
     virtual void presetHasLoaded(){};
+    virtual void loadBeforeConnections(ofJson &json){};
     
     ofColor getColor(){return color;};
     
