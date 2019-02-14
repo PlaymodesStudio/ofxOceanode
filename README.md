@@ -123,6 +123,19 @@ Version history
 * Connection replace instead of new one disapearing
 * Fixed phantom connections
 
+### Version 0.8 (14/02/2018)
+* Major: Updated preset load connections, now we remove unused connections and connect new ones, before we were destroying all connections
+* Windows / Linux compatibility fixes
+* New index random modes
+    - 0 : noRandom
+    - 1 : old method with improved non repeating end (only at -1)
+    - -1 : new non repeating method for all the range [0, -1)
+* New preset methods, before connecting, and for persistent custom (see future documentation...)
+* Phasor new mode, with loop disabled, phasor makes one loop when nreset phase received.
+* Phasor now can be multiple, if you connect a vector to beat_div or beat_mult you get a vector of phasors.
+* Fixes for changing presets and not having random values apearing in the middle of the preset change.
+* Updated examples
+
 
 Build Status
 ------------
