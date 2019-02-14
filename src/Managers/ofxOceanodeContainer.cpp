@@ -1017,6 +1017,27 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
         }
     }
     
+    if(!sourceIsDynamic){
+        if(persistentNodes.count(sourceModule) == 1){
+            if(persistentNodes[sourceModule].count(ofToInt(sourceModuleId)) == 0){
+                return nullptr;
+            }
+        }else{
+            return nullptr;
+        }
+    }
+    
+    if(!sinkIsDynamic){
+        if(persistentNodes.count(sinkModule) == 1){
+            if(persistentNodes[sinkModule].count(ofToInt(sinkModuleId)) == 0){
+                return nullptr;
+            }
+        }else{
+            return nullptr;
+        }
+    }
+    
+    
     
     auto &sourceModuleRef = sourceIsDynamic ? dynamicNodes[sourceModule][ofToInt(sourceModuleId)] : persistentNodes[sourceModule][ofToInt(sourceModuleId)];
     auto &sinkModuleRef = sinkIsDynamic ? dynamicNodes[sinkModule][ofToInt(sinkModuleId)] : persistentNodes[sinkModule][ofToInt(sinkModuleId)];
