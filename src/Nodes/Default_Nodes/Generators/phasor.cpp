@@ -30,7 +30,7 @@ phasor::phasor() : ofxOceanodeNodeModel("Phasor")
 
     addParameterToGroupAndInfo(bpm_Param.set("BPM", 120, 0, 999)).isSavePreset = false;
     parameters->add(beatsDiv_Param.set("Beats Div", {2}, {1}, {512}));
-    parameters->add(beatsMult_Param.set("Beats Mult", {1}, {1}, {512}));
+    parameters->add(beatsMult_Param.set("Beats Mult", {1}, {0}, {512}));
     parameters->add(initPhase_Param.set("Initial Phase", 0, 0, 1));
     parameters->add(resetPhase_Param.set("Reset Phase"));
     parameters->add(loop_Param.set("Loop", true));

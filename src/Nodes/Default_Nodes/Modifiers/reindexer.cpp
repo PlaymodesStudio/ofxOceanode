@@ -47,8 +47,8 @@ void reindexer::presetRecallAfterSettingParameters(ofJson &json){
         }
         reindexGrid = matrixCopy;
         reindexChanged();
-        vector<float> tempInput = input.get();
-        inputListener(tempInput);
+//        vector<float> tempInput = input.get();
+//        inputListener(tempInput);
     }
 }
 

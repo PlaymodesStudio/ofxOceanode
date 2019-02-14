@@ -12,6 +12,7 @@
 ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
     this->registerModel<oscillator>("Generators");
     this->registerModel<phasor>("Generators");
+    this->registerModel<simpleNumberGenerator>("Generators");
     this->registerModel<mapper>("Modifiers");
     this->registerModel<ranger>("Modifiers");
     this->registerModel<oscillatorBank>("Generators");

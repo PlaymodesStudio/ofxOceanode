@@ -10,6 +10,23 @@
 #include "ofxOceanodeNodeModel.h"
 #include "basePhasor.h"
 
+class simpleNumberGenerator : public ofxOceanodeNodeModel{
+public:
+    simpleNumberGenerator() : ofxOceanodeNodeModel("Simple Number Generator"){};
+    ~simpleNumberGenerator(){};
+    
+    void setup(){
+        parameters->add(value.set("Value", 0, 0, 1));
+    }
+    
+    void update(ofEventArgs &a){
+        value = value;
+    }
+    
+private:
+    ofParameter<float> value;
+};
+
 class phasor : public ofxOceanodeNodeModel{
 public:
     phasor();
