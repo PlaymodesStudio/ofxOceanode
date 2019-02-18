@@ -13,15 +13,19 @@
 
 baseOscillator::baseOscillator(){
     oldPhasor = 0;
-    oldValuePreMod = 0;
     indexNormalized = 0;
-    pastRandom = ofRandom(1);
-    newRandom = ofRandom(1);
 #ifdef OFXOCEANODE_USE_RANDOMSEED
     seed = 0;
     std::random_device rd;
     mt.seed(rd());
     dist = std::uniform_real_distribution<float>(0.0, 1.0);
+    oldValuePreMod = dist(mt);
+    pastRandom = dist(mt);
+    newRandom = dist(mt);
+#else
+    oldValuePreMod = ofRandom(1);
+    pastRandom = ofRandom(1);
+    newRandom = ofRandom(1);
 #endif
 }
 
