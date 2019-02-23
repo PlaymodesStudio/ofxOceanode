@@ -56,8 +56,8 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
         }
         if(foundBank == true){
             loadBank();
-            if(presetsList->get(presetInfo[1]) != nullptr)
-               changePresetLabelHighliht(presetsList->get(presetInfo[1]));
+            if(presetsList->getItemByName(presetInfo[1]) != nullptr)
+               changePresetLabelHighliht(presetsList->getItemByName(presetInfo[1]));
                loadPreset(presetInfo[1], presetInfo[0]);
         }
     });
@@ -82,7 +82,7 @@ void ofxOceanodePresetsController::draw(){
 void ofxOceanodePresetsController::update(){
     if(loadPresetInNextUpdate != 0){
         if(currentBankPresets.count(loadPresetInNextUpdate) > 0){
-            changePresetLabelHighliht(presetsList->get(currentBankPresets[loadPresetInNextUpdate]));
+            changePresetLabelHighliht(presetsList->getItemByName(currentBankPresets[loadPresetInNextUpdate]));
             loadPreset(currentBankPresets[loadPresetInNextUpdate], bankSelect->getSelected()->getName());
         }
         loadPresetInNextUpdate = 0;
@@ -122,7 +122,7 @@ void ofxOceanodePresetsController::onGuiTextInputEvent(ofxDatGuiTextInputEvent e
         string newPresetName;
         int newPresetNum;
         if(presetsList->getNumItems() != 0){
-            string lastPreset = presetsList->get(presetsList->getNumItems()-1)->getName();
+            string lastPreset = presetsList->getItemAtIndex(presetsList->getNumItems()-1)->getName();
             newPresetNum = ofToInt(ofSplitString(lastPreset, "--")[0]) + 1;
             newPresetName = ofToString(newPresetNum) + "--" + e.text;
         }else
@@ -131,7 +131,7 @@ void ofxOceanodePresetsController::onGuiTextInputEvent(ofxDatGuiTextInputEvent e
         ofStringReplace(newPresetName, " ", "_"); 
         presetsList->add(newPresetName);
         currentBankPresets[newPresetNum] = newPresetName;
-        changePresetLabelHighliht(presetsList->get(presetsList->getNumItems()-1));
+        changePresetLabelHighliht(presetsList->getItemAtIndex(presetsList->getNumItems()-1));
         savePreset(newPresetName, bankSelect->getSelected()->getName());
         currentPreset = newPresetName;
         e.text = "";

@@ -20,7 +20,7 @@ Just drop the folder into the `openFrameworks/addons/` folder.
 
 Dependencies
 ------------
-[ofxDatGui_PM/of_master_brach](https://github.com/PlaymodesStudio/ofxDatGui_PM/tree/of_master_branch)
+[ofxDatGui_PM](https://github.com/PlaymodesStudio/ofxDatGui_PM)
 
 Use
 ------------
