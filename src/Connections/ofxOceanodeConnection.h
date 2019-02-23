@@ -218,6 +218,73 @@ private:
     ofParameter<T>&  sinkParameter;
 };
 
+template<>
+class ofxOceanodeConnection<void, void>: public ofxOceanodeAbstractConnection{
+public:
+    ofxOceanodeConnection(ofParameter<void>& pSource, ofParameter<void>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+        linkParameters();
+    }
+    ~ofxOceanodeConnection(){
+        ofNotifyEvent(destroyConnection);
+    };
+    
+private:
+    void linkParameters(){
+        parameterEventListener = sourceParameter.newListener([&](){
+            sinkParameter.trigger();
+        });
+    }
+    
+    ofEventListener parameterEventListener;
+    ofParameter<void>& sourceParameter;
+    ofParameter<void>&  sinkParameter;
+};
+
+template<>
+class ofxOceanodeConnection<void, bool>: public ofxOceanodeAbstractConnection{
+public:
+    ofxOceanodeConnection(ofParameter<void>& pSource, ofParameter<bool>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+        linkParameters();
+    }
+    ~ofxOceanodeConnection(){
+        ofNotifyEvent(destroyConnection);
+    };
+    
+private:
+    void linkParameters(){
+        parameterEventListener = sourceParameter.newListener([&](){
+            sinkParameter = !sinkParameter;
+        });
+    }
+    
+    ofEventListener parameterEventListener;
+    ofParameter<void>& sourceParameter;
+    ofParameter<bool>&  sinkParameter;
+};
+
+template<>
+class ofxOceanodeConnection<float, bool>: public ofxOceanodeAbstractConnection{
+public:
+    ofxOceanodeConnection(ofParameter<float>& pSource, ofParameter<bool>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+        linkParameters();
+    }
+    ~ofxOceanodeConnection(){
+        ofNotifyEvent(destroyConnection);
+    };
+    
+private:
+    void linkParameters(){
+        parameterEventListener = sourceParameter.newListener([&](float &f){
+            bool newValue = (f > ((sourceParameter.getMax() - sourceParameter.getMin())/2.0 + sourceParameter.getMin())) ? true : false;
+            if(newValue != sinkParameter) sinkParameter = newValue;
+        });
+    }
+    
+    ofEventListener parameterEventListener;
+    ofParameter<float>& sourceParameter;
+    ofParameter<bool>&  sinkParameter;
+};
+
 
 
 #endif /* ofxOceanodeConnection_h */
