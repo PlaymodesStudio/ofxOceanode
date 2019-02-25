@@ -98,6 +98,7 @@ ofxOceanodeNode* ofxOceanodeContainer::createNodeFromName(string name, int ident
 #ifndef OFXOCEANODE_HEADLESS
         node.getNodeGui().setTransformationMatrix(&transformationMatrix);
 #endif
+        return &node;
     }
     return nullptr;
 }
