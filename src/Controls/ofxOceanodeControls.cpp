@@ -5,6 +5,8 @@
 //  Created by Eduard Frigola Bagué on 12/03/2018.
 //
 
+#ifndef OFXOCEANODE_HEADLESS
+
 #include "ofxOceanodeControls.h"
 #include "ofxOceanodePresetsController.h"
 #include "ofxOceanodeBPMController.h"
@@ -123,3 +125,5 @@ void ofxOceanodeControls::resizeButtons(){
         controllersButtons[i].setSize(itemSize, 30);
     }
 }
+
+#endif

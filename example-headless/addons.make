@@ -1,2 +1,1 @@
-ofxDatGui_PM
 ofxOceanode

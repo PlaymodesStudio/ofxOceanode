@@ -9,8 +9,10 @@
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeNodeModel.h"
-#include "ofxOceanodeNodeGui.h"
 #include "ofxOceanodeConnection.h"
+#ifndef OFXOCEANODE_HEADLESS
+#include "ofxOceanodeNodeGui.h"
+#endif
 
 ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){
     nodeModelListeners.push(nodeModel->disconnectConnectionsForParameter.newListener([&](string &parameter){
@@ -33,6 +35,7 @@ void ofxOceanodeNode::setup(){
     nodeModel->setup();
 }
 
+#ifndef OFXOCEANODE_HEADLESS
 void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     nodeGui = std::move(gui);
     toChangeGuiListeners.push(nodeModel->parameterChangedMinMax.newListener(nodeGui.get(), &ofxOceanodeNodeGui::updateGuiForParameter));
@@ -42,8 +45,8 @@ void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
 
 ofxOceanodeNodeGui& ofxOceanodeNode::getNodeGui(){
     return *nodeGui.get();
-    
 }
+#endif
 
 ofxOceanodeNodeModel& ofxOceanodeNode::getNodeModel(){
     return *nodeModel.get();
@@ -221,6 +224,7 @@ void ofxOceanodeNode::collapseConnections(glm::vec2 sinkPos, glm::vec2 sourcePos
     }
 }
 
+#ifndef OFXOCEANODE_HEADLESS
 void ofxOceanodeNode::expandConnections(){
     for(auto c : inConnections){
         c->setSinkPosition(nodeGui->getSinkConnectionPositionFromParameter(c->getSinkParameter()));
@@ -229,6 +233,7 @@ void ofxOceanodeNode::expandConnections(){
         c->setSourcePosition(nodeGui->getSourceConnectionPositionFromParameter(c->getSourceParameter()));
     }
 }
+#endif
 
 void ofxOceanodeNode::setInConnectionsPositionForParameter(ofAbstractParameter &p, glm::vec2 pos){
     for(auto c : inConnections){
@@ -266,9 +271,11 @@ void ofxOceanodeNode::deleteSelf(){
 }
 
 void ofxOceanodeNode::duplicateSelf(glm::vec2 posToDuplicate){
+#ifndef OFXOCEANODE_HEADLESS
     if(posToDuplicate == glm::vec2(-1, -1)){
         posToDuplicate = toGlm(nodeGui->getPosition() + ofPoint(10, 10));
     }
+#endif
     saveConfig("tempDuplicateGroup.json");
     ofNotifyEvent(duplicateModule, posToDuplicate);
 }

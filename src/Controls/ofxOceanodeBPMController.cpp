@@ -5,6 +5,8 @@
 //  Created by Eduard Frigola Bagué on 13/03/2018.
 //
 
+#ifndef OFXOCEANODE_HEADLESS
+
 #include "ofxOceanodeBPMController.h"
 #include "ofxOceanodeContainer.h"
 #include <numeric>
@@ -103,3 +105,5 @@ void ofxOceanodeBPMController::onButtonPress(ofxDatGuiButtonEvent e){
         container->resetPhase();
     }
 }
+
+#endif

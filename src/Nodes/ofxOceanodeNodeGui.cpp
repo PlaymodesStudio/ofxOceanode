@@ -5,6 +5,8 @@
 //  Created by Eduard Frigola Bagué on 22/02/2018.
 //
 
+#ifndef OFXOCEANODE_HEADLESS
+
 #include "ofxOceanodeNodeGui.h"
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeContainer.h"
@@ -406,3 +408,5 @@ void ofxOceanodeNodeGui::setTransformationMatrix(ofParameter<glm::mat4> *mat){
         gui->setTransformMatrix(ofMatrix4x4(transformationMatrix->get()));
     });
 }
+
+#endif

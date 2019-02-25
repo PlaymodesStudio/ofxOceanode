@@ -11,7 +11,9 @@
 
 #include "ofxOceanodeConnection.h"
 #include "ofxOceanodeNode.h"
+#ifndef OFXOCEANODE_HEADLESS
 #include "ofxOceanodeNodeGui.h"
+#endif
 
 class ofxOceanodeNodeModel;
 class ofxOceanodeNodeRegistry;
@@ -35,7 +37,7 @@ public:
     
     ofxOceanodeContainer(std::shared_ptr<ofxOceanodeNodeRegistry> _registry =
                          make_shared<ofxOceanodeNodeRegistry>(), std::shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry =
-                         make_shared<ofxOceanodeTypesRegistry>(), bool _isHeadless = false);
+                         make_shared<ofxOceanodeTypesRegistry>());
     ~ofxOceanodeContainer();
     
     ofxOceanodeNode* createNodeFromName(string name, int identifier = -1, bool isPersistent = false);
@@ -66,10 +68,10 @@ public:
     ofxOceanodeAbstractConnection* connectConnection(ofParameter<Tsource>& source, ofParameter<Tsink>& sink){
         connections.push_back(make_pair(temporalConnectionNode, make_shared<ofxOceanodeConnection<Tsource, Tsink>>(source, sink)));
         temporalConnectionNode->addOutputConnection(connections.back().second.get());
-        if(!isHeadless){
-            connections.back().second->setSourcePosition(temporalConnectionNode->getNodeGui().getSourceConnectionPositionFromParameter(source));
-            connections.back().second->getGraphics().subscribeToDrawEvent(window);
-        }
+#ifndef OFXOCEANODE_HEADLESS
+        connections.back().second->setSourcePosition(temporalConnectionNode->getNodeGui().getSourceConnectionPositionFromParameter(source));
+        connections.back().second->getGraphics().subscribeToDrawEvent(window);
+#endif
         return connections.back().second.get();
     }
     ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter);
@@ -141,7 +143,6 @@ private:
     float bpm;
     float phase;
     
-    const bool isHeadless;
     bool collapseAll;
     
 #ifdef OFXOCEANODE_USE_OSC

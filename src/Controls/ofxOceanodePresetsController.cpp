@@ -5,6 +5,8 @@
 //  Created by Eduard Frigola Bagué on 12/03/2018.
 //
 
+#ifndef OFXOCEANODE_HEADLESS
+
 #include "ofxOceanodePresetsController.h"
 #include "ofxOceanodeContainer.h"
 
@@ -191,3 +193,5 @@ void ofxOceanodePresetsController::loadPreset(string name, string bank){
 void ofxOceanodePresetsController::savePreset(string name, string bank){
     container->savePreset("Presets/" + bank + "/" + name);
 }
+
+#endif

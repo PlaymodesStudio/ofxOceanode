@@ -5,6 +5,8 @@
 //  Created by Eduard Frigola Bagué on 12/03/2018.
 //
 
+#ifndef OFXOCEANODE_HEADLESS
+
 #include "ofxOceanodeBaseController.h"
 
 ofxOceanodeBaseController::ofxOceanodeBaseController(shared_ptr<ofxOceanodeContainer> _container, string name) : container(_container), controllerName(name){
@@ -70,3 +72,5 @@ void ofxOceanodeBaseController::windowResized(ofResizeEventArgs &a){
     gui->setTheme(mainGuiTheme);
     gui->setWidth(ofGetWidth());
 }
+
+#endif

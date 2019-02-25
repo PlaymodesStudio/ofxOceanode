@@ -9,10 +9,12 @@
 #ifndef ofxOceanode_h
 #define ofxOceanode_h
 
+#ifndef OFXOCEANODE_HEADLESS
 #include "ofxOceanodeCanvas.h"
+#include "ofxOceanodeControls.h"
+#endif
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeNode.h"
-#include "ofxOceanodeControls.h"
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeTypesRegistry.h"
 

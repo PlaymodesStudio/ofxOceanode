@@ -6,6 +6,8 @@
 //
 //
 
+#ifndef OFXOCEANODE_HEADLESS
+
 #include "ofxOceanodeCanvas.h"
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeContainer.h"
@@ -156,3 +158,5 @@ glm::vec3 ofxOceanodeCanvas::getMatrixScale(const glm::mat4 &m){
 glm::mat4 ofxOceanodeCanvas::translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector){
     return glm::translate(glm::mat4(), translationVector) * m;
 }
+
+#endif

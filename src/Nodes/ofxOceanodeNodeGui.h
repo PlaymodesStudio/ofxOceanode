@@ -8,6 +8,8 @@
 #ifndef ofxOceanodeNodeGui_h
 #define ofxOceanodeNodeGui_h
 
+#ifndef OFXOCEANODE_HEADLESS
+
 #include "ofxDatGui.h"
 
 class ofxOceanodeContainer;
@@ -84,5 +86,7 @@ private:
     
     ofParameter<glm::mat4> *transformationMatrix;
 };
+
+#endif
 
 #endif /* ofxOceanodeNodeGui_h */

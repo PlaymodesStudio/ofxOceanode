@@ -9,6 +9,8 @@
 #ifndef ofxOceanodeCanvas_h
 #define ofxOceanodeCanvas_h
 
+#ifndef OFXOCEANODE_HEADLESS
+
 #include "ofMain.h"
 #include "ofxDatGui.h"
 
@@ -57,5 +59,7 @@ private:
     
     ofEventListener changedTransformationMatrix;
 };
+
+#endif
 
 #endif /* ofxOceanodeCanvas_h */

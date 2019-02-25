@@ -22,9 +22,12 @@ public:
     ~ofxOceanodeNode();
     
     void setup();
-    void setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui);
     
+#ifndef OFXOCEANODE_HEADLESS
+    void setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui);
     ofxOceanodeNodeGui& getNodeGui();
+#endif
+    
     ofxOceanodeNodeModel& getNodeModel();
     
     ofColor getColor();
@@ -79,7 +82,9 @@ public:
     ofParameterGroup* getParameters();
 private:
     std::unique_ptr<ofxOceanodeNodeModel> nodeModel;
+#ifndef OFXOCEANODE_HEADLESS
     std::unique_ptr<ofxOceanodeNodeGui> nodeGui;
+#endif
     
     std::vector<ofxOceanodeAbstractConnection*> inConnections;
     std::vector<ofxOceanodeAbstractConnection*> outConnections;
