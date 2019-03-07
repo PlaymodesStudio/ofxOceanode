@@ -88,7 +88,7 @@
 #
 #   Note: Leave a leading space when adding list items with the += operator
 ################################################################################
-# PROJECT_DEFINES = 
+PROJECT_DEFINES = OFXOCEANODE_HEADLESS
 
 ################################################################################
 # PROJECT CFLAGS
