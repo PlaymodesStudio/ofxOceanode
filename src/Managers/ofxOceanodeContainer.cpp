@@ -20,6 +20,8 @@
 
 
 ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry, shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry) : registry(_registry), typesRegistry(_typesRegistry){
+    if(registry == nullptr) registry = make_shared<ofxOceanodeNodeRegistry>();
+    if(typesRegistry == nullptr) typesRegistry = make_shared<ofxOceanodeTypesRegistry>();
     window = ofGetCurrentWindow();
     transformationMatrix = glm::mat4(1);
     temporalConnection = nullptr;

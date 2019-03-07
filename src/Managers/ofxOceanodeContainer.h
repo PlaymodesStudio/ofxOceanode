@@ -35,9 +35,7 @@ class ofxOceanodeContainer {
 public:
     using nodeContainerWithId = std::unordered_map<int, unique_ptr<ofxOceanodeNode>>;
     
-    ofxOceanodeContainer(std::shared_ptr<ofxOceanodeNodeRegistry> _registry =
-                         make_shared<ofxOceanodeNodeRegistry>(), std::shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry =
-                         make_shared<ofxOceanodeTypesRegistry>());
+    ofxOceanodeContainer(std::shared_ptr<ofxOceanodeNodeRegistry> _registry = nullptr, std::shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry = nullptr);
     ~ofxOceanodeContainer();
     
     ofxOceanodeNode* createNodeFromName(string name, int identifier = -1, bool isPersistent = false);
