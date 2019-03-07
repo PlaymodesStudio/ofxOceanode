@@ -41,6 +41,7 @@ void ofxOceanodeNodeModelExternalWindow::setExternalWindowFullScreen(bool b)
 
 
 void ofxOceanodeNodeModelExternalWindow::showExternalWindow(bool &b){
+#ifndef OFXOCEANODE_HEADLESS
     if(b && externalWindow == nullptr){
         ofGLFWWindowSettings prevSettings;
         if(externalWindowRect.getPosition() == glm::vec3(-1, -1, 0)){
@@ -78,6 +79,7 @@ void ofxOceanodeNodeModelExternalWindow::showExternalWindow(bool &b){
         externalWindow->setWindowShouldClose();
         externalWindow = nullptr;
     }
+#endif
 }
 
 void ofxOceanodeNodeModelExternalWindow::windowResizedOwnEvent(ofResizeEventArgs &a){
