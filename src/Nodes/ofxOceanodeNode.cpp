@@ -311,7 +311,7 @@ void ofxOceanodeNode::loadPresetBeforeConnections(string presetFolderPath){
     ofJson json = ofLoadJson(escapedFilename);
     if(json.empty()) json = ofLoadJson(filename);
     
-    if(json.empty()) return false;
+    if(json.empty()) return;
     
     nodeModel->loadBeforeConnections(json);
 }
