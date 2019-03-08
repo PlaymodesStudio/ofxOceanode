@@ -58,16 +58,16 @@ float baseOscillator::computeFunc(float phasor){
     
     
     if(skew_Param < 0){
-        if(w < M_PI+((abs(skew_Param))*M_PI))
-            skewedW = ofMap(w, 0.0, M_PI+((abs(skew_Param))*M_PI), 0.0, M_PI, true);
+        if(w < M_PI+((fabs(skew_Param))*M_PI))
+            skewedW = ofMap(w, 0.0, M_PI+((fabs(skew_Param))*M_PI), 0.0, M_PI, true);
         else
-            skewedW = ofMap(w, M_PI+((abs(skew_Param))*M_PI), 2.0*M_PI, M_PI, 2.0*M_PI, true);
+            skewedW = ofMap(w, M_PI+((fabs(skew_Param))*M_PI), 2.0*M_PI, M_PI, 2.0*M_PI, true);
     }
     else if(skew_Param > 0){
-        if(w > ((1-abs(skew_Param))*M_PI))
-            skewedW = ofMap(w, (1-abs(skew_Param))*M_PI, 2.0*M_PI, M_PI, 2.0*M_PI, true);
+        if(w > ((1-fabs(skew_Param))*M_PI))
+            skewedW = ofMap(w, (1-fabs(skew_Param))*M_PI, 2.0*M_PI, M_PI, 2.0*M_PI, true);
         else
-            skewedW = ofMap(w, 0, ((1-abs(skew_Param))*M_PI), 0.0, M_PI, true);
+            skewedW = ofMap(w, 0, ((1-fabs(skew_Param))*M_PI), 0.0, M_PI, true);
     }
     
     w = skewedW;
@@ -175,7 +175,7 @@ void baseOscillator::computeMultiplyMod(float &value){
     if(biPow_Param != 0){
         value = ofMap(value, 0.0, 1.0, -1.0, 1.0);
         if(value < 0)
-            value = -((biPow_Param < 0) ? pow(abs(value), 1/(float)(-biPow_Param+1)) : pow(abs(value), biPow_Param+1));
+            value = -((biPow_Param < 0) ? pow(fabs(value), 1/(float)(-biPow_Param+1)) : pow(fabs(value), biPow_Param+1));
         else
             value = (biPow_Param < 0) ? pow(value, 1/(float)(-biPow_Param+1)) : pow(value, biPow_Param+1);
         value = ofMap(value, -1.0, 1.0, 0.0, 1.0);
