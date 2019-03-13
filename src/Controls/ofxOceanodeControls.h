@@ -37,6 +37,7 @@ public:
                 return dynamic_pointer_cast<T>(c);
             }
         }
+        return nullptr;
     }
     
     void resizeButtons();
