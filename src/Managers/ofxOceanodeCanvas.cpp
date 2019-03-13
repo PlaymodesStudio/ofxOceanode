@@ -92,7 +92,11 @@ void ofxOceanodeCanvas::mouseDragged(ofMouseEventArgs &e){
 
 void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
     glm::vec2 transformedPos = screenToCanvas(e);
+#ifdef TARGET_OSX
     if(ofGetKeyPressed(OF_KEY_COMMAND)){
+#else
+    if(ofGetKeyPressed(OF_KEY_CONTROL)){
+#endif
         if(e.button == 0){
             popUpMenu->setPosition(e.x, e.y);
             popUpMenu->setVisible(true);
@@ -120,7 +124,11 @@ void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
 
 void ofxOceanodeCanvas::mouseScrolled(ofMouseEventArgs &e){
     glm::vec2 transformedPos = canvasToScreen(e);
+#ifdef TARGET_OSX
     if(ofGetKeyPressed(OF_KEY_COMMAND)){
+#else
+    if(ofGetKeyPressed(OF_KEY_CONTROL)){
+#endif
         float scrollValue = e.scrollY/100.0;
         transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(transformedPos, 0) * getMatrixScale(transformationMatrix->get()) * scrollValue));
         transformationMatrix->set(glm::scale(transformationMatrix->get(), glm::vec3(1-(scrollValue), 1-(scrollValue), 1)));

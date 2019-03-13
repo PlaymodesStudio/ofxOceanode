@@ -190,7 +190,11 @@ void reindexer::keyPressed(ofKeyEventArgs &a){
     }else if(a.key == 'r'){
         reindexGrid = identityReindexMatrix;
         reindexChanged();
+#ifdef TARGET_OSX
     }else if(a.key == 'z' &&  ofGetKeyPressed(OF_KEY_COMMAND)){
+#else
+    }else if(a.key == 'z' &&  ofGetKeyPressed(OF_KEY_CONTROL)){
+#endif
         if(identityStore.size() > 1){
             reindexGrid = identityStore[1];
             identityStore.pop_front();
