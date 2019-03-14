@@ -35,8 +35,14 @@ void ofxOceanodeNodeModelExternalWindow::setExternalWindowShape(int w, int h)
 }
 void ofxOceanodeNodeModelExternalWindow::setExternalWindowFullScreen(bool b)
 {
-    if(b && (externalWindow != nullptr)) externalWindow->setFullscreen(b);
+    if((externalWindow != nullptr)) externalWindow->setFullscreen(b);
 }
+
+void ofxOceanodeNodeModelExternalWindow::toggleFullscreen()
+{
+    if(externalWindow != nullptr) externalWindow->toggleFullscreen();
+}
+
 
 
 

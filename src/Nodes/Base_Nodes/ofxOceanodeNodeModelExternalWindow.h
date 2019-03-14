@@ -21,6 +21,7 @@ public:
     void setExternalWindowPosition(int px, int py);
     void setExternalWindowShape(int w, int h);
     void setExternalWindowFullScreen(bool b);
+    void toggleFullscreen();
     void setShowWindow(bool b){
         showWindow = b;
     }
