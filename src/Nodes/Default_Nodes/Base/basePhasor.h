@@ -15,11 +15,44 @@ public:
     basePhasor();
     ~basePhasor();
     
-    float    bpm_Param;
-    vector<float>    beatsMult_Param;
-    vector<float>    beatsDiv_Param;
-    float  initPhase_Param;
-    bool   loop_Param;
+    void setBpm(float bpm){
+        bpm_Param = bpm;
+        bpm_Param_channel.send(bpm_Param);
+    }
+    
+    void setBeatsMult(vector<float> beatsMult){
+        beatsMult_Param = beatsMult;
+        beatsMult_Param_channel.send(beatsMult_Param);
+        checkChangedSize();
+    }
+    
+    void setBeatsDiv(vector<float> beatsDiv){
+        beatsDiv_Param = beatsDiv;
+        beatsDiv_Param_channel.send(beatsDiv_Param);
+        checkChangedSize();
+    }
+    
+    void setBeatsMult(float beatsMult){
+        beatsMult_Param = vector<float>(1, beatsMult);
+        beatsMult_Param_channel.send(beatsMult_Param);
+        checkChangedSize();
+    }
+    
+    void setBeatsDiv(float beatsDiv){
+        beatsDiv_Param = vector<float>(1, beatsDiv);
+        beatsDiv_Param_channel.send(beatsDiv_Param);
+        checkChangedSize();
+    }
+    
+    void setInitPhase(float initPhase){
+        initPhase_Param = initPhase;
+        initPhase_Param_channel.send(initPhase_Param);
+    }
+    
+    void setLoop(float loop){
+        loop_Param = loop;
+        loop_Param_channel.send(loop_Param);
+    }
 
     vector<float> getPhasors();
     float getPhasor(){
@@ -69,6 +102,25 @@ private:
     ofThreadChannel<vector<double>> phasorToSend;
     vector<double> momentaryPhasor;
     vector<bool> stopPhasor;
+    
+    
+    float    bpm_Param;
+    vector<float>    beatsMult_Param;
+    vector<float>    beatsDiv_Param;
+    float  initPhase_Param;
+    bool   loop_Param;
+    
+    ofThreadChannel<float>    bpm_Param_channel;
+    ofThreadChannel<vector<float>>    beatsMult_Param_channel;
+    ofThreadChannel<vector<float>>    beatsDiv_Param_channel;
+    ofThreadChannel<float>  initPhase_Param_channel;
+    ofThreadChannel<bool>   loop_Param_channel;
+    
+    float    bpm_Param_inThread;
+    vector<float>    beatsMult_Param_inThread;
+    vector<float>    beatsDiv_Param_inThread;
+    float  initPhase_Param_inThread;
+    bool   loop_Param_inThread;
 };
 
 #endif /* basePhasor_h */

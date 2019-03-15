@@ -20,6 +20,11 @@ basePhasor::basePhasor(){
     beatsDiv_Param = vector<float>(1, 1);
     initPhase_Param = 0;
     loop_Param = true;
+    bpm_Param_inThread = 120.00;
+    beatsMult_Param_inThread = vector<float>(1, 1);
+    beatsDiv_Param_inThread = vector<float>(1, 1);
+    initPhase_Param_inThread = 0;
+    loop_Param_inThread = true;
     numPhasors = 1;
     stopPhasor = vector<bool>(1, false);
 }
@@ -43,11 +48,16 @@ void basePhasor::resetPhasor(){
 void basePhasor::threadedFunction(){
     while(isThreadRunning()){
         timer.waitNext();
+        bpm_Param_channel.tryReceive(bpm_Param_inThread);
+        beatsMult_Param_channel.tryReceive(beatsMult_Param_inThread);
+        beatsDiv_Param_channel.tryReceive(beatsDiv_Param_inThread);
+        initPhase_Param_channel.tryReceive(initPhase_Param_inThread);
+        loop_Param_channel.tryReceive(loop_Param_inThread);
         for(int i = 0; i < numPhasors; i++){
             //tue phasor that goes from 0 to 1 at desired frequency
-            double freq = (double)bpm_Param/(double)60;
-            freq = freq * (double)getValueForIndex(beatsMult_Param, i);
-            freq = (double)freq / (double)getValueForIndex(beatsDiv_Param, i);
+            double freq = (double)bpm_Param_inThread/(double)60;
+            freq = freq * (double)getValueForIndex(beatsMult_Param_inThread, i);
+            freq = (double)freq / (double)getValueForIndex(beatsDiv_Param_inThread, i);
             double increment = (1.0f/(double)((double)(1000.0)/(double)freq));
             
             phasor[i] = phasor[i] + increment;
@@ -56,11 +66,11 @@ void basePhasor::threadedFunction(){
             }
             if(phasor[i] >= 1){
                 ofNotifyEvent(phasorCycleIndex, i);
-                if(!loop_Param){
+                if(!loop_Param_inThread){
                     stopPhasor[i] = true;
                 }
             }
-            if(loop_Param){
+            if(loop_Param_inThread){
                 stopPhasor[i] = false;
             }
             
@@ -72,7 +82,7 @@ void basePhasor::threadedFunction(){
             phasorMod[i] = phasor[i];
             
             //take the initPhase_Param as a phase offset param
-            phasorMod[i] += initPhase_Param;
+            phasorMod[i] += initPhase_Param_inThread;
             phasorMod[i] -= (int)phasorMod[i];
         }
         

@@ -11,21 +11,19 @@ phasor::phasor() : ofxOceanodeNodeModel("Phasor")
     phaseOffset = 0;
     color = ofColor::red;
     parameterAutoSettersListeners.push(bpm_Param.newListener([&](float &val){
-        basePh.bpm_Param = val;
+        basePh.setBpm(val);
     }));
     parameterAutoSettersListeners.push(initPhase_Param.newListener([&](float &val){
-        basePh.initPhase_Param = val+phaseOffset - int(val+phaseOffset);
+        basePh.setInitPhase(val+phaseOffset - int(val+phaseOffset));
     }));
     parameterAutoSettersListeners.push(beatsMult_Param.newListener([&](vector<float> &val){
-        basePh.beatsMult_Param = val;
-        basePh.checkChangedSize();
+        basePh.setBeatsMult(val);
     }));
     parameterAutoSettersListeners.push(beatsDiv_Param.newListener([&](vector<float> &val){
-        basePh.beatsDiv_Param = val;
-        basePh.checkChangedSize();
+        basePh.setBeatsDiv(val);
     }));
     parameterAutoSettersListeners.push(loop_Param.newListener([&](bool &val){
-        basePh.loop_Param = val;
+        basePh.setLoop(val);
     }));
 
     addParameterToGroupAndInfo(bpm_Param.set("BPM", 120, 0, 999)).isSavePreset = false;
@@ -48,6 +46,6 @@ void phasor::update(ofEventArgs &e)
 
 void phasor::setPhase(float _phase){
     phaseOffset = _phase;
-    basePh.initPhase_Param = initPhase_Param + phaseOffset - int(initPhase_Param+phaseOffset);
+    basePh.setInitPhase(initPhase_Param + phaseOffset - int(initPhase_Param+phaseOffset));
 }
 
