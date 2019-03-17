@@ -5,6 +5,7 @@
 //  Created by Eduard Frigola on 09/05/2018.
 //
 
+#ifndef OFXOCEANODE_HEADLESS
 #ifdef OFXOCEANODE_USE_OSC
 
 #include "ofxOceanodeOSCController.h"
@@ -22,4 +23,5 @@ void ofxOceanodeOSCController::onGuiTextInputEvent(ofxDatGuiTextInputEvent e){
     container->setupOscReceiver(ofToInt(portIn->getText()));
 }
 
+#endif
 #endif
