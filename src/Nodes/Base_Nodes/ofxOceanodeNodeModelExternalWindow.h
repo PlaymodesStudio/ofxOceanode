@@ -47,8 +47,10 @@ protected:
     void showExternalWindow(bool &b);
     shared_ptr<ofAppBaseWindow> externalWindow;
     ofRectangle                 externalWindowRect;
+    ofWindowMode                externalWindowMode;
     ofEventListeners            windowListenerEvents;
     ofParameter<bool>           showWindow;
+    ofParameter<bool>           fullscreenWindow;
 };
 
 #endif /* ofxOceanodeNodeModelExternalWindow_h */

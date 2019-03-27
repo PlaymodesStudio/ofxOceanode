@@ -12,10 +12,17 @@ ofxOceanodeNodeModelExternalWindow::ofxOceanodeNodeModelExternalWindow(string na
     info.acceptInConnection = false;
     info.acceptOutConnection = false;
     info.isSavePreset = false;
+    auto &info2 = addParameterToGroupAndInfo(fullscreenWindow.set("Fullscreen", false));
+    info2.acceptInConnection = false;
+    info2.acceptOutConnection = false;
+    info2.isSavePreset = false;
     windowListenerEvents.push(showWindow.newListener(this, &ofxOceanodeNodeModelExternalWindow::showExternalWindow));
+    windowListenerEvents.push(fullscreenWindow.newListener([this](bool &b){
+        if(externalWindow != nullptr) externalWindow->setFullscreen(b);
+    }));
     externalWindowRect.setPosition(-1, -1);
     externalWindow = nullptr;
-    
+    externalWindowMode = OF_WINDOW;
 }
 
 ofxOceanodeNodeModelExternalWindow::~ofxOceanodeNodeModelExternalWindow(){
@@ -58,7 +65,7 @@ void ofxOceanodeNodeModelExternalWindow::showExternalWindow(bool &b){
             prevSettings.setSize(externalWindowRect.width, externalWindowRect.height);
             prevSettings.setPosition(externalWindowRect.position);
         }
-        prevSettings.windowMode = OF_WINDOW;
+        prevSettings.windowMode = fullscreenWindow ? OF_FULLSCREEN : OF_WINDOW;
         prevSettings.resizable = true;
         prevSettings.shareContextWith = ofGetCurrentWindow();
         prevSettings.setGLVersion(ofGetGLRenderer()->getGLVersionMajor(), ofGetGLRenderer()->getGLVersionMinor());
@@ -102,12 +109,17 @@ void ofxOceanodeNodeModelExternalWindow::closeExternalWindow(ofEventArgs &e){
 
 void ofxOceanodeNodeModelExternalWindow::presetSave(ofJson &json){
     json["ExtWindowRect"] = {externalWindowRect.x, externalWindowRect.y, externalWindowRect.width, externalWindowRect.height};
+    json["ExtWindowMode"] = fullscreenWindow ? OF_FULLSCREEN : OF_WINDOW;
 }
 
 void ofxOceanodeNodeModelExternalWindow::presetRecallBeforeSettingParameters(ofJson &json){
     if(json.count("ExtWindowRect") == 1){
         auto infoVec = json["ExtWindowRect"];
         externalWindowRect = ofRectangle(infoVec[0], infoVec[1], infoVec[2], infoVec[3]);
+    }
+    if(json.count("ExtWindowMode") == 1){
+        auto windowMode = json["ExtWindowMode"];
+        fullscreenWindow = windowMode == OF_FULLSCREEN ? true : false;
     }
 }
 
