@@ -356,7 +356,11 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             }
         }
         if(!foundConnection){
-            connections.erase(connections.begin()+i);
+            if(!connections[i].second->getIsPersistent()){
+                connections.erase(connections.begin()+i);
+            }else{
+                i++;
+            }
         }
     }
         
