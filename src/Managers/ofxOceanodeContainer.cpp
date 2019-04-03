@@ -53,6 +53,7 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
 }
 
 ofxOceanodeContainer::~ofxOceanodeContainer(){
+    connections.clear();
     dynamicNodes.clear();
     persistentNodes.clear();
 }
@@ -303,6 +304,26 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             }
         }
     }else{
+        for(auto &pair : dynamicNodes){
+            for(auto &nodes : pair.second){
+                for(int i = 0; i < connections.size();){
+                    auto &connection = connections[i];
+                    string sourceName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];;
+                    string sourceModuleId = ofSplitString(sourceName, "_").back();
+                    sourceName.erase(sourceName.find(sourceModuleId)-1);
+                    ofStringReplace(sourceName, "_", " ");
+                    string sinkName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];;
+                    string sinkModuleId = ofSplitString(sinkName, "_").back();
+                    sinkName.erase(sinkName.find(sinkModuleId)-1);
+                    ofStringReplace(sinkName, "_", " ");
+                    if((sourceName == pair.first && ofToInt(sourceModuleId) == (nodes.first)) || (sinkName == pair.first && ofToInt(sinkModuleId) == (nodes.first))){
+                        connections.erase(connections.begin()+i);
+                    }else{
+                        i++;
+                    }
+                }
+            }
+        }
         dynamicNodes.clear();
     }
     
