@@ -29,7 +29,10 @@ struct parameterInfo{
 class ofxOceanodeNodeModel {
 public:
     ofxOceanodeNodeModel(string _name);
-    virtual ~ofxOceanodeNodeModel(){};
+    virtual ~ofxOceanodeNodeModel(){
+        parameters->clear();
+        delete parameters;
+    };
     
     virtual void setup(){};
     virtual void update(ofEventArgs &e){};
@@ -70,9 +73,9 @@ public:
     const parameterInfo getParameterInfo(ofAbstractParameter& p);
     const parameterInfo getParameterInfo(string parameterName);
     
-    static ofAbstractParameter& createDropdownAbstractParameter(string name, vector<string> options, ofParameter<int> &dropdownSelector){
-        ofParameterGroup *tempDropdown = new ofParameterGroup();
-        tempDropdown->setName(name + " Selector");
+    ofAbstractParameter& createDropdownAbstractParameter(string name, vector<string> options, ofParameter<int> &dropdownSelector){
+        dropdownGroups.emplace_back();
+        dropdownGroups.back().setName(name + " Selector");
         string  tempStr;
         ofParameter<string> tempStrParam("Options");
         for(auto opt : options)
@@ -81,9 +84,9 @@ public:
         tempStr.erase(tempStr.end()-3, tempStr.end());
         tempStrParam.set(tempStr);
         
-        tempDropdown->add(tempStrParam);
-        tempDropdown->add(dropdownSelector.set(name, 0, 0, options.size()-1));
-        return *tempDropdown;
+        dropdownGroups.back().add(tempStrParam);
+        dropdownGroups.back().add(dropdownSelector.set(name, 0, 0, options.size()-1));
+        return dropdownGroups.back();
     }
     
 protected:
@@ -93,6 +96,7 @@ protected:
     ofColor color;
     string nameIdentifier;
     unsigned int numIdentifier;
+    vector<ofParameterGroup> dropdownGroups;
     
 private:
     ofEventListeners eventListeners;

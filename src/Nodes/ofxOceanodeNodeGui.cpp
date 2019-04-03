@@ -115,12 +115,12 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
     gui->addHeader(getParameters()->getName());
     gui->addFooter();
     
-    ofxDatGuiTheme* theme = new ofxDatGuiThemeCharcoal;
+    theme = make_unique<ofxDatGuiThemeCharcoal>();
     theme->color.slider.fill = color;
     theme->color.textInput.text = color;
     theme->color.icons = color;
     theme->layout.width = 290;
-    gui->setTheme(theme, true);
+    gui->setTheme(theme.get(), true);
    
     if(position == glm::vec2(-1, -1)){
         gui->setPosition(0, 0);

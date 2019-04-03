@@ -74,6 +74,7 @@ private:
     ofxOceanodeNode& node;
     
     unique_ptr<ofxDatGui> gui;
+    unique_ptr<ofxDatGuiTheme> theme;
     ofColor color;
     glm::vec2 position;
     
