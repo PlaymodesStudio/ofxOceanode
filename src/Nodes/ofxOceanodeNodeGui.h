@@ -28,7 +28,7 @@ public:
     
     void setPosition(glm::vec2 position);
     
-    ofParameterGroup* getParameters();
+    shared_ptr<ofParameterGroup> getParameters();
     glm::vec2 getPosition();
     void collapse();
     void expand();

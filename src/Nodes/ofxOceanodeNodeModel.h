@@ -29,17 +29,14 @@ struct parameterInfo{
 class ofxOceanodeNodeModel {
 public:
     ofxOceanodeNodeModel(string _name);
-    virtual ~ofxOceanodeNodeModel(){
-        parameters->clear();
-        delete parameters;
-    };
+    virtual ~ofxOceanodeNodeModel(){};
     
     virtual void setup(){};
     virtual void update(ofEventArgs &e){};
     virtual void draw(ofEventArgs &e){};
     
     //get parameterGroup
-    ofParameterGroup* getParameterGroup(){return parameters;};
+    shared_ptr<ofParameterGroup> getParameterGroup(){return parameters;};
     
     //getters
     string nodeName(){return nameIdentifier;};
@@ -90,7 +87,7 @@ public:
     }
     
 protected:
-    ofParameterGroup* parameters;
+    shared_ptr<ofParameterGroup> parameters;
     std::map<string, parameterInfo> parametersInfo; //information about interaction of parameter
     bool autoBPM;
     ofColor color;

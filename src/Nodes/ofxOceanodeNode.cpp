@@ -470,6 +470,6 @@ bool ofxOceanodeNode::checkHasInConnection(ofAbstractParameter &p){
 }
 
 
-ofParameterGroup* ofxOceanodeNode::getParameters(){
+shared_ptr<ofParameterGroup> ofxOceanodeNode::getParameters(){
     return nodeModel->getParameterGroup();
 }

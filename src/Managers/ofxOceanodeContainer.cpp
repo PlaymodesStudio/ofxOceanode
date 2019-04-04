@@ -843,7 +843,7 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
             }else if(splitAddress[0] == "Global"){
                 for(auto &nodeType  : dynamicNodes){
                     for(auto &node : nodeType.second){
-                        ofParameterGroup* groupParam = node.second->getParameters();
+                        shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
                         if(groupParam->contains(splitAddress[1])){
                             ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
                             setParameterFromMidiMessage(absParam, m);
@@ -852,7 +852,7 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                 }
                 for(auto &nodeType  : persistentNodes){
                     for(auto &node : nodeType.second){
-                        ofParameterGroup* groupParam = node.second->getParameters();
+                        shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
                         if(groupParam->contains(splitAddress[1])){
                             ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
                             setParameterFromMidiMessage(absParam, m);
@@ -866,7 +866,7 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                 ofStringReplace(moduleName, "_", " ");
                 if(dynamicNodes.count(moduleName) == 1){
                     if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
-                        ofParameterGroup* groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                        shared_ptr<ofParameterGroup> groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
                         if(groupParam->contains(splitAddress[1])){
                             ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
                             setParameterFromMidiMessage(absParam, m);
@@ -875,7 +875,7 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                 }
                 if(persistentNodes.count(moduleName) == 1){
                     if(persistentNodes[moduleName].count(ofToInt(moduleId))){
-                        ofParameterGroup* groupParam = persistentNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                        shared_ptr<ofParameterGroup> groupParam = persistentNodes[moduleName][ofToInt(moduleId)]->getParameters();
                         if(groupParam->contains(splitAddress[1])){
                             ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
                             setParameterFromMidiMessage(absParam, m);

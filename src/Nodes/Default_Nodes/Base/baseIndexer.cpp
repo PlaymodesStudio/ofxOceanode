@@ -92,7 +92,7 @@ void baseIndexer::indexCountChanged(int &indexCount){
     previousIndexCount = indexCount;
 }
 
-void baseIndexer::putParametersInParametersGroup(ofParameterGroup* parameters){
+void baseIndexer::putParametersInParametersGroup(shared_ptr<ofParameterGroup> parameters){
     parameters->add(indexCount);
     parameters->add(numWaves_Param);
     parameters->add(indexInvert_Param);

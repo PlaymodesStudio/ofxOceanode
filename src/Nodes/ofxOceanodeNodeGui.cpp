@@ -241,7 +241,7 @@ void ofxOceanodeNodeGui::updateDropdown(string &dropdownName){
     dropdown->select(getParameters()->getGroup(dropdownName).getInt(1));
 }
 
-ofParameterGroup* ofxOceanodeNodeGui::getParameters(){
+shared_ptr<ofParameterGroup> ofxOceanodeNodeGui::getParameters(){
     return node.getParameters();
 }
 

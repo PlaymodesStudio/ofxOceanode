@@ -79,7 +79,7 @@ public:
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteConnections;
     ofEvent<glm::vec2> duplicateModule;
     
-    ofParameterGroup* getParameters();
+    shared_ptr<ofParameterGroup> getParameters();
 private:
     std::unique_ptr<ofxOceanodeNodeModel> nodeModel;
 #ifndef OFXOCEANODE_HEADLESS

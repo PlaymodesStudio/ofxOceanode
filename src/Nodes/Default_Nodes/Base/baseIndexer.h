@@ -17,7 +17,7 @@ public:
     baseIndexer(int numIndexs, string name);
     ~baseIndexer(){};
     
-    void putParametersInParametersGroup(ofParameterGroup* pg);
+    void putParametersInParametersGroup(shared_ptr<ofParameterGroup> pg);
     
     bool areNewIndexs(){
         return newIndexsFlag;
