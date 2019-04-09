@@ -1078,6 +1078,8 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
     
     if(sourceModuleRef == nullptr || sinkModuleRef == nullptr) return nullptr;
     
+    if(!sourceModuleRef->getParameters()->contains(sourceParameter)) sourceParameter += "_Selector";
+    if(!sinkModuleRef->getParameters()->contains(sinkParameter)) sinkParameter += "_Selector";
     if(sourceModuleRef->getParameters()->contains(sourceParameter) && sinkModuleRef->getParameters()->contains(sinkParameter)){
         ofAbstractParameter &source = sourceModuleRef->getParameters()->get(sourceParameter);
         ofAbstractParameter &sink = sinkModuleRef->getParameters()->get(sinkParameter);
