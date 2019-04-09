@@ -134,75 +134,75 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     auto nodePtr = node.get();
     collection[nodeToBeCreatedName][toBeCreatedId] = std::move(node);
     
-    if(!isPersistent){
-        destroyNodeListeners.push(nodePtr->deleteModuleAndConnections.newListener([this, nodeToBeCreatedName, toBeCreatedId](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
-            //for(auto &containerConnectionIterator = connections.begin(); containerConnectionIterator!= connections.end();){
-			for(int i = 0; i < connections.size();){
-                bool foundConnection = false;
-                for(auto &nodeConnection : connectionsToBeDeleted){
-                    //if(containerConnectionIterator->second.get() == nodeConnection){
-					if(connections[i].second.get() == nodeConnection){
-                        foundConnection = true;
-                        //connections.erase(containerConnectionIterator);
-						connections.erase((connections.begin() + i));
-                        connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
-                        break;
-                    }
-                }
-                if(!foundConnection){
-                    //containerConnectionIterator++;
-					i++;
+    
+    //Interaction listeners
+    destroyNodeListeners.push(nodePtr->deleteModuleAndConnections.newListener([this, nodeToBeCreatedName, toBeCreatedId](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
+        //for(auto &containerConnectionIterator = connections.begin(); containerConnectionIterator!= connections.end();){
+        for(int i = 0; i < connections.size();){
+            bool foundConnection = false;
+            for(auto &nodeConnection : connectionsToBeDeleted){
+                //if(containerConnectionIterator->second.get() == nodeConnection){
+                if(connections[i].second.get() == nodeConnection){
+                    foundConnection = true;
+                    //connections.erase(containerConnectionIterator);
+                    connections.erase((connections.begin() + i));
+                    connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
+                    break;
                 }
             }
-            
+            if(!foundConnection){
+                //containerConnectionIterator++;
+                i++;
+            }
+        }
+        
 #ifdef OFXOCEANODE_USE_MIDI
-            string toBeCreatedEscaped = nodeToBeCreatedName + " " + ofToString(toBeCreatedId);
-            ofStringReplace(toBeCreatedEscaped, " ", "_");
-            vector<string> midiBindingToBeRemoved;
-            for(auto &midiBind : midiBindings){
-                if(ofSplitString(midiBind.first, "-|-")[0] == toBeCreatedEscaped){
-                    for(auto &midiInPair : midiIns){
-                        midiInPair.second.removeListener(midiBind.second.get());
-                    }
-                    midiBindingDestroyed.notify(this, *midiBind.second.get());
-                    midiBindingToBeRemoved.push_back(midiBind.first);
+        string toBeCreatedEscaped = nodeToBeCreatedName + " " + ofToString(toBeCreatedId);
+        ofStringReplace(toBeCreatedEscaped, " ", "_");
+        vector<string> midiBindingToBeRemoved;
+        for(auto &midiBind : midiBindings){
+            if(ofSplitString(midiBind.first, "-|-")[0] == toBeCreatedEscaped){
+                for(auto &midiInPair : midiIns){
+                    midiInPair.second.removeListener(midiBind.second.get());
                 }
+                midiBindingDestroyed.notify(this, *midiBind.second.get());
+                midiBindingToBeRemoved.push_back(midiBind.first);
             }
-            for(auto &s : midiBindingToBeRemoved){
-                midiBindings.erase(s);
-            }
+        }
+        for(auto &s : midiBindingToBeRemoved){
+            midiBindings.erase(s);
+        }
 #endif
-            
-            dynamicNodes[nodeToBeCreatedName].erase(toBeCreatedId);
-        }));
         
-        destroyNodeListeners.push(nodePtr->deleteConnections.newListener([this](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
-            for(auto containerConnectionIterator = connections.begin(); containerConnectionIterator!=connections.end();){
-                bool foundConnection = false;
-                for(auto nodeConnection : connectionsToBeDeleted){
-                    if(containerConnectionIterator->second.get() == nodeConnection){
-                        foundConnection = true;
-                        connections.erase(containerConnectionIterator);
-                        connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
-                        break;
-                    }
-                }
-                if(!foundConnection){
-                    containerConnectionIterator++;
+        dynamicNodes[nodeToBeCreatedName].erase(toBeCreatedId);
+    }));
+    
+    destroyNodeListeners.push(nodePtr->deleteConnections.newListener([this](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
+        for(auto containerConnectionIterator = connections.begin(); containerConnectionIterator!=connections.end();){
+            bool foundConnection = false;
+            for(auto nodeConnection : connectionsToBeDeleted){
+                if(containerConnectionIterator->second.get() == nodeConnection){
+                    foundConnection = true;
+                    connections.erase(containerConnectionIterator);
+                    connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
+                    break;
                 }
             }
-        }));
-        
-        duplicateNodeListeners.push(nodePtr->duplicateModule.newListener([this, nodeToBeCreatedName, nodePtr](glm::vec2 pos){
-            auto newNode = createNodeFromName(nodeToBeCreatedName);
+            if(!foundConnection){
+                containerConnectionIterator++;
+            }
+        }
+    }));
+    
+    duplicateNodeListeners.push(nodePtr->duplicateModule.newListener([this, nodeToBeCreatedName, nodePtr](glm::vec2 pos){
+        auto newNode = createNodeFromName(nodeToBeCreatedName);
 #ifndef OFXOCEANODE_HEADLESS
-            newNode->getNodeGui().setPosition(pos);
+        newNode->getNodeGui().setPosition(pos);
 #endif
-            newNode->loadConfig("tempDuplicateGroup.json");
-            ofFile config("tempDuplicateGroup.json");
-            config.remove();
-        }));
-    }
+        newNode->loadConfig("tempDuplicateGroup.json");
+        ofFile config("tempDuplicateGroup.json");
+        config.remove();
+    }));
     
     return *nodePtr;
 }
