@@ -136,7 +136,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     
     
     //Interaction listeners
-    destroyNodeListeners.push(nodePtr->deleteModuleAndConnections.newListener([this, nodeToBeCreatedName, toBeCreatedId](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
+    destroyNodeListeners.push(nodePtr->deleteModuleAndConnections.newListener([this, nodeToBeCreatedName, toBeCreatedId, isPersistent](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
         //for(auto &containerConnectionIterator = connections.begin(); containerConnectionIterator!= connections.end();){
         for(int i = 0; i < connections.size();){
             bool foundConnection = false;
@@ -173,8 +173,11 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
             midiBindings.erase(s);
         }
 #endif
-        
-        dynamicNodes[nodeToBeCreatedName].erase(toBeCreatedId);
+        if(!isPersistent){
+            dynamicNodes[nodeToBeCreatedName].erase(toBeCreatedId);
+        }else{
+            persistentNodes[nodeToBeCreatedName].erase(toBeCreatedId);
+        }
     }));
     
     destroyNodeListeners.push(nodePtr->deleteConnections.newListener([this](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
