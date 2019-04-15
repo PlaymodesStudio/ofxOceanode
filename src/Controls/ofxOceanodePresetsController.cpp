@@ -114,7 +114,6 @@ void ofxOceanodePresetsController::onGuiScrollViewEvent(ofxDatGuiScrollViewEvent
         savePreset(e.target->getName(), bankSelect->getSelected()->getName());
     }else{
         changePresetLabelHighliht(e.target);
-        currentPreset = e.target->getName();
         loadPreset(e.target->getName(), bankSelect->getSelected()->getName());
     }
 }
@@ -135,6 +134,7 @@ void ofxOceanodePresetsController::onGuiTextInputEvent(ofxDatGuiTextInputEvent e
         currentBankPresets[newPresetNum] = newPresetName;
         changePresetLabelHighliht(presetsList->getItemAtIndex(presetsList->getNumItems()-1));
         savePreset(newPresetName, bankSelect->getSelected()->getName());
+        currentBank = bankSelect->getSelected()->getName();
         currentPreset = newPresetName;
         e.text = "";
     }
@@ -156,7 +156,6 @@ void ofxOceanodePresetsController::changePresetLabelHighliht(ofxDatGuiButton *pr
 
 void ofxOceanodePresetsController::loadBank(){
     string bankName = bankSelect->getSelected()->getName();
-    currentBank = bankName;
     
     ofDirectory dir;
     vector<pair<int, string>> presets;
@@ -188,6 +187,8 @@ void ofxOceanodePresetsController::loadBank(){
 
 void ofxOceanodePresetsController::loadPreset(string name, string bank){
     container->loadPreset("Presets/" + bank + "/" + name);
+    currentPreset = name;
+    currentBank = bank;
 }
 
 void ofxOceanodePresetsController::savePreset(string name, string bank){
