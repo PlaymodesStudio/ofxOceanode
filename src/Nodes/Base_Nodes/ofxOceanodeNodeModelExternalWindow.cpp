@@ -117,9 +117,15 @@ void ofxOceanodeNodeModelExternalWindow::presetRecallBeforeSettingParameters(ofJ
         auto infoVec = json["ExtWindowRect"];
         externalWindowRect = ofRectangle(infoVec[0], infoVec[1], infoVec[2], infoVec[3]);
     }
+}
+
+void ofxOceanodeNodeModelExternalWindow::loadCustomPersistent(ofJson &json){
+    if(json.count("ExtWindowRect") == 1){
+        auto infoVec = json["ExtWindowRect"];
+        externalWindowRect = ofRectangle(infoVec[0], infoVec[1], infoVec[2], infoVec[3]);
+    }
     if(json.count("ExtWindowMode") == 1){
         auto windowMode = json["ExtWindowMode"];
         fullscreenWindow = windowMode == OF_FULLSCREEN ? true : false;
     }
 }
-
