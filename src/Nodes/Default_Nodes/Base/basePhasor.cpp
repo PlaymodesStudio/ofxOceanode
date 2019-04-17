@@ -57,7 +57,9 @@ void basePhasor::threadedFunction(){
             //tue phasor that goes from 0 to 1 at desired frequency
             double freq = (double)bpm_Param_inThread/(double)60;
             freq = freq * (double)getValueForIndex(beatsMult_Param_inThread, i);
-            freq = (double)freq / (double)getValueForIndex(beatsDiv_Param_inThread, i);
+            auto beats_div_val = (double)getValueForIndex(beatsDiv_Param_inThread, i);
+            if(beats_div_val == 0) beats_div_val = 0.0001;
+            freq = (double)freq / beats_div_val;
             double increment = (1.0f/(double)((double)(1000.0)/(double)freq));
             
             phasor[i] = phasor[i] + increment;
