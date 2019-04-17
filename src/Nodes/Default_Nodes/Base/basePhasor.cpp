@@ -63,10 +63,10 @@ void basePhasor::threadedFunction(){
             double increment = (1.0f/(double)((double)(1000.0)/(double)freq));
             
             phasor[i] = phasor[i] + increment;
-            if(i == 0 && phasor[0] >= 1){
+            if(i == 0 && (phasor[0] >= 1 || phasor[0] < 0)){
                 ofNotifyEvent(phasorCycle);
             }
-            if(phasor[i] >= 1){
+            if(phasor[i] >= 1 || phasor[i] < 0){
                 ofNotifyEvent(phasorCycleIndex, i);
                 if(!loop_Param_inThread){
                     stopPhasor[i] = true;
@@ -78,6 +78,7 @@ void basePhasor::threadedFunction(){
             
             if(stopPhasor[i]) phasor[i] = 0;
             
+            if(phasor[i] < 0) phasor[i] += 1.0f;
             phasor[i] -= (int)phasor[i];
             
             //Assign a copy of the phasor to add initPhase
