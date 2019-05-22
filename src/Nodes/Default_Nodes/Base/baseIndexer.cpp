@@ -132,18 +132,11 @@ void baseIndexer::recomputeIndexs(){
             index += odd ? 1 : 0;
         }
         else if(symmetry_Param > 0){
-            index += 1;
+            index += indexInvert_Param > 0.5 ? 0 : 1;
             index %= newNumOfPixels;;
         }
         
-        
-        //INVERSE
-        //Fisrt we invert the index to simulate the wave goes from left to right, inverting indexes, if we want to invertit we don't do this calc
-        int nonInvertIndex = index-1;
-        int invertedIndex = ((float)indexCount/(symmetry_Param+1))-(float)index;
-        index = indexInvert_Param*invertedIndex + (1-indexInvert_Param)*nonInvertIndex;
-        
-        //random
+        //Random
         if(indexRand_Param < 0)
             index = randomizedIndexes[index];
         else if(indexRand_Param > 0)
@@ -152,15 +145,19 @@ void baseIndexer::recomputeIndexs(){
         //COMB
         index = abs(((index%2)*indexCount*combination_Param)-index);
         
+        //INVERSE
+        int nonInvertIndex = index-1;
+        int invertedIndex = ((float)newNumOfPixels/(symmetry_Param+1))-(float)index;
+        float indexf = indexInvert_Param*invertedIndex + (1-indexInvert_Param)*nonInvertIndex;
+        
         //Modulo
         if(modulo_Param != modulo_Param.getMax())
-            index %= modulo_Param;
-        
+            indexf = fmod(indexf, modulo_Param);
         
         int shifted_i = i + round(indexOffset_Param);
         if(shifted_i < 0) shifted_i += indexCount;
         shifted_i %= indexCount;
-        indexs[shifted_i] = (((float)index/(float)indexCount))*(numWaves_Param*((float)indexCount/(float)newNumOfPixels))*(symmetry_Param+1);
+        indexs[shifted_i] = ((indexf/(float)indexCount))*(numWaves_Param*((float)indexCount/(float)newNumOfPixels))*(symmetry_Param+1);
     }
     newIndexs();
 }
