@@ -10,6 +10,9 @@ phasor::phasor() : ofxOceanodeNodeModel("Phasor")
 {
     phaseOffset = 0;
     color = ofColor::red;
+}
+
+void phasor::setup(){
     parameterAutoSettersListeners.push(bpm_Param.newListener([&](float &val){
         basePh.setBpm(val);
     }));

@@ -16,8 +16,9 @@
 
 class mapper : public ofxOceanodeNodeModel{
 public:
-    mapper();
+    mapper() : ofxOceanodeNodeModel("Mapper"){};
     ~mapper(){};
+    void setup() override;
     
     void recalculate();
 

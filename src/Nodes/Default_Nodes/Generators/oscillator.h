@@ -13,8 +13,9 @@
 
 class oscillator : public ofxOceanodeNodeModel{
 public:
-    oscillator();
+    oscillator() : ofxOceanodeNodeModel("Oscillator"){};
     ~oscillator(){};
+    void setup();
         
 private:
     void phasorInListener(float &phasor);

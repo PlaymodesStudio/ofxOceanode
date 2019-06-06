@@ -15,9 +15,9 @@
 //This class will contain a set of oscillators and has to inherit the indexer class (or bank class)
 class oscillatorBank : public baseIndexer{
 public:
-    oscillatorBank();
-    ~oscillatorBank(){
-    };
+    oscillatorBank() : baseIndexer(100, "Oscillator Bank"){};
+    ~oscillatorBank(){};
+    void setup() override;
     
     void presetRecallBeforeSettingParameters(ofJson &json) override;
     void presetRecallAfterSettingParameters(ofJson &json) override;

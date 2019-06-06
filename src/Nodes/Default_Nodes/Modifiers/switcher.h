@@ -16,8 +16,9 @@
 
 class switcher : public ofxOceanodeNodeModel{
 public:
-    switcher();
+    switcher() : ofxOceanodeNodeModel("Switcher Float"){};
     ~switcher(){};
+    void setup() override;
     
     void changedSwitch(int &i);
     void changedInput();

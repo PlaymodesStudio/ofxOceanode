@@ -16,9 +16,9 @@
 
 class ranger : public ofxOceanodeNodeModel{
 public:
-    ranger();
+    ranger() : ofxOceanodeNodeModel("Ranger"){};
     ~ranger(){};
-    void setup(int index = 0);
+    void setup() override;
 //    float getRange();    
 //    void resetRange();
     

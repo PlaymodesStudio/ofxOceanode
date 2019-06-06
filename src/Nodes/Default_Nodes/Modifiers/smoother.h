@@ -12,8 +12,9 @@
 
 class smoother : public ofxOceanodeNodeModel{
 public:
-    smoother();
+    smoother() : ofxOceanodeNodeModel("Smoother"){};
     ~smoother(){};
+    void setup() override;
     
     void presetRecallBeforeSettingParameters(ofJson &json){
         isFirstInput = true;

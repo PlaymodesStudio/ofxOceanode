@@ -46,10 +46,13 @@ public:
     void setBeatMult(float i){beatsMult_Param = vector<float>(1, i);};
     void setBeatDiv(float i){beatsDiv_Param = vector<float>(1, i);};
     
+    void setup();
+    void update(ofEventArgs &e);
+    
     void setPhase(float _phase) override;
 private:
     basePhasor basePh;
-    void update(ofEventArgs &e);
+
 
     ofParameter<float>  bpm_Param;
     ofParameter<vector<float>>    beatsMult_Param;

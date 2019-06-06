@@ -12,8 +12,9 @@
 
 class reindexer : public ofxOceanodeNodeModelExternalWindow{
 public:
-    reindexer();
+    reindexer() : ofxOceanodeNodeModelExternalWindow("Reindexer"){};
     ~reindexer(){};
+    void setup() override;
     
     void presetSave(ofJson &json) override;
     void presetRecallAfterSettingParameters(ofJson &json) override;

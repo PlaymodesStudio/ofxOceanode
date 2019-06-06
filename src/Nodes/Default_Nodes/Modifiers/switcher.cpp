@@ -8,7 +8,7 @@
 
 #include "switcher.h"
 
-switcher::switcher() : ofxOceanodeNodeModel("Switcher Float"){
+void switcher::setup(){
     color = ofColor::white;
     parameters->add(switchSelector.set("Switch", 0, 0, 1));
     parameters->add(input1.set("Input 1", {0}, {0}, {1}));

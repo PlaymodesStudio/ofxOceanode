@@ -8,7 +8,7 @@
 
 #include "oscillatorBank.h"
 
-oscillatorBank::oscillatorBank() : baseIndexer(100, "Oscillator Bank"){
+void oscillatorBank::setup() {
     color = ofColor::blue;
     oscillators.resize(indexCount);
     for(int i=0 ; i < indexCount ; i++){
