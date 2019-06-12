@@ -85,7 +85,7 @@ void ofxOceanodeCanvas::keyPressed(ofKeyEventArgs &e){
 
 void ofxOceanodeCanvas::mouseDragged(ofMouseEventArgs &e){
     if(ofGetKeyPressed(' ')){
-        transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(e-dragCanvasInitialPoint, 0)));
+        transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(dragCanvasInitialPoint-e, 0)));
         dragCanvasInitialPoint = e;
     }
 }
@@ -129,7 +129,7 @@ void ofxOceanodeCanvas::mouseScrolled(ofMouseEventArgs &e){
 #else
     if(ofGetKeyPressed(OF_KEY_CONTROL)){
 #endif
-        float scrollValue = e.scrollY/100.0;
+        float scrollValue = -e.scrollY/100.0;
         transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(transformedPos, 0) * getMatrixScale(transformationMatrix->get()) * scrollValue));
         transformationMatrix->set(glm::scale(transformationMatrix->get(), glm::vec3(1-(scrollValue), 1-(scrollValue), 1)));
 //        if(e.scrollY < 0)
@@ -137,9 +137,9 @@ void ofxOceanodeCanvas::mouseScrolled(ofMouseEventArgs &e){
 //        else
 //        glfwSetCursor((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), zoomOutCursor);
     }else if(ofGetKeyPressed(OF_KEY_ALT)){
-        transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(-e.scrollY*2, 0, 0)));
+        transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(e.scrollY*2, 0, 0)));
     }else{
-        transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(e.scrollX*2, e.scrollY*2, 0)));
+        transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(-e.scrollX*2, -e.scrollY*2, 0)));
     }
 }
 
