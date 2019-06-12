@@ -397,6 +397,10 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
 
     }
     
+    for(auto &connection : connections){
+        connection.second->setActive(false);
+    }
+    
     
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
@@ -427,7 +431,7 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
                         }
                     }
                     if(!connectionExist){
-                        createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key());
+                        createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key())->setActive(false);
                     }
                 }
             }
@@ -444,6 +448,10 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         for(auto &node : nodeTypeMap.second){
             node.second->loadPreset(presetFolderPath);
         }
+    }
+    
+    for(auto &connection : connections){
+        connection.second->setActive(true);
     }
     
     for(auto &nodeTypeMap : dynamicNodes){

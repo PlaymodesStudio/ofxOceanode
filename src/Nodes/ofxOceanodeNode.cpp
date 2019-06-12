@@ -391,8 +391,7 @@ bool ofxOceanodeNode::loadParametersFromJson(ofJson json, bool persistentPreset)
     for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
         if(getParameters()->contains(it.key())){
             ofAbstractParameter& p = getParameters()->get(it.key());
-            if(((!persistentPreset && nodeModel->getParameterInfo(p).isSavePreset) || (persistentPreset && nodeModel->getParameterInfo(p).isSaveProject))
-               && !checkHasInConnection(p)){
+            if(((!persistentPreset && nodeModel->getParameterInfo(p).isSavePreset) || (persistentPreset && nodeModel->getParameterInfo(p).isSaveProject))){
                 if(p.type() == typeid(ofParameter<float>).name()){
                     ofDeserialize(json, p);
                 }else if(p.type() == typeid(ofParameter<int>).name()){

@@ -17,6 +17,7 @@ public:
         sourceParameter = &_sourceParameter;
         sinkParameter = &_sinkParameter;
         isPersistent = false;
+        active = true;
     };
     
     ofxOceanodeAbstractConnection(ofAbstractParameter& _sourceParameter){
@@ -42,6 +43,10 @@ public:
         graphics.movePoint(1, moveVec);
     }
     
+    void setActive(bool a){
+        active = a;
+    }
+    
     ofxOceanodeConnectionGraphics& getGraphics(){return graphics;};
     
     glm::vec2 getPostion(int index){return graphics.getPoint(index);};
@@ -52,10 +57,11 @@ public:
     
     bool getIsPersistent(){return isPersistent;};
     void setIsPersistent(bool p){isPersistent = p;graphics.setWireColor(ofColor(255,0,0));};
-        
+    
     ofEvent<void> destroyConnection;
 protected:
     ofxOceanodeConnectionGraphics graphics;
+    bool active;
     
     ofAbstractParameter* sourceParameter;
     ofAbstractParameter* sinkParameter;
@@ -104,7 +110,8 @@ public:
 private:
     void linkParameters(){
         parameterEventListener = sourceParameter.newListener([&](Tsource &p){
-            sinkParameter = sourceParameter;
+            if(active)
+                sinkParameter = sourceParameter;
         });
         //sinkParameter = sourceParameter;
     }
@@ -120,12 +127,14 @@ public:
     ofxOceanodeConnection(ofParameter<vector<_Tsource>>& pSource, ofParameter<vector<_Tsink>>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
         beforeConnectionValue = sinkParameter.get();
         parameterEventListener = sourceParameter.newListener([&](vector<_Tsource> &vf){
-            //            sinkParameter = vector<_Tsink>(1, f);
-            vector<_Tsink> vec(vf.size());
-            for(int i = 0; i < vf.size(); i ++){
-                vec[i] = vf[i];
+            if(active){
+                //            sinkParameter = vector<_Tsink>(1, f);
+                vector<_Tsink> vec(vf.size());
+                for(int i = 0; i < vf.size(); i ++){
+                    vec[i] = vf[i];
+                }
+                sinkParameter = vec;
             }
-            sinkParameter = vec;
         });
         //sinkParameter = vector<T>(1, sourceParameter);
     }
@@ -153,7 +162,8 @@ public:
     ofxOceanodeConnection(ofParameter<_Tsource>& pSource, ofParameter<vector<_Tsink>>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
         beforeConnectionValue = sinkParameter.get();
         parameterEventListener = sourceParameter.newListener([&](_Tsource &f){
-            sinkParameter = vector<_Tsink>(1, f);
+            if(active)
+                sinkParameter = vector<_Tsink>(1, f);
         });
         //sinkParameter = vector<T>(1, sourceParameter);
     }
@@ -175,13 +185,15 @@ public:
     ofxOceanodeConnection(ofParameter<vector<_Tsource>>& pSource, ofParameter<_Tsink>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
         beforeConnectionValue = sinkParameter.get();
         parameterEventListener = sourceParameter.newListener([&](vector<_Tsource> &vf){
-            if(vf.size() > 0){
-                sinkParameter = vf[0];
+            if(active){
+                if(vf.size() > 0){
+                    sinkParameter = vf[0];
+                }
             }
         });
-//        if(sourceParameter.get().size() > 0){
-//            sinkParameter = sourceParameter.get()[0];
-//        }
+        //        if(sourceParameter.get().size() > 0){
+        //            sinkParameter = sourceParameter.get()[0];
+        //        }
     }
     ~ofxOceanodeConnection(){
         sinkParameter.set(beforeConnectionValue);
@@ -209,7 +221,8 @@ public:
 private:
     void linkParameters(){
         parameterEventListener = sourceParameter.newListener([&](){
-            sinkParameter = sinkParameter;
+            if(active)
+                sinkParameter = sinkParameter;
         });
     }
     
@@ -231,7 +244,8 @@ public:
 private:
     void linkParameters(){
         parameterEventListener = sourceParameter.newListener([&](){
-            sinkParameter.trigger();
+            if(active)
+                sinkParameter.trigger();
         });
     }
     
@@ -253,7 +267,8 @@ public:
 private:
     void linkParameters(){
         parameterEventListener = sourceParameter.newListener([&](){
-            sinkParameter = !sinkParameter;
+            if(active)
+                sinkParameter = !sinkParameter;
         });
     }
     
@@ -275,8 +290,10 @@ public:
 private:
     void linkParameters(){
         parameterEventListener = sourceParameter.newListener([&](float &f){
-            bool newValue = (f > ((sourceParameter.getMax() - sourceParameter.getMin())/2.0 + sourceParameter.getMin())) ? true : false;
-            if(newValue != sinkParameter) sinkParameter = newValue;
+            if(active){
+                bool newValue = (f > ((sourceParameter.getMax() - sourceParameter.getMin())/2.0 + sourceParameter.getMin())) ? true : false;
+                if(newValue != sinkParameter) sinkParameter = newValue;
+            }
         });
     }
     
