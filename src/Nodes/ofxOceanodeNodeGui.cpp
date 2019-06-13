@@ -367,7 +367,7 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
             auto connection = node.parameterConnectionPress(container, *p);
             if(connection != nullptr){
                 connection->setTransformationMatrix(transformationMatrix);
-                connection->setSinkPosition(glm::inverse(transformationMatrix->get()) * glm::vec4(ofGetMouseX(), ofGetMouseY(), 0, 1));
+                connection->setSinkPosition(transformationMatrix->get() * glm::vec4(ofGetMouseX(), ofGetMouseY(), 0, 1));
             }
         }else{
             auto connection = node.parameterConnectionRelease(container, *p);

@@ -75,11 +75,11 @@ class ofxOceanodeNode;
 class ofxOceanodeTemporalConnection: public ofxOceanodeAbstractConnection{
 public:
     ofxOceanodeTemporalConnection(ofAbstractParameter& _p) : ofxOceanodeAbstractConnection(_p){
-        graphics.setPoint(0, glm::vec2(ofGetMouseX(), ofGetMouseY()));
-        graphics.setPoint(1, glm::vec2(ofGetMouseX(), ofGetMouseY()));
+//        graphics.setPoint(0, glm::vec2(ofGetMouseX(), ofGetMouseY()));
+//        graphics.setPoint(1, glm::vec2(ofGetMouseX(), ofGetMouseY()));
         
         mouseDraggedListener = ofEvents().mouseDragged.newListener([&](ofMouseEventArgs & mouse){
-            graphics.setPoint(1, glm::inverse(graphics.getTransformationMatrix()) * glm::vec4(mouse, 0, 1));
+            graphics.setPoint(1, graphics.getTransformationMatrix() * glm::vec4(mouse, 0, 1));
         });
         mouseReleasedListener = ofEvents().mouseReleased.newListener([&](ofMouseEventArgs & mouse){
             graphics.deactivate();

@@ -29,7 +29,7 @@ public:
     void draw(ofEventArgs &args){
         if(points[1] != glm::vec2(-1, -1)){
             ofPushMatrix();
-            ofMultMatrix(transformationMatrix->get());
+            ofMultMatrix(glm::inverse(transformationMatrix->get()));
             {
                 
 //                ofDrawLine(points[0], points[1]);
