@@ -115,7 +115,7 @@ public:
     
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
     
-    void moveModulesInRectangle(glm::vec2 moveVec, ofRectangle rect);
+    vector<ofxOceanodeNodeGui*> getModulesInRectangle(ofRectangle rect, bool entire);
     
 private:
     void temporalConnectionDestructor();

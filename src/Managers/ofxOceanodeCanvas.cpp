@@ -54,14 +54,24 @@ void ofxOceanodeCanvas::setup(){
     }
     
     popUpMenu->onDropdownEvent(this, &ofxOceanodeCanvas::newModuleListener);
-    selectingRect = ofRectangle(0, 0, 0, 0);
+    selectedRect = ofRectangle(0, 0, 0, 0);
+    dragModulesInitialPoint = glm::vec2(NAN, NAN);
 }
 
 void ofxOceanodeCanvas::draw(ofEventArgs &args){
     if(selecting){
         ofPushStyle();
         ofSetColor(255, 255, 255, 40);
-        ofDrawRectangle(ofRectangle(selectInitialPoint, selectEndPoint));
+        ofDrawRectangle(ofRectangle(canvasToScreen(selectInitialPoint), canvasToScreen(selectEndPoint)));
+        ofPopStyle();
+    }
+    else if(selectedRect != ofRectangle(0,0,0,0)){
+        ofPushStyle();
+        if(entireSelect)
+            ofSetColor(255, 80, 0, 40);
+        else
+            ofSetColor(0, 80, 255, 40);
+        ofDrawRectangle(ofRectangle(canvasToScreen(selectedRect.getTopLeft()), canvasToScreen(selectedRect.getBottomRight())));
         ofPopStyle();
     }
 }
@@ -88,19 +98,26 @@ void ofxOceanodeCanvas::keyPressed(ofKeyEventArgs &e){
     if(e.key == ' '){
         //glfwSetCursor((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), openedHandCursor);
         if(ofGetMousePressed()) dragCanvasInitialPoint = glm::vec2(ofGetMouseX(), ofGetMouseY());
-    }else if(e.key == OF_KEY_BACKSPACE && popUpMenu->getVisible()){
+    }else if(e.key == OF_KEY_BACKSPACE){
         popUpMenu->setVisible(false);
+        toMoveNodes.clear();
+        selectedRect = ofRectangle(0,0,0,0);
     }
 }
 
 void ofxOceanodeCanvas::mouseDragged(ofMouseEventArgs &e){
+    glm::vec2 transformedPos = screenToCanvas(e);
     if(ofGetKeyPressed(' ')){
         transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(dragCanvasInitialPoint-e, 0)));
         dragCanvasInitialPoint = e;
-    }else if(selectingRect != ofRectangle(0,0,0,0)){
-        container->moveModulesInRectangle(e - dragModulesInitialPoint, selectingRect);
-    }else if(selecting)
-        selectEndPoint = screenToCanvas(e);
+    }else if(selecting){
+        selectEndPoint = transformedPos;
+    }else if(toMoveNodes.size() != 0 && dragModulesInitialPoint == dragModulesInitialPoint){
+        for(auto node : toMoveNodes){
+            node.first->setPosition(node.second + (transformedPos - dragModulesInitialPoint));
+        }
+        selectedRect.setPosition(glm::vec3(selectedRectIntialPosition + (transformedPos - dragModulesInitialPoint), 1));
+    }
 }
 
 void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
@@ -133,17 +150,38 @@ void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
 //            }
 //        }
 //    }
-    dragModulesInitialPoint = e;
-    selectInitialPoint = transformedPos;
-    if(selectingRect == ofRectangle(0, 0, 0, 0))
+    if(ofGetKeyPressed(OF_KEY_ALT)){
+        selectInitialPoint = transformedPos;
+        selectEndPoint = transformedPos;
+        selectedRect = ofRectangle(0,0,0,0);
         selecting = true;
+    }
+    if(toMoveNodes.size() != 0 && selectedRect.inside(transformedPos)){
+        selectedRectIntialPosition = selectedRect.getPosition();
+        for(auto &node : toMoveNodes){
+            node.second = node.first->getPosition();
+        }
+        dragModulesInitialPoint = transformedPos;
+    }
 }
 
 void ofxOceanodeCanvas::mouseReleased(ofMouseEventArgs &e){
-    if(selecting)
-        selectingRect = ofRectangle(selectInitialPoint, selectEndPoint);
-    else
-        selectingRect = ofRectangle(0, 0, 0, 0);
+    if(selecting){
+        selectedRect = ofRectangle(selectInitialPoint, selectEndPoint);
+        if(glm::all(glm::greaterThan(selectInitialPoint, selectEndPoint)))
+            entireSelect = false;
+        else
+            entireSelect = true;
+        
+        toMoveNodes.clear();
+        for(auto nodeGui : container->getModulesInRectangle(selectedRect, entireSelect)){
+            toMoveNodes.push_back(make_pair(nodeGui, nodeGui->getPosition()));
+        }
+        if(toMoveNodes.size() == 0){
+            selectedRect = ofRectangle(0,0,0,0);
+        }
+    }
+    dragModulesInitialPoint = glm::vec2(NAN, NAN);
     selecting = false;
 }
 

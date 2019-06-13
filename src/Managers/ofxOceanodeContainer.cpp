@@ -907,14 +907,21 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
 #endif
 
 
-void ofxOceanodeContainer::moveModulesInRectangle(glm::vec2 moveVec, ofRectangle rect){
+vector<ofxOceanodeNodeGui*> ofxOceanodeContainer::getModulesInRectangle(ofRectangle rect, bool entire){
+    vector<ofxOceanodeNodeGui*> tempVec;
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             auto &nodeGui = node.second->getNodeGui();
-            if(rect.inside(nodeGui.getPosition()))
-                nodeGui.setPosition(nodeGui.getPosition() + moveVec);
+            if(entire){
+                if(rect.inside(nodeGui.getRectangle()))
+                    tempVec.push_back(&nodeGui);
+            }else{
+                if(rect.intersects(nodeGui.getRectangle()))
+                    tempVec.push_back(&nodeGui);
+            }
         }
     }
+    return tempVec;
 }
 
 #ifdef OFXOCEANODE_USE_MIDI

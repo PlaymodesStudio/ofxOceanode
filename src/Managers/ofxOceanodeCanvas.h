@@ -63,8 +63,11 @@ private:
     glm::vec2 selectInitialPoint;
     glm::vec2 selectEndPoint;
     bool selecting;
-    ofRectangle selectingRect;
+    bool entireSelect;
+    ofRectangle selectedRect;
+    glm::vec2 selectedRectIntialPosition;
     glm::vec2 dragModulesInitialPoint;
+    vector<pair<ofxOceanodeNodeGui*, glm::vec2>> toMoveNodes;
 };
 
 #endif
