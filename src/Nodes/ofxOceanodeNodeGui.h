@@ -30,6 +30,7 @@ public:
     
     shared_ptr<ofParameterGroup> getParameters();
     glm::vec2 getPosition();
+    ofRectangle getRectangle();
     void collapse();
     void expand();
     

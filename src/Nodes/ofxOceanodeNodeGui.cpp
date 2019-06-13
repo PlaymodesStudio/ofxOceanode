@@ -255,6 +255,10 @@ glm::vec2 ofxOceanodeNodeGui::getPosition(){
     return glm::vec2(gui->getPosition().x, gui->getPosition().y);
 }
 
+ofRectangle ofxOceanodeNodeGui::getRectangle(){
+    return ofRectangle(gui->getPosition(), gui->getWidth(), gui->getHeight());
+}
+
 void ofxOceanodeNodeGui::collapse(){
     if(gui->getExpanded()){
         gui->collapse();
