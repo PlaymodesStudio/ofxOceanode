@@ -123,14 +123,13 @@ void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
 }
 
 void ofxOceanodeCanvas::mouseScrolled(ofMouseEventArgs &e){
-    glm::vec2 transformedPos = canvasToScreen(e);
 #ifdef TARGET_OSX
     if(ofGetKeyPressed(OF_KEY_COMMAND)){
 #else
     if(ofGetKeyPressed(OF_KEY_CONTROL)){
 #endif
         float scrollValue = -e.scrollY/100.0;
-        transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(transformedPos, 0) * getMatrixScale(transformationMatrix->get()) * scrollValue));
+        transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(e, 0) * getMatrixScale(transformationMatrix->get()) * scrollValue));
         transformationMatrix->set(glm::scale(transformationMatrix->get(), glm::vec3(1-(scrollValue), 1-(scrollValue), 1)));
 //        if(e.scrollY < 0)
 //        glfwSetCursor((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), zoomInCursor);
