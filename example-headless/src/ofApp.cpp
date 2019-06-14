@@ -7,7 +7,8 @@ void ofApp::setup(){
     
     auto reg = make_shared<ofxOceanodeNodeRegistry>();
     container = make_shared<ofxOceanodeContainer>(reg, make_shared<ofxOceanodeTypesRegistry>());
-    container->loadPreset("Presets/Initial_Bank/1|save");
+    //container->loadPreset("Presets/Initial_Bank/1|save");
+    container->setupOscReceiver(11111);
 }
 
 //--------------------------------------------------------------
