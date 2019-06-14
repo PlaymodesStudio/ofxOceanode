@@ -485,6 +485,15 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
             json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y};
         }
     }
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            glm::vec2 pos(0,0);
+#ifndef OFXOCEANODE_HEADLESS
+            pos = node.second->getNodeGui().getPosition();
+#endif
+            json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y};
+        }
+    }
     ofSavePrettyJson(presetFolderPath + "/modules.json", json);
     
     json.clear();
