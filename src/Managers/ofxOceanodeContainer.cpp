@@ -915,7 +915,7 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
 
 #endif
 
-
+#ifndef OFXOCEANODE_HEADLESS
 vector<ofxOceanodeNodeGui*> ofxOceanodeContainer::getModulesInRectangle(ofRectangle rect, bool entire){
     vector<ofxOceanodeNodeGui*> tempVec;
     for(auto &nodeTypeMap : dynamicNodes){
@@ -932,6 +932,7 @@ vector<ofxOceanodeNodeGui*> ofxOceanodeContainer::getModulesInRectangle(ofRectan
     }
     return tempVec;
 }
+#endif
 
 #ifdef OFXOCEANODE_USE_MIDI
 

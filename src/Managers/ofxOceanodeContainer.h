@@ -115,7 +115,9 @@ public:
     
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
     
+#ifndef OFXOCEANODE_HEADLESS
     vector<ofxOceanodeNodeGui*> getModulesInRectangle(ofRectangle rect, bool entire);
+#endif
     
 private:
     void temporalConnectionDestructor();
