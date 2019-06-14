@@ -854,7 +854,11 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
                 for ( int i = 0 ; i < numPresets; i++){
                     if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(0)){
                         string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
+#ifdef OFXOCEANODE_USE_OSC
+                        loadPreset("Presets/" + bankAndPreset);
+#else
                         ofNotifyEvent(loadPresetEvent, bankAndPreset);
+#endif
                         break;
                     }
                 }
@@ -907,7 +911,11 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
         else if(splitAddress.size() == 3){
             if(splitAddress[0] == "presetLoad"){
                 string bankAndPreset = splitAddress[1] + "/" + splitAddress[2];
+#ifdef OFXOCEANODE_USE_OSC
+                loadPreset("Presets/" + bankAndPreset);
+#else
                 ofNotifyEvent(loadPresetEvent, bankAndPreset);
+#endif
             }
         }
     }
