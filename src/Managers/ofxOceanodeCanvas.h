@@ -42,6 +42,7 @@ public:
     void setContainer(shared_ptr<ofxOceanodeContainer> c){container = c;};
     
     void newModuleListener(ofxDatGuiDropdownEvent e);
+    void searchListener(ofxDatGuiTextInputEvent e);
 private:
     glm::vec3 getMatrixScale(const glm::mat4 &m);
     glm::mat4 translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector);
@@ -52,6 +53,8 @@ private:
     shared_ptr<ofxOceanodeContainer> container;
     ofxDatGui *popUpMenu;
     vector<ofxDatGuiDropdown*> modulesSelectors;
+    ofxDatGuiTextInput *searchField;
+    vector<pair<ofxDatGuiDropdown*, int>> searchedOptions;
     
     ofParameter<glm::mat4> *transformationMatrix;
     glm::vec2 dragCanvasInitialPoint;

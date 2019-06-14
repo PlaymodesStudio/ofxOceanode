@@ -31,6 +31,8 @@ void ofxOceanodeCanvas::setup(){
     popUpMenu = new ofxDatGui();
     popUpMenu->setVisible(false);
     popUpMenu->setPosition(-1, -1);
+    searchField = popUpMenu->addTextInput("Search: ");
+    searchField->setNotifyEachChange(true);
     auto const &models = container->getRegistry().getRegisteredModels();
     auto const &categories = container->getRegistry().getCategories();
     auto const &categoriesModelsAssociation = container->getRegistry().getRegisteredModelsCategoryAssociation();
@@ -53,7 +55,18 @@ void ofxOceanodeCanvas::setup(){
         //modulesSelectors.back()->expand();
     }
     
+    std::unique_ptr<ofxDatGuiTheme> theme = make_unique<ofxDatGuiThemeCharcoal>();
+    //    theme->color.textInput.text = ;
+    //    theme->color.icons = color;
+    theme->layout.width = 290;
+    popUpMenu->setTheme(theme.get(), true);
+    searchField->setLabelColor(theme->color.label*2);
+    for(auto drop : modulesSelectors){
+        drop->setLabelColor(theme->color.label*2);
+    }
+    
     popUpMenu->onDropdownEvent(this, &ofxOceanodeCanvas::newModuleListener);
+    popUpMenu->onTextInputEvent(this, &ofxOceanodeCanvas::searchListener);
     selectedRect = ofRectangle(0, 0, 0, 0);
     dragModulesInitialPoint = glm::vec2(NAN, NAN);
 }
@@ -77,7 +90,7 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
 }
 
 void ofxOceanodeCanvas::newModuleListener(ofxDatGuiDropdownEvent e){
-    unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry().create(e.target->getSelected()->getName());
+    unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry().create(e.target->getChildAt(e.child)->getName());
     
     if (type)
     {
@@ -87,21 +100,80 @@ void ofxOceanodeCanvas::newModuleListener(ofxDatGuiDropdownEvent e){
         node.getNodeGui().setTransformationMatrix(transformationMatrix);
     }
     popUpMenu->setVisible(false);
+    searchField->setFocused(false);
     popUpMenu->setPosition(-1, -1);
     for(auto drop : modulesSelectors){
         drop->setLabel(drop->getName());
         drop->collapse();
+        for(int i = 0; i < drop->getNumOptions(); i++){
+            drop->getChildAt(i)->setVisible(true);
+        }
+    }
+}
+
+void ofxOceanodeCanvas::searchListener(ofxDatGuiTextInputEvent e){
+    ofLog() << e.text << e.confirmed;
+    searchedOptions.clear();
+    if(e.text != ""){
+        for(auto drop : modulesSelectors){
+            int numMathes = 0;
+            for(int i = 0; i < drop->getNumOptions(); i++){
+                auto item = drop->getChildAt(i);
+                string lowercaseName = item->getName();
+                std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
+                if(ofStringTimesInString(item->getName(), e.text) || ofStringTimesInString(lowercaseName, e.text)){
+                    searchedOptions.push_back(make_pair(drop, i));
+                    numMathes++;
+                }else{
+                    item->setVisible(false);
+                }
+            }
+            if(numMathes == 0){
+                for(int i = 0; i < drop->getNumOptions(); i++){
+                    drop->getChildAt(i)->setVisible(true);
+                }
+                drop->collapse();
+            }else{
+                drop->expand();
+            }
+        }
+        if(searchedOptions.size() == 0){
+            for(auto drop : modulesSelectors){
+                drop->collapse();
+                for(int i = 0; i < drop->getNumOptions(); i++){
+                    drop->getChildAt(i)->setVisible(true);
+                }
+            }
+        }
+    }else{
+        for(auto drop : modulesSelectors){
+            drop->setLabel(drop->getName());
+            drop->collapse();
+            for(int i = 0; i < drop->getNumOptions(); i++){
+                drop->getChildAt(i)->setVisible(true);
+            }
+        }
     }
 }
 
 void ofxOceanodeCanvas::keyPressed(ofKeyEventArgs &e){
-    if(e.key == ' '){
-        //glfwSetCursor((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), openedHandCursor);
-        if(ofGetMousePressed()) dragCanvasInitialPoint = glm::vec2(ofGetMouseX(), ofGetMouseY());
-    }else if(e.key == OF_KEY_BACKSPACE){
-        popUpMenu->setVisible(false);
-        toMoveNodes.clear();
-        selectedRect = ofRectangle(0,0,0,0);
+    if(searchField->ofxDatGuiComponent::getFocused()){
+        if(e.key == OF_KEY_RETURN){
+            if(searchedOptions.size() != 0){
+                ofxDatGuiDropdownEvent e(searchedOptions[0].first, 0, searchedOptions[0].second);
+                newModuleListener(e);
+            }
+        }
+    }else{
+        if(e.key == ' '){
+            //glfwSetCursor((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), openedHandCursor);
+            if(ofGetMousePressed()) dragCanvasInitialPoint = glm::vec2(ofGetMouseX(), ofGetMouseY());
+        }else if(e.key == OF_KEY_BACKSPACE){
+            popUpMenu->setVisible(false);
+            searchField->setFocused(false);
+            toMoveNodes.clear();
+            selectedRect = ofRectangle(0,0,0,0);
+        }
     }
 }
 
@@ -128,6 +200,8 @@ void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
     if(ofGetKeyPressed(OF_KEY_CONTROL)){
 #endif
         if(e.button == 0){
+            searchField->setText("");
+            searchField->setFocused(true);
             popUpMenu->setPosition(e.x, e.y);
             popUpMenu->setVisible(true);
         }
@@ -138,18 +212,6 @@ void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
     if(ofGetKeyPressed(' ')){
         dragCanvasInitialPoint = e;
     }
-//    if(ofGetKeyPressed(OF_KEY_CONTROL)){
-//        bool cablePressed = false;
-//        for(auto connection : connections){
-//            if(connection->hitTest(transformedPos) && !cablePressed){
-//                connection->toggleGui(true, e);
-//                cablePressed = true;
-//            }
-//            else if(connection->closedLine){
-//                connection->toggleGui(false);
-//            }
-//        }
-//    }
     if(ofGetKeyPressed(OF_KEY_ALT)){
         selectInitialPoint = transformedPos;
         selectEndPoint = transformedPos;
@@ -194,10 +256,6 @@ void ofxOceanodeCanvas::mouseScrolled(ofMouseEventArgs &e){
         float scrollValue = -e.scrollY/100.0;
         transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(e, 0) * getMatrixScale(transformationMatrix->get()) * scrollValue));
         transformationMatrix->set(glm::scale(transformationMatrix->get(), glm::vec3(1-(scrollValue), 1-(scrollValue), 1)));
-//        if(e.scrollY < 0)
-//        glfwSetCursor((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), zoomInCursor);
-//        else
-//        glfwSetCursor((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), zoomOutCursor);
     }else if(ofGetKeyPressed(OF_KEY_ALT)){
         transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(e.scrollY*2, 0, 0)));
     }else{
