@@ -112,7 +112,6 @@ void ofxOceanodeCanvas::newModuleListener(ofxDatGuiDropdownEvent e){
 }
 
 void ofxOceanodeCanvas::searchListener(ofxDatGuiTextInputEvent e){
-    ofLog() << e.text << e.confirmed;
     searchedOptions.clear();
     if(e.text != ""){
         for(auto drop : modulesSelectors){
