@@ -810,6 +810,50 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
         }
     };
     
+    auto modulateParameterFromOscMessage = [this](ofAbstractParameter& absParam, ofxOscMessage& m){
+        if(absParam.type() == typeid(ofParameter<float>).name()){
+            ofParameter<float> castedParam = absParam.cast<float>();
+            castedParam = ofClamp(castedParam + m.getArgAsFloat(0), castedParam.getMin(), castedParam.getMax());
+        }else if(absParam.type() == typeid(ofParameter<int>).name()){
+            ofParameter<int> castedParam = absParam.cast<int>();
+            if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_FLOAT){
+                int range = castedParam.getMax() - castedParam.getMin();
+                castedParam += ofMap(m.getArgAsFloat(0), 0, 1, -range, range, true);
+            }else{
+                castedParam += ofClamp(castedParam+m.getArgAsInt(0), castedParam.getMin(), castedParam.getMax());
+            }
+        }else if(absParam.type() == typeid(ofParameter<bool>).name()){
+            absParam.cast<bool>() = !absParam.cast<bool>();
+        }else if(absParam.type() == typeid(ofParameterGroup).name()){
+            absParam.castGroup().getInt(1) += m.getArgAsInt(0);
+        }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
+            ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>();
+            vector<float> tempVec;
+            tempVec.resize(m.getNumArgs(), 0);
+            for(int i = 0; i < tempVec.size(); i++){
+                tempVec[i] = ofClamp(tempVec[i] + m.getArgAsFloat(i), castedParam.getMin()[0], castedParam.getMax()[0]);
+            }
+            castedParam = tempVec;
+        }
+        else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
+            ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>();
+            vector<int> tempVec;
+            tempVec.resize(m.getNumArgs(), 0);
+            if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_FLOAT){
+                int range = castedParam.getMax()[0] - castedParam.getMin()[0];
+                for(int i = 0; i < tempVec.size(); i++){
+                    tempVec[i] += ofMap(m.getArgAsFloat(i), 0, 1, -range, range, true);
+                }
+            }
+            else if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT32 || m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT64){
+                for(int i = 0; i < tempVec.size(); i++){
+                    tempVec[i] = ofClamp(tempVec[i]+m.getArgAsInt(i), castedParam.getMin()[0], castedParam.getMax()[0]);
+                }
+            }
+            castedParam = tempVec;
+        }
+    };
+    
     while(oscReceiver.hasWaitingMessages()){
         ofxOscMessage m;
         oscReceiver.getNextMessage(m);
@@ -891,6 +935,50 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
             if(splitAddress[0] == "presetLoad"){
                 string bankAndPreset = splitAddress[1] + "/" + splitAddress[2];
                 ofNotifyEvent(loadPresetEvent, bankAndPreset);
+            }else if(splitAddress[0] == "relative"){
+                if(splitAddress[1] == "Global"){
+                    for(auto &nodeType  : dynamicNodes){
+                        for(auto &node : nodeType.second){
+                            shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
+                            if(groupParam->contains(splitAddress[1])){
+                                ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                                modulateParameterFromOscMessage(absParam, m);
+                            }
+                        }
+                    }
+                    for(auto &nodeType  : persistentNodes){
+                        for(auto &node : nodeType.second){
+                            shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
+                            if(groupParam->contains(splitAddress[1])){
+                                ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                                modulateParameterFromOscMessage(absParam, m);
+                            }
+                        }
+                    }
+                }else{
+                    string moduleName = splitAddress[1];
+                    string moduleId = ofSplitString(moduleName, "_").back();
+                    moduleName.erase(moduleName.find(moduleId)-1);
+                    ofStringReplace(moduleName, "_", " ");
+                    if(dynamicNodes.count(moduleName) == 1){
+                        if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
+                            shared_ptr<ofParameterGroup> groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                            if(groupParam->contains(splitAddress[1])){
+                                ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                                modulateParameterFromOscMessage(absParam, m);
+                            }
+                        }
+                    }
+                    if(persistentNodes.count(moduleName) == 1){
+                        if(persistentNodes[moduleName].count(ofToInt(moduleId))){
+                            shared_ptr<ofParameterGroup> groupParam = persistentNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                            if(groupParam->contains(splitAddress[1])){
+                                ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                                modulateParameterFromOscMessage(absParam, m);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
