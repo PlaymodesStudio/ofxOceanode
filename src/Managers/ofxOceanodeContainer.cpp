@@ -531,6 +531,110 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 #endif
 }
 
+bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referencePosition){
+    string presetFolderPath = "clipboardPreset";
+    ofLog()<<"Load Clipboard Preset";
+    
+    window->makeCurrent();
+    ofGetMainLoop()->setCurrentWindow(window);
+    
+    map<string, map<int, int>> moduleConverter;
+    vector<ofxOceanodeNode*> newCreatedNodes;
+    
+    ofJson json = ofLoadJson(presetFolderPath + "/modules.json");
+    for (ofJson::iterator nodeType = json.begin(); nodeType != json.end(); ++nodeType) {
+        for(ofJson::iterator nodeId = nodeType.value().begin(); nodeId != nodeType.value().end(); ++nodeId){
+            ofLog() << nodeType.key() << " " << nodeId.key();
+            auto node = createNodeFromName(nodeType.key());
+#ifndef OFXOCEANODE_HEADLESS
+            node->getNodeGui().setPosition(glm::vec2(nodeId.value()[0], nodeId.value()[1]) + referencePosition);
+#endif
+            newCreatedNodes.push_back(node);
+            int newNodeId = node->getNodeModel().getNumIdentifier();
+            moduleConverter[nodeType.key()][ofToInt(nodeId.key())] = newNodeId;
+            ofJson tempJson = ofLoadJson(presetFolderPath + "/" + nodeType.key() + "_" + ofToString(nodeId.key()) + ".json");
+            ofSaveJson(presetFolderPath + "/" + nodeType.key() + "_" + ofToString(newNodeId) + ".json", tempJson);
+        }
+    }
+
+    
+
+    for(auto node : newCreatedNodes){
+        node->loadPresetBeforeConnections(presetFolderPath);
+    }
+    
+    
+    json.clear();
+    json = ofLoadJson(presetFolderPath + "/connections.json");
+    for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
+        for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
+            for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
+                for (ofJson::iterator sinkParameter = sinkModule.value().begin(); sinkParameter != sinkModule.value().end(); ++sinkParameter) {
+                    string sourceMappedModule = sourceModule.key();
+                    string sourceMappedModuleId = ofSplitString(sourceMappedModule, "_").back();
+                    sourceMappedModule.erase(sourceMappedModule.find(sourceMappedModuleId)-1);
+                    sourceMappedModule += "_" + ofToString(moduleConverter[sourceMappedModule][ofToInt(sourceMappedModuleId)]);
+                    
+                    string sinkMappedModule = sinkModule.key();
+                    string sinkMappedModuleId = ofSplitString(sinkMappedModule, "_").back();
+                    sinkMappedModule.erase(sinkMappedModule.find(sinkMappedModuleId)-1);
+                    sinkMappedModule += "_" + ofToString(moduleConverter[sinkMappedModule][ofToInt(sinkMappedModuleId)]);
+                    
+                    createConnectionFromInfo(sourceMappedModule, sourceParameter.key(), sinkMappedModule, sinkParameter.key());
+                }
+            }
+        }
+    }
+//
+    for(auto node : newCreatedNodes){
+        node->loadPreset(presetFolderPath);
+    }
+    
+    for(auto node : newCreatedNodes){
+        node->presetHasLoaded();
+    }
+
+    return true;
+}
+
+void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanodeNode*> nodes, glm::vec2 referencePosition){
+    string presetFolderPath = "clipboardPreset";
+    ofLog()<< "Save Clipboard Preset";
+    
+    vector<string> nodeAsParentNames;
+    
+    ofJson json;
+    for(auto &node : nodes){
+        nodeAsParentNames.push_back(node->getParameters()->getEscapedName());
+        glm::vec2 pos(0,0);
+#ifndef OFXOCEANODE_HEADLESS
+        pos = node->getNodeGui().getPosition();
+#endif
+        json[node->getNodeModel().nodeName()][ofToString(node->getNodeModel().getNumIdentifier())] = {pos.x - referencePosition.x, pos.y - referencePosition.y};
+    }
+    ofSavePrettyJson(presetFolderPath + "/modules.json", json);
+    
+    json.clear();
+    for(auto &connection : connections){
+        if(!connection.second->getIsPersistent()){
+            string sourceName = connection.second->getSourceParameter().getName();
+            string sourceParentName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];
+            string sinkName = connection.second->getSinkParameter().getName();
+            string sinkParentName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];
+            if(std::find(nodeAsParentNames.begin(), nodeAsParentNames.end(), sourceParentName) != nodeAsParentNames.end() &&
+               std::find(nodeAsParentNames.begin(), nodeAsParentNames.end(), sinkParentName) != nodeAsParentNames.end()){
+                json[sourceParentName][sourceName][sinkParentName][sinkName];
+            }
+        }
+    }
+    
+    ofSavePrettyJson(presetFolderPath + "/connections.json", json);
+    
+    for(auto &node : nodes){
+        node->savePreset(presetFolderPath);
+    }
+}
+
 void ofxOceanodeContainer::savePersistent(){
     ofLog()<<"Save Persistent";
     string persistentFolderPath = "Persistent";
@@ -924,7 +1028,8 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
 #endif
 
 #ifndef OFXOCEANODE_HEADLESS
-vector<ofxOceanodeNodeGui*> ofxOceanodeContainer::getModulesInRectangle(ofRectangle rect, bool entire){
+
+vector<ofxOceanodeNodeGui*> ofxOceanodeContainer::getModulesGuiInRectangle(ofRectangle rect, bool entire){
     vector<ofxOceanodeNodeGui*> tempVec;
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
@@ -940,6 +1045,35 @@ vector<ofxOceanodeNodeGui*> ofxOceanodeContainer::getModulesInRectangle(ofRectan
     }
     return tempVec;
 }
+
+vector<ofxOceanodeNode*> ofxOceanodeContainer::getModulesInRectangle(ofRectangle rect, bool entire){
+    vector<ofxOceanodeNode*> tempVec;
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            auto &nodeGui = node.second->getNodeGui();
+            if(entire){
+                if(rect.inside(nodeGui.getRectangle()))
+                    tempVec.push_back(node.second.get());
+            }else{
+                if(rect.intersects(nodeGui.getRectangle()))
+                    tempVec.push_back(node.second.get());
+            }
+        }
+    }
+    return tempVec;
+}
+
+bool ofxOceanodeContainer::copyModulesAndConnectionsInsideRect(ofRectangle rect, bool entire){
+    vector<ofxOceanodeNode*> modulesToCopy = getModulesInRectangle(rect, entire);
+    if(modulesToCopy.size() == 0) return false;
+    saveClipboardModulesAndConnections(modulesToCopy, rect.getPosition());
+    return true;
+}
+
+bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 position){
+    return loadClipboardModulesAndConnections(position);
+}
+
 #endif
 
 #ifdef OFXOCEANODE_USE_MIDI

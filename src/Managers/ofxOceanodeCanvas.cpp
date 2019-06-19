@@ -173,6 +173,19 @@ void ofxOceanodeCanvas::keyPressed(ofKeyEventArgs &e){
             toMoveNodes.clear();
             selectedRect = ofRectangle(0,0,0,0);
         }
+#ifdef TARGET_OSX
+        else if(ofGetKeyPressed(OF_KEY_COMMAND)){
+#else
+        else if(ofGetKeyPressed(OF_KEY_CONTROL)){
+#endif
+            if(e.key == 'c' || e.key == 'C'){
+                container->copyModulesAndConnectionsInsideRect(selectedRect, entireSelect);
+                toMoveNodes.clear();
+                selectedRect = ofRectangle(0,0,0,0);
+            }else if(e.key == 'v' || e.key == 'V'){
+                container->pasteModulesAndConnectionsInPosition(screenToCanvas(glm::vec2(ofGetMouseX(), ofGetMouseY())));
+            }
+        }
     }
 }
 
@@ -235,7 +248,7 @@ void ofxOceanodeCanvas::mouseReleased(ofMouseEventArgs &e){
             entireSelect = true;
         
         toMoveNodes.clear();
-        for(auto nodeGui : container->getModulesInRectangle(selectedRect, entireSelect)){
+        for(auto nodeGui : container->getModulesGuiInRectangle(selectedRect, entireSelect)){
             toMoveNodes.push_back(make_pair(nodeGui, nodeGui->getPosition()));
         }
         if(toMoveNodes.size() == 0){

@@ -80,6 +80,9 @@ public:
     bool loadPreset(string presetFolderPath);
     void savePreset(string presetFolderPath);
     
+    bool loadClipboardModulesAndConnections(glm::vec2 referencePosition);
+    void saveClipboardModulesAndConnections(vector<ofxOceanodeNode*> nodes, glm::vec2 referencePosition);
+    
     void savePersistent();
     void loadPersistent();
     void updatePersistent();
@@ -116,7 +119,10 @@ public:
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
     
 #ifndef OFXOCEANODE_HEADLESS
-    vector<ofxOceanodeNodeGui*> getModulesInRectangle(ofRectangle rect, bool entire);
+    vector<ofxOceanodeNodeGui*> getModulesGuiInRectangle(ofRectangle rect, bool entire);
+    vector<ofxOceanodeNode*> getModulesInRectangle(ofRectangle rect, bool entire);
+    bool copyModulesAndConnectionsInsideRect(ofRectangle rect, bool entire);
+    bool pasteModulesAndConnectionsInPosition(glm::vec2 position);
 #endif
     
 private:
