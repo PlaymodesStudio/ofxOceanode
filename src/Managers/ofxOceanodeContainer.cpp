@@ -551,9 +551,11 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
 #endif
             newCreatedNodes.push_back(node);
             int newNodeId = node->getNodeModel().getNumIdentifier();
-            moduleConverter[nodeType.key()][ofToInt(nodeId.key())] = newNodeId;
-            ofJson tempJson = ofLoadJson(presetFolderPath + "/" + nodeType.key() + "_" + ofToString(nodeId.key()) + ".json");
-            ofSaveJson(presetFolderPath + "/" + nodeType.key() + "_" + ofToString(newNodeId) + ".json", tempJson);
+            string escapedNodeName = nodeType.key();
+            ofStringReplace(escapedNodeName, " ", "_");
+            moduleConverter[escapedNodeName][ofToInt(nodeId.key())] = newNodeId;
+            ofJson tempJson = ofLoadJson(presetFolderPath + "/" + escapedNodeName + "_" + ofToString(nodeId.key()) + ".json");
+            ofSaveJson(presetFolderPath + "/" + escapedNodeName + "_" + ofToString(newNodeId) + ".json", tempJson);
         }
     }
 
