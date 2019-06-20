@@ -38,6 +38,9 @@ public:
     ofxOceanodeContainer(std::shared_ptr<ofxOceanodeNodeRegistry> _registry = nullptr, std::shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry = nullptr);
     ~ofxOceanodeContainer();
     
+    void update(ofEventArgs &a);
+    void draw(ofEventArgs &a);
+    
     ofxOceanodeNode* createNodeFromName(string name, int identifier = -1, bool isPersistent = false);
     ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier = -1, bool isPersistent = false);
     
@@ -102,7 +105,7 @@ public:
 #ifdef OFXOCEANODE_USE_OSC
     void setupOscSender(string host, int port);
     void setupOscReceiver(int port);
-    void update(ofEventArgs &args);
+    void receiveOsc();
 #endif
     
 #ifdef OFXOCEANODE_USE_MIDI
@@ -144,6 +147,7 @@ private:
     ofEventListeners destroyConnectionListeners;
     
     ofEventListener updateListener;
+    ofEventListener drawListener;
     
     shared_ptr<ofAppBaseWindow> window;
     

@@ -29,9 +29,8 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     phase = 0;
     collapseAll = false;
     
-#ifdef OFXOCEANODE_USE_OSC
     updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
-#endif
+    drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
     
 #ifdef OFXOCEANODE_USE_MIDI
     ofxMidiIn* midiIn = new ofxMidiIn();
@@ -56,6 +55,41 @@ ofxOceanodeContainer::~ofxOceanodeContainer(){
     connections.clear();
     dynamicNodes.clear();
     persistentNodes.clear();
+}
+
+void ofxOceanodeContainer::update(ofEventArgs &args){
+#ifdef OFXOCEANODE_USE_OSC
+    receiveOsc();
+#endif
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            if(node.second->getActive())
+                node.second->getNodeModel().update(args);
+        }
+    }
+    
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            if(node.second->getActive())
+                node.second->getNodeModel().update(args);
+        }
+    }
+}
+
+void ofxOceanodeContainer::draw(ofEventArgs &args){
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            if(node.second->getActive())
+                node.second->getNodeModel().draw(args);
+        }
+    }
+    
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            if(node.second->getActive())
+                node.second->getNodeModel().draw(args);
+        }
+    }
 }
 
 ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstractParameter& p, ofxOceanodeNode& n){
@@ -116,7 +150,6 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
         toBeCreatedId = lastId;
     }
     nodeModel->setNumIdentifier(toBeCreatedId);
-    nodeModel->registerLoop(window);
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
     node->setup();
 #ifndef OFXOCEANODE_HEADLESS
@@ -889,7 +922,7 @@ void ofxOceanodeContainer::setupOscReceiver(int port){
     oscReceiver.setup(port);
 }
 
-void ofxOceanodeContainer::update(ofEventArgs &args){
+void ofxOceanodeContainer::receiveOsc(){
     
     auto setParameterFromMidiMessage = [this](ofAbstractParameter& absParam, ofxOscMessage& m){
         if(absParam.type() == typeid(ofParameter<float>).name()){

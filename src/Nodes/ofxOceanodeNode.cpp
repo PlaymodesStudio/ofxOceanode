@@ -33,6 +33,7 @@ ofxOceanodeNode::~ofxOceanodeNode(){
 
 void ofxOceanodeNode::setup(){
     nodeModel->setup();
+    active = true;
 }
 
 #ifndef OFXOCEANODE_HEADLESS
@@ -471,4 +472,14 @@ bool ofxOceanodeNode::checkHasInConnection(ofAbstractParameter &p){
 
 shared_ptr<ofParameterGroup> ofxOceanodeNode::getParameters(){
     return nodeModel->getParameterGroup();
+}
+
+void ofxOceanodeNode::setActive(bool act){
+    if(act == active) return;
+    active = act;
+    if(active){
+        nodeGui->enable();
+    }else{
+        nodeGui->disable();
+    }
 }

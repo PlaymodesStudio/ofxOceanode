@@ -75,6 +75,9 @@ public:
     
     bool checkHasInConnection(ofAbstractParameter &p);
     
+    void setActive(bool act);
+    bool getActive(){return active;};
+    
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
     ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteConnections;
     ofEvent<glm::vec2> duplicateModule;
@@ -95,6 +98,7 @@ private:
     ofEventListeners nodeModelListeners;
     
     bool isPersistent;
+    bool active;
 };
 
 #endif /* ofxOceanodeNode_h */

@@ -276,6 +276,14 @@ void ofxOceanodeNodeGui::expand(){
     }
 }
 
+void ofxOceanodeNodeGui::enable(){
+    gui->setVisible(true);
+}
+
+void ofxOceanodeNodeGui::disable(){
+    gui->setVisible(false);
+}
+
 
 void ofxOceanodeNodeGui::keyPressed(ofKeyEventArgs &args){
     if(args.key == 'r' && !args.isRepeat){

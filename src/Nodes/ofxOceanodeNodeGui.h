@@ -34,6 +34,9 @@ public:
     void collapse();
     void expand();
     
+    void enable();
+    void disable();
+    
     glm::vec2 getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter);
     glm::vec2 getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter);
     void setTransformationMatrix(ofParameter<glm::mat4> *mat);
