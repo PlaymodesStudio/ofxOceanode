@@ -192,7 +192,7 @@ void ofxOceanodeCanvas::keyPressed(ofKeyEventArgs &e){
 void ofxOceanodeCanvas::mouseDragged(ofMouseEventArgs &e){
     glm::vec2 transformedPos = screenToCanvas(e);
     if(ofGetKeyPressed(' ')){
-        transformationMatrix->set(translateMatrixWithoutScale(transformationMatrix->get(), glm::vec3(dragCanvasInitialPoint-e, 0)));
+        transformationMatrix->set(glm::translate(transformationMatrix->get(), glm::vec3(dragCanvasInitialPoint-e, 0)));
         dragCanvasInitialPoint = e;
     }else if(selecting){
         selectEndPoint = transformedPos;
