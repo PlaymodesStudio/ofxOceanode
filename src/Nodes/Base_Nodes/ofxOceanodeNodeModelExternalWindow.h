@@ -29,6 +29,7 @@ public:
     
 protected:
     virtual void drawInExternalWindow(ofEventArgs &e){};
+    virtual void setupForExternalWindow(){};
     virtual void updateForExternalWindow(ofEventArgs &e){};
     virtual void closeExternalWindow(ofEventArgs &e);
     virtual void keyPressed(ofKeyEventArgs &a){};

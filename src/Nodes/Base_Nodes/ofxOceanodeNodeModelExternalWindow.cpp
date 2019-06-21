@@ -87,6 +87,7 @@ void ofxOceanodeNodeModelExternalWindow::showExternalWindow(bool &b){
         windowListenerEvents.push(externalWindow->events().mouseExited.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseExited));
         windowListenerEvents.push(externalWindow->events().windowResized.newListener(this, &ofxOceanodeNodeModelExternalWindow::windowResizedOwnEvent));
         windowListenerEvents.push(externalWindow->events().fileDragEvent.newListener(this, &ofxOceanodeNodeModelExternalWindow::dragEvent));
+        setupForExternalWindow();
     }
     else if(!b && externalWindow != nullptr){
         externalWindow->setWindowShouldClose();
