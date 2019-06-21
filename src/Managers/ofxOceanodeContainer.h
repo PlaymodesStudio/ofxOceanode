@@ -126,6 +126,7 @@ public:
     vector<ofxOceanodeNode*> getModulesInRectangle(ofRectangle rect, bool entire);
     bool copyModulesAndConnectionsInsideRect(ofRectangle rect, bool entire);
     bool pasteModulesAndConnectionsInPosition(glm::vec2 position);
+    void setWindow(std::shared_ptr<ofAppBaseWindow> window);
 #endif
     
 private:

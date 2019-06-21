@@ -1133,6 +1133,19 @@ bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 positi
     return loadClipboardModulesAndConnections(position);
 }
 
+void ofxOceanodeContainer::setWindow(std::shared_ptr<ofAppBaseWindow> _window){
+    window = _window;
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            auto &nodeGui = node.second->getNodeGui();
+            nodeGui.setWindow(window);
+        }
+    }
+    for(auto &connection : connections){
+        connection.second->getGraphics().subscribeToDrawEvent(window);
+    }
+}
+
 #endif
 
 #ifdef OFXOCEANODE_USE_MIDI

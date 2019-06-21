@@ -78,6 +78,7 @@ public:
     void deactivate(){points[1] = glm::vec2(-1, -1);};
     
     void subscribeToDrawEvent(shared_ptr<ofAppBaseWindow> w){
+        drawEventListener.unsubscribe();
         if(w == nullptr){
             drawEventListener = ofEvents().draw.newListener(this , &ofxOceanodeConnectionGraphics::draw, OF_EVENT_ORDER_BEFORE_APP);
         }else{

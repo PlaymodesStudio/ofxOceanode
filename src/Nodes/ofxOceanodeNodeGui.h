@@ -34,6 +34,8 @@ public:
     void collapse();
     void expand();
     
+    void setWindow(shared_ptr<ofAppBaseWindow> window);
+    
     void enable();
     void disable();
     

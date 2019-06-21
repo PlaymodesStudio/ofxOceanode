@@ -25,7 +25,7 @@ public:
     ~ofxOceanodeCanvas(){};
     
     
-    void setup();
+    void setup(std::shared_ptr<ofAppBaseWindow> window = ofGetCurrentWindow());
     void update(ofEventArgs &args){};
     void draw(ofEventArgs &args);
     

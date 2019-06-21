@@ -14,14 +14,21 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 
-void ofxOceanodeCanvas::setup(){
+void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){
     ofSetWindowTitle("Canvas");
     
-    listeners.push(ofEvents().update.newListener(this, &ofxOceanodeCanvas::update));
-    listeners.push(ofEvents().draw.newListener(this, &ofxOceanodeCanvas::draw));
+    listeners.push(window->events().update.newListener(this, &ofxOceanodeCanvas::update));
+    listeners.push(window->events().draw.newListener(this, &ofxOceanodeCanvas::draw));
     
-    ofRegisterKeyEvents(this);
-    ofRegisterMouseEvents(this);
+    listeners.push(window->events().mouseDragged.newListener(this,&ofxOceanodeCanvas::mouseDragged));
+    listeners.push(window->events().mouseMoved.newListener(this,&ofxOceanodeCanvas::mouseMoved));
+    listeners.push(window->events().mousePressed.newListener(this,&ofxOceanodeCanvas::mousePressed));
+    listeners.push(window->events().mouseReleased.newListener(this,&ofxOceanodeCanvas::mouseReleased));
+    listeners.push(window->events().mouseScrolled.newListener(this,&ofxOceanodeCanvas::mouseScrolled));
+    listeners.push(window->events().mouseEntered.newListener(this,&ofxOceanodeCanvas::mouseEntered));
+    listeners.push(window->events().mouseExited.newListener(this,&ofxOceanodeCanvas::mouseExited));
+    listeners.push(window->events().keyPressed.newListener(this, &ofxOceanodeCanvas::keyPressed));
+    listeners.push(window->events().keyReleased.newListener(this, &ofxOceanodeCanvas::keyReleased));
     
     transformationMatrix = &container->getTransformationMatrix();
     

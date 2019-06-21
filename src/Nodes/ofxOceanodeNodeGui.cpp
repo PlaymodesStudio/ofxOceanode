@@ -276,6 +276,32 @@ void ofxOceanodeNodeGui::expand(){
     }
 }
 
+void ofxOceanodeNodeGui::setWindow(shared_ptr<ofAppBaseWindow> window){
+    keyAndMouseListeners.unsubscribeAll();
+    if(window == nullptr){
+        keyAndMouseListeners.push(ofEvents().keyPressed.newListener(this,&ofxOceanodeNodeGui::keyPressed));
+        keyAndMouseListeners.push(ofEvents().keyReleased.newListener(this,&ofxOceanodeNodeGui::keyReleased));
+        keyAndMouseListeners.push(ofEvents().mouseDragged.newListener(this,&ofxOceanodeNodeGui::mouseDragged));
+        keyAndMouseListeners.push(ofEvents().mouseMoved.newListener(this,&ofxOceanodeNodeGui::mouseMoved));
+        keyAndMouseListeners.push(ofEvents().mousePressed.newListener(this,&ofxOceanodeNodeGui::mousePressed));
+        keyAndMouseListeners.push(ofEvents().mouseReleased.newListener(this,&ofxOceanodeNodeGui::mouseReleased));
+        keyAndMouseListeners.push(ofEvents().mouseScrolled.newListener(this,&ofxOceanodeNodeGui::mouseScrolled));
+        keyAndMouseListeners.push(ofEvents().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
+        keyAndMouseListeners.push(ofEvents().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
+    }else{
+        keyAndMouseListeners.push(window->events().keyPressed.newListener(this,&ofxOceanodeNodeGui::keyPressed));
+        keyAndMouseListeners.push(window->events().keyReleased.newListener(this,&ofxOceanodeNodeGui::keyReleased));
+        keyAndMouseListeners.push(window->events().mouseDragged.newListener(this,&ofxOceanodeNodeGui::mouseDragged));
+        keyAndMouseListeners.push(window->events().mouseMoved.newListener(this,&ofxOceanodeNodeGui::mouseMoved));
+        keyAndMouseListeners.push(window->events().mousePressed.newListener(this,&ofxOceanodeNodeGui::mousePressed));
+        keyAndMouseListeners.push(window->events().mouseReleased.newListener(this,&ofxOceanodeNodeGui::mouseReleased));
+        keyAndMouseListeners.push(window->events().mouseScrolled.newListener(this,&ofxOceanodeNodeGui::mouseScrolled));
+        keyAndMouseListeners.push(window->events().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
+        keyAndMouseListeners.push(window->events().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
+    }
+    gui->setWindow(window);
+}
+
 void ofxOceanodeNodeGui::enable(){
     gui->setVisible(true);
 }
