@@ -240,6 +240,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
         config.remove();
     }));
     
+    newNodeCreated.notify(this, nodePtr);
     return *nodePtr;
 }
 

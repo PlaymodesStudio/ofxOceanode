@@ -101,6 +101,7 @@ public:
     ofEvent<string> loadPresetEvent;
     ofEvent<float> changedBpmEvent;
     ofEvent<void> saveCurrentPresetEvent;
+    ofEvent<ofxOceanodeNode*> newNodeCreated;
     
 #ifdef OFXOCEANODE_USE_OSC
     void setupOscSender(string host, int port);
