@@ -40,9 +40,9 @@ void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){
     popUpMenu->setPosition(-1, -1);
     searchField = popUpMenu->addTextInput("Search: ");
     searchField->setNotifyEachChange(true);
-    auto const &models = container->getRegistry().getRegisteredModels();
-    auto const &categories = container->getRegistry().getCategories();
-    auto const &categoriesModelsAssociation = container->getRegistry().getRegisteredModelsCategoryAssociation();
+    auto const &models = container->getRegistry()->getRegisteredModels();
+    auto const &categories = container->getRegistry()->getCategories();
+    auto const &categoriesModelsAssociation = container->getRegistry()->getRegisteredModelsCategoryAssociation();
     
     vector<string> categoriesVector;
     for(auto cat : categories){
@@ -97,7 +97,7 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
 }
 
 void ofxOceanodeCanvas::newModuleListener(ofxDatGuiDropdownEvent e){
-    unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry().create(e.target->getChildAt(e.child)->getName());
+    unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(e.target->getChildAt(e.child)->getName());
     
     if (type)
     {

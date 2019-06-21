@@ -78,7 +78,7 @@ public:
     ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter);
     ofxOceanodeAbstractConnection* createConnectionFromCustomType(ofAbstractParameter &source, ofAbstractParameter &sink);
     
-    ofxOceanodeNodeRegistry & getRegistry(){return *registry;};
+    shared_ptr<ofxOceanodeNodeRegistry> getRegistry(){return registry;};
     
     bool loadPreset(string presetFolderPath);
     void savePreset(string presetFolderPath);
