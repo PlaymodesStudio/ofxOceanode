@@ -17,22 +17,25 @@ ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOcea
     position = glm::vec2(10, 10);
     guiToBeDestroyed = false;
     lastExpandedState = true;
+    isGuiCreated = false;
 #ifdef OFXOCEANODE_USE_MIDI
     isListeningMidi = false;
 #endif
+    transformationMatrix = nullptr;
     
+    if(window != nullptr)
+        createGuiFromParameters(window);
     
-    createGuiFromParameters(window);
     if(window == nullptr){
-        keyAndMouseListeners.push(ofEvents().keyPressed.newListener(this,&ofxOceanodeNodeGui::keyPressed));
-        keyAndMouseListeners.push(ofEvents().keyReleased.newListener(this,&ofxOceanodeNodeGui::keyReleased));
-        keyAndMouseListeners.push(ofEvents().mouseDragged.newListener(this,&ofxOceanodeNodeGui::mouseDragged));
-        keyAndMouseListeners.push(ofEvents().mouseMoved.newListener(this,&ofxOceanodeNodeGui::mouseMoved));
-        keyAndMouseListeners.push(ofEvents().mousePressed.newListener(this,&ofxOceanodeNodeGui::mousePressed));
-        keyAndMouseListeners.push(ofEvents().mouseReleased.newListener(this,&ofxOceanodeNodeGui::mouseReleased));
-        keyAndMouseListeners.push(ofEvents().mouseScrolled.newListener(this,&ofxOceanodeNodeGui::mouseScrolled));
-        keyAndMouseListeners.push(ofEvents().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
-        keyAndMouseListeners.push(ofEvents().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
+//        keyAndMouseListeners.push(ofEvents().keyPressed.newListener(this,&ofxOceanodeNodeGui::keyPressed));
+//        keyAndMouseListeners.push(ofEvents().keyReleased.newListener(this,&ofxOceanodeNodeGui::keyReleased));
+//        keyAndMouseListeners.push(ofEvents().mouseDragged.newListener(this,&ofxOceanodeNodeGui::mouseDragged));
+//        keyAndMouseListeners.push(ofEvents().mouseMoved.newListener(this,&ofxOceanodeNodeGui::mouseMoved));
+//        keyAndMouseListeners.push(ofEvents().mousePressed.newListener(this,&ofxOceanodeNodeGui::mousePressed));
+//        keyAndMouseListeners.push(ofEvents().mouseReleased.newListener(this,&ofxOceanodeNodeGui::mouseReleased));
+//        keyAndMouseListeners.push(ofEvents().mouseScrolled.newListener(this,&ofxOceanodeNodeGui::mouseScrolled));
+//        keyAndMouseListeners.push(ofEvents().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
+//        keyAndMouseListeners.push(ofEvents().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
     }else{
         keyAndMouseListeners.push(window->events().keyPressed.newListener(this,&ofxOceanodeNodeGui::keyPressed));
         keyAndMouseListeners.push(window->events().keyReleased.newListener(this,&ofxOceanodeNodeGui::keyReleased));
@@ -127,6 +130,8 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
     }else{
         gui->setPosition(position.x, position.y);
     }
+    if(transformationMatrix != nullptr)
+        gui->setTransformMatrix(ofMatrix4x4(transformationMatrix->get()));
     
     //GUIS EVENT LISTERNERS
     gui->onButtonEvent(this, &ofxOceanodeNodeGui::onGuiButtonEvent);
@@ -136,6 +141,8 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
     gui->onColorPickerEvent(this, &ofxOceanodeNodeGui::onGuiColorPickerEvent);
     gui->onMatrixEvent(this, &ofxOceanodeNodeGui::onGuiMatrixEvent);
     gui->onRightClickEvent(this, &ofxOceanodeNodeGui::onGuiRightClickEvent);
+    
+    isGuiCreated = true;
 }
 
 void ofxOceanodeNodeGui::updateGui(){
@@ -246,12 +253,14 @@ shared_ptr<ofParameterGroup> ofxOceanodeNodeGui::getParameters(){
 }
 
 void ofxOceanodeNodeGui::setPosition(glm::vec2 _position){
-    gui->setPosition(_position.x, _position.y);
+    if(gui != nullptr)
+        gui->setPosition(_position.x, _position.y);
     node.moveConnections(_position - position);
     position = _position;
 }
 
 glm::vec2 ofxOceanodeNodeGui::getPosition(){
+    if(gui == nullptr) return position;
     return glm::vec2(gui->getPosition().x, gui->getPosition().y);
 }
 
@@ -278,16 +287,20 @@ void ofxOceanodeNodeGui::expand(){
 
 void ofxOceanodeNodeGui::setWindow(shared_ptr<ofAppBaseWindow> window){
     keyAndMouseListeners.unsubscribeAll();
+    
+    if(window != nullptr && !isGuiCreated)
+        createGuiFromParameters(window);
+    
     if(window == nullptr){
-        keyAndMouseListeners.push(ofEvents().keyPressed.newListener(this,&ofxOceanodeNodeGui::keyPressed));
-        keyAndMouseListeners.push(ofEvents().keyReleased.newListener(this,&ofxOceanodeNodeGui::keyReleased));
-        keyAndMouseListeners.push(ofEvents().mouseDragged.newListener(this,&ofxOceanodeNodeGui::mouseDragged));
-        keyAndMouseListeners.push(ofEvents().mouseMoved.newListener(this,&ofxOceanodeNodeGui::mouseMoved));
-        keyAndMouseListeners.push(ofEvents().mousePressed.newListener(this,&ofxOceanodeNodeGui::mousePressed));
-        keyAndMouseListeners.push(ofEvents().mouseReleased.newListener(this,&ofxOceanodeNodeGui::mouseReleased));
-        keyAndMouseListeners.push(ofEvents().mouseScrolled.newListener(this,&ofxOceanodeNodeGui::mouseScrolled));
-        keyAndMouseListeners.push(ofEvents().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
-        keyAndMouseListeners.push(ofEvents().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
+//        keyAndMouseListeners.push(ofEvents().keyPressed.newListener(this,&ofxOceanodeNodeGui::keyPressed));
+//        keyAndMouseListeners.push(ofEvents().keyReleased.newListener(this,&ofxOceanodeNodeGui::keyReleased));
+//        keyAndMouseListeners.push(ofEvents().mouseDragged.newListener(this,&ofxOceanodeNodeGui::mouseDragged));
+//        keyAndMouseListeners.push(ofEvents().mouseMoved.newListener(this,&ofxOceanodeNodeGui::mouseMoved));
+//        keyAndMouseListeners.push(ofEvents().mousePressed.newListener(this,&ofxOceanodeNodeGui::mousePressed));
+//        keyAndMouseListeners.push(ofEvents().mouseReleased.newListener(this,&ofxOceanodeNodeGui::mouseReleased));
+//        keyAndMouseListeners.push(ofEvents().mouseScrolled.newListener(this,&ofxOceanodeNodeGui::mouseScrolled));
+//        keyAndMouseListeners.push(ofEvents().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
+//        keyAndMouseListeners.push(ofEvents().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
     }else{
         keyAndMouseListeners.push(window->events().keyPressed.newListener(this,&ofxOceanodeNodeGui::keyPressed));
         keyAndMouseListeners.push(window->events().keyReleased.newListener(this,&ofxOceanodeNodeGui::keyReleased));
@@ -299,7 +312,8 @@ void ofxOceanodeNodeGui::setWindow(shared_ptr<ofAppBaseWindow> window){
         keyAndMouseListeners.push(window->events().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
         keyAndMouseListeners.push(window->events().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
     }
-    gui->setWindow(window);
+    collapse();
+    expand();
 }
 
 void ofxOceanodeNodeGui::enable(){
@@ -418,6 +432,7 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
 }
 
 glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter){
+    if(gui == nullptr) return glm::vec2(0,0);
     auto component = gui->getExpanded() ? gui->getComponent(parameter.getName()) : gui->getHeader();
     if(component == NULL){
         component = gui->getComponent(parameter.getName() + " Selector");
@@ -429,6 +444,7 @@ glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofAbstrac
 }
 
 glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter){
+    if(gui == nullptr) return glm::vec2(0,0);
     auto component = gui->getExpanded() ? gui->getComponent(parameter.getName()) : gui->getHeader();
     if(component == NULL){
         component = gui->getComponent(parameter.getName() + " Selector");
@@ -441,9 +457,12 @@ glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofAbstractP
 
 void ofxOceanodeNodeGui::setTransformationMatrix(ofParameter<glm::mat4> *mat){
     transformationMatrix = mat;
-    gui->setTransformMatrix(ofMatrix4x4(mat->get()));
+    if(gui != nullptr)
+        gui->setTransformMatrix(ofMatrix4x4(mat->get()));
+    
     transformMatrixListener = transformationMatrix->newListener([&](glm::mat4 &m){
-        gui->setTransformMatrix(ofMatrix4x4(transformationMatrix->get()));
+        if(gui != nullptr)
+            gui->setTransformMatrix(ofMatrix4x4(transformationMatrix->get()));
     });
 }
 

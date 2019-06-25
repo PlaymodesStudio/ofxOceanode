@@ -86,6 +86,7 @@ private:
     
     bool guiToBeDestroyed;
     bool lastExpandedState;
+    bool isGuiCreated;
     
 #ifdef OFXOCEANODE_USE_MIDI
     bool isListeningMidi;

@@ -254,8 +254,10 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     ofStringReplace(presetFolderPath, " ", "_");
     ofLog()<<"Load Preset " << presetFolderPath;
     
-    window->makeCurrent();
-    ofGetMainLoop()->setCurrentWindow(window);
+    if(window != nullptr){
+        window->makeCurrent();
+        ofGetMainLoop()->setCurrentWindow(window);
+    }
     
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
@@ -570,8 +572,10 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
     string presetFolderPath = "clipboardPreset";
     ofLog()<<"Load Clipboard Preset";
     
-    window->makeCurrent();
-    ofGetMainLoop()->setCurrentWindow(window);
+    if(window != nullptr){
+        window->makeCurrent();
+        ofGetMainLoop()->setCurrentWindow(window);
+    }
     
     map<string, map<int, int>> moduleConverter;
     vector<ofxOceanodeNode*> newCreatedNodes;
@@ -733,8 +737,10 @@ void ofxOceanodeContainer::loadPersistent(){
     ofLog()<<"Load Persistent";
     string persistentFolderPath = "Persistent";
     
-    window->makeCurrent();
-    ofGetMainLoop()->setCurrentWindow(window);
+    if(window != nullptr){
+        window->makeCurrent();
+        ofGetMainLoop()->setCurrentWindow(window);
+    }
     
     //Read new nodes in preset
     //Check if the nodes exists and update them, (or update all at the end)
