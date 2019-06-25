@@ -23,7 +23,7 @@ public:
     }
     
     void setupValueParameter(){
-        value.set(T());
+        value.set({0});
         value.setMin({0});
         value.setMax({1});
     }
