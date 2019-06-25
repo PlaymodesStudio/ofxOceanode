@@ -86,9 +86,11 @@ void ofxOceanodeNodeMacro::setup(){
         if(inletOutletCreated){
             parameterGroupChanged.notify(this);
             deleteListeners.push(node->deleteModuleAndConnections.newListener([this, node](vector<ofxOceanodeAbstractConnection*> &c){
-                parameters->remove(node->getParameters()->getName());
-                inoutListeners.erase(node->getParameters()->getName());
+                string nodeName = node->getParameters()->getName();
+                parameters->remove(nodeName);
+                inoutListeners.erase(nodeName);
                 parameterGroupChanged.notify(this);
+                disconnectConnectionsForParameter.notify(nodeName);
             }, 0));
         }
     });
