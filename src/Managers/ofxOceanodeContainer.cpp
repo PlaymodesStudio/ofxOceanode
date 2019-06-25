@@ -468,7 +468,8 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
                         }
                     }
                     if(!connectionExist){
-                        createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key())->setActive(false);
+                        auto connection = createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key());
+                        if(connection != nullptr) connection->setActive(false);
                     }
                 }
             }
