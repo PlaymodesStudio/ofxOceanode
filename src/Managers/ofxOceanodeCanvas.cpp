@@ -35,9 +35,8 @@ void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){
     ofxDatGui::setAssetPath("");
     
     ///POP UP MENuS
-    popUpMenu = new ofxDatGui();
+    popUpMenu = new ofxDatGui(-1, -1, window);
     popUpMenu->setVisible(false);
-    popUpMenu->setPosition(-1, -1);
     searchField = popUpMenu->addTextInput("Search: ");
     searchField->setNotifyEachChange(true);
     auto const &models = container->getRegistry()->getRegisteredModels();
