@@ -288,8 +288,11 @@ void ofxOceanodeNodeGui::expand(){
 void ofxOceanodeNodeGui::setWindow(shared_ptr<ofAppBaseWindow> window){
     keyAndMouseListeners.unsubscribeAll();
     
-    if(window != nullptr && !isGuiCreated)
+    if(window != nullptr && !isGuiCreated){
         createGuiFromParameters(window);
+    }else{
+        gui->setWindow(window);
+    }
     
     if(window == nullptr){
 //        keyAndMouseListeners.push(ofEvents().keyPressed.newListener(this,&ofxOceanodeNodeGui::keyPressed));
