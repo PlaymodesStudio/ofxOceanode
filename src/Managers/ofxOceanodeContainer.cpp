@@ -150,6 +150,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
         toBeCreatedId = lastId;
     }
     nodeModel->setNumIdentifier(toBeCreatedId);
+    nodeModel->setContainer(this);
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
     node->setup();
 #ifndef OFXOCEANODE_HEADLESS

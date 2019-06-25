@@ -53,6 +53,7 @@ public:
     bool getAutoBPM(){return autoBPM;};
     virtual void setBpm(float _bpm){};
     virtual void setPhase(float _phase){};
+    virtual void setContainer(ofxOceanodeContainer* container){};
     
     virtual void presetSave(ofJson &json){};
     virtual void presetRecallBeforeSettingParameters(ofJson &json){};
