@@ -17,5 +17,6 @@
 #include "smoother.h"
 #include "localPresetController.h"
 #include "switcher.h"
+#include "ofxOceanodeNodeMacro.h"
 
 #endif /* defaultNodes_h */
