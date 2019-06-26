@@ -17,7 +17,7 @@ public:
     router(string name) : ofxOceanodeNodeModel(name){};
     void setup(){
         setupValueParameter();
-        addParameterToGroupAndInfo(value).acceptInConnection = false;
+        valueInfo = &addParameterToGroupAndInfo(value);
         addParameterToGroupAndInfo(min.set("Min", "0")).acceptInConnection = false;
         addParameterToGroupAndInfo(max.set("Max", "1")).acceptInConnection = false;
     }
@@ -29,6 +29,7 @@ public:
     }
     
 protected:
+    parameterInfo *valueInfo;
     ofParameter<T> value;
     ofParameter<string> min;
     ofParameter<string> max;
@@ -41,6 +42,7 @@ public:
     void setup(){
         this->value.setName("Input");
         router<T>::setup();
+        this->valueInfo->acceptInConnection = false;
     }
 };
 
@@ -51,6 +53,7 @@ public:
     void setup(){
         this->value.setName("Output");
         router<T>::setup();
+        this->valueInfo->acceptOutConnection = false;
     }
 };
 
