@@ -146,6 +146,7 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
 }
 
 void ofxOceanodeNodeGui::updateGui(){
+    if(!isGuiCreated) return;
     for(int i=0 ; i<getParameters()->size(); i++){
         ofAbstractParameter &absParam = getParameters()->get(i);
         if(gui->getComponent(absParam.getName()) == NULL){
@@ -216,6 +217,7 @@ void ofxOceanodeNodeGui::updateGui(){
 
 
 void ofxOceanodeNodeGui::updateGuiForParameter(string &parameterName){
+    if(!isGuiCreated) return;
     ofAbstractParameter &absParam = getParameters()->get(parameterName);
     if(absParam.type() == typeid(ofParameter<float>).name()){
         auto slider = gui->getSlider(absParam.getName());
@@ -240,6 +242,7 @@ void ofxOceanodeNodeGui::updateGuiForParameter(string &parameterName){
 }
 
 void ofxOceanodeNodeGui::updateDropdown(string &dropdownName){
+    if(!isGuiCreated) return;
     auto dropdown = gui->getDropdown(dropdownName);
     dropdown->clear();
     for(auto option : ofSplitString(getParameters()->getGroup(dropdownName).getString(0), "-|-")){
