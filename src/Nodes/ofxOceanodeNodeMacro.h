@@ -79,8 +79,7 @@ private:
     shared_ptr<ofxOceanodeNodeRegistry> registry;
     
     ofEventListener newNodeListener;
-    vector<ofParameter<float>> inputs;
-    vector<ofParameter<float>> outputs;
+    std::unordered_map<string, ofAbstractParameter*> paramsStore;
     
     std::unordered_map<string, ofEventListeners> inoutListeners;
     ofEventListeners deleteListeners;
