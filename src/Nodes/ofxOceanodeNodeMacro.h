@@ -14,7 +14,7 @@
 template<typename T, typename Enable = void>
 class router : public ofxOceanodeNodeModel{
 public:
-    router(string name) : ofxOceanodeNodeModel(name){};
+    router(string name) : ofxOceanodeNodeModel(name){};// + " " + typeid(T).name()){};
     void setup(){
         setupValueParameter();
         valueInfo = &addParameterToGroupAndInfo(value);
@@ -74,15 +74,28 @@ public:
     void loadBeforeConnections(ofJson &json);
     
 private:
+    void newNodeCreated(ofxOceanodeNode* &node);
+    
     ofxOceanodeCanvas* canvas;
     shared_ptr<ofxOceanodeContainer> container;
     shared_ptr<ofxOceanodeNodeRegistry> registry;
     
     ofEventListener newNodeListener;
     std::unordered_map<string, ofAbstractParameter*> paramsStore;
-    
     std::unordered_map<string, ofEventListeners> inoutListeners;
     ofEventListeners deleteListeners;
+    
+    string presetPath;
+    ofParameter<int> bank;
+    vector<string> bankNames;
+    ofParameter<int> preset;
+    int currentPreset;
+    ofParameter<string> savePresetField;
+    vector<string> presetsInBank;
+    ofParameter<string> presetName;
+    ofParameter<bool> savePreset;
+    
+    ofEventListeners presetActionsListeners;
 };
 
 #endif /* ofxOceanodeNodeMacro_h */
