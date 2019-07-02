@@ -64,6 +64,11 @@ public:
     virtual void presetHasLoaded(){};
     virtual void loadBeforeConnections(ofJson &json){};
     
+    void deserializeParameter(ofJson &json, ofAbstractParameter &p){
+        auto pair = std::make_pair(json, p.getName());
+        deserializeParameterEvent.notify(pair);
+    }
+    
     ofColor getColor(){return color;};
     
     parameterInfo& addParameterToGroupAndInfo(ofAbstractParameter& p);
@@ -86,7 +91,7 @@ public:
         dropdownGroups.back().add(dropdownSelector.set(name, 0, 0, options.size()-1));
         return dropdownGroups.back();
     }
-    
+    ofEvent<std::pair<ofJson, string>> deserializeParameterEvent;
 protected:
     shared_ptr<ofParameterGroup> parameters;
     std::map<string, parameterInfo> parametersInfo; //information about interaction of parameter

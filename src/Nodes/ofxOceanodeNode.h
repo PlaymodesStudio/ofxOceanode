@@ -60,6 +60,8 @@ public:
     void presetHasLoaded();
     void loadPresetBeforeConnections(string presetFolderPath);
     
+    void deserializeParameter(ofJson &json, ofAbstractParameter &p, bool persistentPreset = false);
+    
     bool loadConfig(string filename, bool persistentPreset = false);
     void saveConfig(string filename, bool persistentPreset = false);
     

@@ -25,6 +25,9 @@ ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel)
         }
         ofNotifyEvent(deleteConnections, toDeleteConnections);
     }));
+    nodeModelListeners.push(nodeModel->deserializeParameterEvent.newListener([this](std::pair<ofJson, string> pair){
+        deserializeParameter(pair.first, getParameters()->get(pair.second));
+    }));
 }
 
 ofxOceanodeNode::~ofxOceanodeNode(){
@@ -392,43 +395,47 @@ bool ofxOceanodeNode::loadParametersFromJson(ofJson json, bool persistentPreset)
     for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
         if(getParameters()->contains(it.key())){
             ofAbstractParameter& p = getParameters()->get(it.key());
-            if(((!persistentPreset && nodeModel->getParameterInfo(p).isSavePreset) || (persistentPreset && nodeModel->getParameterInfo(p).isSaveProject))){
-                if(p.type() == typeid(ofParameter<float>).name()){
-                    ofDeserialize(json, p);
-                }else if(p.type() == typeid(ofParameter<int>).name()){
-                    ofDeserialize(json, p);
-                }
-                else if(p.type() == typeid(ofParameter<bool>).name()){
-                    ofDeserialize(json, p);
-                }
-                else if(p.type() == typeid(ofParameter<ofColor>).name()){
-                    ofDeserialize(json, p);
-                }
-                else if(p.type() == typeid(ofParameter<string>).name()){
-                    ofDeserialize(json, p);
-                }
-                else if(p.type() == typeid(ofParameter<vector<float>>).name()){
-                    float value = 0;
-                    if(it.value().is_string()){
-                        p.cast<vector<float>>() = vector<float>(1, ofToFloat(it.value()));
-                    }else{
-                        p.cast<vector<float>>() = vector<float>(1, float(it.value()));
-                    }
-                }
-                else if(p.type() == typeid(ofParameter<vector<int>>).name()){
-                    if(it.value().is_string()){
-                        p.cast<vector<int>>() = vector<int>(1, ofToInt(it.value()));
-                    }else{
-                        p.cast<vector<int>>() = vector<int>(1, int(it.value()));
-                    }
-                }
-                else if(p.type() == typeid(ofParameterGroup).name()){
-                    p.castGroup().getInt(1).fromString(json[p.getEscapedName()]);
-                }
-            }
+            deserializeParameter(json, p, persistentPreset);
         }
     }
     return true;
+}
+
+void ofxOceanodeNode::deserializeParameter(ofJson &json, ofAbstractParameter &p, bool persistentPreset){
+    if(((!persistentPreset && nodeModel->getParameterInfo(p).isSavePreset) || (persistentPreset && nodeModel->getParameterInfo(p).isSaveProject))){
+        if(p.type() == typeid(ofParameter<float>).name()){
+            ofDeserialize(json, p);
+        }else if(p.type() == typeid(ofParameter<int>).name()){
+            ofDeserialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<bool>).name()){
+            ofDeserialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<ofColor>).name()){
+            ofDeserialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<string>).name()){
+            ofDeserialize(json, p);
+        }
+        else if(p.type() == typeid(ofParameter<vector<float>>).name()){
+            float value = 0;
+            if(json[p.getEscapedName()].is_string()){
+                p.cast<vector<float>>() = vector<float>(1, ofToFloat(json[p.getEscapedName()]));
+            }else{
+                p.cast<vector<float>>() = vector<float>(1, float(json[p.getEscapedName()]));
+            }
+        }
+        else if(p.type() == typeid(ofParameter<vector<int>>).name()){
+            if(json[p.getEscapedName()].is_string()){
+                p.cast<vector<int>>() = vector<int>(1, ofToInt(json[p.getEscapedName()]));
+            }else{
+                p.cast<vector<int>>() = vector<int>(1, int(json[p.getEscapedName()]));
+            }
+        }
+        else if(p.type() == typeid(ofParameterGroup).name()){
+            p.castGroup().getInt(1).fromString(json[p.getEscapedName()]);
+        }
+    }
 }
 
 void ofxOceanodeNode::setBpm(float bpm){
