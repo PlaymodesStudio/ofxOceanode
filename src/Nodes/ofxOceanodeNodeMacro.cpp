@@ -37,7 +37,9 @@ void ofxOceanodeNodeMacro::setup(){
             bankNames.push_back(dir.getName(i));
         }
     }
-    addParameterToGroupAndInfo(createDropdownAbstractParameter("Bank", bankNames, bank));
+    
+    bankDropdown = &createDropdownAbstractParameter("Bank", bankNames, bank);
+    addParameterToGroupAndInfo(*bankDropdown);
     
     vector<pair<int, string>> presets;
     presetsInBank = {"None"};
@@ -59,7 +61,9 @@ void ofxOceanodeNodeMacro::setup(){
     }
     
     addParameterToGroupAndInfo(savePreset.set("Save Preset?", false));
-    addParameterToGroupAndInfo(createDropdownAbstractParameter("Preset", presetsInBank, preset));
+    
+    presetDropdown = &createDropdownAbstractParameter("Preset", presetsInBank, preset);
+    addParameterToGroupAndInfo(*presetDropdown);
     
     addParameterToGroupAndInfo(savePresetField.set("Save Preset", "")).isSavePreset = false;
     
@@ -250,4 +254,6 @@ void ofxOceanodeNodeMacro::loadBeforeConnections(ofJson &json){
         container->loadPreset(path);
         presetPath = path;
     }
+    deserializeParameter(json, *bankDropdown);
+    deserializeParameter(json, *presetDropdown);
 }

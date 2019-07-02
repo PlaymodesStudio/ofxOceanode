@@ -87,8 +87,10 @@ private:
     
     string presetPath;
     ofParameter<int> bank;
+    ofAbstractParameter* bankDropdown;
     vector<string> bankNames;
     ofParameter<int> preset;
+    ofAbstractParameter* presetDropdown;
     int currentPreset;
     ofParameter<string> savePresetField;
     vector<string> presetsInBank;
