@@ -28,7 +28,7 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     bpm = 120;
     phase = 0;
     collapseAll = false;
-    
+    autoUpdateAndDraw = true;
     updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
     drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
     
@@ -1144,6 +1144,10 @@ bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 positi
 
 void ofxOceanodeContainer::setWindow(std::shared_ptr<ofAppBaseWindow> _window){
     window = _window;
+    if(window != nullptr && autoUpdateAndDraw){
+        updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
+        drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
+    }
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             auto &nodeGui = node.second->getNodeGui();
@@ -1152,6 +1156,17 @@ void ofxOceanodeContainer::setWindow(std::shared_ptr<ofAppBaseWindow> _window){
     }
     for(auto &connection : connections){
         connection.second->getGraphics().subscribeToDrawEvent(window);
+    }
+}
+
+void ofxOceanodeContainer::setAutoUpdateAndDraw(bool b){
+    autoUpdateAndDraw = b;
+    if(b){
+        updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
+        drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
+    }else{
+        updateListener.unsubscribe();
+        drawListener.unsubscribe();
     }
 }
 

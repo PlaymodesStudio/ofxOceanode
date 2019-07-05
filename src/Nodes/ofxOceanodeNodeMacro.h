@@ -83,6 +83,9 @@ public:
     };
     
     void setup();
+    void update(ofEventArgs &a);
+    void draw(ofEventArgs &a);
+    
     void setContainer(ofxOceanodeContainer* container);
     
     void setupForExternalWindow();

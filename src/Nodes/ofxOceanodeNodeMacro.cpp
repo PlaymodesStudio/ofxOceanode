@@ -13,6 +13,14 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModelExternalWindo
     currentPreset = -1;
 }
 
+void ofxOceanodeNodeMacro::update(ofEventArgs &a){
+    container->update(a);
+}
+
+void ofxOceanodeNodeMacro::draw(ofEventArgs &a){
+    container->draw(a);
+}
+
 void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
     registry = container->getRegistry();
     typesRegistry = container->getTypesRegistry();
@@ -24,6 +32,7 @@ void ofxOceanodeNodeMacro::setup(){
     registry->registerModel<inlet<ofTexture*>>("I/O");
     registry->registerModel<outlet<ofTexture*>>("I/O");
     container = make_shared<ofxOceanodeContainer>(registry, typesRegistry);
+    container->setAutoUpdateAndDraw(false);
     container->setWindow(nullptr);
     newNodeListener = container->newNodeCreated.newListener(this, &ofxOceanodeNodeMacro::newNodeCreated);
     ofDirectory dir;

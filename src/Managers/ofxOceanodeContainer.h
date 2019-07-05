@@ -128,6 +128,7 @@ public:
     bool copyModulesAndConnectionsInsideRect(ofRectangle rect, bool entire);
     bool pasteModulesAndConnectionsInPosition(glm::vec2 position);
     void setWindow(std::shared_ptr<ofAppBaseWindow> window);
+    void setAutoUpdateAndDraw(bool b);
 #endif
     
 private:
@@ -150,6 +151,7 @@ private:
     
     ofEventListener updateListener;
     ofEventListener drawListener;
+    bool autoUpdateAndDraw;
     
     shared_ptr<ofAppBaseWindow> window;
     
