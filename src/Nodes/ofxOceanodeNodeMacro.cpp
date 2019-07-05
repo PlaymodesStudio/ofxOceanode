@@ -15,6 +15,89 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModelExternalWindo
 
 void ofxOceanodeNodeMacro::update(ofEventArgs &a){
     container->update(a);
+    auto currentBankLocale = std::filesystem::last_write_time(ofToDataPath("MacroPresets/"));
+    auto currentPresetInBankLocale = std::filesystem::last_write_time(ofToDataPath("MacroPresets/" + bankNames[bank] + "/"));
+    if(currentBankLocale != bankLastChanged){
+        string currentBank = bankNames[bank];
+        ofDirectory dir;
+        dir.open("MacroPresets");
+        dir.sort();
+        bankNames.clear();
+        for(int i = 0; i < dir.listDir(); i++){
+            if(dir.getName(i) != "Project"){
+                bankNames.push_back(dir.getName(i));
+            }
+        }
+        string  tempStr;
+        for(auto opt : bankNames)
+            tempStr += opt + "-|-";
+        tempStr.erase(tempStr.end()-3, tempStr.end());
+        if(tempStr != bankDropdown->castGroup().getString(0).get()){ //Added a bank
+            bankDropdown->castGroup().getString(0) = tempStr;
+            string paramName = bankDropdown->getName();
+            dropdownChanged.notify(paramName);
+            auto currentBankPos = std::find(bankNames.begin(), bankNames.end(), currentBank);
+            if(currentBankPos != bankNames.end())
+                bank.set(std::distance(bankNames.begin(), currentBankPos));
+        }
+        bankLastChanged = currentBankLocale;
+    }
+    else if(currentPresetInBankLocale != presetsInBankLastChanged){
+        vector<pair<int, string>> presets;
+        presetsInBank = {"None"};
+        ofDirectory dir;
+        dir.open("MacroPresets/" + bankNames[bank]);
+        dir.sort();
+        int numPresets = dir.listDir();
+        for ( int i = 0 ; i < numPresets; i++){
+            presets.push_back(pair<int, string>(ofToInt(ofSplitString(dir.getName(i), "--")[0]), dir.getName(i)));
+        }
+        
+        std::sort(presets.begin(), presets.end(), [](pair<int, string> &left, pair<int, string> &right) {
+            return left.first< right.first;
+        });
+        
+        for(auto &p : presets){
+            presetsInBank.push_back(p.second);
+        }
+        string  tempStr;
+        for(auto opt : presetsInBank)
+            tempStr += opt + "-|-";
+        tempStr.erase(tempStr.end()-3, tempStr.end());
+        if(tempStr != presetDropdown->castGroup().getString(0).get()){ //Added a bank
+            presetDropdown->castGroup().getString(0) = tempStr;
+            string paramName = presetDropdown->getName();
+            dropdownChanged.notify(paramName);
+        }
+        presetsInBankLastChanged = currentPresetInBankLocale;
+    }
+    else if(preset != 0){
+        ofDirectory dir;
+        dir.open("MacroPresets/" + bankNames[bank] + "/" + presetsInBank[preset] + "/");
+        bool presetChanged = false;
+        if(dir.listDir() != presetLastChanged.size()) presetChanged = true;
+        else{
+            for(int i = 0; i < dir.listDir(); i++){
+                if(presetLastChanged.count(dir.getPath(i)) == 0){
+                    presetChanged = true;
+                    break;
+                }
+                if(presetLastChanged[dir.getPath(i)] != std::filesystem::last_write_time(ofToDataPath(dir.getPath(i)))){
+                    presetChanged = true;
+                    break;
+                }
+            }
+        }
+        if(presetChanged){
+            container->loadPreset("MacroPresets/" + bankNames[bank] + "/" + presetsInBank[preset]);
+            ofDirectory dir;
+            dir.open("MacroPresets/" + bankNames[bank] + "/" + presetsInBank[preset] + "/");
+            presetLastChanged.clear();
+            for(int i = 0; i < dir.listDir(); i++){
+                presetLastChanged[dir.getPath(i)] = std::filesystem::last_write_time(ofToDataPath(dir.getPath(i)));
+            }
+        }
+    }
 }
 
 void ofxOceanodeNodeMacro::draw(ofEventArgs &a){
@@ -39,10 +122,11 @@ void ofxOceanodeNodeMacro::setup(){
     if(!dir.doesDirectoryExist("MacroPresets")){
         dir.createDirectory("MacroPresets");
     }
+    bankLastChanged = std::filesystem::last_write_time(ofToDataPath("MacroPresets"));
     dir.open("MacroPresets");
     dir.sort();
-    if(dir.listDir() == 0) dir.createDirectory("Other");
-    if(dir.listDir() == 1 && dir.getName(0) == "Project") dir.createDirectory("Other");
+    if(dir.listDir() == 0) dir.createDirectory("MacroPresets/Other");
+    if(dir.listDir() == 1 && dir.getName(0) == "Project") dir.createDirectory("MacroPresets/Other");
     for(int i = 0; i < dir.listDir(); i++){
         if(dir.getName(i) != "Project"){
             bankNames.push_back(dir.getName(i));
@@ -113,7 +197,13 @@ void ofxOceanodeNodeMacro::setup(){
             
             ofStringReplace(newPresetName, " ", "_");
             presetsInBank.push_back(newPresetName);
-            container->savePreset("MacroPresets/" + bankNames[bank] + "/" + newPresetName);
+            container->savePreset("MacroPresets/" + bankNames[bank] + "/" + newPresetName + "/");
+            ofDirectory dir;
+            dir.open("MacroPresets/" + bankNames[bank] + "/" + newPresetName);
+            presetLastChanged.clear();
+            for(int i = 0; i < dir.listDir(); i++){
+                presetLastChanged[dir.getPath(i)] = std::filesystem::last_write_time(ofToDataPath(dir.getPath(i)));
+            }
             s = "";
             string name = "Preset Selector";
             string optionsString = parameters->getGroup(name).getString(0);
@@ -132,6 +222,12 @@ void ofxOceanodeNodeMacro::setup(){
                 savePreset = false;
             }else{
                 container->loadPreset("MacroPresets/" + bankNames[bank] + "/" + presetsInBank[i]);
+            }
+            ofDirectory dir;
+            dir.open("MacroPresets/" + bankNames[bank] + "/" + presetsInBank[i] + "/");
+            presetLastChanged.clear();
+            for(int i = 0; i < dir.listDir(); i++){
+                presetLastChanged[dir.getPath(i)] = std::filesystem::last_write_time(ofToDataPath(dir.getPath(i)));
             }
         }
     }));
@@ -273,6 +369,8 @@ void ofxOceanodeNodeMacro::presetSave(ofJson &json){
         //}
         json["preset"] = presetPath;
         container->savePreset(presetPath);
+    }else{
+        json["BankName"] = bankNames[bank];
     }
 }
 
@@ -283,6 +381,12 @@ void ofxOceanodeNodeMacro::loadBeforeConnections(ofJson &json){
         container->loadPreset(path);
         presetPath = path;
     }
-    deserializeParameter(json, *bankDropdown);
+    else if(json.count("BankName") != 0){
+        string bankName = json["BankName"];
+        auto BankNamePos = std::find(bankNames.begin(), bankNames.end(), bankName);
+        if(BankNamePos != bankNames.end())
+            bank.set(std::distance(bankNames.begin(), BankNamePos));
+    }
+    else deserializeParameter(json, *bankDropdown);
     deserializeParameter(json, *presetDropdown);
 }
