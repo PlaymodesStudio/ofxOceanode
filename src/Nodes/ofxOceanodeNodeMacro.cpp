@@ -19,9 +19,10 @@ void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
 }
 
 void ofxOceanodeNodeMacro::setup(){
-    auto treg = make_shared<ofxOceanodeTypesRegistry>();
     registry->registerModel<inlet<vector<float>>>("I/O");
     registry->registerModel<outlet<vector<float>>>("I/O");
+    registry->registerModel<inlet<ofTexture*>>("I/O");
+    registry->registerModel<outlet<ofTexture*>>("I/O");
     container = make_shared<ofxOceanodeContainer>(registry, typesRegistry);
     container->setWindow(nullptr);
     newNodeListener = container->newNodeCreated.newListener(this, &ofxOceanodeNodeMacro::newNodeCreated);
@@ -202,6 +203,24 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
                 parameters->get<vector<float>>(node->getParameters()->getName()).setMax(vector<float>(1, f));
                 parameterName = node->getParameters()->getName();
                 ofNotifyEvent(parameterChangedMinMax, parameterName);
+            }));
+        }
+    }else if(node->getNodeModel().nodeName() == "Inlet Tex"){
+        if(node->getParameters()->get("Input").type() == typeid(ofParameter<ofTexture*>).name()){
+            ofParameter<ofTexture*> *input = new ofParameter<ofTexture*>();
+            paramsStore[nodeName] = input;
+            parameters->add(input->set(nodeName, nullptr));
+            inoutListeners[node->getParameters()->getName()].push(input->newListener([this, node](ofTexture* &f){
+                node->getParameters()->get<ofTexture*>("Input") = f;
+            }));
+        }
+    }else if(node->getNodeModel().nodeName() == "Outlet Tex"){
+        if(node->getParameters()->get("Output").type() == typeid(ofParameter<ofTexture*>).name()){
+            ofParameter<ofTexture*> *output = new ofParameter<ofTexture*>();
+            paramsStore[nodeName] = output;
+            parameters->add(output->set(node->getParameters()->getName(), nullptr));
+            inoutListeners[node->getParameters()->getName()].push(node->getParameters()->get<ofTexture*>("Output").newListener([this, output](ofTexture* &f){
+                parameters->get<ofTexture*>(output->getName()) = f;
             }));
         }
     }else{

@@ -35,6 +35,24 @@ protected:
     ofParameter<string> max;
 };
 
+template<>
+class router<ofTexture*> : public ofxOceanodeNodeModel{
+public:
+    router(string name) : ofxOceanodeNodeModel(name + " Tex"){};// + " " + typeid(T).name()){};
+    void setup(){
+        setupValueParameter();
+        valueInfo = &addParameterToGroupAndInfo(value);
+    }
+    
+    void setupValueParameter(){
+        value.set(nullptr);
+    }
+    
+protected:
+    parameterInfo *valueInfo;
+    ofParameter<ofTexture*> value;
+};
+
 template<typename T>
 class inlet : public router<T>{
 public:
