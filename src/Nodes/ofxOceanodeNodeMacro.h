@@ -79,6 +79,7 @@ private:
     ofxOceanodeCanvas* canvas;
     shared_ptr<ofxOceanodeContainer> container;
     shared_ptr<ofxOceanodeNodeRegistry> registry;
+    shared_ptr<ofxOceanodeTypesRegistry> typesRegistry;
     
     ofEventListener newNodeListener;
     std::unordered_map<string, ofAbstractParameter*> paramsStore;

@@ -15,13 +15,14 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModelExternalWindo
 
 void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
     registry = container->getRegistry();
+    typesRegistry = container->getTypesRegistry();
 }
 
 void ofxOceanodeNodeMacro::setup(){
     auto treg = make_shared<ofxOceanodeTypesRegistry>();
     registry->registerModel<inlet<vector<float>>>("I/O");
     registry->registerModel<outlet<vector<float>>>("I/O");
-    container = make_shared<ofxOceanodeContainer>(registry, treg);
+    container = make_shared<ofxOceanodeContainer>(registry, typesRegistry);
     container->setWindow(nullptr);
     newNodeListener = container->newNodeCreated.newListener(this, &ofxOceanodeNodeMacro::newNodeCreated);
     ofDirectory dir;
