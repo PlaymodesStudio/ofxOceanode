@@ -14,9 +14,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 
-void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){
-    ofSetWindowTitle("Canvas");
-    
+void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){    
     listeners.push(window->events().update.newListener(this, &ofxOceanodeCanvas::update));
     listeners.push(window->events().draw.newListener(this, &ofxOceanodeCanvas::draw));
     
