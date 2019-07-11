@@ -464,6 +464,8 @@ void ofxOceanodeNode::resetPhase(){
 #endif
     if(getParameters()->contains("Reset Phase")){
         getParameters()->getVoid("Reset Phase").trigger();
+    }else{
+        nodeModel->resetPhase();
     }
 }
 

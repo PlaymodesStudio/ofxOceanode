@@ -94,6 +94,9 @@ public:
     void presetSave(ofJson &json);
     void loadBeforeConnections(ofJson &json);
     
+    void setBpm(float bpm){container->setBpm(bpm);};
+    void resetPhase(){container->resetPhase();};
+    
 private:
     void newNodeCreated(ofxOceanodeNode* &node);
     
