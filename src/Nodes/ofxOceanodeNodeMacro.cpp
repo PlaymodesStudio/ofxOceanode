@@ -134,7 +134,12 @@ void ofxOceanodeNodeMacro::setup(){
     }
     
     bankDropdown = &createDropdownAbstractParameter("Bank", bankNames, bank);
-    addParameterToGroupAndInfo(*bankDropdown);
+    addParameterToGroupAndInfo(*bankDropdown).isSavePreset = false;
+    auto BankNamePos = std::find(bankNames.begin(), bankNames.end(), "Other");
+    if(BankNamePos != bankNames.end()){
+        bank.set(std::distance(bankNames.begin(), BankNamePos));
+    }
+    previousBank = bank;
     
     vector<pair<int, string>> presets;
     presetsInBank = {"None"};
@@ -163,24 +168,37 @@ void ofxOceanodeNodeMacro::setup(){
     addParameterToGroupAndInfo(savePresetField.set("Save Preset", "")).isSavePreset = false;
     
     presetActionsListeners.push(bank.newListener([this](int &i){
-        vector<pair<int, string>> presets;
-        presetsInBank = {"None"};
-        ofDirectory dir;
-        dir.open("MacroPresets/" + bankNames[i]);
-        if(!dir.exists())
-            dir.createDirectory("MacroPresets/" + bankNames[i]);
-        dir.sort();
-        int numPresets = dir.listDir();
-        for ( int i = 0 ; i < numPresets; i++){
-            presets.push_back(pair<int, string>(ofToInt(ofSplitString(dir.getName(i), "--")[0]), dir.getName(i)));
-        }
-        
-        std::sort(presets.begin(), presets.end(), [](pair<int, string> &left, pair<int, string> &right) {
-            return left.first< right.first;
-        });
-        
-        for(auto &p : presets){
-            presetsInBank.push_back(p.second);
+        if(previousBank != bank){
+            vector<pair<int, string>> presets;
+            presetsInBank = {"None"};
+            ofDirectory dir;
+            dir.open("MacroPresets/" + bankNames[i]);
+            if(!dir.exists())
+                dir.createDirectory("MacroPresets/" + bankNames[i]);
+            dir.sort();
+            int numPresets = dir.listDir();
+            for ( int i = 0 ; i < numPresets; i++){
+                presets.push_back(pair<int, string>(ofToInt(ofSplitString(dir.getName(i), "--")[0]), dir.getName(i)));
+            }
+            
+            std::sort(presets.begin(), presets.end(), [](pair<int, string> &left, pair<int, string> &right) {
+                return left.first< right.first;
+            });
+            
+            for(auto &p : presets){
+                presetsInBank.push_back(p.second);
+            }
+            string  tempStr;
+            for(auto opt : presetsInBank)
+                tempStr += opt + "-|-";
+            tempStr.erase(tempStr.end()-3, tempStr.end());
+            if(tempStr != presetDropdown->castGroup().getString(0).get()){ //Added a bank
+                presetDropdown->castGroup().getString(0) = tempStr;
+                string paramName = presetDropdown->getName();
+                dropdownChanged.notify(paramName);
+            }
+            preset = 0;
+            previousBank = bank;
         }
     }));
     

@@ -112,6 +112,7 @@ private:
     
     string presetPath;
     ofParameter<int> bank;
+    int previousBank;
     ofAbstractParameter* bankDropdown;
     vector<string> bankNames;
     ofParameter<int> preset;
