@@ -75,6 +75,7 @@ void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){
     popUpMenu->onTextInputEvent(this, &ofxOceanodeCanvas::searchListener);
     selectedRect = ofRectangle(0, 0, 0, 0);
     dragModulesInitialPoint = glm::vec2(NAN, NAN);
+    selecting = false;
 }
 
 void ofxOceanodeCanvas::draw(ofEventArgs &args){
