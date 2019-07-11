@@ -950,28 +950,36 @@ void ofxOceanodeContainer::receiveOsc(){
             absParam.castGroup().getInt(1) = m.getArgAsInt(0);
         }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
             ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>();
-            vector<float> tempVec;
-            tempVec.resize(m.getNumArgs(), 0);
-            for(int i = 0; i < tempVec.size(); i++){
-                tempVec[i] = ofMap(m.getArgAsFloat(i), 0, 1, castedParam.getMin()[0], castedParam.getMax()[0], true);
-            }
-            castedParam = tempVec;
-        }
-        else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
-            ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>();
-            vector<int> tempVec;
-            tempVec.resize(m.getNumArgs(), 0);
-            if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_FLOAT){
+            if(m.getNumArgs() == 0){
+                castedParam = castedParam;;
+            }else{
+                vector<float> tempVec;
+                tempVec.resize(m.getNumArgs(), 0);
                 for(int i = 0; i < tempVec.size(); i++){
                     tempVec[i] = ofMap(m.getArgAsFloat(i), 0, 1, castedParam.getMin()[0], castedParam.getMax()[0], true);
                 }
+                castedParam = tempVec;
             }
-            else if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT32 || m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT64){
-                for(int i = 0; i < tempVec.size(); i++){
-                    tempVec[i] = ofClamp(m.getArgAsInt(i), castedParam.getMin()[0], castedParam.getMax()[0]);
+        }
+        else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
+            ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>();
+            if(m.getNumArgs() == 0){
+                castedParam = castedParam;;
+            }else{
+                vector<int> tempVec;
+                tempVec.resize(m.getNumArgs(), 0);
+                if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_FLOAT){
+                    for(int i = 0; i < tempVec.size(); i++){
+                        tempVec[i] = ofMap(m.getArgAsFloat(i), 0, 1, castedParam.getMin()[0], castedParam.getMax()[0], true);
+                    }
                 }
+                else if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT32 || m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT64){
+                    for(int i = 0; i < tempVec.size(); i++){
+                        tempVec[i] = ofClamp(m.getArgAsInt(i), castedParam.getMin()[0], castedParam.getMax()[0]);
+                    }
+                }
+                castedParam = tempVec;
             }
-            castedParam = tempVec;
         }
     };
     
