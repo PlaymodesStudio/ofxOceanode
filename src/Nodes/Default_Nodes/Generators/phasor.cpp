@@ -40,6 +40,10 @@ void phasor::setup(){
     resetPhaseListener = resetPhase_Param.newListener([&](){
         basePh.resetPhasor();
     });
+    
+    cycleListener = basePh.phasorCycle.newListener([this](){
+        resetPhase_Param.trigger();
+    });
 }
 
 void phasor::update(ofEventArgs &e)

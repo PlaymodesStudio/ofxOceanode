@@ -65,6 +65,7 @@ private:
     
     ofEventListeners parameterAutoSettersListeners;
     ofEventListener resetPhaseListener;
+    ofEventListener cycleListener;
 };
 
 #endif /* oscillator_h */

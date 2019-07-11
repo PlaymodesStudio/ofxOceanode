@@ -486,9 +486,11 @@ shared_ptr<ofParameterGroup> ofxOceanodeNode::getParameters(){
 void ofxOceanodeNode::setActive(bool act){
     if(act == active) return;
     active = act;
+#ifndef OFXOCEANODE_HEADLESS
     if(active){
         nodeGui->enable();
     }else{
         nodeGui->disable();
     }
+#endif
 }
