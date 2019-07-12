@@ -10,6 +10,7 @@ phasor::phasor() : ofxOceanodeNodeModel("Phasor")
 {
     phaseOffset = 0;
     color = ofColor::red;
+    selfTrigger = false;
 }
 
 void phasor::setup(){
@@ -38,10 +39,14 @@ void phasor::setup(){
     addOutputParameterToGroupAndInfo(phasorMonitor.set("Phasor Output", {0}, {0}, {1}));
     
     resetPhaseListener = resetPhase_Param.newListener([&](){
-        basePh.resetPhasor();
+        if(!selfTrigger)
+            basePh.resetPhasor();
+        else
+            selfTrigger = false;
     });
     
     cycleListener = basePh.phasorCycle.newListener([this](){
+        selfTrigger = true;
         resetPhase_Param.trigger();
     });
 }
