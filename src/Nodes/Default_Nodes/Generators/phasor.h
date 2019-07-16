@@ -66,6 +66,7 @@ private:
     ofEventListeners parameterAutoSettersListeners;
     ofEventListener resetPhaseListener;
     ofEventListener cycleListener;
+    bool selfTrigger;
 };
 
 #endif /* oscillator_h */
