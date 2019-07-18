@@ -17,12 +17,6 @@ public:
     ofxOceanodeConnectionGraphics(){
         points[0] = glm::vec2(-1, -1);
         points[1] = glm::vec2(-1, -1);
-        
-        ofColor back = ofGetBackgroundColor();
-        if (back.getBrightness()>128)
-            wireColor = ofColor(0);
-        else
-            wireColor = ofColor(255);
     };
     ~ofxOceanodeConnectionGraphics(){};
     
@@ -33,6 +27,11 @@ public:
             {
                 
 //                ofDrawLine(points[0], points[1]);
+                ofColor back = ofGetBackgroundColor();
+                if (back.getBrightness()>128)
+                    wireColor = ofColor(0);
+                else
+                    wireColor = ofColor(255);
 
                 ofPath wirePath;
                 wirePath.setCurveResolution(64);
