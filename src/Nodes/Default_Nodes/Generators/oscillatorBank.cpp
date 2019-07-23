@@ -63,7 +63,7 @@ void oscillatorBank::setup() {
         }
     }));
 #endif
-    parameters->add(createDropdownAbstractParameter("Wave", {"sin", "cos", "tri", "square", "saw", "inverted saw", "rand1", "rand2"}, waveSelect_Param));
+    parameters->add(createDropdownAbstractParameter("Wave", {"sin", "cos", "tri", "square", "saw", "inverted saw", "rand1", "rand2", "rand3"}, waveSelect_Param));
 
     addOutputParameterToGroupAndInfo(oscillatorOut.set("Oscillator Out", {0}, {0}, {1}));
     
@@ -109,7 +109,7 @@ void oscillatorBank::computeBank(vector<float> &phasor){
     for(int i = 0; i < oscillators.size(); i++){
         result[i] = oscillators[i].computeFunc(getValueForPosition(phasor, i));
     }
-    if(waveSelect_Param == 6 || waveSelect_Param == 7){
+    if(waveSelect_Param == 6 || waveSelect_Param == 7 || waveSelect_Param == 8){
         auto resultCopy = result;
         for(int i = 0 ; i < result.size() ; i++){
             int new_i = (floor(((float)i/((float)result.size())*(float)indexQuant_Param)) * floor(((float)result.size())/(float)indexQuant_Param));

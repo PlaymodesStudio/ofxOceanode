@@ -22,10 +22,14 @@ baseOscillator::baseOscillator(){
     oldValuePreMod = dist(mt);
     pastRandom = dist(mt);
     newRandom = dist(mt);
+    oldRandom = dist(mt);
+    futureRandom = dist(mt);
 #else
     oldValuePreMod = ofRandom(1);
     pastRandom = ofRandom(1);
     newRandom = ofRandom(1);
+    oldRandom = ofRandom(1);
+    futureRandom = ofRandom(1);
 #endif
 }
 
@@ -137,6 +141,27 @@ float baseOscillator::computeFunc(float phasor){
                 val = pastRandom*(1-linPhase) + newRandom*linPhase;
             
             break;
+        }
+        case rand3Osc:
+        {
+            if(linPhase < oldPhasor){
+                pastRandom = oldRandom;
+                oldRandom = newRandom;
+                newRandom = futureRandom;
+#ifdef OFXOCEANODE_USE_RANDOMSEED
+                futureRandom = dist(mt);
+#else
+                futureRandom = ofRandom(1);
+#endif
+                val = oldRandom;
+            }
+            else{
+                float x = linPhase;
+                float L0 = (newRandom - pastRandom) * 0.5;
+                float L1 = L0 + (oldRandom-newRandom);
+                float L2 = L1 + ((futureRandom - oldRandom)*0.5) + (oldRandom - newRandom);
+                val = oldRandom + (x * (L0 + (x * ((x * L2) - (L1 + L2)))));
+            }
         }
         default:
             break;
