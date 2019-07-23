@@ -69,7 +69,7 @@ void oscillator::setup(){
         }
     }));
 #endif
-    parameters->add(createDropdownAbstractParameter("Wave", {"sin", "cos", "tri", "square", "saw", "inverted saw", "rand1", "rand2"}, waveSelect_Param));
+    parameters->add(createDropdownAbstractParameter("Wave", {"sin", "cos", "tri", "square", "saw", "inverted saw", "rand1", "rand2", "rand3"}, waveSelect_Param));
     addOutputParameterToGroupAndInfo(output.set("Output", 0, 0, 1));
     
     

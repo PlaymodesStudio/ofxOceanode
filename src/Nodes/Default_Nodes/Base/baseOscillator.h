@@ -21,7 +21,8 @@ enum oscTypes{
     sawOsc = 5,
     sawInvOsc = 6,
     rand1Osc = 7,
-    rand2Osc = 8
+    rand2Osc = 8,
+    rand3Osc = 9
 };
 
 class baseOscillator {
@@ -57,6 +58,8 @@ private:
     float indexNormalized;
     float pastRandom;
     float newRandom;
+    float oldRandom;
+    float futureRandom;
     
 #ifdef OFXOCEANODE_USE_RANDOMSEED
     int seed;
