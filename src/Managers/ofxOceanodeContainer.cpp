@@ -367,26 +367,6 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         dynamicNodes.clear();
     }
     
-#ifdef OFXOCEANODE_USE_MIDI
-    json.clear();
-    for(auto &binding : midiBindings){
-        for(auto &midiInPair : midiIns){
-            midiInPair.second.removeListener(binding.second.get());
-        }
-        midiBindingDestroyed.notify(this, *binding.second.get());
-    }
-    midiBindings.clear();
-    json = ofLoadJson(presetFolderPath + "/midi.json");
-    for (ofJson::iterator module = json.begin(); module != json.end(); ++module) {
-        for (ofJson::iterator parameter = module.value().begin(); parameter != module.value().end(); ++parameter) {
-            auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key());
-            if(midiBinding != nullptr){
-                midiBinding->loadPreset(json[module.key()][parameter.key()]);
-            }
-        }
-    }
-#endif
-    
     json.clear();
     json = ofLoadJson(presetFolderPath + "/connections.json");
     for(int i = 0; i < connections.size();){
@@ -450,6 +430,25 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             node.second->loadPresetBeforeConnections(presetFolderPath);
         }
     }
+    
+#ifdef OFXOCEANODE_USE_MIDI
+    for(auto &binding : midiBindings){
+        for(auto &midiInPair : midiIns){
+            midiInPair.second.removeListener(binding.second.get());
+        }
+        midiBindingDestroyed.notify(this, *binding.second.get());
+    }
+    midiBindings.clear();
+    ofJson midiJson = ofLoadJson(presetFolderPath + "/midi.json");
+    for (ofJson::iterator module = midiJson.begin(); module != midiJson.end(); ++module) {
+        for (ofJson::iterator parameter = module.value().begin(); parameter != module.value().end(); ++parameter) {
+            auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key());
+            if(midiBinding != nullptr){
+                midiBinding->loadPreset(midiJson[module.key()][parameter.key()]);
+            }
+        }
+    }
+#endif
     
 
     for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
@@ -1293,8 +1292,11 @@ ofxOceanodeAbstractMidiBinding* ofxOceanodeContainer::createMidiBindingFromInfo(
             if(collection[module][ofToInt(moduleId)]->getParameters()->contains(parameter)){
                 p = &collection[module][ofToInt(moduleId)]->getParameters()->get(parameter);
             }
-            else{
+            else if(collection[module][ofToInt(moduleId)]->getParameters()->contains(parameter + " Selector")){
                 p = &collection[module][ofToInt(moduleId)]->getParameters()->getGroup(parameter + " Selector").getInt(1);
+            }
+            else{
+                return nullptr;
             }
             return createMidiBinding(*p, isPersistent);
         }
