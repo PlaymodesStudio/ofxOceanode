@@ -931,7 +931,14 @@ void ofxOceanodeContainer::setupOscReceiver(int port){
 }
 
 void ofxOceanodeContainer::receiveOsc(){
-    
+    while(oscReceiver.hasWaitingMessages()){
+        ofxOscMessage m;
+        oscReceiver.getNextMessage(m);
+        receiveOscMessage(m);
+    }
+}
+
+void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
     auto setParameterFromMidiMessage = [this](ofAbstractParameter& absParam, ofxOscMessage& m){
         if(absParam.type() == typeid(ofParameter<float>).name()){
             ofParameter<float> castedParam = absParam.cast<float>();
@@ -985,14 +992,14 @@ void ofxOceanodeContainer::receiveOsc(){
     auto modulateParameterFromOscMessage = [this](ofAbstractParameter& absParam, ofxOscMessage& m){
         if(absParam.type() == typeid(ofParameter<float>).name()){
             ofParameter<float> castedParam = absParam.cast<float>();
-            castedParam = ofClamp(castedParam + m.getArgAsFloat(0), castedParam.getMin(), castedParam.getMax());
+            castedParam = castedParam + m.getArgAsFloat(0);
         }else if(absParam.type() == typeid(ofParameter<int>).name()){
             ofParameter<int> castedParam = absParam.cast<int>();
             if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_FLOAT){
                 int range = castedParam.getMax() - castedParam.getMin();
-                castedParam += ofMap(m.getArgAsFloat(0), 0, 1, -range, range, true);
+                castedParam += ofMap(m.getArgAsFloat(0), -1, 1, -range, range, false);
             }else{
-                castedParam += ofClamp(castedParam+m.getArgAsInt(0), castedParam.getMin(), castedParam.getMax());
+                castedParam += (castedParam+m.getArgAsInt(0));
             }
         }else if(absParam.type() == typeid(ofParameter<bool>).name()){
             absParam.cast<bool>() = !absParam.cast<bool>();
@@ -1000,164 +1007,187 @@ void ofxOceanodeContainer::receiveOsc(){
             absParam.castGroup().getInt(1) += m.getArgAsInt(0);
         }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
             ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>();
+            if(castedParam->size() !=1) return;
             vector<float> tempVec;
-            tempVec.resize(m.getNumArgs(), 0);
-            for(int i = 0; i < tempVec.size(); i++){
-                tempVec[i] = ofClamp(tempVec[i] + m.getArgAsFloat(i), castedParam.getMin()[0], castedParam.getMax()[0]);
+            if(m.getNumArgs() == 1 && castedParam->size() != 1){
+                tempVec = castedParam;
+                for(int i = 0; i < tempVec.size(); i++){
+                    tempVec[i] = tempVec[i] + m.getArgAsFloat(0);
+                }
+            }else{
+                if(m.getNumArgs() == castedParam->size()){
+                    tempVec = castedParam;
+                }else if(m.getNumArgs() > castedParam->size()){
+                    tempVec = vector<float>(m.getNumArgs(), castedParam.get()[0]);
+                }
+                for(int i = 0; i < tempVec.size(); i++){
+                    tempVec[i] = tempVec[i] + m.getArgAsFloat(i);
+                }
             }
             castedParam = tempVec;
         }
         else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
             ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>();
+            if(castedParam->size() !=1) return;
             vector<int> tempVec;
             tempVec.resize(m.getNumArgs(), 0);
             if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_FLOAT){
                 int range = castedParam.getMax()[0] - castedParam.getMin()[0];
                 for(int i = 0; i < tempVec.size(); i++){
-                    tempVec[i] += ofMap(m.getArgAsFloat(i), 0, 1, -range, range, true);
+                    tempVec[i] += ofMap(m.getArgAsFloat(i), -1, 1, -range, range, true);
                 }
             }
             else if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT32 || m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT64){
-                for(int i = 0; i < tempVec.size(); i++){
-                    tempVec[i] = ofClamp(tempVec[i]+m.getArgAsInt(i), castedParam.getMin()[0], castedParam.getMax()[0]);
+                if(m.getNumArgs() == 1 && castedParam->size() != 1){
+                    tempVec = castedParam;
+                    for(int i = 0; i < tempVec.size(); i++){
+                        tempVec[i] = tempVec[i] + m.getArgAsInt(0);
+                    }
+                }else{
+                    if(m.getNumArgs() == castedParam->size()){
+                        tempVec = castedParam;
+                    }else if(m.getNumArgs() > castedParam->size()){
+                        tempVec = vector<int>(m.getNumArgs(), castedParam.get()[0]);
+                    }
+                    for(int i = 0; i < tempVec.size(); i++){
+                        tempVec[i] = tempVec[i] + m.getArgAsInt(i);
+                    }
                 }
             }
             castedParam = tempVec;
         }
     };
     
-    while(oscReceiver.hasWaitingMessages()){
-        ofxOscMessage m;
-        oscReceiver.getNextMessage(m);
-        
-        vector<string> splitAddress = ofSplitString(m.getAddress(), "/");
-        if(splitAddress[0].size() == 0) splitAddress.erase(splitAddress.begin());
-        if(splitAddress.size() == 1){
-            if(splitAddress[0] == "phaseReset"){
-                resetPhase();
-            }else if(splitAddress[0] == "bpm"){
-                float newBpm = m.getArgAsFloat(0);
-                ofNotifyEvent(changedBpmEvent, newBpm);
-            }
-        }else if(splitAddress.size() == 2){
-            if(splitAddress[0] == "presetLoad"){
-                string bankName = splitAddress[1];
-                
-                ofDirectory dir;
-                map<int, string> presets;
-                dir.open("Presets/" + bankName);
-                if(!dir.exists())
-                    return;
-                dir.sort();
-                int numPresets = dir.listDir();
-                for ( int i = 0 ; i < numPresets; i++){
-                    if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(0)){
-                        string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
+    
+    vector<string> splitAddress = ofSplitString(m.getAddress(), "/");
+    if(splitAddress[0].size() == 0) splitAddress.erase(splitAddress.begin());
+    if(splitAddress.size() == 1){
+        if(splitAddress[0] == "phaseReset"){
+            resetPhase();
+        }else if(splitAddress[0] == "bpm"){
+            float newBpm = m.getArgAsFloat(0);
+            ofNotifyEvent(changedBpmEvent, newBpm);
+        }
+    }else if(splitAddress.size() == 2){
+        if(splitAddress[0] == "presetLoad"){
+            string bankName = splitAddress[1];
+            
+            ofDirectory dir;
+            map<int, string> presets;
+            dir.open("Presets/" + bankName);
+            if(!dir.exists())
+                return;
+            dir.sort();
+            int numPresets = dir.listDir();
+            for ( int i = 0 ; i < numPresets; i++){
+                if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(0)){
+                    string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
 #ifdef OFXOCEANODE_HEADLESS
                         loadPreset("Presets/" + bankAndPreset);
 #else
                         ofNotifyEvent(loadPresetEvent, bankAndPreset);
 #endif
                         break;
+                }
+            }
+        }else if(splitAddress[0] == "presetSave"){
+            savePreset("Presets/" + splitAddress[1] + "/" + m.getArgAsString(0));
+        }else if(splitAddress[0] == "Global"){
+            for(auto &nodeType  : dynamicNodes){
+                for(auto &node : nodeType.second){
+                    shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
+                    if(groupParam->contains(splitAddress[1])){
+                        ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
+                        setParameterFromMidiMessage(absParam, m);
                     }
                 }
-            }else if(splitAddress[0] == "presetSave"){
-                savePreset("Presets/" + splitAddress[1] + "/" + m.getArgAsString(0));
-            }else if(splitAddress[0] == "Global"){
+            }
+            for(auto &nodeType  : persistentNodes){
+                for(auto &node : nodeType.second){
+                    shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
+                    if(groupParam->contains(splitAddress[1])){
+                        ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
+                        setParameterFromMidiMessage(absParam, m);
+                    }
+                }
+            }
+        }else{
+            string moduleName = splitAddress[0];
+            string moduleId = ofSplitString(moduleName, "_").back();
+            moduleName.erase(moduleName.find(moduleId)-1);
+            ofStringReplace(moduleName, "_", " ");
+            if(dynamicNodes.count(moduleName) == 1){
+                if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
+                    shared_ptr<ofParameterGroup> groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                    if(groupParam->contains(splitAddress[1])){
+                        ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
+                        setParameterFromMidiMessage(absParam, m);
+                    }
+                }
+            }
+            if(persistentNodes.count(moduleName) == 1){
+                if(persistentNodes[moduleName].count(ofToInt(moduleId))){
+                    shared_ptr<ofParameterGroup> groupParam = persistentNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                    if(groupParam->contains(splitAddress[1])){
+                        ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
+                        setParameterFromMidiMessage(absParam, m);
+                    }
+                }
+            }
+        }
+    }
+    else if(splitAddress.size() == 3){
+        if(splitAddress[0] == "presetLoad"){
+            string bankAndPreset = splitAddress[1] + "/" + splitAddress[2];
+#ifdef OFXOCEANODE_HEADLESS
+            loadPreset("Presets/" + bankAndPreset);
+#else
+            ofNotifyEvent(loadPresetEvent, bankAndPreset);
+#endif
+        }else if(splitAddress[0] == "relative"){
+            if(splitAddress[1] == "Global"){
                 for(auto &nodeType  : dynamicNodes){
                     for(auto &node : nodeType.second){
                         shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
-                        if(groupParam->contains(splitAddress[1])){
-                            ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
-                            setParameterFromMidiMessage(absParam, m);
+                        if(groupParam->contains(splitAddress[2])){
+                            ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                            modulateParameterFromOscMessage(absParam, m);
                         }
                     }
                 }
                 for(auto &nodeType  : persistentNodes){
                     for(auto &node : nodeType.second){
                         shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
-                        if(groupParam->contains(splitAddress[1])){
-                            ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
-                            setParameterFromMidiMessage(absParam, m);
+                        if(groupParam->contains(splitAddress[2])){
+                            ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                            modulateParameterFromOscMessage(absParam, m);
                         }
                     }
                 }
             }else{
-                string moduleName = splitAddress[0];
+                string moduleName = splitAddress[1];
                 string moduleId = ofSplitString(moduleName, "_").back();
                 moduleName.erase(moduleName.find(moduleId)-1);
                 ofStringReplace(moduleName, "_", " ");
                 if(dynamicNodes.count(moduleName) == 1){
                     if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
                         shared_ptr<ofParameterGroup> groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
-                        if(groupParam->contains(splitAddress[1])){
-                            ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
-                            setParameterFromMidiMessage(absParam, m);
+                        if(groupParam->contains(splitAddress[2])){
+                            ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                            modulateParameterFromOscMessage(absParam, m);
                         }
                     }
                 }
                 if(persistentNodes.count(moduleName) == 1){
                     if(persistentNodes[moduleName].count(ofToInt(moduleId))){
                         shared_ptr<ofParameterGroup> groupParam = persistentNodes[moduleName][ofToInt(moduleId)]->getParameters();
-                        if(groupParam->contains(splitAddress[1])){
-                            ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
-                            setParameterFromMidiMessage(absParam, m);
+                        if(groupParam->contains(splitAddress[2])){
+                            ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                            modulateParameterFromOscMessage(absParam, m);
                         }
                     }
                 }
             }
-        }
-        else if(splitAddress.size() == 3){
-            if(splitAddress[0] == "presetLoad"){
-                string bankAndPreset = splitAddress[1] + "/" + splitAddress[2];
-#ifdef OFXOCEANODE_HEADLESS
-                loadPreset("Presets/" + bankAndPreset);
-#else
-                ofNotifyEvent(loadPresetEvent, bankAndPreset);
-#endif
-            }else if(splitAddress[0] == "relative"){
-                if(splitAddress[1] == "Global"){
-                    for(auto &nodeType  : dynamicNodes){
-                        for(auto &node : nodeType.second){
-                            shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
-                            if(groupParam->contains(splitAddress[1])){
-                                ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
-                                modulateParameterFromOscMessage(absParam, m);
-                            }
-                        }
-                    }
-                    for(auto &nodeType  : persistentNodes){
-                        for(auto &node : nodeType.second){
-                            shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
-                            if(groupParam->contains(splitAddress[1])){
-                                ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
-                                modulateParameterFromOscMessage(absParam, m);
-                            }
-                        }
-                    }
-                }else{
-                    string moduleName = splitAddress[1];
-                    string moduleId = ofSplitString(moduleName, "_").back();
-                    moduleName.erase(moduleName.find(moduleId)-1);
-                    ofStringReplace(moduleName, "_", " ");
-                    if(dynamicNodes.count(moduleName) == 1){
-                        if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
-                            shared_ptr<ofParameterGroup> groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
-                            if(groupParam->contains(splitAddress[1])){
-                                ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
-                                modulateParameterFromOscMessage(absParam, m);
-                            }
-                        }
-                    }
-                    if(persistentNodes.count(moduleName) == 1){
-                        if(persistentNodes[moduleName].count(ofToInt(moduleId))){
-                            shared_ptr<ofParameterGroup> groupParam = persistentNodes[moduleName][ofToInt(moduleId)]->getParameters();
-                            if(groupParam->contains(splitAddress[1])){
-                                ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
-                                modulateParameterFromOscMessage(absParam, m);
-                            }
-                        }
-                    }
                 }
             }
         }

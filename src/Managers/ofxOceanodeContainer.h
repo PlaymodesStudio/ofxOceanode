@@ -108,6 +108,7 @@ public:
     void setupOscSender(string host, int port);
     void setupOscReceiver(int port);
     void receiveOsc();
+    void receiveOscMessage(ofxOscMessage &m);
 #endif
     
 #ifdef OFXOCEANODE_USE_MIDI
