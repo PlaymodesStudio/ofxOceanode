@@ -113,4 +113,9 @@ void ofxOceanodeMidiController::onGuiTextInputEvent(ofxDatGuiTextInputEvent e){
     
 }
 
+void ofxOceanodeMidiController::setIsMidiLearn(bool b){
+    midiLearn->setChecked(b);
+    container->setIsListeningMidi(b);
+}
+
 #endif
