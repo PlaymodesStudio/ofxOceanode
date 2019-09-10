@@ -13,6 +13,7 @@
 
 class ofxOceanodeContainer;
 class ofxOceanodeAbstractConnection;
+class ofxOscMessage;
 
 struct parameterInfo{
     bool isSavePreset;
@@ -71,6 +72,8 @@ public:
     }
     
     ofColor getColor(){return color;};
+    
+    virtual bool receiveOscMessage(ofxOscMessage &m){return false;};
     
     parameterInfo& addParameterToGroupAndInfo(ofAbstractParameter& p);
     parameterInfo& addOutputParameterToGroupAndInfo(ofAbstractParameter& p);

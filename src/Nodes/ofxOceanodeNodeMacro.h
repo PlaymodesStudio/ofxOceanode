@@ -75,6 +75,8 @@ public:
     }
 };
 
+class ofxOscMessage;
+
 class ofxOceanodeNodeMacro : public ofxOceanodeNodeModelExternalWindow{
 public:
     ofxOceanodeNodeMacro();
@@ -96,6 +98,12 @@ public:
     
     void setBpm(float bpm){container->setBpm(bpm);};
     void resetPhase(){container->resetPhase();};
+    
+#ifdef OFXOCEANODE_USE_OSC
+    bool receiveOscMessage(ofxOscMessage &m) override{
+        container->receiveOscMessage(m);
+        return true;};
+#endif
     
 private:
     void newNodeCreated(ofxOceanodeNode* &node);

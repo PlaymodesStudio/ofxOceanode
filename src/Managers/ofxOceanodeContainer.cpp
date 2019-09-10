@@ -1188,6 +1188,17 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                     }
                 }
             }
+        }else{
+            string moduleName = splitAddress[0];
+            string moduleId = ofSplitString(moduleName, "_").back();
+            moduleName.erase(moduleName.find(moduleId)-1);
+            ofStringReplace(moduleName, "_", " ");
+            if(dynamicNodes.count(moduleName) == 1){
+                if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
+                    string newAddress;
+                    for(int i = 1; i < splitAddress.size(); i++) newAddress += "/" + splitAddress[i];
+                    m.setAddress(newAddress);
+                    dynamicNodes[moduleName][ofToInt(moduleId)]->getNodeModel().receiveOscMessage(m);
                 }
             }
         }
