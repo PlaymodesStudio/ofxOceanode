@@ -12,37 +12,46 @@ float maxRange =  10000.000;
 
 void ranger::setup(){
     color = ofColor::white;
-    parameters->add(Input.set("Input", {0}, {minRange}, {maxRange}));
-    parameters->add(MinInput.set("MinInput", 0,  minRange, maxRange));
-    parameters->add(MaxInput.set("MaxInput", 1.0,  minRange, maxRange));
-    parameters->add(MinOutput.set("MinOutput", 0,  minRange, maxRange));
-    parameters->add(MaxOutput.set("MaxOutput", 1.0,  minRange, maxRange));
-    addOutputParameterToGroupAndInfo(Output.set("Output", {0}, {minRange}, {maxRange}));
+    parameters->add(input.set("Input", {0}, {minRange}, {maxRange}));
+    parameters->add(minInput.set("MinInput", {0}, {minRange}, {maxRange}));
+    parameters->add(maxInput.set("MaxInput", {1}, {minRange}, {maxRange}));
+    parameters->add(minOutput.set("MinOutput", {0}, {minRange}, {maxRange}));
+    parameters->add(maxOutput.set("MaxOutput", {1}, {minRange}, {maxRange}));
+    addOutputParameterToGroupAndInfo(output.set("Output", {0}, {minRange}, {maxRange}));
     
     
-    listeners.push(Input.newListener([&](vector<float> &vf){
+    listeners.push(input.newListener([&](vector<float> &vf){
         recalculate();
     }));
-    listeners.push(MinInput.newListener([&](float &f){
+    listeners.push(minInput.newListener([&](vector<float> &f){
         recalculate();
     }));
-    listeners.push(MaxInput.newListener([&](float &f){
+    listeners.push(maxInput.newListener([&](vector<float> &f){
         recalculate();
     }));
-    listeners.push(MinOutput.newListener([&](float &f){
+    listeners.push(minOutput.newListener([&](vector<float> &f){
         recalculate();
     }));
-    listeners.push(MaxOutput.newListener([&](float &f){
+    listeners.push(maxOutput.newListener([&](vector<float> &f){
         recalculate();
     }));
 }
 
 void ranger::recalculate()
 {
-    vector<float> vFloat = Input.get();
-    for(auto &f : vFloat){
-        f = ofMap(f,MinInput,MaxInput,MinOutput,MaxOutput, true);
+    auto getElementFromIndex = [this](const vector<float> f, int index) -> float{
+        if(index < f.size()){
+            return f[index];
+        }else{
+            return f[0];
+        }
+    };
+    
+    
+    vector<float> tempOut(max({input->size(), minInput->size(), maxInput->size(), minOutput->size(), maxOutput->size()}), 0);
+    for(int i = 0; i < tempOut.size(); i++){
+        tempOut[i] = ofMap(getElementFromIndex(input, i), getElementFromIndex(minInput, i), getElementFromIndex(maxInput, i), getElementFromIndex(minOutput, i), getElementFromIndex(maxOutput, i), true);
     }
-    Output = vFloat;
+    output = tempOut;
 }
 
