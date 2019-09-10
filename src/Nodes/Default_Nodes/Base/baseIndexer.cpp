@@ -138,9 +138,9 @@ void baseIndexer::recomputeIndexs(){
         
         //Random
         if(indexRand_Param < 0)
-            index = randomizedIndexes[index];
+            index = randomizedIndexes[index-1];
         else if(indexRand_Param > 0)
-            index = index*(1-indexRand_Param) + (indexRand[index]*indexRand_Param);
+            index = index*(1-indexRand_Param) + (indexRand[index-1]*indexRand_Param);
         
         //COMB
         index = abs(((index%2)*indexCount*combination_Param)-index);
@@ -171,7 +171,7 @@ void baseIndexer::indexRandChanged(float &val){
     
     if(val < 0){
         for(int i = 0; i < indexCount; i++){
-            randPositions[i] = indexRand[i]*indexRand_Param + i*(1-indexRand_Param);
+            randPositions[i] = indexRand[i]*abs(indexRand_Param) + i*(1-abs(indexRand_Param));
         }
 
         std::sort(

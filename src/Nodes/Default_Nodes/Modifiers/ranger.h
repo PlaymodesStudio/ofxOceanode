@@ -28,12 +28,12 @@ private:
     
     ofEventListeners listeners;
     
-    ofParameter<vector<float>>  Input;
-    ofParameter<float>  MinInput;
-    ofParameter<float>  MaxInput;
-    ofParameter<float>  MinOutput;
-    ofParameter<float>  MaxOutput;
-    ofParameter<vector<float>>  Output;
+    ofParameter<vector<float>>  input;
+    ofParameter<vector<float>>  minInput;
+    ofParameter<vector<float>>  maxInput;
+    ofParameter<vector<float>>  minOutput;
+    ofParameter<vector<float>>  maxOutput;
+    ofParameter<vector<float>>  output;
 };
 
 

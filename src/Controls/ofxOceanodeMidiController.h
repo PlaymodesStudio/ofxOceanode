@@ -65,6 +65,7 @@ public:
     void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);
     
     bool getIsMidiLearn(){return midiLearn->getChecked();};
+    void setIsMidiLearn(bool b);
     
 private:
     ofxDatGuiToggle* midiLearn;
