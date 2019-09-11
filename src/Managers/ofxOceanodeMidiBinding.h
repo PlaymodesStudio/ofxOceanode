@@ -105,8 +105,8 @@ protected:
 template<typename T, typename Enable = void>
 class ofxOceanodeMidiBinding : public ofxOceanodeAbstractMidiBinding{
 public:
-    ofxOceanodeMidiBinding(ofParameter<T>& _parameter) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
-        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName();
+    ofxOceanodeMidiBinding(ofParameter<T>& _parameter, int _id) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
+        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName() + " " + ofToString(_id);
     }
     
     ~ofxOceanodeMidiBinding(){};
@@ -121,8 +121,8 @@ private:
 template<typename T>
 class ofxOceanodeMidiBinding<T, typename std::enable_if<std::is_same<T, int>::value || std::is_same<T, float>::value>::type>: public ofxOceanodeAbstractMidiBinding{
 public:
-    ofxOceanodeMidiBinding(ofParameter<T>& _parameter) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
-        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName();
+    ofxOceanodeMidiBinding(ofParameter<T>& _parameter, int _id) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
+        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName() + " " + ofToString(_id);
         min.set("Min", parameter.getMin(), parameter.getMin(), parameter.getMax());
         max.set("Max", parameter.getMax(), parameter.getMin(), parameter.getMax());
     }
@@ -223,8 +223,8 @@ struct is_std_vector2<std::vector<T,A>> : std::true_type {};
 template<typename T>
 class ofxOceanodeMidiBinding<vector<T>> : public ofxOceanodeAbstractMidiBinding{
 public:
-    ofxOceanodeMidiBinding(ofParameter<vector<T>>& _parameter) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
-        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName();
+    ofxOceanodeMidiBinding(ofParameter<vector<T>>& _parameter, int _id) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
+        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName() + " " + ofToString(_id);
         min.set("Min", parameter.getMin()[0], parameter.getMin()[0], parameter.getMax()[0]);
         max.set("Max", parameter.getMax()[0], parameter.getMin()[0], parameter.getMax()[0]);
     }
@@ -317,8 +317,8 @@ private:
 template<>
 class ofxOceanodeMidiBinding<bool>: public ofxOceanodeAbstractMidiBinding{
 public:
-    ofxOceanodeMidiBinding(ofParameter<bool>& _parameter) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
-        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName();
+    ofxOceanodeMidiBinding(ofParameter<bool>& _parameter, int _id) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
+        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName() + " " + ofToString(_id);
         toggle.set("Toggle", 0, 0, 1);
     }
     
@@ -412,8 +412,8 @@ private:
 template<>
 class ofxOceanodeMidiBinding<void>: public ofxOceanodeAbstractMidiBinding{
 public:
-    ofxOceanodeMidiBinding(ofParameter<void>& _parameter) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
-        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName();
+    ofxOceanodeMidiBinding(ofParameter<void>& _parameter, int _id) : parameter(_parameter), ofxOceanodeAbstractMidiBinding(){
+        name = parameter.getGroupHierarchyNames()[0] + "-|-" + parameter.getEscapedName() + " " + ofToString(_id);
         mode.set("0:Any-1:Filter!=0", 0, 0, 1);
     }
     
