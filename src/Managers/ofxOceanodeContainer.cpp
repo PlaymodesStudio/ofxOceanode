@@ -1146,7 +1146,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                 for(auto &node : nodeType.second){
                     shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
                     if(groupParam->contains(splitAddress[1])){
-                        ofAbstractParameter &absParam = gromiupParam->get(splitAddress[1]);
+                        ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
                         setParameterFromMidiMessage(absParam, m);
                     }
                 }
