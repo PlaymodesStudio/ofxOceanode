@@ -412,7 +412,7 @@ void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
     if(isListeningMidi){
         if(e.down == 1){
             if(ofGetKeyPressed(OF_KEY_SHIFT)){
-                container.removeMidiBinding(*p);
+                container.removeLastMidiBinding(*p);
             }else{
                 container.createMidiBinding(*p);
             }

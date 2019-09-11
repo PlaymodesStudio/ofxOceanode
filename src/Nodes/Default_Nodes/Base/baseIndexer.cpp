@@ -136,19 +136,23 @@ void baseIndexer::recomputeIndexs(){
             index %= newNumOfPixels;;
         }
         
-        //Random
-        if(indexRand_Param < 0)
-            index = randomizedIndexes[index-1];
-        else if(indexRand_Param > 0)
-            index = index*(1-indexRand_Param) + (indexRand[index-1]*indexRand_Param);
-        
         //COMB
         index = abs(((index%2)*indexCount*combination_Param)-index);
         
+        //Random
+        float indexf;
+        if(indexRand_Param < 0)
+            indexf = randomizedIndexes[index-1] + 1;
+        else if(indexRand_Param > 0)
+            indexf = float(index)*(1-indexRand_Param) + (float(indexRand[index-1])*indexRand_Param);
+        else{
+            indexf = index;
+        }
+        
         //INVERSE
-        int nonInvertIndex = index-1;
-        int invertedIndex = ((float)newNumOfPixels/(symmetry_Param+1))-(float)index;
-        float indexf = indexInvert_Param*invertedIndex + (1-indexInvert_Param)*nonInvertIndex;
+        float nonInvertIndex = indexf-1.0f;
+        float invertedIndex = ((float)newNumOfPixels/float(symmetry_Param+1))-indexf;
+        indexf = indexInvert_Param*invertedIndex + (1-indexInvert_Param)*nonInvertIndex;
         
         //Modulo
         if(modulo_Param != modulo_Param.getMax())

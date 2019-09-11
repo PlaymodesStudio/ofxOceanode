@@ -113,9 +113,9 @@ public:
     
 #ifdef OFXOCEANODE_USE_MIDI
     void setIsListeningMidi(bool b);
-    ofxOceanodeAbstractMidiBinding* createMidiBinding(ofAbstractParameter &p, bool isPersistent = false);
-    bool removeMidiBinding(ofAbstractParameter &p);
-    ofxOceanodeAbstractMidiBinding* createMidiBindingFromInfo(string module, string parameter, bool isPersistent = false);
+    ofxOceanodeAbstractMidiBinding* createMidiBinding(ofAbstractParameter &p, bool isPersistent = false, int _id = -1);
+    bool removeLastMidiBinding(ofAbstractParameter &p);
+    ofxOceanodeAbstractMidiBinding* createMidiBindingFromInfo(string module, string parameter, bool isPersistent = false, int _id = -1);
     ofEvent<ofxOceanodeAbstractMidiBinding> midiBindingCreated;
     ofEvent<ofxOceanodeAbstractMidiBinding> midiBindingDestroyed;
     vector<string> getMidiDevices(){return midiInPortList;};
@@ -170,8 +170,8 @@ private:
     
 #ifdef OFXOCEANODE_USE_MIDI
     bool isListeningMidi;
-    map<string, unique_ptr<ofxOceanodeAbstractMidiBinding>> midiBindings;
-    map<string, unique_ptr<ofxOceanodeAbstractMidiBinding>> persistentMidiBindings;
+    map<string, vector<unique_ptr<ofxOceanodeAbstractMidiBinding>>> midiBindings;
+    map<string, vector<unique_ptr<ofxOceanodeAbstractMidiBinding>>> persistentMidiBindings;
     map<string, ofxMidiIn> midiIns;
     map<string, ofxMidiOut> midiOuts;
     
