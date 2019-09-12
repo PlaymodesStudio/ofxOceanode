@@ -39,6 +39,16 @@ void ofxOceanodeNode::setup(){
     active = true;
 }
 
+void ofxOceanodeNode::update(ofEventArgs &e){
+    nodeModel->update(e);
+    nodeGui->update(e);
+}
+
+void ofxOceanodeNode::draw(ofEventArgs &e){
+    nodeModel->draw(e);
+    nodeGui->draw(e);
+}
+
 #ifndef OFXOCEANODE_HEADLESS
 void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     nodeGui = std::move(gui);

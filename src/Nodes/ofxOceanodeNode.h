@@ -22,6 +22,8 @@ public:
     ~ofxOceanodeNode();
     
     void setup();
+    void update(ofEventArgs &e);
+    void draw(ofEventArgs &e);
     
 #ifndef OFXOCEANODE_HEADLESS
     void setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui);

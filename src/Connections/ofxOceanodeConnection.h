@@ -83,8 +83,8 @@ public:
         });
         mouseReleasedListener = ofEvents().mouseReleased.newListener([&](ofMouseEventArgs & mouse){
             graphics.deactivate();
-            ofNotifyEvent(destroyConnection);
-        });
+            //ofNotifyEvent(destroyConnection);
+        }, OF_EVENT_ORDER_AFTER_APP);
     }
     ~ofxOceanodeTemporalConnection(){};
     

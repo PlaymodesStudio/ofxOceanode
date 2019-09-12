@@ -80,14 +80,14 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             if(node.second->getActive())
-                node.second->getNodeModel().update(args);
+                node.second->update(args);
         }
     }
     
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             if(node.second->getActive())
-                node.second->getNodeModel().update(args);
+                node.second->update(args);
         }
     }
 }
@@ -96,14 +96,14 @@ void ofxOceanodeContainer::draw(ofEventArgs &args){
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             if(node.second->getActive())
-                node.second->getNodeModel().draw(args);
+                node.second->draw(args);
         }
     }
     
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             if(node.second->getActive())
-                node.second->getNodeModel().draw(args);
+                node.second->draw(args);
         }
     }
 }

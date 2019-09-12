@@ -10,16 +10,22 @@
 
 #ifndef OFXOCEANODE_HEADLESS
 
-#include "ofxDatGui.h"
+//#include "ofxDatGui.h"
+#include "ofxImGui.h"
 
 class ofxOceanodeContainer;
 class ofxOceanodeNode;
-class ofxDatGui;
+//class ofxDatGui;
+
+using namespace std;
 
 class ofxOceanodeNodeGui{
 public:
     ofxOceanodeNodeGui(ofxOceanodeContainer &container, ofxOceanodeNode &node, shared_ptr<ofAppBaseWindow> window);
     ~ofxOceanodeNodeGui();
+    
+    void update(ofEventArgs &e);
+    void draw(ofEventArgs &e);
     
     void createGuiFromParameters(shared_ptr<ofAppBaseWindow> window);
     void updateGui();
@@ -58,18 +64,18 @@ public:
     void mouseExited(ofMouseEventArgs &args){};
     
 private:
-    void onGuiButtonEvent(ofxDatGuiButtonEvent e);
-    void onGuiToggleEvent(ofxDatGuiToggleEvent e);
-    void onGuiDropdownEvent(ofxDatGuiDropdownEvent e);
-    void onGuiMatrixEvent(ofxDatGuiMatrixEvent e);
-    void onGuiSliderEvent(ofxDatGuiSliderEvent e);
-    void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);
-    void onGuiColorPickerEvent(ofxDatGuiColorPickerEvent e);
-    void onGuiRightClickEvent(ofxDatGuiRightClickEvent e);
-    void onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e);
-    
-    void newModuleListener(ofxDatGuiDropdownEvent e);
-    void newPresetListener(ofxDatGuiTextInputEvent e);
+//    void onGuiButtonEvent(ofxDatGuiButtonEvent e);
+//    void onGuiToggleEvent(ofxDatGuiToggleEvent e);
+//    void onGuiDropdownEvent(ofxDatGuiDropdownEvent e);
+//    void onGuiMatrixEvent(ofxDatGuiMatrixEvent e);
+//    void onGuiSliderEvent(ofxDatGuiSliderEvent e);
+//    void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);
+//    void onGuiColorPickerEvent(ofxDatGuiColorPickerEvent e);
+//    void onGuiRightClickEvent(ofxDatGuiRightClickEvent e);
+//    void onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e);
+//    
+//    void newModuleListener(ofxDatGuiDropdownEvent e);
+//    void newPresetListener(ofxDatGuiTextInputEvent e);
     
     ofEventListeners keyAndMouseListeners;
     ofEventListeners parameterChangedListeners;
@@ -79,8 +85,10 @@ private:
     
     ofxOceanodeNode& node;
     
-    unique_ptr<ofxDatGui> gui;
-    unique_ptr<ofxDatGuiTheme> theme;
+    ofxImGui::Gui gui;
+    
+//    unique_ptr<ofxDatGui> gui;
+//    unique_ptr<ofxDatGuiTheme> theme;
     ofColor color;
     glm::vec2 position;
     
