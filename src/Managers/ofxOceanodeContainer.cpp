@@ -1144,6 +1144,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
         }else if(splitAddress[0] == "Global"){
             for(auto &nodeType  : dynamicNodes){
                 for(auto &node : nodeType.second){
+                    node.second->getNodeModel().receiveOscMessage(m);
                     shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
                     if(groupParam->contains(splitAddress[1])){
                         ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
@@ -1153,6 +1154,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             }
             for(auto &nodeType  : persistentNodes){
                 for(auto &node : nodeType.second){
+                    node.second->getNodeModel().receiveOscMessage(m);
                     shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
                     if(groupParam->contains(splitAddress[1])){
                         ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
@@ -1197,6 +1199,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             if(splitAddress[1] == "Global"){
                 for(auto &nodeType  : dynamicNodes){
                     for(auto &node : nodeType.second){
+                        node.second->getNodeModel().receiveOscMessage(m);
                         shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
                         if(groupParam->contains(splitAddress[2])){
                             ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
@@ -1206,6 +1209,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                 }
                 for(auto &nodeType  : persistentNodes){
                     for(auto &node : nodeType.second){
+                        node.second->getNodeModel().receiveOscMessage(m);
                         shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
                         if(groupParam->contains(splitAddress[2])){
                             ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
