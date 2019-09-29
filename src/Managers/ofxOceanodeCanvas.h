@@ -13,6 +13,7 @@
 
 #include "ofMain.h"
 #include "ofxDatGui.h"
+#include "ofxImGui.h"
 
 class ofxOceanodeContainer;
 class ofxOceanodeNodeGui;
@@ -71,6 +72,8 @@ private:
     glm::vec2 selectedRectIntialPosition;
     glm::vec2 dragModulesInitialPoint;
     vector<pair<ofxOceanodeNodeGui*, glm::vec2>> toMoveNodes;
+    
+    ofxImGui::Gui gui;
 };
 
 #endif

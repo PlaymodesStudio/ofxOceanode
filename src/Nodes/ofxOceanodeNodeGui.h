@@ -27,6 +27,8 @@ public:
     void update(ofEventArgs &e);
     void draw(ofEventArgs &e);
     
+    void constructGui();
+    
     void createGuiFromParameters(shared_ptr<ofAppBaseWindow> window);
     void updateGui();
     void updateGuiForParameter(string &parameterName);
@@ -85,7 +87,10 @@ private:
     
     ofxOceanodeNode& node;
     
-    ofxImGui::Gui gui;
+//    ofxImGui::Gui gui;
+    ofxImGui::Settings settings;
+    bool newPosition;
+    bool outsideDisplay;
     
 //    unique_ptr<ofxDatGui> gui;
 //    unique_ptr<ofxDatGuiTheme> theme;

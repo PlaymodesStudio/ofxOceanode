@@ -1292,25 +1292,27 @@ vector<ofxOceanodeNodeGui*> ofxOceanodeContainer::getModulesGuiInRectangle(ofRec
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             auto &nodeGui = node.second->getNodeGui();
-            if(entire){
-                if(rect.inside(nodeGui.getRectangle()))
-                    tempVec.push_back(&nodeGui);
-            }else{
-                if(rect.intersects(nodeGui.getRectangle()))
-                    tempVec.push_back(&nodeGui);
-            }
+            tempVec.push_back(&nodeGui);
+//            if(entire){
+//                if(rect.inside(nodeGui.getRectangle()))
+//                    tempVec.push_back(&nodeGui);
+//            }else{
+//                if(rect.intersects(nodeGui.getRectangle()))
+//                    tempVec.push_back(&nodeGui);
+//            }
         }
     }
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             auto &nodeGui = node.second->getNodeGui();
-            if(entire){
-                if(rect.inside(nodeGui.getRectangle()))
-                    tempVec.push_back(&nodeGui);
-            }else{
-                if(rect.intersects(nodeGui.getRectangle()))
-                    tempVec.push_back(&nodeGui);
-            }
+            tempVec.push_back(&nodeGui);
+//            if(entire){
+//                if(rect.inside(nodeGui.getRectangle()))
+//                    tempVec.push_back(&nodeGui);
+//            }else{
+//                if(rect.intersects(nodeGui.getRectangle()))
+//                    tempVec.push_back(&nodeGui);
+//            }
         }
     }
     return tempVec;

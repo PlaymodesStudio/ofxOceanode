@@ -74,6 +74,8 @@ void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){
     selectedRect = ofRectangle(0, 0, 0, 0);
     dragModulesInitialPoint = glm::vec2(NAN, NAN);
     selecting = false;
+    
+    gui.setup(nullptr, false);
 }
 
 void ofxOceanodeCanvas::draw(ofEventArgs &args){
@@ -92,6 +94,20 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
         ofDrawRectangle(ofRectangle(canvasToScreen(selectedRect.getTopLeft()), canvasToScreen(selectedRect.getBottomRight())));
         ofPopStyle();
     }
+    
+    //Draw Guis
+    gui.begin();
+//    ImGui::GetIO().DisplaySize = glm::vec2(1000000, 100000);
+    for(auto &node : container->getModulesGuiInRectangle(ofGetWindowRect(), false)){
+        node->constructGui();
+    }
+    
+    gui.end();
+    
+    ofPushMatrix();
+    ofMultMatrix(glm::inverse(transformationMatrix->get()));
+    gui.draw();
+    ofPopMatrix();
 }
 
 void ofxOceanodeCanvas::newModuleListener(ofxDatGuiDropdownEvent e){
