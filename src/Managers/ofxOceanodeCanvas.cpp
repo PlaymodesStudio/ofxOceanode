@@ -189,6 +189,10 @@ void ofxOceanodeCanvas::keyPressed(ofKeyEventArgs &e){
                 selectedRect = ofRectangle(0,0,0,0);
             }else if(e.key == 'v' || e.key == 'V'){
                 container->pasteModulesAndConnectionsInPosition(screenToCanvas(glm::vec2(ofGetMouseX(), ofGetMouseY())));
+            }else if(e.key == 'x' || e.key == 'X'){
+                container->cutModulesAndConnectionsInsideRect(selectedRect, entireSelect);
+                toMoveNodes.clear();
+                selectedRect = ofRectangle(0,0,0,0);
             }
         }
     }

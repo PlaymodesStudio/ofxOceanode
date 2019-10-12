@@ -1327,6 +1327,15 @@ bool ofxOceanodeContainer::copyModulesAndConnectionsInsideRect(ofRectangle rect,
     return true;
 }
 
+
+bool ofxOceanodeContainer::cutModulesAndConnectionsInsideRect(ofRectangle rect, bool entire){
+    vector<ofxOceanodeNode*> modulesToCut = getModulesInRectangle(rect, entire);
+    if(modulesToCut.size() == 0) return false;
+    saveClipboardModulesAndConnections(modulesToCut, rect.getPosition());
+    for(auto &m : modulesToCut) m->deleteSelf();
+    return true;
+}
+
 bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 position){
     return loadClipboardModulesAndConnections(position);
 }
