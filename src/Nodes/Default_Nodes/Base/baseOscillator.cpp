@@ -45,39 +45,32 @@ void baseOscillator::deactivateSeed(){
 #endif
 
 float baseOscillator::computeFunc(float phasor){
-    //get phasor to be w (radial freq)
-    float w = (phasor*2*M_PI);
+    float linPhase = phasor + indexNormalized + phaseOffset_Param;
     
-    float k = (indexNormalized + phaseOffset_Param) * 2 * M_PI;
-//
-//    //invert it?
-//    k *=  freq_Param * ((float)indexCount_Param/(float)indexQuant_Param); //Index Modifiers
+    linPhase = fmod(linPhase, 1);
     
-    w += k;
-    w = fmod(w, 2*M_PI);
-    
-    w = ofMap(w, (1-pulseWidth_Param)*2.0*M_PI, 2.0*M_PI, 0.0, 2.0*M_PI, true);
-    
-    float skewedW = w;
-    
+    float skewedLinPhase = linPhase;
     
     if(skew_Param < 0){
-        if(w < M_PI+((fabs(skew_Param))*M_PI))
-            skewedW = ofMap(w, 0.0, M_PI+((fabs(skew_Param))*M_PI), 0.0, M_PI, true);
+        if(linPhase < 0.5+((fabs(skew_Param))*0.5))
+            skewedLinPhase = ofMap(linPhase, 0.0, 0.5+((fabs(skew_Param))*0.5), 0.0, 0.5, true);
         else
-            skewedW = ofMap(w, M_PI+((fabs(skew_Param))*M_PI), 2.0*M_PI, M_PI, 2.0*M_PI, true);
+            skewedLinPhase = ofMap(linPhase, 0.5+((fabs(skew_Param))*0.5), 1, 0.5, 1, true);
     }
     else if(skew_Param > 0){
-        if(w > ((1-fabs(skew_Param))*M_PI))
-            skewedW = ofMap(w, (1-fabs(skew_Param))*M_PI, 2.0*M_PI, M_PI, 2.0*M_PI, true);
+        if(linPhase > ((1-fabs(skew_Param))*0.5))
+            skewedLinPhase = ofMap(linPhase, (1-fabs(skew_Param))*0.5, 1, 0.5, 1, true);
         else
-            skewedW = ofMap(w, 0, ((1-fabs(skew_Param))*M_PI), 0.0, M_PI, true);
+            skewedLinPhase = ofMap(linPhase, 0, ((1-fabs(skew_Param))*0.5), 0.0, 0.5, true);
     }
     
-    w = skewedW;
-
+    linPhase = skewedLinPhase;
     
-    float linPhase =  w / (2*M_PI);
+    float noPulseWidthPhase = linPhase; //Used for square wave
+    linPhase = ofMap(linPhase, (1-pulseWidth_Param), 1, 0.0, 1, true);
+    
+    //get phasor to be w (radial freq)
+    float w = linPhase * 2*M_PI;
     float val = 0;
     switch (static_cast<oscTypes>(waveSelect_Param+1)){
         case sinOsc:
@@ -100,7 +93,7 @@ float baseOscillator::computeFunc(float phasor){
         }
         case squareOsc:
         {
-            val = (linPhase > 0) ? 1 : 0;
+            val = ((1.0f-noPulseWidthPhase) > pulseWidth_Param) ? 0 : 1;
             break;
         }
         case sawOsc:
@@ -173,7 +166,7 @@ float baseOscillator::computeFunc(float phasor){
     
     oldPhasor = linPhase;
     
-    return val;
+    return ofClamp(val, 0, 1);
 }
 
 void baseOscillator::computeMultiplyMod(float &value){
