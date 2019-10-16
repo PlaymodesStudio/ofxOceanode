@@ -140,18 +140,18 @@ void baseIndexer::recomputeIndexs(){
         index = abs(((index%2)*indexCount*combination_Param)-index);
         
         //Random
-        float indexf;
+        double indexf;
         if(indexRand_Param < 0)
             indexf = randomizedIndexes[index-1] + 1;
         else if(indexRand_Param > 0)
-            indexf = float(index)*(1-indexRand_Param) + (float(indexRand[index-1])*indexRand_Param);
+            indexf = double(index)*(1-indexRand_Param) + (double(indexRand[index-1])*indexRand_Param);
         else{
             indexf = index;
         }
         
         //INVERSE
-        float nonInvertIndex = indexf-1.0f;
-        float invertedIndex = ((float)newNumOfPixels/float(symmetry_Param+1))-indexf;
+        double nonInvertIndex = indexf-1.0f;
+        double invertedIndex = ((double)newNumOfPixels/double(symmetry_Param+1))-indexf;
         indexf = indexInvert_Param*invertedIndex + (1-indexInvert_Param)*nonInvertIndex;
         
         //Modulo
@@ -161,7 +161,7 @@ void baseIndexer::recomputeIndexs(){
         int shifted_i = i + round(indexOffset_Param);
         if(shifted_i < 0) shifted_i += indexCount;
         shifted_i %= indexCount;
-        indexs[shifted_i] = ((indexf/(float)indexCount))*(numWaves_Param*((float)indexCount/(float)newNumOfPixels))*(symmetry_Param+1);
+        indexs[shifted_i] = float(((indexf)/(double)(indexCount))*((double)numWaves_Param*((double)indexCount/(double)newNumOfPixels))*((double)symmetry_Param+1));
     }
     newIndexs();
 }
