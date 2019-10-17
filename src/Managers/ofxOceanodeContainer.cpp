@@ -835,7 +835,7 @@ void ofxOceanodeContainer::loadPersistent(){
             for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
                 for (ofJson::iterator sinkParameter = sinkModule.value().begin(); sinkParameter != sinkModule.value().end(); ++sinkParameter) {
                     auto connection = createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key());
-                    connection->setIsPersistent(true);
+                    if(connection != nullptr) connection->setIsPersistent(true);
                 }
             }
         }
@@ -1476,11 +1476,11 @@ void ofxOceanodeContainer::addNewMidiMessageListener(ofxMidiListener* listener){
 
 ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter){
     string sourceModuleId = ofSplitString(sourceModule, "_").back();
-    sourceModule.erase(sourceModule.find(sourceModuleId)-1);
+    sourceModule.erase(sourceModule.rfind(sourceModuleId)-1);
     ofStringReplace(sourceModule, "_", " ");
     
     string sinkModuleId = ofSplitString(sinkModule, "_").back();
-    sinkModule.erase(sinkModule.find(sinkModuleId)-1);
+    sinkModule.erase(sinkModule.rfind(sinkModuleId)-1);
     ofStringReplace(sinkModule, "_", " ");
     
     bool sourceIsDynamic = false;
