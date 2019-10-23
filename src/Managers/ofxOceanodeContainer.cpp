@@ -310,11 +310,11 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
                         auto &connection = connections[i];
                         string sourceName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];;
                         string sourceModuleId = ofSplitString(sourceName, "_").back();
-                        sourceName.erase(sourceName.find(sourceModuleId)-1);
+                        sourceName.erase(sourceName.rfind(sourceModuleId)-1);
                         ofStringReplace(sourceName, "_", " ");
                         string sinkName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];;
                         string sinkModuleId = ofSplitString(sinkName, "_").back();
-                        sinkName.erase(sinkName.find(sinkModuleId)-1);
+                        sinkName.erase(sinkName.rfind(sinkModuleId)-1);
                         ofStringReplace(sinkName, "_", " ");
                         if((sourceName == moduleName && ofToInt(sourceModuleId) == identifier) || (sinkName == moduleName && ofToInt(sinkModuleId) == identifier)){
                             connections.erase(connections.begin()+i);
@@ -358,11 +358,11 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
                     auto &connection = connections[i];
                     string sourceName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];;
                     string sourceModuleId = ofSplitString(sourceName, "_").back();
-                    sourceName.erase(sourceName.find(sourceModuleId)-1);
+                    sourceName.erase(sourceName.rfind(sourceModuleId)-1);
                     ofStringReplace(sourceName, "_", " ");
                     string sinkName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];;
                     string sinkModuleId = ofSplitString(sinkName, "_").back();
-                    sinkName.erase(sinkName.find(sinkModuleId)-1);
+                    sinkName.erase(sinkName.rfind(sinkModuleId)-1);
                     ofStringReplace(sinkName, "_", " ");
                     if((sourceName == pair.first && ofToInt(sourceModuleId) == (nodes.first)) || (sinkName == pair.first && ofToInt(sinkModuleId) == (nodes.first))){
                         connections.erase(connections.begin()+i);
@@ -644,12 +644,12 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
                 for (ofJson::iterator sinkParameter = sinkModule.value().begin(); sinkParameter != sinkModule.value().end(); ++sinkParameter) {
                     string sourceMappedModule = sourceModule.key();
                     string sourceMappedModuleId = ofSplitString(sourceMappedModule, "_").back();
-                    sourceMappedModule.erase(sourceMappedModule.find(sourceMappedModuleId)-1);
+                    sourceMappedModule.erase(sourceMappedModule.rfind(sourceMappedModuleId)-1);
                     sourceMappedModule += "_" + ofToString(moduleConverter[sourceMappedModule][ofToInt(sourceMappedModuleId)]);
                     
                     string sinkMappedModule = sinkModule.key();
                     string sinkMappedModuleId = ofSplitString(sinkMappedModule, "_").back();
-                    sinkMappedModule.erase(sinkMappedModule.find(sinkMappedModuleId)-1);
+                    sinkMappedModule.erase(sinkMappedModule.rfind(sinkMappedModuleId)-1);
                     sinkMappedModule += "_" + ofToString(moduleConverter[sinkMappedModule][ofToInt(sinkMappedModuleId)]);
                     
                     createConnectionFromInfo(sourceMappedModule, sourceParameter.key(), sinkMappedModule, sinkParameter.key());
@@ -1166,7 +1166,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
         }else{
             string moduleName = splitAddress[0];
             string moduleId = ofSplitString(moduleName, "_").back();
-            moduleName.erase(moduleName.find(moduleId)-1);
+            moduleName.erase(moduleName.rfind(moduleId)-1);
             ofStringReplace(moduleName, "_", " ");
             if(dynamicNodes.count(moduleName) == 1){
                 if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
@@ -1219,7 +1219,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             }else{
                 string moduleName = splitAddress[1];
                 string moduleId = ofSplitString(moduleName, "_").back();
-                moduleName.erase(moduleName.find(moduleId)-1);
+                moduleName.erase(moduleName.rfind(moduleId)-1);
                 ofStringReplace(moduleName, "_", " ");
                 if(dynamicNodes.count(moduleName) == 1){
                     if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
@@ -1453,7 +1453,7 @@ void ofxOceanodeContainer::midiBindingBound(const void * sender, string &portNam
 ofxOceanodeAbstractMidiBinding* ofxOceanodeContainer::createMidiBindingFromInfo(string module, string parameter, bool isPersistent, int _id){
     auto &collection = !isPersistent ? dynamicNodes : persistentNodes;
     string moduleId = ofSplitString(module, "_").back();
-    module.erase(module.find(moduleId)-1);
+    module.erase(module.rfind(moduleId)-1);
     ofStringReplace(module, "_", " ");
     if(collection.count(module) != 0){
         if(collection[module].count(ofToInt(moduleId))){
