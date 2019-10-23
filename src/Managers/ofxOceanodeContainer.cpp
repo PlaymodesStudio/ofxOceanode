@@ -375,45 +375,6 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         dynamicNodes.clear();
     }
     
-#ifdef OFXOCEANODE_USE_MIDI
-    //TODO: No remove old connections
-    json.clear();
-    for(auto &bindingVec : midiBindings){
-        for(auto &binding : bindingVec.second){
-            for(auto &midiInPair : midiIns){
-                midiInPair.second.removeListener(binding.get());
-            }
-            midiBindingDestroyed.notify(this, *binding.get());
-        }
-    }
-    midiBindings.clear();
-    json = ofLoadJson(presetFolderPath + "/midi.json");
-    for (ofJson::iterator module = json.begin(); module != json.end(); ++module) {
-        for (ofJson::iterator parameter = module.value().begin(); parameter != module.value().end(); ++parameter) {
-            if(parameter->is_array()){ //New MultiMidi Method (Setp 19)
-                for(int i = 0; i < parameter->size(); i++){
-                    auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), false, i);
-                    if(midiBinding != nullptr){
-                        midiBinding->loadPreset(json[module.key()][parameter.key()][i]);
-                    }
-                }
-            }else if(parameter.value().find("0") != parameter.value().end()){ //Old MultiMidi Method (August 19)
-                for (ofJson::iterator binding = parameter.value().begin(); binding != parameter.value().end(); ++binding) {
-                    auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), false, ofToInt(binding.key()));
-                    if(midiBinding != nullptr){
-                        midiBinding->loadPreset(json[module.key()][parameter.key()][binding.key()]);
-                    }
-                }
-            }else{
-                auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key());
-                if(midiBinding != nullptr){
-                    midiBinding->loadPreset(json[module.key()][parameter.key()]);
-                }
-            }
-        }
-    }
-#endif
-    
     json.clear();
     json = ofLoadJson(presetFolderPath + "/connections.json");
     for(int i = 0; i < connections.size();){
@@ -502,6 +463,45 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             }
         }
     }
+    
+#ifdef OFXOCEANODE_USE_MIDI
+    //TODO: No remove old connections
+    json.clear();
+    for(auto &bindingVec : midiBindings){
+        for(auto &binding : bindingVec.second){
+            for(auto &midiInPair : midiIns){
+                midiInPair.second.removeListener(binding.get());
+            }
+            midiBindingDestroyed.notify(this, *binding.get());
+        }
+    }
+    midiBindings.clear();
+    json = ofLoadJson(presetFolderPath + "/midi.json");
+    for (ofJson::iterator module = json.begin(); module != json.end(); ++module) {
+        for (ofJson::iterator parameter = module.value().begin(); parameter != module.value().end(); ++parameter) {
+            if(parameter->is_array()){ //New MultiMidi Method (Setp 19)
+                for(int i = 0; i < parameter->size(); i++){
+                    auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), false, i);
+                    if(midiBinding != nullptr){
+                        midiBinding->loadPreset(json[module.key()][parameter.key()][i]);
+                    }
+                }
+            }else if(parameter.value().find("0") != parameter.value().end()){ //Old MultiMidi Method (August 19)
+                for (ofJson::iterator binding = parameter.value().begin(); binding != parameter.value().end(); ++binding) {
+                    auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), false, ofToInt(binding.key()));
+                    if(midiBinding != nullptr){
+                        midiBinding->loadPreset(json[module.key()][parameter.key()][binding.key()]);
+                    }
+                }
+            }else{
+                auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key());
+                if(midiBinding != nullptr){
+                    midiBinding->loadPreset(json[module.key()][parameter.key()]);
+                }
+            }
+        }
+    }
+#endif
     
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
