@@ -341,10 +341,13 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             for (ofJson::iterator it = json[moduleName].begin(); it != json[moduleName].end(); ++it) {
                 int identifier = ofToInt(it.key());
                 if(dynamicNodes[moduleName].count(identifier) == 0){
-                    auto node = createNodeFromName(moduleName, identifier);
+                    vector<float> readArray = it.value();
+                    if(readArray.size() == 2){ //Size 3 means it is only saved as persistent, we only want to move it, if it does not exist we don't create it
+                        auto node = createNodeFromName(moduleName, identifier);
 #ifndef OFXOCEANODE_HEADLESS
-                    node->getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
+                        node->getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
 #endif
+                    }
                 }
             }
         }
@@ -553,7 +556,7 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 #ifndef OFXOCEANODE_HEADLESS
             pos = node.second->getNodeGui().getPosition();
 #endif
-            json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y};
+            json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y, 0}; //We add an element to know is persistent
         }
     }
     ofSavePrettyJson(presetFolderPath + "/modules.json", json);
