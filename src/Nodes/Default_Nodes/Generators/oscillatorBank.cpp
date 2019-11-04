@@ -81,7 +81,12 @@ void oscillatorBank::presetRecallAfterSettingParameters(ofJson &json){
 }
 
 void oscillatorBank::presetHasLoaded(){
-    phasorIn = phasorIn;
+    if(waveSelect_Param == 6 || waveSelect_Param == 7 || waveSelect_Param == 8){
+        phasorIn = vector<float>(1, 1);
+        phasorIn = vector<float>(1, 0);
+    }else{
+        phasorIn = phasorIn;
+    }
 }
 
 void oscillatorBank::indexCountChanged(int &newIndexCount){

@@ -16,6 +16,13 @@ public:
     oscillator() : ofxOceanodeNodeModel("Oscillator"){};
     ~oscillator(){};
     void setup();
+    
+    void presetHasLoaded(){
+        if(waveSelect_Param == 6 || waveSelect_Param == 7 || waveSelect_Param == 8){
+            phasorIn = 1;
+            phasorIn = 0;
+        }
+    }
         
 private:
     void phasorInListener(float &phasor);
