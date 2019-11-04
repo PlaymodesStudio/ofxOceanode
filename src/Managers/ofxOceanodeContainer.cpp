@@ -763,6 +763,12 @@ void ofxOceanodeContainer::savePersistent(){
             binding->savePreset(json[ofSplitString(bindingsPair.first, "-|-")[0]][ofSplitString(bindingsPair.first, "-|-")[1]][i]);
         }
     }
+    for(auto &bindingsPair : persistentMidiBindings){
+        for(int i = 0; i < bindingsPair.second.size(); i++){
+            auto &binding = bindingsPair.second[i];
+            binding->savePreset(json[ofSplitString(bindingsPair.first, "-|-")[0]][ofSplitString(bindingsPair.first, "-|-")[1]][i]);
+        }
+    }
     ofSavePrettyJson(persistentFolderPath + "/midi.json", json);
 #endif
 }
