@@ -13,6 +13,7 @@
 #include "ofParameter.h"
 #include "ofJson.h"
 #include "ofxMidi.h"
+#include "ofTypes.h"
 
 using namespace std;
 
@@ -29,19 +30,27 @@ public:
     };
     ~ofxOceanodeAbstractMidiBinding(){};
     
-    virtual void newMidiMessage(ofxMidiMessage& message) {
-        portName = message.portName;
-        channel = message.channel;
-        status = message.status;
-        messageType = ofxMidiMessage::getStatusString(status);
-        if(message.status == MIDI_CONTROL_CHANGE){
-            control = message.control;
+    void newMidiMessage(ofxMidiMessage& message) {
+        if(isListening){
+            portName = message.portName;
+            channel = message.channel;
+            status = message.status;
+            messageType = ofxMidiMessage::getStatusString(status);
+            if(message.status == MIDI_CONTROL_CHANGE){
+                control = message.control;
+            }
+            if(message.status == MIDI_NOTE_ON || message.status == MIDI_NOTE_OFF){
+                control = message.pitch;
+            }
+            isListening = false;
+            unregisterUnusedMidiIns.notify(this, portName);
         }
-        if(message.status == MIDI_NOTE_ON || message.status == MIDI_NOTE_OFF){
-            control = message.pitch;
+        else{
+            if(mutex.try_lock()){
+                lastsMidiMessage.push_back(message);
+                mutex.unlock();
+            }
         }
-        isListening = false;
-        unregisterUnusedMidiIns.notify(this, portName);
     }
     
     virtual void savePreset(ofJson &json){
@@ -69,7 +78,9 @@ public:
     string type() const{
         return typeid(*this).name();
     }
-
+    
+    virtual void update(){}
+    
     string getName(){return name;};
     
     ofParameter<string> &getMessageType(){return messageType;};
@@ -84,6 +95,9 @@ public:
     
     ofEvent<string> unregisterUnusedMidiIns;
     ofEvent<ofxMidiMessage> midiMessageSender;
+    
+    ofMutex mutex;
+    vector<ofxMidiMessage> lastsMidiMessage;
 protected:
     bool isListening;
     
@@ -111,8 +125,9 @@ public:
     
     ~ofxOceanodeMidiBinding(){};
     
-    void newMidiMessage(ofxMidiMessage& message){};
+    //    void newMidiMessage(ofxMidiMessage& message){};
     void bindParameter(){};
+    void update(){}
     
 private:
     ofParameter<T>& parameter;
@@ -126,7 +141,7 @@ public:
         min.set("Min", parameter.getMin(), parameter.getMin(), parameter.getMax());
         max.set("Max", parameter.getMax(), parameter.getMin(), parameter.getMax());
     }
-
+    
     ~ofxOceanodeMidiBinding(){};
     
     void savePreset(ofJson &json){
@@ -140,45 +155,50 @@ public:
         min.set(json["Min"]);
         max.set(json["Max"]);
     }
-
-    void newMidiMessage(ofxMidiMessage& message){
-        if(message.status == MIDI_NOTE_OFF){
-            message.status = MIDI_NOTE_ON;
-            message.velocity = 0;
-        }
-        if(isListening) ofxOceanodeAbstractMidiBinding::newMidiMessage(message);
-        if(message.channel == channel && message.status == status){
-            bool validMessage = false;
-            switch(status){
-                case MIDI_CONTROL_CHANGE:
-                {
-                    if(message.control == control){
-                        value = message.value;
-                        validMessage = true;
+    
+    void update(){
+        mutex.lock();
+        bool validMessage = false;
+        for(int i = lastsMidiMessage.size()-1; i >= 0 && !validMessage ; i--){
+            ofxMidiMessage &message = lastsMidiMessage[i];
+            if(message.status == MIDI_NOTE_OFF){
+                message.status = MIDI_NOTE_ON;
+                message.velocity = 0;
+            }
+            if(isListening) ofxOceanodeAbstractMidiBinding::newMidiMessage(message);
+            if(message.channel == channel && message.status == status){
+                switch(status){
+                    case MIDI_CONTROL_CHANGE:
+                    {
+                        if(message.control == control){
+                            value = message.value;
+                            validMessage = true;
+                        }
+                        break;
                     }
-                    break;
-                }
-                case MIDI_NOTE_ON:
-                {
-                    if(message.pitch == control){
-                        value = message.velocity;
-                        validMessage = true;
-                        
+                    case MIDI_NOTE_ON:
+                    {
+                        if(message.pitch == control){
+                            value = message.velocity;
+                            validMessage = true;
+                            
+                        }
+                        break;
                     }
-                    break;
+                    default:
+                    {
+                        ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type " << typeid(T).name();
+                    }
                 }
-                default:
-                {
-                    ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type " << typeid(T).name();
+                if(validMessage){
+                    modifiyingParameter = true;
+                    parameter.set(ofMap(value, 1, 127, min, max, true));
+                    modifiyingParameter = false;
                 }
             }
-            if(validMessage){
-                modifiyingParameter = true;
-                parameter.set(ofMap(value, 1, 127, min, max, true));
-                modifiyingParameter = false;
-            }
         }
-        
+        lastsMidiMessage.clear();
+        mutex.unlock();
     };
     void bindParameter(){
         listener = parameter.newListener([this](T &f){
@@ -206,7 +226,7 @@ public:
     
     ofParameter<T> &getMinParameter(){return min;};
     ofParameter<T> &getMaxParameter(){return max;};
-
+    
 private:
     ofParameter<T>& parameter;
     ofParameter<T> min;
@@ -243,42 +263,49 @@ public:
         max.set(json["Max"]);
     }
     
-    void newMidiMessage(ofxMidiMessage& message){
-        if(message.status == MIDI_NOTE_OFF){
-            message.status = MIDI_NOTE_ON;
-            message.velocity = 0;
-        }
-        if(isListening) ofxOceanodeAbstractMidiBinding::newMidiMessage(message);
-        if(message.channel == channel && message.status == status){
-            bool validMessage = false;
-            switch(status){
-                case MIDI_CONTROL_CHANGE:
-                {
-                    if(message.control == control){
-                        value = message.value;
-                        validMessage = true;
-                    }
-                    break;
-                }
-                case MIDI_NOTE_ON:
-                {
-                    if(message.pitch == control){
-                        value = message.velocity;
-                        validMessage = true;
-                    }
-                    break;
-                }
-                default:
-                {
-                    ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type " << typeid(vector<T>).name();
-                }
+    void update(){
+        mutex.lock();
+        bool validMessage = false;
+        for(int i = lastsMidiMessage.size()-1; i >= 0 && !validMessage ; i--){
+            ofxMidiMessage &message = lastsMidiMessage[i];
+            
+            if(message.status == MIDI_NOTE_OFF){
+                message.status = MIDI_NOTE_ON;
+                message.velocity = 0;
             }
-            if(validMessage){
-                modifiyingParameter = true;
+            if(isListening) ofxOceanodeAbstractMidiBinding::newMidiMessage(message);
+            if(message.channel == channel && message.status == status){
+                switch(status){
+                    case MIDI_CONTROL_CHANGE:
+                    {
+                        if(message.control == control){
+                            value = message.value;
+                            validMessage = true;
+                        }
+                        break;
+                    }
+                    case MIDI_NOTE_ON:
+                    {
+                        if(message.pitch == control){
+                            value = message.velocity;
+                            validMessage = true;
+                        }
+                        break;
+                    }
+                    default:
+                    {
+                        ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type " << typeid(vector<T>).name();
+                    }
+                }
+                if(validMessage){
+                    modifiyingParameter = true;
                     parameter.set(vector<T>(1, ofMap(value, 1, 127, min, max, true)));
-                modifiyingParameter = false;
+                    modifiyingParameter = false;
+                }
             }
         }
+        lastsMidiMessage.clear();
+        mutex.unlock();
     };
     
     void bindParameter(){
@@ -334,49 +361,55 @@ public:
         toggle.set(json["Toggle"]);
     }
     
-    void newMidiMessage(ofxMidiMessage& message){
-        if(message.status == MIDI_NOTE_OFF){
-            message.status = MIDI_NOTE_ON;
-            message.velocity = 0;
-        }
-        if(isListening) ofxOceanodeAbstractMidiBinding::newMidiMessage(message);
-        if(message.channel == channel && message.status == status){
-            bool validMessage = false;
-            switch(status){
-                case MIDI_CONTROL_CHANGE:
-                {
-                    if(message.control == control){
-                        value = message.value;
-                        validMessage = true;
+    void update(){
+        mutex.lock();
+        bool validMessage = false;
+        for(int i = lastsMidiMessage.size()-1; i >= 0 && !validMessage ; i--){
+            ofxMidiMessage &message = lastsMidiMessage[i];
+            
+            if(message.status == MIDI_NOTE_OFF){
+                message.status = MIDI_NOTE_ON;
+                message.velocity = 0;
+            }
+            if(isListening) ofxOceanodeAbstractMidiBinding::newMidiMessage(message);
+            if(message.channel == channel && message.status == status){
+                switch(status){
+                    case MIDI_CONTROL_CHANGE:
+                    {
+                        if(message.control == control){
+                            value = message.value;
+                            validMessage = true;
+                        }
+                        break;
                     }
-                    break;
-                }
-                case MIDI_NOTE_ON:
-                {
-                    if(message.pitch == control){
-                        value = message.velocity;
-                        validMessage = true;
+                    case MIDI_NOTE_ON:
+                    {
+                        if(message.pitch == control){
+                            value = message.velocity;
+                            validMessage = true;
+                        }
+                        break;
                     }
-                    break;
+                    default:
+                    {
+                        ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type Bool";
+                    }
                 }
-                default:
-                {
-                    ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type Bool";
+                if(validMessage){
+                    modifiyingParameter = true;
+                    if(toggle == 1){
+                        if(value > 63){
+                            parameter.set(!parameter.get());
+                        }
+                    }else{
+                        parameter.set(value > 63 ? true : false);
+                    }
+                    modifiyingParameter = false;
                 }
             }
-            if(validMessage){
-                modifiyingParameter = true;
-                if(toggle == 1){
-                    if(value > 63){
-                        parameter.set(!parameter.get());
-                    }
-                }else{
-                    parameter.set(value > 63 ? true : false);
-                }
-                modifiyingParameter = false;
-            }
         }
-        
+        lastsMidiMessage.clear();
+        mutex.unlock();
     };
     void bindParameter(){
         listener = parameter.newListener([this](bool &f){
@@ -401,7 +434,7 @@ public:
             }
         });
     };
-
+    
     ofParameter<int> &getToggleParameter(){return toggle;};
     
 private:
@@ -429,49 +462,55 @@ public:
         mode.set(json["Mode"]);
     }
     
-    void newMidiMessage(ofxMidiMessage& message){
-        if(message.status == MIDI_NOTE_OFF){
-            message.status = MIDI_NOTE_ON;
-            message.velocity = 0;
-        }
-        if(isListening) ofxOceanodeAbstractMidiBinding::newMidiMessage(message);
-        if(message.channel == channel && message.status == status){
-            bool validMessage = false;
-            switch(status){
-                case MIDI_CONTROL_CHANGE:
-                {
-                    if(message.control == control){
-                        value = message.value;
-                        validMessage = true;
-                    }
-                    break;
-                }
-                case MIDI_NOTE_ON:
-                {
-                    if(message.pitch == control){
-                        value = message.velocity;
-                        validMessage = true;
-                    }
-                    break;
-                }
-                default:
-                {
-                    ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type Void";
-                }
+    void update(){
+        mutex.lock();
+        bool validMessage = false;
+        for(int i = lastsMidiMessage.size()-1; i >= 0 && !validMessage ; i--){
+            ofxMidiMessage &message = lastsMidiMessage[i];
+            
+            if(message.status == MIDI_NOTE_OFF){
+                message.status = MIDI_NOTE_ON;
+                message.velocity = 0;
             }
-            if(validMessage){
-                modifiyingParameter = true;
-                if(mode == 1){
-                    if(value > 63){
+            if(isListening) ofxOceanodeAbstractMidiBinding::newMidiMessage(message);
+            if(message.channel == channel && message.status == status){
+                switch(status){
+                    case MIDI_CONTROL_CHANGE:
+                    {
+                        if(message.control == control){
+                            value = message.value;
+                            validMessage = true;
+                        }
+                        break;
+                    }
+                    case MIDI_NOTE_ON:
+                    {
+                        if(message.pitch == control){
+                            value = message.velocity;
+                            validMessage = true;
+                        }
+                        break;
+                    }
+                    default:
+                    {
+                        ofLog() << "Midi Type " << ofxMidiMessage::getStatusString(message.status) << " not supported for parameter of type Void";
+                    }
+                }
+                if(validMessage){
+                    modifiyingParameter = true;
+                    if(mode == 1){
+                        if(value > 63){
+                            parameter.trigger();
+                        }
+                    }else{
                         parameter.trigger();
                     }
-                }else{
-                    parameter.trigger();
+                    modifiyingParameter = false;
                 }
-                modifiyingParameter = false;
             }
         }
-        
+        lastsMidiMessage.clear();
+        mutex.unlock();
     };
     void bindParameter(){
         listener = parameter.newListener([this](){

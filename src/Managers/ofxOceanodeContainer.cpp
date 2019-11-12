@@ -61,6 +61,18 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
 #ifdef OFXOCEANODE_USE_OSC
     receiveOsc();
 #endif
+#ifdef OFXOCEANODE_USE_MIDI
+    for(auto &paramBinds : midiBindings){
+        for(auto &bind : paramBinds.second){
+            bind->update();
+        }
+    }
+    for(auto &paramBinds : persistentMidiBindings){
+        for(auto &bind : paramBinds.second){
+            bind->update();
+        }
+    }
+#endif
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             if(node.second->getActive())
