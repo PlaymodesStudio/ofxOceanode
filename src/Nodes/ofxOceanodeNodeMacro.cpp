@@ -8,7 +8,9 @@
 #include "ofxOceanodeNodeMacro.h"
 
 ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModelExternalWindow("Macro"){
+#ifndef OFXOCEANODE_HEADLESS
     canvas = nullptr;
+#endif
     presetPath = "";
     currentPreset = -1;
 }
@@ -115,8 +117,10 @@ void ofxOceanodeNodeMacro::setup(){
     registry->registerModel<inlet<ofTexture*>>("I/O");
     registry->registerModel<outlet<ofTexture*>>("I/O");
     container = make_shared<ofxOceanodeContainer>(registry, typesRegistry);
+#ifndef OFXOCEANODE_HEADLESS
     container->setAutoUpdateAndDraw(false);
     container->setWindow(nullptr);
+#endif
     newNodeListener = container->newNodeCreated.newListener(this, &ofxOceanodeNodeMacro::newNodeCreated);
     ofDirectory dir;
     if(!dir.doesDirectoryExist("MacroPresets")){
@@ -254,6 +258,7 @@ void ofxOceanodeNodeMacro::setup(){
     parameters->add(separate.set("=========================", 'c'));
 }
 
+#ifndef OFXOCEANODE_HEADLESS
 void ofxOceanodeNodeMacro::setupForExternalWindow(){
     container->setWindow(externalWindow);
     canvas = new ofxOceanodeCanvas;
@@ -266,6 +271,7 @@ void ofxOceanodeNodeMacro::closeExternalWindow(ofEventArgs &e){
     delete canvas;
     canvas = nullptr;
 }
+#endif
 
 void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
     bool inletOutletCreated = true;

@@ -81,7 +81,9 @@ class ofxOceanodeNodeMacro : public ofxOceanodeNodeModelExternalWindow{
 public:
     ofxOceanodeNodeMacro();
     ~ofxOceanodeNodeMacro(){
+#ifndef OFXOCEANODE_HEADLESS
         if(canvas != nullptr) delete canvas;
+#endif
     };
     
     void setup();
@@ -90,8 +92,10 @@ public:
     
     void setContainer(ofxOceanodeContainer* container);
     
+#ifndef OFXOCEANODE_HEADLESS
     void setupForExternalWindow();
     void closeExternalWindow(ofEventArgs &e);
+#endif
     
     void presetSave(ofJson &json);
     void loadBeforeConnections(ofJson &json);
@@ -108,7 +112,9 @@ public:
 private:
     void newNodeCreated(ofxOceanodeNode* &node);
     
+#ifndef OFXOCEANODE_HEADLESS
     ofxOceanodeCanvas* canvas;
+#endif
     shared_ptr<ofxOceanodeContainer> container;
     shared_ptr<ofxOceanodeNodeRegistry> registry;
     shared_ptr<ofxOceanodeTypesRegistry> typesRegistry;
