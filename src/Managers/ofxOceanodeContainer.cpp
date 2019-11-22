@@ -23,7 +23,7 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     if(registry == nullptr) registry = make_shared<ofxOceanodeNodeRegistry>();
     if(typesRegistry == nullptr) typesRegistry = make_shared<ofxOceanodeTypesRegistry>();
     window = ofGetCurrentWindow();
-    transformationMatrix = glm::mat4(1);
+    transformationMatrix = glm::mat4(1.0);
     temporalConnection = nullptr;
     bpm = 120;
     phase = 0;

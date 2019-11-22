@@ -227,7 +227,7 @@ void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
             popUpMenu->setVisible(true);
         }
         else if(e.button == 2){
-            transformationMatrix->set(glm::mat4(1));
+            transformationMatrix->set(glm::mat4(1.0));
         }
     }
     if(ofGetKeyPressed(' ')){
@@ -305,7 +305,7 @@ glm::vec3 ofxOceanodeCanvas::getMatrixScale(const glm::mat4 &m){
 }
 
 glm::mat4 ofxOceanodeCanvas::translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector){
-    return glm::translate(glm::mat4(), translationVector) * m;
+    return glm::translate(glm::mat4(1.0), translationVector) * m;
 }
 
 #endif

@@ -131,7 +131,7 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
         gui->setPosition(position.x, position.y);
     }
     if(transformationMatrix != nullptr)
-        gui->setTransformMatrix(ofMatrix4x4(transformationMatrix->get()));
+        gui->setTransformMatrix(transformationMatrix->get());
     
     //GUIS EVENT LISTERNERS
     gui->onButtonEvent(this, &ofxOceanodeNodeGui::onGuiButtonEvent);
@@ -464,11 +464,11 @@ glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofAbstractP
 void ofxOceanodeNodeGui::setTransformationMatrix(ofParameter<glm::mat4> *mat){
     transformationMatrix = mat;
     if(gui != nullptr)
-        gui->setTransformMatrix(ofMatrix4x4(mat->get()));
+        gui->setTransformMatrix(mat->get());
     
     transformMatrixListener = transformationMatrix->newListener([&](glm::mat4 &m){
         if(gui != nullptr)
-            gui->setTransformMatrix(ofMatrix4x4(transformationMatrix->get()));
+            gui->setTransformMatrix(transformationMatrix->get());
     });
 }
 
