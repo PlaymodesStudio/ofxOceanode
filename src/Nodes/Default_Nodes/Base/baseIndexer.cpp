@@ -144,7 +144,7 @@ void baseIndexer::recomputeIndexs(){
         if(indexRand_Param < 0)
             indexf = randomizedIndexes[index-1] + 1;
         else if(indexRand_Param > 0)
-            indexf = double(index)*(1-indexRand_Param) + (double(indexRand[index-1])*indexRand_Param);
+            indexf = double(index)*(1-indexRand_Param) + (double(indexRand[index-1] + 1)*indexRand_Param);
         else{
             indexf = index;
         }
