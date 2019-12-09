@@ -184,6 +184,10 @@ private:
     void midiBindingBound(const void * sender, string &portName);
 #endif
     
+#ifdef OFXOCEANODE_TERMINAL
+    ofEventListener commandListener;
+#endif
+    
 };
 
 #endif /* ofxOceanodeContainer_h */

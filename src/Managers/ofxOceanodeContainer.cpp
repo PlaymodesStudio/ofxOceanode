@@ -18,6 +18,10 @@
 #include "ofxMidiOut.h"
 #endif
 
+#ifdef OFXOCEANODE_TERMINAL
+#include "ofxOceanodeTerminal.h"
+#endif
+
 
 ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry, shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry) : registry(_registry), typesRegistry(_typesRegistry){
     if(registry == nullptr) registry = make_shared<ofxOceanodeNodeRegistry>();
@@ -48,6 +52,66 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
         midiOuts[port].openPort(port);
     }
     isListeningMidi = false;
+#endif
+    
+#ifdef OFXOCEANODE_TERMINAL
+    commandListener = ofxOceanodeTerminal::getInstance()->commandEvent.newListener([this](string &s){
+        vector<string> splitCommand = ofSplitString(s, " ");
+        vector<string> splitAddress = ofSplitString(splitCommand[0], "/");
+        if(splitAddress[0].size() == 0) splitAddress.erase(splitAddress.begin());
+        if(splitAddress.size() == 1){
+            if(splitAddress[0] == "phaseReset"){
+                resetPhase();
+            }else if(splitAddress[0] == "bpm"){
+                float newBpm = ofToFloat(splitCommand[1]);
+                ofNotifyEvent(changedBpmEvent, newBpm);
+            }
+            else if(splitAddress[0] == "presetLoad"){
+                string bankName = splitCommand[1];
+                string presetName = splitCommand[2];
+                string bankAndPreset = bankName + "/" + presetName;
+#ifdef OFXOCEANODE_HEADLESS
+                loadPreset("Presets/" + bankAndPreset);
+#else
+                ofNotifyEvent(loadPresetEvent, bankAndPreset);
+#endif
+            }
+        }else if(splitAddress.size() == 2){
+            if(splitAddress[0] == "presetLoad"){
+                string bankName = splitAddress[1];
+                
+                ofDirectory dir;
+                map<int, string> presets;
+                dir.open("Presets/" + bankName);
+                if(!dir.exists())
+                    return;
+                dir.sort();
+                int numPresets = dir.listDir();
+                for ( int i = 0 ; i < numPresets; i++){
+                    if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == ofToInt(splitCommand[1])){
+                        string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
+#ifdef OFXOCEANODE_HEADLESS
+                        loadPreset("Presets/" + bankAndPreset);
+#else
+                        ofNotifyEvent(loadPresetEvent, bankAndPreset);
+#endif
+                        break;
+                    }
+                }
+            }else if(splitAddress[0] == "presetSave"){
+                savePreset("Presets/" + splitAddress[1] + "/" + splitCommand[1]);
+            }
+        }else if(splitAddress.size() == 3){
+            if(splitAddress[0] == "presetLoad"){
+                string bankAndPreset = splitAddress[1] + "/" + splitAddress[2];
+#ifdef OFXOCEANODE_HEADLESS
+                loadPreset("Presets/" + bankAndPreset);
+#else
+                ofNotifyEvent(loadPresetEvent, bankAndPreset);
+#endif
+            }
+        }
+    });
 #endif
 }
 
