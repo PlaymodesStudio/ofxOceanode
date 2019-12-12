@@ -52,8 +52,8 @@ void oscillator::setup(){
     parameters->add(randomAdd_Param.set("Random Addition", 0, -.5, .5));
     parameters->add(scale_Param.set("Scale", 1, 0, 2));
     parameters->add(offset_Param.set("Offset", 0, -1, 1));
-    parameters->add(pow_Param.set("Pow", 0, -40, 40));
-    parameters->add(biPow_Param.set("Bi Pow", 0, -40, 40));
+    parameters->add(pow_Param.set("Pow", 0, -1, 1));
+    parameters->add(biPow_Param.set("Bi Pow", 0, -1, 1));
     parameters->add(quant_Param.set("Quantization", 255, 2, 255));
     parameters->add(pulseWidth_Param.set("Pulse Width", 1, 0, 1));
     parameters->add(skew_Param.set("Skew", 0, -1, 1));

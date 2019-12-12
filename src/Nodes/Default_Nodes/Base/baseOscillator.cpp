@@ -49,6 +49,10 @@ float baseOscillator::computeFunc(float phasor){
     
     linPhase = fmod(linPhase, 1);
     
+    float noPulseWidthPhase = linPhase; //Used for square wave
+    //linPhase = ofMap(linPhase, (1-pulseWidth_Param), 1, 0.0, 1, true);
+    linPhase = ofMap(linPhase, (1-pulseWidth_Param)*0.5, (1+pulseWidth_Param)*0.5, 0, 1, true);// - pulseWidth_Param) / (1- (pulseWidth_Param*2));
+    
     float skewedLinPhase = linPhase;
     
     if(skew_Param < 0){
@@ -65,9 +69,6 @@ float baseOscillator::computeFunc(float phasor){
     }
     
     linPhase = skewedLinPhase;
-    
-    float noPulseWidthPhase = linPhase; //Used for square wave
-    linPhase = ofMap(linPhase, (1-pulseWidth_Param), 1, 0.0, 1, true);
     
     //get phasor to be w (radial freq)
     float w = linPhase * 2*M_PI;
@@ -186,17 +187,25 @@ void baseOscillator::computeMultiplyMod(float &value){
     value = ofClamp(value, 0.0, 1.0);
     
     //pow
+//    if(pow_Param != 0)
+//        value = (pow_Param < 0) ? pow(value, 1/(float)(-pow_Param+1)) : pow(value, pow_Param+1);
+    
     if(pow_Param != 0)
-        value = (pow_Param < 0) ? pow(value, 1/(float)(-pow_Param+1)) : pow(value, pow_Param+1);
+        customPow(value, pow_Param);
     
     //bipow
+//    if(biPow_Param != 0){
+//        value = ofMap(value, 0.0, 1.0, -1.0, 1.0);
+//        if(value < 0)
+//            value = -((biPow_Param < 0) ? pow(fabs(value), 1/(float)(-biPow_Param+1)) : pow(fabs(value), biPow_Param+1));
+//        else
+//            value = (biPow_Param < 0) ? pow(value, 1/(float)(-biPow_Param+1)) : pow(value, biPow_Param+1);
+//        value = ofMap(value, -1.0, 1.0, 0.0, 1.0);
+//    }
     if(biPow_Param != 0){
-        value = ofMap(value, 0.0, 1.0, -1.0, 1.0);
-        if(value < 0)
-            value = -((biPow_Param < 0) ? pow(fabs(value), 1/(float)(-biPow_Param+1)) : pow(fabs(value), biPow_Param+1));
-        else
-            value = (biPow_Param < 0) ? pow(value, 1/(float)(-biPow_Param+1)) : pow(value, biPow_Param+1);
-        value = ofMap(value, -1.0, 1.0, 0.0, 1.0);
+        value = (value*2) -1;
+        customPow(value, biPow_Param);
+        value = (value+1) * 0.5;
     }
     
     value = ofClamp(value, 0.0, 1.0);
@@ -213,5 +222,12 @@ void baseOscillator::computeMultiplyMod(float &value){
     float invertedValue = 1-value;
     float nonInvertedValue = value;
     value = (invert_Param) * invertedValue + (1-invert_Param) * nonInvertedValue;
+}
+
+void baseOscillator::customPow(float & value, float pow){
+    float k1 = 2*pow*0.99999;
+    float k2 = (k1/((-pow*0.999999)+1));
+    float k3 = k2 * abs(value) + 1;
+    value = value * (k2+1) / k3;
 }
 

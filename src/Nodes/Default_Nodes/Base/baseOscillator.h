@@ -52,6 +52,7 @@ public:
 
 private:
     void computeMultiplyMod(float& value);
+    void customPow(float & value, float pow);
     
     float oldPhasor;
     float oldValuePreMod;
