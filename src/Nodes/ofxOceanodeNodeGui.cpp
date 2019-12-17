@@ -53,8 +53,135 @@ ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
     
 }
 
+void ofxOceanodeNodeGui::constructGui(){
+    ImGui::BeginGroup(); // Lock horizontal position
+    
+    string moduleName = getParameters()->getName();
+    ImGui::Text("%s", moduleName.c_str());
+    
+    for(int i=0 ; i<getParameters()->size(); i++){
+        ofAbstractParameter &absParam = getParameters()->get(i);
+        string uniqueId = absParam.getName();
+        if(absParam.type() == typeid(ofParameter<float>).name()){
+            auto tempCast = absParam.cast<float>();
+            if (ImGui::SliderFloat(uniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax()))
+            {
+                tempCast = tempCast;
+            }
+        }else if(absParam.type() == typeid(ofParameter<int>).name()){
+            auto tempCast = absParam.cast<int>();
+            if (ImGui::SliderInt(uniqueId.c_str(), (int *)&tempCast.get(), tempCast.getMin(), tempCast.getMax()))
+            {
+                tempCast = tempCast;
+            }
+        }else if(absParam.type() == typeid(ofParameter<bool>).name()){
+            auto tempCast = absParam.cast<bool>();
+            if (ImGui::Checkbox(uniqueId.c_str(), (bool *)&tempCast.get()))
+            {
+                tempCast = tempCast;
+            }
+        }else if(absParam.type() == typeid(ofParameter<void>).name()){
+            if (ImGui::Button(uniqueId.c_str()))
+            {
+                absParam.cast<void>().trigger();
+                return true;
+            }
+        }else if(absParam.type() == typeid(ofParameter<string>).name()){
+            auto tempCast = absParam.cast<string>();
+            char * cString = new char[256];
+            strcpy(cString, tempCast.get().c_str());
+            auto result = false;
+            if (ImGui::InputText(uniqueId.c_str(), cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
+            {
+                tempCast = tempCast;
+            }
+            delete[] cString;
+        }else if(absParam.type() == typeid(ofParameter<char>).name()){
+            ImGui::Text("%s", absParam.getName().c_str());
+        }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
+            auto tempCast = absParam.cast<ofFloatColor>();
+            if (ImGui::ColorEdit4(uniqueId.c_str(), (float*)&tempCast.get().r))
+            {
+                tempCast = tempCast;
+            }
+        }else if(absParam.type() == typeid(ofParameterGroup).name()){
+            auto vector_getter = [](void* vec, int idx, const char** out_text)
+            {
+                auto& vector = *static_cast<std::vector<std::string>*>(vec);
+                if (idx < 0 || idx >= static_cast<int>(vector.size())) { return false; }
+                *out_text = vector.at(idx).c_str();
+                return true;
+            };
+    
+            auto tempCast = absParam.castGroup();
+            vector<string> options = ofSplitString(tempCast.getString(0), "-|-");
+            if(ImGui::Combo(uniqueId.c_str(), (int*)&tempCast.getInt(1).get(), vector_getter, static_cast<void*>(&options), options.size())){
+                tempCast.getInt(1) = tempCast.getInt(1);
+            }
+        }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
+            auto tempCast = absParam.cast<vector<float>>();
+            if(tempCast->size() == 1){
+                if (ImGui::SliderFloat(uniqueId.c_str(), (float *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]))
+                {
+                    tempCast = vector<float>(1, tempCast->at(0));
+                }
+            }else{
+                ImGui::PlotHistogram(uniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
+            }
+        }else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
+            auto tempCast = absParam.cast<vector<int>>();
+            if(tempCast->size() == 1){
+                if (ImGui::SliderInt(uniqueId.c_str(), (int *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]))
+                {
+                    tempCast = vector<int>(1, tempCast->at(0));
+                }
+            }else{
+                std::vector<float> floatVec(tempCast.get().begin(), tempCast.get().end());
+                ImGui::PlotHistogram(uniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
+            }
+            
+        }else if(absParam.type() == typeid(ofParameter<pair<int, bool>>).name()){
+//            auto pairParam = absParam.cast<pair<int, bool>>();
+//            auto matrix = gui->addMatrix(absParam.getName(), pairParam.get().first, true);
+//            matrix->setRadioMode(true);
+//            matrix->setHoldMode(pairParam.get().second);
+//            parameterChangedListeners.push(pairParam.newListener([&, matrix](pair<int, bool> &pair){
+//                if(pair.second){
+//                    matrix->select(pair.first);
+//                }else{
+//                    matrix->deselect(pair.first);
+//                }
+//            }));
+        }else {
+//            gui->addLabel(absParam.getName());
+        }
+        inputPositions[uniqueId] = glm::vec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
+        outputPositions[uniqueId] = glm::vec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
+        
+        if(ImGui::IsItemClicked(1)){
+            ofLog() << "Right Clicked " << uniqueId;
+            auto connection = node.parameterConnectionPress(container, absParam);
+//            if(connection != nullptr){
+//                connection->setSourcePosition(glm::vec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2));
+//                connection->setSinkPosition(ImGui::GetMousePos());
+//            }
+        }else if(container.isOpenConnection() && ImGui::IsItemHovered() && !ImGui::IsMouseDown(1)){
+            ofLog() << "Right Released " << uniqueId;
+            auto connection = node.parameterConnectionRelease(container, absParam);
+//            if(connection != nullptr){
+//                connection->setSinkPosition(glm::vec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2));
+//            }
+        }
+    }
+    ImGui::EndGroup();
+    for(auto &outPos : outputPositions){
+        outPos.second.x = inputPositions[outPos.first].x + ImGui::GetItemRectSize().x;
+    }
+    size = ImGui::GetItemRectSize();
+}
+
 void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> window){
-    ofxDatGuiLog::quiet();
+    /*ofxDatGuiLog::quiet();
     ofxDatGui::setAssetPath("");
     
     gui = make_unique<ofxDatGui>(0, 0, window);
@@ -143,9 +270,11 @@ void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> win
     gui->onRightClickEvent(this, &ofxOceanodeNodeGui::onGuiRightClickEvent);
     
     isGuiCreated = true;
+     */
 }
 
 void ofxOceanodeNodeGui::updateGui(){
+    /*
     if(!isGuiCreated) return;
     for(int i=0 ; i<getParameters()->size(); i++){
         ofAbstractParameter &absParam = getParameters()->get(i);
@@ -213,10 +342,12 @@ void ofxOceanodeNodeGui::updateGui(){
             node.setOutConnectionsPositionForParameter(p, getSourceConnectionPositionFromParameter(p));
         }
     }
+     */
 }
 
 
 void ofxOceanodeNodeGui::updateGuiForParameter(string &parameterName){
+    /*
     if(!isGuiCreated) return;
     ofAbstractParameter &absParam = getParameters()->get(parameterName);
     if(absParam.type() == typeid(ofParameter<float>).name()){
@@ -239,9 +370,11 @@ void ofxOceanodeNodeGui::updateGuiForParameter(string &parameterName){
         slider->setMin(absParam.cast<vector<int>>().getMin()[0]);
         slider->setMax(absParam.cast<vector<int>>().getMax()[0]);
     }
+     */
 }
 
 void ofxOceanodeNodeGui::updateDropdown(string &dropdownName){
+    /*
     if(!isGuiCreated) return;
     auto dropdown = gui->getDropdown(dropdownName);
     dropdown->clear();
@@ -249,6 +382,7 @@ void ofxOceanodeNodeGui::updateDropdown(string &dropdownName){
         dropdown->addOption(option);
     }
     dropdown->select(getParameters()->getGroup(dropdownName).getInt(1));
+     */
 }
 
 shared_ptr<ofParameterGroup> ofxOceanodeNodeGui::getParameters(){
@@ -256,46 +390,47 @@ shared_ptr<ofParameterGroup> ofxOceanodeNodeGui::getParameters(){
 }
 
 void ofxOceanodeNodeGui::setPosition(glm::vec2 _position){
-    if(gui != nullptr)
-        gui->setPosition(_position.x, _position.y);
-    node.moveConnections(_position - position);
+//    if(gui != nullptr)
+//        gui->setPosition(_position.x, _position.y);
+//    node.moveConnections(_position - position);
     position = _position;
 }
 
 glm::vec2 ofxOceanodeNodeGui::getPosition(){
-    if(gui == nullptr) return position;
-    return glm::vec2(gui->getPosition().x, gui->getPosition().y);
+    return position;
+//    if(gui == nullptr) return position;
+//    return glm::vec2(gui->getPosition().x, gui->getPosition().y);
 }
 
 ofRectangle ofxOceanodeNodeGui::getRectangle(){
-    return ofRectangle(gui->getPosition(), gui->getWidth(), gui->getHeight());
+//    return ofRectangle(gui->getPosition(), gui->getWidth(), gui->getHeight());
 }
 
 void ofxOceanodeNodeGui::collapse(){
-    if(gui->getExpanded()){
-        gui->collapse();
-        auto header = gui->getHeader();
-        node.collapseConnections(glm::vec2(header->getX(), header->getY() + header->getHeight()/2), glm::vec2(header->getX() + header->getWidth(), header->getY() + header->getHeight()/2));
-        lastExpandedState = false;
-    }
+//    if(gui->getExpanded()){
+//        gui->collapse();
+//        auto header = gui->getHeader();
+//        node.collapseConnections(glm::vec2(header->getX(), header->getY() + header->getHeight()/2), glm::vec2(header->getX() + header->getWidth(), header->getY() + header->getHeight()/2));
+//        lastExpandedState = false;
+//    }
 }
 
 void ofxOceanodeNodeGui::expand(){
-    if(!gui->getExpanded()){
-        gui->expand();
-        node.expandConnections();
-        lastExpandedState = true;
-    }
+//    if(!gui->getExpanded()){
+//        gui->expand();
+//        node.expandConnections();
+//        lastExpandedState = true;
+//    }
 }
 
 void ofxOceanodeNodeGui::setWindow(shared_ptr<ofAppBaseWindow> window){
     keyAndMouseListeners.unsubscribeAll();
     
-    if(window != nullptr && !isGuiCreated){
-        createGuiFromParameters(window);
-    }else{
-        gui->setWindow(window);
-    }
+//    if(window != nullptr && !isGuiCreated){
+//        createGuiFromParameters(window);
+//    }else{
+//        gui->setWindow(window);
+//    }
     
     if(window == nullptr){
 //        keyAndMouseListeners.push(ofEvents().keyPressed.newListener(this,&ofxOceanodeNodeGui::keyPressed));
@@ -323,153 +458,156 @@ void ofxOceanodeNodeGui::setWindow(shared_ptr<ofAppBaseWindow> window){
 }
 
 void ofxOceanodeNodeGui::enable(){
-    gui->setVisible(true);
+//    gui->setVisible(true);
 }
 
 void ofxOceanodeNodeGui::disable(){
-    gui->setVisible(false);
+//    gui->setVisible(false);
 }
 
 
 void ofxOceanodeNodeGui::keyPressed(ofKeyEventArgs &args){
-    if(args.key == 'r' && !args.isRepeat){
-        if(gui->hitTest(ofVec2f(ofGetMouseX(), ofGetMouseY()))){
-            guiToBeDestroyed = true;
-            gui->setOpacity(0.2);
-        }
-    }
+//    if(args.key == 'r' && !args.isRepeat){
+//        if(gui->hitTest(ofVec2f(ofGetMouseX(), ofGetMouseY()))){
+//            guiToBeDestroyed = true;
+//            gui->setOpacity(0.2);
+//        }
+//    }
 }
 
 void ofxOceanodeNodeGui::keyReleased(ofKeyEventArgs &args){
-    if(args.key == 'r'){
-        guiToBeDestroyed = false;
-        gui->setOpacity(1);
-    }
+//    if(args.key == 'r'){
+//        guiToBeDestroyed = false;
+//        gui->setOpacity(1);
+//    }
 }
 
 void ofxOceanodeNodeGui::mouseDragged(ofMouseEventArgs &args){
-    glm::vec2 guiCurrentPos = glm::vec2(gui->getPosition().x, gui->getPosition().y);
-    if(guiCurrentPos != position){
-        node.moveConnections(guiCurrentPos - position);
-        position = guiCurrentPos;
-    }
+//    glm::vec2 guiCurrentPos = glm::vec2(gui->getPosition().x, gui->getPosition().y);
+//    if(guiCurrentPos != position){
+//        node.moveConnections(guiCurrentPos - position);
+//        position = guiCurrentPos;
+//    }
 }
 
 void ofxOceanodeNodeGui::mousePressed(ofMouseEventArgs &args){
-    if(gui->hitTest(args) && args.button != OF_MOUSE_BUTTON_RIGHT){
-       if(args.hasModifier(OF_KEY_ALT)){
-           node.duplicateSelf(toGlm(gui->getPosition() + ofPoint(gui->getWidth() + 10, 0)));
-       }
-       else if(guiToBeDestroyed){
-           node.deleteSelf();
-       }
-    }
+//    if(gui->hitTest(args) && args.button != OF_MOUSE_BUTTON_RIGHT){
+//       if(args.hasModifier(OF_KEY_ALT)){
+//           node.duplicateSelf(toGlm(gui->getPosition() + ofPoint(gui->getWidth() + 10, 0)));
+//       }
+//       else if(guiToBeDestroyed){
+//           node.deleteSelf();
+//       }
+//    }
 }
 
 void ofxOceanodeNodeGui::mouseReleased(ofMouseEventArgs &args){
-    if(gui->hitTest(args)){
-        if(!gui->getExpanded() && lastExpandedState){
-            auto header = gui->getHeader();
-            node.collapseConnections(glm::vec2(header->getX(), header->getY() + header->getHeight()/2), glm::vec2(header->getX() + header->getWidth(), header->getY() + header->getHeight()/2));
-            lastExpandedState = gui->getExpanded();
-        }
-        else if(gui->getExpanded() && !lastExpandedState){
-            node.expandConnections();
-            lastExpandedState = gui->getExpanded();
-        }
-    }
+//    if(gui->hitTest(args)){
+//        if(!gui->getExpanded() && lastExpandedState){
+//            auto header = gui->getHeader();
+//            node.collapseConnections(glm::vec2(header->getX(), header->getY() + header->getHeight()/2), glm::vec2(header->getX() + header->getWidth(), header->getY() + header->getHeight()/2));
+//            lastExpandedState = gui->getExpanded();
+//        }
+//        else if(gui->getExpanded() && !lastExpandedState){
+//            node.expandConnections();
+//            lastExpandedState = gui->getExpanded();
+//        }
+//    }
 }
 
-void ofxOceanodeNodeGui::onGuiButtonEvent(ofxDatGuiButtonEvent e){
-    getParameters()->getVoid(e.target->getName()).trigger();
-}
-void ofxOceanodeNodeGui::onGuiToggleEvent(ofxDatGuiToggleEvent e){
-    getParameters()->getBool(e.target->getName()) = e.checked;
-}
-
-void ofxOceanodeNodeGui::onGuiDropdownEvent(ofxDatGuiDropdownEvent e){
-    getParameters()->getGroup(e.target->getName()).getInt(1) = e.child;
-}
-
-void ofxOceanodeNodeGui::onGuiTextInputEvent(ofxDatGuiTextInputEvent e){
-    getParameters()->getString(e.target->getName()) = e.text;
-}
-
-void ofxOceanodeNodeGui::onGuiColorPickerEvent(ofxDatGuiColorPickerEvent e){
-    getParameters()->getColor(e.target->getName()) = e.color;
-}
-
-void ofxOceanodeNodeGui::onGuiMatrixEvent(ofxDatGuiMatrixEvent e){
-    getParameters()->get(e.target->getName()).cast<pair<int, bool>>() = make_pair(e.child+1, e.enabled);
-}
-
-void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
-    ofAbstractParameter *p = &getParameters()->get(e.target->getName());
-    if(e.target->getType() == ofxDatGuiType::DROPDOWN){
-        p = &getParameters()->getGroup(e.target->getName()).getInt(1);
-    }
-#ifdef OFXOCEANODE_USE_MIDI
-    if(isListeningMidi){
-        if(e.down == 1){
-            if(ofGetKeyPressed(OF_KEY_SHIFT)){
-                container.removeLastMidiBinding(*p);
-            }else{
-                container.createMidiBinding(*p);
-            }
-        }
-    }
-    else
-#endif
-    {
-        if(e.down == 1){
-            auto connection = node.parameterConnectionPress(container, *p);
-            if(connection != nullptr){
-                connection->setTransformationMatrix(transformationMatrix);
-                connection->setSinkPosition(transformationMatrix->get() * glm::vec4(ofGetMouseX(), ofGetMouseY(), 0, 1));
-            }
-        }else{
-            auto connection = node.parameterConnectionRelease(container, *p);
-            if(connection != nullptr){
-                connection->setSinkPosition(getSinkConnectionPositionFromParameter(getParameters()->get(e.target->getName())));
-                connection->setTransformationMatrix(transformationMatrix);
-            }
-        }
-    }
-}
+//void ofxOceanodeNodeGui::onGuiButtonEvent(ofxDatGuiButtonEvent e){
+//    getParameters()->getVoid(e.target->getName()).trigger();
+//}
+//void ofxOceanodeNodeGui::onGuiToggleEvent(ofxDatGuiToggleEvent e){
+//    getParameters()->getBool(e.target->getName()) = e.checked;
+//}
+//
+//void ofxOceanodeNodeGui::onGuiDropdownEvent(ofxDatGuiDropdownEvent e){
+//    getParameters()->getGroup(e.target->getName()).getInt(1) = e.child;
+//}
+//
+//void ofxOceanodeNodeGui::onGuiTextInputEvent(ofxDatGuiTextInputEvent e){
+//    getParameters()->getString(e.target->getName()) = e.text;
+//}
+//
+//void ofxOceanodeNodeGui::onGuiColorPickerEvent(ofxDatGuiColorPickerEvent e){
+//    getParameters()->getColor(e.target->getName()) = e.color;
+//}
+//
+//void ofxOceanodeNodeGui::onGuiMatrixEvent(ofxDatGuiMatrixEvent e){
+//    getParameters()->get(e.target->getName()).cast<pair<int, bool>>() = make_pair(e.child+1, e.enabled);
+//}
+//
+//void ofxOceanodeNodeGui::onGuiRightClickEvent(ofxDatGuiRightClickEvent e){
+//    ofAbstractParameter *p = &getParameters()->get(e.target->getName());
+//    if(e.target->getType() == ofxDatGuiType::DROPDOWN){
+//        p = &getParameters()->getGroup(e.target->getName()).getInt(1);
+//    }
+//#ifdef OFXOCEANODE_USE_MIDI
+//    if(isListeningMidi){
+//        if(e.down == 1){
+//            if(ofGetKeyPressed(OF_KEY_SHIFT)){
+//                container.removeLastMidiBinding(*p);
+//            }else{
+//                container.createMidiBinding(*p);
+//            }
+//        }
+//    }
+//    else
+//#endif
+//    {
+//        if(e.down == 1){
+//            auto connection = node.parameterConnectionPress(container, *p);
+//            if(connection != nullptr){
+//                connection->setTransformationMatrix(transformationMatrix);
+//                connection->setSinkPosition(transformationMatrix->get() * glm::vec4(ofGetMouseX(), ofGetMouseY(), 0, 1));
+//            }
+//        }else{
+//            auto connection = node.parameterConnectionRelease(container, *p);
+//            if(connection != nullptr){
+//                connection->setSinkPosition(getSinkConnectionPositionFromParameter(getParameters()->get(e.target->getName())));
+//                connection->setTransformationMatrix(transformationMatrix);
+//            }
+//        }
+//    }
+//}
 
 glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter){
-    if(gui == nullptr) return glm::vec2(0,0);
-    auto component = gui->getExpanded() ? gui->getComponent(parameter.getName()) : gui->getHeader();
-    if(component == NULL){
-        component = gui->getComponent(parameter.getName() + " Selector");
-    }
-    glm::vec2 position;
-    position.x = component->getX() + component->getWidth();
-    position.y = component->getY() + component->getHeight()/2;
-    return position;
+//    if(gui == nullptr) return glm::vec2(0,0);
+//    auto component = gui->getExpanded() ? gui->getComponent(parameter.getName()) : gui->getHeader();
+//    if(component == NULL){
+//        component = gui->getComponent(parameter.getName() + " Selector");
+//    }
+//    glm::vec2 position;
+//    position.x = component->getX() + component->getWidth();
+//    position.y = component->getY() + component->getHeight()/2;
+//    return position;
+    return outputPositions[parameter.getName()];
 }
 
 glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter){
-    if(gui == nullptr) return glm::vec2(0,0);
-    auto component = gui->getExpanded() ? gui->getComponent(parameter.getName()) : gui->getHeader();
-    if(component == NULL){
-        component = gui->getComponent(parameter.getName() + " Selector");
-    }
-    glm::vec2 position;
-    position.x = component->getX();
-    position.y = component->getY() + component->getHeight()/2;
-    return position;
+//    if(gui == nullptr) return glm::vec2(0,0);
+//    auto component = gui->getExpanded() ? gui->getComponent(parameter.getName()) : gui->getHeader();
+//    if(component == NULL){
+//        component = gui->getComponent(parameter.getName() + " Selector");
+//    }
+//    glm::vec2 position;
+//    position.x = component->getX();
+//    position.y = component->getY() + component->getHeight()/2;
+//    return position;
+    return inputPositions[parameter.getName()];
+    return glm::vec2(0,0);
 }
 
 void ofxOceanodeNodeGui::setTransformationMatrix(ofParameter<glm::mat4> *mat){
     transformationMatrix = mat;
-    if(gui != nullptr)
-        gui->setTransformMatrix(mat->get());
-    
-    transformMatrixListener = transformationMatrix->newListener([&](glm::mat4 &m){
-        if(gui != nullptr)
-            gui->setTransformMatrix(transformationMatrix->get());
-    });
+//    if(gui != nullptr)
+//        gui->setTransformMatrix(mat->get());
+//
+//    transformMatrixListener = transformationMatrix->newListener([&](glm::mat4 &m){
+//        if(gui != nullptr)
+//            gui->setTransformMatrix(transformationMatrix->get());
+//    });
 }
 
 #endif

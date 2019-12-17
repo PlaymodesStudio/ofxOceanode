@@ -113,7 +113,7 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstract
     temporalConnectionNode = &n;
     temporalConnection = new ofxOceanodeTemporalConnection(p);
 #ifndef OFXOCEANODE_HEADLESS
-    temporalConnection->setSourcePosition(n.getNodeGui().getSourceConnectionPositionFromParameter(p));
+    //temporalConnection->setSourcePosition(n.getNodeGui().getSourceConnectionPositionFromParameter(p));
     temporalConnection->getGraphics().subscribeToDrawEvent(window);
 #endif
     destroyConnectionListeners.push(temporalConnection->destroyConnection.newListener(this, &ofxOceanodeContainer::temporalConnectionDestructor));
@@ -1395,6 +1395,14 @@ void ofxOceanodeContainer::setAutoUpdateAndDraw(bool b){
     }
 }
 
+vector<shared_ptr<ofxOceanodeAbstractConnection>> ofxOceanodeContainer::getAllConnections(){
+    vector<shared_ptr<ofxOceanodeAbstractConnection>> tempVec;
+    for(auto &c : connections){
+        tempVec.push_back(c.second);
+    }
+    return tempVec;
+}
+
 #endif
 
 #ifdef OFXOCEANODE_USE_MIDI
@@ -1590,8 +1598,7 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
         temporalConnectionNode = sourceModuleRef.get();
         auto connection = sinkModuleRef->createConnection(*this, source, sink);
 #ifndef OFXOCEANODE_HEADLESS
-            connection->setSinkPosition(sinkModuleRef->getNodeGui().getSinkConnectionPositionFromParameter(sink));
-            connection->setTransformationMatrix(&transformationMatrix);
+            //connection->setSinkPosition(sinkModuleRef->getNodeGui().getSinkConnectionPositionFromParameter(sink));
 #endif
         temporalConnection = nullptr;
         return connection;

@@ -97,10 +97,209 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
     
     //Draw Guis
     gui.begin();
-//    ImGui::GetIO().DisplaySize = glm::vec2(1000000, 100000);
-    for(auto &node : container->getModulesGuiInRectangle(ofGetWindowRect(), false)){
-        node->constructGui();
+    
+    // Draw a list of nodes on the left side
+    bool open_context_menu = false;
+    int node_hovered_in_list = -1;
+    int node_hovered_in_scene = -1;
+//    ImGui::BeginChild("node_list", ImVec2(100, 0));
+//    ImGui::Text("Nodes");
+//    ImGui::Separator();
+//    for (int node_idx = 0; node_idx < nodes.Size; node_idx++)
+//    {
+//        Node* node = &nodes[node_idx];
+//        ImGui::PushID(node->ID);
+//        if (ImGui::Selectable(node->Name, node->ID == node_selected))
+//            node_selected = node->ID;
+//        if (ImGui::IsItemHovered())
+//        {
+//            node_hovered_in_list = node->ID;
+//            open_context_menu |= ImGui::IsMouseClicked(1);
+//        }
+//        ImGui::PopID();
+//    }
+//    ImGui::EndChild();
+    
+    ImGui::SameLine();
+    ImGui::BeginGroup();
+    
+    const float NODE_SLOT_RADIUS = 4.0f;
+    const ImVec2 NODE_WINDOW_PADDING(8.0f, 8.0f);
+    
+    // Create our child canvas
+    ImGui::Text("Hold middle mouse button to scroll (%.2f,%.2f)", scrolling.x, scrolling.y);
+    ImGui::SameLine(ImGui::GetWindowWidth() - 100);
+    ImGui::Checkbox("Show grid", &show_grid);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleColor(ImGuiCol_ChildWindowBg, IM_COL32(60, 60, 70, 200));
+    ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove);
+    ImGui::PushItemWidth(120.0f);
+    
+    ImVec2 offset = /*ImGui::GetCursorScreenPos()*/ + scrolling;
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    // Display grid
+    if (show_grid)
+    {
+        ImU32 GRID_COLOR = IM_COL32(200, 200, 200, 40);
+        float GRID_SZ = 64.0f;
+        ImVec2 win_pos = ImGui::GetCursorScreenPos();
+        ImVec2 canvas_sz = ImGui::GetWindowSize();
+        for (float x = fmodf(scrolling.x, GRID_SZ); x < canvas_sz.x; x += GRID_SZ)
+            draw_list->AddLine(ImVec2(x, 0.0f) + win_pos, ImVec2(x, canvas_sz.y) + win_pos, GRID_COLOR);
+        for (float y = fmodf(scrolling.y, GRID_SZ); y < canvas_sz.y; y += GRID_SZ)
+            draw_list->AddLine(ImVec2(0.0f, y) + win_pos, ImVec2(canvas_sz.x, y) + win_pos, GRID_COLOR);
     }
+    
+    auto getSourceConnectionPositionFromParameter = [this](ofAbstractParameter& param) -> glm::vec2{
+        for(auto &node : container->getModulesGuiInRectangle(ofGetWindowRect(), false)){
+            if(node->getParameters()->getEscapedName()  == param.getGroupHierarchyNames()[0]){
+                return node->getSourceConnectionPositionFromParameter(param);
+            }
+        }
+    };
+    auto getSinkConnectionPositionFromParameter = [this](ofAbstractParameter& param) -> glm::vec2{
+        for(auto &node : container->getModulesGuiInRectangle(ofGetWindowRect(), false)){
+            if(node->getParameters()->getEscapedName() == param.getGroupHierarchyNames()[0]){
+                return node->getSinkConnectionPositionFromParameter(param);
+            }
+        }
+    };
+    
+    // Display links
+    draw_list->ChannelsSplit(2);
+    draw_list->ChannelsSetCurrent(0); // Background
+    for(auto &connection : container->getAllConnections()){
+        glm::vec2 p1 = getSourceConnectionPositionFromParameter(connection->getSourceParameter());
+        glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter());
+        draw_list->AddBezierCurve(p1, p1 + ImVec2(+100, 0), p2 + ImVec2(-100, 0), p2, IM_COL32(200, 200, 100, 255), 3.0f);
+    }
+    if(container->isOpenConnection()){
+        if(!ImGui::IsMouseDown(1)){
+            container->destroyTemporalConnection();
+        }else{
+            glm::vec2 p1 = getSourceConnectionPositionFromParameter(container->getTemporalConnectionParameter());
+            glm::vec2 p2 = ImGui::GetMousePos();
+            draw_list->AddBezierCurve(p1, p1 + ImVec2(+100, 0), p2 + ImVec2(-100, 0), p2, IM_COL32(200, 200, 100, 255), 3.0f);
+        }
+    }
+    
+    // Display nodes
+    int nodeId = -1;
+    for(auto &node : container->getModulesGuiInRectangle(ofGetWindowRect(), false)){
+        nodeId++;
+        ImGui::PushID(node->getParameters()->getName().c_str());
+        
+        glm::vec2 node_rect_min = offset + node->getPosition();
+        
+        // Display node contents first
+        draw_list->ChannelsSetCurrent(1); // Foreground
+        bool old_any_active = ImGui::IsAnyItemActive();
+        ImGui::SetCursorScreenPos(node_rect_min + NODE_WINDOW_PADDING);
+        
+        //Draw Parameters
+        node->constructGui();
+        
+        // Save the size of what we have emitted and whether any of the widgets are being used
+        bool node_widgets_active = (!old_any_active && ImGui::IsAnyItemActive());
+        glm::vec2 size = ImGui::GetItemRectSize() + NODE_WINDOW_PADDING + NODE_WINDOW_PADDING;
+        ImVec2 node_rect_max = node_rect_min + size;
+        
+        
+        
+        // Display node box
+        draw_list->ChannelsSetCurrent(0); // Background
+        ImGui::SetCursorScreenPos(node_rect_min);
+        ImGui::InvisibleButton("node", size);
+        
+        if (ImGui::IsItemHovered())
+        {
+            node_hovered_in_scene = nodeId;
+            open_context_menu |= ImGui::IsMouseClicked(1);
+        }
+        bool node_moving_active = ImGui::IsItemActive();
+        if (node_widgets_active || node_moving_active)
+            node_selected = nodeId;
+        if (node_moving_active && ImGui::IsMouseDragging(0))
+            node->setPosition(node->getPosition() + ImGui::GetIO().MouseDelta);
+        
+        
+        
+        ImU32 node_bg_color = /*(node_hovered_in_list == node->ID || node_hovered_in_scene == node->ID || (node_hovered_in_list == -1 && node_selected == node->ID)) ? IM_COL32(75, 75, 75, 255) :*/ IM_COL32(60, 60, 60, 255);
+        draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
+        draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(100, 100, 100, 255), 4.0f);
+        
+//        auto GetInputSlotPos = [node_rect_min, size, node](int idx) -> glm::vec2{
+//            return glm::vec2(node_rect_min.x, node_rect_min.y + size.y * ((float)idx + 2) / ((float)node->getParameters()->size() + 2));
+//        };
+//
+//        auto GetOutputSlotPos = [node_rect_min, size, node](int idx) -> glm::vec2{
+//            return glm::vec2(node_rect_min.x + size.x, node_rect_min.y + size.y * ((float)idx + 2) / ((float)node->getParameters()->size() + 2));
+//        };
+        
+//        for (int slot_idx = 0; slot_idx < node->getParameters()->size(); slot_idx++)
+//            draw_list->AddCircleFilled(offset + GetInputSlotPos(slot_idx), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
+//        for (int slot_idx = 0; slot_idx < node->getParameters()->size(); slot_idx++)
+//            draw_list->AddCircleFilled(offset + GetOutputSlotPos(slot_idx), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
+        
+        for (auto &param : *node->getParameters().get())
+            draw_list->AddCircleFilled(node->getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
+        for (auto &param : *node->getParameters().get())
+            draw_list->AddCircleFilled(node->getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
+        
+        ImGui::PopID();
+    }
+    
+    draw_list->ChannelsMerge();
+    
+    // Open context menu
+//    if (!ImGui::IsAnyItemHovered() && ImGui::IsMouseHoveringWindow() && ImGui::IsMouseClicked(1))
+//    {
+//        node_selected = node_hovered_in_list = node_hovered_in_scene = -1;
+//        open_context_menu = true;
+//    }
+//    if (open_context_menu)
+//    {
+//        ImGui::OpenPopup("context_menu");
+//        if (node_hovered_in_list != -1)
+//            node_selected = node_hovered_in_list;
+//        if (node_hovered_in_scene != -1)
+//            node_selected = node_hovered_in_scene;
+//    }
+    
+    // Draw context menu
+//    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+//    if (ImGui::BeginPopup("context_menu"))
+//    {
+//        Node* node = node_selected != -1 ? &nodes[node_selected] : NULL;
+//        ImVec2 scene_pos = ImGui::GetMousePosOnOpeningCurrentPopup() - offset;
+//        if (node)
+//        {
+//            ImGui::Text("Node '%s'", node->Name);
+//            ImGui::Separator();
+//            if (ImGui::MenuItem("Rename..", NULL, false, false)) {}
+//            if (ImGui::MenuItem("Delete", NULL, false, false)) {}
+//            if (ImGui::MenuItem("Copy", NULL, false, false)) {}
+//        }
+//        else
+//        {
+//            if (ImGui::MenuItem("Add")) { nodes.push_back(Node(nodes.Size, "New node", scene_pos, 0.5f, ImColor(100, 100, 200), 2, 2)); }
+//            if (ImGui::MenuItem("Paste", NULL, false, false)) {}
+//        }
+//        ImGui::EndPopup();
+//    }
+//    ImGui::PopStyleVar();
+    
+    // Scrolling
+    if (ImGui::IsWindowHovered() /*&& !ImGui::IsAnyItemActive() */&& ImGui::IsMouseDragging(0, 0.0f)){
+        scrolling = scrolling + ImGui::GetIO().MouseDelta;
+    }
+    
+    ImGui::PopItemWidth();
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
+    ImGui::EndGroup();
     
     gui.end();
     

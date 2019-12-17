@@ -64,6 +64,7 @@ public:
     void destroyConnection(ofxOceanodeAbstractConnection* c);
     
     ofAbstractParameter& getTemporalConnectionParameter(){return temporalConnection->getSourceParameter();};
+    void destroyTemporalConnection(){temporalConnectionDestructor();};//Make some checks?
     
     bool isOpenConnection(){return temporalConnection != nullptr;}
     
@@ -72,7 +73,7 @@ public:
         connections.push_back(make_pair(temporalConnectionNode, make_shared<ofxOceanodeConnection<Tsource, Tsink>>(source, sink)));
         temporalConnectionNode->addOutputConnection(connections.back().second.get());
 #ifndef OFXOCEANODE_HEADLESS
-        connections.back().second->setSourcePosition(temporalConnectionNode->getNodeGui().getSourceConnectionPositionFromParameter(source));
+        //connections.back().second->setSourcePosition(temporalConnectionNode->getNodeGui().getSourceConnectionPositionFromParameter(source));
         connections.back().second->getGraphics().subscribeToDrawEvent(window);
 #endif
         temporalConnectionDestructor();
@@ -135,6 +136,8 @@ public:
     bool pasteModulesAndConnectionsInPosition(glm::vec2 position);
     void setWindow(std::shared_ptr<ofAppBaseWindow> window);
     void setAutoUpdateAndDraw(bool b);
+    
+    vector<shared_ptr<ofxOceanodeAbstractConnection>> getAllConnections();
 #endif
     
 private:

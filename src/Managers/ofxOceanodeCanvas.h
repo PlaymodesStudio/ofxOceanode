@@ -74,6 +74,10 @@ private:
     vector<pair<ofxOceanodeNodeGui*, glm::vec2>> toMoveNodes;
     
     ofxImGui::Gui gui;
+    bool inited = false;
+    glm::vec2 scrolling = glm::vec2(0.0f, 0.0f);
+    bool show_grid = true;
+    int node_selected = -1;
 };
 
 #endif

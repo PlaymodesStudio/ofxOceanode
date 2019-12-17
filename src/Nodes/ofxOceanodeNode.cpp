@@ -241,10 +241,10 @@ void ofxOceanodeNode::collapseConnections(glm::vec2 sinkPos, glm::vec2 sourcePos
 #ifndef OFXOCEANODE_HEADLESS
 void ofxOceanodeNode::expandConnections(){
     for(auto c : inConnections){
-        c->setSinkPosition(nodeGui->getSinkConnectionPositionFromParameter(c->getSinkParameter()));
+        //c->setSinkPosition(nodeGui->getSinkConnectionPositionFromParameter(c->getSinkParameter()));
     }
     for(auto c : outConnections){
-        c->setSourcePosition(nodeGui->getSourceConnectionPositionFromParameter(c->getSourceParameter()));
+        //c->setSourcePosition(nodeGui->getSourceConnectionPositionFromParameter(c->getSourceParameter()));
     }
 }
 #endif

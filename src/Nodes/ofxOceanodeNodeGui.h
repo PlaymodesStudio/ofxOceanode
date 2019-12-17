@@ -24,8 +24,8 @@ public:
     ofxOceanodeNodeGui(ofxOceanodeContainer &container, ofxOceanodeNode &node, shared_ptr<ofAppBaseWindow> window);
     ~ofxOceanodeNodeGui();
     
-    void update(ofEventArgs &e);
-    void draw(ofEventArgs &e);
+    void update(ofEventArgs &e){};
+    void draw(ofEventArgs &e){};
     
     void constructGui();
     
@@ -39,6 +39,8 @@ public:
     shared_ptr<ofParameterGroup> getParameters();
     glm::vec2 getPosition();
     ofRectangle getRectangle();
+
+    
     void collapse();
     void expand();
     
@@ -87,15 +89,12 @@ private:
     
     ofxOceanodeNode& node;
     
-//    ofxImGui::Gui gui;
-    ofxImGui::Settings settings;
-    bool newPosition;
-    bool outsideDisplay;
+    map<string, glm::vec2> inputPositions;
+    map<string, glm::vec2> outputPositions;
     
-//    unique_ptr<ofxDatGui> gui;
-//    unique_ptr<ofxDatGuiTheme> theme;
     ofColor color;
     glm::vec2 position;
+    glm::vec2 size;
     
     bool guiToBeDestroyed;
     bool lastExpandedState;

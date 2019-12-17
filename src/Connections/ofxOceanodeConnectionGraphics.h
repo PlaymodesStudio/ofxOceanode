@@ -21,7 +21,7 @@ public:
     ~ofxOceanodeConnectionGraphics(){};
     
     void draw(ofEventArgs &args){
-        if(points[1] != glm::vec2(-1, -1)){
+    /*    if(points[1] != glm::vec2(-1, -1)){
             ofPushMatrix();
             ofMultMatrix(glm::inverse(transformationMatrix->get()));
             {
@@ -63,7 +63,7 @@ public:
                 
             }
             ofPopMatrix();
-        }
+        }*/
     }
     
     void movePoint(int index, glm::vec2 moveVec){
@@ -86,12 +86,9 @@ public:
     }
     
     glm::vec2 getPoint(int index){return points[index];};
-    void setTransformationMatrix(ofParameter<glm::mat4> *m){transformationMatrix = m;};
-    glm::mat4 getTransformationMatrix(){return transformationMatrix->get();};
     void setWireColor(ofColor c){wireColor = c;};
 private:
     glm::vec2 points[2];
-    ofParameter<glm::mat4> *transformationMatrix;
     
     ofEventListener drawEventListener;
     ofColor wireColor;
