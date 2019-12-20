@@ -172,16 +172,16 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
     for(auto &connection : container->getAllConnections()){
         glm::vec2 p1 = getSourceConnectionPositionFromParameter(connection->getSourceParameter());
         glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter());
-        draw_list->AddBezierCurve(p1, p1 + ImVec2(+100, 0), p2 + ImVec2(-100, 0), p2, IM_COL32(200, 200, 100, 255), 3.0f);
+        glm::vec2  controlPoint(0,0);
+        controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
+        draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 100, 255), 3.0f);
     }
     if(container->isOpenConnection()){
-        if(!ImGui::IsMouseDown(1)){
-            container->destroyTemporalConnection();
-        }else{
-            glm::vec2 p1 = getSourceConnectionPositionFromParameter(container->getTemporalConnectionParameter());
-            glm::vec2 p2 = ImGui::GetMousePos();
-            draw_list->AddBezierCurve(p1, p1 + ImVec2(+100, 0), p2 + ImVec2(-100, 0), p2, IM_COL32(200, 200, 100, 255), 3.0f);
-        }
+        glm::vec2 p1 = getSourceConnectionPositionFromParameter(container->getTemporalConnectionParameter());
+        glm::vec2 p2 = ImGui::GetMousePos();
+        glm::vec2  controlPoint(0,0);
+        controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
+        draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 100, 255), 3.0f);
     }
     
     // Display nodes
@@ -248,6 +248,12 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
             draw_list->AddCircleFilled(node->getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
         
         ImGui::PopID();
+    }
+    
+    if(container->isOpenConnection()){
+        if(!ImGui::IsMouseDown(1)){
+            container->destroyTemporalConnection();
+        }
     }
     
     draw_list->ChannelsMerge();
