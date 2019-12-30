@@ -10,21 +10,18 @@
 #include "ofxOceanodeNodeGui.h"
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeContainer.h"
+#include "ofxImGui.h"
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node, shared_ptr<ofAppBaseWindow> window) : container(_container), node(_node){
     color = node.getColor();
-    //color.setBrightness(255);
-    position = glm::vec2(10, 10);
+    color.setBrightness(255);
+    guiRect = ofRectangle(10, 10, 10, 10);
     guiToBeDestroyed = false;
     lastExpandedState = true;
     isGuiCreated = false;
 #ifdef OFXOCEANODE_USE_MIDI
     isListeningMidi = false;
 #endif
-    transformationMatrix = nullptr;
-    
-    if(window != nullptr)
-        createGuiFromParameters(window);
     
     if(window == nullptr){
 //        keyAndMouseListeners.push(ofEvents().keyPressed.newListener(this,&ofxOceanodeNodeGui::keyPressed));
@@ -53,11 +50,32 @@ ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
     
 }
 
-void ofxOceanodeNodeGui::constructGui(){
+bool ofxOceanodeNodeGui::constructGui(){
+    string moduleName = getParameters()->getName();
     ImGui::BeginGroup(); // Lock horizontal position
     
-    string moduleName = getParameters()->getName();
+    bool deleteModule = false;
+    
+    if (ImGui::Button("x"))
+        ImGui::OpenPopup("Delete?");
+    if (ImGui::BeginPopupModal("Delete?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::Text("%s", ("Are you sure you want to delete.\n " + moduleName + "\n").c_str());
+        ImGui::Separator();
+        
+        if (ImGui::Button("OK", ImVec2(120,0))) {
+            ImGui::CloseCurrentPopup();
+            deleteModule = true;
+        }
+        ImGui::SetItemDefaultFocus();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120,0))) { ImGui::CloseCurrentPopup(); }
+        ImGui::EndPopup();
+    }
+    
+    ImGui::SameLine(0, 10);
     ImGui::Text("%s", moduleName.c_str());
+    
     
     for(int i=0 ; i<getParameters()->size(); i++){
         ofAbstractParameter &absParam = getParameters()->get(i);
@@ -153,274 +171,46 @@ void ofxOceanodeNodeGui::constructGui(){
 //                }
 //            }));
         }else {
-//            gui->addLabel(absParam.getName());
+            ImGui::Text("%s", absParam.getName().c_str());
         }
         inputPositions[uniqueId] = glm::vec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
         outputPositions[uniqueId] = glm::vec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
         
         if(ImGui::IsItemClicked(1)){
-            ofLog() << "Right Clicked " << uniqueId;
             auto connection = node.parameterConnectionPress(container, absParam);
-//            if(connection != nullptr){
-//                connection->setSourcePosition(glm::vec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2));
-//                connection->setSinkPosition(ImGui::GetMousePos());
-//            }
         }else if(container.isOpenConnection() && ImGui::IsItemHovered() && !ImGui::IsMouseDown(1)){
-            ofLog() << "Right Released " << uniqueId;
             auto connection = node.parameterConnectionRelease(container, absParam);
-//            if(connection != nullptr){
-//                connection->setSinkPosition(glm::vec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2));
-//            }
         }
     }
     ImGui::EndGroup();
     for(auto &outPos : outputPositions){
         outPos.second.x = inputPositions[outPos.first].x + ImGui::GetItemRectSize().x;
     }
-    size = ImGui::GetItemRectSize();
-}
-
-void ofxOceanodeNodeGui::createGuiFromParameters(shared_ptr<ofAppBaseWindow> window){
-    /*ofxDatGuiLog::quiet();
-    ofxDatGui::setAssetPath("");
-    
-    gui = make_unique<ofxDatGui>(0, 0, window);
-    
-    for(int i=0 ; i<getParameters()->size(); i++){
-        ofAbstractParameter &absParam = getParameters()->get(i);
-        if(absParam.type() == typeid(ofParameter<float>).name()){
-            gui->addSlider(absParam.cast<float>())->setPrecision(1000);
-        }else if(absParam.type() == typeid(ofParameter<int>).name()){
-            gui->addSlider(absParam.cast<int>());
-        }else if(absParam.type() == typeid(ofParameter<bool>).name()){
-            ofxDatGuiToggle* toggle =  gui->addToggle(absParam.getName());
-            toggle->setChecked(absParam.cast<bool>().get());
-            //Add a listener that automatically puts the parameter to the gui.
-            //Best will be to include this to datGui. But this way we can change the gui we use, independent of ofParameter
-            parameterChangedListeners.push(absParam.cast<bool>().newListener([&, toggle](bool &val){
-                toggle->setChecked(val);
-            }));
-        }else if(absParam.type() == typeid(ofParameter<void>).name()){
-            gui->addButton(absParam.getName());
-        }else if(absParam.type() == typeid(ofParameter<string>).name()){
-            auto textInput = gui->addTextInput(absParam.getName(), absParam.cast<string>());
-            parameterChangedListeners.push(absParam.cast<string>().newListener([&, textInput](string &val){
-                textInput->setText(val);
-            }));
-        }else if(absParam.type() == typeid(ofParameter<char>).name()){
-            gui->addLabel(absParam.getName());
-        }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
-            auto colorGui = gui->addColorPicker(absParam.getName(), absParam.cast<ofColor>());
-            parameterChangedListeners.push(absParam.cast<ofColor>().newListener([&, colorGui](ofColor &val){
-                colorGui->setColor(val);
-            }));
-        }else if(absParam.type() == typeid(ofParameterGroup).name()){
-            gui->addLabel(absParam.castGroup().getName());
-            auto dropdown = gui->addDropdown(absParam.castGroup().getName(), ofSplitString(absParam.castGroup().getString(0), "-|-"));
-            dropdown->select(absParam.castGroup().getInt(1));
-            parameterChangedListeners.push(absParam.castGroup().getInt(1).newListener([&, dropdown](int &val){
-                dropdown->select(val);
-            }));
-        }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
-            gui->addMultiSlider(absParam.cast<vector<float>>())->setPrecision(1000);
-        }else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
-            gui->addMultiSlider(absParam.cast<vector<int>>());
-        }else if(absParam.type() == typeid(ofParameter<pair<int, bool>>).name()){
-            auto pairParam = absParam.cast<pair<int, bool>>();
-            auto matrix = gui->addMatrix(absParam.getName(), pairParam.get().first, true);
-            matrix->setRadioMode(true);
-            matrix->setHoldMode(pairParam.get().second);
-            parameterChangedListeners.push(pairParam.newListener([&, matrix](pair<int, bool> &pair){
-                if(pair.second){
-                    matrix->select(pair.first);
-                }else{
-                    matrix->deselect(pair.first);
-                }
-            }));
-        }else {
-            gui->addLabel(absParam.getName());
-        }
+    if(deleteModule){
+        node.deleteSelf();
+        return false;
     }
-    
-    gui->addHeader(getParameters()->getName());
-    gui->addFooter();
-    
-    theme = make_unique<ofxDatGuiThemeCharcoal>();
-    theme->color.slider.fill = color;
-    theme->color.textInput.text = color;
-    theme->color.icons = color;
-    theme->layout.width = 290;
-    gui->setTheme(theme.get(), true);
-   
-    if(position == glm::vec2(-1, -1)){
-        gui->setPosition(0, 0);
-    }else{
-        gui->setPosition(position.x, position.y);
-    }
-    if(transformationMatrix != nullptr)
-        gui->setTransformMatrix(transformationMatrix->get());
-    
-    //GUIS EVENT LISTERNERS
-    gui->onButtonEvent(this, &ofxOceanodeNodeGui::onGuiButtonEvent);
-    gui->onToggleEvent(this, &ofxOceanodeNodeGui::onGuiToggleEvent);
-    gui->onDropdownEvent(this, &ofxOceanodeNodeGui::onGuiDropdownEvent);
-    gui->onTextInputEvent(this, &ofxOceanodeNodeGui::onGuiTextInputEvent);
-    gui->onColorPickerEvent(this, &ofxOceanodeNodeGui::onGuiColorPickerEvent);
-    gui->onMatrixEvent(this, &ofxOceanodeNodeGui::onGuiMatrixEvent);
-    gui->onRightClickEvent(this, &ofxOceanodeNodeGui::onGuiRightClickEvent);
-    
-    isGuiCreated = true;
-     */
-}
-
-void ofxOceanodeNodeGui::updateGui(){
-    /*
-    if(!isGuiCreated) return;
-    for(int i=0 ; i<getParameters()->size(); i++){
-        ofAbstractParameter &absParam = getParameters()->get(i);
-        if(gui->getComponent(absParam.getName()) == NULL){
-            if(absParam.type() == typeid(ofParameter<float>).name()){
-                gui->addSlider(absParam.cast<float>())->setPrecision(1000);
-            }else if(absParam.type() == typeid(ofParameter<int>).name()){
-                gui->addSlider(absParam.cast<int>());
-            }else if(absParam.type() == typeid(ofParameter<bool>).name()){
-                ofxDatGuiToggle* toggle =  gui->addToggle(absParam.getName());
-                toggle->setChecked(absParam.cast<bool>().get());
-                //Add a listener that automatically puts the parameter to the gui.
-                //Best will be to include this to datGui. But this way we can change the gui we use, independent of ofParameter
-                parameterChangedListeners.push(absParam.cast<bool>().newListener([&, toggle](bool &val){
-                    toggle->setChecked(val);
-                }));
-            }else if(absParam.type() == typeid(ofParameter<void>).name()){
-                gui->addButton(absParam.getName());
-            }else if(absParam.type() == typeid(ofParameter<string>).name()){
-                auto textInput = gui->addTextInput(absParam.getName(), absParam.cast<string>());
-                parameterChangedListeners.push(absParam.cast<string>().newListener([&, textInput](string &val){
-                    textInput->setText(val);
-                }));
-            }else if(absParam.type() == typeid(ofParameter<char>).name()){
-                gui->addLabel(absParam.getName());
-            }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
-                auto colorGui = gui->addColorPicker(absParam.getName(), absParam.cast<ofColor>());
-                parameterChangedListeners.push(absParam.cast<ofColor>().newListener([&, colorGui](ofColor &val){
-                    colorGui->setColor(val);
-                }));
-            }else if(absParam.type() == typeid(ofParameterGroup).name()){
-                gui->addLabel(absParam.castGroup().getName());
-                auto dropdown = gui->addDropdown(absParam.castGroup().getName(), ofSplitString(absParam.castGroup().getString(0), "-|-"));
-                dropdown->select(absParam.castGroup().getInt(1));
-                parameterChangedListeners.push(absParam.castGroup().getInt(1).newListener([&, dropdown](int &val){
-                    dropdown->select(val);
-                }));
-            }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
-                gui->addMultiSlider(absParam.cast<vector<float>>())->setPrecision(1000);
-            }else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
-                gui->addMultiSlider(absParam.cast<vector<int>>());
-            }else {
-                gui->addLabel(absParam.getName());
-            }
-        }
-    }
-    bool removedComponents = false;
-    for(int i = 0; i < gui->getNumComponents();){
-        if(gui->getComponent(i) != nullptr){
-            if(!getParameters()->contains(gui->getComponent(i)->getName())){
-                gui->removeComponent(i);
-                removedComponents = true;
-            }
-            else{
-                i++;
-            }
-        }else{
-            i++;
-        }
-    }
-    if(removedComponents){
-        for(int i = 0; i < getParameters()->size(); i++){
-            auto &p = getParameters()->get(i);
-            node.setInConnectionsPositionForParameter(p, getSinkConnectionPositionFromParameter(p));
-            node.setOutConnectionsPositionForParameter(p, getSourceConnectionPositionFromParameter(p));
-        }
-    }
-     */
-}
-
-
-void ofxOceanodeNodeGui::updateGuiForParameter(string &parameterName){
-    /*
-    if(!isGuiCreated) return;
-    ofAbstractParameter &absParam = getParameters()->get(parameterName);
-    if(absParam.type() == typeid(ofParameter<float>).name()){
-        auto slider = gui->getSlider(absParam.getName());
-        slider->setMin(absParam.cast<float>().getMin());
-        slider->setMax(absParam.cast<float>().getMax());
-    }else if(absParam.type() == typeid(ofParameter<int>).name()){
-        auto slider = gui->getSlider(absParam.getName());
-        slider->setMin(absParam.cast<int>().getMin());
-        slider->setMax(absParam.cast<int>().getMax());
-//    }else if(absParam.type() == typeid(ofParameterGroup).name()){
-//        gui->addLabel(parameters->getGroup(i).getName());
-//        gui->addDropdown(parameters->getGroup(i).getName(), ofSplitString(parameters->getGroup(i).getString(0), "-|-"))->select(parameters->getGroup(i).getInt(1));
-    }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
-        auto slider = gui->getMultiSlider(absParam.getName());
-        slider->setMin(absParam.cast<vector<float>>().getMin()[0]);
-        slider->setMax(absParam.cast<vector<float>>().getMax()[0]);
-    }else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
-        auto slider = gui->getMultiSlider(absParam.getName());
-        slider->setMin(absParam.cast<vector<int>>().getMin()[0]);
-        slider->setMax(absParam.cast<vector<int>>().getMax()[0]);
-    }
-     */
-}
-
-void ofxOceanodeNodeGui::updateDropdown(string &dropdownName){
-    /*
-    if(!isGuiCreated) return;
-    auto dropdown = gui->getDropdown(dropdownName);
-    dropdown->clear();
-    for(auto option : ofSplitString(getParameters()->getGroup(dropdownName).getString(0), "-|-")){
-        dropdown->addOption(option);
-    }
-    dropdown->select(getParameters()->getGroup(dropdownName).getInt(1));
-     */
+    return true;
 }
 
 shared_ptr<ofParameterGroup> ofxOceanodeNodeGui::getParameters(){
     return node.getParameters();
 }
 
-void ofxOceanodeNodeGui::setPosition(glm::vec2 _position){
-//    if(gui != nullptr)
-//        gui->setPosition(_position.x, _position.y);
-//    node.moveConnections(_position - position);
-    position = _position;
+void ofxOceanodeNodeGui::setPosition(glm::vec2 position){
+    guiRect.setPosition(glm::vec3(position, 1));
+}
+
+void ofxOceanodeNodeGui::setSize(glm::vec2 size){
+    guiRect.setSize(size.x, size.y);
 }
 
 glm::vec2 ofxOceanodeNodeGui::getPosition(){
-    return position;
-//    if(gui == nullptr) return position;
-//    return glm::vec2(gui->getPosition().x, gui->getPosition().y);
+    return guiRect.getPosition();
 }
 
 ofRectangle ofxOceanodeNodeGui::getRectangle(){
-//    return ofRectangle(gui->getPosition(), gui->getWidth(), gui->getHeight());
-}
-
-void ofxOceanodeNodeGui::collapse(){
-//    if(gui->getExpanded()){
-//        gui->collapse();
-//        auto header = gui->getHeader();
-//        node.collapseConnections(glm::vec2(header->getX(), header->getY() + header->getHeight()/2), glm::vec2(header->getX() + header->getWidth(), header->getY() + header->getHeight()/2));
-//        lastExpandedState = false;
-//    }
-}
-
-void ofxOceanodeNodeGui::expand(){
-//    if(!gui->getExpanded()){
-//        gui->expand();
-//        node.expandConnections();
-//        lastExpandedState = true;
-//    }
+    return guiRect;
 }
 
 void ofxOceanodeNodeGui::setWindow(shared_ptr<ofAppBaseWindow> window){
@@ -453,8 +243,6 @@ void ofxOceanodeNodeGui::setWindow(shared_ptr<ofAppBaseWindow> window){
         keyAndMouseListeners.push(window->events().mouseEntered.newListener(this,&ofxOceanodeNodeGui::mouseEntered));
         keyAndMouseListeners.push(window->events().mouseExited.newListener(this,&ofxOceanodeNodeGui::mouseExited));
     }
-    collapse();
-    expand();
 }
 
 void ofxOceanodeNodeGui::enable(){
@@ -465,6 +253,9 @@ void ofxOceanodeNodeGui::disable(){
 //    gui->setVisible(false);
 }
 
+void ofxOceanodeNodeGui::duplicate(){
+    node.duplicateSelf(getPosition());
+}
 
 void ofxOceanodeNodeGui::keyPressed(ofKeyEventArgs &args){
 //    if(args.key == 'r' && !args.isRepeat){
@@ -515,25 +306,6 @@ void ofxOceanodeNodeGui::mouseReleased(ofMouseEventArgs &args){
 //    }
 }
 
-//void ofxOceanodeNodeGui::onGuiButtonEvent(ofxDatGuiButtonEvent e){
-//    getParameters()->getVoid(e.target->getName()).trigger();
-//}
-//void ofxOceanodeNodeGui::onGuiToggleEvent(ofxDatGuiToggleEvent e){
-//    getParameters()->getBool(e.target->getName()) = e.checked;
-//}
-//
-//void ofxOceanodeNodeGui::onGuiDropdownEvent(ofxDatGuiDropdownEvent e){
-//    getParameters()->getGroup(e.target->getName()).getInt(1) = e.child;
-//}
-//
-//void ofxOceanodeNodeGui::onGuiTextInputEvent(ofxDatGuiTextInputEvent e){
-//    getParameters()->getString(e.target->getName()) = e.text;
-//}
-//
-//void ofxOceanodeNodeGui::onGuiColorPickerEvent(ofxDatGuiColorPickerEvent e){
-//    getParameters()->getColor(e.target->getName()) = e.color;
-//}
-//
 //void ofxOceanodeNodeGui::onGuiMatrixEvent(ofxDatGuiMatrixEvent e){
 //    getParameters()->get(e.target->getName()).cast<pair<int, bool>>() = make_pair(e.child+1, e.enabled);
 //}
@@ -573,41 +345,11 @@ void ofxOceanodeNodeGui::mouseReleased(ofMouseEventArgs &args){
 //}
 
 glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter){
-//    if(gui == nullptr) return glm::vec2(0,0);
-//    auto component = gui->getExpanded() ? gui->getComponent(parameter.getName()) : gui->getHeader();
-//    if(component == NULL){
-//        component = gui->getComponent(parameter.getName() + " Selector");
-//    }
-//    glm::vec2 position;
-//    position.x = component->getX() + component->getWidth();
-//    position.y = component->getY() + component->getHeight()/2;
-//    return position;
     return outputPositions[parameter.getName()];
 }
 
 glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter){
-//    if(gui == nullptr) return glm::vec2(0,0);
-//    auto component = gui->getExpanded() ? gui->getComponent(parameter.getName()) : gui->getHeader();
-//    if(component == NULL){
-//        component = gui->getComponent(parameter.getName() + " Selector");
-//    }
-//    glm::vec2 position;
-//    position.x = component->getX();
-//    position.y = component->getY() + component->getHeight()/2;
-//    return position;
     return inputPositions[parameter.getName()];
-    return glm::vec2(0,0);
-}
-
-void ofxOceanodeNodeGui::setTransformationMatrix(ofParameter<glm::mat4> *mat){
-    transformationMatrix = mat;
-//    if(gui != nullptr)
-//        gui->setTransformMatrix(mat->get());
-//
-//    transformMatrixListener = transformationMatrix->newListener([&](glm::mat4 &m){
-//        if(gui != nullptr)
-//            gui->setTransformMatrix(transformationMatrix->get());
-//    });
 }
 
 #endif

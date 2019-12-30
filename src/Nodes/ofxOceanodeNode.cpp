@@ -52,9 +52,6 @@ void ofxOceanodeNode::draw(ofEventArgs &e){
 #ifndef OFXOCEANODE_HEADLESS
 void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     nodeGui = std::move(gui);
-    toChangeGuiListeners.push(nodeModel->parameterChangedMinMax.newListener(nodeGui.get(), &ofxOceanodeNodeGui::updateGuiForParameter));
-    toChangeGuiListeners.push(nodeModel->dropdownChanged.newListener(nodeGui.get(), &ofxOceanodeNodeGui::updateDropdown));
-    toChangeGuiListeners.push(nodeModel->parameterGroupChanged.newListener(nodeGui.get(), &ofxOceanodeNodeGui::updateGui));
 }
 
 ofxOceanodeNodeGui& ofxOceanodeNode::getNodeGui(){
@@ -218,51 +215,6 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeCont
         addInputConnection(connection);
     }
     return connection;
-}
-
-void ofxOceanodeNode::moveConnections(glm::vec2 moveVector){
-    for(auto c : inConnections){
-        c->moveSinkPosition(moveVector);
-    }
-    for(auto c : outConnections){
-        c->moveSourcePosition(moveVector);
-    }
-}
-
-void ofxOceanodeNode::collapseConnections(glm::vec2 sinkPos, glm::vec2 sourcePos){
-    for(auto c : inConnections){
-        c->setSinkPosition(sinkPos);
-    }
-    for(auto c : outConnections){
-        c->setSourcePosition(sourcePos);
-    }
-}
-
-#ifndef OFXOCEANODE_HEADLESS
-void ofxOceanodeNode::expandConnections(){
-    for(auto c : inConnections){
-        //c->setSinkPosition(nodeGui->getSinkConnectionPositionFromParameter(c->getSinkParameter()));
-    }
-    for(auto c : outConnections){
-        //c->setSourcePosition(nodeGui->getSourceConnectionPositionFromParameter(c->getSourceParameter()));
-    }
-}
-#endif
-
-void ofxOceanodeNode::setInConnectionsPositionForParameter(ofAbstractParameter &p, glm::vec2 pos){
-    for(auto c : inConnections){
-        if(&c->getSinkParameter() == &p){
-            c->setSinkPosition(pos);
-        }
-    }
-}
-
-void ofxOceanodeNode::setOutConnectionsPositionForParameter(ofAbstractParameter &p, glm::vec2 pos){
-    for(auto c : outConnections){
-        if(&c->getSourceParameter() == &p){
-            c->setSourcePosition(pos);
-        }
-    }
 }
 
 void ofxOceanodeNode::addOutputConnection(ofxOceanodeAbstractConnection* c){

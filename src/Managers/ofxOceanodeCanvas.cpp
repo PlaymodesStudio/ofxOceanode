@@ -198,56 +198,53 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
         ImGui::SetCursorScreenPos(node_rect_min + NODE_WINDOW_PADDING);
         
         //Draw Parameters
-        node->constructGui();
-        
-        // Save the size of what we have emitted and whether any of the widgets are being used
-        bool node_widgets_active = (!old_any_active && ImGui::IsAnyItemActive());
-        glm::vec2 size = ImGui::GetItemRectSize() + NODE_WINDOW_PADDING + NODE_WINDOW_PADDING;
-        ImVec2 node_rect_max = node_rect_min + size;
-        
-        
-        
-        // Display node box
-        draw_list->ChannelsSetCurrent(0); // Background
-        ImGui::SetCursorScreenPos(node_rect_min);
-        ImGui::InvisibleButton("node", size);
-        
-        if (ImGui::IsItemHovered())
-        {
-            node_hovered_in_scene = nodeId;
-            open_context_menu |= ImGui::IsMouseClicked(1);
+        if(node->constructGui()){
+            
+            // Save the size of what we have emitted and whether any of the widgets are being used
+            bool node_widgets_active = (!old_any_active && ImGui::IsAnyItemActive());
+            glm::vec2 size = ImGui::GetItemRectSize() + NODE_WINDOW_PADDING + NODE_WINDOW_PADDING;
+            ImVec2 node_rect_max = node_rect_min + size;
+            
+            node->setSize(size);
+            
+            // Display node box
+            draw_list->ChannelsSetCurrent(0); // Background
+            ImGui::SetCursorScreenPos(node_rect_min);
+            ImGui::InvisibleButton("node", size);
+            
+            if (ImGui::IsItemHovered())
+            {
+                node_hovered_in_scene = nodeId;
+                open_context_menu |= ImGui::IsMouseClicked(1);
+            }
+            bool node_moving_active = ImGui::IsItemActive();
+            if (node_widgets_active || node_moving_active)
+                node_selected = nodeId;
+            if (node_moving_active && ImGui::IsMouseDragging(0))
+                node->setPosition(node->getPosition() + ImGui::GetIO().MouseDelta);
+            
+            
+            
+            ImU32 node_bg_color = /*(node_hovered_in_list == node->ID || node_hovered_in_scene == node->ID || (node_hovered_in_list == -1 && node_selected == node->ID)) ? IM_COL32(75, 75, 75, 255) :*/ IM_COL32(60, 60, 60, 255);
+            draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
+            draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(100, 100, 100, 255), 4.0f);
+            
+            for (auto &param : *node->getParameters().get())
+                draw_list->AddCircleFilled(node->getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
+            for (auto &param : *node->getParameters().get())
+                draw_list->AddCircleFilled(node->getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
+            
+            if (ImGui::IsWindowHovered() && ImGui::IsItemActive() && ImGui::IsMouseClicked(0) && ofGetKeyPressed(OF_KEY_ALT) /*&& ImGui::IsKeyDown(OF_KEY_ALT)*/ && !isNodeDuplicated){
+                node->duplicate();
+                isNodeDuplicated = true;
+            }
         }
-        bool node_moving_active = ImGui::IsItemActive();
-        if (node_widgets_active || node_moving_active)
-            node_selected = nodeId;
-        if (node_moving_active && ImGui::IsMouseDragging(0))
-            node->setPosition(node->getPosition() + ImGui::GetIO().MouseDelta);
-        
-        
-        
-        ImU32 node_bg_color = /*(node_hovered_in_list == node->ID || node_hovered_in_scene == node->ID || (node_hovered_in_list == -1 && node_selected == node->ID)) ? IM_COL32(75, 75, 75, 255) :*/ IM_COL32(60, 60, 60, 255);
-        draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
-        draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(100, 100, 100, 255), 4.0f);
-        
-//        auto GetInputSlotPos = [node_rect_min, size, node](int idx) -> glm::vec2{
-//            return glm::vec2(node_rect_min.x, node_rect_min.y + size.y * ((float)idx + 2) / ((float)node->getParameters()->size() + 2));
-//        };
-//
-//        auto GetOutputSlotPos = [node_rect_min, size, node](int idx) -> glm::vec2{
-//            return glm::vec2(node_rect_min.x + size.x, node_rect_min.y + size.y * ((float)idx + 2) / ((float)node->getParameters()->size() + 2));
-//        };
-        
-//        for (int slot_idx = 0; slot_idx < node->getParameters()->size(); slot_idx++)
-//            draw_list->AddCircleFilled(offset + GetInputSlotPos(slot_idx), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
-//        for (int slot_idx = 0; slot_idx < node->getParameters()->size(); slot_idx++)
-//            draw_list->AddCircleFilled(offset + GetOutputSlotPos(slot_idx), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
-        
-        for (auto &param : *node->getParameters().get())
-            draw_list->AddCircleFilled(node->getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
-        for (auto &param : *node->getParameters().get())
-            draw_list->AddCircleFilled(node->getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
         
         ImGui::PopID();
+    }
+    
+    if(!ofGetKeyPressed(OF_KEY_ALT)){
+        isNodeDuplicated = false;
     }
     
     if(container->isOpenConnection()){
@@ -259,11 +256,12 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
     draw_list->ChannelsMerge();
     
     // Open context menu
-//    if (!ImGui::IsAnyItemHovered() && ImGui::IsMouseHoveringWindow() && ImGui::IsMouseClicked(1))
-//    {
+    if (!ImGui::IsAnyItemHovered() && ImGui::IsMouseHoveringWindow() && ImGui::IsMouseClicked(1))
+    {
+        ofLog() << "Display context menu";
 //        node_selected = node_hovered_in_list = node_hovered_in_scene = -1;
 //        open_context_menu = true;
-//    }
+    }
 //    if (open_context_menu)
 //    {
 //        ImGui::OpenPopup("context_menu");
@@ -322,8 +320,7 @@ void ofxOceanodeCanvas::newModuleListener(ofxDatGuiDropdownEvent e){
     {
         auto &node = container->createNode(std::move(type));
         
-        node.getNodeGui().setPosition(screenToCanvas(glm::vec2(popUpMenu->getPosition().x, popUpMenu->getPosition().y)));
-        node.getNodeGui().setTransformationMatrix(transformationMatrix);
+        node.getNodeGui().setPosition((glm::vec2(popUpMenu->getPosition().x, popUpMenu->getPosition().y)) - scrolling);
     }
     popUpMenu->setVisible(false);
     searchField->setFocused(false);

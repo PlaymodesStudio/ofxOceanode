@@ -27,7 +27,6 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     temporalConnection = nullptr;
     bpm = 120;
     phase = 0;
-    collapseAll = false;
     autoUpdateAndDraw = true;
     updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
     drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
@@ -112,10 +111,6 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstract
     if(temporalConnection != nullptr) return nullptr;
     temporalConnectionNode = &n;
     temporalConnection = new ofxOceanodeTemporalConnection(p);
-#ifndef OFXOCEANODE_HEADLESS
-    //temporalConnection->setSourcePosition(n.getNodeGui().getSourceConnectionPositionFromParameter(p));
-    temporalConnection->getGraphics().subscribeToDrawEvent(window);
-#endif
     destroyConnectionListeners.push(temporalConnection->destroyConnection.newListener(this, &ofxOceanodeContainer::temporalConnectionDestructor));
     return temporalConnection;
 }
@@ -148,9 +143,6 @@ ofxOceanodeNode* ofxOceanodeContainer::createNodeFromName(string name, int ident
     if (type)
     {
         auto &node =  createNode(std::move(type), identifier, isPersistent);
-#ifndef OFXOCEANODE_HEADLESS
-        node.getNodeGui().setTransformationMatrix(&transformationMatrix);
-#endif
         return &node;
     }
     return nullptr;
@@ -171,7 +163,6 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     node->setup();
 #ifndef OFXOCEANODE_HEADLESS
         auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node, window);
-        if(collapseAll) nodeGui->collapse();
 #ifdef OFXOCEANODE_USE_MIDI
         nodeGui->setIsListeningMidi(isListeningMidi);
 #endif
@@ -965,35 +956,6 @@ void ofxOceanodeContainer::resetPhase(){
     }
 }
 
-#ifndef OFXOCEANODE_HEADLESS
-void ofxOceanodeContainer::collapseGuis(){
-    collapseAll = true;
-    for(auto &nodeTypeMap : dynamicNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->getNodeGui().collapse();
-        }
-    }
-    for(auto &nodeTypeMap : persistentNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->getNodeGui().collapse();
-        }
-    }
-}
-void ofxOceanodeContainer::expandGuis(){
-    collapseAll = false;
-    for(auto &nodeTypeMap : dynamicNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->getNodeGui().expand();
-        }
-    }
-    for(auto &nodeTypeMap : persistentNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->getNodeGui().expand();
-        }
-    }
-}
-#endif
-
 #ifdef OFXOCEANODE_USE_OSC
 
 void ofxOceanodeContainer::setupOscSender(string host, int port){
@@ -1379,9 +1341,6 @@ void ofxOceanodeContainer::setWindow(std::shared_ptr<ofAppBaseWindow> _window){
             nodeGui.setWindow(window);
         }
     }
-    for(auto &connection : connections){
-        connection.second->getGraphics().subscribeToDrawEvent(window);
-    }
 }
 
 void ofxOceanodeContainer::setAutoUpdateAndDraw(bool b){
@@ -1597,9 +1556,6 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
         
         temporalConnectionNode = sourceModuleRef.get();
         auto connection = sinkModuleRef->createConnection(*this, source, sink);
-#ifndef OFXOCEANODE_HEADLESS
-            //connection->setSinkPosition(sinkModuleRef->getNodeGui().getSinkConnectionPositionFromParameter(sink));
-#endif
         temporalConnection = nullptr;
         return connection;
     }

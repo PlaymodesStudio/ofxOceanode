@@ -72,10 +72,6 @@ public:
     ofxOceanodeAbstractConnection* connectConnection(ofParameter<Tsource>& source, ofParameter<Tsink>& sink){
         connections.push_back(make_pair(temporalConnectionNode, make_shared<ofxOceanodeConnection<Tsource, Tsink>>(source, sink)));
         temporalConnectionNode->addOutputConnection(connections.back().second.get());
-#ifndef OFXOCEANODE_HEADLESS
-        //connections.back().second->setSourcePosition(temporalConnectionNode->getNodeGui().getSourceConnectionPositionFromParameter(source));
-        connections.back().second->getGraphics().subscribeToDrawEvent(window);
-#endif
         temporalConnectionDestructor();
         return connections.back().second.get();
     }
@@ -99,9 +95,6 @@ public:
     void setBpm(float _bpm);
     void setPhase(float _phase);
     void resetPhase();
-    
-    void collapseGuis();
-    void expandGuis();
     
     ofEvent<string> loadPresetEvent;
     ofEvent<float> changedBpmEvent;
@@ -167,8 +160,6 @@ private:
     ofParameter<glm::mat4> transformationMatrix;
     float bpm;
     float phase;
-    
-    bool collapseAll;
     
 #ifdef OFXOCEANODE_USE_OSC
     ofxOscSender oscSender;

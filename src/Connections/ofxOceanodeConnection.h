@@ -9,7 +9,6 @@
 #define ofxOceanodeConnection_h
 
 #include "ofMain.h"
-#include "ofxOceanodeConnectionGraphics.h"
 
 class ofxOceanodeAbstractConnection{
 public:
@@ -27,39 +26,18 @@ public:
     };
     virtual ~ofxOceanodeAbstractConnection(){};
     
-    void setSourcePosition(glm::vec2 posVec){
-        graphics.setPoint(0, posVec);
-    }
-    
-    void setSinkPosition(glm::vec2 posVec){
-        graphics.setPoint(1, posVec);
-    }
-    
-    void moveSourcePosition(glm::vec2 moveVec){
-        graphics.movePoint(0, moveVec);
-    }
-    
-    void moveSinkPosition(glm::vec2 moveVec){
-        graphics.movePoint(1, moveVec);
-    }
-    
     void setActive(bool a){
         active = a;
     }
-    
-    ofxOceanodeConnectionGraphics& getGraphics(){return graphics;};
-    
-    glm::vec2 getPostion(int index){return graphics.getPoint(index);};
     
     ofAbstractParameter& getSourceParameter(){return *sourceParameter;};
     ofAbstractParameter& getSinkParameter(){return *sinkParameter;};
     
     bool getIsPersistent(){return isPersistent;};
-    void setIsPersistent(bool p){isPersistent = p;graphics.setWireColor(ofColor(255,0,0));};
+    void setIsPersistent(bool p){isPersistent = p;};
     
     ofEvent<void> destroyConnection;
 protected:
-    ofxOceanodeConnectionGraphics graphics;
     bool active;
     
     ofAbstractParameter* sourceParameter;
@@ -74,24 +52,12 @@ class ofxOceanodeNode;
 class ofxOceanodeTemporalConnection: public ofxOceanodeAbstractConnection{
 public:
     ofxOceanodeTemporalConnection(ofAbstractParameter& _p) : ofxOceanodeAbstractConnection(_p){
-//        graphics.setPoint(0, glm::vec2(ofGetMouseX(), ofGetMouseY()));
-//        graphics.setPoint(1, glm::vec2(ofGetMouseX(), ofGetMouseY()));
         
-        mouseDraggedListener = ofEvents().mouseDragged.newListener([&](ofMouseEventArgs & mouse){
-            //graphics.setPoint(1, graphics.getTransformationMatrix() * glm::vec4(mouse, 0, 1));
-        });
-        mouseReleasedListener = ofEvents().mouseReleased.newListener([&](ofMouseEventArgs & mouse){
-            graphics.deactivate();
-//            ofNotifyEvent(destroyConnection);
-        });
     }
     ~ofxOceanodeTemporalConnection(){};
     
-    glm::vec2 getSourcePosition(){return graphics.getPoint(0);};
-    
 private:
-    ofEventListener mouseDraggedListener;
-    ofEventListener mouseReleasedListener;
+
 };
 
 template<typename Tsource, typename Tsink, typename Enable = void>
