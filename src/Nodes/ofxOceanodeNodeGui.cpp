@@ -102,7 +102,6 @@ bool ofxOceanodeNodeGui::constructGui(){
             if (ImGui::Button(uniqueId.c_str()))
             {
                 absParam.cast<void>().trigger();
-                return true;
             }
         }else if(absParam.type() == typeid(ofParameter<string>).name()){
             auto tempCast = absParam.cast<string>();
