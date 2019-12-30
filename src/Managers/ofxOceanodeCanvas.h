@@ -73,12 +73,16 @@ private:
     glm::vec2 dragModulesInitialPoint;
     vector<pair<ofxOceanodeNodeGui*, glm::vec2>> toMoveNodes;
     
+    vector<string> categoriesVector;
+    vector<vector<string>> options;
+    
     ofxImGui::Gui gui;
     bool inited = false;
     glm::vec2 scrolling = glm::vec2(0.0f, 0.0f);
     bool show_grid = true;
-    int node_selected = -1;
+    string node_selected = "";
     bool isNodeDuplicated = false;
+    glm::vec2 newNodeClickPos;
 };
 
 #endif

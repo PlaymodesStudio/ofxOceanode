@@ -41,21 +41,20 @@ void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){
     auto const &categories = container->getRegistry()->getCategories();
     auto const &categoriesModelsAssociation = container->getRegistry()->getRegisteredModelsCategoryAssociation();
     
-    vector<string> categoriesVector;
     for(auto cat : categories){
         categoriesVector.push_back(cat);
     }
     
-    vector<vector<string>> options = vector<vector<string>>(categories.size());
+    options = vector<vector<string>>(categories.size());
     for(int i = 0; i < categories.size(); i++){
-        vector<string> options;
+        options.push_back(vector<string>());
         for(auto &model : models){
             if(categoriesModelsAssociation.at(model.first) == categoriesVector[i]){
-                options.push_back(model.first);
+                options[i].push_back(model.first);
             }
         }
-        std::sort(options.begin(), options.end());
-        modulesSelectors.push_back(popUpMenu->addDropdown(categoriesVector[i], options));
+        std::sort(options[i].begin(), options[i].end());
+        modulesSelectors.push_back(popUpMenu->addDropdown(categoriesVector[i], options[i]));
         //modulesSelectors.back()->expand();
     }
     
@@ -100,8 +99,8 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
     
     // Draw a list of nodes on the left side
     bool open_context_menu = false;
-    int node_hovered_in_list = -1;
-    int node_hovered_in_scene = -1;
+    string node_hovered_in_list = "";
+    string node_hovered_in_scene = "";
 //    ImGui::BeginChild("node_list", ImVec2(100, 0));
 //    ImGui::Text("Nodes");
 //    ImGui::Separator();
@@ -185,10 +184,9 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
     }
     
     // Display nodes
-    int nodeId = -1;
     for(auto &node : container->getModulesGuiInRectangle(ofGetWindowRect(), false)){
-        nodeId++;
-        ImGui::PushID(node->getParameters()->getName().c_str());
+        string nodeId = node->getParameters()->getName();
+        ImGui::PushID(nodeId.c_str());
         
         glm::vec2 node_rect_min = offset + node->getPosition();
         
@@ -240,6 +238,33 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
             }
         }
         
+        //Delete duplicate module?
+//        if(ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)){
+//            ImGui::OpenPopup("Context Menu");
+//        }
+//        // Draw menu
+//        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+//        if (ImGui::BeginPopup("Context Menu"))
+//        {
+//            Node* node = node_selected != -1 ? &nodes[node_selected] : NULL;
+//            ImVec2 scene_pos = ImGui::GetMousePosOnOpeningCurrentPopup() - offset;
+//            if (node)
+//            {
+//                ImGui::Text("Node '%s'", node->Name);
+//                ImGui::Separator();
+//                if (ImGui::MenuItem("Rename..", NULL, false, false)) {}
+//                if (ImGui::MenuItem("Delete", NULL, false, false)) {}
+//                if (ImGui::MenuItem("Copy", NULL, false, false)) {}
+//            }
+//            else
+//            {
+//                if (ImGui::MenuItem("Add")) { nodes.push_back(Node(nodes.Size, "New node", scene_pos, 0.5f, ImColor(100, 100, 200), 2, 2)); }
+//                if (ImGui::MenuItem("Paste", NULL, false, false)) {}
+//            }
+//            ImGui::EndPopup();
+//        }
+//        ImGui::PopStyleVar();
+        
         ImGui::PopID();
     }
     
@@ -259,40 +284,39 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
     if (!ImGui::IsAnyItemHovered() && ImGui::IsMouseHoveringWindow() && ImGui::IsMouseClicked(1))
     {
         ofLog() << "Display context menu";
-//        node_selected = node_hovered_in_list = node_hovered_in_scene = -1;
-//        open_context_menu = true;
+        newNodeClickPos = ImGui::GetMousePos();
+        ImGui::OpenPopup("New Node");
     }
-//    if (open_context_menu)
-//    {
-//        ImGui::OpenPopup("context_menu");
-//        if (node_hovered_in_list != -1)
-//            node_selected = node_hovered_in_list;
-//        if (node_hovered_in_scene != -1)
-//            node_selected = node_hovered_in_scene;
-//    }
     
     // Draw context menu
-//    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
-//    if (ImGui::BeginPopup("context_menu"))
-//    {
-//        Node* node = node_selected != -1 ? &nodes[node_selected] : NULL;
-//        ImVec2 scene_pos = ImGui::GetMousePosOnOpeningCurrentPopup() - offset;
-//        if (node)
-//        {
-//            ImGui::Text("Node '%s'", node->Name);
-//            ImGui::Separator();
-//            if (ImGui::MenuItem("Rename..", NULL, false, false)) {}
-//            if (ImGui::MenuItem("Delete", NULL, false, false)) {}
-//            if (ImGui::MenuItem("Copy", NULL, false, false)) {}
-//        }
-//        else
-//        {
-//            if (ImGui::MenuItem("Add")) { nodes.push_back(Node(nodes.Size, "New node", scene_pos, 0.5f, ImColor(100, 100, 200), 2, 2)); }
-//            if (ImGui::MenuItem("Paste", NULL, false, false)) {}
-//        }
-//        ImGui::EndPopup();
-//    }
-//    ImGui::PopStyleVar();
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+    if (ImGui::BeginPopup("New Node"))
+    {
+        char * cString = new char[256];
+        if(ImGui::InputText("Search", cString, 256)){
+            
+        }
+        for(int i = 0; i < categoriesVector.size(); i++){
+            if(ImGui::TreeNode(categoriesVector[i].c_str())){
+                for(auto &op : options[i]){
+                    if(ImGui::Selectable(op.c_str())){
+                        unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
+                        
+                        if (type)
+                        {
+                            auto &node = container->createNode(std::move(type));
+                            
+                            node.getNodeGui().setPosition(newNodeClickPos - scrolling);
+                        }
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                ImGui::TreePop();
+            }
+        }
+        ImGui::EndPopup();
+    }
+    ImGui::PopStyleVar();
     
     // Scrolling
     if (ImGui::IsWindowHovered() /*&& !ImGui::IsAnyItemActive() */&& ImGui::IsMouseDragging(0, 0.0f)){
@@ -439,10 +463,10 @@ void ofxOceanodeCanvas::mousePressed(ofMouseEventArgs &e){
     if(ofGetKeyPressed(OF_KEY_CONTROL)){
 #endif
         if(e.button == 0){
-            searchField->setText("");
-            searchField->setFocused(true);
-            popUpMenu->setPosition(e.x, e.y);
-            popUpMenu->setVisible(true);
+            //searchField->setText("");
+            //searchField->setFocused(true);
+            //popUpMenu->setPosition(e.x, e.y);
+            //popUpMenu->setVisible(true);
         }
         else if(e.button == 2){
             transformationMatrix->set(glm::mat4(1.0));
