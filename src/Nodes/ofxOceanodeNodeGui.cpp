@@ -63,7 +63,7 @@ bool ofxOceanodeNodeGui::constructGui(){
         ImGui::Text("%s", ("Are you sure you want to delete.\n " + moduleName + "\n").c_str());
         ImGui::Separator();
         
-        if (ImGui::Button("OK", ImVec2(120,0))) {
+        if (ImGui::Button("OK", ImVec2(120,0)) || ofGetKeyPressed(OF_KEY_RETURN)) {
             ImGui::CloseCurrentPopup();
             deleteModule = true;
         }
