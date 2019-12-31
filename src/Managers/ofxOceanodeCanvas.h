@@ -12,12 +12,10 @@
 #ifndef OFXOCEANODE_HEADLESS
 
 #include "ofMain.h"
-#include "ofxDatGui.h"
 #include "ofxImGui.h"
 
 class ofxOceanodeContainer;
 class ofxOceanodeNodeGui;
-class ofxDatGui;
 class ofxDatGuiDropdown;
 
 class ofxOceanodeCanvas{
@@ -41,9 +39,6 @@ public:
     void mouseExited(ofMouseEventArgs &e){};
     
     void setContainer(shared_ptr<ofxOceanodeContainer> c){container = c;};
-    
-    void newModuleListener(ofxDatGuiDropdownEvent e);
-    void searchListener(ofxDatGuiTextInputEvent e);
 private:
     glm::vec3 getMatrixScale(const glm::mat4 &m);
     glm::mat4 translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector);
@@ -52,10 +47,6 @@ private:
     glm::vec2 canvasToScreen(glm::vec2 p);
     
     shared_ptr<ofxOceanodeContainer> container;
-    ofxDatGui *popUpMenu;
-    vector<ofxDatGuiDropdown*> modulesSelectors;
-    ofxDatGuiTextInput *searchField;
-    vector<pair<ofxDatGuiDropdown*, int>> searchedOptions;
     
     ofParameter<glm::mat4> *transformationMatrix;
     glm::vec2 dragCanvasInitialPoint;
@@ -75,6 +66,8 @@ private:
     
     vector<string> categoriesVector;
     vector<vector<string>> options;
+    string searchField = "";
+    int numTimesPopup = 0;
     
     ofxImGui::Gui gui;
     bool inited = false;
@@ -83,6 +76,7 @@ private:
     string node_selected = "";
     bool isNodeDuplicated = false;
     glm::vec2 newNodeClickPos;
+    
 };
 
 #endif

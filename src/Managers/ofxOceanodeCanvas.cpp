@@ -30,13 +30,6 @@ void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){
     
     transformationMatrix = &container->getTransformationMatrix();
     
-    ofxDatGui::setAssetPath("");
-    
-    ///POP UP MENuS
-    popUpMenu = new ofxDatGui(-1, -1, window);
-    popUpMenu->setVisible(false);
-    searchField = popUpMenu->addTextInput("Search: ");
-    searchField->setNotifyEachChange(true);
     auto const &models = container->getRegistry()->getRegisteredModels();
     auto const &categories = container->getRegistry()->getCategories();
     auto const &categoriesModelsAssociation = container->getRegistry()->getRegisteredModelsCategoryAssociation();
@@ -54,22 +47,8 @@ void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){
             }
         }
         std::sort(options[i].begin(), options[i].end());
-        modulesSelectors.push_back(popUpMenu->addDropdown(categoriesVector[i], options[i]));
-        //modulesSelectors.back()->expand();
     }
     
-    std::unique_ptr<ofxDatGuiTheme> theme = make_unique<ofxDatGuiThemeCharcoal>();
-    //    theme->color.textInput.text = ;
-    //    theme->color.icons = color;
-    theme->layout.width = 290;
-    popUpMenu->setTheme(theme.get(), true);
-    searchField->setLabelColor(theme->color.label*2);
-    for(auto drop : modulesSelectors){
-        drop->setLabelColor(theme->color.label*2);
-    }
-    
-    popUpMenu->onDropdownEvent(this, &ofxOceanodeCanvas::newModuleListener);
-    popUpMenu->onTextInputEvent(this, &ofxOceanodeCanvas::searchListener);
     selectedRect = ofRectangle(0, 0, 0, 0);
     dragModulesInitialPoint = glm::vec2(NAN, NAN);
     selecting = false;
@@ -280,12 +259,14 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
     
     draw_list->ChannelsMerge();
     
+    
     // Open context menu
     if (!ImGui::IsAnyItemHovered() && ImGui::IsMouseHoveringWindow() && ImGui::IsMouseClicked(1))
     {
-        ofLog() << "Display context menu";
         newNodeClickPos = ImGui::GetMousePos();
         ImGui::OpenPopup("New Node");
+        searchField = "";
+        numTimesPopup = 0;
     }
     
     // Draw context menu
@@ -293,22 +274,51 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
     if (ImGui::BeginPopup("New Node"))
     {
         char * cString = new char[256];
+        strcpy(cString, searchField.c_str());
+        
         if(ImGui::InputText("Search", cString, 256)){
-            
+            searchField = cString;
         }
+        
+        if(numTimesPopup == 1){//!(!ImGui::IsItemClicked() && ImGui::IsMouseDown(0)) && searchField == ""){
+            ImGui::SetKeyboardFocusHere(-1);
+        }
+        
+        numTimesPopup++;
+        
+        bool isEnterPressed = ofGetKeyPressed(OF_KEY_RETURN); //Select first option if enter is pressed
         for(int i = 0; i < categoriesVector.size(); i++){
+            if(numTimesPopup == 1){
+                ImGui::SetNextTreeNodeOpen(false);
+            }
+            if(searchField != "") ImGui::SetNextTreeNodeOpen(true);
+            
             if(ImGui::TreeNode(categoriesVector[i].c_str())){
                 for(auto &op : options[i]){
-                    if(ImGui::Selectable(op.c_str())){
-                        unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
-                        
-                        if (type)
-                        {
-                            auto &node = container->createNode(std::move(type));
-                            
-                            node.getNodeGui().setPosition(newNodeClickPos - scrolling);
+                    bool showThis = false;
+                    if(searchField != ""){
+                        string lowercaseName = op;
+                        std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
+                        if(ofStringTimesInString(op, searchField) || ofStringTimesInString(lowercaseName, searchField)){
+                            showThis = true;
                         }
-                        ImGui::CloseCurrentPopup();
+                    }else{
+                        showThis = true;
+                    }
+                    if(showThis){
+                        if(ImGui::Selectable(op.c_str()) || isEnterPressed){
+                            unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
+                            
+                            if (type)
+                            {
+                                auto &node = container->createNode(std::move(type));
+                                
+                                node.getNodeGui().setPosition(newNodeClickPos - scrolling);
+                            }
+                            ImGui::CloseCurrentPopup();
+                            isEnterPressed = false; //Next options we dont want to create them;
+                            break;
+                        }
                     }
                 }
                 ImGui::TreePop();
@@ -337,88 +347,67 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
     ofPopMatrix();
 }
 
-void ofxOceanodeCanvas::newModuleListener(ofxDatGuiDropdownEvent e){
-    unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(e.target->getChildAt(e.child)->getName());
-    
-    if (type)
-    {
-        auto &node = container->createNode(std::move(type));
-        
-        node.getNodeGui().setPosition((glm::vec2(popUpMenu->getPosition().x, popUpMenu->getPosition().y)) - scrolling);
-    }
-    popUpMenu->setVisible(false);
-    searchField->setFocused(false);
-    popUpMenu->setPosition(-1, -1);
-    for(auto drop : modulesSelectors){
-        drop->setLabel(drop->getName());
-        drop->collapse();
-        for(int i = 0; i < drop->getNumOptions(); i++){
-            drop->getChildAt(i)->setVisible(true);
-        }
-    }
-}
-
-void ofxOceanodeCanvas::searchListener(ofxDatGuiTextInputEvent e){
-    searchedOptions.clear();
-    if(e.text != ""){
-        for(auto drop : modulesSelectors){
-            int numMathes = 0;
-            for(int i = 0; i < drop->getNumOptions(); i++){
-                auto item = drop->getChildAt(i);
-                string lowercaseName = item->getName();
-                std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
-                if(ofStringTimesInString(item->getName(), e.text) || ofStringTimesInString(lowercaseName, e.text)){
-                    searchedOptions.push_back(make_pair(drop, i));
-                    numMathes++;
-                }else{
-                    item->setVisible(false);
-                }
-            }
-            if(numMathes == 0){
-                for(int i = 0; i < drop->getNumOptions(); i++){
-                    drop->getChildAt(i)->setVisible(true);
-                }
-                drop->collapse();
-            }else{
-                drop->expand();
-            }
-        }
-        if(searchedOptions.size() == 0){
-            for(auto drop : modulesSelectors){
-                drop->collapse();
-                for(int i = 0; i < drop->getNumOptions(); i++){
-                    drop->getChildAt(i)->setVisible(true);
-                }
-            }
-        }
-    }else{
-        for(auto drop : modulesSelectors){
-            drop->setLabel(drop->getName());
-            drop->collapse();
-            for(int i = 0; i < drop->getNumOptions(); i++){
-                drop->getChildAt(i)->setVisible(true);
-            }
-        }
-    }
-}
+//void ofxOceanodeCanvas::searchListener(ofxDatGuiTextInputEvent e){
+//    searchedOptions.clear();
+//    if(e.text != ""){
+//        for(auto drop : modulesSelectors){
+//            int numMathes = 0;
+//            for(int i = 0; i < drop->getNumOptions(); i++){
+//                auto item = drop->getChildAt(i);
+//                string lowercaseName = item->getName();
+//                std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
+//                if(ofStringTimesInString(item->getName(), e.text) || ofStringTimesInString(lowercaseName, e.text)){
+//                    searchedOptions.push_back(make_pair(drop, i));
+//                    numMathes++;
+//                }else{
+//                    item->setVisible(false);
+//                }
+//            }
+//            if(numMathes == 0){
+//                for(int i = 0; i < drop->getNumOptions(); i++){
+//                    drop->getChildAt(i)->setVisible(true);
+//                }
+//                drop->collapse();
+//            }else{
+//                drop->expand();
+//            }
+//        }
+//        if(searchedOptions.size() == 0){
+//            for(auto drop : modulesSelectors){
+//                drop->collapse();
+//                for(int i = 0; i < drop->getNumOptions(); i++){
+//                    drop->getChildAt(i)->setVisible(true);
+//                }
+//            }
+//        }
+//    }else{
+//        for(auto drop : modulesSelectors){
+//            drop->setLabel(drop->getName());
+//            drop->collapse();
+//            for(int i = 0; i < drop->getNumOptions(); i++){
+//                drop->getChildAt(i)->setVisible(true);
+//            }
+//        }
+//    }
+//}
 
 void ofxOceanodeCanvas::keyPressed(ofKeyEventArgs &e){
-    if(searchField->ofxDatGuiComponent::getFocused()){
-        if(e.key == OF_KEY_RETURN){
-            if(searchedOptions.size() != 0){
-                ofxDatGuiDropdownEvent e(searchedOptions[0].first, 0, searchedOptions[0].second);
-                newModuleListener(e);
-            }
-        }
-    }else{
+//    if(searchField->ofxDatGuiComponent::getFocused()){
+//        if(e.key == OF_KEY_RETURN){
+//            if(searchedOptions.size() != 0){
+//                ofxDatGuiDropdownEvent e(searchedOptions[0].first, 0, searchedOptions[0].second);
+//                newModuleListener(e);
+//            }
+//        }
+//    }else{
         if(e.key == ' '){
             //glfwSetCursor((GLFWwindow*)ofGetWindowPtr()->getWindowContext(), openedHandCursor);
             if(ofGetMousePressed()) dragCanvasInitialPoint = glm::vec2(ofGetMouseX(), ofGetMouseY());
-        }else if(e.key == OF_KEY_BACKSPACE){
-            popUpMenu->setVisible(false);
-            searchField->setFocused(false);
-            toMoveNodes.clear();
-            selectedRect = ofRectangle(0,0,0,0);
+//        }else if(e.key == OF_KEY_BACKSPACE){
+//            popUpMenu->setVisible(false);
+//            searchField->setFocused(false);
+//            toMoveNodes.clear();
+//            selectedRect = ofRectangle(0,0,0,0);
         }
 #ifdef TARGET_OSX
         else if(ofGetKeyPressed(OF_KEY_COMMAND)){
@@ -437,7 +426,7 @@ void ofxOceanodeCanvas::keyPressed(ofKeyEventArgs &e){
                 selectedRect = ofRectangle(0,0,0,0);
             }
         }
-    }
+//    }
 }
 
 void ofxOceanodeCanvas::mouseDragged(ofMouseEventArgs &e){
