@@ -206,15 +206,17 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
             draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
             draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(100, 100, 100, 255), 4.0f);
             
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDown(0) && ofGetKeyPressed(OF_KEY_COMMAND) /*&& ImGui::IsKeyDown(OF_KEY_ALT)*/ && !isNodeDuplicated){
+                node->duplicate();
+                //Change focus to new duplicated node
+                
+                isNodeDuplicated = true;
+            }
+            
             for (auto &param : *node->getParameters().get())
                 draw_list->AddCircleFilled(node->getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
             for (auto &param : *node->getParameters().get())
                 draw_list->AddCircleFilled(node->getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
-            
-            if (ImGui::IsWindowHovered() && ImGui::IsItemActive() && ImGui::IsMouseClicked(0) && ofGetKeyPressed(OF_KEY_ALT) /*&& ImGui::IsKeyDown(OF_KEY_ALT)*/ && !isNodeDuplicated){
-                node->duplicate();
-                isNodeDuplicated = true;
-            }
         }
         
         //Delete duplicate module?
@@ -247,7 +249,7 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
         ImGui::PopID();
     }
     
-    if(!ofGetKeyPressed(OF_KEY_ALT)){
+    if(!ofGetKeyPressed(OF_KEY_COMMAND)){
         isNodeDuplicated = false;
     }
     
