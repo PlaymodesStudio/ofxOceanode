@@ -50,15 +50,15 @@ public:
     void setIsListeningMidi(bool b){isListeningMidi = b;};
 #endif
     
-    void keyPressed(ofKeyEventArgs &args);
-    void keyReleased(ofKeyEventArgs &args);
-    void mouseMoved(ofMouseEventArgs &args){};
-    void mouseDragged(ofMouseEventArgs &args);
-    void mousePressed(ofMouseEventArgs &args);
-    void mouseReleased(ofMouseEventArgs &args);
-    void mouseScrolled(ofMouseEventArgs &args){};
-    void mouseEntered(ofMouseEventArgs &args){};
-    void mouseExited(ofMouseEventArgs &args){};
+//    void keyPressed(ofKeyEventArgs &args);
+//    void keyReleased(ofKeyEventArgs &args);
+//    void mouseMoved(ofMouseEventArgs &args){};
+//    void mouseDragged(ofMouseEventArgs &args);
+//    void mousePressed(ofMouseEventArgs &args);
+//    void mouseReleased(ofMouseEventArgs &args);
+//    void mouseScrolled(ofMouseEventArgs &args){};
+//    void mouseEntered(ofMouseEventArgs &args){};
+//    void mouseExited(ofMouseEventArgs &args){};
     
 private:
     

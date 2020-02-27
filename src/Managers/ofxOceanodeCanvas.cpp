@@ -54,6 +54,8 @@ void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){
     selecting = false;
     
     gui.setup(nullptr, false);
+    
+    uniqueID = "Canvas";
 }
 
 void ofxOceanodeCanvas::draw(ofEventArgs &args){
@@ -97,7 +99,8 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
 //        ImGui::PopID();
 //    }
 //    ImGui::EndChild();
-    
+
+    ImGui::Begin(uniqueID.c_str());
     ImGui::SameLine();
     ImGui::BeginGroup();
     
@@ -110,7 +113,7 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
     ImGui::Checkbox("Show grid", &show_grid);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    ImGui::PushStyleColor(ImGuiCol_ChildWindowBg, IM_COL32(60, 60, 70, 200));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(60, 60, 70, 200));
     ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove);
     ImGui::PushItemWidth(120.0f);
     
@@ -263,7 +266,7 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
     
     
     // Open context menu
-    if (!ImGui::IsAnyItemHovered() && ImGui::IsMouseHoveringWindow() && ImGui::IsMouseClicked(1))
+    if (!ImGui::IsAnyItemHovered() && ImGui::IsWindowHovered() && ImGui::IsMouseClicked(1))
     {
         newNodeClickPos = ImGui::GetMousePos();
         ImGui::OpenPopup("New Node");
@@ -340,6 +343,8 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(2);
     ImGui::EndGroup();
+    
+    ImGui::End();
     
     gui.end();
     

@@ -264,6 +264,7 @@ void ofxOceanodeNodeMacro::setupForExternalWindow(){
     canvas = new ofxOceanodeCanvas;
     canvas->setContainer(container);
     canvas->setup(externalWindow);
+    canvas->setUniqueID("Macro " + ofToString(getNumIdentifier()));
 }
 
 void ofxOceanodeNodeMacro::closeExternalWindow(ofEventArgs &e){

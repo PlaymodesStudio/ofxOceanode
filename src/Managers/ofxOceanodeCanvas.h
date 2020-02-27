@@ -38,6 +38,8 @@ public:
     void mouseEntered(ofMouseEventArgs &e){};
     void mouseExited(ofMouseEventArgs &e){};
     
+    void setUniqueID(string s){uniqueID = s;};
+    
     void setContainer(shared_ptr<ofxOceanodeContainer> c){container = c;};
 private:
     glm::vec3 getMatrixScale(const glm::mat4 &m);
@@ -76,6 +78,9 @@ private:
     string node_selected = "";
     bool isNodeDuplicated = false;
     glm::vec2 newNodeClickPos;
+    
+    
+    string uniqueID;
     
 };
 
