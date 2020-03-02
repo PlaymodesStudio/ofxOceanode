@@ -47,6 +47,7 @@ public:
     float  amplitude_Param;
     float  invert_Param;
     float  skew_Param;
+    float  roundness_Param;
     
     float computeFunc(float phasor);
 
