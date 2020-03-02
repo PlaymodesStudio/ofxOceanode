@@ -27,6 +27,8 @@
 		842D4B1559D16CD55B1CF6DD /* oscillator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0BE6AC32AE0E7C44E14DFE2F /* oscillator.cpp */; };
 		8EB5677652296BACF3A1C184 /* ofxOceanodeNodeGui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 170083BFE7EEC5851D5DF9E6 /* ofxOceanodeNodeGui.cpp */; };
 		9150F94721FE0E44D16DA0CC /* baseOscillator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F44449692EA3A4B7FBABCF29 /* baseOscillator.cpp */; };
+		9F3F5C42240D5F9700425347 /* chaoticOscillator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F3F5C40240D5F9700425347 /* chaoticOscillator.cpp */; };
+		9F3F5C45240D600F00425347 /* baseChaoticOscillator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F3F5C43240D600F00425347 /* baseChaoticOscillator.cpp */; };
 		9F68E137237B1B36009A6605 /* ofxOceanodeNodeMacro.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F68E136237B1B36009A6605 /* ofxOceanodeNodeMacro.cpp */; };
 		9FC5571B21AC6FAF009468E2 /* switcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9FC5571921AC6FAF009468E2 /* switcher.cpp */; };
 		A670837F6999677674A385D1 /* testNode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1C84792B71D7D5C105077DBF /* testNode.cpp */; };
@@ -125,6 +127,10 @@
 		96D838AC4E4260B0ABA07D05 /* oscillator.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = oscillator.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillator.h; sourceTree = SOURCE_ROOT; };
 		9C1A96A2891A3C36C7DCA0F7 /* phasor.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = phasor.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/phasor.cpp; sourceTree = SOURCE_ROOT; };
 		9E034FA57FE251AC33904E82 /* ofxDatGuiThemes.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiThemes.h; path = ../../../addons/ofxDatGui_PM/src/themes/ofxDatGuiThemes.h; sourceTree = SOURCE_ROOT; };
+		9F3F5C40240D5F9700425347 /* chaoticOscillator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = chaoticOscillator.cpp; path = ../src/Nodes/Default_Nodes/Generators/chaoticOscillator.cpp; sourceTree = "<group>"; };
+		9F3F5C41240D5F9700425347 /* chaoticOscillator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = chaoticOscillator.h; path = ../src/Nodes/Default_Nodes/Generators/chaoticOscillator.h; sourceTree = "<group>"; };
+		9F3F5C43240D600F00425347 /* baseChaoticOscillator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = baseChaoticOscillator.cpp; path = ../src/Nodes/Default_Nodes/Base/baseChaoticOscillator.cpp; sourceTree = "<group>"; };
+		9F3F5C44240D600F00425347 /* baseChaoticOscillator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = baseChaoticOscillator.h; path = ../src/Nodes/Default_Nodes/Base/baseChaoticOscillator.h; sourceTree = "<group>"; };
 		9F68E135237B1B36009A6605 /* ofxOceanodeNodeMacro.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ofxOceanodeNodeMacro.h; path = ../src/Nodes/ofxOceanodeNodeMacro.h; sourceTree = "<group>"; };
 		9F68E136237B1B36009A6605 /* ofxOceanodeNodeMacro.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ofxOceanodeNodeMacro.cpp; path = ../src/Nodes/ofxOceanodeNodeMacro.cpp; sourceTree = "<group>"; };
 		9FC5571921AC6FAF009468E2 /* switcher.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = switcher.cpp; path = ../src/Nodes/Default_Nodes/Modifiers/switcher.cpp; sourceTree = "<group>"; };
@@ -279,6 +285,8 @@
 				85CA43E90443167538D06F3C /* baseIndexer.h */,
 				F44449692EA3A4B7FBABCF29 /* baseOscillator.cpp */,
 				94ED70588667CA0E144E436E /* baseOscillator.h */,
+				9F3F5C43240D600F00425347 /* baseChaoticOscillator.cpp */,
+				9F3F5C44240D600F00425347 /* baseChaoticOscillator.h */,
 				0538E73A948F5367828D0596 /* basePhasor.cpp */,
 				C76BA1A770D742397939F7A7 /* basePhasor.h */,
 			);
@@ -294,6 +302,8 @@
 				3C2190A2D726C8DCEF074E3C /* indexer.h */,
 				9C1A96A2891A3C36C7DCA0F7 /* phasor.cpp */,
 				E187B9F0640B673635B5ECDF /* phasor.h */,
+				9F3F5C40240D5F9700425347 /* chaoticOscillator.cpp */,
+				9F3F5C41240D5F9700425347 /* chaoticOscillator.h */,
 			);
 			name = Generators;
 			sourceTree = "<group>";
@@ -574,6 +584,7 @@
 				E4B69E200A3A1BDC003C02F2 /* main.cpp in Sources */,
 				E4B69E210A3A1BDC003C02F2 /* ofApp.cpp in Sources */,
 				A670837F6999677674A385D1 /* testNode.cpp in Sources */,
+				9F3F5C42240D5F9700425347 /* chaoticOscillator.cpp in Sources */,
 				4A277DA746402C76CE307770 /* ofxDatGuiComponent.cpp in Sources */,
 				646DF4D56CE728133610A7F6 /* ofxSmartFont.cpp in Sources */,
 				BE7DAF3CB982C2BD0FE44648 /* ofxDatGui.cpp in Sources */,
@@ -598,6 +609,7 @@
 				4C3192DB1EAE1CFF29580749 /* indexer.cpp in Sources */,
 				7416EB8AFDAB615D36EC3137 /* phasor.cpp in Sources */,
 				9FC5571B21AC6FAF009468E2 /* switcher.cpp in Sources */,
+				9F3F5C45240D600F00425347 /* baseChaoticOscillator.cpp in Sources */,
 				47608E29666CD58C20E53408 /* mapper.cpp in Sources */,
 				4838368B3C8561AD76D56D69 /* ranger.cpp in Sources */,
 				E1E0C08A53EAFC4A088F5BDC /* reindexer.cpp in Sources */,

@@ -1,32 +1,32 @@
 //
-//  oscillator.h
+//  chaoticOscillator.h
 //  example-basic
 //
-//  Created by Eduard Frigola Bagué on 25/02/2018.
+//  Created by Eduard Frigola Bagué on 02/03/2020.
 //
 
-#ifndef oscillator_h
-#define oscillator_h
+#ifndef chaoticOscillator_h
+#define chaoticOscillator_h
 
 #include "ofxOceanodeNodeModel.h"
-#include "baseOscillator.h"
+#include "baseChaoticOscillator.h"
 
-class oscillator : public ofxOceanodeNodeModel{
+class chaoticOscillator : public ofxOceanodeNodeModel{
 public:
-    oscillator() : ofxOceanodeNodeModel("Oscillator"){};
-    ~oscillator(){};
+    chaoticOscillator() : ofxOceanodeNodeModel("Chaotic Oscillator"){};
+    ~chaoticOscillator(){};
     void setup();
     
     void presetHasLoaded(){
-//        if(waveSelect_Param == 6 || waveSelect_Param == 7 || waveSelect_Param == 8){
-//            phasorIn = vector1;
-//            phasorIn = 0;
-//        }
+        //        if(waveSelect_Param == 6 || waveSelect_Param == 7 || waveSelect_Param == 8){
+        //            phasorIn = vector1;
+        //            phasorIn = 0;
+        //        }
     }
-        
+    
 private:
     void phasorInListener(vector<float> &phasor);
-    vector<baseOscillator> baseOsc;
+    vector<baseChaoticOscillator> baseChOsc;
     
     template <typename T>
     auto getValueForPosition(const vector<T> &param, int index) -> T{
@@ -52,11 +52,16 @@ private:
     ofParameter<vector<float>>  invert_Param;
     ofParameter<vector<float>>  skew_Param;
     ofParameter<vector<float>>  roundness_Param;
+    ofParameter<vector<float>> customDiscreteDistribution_Param;
     ofParameter<vector<float>>  output;
+    ofParameter<vector<int>> seed;
     
     vector<float> result;
     
     ofEventListeners listeners;
+    
+    bool seedChanged;
+    float oldSinglePhasor;
 };
 
-#endif /* oscillator_h */
+#endif /* chaoticOscillator_h */

@@ -13,27 +13,6 @@ void indexer::setup() {
     result.resize(indexs.size());
     
     putParametersInParametersGroup(parameters);
-    
-//#ifdef OFXOCEANODE_USE_RANDOMSEED
-//    parameters->add(seed.set("Seed", {0}, {INT_MIN}, {INT_MAX}));
-//    paramListeners.push(seed.newListener([this](vector<int> &s){
-//        if(s.size() == 1){
-//            if(s[0] == 0){
-//                for(int i = 0; i < oscillators.size(); i++){
-//                    oscillators[i].deactivateSeed();
-//                }
-//            }else{
-//                for(int i = 0; i < oscillators.size(); i++){
-//                    oscillators[i].setSeed(s[0] + i);
-//                }
-//            }
-//        }else{
-//            for(int i = 0; i < oscillators.size(); i++){
-//                oscillators[i].setSeed(getValueForPosition(s, i));
-//            }
-//        }
-//    }));
-//#endif
 
     addOutputParameterToGroupAndInfo(indexsOut.set("Indexs", {0}, {0}, {1}));
 }

@@ -12,37 +12,8 @@
 #include "ofMath.h"
 
 baseOscillator::baseOscillator(){
-    oldPhasor = 0;
     indexNormalized = 0;
-#ifdef OFXOCEANODE_USE_RANDOMSEED
-    seed = 0;
-    std::random_device rd;
-    mt.seed(rd());
-    dist = std::uniform_real_distribution<float>(0.0, 1.0);
-    oldValuePreMod = dist(mt);
-    pastRandom = dist(mt);
-    newRandom = dist(mt);
-    oldRandom = dist(mt);
-    futureRandom = dist(mt);
-#else
-    oldValuePreMod = ofRandom(1);
-    pastRandom = ofRandom(1);
-    newRandom = ofRandom(1);
-    oldRandom = ofRandom(1);
-    futureRandom = ofRandom(1);
-#endif
 }
-
-#ifdef OFXOCEANODE_USE_RANDOMSEED
-void baseOscillator::setSeed(int seed){
-    mt.seed(seed);
-}
-
-void baseOscillator::deactivateSeed(){
-    std::random_device rd;
-    mt.seed(rd());
-}
-#endif
 
 float baseOscillator::computeFunc(float phasor){
     float linPhase = phasor + indexNormalized + phaseOffset_Param;
@@ -100,99 +71,7 @@ float baseOscillator::computeFunc(float phasor){
         val = cos_val;
     }
     
-//    switch (static_cast<oscTypes>(waveSelect_Param+1)){
-//        case sinOsc:
-//        {
-//            val = sin(w);
-//            val = ofMap(val, -1.0, 1.0, 0.0, 1.0);
-//            break;
-//
-//        }
-//        case cosOsc:
-//        {
-//            val = cos(w+M_PI);
-//            val = ofMap(val, -1.0, 1.0, 0.0, 1.0);
-//            break;
-//        }
-//        case triOsc:
-//        {
-//            val = 1-(fabs((linPhase * (-2)) + 1));
-//            break;
-//        }
-//        case squareOsc:
-//        {
-//            val = ((1.0f-noPulseWidthPhase) > pulseWidth_Param) ? 0 : 1;
-//            break;
-//        }
-//        case sawOsc:
-//        {
-//            val = 1-linPhase;
-//            break;
-//        }
-//        case sawInvOsc:
-//        {
-//            val = linPhase;
-//            break;
-//        }
-//        case rand1Osc:
-//        {
-//            if(linPhase < oldPhasor){
-//#ifdef OFXOCEANODE_USE_RANDOMSEED
-//                val = dist(mt);
-//#else
-//                val = ofRandom(1);
-//#endif
-//            }else
-//                val = oldValuePreMod;
-//
-//            break;
-//        }
-//        case rand2Osc:
-//        {
-//            if(linPhase < oldPhasor){
-//                pastRandom = newRandom;
-//#ifdef OFXOCEANODE_USE_RANDOMSEED
-//                newRandom = dist(mt);
-//#else
-//                newRandom = ofRandom(1);
-//#endif
-//                val = pastRandom;
-//            }
-//            else
-//                val = pastRandom*(1-linPhase) + newRandom*linPhase;
-//
-//            break;
-//        }
-//        case rand3Osc:
-//        {
-//            if(linPhase < oldPhasor){
-//                pastRandom = oldRandom;
-//                oldRandom = newRandom;
-//                newRandom = futureRandom;
-//#ifdef OFXOCEANODE_USE_RANDOMSEED
-//                futureRandom = dist(mt);
-//#else
-//                futureRandom = ofRandom(1);
-//#endif
-//                val = oldRandom;
-//            }
-//            else{
-//                float x = linPhase;
-//                float L0 = (newRandom - pastRandom) * 0.5;
-//                float L1 = L0 + (oldRandom-newRandom);
-//                float L2 = L1 + ((futureRandom - oldRandom)*0.5) + (oldRandom - newRandom);
-//                val = oldRandom + (x * (L0 + (x * ((x * L2) - (L1 + L2)))));
-//            }
-//        }
-//        default:
-//            break;
-//    }
-    
-    oldValuePreMod = val;
-    
     computeMultiplyMod(val);
-    
-    oldPhasor = linPhase;
     
     return ofClamp(val, 0, 1);
 }

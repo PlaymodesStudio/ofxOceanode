@@ -39,9 +39,6 @@ private:
     
     
     ofParameter<vector<float>>      indexsOut;
-#ifdef OFXOCEANODE_USE_RANDOMSEED
-    ofParameter<vector<int>> seed;
-#endif
     vector<float> result;
     
     ofEventListeners paramListeners;

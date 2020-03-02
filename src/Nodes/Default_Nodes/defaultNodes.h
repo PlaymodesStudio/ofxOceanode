@@ -9,6 +9,7 @@
 #define defaultNodes_h
 
 #include "oscillator.h"
+#include "chaoticOscillator.h"
 #include "phasor.h"
 #include "mapper.h"
 #include "indexer.h"

@@ -109,16 +109,6 @@ void oscillator::setup(){
     parameters->add(quant_Param.set("Quantization", {255}, {2}, {255}));
     parameters->add(amplitude_Param.set("Fader", {1}, {0}, {1}));
     parameters->add(invert_Param.set("Invert", {0}, {0}, {1}));
-#ifdef OFXOCEANODE_USE_RANDOMSEED
-    parameters->add(seed.set("Seed", 0, INT_MIN, INT_MAX));
-    listeners.push(seed.newListener([this](int &s){
-        if(s == 0){
-            baseOsc.deactivateSeed();
-        }else{
-            baseOsc.setSeed(s);
-        }
-    }));
-#endif
     addOutputParameterToGroupAndInfo(output.set("Output", {0}, {0}, {1}));
     
     
