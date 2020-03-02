@@ -18,33 +18,46 @@ public:
     void setup();
     
     void presetHasLoaded(){
-        if(waveSelect_Param == 6 || waveSelect_Param == 7 || waveSelect_Param == 8){
-            phasorIn = 1;
-            phasorIn = 0;
-        }
+//        if(waveSelect_Param == 6 || waveSelect_Param == 7 || waveSelect_Param == 8){
+//            phasorIn = vector1;
+//            phasorIn = 0;
+//        }
     }
         
 private:
-    void phasorInListener(float &phasor);
-    baseOscillator baseOsc;
+    void phasorInListener(vector<float> &phasor);
+    vector<baseOscillator> baseOsc;
     
-    ofParameter<float>  phasorIn;
-    ofParameter<float>  pow_Param;
-    ofParameter<float>  pulseWidth_Param;
-    ofParameter<float>  phaseOffset_Param;
-    ofParameter<int>    quant_Param;
-    ofParameter<float>  scale_Param;
-    ofParameter<float>  offset_Param;
-    ofParameter<float>  randomAdd_Param;
-    ofParameter<float>  biPow_Param;
-    ofParameter<int>    waveSelect_Param;
-    ofParameter<float>  amplitude_Param;
-    ofParameter<float>  invert_Param;
-    ofParameter<float>  skew_Param;
-    ofParameter<float>  output;
+    template <typename T>
+    auto getValueForPosition(const vector<T> &param, int index) -> T{
+        if(param.size() == 1 || param.size() <= index){
+            return param[0];
+        }
+        else{
+            return param[index];
+        }
+    };
+    
+    ofParameter<vector<float>>  phasorIn;
+    ofParameter<vector<float>>  index_Param;
+    ofParameter<vector<float>>  pow_Param;
+    ofParameter<vector<float>>  pulseWidth_Param;
+    ofParameter<vector<float>>  phaseOffset_Param;
+    ofParameter<vector<int>>  quant_Param;
+    ofParameter<vector<float>>  scale_Param;
+    ofParameter<vector<float>>  offset_Param;
+    ofParameter<vector<float>>  randomAdd_Param;
+    ofParameter<vector<float>>  biPow_Param;
+    ofParameter<vector<float>>  amplitude_Param;
+    ofParameter<vector<float>>  invert_Param;
+    ofParameter<vector<float>>  skew_Param;
+    ofParameter<vector<float>>  roundness_Param;
+    ofParameter<vector<float>>  output;
 #ifdef OFXOCEANODE_USE_RANDOMSEED
     ofParameter<int> seed;
 #endif
+    
+    vector<float> result;
     
     ofEventListeners listeners;
 };

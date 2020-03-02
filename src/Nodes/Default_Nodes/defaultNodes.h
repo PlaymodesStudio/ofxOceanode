@@ -11,7 +11,7 @@
 #include "oscillator.h"
 #include "phasor.h"
 #include "mapper.h"
-#include "oscillatorBank.h"
+#include "indexer.h"
 #include "ranger.h"
 #include "reindexer.h"
 #include "smoother.h"

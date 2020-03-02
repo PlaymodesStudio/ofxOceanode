@@ -9,56 +9,106 @@
 
 void oscillator::setup(){
     color = ofColor::cyan;
-    listeners.push(phaseOffset_Param.newListener([&](float &val){
-        baseOsc.phaseOffset_Param = val;
+    baseOsc.resize(1);
+    result.resize(1);
+    listeners.push(phaseOffset_Param.newListener([&](vector<float> &val){
+        for(int i = 0; i < baseOsc.size(); i++){
+            baseOsc[i].phaseOffset_Param = getValueForPosition(val, i);
+        }
     }));
-    listeners.push(randomAdd_Param.newListener([&](float &val){
-        baseOsc.randomAdd_Param = val;
+    listeners.push(randomAdd_Param.newListener([&](vector<float> &val){
+        for(int i = 0; i < baseOsc.size(); i++){
+            baseOsc[i].randomAdd_Param = getValueForPosition(val, i);
+        }
     }));
-    listeners.push(scale_Param.newListener([&](float &val){
-        baseOsc.scale_Param = val;
+    listeners.push(scale_Param.newListener([&](vector<float> &val){
+        for(int i = 0; i < baseOsc.size(); i++){
+            baseOsc[i].scale_Param = getValueForPosition(val, i);
+        }
     }));
-    listeners.push(offset_Param.newListener([&](float &val){
-        baseOsc.offset_Param = val;
+    listeners.push(offset_Param.newListener([&](vector<float> &val){
+        for(int i = 0; i < baseOsc.size(); i++){
+            baseOsc[i].offset_Param = getValueForPosition(val, i);
+        }
     }));
-    listeners.push(pow_Param.newListener([&](float &val){
-        baseOsc.pow_Param = val;
+    listeners.push(pow_Param.newListener([&](vector<float> &val){
+        for(int i = 0; i < baseOsc.size(); i++){
+            baseOsc[i].pow_Param = getValueForPosition(val, i);
+        }
     }));
-    listeners.push(biPow_Param.newListener([&](float &val){
-        baseOsc.biPow_Param = val;
+    listeners.push(biPow_Param.newListener([&](vector<float> &val){
+        for(int i = 0; i < baseOsc.size(); i++){
+            baseOsc[i].biPow_Param = getValueForPosition(val, i);
+        }
     }));
-    listeners.push(quant_Param.newListener([&](int &val){
-        baseOsc.quant_Param = val;
+    listeners.push(quant_Param.newListener([&](vector<int> &val){
+        for(int i = 0; i < baseOsc.size(); i++){
+            baseOsc[i].quant_Param = getValueForPosition(val, i);
+        }
     }));
-    listeners.push(pulseWidth_Param.newListener([&](float &val){
-        baseOsc.pulseWidth_Param = val;
+    listeners.push(pulseWidth_Param.newListener([&](vector<float> &val){
+        for(int i = 0; i < baseOsc.size(); i++){
+            baseOsc[i].pulseWidth_Param = getValueForPosition(val, i);
+        }
     }));
-    listeners.push(skew_Param.newListener([&](float &val){
-        baseOsc.skew_Param = val;
+    listeners.push(skew_Param.newListener([&](vector<float> &val){
+        for(int i = 0; i < baseOsc.size(); i++){
+            baseOsc[i].skew_Param = getValueForPosition(val, i);
+        }
     }));
-    listeners.push(amplitude_Param.newListener([&](float &val){
-        baseOsc.amplitude_Param = val;
+    listeners.push(amplitude_Param.newListener([&](vector<float> &val){
+        for(int i = 0; i < baseOsc.size(); i++){
+            baseOsc[i].amplitude_Param = getValueForPosition(val, i);
+        }
     }));
-    listeners.push(invert_Param.newListener([&](float &val){
-        baseOsc.invert_Param = val;
+    listeners.push(invert_Param.newListener([&](vector<float> &val){
+        for(int i = 0; i < baseOsc.size(); i++){
+            baseOsc[i].invert_Param = getValueForPosition(val, i);
+        }
     }));
-    listeners.push(waveSelect_Param.newListener([&](int &val){
-        baseOsc.waveSelect_Param = val;
+    listeners.push(roundness_Param.newListener([&](vector<float> &val){
+        for(int i = 0; i < baseOsc.size(); i++){
+            baseOsc[i].roundness_Param = getValueForPosition(val, i);
+        }
+    }));
+    listeners.push(index_Param.newListener([this](vector<float> &val){
+        if(val.size() != baseOsc.size()){
+            baseOsc.resize(val.size());
+            result.resize(val.size());
+            phaseOffset_Param = phaseOffset_Param;
+            roundness_Param = roundness_Param;
+            pulseWidth_Param = pulseWidth_Param;
+            skew_Param = skew_Param;
+            randomAdd_Param = randomAdd_Param;
+            scale_Param = scale_Param;
+            offset_Param = offset_Param;
+            pow_Param = pow_Param;
+            biPow_Param = biPow_Param;
+            quant_Param = quant_Param;
+            amplitude_Param = amplitude_Param;
+            invert_Param = invert_Param;
+        }
+        for(int i = 0; i < baseOsc.size(); i++){
+            baseOsc[i].setIndexNormalized(getValueForPosition(val, i));
+        }
     }));
     
+    
 
-    parameters->add(phasorIn.set("Phasor In", 0, 0, 1));
-    parameters->add(phaseOffset_Param.set("Phase Offset", 0, 0, 1));
-    parameters->add(randomAdd_Param.set("Random Addition", 0, -.5, .5));
-    parameters->add(scale_Param.set("Scale", 1, 0, 2));
-    parameters->add(offset_Param.set("Offset", 0, -1, 1));
-    parameters->add(pow_Param.set("Pow", 0, -1, 1));
-    parameters->add(biPow_Param.set("Bi Pow", 0, -1, 1));
-    parameters->add(quant_Param.set("Quantization", 255, 2, 255));
-    parameters->add(pulseWidth_Param.set("Pulse Width", 1, 0, 1));
-    parameters->add(skew_Param.set("Skew", 0, -1, 1));
-    parameters->add(amplitude_Param.set("Fader", 1, 0, 1));
-    parameters->add(invert_Param.set("Invert", 0, 0, 1));
+    parameters->add(phasorIn.set("Phasor In", {0}, {0}, {1}));
+    parameters->add(index_Param.set("Index", {0}, {0}, {1}));
+    parameters->add(phaseOffset_Param.set("Phase Offset", {0}, {0}, {1}));
+    parameters->add(roundness_Param.set("Roundess", {0}, {0}, {1}));
+    parameters->add(pulseWidth_Param.set("Pulse Width", {.5}, {0}, {1}));
+    parameters->add(skew_Param.set("Skew", {0}, {-1}, {1}));
+    parameters->add(randomAdd_Param.set("Random Addition", {0}, {-.5}, {.5}));
+    parameters->add(scale_Param.set("Scale", {1}, {0}, {2}));
+    parameters->add(offset_Param.set("Offset", {0}, {-1}, {1}));
+    parameters->add(pow_Param.set("Pow", {0}, {-1}, {1}));
+    parameters->add(biPow_Param.set("Bi Pow", {0}, {-1}, {1}));
+    parameters->add(quant_Param.set("Quantization", {255}, {2}, {255}));
+    parameters->add(amplitude_Param.set("Fader", {1}, {0}, {1}));
+    parameters->add(invert_Param.set("Invert", {0}, {0}, {1}));
 #ifdef OFXOCEANODE_USE_RANDOMSEED
     parameters->add(seed.set("Seed", 0, INT_MIN, INT_MAX));
     listeners.push(seed.newListener([this](int &s){
@@ -69,13 +119,15 @@ void oscillator::setup(){
         }
     }));
 #endif
-    parameters->add(createDropdownAbstractParameter("Wave", {"sin", "cos", "tri", "square", "saw", "inverted saw", "rand1", "rand2", "rand3"}, waveSelect_Param));
-    addOutputParameterToGroupAndInfo(output.set("Output", 0, 0, 1));
+    addOutputParameterToGroupAndInfo(output.set("Output", {0}, {0}, {1}));
     
     
     listeners.push(phasorIn.newListener(this, &oscillator::phasorInListener));
 }
 
-void oscillator::phasorInListener(float &phasor){
-    output = baseOsc.computeFunc(phasor);
+void oscillator::phasorInListener(vector<float> &phasor){
+    for(int i = 0; i < baseOsc.size(); i++){
+        result[i] = baseOsc[i].computeFunc(getValueForPosition(phasor, i));
+    }
+    output = result;
 }

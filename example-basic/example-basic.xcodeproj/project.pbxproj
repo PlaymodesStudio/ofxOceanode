@@ -14,7 +14,7 @@
 		4838368B3C8561AD76D56D69 /* ranger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 959F4777E3902536DC81AC0A /* ranger.cpp */; };
 		4A277DA746402C76CE307770 /* ofxDatGuiComponent.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5D13EE4C64902574D9153447 /* ofxDatGuiComponent.cpp */; };
 		4B0881C0E4F3D037FA83C3E3 /* ofxOceanodeNodeModelLocalPreset.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8AC0F166599AAFFA99CD14EF /* ofxOceanodeNodeModelLocalPreset.cpp */; };
-		4C3192DB1EAE1CFF29580749 /* oscillatorBank.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BE59ACA8A0510B61FD8647C6 /* oscillatorBank.cpp */; };
+		4C3192DB1EAE1CFF29580749 /* indexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BE59ACA8A0510B61FD8647C6 /* indexer.cpp */; };
 		4C8024D8DD46223D43C514C0 /* ofxOceanodeNode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 63A44DC38599839305F1F4D3 /* ofxOceanodeNode.cpp */; };
 		4F63EFF3BAACF2B19051E336 /* ofxOceanodeNodeModel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 18902594A5884CA5CA6D3D9D /* ofxOceanodeNodeModel.cpp */; };
 		5769B6A6D79188D3D351933E /* ofxOceanodeContainer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5E65A0C39A6FDCA2888DDAF8 /* ofxOceanodeContainer.cpp */; };
@@ -92,7 +92,7 @@
 		29030CD02944F06F1DAC3E49 /* ofxDatGuiTextInput.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiTextInput.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiTextInput.h; sourceTree = SOURCE_ROOT; };
 		3795AFB8EAAD641D6CA88D4A /* ofxOceanodeTypesRegistry.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeTypesRegistry.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeTypesRegistry.h; sourceTree = SOURCE_ROOT; };
 		3B2B1469CBE279200D558FAB /* mapper.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = mapper.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/mapper.h; sourceTree = SOURCE_ROOT; };
-		3C2190A2D726C8DCEF074E3C /* oscillatorBank.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = oscillatorBank.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillatorBank.h; sourceTree = SOURCE_ROOT; };
+		3C2190A2D726C8DCEF074E3C /* indexer.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = indexer.h; path = ../src/Nodes/Default_Nodes/Generators/indexer.h; sourceTree = SOURCE_ROOT; };
 		3D3CE3C79225FEEDD92A410A /* reindexer.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = reindexer.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/reindexer.cpp; sourceTree = SOURCE_ROOT; };
 		3F15C4313830F7C3C28E1FAE /* ofxDatGuiTextInputField.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiTextInputField.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiTextInputField.h; sourceTree = SOURCE_ROOT; };
 		407D7F7B6D3EDF97638DF661 /* ofxDatGuiEvents.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiEvents.h; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiEvents.h; sourceTree = SOURCE_ROOT; };
@@ -136,7 +136,7 @@
 		A8150F1936B064445E99AF76 /* ofxOceanodeBPMController.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeBPMController.cpp; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeBPMController.cpp; sourceTree = SOURCE_ROOT; };
 		B11DB438E2A6EBD360F8BA50 /* ofxDatGuiFRM.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiFRM.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiFRM.h; sourceTree = SOURCE_ROOT; };
 		B7B623A02730497FBCEA4FF2 /* ofxDatGuiControls.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiControls.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiControls.h; sourceTree = SOURCE_ROOT; };
-		BE59ACA8A0510B61FD8647C6 /* oscillatorBank.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = oscillatorBank.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillatorBank.cpp; sourceTree = SOURCE_ROOT; };
+		BE59ACA8A0510B61FD8647C6 /* indexer.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = indexer.cpp; path = ../src/Nodes/Default_Nodes/Generators/indexer.cpp; sourceTree = SOURCE_ROOT; };
 		BFA88189469A37E0B53C6773 /* ofxOceanodeCanvas.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeCanvas.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeCanvas.h; sourceTree = SOURCE_ROOT; };
 		C1A3EDCC30D80C890BF10EC5 /* localPresetController.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = localPresetController.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers/localPresetController.h; sourceTree = SOURCE_ROOT; };
 		C27DB6A973A67BE0BF855933 /* ofxOceanodePresetsController.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodePresetsController.cpp; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodePresetsController.cpp; sourceTree = SOURCE_ROOT; };
@@ -290,8 +290,8 @@
 			children = (
 				0BE6AC32AE0E7C44E14DFE2F /* oscillator.cpp */,
 				96D838AC4E4260B0ABA07D05 /* oscillator.h */,
-				BE59ACA8A0510B61FD8647C6 /* oscillatorBank.cpp */,
-				3C2190A2D726C8DCEF074E3C /* oscillatorBank.h */,
+				BE59ACA8A0510B61FD8647C6 /* indexer.cpp */,
+				3C2190A2D726C8DCEF074E3C /* indexer.h */,
 				9C1A96A2891A3C36C7DCA0F7 /* phasor.cpp */,
 				E187B9F0640B673635B5ECDF /* phasor.h */,
 			);
@@ -595,7 +595,7 @@
 				BFBE6AEF801BA1F820867405 /* basePhasor.cpp in Sources */,
 				124BB55C818D1F89450ED005 /* localPresetController.cpp in Sources */,
 				842D4B1559D16CD55B1CF6DD /* oscillator.cpp in Sources */,
-				4C3192DB1EAE1CFF29580749 /* oscillatorBank.cpp in Sources */,
+				4C3192DB1EAE1CFF29580749 /* indexer.cpp in Sources */,
 				7416EB8AFDAB615D36EC3137 /* phasor.cpp in Sources */,
 				9FC5571B21AC6FAF009468E2 /* switcher.cpp in Sources */,
 				47608E29666CD58C20E53408 /* mapper.cpp in Sources */,
