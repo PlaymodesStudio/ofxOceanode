@@ -16,6 +16,7 @@ public:
     indexer() : baseIndexer(100, "Indexer"){};
     ~indexer(){};
     void setup() override;
+    void update(ofEventArgs &e) override;
     
     void presetRecallBeforeSettingParameters(ofJson &json) override;
     void presetRecallAfterSettingParameters(ofJson &json) override;

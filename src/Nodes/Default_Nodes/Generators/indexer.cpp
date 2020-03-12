@@ -9,12 +9,17 @@
 #include "indexer.h"
 
 void indexer::setup() {
-    color = ofColor::blue;
+    color = ofColor::orange;
     result.resize(indexs.size());
     
     putParametersInParametersGroup(parameters);
 
     addOutputParameterToGroupAndInfo(indexsOut.set("Indexs", {0}, {0}, {1}));
+    indexsOut = indexs;
+}
+
+void indexer::update(ofEventArgs &e){
+    indexsOut = indexs;
 }
 
 void indexer::presetRecallBeforeSettingParameters(ofJson &json){
@@ -37,8 +42,5 @@ void indexer::indexCountChanged(int &newIndexCount){
 }
 
 void indexer::newIndexs(){
-//    for(int i=0 ; i < oscillators.size() ; i++){
-//        oscillators[i].setIndexNormalized(indexs[i]);
-//    }
     indexsOut = indexs;
 }

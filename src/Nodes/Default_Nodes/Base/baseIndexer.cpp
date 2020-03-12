@@ -118,7 +118,7 @@ void baseIndexer::recomputeIndexs(){
             symmetry_Param--;
         
         bool odd = false;
-        if((abs(indexOffset_Param) - (int)abs(indexOffset_Param)) > 0.5) odd = !odd;
+        //if((abs(indexOffset_Param) - (int)abs(indexOffset_Param)) > 0.5) odd = !odd;
         
         if((int)((index)/(newNumOfPixels/(symmetry_Param+1)))%2 == 1) odd = true;
         
@@ -161,7 +161,7 @@ void baseIndexer::recomputeIndexs(){
         int shifted_i = i + round(indexOffset_Param);
         if(shifted_i < 0) shifted_i += indexCount;
         shifted_i %= indexCount;
-        indexs[shifted_i] = float(((indexf)/(double)(indexCount))*((double)numWaves_Param*((double)indexCount/(double)newNumOfPixels))*((double)symmetry_Param+1));
+        indexs[shifted_i] = fmod(float(((indexf)/(double)(indexCount))*((double)numWaves_Param*((double)indexCount/(double)newNumOfPixels))*((double)symmetry_Param+1)), 1);
     }
     newIndexs();
 }
