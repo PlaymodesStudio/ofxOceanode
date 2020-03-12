@@ -8,7 +8,7 @@
 #include "smoother.h"
 
 void smoother::setup() {
-    color = ofColor::azure;
+    color = ofColor::green;
     parameters->add(input.set("Input", {0}, {0}, {1}));
     parameters->add(smoothing.set("Smoothing", {0.5}, {0}, {1}));
     parameters->add(tension.set("Tension", {0}, {-1}, {1}));
@@ -31,10 +31,15 @@ void smoother::inputListener(vector<float> &vf){
             float smoothingValue = smoothing.get().size() == 1 ? smoothing.get()[0] : smoothing.get()[i];
             float newSmoothing = smoothingValue;
             float tensionValue = tension.get().size() == 1 ? tension.get()[0] : tension.get()[i];
-            if(tensionValue > 0)
-                newSmoothing = ofClamp(smoothingValue * (1 - (abs(previousInput[i] - vf[i]) * tensionValue)), 0, 1);
-            else if(tensionValue < 0)
-                newSmoothing = ofClamp(smoothingValue * (1 - ((1 - abs(previousInput[i] - vf[i])) * abs(tensionValue))), 0, 1);
+            float step = abs(previousInput[i] - vf[i]);
+            
+            if(tensionValue > 0.5){
+                tensionValue = ofMap(tensionValue, .5, 1, 0, .5);
+                newSmoothing = ofLerp(smoothingValue, 0, (step * tensionValue));
+            }else if(tensionValue <= 0.5){
+                tensionValue = pow(ofMap(tensionValue, -1, .5, 1, 0), 0.2);
+                newSmoothing = ofLerp(smoothingValue, .999999, (step * tensionValue));
+            }
             
             newOutput[i] = (newSmoothing * previousInput[i]) + ((1 - newSmoothing) * vf[i]);
         }
