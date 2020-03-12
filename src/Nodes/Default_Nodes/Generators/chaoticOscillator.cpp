@@ -14,6 +14,9 @@ void chaoticOscillator::setup(){
     baseChOsc.resize(1);
     result.resize(1);
     listeners.push(phaseOffset_Param.newListener([this](vector<float> &val){
+        if(val.size() != baseChOsc.size() && index_Param->size() == 1 && phasorIn->size() == 1){
+            resize(val.size());
+        }
         for(int i = 0; i < baseChOsc.size(); i++){
             baseChOsc[i].phaseOffset_Param = getValueForPosition(val, i);
         }
@@ -75,21 +78,7 @@ void chaoticOscillator::setup(){
     }));
     listeners.push(index_Param.newListener([this](vector<float> &val){
         if(val.size() != baseChOsc.size()){
-            baseChOsc.resize(val.size());
-            result.resize(val.size());
-            phaseOffset_Param = phaseOffset_Param;
-            roundness_Param = roundness_Param;
-            pulseWidth_Param = pulseWidth_Param;
-            skew_Param = skew_Param;
-            randomAdd_Param = randomAdd_Param;
-            scale_Param = scale_Param;
-            offset_Param = offset_Param;
-            pow_Param = pow_Param;
-            biPow_Param = biPow_Param;
-            quant_Param = quant_Param;
-            amplitude_Param = amplitude_Param;
-            invert_Param = invert_Param;
-            customDiscreteDistribution_Param = customDiscreteDistribution_Param;
+            resize(val.size());
         }
         for(int i = 0; i < baseChOsc.size(); i++){
             baseChOsc[i].setIndexNormalized(getValueForPosition(val, i));
@@ -128,7 +117,29 @@ void chaoticOscillator::setup(){
     listeners.push(phasorIn.newListener(this, &chaoticOscillator::phasorInListener));
 }
 
+void chaoticOscillator::resize(int newSize){
+    baseChOsc.resize(newSize);
+    result.resize(newSize);
+    phaseOffset_Param = phaseOffset_Param;
+    roundness_Param = roundness_Param;
+    pulseWidth_Param = pulseWidth_Param;
+    skew_Param = skew_Param;
+    randomAdd_Param = randomAdd_Param;
+    scale_Param = scale_Param;
+    offset_Param = offset_Param;
+    pow_Param = pow_Param;
+    biPow_Param = biPow_Param;
+    quant_Param = quant_Param;
+    amplitude_Param = amplitude_Param;
+    invert_Param = invert_Param;
+    customDiscreteDistribution_Param = customDiscreteDistribution_Param;
+    seed = seed;
+};
+
 void chaoticOscillator::phasorInListener(vector<float> &phasor){
+    if(phasor.size() != baseChOsc.size() && phasor.size() != 1 && index_Param->size() == 1){
+        resize(phasor.size());
+    }
     for(int i = 0; i < baseChOsc.size(); i++){
         result[i] = baseChOsc[i].computeFunc(getValueForPosition(phasor, i));
     }

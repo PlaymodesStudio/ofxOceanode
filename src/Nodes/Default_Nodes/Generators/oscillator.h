@@ -38,6 +38,8 @@ private:
         }
     };
     
+    void resize(int newSize);
+    
     ofParameter<vector<float>>  phasorIn;
     ofParameter<vector<float>>  index_Param;
     ofParameter<vector<float>>  pow_Param;

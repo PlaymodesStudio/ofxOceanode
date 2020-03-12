@@ -8,10 +8,14 @@
 #include "oscillator.h"
 
 void oscillator::setup(){
-    color = ofColor::cyan;
+    color = ofColor(0, 127, 255);
     baseOsc.resize(1);
     result.resize(1);
+    
     listeners.push(phaseOffset_Param.newListener([&](vector<float> &val){
+        if(val.size() != baseOsc.size() && index_Param->size() == 1 && phasorIn->size() == 1){
+            resize(val.size());
+        }
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].phaseOffset_Param = getValueForPosition(val, i);
         }
@@ -71,22 +75,9 @@ void oscillator::setup(){
             baseOsc[i].roundness_Param = getValueForPosition(val, i);
         }
     }));
-    listeners.push(index_Param.newListener([this](vector<float> &val){
+    listeners.push(index_Param.newListener([&](vector<float> &val){
         if(val.size() != baseOsc.size()){
-            baseOsc.resize(val.size());
-            result.resize(val.size());
-            phaseOffset_Param = phaseOffset_Param;
-            roundness_Param = roundness_Param;
-            pulseWidth_Param = pulseWidth_Param;
-            skew_Param = skew_Param;
-            randomAdd_Param = randomAdd_Param;
-            scale_Param = scale_Param;
-            offset_Param = offset_Param;
-            pow_Param = pow_Param;
-            biPow_Param = biPow_Param;
-            quant_Param = quant_Param;
-            amplitude_Param = amplitude_Param;
-            invert_Param = invert_Param;
+            resize(val.size());
         }
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].setIndexNormalized(getValueForPosition(val, i));
@@ -98,7 +89,7 @@ void oscillator::setup(){
     parameters->add(phasorIn.set("Phasor In", {0}, {0}, {1}));
     parameters->add(index_Param.set("Index", {0}, {0}, {1}));
     parameters->add(phaseOffset_Param.set("Phase Offset", {0}, {0}, {1}));
-    parameters->add(roundness_Param.set("Roundess", {0}, {0}, {1}));
+    parameters->add(roundness_Param.set("Roundess", {0.5}, {0}, {1}));
     parameters->add(pulseWidth_Param.set("Pulse Width", {.5}, {0}, {1}));
     parameters->add(skew_Param.set("Skew", {0}, {-1}, {1}));
     parameters->add(randomAdd_Param.set("Random Addition", {0}, {-.5}, {.5}));
@@ -115,7 +106,27 @@ void oscillator::setup(){
     listeners.push(phasorIn.newListener(this, &oscillator::phasorInListener));
 }
 
+void oscillator::resize(int newSize){
+    baseOsc.resize(newSize);
+    result.resize(newSize);
+    phaseOffset_Param = phaseOffset_Param;
+    roundness_Param = roundness_Param;
+    pulseWidth_Param = pulseWidth_Param;
+    skew_Param = skew_Param;
+    randomAdd_Param = randomAdd_Param;
+    scale_Param = scale_Param;
+    offset_Param = offset_Param;
+    pow_Param = pow_Param;
+    biPow_Param = biPow_Param;
+    quant_Param = quant_Param;
+    amplitude_Param = amplitude_Param;
+    invert_Param = invert_Param;
+};
+
 void oscillator::phasorInListener(vector<float> &phasor){
+    if(phasor.size() != baseOsc.size() && phasor.size() != 1 && index_Param->size() == 1){
+        resize(phasor.size());
+    }
     for(int i = 0; i < baseOsc.size(); i++){
         result[i] = baseOsc[i].computeFunc(getValueForPosition(phasor, i));
     }
