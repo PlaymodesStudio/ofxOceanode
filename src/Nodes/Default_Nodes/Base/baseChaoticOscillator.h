@@ -37,18 +37,25 @@ public:
     std::vector<float> customDiscreteDistribution;
     
     float computeFunc(float phasor);
+    void modulateNewRandom();
     
 private:
     void computePreInterp(float& value);
     void computeMultiplyMod(float& value);
     void customPow(float & value, float pow);
     
+    
     float oldPhasor;
     float indexNormalized;
     float pastRandom;
-    float newRandom;
     float oldRandom;
+    float newRandom;
     float futureRandom;
+    
+    float pastRandomNotModulated;
+    float oldRandomNotModulated;
+    float newRandomNotModulated;
+    float futureRandomNotModulated;
     
     int seed;
     std::mt19937 mt;

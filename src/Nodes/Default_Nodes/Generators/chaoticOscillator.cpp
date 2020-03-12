@@ -9,8 +9,8 @@
 
 void chaoticOscillator::setup(){
     color = ofColor(0, 200, 255);
-    oldSinglePhasor = 0;
-    seedChanged = false;
+    oldPhasor = vector<float>(1, 0);
+    seedChanged = vector<bool>(true);
     baseChOsc.resize(1);
     result.resize(1);
     listeners.push(phaseOffset_Param.newListener([this](vector<float> &val){
@@ -39,16 +39,19 @@ void chaoticOscillator::setup(){
     listeners.push(pow_Param.newListener([this](vector<float> &val){
         for(int i = 0; i < baseChOsc.size(); i++){
             baseChOsc[i].pow_Param = getValueForPosition(val, i);
+            baseChOsc[i].modulateNewRandom();
         }
     }));
     listeners.push(biPow_Param.newListener([this](vector<float> &val){
         for(int i = 0; i < baseChOsc.size(); i++){
             baseChOsc[i].biPow_Param = getValueForPosition(val, i);
+            baseChOsc[i].modulateNewRandom();
         }
     }));
     listeners.push(quant_Param.newListener([this](vector<int> &val){
         for(int i = 0; i < baseChOsc.size(); i++){
             baseChOsc[i].quant_Param = getValueForPosition(val, i);
+            baseChOsc[i].modulateNewRandom();
         }
     }));
     listeners.push(pulseWidth_Param.newListener([this](vector<float> &val){
@@ -90,7 +93,7 @@ void chaoticOscillator::setup(){
         }
     }));
     listeners.push(seed.newListener([this](vector<int> &val){
-        seedChanged = true;
+        seedChanged = vector<bool>(baseChOsc.size(), true);
     }));
     
     
@@ -105,7 +108,7 @@ void chaoticOscillator::setup(){
     parameters->add(biPow_Param.set("Bi Pow", {0}, {-1}, {1}));
     parameters->add(quant_Param.set("Quantization", {255}, {2}, {255}));
     parameters->add(customDiscreteDistribution_Param.set("Distribution Vec" , {-1}, {0}, {1}));
-    parameters->add(seed.set("Seed", {0}, {INT_MIN}, {INT_MAX}));
+    parameters->add(seed.set("Seed", {-1}, {INT_MIN}, {INT_MAX}));
     parameters->add(randomAdd_Param.set("Random Addition", {0}, {-.5}, {.5}));
     parameters->add(scale_Param.set("Scale", {1}, {0}, {2}));
     parameters->add(offset_Param.set("Offset", {0}, {-1}, {1}));
@@ -134,6 +137,7 @@ void chaoticOscillator::resize(int newSize){
     invert_Param = invert_Param;
     customDiscreteDistribution_Param = customDiscreteDistribution_Param;
     seed = seed;
+    seedChanged = vector<bool>(baseChOsc.size(), true);
 };
 
 void chaoticOscillator::phasorInListener(vector<float> &phasor){
@@ -143,18 +147,22 @@ void chaoticOscillator::phasorInListener(vector<float> &phasor){
     for(int i = 0; i < baseChOsc.size(); i++){
         result[i] = baseChOsc[i].computeFunc(getValueForPosition(phasor, i));
     }
-    if(phasor.size() == 1){
-        if(seedChanged && phasor[0] < oldSinglePhasor){
-            seedChanged = false;
-            for(int i = 0; i < baseChOsc.size(); i++){
+    if(accumulate(seedChanged.begin(), seedChanged.end(), 0) != 0){
+        for(int i = 0; i < baseChOsc.size(); i++){
+            if(seedChanged[i] && getValueForPosition(phasor, i) < getValueForPosition(oldPhasor, i)){
                 if(getValueForPosition(seed.get(), i) == 0){
                     baseChOsc[i].deactivateSeed();
                 }else{
-                    baseChOsc[i].setSeed(getValueForPosition(seed.get(), i));
+                    if(seed->size() == 1 && seed->at(0) < 0){
+                        baseChOsc[i].setSeed(seed->at(0) - (10*i));
+                    }else{
+                        baseChOsc[i].setSeed(getValueForPosition(seed.get(), i));
+                    }
                 }
+                seedChanged[i] = false;
             }
         }
-        oldSinglePhasor = phasor[0];
     }
+    oldPhasor = phasor;
     output = result;
 }

@@ -68,16 +68,19 @@ float baseChaoticOscillator::computeFunc(float phasor){
     float val = 0;
     if(linPhase < oldPhasor){
         pastRandom = oldRandom;
+        pastRandom = oldRandomNotModulated;
         oldRandom = newRandom;
+        oldRandomNotModulated = newRandomNotModulated;
         newRandom = futureRandom;
+        newRandomNotModulated = futureRandomNotModulated;
         if(customDiscreteDistribution.size() > 1){
             std::discrete_distribution<float> disdist(customDiscreteDistribution.begin(), customDiscreteDistribution.end());
             futureRandom = disdist(mt)/(customDiscreteDistribution.size()-1);
         }else{
             futureRandom = dist(mt);
         }
+        futureRandomNotModulated = futureRandom;
         computePreInterp(futureRandom);
-        
         
         val = oldRandom;
     }
@@ -161,3 +164,14 @@ void baseChaoticOscillator::customPow(float & value, float pow){
     value = value * (k2+1) / k3;
 }
 
+void baseChaoticOscillator::modulateNewRandom(){
+    pastRandom = pastRandomNotModulated;
+    computePreInterp(pastRandom);
+    oldRandom = oldRandomNotModulated;
+    computePreInterp(oldRandom);
+    newRandom = newRandomNotModulated;
+    computePreInterp(newRandom);
+    futureRandom = futureRandomNotModulated;
+    computePreInterp(futureRandom);
+    
+}

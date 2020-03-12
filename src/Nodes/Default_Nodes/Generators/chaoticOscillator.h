@@ -62,8 +62,8 @@ private:
     
     ofEventListeners listeners;
     
-    bool seedChanged;
-    float oldSinglePhasor;
+    vector<bool> seedChanged;
+    vector<float> oldPhasor;
 };
 
 #endif /* chaoticOscillator_h */
