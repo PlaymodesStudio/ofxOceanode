@@ -8,7 +8,7 @@
 #include "chaoticOscillator.h"
 
 void chaoticOscillator::setup(){
-    color = ofColor::cyan;
+    color = ofColor(0, 200, 255);
     oldSinglePhasor = 0;
     seedChanged = false;
     baseChOsc.resize(1);
@@ -109,7 +109,7 @@ void chaoticOscillator::setup(){
     parameters->add(phasorIn.set("Phasor In", {0}, {0}, {1}));
     parameters->add(index_Param.set("Index", {0}, {0}, {1}));
     parameters->add(phaseOffset_Param.set("Phase Offset", {0}, {0}, {1}));
-    parameters->add(roundness_Param.set("Roundess", {0}, {0}, {1}));
+    parameters->add(roundness_Param.set("Roundess", {0.5}, {0}, {1}));
     parameters->add(pulseWidth_Param.set("Pulse Width", {.5}, {0}, {1}));
     parameters->add(skew_Param.set("Skew", {0}, {-1}, {1}));
     parameters->add(pow_Param.set("Pow", {0}, {-1}, {1}));
