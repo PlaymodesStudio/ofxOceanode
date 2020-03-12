@@ -12,6 +12,7 @@ ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name)
     parameters = make_shared<ofParameterGroup>(_name);
     autoBPM = true;
     color = ofColor(ofRandom(255), ofRandom(255), ofRandom(255));
+    color.setBrightness(255);
     numIdentifier = -1;
     dropdownGroups.reserve(5);
 }
