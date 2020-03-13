@@ -38,6 +38,8 @@ public:
     ofxOceanodeContainer(std::shared_ptr<ofxOceanodeNodeRegistry> _registry = nullptr, std::shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry = nullptr);
     ~ofxOceanodeContainer();
     
+    void clearContainer();
+    
     void update(ofEventArgs &a);
     void draw(ofEventArgs &a);
     

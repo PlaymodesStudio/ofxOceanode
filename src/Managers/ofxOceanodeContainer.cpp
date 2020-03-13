@@ -52,6 +52,10 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
 }
 
 ofxOceanodeContainer::~ofxOceanodeContainer(){
+    clearContainer();
+}
+
+void ofxOceanodeContainer::clearContainer(){
     connections.clear();
     dynamicNodes.clear();
     persistentNodes.clear();
