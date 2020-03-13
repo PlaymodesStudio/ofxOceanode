@@ -22,6 +22,7 @@ public:
     
     void draw(ofEventArgs &e);
     void update(ofEventArgs &e);
+    void exit(ofEventArgs &e);
     
     void keyPressed(ofKeyEventArgs &e){};
     void mouseMoved(ofMouseEventArgs &a);
@@ -41,6 +42,19 @@ public:
     }
     
     void resizeButtons();
+    
+    ofRectangle getWindowRect(){
+        if(windowRect != ofRectangle(0,0,0,0))
+            return windowRect;
+        
+        return ofRectangle(controlsWindow->getWindowPosition(), controlsWindow->getWindowSize());
+        
+    };
+    void setWindowRect(ofRectangle rect){
+        controlsWindow->setWindowPosition(rect.x, rect.y);
+        controlsWindow->setWindowShape(rect.width, rect.height);
+    }
+    
 private:
     std::shared_ptr<ofAppBaseWindow> controlsWindow;
     std::shared_ptr<ofxOceanodeContainer> container;
@@ -49,6 +63,8 @@ private:
     
     vector<shared_ptr<ofxOceanodeBaseController>> controllers;
     vector<ofRectangle> controllersButtons;
+    
+    ofRectangle windowRect;
 };
 
 #endif

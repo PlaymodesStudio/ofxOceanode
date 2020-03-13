@@ -22,14 +22,8 @@
 ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _container) : container(_container){
     
     ofGLFWWindowSettings prevSettings;
-//    if(reindexWindowRect.getPosition() == glm::vec3(-1, -1, 0)){
-        prevSettings.setSize(500, ofGetScreenHeight());
-        prevSettings.setPosition(glm::vec2(0, 0));
-//    }
-//    else{
-//        prevSettings.setSize(reindexWindowRect.width, reindexWindowRect.height);
-//        prevSettings.setPosition(reindexWindowRect.position);
-//    }
+    prevSettings.setSize(500, ofGetScreenHeight());
+    prevSettings.setPosition(glm::vec2(0, 0));
     prevSettings.windowMode = OF_WINDOW;
     prevSettings.resizable = true;
     prevSettings.shareContextWith = ofGetCurrentWindow();
@@ -39,15 +33,13 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     controlsWindow->setVerticalSync(false);
     listeners.push(controlsWindow->events().draw.newListener(this, &ofxOceanodeControls::draw));
     listeners.push(controlsWindow->events().update.newListener(this, &ofxOceanodeControls::update));
+    listeners.push(controlsWindow->events().exit.newListener(this, &ofxOceanodeControls::exit));
     listeners.push(controlsWindow->events().keyPressed.newListener(this, &ofxOceanodeControls::keyPressed));
     listeners.push(controlsWindow->events().mouseMoved.newListener(this, &ofxOceanodeControls::mouseMoved));
     listeners.push(controlsWindow->events().mousePressed.newListener(this, &ofxOceanodeControls::mousePressed));
     listeners.push(controlsWindow->events().mouseReleased.newListener(this, &ofxOceanodeControls::mouseReleased));
     listeners.push(controlsWindow->events().mouseDragged.newListener(this, &ofxOceanodeControls::mouseDragged));
     listeners.push(controlsWindow->events().windowResized.newListener(this, &ofxOceanodeControls::windowResized));
-//    ofAppGLFWWindow * ofWindow = (ofAppGLFWWindow*)controlsWindow.get();
-//    GLFWwindow * glfwWindow = ofWindow->getGLFWWindow();
-    //        glfwSetWindowCloseCallback(glfwWindow, window_no_close_indexer);
     
     controllers.push_back(make_unique<ofxOceanodePresetsController>(container));
     controllers.push_back(make_unique<ofxOceanodeBPMController>(container));
@@ -65,6 +57,7 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     }
     
     resizeButtons();
+    windowRect = ofRectangle(0,0,0,0);
 }
 
 
@@ -81,6 +74,11 @@ void ofxOceanodeControls::update(ofEventArgs &e){
     for(auto &c : controllers){
         c->update();
     }
+}
+
+void ofxOceanodeControls::exit(ofEventArgs &e){
+    windowRect.setPosition(glm::vec3(controlsWindow->getWindowPosition(), 0));
+    windowRect.setSize(controlsWindow->getWidth(), controlsWindow->getHeight());
 }
 
 void ofxOceanodeControls::mouseMoved(ofMouseEventArgs &a){
