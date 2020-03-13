@@ -53,6 +53,8 @@ protected:
     ofEventListeners            windowListenerEvents;
     ofParameter<bool>           showWindow;
     ofParameter<bool>           fullscreenWindow;
+    
+    bool saveStateOnPreset;
 };
 
 #endif /* ofxOceanodeNodeModelExternalWindow_h */

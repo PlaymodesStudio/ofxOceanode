@@ -23,6 +23,7 @@ ofxOceanodeNodeModelExternalWindow::ofxOceanodeNodeModelExternalWindow(string na
     externalWindowRect.setPosition(-1, -1);
     externalWindow = nullptr;
     externalWindowMode = OF_WINDOW;
+    saveStateOnPreset = true;
 }
 
 ofxOceanodeNodeModelExternalWindow::~ofxOceanodeNodeModelExternalWindow(){
@@ -34,11 +35,13 @@ ofxOceanodeNodeModelExternalWindow::~ofxOceanodeNodeModelExternalWindow(){
 void ofxOceanodeNodeModelExternalWindow::setExternalWindowPosition(int px, int py)
 {
     if(externalWindow != nullptr) externalWindow->setWindowPosition(px,py);
+    else externalWindowRect.setPosition(px, py);
 }
 
 void ofxOceanodeNodeModelExternalWindow::setExternalWindowShape(int w, int h)
 {
     if(externalWindow != nullptr) externalWindow->setWindowShape(w,h);
+    else externalWindowRect.setSize(w, h);
 }
 void ofxOceanodeNodeModelExternalWindow::setExternalWindowFullScreen(bool b)
 {
@@ -109,14 +112,18 @@ void ofxOceanodeNodeModelExternalWindow::closeExternalWindow(ofEventArgs &e){
 }
 
 void ofxOceanodeNodeModelExternalWindow::presetSave(ofJson &json){
-    json["ExtWindowRect"] = {externalWindowRect.x, externalWindowRect.y, externalWindowRect.width, externalWindowRect.height};
-    json["ExtWindowMode"] = fullscreenWindow ? OF_FULLSCREEN : OF_WINDOW;
+    if(saveStateOnPreset){
+        json["ExtWindowRect"] = {externalWindowRect.x, externalWindowRect.y, externalWindowRect.width, externalWindowRect.height};
+        json["ExtWindowMode"] = fullscreenWindow ? OF_FULLSCREEN : OF_WINDOW;
+    }
 }
 
 void ofxOceanodeNodeModelExternalWindow::presetRecallBeforeSettingParameters(ofJson &json){
-    if(json.count("ExtWindowRect") == 1){
-        auto infoVec = json["ExtWindowRect"];
-        externalWindowRect = ofRectangle(infoVec[0], infoVec[1], infoVec[2], infoVec[3]);
+    if(saveStateOnPreset){
+        if(json.count("ExtWindowRect") == 1){
+            auto infoVec = json["ExtWindowRect"];
+            externalWindowRect = ofRectangle(infoVec[0], infoVec[1], infoVec[2], infoVec[3]);
+        }
     }
 }
 
