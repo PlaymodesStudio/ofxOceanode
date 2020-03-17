@@ -19,7 +19,7 @@ void indexer::setup() {
 }
 
 void indexer::update(ofEventArgs &e){
-    indexsOut = indexs;
+    //indexsOut = indexs;
 }
 
 void indexer::presetRecallBeforeSettingParameters(ofJson &json){
