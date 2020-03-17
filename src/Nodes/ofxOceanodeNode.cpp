@@ -452,14 +452,6 @@ void ofxOceanodeNode::setPhase(float phase){
 }
 
 void ofxOceanodeNode::resetPhase(){
-    if(getParameters()->contains("Seed")){
-        auto &seedp = getParameters()->get("Seed");
-        if(seedp.type() == typeid(ofParameter<int>).name()){
-            seedp.cast<int>() = seedp.cast<int>();
-        }else if(seedp.type() == typeid(ofParameter<vector<int>>).name()){
-            seedp.cast<vector<int>>() = seedp.cast<vector<int>>();
-        }
-    }
     if(getParameters()->contains("Reset Phase")){
         getParameters()->getVoid("Reset Phase").trigger();
     }else{

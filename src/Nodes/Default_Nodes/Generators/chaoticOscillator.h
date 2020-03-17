@@ -17,11 +17,18 @@ public:
     ~chaoticOscillator(){};
     void setup();
     
+    void presetRecallBeforeSettingParameters(ofJson &json);
+    
     void presetHasLoaded(){
         //        if(waveSelect_Param == 6 || waveSelect_Param == 7 || waveSelect_Param == 8){
         //            phasorIn = vector1;
         //            phasorIn = 0;
         //        }
+        seedChanged = vector<bool>(baseChOsc.size(), true);
+    }
+    
+    void resetPhase(){
+        seedChanged = vector<bool>(baseChOsc.size(), true);
     }
     
 private:
