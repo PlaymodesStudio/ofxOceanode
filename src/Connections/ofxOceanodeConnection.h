@@ -113,7 +113,7 @@ private:
             if(active)
                 sinkParameter = sourceParameter;
         });
-        //sinkParameter = sourceParameter;
+        sinkParameter = sourceParameter;
     }
     ofEventListener parameterEventListener;
     ofParameter<Tsource>& sourceParameter;
@@ -128,15 +128,10 @@ public:
         beforeConnectionValue = sinkParameter.get();
         parameterEventListener = sourceParameter.newListener([&](vector<_Tsource> &vf){
             if(active){
-                //            sinkParameter = vector<_Tsink>(1, f);
-                vector<_Tsink> vec(vf.size());
-                for(int i = 0; i < vf.size(); i ++){
-                    vec[i] = vf[i];
-                }
-                sinkParameter = vec;
+                sinkParameter = vector<_Tsink>(vf.begin(), vf.end());
             }
         });
-        //sinkParameter = vector<T>(1, sourceParameter);
+        sinkParameter = vector<_Tsink>(sourceParameter->begin(), sourceParameter->end());
     }
     ~ofxOceanodeConnection(){
         sinkParameter.set(beforeConnectionValue);
@@ -165,7 +160,7 @@ public:
             if(active)
                 sinkParameter = vector<_Tsink>(1, f);
         });
-        //sinkParameter = vector<T>(1, sourceParameter);
+        sinkParameter = vector<_Tsink>(1, sourceParameter);
     }
     ~ofxOceanodeConnection(){
         sinkParameter.set(beforeConnectionValue);
@@ -191,9 +186,9 @@ public:
                 }
             }
         });
-        //        if(sourceParameter.get().size() > 0){
-        //            sinkParameter = sourceParameter.get()[0];
-        //        }
+        if(sourceParameter->size() > 0){
+            sinkParameter = sourceParameter.get()[0];
+        }
     }
     ~ofxOceanodeConnection(){
         sinkParameter.set(beforeConnectionValue);
