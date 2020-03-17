@@ -21,19 +21,29 @@ baseChaoticOscillator::baseChaoticOscillator(){
     newRandom = dist(mt);
     oldRandom = dist(mt);
     futureRandom = dist(mt);
+    accumulateCycles = 0;
 }
 
 void baseChaoticOscillator::setSeed(int seed){
+    accumulateCycles = 0;
+    setSeedFlag = true;
     mt.seed(seed);
+    oldPhasor = -1;
 }
 
 void baseChaoticOscillator::deactivateSeed(){
     std::random_device rd;
+    setSeedFlag = true;
     mt.seed(rd());
 }
 
 float baseChaoticOscillator::computeFunc(float phasor){
-    float linPhase = phasor + indexNormalized + phaseOffset_Param;
+//    if(setSeedFlag){
+//        phasor = 0;
+//        setSeedFlag = false;
+//    }
+    
+    float linPhase = phasor + (indexNormalized*length_Param) + phaseOffset_Param;
     linPhase = fmod(linPhase, 1);
     
     if(pulseWidth_Param < 0.5){
@@ -73,23 +83,30 @@ float baseChaoticOscillator::computeFunc(float phasor){
         oldRandomNotModulated = newRandomNotModulated;
         newRandom = futureRandom;
         newRandomNotModulated = futureRandomNotModulated;
-        if(customDiscreteDistribution.size() > 1){
-            std::discrete_distribution<float> disdist(customDiscreteDistribution.begin(), customDiscreteDistribution.end());
-            futureRandom = disdist(mt)/(customDiscreteDistribution.size()-1);
+        float indexPosShifted = (1-fmod(indexNormalized+phaseOffset_Param, 1))*length_Param;
+        if(indexPosShifted == floor(indexPosShifted)) indexPosShifted-=1;
+        if(accumulateCycles >= floor(indexPosShifted)){
+            if(customDiscreteDistribution.size() > 1){
+                std::discrete_distribution<float> disdist(customDiscreteDistribution.begin(), customDiscreteDistribution.end());
+                futureRandom = disdist(mt)/(customDiscreteDistribution.size()-1);
+            }else{
+                futureRandom = dist(mt);
+            }
+            futureRandomNotModulated = futureRandom;
+            computePreInterp(futureRandom);
         }else{
-            futureRandom = dist(mt);
+            accumulateCycles++;
         }
-        futureRandomNotModulated = futureRandom;
-        computePreInterp(futureRandom);
-        
-        val = oldRandom;
+    }
+    //rand2
+    float lin_interp = oldRandom*(1-linPhase) + newRandom*linPhase;
+    
+    //rand3
+    float x = linPhase;
+    if(roundness_Param == 1){
+        val = linPhase > 0.5 ? newRandom : oldRandom;
     }
     else{
-        //rand2
-        float lin_interp = oldRandom*(1-linPhase) + newRandom*linPhase;
-        
-        //rand3
-        float x = linPhase;
         if(roundness_Param > 0.5){
             x = (x*2) - 1;
             customPow(x, (roundness_Param-0.5) * 2);

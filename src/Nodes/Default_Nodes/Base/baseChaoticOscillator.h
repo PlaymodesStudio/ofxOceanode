@@ -33,6 +33,7 @@ public:
     float  invert_Param;
     float  skew_Param;
     float  roundness_Param;
+    int    length_Param;
     
     std::vector<float> customDiscreteDistribution;
     
@@ -44,6 +45,7 @@ private:
     void computeMultiplyMod(float& value);
     void customPow(float & value, float pow);
     
+    int accumulateCycles;
     
     float oldPhasor;
     float indexNormalized;
@@ -60,6 +62,8 @@ private:
     int seed;
     std::mt19937 mt;
     std::uniform_real_distribution<float> dist;
+    
+    bool setSeedFlag;
 };
 
 #endif /* baseChaoticOscillator_h */

@@ -86,6 +86,7 @@ void chaoticOscillator::setup(){
         for(int i = 0; i < baseChOsc.size(); i++){
             baseChOsc[i].setIndexNormalized(getValueForPosition(val, i));
         }
+        seedChanged = vector<bool>(baseChOsc.size(), true);
     }));
     listeners.push(customDiscreteDistribution_Param.newListener([this](vector<float> &val){
         for(int i = 0; i < baseChOsc.size(); i++){
@@ -95,11 +96,18 @@ void chaoticOscillator::setup(){
     listeners.push(seed.newListener([this](vector<int> &val){
         seedChanged = vector<bool>(baseChOsc.size(), true);
     }));
+    listeners.push(length_Param.newListener([this](vector<float> &val){
+        for(int i = 0; i < baseChOsc.size(); i++){
+            baseChOsc[i].length_Param = getValueForPosition(val, i);
+        }
+        seedChanged = vector<bool>(baseChOsc.size(), true);
+    }));
     
     
     
     parameters->add(phasorIn.set("Phasor In", {0}, {0}, {1}));
     parameters->add(index_Param.set("Index", {0}, {0}, {1}));
+    parameters->add(length_Param.set("Length", {1}, {0}, {100}));
     parameters->add(phaseOffset_Param.set("Phase Offset", {0}, {0}, {1}));
     parameters->add(roundness_Param.set("Roundess", {0.5}, {0}, {1}));
     parameters->add(pulseWidth_Param.set("Pulse Width", {.5}, {0}, {1}));
@@ -118,6 +126,7 @@ void chaoticOscillator::setup(){
     addOutputParameterToGroupAndInfo(output.set("Output", {0}, {0}, {1}));
     
     listeners.push(phasorIn.newListener(this, &chaoticOscillator::phasorInListener));
+    desiredLength = 1;
 }
 
 void chaoticOscillator::resize(int newSize){
@@ -138,14 +147,34 @@ void chaoticOscillator::resize(int newSize){
     customDiscreteDistribution_Param = customDiscreteDistribution_Param;
     seed = seed;
     seedChanged = vector<bool>(baseChOsc.size(), true);
+    
+    length_Param.setMax({static_cast<float>(newSize)});
+    string name = length_Param.getName();
+    parameterChangedMinMax.notify(name);
+    if(length_Param->size() == 1){
+        if(desiredLength != -1 && desiredLength <= newSize){
+            length_Param = vector<float>(1, desiredLength);
+            desiredLength = -1;
+        }
+        else{
+            if(length_Param->at(0) > length_Param.getMax()[0]){
+                desiredLength = length_Param->at(0);
+                length_Param =  vector<float>(1, length_Param.getMax()[0]);
+            }
+            length_Param = length_Param;
+        }
+    }
 };
+
+void chaoticOscillator::presetRecallBeforeSettingParameters(ofJson &json){
+    if(json.count("Length") == 1){
+        desiredLength = (json["Length"]);
+    }
+}
 
 void chaoticOscillator::phasorInListener(vector<float> &phasor){
     if(phasor.size() != baseChOsc.size() && phasor.size() != 1 && index_Param->size() == 1){
         resize(phasor.size());
-    }
-    for(int i = 0; i < baseChOsc.size(); i++){
-        result[i] = baseChOsc[i].computeFunc(getValueForPosition(phasor, i));
     }
     if(accumulate(seedChanged.begin(), seedChanged.end(), 0) != 0){
         for(int i = 0; i < baseChOsc.size(); i++){
@@ -154,14 +183,18 @@ void chaoticOscillator::phasorInListener(vector<float> &phasor){
                     baseChOsc[i].deactivateSeed();
                 }else{
                     if(seed->size() == 1 && seed->at(0) < 0){
-                        baseChOsc[i].setSeed(seed->at(0) - (10*i));
+                        baseChOsc[i].setSeed(seed->at(0) - (10*getValueForPosition(index_Param.get(), i)*baseChOsc.size()));
                     }else{
                         baseChOsc[i].setSeed(getValueForPosition(seed.get(), i));
+                        baseChOsc[i].computeFunc(0);
                     }
                 }
                 seedChanged[i] = false;
             }
         }
+    }
+    for(int i = 0; i < baseChOsc.size(); i++){
+        result[i] = baseChOsc[i].computeFunc(getValueForPosition(phasor, i));
     }
     oldPhasor = phasor;
     output = result;

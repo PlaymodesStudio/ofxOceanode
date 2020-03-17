@@ -49,6 +49,7 @@ private:
     
     ofParameter<vector<float>>  phasorIn;
     ofParameter<vector<float>>  index_Param;
+    ofParameter<vector<float>>  length_Param;
     ofParameter<vector<float>>  pow_Param;
     ofParameter<vector<float>>  pulseWidth_Param;
     ofParameter<vector<float>>  phaseOffset_Param;
@@ -71,6 +72,7 @@ private:
     
     vector<bool> seedChanged;
     vector<float> oldPhasor;
+    float desiredLength;
 };
 
 #endif /* chaoticOscillator_h */
