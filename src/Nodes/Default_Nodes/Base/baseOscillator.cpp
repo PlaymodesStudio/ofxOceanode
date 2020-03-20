@@ -23,12 +23,13 @@ float baseOscillator::computeFunc(float phasor){
         linPhase = ofMap(linPhase, 0.5-pulseWidth_Param, 0.5+pulseWidth_Param, 0, 1, true);
         if(skew_Param < 0 && linPhase == 1) linPhase = 0;
     }else if (pulseWidth_Param == 1){
-        linPhase = 0.5;
+        linPhase = ofMap(skew_Param, -1, 1, 1, 0);
     }else{
-        if(linPhase < 0.5){
-            linPhase = ofMap(linPhase, 0, 1-pulseWidth_Param, 0, 0.5, true);
+        float midpoint = ofMap(skew_Param, -1, 1, 1, 0);
+        if(linPhase < midpoint){
+            linPhase = ofMap(linPhase, 0, ofMap(1-pulseWidth_Param, 0, 0.5, 0, midpoint), 0, midpoint, true);
         }else{
-            linPhase = ofMap(linPhase, pulseWidth_Param, 1, 0.5, 1, true);
+            linPhase = ofMap(linPhase, ofMap(pulseWidth_Param, 0.5, 1, midpoint, 1), 1, midpoint, 1, true);
         }
     }
     
@@ -82,7 +83,8 @@ void baseOscillator::computeMultiplyMod(float &value){
     if(randomAdd_Param)
         value += randomAdd_Param*ofRandom(1);
     
-    value = ofClamp(value, 0.0, 1.0);
+    //value = ofClamp(value, 0.0, 1.0);
+    value = value + ((value < 0) * (0 - value)) + ((value > 1) * (1 - value));
     
     //SCALE
     value *= scale_Param;
@@ -90,7 +92,8 @@ void baseOscillator::computeMultiplyMod(float &value){
     //OFFSET
     value += offset_Param;
     
-    value = ofClamp(value, 0.0, 1.0);
+//    value = ofClamp(value, 0.0, 1.0);
+    value = value + ((value < 0) * (0 - value)) + ((value > 1) * (1 - value));
     
     //pow
     if(pow_Param != 0)
@@ -103,14 +106,16 @@ void baseOscillator::computeMultiplyMod(float &value){
         value = (value+1) * 0.5;
     }
     
-    value = ofClamp(value, 0.0, 1.0);
+//    value = ofClamp(value, 0.0, 1.0);
+    value = value + ((value < 0) * (0 - value)) + ((value > 1) * (1 - value));
     
     //Quantization
     if(quant_Param < 255){
         value = (1.0/((float)quant_Param-1))*float(floor(value*quant_Param));
     }
     
-    value = ofClamp(value, 0.0, 1.0);
+//    value = ofClamp(value, 0.0, 1.0);
+    value = value + ((value < 0) * (0 - value)) + ((value > 1) * (1 - value));
     
     value *= amplitude_Param;
     
