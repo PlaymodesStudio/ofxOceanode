@@ -14,7 +14,7 @@
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node, shared_ptr<ofAppBaseWindow> window) : container(_container), node(_node){
     color = node.getColor();
-    color.setBrightness(255);
+    //color.setBrightness(255);
     guiRect = ofRectangle(10, 10, 10, 10);
     guiToBeDestroyed = false;
     lastExpandedState = true;
