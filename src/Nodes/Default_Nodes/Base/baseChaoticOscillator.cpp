@@ -17,10 +17,14 @@ baseChaoticOscillator::baseChaoticOscillator(){
     std::random_device rd;
     mt.seed(rd());
     dist = std::uniform_real_distribution<float>(0.0, 1.0);
-    pastRandom = dist(mt);
-    newRandom = dist(mt);
-    oldRandom = dist(mt);
-    futureRandom = dist(mt);
+    pastRandom = pastRandomNotModulated = dist(mt);
+    newRandom = newRandomNotModulated = dist(mt);
+    oldRandom = oldRandomNotModulated = dist(mt);
+    futureRandom = futureRandomNotModulated = dist(mt);
+    computePreInterp(pastRandom);
+    computePreInterp(newRandom);
+    computePreInterp(oldRandom);
+    computePreInterp(futureRandom);
     accumulateCycles = 0;
 }
 
