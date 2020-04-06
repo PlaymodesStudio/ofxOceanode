@@ -113,6 +113,28 @@
 				<key>sourceTree</key>
 				<string>SOURCE_ROOT</string>
 			</dict>
+			<key>E64DD1D947FCCB2B831A6CB3</key>
+			<dict>
+				<key>fileRef</key>
+				<string>0334494806A37226C334EF23</string>
+				<key>isa</key>
+				<string>PBXBuildFile</string>
+			</dict>
+			<key>0334494806A37226C334EF23</key>
+			<dict>
+				<key>explicitFileType</key>
+				<string>file</string>
+				<key>fileEncoding</key>
+				<string>4</string>
+				<key>isa</key>
+				<string>PBXFileReference</string>
+				<key>name</key>
+				<string>ofxOceanodeNodeGui.cpp.orig</string>
+				<key>path</key>
+				<string>../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeGui.cpp.orig</string>
+				<key>sourceTree</key>
+				<string>SOURCE_ROOT</string>
+			</dict>
 			<key>8EB5677652296BACF3A1C184</key>
 			<dict>
 				<key>fileRef</key>
@@ -875,6 +897,7 @@
 					<string>63A44DC38599839305F1F4D3</string>
 					<string>7839463FADC4E27D1C66C5FB</string>
 					<string>170083BFE7EEC5851D5DF9E6</string>
+					<string>0334494806A37226C334EF23</string>
 					<string>D11A82FE9732DAF8F599F2AB</string>
 					<string>E8523C6791FA3F1C905C1169</string>
 					<string>D7849081CFCC6C8594FF3B8E</string>
@@ -1363,43 +1386,6 @@
 				<key>sourceTree</key>
 				<string>SOURCE_ROOT</string>
 			</dict>
-			<key>542B8A9AF130D0C5A3086539</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.c.h</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeConnectionGraphics.h</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnectionGraphics.h</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
-			<key>C1EEF98E795AFB7BB33F94B1</key>
-			<dict>
-				<key>fileRef</key>
-				<string>76AFF92A62D8AF4E498DB5C3</string>
-				<key>isa</key>
-				<string>PBXBuildFile</string>
-			</dict>
-			<key>76AFF92A62D8AF4E498DB5C3</key>
-			<dict>
-				<key>explicitFileType</key>
-				<string>sourcecode.cpp.cpp</string>
-				<key>fileEncoding</key>
-				<string>4</string>
-				<key>isa</key>
-				<string>PBXFileReference</string>
-				<key>name</key>
-				<string>ofxOceanodeConnectionGraphics.cpp</string>
-				<key>path</key>
-				<string>../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnectionGraphics.cpp</string>
-				<key>sourceTree</key>
-				<string>SOURCE_ROOT</string>
-			</dict>
 			<key>656EE12F1A05CB4841731C77</key>
 			<dict>
 				<key>explicitFileType</key>
@@ -1421,8 +1407,6 @@
 				<array>
 					<string>7C9B84BA3AF325F3D843633B</string>
 					<string>656EE12F1A05CB4841731C77</string>
-					<string>76AFF92A62D8AF4E498DB5C3</string>
-					<string>542B8A9AF130D0C5A3086539</string>
 				</array>
 				<key>isa</key>
 				<string>PBXGroup</string>
@@ -5819,7 +5803,6 @@ fi
 					<string>A0F2BFB15B92B4C6EB9527DE</string>
 					<string>A6F396BE5D1E24326E1F796A</string>
 					<string>C6A203560BFBDA04C5746210</string>
-					<string>C1EEF98E795AFB7BB33F94B1</string>
 					<string>717BCDD6091D90F262DC7860</string>
 					<string>7B5743F2E77F2D5AD9B436F0</string>
 					<string>7B8EE5B7F57088CD23B7934D</string>
@@ -5849,6 +5832,7 @@ fi
 					<string>19D87B8D9CBC3A637A3FCFE0</string>
 					<string>4C8024D8DD46223D43C514C0</string>
 					<string>8EB5677652296BACF3A1C184</string>
+					<string>E64DD1D947FCCB2B831A6CB3</string>
 					<string>63D9CD2C30CFEDD839A4552E</string>
 					<string>4F63EFF3BAACF2B19051E336</string>
 				</array>
