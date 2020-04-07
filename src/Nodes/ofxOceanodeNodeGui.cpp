@@ -10,7 +10,7 @@
 #include "ofxOceanodeNodeGui.h"
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeContainer.h"
-#include "ofxImGui.h"
+#include "ofxImGuiSimple.h"
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node, shared_ptr<ofAppBaseWindow> window) : container(_container), node(_node){
     color = node.getColor();
@@ -67,7 +67,16 @@ bool ofxOceanodeNodeGui::constructGui(){
         ImGui::Text("%s", ("Are you sure you want to delete.\n " + moduleName + "\n").c_str());
         ImGui::Separator();
         
-        if (ImGui::Button("OK", ImVec2(120,0)) || ofGetKeyPressed(OF_KEY_RETURN)) {
+        if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
+            int index = 0;
+            for(auto &key : ImGui::GetIO().KeysDown){
+                if(key){
+                    ofLog() << index;
+                }
+                index++;
+            }
+            ofLog() << "ImguiEnter = " << ImGuiKey_Enter;
+            ofLog() << "OF_KEY_RETURN = " << OF_KEY_RETURN;
             ImGui::CloseCurrentPopup();
             deleteModule = true;
         }

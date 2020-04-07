@@ -12,7 +12,6 @@
 #ifndef OFXOCEANODE_HEADLESS
 
 #include "ofMain.h"
-#include "ofxImGui.h"
 
 class ofxOceanodeContainer;
 class ofxOceanodeNodeGui;
@@ -25,8 +24,8 @@ public:
     
     
     void setup(std::shared_ptr<ofAppBaseWindow> window = ofGetCurrentWindow());
-    void update(ofEventArgs &args){};
-    void draw(ofEventArgs &args);
+    void update(){};
+    void draw();
     
     void keyPressed(ofKeyEventArgs &e);
     void keyReleased(ofKeyEventArgs &e){};
@@ -71,7 +70,6 @@ private:
     string searchField = "";
     int numTimesPopup = 0;
     
-    ofxImGui::Gui gui;
     bool inited = false;
     glm::vec2 scrolling = glm::vec2(0.0f, 0.0f);
     bool show_grid = true;

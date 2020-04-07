@@ -14,9 +14,11 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 
+#include "imgui.h"
+
 void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){    
-    listeners.push(window->events().update.newListener(this, &ofxOceanodeCanvas::update));
-    listeners.push(window->events().draw.newListener(this, &ofxOceanodeCanvas::draw));
+//    listeners.push(window->events().update.newListener(this, &ofxOceanodeCanvas::update));
+//    listeners.push(window->events().draw.newListener(this, &ofxOceanodeCanvas::draw));
     
     listeners.push(window->events().mouseDragged.newListener(this,&ofxOceanodeCanvas::mouseDragged));
     listeners.push(window->events().mouseMoved.newListener(this,&ofxOceanodeCanvas::mouseMoved));
@@ -53,12 +55,10 @@ void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){
     dragModulesInitialPoint = glm::vec2(NAN, NAN);
     selecting = false;
     
-    gui.setup(nullptr, false);
-    
     uniqueID = "Canvas";
 }
 
-void ofxOceanodeCanvas::draw(ofEventArgs &args){
+void ofxOceanodeCanvas::draw(){
     if(selecting){
         ofPushStyle();
         ofSetColor(255, 255, 255, 40);
@@ -76,7 +76,7 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
     }
     
     //Draw Guis
-    gui.begin();
+//    gui.begin();
     
     // Draw a list of nodes on the left side
     bool open_context_menu = false;
@@ -209,10 +209,9 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
             draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
             draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(100, 100, 100, 255), 4.0f);
             
-            if (ImGui::IsItemHovered() && ImGui::IsMouseDown(0) && ofGetKeyPressed(OF_KEY_COMMAND) /*&& ImGui::IsKeyDown(OF_KEY_ALT)*/ && !isNodeDuplicated){
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDown(0) && ImGui::GetIO().KeySuper /*&& ImGui::IsKeyDown(OF_KEY_ALT)*/ && !isNodeDuplicated){
                 node->duplicate();
-                //Change focus to new duplicated node
-                
+                //TODO: Change focus to new duplicated node
                 isNodeDuplicated = true;
             }
             
@@ -291,7 +290,7 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
         
         numTimesPopup++;
         
-        bool isEnterPressed = ofGetKeyPressed(OF_KEY_RETURN); //Select first option if enter is pressed
+        bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
         for(int i = 0; i < categoriesVector.size(); i++){
             if(numTimesPopup == 1){
                 ImGui::SetNextTreeNodeOpen(false);
@@ -346,11 +345,11 @@ void ofxOceanodeCanvas::draw(ofEventArgs &args){
     
     ImGui::End();
     
-    gui.end();
+//    gui.end();
     
     ofPushMatrix();
     ofMultMatrix(glm::inverse(transformationMatrix->get()));
-    gui.draw();
+//    gui.draw();
     ofPopMatrix();
 }
 

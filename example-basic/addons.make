@@ -1,3 +1,3 @@
 ofxDatGui_PM
-ofxImGui
+ofxImGuiSimple
 ofxOceanode

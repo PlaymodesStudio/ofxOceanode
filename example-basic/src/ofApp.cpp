@@ -6,17 +6,10 @@ void ofApp::setup(){
     ofSetVerticalSync(false);
     //ofSetFrameRate(120);
     
-    auto reg = make_shared<ofxOceanodeNodeRegistry>();
-    auto treg = make_shared<ofxOceanodeTypesRegistry>();
-    reg->registerModel<testNode>("Custom Nodes");
-    treg->registerType<customClass*>();
+    oceanode.registerModel<testNode>("Custom Nodes");
+    oceanode.registerType<customClass*>();
+    oceanode.setup();
     
-    
-    container = make_shared<ofxOceanodeContainer>(reg, treg);
-    canvas.setContainer(container);
-    canvas.setup();
-    
-    controls = make_unique<ofxOceanodeControls>(container);
 }
 
 //--------------------------------------------------------------
@@ -26,7 +19,8 @@ void ofApp::update(){
 
 //--------------------------------------------------------------
 void ofApp::draw(){
-    ofDrawBitmapString(ofToString(ofGetFrameRate()), glm::vec2(0,10));
+    oceanode.draw();
+//    ofDrawBitmapString(ofToString(ofGetFrameRate()), glm::vec2(0,10));
 }
 
 //--------------------------------------------------------------
