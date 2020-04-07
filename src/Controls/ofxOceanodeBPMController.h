@@ -9,7 +9,6 @@
 #define ofxOceanodeBPMController_h
 
 #include "ofxOceanodeBaseController.h"
-#include "ofxDatGui.h"
 
 #ifdef OFXOCEANODE_USE_BPM_DETECTION
     #include "ofxAubio.h"
@@ -19,18 +18,20 @@ class ofxOceanodeBPMController: public ofxOceanodeBaseController{
 public:
     ofxOceanodeBPMController(shared_ptr<ofxOceanodeContainer> _container);
     ~ofxOceanodeBPMController(){};
+    
+    void draw();
 
-    void onGuiDropdownEvent(ofxDatGuiDropdownEvent e);
-    void onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e);
-    void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);
-    void onButtonPress(ofxDatGuiButtonEvent e);
+//    void onGuiDropdownEvent(ofxDatGuiDropdownEvent e);
+//    void onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e);
+//    void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);
+//    void onButtonPress(ofxDatGuiButtonEvent e);
     
     void setBPM(float _bpm){bpm = _bpm; oldBpm = bpm;};
     
     void audioIn(ofSoundBuffer &input);
 private:
     
-    ofParameter<float> bpm;
+    float bpm;
     float oldBpm;
     ofEventListener bpmListener;
     

@@ -33,19 +33,21 @@ public:
         canvas.setContainer(container);
         canvas.setup();
         
-//        controls = make_unique<ofxOceanodeControls>(container);
+        controls = make_unique<ofxOceanodeControls>(container);
         
         gui.setup(nullptr);
     };
     
     void update(){
-        
+        container->update();
     };
     
     void draw(){
         gui.begin();
         bool showDocker = true;
         ShowExampleAppDockSpace(&showDocker);
+        container->draw();
+        controls->draw();
         canvas.draw();
         gui.end();
         gui.draw();

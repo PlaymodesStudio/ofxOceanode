@@ -40,8 +40,9 @@ public:
     
     void clearContainer();
     
-    void update(ofEventArgs &a);
-    void draw(ofEventArgs &a);
+    void update();
+    void draw();
+    
     
     ofxOceanodeNode* createNodeFromName(string name, int identifier = -1, bool isPersistent = false);
     ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier = -1, bool isPersistent = false);

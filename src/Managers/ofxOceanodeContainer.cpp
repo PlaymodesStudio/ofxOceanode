@@ -28,8 +28,8 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     bpm = 120;
     phase = 0;
     autoUpdateAndDraw = true;
-    updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
-    drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
+//    updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
+//    drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
     
 #ifdef OFXOCEANODE_USE_MIDI
     ofxMidiIn* midiIn = new ofxMidiIn();
@@ -60,7 +60,8 @@ void ofxOceanodeContainer::clearContainer(){
     persistentNodes.clear();
 }
 
-void ofxOceanodeContainer::update(ofEventArgs &args){
+void ofxOceanodeContainer::update(){
+    ofEventArgs args;
 #ifdef OFXOCEANODE_USE_OSC
     receiveOsc();
 #endif
@@ -91,7 +92,8 @@ void ofxOceanodeContainer::update(ofEventArgs &args){
     }
 }
 
-void ofxOceanodeContainer::draw(ofEventArgs &args){
+void ofxOceanodeContainer::draw(){
+    ofEventArgs args;
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             if(node.second->getActive())
@@ -1332,8 +1334,8 @@ bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 positi
 void ofxOceanodeContainer::setWindow(std::shared_ptr<ofAppBaseWindow> _window){
     window = _window;
     if(window != nullptr && autoUpdateAndDraw){
-        updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
-        drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
+//        updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
+//        drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
     }
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
@@ -1346,11 +1348,11 @@ void ofxOceanodeContainer::setWindow(std::shared_ptr<ofAppBaseWindow> _window){
 void ofxOceanodeContainer::setAutoUpdateAndDraw(bool b){
     autoUpdateAndDraw = b;
     if(b){
-        updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
-        drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
+//        updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
+//        drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
     }else{
-        updateListener.unsubscribe();
-        drawListener.unsubscribe();
+//        updateListener.unsubscribe();
+//        drawListener.unsubscribe();
     }
 }
 

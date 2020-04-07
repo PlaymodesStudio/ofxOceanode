@@ -56,24 +56,26 @@ void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){
     selecting = false;
     
     uniqueID = "Canvas";
+    
+    scrolling = glm::vec2(0,0);
 }
 
 void ofxOceanodeCanvas::draw(){
-    if(selecting){
-        ofPushStyle();
-        ofSetColor(255, 255, 255, 40);
-        ofDrawRectangle(ofRectangle(canvasToScreen(selectInitialPoint), canvasToScreen(selectEndPoint)));
-        ofPopStyle();
-    }
-    else if(selectedRect != ofRectangle(0,0,0,0)){
-        ofPushStyle();
-        if(entireSelect)
-            ofSetColor(255, 80, 0, 40);
-        else
-            ofSetColor(0, 80, 255, 40);
-        ofDrawRectangle(ofRectangle(canvasToScreen(selectedRect.getTopLeft()), canvasToScreen(selectedRect.getBottomRight())));
-        ofPopStyle();
-    }
+//    if(selecting){
+//        ofPushStyle();
+//        ofSetColor(255, 255, 255, 40);
+//        ofDrawRectangle(ofRectangle(canvasToScreen(selectInitialPoint), canvasToScreen(selectEndPoint)));
+//        ofPopStyle();
+//    }
+//    else if(selectedRect != ofRectangle(0,0,0,0)){
+//        ofPushStyle();
+//        if(entireSelect)
+//            ofSetColor(255, 80, 0, 40);
+//        else
+//            ofSetColor(0, 80, 255, 40);
+//        ofDrawRectangle(ofRectangle(canvasToScreen(selectedRect.getTopLeft()), canvasToScreen(selectedRect.getBottomRight())));
+//        ofPopStyle();
+//    }
     
     //Draw Guis
 //    gui.begin();
@@ -117,7 +119,7 @@ void ofxOceanodeCanvas::draw(){
     ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove);
     ImGui::PushItemWidth(120.0f);
     
-    ImVec2 offset = /*ImGui::GetCursorScreenPos()*/ + scrolling;
+    ImVec2 offset = ImGui::GetCursorScreenPos() + scrolling;
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     // Display grid
     if (show_grid)
@@ -171,7 +173,6 @@ void ofxOceanodeCanvas::draw(){
         ImGui::PushID(nodeId.c_str());
         
         glm::vec2 node_rect_min = offset + node->getPosition();
-        
         // Display node contents first
         draw_list->ChannelsSetCurrent(1); // Foreground
         bool old_any_active = ImGui::IsAnyItemActive();
@@ -273,7 +274,7 @@ void ofxOceanodeCanvas::draw(){
         numTimesPopup = 0;
     }
     
-    // Draw context menu
+    // Draw New Node menu
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
     if (ImGui::BeginPopup("New Node"))
     {
@@ -317,7 +318,7 @@ void ofxOceanodeCanvas::draw(){
                             {
                                 auto &node = container->createNode(std::move(type));
                                 
-                                node.getNodeGui().setPosition(newNodeClickPos - scrolling);
+                                node.getNodeGui().setPosition(newNodeClickPos - offset);
                             }
                             ImGui::CloseCurrentPopup();
                             isEnterPressed = false; //Next options we dont want to create them;

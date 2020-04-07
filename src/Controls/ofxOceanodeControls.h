@@ -20,16 +20,8 @@ public:
     ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _container);
     ~ofxOceanodeControls(){};
     
-    void draw(ofEventArgs &e);
-    void update(ofEventArgs &e);
-    void exit(ofEventArgs &e);
-    
-    void keyPressed(ofKeyEventArgs &e){};
-    void mouseMoved(ofMouseEventArgs &a);
-    void mousePressed(ofMouseEventArgs &a);
-    void mouseReleased(ofMouseEventArgs &a);
-    void mouseDragged(ofMouseEventArgs &a);
-    void windowResized(ofResizeEventArgs &a);
+    void draw();
+    void update();
     
     template<class T>
     shared_ptr<T> get(){
@@ -41,30 +33,12 @@ public:
         return nullptr;
     }
     
-    void resizeButtons();
-    
-    ofRectangle getWindowRect(){
-        if(windowRect != ofRectangle(0,0,0,0))
-            return windowRect;
-        
-        return ofRectangle(controlsWindow->getWindowPosition(), controlsWindow->getWindowSize());
-        
-    };
-    void setWindowRect(ofRectangle rect){
-        controlsWindow->setWindowPosition(rect.x, rect.y);
-        controlsWindow->setWindowShape(rect.width, rect.height);
-    }
-    
 private:
-    std::shared_ptr<ofAppBaseWindow> controlsWindow;
     std::shared_ptr<ofxOceanodeContainer> container;
     
     ofEventListeners listeners;
     
     vector<shared_ptr<ofxOceanodeBaseController>> controllers;
-    vector<ofRectangle> controllersButtons;
-    
-    ofRectangle windowRect;
 };
 
 #endif

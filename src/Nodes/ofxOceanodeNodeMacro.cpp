@@ -7,7 +7,7 @@
 
 #include "ofxOceanodeNodeMacro.h"
 
-ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModelExternalWindow("Macro"){
+ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
 #ifndef OFXOCEANODE_HEADLESS
     canvas = nullptr;
 #endif
@@ -16,7 +16,7 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModelExternalWindo
 }
 
 void ofxOceanodeNodeMacro::update(ofEventArgs &a){
-    container->update(a);
+    container->update();
 //    auto currentBankLocale = std::filesystem::last_write_time(ofToDataPath("MacroPresets/"));
 //    auto currentPresetInBankLocale = std::filesystem::last_write_time(ofToDataPath("MacroPresets/" + bankNames[bank] + "/"));
 //    if(currentBankLocale != bankLastChanged){
@@ -103,7 +103,8 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 }
 
 void ofxOceanodeNodeMacro::draw(ofEventArgs &a){
-    container->draw(a);
+    canvas->draw();
+    container->draw();
 }
 
 void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
@@ -256,23 +257,13 @@ void ofxOceanodeNodeMacro::setup(){
     
     ofParameter<char> separate;
     parameters->add(separate.set("=========================", 'c'));
-}
-
-#ifndef OFXOCEANODE_HEADLESS
-void ofxOceanodeNodeMacro::setupForExternalWindow(){
-    container->setWindow(externalWindow);
+    
+    
     canvas = new ofxOceanodeCanvas;
     canvas->setContainer(container);
-    canvas->setup(externalWindow);
+    canvas->setup();
     canvas->setUniqueID("Macro " + ofToString(getNumIdentifier()));
 }
-
-void ofxOceanodeNodeMacro::closeExternalWindow(ofEventArgs &e){
-    ofxOceanodeNodeModelExternalWindow::closeExternalWindow(e);
-    delete canvas;
-    canvas = nullptr;
-}
-#endif
 
 void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
     bool inletOutletCreated = true;

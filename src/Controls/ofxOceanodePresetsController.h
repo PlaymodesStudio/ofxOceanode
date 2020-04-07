@@ -9,7 +9,6 @@
 #define ofxOceanodePresetsController_h
 
 #include "ofxOceanodeBaseController.h"
-#include "ofxDatGui.h"
 
 class ofxOceanodePresetsController: public ofxOceanodeBaseController{
 public:
@@ -21,26 +20,28 @@ public:
     
     void loadPresetFromNumber(int num);
     
-    void onGuiDropdownEvent(ofxDatGuiDropdownEvent e);
-    void onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e);
-    void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);
+//    void onGuiDropdownEvent(ofxDatGuiDropdownEvent e);
+//    void onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e);
+//    void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);
     
-    void windowResized(ofResizeEventArgs &a);
+//    void windowResized(ofResizeEventArgs &a);
 private:
-    void changePresetLabelHighliht(ofxDatGuiButton *presetToHighlight);
+//    void changePresetLabelHighliht(ofxDatGuiButton *presetToHighlight);
     void loadBank();
     
     void loadPreset(string name, string bank);
     void savePreset(string name, string bank);
     
-    ofxDatGuiDropdown* bankSelect;
-    ofxDatGuiScrollView* presetsList;
-    ofxDatGuiButton*    oldPresetButton;
+//    ofxDatGuiDropdown* bankSelect;
+//    ofxDatGuiScrollView* presetsList;
+//    ofxDatGuiButton*    oldPresetButton;
     
-    map<int, string> currentBankPresets;
+    map<string, vector<pair<int, string>>> bankPresets;
+    map<string, pair<int, string>> currentPreset;
     
-    string currentBank;
-    string currentPreset;
+    vector<string> banks;
+    int currentBank;
+
     
     int loadPresetInNextUpdate;
     

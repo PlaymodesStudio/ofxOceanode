@@ -77,7 +77,7 @@ public:
 
 class ofxOscMessage;
 
-class ofxOceanodeNodeMacro : public ofxOceanodeNodeModelExternalWindow{
+class ofxOceanodeNodeMacro : public ofxOceanodeNodeModel{
 public:
     ofxOceanodeNodeMacro();
     ~ofxOceanodeNodeMacro(){
@@ -91,11 +91,6 @@ public:
     void draw(ofEventArgs &a);
     
     void setContainer(ofxOceanodeContainer* container);
-    
-#ifndef OFXOCEANODE_HEADLESS
-    void setupForExternalWindow();
-    void closeExternalWindow(ofEventArgs &e);
-#endif
     
     void presetSave(ofJson &json);
     void loadBeforeConnections(ofJson &json);
