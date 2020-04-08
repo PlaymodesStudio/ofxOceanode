@@ -19,7 +19,6 @@ ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
     this->registerModel<indexer>("Generators");
     this->registerModel<reindexer>("Modifiers");
     this->registerModel<smoother>("Modifiers");
-    this->registerModel<localPresetController>("Controllers");
     this->registerModel<switcher>("Modifiers");
     this->registerModel<ofxOceanodeNodeMacro>("MACRO");
 }
