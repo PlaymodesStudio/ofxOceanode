@@ -59,7 +59,7 @@ bool ofxOceanodeNodeGui::constructGui(){
 //    ImGui::SameLine(0, 10);
     ImGui::Text("%s", moduleName.c_str());
     
-    ImGui::SameLine(0);
+    ImGui::SameLine(guiRect.width - 30);
     if (ImGui::Button("x"))
         ImGui::OpenPopup("Delete?");
     if (ImGui::BeginPopupModal("Delete?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
