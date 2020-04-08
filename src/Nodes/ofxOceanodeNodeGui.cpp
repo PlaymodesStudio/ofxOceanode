@@ -88,7 +88,11 @@ bool ofxOceanodeNodeGui::constructGui(){
                 ImGui::SliderFloat(uniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax());
             }
             //TODO: Implement better this hack
+            // Maybe discard and reset value when not presed enter??
             if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()) ){
+                tempCast = tempCast;
+            }
+            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                 tempCast = tempCast;
             }
         }else if(absParam.type() == typeid(ofParameter<int>).name()){
@@ -101,15 +105,24 @@ bool ofxOceanodeNodeGui::constructGui(){
             if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                 tempCast = tempCast;
             }
+            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                tempCast = tempCast;
+            }
         }else if(absParam.type() == typeid(ofParameter<bool>).name()){
             auto tempCast = absParam.cast<bool>();
             if (ImGui::Checkbox(uniqueId.c_str(), (bool *)&tempCast.get()))
             {
                 tempCast = tempCast;
             }
+            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                tempCast = !tempCast;
+            }
         }else if(absParam.type() == typeid(ofParameter<void>).name()){
             if (ImGui::Button(uniqueId.c_str()))
             {
+                absParam.cast<void>().trigger();
+            }
+            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                 absParam.cast<void>().trigger();
             }
         }else if(absParam.type() == typeid(ofParameter<string>).name()){
@@ -130,6 +143,9 @@ bool ofxOceanodeNodeGui::constructGui(){
             {
                 tempCast = tempCast;
             }
+            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                tempCast = tempCast;
+            }
         }else if(absParam.type() == typeid(ofParameterGroup).name()){
             auto vector_getter = [](void* vec, int idx, const char** out_text)
             {
@@ -143,6 +159,9 @@ bool ofxOceanodeNodeGui::constructGui(){
             vector<string> options = ofSplitString(tempCast.getString(0), "-|-");
             if(ImGui::Combo(uniqueId.c_str(), (int*)&tempCast.getInt(1).get(), vector_getter, static_cast<void*>(&options), options.size())){
                 tempCast.getInt(1) = tempCast.getInt(1);
+            }
+            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                tempCast = tempCast;
             }
         }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
             auto tempCast = absParam.cast<vector<float>>();
@@ -158,6 +177,9 @@ bool ofxOceanodeNodeGui::constructGui(){
             }else{
                 ImGui::PlotHistogram(uniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
             }
+            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                tempCast = tempCast;
+            }
         }else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
             auto tempCast = absParam.cast<vector<int>>();
             if(tempCast->size() == 1){
@@ -172,6 +194,9 @@ bool ofxOceanodeNodeGui::constructGui(){
             }else{
                 std::vector<float> floatVec(tempCast.get().begin(), tempCast.get().end());
                 ImGui::PlotHistogram(uniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
+            }
+            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                tempCast = tempCast;
             }
         }else {
             ImGui::Text("%s", absParam.getName().c_str());
