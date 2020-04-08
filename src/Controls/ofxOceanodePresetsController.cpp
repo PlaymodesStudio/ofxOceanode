@@ -33,43 +33,44 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
             std::sort(bankPresets[bankName].begin(), bankPresets[bankName].end(), [](pair<int, string> &left, pair<int, string> &right) {
                 return left.first< right.first;
             });
+            currentPreset[bankName].first = 0;
         }
+        
     }
     if(dir.listDir() == 0){
         banks.push_back("Initial_Bank");
     }
     currentBank = 0;
-    banks.push_back(" -- NEW BANK -- ");
 
-//    gui->addTextInput("New Preset");
-
+    //TODO: test listeners check if new logic is working, when untitled
     presetListener = container->loadPresetEvent.newListener([this](string preset){
-//        vector<string> presetInfo = ofSplitString(preset, "/");
-//        oldPresetButton = nullptr;
-//        bool foundBank = false;
-//        for(int i = 0; i < bankSelect->getNumOptions(); i++){
-//            if(bankSelect->getChildAt(i)->getName() == presetInfo[0]){
-//                bankSelect->select(i);
-//                foundBank = true;
-//                break;
-//            }
-//        }
-//        if(foundBank == true){
-//            loadBank();
-//            if(presetsList->getItemByName(presetInfo[1]) != nullptr)
-//               changePresetLabelHighliht(presetsList->getItemByName(presetInfo[1]));
-//               loadPreset(presetInfo[1], presetInfo[0]);
-//        }
+        vector<string> presetInfo = ofSplitString(preset, "/");
+        bool foundBank = false;
+        for(int i = 0; i < banks.size(); i++){
+            if(banks[i] == presetInfo[0]){
+                currentBank = i;
+                foundBank = true;
+                break;
+            }
+        }
+        if(foundBank == true){
+            if(find_if(bankPresets[banks[currentBank]].begin(), bankPresets[banks[currentBank]].begin(), [presetInfo](pair<int, string> &preset){
+                return preset.second == presetInfo[1];
+            }) != bankPresets[banks[currentBank]].end()){
+               loadPreset(presetInfo[1], presetInfo[0]);
+            }
+        }
     });
 
     saveCurrentPresetListener = container->saveCurrentPresetEvent.newListener([this](){
-//        if(currentPreset == "Untitled"){
-////            ofxDatGuiTextInputEvent tie(nullptr, "Untitled");
-////            onGuiTextInputEvent(tie);
-//        }else{
-//            savePreset(currentPreset, currentBank);
-//        }
+        if(currentPreset[banks[currentBank]].first == 0){
+            createPreset(string("Untitled"));
+        }else{
+            savePreset(currentPreset[banks[currentBank]].second, banks[currentBank]);
+        }
     });
+    
+    newPresetCreated = false;
 
     loadPresetInNextUpdate = 0;
 }
@@ -83,52 +84,98 @@ void ofxOceanodePresetsController::draw(){
         return true;
     };
     
-    ImGui::Begin(controllerName.c_str()),
-    ImGui::Combo("Bank", &currentBank, vector_getter, static_cast<void*>(&banks), banks.size());
+    ImGui::Begin(controllerName.c_str());
+    if(ImGui::Combo("Bank", &currentBank, vector_getter, static_cast<void*>(&banks), banks.size())){
+        //TODO: Do something when load bank?
+    }
+    ImGui::SameLine(ImGui::GetWindowWidth() - 20);
+    if(ImGui::Button("+")){
+        ImGui::OpenPopup("Add New Bank");
+    }
+    if(ImGui::BeginPopupModal("Add New Bank", NULL, ImGuiWindowFlags_AlwaysAutoResize)){
+        static char cString[256];
+        if (ImGui::InputText("Bank Name", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
+        {
+            string proposedNewName(cString);
+            ofStringReplace(proposedNewName, " ", "_");
+            if(find(banks.begin(), banks.end(), proposedNewName) == banks.end()){
+                if(proposedNewName != ""){
+                    banks.push_back(proposedNewName);
+                    currentBank = banks.size()-1;
+                    currentPreset[banks[currentBank]].first = 0;
+                }
+                ImGui::CloseCurrentPopup();
+            }
+            strcpy(cString, "");
+        }
+        if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsItemActive()){
+            strcpy(cString, "");
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+    
     ImGui::Text("%s", "<== Presets List ==>");
-    ImGui::BeginGroup();
+    float child_h = (ImGui::GetContentRegionAvail().y - (5 * ImGui::GetStyle().ItemSpacing.x));
+    float child_w = ImGui::GetContentRegionAvail().x;
+    ImGui::BeginChild("Preset List", ImVec2(child_w, child_h));
     for(auto &p: bankPresets[banks[currentBank]]){
+        //Todo: Hightlight if current preset
         if(ImGui::Button(p.second.c_str())){
             if(ImGui::GetIO().KeyShift){
                 savePreset(p.second, banks[currentBank]);
             }else{
                 loadPreset(p.second, banks[currentBank]);
+                currentPreset[banks[currentBank]] = p;
             }
         }
+        if(newPresetCreated && p == bankPresets[banks[currentBank]].back()){
+            ImGui::SetScrollHereY(0.0f);
+            newPresetCreated = false;
+        }
     }
+    ImGui::EndChild();
     ImGui::Text("-----------");
-    ImGui::Separator();
     static char cString[256] = "";
     if (ImGui::InputText("New Preset", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
     {
         if(strcmp(cString, "") != 0){
-            char newPresetName;
-            int newPresetNum = 1;
-            if(bankPresets[banks[currentBank]].size() != 0){
-                int lastPreset = bankPresets[banks[currentBank]].back().first;
-                newPresetNum = lastPreset + 1;
-            }
-            sprintf(&newPresetName, "%d--%s", newPresetNum, cString);
-            string newPresetString(&newPresetName);
-            ofStringReplace(newPresetString, " ", "_");
-            bankPresets[banks[currentBank]].push_back(pair<int, string>(newPresetNum, newPresetString));
-            currentPreset[banks[currentBank]] = bankPresets[banks[currentBank]].back();
-            savePreset(newPresetString, banks[currentBank]);
+            createPreset(string(cString));
         }
         strcpy(cString, "");
     }
-    ImGui::EndGroup();
     ImGui::End();
 }
 
+void ofxOceanodePresetsController::createPreset(string name){
+    char newPresetName;
+    int newPresetNum = 1;
+    if(bankPresets[banks[currentBank]].size() != 0){
+        int lastPreset = bankPresets[banks[currentBank]].back().first;
+        newPresetNum = lastPreset + 1;
+    }
+    sprintf(&newPresetName, "%d--%s", newPresetNum, name.c_str());
+    string newPresetString(&newPresetName);
+    ofStringReplace(newPresetString, " ", "_");
+    bankPresets[banks[currentBank]].push_back(pair<int, string>(newPresetNum, newPresetString));
+    currentPreset[banks[currentBank]] = bankPresets[banks[currentBank]].back();
+    savePreset(newPresetString, banks[currentBank]);
+    newPresetCreated = true;
+}
+
 void ofxOceanodePresetsController::update(){
-//    if(loadPresetInNextUpdate != 0){
-//        if(currentBankPresets.count(loadPresetInNextUpdate) > 0){
-//            changePresetLabelHighliht(presetsList->getItemByName(currentBankPresets[loadPresetInNextUpdate]));
-//            loadPreset(currentBankPresets[loadPresetInNextUpdate], bankSelect->getSelected()->getName());
-//        }
-//        loadPresetInNextUpdate = 0;
-//    }
+    //TODO: Test functionality
+    if(loadPresetInNextUpdate != 0){
+        int toLoad = loadPresetInNextUpdate;
+        auto itemToLoad = find_if(bankPresets[banks[currentBank]].begin(), bankPresets[banks[currentBank]].end(), [toLoad](pair<int, string> &preset){
+            return preset.first == toLoad;
+        });
+        if(itemToLoad != bankPresets[banks[currentBank]].end()){
+            loadPreset(itemToLoad->second, banks[currentBank]);
+            currentPreset[banks[currentBank]] = *itemToLoad;
+        }
+        loadPresetInNextUpdate = 0;
+    }
 }
 
 
@@ -136,60 +183,8 @@ void ofxOceanodePresetsController::loadPresetFromNumber(int num){
     loadPresetInNextUpdate = num;
 }
 
-//void ofxOceanodePresetsController::onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e){
-//    if(ofGetKeyPressed(OF_KEY_SHIFT)){
-//        changePresetLabelHighliht(e.target);
-//        savePreset(e.target->getName(), bankSelect->getSelected()->getName());
-//    }else{
-//        changePresetLabelHighliht(e.target);
-//        loadPreset(e.target->getName(), bankSelect->getSelected()->getName());
-//    }
-//}
-//
-//void ofxOceanodePresetsController::onGuiTextInputEvent(ofxDatGuiTextInputEvent e){
-//    if(e.text != ""){
-//        string newPresetName;
-//        int newPresetNum;
-//        if(presetsList->getNumItems() != 0){
-//            string lastPreset = presetsList->getItemAtIndex(presetsList->getNumItems()-1)->getName();
-//            newPresetNum = ofToInt(ofSplitString(lastPreset, "--")[0]) + 1;
-//            newPresetName = ofToString(newPresetNum) + "--" + e.text;
-//        }else
-//            newPresetName = "1--" + e.text;
-//        
-//        ofStringReplace(newPresetName, " ", "_"); 
-//        presetsList->add(newPresetName);
-//        currentBankPresets[newPresetNum] = newPresetName;
-//        changePresetLabelHighliht(presetsList->getItemAtIndex(presetsList->getNumItems()-1));
-//        savePreset(newPresetName, bankSelect->getSelected()->getName());
-//        currentBank = bankSelect->getSelected()->getName();
-//        currentPreset = newPresetName;
-//        e.text = "";
-//    }
-//}
-//
-//void ofxOceanodePresetsController::windowResized(ofResizeEventArgs &a){
-//    ofxOceanodeBaseController::windowResized(a);
-//    int layoutHeight = mainGuiTheme->layout.height;
-//    presetsList->setNumVisible(floor((ofGetHeight()-((layoutHeight+1.5)*3))/(float)(layoutHeight+1.5)));
-//}
-
-//void ofxOceanodePresetsController::changePresetLabelHighliht(ofxDatGuiButton *presetToHighlight){
-//    if(presetToHighlight != nullptr){
-//        if(oldPresetButton != nullptr) oldPresetButton->setTheme(mainGuiTheme);
-//        presetToHighlight->setLabelColor(ofColor::red);
-//        oldPresetButton = presetToHighlight;
-//    }
-//}
-
-void ofxOceanodePresetsController::loadBank(){
-
-}
-
 void ofxOceanodePresetsController::loadPreset(string name, string bank){
     container->loadPreset("Presets/" + bank + "/" + name);
-//    currentPreset = name;
-//    currentBank = bank;
 }
 
 void ofxOceanodePresetsController::savePreset(string name, string bank){

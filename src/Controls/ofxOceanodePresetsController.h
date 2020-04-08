@@ -19,22 +19,11 @@ public:
     void update();
     
     void loadPresetFromNumber(int num);
-    
-//    void onGuiDropdownEvent(ofxDatGuiDropdownEvent e);
-//    void onGuiScrollViewEvent(ofxDatGuiScrollViewEvent e);
-//    void onGuiTextInputEvent(ofxDatGuiTextInputEvent e);
-    
-//    void windowResized(ofResizeEventArgs &a);
 private:
-//    void changePresetLabelHighliht(ofxDatGuiButton *presetToHighlight);
-    void loadBank();
+    void createPreset(string name);
     
     void loadPreset(string name, string bank);
     void savePreset(string name, string bank);
-    
-//    ofxDatGuiDropdown* bankSelect;
-//    ofxDatGuiScrollView* presetsList;
-//    ofxDatGuiButton*    oldPresetButton;
     
     map<string, vector<pair<int, string>>> bankPresets;
     map<string, pair<int, string>> currentPreset;
@@ -42,7 +31,7 @@ private:
     vector<string> banks;
     int currentBank;
 
-    
+    bool newPresetCreated;
     int loadPresetInNextUpdate;
     
     ofEventListener presetListener;
