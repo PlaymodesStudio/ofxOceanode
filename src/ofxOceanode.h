@@ -137,6 +137,7 @@ public:
                 if (ImGui::BeginMenu("Open Recent")) {
                     if(ImGui::MenuItem("Recent1.oceanode")){}
                     if(ImGui::MenuItem("Recent2.oceanode")){}
+                    ImGui::EndMenu();
                 }
                 ImGui::EndMenu();
             }
@@ -152,9 +153,9 @@ public:
             }
             if(ImGui::BeginMenu("Windows"))
             {
-                if (ImGui::MenuItem("Show Presets" "CMD+P")) {}
-                if (ImGui::MenuItem("Show BPM" "CMD+B")) {}
-                if (ImGui::MenuItem("Show Timeline" "CMD+T")) {}
+                if (ImGui::MenuItem("Show Presets", "CMD+P")) {}
+                if (ImGui::MenuItem("Show BPM", "CMD+B")) {}
+                if (ImGui::MenuItem("Show Timeline", "CMD+T")) {}
                 ImGui::EndMenu();
             }
             ImGui::EndMenuBar();
