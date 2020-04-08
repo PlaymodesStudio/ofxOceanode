@@ -88,7 +88,7 @@ void ofxOceanodePresetsController::draw(){
     if(ImGui::Combo("Bank", &currentBank, vector_getter, static_cast<void*>(&banks), banks.size())){
         //TODO: Do something when load bank?
     }
-    ImGui::SameLine(ImGui::GetWindowWidth() - 20);
+    ImGui::SameLine(ImGui::GetWindowWidth() - 23);
     if(ImGui::Button("+")){
         ImGui::OpenPopup("Add New Bank");
     }
@@ -115,10 +115,16 @@ void ofxOceanodePresetsController::draw(){
         ImGui::EndPopup();
     }
     
-    ImGui::Text("%s", "<== Presets List ==>");
-    float child_h = (ImGui::GetContentRegionAvail().y - (5 * ImGui::GetStyle().ItemSpacing.x));
+//    ImGui::Text("%s", "<== Presets List ==>");
+    float child_h = (ImGui::GetContentRegionAvail().y - (3 * ImGui::GetStyle().ItemSpacing.x));
     float child_w = ImGui::GetContentRegionAvail().x;
-    ImGui::BeginChild("Preset List", ImVec2(child_w, child_h));
+    ImGuiWindowFlags child_flags = ImGuiWindowFlags_MenuBar;
+    ImGui::BeginChild("Preset List", ImVec2(child_w, child_h), true, child_flags);
+    if (ImGui::BeginMenuBar())
+    {
+        ImGui::TextUnformatted("Presets List");
+        ImGui::EndMenuBar();
+    }
     for(auto &p: bankPresets[banks[currentBank]]){
         //Todo: Hightlight if current preset
         if(ImGui::Button(p.second.c_str())){
@@ -135,7 +141,6 @@ void ofxOceanodePresetsController::draw(){
         }
     }
     ImGui::EndChild();
-    ImGui::Text("-----------");
     static char cString[256] = "";
     if (ImGui::InputText("New Preset", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
     {
