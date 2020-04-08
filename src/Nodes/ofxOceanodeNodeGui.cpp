@@ -68,15 +68,6 @@ bool ofxOceanodeNodeGui::constructGui(){
         ImGui::Separator();
         
         if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
-            int index = 0;
-            for(auto &key : ImGui::GetIO().KeysDown){
-                if(key){
-                    ofLog() << index;
-                }
-                index++;
-            }
-            ofLog() << "ImguiEnter = " << ImGuiKey_Enter;
-            ofLog() << "OF_KEY_RETURN = " << OF_KEY_RETURN;
             ImGui::CloseCurrentPopup();
             deleteModule = true;
         }
@@ -91,15 +82,27 @@ bool ofxOceanodeNodeGui::constructGui(){
         string uniqueId = absParam.getName();
         if(absParam.type() == typeid(ofParameter<float>).name()){
             auto tempCast = absParam.cast<float>();
-            if (ImGui::SliderFloat(uniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax()))
-            {
-                tempCast = tempCast;
+            if(tempCast.getMin() == FLT_MIN || tempCast.getMax() == FLT_MAX){
+                if (ImGui::DragFloat(uniqueId.c_str(), (float *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax())){
+                    tempCast = tempCast;
+                }
+            }else{
+                if (ImGui::SliderFloat(uniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax()))
+                {
+                    tempCast = tempCast;
+                }
             }
         }else if(absParam.type() == typeid(ofParameter<int>).name()){
             auto tempCast = absParam.cast<int>();
-            if (ImGui::SliderInt(uniqueId.c_str(), (int *)&tempCast.get(), tempCast.getMin(), tempCast.getMax()))
-            {
-                tempCast = tempCast;
+           if(tempCast.getMin() == INT_MIN || tempCast.getMax() == INT_MAX){
+                if (ImGui::DragInt(uniqueId.c_str(), (int *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax())){
+                    tempCast = tempCast;
+                }
+            }else{
+                if (ImGui::SliderInt(uniqueId.c_str(), (int *)&tempCast.get(), tempCast.getMin(), tempCast.getMax()))
+                {
+                    tempCast = tempCast;
+                }
             }
         }else if(absParam.type() == typeid(ofParameter<bool>).name()){
             auto tempCast = absParam.cast<bool>();
@@ -147,9 +150,15 @@ bool ofxOceanodeNodeGui::constructGui(){
         }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
             auto tempCast = absParam.cast<vector<float>>();
             if(tempCast->size() == 1){
-                if (ImGui::SliderFloat(uniqueId.c_str(), (float *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]))
-                {
-                    tempCast = vector<float>(1, tempCast->at(0));
+                if(tempCast.getMin()[0] == FLT_MIN || tempCast.getMax()[0] == FLT_MAX){
+                    if (ImGui::DragFloat(uniqueId.c_str(), (float *)&tempCast->at(0), 1, tempCast.getMin()[0], tempCast.getMax()[0])){
+                        tempCast = tempCast;
+                    }
+                }else{
+                    if (ImGui::SliderFloat(uniqueId.c_str(), (float *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]))
+                    {
+                        tempCast = vector<float>(1, tempCast->at(0));
+                    }
                 }
             }else{
                 ImGui::PlotHistogram(uniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
@@ -157,27 +166,20 @@ bool ofxOceanodeNodeGui::constructGui(){
         }else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
             auto tempCast = absParam.cast<vector<int>>();
             if(tempCast->size() == 1){
-                if (ImGui::SliderInt(uniqueId.c_str(), (int *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]))
-                {
-                    tempCast = vector<int>(1, tempCast->at(0));
+                if(tempCast.getMin()[0] == INT_MIN || tempCast.getMax()[0] == INT_MAX){
+                    if (ImGui::DragInt(uniqueId.c_str(), (int *)&tempCast->at(0), 1, tempCast.getMin()[0], tempCast.getMax()[0])){
+                        tempCast = tempCast;
+                    }
+                }else{
+                    if (ImGui::SliderInt(uniqueId.c_str(), (int *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]))
+                    {
+                        tempCast = vector<int>(1, tempCast->at(0));
+                    }
                 }
             }else{
                 std::vector<float> floatVec(tempCast.get().begin(), tempCast.get().end());
                 ImGui::PlotHistogram(uniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
             }
-            
-        }else if(absParam.type() == typeid(ofParameter<pair<int, bool>>).name()){
-//            auto pairParam = absParam.cast<pair<int, bool>>();
-//            auto matrix = gui->addMatrix(absParam.getName(), pairParam.get().first, true);
-//            matrix->setRadioMode(true);
-//            matrix->setHoldMode(pairParam.get().second);
-//            parameterChangedListeners.push(pairParam.newListener([&, matrix](pair<int, bool> &pair){
-//                if(pair.second){
-//                    matrix->select(pair.first);
-//                }else{
-//                    matrix->deselect(pair.first);
-//                }
-//            }));
         }else {
             ImGui::Text("%s", absParam.getName().c_str());
         }
