@@ -83,26 +83,23 @@ bool ofxOceanodeNodeGui::constructGui(){
         if(absParam.type() == typeid(ofParameter<float>).name()){
             auto tempCast = absParam.cast<float>();
             if(tempCast.getMin() == FLT_MIN || tempCast.getMax() == FLT_MAX){
-                if (ImGui::DragFloat(uniqueId.c_str(), (float *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax())){
-                    tempCast = tempCast;
-                }
+                ImGui::DragFloat(uniqueId.c_str(), (float *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax());
             }else{
-                if (ImGui::SliderFloat(uniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax()))
-                {
-                    tempCast = tempCast;
-                }
+                ImGui::SliderFloat(uniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax());
+            }
+            //TODO: Implement better this hack
+            if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()) ){
+                tempCast = tempCast;
             }
         }else if(absParam.type() == typeid(ofParameter<int>).name()){
             auto tempCast = absParam.cast<int>();
-           if(tempCast.getMin() == INT_MIN || tempCast.getMax() == INT_MAX){
-                if (ImGui::DragInt(uniqueId.c_str(), (int *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax())){
-                    tempCast = tempCast;
-                }
+            if(tempCast.getMin() == INT_MIN || tempCast.getMax() == INT_MAX){
+                ImGui::DragInt(uniqueId.c_str(), (int *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax());
             }else{
-                if (ImGui::SliderInt(uniqueId.c_str(), (int *)&tempCast.get(), tempCast.getMin(), tempCast.getMax()))
-                {
-                    tempCast = tempCast;
-                }
+                ImGui::SliderInt(uniqueId.c_str(), (int *)&tempCast.get(), tempCast.getMin(), tempCast.getMax());
+            }
+            if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
+                tempCast = tempCast;
             }
         }else if(absParam.type() == typeid(ofParameter<bool>).name()){
             auto tempCast = absParam.cast<bool>();
@@ -151,14 +148,12 @@ bool ofxOceanodeNodeGui::constructGui(){
             auto tempCast = absParam.cast<vector<float>>();
             if(tempCast->size() == 1){
                 if(tempCast.getMin()[0] == FLT_MIN || tempCast.getMax()[0] == FLT_MAX){
-                    if (ImGui::DragFloat(uniqueId.c_str(), (float *)&tempCast->at(0), 1, tempCast.getMin()[0], tempCast.getMax()[0])){
-                        tempCast = tempCast;
-                    }
+                    ImGui::DragFloat(uniqueId.c_str(), (float *)&tempCast->at(0), 1, tempCast.getMin()[0], tempCast.getMax()[0]);
                 }else{
-                    if (ImGui::SliderFloat(uniqueId.c_str(), (float *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]))
-                    {
-                        tempCast = vector<float>(1, tempCast->at(0));
-                    }
+                    ImGui::SliderFloat(uniqueId.c_str(), (float *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]);
+                }
+                if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
+                    tempCast = vector<float>(1, tempCast->at(0));
                 }
             }else{
                 ImGui::PlotHistogram(uniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
@@ -167,14 +162,12 @@ bool ofxOceanodeNodeGui::constructGui(){
             auto tempCast = absParam.cast<vector<int>>();
             if(tempCast->size() == 1){
                 if(tempCast.getMin()[0] == INT_MIN || tempCast.getMax()[0] == INT_MAX){
-                    if (ImGui::DragInt(uniqueId.c_str(), (int *)&tempCast->at(0), 1, tempCast.getMin()[0], tempCast.getMax()[0])){
-                        tempCast = tempCast;
-                    }
+                    ImGui::DragInt(uniqueId.c_str(), (int *)&tempCast->at(0), 1, tempCast.getMin()[0], tempCast.getMax()[0]);
                 }else{
-                    if (ImGui::SliderInt(uniqueId.c_str(), (int *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]))
-                    {
-                        tempCast = vector<int>(1, tempCast->at(0));
-                    }
+                    ImGui::SliderInt(uniqueId.c_str(), (int *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]);
+                }
+                if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
+                    tempCast = vector<int>(1, tempCast->at(0));
                 }
             }else{
                 std::vector<float> floatVec(tempCast.get().begin(), tempCast.get().end());
