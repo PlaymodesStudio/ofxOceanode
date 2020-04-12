@@ -6,27 +6,19 @@ void ofApp::setup(){
     ofSetVerticalSync(true);
     ofSetEscapeQuitsApp(false);
     
-    auto reg = make_shared<ofxOceanodeNodeRegistry>();
-    auto treg = make_shared<ofxOceanodeTypesRegistry>();
-    
-    container = make_shared<ofxOceanodeContainer>(reg, treg);
-
-    canvas.setContainer(container);
-    canvas.setup();
-    controls = make_unique<ofxOceanodeControls>(container);
-    
+    oceanode.setup();
     //If we load before creating controls the persistent midi bindings will not be visible in midi gui
-    container->loadPersistent();
+//    container->loadPersistent();
 }
 
 //--------------------------------------------------------------
 void ofApp::update(){
-
+    oceanode.update();
 }
 
 //--------------------------------------------------------------
 void ofApp::draw(){
-
+    oceanode.draw();
 }
 
 //--------------------------------------------------------------

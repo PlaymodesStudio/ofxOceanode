@@ -8,11 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		026CF24E227F5DFC3C392E27 /* ofxOceanodePresetsController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C27DB6A973A67BE0BF855933 /* ofxOceanodePresetsController.cpp */; };
-		0BEE6D908B90BD8BCB7071A4 /* ofxOceanodeMidiBinding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F0DF3E4F877F8E51B24698B3 /* ofxOceanodeMidiBinding.cpp */; };
 		102C0035698294FDB36E6899 /* ofxOceanodeTypesRegistry.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 60A6750E6D5A48E6B4B69C0A /* ofxOceanodeTypesRegistry.cpp */; };
 		124F8F2EA0264C76DD324ADC /* imgui_impl_opengl2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5D7F4B977F6DAE83009B2BEA /* imgui_impl_opengl2.cpp */; };
 		19D87B8D9CBC3A637A3FCFE0 /* switcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6962CFFA24B1C8A59A419D24 /* switcher.cpp */; };
-		210113B93D0C86F7DF921A87 /* ofxOceanodeOSCController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 499C7B06926EEE148981AE7F /* ofxOceanodeOSCController.cpp */; };
 		29BF2E629ECCA5AF37C2CD5C /* indexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F28287AC068737B816BE7E8 /* indexer.cpp */; };
 		47608E29666CD58C20E53408 /* mapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D623E907C25C25D1AB411052 /* mapper.cpp */; };
 		4838368B3C8561AD76D56D69 /* ranger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 959F4777E3902536DC81AC0A /* ranger.cpp */; };
@@ -45,7 +43,6 @@
 		E1E0C08A53EAFC4A088F5BDC /* reindexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3D3CE3C79225FEEDD92A410A /* reindexer.cpp */; };
 		E4B69E200A3A1BDC003C02F2 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E4B69E1D0A3A1BDC003C02F2 /* main.cpp */; };
 		E4B69E210A3A1BDC003C02F2 /* ofApp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E4B69E1E0A3A1BDC003C02F2 /* ofApp.cpp */; };
-		EB90AF0EFA3A80E58C07AC46 /* ofxOceanodeMidiController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E05C2B948C3533E37FD66528 /* ofxOceanodeMidiController.cpp */; };
 		F85A2176044B4D8E3047F28F /* imgui_widgets.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 56507DDEF8EB703B656905D0 /* imgui_widgets.cpp */; };
 		FE7602E65C7BA676951A37FB /* ofxOceanodeCanvas.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 69F09B1450CB3FF08A87D2FF /* ofxOceanodeCanvas.cpp */; };
 /* End PBXBuildFile section */
@@ -82,9 +79,7 @@
 		3D3CE3C79225FEEDD92A410A /* reindexer.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = reindexer.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/reindexer.cpp; sourceTree = SOURCE_ROOT; };
 		46ADAF0F6560879BAE3D1C61 /* ofxOceanodeBaseController.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeBaseController.h; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeBaseController.h; sourceTree = SOURCE_ROOT; };
 		476A4C5601D294421900ADDB /* chaoticOscillator.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = chaoticOscillator.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/chaoticOscillator.h; sourceTree = SOURCE_ROOT; };
-		499C7B06926EEE148981AE7F /* ofxOceanodeOSCController.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeOSCController.cpp; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeOSCController.cpp; sourceTree = SOURCE_ROOT; };
 		4A76FE1EC14329064FDB60C7 /* ofxOceanodeNodeRegistry.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNodeRegistry.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeNodeRegistry.h; sourceTree = SOURCE_ROOT; };
-		4C1870613449AC6489DA5F0B /* ofxOceanodeMidiController.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeMidiController.h; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeMidiController.h; sourceTree = SOURCE_ROOT; };
 		4ED5BE88FEF673A05EFD5FD7 /* imgui_draw.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = imgui_draw.cpp; path = ../../../addons/ofxImGuiSimple/libs/imgui/src/imgui_draw.cpp; sourceTree = SOURCE_ROOT; };
 		5382BE102A38275ED1019D27 /* chaoticOscillator.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = chaoticOscillator.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/chaoticOscillator.cpp; sourceTree = SOURCE_ROOT; };
 		56507DDEF8EB703B656905D0 /* imgui_widgets.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = imgui_widgets.cpp; path = ../../../addons/ofxImGuiSimple/libs/imgui/src/imgui_widgets.cpp; sourceTree = SOURCE_ROOT; };
@@ -102,7 +97,6 @@
 		6801E5F9CC3F24E8DDD8FF60 /* imgui_internal.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = imgui_internal.h; path = ../../../addons/ofxImGuiSimple/libs/imgui/src/imgui_internal.h; sourceTree = SOURCE_ROOT; };
 		6962CFFA24B1C8A59A419D24 /* switcher.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = switcher.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/switcher.cpp; sourceTree = SOURCE_ROOT; };
 		69F09B1450CB3FF08A87D2FF /* ofxOceanodeCanvas.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeCanvas.cpp; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeCanvas.cpp; sourceTree = SOURCE_ROOT; };
-		73520CA7939116FBB46C3F19 /* ofxOceanodeOSCController.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeOSCController.h; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeOSCController.h; sourceTree = SOURCE_ROOT; };
 		74238B38653A8112BB64B62B /* imgui.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = imgui.cpp; path = ../../../addons/ofxImGuiSimple/libs/imgui/src/imgui.cpp; sourceTree = SOURCE_ROOT; };
 		7839463FADC4E27D1C66C5FB /* ofxOceanodeNode.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNode.h; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNode.h; sourceTree = SOURCE_ROOT; };
 		7C9B84BA3AF325F3D843633B /* ofxOceanodeConnection.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeConnection.cpp; path = ../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnection.cpp; sourceTree = SOURCE_ROOT; };
@@ -117,7 +111,6 @@
 		9F28287AC068737B816BE7E8 /* indexer.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = indexer.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/indexer.cpp; sourceTree = SOURCE_ROOT; };
 		9F467AD37147258BE119E42B /* ofxImGuiSimple.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxImGuiSimple.cpp; path = ../../../addons/ofxImGuiSimple/src/ofxImGuiSimple.cpp; sourceTree = SOURCE_ROOT; };
 		A8150F1936B064445E99AF76 /* ofxOceanodeBPMController.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeBPMController.cpp; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeBPMController.cpp; sourceTree = SOURCE_ROOT; };
-		A914AD56DE399642506DDB33 /* ofxOceanodeMidiBinding.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeMidiBinding.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeMidiBinding.h; sourceTree = SOURCE_ROOT; };
 		AF45987CEF73D6D1587AFFDA /* switcher.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = switcher.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/switcher.h; sourceTree = SOURCE_ROOT; };
 		BCC5EBF5A6785CDA3C189680 /* ofxImGuiSimple.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxImGuiSimple.h; path = ../../../addons/ofxImGuiSimple/src/ofxImGuiSimple.h; sourceTree = SOURCE_ROOT; };
 		BFA88189469A37E0B53C6773 /* ofxOceanodeCanvas.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeCanvas.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeCanvas.h; sourceTree = SOURCE_ROOT; };
@@ -131,7 +124,6 @@
 		D7849081CFCC6C8594FF3B8E /* ofxOceanodeNodeMacro.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNodeMacro.h; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeMacro.h; sourceTree = SOURCE_ROOT; };
 		D99598A5E5CD72D0717837BC /* imconfig.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = imconfig.h; path = ../../../addons/ofxImGuiSimple/src/imgui_impl/imconfig.h; sourceTree = SOURCE_ROOT; };
 		DCC77D1E228088A526604E34 /* smoother.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = smoother.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/smoother.h; sourceTree = SOURCE_ROOT; };
-		E05C2B948C3533E37FD66528 /* ofxOceanodeMidiController.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeMidiController.cpp; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeMidiController.cpp; sourceTree = SOURCE_ROOT; };
 		E187B9F0640B673635B5ECDF /* phasor.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = phasor.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/phasor.h; sourceTree = SOURCE_ROOT; };
 		E3AEAB46A9B50A85A3760469 /* imgui_impl_glfw.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = imgui_impl_glfw.cpp; path = ../../../addons/ofxImGuiSimple/src/imgui_impl/imgui_impl_glfw.cpp; sourceTree = SOURCE_ROOT; };
 		E42962AC2163EDD300A6A9E2 /* ofCamera.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ofCamera.cpp; path = ../../../libs/openFrameworks/3d/ofCamera.cpp; sourceTree = SOURCE_ROOT; };
@@ -320,7 +312,6 @@
 		E8523C6791FA3F1C905C1169 /* ofxOceanodeNodeMacro.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeNodeMacro.cpp; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeMacro.cpp; sourceTree = SOURCE_ROOT; };
 		EA0730CA1A73FC90DCF8C770 /* smoother.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = smoother.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/smoother.cpp; sourceTree = SOURCE_ROOT; };
 		EDEAD1332CEFCB6171498ADE /* ofxOceanodeNodeModel.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNodeModel.h; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeModel.h; sourceTree = SOURCE_ROOT; };
-		F0DF3E4F877F8E51B24698B3 /* ofxOceanodeMidiBinding.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeMidiBinding.cpp; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeMidiBinding.cpp; sourceTree = SOURCE_ROOT; };
 		F15C9896F6A32FCA280CD4B5 /* ofxOceanodeNodeRegistry.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeNodeRegistry.cpp; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeNodeRegistry.cpp; sourceTree = SOURCE_ROOT; };
 		F24887AB1BADDDBB829D94E1 /* testNode.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = testNode.h; path = src/testNode.h; sourceTree = SOURCE_ROOT; };
 		F44449692EA3A4B7FBABCF29 /* baseOscillator.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = baseOscillator.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/baseOscillator.cpp; sourceTree = SOURCE_ROOT; };
@@ -477,10 +468,6 @@
 				46ADAF0F6560879BAE3D1C61 /* ofxOceanodeBaseController.h */,
 				C3AD3B4C116407604DCFB986 /* ofxOceanodeControls.cpp */,
 				CA4B325D2EC75988A7F9E2CB /* ofxOceanodeControls.h */,
-				E05C2B948C3533E37FD66528 /* ofxOceanodeMidiController.cpp */,
-				4C1870613449AC6489DA5F0B /* ofxOceanodeMidiController.h */,
-				499C7B06926EEE148981AE7F /* ofxOceanodeOSCController.cpp */,
-				73520CA7939116FBB46C3F19 /* ofxOceanodeOSCController.h */,
 				C27DB6A973A67BE0BF855933 /* ofxOceanodePresetsController.cpp */,
 				56FB03D9F622C9350A0AB8BC /* ofxOceanodePresetsController.h */,
 			);
@@ -866,8 +853,6 @@
 				BFA88189469A37E0B53C6773 /* ofxOceanodeCanvas.h */,
 				5E65A0C39A6FDCA2888DDAF8 /* ofxOceanodeContainer.cpp */,
 				FC8E873E04A65764668D30AB /* ofxOceanodeContainer.h */,
-				F0DF3E4F877F8E51B24698B3 /* ofxOceanodeMidiBinding.cpp */,
-				A914AD56DE399642506DDB33 /* ofxOceanodeMidiBinding.h */,
 				F15C9896F6A32FCA280CD4B5 /* ofxOceanodeNodeRegistry.cpp */,
 				4A76FE1EC14329064FDB60C7 /* ofxOceanodeNodeRegistry.h */,
 				60A6750E6D5A48E6B4B69C0A /* ofxOceanodeTypesRegistry.cpp */,
@@ -989,12 +974,9 @@
 				717BCDD6091D90F262DC7860 /* ofxOceanodeBPMController.cpp in Sources */,
 				7B5743F2E77F2D5AD9B436F0 /* ofxOceanodeBaseController.cpp in Sources */,
 				7B8EE5B7F57088CD23B7934D /* ofxOceanodeControls.cpp in Sources */,
-				EB90AF0EFA3A80E58C07AC46 /* ofxOceanodeMidiController.cpp in Sources */,
-				210113B93D0C86F7DF921A87 /* ofxOceanodeOSCController.cpp in Sources */,
 				026CF24E227F5DFC3C392E27 /* ofxOceanodePresetsController.cpp in Sources */,
 				FE7602E65C7BA676951A37FB /* ofxOceanodeCanvas.cpp in Sources */,
 				5769B6A6D79188D3D351933E /* ofxOceanodeContainer.cpp in Sources */,
-				0BEE6D908B90BD8BCB7071A4 /* ofxOceanodeMidiBinding.cpp in Sources */,
 				B7559FEE382DBA7FB094D5E7 /* ofxOceanodeNodeRegistry.cpp in Sources */,
 				102C0035698294FDB36E6899 /* ofxOceanodeTypesRegistry.cpp in Sources */,
 				7CC1A4D669C6C1B3786CD384 /* ofxOceanodeNodeModelExternalWindow.cpp in Sources */,

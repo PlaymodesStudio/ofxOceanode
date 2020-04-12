@@ -111,13 +111,14 @@ public:
     
 #ifdef OFXOCEANODE_USE_MIDI
     void setIsListeningMidi(bool b);
-    ofxOceanodeAbstractMidiBinding* createMidiBinding(ofAbstractParameter &p, bool isPersistent = false, int _id = -1);
+    shared_ptr<ofxOceanodeAbstractMidiBinding> createMidiBinding(ofAbstractParameter &p, bool isPersistent = false, int _id = -1);
     bool removeLastMidiBinding(ofAbstractParameter &p);
-    ofxOceanodeAbstractMidiBinding* createMidiBindingFromInfo(string module, string parameter, bool isPersistent = false, int _id = -1);
-    ofEvent<ofxOceanodeAbstractMidiBinding> midiBindingCreated;
-    ofEvent<ofxOceanodeAbstractMidiBinding> midiBindingDestroyed;
+    shared_ptr<ofxOceanodeAbstractMidiBinding> createMidiBindingFromInfo(string module, string parameter, bool isPersistent = false, int _id = -1);
     vector<string> getMidiDevices(){return midiInPortList;};
     void addNewMidiMessageListener(ofxMidiListener* listener);
+    
+    map<string, vector<shared_ptr<ofxOceanodeAbstractMidiBinding>>>& getMidiBindings(){return midiBindings;};
+    map<string, vector<shared_ptr<ofxOceanodeAbstractMidiBinding>>>& getPersistentMidiBindings(){return persistentMidiBindings;};
 #endif
     
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
@@ -169,8 +170,8 @@ private:
     
 #ifdef OFXOCEANODE_USE_MIDI
     bool isListeningMidi;
-    map<string, vector<unique_ptr<ofxOceanodeAbstractMidiBinding>>> midiBindings;
-    map<string, vector<unique_ptr<ofxOceanodeAbstractMidiBinding>>> persistentMidiBindings;
+    map<string, vector<shared_ptr<ofxOceanodeAbstractMidiBinding>>> midiBindings;
+    map<string, vector<shared_ptr<ofxOceanodeAbstractMidiBinding>>> persistentMidiBindings;
     map<string, ofxMidiIn> midiIns;
     map<string, ofxMidiOut> midiOuts;
     
