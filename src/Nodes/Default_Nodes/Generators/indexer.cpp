@@ -14,7 +14,7 @@ void indexer::setup() {
     
     putParametersInParametersGroup(parameters);
 
-    addOutputParameterToGroupAndInfo(indexsOut.set("Indexs", {0}, {0}, {1}));
+    addOutputParameterToGroupAndInfo(indexsOut.set("Output", {0}, {0}, {1}));
     indexsOut = indexs;
 }
 

@@ -86,18 +86,18 @@ void oscillator::setup(){
     
     
 
-    parameters->add(phasorIn.set("Phasor In", {0}, {0}, {1}));
+    parameters->add(phasorIn.set("Phase", {0}, {0}, {1}));
     parameters->add(index_Param.set("Index", {0}, {0}, {1}));
-    parameters->add(phaseOffset_Param.set("Phase Offset", {0}, {0}, {1}));
-    parameters->add(roundness_Param.set("Roundess", {0.5}, {0}, {1}));
-    parameters->add(pulseWidth_Param.set("Pulse Width", {.5}, {0}, {1}));
+    parameters->add(phaseOffset_Param.set("Ph Off", {0}, {0}, {1}));
+    parameters->add(roundness_Param.set("Round", {0.5}, {0}, {1}));
+    parameters->add(pulseWidth_Param.set("PulseW", {.5}, {0}, {1}));
     parameters->add(skew_Param.set("Skew", {0}, {-1}, {1}));
-    parameters->add(randomAdd_Param.set("Random Addition", {0}, {-.5}, {.5}));
+    parameters->add(randomAdd_Param.set("Rnd Add", {0}, {-.5}, {.5}));
     parameters->add(scale_Param.set("Scale", {1}, {0}, {2}));
     parameters->add(offset_Param.set("Offset", {0}, {-1}, {1}));
     parameters->add(pow_Param.set("Pow", {0}, {-1}, {1}));
-    parameters->add(biPow_Param.set("Bi Pow", {0}, {-1}, {1}));
-    parameters->add(quant_Param.set("Quantization", {255}, {2}, {255}));
+    parameters->add(biPow_Param.set("BiPow", {0}, {-1}, {1}));
+    parameters->add(quant_Param.set("Quant", {255}, {2}, {255}));
     parameters->add(amplitude_Param.set("Fader", {1}, {0}, {1}));
     parameters->add(invert_Param.set("Invert", {0}, {0}, {1}));
     addOutputParameterToGroupAndInfo(output.set("Output", {0}, {0}, {1}));

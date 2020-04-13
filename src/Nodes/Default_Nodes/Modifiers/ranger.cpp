@@ -13,10 +13,10 @@ float maxRange =  10000.000;
 void ranger::setup(){
     color = ofColor::white;
     parameters->add(input.set("Input", {0}, {minRange}, {maxRange}));
-    parameters->add(minInput.set("MinInput", {0}, {minRange}, {maxRange}));
-    parameters->add(maxInput.set("MaxInput", {1}, {minRange}, {maxRange}));
-    parameters->add(minOutput.set("MinOutput", {0}, {minRange}, {maxRange}));
-    parameters->add(maxOutput.set("MaxOutput", {1}, {minRange}, {maxRange}));
+    parameters->add(minInput.set("Min In", {0}, {minRange}, {maxRange}));
+    parameters->add(maxInput.set("Max In", {1}, {minRange}, {maxRange}));
+    parameters->add(minOutput.set("Min Out", {0}, {minRange}, {maxRange}));
+    parameters->add(maxOutput.set("Max Out", {1}, {minRange}, {maxRange}));
     addOutputParameterToGroupAndInfo(output.set("Output", {0}, {minRange}, {maxRange}));
     
     

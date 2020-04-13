@@ -95,20 +95,27 @@ bool ofxOceanodeNodeGui::constructGui(){
     
         ImGui::Spacing();
         
+        auto startPos = ImGui::GetCursorScreenPos();
+        
         for(int i=0 ; i<getParameters()->size(); i++){
             ofAbstractParameter &absParam = getParameters()->get(i);
             string uniqueId = absParam.getName();
+            ImGui::Text("%s", uniqueId.c_str());
+            ImGui::SameLine(ImGui::GetItemRectMin().x - startPos.x + 50);
             
+            string hiddenUniqueId = "##" + uniqueId;
             ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()));
             ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()));
+            
+            ImGui::SetNextItemWidth(150);
             
             if(absParam.type() == typeid(ofParameter<float>).name()){
                 auto tempCast = absParam.cast<float>();
                 if(tempCast.getMin() == FLT_MIN || tempCast.getMax() == FLT_MAX){
-                    ImGui::DragFloat(uniqueId.c_str(), (float *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax());
+                    ImGui::DragFloat(hiddenUniqueId.c_str(), (float *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax());
                 }else{
                     
-                    ImGui::SliderFloat(uniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax());
+                    ImGui::SliderFloat(hiddenUniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax());
                 }
                 //TODO: Implement better this hack
                 // Maybe discard and reset value when not presed enter??
@@ -121,9 +128,9 @@ bool ofxOceanodeNodeGui::constructGui(){
             }else if(absParam.type() == typeid(ofParameter<int>).name()){
                 auto tempCast = absParam.cast<int>();
                 if(tempCast.getMin() == INT_MIN || tempCast.getMax() == INT_MAX){
-                    ImGui::DragInt(uniqueId.c_str(), (int *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax());
+                    ImGui::DragInt(hiddenUniqueId.c_str(), (int *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax());
                 }else{
-                    ImGui::SliderInt(uniqueId.c_str(), (int *)&tempCast.get(), tempCast.getMin(), tempCast.getMax());
+                    ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast.get(), tempCast.getMin(), tempCast.getMax());
                 }
                 if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                     tempCast = tempCast;
@@ -133,7 +140,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 }
             }else if(absParam.type() == typeid(ofParameter<bool>).name()){
                 auto tempCast = absParam.cast<bool>();
-                if (ImGui::Checkbox(uniqueId.c_str(), (bool *)&tempCast.get()))
+                if (ImGui::Checkbox(hiddenUniqueId.c_str(), (bool *)&tempCast.get()))
                 {
                     tempCast = tempCast;
                 }
@@ -141,7 +148,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                     tempCast = !tempCast;
                 }
             }else if(absParam.type() == typeid(ofParameter<void>).name()){
-                if (ImGui::Button(uniqueId.c_str()))
+                if (ImGui::Button(hiddenUniqueId.c_str(), ImVec2(ImGui::GetFrameHeight(), 0)))
                 {
                     absParam.cast<void>().trigger();
                 }
@@ -153,7 +160,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 char * cString = new char[256];
                 strcpy(cString, tempCast.get().c_str());
                 auto result = false;
-                if (ImGui::InputText(uniqueId.c_str(), cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
+                if (ImGui::InputText(hiddenUniqueId.c_str(), cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
                 {
                     tempCast = tempCast;
                 }
@@ -162,7 +169,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 ImGui::Text("%s", absParam.getName().c_str());
             }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
                 auto tempCast = absParam.cast<ofFloatColor>();
-                if (ImGui::ColorEdit4(uniqueId.c_str(), (float*)&tempCast.get().r))
+                if (ImGui::ColorEdit4(hiddenUniqueId.c_str(), (float*)&tempCast.get().r))
                 {
                     tempCast = tempCast;
                 }
@@ -180,7 +187,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 
                 auto tempCast = absParam.castGroup();
                 vector<string> options = ofSplitString(tempCast.getString(0), "-|-");
-                if(ImGui::Combo(uniqueId.c_str(), (int*)&tempCast.getInt(1).get(), vector_getter, static_cast<void*>(&options), options.size())){
+                if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.getInt(1).get(), vector_getter, static_cast<void*>(&options), options.size())){
                     tempCast.getInt(1) = tempCast.getInt(1);
                 }
                 if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
@@ -190,15 +197,15 @@ bool ofxOceanodeNodeGui::constructGui(){
                 auto tempCast = absParam.cast<vector<float>>();
                 if(tempCast->size() == 1){
                     if(tempCast.getMin()[0] == FLT_MIN || tempCast.getMax()[0] == FLT_MAX){
-                        ImGui::DragFloat(uniqueId.c_str(), (float *)&tempCast->at(0), 1, tempCast.getMin()[0], tempCast.getMax()[0]);
+                        ImGui::DragFloat(hiddenUniqueId.c_str(), (float *)&tempCast->at(0), 1, tempCast.getMin()[0], tempCast.getMax()[0]);
                     }else{
-                        ImGui::SliderFloat(uniqueId.c_str(), (float *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]);
+                        ImGui::SliderFloat(hiddenUniqueId.c_str(), (float *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]);
                     }
                     if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                         tempCast = vector<float>(1, tempCast->at(0));
                     }
                 }else{
-                    ImGui::PlotHistogram(uniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
+                    ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
                 }
                 if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                     tempCast = tempCast;
@@ -207,25 +214,25 @@ bool ofxOceanodeNodeGui::constructGui(){
                 auto tempCast = absParam.cast<vector<int>>();
                 if(tempCast->size() == 1){
                     if(tempCast.getMin()[0] == INT_MIN || tempCast.getMax()[0] == INT_MAX){
-                        ImGui::DragInt(uniqueId.c_str(), (int *)&tempCast->at(0), 1, tempCast.getMin()[0], tempCast.getMax()[0]);
+                        ImGui::DragInt(hiddenUniqueId.c_str(), (int *)&tempCast->at(0), 1, tempCast.getMin()[0], tempCast.getMax()[0]);
                     }else{
-                        ImGui::SliderInt(uniqueId.c_str(), (int *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]);
+                        ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]);
                     }
                     if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                         tempCast = vector<int>(1, tempCast->at(0));
                     }
                 }else{
                     std::vector<float> floatVec(tempCast.get().begin(), tempCast.get().end());
-                    ImGui::PlotHistogram(uniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
+                    ImGui::PlotHistogram(hiddenUniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
                 }
                 if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                     tempCast = tempCast;
                 }
             }else {
-                ImGui::Text("%s", absParam.getName().c_str());
+                ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
             }
-            inputPositions[uniqueId] = glm::vec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
-            outputPositions[uniqueId] = glm::vec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
+            inputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
+            outputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
             
             if(ImGui::IsItemClicked(1)){
 #ifdef OFXOCEANODE_USE_MIDI
@@ -254,8 +261,11 @@ bool ofxOceanodeNodeGui::constructGui(){
     }
     ImGui::EndGroup();
     if(expanded){
+        for(auto &inPos : inputPositions){
+            inPos.second.x = ImGui::GetItemRectMin().x;
+        }
         for(auto &outPos : outputPositions){
-            outPos.second.x = inputPositions[outPos.first].x + ImGui::GetItemRectSize().x;
+            outPos.second.x = ImGui::GetItemRectMax().x;
         }
     }else{
         auto numParams = getParameters()->size();
