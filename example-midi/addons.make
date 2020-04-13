@@ -1,3 +1,4 @@
-ofxDatGui_PM
-ofxMidi
+ofxImGuiSimple
 ofxOceanode
+ofxMidi
+ofxOceanodeMidi

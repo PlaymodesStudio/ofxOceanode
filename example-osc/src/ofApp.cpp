@@ -2,21 +2,17 @@
 
 //--------------------------------------------------------------
 void ofApp::setup(){
-    container = make_shared<ofxOceanodeContainer>();
-    canvas.setContainer(container);
-    canvas.setup();
-    
-    controls = make_unique<ofxOceanodeControls>(container);
+    oceanode.setup();
 }
 
 //--------------------------------------------------------------
 void ofApp::update(){
-
+    oceanode.update();
 }
 
 //--------------------------------------------------------------
 void ofApp::draw(){
-
+    oceanode.draw();
 }
 
 //--------------------------------------------------------------

@@ -218,7 +218,19 @@ bool ofxOceanodeNodeGui::constructGui(){
         outputPositions[uniqueId] = glm::vec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
         
         if(ImGui::IsItemClicked(1)){
-            auto connection = node.parameterConnectionPress(container, absParam);
+#ifdef OFXOCEANODE_USE_MIDI
+            if(isListeningMidi){
+                if(ImGui::GetIO().KeyShift){
+                    container.removeLastMidiBinding(absParam);
+                }else{
+                    container.createMidiBinding(absParam);
+                }
+            }
+            else
+#endif
+            {
+                auto connection = node.parameterConnectionPress(container, absParam);
+            }
         }else if(container.isOpenConnection() && ImGui::IsItemHovered() && !ImGui::IsMouseDown(1)){
             auto connection = node.parameterConnectionRelease(container, absParam);
         }

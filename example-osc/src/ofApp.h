@@ -22,8 +22,6 @@ public:
     void dragEvent(ofDragInfo dragInfo);
     void gotMessage(ofMessage msg);
     
-    ofxOceanodeCanvas canvas;
-    shared_ptr<ofxOceanodeContainer> container;
-    unique_ptr<ofxOceanodeControls> controls;
+    ofxOceanode oceanode;
 };
 
