@@ -107,16 +107,16 @@ void ofxOceanodeCanvas::draw(){
     ImGui::BeginGroup();
     
     const float NODE_SLOT_RADIUS = 4.0f;
-    const ImVec2 NODE_WINDOW_PADDING(8.0f, 8.0f);
+    const ImVec2 NODE_WINDOW_PADDING(8.0f, 7.0f);
     
     // Create our child canvas
     ImGui::Text("Hold middle mouse button to scroll (%.2f,%.2f)", scrolling.x, scrolling.y);
-    ImGui::SameLine(ImGui::GetWindowWidth() - 100);
+    ImGui::SameLine(ImGui::GetWindowWidth() - 150);
     ImGui::Checkbox("Show grid", &show_grid);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(60, 60, 60, 200));
-    ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove);
+    ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
     ImGui::PushItemWidth(120.0f);
     
     ImVec2 offset = ImGui::GetCursorScreenPos() + scrolling;
@@ -153,14 +153,14 @@ void ofxOceanodeCanvas::draw(){
     draw_list->ChannelsSplit(2);
     draw_list->ChannelsSetCurrent(0); // Background
     for(auto &connection : container->getAllConnections()){
-        glm::vec2 p1 = getSourceConnectionPositionFromParameter(connection->getSourceParameter());
-        glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter());
+        glm::vec2 p1 = getSourceConnectionPositionFromParameter(connection->getSourceParameter()) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
+        glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter()) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
         glm::vec2  controlPoint(0,0);
         controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
         draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 200, 128), 2.0f);
     }
     if(container->isOpenConnection()){
-        glm::vec2 p1 = getSourceConnectionPositionFromParameter(container->getTemporalConnectionParameter());
+        glm::vec2 p1 = getSourceConnectionPositionFromParameter(container->getTemporalConnectionParameter()) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
         glm::vec2 p2 = ImGui::GetMousePos();
         glm::vec2  controlPoint(0,0);
         controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
@@ -186,9 +186,11 @@ void ofxOceanodeCanvas::draw(){
             bool node_widgets_active = (!old_any_active && ImGui::IsAnyItemActive());
             glm::vec2 size = ImGui::GetItemRectSize() + NODE_WINDOW_PADDING + NODE_WINDOW_PADDING;
             ImVec2 node_rect_max = node_rect_min + size;
-            ImVec2 node_rect_header = node_rect_min + ImVec2(size.x,23);
+            ImVec2 node_rect_header = node_rect_min + ImVec2(size.x,29);
             
-            node->setSize(size);
+            if(node->getExpanded()){
+                node->setSize(size);
+            }
             
             // Display node box
             draw_list->ChannelsSetCurrent(0); // Background
@@ -212,8 +214,9 @@ void ofxOceanodeCanvas::draw(){
             ImU32 node_hd_color = IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,64);
             
             
-            
-            draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
+            if(node->getExpanded()){
+                draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
+            }
             draw_list->AddRectFilled(node_rect_min, node_rect_header, node_hd_color, 4.0f);
             
             //draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(0, 0, 0, 255), 4.0f);
