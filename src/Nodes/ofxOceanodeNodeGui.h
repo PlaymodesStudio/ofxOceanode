@@ -43,6 +43,8 @@ public:
     
     void duplicate();
     
+    ofColor getColor(){return color;};
+    
     glm::vec2 getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter);
     glm::vec2 getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter);
     

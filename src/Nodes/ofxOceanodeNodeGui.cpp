@@ -60,8 +60,16 @@ bool ofxOceanodeNodeGui::constructGui(){
     ImGui::Text("%s", moduleName.c_str());
     
     ImGui::SameLine(guiRect.width - 30);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(220,220,220,255)));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(ImColor(0, 0, 0,0)));
+
     if (ImGui::Button("x"))
+    {
         ImGui::OpenPopup("Delete?");
+    }
+    ImGui::PopStyleColor();
+    ImGui::PopStyleColor();
+    
     if (ImGui::BeginPopupModal("Delete?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
     {
         ImGui::Text("%s", ("Are you sure you want to delete.\n " + moduleName + "\n").c_str());
@@ -80,11 +88,16 @@ bool ofxOceanodeNodeGui::constructGui(){
     for(int i=0 ; i<getParameters()->size(); i++){
         ofAbstractParameter &absParam = getParameters()->get(i);
         string uniqueId = absParam.getName();
+
+        ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()));
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()));
+
         if(absParam.type() == typeid(ofParameter<float>).name()){
             auto tempCast = absParam.cast<float>();
             if(tempCast.getMin() == FLT_MIN || tempCast.getMax() == FLT_MAX){
                 ImGui::DragFloat(uniqueId.c_str(), (float *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax());
             }else{
+                
                 ImGui::SliderFloat(uniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax());
             }
             //TODO: Implement better this hack
@@ -209,6 +222,10 @@ bool ofxOceanodeNodeGui::constructGui(){
         }else if(container.isOpenConnection() && ImGui::IsItemHovered() && !ImGui::IsMouseDown(1)){
             auto connection = node.parameterConnectionRelease(container, absParam);
         }
+        
+        ImGui::PopStyleColor();
+        ImGui::PopStyleColor();
+
     }
     ImGui::EndGroup();
     for(auto &outPos : outputPositions){

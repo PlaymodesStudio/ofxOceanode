@@ -115,7 +115,7 @@ void ofxOceanodeCanvas::draw(){
     ImGui::Checkbox("Show grid", &show_grid);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(60, 60, 70, 200));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(60, 60, 60, 200));
     ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove);
     ImGui::PushItemWidth(120.0f);
     
@@ -124,7 +124,7 @@ void ofxOceanodeCanvas::draw(){
     // Display grid
     if (show_grid)
     {
-        ImU32 GRID_COLOR = IM_COL32(200, 200, 200, 40);
+        ImU32 GRID_COLOR = IM_COL32(90, 90, 90, 40);
         float GRID_SZ = 64.0f;
         ImVec2 win_pos = ImGui::GetCursorScreenPos();
         ImVec2 canvas_sz = ImGui::GetWindowSize();
@@ -157,18 +157,19 @@ void ofxOceanodeCanvas::draw(){
         glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter());
         glm::vec2  controlPoint(0,0);
         controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
-        draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 100, 255), 3.0f);
+        draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 200, 128), 2.0f);
     }
     if(container->isOpenConnection()){
         glm::vec2 p1 = getSourceConnectionPositionFromParameter(container->getTemporalConnectionParameter());
         glm::vec2 p2 = ImGui::GetMousePos();
         glm::vec2  controlPoint(0,0);
         controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
-        draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 100, 255), 3.0f);
+        draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(255, 255, 255, 128), 1.0f);
     }
     
     // Display nodes
-    for(auto &node : container->getModulesGuiInRectangle(ofGetWindowRect(), false)){
+    for(auto &node : container->getModulesGuiInRectangle(ofGetWindowRect(), false))
+    {
         string nodeId = node->getParameters()->getName();
         ImGui::PushID(nodeId.c_str());
         
@@ -185,6 +186,7 @@ void ofxOceanodeCanvas::draw(){
             bool node_widgets_active = (!old_any_active && ImGui::IsAnyItemActive());
             glm::vec2 size = ImGui::GetItemRectSize() + NODE_WINDOW_PADDING + NODE_WINDOW_PADDING;
             ImVec2 node_rect_max = node_rect_min + size;
+            ImVec2 node_rect_header = node_rect_min + ImVec2(size.x,23);
             
             node->setSize(size);
             
@@ -206,9 +208,15 @@ void ofxOceanodeCanvas::draw(){
             
             
             
-            ImU32 node_bg_color = /*(node_hovered_in_list == node->ID || node_hovered_in_scene == node->ID || (node_hovered_in_list == -1 && node_selected == node->ID)) ? IM_COL32(75, 75, 75, 255) :*/ IM_COL32(60, 60, 60, 255);
+            ImU32 node_bg_color = /*(node_hovered_in_list == node->ID || node_hovered_in_scene == node->ID || (node_hovered_in_list == -1 && node_selected == node->ID)) ? IM_COL32(75, 75, 75, 255) :*/ IM_COL32(40, 40, 40, 255);
+            ImU32 node_hd_color = IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,64);
+            
+            
+            
             draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
-            draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(100, 100, 100, 255), 4.0f);
+            draw_list->AddRectFilled(node_rect_min, node_rect_header, node_hd_color, 4.0f);
+            
+            //draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(0, 0, 0, 255), 4.0f);
             
             if (ImGui::IsItemHovered() && ImGui::IsMouseDown(0) && ImGui::GetIO().KeySuper /*&& ImGui::IsKeyDown(OF_KEY_ALT)*/ && !isNodeDuplicated){
                 node->duplicate();
@@ -217,9 +225,9 @@ void ofxOceanodeCanvas::draw(){
             }
             
             for (auto &param : *node->getParameters().get())
-                draw_list->AddCircleFilled(node->getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
+                draw_list->AddCircleFilled(node->getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0), 3, IM_COL32(0, 0, 0, 255));
             for (auto &param : *node->getParameters().get())
-                draw_list->AddCircleFilled(node->getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0), NODE_SLOT_RADIUS, IM_COL32(150, 150, 150, 150));
+                draw_list->AddCircleFilled(node->getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0), 3, IM_COL32(0, 0, 0, 255));
         }
         
         //Delete duplicate module?
