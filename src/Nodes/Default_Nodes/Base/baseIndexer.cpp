@@ -20,14 +20,14 @@ baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name
     iota(randomizedIndexes.begin(), randomizedIndexes.end(), 0);
     indexRand_Param_previous = 0;
     
-    numWaves_Param.set("Num Waves", 1, 0, indexCount);
-    indexInvert_Param.set("Index Invert", 0, 0, 1);
-    symmetry_Param.set("Symmetry", 0, 0, indexCount/2);
-    indexRand_Param.set("Index Random", 0, -1, 1);
-    indexOffset_Param.set("Index Offset", 0, -indexCount/2, indexCount/2);
-    indexQuant_Param.set("Index Quantization", indexCount, 1, indexCount);
-    combination_Param.set("Index Combination", 0, 0, 1);
-    modulo_Param.set("Index Modulo", indexCount, 1, indexCount);
+    numWaves_Param.set("NWaves", 1, 0, indexCount);
+    indexInvert_Param.set("Invert", 0, 0, 1);
+    symmetry_Param.set("Sym", 0, 0, indexCount/2);
+    indexRand_Param.set("Random", 0, -1, 1);
+    indexOffset_Param.set("Offset", 0, -indexCount/2, indexCount/2);
+    indexQuant_Param.set("Quant", indexCount, 1, indexCount);
+    combination_Param.set("Comb", 0, 0, 1);
+    modulo_Param.set("Modulo", indexCount, 1, indexCount);
     
     recomputeIndexs();
 

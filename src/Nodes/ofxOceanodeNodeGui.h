@@ -45,6 +45,8 @@ public:
     
     ofColor getColor(){return color;};
     
+    bool getExpanded(){return expanded;};
+    
     glm::vec2 getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter);
     glm::vec2 getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter);
     
@@ -79,6 +81,8 @@ private:
     bool guiToBeDestroyed;
     bool lastExpandedState;
     bool isGuiCreated;
+    
+    bool expanded;
     
 #ifdef OFXOCEANODE_USE_MIDI
     bool isListeningMidi;

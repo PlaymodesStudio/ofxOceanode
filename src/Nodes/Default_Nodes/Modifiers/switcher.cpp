@@ -11,8 +11,8 @@
 void switcher::setup(){
     color = ofColor::white;
     parameters->add(switchSelector.set("Switch", 0, 0, 1));
-    parameters->add(input1.set("Input 1", {0}, {0}, {1}));
-    parameters->add(input2.set("Input 2", {0}, {0}, {1}));
+    parameters->add(input1.set("In 1", {0}, {0}, {1}));
+    parameters->add(input2.set("In 2", {0}, {0}, {1}));
     addOutputParameterToGroupAndInfo(output.set("Output", {0}, {0}, {1}));
 
     listeners.push(input1.newListener([&](vector<float> &vf){

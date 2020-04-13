@@ -11,10 +11,10 @@
 void mapper::setup() {
     color = ofColor::white;
     parameters->add(input.set("Input", {0}, {0}, {1}));
-    parameters->add(minInput.set("MinInput", {0}, {0}, {1}));
-    parameters->add(maxInput.set("MaxInput", {1}, {0}, {1}));
-    parameters->add(minOutput.set("MinOutput", {0}, {0}, {1}));
-    parameters->add(maxOutput.set("MaxOutput", {1}, {0}, {1}));
+    parameters->add(minInput.set("Min In", {0}, {0}, {1}));
+    parameters->add(maxInput.set("Max In", {1}, {0}, {1}));
+    parameters->add(minOutput.set("Min Out", {0}, {0}, {1}));
+    parameters->add(maxOutput.set("Max Out", {1}, {0}, {1}));
     addOutputParameterToGroupAndInfo(output.set("Output", {0}, {0}, {1}));
 
     listeners.push(input.newListener([&](vector<float> &vf){
