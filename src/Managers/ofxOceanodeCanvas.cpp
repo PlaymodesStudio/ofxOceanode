@@ -110,9 +110,9 @@ void ofxOceanodeCanvas::draw(){
     const ImVec2 NODE_WINDOW_PADDING(8.0f, 8.0f);
     
     // Create our child canvas
-    ImGui::Text("Hold middle mouse button to scroll (%.2f,%.2f)", scrolling.x, scrolling.y);
-    ImGui::SameLine(ImGui::GetWindowWidth() - 100);
-    ImGui::Checkbox("Show grid", &show_grid);
+    ImGui::Text("[%.2f,%.2f]", scrolling.x, scrolling.y);
+    //ImGui::SameLine(ImGui::GetWindowWidth() - 100);
+    //ImGui::Checkbox("Show grid", &show_grid);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(60, 60, 60, 200));
