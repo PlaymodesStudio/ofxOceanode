@@ -90,6 +90,7 @@ bool ofxOceanodeNodeGui::constructGui(){
         string uniqueId = absParam.getName();
 
         ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()));
+        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()));
         ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()));
 
         if(absParam.type() == typeid(ofParameter<float>).name()){
@@ -235,8 +236,7 @@ bool ofxOceanodeNodeGui::constructGui(){
             auto connection = node.parameterConnectionRelease(container, absParam);
         }
         
-        ImGui::PopStyleColor();
-        ImGui::PopStyleColor();
+        ImGui::PopStyleColor(3);
 
     }
     ImGui::EndGroup();
