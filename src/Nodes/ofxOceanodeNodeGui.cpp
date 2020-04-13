@@ -105,6 +105,7 @@ bool ofxOceanodeNodeGui::constructGui(){
             
             string hiddenUniqueId = "##" + uniqueId;
             ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()));
+            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()));
             ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()));
             
             ImGui::SetNextItemWidth(150);
@@ -252,9 +253,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 auto connection = node.parameterConnectionRelease(container, absParam);
             }
             
-            ImGui::PopStyleColor();
-            ImGui::PopStyleColor();
-            
+            ImGui::PopStyleColor(3);
         }
     }else{
         
