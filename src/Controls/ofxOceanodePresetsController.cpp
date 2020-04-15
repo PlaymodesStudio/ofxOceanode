@@ -85,7 +85,11 @@ void ofxOceanodePresetsController::draw(){
     };
     
     ImGui::Begin(controllerName.c_str());
-    if(ImGui::Combo("Bank", &currentBank, vector_getter, static_cast<void*>(&banks), banks.size())){
+    
+    // Bank related
+    ImGui::Text("%s","Bank :");
+    ImGui::SameLine();
+    if(ImGui::Combo("##Bank", &currentBank, vector_getter, static_cast<void*>(&banks), banks.size())){
         //TODO: Do something when load bank?
     }
     ImGui::SameLine(ImGui::GetWindowWidth() - 23);
@@ -114,19 +118,65 @@ void ofxOceanodePresetsController::draw(){
         }
         ImGui::EndPopup();
     }
+
+    ImGui::Separator();
     
-//    ImGui::Text("%s", "<== Presets List ==>");
-    float child_h = (ImGui::GetContentRegionAvail().y - (3 * ImGui::GetStyle().ItemSpacing.x));
-    float child_w = ImGui::GetContentRegionAvail().x;
-    ImGuiWindowFlags child_flags = ImGuiWindowFlags_MenuBar;
-    ImGui::BeginChild("Preset List", ImVec2(child_w, child_h), true, child_flags);
-    if (ImGui::BeginMenuBar())
+    // Preset related
+
+    // preset name, by default = "-" until it's loaded or saved.
+    string presetName = "-";
+    if(currentPreset[banks[currentBank]].second=="")
     {
-        ImGui::TextUnformatted("Presets List");
-        ImGui::EndMenuBar();
+        presetName = "-";
     }
+    else presetName = currentPreset[banks[currentBank]].second;
+    ImGui::Text("Preset : %s",presetName.c_str());
+    ImGui::SameLine(ImGui::GetWindowWidth() - 62);
+    if(ImGui::Button("Save")){
+        savePreset(currentPreset[banks[currentBank]].second,banks[currentBank]);
+    }
+    ImGui::SameLine(ImGui::GetWindowWidth() - 23);
+    if(ImGui::Button("+##NewPreset")){
+        ImGui::OpenPopup("Add New Preset");
+    }
+    if(ImGui::BeginPopupModal("Add New Preset", NULL, ImGuiWindowFlags_AlwaysAutoResize)){
+        static char cString[256];
+        if (ImGui::InputText("Preset Name", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
+        {
+            string proposedNewName(cString);
+            ofStringReplace(proposedNewName, " ", "_");
+
+            if(strcmp(proposedNewName.c_str(), "") != 0){
+                createPreset(string(proposedNewName));
+                newPresetCreated=true;
+            }
+            strcpy(cString, "");
+            ImGui::CloseCurrentPopup();
+        }
+        if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsItemActive()){
+            strcpy(cString, "");
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+
+    float child_h = ImGui::GetContentRegionAvail().y;
+    float child_w = ImGui::GetContentRegionAvail().x;
+    //ImGuiWindowFlags child_flags = ImGuiWindowFlags_MenuBar;
+    ImGui::BeginChild("Preset List", ImVec2(child_w, child_h), true);
+
+
+    // Draw Preset List
+    
     for(auto &p: bankPresets[banks[currentBank]]){
-        //Todo: Hightlight if current preset
+        
+        bool isCurrentPreset = (p == currentPreset[banks[currentBank]]);
+        
+        ImGuiStyle style = ImGui::GetStyle();
+    
+        if(isCurrentPreset) ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TabHovered]);
+        
         if(ImGui::Button(p.second.c_str())){
             if(ImGui::GetIO().KeyShift){
                 savePreset(p.second, banks[currentBank]);
@@ -135,20 +185,14 @@ void ofxOceanodePresetsController::draw(){
                 currentPreset[banks[currentBank]] = p;
             }
         }
+        if(isCurrentPreset) ImGui::PopStyleColor();
+
         if(newPresetCreated && p == bankPresets[banks[currentBank]].back()){
             ImGui::SetScrollHereY(0.0f);
             newPresetCreated = false;
         }
     }
     ImGui::EndChild();
-    static char cString[256] = "";
-    if (ImGui::InputText("New Preset", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
-    {
-        if(strcmp(cString, "") != 0){
-            createPreset(string(cString));
-        }
-        strcpy(cString, "");
-    }
     ImGui::End();
 }
 

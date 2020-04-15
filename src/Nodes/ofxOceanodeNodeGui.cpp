@@ -85,6 +85,11 @@ bool ofxOceanodeNodeGui::constructGui(){
             ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()));
             ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()));
             ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()));
+            ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(node.getColor()*.25f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
+
+
             
             ImGui::SetNextItemWidth(150);
             
@@ -231,7 +236,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 auto connection = node.parameterConnectionRelease(container, absParam);
             }
             
-            ImGui::PopStyleColor(3);
+            ImGui::PopStyleColor(6);
         }
     }else{
         
