@@ -65,7 +65,6 @@ public:
     bool loadParametersFromJson(ofJson json, bool persistentPreset = false);
     
     void setBpm(float bpm);
-    void setPhase(float _phase);
     void resetPhase();
     
     bool getIsPersistent(){return isPersistent;};

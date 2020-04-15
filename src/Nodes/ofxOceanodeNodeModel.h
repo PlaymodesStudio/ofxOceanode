@@ -49,13 +49,8 @@ public:
     ofEvent<void> parameterGroupChanged;
     ofEvent<string> disconnectConnectionsForParameter;
     
-    void registerLoop(shared_ptr<ofAppBaseWindow> w = nullptr);
-    
-    bool getAutoBPM(){return autoBPM;};
     virtual void setBpm(float _bpm){};
     virtual void resetPhase(){};
-    virtual void setPhase(float _phase){};
-    virtual void setContainer(ofxOceanodeContainer* container){};
     
     virtual void presetSave(ofJson &json){};
     virtual void presetRecallBeforeSettingParameters(ofJson &json){};
@@ -73,7 +68,9 @@ public:
     
     ofColor getColor(){return color;};
     
+    //For Macro
     virtual bool receiveOscMessage(ofxOscMessage &m){return false;};
+    virtual void setContainer(ofxOceanodeContainer* container){};
     
     parameterInfo& addParameterToGroupAndInfo(ofAbstractParameter& p);
     parameterInfo& addOutputParameterToGroupAndInfo(ofAbstractParameter& p);
@@ -96,10 +93,10 @@ public:
         return dropdownGroups.back();
     }
     ofEvent<std::pair<ofJson, string>> deserializeParameterEvent;
+    
 protected:
     shared_ptr<ofParameterGroup> parameters;
     std::map<string, parameterInfo> parametersInfo; //information about interaction of parameter
-    bool autoBPM;
     ofColor color;
     string nameIdentifier;
     unsigned int numIdentifier;

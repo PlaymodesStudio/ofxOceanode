@@ -94,7 +94,6 @@ public:
     void saveCurrentPreset();
     
     void setBpm(float _bpm);
-    void setPhase(float _phase);
     void resetPhase();
     
     ofEvent<string> loadPresetEvent;
@@ -129,8 +128,6 @@ public:
     bool copyModulesAndConnectionsInsideRect(ofRectangle rect, bool entire);
     bool cutModulesAndConnectionsInsideRect(ofRectangle rect, bool entire);
     bool pasteModulesAndConnectionsInPosition(glm::vec2 position);
-    void setWindow(std::shared_ptr<ofAppBaseWindow> window);
-    void setAutoUpdateAndDraw(bool b);
     
     vector<shared_ptr<ofxOceanodeAbstractConnection>> getAllConnections();
 #endif
@@ -152,12 +149,6 @@ private:
     ofEventListeners destroyNodeListeners;
     ofEventListeners duplicateNodeListeners;
     ofEventListeners destroyConnectionListeners;
-    
-    ofEventListener updateListener;
-    ofEventListener drawListener;
-    bool autoUpdateAndDraw;
-    
-    shared_ptr<ofAppBaseWindow> window;
     
     ofParameter<glm::mat4> transformationMatrix;
     float bpm;

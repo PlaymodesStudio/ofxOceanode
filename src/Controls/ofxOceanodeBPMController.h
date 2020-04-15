@@ -46,7 +46,7 @@ private:
 
     
 #ifdef OFXOCEANODE_USE_BPM_DETECTION
-    ofxDatGuiToggle* useDetection;
+    bool useDetection;
     ofxAubioBeat bpmDetection;
     ofSoundStream soundStream;
 #endif

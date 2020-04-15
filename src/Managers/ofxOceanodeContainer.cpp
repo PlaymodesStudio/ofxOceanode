@@ -22,14 +22,10 @@
 ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry, shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry) : registry(_registry), typesRegistry(_typesRegistry){
     if(registry == nullptr) registry = make_shared<ofxOceanodeNodeRegistry>();
     if(typesRegistry == nullptr) typesRegistry = make_shared<ofxOceanodeTypesRegistry>();
-    window = ofGetCurrentWindow();
     transformationMatrix = glm::mat4(1.0);
     temporalConnection = nullptr;
     bpm = 120;
     phase = 0;
-    autoUpdateAndDraw = true;
-//    updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
-//    drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
     
 #ifdef OFXOCEANODE_USE_MIDI
     ofxMidiIn* midiIn = new ofxMidiIn();
@@ -164,14 +160,13 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
     node->setup();
 #ifndef OFXOCEANODE_HEADLESS
-        auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node, window);
+        auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);
 #ifdef OFXOCEANODE_USE_MIDI
         nodeGui->setIsListeningMidi(isListeningMidi);
 #endif
         node->setGui(std::move(nodeGui));
 #endif
     node->setBpm(bpm);
-    node->setPhase(phase);
     node->setIsPersistent(isPersistent);
     
     auto nodePtr = node.get();
@@ -252,11 +247,6 @@ void ofxOceanodeContainer::temporalConnectionDestructor(){
 bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     ofStringReplace(presetFolderPath, " ", "_");
     ofLog()<<"Load Preset " << presetFolderPath;
-    
-    if(window != nullptr){
-        window->makeCurrent();
-        ofGetMainLoop()->setCurrentWindow(window);
-    }
     
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
@@ -596,11 +586,6 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
     string presetFolderPath = "clipboardPreset";
     ofLog()<<"Load Clipboard Preset";
     
-    if(window != nullptr){
-        window->makeCurrent();
-        ofGetMainLoop()->setCurrentWindow(window);
-    }
-    
     map<string, map<int, int>> moduleConverter;
     vector<ofxOceanodeNode*> newCreatedNodes;
     
@@ -770,11 +755,6 @@ void ofxOceanodeContainer::loadPersistent(){
     ofLog()<<"Load Persistent";
     string persistentFolderPath = "Persistent";
     
-    if(window != nullptr){
-        window->makeCurrent();
-        ofGetMainLoop()->setCurrentWindow(window);
-    }
-    
     //Read new nodes in preset
     //Check if the nodes exists and update them, (or update all at the end)
     //Create new modules and update them (or update at end)
@@ -910,20 +890,6 @@ void ofxOceanodeContainer::setBpm(float _bpm){
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->setBpm(bpm);
-        }
-    }
-}
-
-void ofxOceanodeContainer::setPhase(float _phase){
-    phase = _phase;
-    for(auto &nodeTypeMap : dynamicNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->setPhase(phase);
-        }
-    }
-    for(auto &nodeTypeMap : persistentNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->setPhase(phase);
         }
     }
 }
@@ -1312,31 +1278,6 @@ bool ofxOceanodeContainer::cutModulesAndConnectionsInsideRect(ofRectangle rect, 
 
 bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 position){
     return loadClipboardModulesAndConnections(position);
-}
-
-void ofxOceanodeContainer::setWindow(std::shared_ptr<ofAppBaseWindow> _window){
-    window = _window;
-    if(window != nullptr && autoUpdateAndDraw){
-//        updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
-//        drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
-    }
-    for(auto &nodeTypeMap : dynamicNodes){
-        for(auto &node : nodeTypeMap.second){
-            auto &nodeGui = node.second->getNodeGui();
-            nodeGui.setWindow(window);
-        }
-    }
-}
-
-void ofxOceanodeContainer::setAutoUpdateAndDraw(bool b){
-    autoUpdateAndDraw = b;
-    if(b){
-//        updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
-//        drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
-    }else{
-//        updateListener.unsubscribe();
-//        drawListener.unsubscribe();
-    }
 }
 
 vector<shared_ptr<ofxOceanodeAbstractConnection>> ofxOceanodeContainer::getAllConnections(){

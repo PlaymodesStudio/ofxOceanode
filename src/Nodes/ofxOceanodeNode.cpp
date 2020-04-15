@@ -401,24 +401,11 @@ void ofxOceanodeNode::deserializeParameter(ofJson &json, ofAbstractParameter &p,
 }
 
 void ofxOceanodeNode::setBpm(float bpm){
-    if(getParameters()->contains("BPM") && nodeModel->getAutoBPM()){
-        if(!checkHasInConnection(getParameters()->getFloat("BPM")))
-            getParameters()->getFloat("BPM") = bpm;
-    }else{
-        nodeModel->setBpm(bpm);
-    }
-}
-
-void ofxOceanodeNode::setPhase(float phase){
-    nodeModel->setPhase(phase);
+    nodeModel->setBpm(bpm);
 }
 
 void ofxOceanodeNode::resetPhase(){
-    if(getParameters()->contains("Reset Phase")){
-        getParameters()->getVoid("Reset Phase").trigger();
-    }else{
-        nodeModel->resetPhase();
-    }
+    nodeModel->resetPhase();
 }
 
 bool ofxOceanodeNode::checkHasInConnection(ofAbstractParameter &p){

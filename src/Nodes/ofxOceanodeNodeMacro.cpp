@@ -118,10 +118,6 @@ void ofxOceanodeNodeMacro::setup(){
     registry->registerModel<inlet<ofTexture*>>("I/O");
     registry->registerModel<outlet<ofTexture*>>("I/O");
     container = make_shared<ofxOceanodeContainer>(registry, typesRegistry);
-#ifndef OFXOCEANODE_HEADLESS
-    container->setAutoUpdateAndDraw(false);
-    container->setWindow(nullptr);
-#endif
     newNodeListener = container->newNodeCreated.newListener(this, &ofxOceanodeNodeMacro::newNodeCreated);
     ofDirectory dir;
     if(!dir.doesDirectoryExist("MacroPresets")){
