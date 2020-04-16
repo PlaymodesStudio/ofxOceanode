@@ -287,12 +287,14 @@ void ofxOceanodeCanvas::draw(){
     
     // Draw New Node menu
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+    
+
     if (ImGui::BeginPopup("New Node"))
     {
         char * cString = new char[256];
         strcpy(cString, searchField.c_str());
         
-        if(ImGui::InputText("Search", cString, 256)){
+        if(ImGui::InputText("?", cString, 256)){
             searchField = cString;
         }
         
@@ -308,9 +310,17 @@ void ofxOceanodeCanvas::draw(){
                 ImGui::SetNextTreeNodeOpen(false);
             }
             if(searchField != "") ImGui::SetNextTreeNodeOpen(true);
+
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f,0.45f,0.0f,0.5f));
+            ImGui::Button("##colorTree",ImVec2(5,0));
+            ImGui::PopStyleColor();
+            ImGui::SameLine();
+
             
-            if(ImGui::TreeNode(categoriesVector[i].c_str())){
-                for(auto &op : options[i]){
+            if(ImGui::TreeNode(categoriesVector[i].c_str()))
+            {
+                for(auto &op : options[i])
+                {
                     bool showThis = false;
                     if(searchField != ""){
                         string lowercaseName = op;
@@ -321,28 +331,41 @@ void ofxOceanodeCanvas::draw(){
                     }else{
                         showThis = true;
                     }
-                    if(showThis){
-                        if(ImGui::Selectable(op.c_str()) || isEnterPressed){
+                    if(showThis)
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f,0.45f,0.0f,0.5f));
+                        ImGui::Button("##colorBand",ImVec2(5,0));
+                        ImGui::SameLine();
+                        ImGui::PopStyleColor();
+                        
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
+
+                        if(ImGui::Selectable(op.c_str()) || isEnterPressed)
+                        {
                             unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
-                            
                             if (type)
                             {
                                 auto &node = container->createNode(std::move(type));
-                                
                                 node.getNodeGui().setPosition(newNodeClickPos - offset);
                             }
-                            ImGui::CloseCurrentPopup();
+                            ImGui::PopStyleColor();
+
                             isEnterPressed = false; //Next options we dont want to create them;
                             break;
                         }
+                        ImGui::PopStyleColor();
+
+                        
                     }
                 }
+                //ImGui::CloseCurrentPopup();
                 ImGui::TreePop();
             }
         }
         ImGui::EndPopup();
     }
     ImGui::PopStyleVar();
+    //ImGui::PopStyleColor();
     
     // Scrolling
     if (ImGui::IsWindowHovered() /*&& !ImGui::IsAnyItemActive() */&& ImGui::IsMouseDragging(0, 0.0f)){

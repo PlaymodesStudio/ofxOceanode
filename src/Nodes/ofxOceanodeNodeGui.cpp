@@ -58,9 +58,13 @@ bool ofxOceanodeNodeGui::constructGui(){
     
     bool deleteModule = false;
     
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
+
     if(ImGui::ArrowButton("expand", expanded ? ImGuiDir_Down : ImGuiDir_Right)){
         expanded = !expanded;
     }
+    ImGui::PopStyleColor();
+    
     ImGui::SameLine();
 //    ImGui::SameLine(0, 10);
     ImGui::Text("%s", moduleName.c_str());
@@ -73,8 +77,7 @@ bool ofxOceanodeNodeGui::constructGui(){
     {
         ImGui::OpenPopup("Delete?");
     }
-    ImGui::PopStyleColor();
-    ImGui::PopStyleColor();
+    ImGui::PopStyleColor(2);
     
     if (ImGui::BeginPopupModal("Delete?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
     {
@@ -111,8 +114,6 @@ bool ofxOceanodeNodeGui::constructGui(){
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
 
-
-            
             ImGui::SetNextItemWidth(150);
             
             if(absParam.type() == typeid(ofParameter<float>).name()){
