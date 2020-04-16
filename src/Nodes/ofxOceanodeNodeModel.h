@@ -82,7 +82,7 @@ public:
     
     ofAbstractParameter& createDropdownAbstractParameter(string name, vector<string> options, ofParameter<int> &dropdownSelector){
         dropdownGroups.emplace_back();
-        dropdownGroups.back().setName(name + " Selector");
+        dropdownGroups.back().setName(name);
         string  tempStr;
         ofParameter<string> tempStrParam("Options");
         for(auto opt : options)
