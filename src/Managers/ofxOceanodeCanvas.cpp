@@ -434,7 +434,7 @@ void ofxOceanodeCanvas::draw(){
                                 node.getNodeGui().setPosition(newNodeClickPos - offset);
                             }
                             ImGui::PopStyleColor();
-
+                            ImGui::CloseCurrentPopup();
                             isEnterPressed = false; //Next options we dont want to create them;
                             break;
                         }
