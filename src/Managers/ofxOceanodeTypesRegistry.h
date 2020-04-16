@@ -14,7 +14,7 @@ class ofxOceanodeTypesRegistry{
 public:
     using registryCreator   = std::function<ofxOceanodeAbstractConnection*(ofxOceanodeContainer &container, ofAbstractParameter &source, ofAbstractParameter &sink)>;
     
-    ofxOceanodeTypesRegistry(){};
+    ofxOceanodeTypesRegistry();
     ~ofxOceanodeTypesRegistry(){};
     
     template<typename T>

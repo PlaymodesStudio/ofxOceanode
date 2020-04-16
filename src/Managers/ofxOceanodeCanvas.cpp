@@ -135,18 +135,16 @@ void ofxOceanodeCanvas::draw(){
     }
     
     auto getSourceConnectionPositionFromParameter = [this](ofAbstractParameter& param) -> glm::vec2{
-        for(auto &node : container->getModulesGuiInRectangle(ofGetWindowRect(), false)){
-            if(node->getParameters()->getEscapedName()  == param.getGroupHierarchyNames()[0]){
-                return node->getSourceConnectionPositionFromParameter(param);
-            }
+        if(container->getParameterGroupNodesMap().count(param.getGroupHierarchyNames().front())){
+            return container->getParameterGroupNodesMap().at(param.getGroupHierarchyNames().front())->getNodeGui().getSourceConnectionPositionFromParameter(param);
         }
+        //TODO: Throw exception
     };
     auto getSinkConnectionPositionFromParameter = [this](ofAbstractParameter& param) -> glm::vec2{
-        for(auto &node : container->getModulesGuiInRectangle(ofGetWindowRect(), false)){
-            if(node->getParameters()->getEscapedName() == param.getGroupHierarchyNames()[0]){
-                return node->getSinkConnectionPositionFromParameter(param);
-            }
+        if(container->getParameterGroupNodesMap().count(param.getGroupHierarchyNames().front())){
+            return container->getParameterGroupNodesMap().at(param.getGroupHierarchyNames().front())->getNodeGui().getSinkConnectionPositionFromParameter(param);
         }
+        //TODO: Throw exception
     };
     
     // Display links
@@ -159,28 +157,45 @@ void ofxOceanodeCanvas::draw(){
         controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
         draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 200, 128), 2.0f);
     }
-    if(container->isOpenConnection()){
-        glm::vec2 p1 = getSourceConnectionPositionFromParameter(container->getTemporalConnectionParameter()) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
-        glm::vec2 p2 = ImGui::GetMousePos();
+//    if(container->isOpenConnection()){
+//        glm::vec2 p1 = getSourceConnectionPositionFromParameter(container->getTemporalConnectionParameter()) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
+//        glm::vec2 p2 = ImGui::GetMousePos();
+//        glm::vec2  controlPoint(0,0);
+//        controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
+//        draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(255, 255, 255, 128), 1.0f);
+//    }
+    if(tempSourceParameter != nullptr || tempSinkParameter != nullptr){
+        glm::vec2 p1, p2;
+        if(tempSourceParameter != nullptr){
+            p1 = getSourceConnectionPositionFromParameter(*tempSourceParameter) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
+            p2 = ImGui::GetMousePos();
+        }else{
+            p1 = ImGui::GetMousePos();
+            p2 = getSinkConnectionPositionFromParameter(*tempSinkParameter) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
+        }
         glm::vec2  controlPoint(0,0);
         controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
         draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(255, 255, 255, 128), 1.0f);
     }
     
     // Display nodes
-    for(auto &node : container->getModulesGuiInRectangle(ofGetWindowRect(), false))
+    //Iterating over the map gives errors as we are removing elements from the map during the iteration.
+    vector<pair<string, ofxOceanodeNode*>> nodesInThisFrame = vector<pair<string, ofxOceanodeNode*>>(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
+    for(auto nodePair : nodesInThisFrame)
     {
+        auto node = nodePair.second;
+        auto &nodeGui = node->getNodeGui();
         string nodeId = node->getParameters()->getName();
         ImGui::PushID(nodeId.c_str());
         
-        glm::vec2 node_rect_min = offset + node->getPosition();
+        glm::vec2 node_rect_min = offset + nodeGui.getPosition();
         // Display node contents first
         draw_list->ChannelsSetCurrent(1); // Foreground
         bool old_any_active = ImGui::IsAnyItemActive();
         ImGui::SetCursorScreenPos(node_rect_min + NODE_WINDOW_PADDING);
         
         //Draw Parameters
-        if(node->constructGui()){
+        if(nodeGui.constructGui()){
             
             // Save the size of what we have emitted and whether any of the widgets are being used
             bool node_widgets_active = (!old_any_active && ImGui::IsAnyItemActive());
@@ -188,8 +203,8 @@ void ofxOceanodeCanvas::draw(){
             ImVec2 node_rect_max = node_rect_min + size;
             ImVec2 node_rect_header = node_rect_min + ImVec2(size.x,29);
             
-            if(node->getExpanded()){
-                node->setSize(size);
+            if(nodeGui.getExpanded()){
+                nodeGui.setSize(size);
             }
             
             // Display node box
@@ -203,34 +218,103 @@ void ofxOceanodeCanvas::draw(){
                 open_context_menu |= ImGui::IsMouseClicked(1);
             }
             bool node_moving_active = ImGui::IsItemActive();
-            if (node_widgets_active || node_moving_active)
-                node_selected = nodeId;
-            if (node_moving_active && ImGui::IsMouseDragging(0))
-                node->setPosition(node->getPosition() + ImGui::GetIO().MouseDelta);
-            
-            
             
             ImU32 node_bg_color = /*(node_hovered_in_list == node->ID || node_hovered_in_scene == node->ID || (node_hovered_in_list == -1 && node_selected == node->ID)) ? IM_COL32(75, 75, 75, 255) :*/ IM_COL32(40, 40, 40, 255);
             ImU32 node_hd_color = IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,64);
             
             
-            if(node->getExpanded()){
+            if(nodeGui.getExpanded()){
                 draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
             }
             draw_list->AddRectFilled(node_rect_min, node_rect_header, node_hd_color, 4.0f);
             
             //draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(0, 0, 0, 255), 4.0f);
             
-            if (ImGui::IsItemHovered() && ImGui::IsMouseDown(0) && ImGui::GetIO().KeySuper /*&& ImGui::IsKeyDown(OF_KEY_ALT)*/ && !isNodeDuplicated){
-                node->duplicate();
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDown(0) && ImGui::GetIO().KeySuper && !isNodeDuplicated){
+                nodeGui.duplicate();
                 //TODO: Change focus to new duplicated node
                 isNodeDuplicated = true;
             }
             
-            for (auto &param : *node->getParameters().get())
-                draw_list->AddCircleFilled(node->getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0), 3, IM_COL32(0, 0, 0, 255));
-            for (auto &param : *node->getParameters().get())
-                draw_list->AddCircleFilled(node->getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0), 3, IM_COL32(0, 0, 0, 255));
+            int NODE_BULLET_MIN_SIZE = 3;
+            int NODE_BULLET_MAX_SIZE = 10;
+            int NODE_BULLET_GROW_DIST = 10;
+            
+            for (auto &param : *node->getParameters().get()){
+                //TODO: Check if parameter is plugable
+                auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
+                //TODO: only grow bulllets that the temporal connection is plugable to.
+                auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
+                auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
+                draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
+                if(mouseToBulletDistance < bulletSize){
+                    if(ImGui::IsMouseClicked(0)){
+                        isCreatingConnection = true;
+                        auto inConnection = node->getInputConnectionForParameter(*param);
+                        if(inConnection != nullptr){ //Parmaeter has sink connected
+                            tempSourceParameter = &inConnection->getSourceParameter();
+                            if(!ImGui::GetIO().KeyAlt){
+                                container->destroyConnection(inConnection);
+                            }
+                        }else{
+                            tempSinkParameter = param.get();
+                        }
+                    }else if(ImGui::IsMouseReleased(0) && isCreatingConnection){
+                        isCreatingConnection = false;
+                        if(tempSinkParameter != nullptr){
+                            tempSinkParameter = nullptr;
+                            ofLog() << "Cannot create a conection from Sink to Sink";
+                        }
+                        else if(tempSourceParameter != nullptr){
+                            if(tempSourceParameter != param.get()){ //Is the same parameter, no conection between them
+                                //Remove previous connection connected to that parameter.
+                                auto inConnection = node->getInputConnectionForParameter(*param);
+                                if(inConnection != nullptr) container->destroyConnection(inConnection);
+                                container->createConnection(*tempSourceParameter, *param);
+                            }
+                            else{
+                                ofLog() << "Cannot create connection with same parameter";
+                            }
+                            tempSourceParameter = nullptr;
+                        }
+                    }
+                }
+            }
+            for (auto &param : *node->getParameters().get()){
+                //TODO: Check if parameter is plugable
+                auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
+                //TODO: only grow bulllets that the temporal connection is plugable to.
+                auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
+                auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
+                draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
+                if(mouseToBulletDistance < bulletSize){
+                    if(ImGui::IsMouseClicked(0)){
+                        isCreatingConnection = true;
+                        tempSourceParameter = param.get();
+                    }else if(ImGui::IsMouseReleased(0) && isCreatingConnection){
+                        isCreatingConnection = false;
+                        if(tempSourceParameter != nullptr){
+                            tempSourceParameter = nullptr;
+                            ofLog() << "Cannot create a conection from Source to Source";
+                        }
+                        if(tempSinkParameter != nullptr){
+                            if(tempSinkParameter != param.get()){ //Is the same parameter, no conection between them
+                                container->createConnection(*param, *tempSinkParameter);
+                            }
+                            else{
+                                ofLog() << "Cannot create connection with same parameter";
+                            }
+                            tempSinkParameter = nullptr;
+                        }
+                    }
+                }
+            }
+            if(!isCreatingConnection){
+                if (node_widgets_active || node_moving_active)
+                    node_selected = nodeId;
+                if (node_moving_active && ImGui::IsMouseDragging(0))
+                    nodeGui.setPosition(nodeGui.getPosition() + ImGui::GetIO().MouseDelta);
+            }
         }
         
         //Delete duplicate module?
@@ -265,12 +349,6 @@ void ofxOceanodeCanvas::draw(){
     
     if(!ofGetKeyPressed(OF_KEY_COMMAND)){
         isNodeDuplicated = false;
-    }
-    
-    if(container->isOpenConnection()){
-        if(!ImGui::IsMouseDown(1)){
-            container->destroyTemporalConnection();
-        }
     }
     
     draw_list->ChannelsMerge();
@@ -345,8 +423,15 @@ void ofxOceanodeCanvas::draw(){
     ImGui::PopStyleVar();
     
     // Scrolling
-    if (ImGui::IsWindowHovered() /*&& !ImGui::IsAnyItemActive() */&& ImGui::IsMouseDragging(0, 0.0f)){
+    if (ImGui::IsWindowHovered() && ImGui::IsMouseDragging(0, 0.0f) && !isCreatingConnection){
         scrolling = scrolling + ImGui::GetIO().MouseDelta;
+    }
+    
+    if (isCreatingConnection && !ImGui::IsMouseDown(0)){
+        //Destroy temporal connection
+        tempSourceParameter = nullptr;
+        tempSinkParameter = nullptr;
+        isCreatingConnection = false;
     }
     
     ImGui::PopItemWidth();

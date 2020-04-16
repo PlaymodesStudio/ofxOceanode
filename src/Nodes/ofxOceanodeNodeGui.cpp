@@ -218,23 +218,23 @@ bool ofxOceanodeNodeGui::constructGui(){
             inputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
             outputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
             
-            if(ImGui::IsItemClicked(1)){
-#ifdef OFXOCEANODE_USE_MIDI
-                if(isListeningMidi){
-                    if(ImGui::GetIO().KeyShift){
-                        container.removeLastMidiBinding(absParam);
-                    }else{
-                        container.createMidiBinding(absParam);
-                    }
-                }
-                else
-#endif
-                {
-                    auto connection = node.parameterConnectionPress(container, absParam);
-                }
-            }else if(container.isOpenConnection() && ImGui::IsItemHovered() && !ImGui::IsMouseDown(1)){
-                auto connection = node.parameterConnectionRelease(container, absParam);
-            }
+//            if(ImGui::IsItemClicked(1)){
+//#ifdef OFXOCEANODE_USE_MIDI
+//                if(isListeningMidi){
+//                    if(ImGui::GetIO().KeyShift){
+//                        container.removeLastMidiBinding(absParam);
+//                    }else{
+//                        container.createMidiBinding(absParam);
+//                    }
+//                }
+//                else
+//#endif
+//                {
+//                    auto connection = node.parameterConnectionPress(container, absParam);
+//                }
+//            }else if(container.isOpenConnection() && ImGui::IsItemHovered() && !ImGui::IsMouseDown(1)){
+//                auto connection = node.parameterConnectionRelease(container, absParam);
+//            }
             
             ImGui::PopStyleColor(6);
         }
