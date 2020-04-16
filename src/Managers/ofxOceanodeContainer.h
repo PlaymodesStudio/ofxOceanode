@@ -33,7 +33,7 @@ class ofxMidiListener;
 
 class ofxOceanodeContainer {
 public:
-    using nodeContainerWithId = std::unordered_map<int, unique_ptr<ofxOceanodeNode>>;
+    using nodeContainerWithId = std::unordered_map<int, shared_ptr<ofxOceanodeNode>>;
     
     ofxOceanodeContainer(std::shared_ptr<ofxOceanodeNodeRegistry> _registry = nullptr, std::shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry = nullptr);
     ~ofxOceanodeContainer();
@@ -57,27 +57,18 @@ public:
         return node;
     }
     
-//    void createConnection(ofAbstractParameter& p);
-    
     ofxOceanodeAbstractConnection* createConnection(ofAbstractParameter& p, ofxOceanodeNode& n);
-    
-    ofxOceanodeAbstractConnection* disconnectConnection(ofxOceanodeAbstractConnection* c);
     void destroyConnection(ofxOceanodeAbstractConnection* c);
-    
-    ofAbstractParameter& getTemporalConnectionParameter(){return temporalConnection->getSourceParameter();};
-    void destroyTemporalConnection(){temporalConnectionDestructor();};//Make some checks?
-    
-    bool isOpenConnection(){return temporalConnection != nullptr;}
     
     template<typename Tsource, typename Tsink>
     ofxOceanodeAbstractConnection* connectConnection(ofParameter<Tsource>& source, ofParameter<Tsink>& sink){
-        connections.push_back(make_pair(temporalConnectionNode, make_shared<ofxOceanodeConnection<Tsource, Tsink>>(source, sink)));
-        temporalConnectionNode->addOutputConnection(connections.back().second.get());
-        temporalConnectionDestructor();
-        return connections.back().second.get();
+        connections.push_back(move(make_unique<ofxOceanodeConnection<Tsource, Tsink>>(source, sink)));
+        parameterGroupNodesMap[source.getGroupHierarchyNames().front()]->addOutputConnection(connections.back().get());
+        parameterGroupNodesMap[sink.getGroupHierarchyNames().front()]->addInputConnection(connections.back().get());
+        return connections.back().get();
     }
     ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter);
-    ofxOceanodeAbstractConnection* createConnectionFromCustomType(ofAbstractParameter &source, ofAbstractParameter &sink);
+    ofxOceanodeAbstractConnection* createConnection(ofAbstractParameter &source, ofAbstractParameter &sink);
     
     shared_ptr<ofxOceanodeNodeRegistry> getRegistry(){return registry;};
     shared_ptr<ofxOceanodeTypesRegistry> getTypesRegistry(){return typesRegistry;};
@@ -94,7 +85,6 @@ public:
     void saveCurrentPreset();
     
     void setBpm(float _bpm);
-    void setPhase(float _phase);
     void resetPhase();
     
     ofEvent<string> loadPresetEvent;
@@ -129,10 +119,9 @@ public:
     bool copyModulesAndConnectionsInsideRect(ofRectangle rect, bool entire);
     bool cutModulesAndConnectionsInsideRect(ofRectangle rect, bool entire);
     bool pasteModulesAndConnectionsInPosition(glm::vec2 position);
-    void setWindow(std::shared_ptr<ofAppBaseWindow> window);
-    void setAutoUpdateAndDraw(bool b);
     
-    vector<shared_ptr<ofxOceanodeAbstractConnection>> getAllConnections();
+    const vector<unique_ptr<ofxOceanodeAbstractConnection>>& getAllConnections(){return connections;};
+    const std::unordered_map<string, ofxOceanodeNode*> & getParameterGroupNodesMap(){return parameterGroupNodesMap;};
 #endif
     
 private:
@@ -141,23 +130,16 @@ private:
     //NodeModel;
     std::unordered_map<string, nodeContainerWithId> dynamicNodes;
     std::unordered_map<string, nodeContainerWithId> persistentNodes;
+    
+    std::unordered_map<string, ofxOceanodeNode*> parameterGroupNodesMap; //Maps nodes to parameterGroup.getName() reference, used in canvas
 
-    string temporalConnectionTypeName;
-    ofxOceanodeNode* temporalConnectionNode;
-    ofxOceanodeTemporalConnection*   temporalConnection;
-    vector<pair<ofxOceanodeNode*, shared_ptr<ofxOceanodeAbstractConnection>>> connections;
+    vector<unique_ptr<ofxOceanodeAbstractConnection>> connections;
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;
     std::shared_ptr<ofxOceanodeTypesRegistry>   typesRegistry;
     
     ofEventListeners destroyNodeListeners;
     ofEventListeners duplicateNodeListeners;
     ofEventListeners destroyConnectionListeners;
-    
-    ofEventListener updateListener;
-    ofEventListener drawListener;
-    bool autoUpdateAndDraw;
-    
-    shared_ptr<ofAppBaseWindow> window;
     
     ofParameter<glm::mat4> transformationMatrix;
     float bpm;

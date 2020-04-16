@@ -10,7 +10,6 @@
 
 ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name){
     parameters = make_shared<ofParameterGroup>(_name);
-    autoBPM = true;
     color = ofColor(ofRandom(255), ofRandom(255), ofRandom(255));
     color.setBrightness(255);
     numIdentifier = -1;
@@ -20,16 +19,6 @@ ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name)
 void ofxOceanodeNodeModel::setNumIdentifier(unsigned int num){
     numIdentifier = num;
     parameters->setName(nameIdentifier + " " + ofToString(num));
-}
-
-void ofxOceanodeNodeModel::registerLoop(shared_ptr<ofAppBaseWindow> w){
-    if(w == nullptr){
-        eventListeners.push(ofEvents().draw.newListener(this, &ofxOceanodeNodeModel::draw));
-        eventListeners.push(ofEvents().update.newListener(this, &ofxOceanodeNodeModel::update));
-    }else{
-        eventListeners.push(w->events().draw.newListener(this, &ofxOceanodeNodeModel::draw));
-        eventListeners.push(w->events().update.newListener(this, &ofxOceanodeNodeModel::update));
-    }
 }
 
 parameterInfo& ofxOceanodeNodeModel::addParameterToGroupAndInfo(ofAbstractParameter& p){

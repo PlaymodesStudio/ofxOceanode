@@ -47,19 +47,6 @@ private:
     bool isPersistent;
 };
 
-class ofxOceanodeNode;
-
-class ofxOceanodeTemporalConnection: public ofxOceanodeAbstractConnection{
-public:
-    ofxOceanodeTemporalConnection(ofAbstractParameter& _p) : ofxOceanodeAbstractConnection(_p){
-        
-    }
-    ~ofxOceanodeTemporalConnection(){};
-    
-private:
-
-};
-
 template<typename Tsource, typename Tsink, typename Enable = void>
 class ofxOceanodeConnection: public ofxOceanodeAbstractConnection{
 public:

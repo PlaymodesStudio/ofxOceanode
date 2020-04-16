@@ -51,7 +51,9 @@ public:
     void setup();
     void update(ofEventArgs &e);
     
-    void setPhase(float _phase) override;
+    void resetPhase() override;
+    void setBpm(float bpm) override;
+    
 private:
     basePhasor basePh;
 

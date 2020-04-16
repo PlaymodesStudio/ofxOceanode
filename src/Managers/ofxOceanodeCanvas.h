@@ -77,6 +77,9 @@ private:
     bool isNodeDuplicated = false;
     glm::vec2 newNodeClickPos;
     
+    bool isCreatingConnection;
+    ofAbstractParameter* tempSourceParameter = nullptr;
+    ofAbstractParameter* tempSinkParameter = nullptr;
     
     string uniqueID;
     

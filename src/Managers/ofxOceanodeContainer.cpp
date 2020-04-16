@@ -22,14 +22,9 @@
 ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry, shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry) : registry(_registry), typesRegistry(_typesRegistry){
     if(registry == nullptr) registry = make_shared<ofxOceanodeNodeRegistry>();
     if(typesRegistry == nullptr) typesRegistry = make_shared<ofxOceanodeTypesRegistry>();
-    window = ofGetCurrentWindow();
     transformationMatrix = glm::mat4(1.0);
-    temporalConnection = nullptr;
     bpm = 120;
     phase = 0;
-    autoUpdateAndDraw = true;
-//    updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
-//    drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
     
 #ifdef OFXOCEANODE_USE_MIDI
     ofxMidiIn* midiIn = new ofxMidiIn();
@@ -109,30 +104,10 @@ void ofxOceanodeContainer::draw(){
     }
 }
 
-ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstractParameter& p, ofxOceanodeNode& n){
-    if(temporalConnection != nullptr) return nullptr;
-    temporalConnectionNode = &n;
-    temporalConnection = new ofxOceanodeTemporalConnection(p);
-    destroyConnectionListeners.push(temporalConnection->destroyConnection.newListener(this, &ofxOceanodeContainer::temporalConnectionDestructor));
-    return temporalConnection;
-}
-
-ofxOceanodeAbstractConnection* ofxOceanodeContainer::disconnectConnection(ofxOceanodeAbstractConnection* connection){
-    for(auto c : connections){
-        if(c.second.get() == connection){
-            if(!ofGetKeyPressed(OF_KEY_ALT)){
-                connections.erase(std::remove(connections.begin(), connections.end(), c));
-            }
-            return createConnection(connection->getSourceParameter(), *c.first);
-            break;
-        }
-    }
-    return nullptr;
-}
-
 void ofxOceanodeContainer::destroyConnection(ofxOceanodeAbstractConnection* connection){
-    for(auto c : connections){
-        if(c.second.get() == connection){
+    //TODO: Change for find
+    for(auto &c : connections){
+        if(c.get() == connection){
             connections.erase(std::remove(connections.begin(), connections.end(), c));
             break;
         }
@@ -161,31 +136,31 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     }
     nodeModel->setNumIdentifier(toBeCreatedId);
     nodeModel->setContainer(this);
-    auto node = make_unique<ofxOceanodeNode>(move(nodeModel));
+    auto node = make_shared<ofxOceanodeNode>(move(nodeModel));
     node->setup();
 #ifndef OFXOCEANODE_HEADLESS
-        auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node, window);
+        auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);
 #ifdef OFXOCEANODE_USE_MIDI
         nodeGui->setIsListeningMidi(isListeningMidi);
 #endif
         node->setGui(std::move(nodeGui));
 #endif
     node->setBpm(bpm);
-    node->setPhase(phase);
     node->setIsPersistent(isPersistent);
     
     auto nodePtr = node.get();
     collection[nodeToBeCreatedName][toBeCreatedId] = std::move(node);
-    
+    parameterGroupNodesMap[nodePtr->getParameters()->getEscapedName()] = nodePtr;
     
     //Interaction listeners
     destroyNodeListeners.push(nodePtr->deleteModuleAndConnections.newListener([this, nodeToBeCreatedName, toBeCreatedId, isPersistent](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
         //for(auto &containerConnectionIterator = connections.begin(); containerConnectionIterator!= connections.end();){
+        //TODO: Change deletion with find
         for(int i = 0; i < connections.size();){
             bool foundConnection = false;
             for(auto &nodeConnection : connectionsToBeDeleted){
                 //if(containerConnectionIterator->second.get() == nodeConnection){
-                if(connections[i].second.get() == nodeConnection){
+                if(connections[i].get() == nodeConnection){
                     foundConnection = true;
                     //connections.erase(containerConnectionIterator);
                     connections.erase((connections.begin() + i));
@@ -206,18 +181,24 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
             }
         }
 #endif
+        
         if(!isPersistent){
+            //Delete Map
+            parameterGroupNodesMap.erase(dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters()->getEscapedName());
             dynamicNodes[nodeToBeCreatedName].erase(toBeCreatedId);
         }else{
+            //Delete Map
+            parameterGroupNodesMap.erase(persistentNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters()->getEscapedName());
             persistentNodes[nodeToBeCreatedName].erase(toBeCreatedId);
         }
     }));
     
     destroyNodeListeners.push(nodePtr->deleteConnections.newListener([this](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
+        //TODO: Use this function in deleteModuleAndConnections function listener, with the use of find
         for(auto containerConnectionIterator = connections.begin(); containerConnectionIterator!=connections.end();){
             bool foundConnection = false;
             for(auto nodeConnection : connectionsToBeDeleted){
-                if(containerConnectionIterator->second.get() == nodeConnection){
+                if(containerConnectionIterator->get() == nodeConnection){
                     foundConnection = true;
                     connections.erase(containerConnectionIterator);
                     connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
@@ -238,25 +219,18 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
         newNode->loadConfig("tempDuplicateGroup.json");
         ofFile config("tempDuplicateGroup.json");
         config.remove();
+        
+        //TODO: return a refrence to the node
     }));
     
+    //Used in Macro
     newNodeCreated.notify(this, nodePtr);
     return *nodePtr;
-}
-
-void ofxOceanodeContainer::temporalConnectionDestructor(){
-    delete temporalConnection;
-    temporalConnection = nullptr;
 }
 
 bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     ofStringReplace(presetFolderPath, " ", "_");
     ofLog()<<"Load Preset " << presetFolderPath;
-    
-    if(window != nullptr){
-        window->makeCurrent();
-        ofGetMainLoop()->setCurrentWindow(window);
-    }
     
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
@@ -302,11 +276,11 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
                 }else{
                     for(int i = 0; i < connections.size();){
                         auto &connection = connections[i];
-                        string sourceName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];;
+                        string sourceName = connection->getSourceParameter().getGroupHierarchyNames()[0];;
                         string sourceModuleId = ofSplitString(sourceName, "_").back();
                         sourceName.erase(sourceName.rfind(sourceModuleId)-1);
                         ofStringReplace(sourceName, "_", " ");
-                        string sinkName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];;
+                        string sinkName = connection->getSinkParameter().getGroupHierarchyNames()[0];;
                         string sinkModuleId = ofSplitString(sinkName, "_").back();
                         sinkName.erase(sinkName.rfind(sinkModuleId)-1);
                         ofStringReplace(sinkName, "_", " ");
@@ -350,11 +324,11 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             for(auto &nodes : pair.second){
                 for(int i = 0; i < connections.size();){
                     auto &connection = connections[i];
-                    string sourceName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];;
+                    string sourceName = connection->getSourceParameter().getGroupHierarchyNames()[0];;
                     string sourceModuleId = ofSplitString(sourceName, "_").back();
                     sourceName.erase(sourceName.rfind(sourceModuleId)-1);
                     ofStringReplace(sourceName, "_", " ");
-                    string sinkName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];;
+                    string sinkName = connection->getSinkParameter().getGroupHierarchyNames()[0];;
                     string sinkModuleId = ofSplitString(sinkName, "_").back();
                     sinkName.erase(sinkName.rfind(sinkModuleId)-1);
                     ofStringReplace(sinkName, "_", " ");
@@ -372,10 +346,10 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     json.clear();
     json = ofLoadJson(presetFolderPath + "/connections.json");
     for(int i = 0; i < connections.size();){
-        string sourceParameter = connections[i].second->getSourceParameter().getName();
-        string sourceModule = connections[i].second->getSourceParameter().getGroupHierarchyNames()[0];
-        string sinkParameter = connections[i].second->getSinkParameter().getName();
-        string sinkModule = connections[i].second->getSinkParameter().getGroupHierarchyNames()[0];
+        string sourceParameter = connections[i]->getSourceParameter().getName();
+        string sourceModule = connections[i]->getSourceParameter().getGroupHierarchyNames()[0];
+        string sinkParameter = connections[i]->getSinkParameter().getName();
+        string sinkModule = connections[i]->getSinkParameter().getGroupHierarchyNames()[0];
 
         bool foundConnection = false;
         if(json.find(sourceModule) != json.end()){
@@ -399,7 +373,7 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             }
         }
         if(!foundConnection){
-            if(!connections[i].second->getIsPersistent()){
+            if(!connections[i]->getIsPersistent()){
                 connections.erase(connections.begin()+i);
             }else{
                 i++;
@@ -409,15 +383,15 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         
     vector<vector<string>> oldConnectionsInfo(connections.size(), vector<string>(4));
     for(int i = 0; i < connections.size(); i++){
-        oldConnectionsInfo[i][1] = connections[i].second->getSourceParameter().getName();
-        oldConnectionsInfo[i][0] = connections[i].second->getSourceParameter().getGroupHierarchyNames()[0];
-        oldConnectionsInfo[i][3] = connections[i].second->getSinkParameter().getName();
-        oldConnectionsInfo[i][2] = connections[i].second->getSinkParameter().getGroupHierarchyNames()[0];
+        oldConnectionsInfo[i][1] = connections[i]->getSourceParameter().getName();
+        oldConnectionsInfo[i][0] = connections[i]->getSourceParameter().getGroupHierarchyNames()[0];
+        oldConnectionsInfo[i][3] = connections[i]->getSinkParameter().getName();
+        oldConnectionsInfo[i][2] = connections[i]->getSinkParameter().getGroupHierarchyNames()[0];
 
     }
     
     for(auto &connection : connections){
-        connection.second->setActive(false);
+        connection->setActive(false);
     }
     
     
@@ -509,7 +483,7 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     }
     
     for(auto &connection : connections){
-        connection.second->setActive(true);
+        connection->setActive(true);
     }
     
     for(auto &nodeTypeMap : dynamicNodes){
@@ -556,11 +530,11 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
     
     json.clear();
     for(auto &connection : connections){
-        if(!connection.second->getIsPersistent()){
-            string sourceName = connection.second->getSourceParameter().getName();
-            string sourceParentName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];
-            string sinkName = connection.second->getSinkParameter().getName();
-            string sinkParentName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];
+        if(!connection->getIsPersistent()){
+            string sourceName = connection->getSourceParameter().getName();
+            string sourceParentName = connection->getSourceParameter().getGroupHierarchyNames()[0];
+            string sinkName = connection->getSinkParameter().getName();
+            string sinkParentName = connection->getSinkParameter().getGroupHierarchyNames()[0];
             json[sourceParentName][sourceName][sinkParentName][sinkName];
         }
     }
@@ -595,11 +569,6 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referencePosition){
     string presetFolderPath = "clipboardPreset";
     ofLog()<<"Load Clipboard Preset";
-    
-    if(window != nullptr){
-        window->makeCurrent();
-        ofGetMainLoop()->setCurrentWindow(window);
-    }
     
     map<string, map<int, int>> moduleConverter;
     vector<ofxOceanodeNode*> newCreatedNodes;
@@ -681,11 +650,11 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
     
     json.clear();
     for(auto &connection : connections){
-        if(!connection.second->getIsPersistent()){
-            string sourceName = connection.second->getSourceParameter().getName();
-            string sourceParentName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];
-            string sinkName = connection.second->getSinkParameter().getName();
-            string sinkParentName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];
+        if(!connection->getIsPersistent()){
+            string sourceName = connection->getSourceParameter().getName();
+            string sourceParentName = connection->getSourceParameter().getGroupHierarchyNames()[0];
+            string sinkName = connection->getSinkParameter().getName();
+            string sinkParentName = connection->getSinkParameter().getGroupHierarchyNames()[0];
             if(std::find(nodeAsParentNames.begin(), nodeAsParentNames.end(), sourceParentName) != nodeAsParentNames.end() &&
                std::find(nodeAsParentNames.begin(), nodeAsParentNames.end(), sinkParentName) != nodeAsParentNames.end()){
                 json[sourceParentName][sourceName][sinkParentName][sinkName];
@@ -727,10 +696,10 @@ void ofxOceanodeContainer::savePersistent(){
     
     json.clear();
     for(auto &connection : connections){
-        string sourceName = connection.second->getSourceParameter().getName();
-        string sourceParentName = connection.second->getSourceParameter().getGroupHierarchyNames()[0];
-        string sinkName = connection.second->getSinkParameter().getName();
-        string sinkParentName = connection.second->getSinkParameter().getGroupHierarchyNames()[0];
+        string sourceName = connection->getSourceParameter().getName();
+        string sourceParentName = connection->getSourceParameter().getGroupHierarchyNames()[0];
+        string sinkName = connection->getSinkParameter().getName();
+        string sinkParentName = connection->getSinkParameter().getGroupHierarchyNames()[0];
         json[sourceParentName][sourceName][sinkParentName][sinkName];
     }
     
@@ -769,11 +738,6 @@ void ofxOceanodeContainer::savePersistent(){
 void ofxOceanodeContainer::loadPersistent(){
     ofLog()<<"Load Persistent";
     string persistentFolderPath = "Persistent";
-    
-    if(window != nullptr){
-        window->makeCurrent();
-        ofGetMainLoop()->setCurrentWindow(window);
-    }
     
     //Read new nodes in preset
     //Check if the nodes exists and update them, (or update all at the end)
@@ -817,7 +781,7 @@ void ofxOceanodeContainer::loadPersistent(){
     
     //connections.clear();
     for(int i = 0; i < connections.size();){
-        if(!connections[i].second->getIsPersistent()){
+        if(!connections[i]->getIsPersistent()){
             connections.erase(connections.begin()+i);
         }else{
             i++;
@@ -910,20 +874,6 @@ void ofxOceanodeContainer::setBpm(float _bpm){
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->setBpm(bpm);
-        }
-    }
-}
-
-void ofxOceanodeContainer::setPhase(float _phase){
-    phase = _phase;
-    for(auto &nodeTypeMap : dynamicNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->setPhase(phase);
-        }
-    }
-    for(auto &nodeTypeMap : persistentNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->setPhase(phase);
         }
     }
 }
@@ -1314,38 +1264,6 @@ bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 positi
     return loadClipboardModulesAndConnections(position);
 }
 
-void ofxOceanodeContainer::setWindow(std::shared_ptr<ofAppBaseWindow> _window){
-    window = _window;
-    if(window != nullptr && autoUpdateAndDraw){
-//        updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
-//        drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
-    }
-    for(auto &nodeTypeMap : dynamicNodes){
-        for(auto &node : nodeTypeMap.second){
-            auto &nodeGui = node.second->getNodeGui();
-            nodeGui.setWindow(window);
-        }
-    }
-}
-
-void ofxOceanodeContainer::setAutoUpdateAndDraw(bool b){
-    autoUpdateAndDraw = b;
-    if(b){
-//        updateListener = window->events().update.newListener(this, &ofxOceanodeContainer::update);
-//        drawListener = window->events().draw.newListener(this, &ofxOceanodeContainer::draw);
-    }else{
-//        updateListener.unsubscribe();
-//        drawListener.unsubscribe();
-    }
-}
-
-vector<shared_ptr<ofxOceanodeAbstractConnection>> ofxOceanodeContainer::getAllConnections(){
-    vector<shared_ptr<ofxOceanodeAbstractConnection>> tempVec;
-    for(auto &c : connections){
-        tempVec.push_back(c.second);
-    }
-    return tempVec;
-}
 
 #endif
 
@@ -1478,52 +1396,8 @@ void ofxOceanodeContainer::addNewMidiMessageListener(ofxMidiListener* listener){
 #endif
 
 ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter){
-    string sourceModuleId = ofSplitString(sourceModule, "_").back();
-    sourceModule.erase(sourceModule.rfind(sourceModuleId)-1);
-    ofStringReplace(sourceModule, "_", " ");
-    
-    string sinkModuleId = ofSplitString(sinkModule, "_").back();
-    sinkModule.erase(sinkModule.rfind(sinkModuleId)-1);
-    ofStringReplace(sinkModule, "_", " ");
-    
-    bool sourceIsDynamic = false;
-    if(dynamicNodes.count(sourceModule) == 1){
-        if(dynamicNodes[sourceModule].count(ofToInt(sourceModuleId)) == 1){
-            sourceIsDynamic = true;
-        }
-    }
-    
-    bool sinkIsDynamic = false;
-    if(dynamicNodes.count(sinkModule) == 1){
-        if(dynamicNodes[sinkModule].count(ofToInt(sinkModuleId)) == 1){
-            sinkIsDynamic = true;
-        }
-    }
-    
-    if(!sourceIsDynamic){
-        if(persistentNodes.count(sourceModule) == 1){
-            if(persistentNodes[sourceModule].count(ofToInt(sourceModuleId)) == 0){
-                return nullptr;
-            }
-        }else{
-            return nullptr;
-        }
-    }
-    
-    if(!sinkIsDynamic){
-        if(persistentNodes.count(sinkModule) == 1){
-            if(persistentNodes[sinkModule].count(ofToInt(sinkModuleId)) == 0){
-                return nullptr;
-            }
-        }else{
-            return nullptr;
-        }
-    }
-    
-    
-    
-    auto &sourceModuleRef = sourceIsDynamic ? dynamicNodes[sourceModule][ofToInt(sourceModuleId)] : persistentNodes[sourceModule][ofToInt(sourceModuleId)];
-    auto &sinkModuleRef = sinkIsDynamic ? dynamicNodes[sinkModule][ofToInt(sinkModuleId)] : persistentNodes[sinkModule][ofToInt(sinkModuleId)];
+    auto sourceModuleRef = parameterGroupNodesMap.count(sourceModule) == 1 ? parameterGroupNodesMap[sourceModule] : nullptr;
+    auto sinkModuleRef = parameterGroupNodesMap.count(sinkModule) == 1 ? parameterGroupNodesMap[sinkModule] : nullptr;
     
     if(sourceModuleRef == nullptr || sinkModuleRef == nullptr) return nullptr;
     
@@ -1532,17 +1406,96 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
     if(sourceModuleRef->getParameters()->contains(sourceParameter) && sinkModuleRef->getParameters()->contains(sinkParameter)){
         ofAbstractParameter &source = sourceModuleRef->getParameters()->get(sourceParameter);
         ofAbstractParameter &sink = sinkModuleRef->getParameters()->get(sinkParameter);
-        
-        temporalConnectionNode = sourceModuleRef.get();
-        auto connection = sinkModuleRef->createConnection(*this, source, sink);
-        temporalConnection = nullptr;
-        return connection;
+        return createConnection(source, sink);
     }
-    
     return nullptr;
 }
 
-ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromCustomType(ofAbstractParameter &source, ofAbstractParameter &sink){
-    return typesRegistry->createCustomTypeConnection(*this, source, sink);
+ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstractParameter &source, ofAbstractParameter &sink){
+    ofxOceanodeAbstractConnection* connection = nullptr;
+    if(source.type() == sink.type()){
+        connection = typesRegistry->createCustomTypeConnection(*this, source, sink);
+    }else if(source.type() == typeid(ofParameter<float>).name()){
+        if(sink.type() == typeid(ofParameter<int>).name()){
+            connection = connectConnection(source.cast<float>(), sink.cast<int>());
+        }
+        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+            connection = connectConnection(source.cast<float>(), sink.cast<vector<float>>());
+        }
+        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
+            connection = connectConnection(source.cast<float>(), sink.cast<vector<int>>());
+        }
+        else if(sink.type() == typeid(ofParameterGroup).name()){
+            connection = connectConnection(source.cast<float>(), sink.castGroup().getInt(1));
+        }
+        else if(sink.type() == typeid(ofParameter<bool>).name()){
+            connection = connectConnection(source.cast<float>(), sink.cast<bool>());
+        }
+    }else if(source.type() == typeid(ofParameter<int>).name()){
+        if(sink.type() == typeid(ofParameter<float>).name()){
+            connection = connectConnection(source.cast<int>(), sink.cast<float>());
+        }
+        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+            connection = connectConnection(source.cast<int>(), sink.cast<vector<float>>());
+        }
+        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
+            connection = connectConnection(source.cast<int>(), sink.cast<vector<int>>());
+        }
+        else if(sink.type() == typeid(ofParameterGroup).name()){
+            connection = connectConnection(source.cast<int>(), sink.castGroup().getInt(1));
+        }
+    }else if(source.type() == typeid(ofParameter<vector<float>>).name()){
+        if(sink.type() == typeid(ofParameter<float>).name()){
+            connection = connectConnection(source.cast<vector<float>>(), sink.cast<float>());
+        }
+        else if(sink.type() == typeid(ofParameter<int>).name()){
+            connection = connectConnection(source.cast<vector<float>>(), sink.cast<int>());
+        }
+        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
+            connection = connectConnection(source.cast<vector<float>>(), sink.cast<vector<int>>());
+        }
+        else if(sink.type() == typeid(ofParameterGroup).name()){
+            connection = connectConnection(source.cast<vector<float>>(), sink.castGroup().getInt(1));
+        }
+    }else if(source.type() == typeid(ofParameter<vector<int>>).name()){
+        if(sink.type() == typeid(ofParameter<float>).name()){
+            connection = connectConnection(source.cast<vector<int>>(), sink.cast<float>());
+        }
+        else if(sink.type() == typeid(ofParameter<int>).name()){
+            connection = connectConnection(source.cast<vector<int>>(), sink.cast<int>());
+        }
+        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+            connection = connectConnection(source.cast<vector<int>>(), sink.cast<vector<float>>());
+        }
+        else if(sink.type() == typeid(ofParameterGroup).name()){
+            connection = connectConnection(source.cast<vector<int>>(), sink.castGroup().getInt(1));
+        }
+    }else if(source.type() == typeid(ofParameter<void>).name()){
+        if(sink.type() == typeid(ofParameter<bool>).name()){
+            connection = connectConnection(source.cast<void>(), sink.cast<bool>());
+        }
+        else if(sink.type() == typeid(ofParameter<int>).name()){
+            connection = connectConnection(source.cast<void>(), sink.cast<int>());
+        }
+        else if(sink.type() == typeid(ofParameter<float>).name()){
+            connection = connectConnection(source.cast<void>(), sink.cast<float>());
+        }
+        else if(sink.type() == typeid(ofParameter<bool>).name()){
+            connection = connectConnection(source.cast<void>(), sink.cast<bool>());
+        }
+    }else if(source.type() == typeid(ofParameterGroup).name()){
+        if(sink.type() == typeid(ofParameter<float>).name()){
+            connection = connectConnection(source.castGroup().getInt(1), sink.cast<float>());
+        }
+        else if(sink.type() == typeid(ofParameter<int>).name()){
+            connection = connectConnection(source.castGroup().getInt(1), sink.cast<int>());
+        }
+        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+            connection = connectConnection(source.castGroup().getInt(1), sink.cast<vector<float>>());
+        }
+        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
+            connection = connectConnection(source.castGroup().getInt(1), sink.cast<vector<int>>());
+        }
+    }
+    return connection;
 }
-

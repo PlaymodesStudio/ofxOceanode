@@ -17,6 +17,7 @@
 ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){
     nodeModelListeners.push(nodeModel->disconnectConnectionsForParameter.newListener([&](string &parameter){
         vector<ofxOceanodeAbstractConnection*> toDeleteConnections;
+        //TODO: Change with find_if
         for(auto c : inConnections){
             if(c->getSinkParameter().getName() == parameter) toDeleteConnections.push_back(c);
         }
@@ -39,6 +40,7 @@ void ofxOceanodeNode::setup(){
     active = true;
 }
 
+//TODO: remove event args
 void ofxOceanodeNode::update(ofEventArgs &e){
     nodeModel->update(e);
     nodeGui->update(e);
@@ -66,155 +68,6 @@ ofxOceanodeNodeModel& ofxOceanodeNode::getNodeModel(){
 
 ofColor ofxOceanodeNode::getColor(){
     return nodeModel->getColor();
-}
-
-ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter){
-    for(auto c : inConnections){
-        if(&c->getSinkParameter() == &parameter){
-            return container.disconnectConnection(c);
-        }
-    }
-    if(nodeModel->getParameterInfo(parameter).acceptOutConnection){
-        return container.createConnection(parameter, *this);
-    }else{
-        return nullptr;
-    }
-}
-
-ofxOceanodeAbstractConnection* ofxOceanodeNode::parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter){
-    //Big function
-    if(container.isOpenConnection()){
-        for(auto c : inConnections){
-            if(&c->getSinkParameter() == &parameter){
-                container.destroyConnection(c);
-            }
-        }
-        if(!nodeModel->getParameterInfo(parameter).acceptInConnection){
-            return nullptr;
-        }
-        if(&container.getTemporalConnectionParameter() != &parameter){
-            return createConnection(container, container.getTemporalConnectionParameter(), parameter);
-        }
-    }
-    return nullptr;
-}
-
-ofxOceanodeAbstractConnection* ofxOceanodeNode::createConnection(ofxOceanodeContainer& container, ofAbstractParameter& sourceParameter, ofAbstractParameter& sinkParameter){
-    ofxOceanodeAbstractConnection* connection = nullptr;
-    ofAbstractParameter& source = sourceParameter;
-    ofAbstractParameter& sink = sinkParameter;
-    if(source.type() == sink.type()){
-        if(source.type() == typeid(ofParameter<int>).name()){
-            connection = container.connectConnection(source.cast<int>(), sink.cast<int>());
-        }
-        else if(source.type() == typeid(ofParameter<float>).name()){
-            connection = container.connectConnection(source.cast<float>(), sink.cast<float>());
-        }
-        else if(source.type() == typeid(ofParameter<bool>).name()){
-            connection = container.connectConnection(source.cast<bool>(), sink.cast<bool>());
-        }
-        else if(source.type() == typeid(ofParameter<void>).name()){
-            connection = container.connectConnection(source.cast<void>(), sink.cast<void>());
-        }
-        else if(source.type() == typeid(ofParameter<vector<float>>).name()){
-            connection = container.connectConnection(source.cast<vector<float>>(), sink.cast<vector<float>>());
-        }
-        else if(source.type() == typeid(ofParameterGroup).name()){
-            connection = container.connectConnection(source.castGroup().getInt(1), sink.castGroup().getInt(1));
-        }
-        else if(source.type() == typeid(ofParameter<vector<int>>).name()){
-            connection = container.connectConnection(source.cast<vector<int>>(), sink.cast<vector<int>>());
-        }
-        else if(source.type() == typeid(ofParameter<short int>).name()){
-            connection = container.connectConnection(source.cast<short int>(), sink.cast<short int>());
-        }
-        else{
-            connection = container.createConnectionFromCustomType(source, sink);
-        }
-    }else if(source.type() == typeid(ofParameter<float>).name()){
-        if(sink.type() == typeid(ofParameter<int>).name()){
-            connection = container.connectConnection(source.cast<float>(), sink.cast<int>());
-        }
-        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
-            connection = container.connectConnection(source.cast<float>(), sink.cast<vector<float>>());
-        }
-        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
-            connection = container.connectConnection(source.cast<float>(), sink.cast<vector<int>>());
-        }
-        else if(sink.type() == typeid(ofParameterGroup).name()){
-            connection = container.connectConnection(source.cast<float>(), sink.castGroup().getInt(1));
-        }
-        else if(sink.type() == typeid(ofParameter<bool>).name()){
-            connection = container.connectConnection(source.cast<float>(), sink.cast<bool>());
-        }
-    }else if(source.type() == typeid(ofParameter<int>).name()){
-        if(sink.type() == typeid(ofParameter<float>).name()){
-            connection = container.connectConnection(source.cast<int>(), sink.cast<float>());
-        }
-        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
-            connection = container.connectConnection(source.cast<int>(), sink.cast<vector<float>>());
-        }
-        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
-            connection = container.connectConnection(source.cast<int>(), sink.cast<vector<int>>());
-        }
-        else if(sink.type() == typeid(ofParameterGroup).name()){
-            connection = container.connectConnection(source.cast<int>(), sink.castGroup().getInt(1));
-        }
-    }else if(source.type() == typeid(ofParameter<vector<float>>).name()){
-        if(sink.type() == typeid(ofParameter<float>).name()){
-            connection = container.connectConnection(source.cast<vector<float>>(), sink.cast<float>());
-        }
-        else if(sink.type() == typeid(ofParameter<int>).name()){
-            connection = container.connectConnection(source.cast<vector<float>>(), sink.cast<int>());
-        }
-        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
-            connection = container.connectConnection(source.cast<vector<float>>(), sink.cast<vector<int>>());
-        }
-        else if(sink.type() == typeid(ofParameterGroup).name()){
-            connection = container.connectConnection(source.cast<vector<float>>(), sink.castGroup().getInt(1));
-        }
-    }else if(source.type() == typeid(ofParameter<vector<int>>).name()){
-        if(sink.type() == typeid(ofParameter<float>).name()){
-            connection = container.connectConnection(source.cast<vector<int>>(), sink.cast<float>());
-        }
-        else if(sink.type() == typeid(ofParameter<int>).name()){
-            connection = container.connectConnection(source.cast<vector<int>>(), sink.cast<int>());
-        }
-        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
-            connection = container.connectConnection(source.cast<vector<int>>(), sink.cast<vector<float>>());
-        }
-        else if(sink.type() == typeid(ofParameterGroup).name()){
-            connection = container.connectConnection(source.cast<vector<int>>(), sink.castGroup().getInt(1));
-        }
-    }else if(source.type() == typeid(ofParameter<void>).name()){
-        if(sink.type() == typeid(ofParameter<bool>).name()){
-            connection = container.connectConnection(source.cast<void>(), sink.cast<bool>());
-        }else if(sink.type() == typeid(ofParameter<int>).name()){
-            connection = container.connectConnection(source.cast<void>(), sink.cast<int>());
-        }else if(sink.type() == typeid(ofParameter<float>).name()){
-            connection = container.connectConnection(source.cast<void>(), sink.cast<float>());
-        }else if(sink.type() == typeid(ofParameter<bool>).name()){
-            connection = container.connectConnection(source.cast<void>(), sink.cast<bool>());
-        }
-    }else if(source.type() == typeid(ofParameterGroup).name()){
-        if(sink.type() == typeid(ofParameter<float>).name()){
-            connection = container.connectConnection(source.castGroup().getInt(1), sink.cast<float>());
-        }
-        else if(sink.type() == typeid(ofParameter<int>).name()){
-            connection = container.connectConnection(source.castGroup().getInt(1), sink.cast<int>());
-        }
-        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
-            connection = container.connectConnection(source.castGroup().getInt(1), sink.cast<vector<float>>());
-        }
-        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
-            connection = container.connectConnection(source.castGroup().getInt(1), sink.cast<vector<int>>());
-        }
-    }
-    
-    if(connection != nullptr){
-        addInputConnection(connection);
-    }
-    return connection;
 }
 
 void ofxOceanodeNode::addOutputConnection(ofxOceanodeAbstractConnection* c){
@@ -401,24 +254,11 @@ void ofxOceanodeNode::deserializeParameter(ofJson &json, ofAbstractParameter &p,
 }
 
 void ofxOceanodeNode::setBpm(float bpm){
-    if(getParameters()->contains("BPM") && nodeModel->getAutoBPM()){
-        if(!checkHasInConnection(getParameters()->getFloat("BPM")))
-            getParameters()->getFloat("BPM") = bpm;
-    }else{
-        nodeModel->setBpm(bpm);
-    }
-}
-
-void ofxOceanodeNode::setPhase(float phase){
-    nodeModel->setPhase(phase);
+    nodeModel->setBpm(bpm);
 }
 
 void ofxOceanodeNode::resetPhase(){
-    if(getParameters()->contains("Reset Phase")){
-        getParameters()->getVoid("Reset Phase").trigger();
-    }else{
-        nodeModel->resetPhase();
-    }
+    nodeModel->resetPhase();
 }
 
 bool ofxOceanodeNode::checkHasInConnection(ofAbstractParameter &p){
@@ -429,6 +269,29 @@ bool ofxOceanodeNode::checkHasInConnection(ofAbstractParameter &p){
     }
     return false;
 }
+
+ofxOceanodeAbstractConnection* ofxOceanodeNode::getInputConnectionForParameter(ofAbstractParameter& param){
+    auto findPos = std::find_if(inConnections.begin(), inConnections.end(), [&param](ofxOceanodeAbstractConnection *c){
+        return
+        &c->getSinkParameter() == &param;
+    });
+    if(findPos != inConnections.end()){
+        return *findPos;
+    }
+    return nullptr;
+}
+
+ofxOceanodeAbstractConnection* ofxOceanodeNode::getOutputConnectionForParameter(ofAbstractParameter& param){
+    auto findPos = std::find_if(outConnections.begin(), outConnections.end(), [&param](ofxOceanodeAbstractConnection *c){
+        return
+        &c->getSinkParameter() == &param;
+    });
+    if(findPos != outConnections.end()){
+        return *findPos;
+    }
+    return nullptr;
+}
+
 
 
 shared_ptr<ofParameterGroup> ofxOceanodeNode::getParameters(){

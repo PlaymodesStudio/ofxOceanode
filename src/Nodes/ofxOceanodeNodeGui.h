@@ -21,7 +21,7 @@ using namespace std;
 
 class ofxOceanodeNodeGui{
 public:
-    ofxOceanodeNodeGui(ofxOceanodeContainer &container, ofxOceanodeNode &node, shared_ptr<ofAppBaseWindow> window);
+    ofxOceanodeNodeGui(ofxOceanodeContainer &container, ofxOceanodeNode &node);
     ~ofxOceanodeNodeGui();
     
     void update(ofEventArgs &e){};
@@ -35,8 +35,6 @@ public:
     shared_ptr<ofParameterGroup> getParameters();
     glm::vec2 getPosition();
     ofRectangle getRectangle();
-    
-    void setWindow(shared_ptr<ofAppBaseWindow> window);
     
     void enable();
     void disable();
@@ -53,16 +51,6 @@ public:
 #ifdef OFXOCEANODE_USE_MIDI
     void setIsListeningMidi(bool b){isListeningMidi = b;};
 #endif
-    
-//    void keyPressed(ofKeyEventArgs &args);
-//    void keyReleased(ofKeyEventArgs &args);
-//    void mouseMoved(ofMouseEventArgs &args){};
-//    void mouseDragged(ofMouseEventArgs &args);
-//    void mousePressed(ofMouseEventArgs &args);
-//    void mouseReleased(ofMouseEventArgs &args);
-//    void mouseScrolled(ofMouseEventArgs &args){};
-//    void mouseEntered(ofMouseEventArgs &args){};
-//    void mouseExited(ofMouseEventArgs &args){};
     
 private:
     

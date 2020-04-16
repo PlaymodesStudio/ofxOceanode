@@ -34,13 +34,7 @@ public:
     
     ofColor getColor();
     
-    ofxOceanodeAbstractConnection* parameterConnectionPress(ofxOceanodeContainer& container, ofAbstractParameter& parameter);
-    ofxOceanodeAbstractConnection* parameterConnectionRelease(ofxOceanodeContainer& container, ofAbstractParameter& parameter);
-    
-    ofxOceanodeAbstractConnection* createConnection(ofxOceanodeContainer& container, ofAbstractParameter& sourceParameter, ofAbstractParameter& sinkParameter);
-    
     void addOutputConnection(ofxOceanodeAbstractConnection* c);
-    
     void addInputConnection(ofxOceanodeAbstractConnection* c);
     
     void deleteSelf();
@@ -65,13 +59,15 @@ public:
     bool loadParametersFromJson(ofJson json, bool persistentPreset = false);
     
     void setBpm(float bpm);
-    void setPhase(float _phase);
     void resetPhase();
     
     bool getIsPersistent(){return isPersistent;};
     void setIsPersistent(bool p){isPersistent = p;};
     
     bool checkHasInConnection(ofAbstractParameter &p);
+    
+    ofxOceanodeAbstractConnection* getInputConnectionForParameter(ofAbstractParameter& param);
+    ofxOceanodeAbstractConnection* getOutputConnectionForParameter(ofAbstractParameter& param);
     
     void setActive(bool act);
     bool getActive(){return active;};

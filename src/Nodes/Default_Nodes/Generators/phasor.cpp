@@ -56,8 +56,11 @@ void phasor::update(ofEventArgs &e)
     phasorMonitor = basePh.getPhasors();
 }
 
-void phasor::setPhase(float _phase){
-    phaseOffset = _phase;
-    basePh.setInitPhase(initPhase_Param + phaseOffset - int(initPhase_Param+phaseOffset));
+void phasor::resetPhase(){
+    resetPhase_Param.trigger();
 }
 
+void phasor::setBpm(float bpm){
+    //TODO: Check if BPM is being modulated. Maybe info in parametersInfo?
+    bpm_Param = bpm;
+}

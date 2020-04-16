@@ -7,6 +7,18 @@
 
 #include "ofxOceanodeTypesRegistry.h"
 
+ofxOceanodeTypesRegistry::ofxOceanodeTypesRegistry(){
+    this->registerType<float>();
+    this->registerType<int>();
+    this->registerType<bool>();
+    this->registerType<void>();
+    this->registerType<string>();
+    this->registerType<char>();
+    this->registerType<ofParameterGroup>();
+    this->registerType<vector<float>>();
+    this->registerType<vector<int>>();
+}
+
 ofxOceanodeAbstractConnection* ofxOceanodeTypesRegistry::createCustomTypeConnection(ofxOceanodeContainer &container, ofAbstractParameter &source, ofAbstractParameter &sink){
     for(auto functionForType : registryColector){
         auto connection = functionForType(container, source, sink);
