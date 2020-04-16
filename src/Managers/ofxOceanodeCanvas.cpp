@@ -395,12 +395,12 @@ void ofxOceanodeCanvas::draw(){
             if(numTimesPopup == 1){
                 ImGui::SetNextTreeNodeOpen(false);
             }
-            if(searchField != "") ImGui::SetNextTreeNodeOpen(true);
-
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f,0.45f,0.0f,0.5f));
             ImGui::Button("##colorTree",ImVec2(5,0));
             ImGui::PopStyleColor();
             ImGui::SameLine();
+
+            if(searchField != "") ImGui::SetNextTreeNodeOpen(true);
 
             if(ImGui::TreeNode(categoriesVector[i].c_str()))
             {
