@@ -171,7 +171,7 @@ void ofxOceanodeCanvas::draw(){
             p2 = ImGui::GetMousePos();
         }else{
             p1 = ImGui::GetMousePos();
-            p2 = getSinkConnectionPositionFromParameter(*tempSinkParameter) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
+            p2 = getSinkConnectionPositionFromParameter(*tempSinkParameter) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
         }
         glm::vec2  controlPoint(0,0);
         controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
