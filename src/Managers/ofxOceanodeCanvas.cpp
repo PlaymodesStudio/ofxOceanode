@@ -111,8 +111,16 @@ void ofxOceanodeCanvas::draw(){
     
     // Create our child canvas
     ImGui::Text("[%.2f,%.2f]", scrolling.x, scrolling.y);
-    //ImGui::SameLine(ImGui::GetWindowWidth() - 100);
-    //ImGui::Checkbox("Show grid", &show_grid);
+    
+    ImGui::SameLine();
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
+    if(ImGui::Button("[C]"))
+    {
+        scrolling.x = 0;
+        scrolling.y = 0;
+    }
+    ImGui::PopStyleVar();
+
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(60, 60, 60, 200));
@@ -316,7 +324,6 @@ void ofxOceanodeCanvas::draw(){
             ImGui::PopStyleColor();
             ImGui::SameLine();
 
-            
             if(ImGui::TreeNode(categoriesVector[i].c_str()))
             {
                 for(auto &op : options[i])
