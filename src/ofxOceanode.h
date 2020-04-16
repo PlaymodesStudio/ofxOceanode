@@ -66,6 +66,9 @@ private:
 //    vector<ofxOceanodeAbstractTimeline> timelines;
     
     ofxImGuiSimple gui;
+    void showManualWindow(bool *b);
+    void showHelpPopUp();
+
 };
 
 #endif /* ofxOceanode_h */

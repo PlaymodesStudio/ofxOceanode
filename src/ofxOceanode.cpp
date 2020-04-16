@@ -97,10 +97,11 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     {
         //ShowDockingDisabledMessage();
     }
-    
+    static bool showManual = false;
     static bool show_app_metrics = false;
     if (show_app_metrics){ImGui::ShowMetricsWindow(&show_app_metrics);}
-    
+    if (showManual) showManualWindow(&showManual);
+
     if (ImGui::BeginMenuBar())
     {
         if (ImGui::BeginMenu("File"))
@@ -145,8 +146,71 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             }
             ImGui::EndMenu();
         }
+        if(ImGui::BeginMenu("Help"))
+        {
+            ImGui::MenuItem("Show User Manual", "CMD+L", &showManual);
+            if(ImGui::Button("Show Help"))
+            {
+                ImGui::OpenPopup("Help?");
+            }
+            if(ImGui::BeginPopupModal("Help?", NULL, ImGuiWindowFlags_AlwaysAutoResize)){
+                showHelpPopUp();
+                ImGui::EndPopup();
+            }
+            
+            ImGui::EndMenu();
+        }
         ImGui::EndMenuBar();
     }
     
     ImGui::End();
 }
+
+void ofxOceanode::showManualWindow(bool *b)
+{
+    ImGui::Begin("Show User Manual");
+    ImGui::Button("This is a user manual !");
+    ImGui::Text("Framerate is %f", ofGetFrameRate());
+//
+//    ofImage*  i = new ofImage();
+//    i->allocate(270,70,OF_IMAGE_COLOR);
+//    i->setUseTexture(true);
+//    i->load("./../../../ofxaddons_thumbnail.png");
+//    i->setUseTexture(true);
+//    i->update();
+//
+//    if(i->isAllocated())
+//    {
+//        ImTextureID MtextureID = (ImTextureID*)(intptr_t) i->getTexture().texData.textureID;
+//        glm::vec2 size;
+//        size.x = 270;
+//        size.y = 70;//(tempCast.get()->getWidth() / tempCast.get()->getHeight()) * size.x;
+//        ImGui::Image(MtextureID, size, ImVec2(0,0), ImVec2(1,1), ImColor(255,255,255,255), ImColor(0,0,0,0));
+//
+//
+////        ofTexture* t = &i->getTexture();
+////        ImGui::Image(MtextureID,size);
+////        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+////
+////        void ImDrawList::AddImage(ImTextureID user_texture_id, const ImVec2& p_min, const ImVec2& p_max, const ImVec2& uv_min, const ImVec2& uv_max, ImU32 col)
+////        draw_list->PushTextureID(MtextureID);
+////        draw_list->AddImage(MtextureID, ImVec2(0,0), ImVec2(100,100),ImVec2(0,0), ImVec2(1,1), ImColor(255,255,255,255));
+////        draw_list->PopTextureID();
+//    }
+ 
+
+    ImGui::End();
+        
+}
+
+
+void ofxOceanode::showHelpPopUp()
+{    
+    ImGui::Text("This is very helpful!");
+    if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsItemActive()){
+        ImGui::CloseCurrentPopup();
+    }
+}
+
+
+
