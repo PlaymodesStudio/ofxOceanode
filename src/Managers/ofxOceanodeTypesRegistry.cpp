@@ -14,7 +14,6 @@ ofxOceanodeTypesRegistry::ofxOceanodeTypesRegistry(){
     this->registerType<void>();
     this->registerType<string>();
     this->registerType<char>();
-    this->registerType<ofParameterGroup>();
     this->registerType<vector<float>>();
     this->registerType<vector<int>>();
 }

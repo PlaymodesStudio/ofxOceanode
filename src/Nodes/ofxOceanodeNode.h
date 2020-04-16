@@ -15,6 +15,7 @@ class ofxOceanodeAbstractConnection;
 class ofxOceanodeNodeGui;
 class ofxOceanodeNodeModel;
 class ofxOceanodeContainer;
+class parameterInfo;
 
 class ofxOceanodeNode {
 public:
@@ -65,6 +66,8 @@ public:
     void setIsPersistent(bool p){isPersistent = p;};
     
     bool checkHasInConnection(ofAbstractParameter &p);
+    
+    const parameterInfo& getParameterInfo(ofAbstractParameter &p);
     
     ofxOceanodeAbstractConnection* getInputConnectionForParameter(ofAbstractParameter& param);
     ofxOceanodeAbstractConnection* getOutputConnectionForParameter(ofAbstractParameter& param);

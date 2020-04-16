@@ -9,6 +9,7 @@
 
 #include "ofxOceanodeNodeGui.h"
 #include "ofxOceanodeNode.h"
+#include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxImGuiSimple.h"
 
@@ -112,16 +113,34 @@ bool ofxOceanodeNodeGui::constructGui(){
                 }
             }else if(absParam.type() == typeid(ofParameter<int>).name()){
                 auto tempCast = absParam.cast<int>();
-                if(tempCast.getMin() == INT_MIN || tempCast.getMax() == INT_MAX){
-                    ImGui::DragInt(hiddenUniqueId.c_str(), (int *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax());
+                if(node.getParameterInfo(tempCast).dropdownOptions.size() == 0){ //Int slider
+                    if(tempCast.getMin() == INT_MIN || tempCast.getMax() == INT_MAX){
+                        ImGui::DragInt(hiddenUniqueId.c_str(), (int *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax());
+                    }else{
+                        ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast.get(), tempCast.getMin(), tempCast.getMax());
+                    }
+                    if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
+                        tempCast = tempCast;
+                    }
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                        tempCast = tempCast;
+                    }
                 }else{
-                    ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast.get(), tempCast.getMin(), tempCast.getMax());
-                }
-                if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-                    tempCast = tempCast;
-                }
-                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
-                    tempCast = tempCast;
+                    auto vector_getter = [](void* vec, int idx, const char** out_text)
+                    {
+                        auto& vector = *static_cast<std::vector<std::string>*>(vec);
+                        if (idx < 0 || idx >= static_cast<int>(vector.size())) { return false; }
+                        *out_text = vector.at(idx).c_str();
+                        return true;
+                    };
+                    
+                    vector<string> options = node.getParameterInfo(tempCast).dropdownOptions;
+                    if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.get(), vector_getter, static_cast<void*>(&options), options.size())){
+                        tempCast = tempCast;
+                    }
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                        tempCast = tempCast;
+                    }
                 }
             }else if(absParam.type() == typeid(ofParameter<bool>).name()){
                 auto tempCast = absParam.cast<bool>();
@@ -157,23 +176,6 @@ bool ofxOceanodeNodeGui::constructGui(){
                 if (ImGui::ColorEdit4(hiddenUniqueId.c_str(), (float*)&tempCast.get().r))
                 {
                     tempCast = tempCast;
-                }
-                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
-                    tempCast = tempCast;
-                }
-            }else if(absParam.type() == typeid(ofParameterGroup).name()){
-                auto vector_getter = [](void* vec, int idx, const char** out_text)
-                {
-                    auto& vector = *static_cast<std::vector<std::string>*>(vec);
-                    if (idx < 0 || idx >= static_cast<int>(vector.size())) { return false; }
-                    *out_text = vector.at(idx).c_str();
-                    return true;
-                };
-                
-                auto tempCast = absParam.castGroup();
-                vector<string> options = ofSplitString(tempCast.getString(0), "-|-");
-                if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.getInt(1).get(), vector_getter, static_cast<void*>(&options), options.size())){
-                    tempCast.getInt(1) = tempCast.getInt(1);
                 }
                 if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                     tempCast = tempCast;

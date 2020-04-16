@@ -199,9 +199,6 @@ ofJson ofxOceanodeNode::saveParametersToJson(bool persistentPreset){
                     json[p.getEscapedName()] = vecI[0];
                 }
             }
-            else if(p.type() == typeid(ofParameterGroup).name()){
-                json[p.getEscapedName()] = p.castGroup().getInt(1).toString();
-            }
         }
     }
     return json;
@@ -217,7 +214,7 @@ bool ofxOceanodeNode::loadParametersFromJson(ofJson json, bool persistentPreset)
 }
 
 void ofxOceanodeNode::deserializeParameter(ofJson &json, ofAbstractParameter &p, bool persistentPreset){
-    if(((!persistentPreset && nodeModel->getParameterInfo(p).isSavePreset) || (persistentPreset && nodeModel->getParameterInfo(p).isSaveProject))){
+    if((((!persistentPreset && nodeModel->getParameterInfo(p).isSavePreset) || (persistentPreset && nodeModel->getParameterInfo(p).isSaveProject))) && json.count(p.getEscapedName()) && !checkHasInConnection(p)){
         if(p.type() == typeid(ofParameter<float>).name()){
             ofDeserialize(json, p);
         }else if(p.type() == typeid(ofParameter<int>).name()){
@@ -246,9 +243,6 @@ void ofxOceanodeNode::deserializeParameter(ofJson &json, ofAbstractParameter &p,
             }else{
                 p.cast<vector<int>>() = vector<int>(1, int(json[p.getEscapedName()]));
             }
-        }
-        else if(p.type() == typeid(ofParameterGroup).name()){
-            p.castGroup().getInt(1).fromString(json[p.getEscapedName()]);
         }
     }
 }
@@ -292,7 +286,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeNode::getOutputConnectionForParameter(
     return nullptr;
 }
 
-
+const parameterInfo& ofxOceanodeNode::getParameterInfo(ofAbstractParameter &p){
+    return nodeModel->getParameterInfo(p);
+}
 
 shared_ptr<ofParameterGroup> ofxOceanodeNode::getParameters(){
     return nodeModel->getParameterGroup();
