@@ -83,9 +83,6 @@ void ofxOceanodePresetsController::draw(){
         *out_text = vector.at(idx).c_str();
         return true;
     };
-    
-    ImGui::Begin(controllerName.c_str());
-    
     // Bank related
     ImGui::Text("%s","Bank :");
     ImGui::SameLine();
@@ -193,7 +190,6 @@ void ofxOceanodePresetsController::draw(){
         }
     }
     ImGui::EndChild();
-    ImGui::End();
 }
 
 void ofxOceanodePresetsController::createPreset(string name){

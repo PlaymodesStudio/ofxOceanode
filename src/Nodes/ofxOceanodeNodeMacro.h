@@ -80,11 +80,7 @@ class ofxOscMessage;
 class ofxOceanodeNodeMacro : public ofxOceanodeNodeModel{
 public:
     ofxOceanodeNodeMacro();
-    ~ofxOceanodeNodeMacro(){
-#ifndef OFXOCEANODE_HEADLESS
-        if(canvas != nullptr) delete canvas;
-#endif
-    };
+    ~ofxOceanodeNodeMacro(){};
     
     void setup();
     void update(ofEventArgs &a);
@@ -108,7 +104,7 @@ private:
     void newNodeCreated(ofxOceanodeNode* &node);
     
 #ifndef OFXOCEANODE_HEADLESS
-    ofxOceanodeCanvas* canvas;
+    ofxOceanodeCanvas canvas;
 #endif
     shared_ptr<ofxOceanodeContainer> container;
     shared_ptr<ofxOceanodeNodeRegistry> registry;
@@ -137,6 +133,8 @@ private:
     std::time_t presetsInBankLastChanged;
     
     ofEventListeners presetActionsListeners;
+    
+    string canvasParentID;
 };
 
 #endif /* ofxOceanodeNodeMacro_h */

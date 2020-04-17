@@ -15,7 +15,6 @@
 
 class ofxOceanodeContainer;
 class ofxOceanodeNodeGui;
-class ofxDatGuiDropdown;
 
 class ofxOceanodeCanvas{
 public:
@@ -23,7 +22,7 @@ public:
     ~ofxOceanodeCanvas(){};
     
     
-    void setup(std::shared_ptr<ofAppBaseWindow> window = ofGetCurrentWindow());
+    void setup(string _uid = "Canvas", string _pid = "");
     void update(){};
     void draw();
     
@@ -37,9 +36,9 @@ public:
     void mouseEntered(ofMouseEventArgs &e){};
     void mouseExited(ofMouseEventArgs &e){};
     
-    void setUniqueID(string s){uniqueID = s;};
-    
     void setContainer(shared_ptr<ofxOceanodeContainer> c){container = c;};
+    
+    string getUniqueID(){return uniqueID;};
 private:
     glm::vec3 getMatrixScale(const glm::mat4 &m);
     glm::mat4 translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector);
@@ -82,7 +81,8 @@ private:
     ofAbstractParameter* tempSinkParameter = nullptr;
     
     string uniqueID;
-    
+    string parentID;
+    bool isFirstDraw = true;
 };
 
 #endif

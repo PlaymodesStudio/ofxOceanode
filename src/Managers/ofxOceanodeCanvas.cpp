@@ -15,21 +15,10 @@
 #include <glm/gtx/matrix_decompose.hpp>
 
 #include "imgui.h"
+#include "imgui_internal.h"
+#include "ofxOceanodeShared.h"
 
-void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){    
-//    listeners.push(window->events().update.newListener(this, &ofxOceanodeCanvas::update));
-//    listeners.push(window->events().draw.newListener(this, &ofxOceanodeCanvas::draw));
-    
-    listeners.push(window->events().mouseDragged.newListener(this,&ofxOceanodeCanvas::mouseDragged));
-    listeners.push(window->events().mouseMoved.newListener(this,&ofxOceanodeCanvas::mouseMoved));
-    listeners.push(window->events().mousePressed.newListener(this,&ofxOceanodeCanvas::mousePressed));
-    listeners.push(window->events().mouseReleased.newListener(this,&ofxOceanodeCanvas::mouseReleased));
-    listeners.push(window->events().mouseScrolled.newListener(this,&ofxOceanodeCanvas::mouseScrolled));
-    listeners.push(window->events().mouseEntered.newListener(this,&ofxOceanodeCanvas::mouseEntered));
-    listeners.push(window->events().mouseExited.newListener(this,&ofxOceanodeCanvas::mouseExited));
-    listeners.push(window->events().keyPressed.newListener(this, &ofxOceanodeCanvas::keyPressed));
-    listeners.push(window->events().keyReleased.newListener(this, &ofxOceanodeCanvas::keyReleased));
-    
+void ofxOceanodeCanvas::setup(string _uid, string _pid){
     transformationMatrix = &container->getTransformationMatrix();
     
     auto const &models = container->getRegistry()->getRegisteredModels();
@@ -55,7 +44,13 @@ void ofxOceanodeCanvas::setup(std::shared_ptr<ofAppBaseWindow> window){
     dragModulesInitialPoint = glm::vec2(NAN, NAN);
     selecting = false;
     
-    uniqueID = "Canvas";
+    parentID = _pid;
+    if(parentID != "Canvas" && parentID != ""){ //It is not canvas, and it is not the first branch of macros
+        uniqueID = parentID + " / " + _uid; //Apend Parent to name;
+    }else{
+        uniqueID = _uid;
+    }
+    container->setCanvasID(uniqueID);
     
     scrolling = glm::vec2(0,0);
 }
@@ -101,6 +96,8 @@ void ofxOceanodeCanvas::draw(){
 //        ImGui::PopID();
 //    }
 //    ImGui::EndChild();
+    
+    ImGui::SetNextWindowDockID(ofxOceanodeShared::getDockspaceID(), ImGuiCond_FirstUseEver);
 
     ImGui::Begin(uniqueID.c_str());
     ImGui::SameLine();
@@ -255,7 +252,7 @@ void ofxOceanodeCanvas::draw(){
                 auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
                 auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
                 draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
-                if(mouseToBulletDistance < bulletSize){
+                if(mouseToBulletDistance < bulletSize && !ImGui::IsPopupOpen("New Node")){
                     if(ImGui::IsMouseClicked(0)){
                         isCreatingConnection = true;
                         auto inConnection = node->getInputConnectionForParameter(*param);
@@ -295,7 +292,7 @@ void ofxOceanodeCanvas::draw(){
                 auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
                 auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
                 draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
-                if(mouseToBulletDistance < bulletSize){
+                if(mouseToBulletDistance < bulletSize && !ImGui::IsPopupOpen("New Node")){
                     if(ImGui::IsMouseClicked(0)){
                         isCreatingConnection = true;
                         tempSourceParameter = param.get();
@@ -472,7 +469,11 @@ void ofxOceanodeCanvas::draw(){
     
     ImGui::End();
     
-//    gui.end();
+    //TODO: Find better way to to this, when macro created, recoverr focus on canvas, should be its parent. something like. container->getParentCanvas? Or set a id in canvas as "Parent Canvas".
+    if(isFirstDraw && parentID != ""){
+        ImGui::FocusWindow(ImGui::FindWindowByName(parentID.c_str()));
+        isFirstDraw = false;
+    }
     
     ofPushMatrix();
     ofMultMatrix(glm::inverse(transformationMatrix->get()));

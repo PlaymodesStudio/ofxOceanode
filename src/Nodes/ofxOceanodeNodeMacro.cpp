@@ -8,9 +8,6 @@
 #include "ofxOceanodeNodeMacro.h"
 
 ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
-#ifndef OFXOCEANODE_HEADLESS
-    canvas = nullptr;
-#endif
     presetPath = "";
     currentPreset = -1;
 }
@@ -103,13 +100,14 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 }
 
 void ofxOceanodeNodeMacro::draw(ofEventArgs &a){
-    canvas->draw();
+    canvas.draw();
     container->draw();
 }
 
 void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
     registry = container->getRegistry();
     typesRegistry = container->getTypesRegistry();
+    canvasParentID = container->getCanvasID();
 }
 
 void ofxOceanodeNodeMacro::setup(){
@@ -255,10 +253,8 @@ void ofxOceanodeNodeMacro::setup(){
     parameters->add(separate.set("=========================", 'c'));
     
     
-    canvas = new ofxOceanodeCanvas;
-    canvas->setContainer(container);
-    canvas->setup();
-    canvas->setUniqueID("Macro " + ofToString(getNumIdentifier()));
+    canvas.setContainer(container);
+    canvas.setup("Macro " + ofToString(getNumIdentifier()), canvasParentID);
 }
 
 void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){

@@ -124,6 +124,9 @@ public:
     const std::unordered_map<string, ofxOceanodeNode*> & getParameterGroupNodesMap(){return parameterGroupNodesMap;};
 #endif
     
+    void setCanvasID(string s){canvasID = s;};
+    string getCanvasID(){return canvasID;};
+    
 private:
     void temporalConnectionDestructor();
     
@@ -164,7 +167,7 @@ private:
     ofEventListeners midiSenderListeners;
     void midiBindingBound(const void * sender, string &portName);
 #endif
-    
+    string canvasID;
 };
 
 #endif /* ofxOceanodeContainer_h */

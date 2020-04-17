@@ -10,6 +10,8 @@
 #include "ofxOceanodeControls.h"
 #include "ofxOceanodePresetsController.h"
 #include "ofxOceanodeBPMController.h"
+#include "imgui.h"
+#include "ofxOceanodeShared.h"
 
 #ifdef OFXOCEANODE_USE_OSC
     #include "ofxOceanodeOSCController.h"
@@ -35,7 +37,10 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
 
 void ofxOceanodeControls::draw(){
     for(auto &c : controllers){
+        ImGui::SetNextWindowDockID(ofxOceanodeShared::getLeftNodeID(), ImGuiCond_FirstUseEver);
+        ImGui::Begin(c->getControllerName().c_str());
         c->draw();
+        ImGui::End();
     }
 }
 

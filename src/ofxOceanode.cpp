@@ -7,6 +7,8 @@
 
 #include "ofxOceanode.h"
 #include "ofxOceanodeTheme.h"
+#include "ofxOceanodeShared.h"
+#include "imgui_internal.h"
 
 ofxOceanode::ofxOceanode(){
     nodeRegistry = make_shared<ofxOceanodeNodeRegistry>();
@@ -92,9 +94,18 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     {
         ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
         ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+        ofxOceanodeShared::setDockspaceID(dockspace_id);
+        if(!ImGui::DockBuilderGetNode(dockspace_id)->IsSplitNode()){ //We dont have a split node;
+            ImGuiID centralNode_id;
+            ImGuiID leftNode_id;
+            ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Left, 0.2, &leftNode_id, &centralNode_id);
+            ofxOceanodeShared::setCentralNodeID(centralNode_id);
+            ofxOceanodeShared::setLeftNodeID(leftNode_id);
+        }
     }
     else
     {
+        //TODO: Show assert, we need docking
         //ShowDockingDisabledMessage();
     }
     static bool showManual = false;

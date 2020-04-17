@@ -49,7 +49,6 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
 }
 
 void ofxOceanodeBPMController::draw(){
-    ImGui::Begin(controllerName.c_str());
     if (ImGui::DragFloat("BPM", &bpm, 0.005))
     {
         container->setBpm(bpm);
@@ -85,8 +84,6 @@ void ofxOceanodeBPMController::draw(){
     #ifdef OFXOCEANODE_USE_BPM_DETECTION
     ImGui::Toggle("Auto BPM", &useDetection);
     #endif
-    ImGui::End();
-    
 }
 
 void ofxOceanodeBPMController::audioIn(ofSoundBuffer &input){
