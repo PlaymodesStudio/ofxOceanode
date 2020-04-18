@@ -73,7 +73,7 @@ private:
     ofxImGuiSimple gui;
     void showManualWindow(bool *b);
     void showHelpPopUp();
-
+    bool firstDraw = true;
 };
 
 #endif /* ofxOceanode_h */

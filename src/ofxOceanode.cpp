@@ -48,7 +48,10 @@ void ofxOceanode::draw(){
     //        }
     
     //Make Presets the current active tab on the first frame
-    ImGui::DockBuilderGetNode(ofxOceanodeShared::getLeftNodeID())->TabBar->SelectedTabId = ImGui::FindWindowByName("Presets")->ID;
+    if(firstDraw){
+        ImGui::DockBuilderGetNode(ofxOceanodeShared::getLeftNodeID())->TabBar->NextSelectedTabId = ImGui::FindWindowByName("Presets")->ID;
+        firstDraw = false;
+    }
     
     gui.end();
     gui.draw();
