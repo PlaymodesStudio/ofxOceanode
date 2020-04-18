@@ -21,25 +21,6 @@
 void ofxOceanodeCanvas::setup(string _uid, string _pid){
     transformationMatrix = &container->getTransformationMatrix();
     
-    auto const &models = container->getRegistry()->getRegisteredModels();
-    auto const &categories = container->getRegistry()->getCategories();
-    auto const &categoriesModelsAssociation = container->getRegistry()->getRegisteredModelsCategoryAssociation();
-    
-    for(auto cat : categories){
-        categoriesVector.push_back(cat);
-    }
-    
-    options = vector<vector<string>>(categories.size());
-    for(int i = 0; i < categories.size(); i++){
-        options.push_back(vector<string>());
-        for(auto &model : models){
-            if(categoriesModelsAssociation.at(model.first) == categoriesVector[i]){
-                options[i].push_back(model.first);
-            }
-        }
-        std::sort(options[i].begin(), options[i].end());
-    }
-    
     selectedRect = ofRectangle(0, 0, 0, 0);
     dragModulesInitialPoint = glm::vec2(NAN, NAN);
     selecting = false;
@@ -366,6 +347,24 @@ void ofxOceanodeCanvas::draw(){
         ImGui::OpenPopup("New Node");
         searchField = "";
         numTimesPopup = 0;
+        
+        //Get node registry to update newly registered nodes
+        auto const &models = container->getRegistry()->getRegisteredModels();
+        auto const &categories = container->getRegistry()->getCategories();
+        auto const &categoriesModelsAssociation = container->getRegistry()->getRegisteredModelsCategoryAssociation();
+        
+        categoriesVector = vector<string>(categories.begin(), categories.end());
+        
+        options = vector<vector<string>>(categories.size());
+        for(int i = 0; i < categories.size(); i++){
+            options.push_back(vector<string>());
+            for(auto &model : models){
+                if(categoriesModelsAssociation.at(model.first) == categoriesVector[i]){
+                    options[i].push_back(model.first);
+                }
+            }
+            std::sort(options[i].begin(), options[i].end());
+        }
     }
     
     // Draw New Node menu
