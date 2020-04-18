@@ -44,7 +44,7 @@ public:
     };
     
     template<typename T>
-    T& addController(){
+    shared_ptr<T> addController(){
         return controls->addController<T>();
     }
     
