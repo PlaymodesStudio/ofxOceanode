@@ -46,6 +46,10 @@ void ofxOceanode::draw(){
     //        for(auto &t : timelines){
     //            t.draw();
     //        }
+    
+    //Make Presets the current active tab on the first frame
+    ImGui::DockBuilderGetNode(ofxOceanodeShared::getLeftNodeID())->TabBar->SelectedTabId = ImGui::FindWindowByName("Presets")->ID;
+    
     gui.end();
     gui.draw();
 }
