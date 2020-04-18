@@ -22,15 +22,15 @@
 #endif
 
 ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _container) : container(_container){
-    controllers.push_back(make_unique<ofxOceanodePresetsController>(container));
-    controllers.push_back(make_unique<ofxOceanodeBPMController>(container));
+    controllers.push_back(move(make_unique<ofxOceanodePresetsController>(container)));
+    controllers.push_back(move(make_unique<ofxOceanodeBPMController>(container)));
     
 #ifdef OFXOCEANODE_USE_OSC
-    controllers.push_back(make_unique<ofxOceanodeOSCController>(container));
+    controllers.push_back(move(make_unique<ofxOceanodeOSCController>(container)));
 #endif
     
 #ifdef OFXOCEANODE_USE_MIDI
-    controllers.push_back(make_unique<ofxOceanodeMidiController>(get<ofxOceanodePresetsController>(), container));
+    controllers.push_back(move(make_unique<ofxOceanodeMidiController>(get<ofxOceanodePresetsController>(), container)));
 #endif
 }
 

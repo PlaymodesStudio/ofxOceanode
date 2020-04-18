@@ -24,13 +24,22 @@ public:
     void update();
     
     template<class T>
-    shared_ptr<T> get(){
-        for(auto c : controllers){
-            if(dynamic_pointer_cast<T>(c) != nullptr){
-                return dynamic_pointer_cast<T>(c);
+    T* get(){
+        for(auto &c : controllers){
+            if(dynamic_cast<T>(c.get()) != nullptr){
+                return dynamic_cast<T>(c.get());
             }
         }
         return nullptr;
+    }
+    
+    //TODO: add arguments
+    template<typename T>
+    T& addController(){
+        auto uniqueC = make_unique<T>();
+        auto ref = uniqueC.get();
+        controllers.push_back(move(uniqueC));
+        return *ref;
     }
     
 private:
@@ -38,7 +47,7 @@ private:
     
     ofEventListeners listeners;
     
-    vector<shared_ptr<ofxOceanodeBaseController>> controllers;
+    vector<unique_ptr<ofxOceanodeBaseController>> controllers;
 };
 
 #endif

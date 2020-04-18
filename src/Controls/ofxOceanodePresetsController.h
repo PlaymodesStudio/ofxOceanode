@@ -36,6 +36,8 @@ private:
     
     ofEventListener presetListener;
     ofEventListener saveCurrentPresetListener;
+    
+    shared_ptr<ofxOceanodeContainer> container;
 };
 
 #endif /* ofxOceanodePresetsController_h */

@@ -11,7 +11,7 @@
 #include "ofxOceanodeContainer.h"
 #include "imgui.h"
 
-ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanodeContainer> _container) : ofxOceanodeBaseController(_container, "Presets"){
+ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("Presets"){
     //Preset Control
     ofDirectory dir;
     dir.open("Presets");

@@ -14,19 +14,15 @@ class ofxOceanodeContainer;
 
 class ofxOceanodeBaseController{
 public:
-    ofxOceanodeBaseController(shared_ptr<ofxOceanodeContainer> _container, string name);
+    ofxOceanodeBaseController(string name);
     virtual ~ofxOceanodeBaseController(){};
     
-    virtual void draw();
-    virtual void update();
+    virtual void draw() = 0;
+    virtual void update(){};
     
     string getControllerName(){return controllerName;};
 protected:
     string controllerName;
-    
-    ofEventListeners listeners;
-    
-    shared_ptr<ofxOceanodeContainer> container;
 };
 
 #endif /* ofxOceanodeBaseController_h */

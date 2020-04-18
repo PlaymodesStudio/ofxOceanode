@@ -14,7 +14,7 @@
 
 //DatGui
 
-ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContainer> _container) : ofxOceanodeBaseController(_container, "BPM"){
+ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("BPM"){
     bpm = 120;
     container->setBpm(bpm);
     lastButtonPressTime = -1;

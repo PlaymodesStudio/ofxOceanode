@@ -9,15 +9,7 @@
 
 #include "ofxOceanodeBaseController.h"
 
-ofxOceanodeBaseController::ofxOceanodeBaseController(shared_ptr<ofxOceanodeContainer> _container, string name) : container(_container), controllerName(name){
-
-}
-
-void ofxOceanodeBaseController::draw(){
-    
-}
-
-void ofxOceanodeBaseController::update(){
+ofxOceanodeBaseController::ofxOceanodeBaseController(string name) : controllerName(name){
 
 }
 

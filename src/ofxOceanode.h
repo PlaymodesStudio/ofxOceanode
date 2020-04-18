@@ -43,6 +43,11 @@ public:
         typesRegistry->registerType<T>();
     };
     
+    template<typename T>
+    T& addController(){
+        return controls->addController<T>();
+    }
+    
     //TODO: Clean
     // From imgui_demo.cpp
     //-----------------------------------------------------------------------------

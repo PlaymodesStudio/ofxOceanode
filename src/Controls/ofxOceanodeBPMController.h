@@ -50,6 +50,7 @@ private:
     ofxAubioBeat bpmDetection;
     ofSoundStream soundStream;
 #endif
+    shared_ptr<ofxOceanodeContainer> container;
 };
 
 
