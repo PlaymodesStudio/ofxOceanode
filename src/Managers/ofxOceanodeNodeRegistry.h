@@ -23,10 +23,13 @@ public:
     ~ofxOceanodeNodeRegistry(){};
     
     
-    template<typename ModelType>
-    void registerModel(string const &category = "Nodes", registryItemCloner cloner = [](){return std::make_unique<ModelType>();}){
-        static_assert(std::is_base_of<ofxOceanodeNodeModel, ModelType>::value,
-                      "Must pass a subclass of ofxOceanodeNodeModel to registerType");
+    template<typename ModelType, typename... Args>
+    void registerModel(string const category, Args... args){
+        static_assert(std::is_base_of<ofxOceanodeNodeModel, ModelType>::value, "Must pass a subclass of ofxOceanodeNodeModel to registerType");
+        
+        registryItemCloner cloner = [args...](){
+            return std::make_unique<ModelType>(args...);
+        };
         
         const string name = cloner()->nodeName();
         

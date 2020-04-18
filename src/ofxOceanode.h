@@ -34,8 +34,13 @@ public:
     void draw();
     
     template<typename T>
-    void registerModel(string category){
+    void registerModel(string category = "Default"){
         nodeRegistry->registerModel<T>(category);
+    };
+    
+    template<typename T, typename... Args>
+    void registerModel(string category, Args... args){
+        nodeRegistry->registerModel<T, Args...>(category, args...);
     };
     
     template<typename T>
