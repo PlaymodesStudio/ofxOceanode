@@ -1,15 +1,17 @@
 #include "ofApp.h"
 #include "testNode.h"
+#include "testController.h"
 
 //--------------------------------------------------------------
 void ofApp::setup(){
     ofSetVerticalSync(false);
     //ofSetFrameRate(120);
     
-    oceanode.registerModel<testNode>("Custom Nodes");
+    
     oceanode.registerType<customClass*>();
     oceanode.setup();
-    
+    auto controllerRef = oceanode.addController<testController>();
+    oceanode.registerModel<testNode>("Custom Nodes", controllerRef);
 }
 
 //--------------------------------------------------------------

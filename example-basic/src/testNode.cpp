@@ -7,8 +7,9 @@
 //
 
 #include "testNode.h"
+#include "testController.h"
 
-testNode::testNode() : ofxOceanodeNodeModel("Test"){
+testNode::testNode(shared_ptr<testController> tController) : controller(tController), ofxOceanodeNodeModel("Test"){
     addParameterToGroupAndInfo(intParam.set("int", 0, 0, 100)).acceptOutConnection = false;
     parameters->add(floatParam.set("float", 3, 0, 10));
     parameters->add(boolParam.set("bool", true));
@@ -26,5 +27,9 @@ testNode::testNode() : ofxOceanodeNodeModel("Test"){
     
     listener2 = intModParam.newListener([&](customClass* &c){
         ofLog()<<"received From custom class " << ofGetElapsedTimeMicros();
+    });
+    
+    listener3 = controller->newValue.newListener([&](float &f){
+        floatParam = f;
     });
 }
