@@ -95,13 +95,16 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
         ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
         ofxOceanodeShared::setDockspaceID(dockspace_id);
+        ImGuiID centralNode_id;
+        ImGuiID leftNode_id;
         if(!ImGui::DockBuilderGetNode(dockspace_id)->IsSplitNode()){ //We dont have a split node;
-            ImGuiID centralNode_id;
-            ImGuiID leftNode_id;
             ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Left, 0.2, &leftNode_id, &centralNode_id);
-            ofxOceanodeShared::setCentralNodeID(centralNode_id);
-            ofxOceanodeShared::setLeftNodeID(leftNode_id);
+        }else{
+            centralNode_id = ImGui::DockBuilderGetNode(dockspace_id)->ChildNodes[1]->ID;
+            leftNode_id = ImGui::DockBuilderGetNode(dockspace_id)->ChildNodes[0]->ID;
         }
+        ofxOceanodeShared::setCentralNodeID(centralNode_id);
+        ofxOceanodeShared::setLeftNodeID(leftNode_id);
     }
     else
     {
