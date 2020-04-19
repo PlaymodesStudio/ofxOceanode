@@ -26,16 +26,6 @@ public:
     void update(){};
     void draw();
     
-    void keyPressed(ofKeyEventArgs &e);
-    void keyReleased(ofKeyEventArgs &e){};
-    void mouseMoved(ofMouseEventArgs &e){};
-    void mouseDragged(ofMouseEventArgs &e);
-    void mousePressed(ofMouseEventArgs &e);
-    void mouseReleased(ofMouseEventArgs &e);
-    void mouseScrolled(ofMouseEventArgs &e);
-    void mouseEntered(ofMouseEventArgs &e){};
-    void mouseExited(ofMouseEventArgs &e){};
-    
     void setContainer(shared_ptr<ofxOceanodeContainer> c){container = c;};
     
     string getUniqueID(){return uniqueID;};
@@ -57,12 +47,10 @@ private:
     
     glm::vec2 selectInitialPoint;
     glm::vec2 selectEndPoint;
-    bool selecting;
+    bool isSelecting;
+    bool isSelected;
     bool entireSelect;
     ofRectangle selectedRect;
-    glm::vec2 selectedRectIntialPosition;
-    glm::vec2 dragModulesInitialPoint;
-    vector<pair<ofxOceanodeNodeGui*, glm::vec2>> toMoveNodes;
     
     vector<string> categoriesVector;
     vector<vector<string>> options;

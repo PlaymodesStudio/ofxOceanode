@@ -45,6 +45,9 @@ public:
     
     bool getExpanded(){return expanded;};
     
+    void setSelected(bool b){selected = b;};
+    bool getSelected(){return selected;};
+    
     glm::vec2 getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter);
     glm::vec2 getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter);
     
@@ -71,6 +74,7 @@ private:
     bool isGuiCreated;
     
     bool expanded;
+    bool selected = false;
     
 #ifdef OFXOCEANODE_USE_MIDI
     bool isListeningMidi;
