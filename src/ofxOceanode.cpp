@@ -119,6 +119,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         //ShowDockingDisabledMessage();
     }
     static bool showManual = false;
+    bool showHelp = false;
     static bool show_app_metrics = false;
     if (show_app_metrics){ImGui::ShowMetricsWindow(&show_app_metrics);}
     if (showManual) showManualWindow(&showManual);
@@ -170,21 +171,19 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         if(ImGui::BeginMenu("Help"))
         {
             ImGui::MenuItem("Show User Manual", "CMD+L", &showManual);
-            if(ImGui::Button("Show Help"))
-            {
-                ImGui::OpenPopup("Help?");
+            if(ImGui::MenuItem("Show Help", "CMD+H")){
+                showHelp = true;
             }
-            if(ImGui::BeginPopupModal("Help?", NULL, ImGuiWindowFlags_AlwaysAutoResize)){
-                showHelpPopUp();
-                ImGui::EndPopup();
-            }
-            
             ImGui::EndMenu();
         }
         ImGui::EndMenuBar();
     }
-    
     ImGui::End();
+    
+    if(showHelp){
+        ImGui::OpenPopup("Here are some tips:");
+    }
+    showHelpPopUp();
 }
 
 void ofxOceanode::showManualWindow(bool *b)
@@ -226,10 +225,28 @@ void ofxOceanode::showManualWindow(bool *b)
 
 
 void ofxOceanode::showHelpPopUp()
-{    
-    ImGui::Text("This is very helpful!");
-    if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsItemActive()){
-        ImGui::CloseCurrentPopup();
+{
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize;
+    bool p_open = true;
+    if(ImGui::BeginPopupModal("Here are some tips:", &p_open, flags)){
+        ImGui::Text("%s", " - Press RIGHT CLICK to open new node popup");
+        ImGui::Spacing();
+        ImGui::Text("%s", " - Hold SPACE to move canvas");
+        ImGui::Spacing();
+        ImGui::Text("%s", " - Press CMD and drag over node to duplicate");
+        ImGui::Spacing();
+        ImGui::Text("%s", " - Press CMD and drag over canvas to begin selection");
+        ImGui::Text("%s", "   * From Up to Down select all node");
+        ImGui::Text("%s", "   * From Down to Up select region node");
+        ImGui::Spacing();
+        ImGui::Text("%s", " - Press BACKSPACE or drag a node to clear selection");
+        ImGui::Spacing();
+        ImGui::Text("%s", " - Press CMD+C to copy selection");
+        ImGui::Spacing();
+        ImGui::Text("%s", " - Press CMD+X to cut selection");
+        ImGui::Spacing();
+        ImGui::Text("%s", " - Press CMD+V to paste selection on mouse position");
+        ImGui::EndPopup();
     }
 }
 
