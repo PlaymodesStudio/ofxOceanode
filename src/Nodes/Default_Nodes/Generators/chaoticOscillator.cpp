@@ -116,7 +116,7 @@ void chaoticOscillator::setup(){
     parameters->add(biPow_Param.set("BiPow", {0}, {-1}, {1}));
     parameters->add(quant_Param.set("Quant", {255}, {2}, {255}));
     parameters->add(customDiscreteDistribution_Param.set("Dist" , {-1}, {0}, {1}));
-    parameters->add(seed.set("Seed", {-1}, {INT_MIN}, {INT_MAX}));
+    parameters->add(seed.set("Seed", {-1}, {(INT_MIN+1)/2}, {(INT_MAX-1)/2}));
     parameters->add(randomAdd_Param.set("Rnd Add", {0}, {-.5}, {.5}));
     parameters->add(scale_Param.set("Scale", {1}, {0}, {2}));
     parameters->add(offset_Param.set("Offset", {0}, {-1}, {1}));

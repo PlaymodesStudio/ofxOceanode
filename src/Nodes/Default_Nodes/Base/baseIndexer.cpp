@@ -10,7 +10,7 @@
 #include <numeric>
 
 baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name){
-    indexCount.set("Size", numIndexs, 1, INT_MAX);
+    indexCount.set("Size", numIndexs, 1, 99999);
     previousIndexCount = indexCount;
     indexs.resize(indexCount, 0);
     indexRand.resize(indexCount , 0);
