@@ -231,21 +231,27 @@ void ofxOceanode::showHelpPopUp()
     if(ImGui::BeginPopupModal("Here are some tips:", &p_open, flags)){
         ImGui::Text("%s", " - Press RIGHT CLICK to open new node popup");
         ImGui::Spacing();
-        ImGui::Text("%s", " - Hold SPACE to move canvas");
+        ImGui::Text("%s", " - Drag empty to move canvas");
         ImGui::Spacing();
-        ImGui::Text("%s", " - Press CMD and drag over node to duplicate");
+        ImGui::Text("%s", " - Hold SHIFT to multiselect");
         ImGui::Spacing();
-        ImGui::Text("%s", " - Press CMD and drag over canvas to begin selection");
+        ImGui::Text("%s", " - Press CMD and drag over canvas to select multiple nodes (SHIFT adds to current selection)");
         ImGui::Text("%s", "   * From Up to Down select all node");
         ImGui::Text("%s", "   * From Down to Up select region node");
         ImGui::Spacing();
-        ImGui::Text("%s", " - Press BACKSPACE or drag a node to clear selection");
+        ImGui::Text("%s", " - Press in empty space or drag a node to clear selection");
+        ImGui::Spacing();
+        ImGui::Text("%s", " - Press BACKSPACE to delete selected nodes");
         ImGui::Spacing();
         ImGui::Text("%s", " - Press CMD+C to copy selection");
         ImGui::Spacing();
         ImGui::Text("%s", " - Press CMD+X to cut selection");
         ImGui::Spacing();
-        ImGui::Text("%s", " - Press CMD+V to paste selection on mouse position");
+        ImGui::Text("%s", " - Press CMD+V to paste selection on mouse position (SHIFT to also paste in connections)");
+        ImGui::Spacing();
+        ImGui::Text("%s", " - Press CMD+D to duplicate selection on mouse position (SHIFT to also duplicate in connections)");
+        ImGui::Spacing();
+        ImGui::Text("%s", " - Press CMD+A to select are nodes");
         ImGui::EndPopup();
     }
 }
