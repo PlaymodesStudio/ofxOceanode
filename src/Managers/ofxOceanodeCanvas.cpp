@@ -237,11 +237,6 @@ void ofxOceanodeCanvas::draw(){
                 
                 //draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(0, 0, 0, 255), 4.0f);
                 
-                if (ImGui::IsItemClicked() && ImGui::GetIO().KeySuper){
-                    nodeGui.duplicate();
-                    //TODO: Change focus to new duplicated node
-                    isNodeDuplicated = true;
-                }
                 
                 int NODE_BULLET_MIN_SIZE = 3;
                 int NODE_BULLET_MAX_SIZE = 10;

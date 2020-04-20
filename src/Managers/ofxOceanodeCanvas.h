@@ -69,7 +69,6 @@ private:
     glm::vec2 scrolling = glm::vec2(0.0f, 0.0f);
     bool show_grid = true;
     string node_selected = "";
-    bool isNodeDuplicated = false;
     glm::vec2 newNodeClickPos;
     
     bool isCreatingConnection;
