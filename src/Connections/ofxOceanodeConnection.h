@@ -12,11 +12,11 @@
 
 class ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeAbstractConnection(ofAbstractParameter& _sourceParameter, ofAbstractParameter& _sinkParameter){
+    ofxOceanodeAbstractConnection(ofAbstractParameter& _sourceParameter, ofAbstractParameter& _sinkParameter, bool _active = true){
         sourceParameter = &_sourceParameter;
         sinkParameter = &_sinkParameter;
         isPersistent = false;
-        active = true;
+        active = _active;
     };
     
     ofxOceanodeAbstractConnection(ofAbstractParameter& _sourceParameter){
@@ -28,6 +28,7 @@ public:
     
     void setActive(bool a){
         active = a;
+        if(active) passValueFunc();
     }
     
     ofAbstractParameter& getSourceParameter(){return *sourceParameter;};
@@ -40,6 +41,8 @@ public:
 protected:
     bool active;
     
+    virtual void passValueFunc() = 0;
+    
     ofAbstractParameter* sourceParameter;
     ofAbstractParameter* sinkParameter;
     
@@ -50,9 +53,12 @@ private:
 template<typename Tsource, typename Tsink, typename Enable = void>
 class ofxOceanodeConnection: public ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeConnection(ofParameter<Tsource>& pSource, ofParameter<Tsink>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+    ofxOceanodeConnection(ofParameter<Tsource>& pSource, ofParameter<Tsink>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource), sinkParameter(pSink){
         beforeConnectionValue = sinkParameter.get();
-        linkParameters();
+        parameterEventListener = sourceParameter.newListener([&](Tsource &p){
+            passValueFunc();
+        });
+        passValueFunc();
     }
     ~ofxOceanodeConnection(){
         sinkParameter.set(beforeConnectionValue);
@@ -60,12 +66,10 @@ public:
     };
     
 private:
-    void linkParameters(){
-        parameterEventListener = sourceParameter.newListener([&](Tsource &p){
-            if(active)
-                sinkParameter = sourceParameter;
-        });
-        sinkParameter = sourceParameter;
+    void passValueFunc(){
+        if(active){
+            sinkParameter = sourceParameter;
+        }
     }
     ofEventListener parameterEventListener;
     ofParameter<Tsource>& sourceParameter;
@@ -76,14 +80,12 @@ private:
 template<typename _Tsource, typename _Tsink>
 class ofxOceanodeConnection<vector<_Tsource>, vector<_Tsink>, typename std::enable_if<!std::is_same<_Tsource, _Tsink>::value>::type>: public ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeConnection(ofParameter<vector<_Tsource>>& pSource, ofParameter<vector<_Tsink>>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+    ofxOceanodeConnection(ofParameter<vector<_Tsource>>& pSource, ofParameter<vector<_Tsink>>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource), sinkParameter(pSink){
         beforeConnectionValue = sinkParameter.get();
         parameterEventListener = sourceParameter.newListener([&](vector<_Tsource> &vf){
-            if(active){
-                sinkParameter = vector<_Tsink>(vf.begin(), vf.end());
-            }
+            passValueFunc();
         });
-        sinkParameter = vector<_Tsink>(sourceParameter->begin(), sourceParameter->end());
+        passValueFunc();
     }
     ~ofxOceanodeConnection(){
         sinkParameter.set(beforeConnectionValue);
@@ -91,6 +93,11 @@ public:
     };
     
 private:
+    void passValueFunc(){
+        if(active){
+            sinkParameter = vector<_Tsink>(sourceParameter->begin(), sourceParameter->end());
+        }
+    }
     ofEventListener parameterEventListener;
     ofParameter<vector<_Tsource>>& sourceParameter;
     ofParameter<vector<_Tsink>>&  sinkParameter;
@@ -106,13 +113,12 @@ struct is_std_vector<std::vector<T,A>> : std::true_type {};
 template<typename _Tsource, typename _Tsink>
 class ofxOceanodeConnection<_Tsource, vector<_Tsink>, typename std::enable_if<!is_std_vector<_Tsource>::value>::type>: public ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeConnection(ofParameter<_Tsource>& pSource, ofParameter<vector<_Tsink>>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+    ofxOceanodeConnection(ofParameter<_Tsource>& pSource, ofParameter<vector<_Tsink>>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource), sinkParameter(pSink){
         beforeConnectionValue = sinkParameter.get();
         parameterEventListener = sourceParameter.newListener([&](_Tsource &f){
-            if(active)
-                sinkParameter = vector<_Tsink>(1, f);
+            passValueFunc();
         });
-        sinkParameter = vector<_Tsink>(1, sourceParameter);
+        passValueFunc();
     }
     ~ofxOceanodeConnection(){
         sinkParameter.set(beforeConnectionValue);
@@ -120,6 +126,11 @@ public:
     };
     
 private:
+    void passValueFunc(){
+        if(active){
+            sinkParameter = vector<_Tsink>(1, sourceParameter);
+        }
+    }
     ofEventListener parameterEventListener;
     ofParameter<_Tsource>& sourceParameter;
     ofParameter<vector<_Tsink>>&  sinkParameter;
@@ -129,18 +140,12 @@ private:
 template<typename _Tsource, typename _Tsink>
 class ofxOceanodeConnection<vector<_Tsource>, _Tsink, typename std::enable_if<!is_std_vector<_Tsink>::value>::type>: public ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeConnection(ofParameter<vector<_Tsource>>& pSource, ofParameter<_Tsink>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
+    ofxOceanodeConnection(ofParameter<vector<_Tsource>>& pSource, ofParameter<_Tsink>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource), sinkParameter(pSink){
         beforeConnectionValue = sinkParameter.get();
         parameterEventListener = sourceParameter.newListener([&](vector<_Tsource> &vf){
-            if(active){
-                if(vf.size() > 0){
-                    sinkParameter = vf[0];
-                }
-            }
+            passValueFunc();
         });
-        if(sourceParameter->size() > 0){
-            sinkParameter = sourceParameter.get()[0];
-        }
+        passValueFunc();
     }
     ~ofxOceanodeConnection(){
         sinkParameter.set(beforeConnectionValue);
@@ -148,6 +153,11 @@ public:
     };
     
 private:
+    void passValueFunc(){
+        if(active && sourceParameter->size() > 0){
+            sinkParameter = sourceParameter.get()[0];
+        }
+    }
     ofEventListener parameterEventListener;
     ofParameter<vector<_Tsource>>& sourceParameter;
     ofParameter<_Tsink>&  sinkParameter;
@@ -158,21 +168,21 @@ private:
 template<typename T>
 class ofxOceanodeConnection<void, T>: public ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeConnection(ofParameter<void>& pSource, ofParameter<T>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
-        linkParameters();
+    ofxOceanodeConnection(ofParameter<void>& pSource, ofParameter<T>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource), sinkParameter(pSink){
+        parameterEventListener = sourceParameter.newListener([&](){
+            passValueFunc();
+        });
     }
     ~ofxOceanodeConnection(){
         ofNotifyEvent(destroyConnection);
     };
     
 private:
-    void linkParameters(){
-        parameterEventListener = sourceParameter.newListener([&](){
-            if(active)
-                sinkParameter = sinkParameter;
-        });
+    void passValueFunc(){
+        if(active){
+            sinkParameter = sinkParameter;
+        }
     }
-    
     ofEventListener parameterEventListener;
     ofParameter<void>& sourceParameter;
     ofParameter<T>&  sinkParameter;
@@ -181,21 +191,21 @@ private:
 template<>
 class ofxOceanodeConnection<void, void>: public ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeConnection(ofParameter<void>& pSource, ofParameter<void>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
-        linkParameters();
+    ofxOceanodeConnection(ofParameter<void>& pSource, ofParameter<void>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource), sinkParameter(pSink){
+        parameterEventListener = sourceParameter.newListener([&](){
+            passValueFunc();
+        });
     }
     ~ofxOceanodeConnection(){
         ofNotifyEvent(destroyConnection);
     };
     
 private:
-    void linkParameters(){
-        parameterEventListener = sourceParameter.newListener([&](){
-            if(active)
-                sinkParameter.trigger();
-        });
+    void passValueFunc(){
+        if(active){
+            sinkParameter.trigger();
+        }
     }
-    
     ofEventListener parameterEventListener;
     ofParameter<void>& sourceParameter;
     ofParameter<void>&  sinkParameter;
@@ -204,21 +214,21 @@ private:
 template<>
 class ofxOceanodeConnection<void, bool>: public ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeConnection(ofParameter<void>& pSource, ofParameter<bool>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
-        linkParameters();
+    ofxOceanodeConnection(ofParameter<void>& pSource, ofParameter<bool>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource), sinkParameter(pSink){
+        parameterEventListener = sourceParameter.newListener([&](){
+            passValueFunc();
+        });
     }
     ~ofxOceanodeConnection(){
         ofNotifyEvent(destroyConnection);
     };
     
 private:
-    void linkParameters(){
-        parameterEventListener = sourceParameter.newListener([&](){
-            if(active)
-                sinkParameter = !sinkParameter;
-        });
+    void passValueFunc(){
+        if(active){
+            sinkParameter = !sinkParameter;
+        }
     }
-    
     ofEventListener parameterEventListener;
     ofParameter<void>& sourceParameter;
     ofParameter<bool>&  sinkParameter;
@@ -227,23 +237,22 @@ private:
 template<>
 class ofxOceanodeConnection<float, bool>: public ofxOceanodeAbstractConnection{
 public:
-    ofxOceanodeConnection(ofParameter<float>& pSource, ofParameter<bool>& pSink) : ofxOceanodeAbstractConnection(pSource, pSink), sourceParameter(pSource), sinkParameter(pSink){
-        linkParameters();
+    ofxOceanodeConnection(ofParameter<float>& pSource, ofParameter<bool>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource), sinkParameter(pSink){
+        parameterEventListener = sourceParameter.newListener([&](float &f){
+            passValueFunc();
+        });
     }
     ~ofxOceanodeConnection(){
         ofNotifyEvent(destroyConnection);
     };
     
 private:
-    void linkParameters(){
-        parameterEventListener = sourceParameter.newListener([&](float &f){
-            if(active){
-                bool newValue = (f > ((sourceParameter.getMax() - sourceParameter.getMin())/2.0 + sourceParameter.getMin())) ? true : false;
-                if(newValue != sinkParameter) sinkParameter = newValue;
-            }
-        });
+    void passValueFunc(){
+        if(active){
+            bool newValue = (sourceParameter > ((sourceParameter.getMax() - sourceParameter.getMin())/2.0 + sourceParameter.getMin())) ? true : false;
+            if(newValue != sinkParameter) sinkParameter = newValue;
+        }
     }
-    
     ofEventListener parameterEventListener;
     ofParameter<float>& sourceParameter;
     ofParameter<bool>&  sinkParameter;

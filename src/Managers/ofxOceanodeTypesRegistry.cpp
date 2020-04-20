@@ -18,9 +18,9 @@ ofxOceanodeTypesRegistry::ofxOceanodeTypesRegistry(){
     this->registerType<vector<int>>();
 }
 
-ofxOceanodeAbstractConnection* ofxOceanodeTypesRegistry::createCustomTypeConnection(ofxOceanodeContainer &container, ofAbstractParameter &source, ofAbstractParameter &sink){
+ofxOceanodeAbstractConnection* ofxOceanodeTypesRegistry::createCustomTypeConnection(ofxOceanodeContainer &container, ofAbstractParameter &source, ofAbstractParameter &sink, bool active){
     for(auto functionForType : registryColector){
-        auto connection = functionForType(container, source, sink);
+        auto connection = functionForType(container, source, sink, active);
         if(connection != nullptr) return connection;
     }
     return nullptr;

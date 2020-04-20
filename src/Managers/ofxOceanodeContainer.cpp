@@ -424,8 +424,7 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
                         }
                     }
                     if(!connectionExist){
-                        auto connection = createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key());
-                        if(connection != nullptr) connection->setActive(false);
+                        auto connection = createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key(), false);
                     }
                 }
             }
@@ -1361,77 +1360,77 @@ void ofxOceanodeContainer::addNewMidiMessageListener(ofxMidiListener* listener){
 
 #endif
 
-ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter){
+ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter, bool active){
     auto sourceModuleRef = parameterGroupNodesMap.count(sourceModule) == 1 ? parameterGroupNodesMap[sourceModule] : nullptr;
     auto sinkModuleRef = parameterGroupNodesMap.count(sinkModule) == 1 ? parameterGroupNodesMap[sinkModule] : nullptr;
     if(sourceModuleRef == nullptr || sinkModuleRef == nullptr) return nullptr;
     if(sourceModuleRef->getParameters()->contains(sourceParameter) && sinkModuleRef->getParameters()->contains(sinkParameter)){
         ofAbstractParameter &source = sourceModuleRef->getParameters()->get(sourceParameter);
         ofAbstractParameter &sink = sinkModuleRef->getParameters()->get(sinkParameter);
-        return createConnection(source, sink);
+        return createConnection(source, sink, active);
     }
     return nullptr;
 }
 
-ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstractParameter &source, ofAbstractParameter &sink){
+ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstractParameter &source, ofAbstractParameter &sink, bool active){
     ofxOceanodeAbstractConnection* connection = nullptr;
     if(source.type() == sink.type()){
-        connection = typesRegistry->createCustomTypeConnection(*this, source, sink);
+        connection = typesRegistry->createCustomTypeConnection(*this, source, sink, active);
     }else if(source.type() == typeid(ofParameter<float>).name()){
         if(sink.type() == typeid(ofParameter<int>).name()){
-            connection = connectConnection(source.cast<float>(), sink.cast<int>());
+            connection = connectConnection(source.cast<float>(), sink.cast<int>(), active);
         }
         else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
-            connection = connectConnection(source.cast<float>(), sink.cast<vector<float>>());
+            connection = connectConnection(source.cast<float>(), sink.cast<vector<float>>(), active);
         }
         else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
-            connection = connectConnection(source.cast<float>(), sink.cast<vector<int>>());
+            connection = connectConnection(source.cast<float>(), sink.cast<vector<int>>(), active);
         }
         else if(sink.type() == typeid(ofParameter<bool>).name()){
-            connection = connectConnection(source.cast<float>(), sink.cast<bool>());
+            connection = connectConnection(source.cast<float>(), sink.cast<bool>(), active);
         }
     }else if(source.type() == typeid(ofParameter<int>).name()){
         if(sink.type() == typeid(ofParameter<float>).name()){
-            connection = connectConnection(source.cast<int>(), sink.cast<float>());
+            connection = connectConnection(source.cast<int>(), sink.cast<float>(), active);
         }
         else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
-            connection = connectConnection(source.cast<int>(), sink.cast<vector<float>>());
+            connection = connectConnection(source.cast<int>(), sink.cast<vector<float>>(), active);
         }
         else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
-            connection = connectConnection(source.cast<int>(), sink.cast<vector<int>>());
+            connection = connectConnection(source.cast<int>(), sink.cast<vector<int>>(), active);
         }
     }else if(source.type() == typeid(ofParameter<vector<float>>).name()){
         if(sink.type() == typeid(ofParameter<float>).name()){
-            connection = connectConnection(source.cast<vector<float>>(), sink.cast<float>());
+            connection = connectConnection(source.cast<vector<float>>(), sink.cast<float>(), active);
         }
         else if(sink.type() == typeid(ofParameter<int>).name()){
-            connection = connectConnection(source.cast<vector<float>>(), sink.cast<int>());
+            connection = connectConnection(source.cast<vector<float>>(), sink.cast<int>(), active);
         }
         else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
-            connection = connectConnection(source.cast<vector<float>>(), sink.cast<vector<int>>());
+            connection = connectConnection(source.cast<vector<float>>(), sink.cast<vector<int>>(), active);
         }
     }else if(source.type() == typeid(ofParameter<vector<int>>).name()){
         if(sink.type() == typeid(ofParameter<float>).name()){
-            connection = connectConnection(source.cast<vector<int>>(), sink.cast<float>());
+            connection = connectConnection(source.cast<vector<int>>(), sink.cast<float>(), active);
         }
         else if(sink.type() == typeid(ofParameter<int>).name()){
-            connection = connectConnection(source.cast<vector<int>>(), sink.cast<int>());
+            connection = connectConnection(source.cast<vector<int>>(), sink.cast<int>(), active);
         }
         else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
-            connection = connectConnection(source.cast<vector<int>>(), sink.cast<vector<float>>());
+            connection = connectConnection(source.cast<vector<int>>(), sink.cast<vector<float>>(), active);
         }
     }else if(source.type() == typeid(ofParameter<void>).name()){
         if(sink.type() == typeid(ofParameter<bool>).name()){
-            connection = connectConnection(source.cast<void>(), sink.cast<bool>());
+            connection = connectConnection(source.cast<void>(), sink.cast<bool>(), active);
         }
         else if(sink.type() == typeid(ofParameter<int>).name()){
-            connection = connectConnection(source.cast<void>(), sink.cast<int>());
+            connection = connectConnection(source.cast<void>(), sink.cast<int>(), active);
         }
         else if(sink.type() == typeid(ofParameter<float>).name()){
-            connection = connectConnection(source.cast<void>(), sink.cast<float>());
+            connection = connectConnection(source.cast<void>(), sink.cast<float>(), active);
         }
         else if(sink.type() == typeid(ofParameter<bool>).name()){
-            connection = connectConnection(source.cast<void>(), sink.cast<bool>());
+            connection = connectConnection(source.cast<void>(), sink.cast<bool>(), active);
         }
     }
     return connection;

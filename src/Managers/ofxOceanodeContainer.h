@@ -61,14 +61,14 @@ public:
     void destroyConnection(ofxOceanodeAbstractConnection* c);
     
     template<typename Tsource, typename Tsink>
-    ofxOceanodeAbstractConnection* connectConnection(ofParameter<Tsource>& source, ofParameter<Tsink>& sink){
-        connections.push_back(move(make_unique<ofxOceanodeConnection<Tsource, Tsink>>(source, sink)));
+    ofxOceanodeAbstractConnection* connectConnection(ofParameter<Tsource>& source, ofParameter<Tsink>& sink, bool active = true){
+        connections.push_back(move(make_unique<ofxOceanodeConnection<Tsource, Tsink>>(source, sink, active)));
         parameterGroupNodesMap[source.getGroupHierarchyNames().front()]->addOutputConnection(connections.back().get());
         parameterGroupNodesMap[sink.getGroupHierarchyNames().front()]->addInputConnection(connections.back().get());
         return connections.back().get();
     }
-    ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter);
-    ofxOceanodeAbstractConnection* createConnection(ofAbstractParameter &source, ofAbstractParameter &sink);
+    ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter, bool active = true);
+    ofxOceanodeAbstractConnection* createConnection(ofAbstractParameter &source, ofAbstractParameter &sink, bool active = true);
     
     shared_ptr<ofxOceanodeNodeRegistry> getRegistry(){return registry;};
     shared_ptr<ofxOceanodeTypesRegistry> getTypesRegistry(){return typesRegistry;};
