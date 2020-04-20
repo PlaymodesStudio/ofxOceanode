@@ -18,6 +18,9 @@
 #include "imgui_internal.h"
 #include "ofxOceanodeShared.h"
 
+bool firstDraw = false;
+ImVec2 firstSize;
+
 void ofxOceanodeCanvas::setup(string _uid, string _pid){
     transformationMatrix = &container->getTransformationMatrix();
     
@@ -89,13 +92,25 @@ void ofxOceanodeCanvas::draw(){
         if (show_grid)
         {
             ImU32 GRID_COLOR = IM_COL32(90, 90, 90, 40);
+            ImU32 GRID_COLOR_CENTER = IM_COL32(30, 30, 30, 80);
             float GRID_SZ = 64.0f;
             ImVec2 win_pos = ImGui::GetCursorScreenPos();
-            ImVec2 canvas_sz = ImGui::GetWindowSize();
+            ImVec2 canvas_sz = ImGui::GetContentRegionAvail();
+
+            if(!firstDraw){
+                firstDraw=true;
+                firstSize=ImGui::GetContentRegionAvail();
+                firstSize=ImVec2((int(firstSize.x/GRID_SZ)*GRID_SZ),int(firstSize.y/GRID_SZ)*GRID_SZ);}
+            
             for (float x = fmodf(scrolling.x, GRID_SZ); x < canvas_sz.x; x += GRID_SZ)
                 draw_list->AddLine(ImVec2(x, 0.0f) + win_pos, ImVec2(x, canvas_sz.y) + win_pos, GRID_COLOR);
             for (float y = fmodf(scrolling.y, GRID_SZ); y < canvas_sz.y; y += GRID_SZ)
                 draw_list->AddLine(ImVec2(0.0f, y) + win_pos, ImVec2(canvas_sz.x, y) + win_pos, GRID_COLOR);
+            
+            ImVec2 origin = ImVec2(win_pos.x + scrolling.x + firstSize.x/2.0 , win_pos.y + scrolling.y + firstSize.y/2.0);
+            draw_list->AddLine(ImVec2(origin.x,0),ImVec2(origin.x,origin.x +  canvas_sz.y/2),GRID_COLOR_CENTER,2);
+            //todo...why da fuck i need to *100 !? it should be * canvas_sz.x/2 ?!
+            draw_list->AddLine(ImVec2(0,origin.y),ImVec2(origin.x +  canvas_sz.x*100,origin.y),GRID_COLOR_CENTER,2);
         }
         
         auto getSourceConnectionPositionFromParameter = [this](ofAbstractParameter& param) -> glm::vec2{
