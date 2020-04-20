@@ -566,7 +566,7 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 #endif
 }
 
-bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referencePosition){
+bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referencePosition, bool allowOutsideInputs){
     string presetFolderPath = "clipboardPreset";
     ofLog()<<"Load Clipboard Preset";
     
@@ -605,17 +605,21 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
         for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
             for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
                 for (ofJson::iterator sinkParameter = sinkModule.value().begin(); sinkParameter != sinkModule.value().end(); ++sinkParameter) {
-                    string sourceMappedModule = sourceModule.key();
-                    string sourceMappedModuleId = ofSplitString(sourceMappedModule, "_").back();
-                    sourceMappedModule.erase(sourceMappedModule.rfind(sourceMappedModuleId)-1);
-                    sourceMappedModule += "_" + ofToString(moduleConverter[sourceMappedModule][ofToInt(sourceMappedModuleId)]);
-                    
-                    string sinkMappedModule = sinkModule.key();
-                    string sinkMappedModuleId = ofSplitString(sinkMappedModule, "_").back();
-                    sinkMappedModule.erase(sinkMappedModule.rfind(sinkMappedModuleId)-1);
-                    sinkMappedModule += "_" + ofToString(moduleConverter[sinkMappedModule][ofToInt(sinkMappedModuleId)]);
-                    
-                    createConnectionFromInfo(sourceMappedModule, sourceParameter.key(), sinkMappedModule, sinkParameter.key());
+                    if(allowOutsideInputs || sinkParameter.value()){
+                        string sourceMappedModule = sourceModule.key();
+                        if(sinkParameter.value()){
+                            string sourceMappedModuleId = ofSplitString(sourceMappedModule, "_").back();
+                            sourceMappedModule.erase(sourceMappedModule.rfind(sourceMappedModuleId)-1);
+                            sourceMappedModule += "_" + ofToString(moduleConverter[sourceMappedModule][ofToInt(sourceMappedModuleId)]);
+                        }
+                        
+                        string sinkMappedModule = sinkModule.key();
+                        string sinkMappedModuleId = ofSplitString(sinkMappedModule, "_").back();
+                        sinkMappedModule.erase(sinkMappedModule.rfind(sinkMappedModuleId)-1);
+                        sinkMappedModule += "_" + ofToString(moduleConverter[sinkMappedModule][ofToInt(sinkMappedModuleId)]);
+                        
+                        createConnectionFromInfo(sourceMappedModule, sourceParameter.key(), sinkMappedModule, sinkParameter.key());
+                    }
                 }
             }
         }
@@ -656,9 +660,10 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
             string sourceParentName = connection->getSourceParameter().getGroupHierarchyNames()[0];
             string sinkName = connection->getSinkParameter().getName();
             string sinkParentName = connection->getSinkParameter().getGroupHierarchyNames()[0];
-            if(std::find(nodeAsParentNames.begin(), nodeAsParentNames.end(), sourceParentName) != nodeAsParentNames.end() &&
-               std::find(nodeAsParentNames.begin(), nodeAsParentNames.end(), sinkParentName) != nodeAsParentNames.end()){
-                json[sourceParentName][sourceName][sinkParentName][sinkName];
+            bool sourceIsInModuleList = std::find(nodeAsParentNames.begin(), nodeAsParentNames.end(), sourceParentName) != nodeAsParentNames.end();
+            bool sinkIsInModuleList = std::find(nodeAsParentNames.begin(), nodeAsParentNames.end(), sinkParentName) != nodeAsParentNames.end();
+            if(sinkIsInModuleList){
+                json[sourceParentName][sourceName][sinkParentName][sinkName] = sourceIsInModuleList;
             }
         }
     }
@@ -1223,8 +1228,8 @@ bool ofxOceanodeContainer::cutSelectedModulesWithConnections(){
     return true;
 }
 
-bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 position){
-    return loadClipboardModulesAndConnections(position);
+bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 position, bool allowOutsideInputs){
+    return loadClipboardModulesAndConnections(position, allowOutsideInputs);
 }
 
 bool ofxOceanodeContainer::deleteSelectedModules(){

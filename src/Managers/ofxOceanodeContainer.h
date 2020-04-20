@@ -76,7 +76,7 @@ public:
     bool loadPreset(string presetFolderPath);
     void savePreset(string presetFolderPath);
     
-    bool loadClipboardModulesAndConnections(glm::vec2 referencePosition);
+    bool loadClipboardModulesAndConnections(glm::vec2 referencePosition, bool allowOutsideInputs);
     void saveClipboardModulesAndConnections(vector<ofxOceanodeNode*> nodes, glm::vec2 referencePosition);
     
     void savePersistent();
@@ -118,7 +118,7 @@ public:
     
     bool copySelectedModulesWithConnections();
     bool cutSelectedModulesWithConnections();
-    bool pasteModulesAndConnectionsInPosition(glm::vec2 position);
+    bool pasteModulesAndConnectionsInPosition(glm::vec2 position, bool allowOutsideInputs);
     bool deleteSelectedModules();
     
     const vector<unique_ptr<ofxOceanodeAbstractConnection>>& getAllConnections(){return connections;};

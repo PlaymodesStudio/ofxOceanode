@@ -489,13 +489,13 @@ void ofxOceanodeCanvas::draw(){
                 deselectAllNodes();
             }else if(ImGui::IsKeyPressed('V')){
                 deselectAllNodes();
-                container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset);
+                container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset, ImGui::GetIO().KeyShift);
             }else if(ImGui::IsKeyPressed('X')){
                 container->cutSelectedModulesWithConnections();
             }else if(ImGui::IsKeyPressed('D')){
                 container->copySelectedModulesWithConnections();
                 deselectAllNodes();
-                container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset);
+                container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset, ImGui::GetIO().KeyShift);
             }else if(ImGui::IsKeyPressed('A')){
                 selectAllNodes();
             }
