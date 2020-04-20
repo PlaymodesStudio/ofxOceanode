@@ -24,7 +24,7 @@ public:
     
     void setup(string _uid = "Canvas", string _pid = "");
     void update(){};
-    void draw();
+    void draw(bool *open = NULL);
     
     void setContainer(shared_ptr<ofxOceanodeContainer> c){container = c;};
     

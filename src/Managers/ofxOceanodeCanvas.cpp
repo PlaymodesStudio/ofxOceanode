@@ -36,7 +36,7 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
     moveSelectedModulesWithDrag = glm::vec2(0,0);
 }
 
-void ofxOceanodeCanvas::draw(){
+void ofxOceanodeCanvas::draw(bool *open){
     //Draw Guis
     
     // Draw a list of nodes on the left side
@@ -48,8 +48,7 @@ void ofxOceanodeCanvas::draw(){
     
     
     ImGui::SetNextWindowDockID(ofxOceanodeShared::getDockspaceID(), ImGuiCond_FirstUseEver);
-    
-    if(ImGui::Begin(uniqueID.c_str())){
+    if(ImGui::Begin(uniqueID.c_str(), open)){
         ImGui::SameLine();
         ImGui::BeginGroup();
         

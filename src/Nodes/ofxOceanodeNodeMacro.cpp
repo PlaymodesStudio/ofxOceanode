@@ -100,7 +100,10 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 }
 
 void ofxOceanodeNodeMacro::draw(ofEventArgs &a){
-    canvas.draw();
+    if(showWindow){
+        canvas.draw((bool*)&showWindow.get());
+        showWindow = showWindow;
+    }
     container->draw();
 }
 
@@ -111,6 +114,8 @@ void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
 }
 
 void ofxOceanodeNodeMacro::setup(){
+    parameters->add(showWindow.set("Show", true));
+    
     registry->registerModel<inlet<vector<float>>>("I/O");
     registry->registerModel<outlet<vector<float>>>("I/O");
     registry->registerModel<inlet<ofTexture*>>("I/O");

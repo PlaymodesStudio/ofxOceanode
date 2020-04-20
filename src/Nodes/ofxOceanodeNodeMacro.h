@@ -115,6 +115,7 @@ private:
     std::unordered_map<string, ofEventListeners> inoutListeners;
     ofEventListeners deleteListeners;
     
+    ofParameter<bool> showWindow;
     string presetPath;
     ofParameter<int> bank;
     int previousBank;
