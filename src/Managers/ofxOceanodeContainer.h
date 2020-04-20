@@ -114,10 +114,8 @@ public:
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
     
 #ifndef OFXOCEANODE_HEADLESS
-    vector<ofxOceanodeNodeGui*> getModulesGuiInRectangle(ofRectangle rect, bool entire);
-    vector<ofxOceanodeNode*> getModulesInRectangle(ofRectangle rect, bool entire);
-    bool copyModulesAndConnectionsInsideRect(ofRectangle rect, bool entire);
-    bool cutModulesAndConnectionsInsideRect(ofRectangle rect, bool entire);
+    bool copySelectedModulesWithConnections();
+    bool cutSelectedModulesWithConnections();
     bool pasteModulesAndConnectionsInPosition(glm::vec2 position);
     
     const vector<unique_ptr<ofxOceanodeAbstractConnection>>& getAllConnections(){return connections;};

@@ -26,7 +26,6 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
     
     selectedRect = ofRectangle(0, 0, 0, 0);
     isSelecting = false;
-    isSelected = false;
     
     parentID = _pid;
     if(parentID != "Canvas" && parentID != ""){ //It is not canvas, and it is not the first branch of macros
@@ -37,6 +36,7 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
     container->setCanvasID(uniqueID);
     
     scrolling = glm::vec2(0,0);
+    moveSelectedModulesWithDrag = glm::vec2(0,0);
 }
 
 void ofxOceanodeCanvas::draw(){
@@ -46,6 +46,9 @@ void ofxOceanodeCanvas::draw(){
     bool open_context_menu = false;
     string node_hovered_in_list = "";
     string node_hovered_in_scene = "";
+    
+    bool isAnyNodeHovered = false;
+    
     
     ImGui::SetNextWindowDockID(ofxOceanodeShared::getDockspaceID(), ImGuiCond_FirstUseEver);
     
@@ -81,7 +84,6 @@ void ofxOceanodeCanvas::draw(){
         if(ImGui::IsMouseReleased(0)){
             if(isSelecting){
                 isSelecting = false;
-                isSelected = true;
                 selectionHasBeenMade = true;
             }else{
                 //selectedRect = ofRectangle(0,0,0,0);
@@ -166,7 +168,7 @@ void ofxOceanodeCanvas::draw(){
             bool old_any_active = ImGui::IsAnyItemActive();
             ImGui::SetCursorScreenPos(node_rect_min + NODE_WINDOW_PADDING);
             
-            //TODO: Disable group intraction if(isSelected)
+            
             //Draw Parameters
             if(nodeGui.constructGui()){
                 
@@ -188,6 +190,7 @@ void ofxOceanodeCanvas::draw(){
                 
                 if (ImGui::IsItemHovered())
                 {
+                    isAnyNodeHovered = true;
                     node_hovered_in_scene = nodeId;
                     open_context_menu |= ImGui::IsMouseClicked(1);
                 }
@@ -201,22 +204,37 @@ void ofxOceanodeCanvas::draw(){
                     }
                 };
                 
-                //MultiSelect
-                if(selectionHasBeenMade){
-                    nodeGui.setSelected(getIsSelectedByRect(nodeGui.getRectangle()));
-                    if(entireSelect){
-                        nodeGui.setSelected(selectedRect.inside(nodeGui.getRectangle()));
-                    }else{
-                        nodeGui.setSelected(selectedRect.intersects(nodeGui.getRectangle()));
-                    }
-                }else if(!isSelected){
+                if((deselectAllNodesExcept != nodeId && deselectAllNodesExcept != "")){
                     nodeGui.setSelected(false);
+                }else{
+                    deselectAllNodesExcept = "";
                 }
                 
-                if(node_moving_active){
-                    isSelected = false; //Disable Selection;
-                }else if(isSelected){
-                    node_moving_active = nodeGui.getSelected() && !interacting_node;
+                bool toCheckPress = nodeGui.getSelected() && lastSelectedNode != nodeId ? ImGui::IsMouseReleased(0) : ImGui::IsMouseClicked(0);
+                
+                if(toCheckPress && ImGui::IsItemHovered(ImGuiHoveredFlags_None)){
+                    if(nodeGui.getSelected() && lastSelectedNode == nodeId) lastSelectedNode = "";
+                    if(!someDragAppliedToSelection || !nodeGui.getSelected()){
+                        if(!ImGui::GetIO().KeyShift){
+                            deselectAllNodesExcept = nodeId;
+                            nodeGui.setSelected(true);
+                        }else{
+                            nodeGui.setSelected(!nodeGui.getSelected());
+                        }
+                        if(nodeGui.getSelected()) lastSelectedNode = nodeId;
+                    }
+                }
+                if(ImGui::IsMouseReleased(0) && ImGui::IsItemHovered(ImGuiHoveredFlags_None) && nodeGui.getSelected() && lastSelectedNode == nodeId){
+                    lastSelectedNode = "";
+                }
+                
+                //MultiSelect
+                if(selectionHasBeenMade){
+                    bool fitSelection = getIsSelectedByRect(nodeGui.getRectangle());
+                    if(!ImGui::GetIO().KeyShift)
+                        nodeGui.setSelected(fitSelection);
+                    else if(fitSelection)
+                        nodeGui.setSelected(true);
                 }
                 
                 bool isSelectedOrSelecting = nodeGui.getSelected() || (isSelecting && getIsSelectedByRect(nodeGui.getRectangle()));
@@ -313,11 +331,14 @@ void ofxOceanodeCanvas::draw(){
                         }
                     }
                 }
+                if(someSelectedModuleMove == nodeId) someSelectedModuleMove = "";
                 if(!isCreatingConnection){
                     if (node_widgets_active || node_moving_active)
                         node_selected = nodeId;
-                    if (node_moving_active && ImGui::IsMouseDragging(0, 0.0f))
-                        nodeGui.setPosition(nodeGui.getPosition() + ImGui::GetIO().MouseDelta);
+                    if (node_moving_active && ImGui::IsMouseDragging(0, 0.0f) && !node_widgets_active)
+                        someSelectedModuleMove = nodeId;
+                    if(someSelectedModuleMove != "" && nodeGui.getSelected())
+                        nodeGui.setPosition(nodeGui.getPosition() + moveSelectedModulesWithDrag);
                 }
             }
             ImGui::PopID();
@@ -435,27 +456,30 @@ void ofxOceanodeCanvas::draw(){
         // Scrolling
         if(ImGui::IsMouseDragging(0, 0.0f)){
             if (ImGui::IsWindowHovered()){
-                if(ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                if(ImGui::GetIO().KeySuper && !isCreatingConnection){//MultiSelect not allowed when connecting connectio
+                    if(!isSelecting){
+                        selectInitialPoint = ImGui::GetMousePos() - ImGui::GetIO().MouseDelta - offset;
+                        isSelecting  = true;
+                    }
+                    selectEndPoint = ImGui::GetMousePos() - offset;
+                    selectedRect = ofRectangle(selectInitialPoint, selectEndPoint);
+                    entireSelect =  selectInitialPoint.y < selectEndPoint.y;
+                    canvasHasScolled = true; //HACK to not remove selection on mouse release
+                }
+                if((!isSelecting && !isCreatingConnection) || (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space)))){
                     scrolling = scrolling + ImGui::GetIO().MouseDelta;
-                    if(isSelecting){
-                        selectInitialPoint = selectInitialPoint + ImGui::GetIO().MouseDelta;
+                    if(glm::vec2(ImGui::GetIO().MouseDelta) != glm::vec2(0,0)) canvasHasScolled = true;
+                    if(isSelecting && !ImGui::GetIO().KeySuper){
+                        selectInitialPoint = selectInitialPoint +  ImGui::GetIO().MouseDelta;
                         selectEndPoint = selectEndPoint + ImGui::GetIO().MouseDelta;
                         selectedRect = ofRectangle(selectInitialPoint, selectEndPoint);
                         entireSelect = glm::vec2(selectedRect.getTopLeft()) == selectInitialPoint;
                     }
-                }else if(ImGui::GetIO().KeySuper && !isCreatingConnection){//MultiSelect not allowed when connecting connectio
-                    if(!isSelecting){
-                        selectInitialPoint = ImGui::GetMousePos() - ImGui::GetIO().MouseDelta - offset;
-                        isSelecting  = true;
-                        isSelected = false;
-                    }
-                    selectEndPoint = ImGui::GetMousePos() - offset;
-                    selectedRect = ofRectangle(selectInitialPoint, selectEndPoint);
-                    entireSelect = glm::vec2(selectedRect.getTopLeft()) == selectInitialPoint;
                 }
-            }
-            if(isSelected){
-                selectedRect.translate(ImGui::GetIO().MouseDelta);
+            }else if(someSelectedModuleMove != "" && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)){
+                moveSelectedModulesWithDrag = ImGui::GetIO().MouseDelta;
+                if(moveSelectedModulesWithDrag != glm::vec2(0,0))
+                    someDragAppliedToSelection = true;
             }
         }
         
@@ -468,23 +492,30 @@ void ofxOceanodeCanvas::draw(){
             }
         }
         
-        if(ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace))){
-            isSelected = false;
+        
+        if(ImGui::IsMouseReleased(0)){
+            if(canvasHasScolled){
+                canvasHasScolled = false;
+            }else if(!isAnyNodeHovered && !someDragAppliedToSelection){
+                deselectAllNodes();
+            }
+            someDragAppliedToSelection = false;
+            moveSelectedModulesWithDrag = glm::vec2(0,0);
         }
         
         if(ImGui::GetIO().KeySuper){
             if(ImGui::IsKeyPressed('C')){
-                if(isSelected){
-                    container->copyModulesAndConnectionsInsideRect(selectedRect, entireSelect);
-                    isSelected = false;
-                }
+                container->copySelectedModulesWithConnections();
+                deselectAllNodes();
             }else if(ImGui::IsKeyPressed('V')){
+                deselectAllNodes();
                 container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset);
             }else if(ImGui::IsKeyPressed('X')){
-                if(isSelected){
-                    container->cutModulesAndConnectionsInsideRect(selectedRect, entireSelect);
-                    isSelected = false;
-                }
+                container->cutSelectedModulesWithConnections();
+            }else if(ImGui::IsKeyPressed('D')){
+                container->copySelectedModulesWithConnections();
+                deselectAllNodes();
+                container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset);
             }
         }
         
@@ -553,6 +584,12 @@ glm::vec3 ofxOceanodeCanvas::getMatrixScale(const glm::mat4 &m){
 
 glm::mat4 ofxOceanodeCanvas::translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector){
     return glm::translate(glm::mat4(1.0), translationVector) * m;
+}
+
+void ofxOceanodeCanvas::deselectAllNodes(){
+    for(auto &n: container->getParameterGroupNodesMap()){
+        n.second->getNodeGui().setSelected(false);
+    }
 }
 
 #endif

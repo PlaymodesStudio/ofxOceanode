@@ -48,9 +48,17 @@ private:
     glm::vec2 selectInitialPoint;
     glm::vec2 selectEndPoint;
     bool isSelecting;
-    bool isSelected;
     bool entireSelect;
     ofRectangle selectedRect;
+    
+    string deselectAllNodesExcept = "";
+    string lastSelectedNode = "";
+    string someSelectedModuleMove = "";
+    glm::vec2 moveSelectedModulesWithDrag;
+    bool someDragAppliedToSelection = false;
+    
+    bool canvasHasScolled = false;
+    void deselectAllNodes();
     
     vector<string> categoriesVector;
     vector<vector<string>> options;

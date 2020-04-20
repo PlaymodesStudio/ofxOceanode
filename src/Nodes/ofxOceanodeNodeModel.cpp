@@ -43,9 +43,8 @@ const parameterInfo& ofxOceanodeNodeModel::getParameterInfo(ofAbstractParameter&
 }
 
 const parameterInfo& ofxOceanodeNodeModel::getParameterInfo(string parameterName){
-    if(parametersInfo.count(parameterName) != 0){
-        return parametersInfo[parameterName];
-    }else{
-        return parameterInfo();
+    if(parametersInfo.count(parameterName) == 0){
+        parametersInfo[parameterName] = parameterInfo();
     }
+    return parametersInfo[parameterName];
 }
