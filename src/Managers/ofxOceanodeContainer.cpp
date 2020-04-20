@@ -1181,14 +1181,12 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
 
 #ifndef OFXOCEANODE_HEADLESS
 
-bool ofxOceanodeContainer::copySelectedModulesWithConnections(){
+vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules(){
     vector<ofxOceanodeNode*> modulesToCopy;
-    glm::vec2 minPosition(FLT_MAX, FLT_MAX);
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             if(node.second->getNodeGui().getSelected()){
                 modulesToCopy.push_back(node.second.get());
-                minPosition = glm::vec2(min(node.second->getNodeGui().getPosition().x, minPosition.x), min(node.second->getNodeGui().getPosition().y, minPosition.y));
             }
         }
     }
@@ -1196,9 +1194,17 @@ bool ofxOceanodeContainer::copySelectedModulesWithConnections(){
         for(auto &node : nodeTypeMap.second){
             if(node.second->getNodeGui().getSelected()){
                 modulesToCopy.push_back(node.second.get());
-                minPosition = glm::vec2(min(node.second->getNodeGui().getPosition().x, minPosition.x), min(node.second->getNodeGui().getPosition().y, minPosition.y));
             }
         }
+    }
+    return modulesToCopy;
+}
+
+bool ofxOceanodeContainer::copySelectedModulesWithConnections(){
+    vector<ofxOceanodeNode*> modulesToCopy = getSelectedModules();
+    glm::vec2 minPosition(FLT_MAX, FLT_MAX);
+    for(auto &node : modulesToCopy){
+        minPosition = glm::vec2(min(node->getNodeGui().getPosition().x, minPosition.x), min(node->getNodeGui().getPosition().y, minPosition.y));
     }
     if(modulesToCopy.size() == 0) return false;
     saveClipboardModulesAndConnections(modulesToCopy, minPosition);
@@ -1206,23 +1212,10 @@ bool ofxOceanodeContainer::copySelectedModulesWithConnections(){
 }
 
 bool ofxOceanodeContainer::cutSelectedModulesWithConnections(){
-   vector<ofxOceanodeNode*> modulesToCut;
+    vector<ofxOceanodeNode*> modulesToCut = getSelectedModules();
     glm::vec2 minPosition(FLT_MAX, FLT_MAX);
-    for(auto &nodeTypeMap : dynamicNodes){
-        for(auto &node : nodeTypeMap.second){
-            if(node.second->getNodeGui().getSelected()){
-                modulesToCut.push_back(node.second.get());
-                minPosition = glm::vec2(min(node.second->getNodeGui().getPosition().x, minPosition.x), min(node.second->getNodeGui().getPosition().y, minPosition.y));
-            }
-        }
-    }
-    for(auto &nodeTypeMap : persistentNodes){
-        for(auto &node : nodeTypeMap.second){
-            if(node.second->getNodeGui().getSelected()){
-                modulesToCut.push_back(node.second.get());
-                minPosition = glm::vec2(min(node.second->getNodeGui().getPosition().x, minPosition.x), min(node.second->getNodeGui().getPosition().y, minPosition.y));
-            }
-        }
+    for(auto &node : modulesToCut){
+        minPosition = glm::vec2(min(node->getNodeGui().getPosition().x, minPosition.x), min(node->getNodeGui().getPosition().y, minPosition.y));
     }
     if(modulesToCut.size() == 0) return false;
     saveClipboardModulesAndConnections(modulesToCut, minPosition);
@@ -1232,6 +1225,10 @@ bool ofxOceanodeContainer::cutSelectedModulesWithConnections(){
 
 bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 position){
     return loadClipboardModulesAndConnections(position);
+}
+
+bool ofxOceanodeContainer::deleteSelectedModules(){
+    for(auto &m : getSelectedModules()) m->deleteSelf();
 }
 
 

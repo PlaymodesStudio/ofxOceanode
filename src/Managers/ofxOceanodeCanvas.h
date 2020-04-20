@@ -59,6 +59,7 @@ private:
     
     bool canvasHasScolled = false;
     void deselectAllNodes();
+    void selectAllNodes();
     
     vector<string> categoriesVector;
     vector<vector<string>> options;

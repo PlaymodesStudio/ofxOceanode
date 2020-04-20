@@ -114,9 +114,12 @@ public:
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
     
 #ifndef OFXOCEANODE_HEADLESS
+    vector<ofxOceanodeNode*> getSelectedModules();
+    
     bool copySelectedModulesWithConnections();
     bool cutSelectedModulesWithConnections();
     bool pasteModulesAndConnectionsInPosition(glm::vec2 position);
+    bool deleteSelectedModules();
     
     const vector<unique_ptr<ofxOceanodeAbstractConnection>>& getAllConnections(){return connections;};
     const std::unordered_map<string, ofxOceanodeNode*> & getParameterGroupNodesMap(){return parameterGroupNodesMap;};

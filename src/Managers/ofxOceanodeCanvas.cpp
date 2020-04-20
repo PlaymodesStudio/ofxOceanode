@@ -496,7 +496,12 @@ void ofxOceanodeCanvas::draw(){
                 container->copySelectedModulesWithConnections();
                 deselectAllNodes();
                 container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset);
+            }else if(ImGui::IsKeyPressed('A')){
+                selectAllNodes();
             }
+        }
+        else if(ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace)) && !ImGui::IsAnyItemActive()){
+            container->deleteSelectedModules();
         }
         
         if (isCreatingConnection && !ImGui::IsMouseDown(0)){
@@ -569,6 +574,12 @@ glm::mat4 ofxOceanodeCanvas::translateMatrixWithoutScale(const glm::mat4 &m, glm
 void ofxOceanodeCanvas::deselectAllNodes(){
     for(auto &n: container->getParameterGroupNodesMap()){
         n.second->getNodeGui().setSelected(false);
+    }
+}
+
+void ofxOceanodeCanvas::selectAllNodes(){
+    for(auto &n: container->getParameterGroupNodesMap()){
+        n.second->getNodeGui().setSelected(true);
     }
 }
 
