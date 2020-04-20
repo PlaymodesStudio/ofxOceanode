@@ -99,44 +99,8 @@ void ofxOceanodeCanvas::draw(bool *open){
                 draw_list->AddLine(ImVec2(0.0f, y) + win_pos, ImVec2(canvas_sz.x, y) + win_pos, GRID_COLOR);
         }
         
-        auto getSourceConnectionPositionFromParameter = [this](ofAbstractParameter& param) -> glm::vec2{
-            if(container->getParameterGroupNodesMap().count(param.getGroupHierarchyNames().front())){
-                return container->getParameterGroupNodesMap().at(param.getGroupHierarchyNames().front())->getNodeGui().getSourceConnectionPositionFromParameter(param);
-            }
-            //TODO: Throw exception
-        };
-        auto getSinkConnectionPositionFromParameter = [this](ofAbstractParameter& param) -> glm::vec2{
-            if(container->getParameterGroupNodesMap().count(param.getGroupHierarchyNames().front())){
-                return container->getParameterGroupNodesMap().at(param.getGroupHierarchyNames().front())->getNodeGui().getSinkConnectionPositionFromParameter(param);
-            }
-            //TODO: Throw exception
-        };
-        
-        // Display links
-        draw_list->ChannelsSplit(2);
-        draw_list->ChannelsSetCurrent(0); // Background
-        for(auto &connection : container->getAllConnections()){
-            glm::vec2 p1 = getSourceConnectionPositionFromParameter(connection->getSourceParameter()) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
-            glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter()) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
-            glm::vec2  controlPoint(0,0);
-            controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
-            draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 200, 128), 2.0f);
-        }
-        if(tempSourceParameter != nullptr || tempSinkParameter != nullptr){
-            glm::vec2 p1, p2;
-            if(tempSourceParameter != nullptr){
-                p1 = getSourceConnectionPositionFromParameter(*tempSourceParameter) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
-                p2 = ImGui::GetMousePos();
-            }else{
-                p1 = ImGui::GetMousePos();
-                p2 = getSinkConnectionPositionFromParameter(*tempSinkParameter) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
-            }
-            glm::vec2  controlPoint(0,0);
-            controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
-            draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(255, 255, 255, 128), 1.0f);
-        }
-        
         // Display nodes
+        draw_list->ChannelsSplit(2);
         //Iterating over the map gives errors as we are removing elements from the map during the iteration.
         vector<pair<string, ofxOceanodeNode*>> nodesInThisFrame = vector<pair<string, ofxOceanodeNode*>>(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
         for(auto nodePair : nodesInThisFrame)
@@ -241,6 +205,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                 int NODE_BULLET_MAX_SIZE = 10;
                 int NODE_BULLET_GROW_DIST = 10;
                 
+                //TODO: Review press/release detection, better use ImGui::InvisibeButton()?
                 for (auto &param : *node->getParameters().get()){
                     //TODO: Check if parameter is plugable
                     auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
@@ -323,7 +288,7 @@ void ofxOceanodeCanvas::draw(bool *open){
             ImGui::PopID();
         }
         
-        draw_list->ChannelsMerge();
+        
         
         
         // Open context menu
@@ -509,6 +474,44 @@ void ofxOceanodeCanvas::draw(bool *open){
             tempSinkParameter = nullptr;
             isCreatingConnection = false;
         }
+        
+        auto getSourceConnectionPositionFromParameter = [this](ofAbstractParameter& param) -> glm::vec2{
+            if(container->getParameterGroupNodesMap().count(param.getGroupHierarchyNames().front())){
+                return container->getParameterGroupNodesMap().at(param.getGroupHierarchyNames().front())->getNodeGui().getSourceConnectionPositionFromParameter(param);
+            }
+            //TODO: Throw exception
+        };
+        auto getSinkConnectionPositionFromParameter = [this](ofAbstractParameter& param) -> glm::vec2{
+            if(container->getParameterGroupNodesMap().count(param.getGroupHierarchyNames().front())){
+                return container->getParameterGroupNodesMap().at(param.getGroupHierarchyNames().front())->getNodeGui().getSinkConnectionPositionFromParameter(param);
+            }
+            //TODO: Throw exception
+        };
+        
+        // Display links
+        draw_list->ChannelsSetCurrent(0); // Background
+        for(auto &connection : container->getAllConnections()){
+            glm::vec2 p1 = getSourceConnectionPositionFromParameter(connection->getSourceParameter()) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
+            glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter()) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
+            glm::vec2  controlPoint(0,0);
+            controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
+            draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 200, 128), 2.0f);
+        }
+        if(tempSourceParameter != nullptr || tempSinkParameter != nullptr){
+            glm::vec2 p1, p2;
+            if(tempSourceParameter != nullptr){
+                p1 = getSourceConnectionPositionFromParameter(*tempSourceParameter) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
+                p2 = ImGui::GetMousePos();
+            }else{
+                p1 = ImGui::GetMousePos();
+                p2 = getSinkConnectionPositionFromParameter(*tempSinkParameter) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
+            }
+            glm::vec2  controlPoint(0,0);
+            controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
+            draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(255, 255, 255, 128), 1.0f);
+        }
+        
+        draw_list->ChannelsMerge();
         
         ImGui::PopItemWidth();
         ImGui::EndChild();
