@@ -56,14 +56,16 @@ void ofxOceanodeCanvas::draw(bool *open){
         const ImVec2 NODE_WINDOW_PADDING(8.0f, 7.0f);
         
         // Create our child canvas
-        ImGui::Text("[%.2f,%.2f]", scrolling.x, scrolling.y);
         
-        ImGui::SameLine();
+        ImGui::Text("[%d,%d]",int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
+
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x-20.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
-        if(ImGui::Button("[C]"))
+        
+        bool recenterCanvas = false;
+        if(ImGui::Button("[C]") || isFirstDraw)
         {
-            scrolling.x = 0;
-            scrolling.y = 0;
+            recenterCanvas = true;
         }
         ImGui::PopStyleVar();
         
@@ -90,15 +92,27 @@ void ofxOceanodeCanvas::draw(bool *open){
         if (show_grid)
         {
             ImU32 GRID_COLOR = IM_COL32(90, 90, 90, 40);
+            ImU32 GRID_COLOR_CENTER = IM_COL32(30, 30, 30, 80);
             float GRID_SZ = 64.0f;
             ImVec2 win_pos = ImGui::GetCursorScreenPos();
-            ImVec2 canvas_sz = ImGui::GetWindowSize();
+            ImVec2 canvas_sz = ImGui::GetContentRegionAvail();
+            
+            if (recenterCanvas )
+            {
+                scrolling.x = ImGui::GetContentRegionAvail().x/2.0f;
+                scrolling.y = ImGui::GetContentRegionAvail().y/2.0f;
+            }
+
             for (float x = fmodf(scrolling.x, GRID_SZ); x < canvas_sz.x; x += GRID_SZ)
                 draw_list->AddLine(ImVec2(x, 0.0f) + win_pos, ImVec2(x, canvas_sz.y) + win_pos, GRID_COLOR);
             for (float y = fmodf(scrolling.y, GRID_SZ); y < canvas_sz.y; y += GRID_SZ)
                 draw_list->AddLine(ImVec2(0.0f, y) + win_pos, ImVec2(canvas_sz.x, y) + win_pos, GRID_COLOR);
+            
+            ImVec2 origin = ImVec2(win_pos.x + scrolling.x, win_pos.y + scrolling.y );
+            draw_list->AddLine(ImVec2(origin.x,0),ImVec2(origin.x,origin.x +  canvas_sz.y/2),GRID_COLOR_CENTER,2);
+            draw_list->AddLine(ImVec2(0,origin.y),ImVec2(origin.x +  canvas_sz.x,origin.y),GRID_COLOR_CENTER,2);
         }
-        
+                
         // Display nodes
         draw_list->ChannelsSplit(2);
         //Iterating over the map gives errors as we are removing elements from the map during the iteration.
@@ -525,9 +539,9 @@ void ofxOceanodeCanvas::draw(bool *open){
     //TODO: Find better way to to this, when macro created, recoverr focus on canvas, should be its parent. something like. container->getParentCanvas? Or set a id in canvas as "Parent Canvas".
     if(isFirstDraw && parentID != ""){
         ImGui::FocusWindow(ImGui::FindWindowByName(parentID.c_str()));
-        isFirstDraw = false;
+        
     }
-    
+    isFirstDraw = false;
     ofPushMatrix();
     ofMultMatrix(glm::inverse(transformationMatrix->get()));
     ofPopMatrix();

@@ -29,6 +29,7 @@ public:
     void setContainer(shared_ptr<ofxOceanodeContainer> c){container = c;};
     
     string getUniqueID(){return uniqueID;};
+    
 private:
     glm::vec3 getMatrixScale(const glm::mat4 &m);
     glm::mat4 translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector);
@@ -67,8 +68,11 @@ private:
     int numTimesPopup = 0;
     
     bool inited = false;
+    
     glm::vec2 scrolling = glm::vec2(0.0f, 0.0f);
+    glm::vec2 scrollingOffset = glm::vec2(0.0f, 0.0f);
     bool show_grid = true;
+    
     string node_selected = "";
     glm::vec2 newNodeClickPos;
     
