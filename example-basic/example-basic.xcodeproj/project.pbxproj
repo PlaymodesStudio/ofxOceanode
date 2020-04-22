@@ -116,6 +116,7 @@
 		9F4F33CF244A77B400F84A37 /* testController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = testController.h; sourceTree = "<group>"; };
 		9F5C392B245743AE00BB3D61 /* ofxOceanodeParameter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ofxOceanodeParameter.h; path = ../src/ofxOceanodeParameter.h; sourceTree = "<group>"; };
 		9F5C392C2458EF3B00BB3D61 /* ofxOceanodeParameter.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ofxOceanodeParameter.cpp; path = ../src/ofxOceanodeParameter.cpp; sourceTree = "<group>"; };
+		9F5C392A2450E88C00BB3D61 /* router.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = router.h; path = ../src/Nodes/Default_Nodes/router.h; sourceTree = "<group>"; };
 		9FE96F4B2444C938001419CD /* ofxOceanodeTheme.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ofxOceanodeTheme.h; path = ../src/ofxOceanodeTheme.h; sourceTree = "<group>"; };
 		9FE96F4C2444D4DD001419CD /* ofxOceanode.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ofxOceanode.cpp; path = ../src/ofxOceanode.cpp; sourceTree = "<group>"; };
 		A8150F1936B064445E99AF76 /* ofxOceanodeBPMController.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeBPMController.cpp; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeBPMController.cpp; sourceTree = SOURCE_ROOT; };
@@ -385,6 +386,7 @@
 				86C08C13FA71904D23256B02 /* Generators */,
 				C9E0C4F6A9698E8F0EF5E14C /* Modifiers */,
 				60A061F8C47B5624AE6C450E /* defaultNodes.h */,
+				9F5C392A2450E88C00BB3D61 /* router.h */,
 			);
 			name = Default_Nodes;
 			sourceTree = "<group>";

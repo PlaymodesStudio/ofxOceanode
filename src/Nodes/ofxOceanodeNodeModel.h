@@ -60,6 +60,8 @@ public:
     //For Macro
     virtual bool receiveOscMessage(ofxOscMessage &m){return false;};
     virtual void setContainer(ofxOceanodeContainer* container){};
+    
+    shared_ptr<ofxOceanodeAbstractParameter> addParameter(ofAbstractParameter& p, ofxOceanodeParameterFlags flags = 0);
 	
 	template<typename ParameterType>
 	shared_ptr<ofxOceanodeParameter<ParameterType>> addParameter(ofParameter<ParameterType>& p, ofxOceanodeParameterFlags flags = 0){

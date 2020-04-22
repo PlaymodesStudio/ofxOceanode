@@ -116,10 +116,10 @@ void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
 void ofxOceanodeNodeMacro::setup(){
     addParameter(showWindow.set("Show", true));
     
-    registry->registerModel<inlet<vector<float>>>("I/O");
-    registry->registerModel<outlet<vector<float>>>("I/O");
-    registry->registerModel<inlet<ofTexture*>>("I/O");
-    registry->registerModel<outlet<ofTexture*>>("I/O");
+//    registry->registerModel<inlet<vector<float>>>("I/O");
+//    registry->registerModel<outlet<vector<float>>>("I/O");
+//    registry->registerModel<inlet<ofTexture*>>("I/O");
+//    registry->registerModel<outlet<ofTexture*>>("I/O");
     container = make_shared<ofxOceanodeContainer>(registry, typesRegistry);
     newNodeListener = container->newNodeCreated.newListener(this, &ofxOceanodeNodeMacro::newNodeCreated);
     ofDirectory dir;
@@ -254,100 +254,23 @@ void ofxOceanodeNodeMacro::setup(){
 }
 
 void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
-    bool inletOutletCreated = true;
     string nodeName = node->getParameters().getName();
-//    if(node->getNodeModel().nodeName() == "Inlet"){
-//        if(node->getParameters()->get("Input").type() == typeid(ofParameter<vector<float>>).name()){
-//            ofParameter<vector<float>> *input = new ofParameter<vector<float>>();
-//            paramsStore[nodeName] = input;
-//            addParameter(input->set(nodeName, {0}, {0}, {1}));
-//            inoutListeners[node->getParameters()->getName()].push(input->newListener([this, node](vector<float> &f){
-//                node->getParameters()->get<vector<float>>("Input") = f;
-//            }));
-//            inoutListeners[node->getParameters()->getName()].push(node->getParameters()->getString("Min").newListener([this, node](string &s){
-//                float f = ofToFloat(s);
-//                node->getParameters()->get<vector<float>>("Input").setMin(vector<float>(1, f));
-//                string parameterName = "Input";
-//                ofNotifyEvent(node->getNodeModel().parameterChangedMinMax, parameterName);
-//
-//                parameters->get<vector<float>>(node->getParameters()->getName()).setMin(vector<float>(1, f));
-//                parameterName = node->getParameters()->getName();
-//                ofNotifyEvent(parameterChangedMinMax, parameterName);
-//            }));
-//            inoutListeners[node->getParameters()->getName()].push(node->getParameters()->getString("Max").newListener([this, node](string &s){
-//                float f = ofToFloat(s);
-//                node->getParameters()->get<vector<float>>("Input").setMax(vector<float>(1, f));
-//                string parameterName = "Input";
-//                ofNotifyEvent(node->getNodeModel().parameterChangedMinMax, parameterName);
-//
-//                parameters->get<vector<float>>(node->getParameters()->getName()).setMax(vector<float>(1, f));
-//                parameterName = node->getParameters()->getName();
-//                ofNotifyEvent(parameterChangedMinMax, parameterName);
-//            }));
-//        }
-//    }else if(node->getNodeModel().nodeName() == "Outlet"){
-//        if(node->getParameters()->get("Output").type() == typeid(ofParameter<vector<float>>).name()){
-//            ofParameter<vector<float>> *output = new ofParameter<vector<float>>();
-//            paramsStore[nodeName] = output;
-//            addParameter(output->set(node->getParameters()->getName(), {0}, {0}, {1}));
-//            inoutListeners[node->getParameters()->getName()].push(node->getParameters()->get<vector<float>>("Output").newListener([this, output](vector<float> &f){
-//                parameters->get<vector<float>>(output->getName()) = f;
-//            }));
-//            inoutListeners[node->getParameters()->getName()].push(node->getParameters()->getString("Min").newListener([this, node](string &s){
-//                float f = ofToFloat(s);
-//                node->getParameters()->get<vector<float>>("Output").setMin(vector<float>(1, f));
-//                string parameterName = "Output";
-//                ofNotifyEvent(node->getNodeModel().parameterChangedMinMax, parameterName);
-//
-//                parameters->get<vector<float>>(node->getParameters()->getName()).setMin(vector<float>(1, f));
-//                parameterName = node->getParameters()->getName();
-//                ofNotifyEvent(parameterChangedMinMax, parameterName);
-//            }));
-//            inoutListeners[node->getParameters()->getName()].push(node->getParameters()->getString("Max").newListener([this, node](string &s){
-//                float f = ofToFloat(s);
-//                node->getParameters()->get<vector<float>>("Output").setMax(vector<float>(1, f));
-//                string parameterName = "Output";
-//                ofNotifyEvent(node->getNodeModel().parameterChangedMinMax, parameterName);
-//
-//                parameters->get<vector<float>>(node->getParameters()->getName()).setMax(vector<float>(1, f));
-//                parameterName = node->getParameters()->getName();
-//                ofNotifyEvent(parameterChangedMinMax, parameterName);
-//            }));
-//        }
-//    }else if(node->getNodeModel().nodeName() == "Inlet Tex"){
-//        if(node->getParameters()->get("Input").type() == typeid(ofParameter<ofTexture*>).name()){
-//            ofParameter<ofTexture*> *input = new ofParameter<ofTexture*>();
-//            paramsStore[nodeName] = input;
-//            addParameter(input->set(nodeName, nullptr));
-//            inoutListeners[node->getParameters()->getName()].push(input->newListener([this, node](ofTexture* &f){
-//                node->getParameters()->get<ofTexture*>("Input") = f;
-//            }));
-//        }
-//    }else if(node->getNodeModel().nodeName() == "Outlet Tex"){
-//        if(node->getParameters()->get("Output").type() == typeid(ofParameter<ofTexture*>).name()){
-//            ofParameter<ofTexture*> *output = new ofParameter<ofTexture*>();
-//            paramsStore[nodeName] = output;
-//            addParameter(output->set(node->getParameters()->getName(), nullptr));
-//            inoutListeners[node->getParameters()->getName()].push(node->getParameters()->get<ofTexture*>("Output").newListener([this, output](ofTexture* &f){
-//                parameters->get<ofTexture*>(output->getName()) = f;
-//            }));
-//        }
-//    }else{
-//        inletOutletCreated = false;
-//    }
-//
-//    if(inletOutletCreated){
-//        parameterGroupChanged.notify(this);
-//        deleteListeners.push(node->deleteModuleAndConnections.newListener([this, node](vector<ofxOceanodeAbstractConnection*> &c){
-//            string nodeName = node->getParameters()->getName();
-//            disconnectConnectionsForParameter.notify(nodeName);
-//            parameters->remove(nodeName);
-//            inoutListeners.erase(nodeName);
-//            parameterGroupChanged.notify(this);
-//            delete paramsStore[nodeName];
-//            paramsStore.erase(nodeName);
-//        }, 0));
-//    }
+    if(ofSplitString(nodeName, " ")[0] == "Router"){
+        auto newCreatedParam = typesRegistry->createRouterFromType(node);
+        string paramName = newCreatedParam->getName();
+        while (getParameterGroup().contains(paramName)) {
+            paramName += paramName;
+        }
+        newCreatedParam->setName(paramName);
+        addParameter(*newCreatedParam.get());
+        
+        parameterGroupChanged.notify(this);
+        deleteListeners.push(node->deleteModule.newListener([this, node](){
+            string nodeName = node->getParameters().getName();
+            //getParameters().remove(nodeName);
+            inoutListeners.erase(nodeName);
+        }, 0));
+    }
 }
 
 void ofxOceanodeNodeMacro::presetSave(ofJson &json){
@@ -391,6 +314,6 @@ void ofxOceanodeNodeMacro::loadBeforeConnections(ofJson &json){
         if(BankNamePos != bankNames.end())
             bank.set(std::distance(bankNames.begin(), BankNamePos));
     }
-    else deserializeParameter(json, *bankDropdown);
-    deserializeParameter(json, *presetDropdown);
+//    else deserializeParameter(json, *bankDropdown);
+//    deserializeParameter(json, *presetDropdown);
 }
