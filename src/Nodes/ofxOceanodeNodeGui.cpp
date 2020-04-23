@@ -275,7 +275,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 auto result = false;
                 if (ImGui::InputText(hiddenUniqueId.c_str(), cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
                 {
-                    tempCast = tempCast;
+                    tempCast = cString;
                 }
                 delete[] cString;
             // PARAM CHAR
