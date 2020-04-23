@@ -63,7 +63,7 @@ void ofxOceanodeCanvas::draw(bool *open){
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
         
         bool recenterCanvas = false;
-        if(ImGui::Button("[C]") || isFirstDraw)
+        if(ImGui::Button("[C]") || isFirstDraw)
         {
             recenterCanvas = true;
         }
@@ -112,21 +112,50 @@ void ofxOceanodeCanvas::draw(bool *open){
             draw_list->AddLine(ImVec2(origin.x,0),ImVec2(origin.x,origin.x +  canvas_sz.y/2),GRID_COLOR_CENTER,2);
             draw_list->AddLine(ImVec2(0,origin.y),ImVec2(origin.x +  canvas_sz.x,origin.y),GRID_COLOR_CENTER,2);
         }
-                
+		
+		vector<pair<string, ofxOceanodeNode*>> nodesInThisFrame = vector<pair<string, ofxOceanodeNode*>>(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
+		
+		//Look for deleted Nodes in drawing nodes order map
+		vector<int> erasedPositions;
+		for(auto it = nodesDrawingOrder.begin() ; it != nodesDrawingOrder.end(); ){
+			string nodeId = it->first;
+			if(find_if(nodesInThisFrame.begin(), nodesInThisFrame.end(), [nodeId](pair<string, ofxOceanodeNode*> &pair){return pair.first == nodeId;}) != nodesInThisFrame.end()){
+				++it;
+			}else{
+				erasedPositions.push_back(it->second);
+				it = nodesDrawingOrder.erase(it);
+			}
+		}
+		for(auto &i : erasedPositions){
+			//We reorder the list do that this selected node goes to the top layer;
+			for_each(nodesDrawingOrder.begin(), nodesDrawingOrder.end(), [i](std::pair<const string, int> &orderPair){
+				if(orderPair.second > i) orderPair.second--;
+			});
+		}
+		
+		
+		//Draw List layers
+		draw_list->ChannelsSplit(max(nodesDrawingOrder.size(), (size_t)2)*2 + 1); //We have foreground + background of each node + connections on the background
+		
         // Display nodes
-        draw_list->ChannelsSplit(2);
         //Iterating over the map gives errors as we are removing elements from the map during the iteration.
-        vector<pair<string, ofxOceanodeNode*>> nodesInThisFrame = vector<pair<string, ofxOceanodeNode*>>(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
         for(auto nodePair : nodesInThisFrame)
         {
             auto node = nodePair.second;
             auto &nodeGui = node->getNodeGui();
-            string nodeId = node->getParameters()->getName();
+            string nodeId = nodePair.first;
             ImGui::PushID(nodeId.c_str());
+			
+			int nodeDrawChannel = 1;
+			if(nodesDrawingOrder.count(nodeId) != 0){
+				nodeDrawChannel = (nodesDrawingOrder[nodeId] * 2) + 1; //We have two channels per node, and we have to shift 1 position to get the connecitons channel
+			}else{
+				nodesDrawingOrder[nodeId] = nodesDrawingOrder.size();
+			}
             
             glm::vec2 node_rect_min = offset + nodeGui.getPosition();
             // Display node contents first
-            draw_list->ChannelsSetCurrent(1); // Foreground
+            draw_list->ChannelsSetCurrent(nodeDrawChannel+1); // Foreground
             bool old_any_active = ImGui::IsAnyItemActive();
             ImGui::SetCursorScreenPos(node_rect_min + NODE_WINDOW_PADDING);
             
@@ -145,7 +174,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                 }
                 
                 // Display node box
-                draw_list->ChannelsSetCurrent(0); // Background
+                draw_list->ChannelsSetCurrent(nodeDrawChannel); // Background
                 ImGui::SetCursorScreenPos(node_rect_min);
                 bool interacting_node = ImGui::IsItemActive();
                 ImGui::InvisibleButton("node", size);
@@ -180,6 +209,13 @@ void ofxOceanodeCanvas::draw(bool *open){
                         if(!ImGui::GetIO().KeyShift){
                             deselectAllNodesExcept = nodeId;
                             nodeGui.setSelected(true);
+							
+							//We reorder the list do that this selected node goes to the top layer;
+							int rearangeFrom = nodesDrawingOrder[nodeId];
+							nodesDrawingOrder[nodeId] = nodesDrawingOrder.size();
+							for_each(nodesDrawingOrder.begin(), nodesDrawingOrder.end(), [rearangeFrom](std::pair<const string, int> &orderPair){
+								if(orderPair.second > rearangeFrom) orderPair.second--;
+							});
                         }else{
                             nodeGui.setSelected(!nodeGui.getSelected());
                         }
@@ -300,7 +336,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                 }
             }
             ImGui::PopID();
-        }
+		}
         
         
         
