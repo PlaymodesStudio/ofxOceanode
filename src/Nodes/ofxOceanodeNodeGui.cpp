@@ -240,6 +240,15 @@ bool ofxOceanodeNodeGui::constructGui(){
             /////////////
             else if(absParam.type() == typeid(ofParameter<bool>).name()){
                 auto tempCast = absParam.cast<bool>();
+				
+				if(drag != 0){
+					if(drag > 0 && tempCast == false){
+						tempCast = true;
+					}else if(drag < 0 && tempCast == true){
+						tempCast = false;
+					}
+				}
+				
                 if (ImGui::Checkbox(hiddenUniqueId.c_str(), (bool *)&tempCast.get()))
                 {
                     tempCast = tempCast;
@@ -276,17 +285,51 @@ bool ofxOceanodeNodeGui::constructGui(){
             // PARAM COLOR
             //////////////
             }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
-                auto tempCast = absParam.cast<ofFloatColor>();
-                if (ImGui::ColorEdit4(hiddenUniqueId.c_str(), (float*)&tempCast.get().r))
+                auto tempCast = absParam.cast<ofColor>();
+				ofFloatColor floatColor(tempCast.get());
+				
+				if(drag != 0){
+					float step = 0.001f;
+					if(ImGui::GetIO().KeyShift) step /= 10;
+					if(ImGui::GetIO().KeyAlt) step *= 10;
+					float newVal = floatColor.getBrightness() + (step * drag);
+					newVal = ofClamp(newVal, 0, 1);
+					floatColor.setBrightness(newVal);
+					tempCast = ofColor(floatColor);
+				}
+				
+                if (ImGui::ColorEdit3(hiddenUniqueId.c_str(), &floatColor.r))
                 {
-                    tempCast = tempCast;
+                    tempCast = ofColor(floatColor);
                 }
                 if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                     tempCast = tempCast;
                 }
-            }
-            // PARAM DUMMY
-            //////////////
+			//PARAM FLOAT COLOR
+			///////////////////
+			}else if(absParam.type() == typeid(ofParameter<ofFloatColor>).name()){
+				auto tempCast = absParam.cast<ofFloatColor>();
+				if(drag != 0){
+					float step = 0.001f;
+					if(ImGui::GetIO().KeyShift) step /= 10;
+					if(ImGui::GetIO().KeyAlt) step *= 10;
+					float newVal = tempCast->getBrightness() + (step * drag);
+					newVal = ofClamp(newVal, 0, 1);
+					ofFloatColor tempColor = tempCast;
+					tempColor.setBrightness(newVal);
+					tempCast = tempColor;
+				}
+				
+				if (ImGui::ColorEdit3(hiddenUniqueId.c_str(), (float*)&tempCast.get().r))
+				{
+					tempCast = tempCast;
+				}
+				if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+					tempCast = tempCast;
+				}
+			}
+            // UNKNOWN PARAM
+            ////////////////
             else
             {
                 ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
