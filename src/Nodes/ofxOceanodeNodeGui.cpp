@@ -82,16 +82,25 @@ bool ofxOceanodeNodeGui::constructGui(){
             ofAbstractParameter &absParam = getParameters()->get(i);
             string uniqueId = absParam.getName();
             ImGui::Text("%s", uniqueId.c_str());
-            
-            int distItem0 = ImGui::GetItemRectMin().x - startPos.x + 50;
-            if(absParam.type() != typeid(ofParameter<float>).name())
-            {
-                ImGui::SameLine(ImGui::GetItemRectMin().x - startPos.x + 50);
-                ImGui::SetNextItemWidth(150);
-            }
-
-            ImGui::SetItemAllowOverlap();
-            
+			
+			ImGui::SetItemAllowOverlap();
+			ImGui::SameLine(-1);
+			ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(51, ImGui::GetFrameHeight())); //Used to check later behaviours
+			
+			int drag = 0;
+			if(ImGui::IsItemActive() && ImGui::IsMouseDragging(0, 0.1f)){
+				drag = ImGui::GetIO().MouseDelta.x;
+			}
+			if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)){
+				ofLog() << uniqueId << " Is double clicked RESET VALUE";
+			}else if(ImGui::IsItemClicked(1)){
+				ofLog() << uniqueId << " Is right click OPEN POPUP";
+			}
+			
+			
+			ImGui::SameLine(50);
+			ImGui::SetNextItemWidth(150);
+ 
             string hiddenUniqueId = "##" + uniqueId;
             ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()*0.5f));
             ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()*0.5f));
@@ -106,22 +115,16 @@ bool ofxOceanodeNodeGui::constructGui(){
             {
                 auto tempCast = absParam.cast<float>();
                 
-                ImGui::PushStyleColor(ImGuiCol_FrameBg,ImVec4(0,0,0,0));
-                ImGui::PushStyleColor(ImGuiCol_FrameBgActive,ImVec4(0,0,0,0));
-                ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,ImVec4(0.00f,0.00f,0.00f,0.00f));
-                ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0,0,0,0));
-                
-                ImGui::SameLine(-1);
-                ImGui::SetNextItemWidth(51);
-                if(ImGui::DragFloat(("##drag float"+uniqueId).c_str(), (float *)&tempCast.get(), 0.001f,tempCast.getMin(),tempCast.getMax(),"%.03f"))
-                {
-                    tempCast = tempCast;
-                }
-                ImGui::PopStyleColor(4);
+				if(drag != 0){
+					float step = 0.001f;
+					if(ImGui::GetIO().KeyShift) step /= 10;
+					if(ImGui::GetIO().KeyAlt) step *= 10;
+					float newVal = tempCast + (step * drag);
+					newVal = ofClamp(newVal, tempCast.getMin(), tempCast.getMax());
+					tempCast.set(newVal);
+				}
 
-                ImGui::SameLine(distItem0);
-                ImGui::SetNextItemWidth(150);
-                ImGui::SliderFloat(hiddenUniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax());
+                ImGui::SliderFloat(hiddenUniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax(), "%.4f");
                 
                 //TODO: Implement better this hack
                 // Maybe discard and reset value when not presed enter??
@@ -139,35 +142,28 @@ bool ofxOceanodeNodeGui::constructGui(){
                 auto tempCast = absParam.cast<vector<float>>();
                 if(tempCast->size() == 1)
                 {
-                    ImGui::PushStyleColor(ImGuiCol_FrameBg,ImVec4(0,0,0,0));
-                    ImGui::PushStyleColor(ImGuiCol_FrameBgActive,ImVec4(0,0,0,0));
-                    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,ImVec4(0.00f,0.00f,0.00f,0.00f));
-                    ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0,0,0,0));
-                    
-                    ImGui::SameLine(-1);
-                    ImGui::SetNextItemWidth(51);
-                    if(ImGui::DragFloat(("##drag_vec_float"+uniqueId).c_str(), (float *)&tempCast->at(0),  0.001f, tempCast.getMin()[0], (tempCast.getMax()[0])))
-                        tempCast = tempCast;
-                    
-                    ImGui::PopStyleColor(4);
-                    
-                    ImGui::SameLine(distItem0);
-                    ImGui::SetNextItemWidth(150);
-                    
+					if(drag != 0){
+						float step = 0.001f;
+						if(ImGui::GetIO().KeyShift) step /= 10;
+						if(ImGui::GetIO().KeyAlt) step *= 10;
+						float newVal = tempCast->at(0) + (step * drag);
+						newVal = ofClamp(newVal, tempCast.getMin()[0], tempCast.getMax()[0]);
+						tempCast.set(vector<float>(1, newVal));
+					}
+					
                     ImGui::SliderFloat(hiddenUniqueId.c_str(),
                                        (float *)&tempCast->at(0),
                                        tempCast.getMin()[0],
-                                       tempCast.getMax()[0]);
+                                       tempCast.getMax()[0], "%.4f");
                     
                     if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                         tempCast = vector<float>(1, tempCast->at(0));
                     }
-                    
-                    }else{
-                        ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
-                    }
-                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
-                        tempCast = tempCast;
+				}else{
+					ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
+				}
+				if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+					tempCast = tempCast;
                 }
             }
             // PARAM INT
@@ -177,22 +173,15 @@ bool ofxOceanodeNodeGui::constructGui(){
                 auto tempCast = absParam.cast<int>();
                 if(node.getParameterInfo(tempCast).dropdownOptions.size() == 0)
                 {
-                    ImGui::PushStyleColor(ImGuiCol_FrameBg,ImVec4(0,0,0,0));
-                    ImGui::PushStyleColor(ImGuiCol_FrameBgActive,ImVec4(0,0,0,0));
-                    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,ImVec4(0.00f,0.00f,0.00f,0.00f));
-                    ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0,0,0,0));
+					if(drag != 0){
+						int step = 5;
+						if(ImGui::GetIO().KeyShift) step = 1;
+						if(ImGui::GetIO().KeyAlt) step = 10;
+						int newVal = tempCast + (step * drag);
+						newVal = ofClamp(newVal, tempCast.getMin(), tempCast.getMax());
+						tempCast.set(newVal);
+					}
 
-                    ImGui::SameLine(-1);
-                    ImGui::SetNextItemWidth(51);
-                    if(ImGui::DragInt(("##drag int"+uniqueId).c_str(), (int *)&tempCast.get(), 1, tempCast.getMin(), (tempCast.getMax()/1)))
-                    {
-                        tempCast = tempCast;
-                    }
-                    ImGui::PopStyleColor(4);
-
-                    ImGui::SameLine(distItem0);
-                    ImGui::SetNextItemWidth(150);
-                    
                     ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast.get(),tempCast.getMin(),tempCast.getMax());
 
                     if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()))
@@ -225,22 +214,15 @@ bool ofxOceanodeNodeGui::constructGui(){
                 auto tempCast = absParam.cast<vector<int>>();
                 if(tempCast->size() == 1)
                 {
-                    ImGui::PushStyleColor(ImGuiCol_FrameBg,ImVec4(0,0,0,0));
-                    ImGui::PushStyleColor(ImGuiCol_FrameBgActive,ImVec4(0,0,0,0));
-                    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,ImVec4(0.00f,0.00f,0.00f,0.00f));
-                    ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0,0,0,0));
-                    
-                    ImGui::SameLine(-1);
-                    ImGui::SetNextItemWidth(51);
-                    
-                    if(ImGui::DragInt(("##drag_vec_int"+uniqueId).c_str(), (int *)&tempCast->at(0), 1, tempCast.getMin()[0], (tempCast.getMax()[0])))
-                        tempCast = tempCast;
-                    
-                    ImGui::PopStyleColor(4);
-                    
-                    ImGui::SameLine(distItem0);
-                    ImGui::SetNextItemWidth(150);
-                    
+					if(drag != 0){
+						int step = 5;
+						if(ImGui::GetIO().KeyShift) step = 1;
+						if(ImGui::GetIO().KeyAlt) step = 10;
+						int newVal = tempCast->at(0) + (step * drag);
+						newVal = ofClamp(newVal, tempCast.getMin()[0], tempCast.getMax()[0]);
+						tempCast.set(vector<int>(1, newVal));
+					}
+					
                     ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast->at(0),tempCast.getMin()[0],tempCast.getMax()[0]);
                     
                     if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
