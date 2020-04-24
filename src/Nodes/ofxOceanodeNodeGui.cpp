@@ -81,6 +81,7 @@ bool ofxOceanodeNodeGui::constructGui(){
         for(int i=0 ; i<getParameters()->size(); i++){
             ofAbstractParameter &absParam = getParameters()->get(i);
             string uniqueId = absParam.getName();
+			ImGui::PushID(uniqueId.c_str());
             ImGui::Text("%s", uniqueId.c_str());
 			
 			ImGui::SetItemAllowOverlap();
@@ -88,13 +89,52 @@ bool ofxOceanodeNodeGui::constructGui(){
 			ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(51, ImGui::GetFrameHeight())); //Used to check later behaviours
 			
 			int drag = 0;
+			bool resetValue = false;
 			if(ImGui::IsItemActive() && ImGui::IsMouseDragging(0, 0.1f)){
 				drag = ImGui::GetIO().MouseDelta.x;
 			}
 			if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)){
-				ofLog() << uniqueId << " Is double clicked RESET VALUE";
+				resetValue = true;
 			}else if(ImGui::IsItemClicked(1)){
-				ofLog() << uniqueId << " Is right click OPEN POPUP";
+				ImGui::OpenPopup("Param Popup");
+			}
+			
+			if(ImGui::BeginPopup("Param Popup")){
+				ImGui::Separator();
+				if(true){ //Param is not scoped
+					if(ImGui::Selectable("Add to Scope")){
+					
+					}
+				}else{
+					if(ImGui::Selectable("Remove from Scope")){
+						
+					}
+				}
+				ImGui::Separator();
+				if(true){ //Param is not timelined
+					if(ImGui::Selectable("Add to Timeline")){
+						
+					}
+				}else{
+					if(ImGui::Selectable("Remove from Timeline")){
+						
+					}
+				}
+#ifdef OFXOCEANODE_USE_MIDI
+				ImGui::Separator();
+				if(ImGui::Selectable("Bind MIDI")){
+					container.createMidiBinding(absParam);
+				}
+				if(ImGui::Selectable("Unbind last MIDI")){
+					container.removeLastMidiBinding(absParam);
+				}
+#endif
+#ifdef OFXOCEANODE_USE_OSC
+				ImGui::Separator();
+				ImGui::Text("OSC Address: %s/%s", getParameters()->getEscapedName().c_str(), absParam.getEscapedName().c_str());
+#endif
+				ImGui::Separator();
+				ImGui::EndPopup();
 			}
 			
 			
@@ -123,6 +163,10 @@ bool ofxOceanodeNodeGui::constructGui(){
 					newVal = ofClamp(newVal, tempCast.getMin(), tempCast.getMax());
 					tempCast.set(newVal);
 				}
+				
+				if(resetValue){
+					tempCast = 0;
+				}
 
                 ImGui::SliderFloat(hiddenUniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax(), "%.4f");
                 
@@ -149,6 +193,10 @@ bool ofxOceanodeNodeGui::constructGui(){
 						float newVal = tempCast->at(0) + (step * drag);
 						newVal = ofClamp(newVal, tempCast.getMin()[0], tempCast.getMax()[0]);
 						tempCast.set(vector<float>(1, newVal));
+					}
+					
+					if(resetValue){
+						tempCast = vector<float>(1, 0);
 					}
 					
                     ImGui::SliderFloat(hiddenUniqueId.c_str(),
@@ -180,6 +228,10 @@ bool ofxOceanodeNodeGui::constructGui(){
 						int newVal = tempCast + (step * drag);
 						newVal = ofClamp(newVal, tempCast.getMin(), tempCast.getMax());
 						tempCast.set(newVal);
+					}
+					
+					if(resetValue){
+						tempCast = 0;
 					}
 
                     ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast.get(),tempCast.getMin(),tempCast.getMax());
@@ -221,6 +273,10 @@ bool ofxOceanodeNodeGui::constructGui(){
 						int newVal = tempCast->at(0) + (step * drag);
 						newVal = ofClamp(newVal, tempCast.getMin()[0], tempCast.getMax()[0]);
 						tempCast.set(vector<int>(1, newVal));
+					}
+					
+					if(resetValue){
+						tempCast = vector<int>(1, 0);
 					}
 					
                     ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast->at(0),tempCast.getMin()[0],tempCast.getMax()[0]);
@@ -336,26 +392,10 @@ bool ofxOceanodeNodeGui::constructGui(){
             }
             inputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
             outputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
-            
-//            if(ImGui::IsItemClicked(1)){
-//#ifdef OFXOCEANODE_USE_MIDI
-//                if(isListeningMidi){
-//                    if(ImGui::GetIO().KeyShift){
-//                        container.removeLastMidiBinding(absParam);
-//                    }else{
-//                        container.createMidiBinding(absParam);
-//                    }
-//                }
-//                else
-//#endif
-//                {
-//                    auto connection = node.parameterConnectionPress(container, absParam);
-//                }
-//            }else if(container.isOpenConnection() && ImGui::IsItemHovered() && !ImGui::IsMouseDown(1)){
-//                auto connection = node.parameterConnectionRelease(container, absParam);
-//            }
-            
+			
             ImGui::PopStyleColor(6);
+			
+			ImGui::PopID();
         } //endFor
     }else{}
     
