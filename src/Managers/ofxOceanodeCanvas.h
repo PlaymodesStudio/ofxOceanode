@@ -75,6 +75,7 @@ private:
     
     string node_selected = "";
     glm::vec2 newNodeClickPos;
+	std::map<string, int> nodesDrawingOrder;
     
     bool isCreatingConnection;
     ofAbstractParameter* tempSourceParameter = nullptr;
