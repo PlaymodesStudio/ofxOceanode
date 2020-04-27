@@ -260,6 +260,7 @@ void ofxOceanodePresetsController::draw(){
                 // reordering presets
                 if (ImGui::IsItemActive() && !ImGui::IsItemHovered())
                 {
+                    currentBank = b;
                     currentPreset[banks[b]] = presetName;
                     
                     int n_next = n + (ImGui::GetMouseDragDelta(0).y < 0.f ? -1 : 1);
@@ -271,10 +272,7 @@ void ofxOceanodePresetsController::draw(){
                         // reorder data
                         bankPresets[banks[b]][n] = bankPresets[banks[b]][n_next];
                         bankPresets[banks[b]][n_next] = presetName;
-                        
-                        cout << n << " _ " << bankPresets[banks[b]][n] << endl;
-                        cout << n_next << " _" << bankPresets[banks[b]][n_next] << endl;
-                        
+                                                
                         ImGui::ResetMouseDragDelta();
 
                         // reorder in folder
