@@ -45,7 +45,7 @@ void ofxOceanodeCanvas::draw(bool *open){
     string node_hovered_in_scene = "";
     
     bool isAnyNodeHovered = false;
-    
+    bool connectionIsDoable = false;
     
     ImGui::SetNextWindowDockID(ofxOceanodeShared::getDockspaceID(), ImGuiCond_FirstUseEver);
     if(ImGui::Begin(uniqueID.c_str(), open)){
@@ -265,7 +265,8 @@ void ofxOceanodeCanvas::draw(bool *open){
                     auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
                     auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
                     draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
-                    if(mouseToBulletDistance < bulletSize && !ImGui::IsPopupOpen("New Node")){
+                    if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node")){
+                        connectionIsDoable = true;
                         if(ImGui::IsMouseClicked(0)){
                             isCreatingConnection = true;
                             auto inConnection = node->getInputConnectionForParameter(*param);
@@ -305,7 +306,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                     auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
                     auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
                     draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
-                    if(mouseToBulletDistance < bulletSize && !ImGui::IsPopupOpen("New Node")){
+                    if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node")){
                         if(ImGui::IsMouseClicked(0)){
                             isCreatingConnection = true;
                             tempSourceParameter = param.get();
@@ -560,7 +561,15 @@ void ofxOceanodeCanvas::draw(bool *open){
             }
             glm::vec2  controlPoint(0,0);
             controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
-            draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(255, 255, 255, 128), 1.0f);
+            float linkWidth = 2.0f;
+            ImColor c;
+            if(connectionIsDoable){
+                linkWidth = 3.0f;
+                c = IM_COL32(255, 255, 255, 128);
+            }else{
+                c = IM_COL32(255, 255, 255, 64);
+            }
+            draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, c, linkWidth);
         }
         
         draw_list->ChannelsMerge();
