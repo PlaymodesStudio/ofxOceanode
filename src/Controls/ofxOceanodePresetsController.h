@@ -19,15 +19,16 @@ public:
     void update();
     
     void loadPresetFromNumber(int num);
+    
 private:
     void createPreset(string name);
     
     void loadPreset(string name, string bank);
     void savePreset(string name, string bank);
+    void deletePreset(string name, string bank);
     
-    map<string, vector<pair<int, string>>> bankPresets;
-    map<string, pair<int, string>> currentPreset;
-    
+    map<string, vector<string>> bankPresets;
+    map<string, string> currentPreset;
     vector<string> banks;
     int currentBank;
 
