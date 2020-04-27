@@ -61,12 +61,14 @@ void ofxOceanodeCanvas::draw(bool *open){
 
         ImGui::SameLine(ImGui::GetContentRegionAvail().x-20.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
-        
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+
         bool recenterCanvas = false;
         if(ImGui::Button("[C]") || isFirstDraw)
         {
             recenterCanvas = true;
         }
+        ImGui::PopStyleColor();
         ImGui::PopStyleVar();
         
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
@@ -204,7 +206,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                 //            ImU32 node_bg_color = /*(node_hovered_in_list == node->ID || node_hovered_in_scene == node->ID || (node_hovered_in_list == -1 && node_selected == node->ID)) ? IM_COL32(75, 75, 75, 255) :*/ IM_COL32(40, 40, 40, 255);
                 ImU32 node_bg_color = IM_COL32(40, 40, 40, 255);
                 
-                ImU32 node_hd_color = (isSelectedOrSelecting) ? IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,255) : IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,64);
+                ImU32 node_hd_color = (isSelectedOrSelecting) ? IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,160) : IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,64);
                 
                 
                 if(nodeGui.getExpanded()){
