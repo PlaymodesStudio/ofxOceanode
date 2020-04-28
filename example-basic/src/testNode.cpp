@@ -10,14 +10,14 @@
 #include "testController.h"
 
 testNode::testNode(shared_ptr<testController> tController) : controller(tController), ofxOceanodeNodeModel("Test"){
-    addParameterToGroupAndInfo(intParam.set("int", 0, 0, 100)).acceptOutConnection = false;
-    parameters->add(floatParam.set("float", 3, 0, 10));
-    parameters->add(boolParam.set("bool", true));
-    parameters->add(voidParam.set("Request BPM"));
-    parameters->add(textParam.set("testInput", "adfas"));
-    parameters->add(labelParam.set("testLabel", ' '));
-    parameters->add(colorParam.set("Color", ofColor::red, ofColor::white, ofColor::black));
-    parameters->add(intModParam.set("Custom", nullptr));
+    addParameter(intParam.set("int", 0, 0, 100), ofxOceanodeParameterFlags_DisableOutConnection);
+    addParameter(floatParam.set("float", 3, 0, 10));
+    addParameter(boolParam.set("bool", true));
+    addParameter(voidParam.set("Request BPM"));
+    addParameter(textParam.set("testInput", "adfas"));
+    addParameter(labelParam.set("testLabel", ' '));
+    addParameter(colorParam.set("Color", ofColor::red, ofColor::white, ofColor::black));
+    addParameter(intModParam.set("Custom", nullptr));
     
     listener = voidParam.newListener([&](){
         customClass* c = new customClass();

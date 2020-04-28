@@ -20,31 +20,20 @@ void ofxOceanodeNodeModel::setNumIdentifier(unsigned int num){
     parameters->setName(nameIdentifier + " " + ofToString(num));
 }
 
-parameterInfo& ofxOceanodeNodeModel::addParameterToGroupAndInfo(ofAbstractParameter& p){
-    parameters->add(p);
-    if(parametersInfo.count(p.getName()) == 0) parametersInfo[p.getName()] = parameterInfo();
-    return parametersInfo[p.getName()];
-}
-
-parameterInfo& ofxOceanodeNodeModel::addOutputParameterToGroupAndInfo(ofAbstractParameter& p){
-    parameters->add(p);
-    
-    if(parametersInfo.count(p.getName()) == 0) parametersInfo[p.getName()] = parameterInfo(false, true, false, true);
-    else{
-        parametersInfo[p.getName()].acceptInConnection = false;
-        parametersInfo[p.getName()].isSavePreset = false;
-    }
-    
-    return parametersInfo[p.getName()];
-}
-
-const parameterInfo& ofxOceanodeNodeModel::getParameterInfo(ofAbstractParameter& p){
-    return getParameterInfo(p.getName());
-}
-
-const parameterInfo& ofxOceanodeNodeModel::getParameterInfo(string parameterName){
-    if(parametersInfo.count(parameterName) == 0){
-        parametersInfo[parameterName] = parameterInfo();
-    }
-    return parametersInfo[parameterName];
-}
+//parameterInfo& ofxOceanodeNodeModel::addParameterToGroupAndInfo(ofAbstractParameter& p){
+//    addParameter(p);
+//    if(parametersInfo.count(p.getName()) == 0) parametersInfo[p.getName()] = parameterInfo();
+//    return parametersInfo[p.getName()];
+//}
+//
+//parameterInfo& ofxOceanodeNodeModel::addOutputParameterToGroupAndInfo(ofAbstractParameter& p){
+//    parameters->add(p);
+//
+//    if(parametersInfo.count(p.getName()) == 0) parametersInfo[p.getName()] = parameterInfo(false, true, false, true);
+//    else{
+//        parametersInfo[p.getName()].acceptInConnection = false;
+//        parametersInfo[p.getName()].isSavePreset = false;
+//    }
+//
+//    return parametersInfo[p.getName()];
+//}

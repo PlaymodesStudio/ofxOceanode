@@ -92,16 +92,16 @@ void baseIndexer::indexCountChanged(int &indexCount){
     previousIndexCount = indexCount;
 }
 
-void baseIndexer::putParametersInParametersGroup(shared_ptr<ofParameterGroup> parameters){
-    parameters->add(indexCount);
-    parameters->add(numWaves_Param);
-    parameters->add(indexInvert_Param);
-    parameters->add(symmetry_Param);
-    parameters->add(indexRand_Param);
-    parameters->add(indexOffset_Param);
-    parameters->add(indexQuant_Param);
-    parameters->add(combination_Param);
-    parameters->add(modulo_Param);
+void baseIndexer::putParametersInParametersGroup(){
+    addParameter(indexCount);
+    addParameter(numWaves_Param);
+    addParameter(indexInvert_Param);
+    addParameter(symmetry_Param);
+    addParameter(indexRand_Param);
+    addParameter(indexOffset_Param);
+    addParameter(indexQuant_Param);
+    addParameter(combination_Param);
+    addParameter(modulo_Param);
 }
 
 void baseIndexer::recomputeIndexs(){

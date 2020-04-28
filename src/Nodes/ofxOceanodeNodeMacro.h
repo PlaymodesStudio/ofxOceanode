@@ -17,9 +17,9 @@ public:
     router(string name) : ofxOceanodeNodeModel(name){};// + " " + typeid(T).name()){};
     void setup(){
         setupValueParameter();
-        valueInfo = &addParameterToGroupAndInfo(value);
-        addParameterToGroupAndInfo(min.set("Min", "0")).acceptInConnection = false;
-        addParameterToGroupAndInfo(max.set("Max", "1")).acceptInConnection = false;
+        addParameter(value);
+		addParameter(min.set("Min", "0"), ofxOceanodeParameterFlags_DisableInConnection);
+		addParameter(max.set("Max", "1"), ofxOceanodeParameterFlags_DisableInConnection);
     }
     
     void setupValueParameter(){
@@ -29,7 +29,6 @@ public:
     }
     
 protected:
-    parameterInfo *valueInfo;
     ofParameter<T> value;
     ofParameter<string> min;
     ofParameter<string> max;
@@ -40,8 +39,8 @@ class router<ofTexture*> : public ofxOceanodeNodeModel{
 public:
     router(string name) : ofxOceanodeNodeModel(name + " Tex"){};// + " " + typeid(T).name()){};
     void setup(){
-        setupValueParameter();
-        valueInfo = &addParameterToGroupAndInfo(value);
+		setupValueParameter();
+       	addParameter(value);
     }
     
     void setupValueParameter(){
@@ -49,7 +48,6 @@ public:
     }
     
 protected:
-    parameterInfo *valueInfo;
     ofParameter<ofTexture*> value;
 };
 
@@ -60,7 +58,7 @@ public:
     void setup(){
         this->value.setName("Input");
         router<T>::setup();
-        this->valueInfo->acceptInConnection = false;
+        //this->valueInfo->acceptInConnection = false;
     }
 };
 
@@ -71,7 +69,7 @@ public:
     void setup(){
         this->value.setName("Output");
         router<T>::setup();
-        this->valueInfo->acceptOutConnection = false;
+        //this->valueInfo->acceptOutConnection = false;
     }
 };
 

@@ -9,10 +9,10 @@
 
 void smoother::setup() {
     color = ofColor::green;
-    parameters->add(input.set("Input", {0}, {0}, {1}));
-    parameters->add(smoothing.set("Smooth", {0.5}, {0}, {1}));
-    parameters->add(tension.set("Tension", {0}, {-1}, {1}));
-    addOutputParameterToGroupAndInfo(output.set("Output", {0}, {0}, {1}));
+    addParameter(input.set("Input", {0}, {0}, {1}));
+    addParameter(smoothing.set("Smooth", {0.5}, {0}, {1}));
+    addParameter(tension.set("Tension", {0}, {-1}, {1}));
+    addOutputParameter(output.set("Output", {0}, {0}, {1}));
     
     inputEventListener = input.newListener(this, &smoother::inputListener);
     

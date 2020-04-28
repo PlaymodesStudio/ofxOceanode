@@ -8,14 +8,8 @@
 #include "ofxOceanodeNodeModelExternalWindow.h"
 
 ofxOceanodeNodeModelExternalWindow::ofxOceanodeNodeModelExternalWindow(string name)  : ofxOceanodeNodeModel(name){
-    auto &info = addParameterToGroupAndInfo(showWindow.set("Show Window", false));
-    info.acceptInConnection = false;
-    info.acceptOutConnection = false;
-    info.isSavePreset = false;
-    auto &info2 = addParameterToGroupAndInfo(fullscreenWindow.set("Fullscreen", false));
-    info2.acceptInConnection = false;
-    info2.acceptOutConnection = false;
-    info2.isSavePreset = false;
+	addParameter(showWindow.set("Show Window", false), ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisableOutConnection | ofxOceanodeParameterFlags_DisableSavePreset);
+    addParameter(fullscreenWindow.set("Fullscreen", false), ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisableOutConnection | ofxOceanodeParameterFlags_DisableSavePreset);
     windowListenerEvents.push(showWindow.newListener(this, &ofxOceanodeNodeModelExternalWindow::showExternalWindow));
     windowListenerEvents.push(fullscreenWindow.newListener([this](bool &b){
         if(externalWindow != nullptr) externalWindow->setFullscreen(b);

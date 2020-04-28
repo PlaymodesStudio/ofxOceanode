@@ -12,6 +12,7 @@
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxImGuiSimple.h"
+#include "ofxOceanodeParameter.h"
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node) : container(_container), node(_node){
     color = node.getColor();
@@ -79,7 +80,7 @@ bool ofxOceanodeNodeGui::constructGui(){
         auto startPos = ImGui::GetCursorScreenPos();
         
         for(int i=0 ; i<getParameters()->size(); i++){
-            ofAbstractParameter &absParam = getParameters()->get(i);
+            ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters()->get(i));
             string uniqueId = absParam.getName();
 			ImGui::PushID(uniqueId.c_str());
             ImGui::Text("%s", uniqueId.c_str());
@@ -151,10 +152,10 @@ bool ofxOceanodeNodeGui::constructGui(){
             
             // PARAM FLOAT
             ///////////////
-            if(absParam.type() == typeid(ofParameter<float>).name())
+            if(absParam.valueType() == typeid(float).name())
             {
-                auto tempCast = absParam.cast<float>();
-                
+                auto tempCast = absParam.cast<float>().getParameter();
+				
 				if(drag != 0){
 					float step = 0.001f;
 					if(ImGui::GetIO().KeyShift) step /= 10;
@@ -165,7 +166,7 @@ bool ofxOceanodeNodeGui::constructGui(){
 				}
 				
 				if(resetValue){
-					tempCast = 0;
+					tempCast = absParam.cast<float>().getDefaultValue();
 				}
 
                 ImGui::SliderFloat(hiddenUniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax(), "%.4f");
@@ -181,9 +182,9 @@ bool ofxOceanodeNodeGui::constructGui(){
             }
             // PARAM VECTOR < FLOAT >
             /////////////////////////
-            else if(absParam.type() == typeid(ofParameter<vector<float>>).name())
+            else if(absParam.valueType() == typeid(vector<float>).name())
             {
-                auto tempCast = absParam.cast<vector<float>>();
+                auto tempCast = absParam.cast<vector<float>>().getParameter();
                 if(tempCast->size() == 1)
                 {
 					if(drag != 0){
@@ -196,7 +197,7 @@ bool ofxOceanodeNodeGui::constructGui(){
 					}
 					
 					if(resetValue){
-						tempCast = vector<float>(1, 0);
+						tempCast = absParam.cast<vector<float>>().getDefaultValue();
 					}
 					
                     ImGui::SliderFloat(hiddenUniqueId.c_str(),
@@ -216,10 +217,10 @@ bool ofxOceanodeNodeGui::constructGui(){
             }
             // PARAM INT
             /////////////
-            else if(absParam.type() == typeid(ofParameter<int>).name())
+            else if(absParam.valueType() == typeid(int).name())
             {
-                auto tempCast = absParam.cast<int>();
-                if(node.getParameterInfo(tempCast).dropdownOptions.size() == 0)
+                auto tempCast = absParam.cast<int>().getParameter();
+				if(absParam.cast<int>().getDropdownOptions().size() == 0)
                 {
 					if(drag != 0){
 						int step = 5;
@@ -231,7 +232,7 @@ bool ofxOceanodeNodeGui::constructGui(){
 					}
 					
 					if(resetValue){
-						tempCast = 0;
+						tempCast = absParam.cast<int>().getDefaultValue();
 					}
 
                     ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast.get(),tempCast.getMin(),tempCast.getMax());
@@ -250,7 +251,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                         return true;
                     };
                 
-                vector<string> options = node.getParameterInfo(tempCast).dropdownOptions;
+					vector<string> options = absParam.cast<int>().getDropdownOptions();
                 if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.get(), vector_getter, static_cast<void*>(&options), options.size()))
                     tempCast = tempCast;
                 
@@ -261,9 +262,9 @@ bool ofxOceanodeNodeGui::constructGui(){
             }
             // PARAM VECTOR < INT >
             /////////////////////////
-            else if(absParam.type() == typeid(ofParameter<vector<int>>).name())
+            else if(absParam.valueType() == typeid(vector<int>).name())
             {
-                auto tempCast = absParam.cast<vector<int>>();
+                auto tempCast = absParam.cast<vector<int>>().getParameter();
                 if(tempCast->size() == 1)
                 {
 					if(drag != 0){
@@ -276,7 +277,7 @@ bool ofxOceanodeNodeGui::constructGui(){
 					}
 					
 					if(resetValue){
-						tempCast = vector<int>(1, 0);
+						tempCast = absParam.cast<vector<int>>().getDefaultValue();
 					}
 					
                     ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast->at(0),tempCast.getMin()[0],tempCast.getMax()[0]);
@@ -294,8 +295,8 @@ bool ofxOceanodeNodeGui::constructGui(){
             }
             // PARAM BOOL
             /////////////
-            else if(absParam.type() == typeid(ofParameter<bool>).name()){
-                auto tempCast = absParam.cast<bool>();
+            else if(absParam.valueType() == typeid(bool).name()){
+                auto tempCast = absParam.cast<bool>().getParameter();
 				
 				if(drag != 0){
 					if(drag > 0 && tempCast == false){
@@ -314,18 +315,19 @@ bool ofxOceanodeNodeGui::constructGui(){
                 }
             // PARAM VOID
             /////////////
-            }else if(absParam.type() == typeid(ofParameter<void>).name()){
+            }else if(absParam.valueType() == typeid(void).name()){
+				auto tempCast = absParam.cast<void>().getParameter();
                 if (ImGui::Button(hiddenUniqueId.c_str(), ImVec2(ImGui::GetFrameHeight(), 0)))
                 {
-                    absParam.cast<void>().trigger();
+                    tempCast.trigger();
                 }
                 if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
-                    absParam.cast<void>().trigger();
+                    tempCast.trigger();
                 }
             // PARAM STRING
             ///////////////
-            }else if(absParam.type() == typeid(ofParameter<string>).name()){
-                auto tempCast = absParam.cast<string>();
+            }else if(absParam.valueType() == typeid(string).name()){
+                auto tempCast = absParam.cast<string>().getParameter();
                 char * cString = new char[256];
                 strcpy(cString, tempCast.get().c_str());
                 auto result = false;
@@ -336,12 +338,12 @@ bool ofxOceanodeNodeGui::constructGui(){
                 delete[] cString;
             // PARAM CHAR
             /////////////
-            }else if(absParam.type() == typeid(ofParameter<char>).name()){
+            }else if(absParam.valueType() == typeid(char).name()){
                 ImGui::Text("%s", absParam.getName().c_str());
             // PARAM COLOR
             //////////////
             }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
-                auto tempCast = absParam.cast<ofColor>();
+                auto tempCast = absParam.cast<ofColor>().getParameter();
 				ofFloatColor floatColor(tempCast.get());
 				
 				if(drag != 0){
@@ -363,8 +365,8 @@ bool ofxOceanodeNodeGui::constructGui(){
                 }
 			//PARAM FLOAT COLOR
 			///////////////////
-			}else if(absParam.type() == typeid(ofParameter<ofFloatColor>).name()){
-				auto tempCast = absParam.cast<ofFloatColor>();
+			}else if(absParam.valueType() == typeid(ofFloatColor).name()){
+				auto tempCast = absParam.cast<ofFloatColor>().getParameter();
 				if(drag != 0){
 					float step = 0.001f;
 					if(ImGui::GetIO().KeyShift) step /= 10;
@@ -456,11 +458,11 @@ void ofxOceanodeNodeGui::duplicate(){
     node.duplicateSelf(getPosition());
 }
 
-glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter){
+glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter){
     return outputPositions[parameter.getName()];
 }
 
-glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter){
+glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter){
     return inputPositions[parameter.getName()];
 }
 

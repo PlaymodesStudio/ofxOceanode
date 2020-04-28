@@ -15,7 +15,7 @@ class ofxOceanodeAbstractConnection;
 class ofxOceanodeNodeGui;
 class ofxOceanodeNodeModel;
 class ofxOceanodeContainer;
-class parameterInfo;
+class ofxOceanodeAbstractParameter;
 
 class ofxOceanodeNode {
 public:
@@ -51,7 +51,7 @@ public:
     void presetHasLoaded();
     void loadPresetBeforeConnections(string presetFolderPath);
     
-    void deserializeParameter(ofJson &json, ofAbstractParameter &p, bool persistentPreset = false);
+    void deserializeParameter(ofJson &json, ofxOceanodeAbstractParameter &p, bool persistentPreset = false);
     
     bool loadConfig(string filename, bool persistentPreset = false);
     void saveConfig(string filename, bool persistentPreset = false);
@@ -66,9 +66,7 @@ public:
     void setIsPersistent(bool p){isPersistent = p;};
     
     bool checkHasInConnection(ofAbstractParameter &p);
-    
-    const parameterInfo& getParameterInfo(ofAbstractParameter &p);
-    
+	
     ofxOceanodeAbstractConnection* getInputConnectionForParameter(ofAbstractParameter& param);
     ofxOceanodeAbstractConnection* getOutputConnectionForParameter(ofAbstractParameter& param);
     

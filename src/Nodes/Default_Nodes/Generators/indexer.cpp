@@ -12,9 +12,9 @@ void indexer::setup() {
     color = ofColor::orange;
     result.resize(indexs.size());
     
-    putParametersInParametersGroup(parameters);
+    putParametersInParametersGroup();
 
-    addOutputParameterToGroupAndInfo(indexsOut.set("Output", {0}, {0}, {1}));
+    addOutputParameter(indexsOut.set("Output", {0}, {0}, {1}));
     indexsOut = indexs;
 }
 
@@ -24,7 +24,8 @@ void indexer::update(ofEventArgs &e){
 
 void indexer::presetRecallBeforeSettingParameters(ofJson &json){
     if(json.count("Size") == 1){
-        parameters->getInt("Size") = ofToInt(json["Size"]);
+		//TODO: FIX size loading
+        //parameters->getInt("Size") = ofToInt(json["Size"]);
     }
 }
 

@@ -30,13 +30,13 @@ void phasor::setup(){
         basePh.setLoop(val);
     }));
 
-    addParameterToGroupAndInfo(bpm_Param.set("BPM", 120, 0, 999)).isSavePreset = false;
-    parameters->add(beatsDiv_Param.set("Div", {2}, {1}, {512}));
-    parameters->add(beatsMult_Param.set("Mult", {1}, {0}, {512}));
-    parameters->add(initPhase_Param.set("Init Ph", 0, 0, 1));
-    parameters->add(resetPhase_Param.set("Reset"));
-    parameters->add(loop_Param.set("Loop", true));
-    addOutputParameterToGroupAndInfo(phasorMonitor.set("Phase", {0}, {0}, {1}));
+    addParameter(bpm_Param.set("BPM", 120, 0, 999), ofxOceanodeParameterFlags_DisableSavePreset);
+    addParameter(beatsDiv_Param.set("Div", {2}, {1}, {512}));
+    addParameter(beatsMult_Param.set("Mult", {1}, {0}, {512}));
+    addParameter(initPhase_Param.set("Init Ph", 0, 0, 1));
+    addParameter(resetPhase_Param.set("Reset"));
+    addParameter(loop_Param.set("Loop", true));
+    addOutputParameter(phasorMonitor.set("Phase", {0}, {0}, {1}));
     
     resetPhaseListener = resetPhase_Param.newListener([&](){
         if(!selfTrigger)

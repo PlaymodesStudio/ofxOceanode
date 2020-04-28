@@ -10,6 +10,7 @@
 #define ofxOceanodeNodeModel_h
 
 #include "ofMain.h"
+#include "ofxOceanodeParameter.h"
 
 class ofxOceanodeContainer;
 class ofxOceanodeAbstractConnection;
@@ -31,21 +32,7 @@ public:
     bool acceptOutConnection;
     
     vector<string> dropdownOptions;
-    
-//    T defaultValue;
 };
-
-//struct parameterInfo{
-//    bool isSavePreset;
-//    bool isSaveProject;
-//    bool acceptInConnection;
-//    bool acceptOutConnection;
-//    parameterInfo(bool spres = true, bool sproj = true, bool inc = true, bool outc = true) : isSavePreset(spres), isSaveProject(sproj), acceptInConnection(inc), acceptOutConnection(outc){};
-//    void convertToProject(){
-//        isSavePreset = false;
-//        isSaveProject = true;
-//    }
-//};
 
 class ofxOceanodeNodeModel {
 public:
@@ -91,28 +78,38 @@ public:
     //For Macro
     virtual bool receiveOscMessage(ofxOscMessage &m){return false;};
     virtual void setContainer(ofxOceanodeContainer* container){};
+	
+	template<typename ParameterType>
+	shared_ptr<ofxOceanodeParameter<ParameterType>> addParameter(ofParameter<ParameterType>& p, ofxOceanodeParameterFlags flags = 0){
+		//TODO: Review if we loose the data?
+		auto oceaParam = make_shared<ofxOceanodeParameter<ParameterType>>();
+		oceaParam->bindParameter(p);
+		oceaParam->setFlags(flags);
+		parameters->add(*oceaParam);
+		return dynamic_pointer_cast<ofxOceanodeParameter<ParameterType>>(*(parameters->end()-1));
+	}
+	
+	template<typename ParameterType>
+	shared_ptr<ofxOceanodeParameter<ParameterType>> addOutputParameter(ofParameter<ParameterType>& p, ofxOceanodeParameterFlags flags = 0){
+		auto oceaParam = addParameter(p, flags | ofxOceanodeParameterFlags_DisableInConnection);
+		return oceaParam;
+	}
     
-    parameterInfo& addParameterToGroupAndInfo(ofAbstractParameter& p);
-    parameterInfo& addOutputParameterToGroupAndInfo(ofAbstractParameter& p);
-    const parameterInfo& getParameterInfo(ofAbstractParameter& p);
-    const parameterInfo& getParameterInfo(string parameterName);
-    
-    ofAbstractParameter& createDropdownAbstractParameter(string name, vector<string> options, ofParameter<int> &dropdownSelector){
-        dropdownSelector.set(name, 0, 0, options.size()-1);
-        parametersInfo[dropdownSelector.getName()] = parameterInfo();
-        parametersInfo[dropdownSelector.getName()].dropdownOptions = options;
-        return dropdownSelector;
+    shared_ptr<ofxOceanodeParameter<int>> addParameterDropdown(ofParameter<int> &dropdownSelector, string name, int defaultPos, vector<string> options, ofxOceanodeParameterFlags flags = 0){
+        dropdownSelector.set(name, defaultPos, 0, options.size()-1);
+		auto op = addParameter(dropdownSelector, flags);
+		op->setDropdownOptions(options);
+        return op;
     }
     ofEvent<std::pair<ofJson, string>> deserializeParameterEvent;
     
 protected:
-    shared_ptr<ofParameterGroup> parameters;
-    std::map<string, parameterInfo> parametersInfo; //information about interaction of parameter
     ofColor color;
     string nameIdentifier;
     unsigned int numIdentifier;
     
 private:
+	shared_ptr<ofParameterGroup> parameters;
     ofEventListeners eventListeners;
 };
 

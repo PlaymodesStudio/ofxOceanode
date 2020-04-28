@@ -911,20 +911,21 @@ void ofxOceanodeContainer::receiveOsc(){
 }
 
 void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
+	//Todo: Fix for ofxOceanodeParameter
     auto setParameterFromMidiMessage = [this](ofAbstractParameter& absParam, ofxOscMessage& m){
-        if(absParam.type() == typeid(ofParameter<float>).name()){
+        if(absParam.valueType() == typeid(float).name()){
             ofParameter<float> castedParam = absParam.cast<float>();
             castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
-        }else if(absParam.type() == typeid(ofParameter<int>).name()){
+        }else if(absParam.valueType() == typeid(int).name()){
             ofParameter<int> castedParam = absParam.cast<int>();
             castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
-        }else if(absParam.type() == typeid(ofParameter<bool>).name()){
+        }else if(absParam.valueType() == typeid(bool).name()){
             absParam.cast<bool>() = m.getArgAsBool(0);
-        }else if(absParam.type() == typeid(ofParameter<void>).name()){
+        }else if(absParam.valueType() == typeid(void).name()){
             absParam.cast<void>().trigger();
-        }else if(absParam.type() == typeid(ofParameter<string>).name()){
+        }else if(absParam.valueType() == typeid(string).name()){
             absParam.cast<string>() = m.getArgAsString(0);
-        }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
+        }else if(absParam.valueType() == typeid(vector<float>).name()){
             ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>();
             if(m.getNumArgs() == 0){
                 castedParam = castedParam;;
@@ -937,7 +938,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                 castedParam = tempVec;
             }
         }
-        else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
+        else if(absParam.valueType() == typeid(vector<int>).name()){
             ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>();
             if(m.getNumArgs() == 0){
                 castedParam = castedParam;;
@@ -960,10 +961,10 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
     };
     
     auto modulateParameterFromOscMessage = [this](ofAbstractParameter& absParam, ofxOscMessage& m){
-        if(absParam.type() == typeid(ofParameter<float>).name()){
+        if(absParam.valueType() == typeid(float).name()){
             ofParameter<float> castedParam = absParam.cast<float>();
             castedParam = castedParam + m.getArgAsFloat(0);
-        }else if(absParam.type() == typeid(ofParameter<int>).name()){
+        }else if(absParam.valueType() == typeid(int).name()){
             ofParameter<int> castedParam = absParam.cast<int>();
             if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_FLOAT){
                 int range = castedParam.getMax() - castedParam.getMin();
@@ -971,9 +972,9 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             }else{
                 castedParam += (castedParam+m.getArgAsInt(0));
             }
-        }else if(absParam.type() == typeid(ofParameter<bool>).name()){
+        }else if(absParam.valueType() == typeid(bool).name()){
             absParam.cast<bool>() = !absParam.cast<bool>();
-        }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
+        }else if(absParam.valueType() == typeid(vector<float>).name()){
             ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>();
             if(castedParam->size() !=1) return;
             vector<float> tempVec;
@@ -994,7 +995,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             }
             castedParam = tempVec;
         }
-        else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
+        else if(absParam.valueType() == typeid(vector<int>).name()){
             ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>();
             if(castedParam->size() !=1) return;
             vector<int> tempVec;
@@ -1238,7 +1239,7 @@ bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 positi
 #endif
 
 #ifdef OFXOCEANODE_USE_MIDI
-
+//TODO: Review for ofxOceanodeParameter
 void ofxOceanodeContainer::setIsListeningMidi(bool b){
     isListeningMidi = b;
     for(auto &nodeTypeMap : dynamicNodes){
@@ -1261,22 +1262,22 @@ shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBindi
     }
     
     shared_ptr<ofxOceanodeAbstractMidiBinding> midiBinding = nullptr;
-    if(p.type() == typeid(ofParameter<float>).name()){
+    if(p.valueType() == typeid(float).name()){
         midiBinding = make_unique<ofxOceanodeMidiBinding<float>>(p.cast<float>(), _id);
     }
-    else if(p.type() == typeid(ofParameter<int>).name()){
+    else if(p.valueType() == typeid(int).name()){
         midiBinding = make_unique<ofxOceanodeMidiBinding<int>>(p.cast<int>(), _id);
     }
-    else if(p.type() == typeid(ofParameter<bool>).name()){
+    else if(p.valueType() == typeid(bool).name()){
         midiBinding = make_unique<ofxOceanodeMidiBinding<bool>>(p.cast<bool>(), _id);
     }
-    else if(p.type() == typeid(ofParameter<void>).name()){
+    else if(p.valueType() == typeid(void).name()){
         midiBinding = make_unique<ofxOceanodeMidiBinding<void>>(p.cast<void>(), _id);
     }
-    else if(p.type() == typeid(ofParameter<vector<float>>).name()){
+    else if(p.valueType() == typeid(vector<float>).name()){
         midiBinding = make_unique<ofxOceanodeMidiBinding<vector<float>>>(p.cast<vector<float>>(), _id);
     }
-    else if(p.type() == typeid(ofParameter<vector<int>>).name()){
+    else if(p.valueType() == typeid(vector<int>).name()){
         midiBinding = make_unique<ofxOceanodeMidiBinding<vector<int>>>(p.cast<vector<int>>(), _id);
     }
     if(midiBinding != nullptr){
@@ -1366,69 +1367,69 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
     if(sourceModuleRef->getParameters()->contains(sourceParameter) && sinkModuleRef->getParameters()->contains(sinkParameter)){
         ofAbstractParameter &source = sourceModuleRef->getParameters()->get(sourceParameter);
         ofAbstractParameter &sink = sinkModuleRef->getParameters()->get(sinkParameter);
-        return createConnection(source, sink);
+        return createConnection(static_cast<ofxOceanodeAbstractParameter &>(source), static_cast<ofxOceanodeAbstractParameter &>(sink));
     }
     return nullptr;
 }
 
-ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstractParameter &source, ofAbstractParameter &sink){
+ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink){
     ofxOceanodeAbstractConnection* connection = nullptr;
-    if(source.type() == sink.type()){
+    if(source.valueType() == sink.valueType()){
         connection = typesRegistry->createCustomTypeConnection(*this, source, sink);
-    }else if(source.type() == typeid(ofParameter<float>).name()){
-        if(sink.type() == typeid(ofParameter<int>).name()){
+    }else if(source.valueType() == typeid(float).name()){
+        if(sink.valueType() == typeid(int).name()){
             connection = connectConnection(source.cast<float>(), sink.cast<int>());
         }
-        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+        else if(sink.valueType() == typeid(vector<float>).name()){
             connection = connectConnection(source.cast<float>(), sink.cast<vector<float>>());
         }
-        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
+        else if(sink.valueType() == typeid(vector<int>).name()){
             connection = connectConnection(source.cast<float>(), sink.cast<vector<int>>());
         }
-        else if(sink.type() == typeid(ofParameter<bool>).name()){
+        else if(sink.valueType() == typeid(bool).name()){
             connection = connectConnection(source.cast<float>(), sink.cast<bool>());
         }
-    }else if(source.type() == typeid(ofParameter<int>).name()){
-        if(sink.type() == typeid(ofParameter<float>).name()){
+    }else if(source.valueType() == typeid(int).name()){
+        if(sink.valueType() == typeid(float).name()){
             connection = connectConnection(source.cast<int>(), sink.cast<float>());
         }
-        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+        else if(sink.valueType() == typeid(vector<float>).name()){
             connection = connectConnection(source.cast<int>(), sink.cast<vector<float>>());
         }
-        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
+        else if(sink.valueType() == typeid(vector<int>).name()){
             connection = connectConnection(source.cast<int>(), sink.cast<vector<int>>());
         }
-    }else if(source.type() == typeid(ofParameter<vector<float>>).name()){
-        if(sink.type() == typeid(ofParameter<float>).name()){
+    }else if(source.valueType() == typeid(vector<float>).name()){
+        if(sink.valueType() == typeid(float).name()){
             connection = connectConnection(source.cast<vector<float>>(), sink.cast<float>());
         }
-        else if(sink.type() == typeid(ofParameter<int>).name()){
+        else if(sink.valueType() == typeid(int).name()){
             connection = connectConnection(source.cast<vector<float>>(), sink.cast<int>());
         }
-        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
+        else if(sink.valueType() == typeid(vector<int>).name()){
             connection = connectConnection(source.cast<vector<float>>(), sink.cast<vector<int>>());
         }
-    }else if(source.type() == typeid(ofParameter<vector<int>>).name()){
-        if(sink.type() == typeid(ofParameter<float>).name()){
+    }else if(source.valueType() == typeid(vector<int>).name()){
+        if(sink.valueType() == typeid(float).name()){
             connection = connectConnection(source.cast<vector<int>>(), sink.cast<float>());
         }
-        else if(sink.type() == typeid(ofParameter<int>).name()){
+        else if(sink.valueType() == typeid(int).name()){
             connection = connectConnection(source.cast<vector<int>>(), sink.cast<int>());
         }
-        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+        else if(sink.valueType() == typeid(vector<float>).name()){
             connection = connectConnection(source.cast<vector<int>>(), sink.cast<vector<float>>());
         }
-    }else if(source.type() == typeid(ofParameter<void>).name()){
-        if(sink.type() == typeid(ofParameter<bool>).name()){
+    }else if(source.valueType() == typeid(void).name()){
+        if(sink.valueType() == typeid(bool).name()){
             connection = connectConnection(source.cast<void>(), sink.cast<bool>());
         }
-        else if(sink.type() == typeid(ofParameter<int>).name()){
+        else if(sink.valueType() == typeid(int).name()){
             connection = connectConnection(source.cast<void>(), sink.cast<int>());
         }
-        else if(sink.type() == typeid(ofParameter<float>).name()){
+        else if(sink.valueType() == typeid(float).name()){
             connection = connectConnection(source.cast<void>(), sink.cast<float>());
         }
-        else if(sink.type() == typeid(ofParameter<bool>).name()){
+        else if(sink.valueType() == typeid(bool).name()){
             connection = connectConnection(source.cast<void>(), sink.cast<bool>());
         }
     }

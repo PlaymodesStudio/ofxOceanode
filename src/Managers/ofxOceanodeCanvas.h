@@ -15,6 +15,7 @@
 
 class ofxOceanodeContainer;
 class ofxOceanodeNodeGui;
+class ofxOceanodeAbstractParameter;
 
 class ofxOceanodeCanvas{
 public:
@@ -73,8 +74,8 @@ private:
     glm::vec2 newNodeClickPos;
     
     bool isCreatingConnection;
-    ofAbstractParameter* tempSourceParameter = nullptr;
-    ofAbstractParameter* tempSinkParameter = nullptr;
+    ofxOceanodeAbstractParameter* tempSourceParameter = nullptr;
+    ofxOceanodeAbstractParameter* tempSinkParameter = nullptr;
     
     string uniqueID;
     string parentID;
