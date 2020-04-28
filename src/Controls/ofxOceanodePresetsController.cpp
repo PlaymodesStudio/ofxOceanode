@@ -11,6 +11,8 @@
 #include "ofxOceanodeContainer.h"
 #include "imgui.h"
 
+int mouseAction=0;
+
 ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("Presets"){
     //Preset Control
     ofDirectory dir;
@@ -236,7 +238,7 @@ void ofxOceanodePresetsController::draw(){
             ImGui::PushStyleColor(ImGuiCol_WindowBg,ImVec4(1.0f,0.0f,0.0f,1.0f));
         }
         
-        ImGui::SetNextItemOpen(true);
+        //ImGui::SetNextItemOpen(true);
         
         if (ImGui::TreeNode(banks[b].c_str()))
         {
@@ -244,6 +246,7 @@ void ofxOceanodePresetsController::draw(){
             ImGui::PushStyleColor(ImGuiCol_Text,style.Colors[ImGuiCol_Text]);
             string presetName;
 
+            
             ImGui::PushStyleColor(ImGuiCol_HeaderActive,style.Colors[ImGuiCol_TabActive] );
             for (int n = 0; n < bankPresets[banks[b]].size(); n++)
             {
@@ -258,10 +261,18 @@ void ofxOceanodePresetsController::draw(){
                 if((isCurrentPreset)&&(b==currentBank)) ImGui::PopStyleColor();
                 
                 // reordering presets
+                
+                if (ImGui::IsItemActive() && ImGui::IsItemClicked(0))
+                {
+                    mouseAction=1;
+                }
+                
                 if (ImGui::IsItemActive() && !ImGui::IsItemHovered())
                 {
-                    currentBank = b;
-                    currentPreset[banks[b]] = presetName;
+                    //currentBank = b;
+                    //currentPreset[banks[b]] = presetName;
+                    
+                    mouseAction=2;
                     
                     int n_next = n + (ImGui::GetMouseDragDelta(0).y < 0.f ? -1 : 1);
                     if (n_next >= 0 && n_next < bankPresets[banks[b]].size())
@@ -272,16 +283,15 @@ void ofxOceanodePresetsController::draw(){
                         // reorder data
                         bankPresets[banks[b]][n] = bankPresets[banks[b]][n_next];
                         bankPresets[banks[b]][n_next] = presetName;
-                                                
+                        
                         ImGui::ResetMouseDragDelta();
 
                         // reorder in folder
                         string nNewPresentName =  ofToString(n+1) +  "--" + bankPresets[banks[b]][n];
                         string nNextNewPresetName = ofToString(n_next+1) +  "--" + bankPresets[banks[b]][n_next];
-                        string dirPath = "./Presets/" + banks[currentBank];
+                        string dirPath = "./Presets/" + banks[b];
                         ofDirectory dir;
                         dir.open(dirPath);
-                        cout << dir.getAbsolutePath() << endl;
 
                         std::filesystem::rename(dir.getAbsolutePath()+"/"+nOldPresetName,dir.getAbsolutePath()+"/" + nNextNewPresetName);
                         std::filesystem::rename(dir.getAbsolutePath()+"/"+nNextOldPresetName,dir.getAbsolutePath()+"/" + nNewPresentName);
@@ -289,19 +299,21 @@ void ofxOceanodePresetsController::draw(){
                     }
 
                 }
-                if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(0))
+                if ((ImGui::IsItemHovered() && ImGui::IsMouseReleased(0)))
                 {
-                    currentBank = b;
-                    currentPreset[banks[b]] = presetName;
                     
                     if(ImGui::GetIO().KeyShift){
+                        currentBank = b;
+                        currentPreset[banks[b]] = presetName;
                         savePreset(bankPresets[banks[b]][n], banks[b]);
-                    }else{
+                    }else if(mouseAction==1)
+                    {
+                        currentBank = b;
+                        currentPreset[banks[b]] = presetName;
                         loadPreset(bankPresets[banks[b]][n], banks[b]);
                         currentPreset[banks[b]] = bankPresets[banks[b]][n];
-
                     }
-
+                    mouseAction=0;
                 }
             }
             ImGui::TreePop();
