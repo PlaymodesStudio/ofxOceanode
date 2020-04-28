@@ -147,6 +147,7 @@ bool ofxOceanodeNode::loadConfig(string filename, bool persistentPreset){
         nodeModel->loadCustomPersistent(json);
     
     //Hack Put all faders to 0;
+	//TODO: Review hack
 //    if(getParameters()->contains("Fader")){
 //        if(getParameters()->get("Fader").type() == typeid(ofParameter<float>()).name()){
 //            getParameters()->getFloat("Fader") = 0;
@@ -173,21 +174,7 @@ ofJson ofxOceanodeNode::saveParametersToJson(bool persistentPreset){
     for(int i = 0; i < getParameters()->size(); i++){
         ofxOceanodeAbstractParameter& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters()->get(i));
         if((!persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) || (persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject))){
-            if(p.valueType() == typeid(float).name()){
-                ofSerialize(json, p.cast<float>().getParameter());
-            }else if(p.valueType() == typeid(int).name()){
-                ofSerialize(json, p.cast<int>().getParameter());
-            }
-            else if(p.valueType() == typeid(bool).name()){
-                ofSerialize(json, p.cast<bool>().getParameter());
-            }
-            else if(p.valueType() == typeid(ofColor).name()){
-                ofSerialize(json, p.cast<ofColor>().getParameter());
-            }
-            else if(p.valueType() == typeid(string).name()){
-                ofSerialize(json, p.cast<string>().getParameter());
-            }
-            else if(p.valueType() == typeid(vector<float>).name()){
+            if(p.valueType() == typeid(vector<float>).name()){
                 auto vecF = p.cast<vector<float>>().getParameter().get();
                 if(vecF.size() == 1){
                     json[p.getEscapedName()] = vecF[0];
@@ -198,7 +185,9 @@ ofJson ofxOceanodeNode::saveParametersToJson(bool persistentPreset){
                 if(vecI.size() == 1){
                     json[p.getEscapedName()] = vecI[0];
                 }
-            }
+			}else{
+				 ofSerialize(json, p);
+			}
         }
     }
     return json;
@@ -215,21 +204,7 @@ bool ofxOceanodeNode::loadParametersFromJson(ofJson json, bool persistentPreset)
 
 void ofxOceanodeNode::deserializeParameter(ofJson &json, ofxOceanodeAbstractParameter &p, bool persistentPreset){
     if((((!persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) || (persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject)))) && json.count(p.getEscapedName()) && !checkHasInConnection(p)){
-        if(p.valueType() == typeid(float).name()){
-            ofDeserialize(json, p.cast<float>().getParameter());
-        }else if(p.valueType() == typeid(int).name()){
-            ofDeserialize(json, p.cast<int>().getParameter());
-        }
-        else if(p.valueType() == typeid(bool).name()){
-            ofDeserialize(json, p.cast<bool>().getParameter());
-        }
-        else if(p.valueType() == typeid(ofColor).name()){
-            ofDeserialize(json, p.cast<ofColor>().getParameter());
-        }
-        else if(p.valueType() == typeid(string).name()){
-            ofDeserialize(json, p.cast<string>().getParameter());
-        }
-        else if(p.valueType() == typeid(vector<float>).name()){
+        if(p.valueType() == typeid(vector<float>).name()){
             float value = 0;
             if(json[p.getEscapedName()].is_string()){
 				p.cast<vector<float>>().getParameter() = vector<float>(1, ofToFloat(json[p.getEscapedName()]));
@@ -243,7 +218,9 @@ void ofxOceanodeNode::deserializeParameter(ofJson &json, ofxOceanodeAbstractPara
             }else{
                 p.cast<vector<int>>().getParameter() = vector<int>(1, int(json[p.getEscapedName()]));
             }
-        }
+		}else{
+			ofDeserialize(json, p);
+		}
     }
 }
 
