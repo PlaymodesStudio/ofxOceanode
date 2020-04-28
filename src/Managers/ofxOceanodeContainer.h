@@ -100,8 +100,8 @@ public:
     
 #ifdef OFXOCEANODE_USE_MIDI
     void setIsListeningMidi(bool b);
-    shared_ptr<ofxOceanodeAbstractMidiBinding> createMidiBinding(ofAbstractParameter &p, bool isPersistent = false, int _id = -1);
-    bool removeLastMidiBinding(ofAbstractParameter &p);
+    shared_ptr<ofxOceanodeAbstractMidiBinding> createMidiBinding(ofxOceanodeAbstractParameter &p, bool isPersistent = false, int _id = -1);
+    bool removeLastMidiBinding(ofxOceanodeAbstractParameter &p);
     shared_ptr<ofxOceanodeAbstractMidiBinding> createMidiBindingFromInfo(string module, string parameter, bool isPersistent = false, int _id = -1);
     vector<string> getMidiDevices(){return midiInPortList;};
     void addNewMidiMessageListener(ofxMidiListener* listener);

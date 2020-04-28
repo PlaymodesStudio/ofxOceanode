@@ -176,8 +176,9 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
         
 #ifdef OFXOCEANODE_USE_MIDI
         if(!isPersistent){
-            for(auto &p : *dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters().get()){
-                while(removeLastMidiBinding(*p.get()));
+			for(int i = 0 ; i < dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters()->size(); i++){
+				auto &p = dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters()->get(i);
+                while(removeLastMidiBinding(static_cast<ofxOceanodeAbstractParameter &>(p)));
             }
         }
 #endif
@@ -912,21 +913,22 @@ void ofxOceanodeContainer::receiveOsc(){
 
 void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
 	//Todo: Fix for ofxOceanodeParameter
-    auto setParameterFromMidiMessage = [this](ofAbstractParameter& absParam, ofxOscMessage& m){
+    auto setParameterFromMidiMessage = [this](ofAbstractParameter& _absParam, ofxOscMessage& m){
+		ofxOceanodeAbstractParameter& absParam = static_cast<ofxOceanodeAbstractParameter &>(_absParam);
         if(absParam.valueType() == typeid(float).name()){
-            ofParameter<float> castedParam = absParam.cast<float>();
+            ofParameter<float> castedParam = absParam.cast<float>().getParameter();
             castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
         }else if(absParam.valueType() == typeid(int).name()){
-            ofParameter<int> castedParam = absParam.cast<int>();
+            ofParameter<int> castedParam = absParam.cast<int>().getParameter();
             castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
         }else if(absParam.valueType() == typeid(bool).name()){
-            absParam.cast<bool>() = m.getArgAsBool(0);
+            absParam.cast<bool>().getParameter() = m.getArgAsBool(0);
         }else if(absParam.valueType() == typeid(void).name()){
-            absParam.cast<void>().trigger();
+            absParam.cast<void>().getParameter().trigger();
         }else if(absParam.valueType() == typeid(string).name()){
-            absParam.cast<string>() = m.getArgAsString(0);
+            absParam.cast<string>().getParameter() = m.getArgAsString(0);
         }else if(absParam.valueType() == typeid(vector<float>).name()){
-            ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>();
+            ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>().getParameter();
             if(m.getNumArgs() == 0){
                 castedParam = castedParam;;
             }else{
@@ -939,7 +941,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             }
         }
         else if(absParam.valueType() == typeid(vector<int>).name()){
-            ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>();
+            ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>().getParameter();
             if(m.getNumArgs() == 0){
                 castedParam = castedParam;;
             }else{
@@ -960,12 +962,13 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
         }
     };
     
-    auto modulateParameterFromOscMessage = [this](ofAbstractParameter& absParam, ofxOscMessage& m){
+    auto modulateParameterFromOscMessage = [this](ofAbstractParameter& _absParam, ofxOscMessage& m){
+		ofxOceanodeAbstractParameter& absParam = static_cast<ofxOceanodeAbstractParameter &>(_absParam);
         if(absParam.valueType() == typeid(float).name()){
-            ofParameter<float> castedParam = absParam.cast<float>();
+            ofParameter<float> castedParam = absParam.cast<float>().getParameter();
             castedParam = castedParam + m.getArgAsFloat(0);
         }else if(absParam.valueType() == typeid(int).name()){
-            ofParameter<int> castedParam = absParam.cast<int>();
+            ofParameter<int> castedParam = absParam.cast<int>().getParameter();
             if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_FLOAT){
                 int range = castedParam.getMax() - castedParam.getMin();
                 castedParam += ofMap(m.getArgAsFloat(0), -1, 1, -range, range, false);
@@ -973,9 +976,9 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                 castedParam += (castedParam+m.getArgAsInt(0));
             }
         }else if(absParam.valueType() == typeid(bool).name()){
-            absParam.cast<bool>() = !absParam.cast<bool>();
+            absParam.cast<bool>().getParameter() = !absParam.cast<bool>().getParameter();
         }else if(absParam.valueType() == typeid(vector<float>).name()){
-            ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>();
+            ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>().getParameter();
             if(castedParam->size() !=1) return;
             vector<float> tempVec;
             if(m.getNumArgs() == 1 && castedParam->size() != 1){
@@ -996,7 +999,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             castedParam = tempVec;
         }
         else if(absParam.valueType() == typeid(vector<int>).name()){
-            ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>();
+            ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>().getParameter();
             if(castedParam->size() !=1) return;
             vector<int> tempVec;
             tempVec.resize(m.getNumArgs(), 0);
@@ -1254,7 +1257,7 @@ void ofxOceanodeContainer::setIsListeningMidi(bool b){
     }
 }
 
-shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p, bool isPersistent, int _id){
+shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBinding(ofxOceanodeAbstractParameter &p, bool isPersistent, int _id){
     string name = p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName();
     
     if(_id == -1){
@@ -1263,22 +1266,22 @@ shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBindi
     
     shared_ptr<ofxOceanodeAbstractMidiBinding> midiBinding = nullptr;
     if(p.valueType() == typeid(float).name()){
-        midiBinding = make_unique<ofxOceanodeMidiBinding<float>>(p.cast<float>(), _id);
+        midiBinding = make_unique<ofxOceanodeMidiBinding<float>>(p.cast<float>().getParameter(), _id);
     }
     else if(p.valueType() == typeid(int).name()){
-        midiBinding = make_unique<ofxOceanodeMidiBinding<int>>(p.cast<int>(), _id);
+        midiBinding = make_unique<ofxOceanodeMidiBinding<int>>(p.cast<int>().getParameter(), _id);
     }
     else if(p.valueType() == typeid(bool).name()){
-        midiBinding = make_unique<ofxOceanodeMidiBinding<bool>>(p.cast<bool>(), _id);
+        midiBinding = make_unique<ofxOceanodeMidiBinding<bool>>(p.cast<bool>().getParameter(), _id);
     }
     else if(p.valueType() == typeid(void).name()){
-        midiBinding = make_unique<ofxOceanodeMidiBinding<void>>(p.cast<void>(), _id);
+        midiBinding = make_unique<ofxOceanodeMidiBinding<void>>(p.cast<void>().getParameter(), _id);
     }
     else if(p.valueType() == typeid(vector<float>).name()){
-        midiBinding = make_unique<ofxOceanodeMidiBinding<vector<float>>>(p.cast<vector<float>>(), _id);
+        midiBinding = make_unique<ofxOceanodeMidiBinding<vector<float>>>(p.cast<vector<float>>().getParameter(), _id);
     }
     else if(p.valueType() == typeid(vector<int>).name()){
-        midiBinding = make_unique<ofxOceanodeMidiBinding<vector<int>>>(p.cast<vector<int>>(), _id);
+        midiBinding = make_unique<ofxOceanodeMidiBinding<vector<int>>>(p.cast<vector<int>>().getParameter(), _id);
     }
     if(midiBinding != nullptr){
         for(auto &midiInPair : midiIns){
@@ -1295,7 +1298,7 @@ shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBindi
     return nullptr;
 }
 
-bool ofxOceanodeContainer::removeLastMidiBinding(ofAbstractParameter &p){
+bool ofxOceanodeContainer::removeLastMidiBinding(ofxOceanodeAbstractParameter &p){
     string midiBindingName = p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName();
     if(midiBindings.count(midiBindingName) != 0){
         for(auto &midiInPair : midiIns){
@@ -1343,13 +1346,12 @@ shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBindi
     ofStringReplace(module, "_", " ");
     if(collection.count(module) != 0){
         if(collection[module].count(ofToInt(moduleId))){
-            ofAbstractParameter* p = nullptr;
             if(collection[module][ofToInt(moduleId)]->getParameters()->contains(parameter)){
-                p = &collection[module][ofToInt(moduleId)]->getParameters()->get(parameter);
+                return createMidiBinding(static_cast<ofxOceanodeAbstractParameter&>(collection[module][ofToInt(moduleId)]->getParameters()->get(parameter)), isPersistent, _id);
             }
-            return createMidiBinding(*p, isPersistent, _id);
         }
     }
+	return nullptr;
 }
 
 void ofxOceanodeContainer::addNewMidiMessageListener(ofxMidiListener* listener){
