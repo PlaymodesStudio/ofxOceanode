@@ -100,6 +100,10 @@ public:
 	void setDropdownOptions(std::vector<std::string> op){dropdownOptions = op;};
 	std::vector<std::string> getDropdownOptions(){return dropdownOptions;};
 	
+	void registerNormalDrag(std::function<void(ofParameter<ParameterType> &p, int drag)> func){normalDrag = func;};
+	void registerPrecisionDrag(std::function<void(ofParameter<ParameterType> &p, int drag)> func){precisionDrag = func;};
+	void registerSpeedDrag(std::function<void(ofParameter<ParameterType> &p, int drag)> func){speedDrag = func;};
+	
 	void applyNormalDrag(int drag){normalDrag(*parameter.get(), drag);};
 	void applyPrecisionDrag(int drag){precisionDrag(*parameter.get(), drag);};
 	void applySpeedDrag(int drag){speedDrag(*parameter.get(), drag);};

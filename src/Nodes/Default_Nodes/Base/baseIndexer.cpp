@@ -94,7 +94,10 @@ void baseIndexer::indexCountChanged(int &indexCount){
 
 void baseIndexer::putParametersInParametersGroup(){
     addParameter(indexCount);
-    addParameter(numWaves_Param);
+	addParameter(numWaves_Param)->registerSpeedDrag([](ofParameter<float> &p, int drag){
+		float closestp = drag > 0 ? floor(p) : ceil(p);
+		p = ofClamp(closestp + drag, p.getMin(), p.getMax());
+	});
     addParameter(indexInvert_Param);
     addParameter(symmetry_Param);
     addParameter(indexRand_Param);
