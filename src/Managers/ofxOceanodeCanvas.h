@@ -15,6 +15,7 @@
 
 class ofxOceanodeContainer;
 class ofxOceanodeNodeGui;
+class ofxOceanodeAbstractParameter;
 
 class ofxOceanodeCanvas{
 public:
@@ -78,8 +79,8 @@ private:
 	std::map<string, int> nodesDrawingOrder;
     
     bool isCreatingConnection;
-    ofAbstractParameter* tempSourceParameter = nullptr;
-    ofAbstractParameter* tempSinkParameter = nullptr;
+    ofxOceanodeAbstractParameter* tempSourceParameter = nullptr;
+    ofxOceanodeAbstractParameter* tempSinkParameter = nullptr;
     
     string uniqueID;
     string parentID;

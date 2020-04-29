@@ -10,7 +10,7 @@
 #include <numeric>
 
 baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name){
-    indexCount.set("Size", numIndexs, 1, INT_MAX);
+    indexCount.set("Size", numIndexs, 1, 99999);
     previousIndexCount = indexCount;
     indexs.resize(indexCount, 0);
     indexRand.resize(indexCount , 0);
@@ -92,16 +92,19 @@ void baseIndexer::indexCountChanged(int &indexCount){
     previousIndexCount = indexCount;
 }
 
-void baseIndexer::putParametersInParametersGroup(shared_ptr<ofParameterGroup> parameters){
-    parameters->add(indexCount);
-    parameters->add(numWaves_Param);
-    parameters->add(indexInvert_Param);
-    parameters->add(symmetry_Param);
-    parameters->add(indexRand_Param);
-    parameters->add(indexOffset_Param);
-    parameters->add(indexQuant_Param);
-    parameters->add(combination_Param);
-    parameters->add(modulo_Param);
+void baseIndexer::putParametersInParametersGroup(){
+    addParameter(indexCount);
+	addParameter(numWaves_Param)->registerSpeedDrag([](ofParameter<float> &p, int drag){
+		float closestp = drag > 0 ? floor(p) : ceil(p);
+		p = ofClamp(closestp + drag, p.getMin(), p.getMax());
+	});
+    addParameter(indexInvert_Param);
+    addParameter(symmetry_Param);
+    addParameter(indexRand_Param);
+    addParameter(indexOffset_Param);
+    addParameter(indexQuant_Param);
+    addParameter(combination_Param);
+    addParameter(modulo_Param);
 }
 
 void baseIndexer::recomputeIndexs(){
