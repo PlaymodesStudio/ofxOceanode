@@ -157,12 +157,9 @@ bool ofxOceanodeNodeGui::constructGui(){
                 auto tempCast = absParam.cast<float>().getParameter();
 				
 				if(drag != 0){
-					float step = 0.001f;
-					if(ImGui::GetIO().KeyShift) step /= 10;
-					if(ImGui::GetIO().KeyAlt) step *= 10;
-					float newVal = tempCast + (step * drag);
-					newVal = ofClamp(newVal, tempCast.getMin(), tempCast.getMax());
-					tempCast.set(newVal);
+					if(ImGui::GetIO().KeyShift) absParam.cast<float>().applyPrecisionDrag(drag);
+					else if(ImGui::GetIO().KeyAlt) absParam.cast<float>().applySpeedDrag(drag);
+					else absParam.cast<float>().applyNormalDrag(drag);
 				}
 				
 				if(resetValue){
@@ -188,12 +185,9 @@ bool ofxOceanodeNodeGui::constructGui(){
                 if(tempCast->size() == 1)
                 {
 					if(drag != 0){
-						float step = 0.001f;
-						if(ImGui::GetIO().KeyShift) step /= 10;
-						if(ImGui::GetIO().KeyAlt) step *= 10;
-						float newVal = tempCast->at(0) + (step * drag);
-						newVal = ofClamp(newVal, tempCast.getMin()[0], tempCast.getMax()[0]);
-						tempCast.set(vector<float>(1, newVal));
+						if(ImGui::GetIO().KeyShift) absParam.cast<vector<float>>().applyPrecisionDrag(drag);
+						else if(ImGui::GetIO().KeyAlt) absParam.cast<vector<float>>().applySpeedDrag(drag);
+						else absParam.cast<vector<float>>().applyNormalDrag(drag);
 					}
 					
 					if(resetValue){
@@ -223,12 +217,9 @@ bool ofxOceanodeNodeGui::constructGui(){
 				if(absParam.cast<int>().getDropdownOptions().size() == 0)
                 {
 					if(drag != 0){
-						int step = 5;
-						if(ImGui::GetIO().KeyShift) step = 1;
-						if(ImGui::GetIO().KeyAlt) step = 10;
-						int newVal = tempCast + (step * drag);
-						newVal = ofClamp(newVal, tempCast.getMin(), tempCast.getMax());
-						tempCast.set(newVal);
+						if(ImGui::GetIO().KeyShift) absParam.cast<int>().applyPrecisionDrag(drag);
+						else if(ImGui::GetIO().KeyAlt) absParam.cast<int>().applySpeedDrag(drag);
+						else absParam.cast<int>().applyNormalDrag(drag);
 					}
 					
 					if(resetValue){
@@ -268,12 +259,9 @@ bool ofxOceanodeNodeGui::constructGui(){
                 if(tempCast->size() == 1)
                 {
 					if(drag != 0){
-						int step = 5;
-						if(ImGui::GetIO().KeyShift) step = 1;
-						if(ImGui::GetIO().KeyAlt) step = 10;
-						int newVal = tempCast->at(0) + (step * drag);
-						newVal = ofClamp(newVal, tempCast.getMin()[0], tempCast.getMax()[0]);
-						tempCast.set(vector<int>(1, newVal));
+						if(ImGui::GetIO().KeyShift) absParam.cast<vector<int>>().applyPrecisionDrag(drag);
+						else if(ImGui::GetIO().KeyAlt) absParam.cast<vector<int>>().applySpeedDrag(drag);
+						else absParam.cast<vector<int>>().applyNormalDrag(drag);
 					}
 					
 					if(resetValue){
@@ -299,11 +287,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 auto tempCast = absParam.cast<bool>().getParameter();
 				
 				if(drag != 0){
-					if(drag > 0 && tempCast == false){
-						tempCast = true;
-					}else if(drag < 0 && tempCast == true){
-						tempCast = false;
-					}
+					absParam.cast<bool>().applyNormalDrag(drag);
 				}
 				
                 if (ImGui::Checkbox(hiddenUniqueId.c_str(), (bool *)&tempCast.get()))
@@ -344,17 +328,13 @@ bool ofxOceanodeNodeGui::constructGui(){
             //////////////
             }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
                 auto tempCast = absParam.cast<ofColor>().getParameter();
-				ofFloatColor floatColor(tempCast.get());
-				
 				if(drag != 0){
-					float step = 0.001f;
-					if(ImGui::GetIO().KeyShift) step /= 10;
-					if(ImGui::GetIO().KeyAlt) step *= 10;
-					float newVal = floatColor.getBrightness() + (step * drag);
-					newVal = ofClamp(newVal, 0, 1);
-					floatColor.setBrightness(newVal);
-					tempCast = ofColor(floatColor);
+					if(ImGui::GetIO().KeyShift) absParam.cast<ofColor>().applyPrecisionDrag(drag);
+					else if(ImGui::GetIO().KeyAlt) absParam.cast<ofColor>().applySpeedDrag(drag);
+					else absParam.cast<ofColor>().applyNormalDrag(drag);
 				}
+				
+				ofFloatColor floatColor(tempCast.get());
 				
                 if (ImGui::ColorEdit3(hiddenUniqueId.c_str(), &floatColor.r))
                 {
@@ -367,15 +347,11 @@ bool ofxOceanodeNodeGui::constructGui(){
 			///////////////////
 			}else if(absParam.valueType() == typeid(ofFloatColor).name()){
 				auto tempCast = absParam.cast<ofFloatColor>().getParameter();
+				
 				if(drag != 0){
-					float step = 0.001f;
-					if(ImGui::GetIO().KeyShift) step /= 10;
-					if(ImGui::GetIO().KeyAlt) step *= 10;
-					float newVal = tempCast->getBrightness() + (step * drag);
-					newVal = ofClamp(newVal, 0, 1);
-					ofFloatColor tempColor = tempCast;
-					tempColor.setBrightness(newVal);
-					tempCast = tempColor;
+					if(ImGui::GetIO().KeyShift) absParam.cast<ofFloatColor>().applyPrecisionDrag(drag);
+					else if(ImGui::GetIO().KeyAlt) absParam.cast<ofFloatColor>().applySpeedDrag(drag);
+					else absParam.cast<ofFloatColor>().applyNormalDrag(drag);
 				}
 				
 				if (ImGui::ColorEdit3(hiddenUniqueId.c_str(), (float*)&tempCast.get().r))

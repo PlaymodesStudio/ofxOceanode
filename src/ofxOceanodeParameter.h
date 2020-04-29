@@ -8,6 +8,8 @@
 #ifndef ofxOceanodeParameter_h
 #define ofxOceanodeParameter_h
 
+#include "ofParameter.h"
+
 typedef int ofxOceanodeParameterFlags;
 
 enum ofxOceanodeParameterFlags_
@@ -25,7 +27,9 @@ class ofxOceanodeParameter;
 
 class ofxOceanodeAbstractParameter : public ofAbstractParameter{
 public:
-	ofxOceanodeAbstractParameter(){};
+	ofxOceanodeAbstractParameter(){
+		flags = 0;
+	};
 	virtual ~ofxOceanodeAbstractParameter() {};
 	
 	virtual std::string getName() const = 0;
@@ -60,13 +64,15 @@ protected:
 	virtual const void* getInternalObject() const = 0;
 	
 private:
-	ofxOceanodeParameterFlags flags = 0;
+	ofxOceanodeParameterFlags flags;
 };
 
 template<typename ParameterType>
 class ofxOceanodeParameter: public ofxOceanodeAbstractParameter{
 public:
-	ofxOceanodeParameter(){};
+	ofxOceanodeParameter(){
+		parameter = nullptr;
+	};
 	virtual ~ofxOceanodeParameter() {};
 	
 	//Overrided
@@ -82,14 +88,21 @@ public:
 	
 	//Custom
 	void bindParameter(ofParameter<ParameterType> &p){
-		parameter = make_shared<ofParameter<ParameterType>>(p);
-		defaultValue = p;
+		//TODO: Throw exception
+		if(parameter == nullptr){
+			parameter = std::make_shared<ofParameter<ParameterType>>(p);
+			defaultValue = p;
+		}
 	}
 	ofParameter<ParameterType> & getParameter(){return *parameter;}
 	ParameterType getDefaultValue(){return defaultValue;};
 	
-	void setDropdownOptions(vector<string> op){dropdownOptions = op;};
-	vector<string> getDropdownOptions(){return dropdownOptions;};
+	void setDropdownOptions(std::vector<std::string> op){dropdownOptions = op;};
+	std::vector<std::string> getDropdownOptions(){return dropdownOptions;};
+	
+	void applyNormalDrag(int drag){normalDrag(*parameter.get(), drag);};
+	void applyPrecisionDrag(int drag){precisionDrag(*parameter.get(), drag);};
+	void applySpeedDrag(int drag){speedDrag(*parameter.get(), drag);};
 	
 protected:
 	const ofParameterGroup getFirstParent() const { return parameter->getFirstParent();}
@@ -97,9 +110,13 @@ protected:
 	const void* getInternalObject() const { return parameter->getInternalObject();}
 	
 private:
-	shared_ptr<ofParameter<ParameterType>> parameter;
-	vector<string> dropdownOptions;
+	std::shared_ptr<ofParameter<ParameterType>> parameter;
+	std::vector<std::string> dropdownOptions;
 	ParameterType defaultValue;
+	
+	std::function<void(ofParameter<ParameterType> &p, int drag)> normalDrag;
+	std::function<void(ofParameter<ParameterType> &p, int drag)> precisionDrag;
+	std::function<void(ofParameter<ParameterType> &p, int drag)> speedDrag;
 };
 
 template<>
@@ -121,7 +138,7 @@ public:
 	
 	//Custom
 	void bindParameter(ofParameter<void> &p){
-		parameter = make_shared<ofParameter<void>>(p);
+		parameter = std::make_shared<ofParameter<void>>(p);
 	}
 	ofParameter<void> & getParameter(){return *parameter;}
 	
@@ -134,7 +151,7 @@ protected:
 	const void* getInternalObject() const { return parameter->getInternalObject();}
 	
 private:
-	shared_ptr<ofParameter<void>> parameter;
+	std::shared_ptr<ofParameter<void>> parameter;
 	ofxOceanodeParameterFlags flags = 0;
 };
 
