@@ -15,24 +15,6 @@
 class ofxOceanodeContainer;
 class ofxOscMessage;
 
-//template <typename T>
-class parameterInfo{
-public:
-    parameterInfo(bool spres = true, bool sproj = true, bool inc = true, bool outc = true) : isSavePreset(spres), isSaveProject(sproj), acceptInConnection(inc), acceptOutConnection(outc){};
-    
-    void convertToProject(){
-        isSavePreset = false;
-        isSaveProject = true;
-    }
-    
-    bool isSavePreset;
-    bool isSaveProject;
-    bool acceptInConnection;
-    bool acceptOutConnection;
-    
-    vector<string> dropdownOptions;
-};
-
 class ofxOceanodeNodeModel {
 public:
     ofxOceanodeNodeModel(string _name);
