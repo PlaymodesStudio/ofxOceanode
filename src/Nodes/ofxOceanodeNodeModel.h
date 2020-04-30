@@ -43,7 +43,7 @@ public:
     virtual void draw(ofEventArgs &e){};
     
     //get parameterGroup
-    shared_ptr<ofParameterGroup> getParameterGroup(){return parameters;};
+    ofParameterGroup &getParameterGroup(){return parameters;};
     
     //getters
     string nodeName(){return nameIdentifier;};
@@ -83,8 +83,8 @@ public:
 		auto oceaParam = make_shared<ofxOceanodeParameter<ParameterType>>();
 		oceaParam->bindParameter(p);
 		oceaParam->setFlags(flags);
-		parameters->add(*oceaParam);
-		return dynamic_pointer_cast<ofxOceanodeParameter<ParameterType>>(*(parameters->end()-1));
+		parameters.add(*oceaParam);
+		return dynamic_pointer_cast<ofxOceanodeParameter<ParameterType>>(*(parameters.end()-1));
 	}
 	
 	template<typename ParameterType>
@@ -103,11 +103,11 @@ public:
     
 protected:
     ofColor color;
-    string nameIdentifier;
-    unsigned int numIdentifier;
     
 private:
-	shared_ptr<ofParameterGroup> parameters;
+    string nameIdentifier;
+    unsigned int numIdentifier;
+	ofParameterGroup parameters;
     ofEventListeners eventListeners;
 };
 

@@ -9,7 +9,7 @@
 #include "ofxOceanodeNodeModel.h"
 
 ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name){
-    parameters = make_shared<ofParameterGroup>(_name);
+    parameters.setName(_name);
     color = ofColor(ofRandom(255), ofRandom(255), ofRandom(255));
     color.setBrightness(255);
     numIdentifier = -1;
@@ -17,7 +17,7 @@ ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name)
 
 void ofxOceanodeNodeModel::setNumIdentifier(unsigned int num){
     numIdentifier = num;
-    parameters->setName(nameIdentifier + " " + ofToString(num));
+    parameters.setName(nameIdentifier + " " + ofToString(num));
 }
 
 //parameterInfo& ofxOceanodeNodeModel::addParameterToGroupAndInfo(ofAbstractParameter& p){

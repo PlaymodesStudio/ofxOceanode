@@ -33,7 +33,7 @@ ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
 }
 
 bool ofxOceanodeNodeGui::constructGui(){
-    string moduleName = getParameters()->getName();
+    string moduleName = getParameters().getName();
     ImGui::BeginGroup(); // Lock horizontal position
     
     bool deleteModule = false;
@@ -79,8 +79,8 @@ bool ofxOceanodeNodeGui::constructGui(){
         
         auto startPos = ImGui::GetCursorScreenPos();
         
-        for(int i=0 ; i<getParameters()->size(); i++){
-            ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters()->get(i));
+        for(int i=0 ; i<getParameters().size(); i++){
+            ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
             string uniqueId = absParam.getName();
 			ImGui::PushID(uniqueId.c_str());
             ImGui::Text("%s", uniqueId.c_str());
@@ -132,7 +132,7 @@ bool ofxOceanodeNodeGui::constructGui(){
 #endif
 #ifdef OFXOCEANODE_USE_OSC
 				ImGui::Separator();
-				ImGui::Text("OSC Address: %s/%s", getParameters()->getEscapedName().c_str(), absParam.getEscapedName().c_str());
+				ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
 #endif
 				ImGui::Separator();
 				ImGui::EndPopup();
@@ -386,9 +386,9 @@ bool ofxOceanodeNodeGui::constructGui(){
             outPos.second.x = ImGui::GetItemRectMax().x;
         }
     }else{
-        auto numParams = getParameters()->size();
+        auto numParams = getParameters().size();
         for(int i=0 ; i < numParams; i++){
-            ofAbstractParameter &absParam = getParameters()->get(i);
+            ofAbstractParameter &absParam = getParameters().get(i);
             string uniqueId = absParam.getName();
             float yPos = numParams == 1 ? ImGui::GetItemRectSize().y / 2 : ImGui::GetItemRectSize().y * ((float)i/(numParams-1));
             inputPositions[uniqueId] = glm::vec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + yPos);
@@ -402,7 +402,7 @@ bool ofxOceanodeNodeGui::constructGui(){
     return true;
 }
 
-shared_ptr<ofParameterGroup> ofxOceanodeNodeGui::getParameters(){
+ofParameterGroup &ofxOceanodeNodeGui::getParameters(){
     return node.getParameters();
 }
 

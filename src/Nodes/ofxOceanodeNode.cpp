@@ -118,11 +118,11 @@ bool ofxOceanodeNode::loadConfig(string filename, bool persistentPreset){
     
     //Hack Put all faders to 0;
 	//TODO: Review hack
-//    if(getParameters()->contains("Fader")){
-//        if(getParameters()->get("Fader").type() == typeid(ofParameter<float>()).name()){
-//            getParameters()->getFloat("Fader") = 0;
+//    if(getParameters().contains("Fader")){
+//        if(getParameters().get("Fader").type() == typeid(ofParameter<float>()).name()){
+//            getParameters().getFloat("Fader") = 0;
 //        }else{
-//            getParameters()->get<vector<float>>("Fader") = {0};
+//            getParameters().get<vector<float>>("Fader") = {0};
 //        }
 //    }
     
@@ -141,8 +141,8 @@ void ofxOceanodeNode::saveConfig(string filename, bool persistentPreset){
 
 ofJson ofxOceanodeNode::saveParametersToJson(bool persistentPreset){
     ofJson json;
-    for(int i = 0; i < getParameters()->size(); i++){
-        ofxOceanodeAbstractParameter& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters()->get(i));
+    for(int i = 0; i < getParameters().size(); i++){
+        ofxOceanodeAbstractParameter& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
         if((!persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) || (persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject))){
             if(p.valueType() == typeid(vector<float>).name()){
                 auto vecF = p.cast<vector<float>>().getParameter().get();
@@ -164,8 +164,8 @@ ofJson ofxOceanodeNode::saveParametersToJson(bool persistentPreset){
 }
 bool ofxOceanodeNode::loadParametersFromJson(ofJson json, bool persistentPreset){
     for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
-        if(getParameters()->contains(it.key())){
-            ofxOceanodeAbstractParameter& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters()->get(it.key()));
+        if(getParameters().contains(it.key())){
+            ofxOceanodeAbstractParameter& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(it.key()));
             deserializeParameter(json, p, persistentPreset);
         }
     }
@@ -202,7 +202,7 @@ void ofxOceanodeNode::resetPhase(){
     nodeModel->resetPhase();
 }
 
-shared_ptr<ofParameterGroup> ofxOceanodeNode::getParameters(){
+ofParameterGroup& ofxOceanodeNode::getParameters(){
     return nodeModel->getParameterGroup();
 }
 

@@ -255,7 +255,7 @@ void ofxOceanodeNodeMacro::setup(){
 
 void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
     bool inletOutletCreated = true;
-    string nodeName = node->getParameters()->getName();
+    string nodeName = node->getParameters().getName();
 //    if(node->getNodeModel().nodeName() == "Inlet"){
 //        if(node->getParameters()->get("Input").type() == typeid(ofParameter<vector<float>>).name()){
 //            ofParameter<vector<float>> *input = new ofParameter<vector<float>>();

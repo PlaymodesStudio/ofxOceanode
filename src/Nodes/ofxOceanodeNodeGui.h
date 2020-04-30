@@ -33,7 +33,7 @@ public:
     void setPosition(glm::vec2 position);
     void setSize(glm::vec2 size);
     
-    shared_ptr<ofParameterGroup> getParameters();
+    ofParameterGroup &getParameters();
     glm::vec2 getPosition();
     ofRectangle getRectangle();
     

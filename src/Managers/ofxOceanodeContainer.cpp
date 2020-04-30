@@ -140,14 +140,14 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     
     auto nodePtr = node.get();
     collection[nodeToBeCreatedName][toBeCreatedId] = std::move(node);
-    parameterGroupNodesMap[nodePtr->getParameters()->getEscapedName()] = nodePtr;
+    parameterGroupNodesMap[nodePtr->getParameters().getEscapedName()] = nodePtr;
     
     //Interaction listeners
     destroyNodeListeners.push(nodePtr->deleteModule.newListener([this, nodeToBeCreatedName, toBeCreatedId, isPersistent](){
 #ifdef OFXOCEANODE_USE_MIDI
         if(!isPersistent){
-			for(int i = 0 ; i < dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters()->size(); i++){
-				auto &p = dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters()->get(i);
+			for(int i = 0 ; i < dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters().size(); i++){
+				auto &p = dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters().get(i);
                 while(removeLastMidiBinding(static_cast<ofxOceanodeAbstractParameter &>(p)));
             }
         }
@@ -155,11 +155,11 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
         
         if(!isPersistent){
             //Delete Map
-            parameterGroupNodesMap.erase(dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters()->getEscapedName());
+            parameterGroupNodesMap.erase(dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters().getEscapedName());
             dynamicNodes[nodeToBeCreatedName].erase(toBeCreatedId);
         }else{
             //Delete Map
-            parameterGroupNodesMap.erase(persistentNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters()->getEscapedName());
+            parameterGroupNodesMap.erase(persistentNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters().getEscapedName());
             persistentNodes[nodeToBeCreatedName].erase(toBeCreatedId);
         }
     }));
@@ -596,7 +596,7 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
     
     ofJson json;
     for(auto &node : nodes){
-        nodeAsParentNames.push_back(node->getParameters()->getEscapedName());
+        nodeAsParentNames.push_back(node->getParameters().getEscapedName());
         glm::vec2 pos(0,0);
 #ifndef OFXOCEANODE_HEADLESS
         pos = node->getNodeGui().getPosition();
@@ -1300,8 +1300,8 @@ shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBindi
     ofStringReplace(module, "_", " ");
     if(collection.count(module) != 0){
         if(collection[module].count(ofToInt(moduleId))){
-            if(collection[module][ofToInt(moduleId)]->getParameters()->contains(parameter)){
-                return createMidiBinding(static_cast<ofxOceanodeAbstractParameter&>(collection[module][ofToInt(moduleId)]->getParameters()->get(parameter)), isPersistent, _id);
+            if(collection[module][ofToInt(moduleId)]->getParameters().contains(parameter)){
+                return createMidiBinding(static_cast<ofxOceanodeAbstractParameter&>(collection[module][ofToInt(moduleId)]->getParameters().get(parameter)), isPersistent, _id);
             }
         }
     }
@@ -1320,9 +1320,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
     auto sourceModuleRef = parameterGroupNodesMap.count(sourceModule) == 1 ? parameterGroupNodesMap[sourceModule] : nullptr;
     auto sinkModuleRef = parameterGroupNodesMap.count(sinkModule) == 1 ? parameterGroupNodesMap[sinkModule] : nullptr;
     if(sourceModuleRef == nullptr || sinkModuleRef == nullptr) return nullptr;
-    if(sourceModuleRef->getParameters()->contains(sourceParameter) && sinkModuleRef->getParameters()->contains(sinkParameter)){
-        ofAbstractParameter &source = sourceModuleRef->getParameters()->get(sourceParameter);
-        ofAbstractParameter &sink = sinkModuleRef->getParameters()->get(sinkParameter);
+    if(sourceModuleRef->getParameters().contains(sourceParameter) && sinkModuleRef->getParameters().contains(sinkParameter)){
+        ofAbstractParameter &source = sourceModuleRef->getParameters().get(sourceParameter);
+        ofAbstractParameter &sink = sinkModuleRef->getParameters().get(sinkParameter);
         return createConnection(static_cast<ofxOceanodeAbstractParameter &>(source), static_cast<ofxOceanodeAbstractParameter &>(sink), active);
     }
     return nullptr;

@@ -258,7 +258,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                 int NODE_BULLET_MAX_SIZE = 10;
                 int NODE_BULLET_GROW_DIST = 10;
                 
-                for (auto &absParam : *node->getParameters().get()){
+                for (auto &absParam : node->getParameters()){
 					auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
                     //TODO: Check if parameter is plugable
                     auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
@@ -301,7 +301,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                         }
                     }
                 }
-                for (auto &absParam : *node->getParameters().get()){
+                for (auto &absParam : node->getParameters()){
 					auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
                     //TODO: Check if parameter is plugable
                     auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0);

@@ -67,7 +67,7 @@ public:
     ofEvent<void> deleteModule;
     ofEvent<glm::vec2> duplicateModule;
     
-    shared_ptr<ofParameterGroup> getParameters();
+    ofParameterGroup& getParameters();
 private:
     std::unique_ptr<ofxOceanodeNodeModel> nodeModel;
 #ifndef OFXOCEANODE_HEADLESS
