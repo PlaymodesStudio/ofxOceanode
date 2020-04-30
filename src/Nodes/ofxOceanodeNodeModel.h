@@ -17,6 +17,8 @@ class ofxOscMessage;
 
 class ofxOceanodeNodeModel {
 public:
+    using customGuiRegion = ofParameter<std::function<void()>>;
+    
     ofxOceanodeNodeModel(string _name);
     virtual ~ofxOceanodeNodeModel(){};
     
@@ -81,6 +83,11 @@ public:
 		op->setDropdownOptions(options);
         return op;
     }
+    
+    shared_ptr<ofxOceanodeParameter<std::function<void()>>> addCustomRegion(customGuiRegion &p, std::function<void()> func){
+        return addParameter(p.set(func), ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisableOutConnection | ofxOceanodeParameterFlags_DisableSavePreset | ofxOceanodeParameterFlags_DisableSaveProject);
+    }
+    
     ofEvent<std::pair<ofJson, string>> deserializeParameterEvent;
     
 protected:
