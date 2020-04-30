@@ -140,7 +140,6 @@ private:
     std::shared_ptr<ofxOceanodeTypesRegistry>   typesRegistry;
     
     ofEventListeners destroyNodeListeners;
-    ofEventListeners duplicateNodeListeners;
     ofEventListeners destroyConnectionListeners;
     
     ofParameter<glm::mat4> transformationMatrix;

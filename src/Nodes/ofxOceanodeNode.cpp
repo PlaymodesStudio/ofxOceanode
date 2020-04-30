@@ -59,16 +59,6 @@ void ofxOceanodeNode::deleteSelf(){
     ofNotifyEvent(deleteModule);
 }
 
-void ofxOceanodeNode::duplicateSelf(glm::vec2 posToDuplicate){
-#ifndef OFXOCEANODE_HEADLESS
-    if(posToDuplicate == glm::vec2(-1, -1)){
-        posToDuplicate = toGlm(nodeGui->getPosition() + ofPoint(10, 10));
-    }
-#endif
-    saveConfig("tempDuplicateGroup.json");
-    ofNotifyEvent(duplicateModule, posToDuplicate);
-}
-
 bool ofxOceanodeNode::loadPreset(string presetFolderPath){
     return loadConfig(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json");
 }

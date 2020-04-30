@@ -35,7 +35,6 @@ public:
     ofColor getColor();
     
     void deleteSelf();
-    void duplicateSelf(glm::vec2 posToDuplicate = glm::vec2(-1, -1));
     
     bool loadPreset(string presetFolderPath);
     void savePreset(string presetFolderPath);
@@ -65,7 +64,6 @@ public:
     bool getActive(){return active;};
     
     ofEvent<void> deleteModule;
-    ofEvent<glm::vec2> duplicateModule;
     
     ofParameterGroup& getParameters();
 private:

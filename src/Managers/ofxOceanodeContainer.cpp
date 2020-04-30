@@ -164,18 +164,6 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
         }
     }));
     
-    duplicateNodeListeners.push(nodePtr->duplicateModule.newListener([this, nodeToBeCreatedName, nodePtr](glm::vec2 pos){
-        auto newNode = createNodeFromName(nodeToBeCreatedName);
-#ifndef OFXOCEANODE_HEADLESS
-        newNode->getNodeGui().setPosition(pos);
-#endif
-        newNode->loadConfig("tempDuplicateGroup.json");
-        ofFile config("tempDuplicateGroup.json");
-        config.remove();
-        
-        //TODO: return a refrence to the node
-    }));
-    
     //Used in Macro
     newNodeCreated.notify(this, nodePtr);
     return *nodePtr;

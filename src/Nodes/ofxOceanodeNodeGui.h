@@ -40,8 +40,6 @@ public:
     void enable();
     void disable();
     
-    void duplicate();
-    
     ofColor getColor(){return color;};
     
     bool getExpanded(){return expanded;};

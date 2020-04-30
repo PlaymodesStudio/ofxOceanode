@@ -430,10 +430,6 @@ void ofxOceanodeNodeGui::disable(){
 //    gui->setVisible(false);
 }
 
-void ofxOceanodeNodeGui::duplicate(){
-    node.duplicateSelf(getPosition());
-}
-
 glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter){
     return outputPositions[parameter.getName()];
 }
