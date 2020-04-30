@@ -14,22 +14,7 @@
 #include "ofxOceanodeNodeGui.h"
 #endif
 
-ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){
-    nodeModelListeners.push(nodeModel->disconnectConnectionsForParameter.newListener([&](string &parameter){
-        vector<ofxOceanodeAbstractConnection*> toDeleteConnections;
-        //TODO: Change with find_if
-        for(auto c : inConnections){
-            if(c->getSinkParameter().getName() == parameter) toDeleteConnections.push_back(c);
-        }
-        for(auto c : outConnections){
-            if(c->getSourceParameter().getName() == parameter) toDeleteConnections.push_back(c);
-        }
-        ofNotifyEvent(deleteConnections, toDeleteConnections);
-    }));
-    nodeModelListeners.push(nodeModel->deserializeParameterEvent.newListener([this](std::pair<ofJson, string> pair){
-        deserializeParameter(pair.first, static_cast<ofxOceanodeAbstractParameter&>(getParameters()->get(pair.second)));
-    }));
-}
+ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){}
 
 ofxOceanodeNode::~ofxOceanodeNode(){
     
@@ -70,23 +55,8 @@ ofColor ofxOceanodeNode::getColor(){
     return nodeModel->getColor();
 }
 
-void ofxOceanodeNode::addOutputConnection(ofxOceanodeAbstractConnection* c){
-    outConnections.push_back(c);
-    outConnectionsListeners.push(c->destroyConnection.newListener([&, c](){
-        outConnections.erase(std::remove(outConnections.begin(), outConnections.end(), c));
-    }));
-}
-
-void ofxOceanodeNode::addInputConnection(ofxOceanodeAbstractConnection* c){
-    inConnections.push_back(c);
-    inConnectionsListeners.push(c->destroyConnection.newListener([&, c](){
-        inConnections.erase(std::remove(inConnections.begin(), inConnections.end(), c));
-    }));
-}
-
 void ofxOceanodeNode::deleteSelf(){
-    inConnections.insert(inConnections.end(), outConnections.begin(), outConnections.end());
-    ofNotifyEvent(deleteModuleAndConnections, inConnections);
+    ofNotifyEvent(deleteModule);
 }
 
 void ofxOceanodeNode::duplicateSelf(glm::vec2 posToDuplicate){
@@ -203,7 +173,7 @@ bool ofxOceanodeNode::loadParametersFromJson(ofJson json, bool persistentPreset)
 }
 
 void ofxOceanodeNode::deserializeParameter(ofJson &json, ofxOceanodeAbstractParameter &p, bool persistentPreset){
-    if((((!persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) || (persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject)))) && json.count(p.getEscapedName()) && !checkHasInConnection(p)){
+    if((((!persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) || (persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject)))) && json.count(p.getEscapedName()) && !p.hasInConnection()){
         if(p.valueType() == typeid(vector<float>).name()){
             float value = 0;
             if(json[p.getEscapedName()].is_string()){
@@ -230,37 +200,6 @@ void ofxOceanodeNode::setBpm(float bpm){
 
 void ofxOceanodeNode::resetPhase(){
     nodeModel->resetPhase();
-}
-
-bool ofxOceanodeNode::checkHasInConnection(ofAbstractParameter &p){
-    for(auto &c : inConnections){
-        if(&c->getSinkParameter() == &p){
-            return true;
-        }
-    }
-    return false;
-}
-
-ofxOceanodeAbstractConnection* ofxOceanodeNode::getInputConnectionForParameter(ofAbstractParameter& param){
-    auto findPos = std::find_if(inConnections.begin(), inConnections.end(), [&param](ofxOceanodeAbstractConnection *c){
-        return
-        &c->getSinkParameter() == &param;
-    });
-    if(findPos != inConnections.end()){
-        return *findPos;
-    }
-    return nullptr;
-}
-
-ofxOceanodeAbstractConnection* ofxOceanodeNode::getOutputConnectionForParameter(ofAbstractParameter& param){
-    auto findPos = std::find_if(outConnections.begin(), outConnections.end(), [&param](ofxOceanodeAbstractConnection *c){
-        return
-        &c->getSinkParameter() == &param;
-    });
-    if(findPos != outConnections.end()){
-        return *findPos;
-    }
-    return nullptr;
 }
 
 shared_ptr<ofParameterGroup> ofxOceanodeNode::getParameters(){

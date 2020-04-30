@@ -18,13 +18,22 @@ public:
         sinkParameter = &_sinkParameter;
         isPersistent = false;
         active = _active;
+        sourceParameter->addOutConnection(this);
+        sinkParameter->setInConnection(this);
     };
 
-    virtual ~ofxOceanodeAbstractConnection(){};
+    virtual ~ofxOceanodeAbstractConnection(){
+        sourceParameter->removeOutConnection(this);
+        sinkParameter->removeInConnection(this);
+    };
     
     void setActive(bool a){
         active = a;
         if(active) passValueFunc();
+    }
+    
+    void deleteSelf(){
+        destroyConnection.notify();
     }
     
     ofxOceanodeAbstractParameter& getSourceParameter(){return *sourceParameter;};
@@ -58,7 +67,6 @@ public:
     }
     ~ofxOceanodeConnection(){
         sinkParameter.set(beforeConnectionValue);
-        ofNotifyEvent(destroyConnection);
     };
     
 private:
@@ -85,7 +93,6 @@ public:
     }
     ~ofxOceanodeConnection(){
         sinkParameter.set(beforeConnectionValue);
-        ofNotifyEvent(destroyConnection);
     };
     
 private:
@@ -118,7 +125,6 @@ public:
     }
     ~ofxOceanodeConnection(){
         sinkParameter.set(beforeConnectionValue);
-        ofNotifyEvent(destroyConnection);
     };
     
 private:
@@ -145,7 +151,6 @@ public:
     }
     ~ofxOceanodeConnection(){
         sinkParameter.set(beforeConnectionValue);
-        ofNotifyEvent(destroyConnection);
     };
     
 private:
@@ -169,9 +174,7 @@ public:
             passValueFunc();
         });
     }
-    ~ofxOceanodeConnection(){
-        ofNotifyEvent(destroyConnection);
-    };
+    ~ofxOceanodeConnection(){};
     
 private:
     void passValueFunc(){
@@ -192,9 +195,7 @@ public:
             passValueFunc();
         });
     }
-    ~ofxOceanodeConnection(){
-        ofNotifyEvent(destroyConnection);
-    };
+    ~ofxOceanodeConnection(){};
     
 private:
     void passValueFunc(){
@@ -215,9 +216,7 @@ public:
             passValueFunc();
         });
     }
-    ~ofxOceanodeConnection(){
-        ofNotifyEvent(destroyConnection);
-    };
+    ~ofxOceanodeConnection(){};
     
 private:
     void passValueFunc(){
@@ -238,9 +237,7 @@ public:
             passValueFunc();
         });
     }
-    ~ofxOceanodeConnection(){
-        ofNotifyEvent(destroyConnection);
-    };
+    ~ofxOceanodeConnection(){};
     
 private:
     void passValueFunc(){

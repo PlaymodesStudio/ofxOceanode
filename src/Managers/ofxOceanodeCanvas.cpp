@@ -270,11 +270,11 @@ void ofxOceanodeCanvas::draw(bool *open){
                         connectionIsDoable = true;
                         if(ImGui::IsMouseClicked(0)){
                             isCreatingConnection = true;
-                            auto inConnection = node->getInputConnectionForParameter(*param);
-                            if(inConnection != nullptr){ //Parmaeter has sink connected
+                            if(param->hasInConnection()){ //Parmaeter has sink connected
+                                auto inConnection = param->getInConnection();
                                 tempSourceParameter = &inConnection->getSourceParameter();
                                 if(!ImGui::GetIO().KeyAlt){
-                                    container->destroyConnection(inConnection);
+                                    inConnection->deleteSelf();
                                 }
                             }else{
                                 tempSinkParameter = param.get();
@@ -288,8 +288,9 @@ void ofxOceanodeCanvas::draw(bool *open){
                             else if(tempSourceParameter != nullptr){
                                 if(tempSourceParameter != param.get()){ //Is the same parameter, no conection between them
                                     //Remove previous connection connected to that parameter.
-                                    auto inConnection = node->getInputConnectionForParameter(*param);
-                                    if(inConnection != nullptr) container->destroyConnection(inConnection);
+                                    if(param->hasInConnection()){
+                                        param->getInConnection()->deleteSelf();
+                                    }
                                     container->createConnection(*tempSourceParameter, *param);
                                 }
                                 else{

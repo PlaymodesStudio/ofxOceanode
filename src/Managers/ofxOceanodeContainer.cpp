@@ -104,16 +104,6 @@ void ofxOceanodeContainer::draw(){
     }
 }
 
-void ofxOceanodeContainer::destroyConnection(ofxOceanodeAbstractConnection* connection){
-    //TODO: Change for find
-    for(auto &c : connections){
-        if(c.get() == connection){
-            connections.erase(std::remove(connections.begin(), connections.end(), c));
-            break;
-        }
-    }
-}
-
 ofxOceanodeNode* ofxOceanodeContainer::createNodeFromName(string name, int identifier, bool isPersistent){
     unique_ptr<ofxOceanodeNodeModel> type = registry->create(name);
     
@@ -153,27 +143,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     parameterGroupNodesMap[nodePtr->getParameters()->getEscapedName()] = nodePtr;
     
     //Interaction listeners
-    destroyNodeListeners.push(nodePtr->deleteModuleAndConnections.newListener([this, nodeToBeCreatedName, toBeCreatedId, isPersistent](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
-        //for(auto &containerConnectionIterator = connections.begin(); containerConnectionIterator!= connections.end();){
-        //TODO: Change deletion with find
-        for(int i = 0; i < connections.size();){
-            bool foundConnection = false;
-            for(auto &nodeConnection : connectionsToBeDeleted){
-                //if(containerConnectionIterator->second.get() == nodeConnection){
-                if(connections[i].get() == nodeConnection){
-                    foundConnection = true;
-                    //connections.erase(containerConnectionIterator);
-                    connections.erase((connections.begin() + i));
-                    connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
-                    break;
-                }
-            }
-            if(!foundConnection){
-                //containerConnectionIterator++;
-                i++;
-            }
-        }
-        
+    destroyNodeListeners.push(nodePtr->deleteModule.newListener([this, nodeToBeCreatedName, toBeCreatedId, isPersistent](){
 #ifdef OFXOCEANODE_USE_MIDI
         if(!isPersistent){
 			for(int i = 0 ; i < dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters()->size(); i++){
@@ -191,24 +161,6 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
             //Delete Map
             parameterGroupNodesMap.erase(persistentNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters()->getEscapedName());
             persistentNodes[nodeToBeCreatedName].erase(toBeCreatedId);
-        }
-    }));
-    
-    destroyNodeListeners.push(nodePtr->deleteConnections.newListener([this](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
-        //TODO: Use this function in deleteModuleAndConnections function listener, with the use of find
-        for(auto containerConnectionIterator = connections.begin(); containerConnectionIterator!=connections.end();){
-            bool foundConnection = false;
-            for(auto nodeConnection : connectionsToBeDeleted){
-                if(containerConnectionIterator->get() == nodeConnection){
-                    foundConnection = true;
-                    connections.erase(containerConnectionIterator);
-                    connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
-                    break;
-                }
-            }
-            if(!foundConnection){
-                containerConnectionIterator++;
-            }
         }
     }));
     
@@ -653,6 +605,7 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
     }
     ofSavePrettyJson(presetFolderPath + "/modules.json", json);
     
+    //TODO: search for connections in each parameter of the node? instead of searching all connections? try performance
     json.clear();
     for(auto &connection : connections){
         if(!connection->getIsPersistent()){

@@ -13,7 +13,6 @@
 #include "ofxOceanodeParameter.h"
 
 class ofxOceanodeContainer;
-class ofxOceanodeAbstractConnection;
 class ofxOscMessage;
 
 //template <typename T>
@@ -54,7 +53,6 @@ public:
     ofEvent<string> parameterChangedMinMax;
     ofEvent<string> dropdownChanged;
     ofEvent<void> parameterGroupChanged;
-    ofEvent<string> disconnectConnectionsForParameter;
     
     virtual void setBpm(float _bpm){};
     virtual void resetPhase(){};

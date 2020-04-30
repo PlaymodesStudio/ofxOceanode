@@ -10,6 +10,8 @@
 
 #include "ofParameter.h"
 
+class ofxOceanodeAbstractConnection;
+
 typedef int ofxOceanodeParameterFlags;
 
 enum ofxOceanodeParameterFlags_
@@ -29,8 +31,9 @@ class ofxOceanodeAbstractParameter : public ofAbstractParameter{
 public:
 	ofxOceanodeAbstractParameter(){
 		flags = 0;
+        inConnection = nullptr;
 	};
-	virtual ~ofxOceanodeAbstractParameter() {};
+    virtual ~ofxOceanodeAbstractParameter(){};
 	
 	virtual std::string getName() const = 0;
 	virtual void setName(const std::string & name) = 0;
@@ -57,6 +60,17 @@ public:
 	
 	ofxOceanodeParameterFlags getFlags(){return flags;};
 	ofxOceanodeParameterFlags setFlags(ofxOceanodeParameterFlags f){flags = f;};
+    
+    bool hasInConnection(){return inConnection != nullptr;};
+    ofxOceanodeAbstractConnection* getInConnection(){return inConnection;};
+    
+    void setInConnection(ofxOceanodeAbstractConnection* c){inConnection = c;};
+    void addOutConnection(ofxOceanodeAbstractConnection* c){outConnections.push_back(c);};
+    
+    void removeInConnection(ofxOceanodeAbstractConnection* c){if(inConnection == c) inConnection = nullptr;};
+    void removeOutConnection(ofxOceanodeAbstractConnection* c){outConnections.erase(std::remove(outConnections.begin(), outConnections.end(), c));};
+    
+    void removeAllConnections();
 	
 protected:
 	virtual const ofParameterGroup getFirstParent() const = 0;
@@ -64,6 +78,8 @@ protected:
 	virtual const void* getInternalObject() const = 0;
 	
 private:
+    ofxOceanodeAbstractConnection* inConnection;
+    std::vector<ofxOceanodeAbstractConnection*> outConnections;
 	ofxOceanodeParameterFlags flags;
 };
 
@@ -73,7 +89,10 @@ public:
 	ofxOceanodeParameter(){
 		parameter = nullptr;
 	};
-	virtual ~ofxOceanodeParameter() {};
+    
+	~ofxOceanodeParameter() {
+        removeAllConnections();
+    };
 	
 	//Overrided
 	std::string getName() const { return parameter->getName();}
@@ -127,7 +146,9 @@ template<>
 class ofxOceanodeParameter<void>: public ofxOceanodeAbstractParameter{
 public:
 	ofxOceanodeParameter(){};
-	virtual ~ofxOceanodeParameter() {};
+	~ofxOceanodeParameter() {
+        removeAllConnections();
+    };
 	
 	//Overrided
 	std::string getName() const { return parameter->getName();}

@@ -11,7 +11,6 @@
 
 #include "ofMain.h"
 
-class ofxOceanodeAbstractConnection;
 class ofxOceanodeNodeGui;
 class ofxOceanodeNodeModel;
 class ofxOceanodeContainer;
@@ -34,9 +33,6 @@ public:
     ofxOceanodeNodeModel& getNodeModel();
     
     ofColor getColor();
-    
-    void addOutputConnection(ofxOceanodeAbstractConnection* c);
-    void addInputConnection(ofxOceanodeAbstractConnection* c);
     
     void deleteSelf();
     void duplicateSelf(glm::vec2 posToDuplicate = glm::vec2(-1, -1));
@@ -65,16 +61,10 @@ public:
     bool getIsPersistent(){return isPersistent;};
     void setIsPersistent(bool p){isPersistent = p;};
     
-    bool checkHasInConnection(ofAbstractParameter &p);
-	
-    ofxOceanodeAbstractConnection* getInputConnectionForParameter(ofAbstractParameter& param);
-    ofxOceanodeAbstractConnection* getOutputConnectionForParameter(ofAbstractParameter& param);
-    
     void setActive(bool act);
     bool getActive(){return active;};
     
-    ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
-    ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteConnections;
+    ofEvent<void> deleteModule;
     ofEvent<glm::vec2> duplicateModule;
     
     shared_ptr<ofParameterGroup> getParameters();
@@ -84,11 +74,6 @@ private:
     std::unique_ptr<ofxOceanodeNodeGui> nodeGui;
 #endif
     
-    std::vector<ofxOceanodeAbstractConnection*> inConnections;
-    std::vector<ofxOceanodeAbstractConnection*> outConnections;
-    
-    ofEventListeners inConnectionsListeners;
-    ofEventListeners outConnectionsListeners;
     ofEventListeners nodeModelListeners;
     
     bool isPersistent;

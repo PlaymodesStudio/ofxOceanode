@@ -7,6 +7,12 @@
 
 #include "ofxOceanodeParameter.h"
 #include "ofMath.h"
+#include "ofxOceanodeConnection.h"
+
+void ofxOceanodeAbstractParameter::removeAllConnections(){
+    if(inConnection != nullptr) inConnection->deleteSelf();
+    for(auto c : outConnections) c->deleteSelf();
+};
 
 template<>
 ofxOceanodeParameter<float>::ofxOceanodeParameter(){

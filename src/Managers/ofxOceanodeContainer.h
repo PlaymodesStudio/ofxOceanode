@@ -57,14 +57,14 @@ public:
         return node;
     }
     
-    void destroyConnection(ofxOceanodeAbstractConnection* c);
-    
     template<typename Tsource, typename Tsink>
     ofxOceanodeAbstractConnection* connectConnection(ofxOceanodeParameter<Tsource>& source, ofxOceanodeParameter<Tsink>& sink, bool active = true){
         connections.push_back(move(make_unique<ofxOceanodeConnection<Tsource, Tsink>>(source, sink, active)));
-        parameterGroupNodesMap[source.getGroupHierarchyNames().front()]->addOutputConnection(connections.back().get());
-        parameterGroupNodesMap[sink.getGroupHierarchyNames().front()]->addInputConnection(connections.back().get());
-        return connections.back().get();
+        auto connectionRef = connections.back().get();
+        destroyConnectionListeners.push(connectionRef->destroyConnection.newListener([this, connectionRef](){
+            connections.erase(std::find_if(connections.begin(), connections.end(), [connectionRef](std::unique_ptr<ofxOceanodeAbstractConnection> const &c){return c.get() == connectionRef;}));
+        }));
+        return connectionRef;
     }
     ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter, bool active = true);
     ofxOceanodeAbstractConnection* createConnection(ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active = true);
@@ -128,7 +128,6 @@ public:
     string getCanvasID(){return canvasID;};
     
 private:
-    void temporalConnectionDestructor();
     
     //NodeModel;
     std::unordered_map<string, nodeContainerWithId> dynamicNodes;
