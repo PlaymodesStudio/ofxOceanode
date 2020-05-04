@@ -51,16 +51,18 @@ bool ofxOceanodeNodeGui::constructGui(){
     ImGui::SameLine(guiRect.width - 30);
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(220,220,220,255)));
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(ImColor(0, 0, 0,0)));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(ImColor(0, 0, 0,0)));
 
     if (ImGui::Button("x"))
     {
         ImGui::OpenPopup("Delete?");
     }
-    ImGui::PopStyleColor(2);
+    ImGui::PopStyleColor(4);
     
     if (ImGui::BeginPopupModal("Delete?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
     {
-        ImGui::Text("%s", ("Are you sure you want to delete.\n " + moduleName + "\n").c_str());
+        ImGui::Text("%s", (moduleName + "\n").c_str());
         ImGui::Separator();
         
         if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
