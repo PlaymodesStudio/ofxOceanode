@@ -7,6 +7,7 @@
 //
 
 #include "ofxOceanodeNodeModel.h"
+#include "ofxOceanodeTypesRegistry.h"
 
 ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name){
     parameters.setName(_name);
@@ -18,6 +19,11 @@ ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name)
 void ofxOceanodeNodeModel::setNumIdentifier(unsigned int num){
     numIdentifier = num;
     parameters.setName(nameIdentifier + " " + ofToString(num));
+}
+
+shared_ptr<ofxOceanodeAbstractParameter> ofxOceanodeNodeModel::addParameter(ofAbstractParameter& p, ofxOceanodeParameterFlags flags){
+    parameters.add(*ofxOceanodeTypesRegistry::getInstance().createOceanodeAbstractFromAbstract(p));
+    return dynamic_pointer_cast<ofxOceanodeAbstractParameter>(*(parameters.end()-1));
 }
 
 //parameterInfo& ofxOceanodeNodeModel::addParameterToGroupAndInfo(ofAbstractParameter& p){

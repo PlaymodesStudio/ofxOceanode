@@ -25,3 +25,11 @@ ofxOceanodeAbstractConnection* ofxOceanodeTypesRegistry::createCustomTypeConnect
     }
     return nullptr;
 }
+
+shared_ptr<ofxOceanodeAbstractParameter> ofxOceanodeTypesRegistry::createOceanodeAbstractFromAbstract(ofAbstractParameter &p){
+    for(auto functionForType : absParamColector){
+        auto param = functionForType(p);
+        if(param != nullptr) return param;
+    }
+    return nullptr;
+}

@@ -14,9 +14,15 @@
 class ofxOceanodeTypesRegistry{
 public:
     using registryCreator   = std::function<ofxOceanodeAbstractConnection*(ofxOceanodeContainer &container, ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active)>;
+    using absParamCreator   = std::function<shared_ptr<ofxOceanodeAbstractParameter> (ofAbstractParameter &p)>;
     
     ofxOceanodeTypesRegistry();
     ~ofxOceanodeTypesRegistry(){};
+    
+    static ofxOceanodeTypesRegistry &getInstance(){
+        static ofxOceanodeTypesRegistry instance;
+        return instance;
+    }
     
     template<typename T>
     void registerType(){
@@ -29,12 +35,25 @@ public:
             };
         
         registryColector.push_back(std::move(creator));
+        
+        absParamCreator aPCreator = [](ofAbstractParameter &p) -> shared_ptr<ofxOceanodeAbstractParameter>{
+            if(p.valueType() == typeid(T).name()){
+                auto oceaParam = make_shared<ofxOceanodeParameter<T>>();
+                oceaParam->bindParameter(p.cast<T>());
+                return oceaParam;
+            }
+            return nullptr;
+        };
+        
+        absParamColector.push_back(std::move(aPCreator));
     }
 	
     ofxOceanodeAbstractConnection* createCustomTypeConnection(ofxOceanodeContainer &container, ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active = true);
+    shared_ptr<ofxOceanodeAbstractParameter> createOceanodeAbstractFromAbstract(ofAbstractParameter &p);
     
 private:
     vector<registryCreator> registryColector;
+    vector<absParamCreator> absParamColector;
 };
 
 #endif /* ofxOceanodeTypesRegistry_h */
