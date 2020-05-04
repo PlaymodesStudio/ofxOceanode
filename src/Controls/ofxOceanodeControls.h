@@ -14,10 +14,12 @@
 #include "ofxOceanodeBaseController.h"
 
 class ofxOceanodeContainer;
+class ofxOceanodeCanvas;
 
 class ofxOceanodeControls{
 public:
-    ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _container);
+
+    ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _container,ofxOceanodeCanvas* _canvas);
     ~ofxOceanodeControls(){};
     
     void draw();
@@ -42,9 +44,7 @@ public:
     
 private:
     std::shared_ptr<ofxOceanodeContainer> container;
-    
     ofEventListeners listeners;
-    
     vector<shared_ptr<ofxOceanodeBaseController>> controllers;
 };
 

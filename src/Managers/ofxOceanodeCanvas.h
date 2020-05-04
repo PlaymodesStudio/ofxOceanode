@@ -30,6 +30,11 @@ public:
     
     string getUniqueID(){return uniqueID;};
     
+    glm::vec2 getScrolling(){return scrolling;};
+    glm::vec2 getScrollingOffset(){return scrollingOffset;};
+    glm::vec2 getOffsetToCenter(){return offsetToCenter;};
+    void setScrolling(glm::vec2 o){scrolling = o;}
+    
 private:
     glm::vec3 getMatrixScale(const glm::mat4 &m);
     glm::mat4 translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector);
@@ -71,6 +76,7 @@ private:
     
     glm::vec2 scrolling = glm::vec2(0.0f, 0.0f);
     glm::vec2 scrollingOffset = glm::vec2(0.0f, 0.0f);
+    glm::vec2 offsetToCenter = glm::vec2(0.0f, 0.0f);
     bool show_grid = true;
     
     string node_selected = "";

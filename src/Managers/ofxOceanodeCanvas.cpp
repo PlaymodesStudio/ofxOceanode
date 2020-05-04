@@ -56,7 +56,7 @@ void ofxOceanodeCanvas::draw(bool *open){
         const ImVec2 NODE_WINDOW_PADDING(8.0f, 7.0f);
         
         // Create our child canvas
-        
+        offsetToCenter = glm::vec2(int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
         ImGui::Text("[%d,%d]",int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
 
         ImGui::SameLine(ImGui::GetContentRegionAvail().x-20.0f);

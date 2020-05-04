@@ -340,7 +340,9 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
                 }
             }
         }
+        parameterGroupNodesMap.clear();
         dynamicNodes.clear();
+
     }
     
     json.clear();
@@ -1203,6 +1205,23 @@ vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules(){
     }
     return modulesToCopy;
 }
+
+vector<ofxOceanodeNode*> ofxOceanodeContainer::getAllModules(){
+    vector<ofxOceanodeNode*> modulesToCopy;
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second)
+        {
+            modulesToCopy.push_back(node.second.get());
+        }
+    }
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            modulesToCopy.push_back(node.second.get());
+        }
+    }
+    return modulesToCopy;
+}
+
 
 bool ofxOceanodeContainer::copySelectedModulesWithConnections(){
     vector<ofxOceanodeNode*> modulesToCopy = getSelectedModules();
