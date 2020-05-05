@@ -17,6 +17,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "ofxOceanodeShared.h"
+#include "ofxOceanodeParameter.h"
 
 void ofxOceanodeCanvas::setup(string _uid, string _pid){
     transformationMatrix = &container->getTransformationMatrix();
@@ -257,8 +258,8 @@ void ofxOceanodeCanvas::draw(bool *open){
                 int NODE_BULLET_MAX_SIZE = 10;
                 int NODE_BULLET_GROW_DIST = 10;
                 
-                //TODO: Review press/release detection, better use ImGui::InvisibeButton()?
-                for (auto &param : *node->getParameters().get()){
+                for (auto &absParam : node->getParameters()){
+					auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
                     //TODO: Check if parameter is plugable
                     auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
                     //TODO: only grow bulllets that the temporal connection is plugable to.
@@ -269,11 +270,11 @@ void ofxOceanodeCanvas::draw(bool *open){
                         connectionIsDoable = true;
                         if(ImGui::IsMouseClicked(0)){
                             isCreatingConnection = true;
-                            auto inConnection = node->getInputConnectionForParameter(*param);
-                            if(inConnection != nullptr){ //Parmaeter has sink connected
+                            if(param->hasInConnection()){ //Parmaeter has sink connected
+                                auto inConnection = param->getInConnection();
                                 tempSourceParameter = &inConnection->getSourceParameter();
                                 if(!ImGui::GetIO().KeyAlt){
-                                    container->destroyConnection(inConnection);
+                                    inConnection->deleteSelf();
                                 }
                             }else{
                                 tempSinkParameter = param.get();
@@ -287,8 +288,9 @@ void ofxOceanodeCanvas::draw(bool *open){
                             else if(tempSourceParameter != nullptr){
                                 if(tempSourceParameter != param.get()){ //Is the same parameter, no conection between them
                                     //Remove previous connection connected to that parameter.
-                                    auto inConnection = node->getInputConnectionForParameter(*param);
-                                    if(inConnection != nullptr) container->destroyConnection(inConnection);
+                                    if(param->hasInConnection()){
+                                        param->getInConnection()->deleteSelf();
+                                    }
                                     container->createConnection(*tempSourceParameter, *param);
                                 }
                                 else{
@@ -299,7 +301,8 @@ void ofxOceanodeCanvas::draw(bool *open){
                         }
                     }
                 }
-                for (auto &param : *node->getParameters().get()){
+                for (auto &absParam : node->getParameters()){
+					auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
                     //TODO: Check if parameter is plugable
                     auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
                     //TODO: only grow bulllets that the temporal connection is plugable to.
@@ -528,13 +531,13 @@ void ofxOceanodeCanvas::draw(bool *open){
             isCreatingConnection = false;
         }
         
-        auto getSourceConnectionPositionFromParameter = [this](ofAbstractParameter& param) -> glm::vec2{
+        auto getSourceConnectionPositionFromParameter = [this](ofxOceanodeAbstractParameter& param) -> glm::vec2{
             if(container->getParameterGroupNodesMap().count(param.getGroupHierarchyNames().front())){
                 return container->getParameterGroupNodesMap().at(param.getGroupHierarchyNames().front())->getNodeGui().getSourceConnectionPositionFromParameter(param);
             }
             //TODO: Throw exception
         };
-        auto getSinkConnectionPositionFromParameter = [this](ofAbstractParameter& param) -> glm::vec2{
+        auto getSinkConnectionPositionFromParameter = [this](ofxOceanodeAbstractParameter& param) -> glm::vec2{
             if(container->getParameterGroupNodesMap().count(param.getGroupHierarchyNames().front())){
                 return container->getParameterGroupNodesMap().at(param.getGroupHierarchyNames().front())->getNodeGui().getSinkConnectionPositionFromParameter(param);
             }

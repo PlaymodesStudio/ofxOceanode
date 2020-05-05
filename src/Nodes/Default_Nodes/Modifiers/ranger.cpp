@@ -12,12 +12,12 @@ float maxRange =  10000.000;
 
 void ranger::setup(){
     color = ofColor::white;
-    parameters->add(input.set("Input", {0}, {minRange}, {maxRange}));
-    parameters->add(minInput.set("Min In", {0}, {minRange}, {maxRange}));
-    parameters->add(maxInput.set("Max In", {1}, {minRange}, {maxRange}));
-    parameters->add(minOutput.set("Min Out", {0}, {minRange}, {maxRange}));
-    parameters->add(maxOutput.set("Max Out", {1}, {minRange}, {maxRange}));
-    addOutputParameterToGroupAndInfo(output.set("Output", {0}, {minRange}, {maxRange}));
+    addParameter(input.set("Input", {0}, {minRange}, {maxRange}));
+    addParameter(minInput.set("Min In", {0}, {minRange}, {maxRange}));
+    addParameter(maxInput.set("Max In", {1}, {minRange}, {maxRange}));
+    addParameter(minOutput.set("Min Out", {0}, {minRange}, {maxRange}));
+    addParameter(maxOutput.set("Max Out", {1}, {minRange}, {maxRange}));
+    addOutputParameter(output.set("Output", {0}, {minRange}, {maxRange}));
     
     
     listeners.push(input.newListener([&](vector<float> &vf){

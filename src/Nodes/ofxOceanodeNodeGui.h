@@ -12,6 +12,7 @@
 
 class ofxOceanodeContainer;
 class ofxOceanodeNode;
+class ofxOceanodeAbstractParameter;
 
 #include "ofEvents.h"
 #include "ofParameterGroup.h"
@@ -32,14 +33,12 @@ public:
     void setPosition(glm::vec2 position);
     void setSize(glm::vec2 size);
     
-    shared_ptr<ofParameterGroup> getParameters();
+    ofParameterGroup &getParameters();
     glm::vec2 getPosition();
     ofRectangle getRectangle();
     
     void enable();
     void disable();
-    
-    void duplicate();
     
     ofColor getColor(){return color;};
     
@@ -48,8 +47,8 @@ public:
     void setSelected(bool b){selected = b;};
     bool getSelected(){return selected;};
     
-    glm::vec2 getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter);
-    glm::vec2 getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter);
+    glm::vec2 getSourceConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter);
+    glm::vec2 getSinkConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter);
     
 #ifdef OFXOCEANODE_USE_MIDI
     void setIsListeningMidi(bool b){isListeningMidi = b;};

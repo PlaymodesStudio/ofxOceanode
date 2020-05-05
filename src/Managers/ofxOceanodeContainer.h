@@ -57,18 +57,17 @@ public:
         return node;
     }
     
-    ofxOceanodeAbstractConnection* createConnection(ofAbstractParameter& p, ofxOceanodeNode& n);
-    void destroyConnection(ofxOceanodeAbstractConnection* c);
-    
     template<typename Tsource, typename Tsink>
-    ofxOceanodeAbstractConnection* connectConnection(ofParameter<Tsource>& source, ofParameter<Tsink>& sink, bool active = true){
+    ofxOceanodeAbstractConnection* connectConnection(ofxOceanodeParameter<Tsource>& source, ofxOceanodeParameter<Tsink>& sink, bool active = true){
         connections.push_back(move(make_unique<ofxOceanodeConnection<Tsource, Tsink>>(source, sink, active)));
-        parameterGroupNodesMap[source.getGroupHierarchyNames().front()]->addOutputConnection(connections.back().get());
-        parameterGroupNodesMap[sink.getGroupHierarchyNames().front()]->addInputConnection(connections.back().get());
-        return connections.back().get();
+        auto connectionRef = connections.back().get();
+        destroyConnectionListeners.push(connectionRef->destroyConnection.newListener([this, connectionRef](){
+            connections.erase(std::find_if(connections.begin(), connections.end(), [connectionRef](std::unique_ptr<ofxOceanodeAbstractConnection> const &c){return c.get() == connectionRef;}));
+        }));
+        return connectionRef;
     }
     ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter, bool active = true);
-    ofxOceanodeAbstractConnection* createConnection(ofAbstractParameter &source, ofAbstractParameter &sink, bool active = true);
+    ofxOceanodeAbstractConnection* createConnection(ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active = true);
     
     shared_ptr<ofxOceanodeNodeRegistry> getRegistry(){return registry;};
     shared_ptr<ofxOceanodeTypesRegistry> getTypesRegistry(){return typesRegistry;};
@@ -101,8 +100,8 @@ public:
     
 #ifdef OFXOCEANODE_USE_MIDI
     void setIsListeningMidi(bool b);
-    shared_ptr<ofxOceanodeAbstractMidiBinding> createMidiBinding(ofAbstractParameter &p, bool isPersistent = false, int _id = -1);
-    bool removeLastMidiBinding(ofAbstractParameter &p);
+    shared_ptr<ofxOceanodeAbstractMidiBinding> createMidiBinding(ofxOceanodeAbstractParameter &p, bool isPersistent = false, int _id = -1);
+    bool removeLastMidiBinding(ofxOceanodeAbstractParameter &p);
     shared_ptr<ofxOceanodeAbstractMidiBinding> createMidiBindingFromInfo(string module, string parameter, bool isPersistent = false, int _id = -1);
     vector<string> getMidiDevices(){return midiInPortList;};
     void addNewMidiMessageListener(ofxMidiListener* listener);
@@ -130,7 +129,6 @@ public:
     string getCanvasID(){return canvasID;};
     
 private:
-    void temporalConnectionDestructor();
     
     //NodeModel;
     std::unordered_map<string, nodeContainerWithId> dynamicNodes;
@@ -143,7 +141,6 @@ private:
     std::shared_ptr<ofxOceanodeTypesRegistry>   typesRegistry;
     
     ofEventListeners destroyNodeListeners;
-    ofEventListeners duplicateNodeListeners;
     ofEventListeners destroyConnectionListeners;
     
     ofParameter<glm::mat4> transformationMatrix;

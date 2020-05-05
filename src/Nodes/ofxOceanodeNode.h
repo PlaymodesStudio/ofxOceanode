@@ -11,11 +11,10 @@
 
 #include "ofMain.h"
 
-class ofxOceanodeAbstractConnection;
 class ofxOceanodeNodeGui;
 class ofxOceanodeNodeModel;
 class ofxOceanodeContainer;
-class parameterInfo;
+class ofxOceanodeAbstractParameter;
 
 class ofxOceanodeNode {
 public:
@@ -35,11 +34,7 @@ public:
     
     ofColor getColor();
     
-    void addOutputConnection(ofxOceanodeAbstractConnection* c);
-    void addInputConnection(ofxOceanodeAbstractConnection* c);
-    
     void deleteSelf();
-    void duplicateSelf(glm::vec2 posToDuplicate = glm::vec2(-1, -1));
     
     bool loadPreset(string presetFolderPath);
     void savePreset(string presetFolderPath);
@@ -51,7 +46,7 @@ public:
     void presetHasLoaded();
     void loadPresetBeforeConnections(string presetFolderPath);
     
-    void deserializeParameter(ofJson &json, ofAbstractParameter &p, bool persistentPreset = false);
+    void deserializeParameter(ofJson &json, ofxOceanodeAbstractParameter &p, bool persistentPreset = false);
     
     bool loadConfig(string filename, bool persistentPreset = false);
     void saveConfig(string filename, bool persistentPreset = false);
@@ -65,32 +60,18 @@ public:
     bool getIsPersistent(){return isPersistent;};
     void setIsPersistent(bool p){isPersistent = p;};
     
-    bool checkHasInConnection(ofAbstractParameter &p);
-    
-    const parameterInfo& getParameterInfo(ofAbstractParameter &p);
-    
-    ofxOceanodeAbstractConnection* getInputConnectionForParameter(ofAbstractParameter& param);
-    ofxOceanodeAbstractConnection* getOutputConnectionForParameter(ofAbstractParameter& param);
-    
     void setActive(bool act);
     bool getActive(){return active;};
     
-    ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteModuleAndConnections;
-    ofEvent<vector<ofxOceanodeAbstractConnection*>> deleteConnections;
-    ofEvent<glm::vec2> duplicateModule;
+    ofEvent<void> deleteModule;
     
-    shared_ptr<ofParameterGroup> getParameters();
+    ofParameterGroup& getParameters();
 private:
     std::unique_ptr<ofxOceanodeNodeModel> nodeModel;
 #ifndef OFXOCEANODE_HEADLESS
     std::unique_ptr<ofxOceanodeNodeGui> nodeGui;
 #endif
     
-    std::vector<ofxOceanodeAbstractConnection*> inConnections;
-    std::vector<ofxOceanodeAbstractConnection*> outConnections;
-    
-    ofEventListeners inConnectionsListeners;
-    ofEventListeners outConnectionsListeners;
     ofEventListeners nodeModelListeners;
     
     bool isPersistent;

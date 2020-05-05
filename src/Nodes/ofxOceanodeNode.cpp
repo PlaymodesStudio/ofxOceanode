@@ -14,22 +14,7 @@
 #include "ofxOceanodeNodeGui.h"
 #endif
 
-ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){
-    nodeModelListeners.push(nodeModel->disconnectConnectionsForParameter.newListener([&](string &parameter){
-        vector<ofxOceanodeAbstractConnection*> toDeleteConnections;
-        //TODO: Change with find_if
-        for(auto c : inConnections){
-            if(c->getSinkParameter().getName() == parameter) toDeleteConnections.push_back(c);
-        }
-        for(auto c : outConnections){
-            if(c->getSourceParameter().getName() == parameter) toDeleteConnections.push_back(c);
-        }
-        ofNotifyEvent(deleteConnections, toDeleteConnections);
-    }));
-    nodeModelListeners.push(nodeModel->deserializeParameterEvent.newListener([this](std::pair<ofJson, string> pair){
-        deserializeParameter(pair.first, getParameters()->get(pair.second));
-    }));
-}
+ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){}
 
 ofxOceanodeNode::~ofxOceanodeNode(){
     
@@ -70,33 +55,8 @@ ofColor ofxOceanodeNode::getColor(){
     return nodeModel->getColor();
 }
 
-void ofxOceanodeNode::addOutputConnection(ofxOceanodeAbstractConnection* c){
-    outConnections.push_back(c);
-    outConnectionsListeners.push(c->destroyConnection.newListener([&, c](){
-        outConnections.erase(std::remove(outConnections.begin(), outConnections.end(), c));
-    }));
-}
-
-void ofxOceanodeNode::addInputConnection(ofxOceanodeAbstractConnection* c){
-    inConnections.push_back(c);
-    inConnectionsListeners.push(c->destroyConnection.newListener([&, c](){
-        inConnections.erase(std::remove(inConnections.begin(), inConnections.end(), c));
-    }));
-}
-
 void ofxOceanodeNode::deleteSelf(){
-    inConnections.insert(inConnections.end(), outConnections.begin(), outConnections.end());
-    ofNotifyEvent(deleteModuleAndConnections, inConnections);
-}
-
-void ofxOceanodeNode::duplicateSelf(glm::vec2 posToDuplicate){
-#ifndef OFXOCEANODE_HEADLESS
-    if(posToDuplicate == glm::vec2(-1, -1)){
-        posToDuplicate = toGlm(nodeGui->getPosition() + ofPoint(10, 10));
-    }
-#endif
-    saveConfig("tempDuplicateGroup.json");
-    ofNotifyEvent(duplicateModule, posToDuplicate);
+    ofNotifyEvent(deleteModule);
 }
 
 bool ofxOceanodeNode::loadPreset(string presetFolderPath){
@@ -147,13 +107,14 @@ bool ofxOceanodeNode::loadConfig(string filename, bool persistentPreset){
         nodeModel->loadCustomPersistent(json);
     
     //Hack Put all faders to 0;
-    if(getParameters()->contains("Fader")){
-        if(getParameters()->get("Fader").type() == typeid(ofParameter<float>()).name()){
-            getParameters()->getFloat("Fader") = 0;
-        }else{
-            getParameters()->get<vector<float>>("Fader") = {0};
-        }
-    }
+	//TODO: Review hack
+//    if(getParameters().contains("Fader")){
+//        if(getParameters().get("Fader").type() == typeid(ofParameter<float>()).name()){
+//            getParameters().getFloat("Fader") = 0;
+//        }else{
+//            getParameters().get<vector<float>>("Fader") = {0};
+//        }
+//    }
     
     nodeModel->presetRecallBeforeSettingParameters(json);
     loadParametersFromJson(json, persistentPreset);
@@ -170,80 +131,56 @@ void ofxOceanodeNode::saveConfig(string filename, bool persistentPreset){
 
 ofJson ofxOceanodeNode::saveParametersToJson(bool persistentPreset){
     ofJson json;
-    for(int i = 0; i < getParameters()->size(); i++){
-        ofAbstractParameter& p = getParameters()->get(i);
-        if((!persistentPreset && nodeModel->getParameterInfo(p).isSavePreset) || (persistentPreset && nodeModel->getParameterInfo(p).isSaveProject)){
-            if(p.type() == typeid(ofParameter<float>).name()){
-                ofSerialize(json, p);
-            }else if(p.type() == typeid(ofParameter<int>).name()){
-                ofSerialize(json, p);
-            }
-            else if(p.type() == typeid(ofParameter<bool>).name()){
-                ofSerialize(json, p);
-            }
-            else if(p.type() == typeid(ofParameter<ofColor>).name()){
-                ofSerialize(json, p);
-            }
-            else if(p.type() == typeid(ofParameter<string>).name()){
-                ofSerialize(json, p);
-            }
-            else if(p.type() == typeid(ofParameter<vector<float>>).name()){
-                auto vecF = p.cast<vector<float>>().get();
+    for(int i = 0; i < getParameters().size(); i++){
+        ofxOceanodeAbstractParameter& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
+        if((!persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) || (persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject))){
+            if(p.valueType() == typeid(vector<float>).name()){
+                auto vecF = p.cast<vector<float>>().getParameter().get();
                 if(vecF.size() == 1){
                     json[p.getEscapedName()] = vecF[0];
                 }
             }
-            else if(p.type() == typeid(ofParameter<vector<int>>).name()){
-                auto vecI = p.cast<vector<int>>().get();
+            else if(p.type() == typeid(vector<int>).name()){
+                auto vecI = p.cast<vector<int>>().getParameter().get();
                 if(vecI.size() == 1){
                     json[p.getEscapedName()] = vecI[0];
                 }
-            }
+			}else{
+				 ofSerialize(json, p);
+			}
         }
     }
     return json;
 }
 bool ofxOceanodeNode::loadParametersFromJson(ofJson json, bool persistentPreset){
     for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
-        if(getParameters()->contains(it.key())){
-            ofAbstractParameter& p = getParameters()->get(it.key());
+        if(getParameters().contains(it.key())){
+            ofxOceanodeAbstractParameter& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(it.key()));
             deserializeParameter(json, p, persistentPreset);
         }
     }
     return true;
 }
 
-void ofxOceanodeNode::deserializeParameter(ofJson &json, ofAbstractParameter &p, bool persistentPreset){
-    if((((!persistentPreset && nodeModel->getParameterInfo(p).isSavePreset) || (persistentPreset && nodeModel->getParameterInfo(p).isSaveProject))) && json.count(p.getEscapedName()) && !checkHasInConnection(p)){
-        if(p.type() == typeid(ofParameter<float>).name()){
-            ofDeserialize(json, p);
-        }else if(p.type() == typeid(ofParameter<int>).name()){
-            ofDeserialize(json, p);
-        }
-        else if(p.type() == typeid(ofParameter<bool>).name()){
-            ofDeserialize(json, p);
-        }
-        else if(p.type() == typeid(ofParameter<ofColor>).name()){
-            ofDeserialize(json, p);
-        }
-        else if(p.type() == typeid(ofParameter<string>).name()){
-            ofDeserialize(json, p);
-        }
-        else if(p.type() == typeid(ofParameter<vector<float>>).name()){
+void ofxOceanodeNode::deserializeParameter(ofJson &json, ofxOceanodeAbstractParameter &p, bool persistentPreset){
+    if((((!persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) || (persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject)))) && json.count(p.getEscapedName()) && !p.hasInConnection()){
+        if(p.valueType() == typeid(vector<float>).name()){
             float value = 0;
             if(json[p.getEscapedName()].is_string()){
-                p.cast<vector<float>>() = vector<float>(1, ofToFloat(json[p.getEscapedName()]));
+				p.cast<vector<float>>().getParameter() = vector<float>(1, ofToFloat(json[p.getEscapedName()]));
             }else{
-                p.cast<vector<float>>() = vector<float>(1, float(json[p.getEscapedName()]));
+                p.cast<vector<float>>().getParameter() = vector<float>(1, float(json[p.getEscapedName()]));
             }
         }
-        else if(p.type() == typeid(ofParameter<vector<int>>).name()){
+        else if(p.valueType() == typeid(vector<int>).name()){
             if(json[p.getEscapedName()].is_string()){
-                p.cast<vector<int>>() = vector<int>(1, ofToInt(json[p.getEscapedName()]));
+                p.cast<vector<int>>().getParameter() = vector<int>(1, ofToInt(json[p.getEscapedName()]));
             }else{
-                p.cast<vector<int>>() = vector<int>(1, int(json[p.getEscapedName()]));
+                p.cast<vector<int>>().getParameter() = vector<int>(1, int(json[p.getEscapedName()]));
             }
-        }
+		}else{
+			ofDeserialize(json, p);
+		}
     }
 }
 
@@ -255,42 +192,7 @@ void ofxOceanodeNode::resetPhase(){
     nodeModel->resetPhase();
 }
 
-bool ofxOceanodeNode::checkHasInConnection(ofAbstractParameter &p){
-    for(auto &c : inConnections){
-        if(&c->getSinkParameter() == &p){
-            return true;
-        }
-    }
-    return false;
-}
-
-ofxOceanodeAbstractConnection* ofxOceanodeNode::getInputConnectionForParameter(ofAbstractParameter& param){
-    auto findPos = std::find_if(inConnections.begin(), inConnections.end(), [&param](ofxOceanodeAbstractConnection *c){
-        return
-        &c->getSinkParameter() == &param;
-    });
-    if(findPos != inConnections.end()){
-        return *findPos;
-    }
-    return nullptr;
-}
-
-ofxOceanodeAbstractConnection* ofxOceanodeNode::getOutputConnectionForParameter(ofAbstractParameter& param){
-    auto findPos = std::find_if(outConnections.begin(), outConnections.end(), [&param](ofxOceanodeAbstractConnection *c){
-        return
-        &c->getSinkParameter() == &param;
-    });
-    if(findPos != outConnections.end()){
-        return *findPos;
-    }
-    return nullptr;
-}
-
-const parameterInfo& ofxOceanodeNode::getParameterInfo(ofAbstractParameter &p){
-    return nodeModel->getParameterInfo(p);
-}
-
-shared_ptr<ofParameterGroup> ofxOceanodeNode::getParameters(){
+ofParameterGroup& ofxOceanodeNode::getParameters(){
     return nodeModel->getParameterGroup();
 }
 

@@ -18,7 +18,7 @@ public:
     ~simpleNumberGenerator(){};
     
     void setup(){
-        parameters->add(value.set("Value", 0, 0, 1));
+        addParameter(value.set("Value", 0, 0, 1));
     }
     
     void update(ofEventArgs &a){

@@ -12,6 +12,7 @@
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxImGuiSimple.h"
+#include "ofxOceanodeParameter.h"
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node) : container(_container), node(_node){
     color = node.getColor();
@@ -32,20 +33,19 @@ ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
 }
 
 bool ofxOceanodeNodeGui::constructGui(){
-    string moduleName = getParameters()->getName();
+    string moduleName = getParameters().getName();
     ImGui::BeginGroup(); // Lock horizontal position
     
     bool deleteModule = false;
     
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
-
+    
     if(ImGui::ArrowButton("expand", expanded ? ImGuiDir_Down : ImGuiDir_Right)){
         expanded = !expanded;
     }
     ImGui::PopStyleColor();
     
     ImGui::SameLine();
-//    ImGui::SameLine(0, 10);
     ImGui::Text("%s", moduleName.c_str());
     
     ImGui::SameLine(guiRect.width - 30);
@@ -76,176 +76,313 @@ bool ofxOceanodeNodeGui::constructGui(){
     }
     
     if(expanded){
-    
+        
         ImGui::Spacing();
         
         auto startPos = ImGui::GetCursorScreenPos();
         
-        for(int i=0 ; i<getParameters()->size(); i++){
-            ofAbstractParameter &absParam = getParameters()->get(i);
+        for(int i=0 ; i<getParameters().size(); i++){
+            ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
             string uniqueId = absParam.getName();
-            ImGui::Text("%s", uniqueId.c_str());
-            ImGui::SameLine(ImGui::GetItemRectMin().x - startPos.x + 50);
-            
-            string hiddenUniqueId = "##" + uniqueId;
-            ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()));
-            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()));
-            ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()));
-            ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(node.getColor()*.25f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
-
-            ImGui::SetNextItemWidth(150);
-            
-            if(absParam.type() == typeid(ofParameter<float>).name()){
-                auto tempCast = absParam.cast<float>();
-                if(tempCast.getMin() == FLT_MIN || tempCast.getMax() == FLT_MAX){
-                    ImGui::DragFloat(hiddenUniqueId.c_str(), (float *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax());
-                }else{
-                    
-                    ImGui::SliderFloat(hiddenUniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax());
+            ImGui::PushID(uniqueId.c_str());
+            if(absParam.valueType() == typeid(std::function<void()>).name()){
+                absParam.cast<std::function<void()>>().getParameter().get()();
+            }else{
+                
+                ImGui::Text("%s", uniqueId.c_str());
+                
+                ImGui::SetItemAllowOverlap();
+                ImGui::SameLine(-1);
+                ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(51, ImGui::GetFrameHeight())); //Used to check later behaviours
+                
+                int drag = 0;
+                bool resetValue = false;
+                if(ImGui::IsItemActive() && ImGui::IsMouseDragging(0, 0.1f)){
+                    drag = ImGui::GetIO().MouseDelta.x;
                 }
-                //TODO: Implement better this hack
-                // Maybe discard and reset value when not presed enter??
-                if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()) ){
-                    tempCast = tempCast;
+                if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)){
+                    resetValue = true;
+                }else if(ImGui::IsItemClicked(1)){
+                    ImGui::OpenPopup("Param Popup");
                 }
-                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
-                    tempCast = tempCast;
-                }
-            }else if(absParam.type() == typeid(ofParameter<int>).name()){
-                auto tempCast = absParam.cast<int>();
-                if(node.getParameterInfo(tempCast).dropdownOptions.size() == 0){ //Int slider
-                    if(tempCast.getMin() == INT_MIN || tempCast.getMax() == INT_MAX){
-                        ImGui::DragInt(hiddenUniqueId.c_str(), (int *)&tempCast.get(), 1, tempCast.getMin(), tempCast.getMax());
+                
+                if(ImGui::BeginPopup("Param Popup")){
+                    ImGui::Separator();
+                    if(true){ //Param is not scoped
+                        if(ImGui::Selectable("Add to Scope")){
+                            
+                        }
                     }else{
-                        ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast.get(), tempCast.getMin(), tempCast.getMax());
+                        if(ImGui::Selectable("Remove from Scope")){
+                            
+                        }
                     }
-                    if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
+                    ImGui::Separator();
+                    if(true){ //Param is not timelined
+                        if(ImGui::Selectable("Add to Timeline")){
+                            
+                        }
+                    }else{
+                        if(ImGui::Selectable("Remove from Timeline")){
+                            
+                        }
+                    }
+#ifdef OFXOCEANODE_USE_MIDI
+                    ImGui::Separator();
+                    if(ImGui::Selectable("Bind MIDI")){
+                        container.createMidiBinding(absParam);
+                    }
+                    if(ImGui::Selectable("Unbind last MIDI")){
+                        container.removeLastMidiBinding(absParam);
+                    }
+#endif
+#ifdef OFXOCEANODE_USE_OSC
+                    ImGui::Separator();
+                    ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
+#endif
+                    ImGui::Separator();
+                    ImGui::EndPopup();
+                }
+                
+                
+                ImGui::SameLine(50);
+                ImGui::SetNextItemWidth(150);
+                
+                string hiddenUniqueId = "##" + uniqueId;
+                ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()*0.5f));
+                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()*0.5f));
+                ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()*0.5f));
+                ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(node.getColor()*.25f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
+                
+                // PARAM FLOAT
+                ///////////////
+                if(absParam.valueType() == typeid(float).name())
+                {
+                    auto tempCast = absParam.cast<float>().getParameter();
+                    
+                    if(drag != 0){
+                        if(ImGui::GetIO().KeyShift) absParam.cast<float>().applyPrecisionDrag(drag);
+                        else if(ImGui::GetIO().KeyAlt) absParam.cast<float>().applySpeedDrag(drag);
+                        else absParam.cast<float>().applyNormalDrag(drag);
+                    }
+                    
+                    if(resetValue){
+                        tempCast = absParam.cast<float>().getDefaultValue();
+                    }
+                    
+                    ImGui::SliderFloat(hiddenUniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax(), "%.4f");
+                    
+                    //TODO: Implement better this hack
+                    // Maybe discard and reset value when not presed enter??
+                    if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()) ){
                         tempCast = tempCast;
                     }
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast = tempCast;
                     }
-                }else{
-                    auto vector_getter = [](void* vec, int idx, const char** out_text)
+                }
+                // PARAM VECTOR < FLOAT >
+                /////////////////////////
+                else if(absParam.valueType() == typeid(vector<float>).name())
+                {
+                    auto tempCast = absParam.cast<vector<float>>().getParameter();
+                    if(tempCast->size() == 1)
                     {
-                        auto& vector = *static_cast<std::vector<std::string>*>(vec);
-                        if (idx < 0 || idx >= static_cast<int>(vector.size())) { return false; }
-                        *out_text = vector.at(idx).c_str();
-                        return true;
-                    };
+                        if(drag != 0){
+                            if(ImGui::GetIO().KeyShift) absParam.cast<vector<float>>().applyPrecisionDrag(drag);
+                            else if(ImGui::GetIO().KeyAlt) absParam.cast<vector<float>>().applySpeedDrag(drag);
+                            else absParam.cast<vector<float>>().applyNormalDrag(drag);
+                        }
+                        
+                        if(resetValue){
+                            tempCast = absParam.cast<vector<float>>().getDefaultValue();
+                        }
+                        
+                        ImGui::SliderFloat(hiddenUniqueId.c_str(),
+                                           (float *)&tempCast->at(0),
+                                           tempCast.getMin()[0],
+                                           tempCast.getMax()[0], "%.4f");
+                        
+                        if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
+                            tempCast = vector<float>(1, tempCast->at(0));
+                        }
+                    }else{
+                        ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
+                    }
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                        tempCast = tempCast;
+                    }
+                }
+                // PARAM INT
+                /////////////
+                else if(absParam.valueType() == typeid(int).name())
+                {
+                    auto tempCast = absParam.cast<int>().getParameter();
+                    if(absParam.cast<int>().getDropdownOptions().size() == 0)
+                    {
+                        if(drag != 0){
+                            if(ImGui::GetIO().KeyShift) absParam.cast<int>().applyPrecisionDrag(drag);
+                            else if(ImGui::GetIO().KeyAlt) absParam.cast<int>().applySpeedDrag(drag);
+                            else absParam.cast<int>().applyNormalDrag(drag);
+                        }
+                        
+                        if(resetValue){
+                            tempCast = absParam.cast<int>().getDefaultValue();
+                        }
+                        
+                        ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast.get(),tempCast.getMin(),tempCast.getMax());
+                        
+                        if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()))
+                            tempCast = tempCast;
+                        if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space)))
+                            tempCast = tempCast;
+                        
+                    }else{
+                        auto vector_getter = [](void* vec, int idx, const char** out_text)
+                        {
+                            auto& vector = *static_cast<std::vector<std::string>*>(vec);
+                            if (idx < 0 || idx >= static_cast<int>(vector.size())) { return false; }
+                            *out_text = vector.at(idx).c_str();
+                            return true;
+                        };
+                        
+                        vector<string> options = absParam.cast<int>().getDropdownOptions();
+                        if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.get(), vector_getter, static_cast<void*>(&options), options.size()))
+                            tempCast = tempCast;
+                        
+                        if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space)))
+                            tempCast = tempCast;
+                        
+                    }
+                }
+                // PARAM VECTOR < INT >
+                /////////////////////////
+                else if(absParam.valueType() == typeid(vector<int>).name())
+                {
+                    auto tempCast = absParam.cast<vector<int>>().getParameter();
+                    if(tempCast->size() == 1)
+                    {
+                        if(drag != 0){
+                            if(ImGui::GetIO().KeyShift) absParam.cast<vector<int>>().applyPrecisionDrag(drag);
+                            else if(ImGui::GetIO().KeyAlt) absParam.cast<vector<int>>().applySpeedDrag(drag);
+                            else absParam.cast<vector<int>>().applyNormalDrag(drag);
+                        }
+                        
+                        if(resetValue){
+                            tempCast = absParam.cast<vector<int>>().getDefaultValue();
+                        }
+                        
+                        ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast->at(0),tempCast.getMin()[0],tempCast.getMax()[0]);
+                        
+                        if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
+                            tempCast = vector<int>(1, tempCast->at(0));
+                        }
+                    }
+                    else{
+                        std::vector<float> floatVec(tempCast.get().begin(), tempCast.get().end());
+                        ImGui::PlotHistogram(hiddenUniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
+                    }
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space)))
+                        tempCast = tempCast;
+                }
+                // PARAM BOOL
+                /////////////
+                else if(absParam.valueType() == typeid(bool).name()){
+                    auto tempCast = absParam.cast<bool>().getParameter();
                     
-                    vector<string> options = node.getParameterInfo(tempCast).dropdownOptions;
-                    if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.get(), vector_getter, static_cast<void*>(&options), options.size())){
+                    if(drag != 0){
+                        absParam.cast<bool>().applyNormalDrag(drag);
+                    }
+                    
+                    if (ImGui::Checkbox(hiddenUniqueId.c_str(), (bool *)&tempCast.get()))
+                    {
+                        tempCast = tempCast;
+                    }
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                        tempCast = !tempCast;
+                    }
+                    // PARAM VOID
+                    /////////////
+                }else if(absParam.valueType() == typeid(void).name()){
+                    auto tempCast = absParam.cast<void>().getParameter();
+                    if (ImGui::Button(hiddenUniqueId.c_str(), ImVec2(ImGui::GetFrameHeight(), 0)))
+                    {
+                        tempCast.trigger();
+                    }
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                        tempCast.trigger();
+                    }
+                    // PARAM STRING
+                    ///////////////
+                }else if(absParam.valueType() == typeid(string).name()){
+                    auto tempCast = absParam.cast<string>().getParameter();
+                    char * cString = new char[256];
+                    strcpy(cString, tempCast.get().c_str());
+                    auto result = false;
+                    if (ImGui::InputText(hiddenUniqueId.c_str(), cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
+                    {
+                        tempCast = cString;
+                    }
+                    delete[] cString;
+                    // PARAM CHAR
+                    /////////////
+                }else if(absParam.valueType() == typeid(char).name()){
+                    ImGui::Text("%s", absParam.getName().c_str());
+                    // PARAM COLOR
+                    //////////////
+                }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
+                    auto tempCast = absParam.cast<ofColor>().getParameter();
+                    if(drag != 0){
+                        if(ImGui::GetIO().KeyShift) absParam.cast<ofColor>().applyPrecisionDrag(drag);
+                        else if(ImGui::GetIO().KeyAlt) absParam.cast<ofColor>().applySpeedDrag(drag);
+                        else absParam.cast<ofColor>().applyNormalDrag(drag);
+                    }
+                    
+                    ofFloatColor floatColor(tempCast.get());
+                    
+                    if (ImGui::ColorEdit3(hiddenUniqueId.c_str(), &floatColor.r))
+                    {
+                        tempCast = ofColor(floatColor);
+                    }
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                        tempCast = tempCast;
+                    }
+                    //PARAM FLOAT COLOR
+                    ///////////////////
+                }else if(absParam.valueType() == typeid(ofFloatColor).name()){
+                    auto tempCast = absParam.cast<ofFloatColor>().getParameter();
+                    
+                    if(drag != 0){
+                        if(ImGui::GetIO().KeyShift) absParam.cast<ofFloatColor>().applyPrecisionDrag(drag);
+                        else if(ImGui::GetIO().KeyAlt) absParam.cast<ofFloatColor>().applySpeedDrag(drag);
+                        else absParam.cast<ofFloatColor>().applyNormalDrag(drag);
+                    }
+                    
+                    if (ImGui::ColorEdit3(hiddenUniqueId.c_str(), (float*)&tempCast.get().r))
+                    {
                         tempCast = tempCast;
                     }
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast = tempCast;
                     }
                 }
-            }else if(absParam.type() == typeid(ofParameter<bool>).name()){
-                auto tempCast = absParam.cast<bool>();
-                if (ImGui::Checkbox(hiddenUniqueId.c_str(), (bool *)&tempCast.get()))
+                // UNKNOWN PARAM
+                ////////////////
+                else
                 {
-                    tempCast = tempCast;
+                    ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
                 }
-                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
-                    tempCast = !tempCast;
-                }
-            }else if(absParam.type() == typeid(ofParameter<void>).name()){
-                if (ImGui::Button(hiddenUniqueId.c_str(), ImVec2(ImGui::GetFrameHeight(), 0)))
-                {
-                    absParam.cast<void>().trigger();
-                }
-                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
-                    absParam.cast<void>().trigger();
-                }
-            }else if(absParam.type() == typeid(ofParameter<string>).name()){
-                auto tempCast = absParam.cast<string>();
-                char * cString = new char[256];
-                strcpy(cString, tempCast.get().c_str());
-                auto result = false;
-                if (ImGui::InputText(hiddenUniqueId.c_str(), cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
-                {
-                    tempCast = tempCast;
-                }
-                delete[] cString;
-            }else if(absParam.type() == typeid(ofParameter<char>).name()){
-                ImGui::Text("%s", absParam.getName().c_str());
-            }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
-                auto tempCast = absParam.cast<ofFloatColor>();
-                if (ImGui::ColorEdit4(hiddenUniqueId.c_str(), (float*)&tempCast.get().r))
-                {
-                    tempCast = tempCast;
-                }
-                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
-                    tempCast = tempCast;
-                }
-            }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
-                auto tempCast = absParam.cast<vector<float>>();
-                if(tempCast->size() == 1){
-                    if(tempCast.getMin()[0] == FLT_MIN || tempCast.getMax()[0] == FLT_MAX){
-                        ImGui::DragFloat(hiddenUniqueId.c_str(), (float *)&tempCast->at(0), 1, tempCast.getMin()[0], tempCast.getMax()[0]);
-                    }else{
-                        ImGui::SliderFloat(hiddenUniqueId.c_str(), (float *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]);
-                    }
-                    if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-                        tempCast = vector<float>(1, tempCast->at(0));
-                    }
-                }else{
-                    ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
-                }
-                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
-                    tempCast = tempCast;
-                }
-            }else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
-                auto tempCast = absParam.cast<vector<int>>();
-                if(tempCast->size() == 1){
-                    if(tempCast.getMin()[0] == INT_MIN || tempCast.getMax()[0] == INT_MAX){
-                        ImGui::DragInt(hiddenUniqueId.c_str(), (int *)&tempCast->at(0), 1, tempCast.getMin()[0], tempCast.getMax()[0]);
-                    }else{
-                        ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]);
-                    }
-                    if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-                        tempCast = vector<int>(1, tempCast->at(0));
-                    }
-                }else{
-                    std::vector<float> floatVec(tempCast.get().begin(), tempCast.get().end());
-                    ImGui::PlotHistogram(hiddenUniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
-                }
-                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
-                    tempCast = tempCast;
-                }
-            }else {
-                ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
+                inputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
+                outputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
+                
+                ImGui::PopStyleColor(6);
             }
-            inputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
-            outputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
-            
-//            if(ImGui::IsItemClicked(1)){
-//#ifdef OFXOCEANODE_USE_MIDI
-//                if(isListeningMidi){
-//                    if(ImGui::GetIO().KeyShift){
-//                        container.removeLastMidiBinding(absParam);
-//                    }else{
-//                        container.createMidiBinding(absParam);
-//                    }
-//                }
-//                else
-//#endif
-//                {
-//                    auto connection = node.parameterConnectionPress(container, absParam);
-//                }
-//            }else if(container.isOpenConnection() && ImGui::IsItemHovered() && !ImGui::IsMouseDown(1)){
-//                auto connection = node.parameterConnectionRelease(container, absParam);
-//            }
-            
-            ImGui::PopStyleColor(6);
-        }
-    }else{
-        
-    }
+            ImGui::PopID();
+        } //endFor
+    }else{}
+    
     ImGui::EndGroup();
     if(expanded){
         for(auto &inPos : inputPositions){
@@ -255,9 +392,9 @@ bool ofxOceanodeNodeGui::constructGui(){
             outPos.second.x = ImGui::GetItemRectMax().x;
         }
     }else{
-        auto numParams = getParameters()->size();
+        auto numParams = getParameters().size();
         for(int i=0 ; i < numParams; i++){
-            ofAbstractParameter &absParam = getParameters()->get(i);
+            ofAbstractParameter &absParam = getParameters().get(i);
             string uniqueId = absParam.getName();
             float yPos = numParams == 1 ? ImGui::GetItemRectSize().y / 2 : ImGui::GetItemRectSize().y * ((float)i/(numParams-1));
             inputPositions[uniqueId] = glm::vec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + yPos);
@@ -271,7 +408,7 @@ bool ofxOceanodeNodeGui::constructGui(){
     return true;
 }
 
-shared_ptr<ofParameterGroup> ofxOceanodeNodeGui::getParameters(){
+ofParameterGroup &ofxOceanodeNodeGui::getParameters(){
     return node.getParameters();
 }
 
@@ -292,22 +429,18 @@ ofRectangle ofxOceanodeNodeGui::getRectangle(){
 }
 
 void ofxOceanodeNodeGui::enable(){
-//    gui->setVisible(true);
+    //    gui->setVisible(true);
 }
 
 void ofxOceanodeNodeGui::disable(){
-//    gui->setVisible(false);
+    //    gui->setVisible(false);
 }
 
-void ofxOceanodeNodeGui::duplicate(){
-    node.duplicateSelf(getPosition());
-}
-
-glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofAbstractParameter& parameter){
+glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter){
     return outputPositions[parameter.getName()];
 }
 
-glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofAbstractParameter& parameter){
+glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter){
     return inputPositions[parameter.getName()];
 }
 

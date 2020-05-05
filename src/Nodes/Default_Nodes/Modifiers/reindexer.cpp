@@ -11,9 +11,9 @@
 
 void reindexer::setup(){
     color = ofColor::orange;
-    parameters->add(input.set("Input", {0}, {0}, {1}));
-    parameters->add(outputSize.set("Out Size", 10, 1, 100));
-    addOutputParameterToGroupAndInfo(output.set("Output", {0}, {0}, {1}));
+    addParameter(input.set("Input", {0}, {0}, {1}));
+    addParameter(outputSize.set("Out Size", 10, 1, 100));
+    addOutputParameter(output.set("Output", {0}, {0}, {1}));
     
     inputListenerEvent = input.newListener(this, &reindexer::inputListener);
     outputSizeListenerEvent = outputSize.newListener(this, &reindexer::outputSizeListener);

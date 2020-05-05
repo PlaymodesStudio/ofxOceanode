@@ -104,16 +104,6 @@ void ofxOceanodeContainer::draw(){
     }
 }
 
-void ofxOceanodeContainer::destroyConnection(ofxOceanodeAbstractConnection* connection){
-    //TODO: Change for find
-    for(auto &c : connections){
-        if(c.get() == connection){
-            connections.erase(std::remove(connections.begin(), connections.end(), c));
-            break;
-        }
-    }
-}
-
 ofxOceanodeNode* ofxOceanodeContainer::createNodeFromName(string name, int identifier, bool isPersistent){
     unique_ptr<ofxOceanodeNodeModel> type = registry->create(name);
     
@@ -150,77 +140,28 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     
     auto nodePtr = node.get();
     collection[nodeToBeCreatedName][toBeCreatedId] = std::move(node);
-    parameterGroupNodesMap[nodePtr->getParameters()->getEscapedName()] = nodePtr;
+    parameterGroupNodesMap[nodePtr->getParameters().getEscapedName()] = nodePtr;
     
     //Interaction listeners
-    destroyNodeListeners.push(nodePtr->deleteModuleAndConnections.newListener([this, nodeToBeCreatedName, toBeCreatedId, isPersistent](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
-        //for(auto &containerConnectionIterator = connections.begin(); containerConnectionIterator!= connections.end();){
-        //TODO: Change deletion with find
-        for(int i = 0; i < connections.size();){
-            bool foundConnection = false;
-            for(auto &nodeConnection : connectionsToBeDeleted){
-                //if(containerConnectionIterator->second.get() == nodeConnection){
-                if(connections[i].get() == nodeConnection){
-                    foundConnection = true;
-                    //connections.erase(containerConnectionIterator);
-                    connections.erase((connections.begin() + i));
-                    connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
-                    break;
-                }
-            }
-            if(!foundConnection){
-                //containerConnectionIterator++;
-                i++;
-            }
-        }
-        
+    destroyNodeListeners.push(nodePtr->deleteModule.newListener([this, nodeToBeCreatedName, toBeCreatedId, isPersistent](){
 #ifdef OFXOCEANODE_USE_MIDI
         if(!isPersistent){
-            for(auto &p : *dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters().get()){
-                while(removeLastMidiBinding(*p.get()));
+			for(int i = 0 ; i < dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters().size(); i++){
+				auto &p = dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters().get(i);
+                while(removeLastMidiBinding(static_cast<ofxOceanodeAbstractParameter &>(p)));
             }
         }
 #endif
         
         if(!isPersistent){
             //Delete Map
-            parameterGroupNodesMap.erase(dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters()->getEscapedName());
+            parameterGroupNodesMap.erase(dynamicNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters().getEscapedName());
             dynamicNodes[nodeToBeCreatedName].erase(toBeCreatedId);
         }else{
             //Delete Map
-            parameterGroupNodesMap.erase(persistentNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters()->getEscapedName());
+            parameterGroupNodesMap.erase(persistentNodes[nodeToBeCreatedName][toBeCreatedId]->getParameters().getEscapedName());
             persistentNodes[nodeToBeCreatedName].erase(toBeCreatedId);
         }
-    }));
-    
-    destroyNodeListeners.push(nodePtr->deleteConnections.newListener([this](vector<ofxOceanodeAbstractConnection*> connectionsToBeDeleted){
-        //TODO: Use this function in deleteModuleAndConnections function listener, with the use of find
-        for(auto containerConnectionIterator = connections.begin(); containerConnectionIterator!=connections.end();){
-            bool foundConnection = false;
-            for(auto nodeConnection : connectionsToBeDeleted){
-                if(containerConnectionIterator->get() == nodeConnection){
-                    foundConnection = true;
-                    connections.erase(containerConnectionIterator);
-                    connectionsToBeDeleted.erase(std::remove(connectionsToBeDeleted.begin(), connectionsToBeDeleted.end(), nodeConnection));
-                    break;
-                }
-            }
-            if(!foundConnection){
-                containerConnectionIterator++;
-            }
-        }
-    }));
-    
-    duplicateNodeListeners.push(nodePtr->duplicateModule.newListener([this, nodeToBeCreatedName, nodePtr](glm::vec2 pos){
-        auto newNode = createNodeFromName(nodeToBeCreatedName);
-#ifndef OFXOCEANODE_HEADLESS
-        newNode->getNodeGui().setPosition(pos);
-#endif
-        newNode->loadConfig("tempDuplicateGroup.json");
-        ofFile config("tempDuplicateGroup.json");
-        config.remove();
-        
-        //TODO: return a refrence to the node
     }));
     
     //Used in Macro
@@ -645,7 +586,7 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
     
     ofJson json;
     for(auto &node : nodes){
-        nodeAsParentNames.push_back(node->getParameters()->getEscapedName());
+        nodeAsParentNames.push_back(node->getParameters().getEscapedName());
         glm::vec2 pos(0,0);
 #ifndef OFXOCEANODE_HEADLESS
         pos = node->getNodeGui().getPosition();
@@ -654,6 +595,7 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
     }
     ofSavePrettyJson(presetFolderPath + "/modules.json", json);
     
+    //TODO: search for connections in each parameter of the node? instead of searching all connections? try performance
     json.clear();
     for(auto &connection : connections){
         if(!connection->getIsPersistent()){
@@ -917,21 +859,23 @@ void ofxOceanodeContainer::receiveOsc(){
 }
 
 void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
-    auto setParameterFromMidiMessage = [this](ofAbstractParameter& absParam, ofxOscMessage& m){
-        if(absParam.type() == typeid(ofParameter<float>).name()){
-            ofParameter<float> castedParam = absParam.cast<float>();
+	//Todo: Fix for ofxOceanodeParameter
+    auto setParameterFromMidiMessage = [this](ofAbstractParameter& _absParam, ofxOscMessage& m){
+		ofxOceanodeAbstractParameter& absParam = static_cast<ofxOceanodeAbstractParameter &>(_absParam);
+        if(absParam.valueType() == typeid(float).name()){
+            ofParameter<float> castedParam = absParam.cast<float>().getParameter();
             castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
-        }else if(absParam.type() == typeid(ofParameter<int>).name()){
-            ofParameter<int> castedParam = absParam.cast<int>();
+        }else if(absParam.valueType() == typeid(int).name()){
+            ofParameter<int> castedParam = absParam.cast<int>().getParameter();
             castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
-        }else if(absParam.type() == typeid(ofParameter<bool>).name()){
-            absParam.cast<bool>() = m.getArgAsBool(0);
-        }else if(absParam.type() == typeid(ofParameter<void>).name()){
-            absParam.cast<void>().trigger();
-        }else if(absParam.type() == typeid(ofParameter<string>).name()){
-            absParam.cast<string>() = m.getArgAsString(0);
-        }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
-            ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>();
+        }else if(absParam.valueType() == typeid(bool).name()){
+            absParam.cast<bool>().getParameter() = m.getArgAsBool(0);
+        }else if(absParam.valueType() == typeid(void).name()){
+            absParam.cast<void>().getParameter().trigger();
+        }else if(absParam.valueType() == typeid(string).name()){
+            absParam.cast<string>().getParameter() = m.getArgAsString(0);
+        }else if(absParam.valueType() == typeid(vector<float>).name()){
+            ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>().getParameter();
             if(m.getNumArgs() == 0){
                 castedParam = castedParam;;
             }else{
@@ -943,8 +887,8 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                 castedParam = tempVec;
             }
         }
-        else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
-            ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>();
+        else if(absParam.valueType() == typeid(vector<int>).name()){
+            ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>().getParameter();
             if(m.getNumArgs() == 0){
                 castedParam = castedParam;;
             }else{
@@ -965,22 +909,23 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
         }
     };
     
-    auto modulateParameterFromOscMessage = [this](ofAbstractParameter& absParam, ofxOscMessage& m){
-        if(absParam.type() == typeid(ofParameter<float>).name()){
-            ofParameter<float> castedParam = absParam.cast<float>();
+    auto modulateParameterFromOscMessage = [this](ofAbstractParameter& _absParam, ofxOscMessage& m){
+		ofxOceanodeAbstractParameter& absParam = static_cast<ofxOceanodeAbstractParameter &>(_absParam);
+        if(absParam.valueType() == typeid(float).name()){
+            ofParameter<float> castedParam = absParam.cast<float>().getParameter();
             castedParam = castedParam + m.getArgAsFloat(0);
-        }else if(absParam.type() == typeid(ofParameter<int>).name()){
-            ofParameter<int> castedParam = absParam.cast<int>();
+        }else if(absParam.valueType() == typeid(int).name()){
+            ofParameter<int> castedParam = absParam.cast<int>().getParameter();
             if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_FLOAT){
                 int range = castedParam.getMax() - castedParam.getMin();
                 castedParam += ofMap(m.getArgAsFloat(0), -1, 1, -range, range, false);
             }else{
                 castedParam += (castedParam+m.getArgAsInt(0));
             }
-        }else if(absParam.type() == typeid(ofParameter<bool>).name()){
-            absParam.cast<bool>() = !absParam.cast<bool>();
-        }else if(absParam.type() == typeid(ofParameter<vector<float>>).name()){
-            ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>();
+        }else if(absParam.valueType() == typeid(bool).name()){
+            absParam.cast<bool>().getParameter() = !absParam.cast<bool>().getParameter();
+        }else if(absParam.valueType() == typeid(vector<float>).name()){
+            ofParameter<vector<float>> castedParam = absParam.cast<vector<float>>().getParameter();
             if(castedParam->size() !=1) return;
             vector<float> tempVec;
             if(m.getNumArgs() == 1 && castedParam->size() != 1){
@@ -1000,8 +945,8 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             }
             castedParam = tempVec;
         }
-        else if(absParam.type() == typeid(ofParameter<vector<int>>).name()){
-            ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>();
+        else if(absParam.valueType() == typeid(vector<int>).name()){
+            ofParameter<vector<int>> castedParam = absParam.cast<vector<int>>().getParameter();
             if(castedParam->size() !=1) return;
             vector<int> tempVec;
             tempVec.resize(m.getNumArgs(), 0);
@@ -1070,9 +1015,9 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             for(auto &nodeType  : dynamicNodes){
                 for(auto &node : nodeType.second){
                     node.second->getNodeModel().receiveOscMessage(m);
-                    shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
-                    if(groupParam->contains(splitAddress[1])){
-                        ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
+                    ofParameterGroup& groupParam = node.second->getParameters();
+                    if(groupParam.contains(splitAddress[1])){
+                        ofAbstractParameter &absParam = groupParam.get(splitAddress[1]);
                         setParameterFromMidiMessage(absParam, m);
                     }
                 }
@@ -1080,9 +1025,9 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             for(auto &nodeType  : persistentNodes){
                 for(auto &node : nodeType.second){
                     node.second->getNodeModel().receiveOscMessage(m);
-                    shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
-                    if(groupParam->contains(splitAddress[1])){
-                        ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
+                    ofParameterGroup& groupParam = node.second->getParameters();
+                    if(groupParam.contains(splitAddress[1])){
+                        ofAbstractParameter &absParam = groupParam.get(splitAddress[1]);
                         setParameterFromMidiMessage(absParam, m);
                     }
                 }
@@ -1094,18 +1039,18 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             ofStringReplace(moduleName, "_", " ");
             if(dynamicNodes.count(moduleName) == 1){
                 if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
-                    shared_ptr<ofParameterGroup> groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
-                    if(groupParam->contains(splitAddress[1])){
-                        ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
+                    ofParameterGroup& groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                    if(groupParam.contains(splitAddress[1])){
+                        ofAbstractParameter &absParam = groupParam.get(splitAddress[1]);
                         setParameterFromMidiMessage(absParam, m);
                     }
                 }
             }
             if(persistentNodes.count(moduleName) == 1){
                 if(persistentNodes[moduleName].count(ofToInt(moduleId))){
-                    shared_ptr<ofParameterGroup> groupParam = persistentNodes[moduleName][ofToInt(moduleId)]->getParameters();
-                    if(groupParam->contains(splitAddress[1])){
-                        ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
+                    ofParameterGroup& groupParam = persistentNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                    if(groupParam.contains(splitAddress[1])){
+                        ofAbstractParameter &absParam = groupParam.get(splitAddress[1]);
                         setParameterFromMidiMessage(absParam, m);
                     }
                 }
@@ -1125,9 +1070,9 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                 for(auto &nodeType  : dynamicNodes){
                     for(auto &node : nodeType.second){
                         node.second->getNodeModel().receiveOscMessage(m);
-                        shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
-                        if(groupParam->contains(splitAddress[2])){
-                            ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                        ofParameterGroup& groupParam = node.second->getParameters();
+                        if(groupParam.contains(splitAddress[2])){
+                            ofAbstractParameter &absParam = groupParam.get(splitAddress[2]);
                             modulateParameterFromOscMessage(absParam, m);
                         }
                     }
@@ -1135,9 +1080,9 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                 for(auto &nodeType  : persistentNodes){
                     for(auto &node : nodeType.second){
                         node.second->getNodeModel().receiveOscMessage(m);
-                        shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
-                        if(groupParam->contains(splitAddress[2])){
-                            ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                        ofParameterGroup& groupParam = node.second->getParameters();
+                        if(groupParam.contains(splitAddress[2])){
+                            ofAbstractParameter &absParam = groupParam.get(splitAddress[2]);
                             modulateParameterFromOscMessage(absParam, m);
                         }
                     }
@@ -1149,18 +1094,18 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                 ofStringReplace(moduleName, "_", " ");
                 if(dynamicNodes.count(moduleName) == 1){
                     if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
-                        shared_ptr<ofParameterGroup> groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
-                        if(groupParam->contains(splitAddress[2])){
-                            ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                        ofParameterGroup& groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                        if(groupParam.contains(splitAddress[2])){
+                            ofAbstractParameter &absParam = groupParam.get(splitAddress[2]);
                             modulateParameterFromOscMessage(absParam, m);
                         }
                     }
                 }
                 if(persistentNodes.count(moduleName) == 1){
                     if(persistentNodes[moduleName].count(ofToInt(moduleId))){
-                        shared_ptr<ofParameterGroup> groupParam = persistentNodes[moduleName][ofToInt(moduleId)]->getParameters();
-                        if(groupParam->contains(splitAddress[2])){
-                            ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                        ofParameterGroup& groupParam = persistentNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                        if(groupParam.contains(splitAddress[2])){
+                            ofAbstractParameter &absParam = groupParam.get(splitAddress[2]);
                             modulateParameterFromOscMessage(absParam, m);
                         }
                     }
@@ -1258,7 +1203,7 @@ bool ofxOceanodeContainer::deleteSelectedModules(){
 #endif
 
 #ifdef OFXOCEANODE_USE_MIDI
-
+//TODO: Review for ofxOceanodeParameter
 void ofxOceanodeContainer::setIsListeningMidi(bool b){
     isListeningMidi = b;
     for(auto &nodeTypeMap : dynamicNodes){
@@ -1273,7 +1218,7 @@ void ofxOceanodeContainer::setIsListeningMidi(bool b){
     }
 }
 
-shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBinding(ofAbstractParameter &p, bool isPersistent, int _id){
+shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBinding(ofxOceanodeAbstractParameter &p, bool isPersistent, int _id){
     string name = p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName();
     
     if(_id == -1){
@@ -1281,23 +1226,23 @@ shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBindi
     }
     
     shared_ptr<ofxOceanodeAbstractMidiBinding> midiBinding = nullptr;
-    if(p.type() == typeid(ofParameter<float>).name()){
-        midiBinding = make_unique<ofxOceanodeMidiBinding<float>>(p.cast<float>(), _id);
+    if(p.valueType() == typeid(float).name()){
+        midiBinding = make_unique<ofxOceanodeMidiBinding<float>>(p.cast<float>().getParameter(), _id);
     }
-    else if(p.type() == typeid(ofParameter<int>).name()){
-        midiBinding = make_unique<ofxOceanodeMidiBinding<int>>(p.cast<int>(), _id);
+    else if(p.valueType() == typeid(int).name()){
+        midiBinding = make_unique<ofxOceanodeMidiBinding<int>>(p.cast<int>().getParameter(), _id);
     }
-    else if(p.type() == typeid(ofParameter<bool>).name()){
-        midiBinding = make_unique<ofxOceanodeMidiBinding<bool>>(p.cast<bool>(), _id);
+    else if(p.valueType() == typeid(bool).name()){
+        midiBinding = make_unique<ofxOceanodeMidiBinding<bool>>(p.cast<bool>().getParameter(), _id);
     }
-    else if(p.type() == typeid(ofParameter<void>).name()){
-        midiBinding = make_unique<ofxOceanodeMidiBinding<void>>(p.cast<void>(), _id);
+    else if(p.valueType() == typeid(void).name()){
+        midiBinding = make_unique<ofxOceanodeMidiBinding<void>>(p.cast<void>().getParameter(), _id);
     }
-    else if(p.type() == typeid(ofParameter<vector<float>>).name()){
-        midiBinding = make_unique<ofxOceanodeMidiBinding<vector<float>>>(p.cast<vector<float>>(), _id);
+    else if(p.valueType() == typeid(vector<float>).name()){
+        midiBinding = make_unique<ofxOceanodeMidiBinding<vector<float>>>(p.cast<vector<float>>().getParameter(), _id);
     }
-    else if(p.type() == typeid(ofParameter<vector<int>>).name()){
-        midiBinding = make_unique<ofxOceanodeMidiBinding<vector<int>>>(p.cast<vector<int>>(), _id);
+    else if(p.valueType() == typeid(vector<int>).name()){
+        midiBinding = make_unique<ofxOceanodeMidiBinding<vector<int>>>(p.cast<vector<int>>().getParameter(), _id);
     }
     if(midiBinding != nullptr){
         for(auto &midiInPair : midiIns){
@@ -1314,7 +1259,7 @@ shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBindi
     return nullptr;
 }
 
-bool ofxOceanodeContainer::removeLastMidiBinding(ofAbstractParameter &p){
+bool ofxOceanodeContainer::removeLastMidiBinding(ofxOceanodeAbstractParameter &p){
     string midiBindingName = p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName();
     if(midiBindings.count(midiBindingName) != 0){
         for(auto &midiInPair : midiIns){
@@ -1362,13 +1307,12 @@ shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBindi
     ofStringReplace(module, "_", " ");
     if(collection.count(module) != 0){
         if(collection[module].count(ofToInt(moduleId))){
-            ofAbstractParameter* p = nullptr;
-            if(collection[module][ofToInt(moduleId)]->getParameters()->contains(parameter)){
-                p = &collection[module][ofToInt(moduleId)]->getParameters()->get(parameter);
+            if(collection[module][ofToInt(moduleId)]->getParameters().contains(parameter)){
+                return createMidiBinding(static_cast<ofxOceanodeAbstractParameter&>(collection[module][ofToInt(moduleId)]->getParameters().get(parameter)), isPersistent, _id);
             }
-            return createMidiBinding(*p, isPersistent, _id);
         }
     }
+	return nullptr;
 }
 
 void ofxOceanodeContainer::addNewMidiMessageListener(ofxMidiListener* listener){
@@ -1383,72 +1327,72 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
     auto sourceModuleRef = parameterGroupNodesMap.count(sourceModule) == 1 ? parameterGroupNodesMap[sourceModule] : nullptr;
     auto sinkModuleRef = parameterGroupNodesMap.count(sinkModule) == 1 ? parameterGroupNodesMap[sinkModule] : nullptr;
     if(sourceModuleRef == nullptr || sinkModuleRef == nullptr) return nullptr;
-    if(sourceModuleRef->getParameters()->contains(sourceParameter) && sinkModuleRef->getParameters()->contains(sinkParameter)){
-        ofAbstractParameter &source = sourceModuleRef->getParameters()->get(sourceParameter);
-        ofAbstractParameter &sink = sinkModuleRef->getParameters()->get(sinkParameter);
-        return createConnection(source, sink, active);
+    if(sourceModuleRef->getParameters().contains(sourceParameter) && sinkModuleRef->getParameters().contains(sinkParameter)){
+        ofAbstractParameter &source = sourceModuleRef->getParameters().get(sourceParameter);
+        ofAbstractParameter &sink = sinkModuleRef->getParameters().get(sinkParameter);
+        return createConnection(static_cast<ofxOceanodeAbstractParameter &>(source), static_cast<ofxOceanodeAbstractParameter &>(sink), active);
     }
     return nullptr;
 }
 
-ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofAbstractParameter &source, ofAbstractParameter &sink, bool active){
+ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active){
     ofxOceanodeAbstractConnection* connection = nullptr;
-    if(source.type() == sink.type()){
+    if(source.valueType() == sink.valueType()){
         connection = typesRegistry->createCustomTypeConnection(*this, source, sink, active);
-    }else if(source.type() == typeid(ofParameter<float>).name()){
-        if(sink.type() == typeid(ofParameter<int>).name()){
+    }else if(source.valueType() == typeid(float).name()){
+        if(sink.valueType() == typeid(int).name()){
             connection = connectConnection(source.cast<float>(), sink.cast<int>(), active);
         }
-        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+        else if(sink.valueType() == typeid(vector<float>).name()){
             connection = connectConnection(source.cast<float>(), sink.cast<vector<float>>(), active);
         }
-        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
+        else if(sink.valueType() == typeid(vector<int>).name()){
             connection = connectConnection(source.cast<float>(), sink.cast<vector<int>>(), active);
         }
-        else if(sink.type() == typeid(ofParameter<bool>).name()){
+        else if(sink.valueType() == typeid(bool).name()){
             connection = connectConnection(source.cast<float>(), sink.cast<bool>(), active);
         }
-    }else if(source.type() == typeid(ofParameter<int>).name()){
-        if(sink.type() == typeid(ofParameter<float>).name()){
+    }else if(source.valueType() == typeid(int).name()){
+        if(sink.valueType() == typeid(float).name()){
             connection = connectConnection(source.cast<int>(), sink.cast<float>(), active);
         }
-        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+        else if(sink.valueType() == typeid(vector<float>).name()){
             connection = connectConnection(source.cast<int>(), sink.cast<vector<float>>(), active);
         }
-        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
+        else if(sink.valueType() == typeid(vector<int>).name()){
             connection = connectConnection(source.cast<int>(), sink.cast<vector<int>>(), active);
         }
-    }else if(source.type() == typeid(ofParameter<vector<float>>).name()){
-        if(sink.type() == typeid(ofParameter<float>).name()){
+    }else if(source.valueType() == typeid(vector<float>).name()){
+        if(sink.valueType() == typeid(float).name()){
             connection = connectConnection(source.cast<vector<float>>(), sink.cast<float>(), active);
         }
-        else if(sink.type() == typeid(ofParameter<int>).name()){
+        else if(sink.valueType() == typeid(int).name()){
             connection = connectConnection(source.cast<vector<float>>(), sink.cast<int>(), active);
         }
-        else if(sink.type() == typeid(ofParameter<vector<int>>).name()){
+        else if(sink.valueType() == typeid(vector<int>).name()){
             connection = connectConnection(source.cast<vector<float>>(), sink.cast<vector<int>>(), active);
         }
-    }else if(source.type() == typeid(ofParameter<vector<int>>).name()){
-        if(sink.type() == typeid(ofParameter<float>).name()){
+    }else if(source.valueType() == typeid(vector<int>).name()){
+        if(sink.valueType() == typeid(float).name()){
             connection = connectConnection(source.cast<vector<int>>(), sink.cast<float>(), active);
         }
-        else if(sink.type() == typeid(ofParameter<int>).name()){
+        else if(sink.valueType() == typeid(int).name()){
             connection = connectConnection(source.cast<vector<int>>(), sink.cast<int>(), active);
         }
-        else if(sink.type() == typeid(ofParameter<vector<float>>).name()){
+        else if(sink.valueType() == typeid(vector<float>).name()){
             connection = connectConnection(source.cast<vector<int>>(), sink.cast<vector<float>>(), active);
         }
-    }else if(source.type() == typeid(ofParameter<void>).name()){
-        if(sink.type() == typeid(ofParameter<bool>).name()){
+    }else if(source.valueType() == typeid(void).name()){
+        if(sink.valueType() == typeid(bool).name()){
             connection = connectConnection(source.cast<void>(), sink.cast<bool>(), active);
         }
-        else if(sink.type() == typeid(ofParameter<int>).name()){
+        else if(sink.valueType() == typeid(int).name()){
             connection = connectConnection(source.cast<void>(), sink.cast<int>(), active);
         }
-        else if(sink.type() == typeid(ofParameter<float>).name()){
+        else if(sink.valueType() == typeid(float).name()){
             connection = connectConnection(source.cast<void>(), sink.cast<float>(), active);
         }
-        else if(sink.type() == typeid(ofParameter<bool>).name()){
+        else if(sink.valueType() == typeid(bool).name()){
             connection = connectConnection(source.cast<void>(), sink.cast<bool>(), active);
         }
     }
