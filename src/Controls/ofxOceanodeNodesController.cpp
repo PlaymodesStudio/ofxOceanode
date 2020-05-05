@@ -143,9 +143,9 @@ void ofxOceanodeNodesController::draw()
         {
             bool showThis = false;
             if(searchFieldMyNodes != ""){
-                string lowercaseName = node->getParameters()->getName();
+                string lowercaseName = node->getParameters().getName();
                 std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
-                if(ofStringTimesInString(node->getParameters()->getName(), searchFieldMyNodes) || ofStringTimesInString(lowercaseName, searchFieldMyNodes)){
+                if(ofStringTimesInString(node->getParameters().getName(), searchFieldMyNodes) || ofStringTimesInString(lowercaseName, searchFieldMyNodes)){
                     showThis = true;
                 }
             }else{
@@ -153,7 +153,7 @@ void ofxOceanodeNodesController::draw()
             }
             if(showThis)
             {
-                if(ImGui::Selectable(node->getParameters()->getName().c_str()) || isEnterPressed)
+                if(ImGui::Selectable(node->getParameters().getName().c_str()) || isEnterPressed)
                 {
                     // get the size of the node to be able to center properly
                     glm::vec2 nodeSize = glm::vec2(node->getNodeGui().getRectangle().getWidth(),node->getNodeGui().getRectangle().getHeight());
