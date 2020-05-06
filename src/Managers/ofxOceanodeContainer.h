@@ -114,6 +114,7 @@ public:
     
 #ifndef OFXOCEANODE_HEADLESS
     vector<ofxOceanodeNode*> getSelectedModules();
+    vector<ofxOceanodeNode*> getAllModules();
     
     bool copySelectedModulesWithConnections();
     bool cutSelectedModulesWithConnections();

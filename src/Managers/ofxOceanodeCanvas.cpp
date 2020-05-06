@@ -57,7 +57,7 @@ void ofxOceanodeCanvas::draw(bool *open){
         const ImVec2 NODE_WINDOW_PADDING(8.0f, 7.0f);
         
         // Create our child canvas
-        
+        offsetToCenter = glm::vec2(int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
         ImGui::Text("[%d,%d]",int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
 
         ImGui::SameLine(ImGui::GetContentRegionAvail().x-20.0f);
@@ -102,8 +102,26 @@ void ofxOceanodeCanvas::draw(bool *open){
             
             if (recenterCanvas )
             {
-                scrolling.x = ImGui::GetContentRegionAvail().x/2.0f;
-                scrolling.y = ImGui::GetContentRegionAvail().y/2.0f;
+                if(!ImGui::GetIO().KeyShift)
+                {
+                    scrolling.x = ImGui::GetContentRegionAvail().x/2.0f;
+                    scrolling.y = ImGui::GetContentRegionAvail().y/2.0f;
+                }
+                else
+                {
+                    vector<ofxOceanodeNode*> allNodes = container->getAllModules();
+                    glm::vec2 centerOfMass = glm::vec2(0.0f,0.0f);
+                    glm::vec2 currentNodeCenter;
+                    glm::vec2 currentNodeRectangle;
+                    for(int i=0;i<allNodes.size();i++)
+                    {
+                        currentNodeRectangle =  glm::vec2(allNodes[i]->getNodeGui().getRectangle().width,allNodes[i]->getNodeGui().getRectangle().height);
+                        currentNodeCenter = allNodes[i]->getNodeGui().getPosition() + currentNodeRectangle/2.0f  ;
+                        centerOfMass = centerOfMass + currentNodeCenter;
+                    }
+                    scrolling.x = (ImGui::GetContentRegionAvail().x/2.0f) - (centerOfMass.x/allNodes.size());
+                    scrolling.y = (ImGui::GetContentRegionAvail().y/2.0f) - (centerOfMass.y/allNodes.size());
+                }
             }
 
             for (float x = fmodf(scrolling.x, GRID_SZ); x < canvas_sz.x; x += GRID_SZ)

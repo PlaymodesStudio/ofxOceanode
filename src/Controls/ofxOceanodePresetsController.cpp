@@ -95,6 +95,9 @@ void ofxOceanodePresetsController::draw(){
     ImGui::Text("%s",banks[currentBank].c_str());
     ImGui::PopStyleColor();
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+
+    ImGui::Separator();
+
     if(ImGui::Button("[+]")){
         ImGui::OpenPopup("Add New Bank");
     }
@@ -161,7 +164,8 @@ void ofxOceanodePresetsController::draw(){
     ImGui::SetNextWindowSize(ImVec2(200,100));
     if(ImGui::BeginPopupModal("Save preset as :", NULL)){
         static char cString[256];
-        //ImGui::SetKeyboardFocusHere(0);
+        
+//        ImGui::SetKeyboardFocusHere(0);
         
         if (ImGui::InputText("##Preset Name : ", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
         {

@@ -25,7 +25,8 @@ void ofxOceanode::setup(){
     canvas.setContainer(container);
     canvas.setup();
     scope->setup();
-    controls = make_unique<ofxOceanodeControls>(container);
+    //controls = make_unique<ofxOceanodeControls>(container);
+    controls = make_unique<ofxOceanodeControls>(container,&canvas);
     //        timelines.emplace_back("Phasor_1/Beats_Div");
     //        timelines.emplace_back("Oscillator_1/Pow");
     //        timelines.emplace_back("Indexer_1/NumWaves");
