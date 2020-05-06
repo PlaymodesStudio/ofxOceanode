@@ -32,6 +32,7 @@ public:
 	ofxOceanodeAbstractParameter(){
 		flags = 0;
         inConnection = nullptr;
+        hasScope = false;
 	};
     virtual ~ofxOceanodeAbstractParameter(){};
 	
@@ -71,6 +72,9 @@ public:
     void removeOutConnection(ofxOceanodeAbstractConnection* c){outConnections.erase(std::remove(outConnections.begin(), outConnections.end(), c));};
     
     void removeAllConnections();
+    
+    bool isScoped(){return hasScope;};
+    void setScoped(bool b){hasScope = b;};
 	
 protected:
 	virtual const ofParameterGroup getFirstParent() const = 0;
@@ -81,6 +85,7 @@ private:
     ofxOceanodeAbstractConnection* inConnection;
     std::vector<ofxOceanodeAbstractConnection*> outConnections;
 	ofxOceanodeParameterFlags flags;
+    bool hasScope;
 };
 
 template<typename ParameterType>

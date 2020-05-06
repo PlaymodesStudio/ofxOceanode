@@ -17,6 +17,7 @@
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeTypesRegistry.h"
+#include "ofxOceanodeScope.h"
 
 //#include "ofxOceanodeAbstractTimeline.h"
 
@@ -72,6 +73,7 @@ private:
     
     shared_ptr<ofxOceanodeNodeRegistry> nodeRegistry;
     shared_ptr<ofxOceanodeTypesRegistry> typesRegistry;
+    ofxOceanodeScope* scope;
     
 //    vector<ofxOceanodeAbstractTimeline> timelines;
     

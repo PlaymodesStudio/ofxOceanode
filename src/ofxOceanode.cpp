@@ -13,6 +13,7 @@
 ofxOceanode::ofxOceanode(){
     nodeRegistry = make_shared<ofxOceanodeNodeRegistry>();
     typesRegistry = make_shared<ofxOceanodeTypesRegistry>();
+    scope = ofxOceanodeScope::getInstance();
     firstDraw = true;
     settingsLoaded = false;
 }
@@ -23,7 +24,7 @@ void ofxOceanode::setup(){
     container = make_shared<ofxOceanodeContainer>(nodeRegistry, typesRegistry);
     canvas.setContainer(container);
     canvas.setup();
-    
+    scope->setup();
     controls = make_unique<ofxOceanodeControls>(container);
     //        timelines.emplace_back("Phasor_1/Beats_Div");
     //        timelines.emplace_back("Oscillator_1/Pow");
@@ -42,6 +43,7 @@ void ofxOceanode::draw(){
     gui.begin();
     bool showDocker = true;
     ShowExampleAppDockSpace(&showDocker);
+    scope->draw();
     container->draw();
     controls->draw();
     canvas.draw();

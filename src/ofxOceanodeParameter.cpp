@@ -8,10 +8,13 @@
 #include "ofxOceanodeParameter.h"
 #include "ofMath.h"
 #include "ofxOceanodeConnection.h"
+#include "ofxOceanodeScope.h"
 
 void ofxOceanodeAbstractParameter::removeAllConnections(){
     if(inConnection != nullptr) inConnection->deleteSelf();
     for(auto c : outConnections) c->deleteSelf();
+    
+    if(hasScope) ofxOceanodeScope::getInstance()->removeParameter(this);
 };
 
 template<>

@@ -13,6 +13,7 @@
 #include "ofxOceanodeContainer.h"
 #include "ofxImGuiSimple.h"
 #include "ofxOceanodeParameter.h"
+#include "ofxOceanodeScope.h"
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node) : container(_container), node(_node){
     color = node.getColor();
@@ -106,13 +107,13 @@ bool ofxOceanodeNodeGui::constructGui(){
                 
                 if(ImGui::BeginPopup("Param Popup")){
                     ImGui::Separator();
-                    if(true){ //Param is not scoped
+                    if(!absParam.isScoped()){ //Param is not scoped
                         if(ImGui::Selectable("Add to Scope")){
-                            
+                            ofxOceanodeScope::getInstance()->addParameter(&absParam);
                         }
                     }else{
                         if(ImGui::Selectable("Remove from Scope")){
-                            
+                             ofxOceanodeScope::getInstance()->removeParameter(&absParam);
                         }
                     }
                     ImGui::Separator();
