@@ -140,7 +140,7 @@ ofJson ofxOceanodeNode::saveParametersToJson(bool persistentPreset){
                     json[p.getEscapedName()] = vecF[0];
                 }
             }
-            else if(p.type() == typeid(vector<int>).name()){
+            else if(p.valueType() == typeid(vector<int>).name()){
                 auto vecI = p.cast<vector<int>>().getParameter().get();
                 if(vecI.size() == 1){
                     json[p.getEscapedName()] = vecI[0];
