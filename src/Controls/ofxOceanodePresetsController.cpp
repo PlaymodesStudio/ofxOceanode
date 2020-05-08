@@ -329,18 +329,15 @@ void ofxOceanodePresetsController::draw(){
 }
 
 void ofxOceanodePresetsController::createPreset(string name){
-    char newPresetName;
     int newPresetNum = 1;
     if(bankPresets[banks[currentBank]].size() != 0){
         int lastPreset = bankPresets[banks[currentBank]].size();
         newPresetNum = lastPreset + 1;
     }
-    sprintf(&newPresetName, "%s", name.c_str());
-    string newPresetString(&newPresetName);
-    ofStringReplace(newPresetString, " ", "_");
-    bankPresets[banks[currentBank]].push_back(newPresetString);
+    ofStringReplace(name, " ", "_");
+    bankPresets[banks[currentBank]].push_back(name);
     currentPreset[banks[currentBank]] = bankPresets[banks[currentBank]].back();
-    savePreset(newPresetString, banks[currentBank]);
+    savePreset(name, banks[currentBank]);
     newPresetCreated = true;
 }
 
