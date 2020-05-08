@@ -444,7 +444,8 @@ void ofxOceanodeCanvas::draw(bool *open){
                             
                             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
                             
-                            if(ImGui::Selectable(op.c_str()) || isEnterPressed)
+                            
+                            if((ImGui::Selectable(op.c_str()) || isEnterPressed) && searchField!="")
                             {
                                 unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
                                 if (type)
@@ -455,6 +456,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                                 ImGui::PopStyleColor();
                                 ImGui::CloseCurrentPopup();
                                 isEnterPressed = false; //Next options we dont want to create them;
+                                searchField="";
                                 break;
                             }
                             ImGui::PopStyleColor();
