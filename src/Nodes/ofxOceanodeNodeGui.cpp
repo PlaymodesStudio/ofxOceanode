@@ -178,7 +178,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                     //TODO: Implement better this hack
                     // Maybe discard and reset value when not presed enter??
                     if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()) ){
-                        tempCast = tempCast;
+                        tempCast = ofClamp(tempCast, tempCast.getMin(), tempCast.getMax());
                     }
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast = tempCast;
@@ -207,7 +207,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                                            tempCast.getMax()[0], "%.4f");
                         
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-                            tempCast = vector<float>(1, tempCast->at(0));
+                            tempCast = vector<float>(1, ofClamp(tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]));
                         }
                     }else{
                         ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
@@ -251,7 +251,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                         
                         vector<string> options = absParam.cast<int>().getDropdownOptions();
                         if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.get(), vector_getter, static_cast<void*>(&options), options.size()))
-                            tempCast = tempCast;
+                            tempCast = ofClamp(tempCast, tempCast.getMin(), tempCast.getMax());
                         
                         if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space)))
                             tempCast = tempCast;
@@ -278,7 +278,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                         ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast->at(0),tempCast.getMin()[0],tempCast.getMax()[0]);
                         
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-                            tempCast = vector<int>(1, tempCast->at(0));
+                            tempCast = vector<int>(1, ofClamp(tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]));
                         }
                     }
                     else{
