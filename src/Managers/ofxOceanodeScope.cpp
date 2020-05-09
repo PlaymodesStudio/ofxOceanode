@@ -23,12 +23,27 @@ bool Splitter(int splitNum, bool split_vertically, float thickness, float* size1
     return SplitterBehavior(bb, id, split_vertically ? ImGuiAxis_X : ImGuiAxis_Y, size1, size2, min_size1, min_size2, 4.0f, 0.04f);
 }
 
+
+
 void ofxOceanodeScope::setup(){
     scopeTypes.push_back([](ofxOceanodeAbstractParameter *p, ImVec2 size) -> bool{
-        if(p->valueType() == typeid(std::vector<float>).name()){
+        float child_h = ImGui::GetContentRegionAvail().y;
+        float child_w = ImGui::GetContentRegionAvail().x;
+        //ImGuiWindowFlags child_flags = ImGuiWindowFlags_MenuBar;
+
+        ImGui::BeginChild(("Child_" + p->getGroupHierarchyNames().front()).c_str(), size, true);
+        
+        // VECTOR FLOAT PARAM
+        
+        if(p->valueType() == typeid(std::vector<float>).name())
+        {
             auto param = p->cast<std::vector<float>>().getParameter();
-//            auto size = ImGui::GetContentRegionAvail();
-            if(param->size() == 1 && size.x > size.y){
+            
+            ImGui::Button((p->getGroupHierarchyNames().front() + "/" + p->getName() + " : 1 x "  + ofToString(param->size())).c_str());
+            //auto size = ImGui::GetContentRegionAvail();
+            size = ImVec2(size.x,size.y-10);
+            if(param->size() == 1 && size.x > size.y)
+            {
                 ImGui::ProgressBar((param.get()[0] - param.getMin()[0]) * (param.getMax()[0] - param.getMin()[0]), size, "");
                 if(ImGui::IsItemHovered()){
                     ImGui::BeginTooltip();
@@ -36,10 +51,12 @@ void ofxOceanodeScope::setup(){
                     ImGui::EndTooltip();
                 }
             }else{
-                ImGui::PlotHistogram(("##" + p->getName()).c_str(), &param.get()[0], param->size(), 0, NULL, param.getMin()[0], param.getMax()[0], size);
+                ImGui::PlotHistogram((p->getName()).c_str(), &param.get()[0], param->size(), 0, NULL, param.getMin()[0], param.getMax()[0], size);
             }
+            ImGui::EndChild();
             return true;
         }
+        ImGui::EndChild();
         return false;
     });
 }
