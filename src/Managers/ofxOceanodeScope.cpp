@@ -107,11 +107,17 @@ void ofxOceanodeScope::draw(){
 }
 
 void ofxOceanodeScope::addParameter(ofxOceanodeAbstractParameter* p){
-    scopedParameters.emplace_back(p);
     p->setScoped(true);
+    scopedParameters.emplace_back(p);
 }
 
 void ofxOceanodeScope::removeParameter(ofxOceanodeAbstractParameter* p){
-    scopedParameters.erase(std::find_if(scopedParameters.begin(), scopedParameters.end(), [p](const ofxOceanodeScopeItem& i){return i.parameter == p;}));
     p->setScoped(false);
+    auto scopeToRemove = std::find_if(scopedParameters.begin(), scopedParameters.end(), [p](const ofxOceanodeScopeItem& i){return i.parameter == p;});
+    float sizeBackup = scopeToRemove->sizeRelative;
+    scopedParameters.erase(scopeToRemove);
+    for (auto &sp : scopedParameters) {
+        sp.sizeRelative += ((sizeBackup - 1) / scopedParameters.size());
+    }
+    
 }
