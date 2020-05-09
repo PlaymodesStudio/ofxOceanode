@@ -67,6 +67,7 @@ void ofxOceanodeNodesController::draw()
         ImGui::Separator();
 
         bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
+        
         for(int i = 0; i < categoriesVector.size(); i++)
         {
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f,0.45f,0.0f,0.5f));
@@ -98,7 +99,7 @@ void ofxOceanodeNodesController::draw()
                         
                         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
                         
-                        if(ImGui::Selectable(op.c_str()) || isEnterPressed)
+                        if((ImGui::Selectable(op.c_str()) || isEnterPressed) && searchField!="")
                         {
                             unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
                             if (type)
@@ -109,6 +110,7 @@ void ofxOceanodeNodesController::draw()
                             ImGui::PopStyleColor();
                             ImGui::CloseCurrentPopup();
                             isEnterPressed = false; //Next options we dont want to create them;
+                            searchField="";
                             break;
                         }
                         ImGui::PopStyleColor();
