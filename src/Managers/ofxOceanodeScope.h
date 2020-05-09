@@ -11,12 +11,24 @@
 #include <functional>
 #include <iostream>
 #include <vector>
+#include "ofColor.h"
 
 class ofxOceanodeAbstractParameter;
+class ImVec2;
+
+class ofxOceanodeScopeItem {
+public:
+    ofxOceanodeScopeItem(ofxOceanodeAbstractParameter* p, ofColor c = ofColor::white, float s = 1) : parameter(p), color(c), sizeRelative(s){};
+    ~ofxOceanodeScopeItem(){};
+    
+    ofxOceanodeAbstractParameter* parameter;
+    ofColor color;
+    float sizeRelative;
+};
 
 class ofxOceanodeScope {
 public:
-    using scopeFunc = std::function<bool(ofxOceanodeAbstractParameter* p)>;
+    using scopeFunc = std::function<bool(ofxOceanodeAbstractParameter* p, ImVec2 size)>;
     
     ofxOceanodeScope(){};
     ~ofxOceanodeScope(){};
@@ -34,7 +46,9 @@ public:
     
 private:
     std::vector<scopeFunc> scopeTypes;
-    std::vector<ofxOceanodeAbstractParameter*> scopedParameters;
+    std::vector<ofxOceanodeScopeItem> scopedParameters;
+    
+    float windowHeight;
 };
 
 #endif /* ofxOceanodeScope_h */
