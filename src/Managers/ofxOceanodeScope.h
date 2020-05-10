@@ -41,7 +41,7 @@ public:
     void setup();
     void draw();
     
-    void addParameter(ofxOceanodeAbstractParameter* p);
+    void addParameter(ofxOceanodeAbstractParameter* p, ofColor _color);
     void removeParameter(ofxOceanodeAbstractParameter* p);
     
 private:

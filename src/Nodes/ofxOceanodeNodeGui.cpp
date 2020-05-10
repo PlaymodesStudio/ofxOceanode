@@ -111,7 +111,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                     ImGui::Separator();
                     if(!absParam.isScoped()){ //Param is not scoped
                         if(ImGui::Selectable("Add to Scope")){
-                            ofxOceanodeScope::getInstance()->addParameter(&absParam);
+                            ofxOceanodeScope::getInstance()->addParameter(&absParam,getColor());
                         }
                     }else{
                         if(ImGui::Selectable("Remove from Scope")){
@@ -156,6 +156,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(node.getColor()*.25f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
+                
                 
                 // PARAM FLOAT
                 ///////////////
