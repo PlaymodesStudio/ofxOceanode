@@ -23,47 +23,37 @@ bool Splitter(int splitNum, bool split_vertically, float thickness, float* size1
     return SplitterBehavior(bb, id, split_vertically ? ImGuiAxis_X : ImGuiAxis_Y, size1, size2, min_size1, min_size2, 4.0f, 0.04f);
 }
 
-
-
 void ofxOceanodeScope::setup(){
     scopeTypes.push_back([](ofxOceanodeAbstractParameter *p, ImVec2 size) -> bool{
-        float child_h = ImGui::GetContentRegionAvail().y;
-        float child_w = ImGui::GetContentRegionAvail().x;
-        //ImGuiWindowFlags child_flags = ImGuiWindowFlags_MenuBar;
-
-        ImGui::BeginChild(("Child_" + p->getGroupHierarchyNames().front()).c_str(), size, true);
-        
         // VECTOR FLOAT PARAM
-        
         if(p->valueType() == typeid(std::vector<float>).name())
         {
             auto param = p->cast<std::vector<float>>().getParameter();
-            
-            ImGui::Button((p->getGroupHierarchyNames().front() + "/" + p->getName() + " : 1 x "  + ofToString(param->size())).c_str());
-            //auto size = ImGui::GetContentRegionAvail();
-            size = ImVec2(size.x,size.y-10);
+            auto size2 = ImGui::GetContentRegionAvail();
+
             if(param->size() == 1 && size.x > size.y)
             {
-                ImGui::ProgressBar((param.get()[0] - param.getMin()[0]) * (param.getMax()[0] - param.getMin()[0]), size, "");
+                ImGui::ProgressBar((param.get()[0] - param.getMin()[0]) * (param.getMax()[0] - param.getMin()[0]), size2, "");
+
                 if(ImGui::IsItemHovered()){
                     ImGui::BeginTooltip();
                     ImGui::Text("%3f", param.get()[0]);
                     ImGui::EndTooltip();
                 }
             }else{
-                ImGui::PlotHistogram((p->getName()).c_str(), &param.get()[0], param->size(), 0, NULL, param.getMin()[0], param.getMax()[0], size);
+                ImGui::PlotHistogram((p->getName()).c_str(), &param.get()[0], param->size(), 0, NULL, param.getMin()[0], param.getMax()[0], size2);
             }
-            ImGui::EndChild();
             return true;
         }
-        ImGui::EndChild();
+
         return false;
     });
 }
 
 void ofxOceanodeScope::draw(){
+
     if(scopedParameters.size() > 0){
-        ImGui::Begin("Scope", NULL, ImGuiWindowFlags_NoScrollbar);
+        ImGui::Begin("Scopes", NULL, ImGuiWindowFlags_NoScrollbar);
         windowHeight = ImGui::GetContentRegionAvail().y;
         for(int i = 0; i < scopedParameters.size()-1; i++){
             float topHeight = 0;
@@ -92,23 +82,55 @@ void ofxOceanodeScope::draw(){
                 }
             }
         }
-        
-        
-        for(int i = 0; i < scopedParameters.size(); i++){
+        for(int i = 0; i < scopedParameters.size(); i++)
+        {
             auto &p = scopedParameters[i];
             auto itemHeight = (p.sizeRelative / scopedParameters.size() * windowHeight) - 2.5;
+
+            auto size = ImVec2(ImGui::GetContentRegionAvailWidth(), itemHeight);
             
-            for(auto f : scopeTypes){
+            ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(p.color*0.75f));
+            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(p.color*0.75f));
+            ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(p.color*0.75f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+            ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(0.0,0.0,0.0,0.0));
+            
+            ImGui::BeginChild(("Child_" + p.parameter->getGroupHierarchyNames().front()).c_str(), size, true);
+            ImGui::Text((p.parameter->getGroupHierarchyNames().front() + "/" + p.parameter->getName()).c_str());
+            ImGui::SameLine();
+            if(ImGui::Button("[^]##MoveScopeUp"))
+            {
+                if(i>0) std::swap(scopedParameters[i],scopedParameters[i-1]);
+            }
+            ImGui::SameLine();
+            if(ImGui::Button("[v]##MoveScopeDown"))
+            {
+                if(i<scopedParameters.size()-1) std::swap(scopedParameters[i],scopedParameters[i+1]);
+                
+            }
+            ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - 10);
+
+            if(ImGui::Button("x##RemoveScope"))
+            {
+                ofxOceanodeScope::getInstance()->removeParameter(p.parameter);
+            }
+
+            // f() function to properly draw each scope item
+            for(auto f : scopeTypes)
+            {
                 if(f(p.parameter, ImVec2(ImGui::GetContentRegionAvailWidth(), itemHeight))) break;
             }
+            
+            ImGui::PopStyleColor(5);
+            ImGui::EndChild();
         }
         ImGui::End();
     }
 }
 
-void ofxOceanodeScope::addParameter(ofxOceanodeAbstractParameter* p){
+void ofxOceanodeScope::addParameter(ofxOceanodeAbstractParameter* p, ofColor _color){
     p->setScoped(true);
-    scopedParameters.emplace_back(p);
+    scopedParameters.emplace_back(p,_color);
 }
 
 void ofxOceanodeScope::removeParameter(ofxOceanodeAbstractParameter* p){
