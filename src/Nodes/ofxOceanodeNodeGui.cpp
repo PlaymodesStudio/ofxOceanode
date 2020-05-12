@@ -107,44 +107,6 @@ bool ofxOceanodeNodeGui::constructGui(){
                     ImGui::OpenPopup("Param Popup");
                 }
                 
-                if(ImGui::BeginPopup("Param Popup")){
-                    ImGui::Separator();
-                    if(!absParam.isScoped()){ //Param is not scoped
-                        if(ImGui::Selectable("Add to Scope")){
-                            ofxOceanodeScope::getInstance()->addParameter(&absParam,getColor());
-                        }
-                    }else{
-                        if(ImGui::Selectable("Remove from Scope")){
-                             ofxOceanodeScope::getInstance()->removeParameter(&absParam);
-                        }
-                    }
-                    ImGui::Separator();
-                    if(true){ //Param is not timelined
-                        if(ImGui::Selectable("Add to Timeline")){
-                            
-                        }
-                    }else{
-                        if(ImGui::Selectable("Remove from Timeline")){
-                            
-                        }
-                    }
-#ifdef OFXOCEANODE_USE_MIDI
-                    ImGui::Separator();
-                    if(ImGui::Selectable("Bind MIDI")){
-                        container.createMidiBinding(absParam);
-                    }
-                    if(ImGui::Selectable("Unbind last MIDI")){
-                        container.removeLastMidiBinding(absParam);
-                    }
-#endif
-#ifdef OFXOCEANODE_USE_OSC
-                    ImGui::Separator();
-                    ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
-#endif
-                    ImGui::Separator();
-                    ImGui::EndPopup();
-                }
-                
                 
                 ImGui::SameLine(50);
                 ImGui::SetNextItemWidth(150);
@@ -376,6 +338,49 @@ bool ofxOceanodeNodeGui::constructGui(){
                 {
                     ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
                 }
+                
+                if(ImGui::IsItemClicked(1)){
+                    ImGui::OpenPopup("Param Popup");
+                }
+                
+                if(ImGui::BeginPopup("Param Popup")){
+                    ImGui::Separator();
+                    if(!absParam.isScoped()){ //Param is not scoped
+                        if(ImGui::Selectable("Add to Scope")){
+                            ofxOceanodeScope::getInstance()->addParameter(&absParam,getColor());
+                        }
+                    }else{
+                        if(ImGui::Selectable("Remove from Scope")){
+                            ofxOceanodeScope::getInstance()->removeParameter(&absParam);
+                        }
+                    }
+                    ImGui::Separator();
+                    if(true){ //Param is not timelined
+                        if(ImGui::Selectable("Add to Timeline")){
+                            
+                        }
+                    }else{
+                        if(ImGui::Selectable("Remove from Timeline")){
+                            
+                        }
+                    }
+#ifdef OFXOCEANODE_USE_MIDI
+                    ImGui::Separator();
+                    if(ImGui::Selectable("Bind MIDI")){
+                        container.createMidiBinding(absParam);
+                    }
+                    if(ImGui::Selectable("Unbind last MIDI")){
+                        container.removeLastMidiBinding(absParam);
+                    }
+#endif
+#ifdef OFXOCEANODE_USE_OSC
+                    ImGui::Separator();
+                    ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
+#endif
+                    ImGui::Separator();
+                    ImGui::EndPopup();
+                }
+                
                 inputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
                 outputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
                 
