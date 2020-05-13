@@ -108,7 +108,7 @@ void chaoticOscillator::setup(){
     addParameter(phasorIn.set("Phase", {0}, {0}, {1}));
     addParameter(index_Param.set("Index", {0}, {0}, {1}));
     addParameter(length_Param.set("Length", {1}, {0}, {100}));
-    addParameter(phaseOffset_Param.set("Ph Off", {0}, {0}, {1}));
+    addParameter(phaseOffset_Param.set("Ph.Off", {0}, {0}, {1}));
     addParameter(roundness_Param.set("Round", {0.5}, {0}, {1}));
     addParameter(pulseWidth_Param.set("PulseW", {.5}, {0}, {1}));
     addParameter(skew_Param.set("Skew", {0}, {-1}, {1}));

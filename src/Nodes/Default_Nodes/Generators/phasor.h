@@ -12,7 +12,7 @@
 
 class simpleNumberGenerator : public ofxOceanodeNodeModel{
 public:
-    simpleNumberGenerator() : ofxOceanodeNodeModel("Simple Number Generator"){
+    simpleNumberGenerator() : ofxOceanodeNodeModel("Number"){
         color = ofColor::red;
     };
     ~simpleNumberGenerator(){};
