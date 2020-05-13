@@ -108,7 +108,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 }
                 
                 
-                ImGui::SameLine(50);
+                ImGui::SameLine(60);
                 ImGui::SetNextItemWidth(150);
                 
                 string hiddenUniqueId = "##" + uniqueId;
@@ -293,7 +293,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                     // PARAM CHAR
                     /////////////
                 }else if(absParam.valueType() == typeid(char).name()){
-                    ImGui::Text("%s", absParam.getName().c_str());
+                    ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
                     // PARAM COLOR
                     //////////////
                 }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
