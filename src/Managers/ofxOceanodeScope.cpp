@@ -33,7 +33,7 @@ void ofxOceanodeScope::setup(){
 
             if(param->size() == 1 && size.x > size.y)
             {
-                ImGui::ProgressBar((param.get()[0] - param.getMin()[0]) * (param.getMax()[0] - param.getMin()[0]), size2, "");
+                ImGui::ProgressBar((param.get()[0] - param.getMin()[0]) / (param.getMax()[0] - param.getMin()[0]), size2, "");
 
                 if(ImGui::IsItemHovered()){
                     ImGui::BeginTooltip();
@@ -95,7 +95,12 @@ void ofxOceanodeScope::draw(){
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
             ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(0.0,0.0,0.0,0.0));
             
-            ImGui::BeginChild(("Child_" + p.parameter->getGroupHierarchyNames().front()).c_str(), size, true);
+            ImGui::BeginChild(("Child_" + p.parameter->getGroupHierarchyNames().front() + "/" + p.parameter->getName()).c_str(), size, true);
+            if(ImGui::Button("x##RemoveScope"))
+            {
+                ofxOceanodeScope::getInstance()->removeParameter(p.parameter);
+            }
+            ImGui::SameLine();
             ImGui::Text((p.parameter->getGroupHierarchyNames().front() + "/" + p.parameter->getName()).c_str());
             ImGui::SameLine();
             if(ImGui::Button("[^]##MoveScopeUp"))
@@ -108,12 +113,7 @@ void ofxOceanodeScope::draw(){
                 if(i<scopedParameters.size()-1) std::swap(scopedParameters[i],scopedParameters[i+1]);
                 
             }
-            ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - 10);
 
-            if(ImGui::Button("x##RemoveScope"))
-            {
-                ofxOceanodeScope::getInstance()->removeParameter(p.parameter);
-            }
 
             // f() function to properly draw each scope item
             for(auto f : scopeTypes)
