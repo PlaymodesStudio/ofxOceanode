@@ -59,7 +59,13 @@ void ofxOceanodeCanvas::draw(bool *open){
         // Create our child canvas
         offsetToCenter = glm::vec2(int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
         ImGui::Text("[%d,%d]",int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
-
+        ImGui::SameLine();
+        float fps = ofGetFrameRate();
+        if(fps>=60.0) ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.0,1.0,0.0,0.5));
+        else if(fps>30.0) ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1.0,0.5,0.0,0.5));
+        else ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1.0,0.0,0.0,0.5));
+        ImGui::Text("%d fps",int(fps));
+        ImGui::PopStyleColor();
         ImGui::SameLine(ImGui::GetContentRegionAvail().x-20.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
@@ -410,6 +416,7 @@ void ofxOceanodeCanvas::draw(bool *open){
             numTimesPopup++;
             
             bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
+            bool isEnterReleased = ImGui::IsKeyReleased(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
             for(int i = 0; i < categoriesVector.size(); i++){
                 if(numTimesPopup == 1){
                     ImGui::SetNextTreeNodeOpen(false);
@@ -445,7 +452,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
                             
                             
-                            if((ImGui::Selectable(op.c_str()) || isEnterPressed) && searchField!="")
+                            if( ImGui::Selectable(op.c_str()) || ( searchField!="" && isEnterReleased) )
                             {
                                 unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
                                 if (type)
@@ -460,8 +467,6 @@ void ofxOceanodeCanvas::draw(bool *open){
                                 break;
                             }
                             ImGui::PopStyleColor();
-                            
-                            
                         }
                     }
                     //ImGui::CloseCurrentPopup();

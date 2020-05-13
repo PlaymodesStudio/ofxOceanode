@@ -55,7 +55,6 @@ void ofxOceanodeNodesController::draw()
     if(ImGui::TreeNode("+ Nodes"))
     {
         ImGui::Separator();
-        
         char * cString = new char[256];
         strcpy(cString, searchField.c_str());
         ImVec2 offset = ImGui::GetCursorScreenPos() + canvas->getScrolling();
@@ -65,9 +64,9 @@ void ofxOceanodeNodesController::draw()
             searchField = cString;
         }
         ImGui::Separator();
-
         bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
-        
+        bool isEnterReleased = ImGui::IsKeyReleased(ImGui::GetKeyIndex(ImGuiKey_Enter));
+
         for(int i = 0; i < categoriesVector.size(); i++)
         {
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f,0.45f,0.0f,0.5f));
@@ -99,19 +98,23 @@ void ofxOceanodeNodesController::draw()
                         
                         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
                         
-                        if((ImGui::Selectable(op.c_str()) || isEnterPressed) && searchField!="")
+                        if( ImGui::Selectable(op.c_str()) || ( searchField!="" && isEnterReleased) )
                         {
-                            unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
-                            if (type)
+                            if(true)
                             {
-                                auto &node = container->createNode(std::move(type));
-                                node.getNodeGui().setPosition(-canvas->getOffsetToCenter());
+                                unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
+                                if (type)
+                                {
+                                    auto &node = container->createNode(std::move(type));
+                                    node.getNodeGui().setPosition(-canvas->getOffsetToCenter());
+                                }
+                                ImGui::PopStyleColor();
+                                ImGui::CloseCurrentPopup();
+                                isEnterPressed = false; //Next options we dont want to create them;
+                                searchField="";
+                                
+                                break;
                             }
-                            ImGui::PopStyleColor();
-                            ImGui::CloseCurrentPopup();
-                            isEnterPressed = false; //Next options we dont want to create them;
-                            searchField="";
-                            break;
                         }
                         ImGui::PopStyleColor();
                     }
