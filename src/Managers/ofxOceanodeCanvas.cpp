@@ -153,12 +153,14 @@ void ofxOceanodeCanvas::draw(bool *open){
 				it = nodesDrawingOrder.erase(it);
 			}
 		}
-		for(auto &i : erasedPositions){
-			//We reorder the list do that this selected node goes to the top layer;
-			for_each(nodesDrawingOrder.begin(), nodesDrawingOrder.end(), [i](std::pair<const string, int> &orderPair){
-				if(orderPair.second > i) orderPair.second--;
-			});
-		}
+        while(erasedPositions.size() != 0){
+            auto max_e = std::max_element(erasedPositions.begin(), erasedPositions.end());
+            auto i = *max_e;
+            for_each(nodesDrawingOrder.begin(), nodesDrawingOrder.end(), [i](std::pair<const string, int> &orderPair){
+                if(orderPair.second > i) orderPair.second--;
+            });
+            erasedPositions.erase(max_e);
+        }
 		
 		
 		//Draw List layers
