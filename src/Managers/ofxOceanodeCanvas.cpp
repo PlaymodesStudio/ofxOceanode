@@ -230,19 +230,13 @@ void ofxOceanodeCanvas::draw(bool *open){
                     }
                 };
                 
-                if((deselectAllNodesExcept != nodeId && deselectAllNodesExcept != "")){
-                    nodeGui.setSelected(false);
-                }else{
-                    deselectAllNodesExcept = "";
-                }
-                
                 bool toCheckPress = nodeGui.getSelected() && lastSelectedNode != nodeId ? ImGui::IsMouseReleased(0) : ImGui::IsMouseClicked(0);
                 
                 if(toCheckPress && ImGui::IsItemHovered(ImGuiHoveredFlags_None)){
                     if(nodeGui.getSelected() && lastSelectedNode == nodeId) lastSelectedNode = "";
                     if(!someDragAppliedToSelection || !nodeGui.getSelected()){
                         if(!ImGui::GetIO().KeyShift){
-                            deselectAllNodesExcept = nodeId;
+                            deselectAllNodes();
                             nodeGui.setSelected(true);
 							
 							//We reorder the list do that this selected node goes to the top layer;

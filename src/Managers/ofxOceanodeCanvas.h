@@ -58,7 +58,6 @@ private:
     bool entireSelect;
     ofRectangle selectedRect;
     
-    string deselectAllNodesExcept = "";
     string lastSelectedNode = "";
     string someSelectedModuleMove = "";
     glm::vec2 moveSelectedModulesWithDrag;
