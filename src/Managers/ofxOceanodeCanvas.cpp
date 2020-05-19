@@ -165,6 +165,12 @@ void ofxOceanodeCanvas::draw(bool *open){
 		
 		//Draw List layers
 		draw_list->ChannelsSplit(max(nodesDrawingOrder.size(), (size_t)2)*2 + 1); //We have foreground + background of each node + connections on the background
+        
+        
+        //reorder nodesInThisFrame, so they are in correct drawing order, for the interaction to work properly
+        std::sort(nodesInThisFrame.begin(), nodesInThisFrame.end(), [this](std::pair<std::string, ofxOceanodeNode*> a, std::pair<std::string, ofxOceanodeNode*> b){
+            return nodesDrawingOrder[a.first] > nodesDrawingOrder[b.first];
+        });
 		
         // Display nodes
         //Iterating over the map gives errors as we are removing elements from the map during the iteration.
