@@ -212,6 +212,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                 draw_list->ChannelsSetCurrent(nodeDrawChannel); // Background
                 ImGui::SetCursorScreenPos(node_rect_min);
                 bool interacting_node = ImGui::IsItemActive();
+                bool connectionCanBeInteracted = !ImGui::IsAnyItemActive() && ImGui::IsWindowHovered();
                 ImGui::InvisibleButton("node", size);
                 
                 if (ImGui::IsItemHovered())
@@ -271,7 +272,6 @@ void ofxOceanodeCanvas::draw(bool *open){
                 
                 ImU32 node_hd_color = (isSelectedOrSelecting) ? IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,160) : IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,64);
                 
-                
                 if(nodeGui.getExpanded()){
                     draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
                 }
@@ -279,80 +279,81 @@ void ofxOceanodeCanvas::draw(bool *open){
                 
                 //draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(0, 0, 0, 255), 4.0f);
                 
-                
-                int NODE_BULLET_MIN_SIZE = 3;
-                int NODE_BULLET_MAX_SIZE = 10;
-                int NODE_BULLET_GROW_DIST = 10;
-                
-                for (auto &absParam : node->getParameters()){
-					auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
-                    //TODO: Check if parameter is plugable
-                    auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
-                    //TODO: only grow bulllets that the temporal connection is plugable to.
-                    auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
-                    auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
-                    draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
-                    if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node")){
-                        connectionIsDoable = true;
-                        if(ImGui::IsMouseClicked(0)){
-                            isCreatingConnection = true;
-                            if(param->hasInConnection()){ //Parmaeter has sink connected
-                                auto inConnection = param->getInConnection();
-                                tempSourceParameter = &inConnection->getSourceParameter();
-                                if(!ImGui::GetIO().KeyAlt){
-                                    inConnection->deleteSelf();
-                                }
-                            }else{
-                                tempSinkParameter = param.get();
-                            }
-                        }else if(ImGui::IsMouseReleased(0) && isCreatingConnection){
-                            isCreatingConnection = false;
-                            if(tempSinkParameter != nullptr){
-                                tempSinkParameter = nullptr;
-                                ofLog() << "Cannot create a conection from Sink to Sink";
-                            }
-                            else if(tempSourceParameter != nullptr){
-                                if(tempSourceParameter != param.get()){ //Is the same parameter, no conection between them
-                                    //Remove previous connection connected to that parameter.
-                                    if(param->hasInConnection()){
-                                        param->getInConnection()->deleteSelf();
+                if(nodeGui.getExpanded()){
+                    int NODE_BULLET_MIN_SIZE = 3;
+                    int NODE_BULLET_MAX_SIZE = 10;
+                    int NODE_BULLET_GROW_DIST = 10;
+                    
+                    for (auto &absParam : node->getParameters()){
+                        auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
+                        //TODO: Check if parameter is plugable
+                        auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
+                        //TODO: only grow bulllets that the temporal connection is plugable to.
+                        auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
+                        auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
+                        draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
+                        if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
+                            connectionIsDoable = true;
+                            if(ImGui::IsMouseClicked(0)){
+                                isCreatingConnection = true;
+                                if(param->hasInConnection()){ //Parmaeter has sink connected
+                                    auto inConnection = param->getInConnection();
+                                    tempSourceParameter = &inConnection->getSourceParameter();
+                                    if(!ImGui::GetIO().KeyAlt){
+                                        inConnection->deleteSelf();
                                     }
-                                    container->createConnection(*tempSourceParameter, *param);
+                                }else{
+                                    tempSinkParameter = param.get();
                                 }
-                                else{
-                                    ofLog() << "Cannot create connection with same parameter";
+                            }else if(ImGui::IsMouseReleased(0) && isCreatingConnection){
+                                isCreatingConnection = false;
+                                if(tempSinkParameter != nullptr){
+                                    tempSinkParameter = nullptr;
+                                    ofLog() << "Cannot create a conection from Sink to Sink";
                                 }
-                                tempSourceParameter = nullptr;
+                                else if(tempSourceParameter != nullptr){
+                                    if(tempSourceParameter != param.get()){ //Is the same parameter, no conection between them
+                                        //Remove previous connection connected to that parameter.
+                                        if(param->hasInConnection()){
+                                            param->getInConnection()->deleteSelf();
+                                        }
+                                        container->createConnection(*tempSourceParameter, *param);
+                                    }
+                                    else{
+                                        ofLog() << "Cannot create connection with same parameter";
+                                    }
+                                    tempSourceParameter = nullptr;
+                                }
                             }
                         }
                     }
-                }
-                for (auto &absParam : node->getParameters()){
-					auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
-                    //TODO: Check if parameter is plugable
-                    auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
-                    //TODO: only grow bulllets that the temporal connection is plugable to.
-                    auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
-                    auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
-                    draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
-                    if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node")){
-                        if(ImGui::IsMouseClicked(0)){
-                            isCreatingConnection = true;
-                            tempSourceParameter = param.get();
-                        }else if(ImGui::IsMouseReleased(0) && isCreatingConnection){
-                            isCreatingConnection = false;
-                            if(tempSourceParameter != nullptr){
-                                tempSourceParameter = nullptr;
-                                ofLog() << "Cannot create a conection from Source to Source";
-                            }
-                            if(tempSinkParameter != nullptr){
-                                if(tempSinkParameter != param.get()){ //Is the same parameter, no conection between them
-                                    container->createConnection(*param, *tempSinkParameter);
+                    for (auto &absParam : node->getParameters()){
+                        auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
+                        //TODO: Check if parameter is plugable
+                        auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
+                        //TODO: only grow bulllets that the temporal connection is plugable to.
+                        auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
+                        auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
+                        draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
+                        if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
+                            if(ImGui::IsMouseClicked(0)){
+                                isCreatingConnection = true;
+                                tempSourceParameter = param.get();
+                            }else if(ImGui::IsMouseReleased(0) && isCreatingConnection){
+                                isCreatingConnection = false;
+                                if(tempSourceParameter != nullptr){
+                                    tempSourceParameter = nullptr;
+                                    ofLog() << "Cannot create a conection from Source to Source";
                                 }
-                                else{
-                                    ofLog() << "Cannot create connection with same parameter";
+                                if(tempSinkParameter != nullptr){
+                                    if(tempSinkParameter != param.get()){ //Is the same parameter, no conection between them
+                                        container->createConnection(*param, *tempSinkParameter);
+                                    }
+                                    else{
+                                        ofLog() << "Cannot create connection with same parameter";
+                                    }
+                                    tempSinkParameter = nullptr;
                                 }
-                                tempSinkParameter = nullptr;
                             }
                         }
                     }
