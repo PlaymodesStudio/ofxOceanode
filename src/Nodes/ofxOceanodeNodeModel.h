@@ -90,6 +90,11 @@ public:
         return addParameter(p.set(func), ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisableOutConnection | ofxOceanodeParameterFlags_DisableSavePreset | ofxOceanodeParameterFlags_DisableSaveProject);
     }
     
+    template<typename ParameterType>
+    ofParameter<ParameterType>& getParameter(string name){
+        return static_cast<ofxOceanodeAbstractParameter&>(parameters.get(name)).cast<ParameterType>().getParameter();
+    }
+    
     ofEvent<std::pair<ofJson, string>> deserializeParameterEvent;
     
 protected:
