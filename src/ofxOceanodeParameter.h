@@ -93,6 +93,7 @@ class ofxOceanodeParameter: public ofxOceanodeAbstractParameter{
 public:
 	ofxOceanodeParameter(){
 		parameter = nullptr;
+        registerDragFunctions();
 	};
     
 	~ofxOceanodeParameter() {
@@ -124,6 +125,12 @@ public:
 	void setDropdownOptions(std::vector<std::string> op){dropdownOptions = op;};
 	std::vector<std::string> getDropdownOptions(){return dropdownOptions;};
 	
+    void registerDragFunctions(){
+        normalDrag = [](ofParameter<ParameterType> &p, int drag){};
+        precisionDrag = [](ofParameter<ParameterType> &p, int drag){};
+        speedDrag = [](ofParameter<ParameterType> &p, int drag){};
+    };
+    
 	void registerNormalDrag(std::function<void(ofParameter<ParameterType> &p, int drag)> func){normalDrag = func;};
 	void registerPrecisionDrag(std::function<void(ofParameter<ParameterType> &p, int drag)> func){precisionDrag = func;};
 	void registerSpeedDrag(std::function<void(ofParameter<ParameterType> &p, int drag)> func){speedDrag = func;};
