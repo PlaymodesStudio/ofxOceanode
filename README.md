@@ -20,29 +20,28 @@ Just drop the folder into the `openFrameworks/addons/` folder.
 
 Dependencies
 ------------
-[ofxDatGui_PM](https://github.com/PlaymodesStudio/ofxDatGui_PM)
+[ofxImGuiSimple](https://github.com/PlaymodesStudio/ofxImGuiSimple)
 
 Use
 ------------
-- Copy `ofxBraitsch` folder into `data` folder.
 - Add  `#include "ofxOceanode.h"` into `ofApp.h`
-- Decalre a canvas, container and a controls in `ofApp.h` as:
+- Decalre a ofxOceanode object in `ofApp.h` as:
 ```cpp
-ofxOceanodeCanvas canvas;
-shared_ptr<ofxOceanodeContainer> container;
-unique_ptr<ofxOceanodeControls> controls;
+ofxOceanode oceanode;
 ```
 
-- Create them in `ofApp.cpp` and assign container to canvas in the following way:
+- Setup the object in `ofApp.cpp`:
 ```cpp
-container = make_shared<ofxOceanodeContainer>(reg, treg);
-canvas.setContainer(container);
-canvas.setup();
-    
-controls = new ofxOceanodeControls(container);
+oceanode.setup();
 ```
 
-- For creating custom nodes, check out example-basic
+- You can add aditional nodes with:
+```cpp
+oceanode.registerModel<euclideanGenerator>("Generators");
+```
+with `euclideanGenerator` as the class, and `"Generators"` as the category name.
+
+- For creating custom nodes, check out example-basic.
 
 
 Compatibility
@@ -51,9 +50,10 @@ Only compatible with openFrameworks latest release (0.10) or github master branc
  - macOs
  - Win
  - Linux
- - Rpi (only headless mode tested)
+ - Rpi (coming soon)
+ - ios (tested but needs some changes to be done to repo)
  
-We mainly work on macOs, and we are not testing every change into win/linux. So it's probable that something is broken for those platforms. Also control keystrokes are not optimized for those platforms.
+We mainly work on macOs, and we are not testing every change into other platforms. So it's probable that something is broken for those platforms.
 
 Known issues
 ------------
