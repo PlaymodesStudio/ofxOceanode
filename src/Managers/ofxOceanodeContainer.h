@@ -86,7 +86,8 @@ public:
     void setBpm(float _bpm);
     void resetPhase();
     
-    ofEvent<string> loadPresetEvent;
+    ofEvent<pair<string, string>> loadPresetEvent;
+    ofEvent<pair<string, int>> loadPresetNumEvent;
     ofEvent<float> changedBpmEvent;
     ofEvent<void> saveCurrentPresetEvent;
     ofEvent<ofxOceanodeNode*> newNodeCreated;

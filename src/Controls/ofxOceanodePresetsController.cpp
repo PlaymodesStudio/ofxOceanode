@@ -43,25 +43,29 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
     }
     currentBank = 0;
 
-    //TODO: test listeners check if new logic is working, when untitled
-    presetListener = container->loadPresetEvent.newListener([this](string preset){
-        vector<string> presetInfo = ofSplitString(preset, "/");
-        bool foundBank = false;
-        //TODO: add 2 find embeeded ... find bank and then preset
-        for(int i = 0; i < banks.size(); i++){
-            if(banks[i] == presetInfo[0]){
-                currentBank = i;
-                foundBank = true;
-                break;
+    presetListener = container->loadPresetEvent.newListener([this](pair<string, string> presetInfo){
+        string bankName = presetInfo.first;
+        string presetName = presetInfo.second;
+        auto bankPos = std::find(banks.begin(), banks.end(), bankName);
+        if(bankPos != banks.end()){
+            currentBank = bankPos - banks.begin();
+            if(std::find(bankPresets[bankName].begin(), bankPresets[bankName].end(), presetName) != bankPresets[bankName].end()){
+                loadPreset(presetName, bankName);
+                currentPreset[bankName] = presetName;
             }
         }
-        if(foundBank == true){
-            if(find(bankPresets[banks[currentBank]].begin(),
-                    bankPresets[banks[currentBank]].end(),
-                    presetInfo[1])
-                    != bankPresets[banks[currentBank]].end())
-            {
-                loadPreset(presetInfo[1], presetInfo[0]);
+    });
+    
+    presetNumListener = container->loadPresetNumEvent.newListener([this](pair<string, int> presetInfo){
+        string bankName = presetInfo.first;
+        int presetNum = presetInfo.second;
+        
+        auto bankPos = std::find(banks.begin(), banks.end(), bankName);
+        if(bankPos != banks.end()){
+            currentBank = bankPos - banks.begin();
+            if(bankPresets[bankName].size() >= presetNum){
+                loadPreset(bankPresets[bankName][presetNum-1], bankName);
+                currentPreset[bankName] = bankPresets[bankName][presetNum-1];
             }
         }
     });
