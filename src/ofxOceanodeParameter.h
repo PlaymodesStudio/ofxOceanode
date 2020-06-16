@@ -60,7 +60,7 @@ public:
 	virtual std::shared_ptr<ofAbstractParameter> newReference() const = 0;
 	
 	ofxOceanodeParameterFlags getFlags(){return flags;};
-	ofxOceanodeParameterFlags setFlags(ofxOceanodeParameterFlags f){flags = f;};
+	void setFlags(ofxOceanodeParameterFlags f){flags = f;};
     
     bool hasInConnection(){return inConnection != nullptr;};
     ofxOceanodeAbstractConnection* getInConnection(){return inConnection;};
@@ -180,7 +180,7 @@ public:
 	ofParameter<void> & getParameter(){return *parameter;}
 	
 	ofxOceanodeParameterFlags getFlags();
-	ofxOceanodeParameterFlags setFlags(ofxOceanodeParameterFlags f){flags = f;};
+	void setFlags(ofxOceanodeParameterFlags f){flags = f;};
 	
 protected:
 	const ofParameterGroup getFirstParent() const { return parameter->getFirstParent();}

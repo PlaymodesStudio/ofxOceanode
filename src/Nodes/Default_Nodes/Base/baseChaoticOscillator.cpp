@@ -92,8 +92,8 @@ float baseChaoticOscillator::computeFunc(float phasor){
         if(indexPosShifted == floor(indexPosShifted)) indexPosShifted-=1;
         if(accumulateCycles >= floor(indexPosShifted)){
             if(customDiscreteDistribution.size() > 1){
-                std::discrete_distribution<float> disdist(customDiscreteDistribution.begin(), customDiscreteDistribution.end());
-                futureRandom = disdist(mt)/(customDiscreteDistribution.size()-1);
+                std::discrete_distribution<int> disdist(customDiscreteDistribution.begin(), customDiscreteDistribution.end());
+                futureRandom = (float)disdist(mt)/(customDiscreteDistribution.size()-1);
             }else{
                 futureRandom = dist(mt);
             }

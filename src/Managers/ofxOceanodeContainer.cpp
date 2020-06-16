@@ -1221,6 +1221,8 @@ bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 positi
 
 bool ofxOceanodeContainer::deleteSelectedModules(){
     for(auto &m : getSelectedModules()) m->deleteSelf();
+    if(getSelectedModules().size() > 0) return true;
+    return false;
 }
 
 

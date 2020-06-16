@@ -563,12 +563,14 @@ void ofxOceanodeCanvas::draw(bool *open){
             if(container->getParameterGroupNodesMap().count(param.getGroupHierarchyNames().front())){
                 return container->getParameterGroupNodesMap().at(param.getGroupHierarchyNames().front())->getNodeGui().getSourceConnectionPositionFromParameter(param);
             }
+            return glm::vec2();
             //TODO: Throw exception
         };
         auto getSinkConnectionPositionFromParameter = [this](ofxOceanodeAbstractParameter& param) -> glm::vec2{
             if(container->getParameterGroupNodesMap().count(param.getGroupHierarchyNames().front())){
                 return container->getParameterGroupNodesMap().at(param.getGroupHierarchyNames().front())->getNodeGui().getSinkConnectionPositionFromParameter(param);
             }
+            return glm::vec2();
             //TODO: Throw exception
         };
         
