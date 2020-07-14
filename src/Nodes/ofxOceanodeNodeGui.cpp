@@ -136,12 +136,13 @@ bool ofxOceanodeNodeGui::constructGui(){
                         tempCast = absParam.cast<float>().getDefaultValue();
                     }
                     
-                    ImGui::SliderFloat(hiddenUniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax(), "%.4f");
+                    auto temp = tempCast.get();
+                    ImGui::SliderFloat(hiddenUniqueId.c_str(), &temp, tempCast.getMin(), tempCast.getMax(), "%.4f");
                     
                     //TODO: Implement better this hack
                     // Maybe discard and reset value when not presed enter??
                     if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()) ){
-                        tempCast = ofClamp(tempCast, tempCast.getMin(), tempCast.getMax());
+                        tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
                     }
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast = tempCast;
@@ -164,13 +165,14 @@ bool ofxOceanodeNodeGui::constructGui(){
                             tempCast = absParam.cast<vector<float>>().getDefaultValue();
                         }
                         
+                        auto temp = tempCast.get()[0];
                         ImGui::SliderFloat(hiddenUniqueId.c_str(),
-                                           (float *)&tempCast->at(0),
+                                           &temp,
                                            tempCast.getMin()[0],
                                            tempCast.getMax()[0], "%.4f");
                         
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-                            tempCast = vector<float>(1, ofClamp(tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]));
+                            tempCast = vector<float>(1, ofClamp(temp, tempCast.getMin()[0], tempCast.getMax()[0]));
                         }
                     }else{
                         ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
@@ -196,10 +198,11 @@ bool ofxOceanodeNodeGui::constructGui(){
                             tempCast = absParam.cast<int>().getDefaultValue();
                         }
                         
-                        ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast.get(),tempCast.getMin(),tempCast.getMax());
+                        auto temp = tempCast.get();
+                        ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin(),tempCast.getMax());
                         
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()))
-                            tempCast = tempCast;
+                            tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
                         if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space)))
                             tempCast = tempCast;
                         
@@ -238,10 +241,11 @@ bool ofxOceanodeNodeGui::constructGui(){
                             tempCast = absParam.cast<vector<int>>().getDefaultValue();
                         }
                         
-                        ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast->at(0),tempCast.getMin()[0],tempCast.getMax()[0]);
+                        auto temp = tempCast.get()[0];
+                        ImGui::SliderInt(hiddenUniqueId.c_str(),&temp,tempCast.getMin()[0],tempCast.getMax()[0]);
                         
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-                            tempCast = vector<int>(1, ofClamp(tempCast->at(0), tempCast.getMin()[0], tempCast.getMax()[0]));
+                            tempCast = vector<int>(1, ofClamp(temp, tempCast.getMin()[0], tempCast.getMax()[0]));
                         }
                     }
                     else{
