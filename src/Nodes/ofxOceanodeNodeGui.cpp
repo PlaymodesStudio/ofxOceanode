@@ -13,6 +13,7 @@
 #include "ofxOceanodeContainer.h"
 #include "ofxImGuiSimple.h"
 #include "ofxOceanodeParameter.h"
+#include "ofxOceanodeScope.h"
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node) : container(_container), node(_node){
     color = node.getColor();
@@ -51,16 +52,18 @@ bool ofxOceanodeNodeGui::constructGui(){
     ImGui::SameLine(guiRect.width - 30);
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(220,220,220,255)));
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(ImColor(0, 0, 0,0)));
-    
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(ImColor(0, 0, 0,0)));
+
     if (ImGui::Button("x"))
     {
         ImGui::OpenPopup("Delete?");
     }
-    ImGui::PopStyleColor(2);
+    ImGui::PopStyleColor(4);
     
     if (ImGui::BeginPopupModal("Delete?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
     {
-        ImGui::Text("%s", ("Are you sure you want to delete.\n " + moduleName + "\n").c_str());
+        ImGui::Text("%s", (moduleName + "\n").c_str());
         ImGui::Separator();
         
         if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
@@ -104,46 +107,8 @@ bool ofxOceanodeNodeGui::constructGui(){
                     ImGui::OpenPopup("Param Popup");
                 }
                 
-                if(ImGui::BeginPopup("Param Popup")){
-                    ImGui::Separator();
-                    if(true){ //Param is not scoped
-                        if(ImGui::Selectable("Add to Scope")){
-                            
-                        }
-                    }else{
-                        if(ImGui::Selectable("Remove from Scope")){
-                            
-                        }
-                    }
-                    ImGui::Separator();
-                    if(true){ //Param is not timelined
-                        if(ImGui::Selectable("Add to Timeline")){
-                            
-                        }
-                    }else{
-                        if(ImGui::Selectable("Remove from Timeline")){
-                            
-                        }
-                    }
-#ifdef OFXOCEANODE_USE_MIDI
-                    ImGui::Separator();
-                    if(ImGui::Selectable("Bind MIDI")){
-                        container.createMidiBinding(absParam);
-                    }
-                    if(ImGui::Selectable("Unbind last MIDI")){
-                        container.removeLastMidiBinding(absParam);
-                    }
-#endif
-#ifdef OFXOCEANODE_USE_OSC
-                    ImGui::Separator();
-                    ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
-#endif
-                    ImGui::Separator();
-                    ImGui::EndPopup();
-                }
                 
-                
-                ImGui::SameLine(50);
+                ImGui::SameLine(60);
                 ImGui::SetNextItemWidth(150);
                 
                 string hiddenUniqueId = "##" + uniqueId;
@@ -153,6 +118,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(node.getColor()*.25f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
+                
                 
                 // PARAM FLOAT
                 ///////////////
@@ -170,12 +136,13 @@ bool ofxOceanodeNodeGui::constructGui(){
                         tempCast = absParam.cast<float>().getDefaultValue();
                     }
                     
-                    ImGui::SliderFloat(hiddenUniqueId.c_str(), (float *)&tempCast.get(), tempCast.getMin(), tempCast.getMax(), "%.4f");
+                    auto temp = tempCast.get();
+                    ImGui::SliderFloat(hiddenUniqueId.c_str(), &temp, tempCast.getMin(), tempCast.getMax(), "%.4f");
                     
                     //TODO: Implement better this hack
                     // Maybe discard and reset value when not presed enter??
                     if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()) ){
-                        tempCast = tempCast;
+                        tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
                     }
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast = tempCast;
@@ -198,13 +165,14 @@ bool ofxOceanodeNodeGui::constructGui(){
                             tempCast = absParam.cast<vector<float>>().getDefaultValue();
                         }
                         
+                        auto temp = tempCast.get()[0];
                         ImGui::SliderFloat(hiddenUniqueId.c_str(),
-                                           (float *)&tempCast->at(0),
+                                           &temp,
                                            tempCast.getMin()[0],
                                            tempCast.getMax()[0], "%.4f");
                         
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-                            tempCast = vector<float>(1, tempCast->at(0));
+                            tempCast = vector<float>(1, ofClamp(temp, tempCast.getMin()[0], tempCast.getMax()[0]));
                         }
                     }else{
                         ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
@@ -230,10 +198,11 @@ bool ofxOceanodeNodeGui::constructGui(){
                             tempCast = absParam.cast<int>().getDefaultValue();
                         }
                         
-                        ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast.get(),tempCast.getMin(),tempCast.getMax());
+                        auto temp = tempCast.get();
+                        ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin(),tempCast.getMax());
                         
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()))
-                            tempCast = tempCast;
+                            tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
                         if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space)))
                             tempCast = tempCast;
                         
@@ -248,7 +217,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                         
                         vector<string> options = absParam.cast<int>().getDropdownOptions();
                         if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.get(), vector_getter, static_cast<void*>(&options), options.size()))
-                            tempCast = tempCast;
+                            tempCast = ofClamp(tempCast, tempCast.getMin(), tempCast.getMax());
                         
                         if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space)))
                             tempCast = tempCast;
@@ -272,10 +241,11 @@ bool ofxOceanodeNodeGui::constructGui(){
                             tempCast = absParam.cast<vector<int>>().getDefaultValue();
                         }
                         
-                        ImGui::SliderInt(hiddenUniqueId.c_str(), (int *)&tempCast->at(0),tempCast.getMin()[0],tempCast.getMax()[0]);
+                        auto temp = tempCast.get()[0];
+                        ImGui::SliderInt(hiddenUniqueId.c_str(),&temp,tempCast.getMin()[0],tempCast.getMax()[0]);
                         
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-                            tempCast = vector<int>(1, tempCast->at(0));
+                            tempCast = vector<int>(1, ofClamp(temp, tempCast.getMin()[0], tempCast.getMax()[0]));
                         }
                     }
                     else{
@@ -327,7 +297,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                     // PARAM CHAR
                     /////////////
                 }else if(absParam.valueType() == typeid(char).name()){
-                    ImGui::Text("%s", absParam.getName().c_str());
+                    ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
                     // PARAM COLOR
                     //////////////
                 }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
@@ -372,6 +342,49 @@ bool ofxOceanodeNodeGui::constructGui(){
                 {
                     ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
                 }
+                
+                if(ImGui::IsItemClicked(1)){
+                    ImGui::OpenPopup("Param Popup");
+                }
+                
+                if(ImGui::BeginPopup("Param Popup")){
+                    ImGui::Separator();
+                    if(!absParam.isScoped()){ //Param is not scoped
+                        if(ImGui::Selectable("Add to Scope")){
+                            ofxOceanodeScope::getInstance()->addParameter(&absParam,getColor());
+                        }
+                    }else{
+                        if(ImGui::Selectable("Remove from Scope")){
+                            ofxOceanodeScope::getInstance()->removeParameter(&absParam);
+                        }
+                    }
+                    ImGui::Separator();
+                    if(true){ //Param is not timelined
+                        if(ImGui::Selectable("Add to Timeline")){
+                            
+                        }
+                    }else{
+                        if(ImGui::Selectable("Remove from Timeline")){
+                            
+                        }
+                    }
+#ifdef OFXOCEANODE_USE_MIDI
+                    ImGui::Separator();
+                    if(ImGui::Selectable("Bind MIDI")){
+                        container.createMidiBinding(absParam);
+                    }
+                    if(ImGui::Selectable("Unbind last MIDI")){
+                        container.removeLastMidiBinding(absParam);
+                    }
+#endif
+#ifdef OFXOCEANODE_USE_OSC
+                    ImGui::Separator();
+                    ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
+#endif
+                    ImGui::Separator();
+                    ImGui::EndPopup();
+                }
+                
                 inputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
                 outputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
                 

@@ -12,7 +12,7 @@
 void reindexer::setup(){
     color = ofColor::orange;
     addParameter(input.set("Input", {0}, {0}, {1}));
-    addParameter(outputSize.set("Out Size", 10, 1, 100));
+    addParameter(outputSize.set("Out.Size", 10, 1, 100));
     addOutputParameter(output.set("Output", {0}, {0}, {1}));
     
     inputListenerEvent = input.newListener(this, &reindexer::inputListener);

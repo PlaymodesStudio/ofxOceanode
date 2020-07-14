@@ -43,25 +43,29 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
     }
     currentBank = 0;
 
-    //TODO: test listeners check if new logic is working, when untitled
-    presetListener = container->loadPresetEvent.newListener([this](string preset){
-        vector<string> presetInfo = ofSplitString(preset, "/");
-        bool foundBank = false;
-        //TODO: add 2 find embeeded ... find bank and then preset
-        for(int i = 0; i < banks.size(); i++){
-            if(banks[i] == presetInfo[0]){
-                currentBank = i;
-                foundBank = true;
-                break;
+    presetListener = container->loadPresetEvent.newListener([this](pair<string, string> presetInfo){
+        string bankName = presetInfo.first;
+        string presetName = presetInfo.second;
+        auto bankPos = std::find(banks.begin(), banks.end(), bankName);
+        if(bankPos != banks.end()){
+            currentBank = bankPos - banks.begin();
+            if(std::find(bankPresets[bankName].begin(), bankPresets[bankName].end(), presetName) != bankPresets[bankName].end()){
+                loadPreset(presetName, bankName);
+                currentPreset[bankName] = presetName;
             }
         }
-        if(foundBank == true){
-            if(find(bankPresets[banks[currentBank]].begin(),
-                    bankPresets[banks[currentBank]].end(),
-                    presetInfo[1])
-                    != bankPresets[banks[currentBank]].end())
-            {
-                loadPreset(presetInfo[1], presetInfo[0]);
+    });
+    
+    presetNumListener = container->loadPresetNumEvent.newListener([this](pair<string, int> presetInfo){
+        string bankName = presetInfo.first;
+        int presetNum = presetInfo.second;
+        
+        auto bankPos = std::find(banks.begin(), banks.end(), bankName);
+        if(bankPos != banks.end()){
+            currentBank = bankPos - banks.begin();
+            if(bankPresets[bankName].size() >= presetNum){
+                loadPreset(bankPresets[bankName][presetNum-1], bankName);
+                currentPreset[bankName] = bankPresets[bankName][presetNum-1];
             }
         }
     });
@@ -95,6 +99,9 @@ void ofxOceanodePresetsController::draw(){
     ImGui::Text("%s",banks[currentBank].c_str());
     ImGui::PopStyleColor();
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+
+    ImGui::Separator();
+
     if(ImGui::Button("[+]")){
         ImGui::OpenPopup("Add New Bank");
     }
@@ -161,7 +168,8 @@ void ofxOceanodePresetsController::draw(){
     ImGui::SetNextWindowSize(ImVec2(200,100));
     if(ImGui::BeginPopupModal("Save preset as :", NULL)){
         static char cString[256];
-        //ImGui::SetKeyboardFocusHere(0);
+        
+//        ImGui::SetKeyboardFocusHere(0);
         
         if (ImGui::InputText("##Preset Name : ", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
         {
@@ -325,18 +333,15 @@ void ofxOceanodePresetsController::draw(){
 }
 
 void ofxOceanodePresetsController::createPreset(string name){
-    char newPresetName;
     int newPresetNum = 1;
     if(bankPresets[banks[currentBank]].size() != 0){
         int lastPreset = bankPresets[banks[currentBank]].size();
         newPresetNum = lastPreset + 1;
     }
-    sprintf(&newPresetName, "%s", name.c_str());
-    string newPresetString(&newPresetName);
-    ofStringReplace(newPresetString, " ", "_");
-    bankPresets[banks[currentBank]].push_back(newPresetString);
+    ofStringReplace(name, " ", "_");
+    bankPresets[banks[currentBank]].push_back(name);
     currentPreset[banks[currentBank]] = bankPresets[banks[currentBank]].back();
-    savePreset(newPresetString, banks[currentBank]);
+    savePreset(name, banks[currentBank]);
     newPresetCreated = true;
 }
 

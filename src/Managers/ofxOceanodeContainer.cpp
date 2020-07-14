@@ -281,7 +281,10 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
                 }
             }
         }
+        //TODO: Only delete not persistent in the map
+        parameterGroupNodesMap.clear();
         dynamicNodes.clear();
+
     }
     
     json.clear();
@@ -985,8 +988,12 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             float newBpm = m.getArgAsFloat(0);
             ofNotifyEvent(changedBpmEvent, newBpm);
         }
-    }else if(splitAddress.size() == 2){
+    }else if(splitAddress.size() == 2){ //Load preset by name
         if(splitAddress[0] == "presetLoad"){
+#ifndef OFXOCEANODE_HEADLESS
+            auto toSendPair = make_pair(splitAddress[1], m.getArgAsString(0));
+            loadPresetEvent.notify(toSendPair);
+#else
             string bankName = splitAddress[1];
             
             ofDirectory dir;
@@ -997,25 +1004,43 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             dir.sort();
             int numPresets = dir.listDir();
             for ( int i = 0 ; i < numPresets; i++){
-                if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(0)){
+                if(ofSplitString(dir.getName(i), "--")[1] == m.getArgAsString(0)){
                     string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
-#ifdef OFXOCEANODE_HEADLESS
-                        loadPreset("Presets/" + bankAndPreset);
-#else
-                        ofNotifyEvent(loadPresetEvent, bankAndPreset);
-#endif
-                        break;
+                    loadPreset("Presets/" + bankAndPreset);
+                    break;
                 }
             }
-        }else if(splitAddress[0] == "presetSave"){
-            savePreset("Presets/" + splitAddress[1] + "/" + m.getArgAsString(0));
+#endif
+        }else if(splitAddress[0] == "presetLoadi"){ //Load preset by number
+#ifndef OFXOCEANODE_HEADLESS
+            auto toSendPair = make_pair(splitAddress[1], m.getArgAsInt(0));
+            loadPresetNumEvent.notify(toSendPair);
+#else
+            string bankName = splitAddress[1];
+            ofDirectory dir;
+            map<int, string> presets;
+            dir.open("Presets/" + bankName);
+            if(!dir.exists())
+                return;
+            dir.sort();
+            int numPresets = dir.listDir();
+            for ( int i = 0 ; i < numPresets; i++){
+                if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(0)){
+                    string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
+                    loadPreset("Presets/" + bankAndPreset);
+                    break;
+                }
+            }
+#endif
+//        }else if(splitAddress[0] == "presetSave"){
+//            savePreset("Presets/" + splitAddress[1] + "/" + m.getArgAsString(0));
         }else if(splitAddress[0] == "Global"){
             for(auto &nodeType  : dynamicNodes){
                 for(auto &node : nodeType.second){
                     node.second->getNodeModel().receiveOscMessage(m);
-                    shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
-                    if(groupParam->contains(splitAddress[1])){
-                        ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
+                    ofParameterGroup& groupParam = node.second->getParameters();
+                    if(groupParam.contains(splitAddress[1])){
+                        ofAbstractParameter &absParam = groupParam.get(splitAddress[1]);
                         setParameterFromMidiMessage(absParam, m);
                     }
                 }
@@ -1023,32 +1048,33 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             for(auto &nodeType  : persistentNodes){
                 for(auto &node : nodeType.second){
                     node.second->getNodeModel().receiveOscMessage(m);
-                    shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
-                    if(groupParam->contains(splitAddress[1])){
-                        ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
+                    ofParameterGroup& groupParam = node.second->getParameters();
+                    if(groupParam.contains(splitAddress[1])){
+                        ofAbstractParameter &absParam = groupParam.get(splitAddress[1]);
                         setParameterFromMidiMessage(absParam, m);
                     }
                 }
             }
         }else{
+            //TODO: check if is in the form of NAME_ID
             string moduleName = splitAddress[0];
             string moduleId = ofSplitString(moduleName, "_").back();
             moduleName.erase(moduleName.rfind(moduleId)-1);
             ofStringReplace(moduleName, "_", " ");
             if(dynamicNodes.count(moduleName) == 1){
                 if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
-                    shared_ptr<ofParameterGroup> groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
-                    if(groupParam->contains(splitAddress[1])){
-                        ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
+                    ofParameterGroup& groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                    if(groupParam.contains(splitAddress[1])){
+                        ofAbstractParameter &absParam = groupParam.get(splitAddress[1]);
                         setParameterFromMidiMessage(absParam, m);
                     }
                 }
             }
             if(persistentNodes.count(moduleName) == 1){
                 if(persistentNodes[moduleName].count(ofToInt(moduleId))){
-                    shared_ptr<ofParameterGroup> groupParam = persistentNodes[moduleName][ofToInt(moduleId)]->getParameters();
-                    if(groupParam->contains(splitAddress[1])){
-                        ofAbstractParameter &absParam = groupParam->get(splitAddress[1]);
+                    ofParameterGroup& groupParam = persistentNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                    if(groupParam.contains(splitAddress[1])){
+                        ofAbstractParameter &absParam = groupParam.get(splitAddress[1]);
                         setParameterFromMidiMessage(absParam, m);
                     }
                 }
@@ -1056,21 +1082,21 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
         }
     }
     else if(splitAddress.size() == 3){
-        if(splitAddress[0] == "presetLoad"){
-            string bankAndPreset = splitAddress[1] + "/" + splitAddress[2];
-#ifdef OFXOCEANODE_HEADLESS
-            loadPreset("Presets/" + bankAndPreset);
-#else
-            ofNotifyEvent(loadPresetEvent, bankAndPreset);
-#endif
-        }else if(splitAddress[0] == "relative"){
+//        if(splitAddress[0] == "presetLoad"){
+//            string bankAndPreset = splitAddress[1] + "/" + splitAddress[2];
+//#ifdef OFXOCEANODE_HEADLESS
+//            loadPreset("Presets/" + bankAndPreset);
+//#else
+//            ofNotifyEvent(loadPresetEvent, bankAndPreset);
+//#endif
+        /*}else*/ if(splitAddress[0] == "relative"){
             if(splitAddress[1] == "Global"){
                 for(auto &nodeType  : dynamicNodes){
                     for(auto &node : nodeType.second){
                         node.second->getNodeModel().receiveOscMessage(m);
-                        shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
-                        if(groupParam->contains(splitAddress[2])){
-                            ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                        ofParameterGroup& groupParam = node.second->getParameters();
+                        if(groupParam.contains(splitAddress[2])){
+                            ofAbstractParameter &absParam = groupParam.get(splitAddress[2]);
                             modulateParameterFromOscMessage(absParam, m);
                         }
                     }
@@ -1078,9 +1104,9 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                 for(auto &nodeType  : persistentNodes){
                     for(auto &node : nodeType.second){
                         node.second->getNodeModel().receiveOscMessage(m);
-                        shared_ptr<ofParameterGroup> groupParam = node.second->getParameters();
-                        if(groupParam->contains(splitAddress[2])){
-                            ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                        ofParameterGroup& groupParam = node.second->getParameters();
+                        if(groupParam.contains(splitAddress[2])){
+                            ofAbstractParameter &absParam = groupParam.get(splitAddress[2]);
                             modulateParameterFromOscMessage(absParam, m);
                         }
                     }
@@ -1092,18 +1118,18 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                 ofStringReplace(moduleName, "_", " ");
                 if(dynamicNodes.count(moduleName) == 1){
                     if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
-                        shared_ptr<ofParameterGroup> groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
-                        if(groupParam->contains(splitAddress[2])){
-                            ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                        ofParameterGroup& groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                        if(groupParam.contains(splitAddress[2])){
+                            ofAbstractParameter &absParam = groupParam.get(splitAddress[2]);
                             modulateParameterFromOscMessage(absParam, m);
                         }
                     }
                 }
                 if(persistentNodes.count(moduleName) == 1){
                     if(persistentNodes[moduleName].count(ofToInt(moduleId))){
-                        shared_ptr<ofParameterGroup> groupParam = persistentNodes[moduleName][ofToInt(moduleId)]->getParameters();
-                        if(groupParam->contains(splitAddress[2])){
-                            ofAbstractParameter &absParam = groupParam->get(splitAddress[2]);
+                        ofParameterGroup& groupParam = persistentNodes[moduleName][ofToInt(moduleId)]->getParameters();
+                        if(groupParam.contains(splitAddress[2])){
+                            ofAbstractParameter &absParam = groupParam.get(splitAddress[2]);
                             modulateParameterFromOscMessage(absParam, m);
                         }
                     }
@@ -1149,6 +1175,23 @@ vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules(){
     return modulesToCopy;
 }
 
+vector<ofxOceanodeNode*> ofxOceanodeContainer::getAllModules(){
+    vector<ofxOceanodeNode*> modulesToCopy;
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second)
+        {
+            modulesToCopy.push_back(node.second.get());
+        }
+    }
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            modulesToCopy.push_back(node.second.get());
+        }
+    }
+    return modulesToCopy;
+}
+
+
 bool ofxOceanodeContainer::copySelectedModulesWithConnections(){
     vector<ofxOceanodeNode*> modulesToCopy = getSelectedModules();
     glm::vec2 minPosition(FLT_MAX, FLT_MAX);
@@ -1178,6 +1221,8 @@ bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 positi
 
 bool ofxOceanodeContainer::deleteSelectedModules(){
     for(auto &m : getSelectedModules()) m->deleteSelf();
+    if(getSelectedModules().size() > 0) return true;
+    return false;
 }
 
 

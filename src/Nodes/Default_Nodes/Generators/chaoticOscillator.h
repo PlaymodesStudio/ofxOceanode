@@ -13,7 +13,7 @@
 
 class chaoticOscillator : public ofxOceanodeNodeModel{
 public:
-    chaoticOscillator() : ofxOceanodeNodeModel("Chaotic Oscillator"){};
+    chaoticOscillator() : ofxOceanodeNodeModel("Random Oscillator"){};
     ~chaoticOscillator(){};
     void setup();
     

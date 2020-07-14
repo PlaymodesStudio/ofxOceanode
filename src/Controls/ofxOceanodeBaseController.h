@@ -11,6 +11,7 @@
 #include "ofMain.h"
 
 class ofxOceanodeContainer;
+class ofxOceanodeCanvas;
 
 class ofxOceanodeBaseController{
 public:

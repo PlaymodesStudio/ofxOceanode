@@ -22,7 +22,7 @@ void ofxOceanodeNodeModel::setNumIdentifier(unsigned int num){
 }
 
 shared_ptr<ofxOceanodeAbstractParameter> ofxOceanodeNodeModel::addParameter(ofAbstractParameter& p, ofxOceanodeParameterFlags flags){
-    parameters.add(*ofxOceanodeTypesRegistry::getInstance().createOceanodeAbstractFromAbstract(p));
+    parameters.add(*ofxOceanodeTypesRegistry::getInstance()->createOceanodeAbstractFromAbstract(p));
     return dynamic_pointer_cast<ofxOceanodeAbstractParameter>(*(parameters.end()-1));
 }
 

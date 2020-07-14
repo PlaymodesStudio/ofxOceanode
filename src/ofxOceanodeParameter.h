@@ -32,6 +32,7 @@ public:
 	ofxOceanodeAbstractParameter(){
 		flags = 0;
         inConnection = nullptr;
+        hasScope = false;
 	};
     virtual ~ofxOceanodeAbstractParameter(){};
 	
@@ -59,7 +60,7 @@ public:
 	virtual std::shared_ptr<ofAbstractParameter> newReference() const = 0;
 	
 	ofxOceanodeParameterFlags getFlags(){return flags;};
-	ofxOceanodeParameterFlags setFlags(ofxOceanodeParameterFlags f){flags = f;};
+	void setFlags(ofxOceanodeParameterFlags f){flags = f;};
     
     bool hasInConnection(){return inConnection != nullptr;};
     ofxOceanodeAbstractConnection* getInConnection(){return inConnection;};
@@ -71,6 +72,9 @@ public:
     void removeOutConnection(ofxOceanodeAbstractConnection* c){outConnections.erase(std::remove(outConnections.begin(), outConnections.end(), c));};
     
     void removeAllConnections();
+    
+    bool isScoped(){return hasScope;};
+    void setScoped(bool b){hasScope = b;};
 	
 protected:
 	virtual const ofParameterGroup getFirstParent() const = 0;
@@ -81,6 +85,7 @@ private:
     ofxOceanodeAbstractConnection* inConnection;
     std::vector<ofxOceanodeAbstractConnection*> outConnections;
 	ofxOceanodeParameterFlags flags;
+    bool hasScope;
 };
 
 template<typename ParameterType>
@@ -88,6 +93,7 @@ class ofxOceanodeParameter: public ofxOceanodeAbstractParameter{
 public:
 	ofxOceanodeParameter(){
 		parameter = nullptr;
+        registerDragFunctions();
 	};
     
 	~ofxOceanodeParameter() {
@@ -119,6 +125,12 @@ public:
 	void setDropdownOptions(std::vector<std::string> op){dropdownOptions = op;};
 	std::vector<std::string> getDropdownOptions(){return dropdownOptions;};
 	
+    void registerDragFunctions(){
+        normalDrag = [](ofParameter<ParameterType> &p, int drag){};
+        precisionDrag = [](ofParameter<ParameterType> &p, int drag){};
+        speedDrag = [](ofParameter<ParameterType> &p, int drag){};
+    };
+    
 	void registerNormalDrag(std::function<void(ofParameter<ParameterType> &p, int drag)> func){normalDrag = func;};
 	void registerPrecisionDrag(std::function<void(ofParameter<ParameterType> &p, int drag)> func){precisionDrag = func;};
 	void registerSpeedDrag(std::function<void(ofParameter<ParameterType> &p, int drag)> func){speedDrag = func;};
@@ -168,7 +180,7 @@ public:
 	ofParameter<void> & getParameter(){return *parameter;}
 	
 	ofxOceanodeParameterFlags getFlags();
-	ofxOceanodeParameterFlags setFlags(ofxOceanodeParameterFlags f){flags = f;};
+	void setFlags(ofxOceanodeParameterFlags f){flags = f;};
 	
 protected:
 	const ofParameterGroup getFirstParent() const { return parameter->getFirstParent();}

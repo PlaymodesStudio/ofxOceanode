@@ -24,8 +24,8 @@ void indexer::update(ofEventArgs &e){
 
 void indexer::presetRecallBeforeSettingParameters(ofJson &json){
     if(json.count("Size") == 1){
-		//TODO: FIX size loading
-        //parameters->getInt("Size") = ofToInt(json["Size"]);
+		//TODO: variable on ofxOceanodeParameter to allow for making parameters load order (set priority)
+        indexCount = ofToInt(json["Size"]);
     }
 }
 

@@ -36,6 +36,7 @@ private:
     int loadPresetInNextUpdate;
     
     ofEventListener presetListener;
+    ofEventListener presetNumListener;
     ofEventListener saveCurrentPresetListener;
     
     shared_ptr<ofxOceanodeContainer> container;

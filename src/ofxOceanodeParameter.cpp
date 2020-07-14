@@ -8,15 +8,17 @@
 #include "ofxOceanodeParameter.h"
 #include "ofMath.h"
 #include "ofxOceanodeConnection.h"
+#include "ofxOceanodeScope.h"
 
 void ofxOceanodeAbstractParameter::removeAllConnections(){
     if(inConnection != nullptr) inConnection->deleteSelf();
     for(auto c : outConnections) c->deleteSelf();
+    
+    if(hasScope) ofxOceanodeScope::getInstance()->removeParameter(this);
 };
 
 template<>
-ofxOceanodeParameter<float>::ofxOceanodeParameter(){
-	parameter = nullptr;
+void ofxOceanodeParameter<float>::registerDragFunctions(){
 	normalDrag = [](ofParameter<float> &p, int drag){
 		p = ofClamp(p + (0.001f*drag), p.getMin(), p.getMax());
 	};
@@ -29,7 +31,7 @@ ofxOceanodeParameter<float>::ofxOceanodeParameter(){
 }
 
 template<>
-ofxOceanodeParameter<std::vector<float>>::ofxOceanodeParameter(){
+void ofxOceanodeParameter<std::vector<float>>::registerDragFunctions(){
 	parameter = nullptr;
 	normalDrag = [](ofParameter<std::vector<float>> &p, int drag){
 		if(p->size() == 1)
@@ -46,7 +48,7 @@ ofxOceanodeParameter<std::vector<float>>::ofxOceanodeParameter(){
 }
 
 template<>
-ofxOceanodeParameter<int>::ofxOceanodeParameter(){
+void ofxOceanodeParameter<int>::registerDragFunctions(){
 	parameter = nullptr;
 	normalDrag = [](ofParameter<int> &p, int drag){
 		p = ofClamp(p + (5*drag), p.getMin(), p.getMax());
@@ -60,7 +62,7 @@ ofxOceanodeParameter<int>::ofxOceanodeParameter(){
 }
 
 template<>
-ofxOceanodeParameter<std::vector<int>>::ofxOceanodeParameter(){
+void ofxOceanodeParameter<std::vector<int>>::registerDragFunctions(){
 	parameter = nullptr;
 	normalDrag = [](ofParameter<std::vector<int>> &p, int drag){
 		if(p->size() == 1)
@@ -77,7 +79,7 @@ ofxOceanodeParameter<std::vector<int>>::ofxOceanodeParameter(){
 }
 
 template<>
-ofxOceanodeParameter<bool>::ofxOceanodeParameter(){
+void ofxOceanodeParameter<bool>::registerDragFunctions(){
 	parameter = nullptr;
 	normalDrag = [](ofParameter<bool> &p, int drag){
 		if(drag > 0 && !p) p = true;
@@ -92,7 +94,7 @@ ofxOceanodeParameter<bool>::ofxOceanodeParameter(){
 }
 
 template<>
-ofxOceanodeParameter<ofColor>::ofxOceanodeParameter(){
+void ofxOceanodeParameter<ofColor>::registerDragFunctions(){
 	parameter = nullptr;
 	normalDrag = [](ofParameter<ofColor> &p, int drag){
 		int brightness = p->getBrightness() + (5 * drag);
@@ -118,7 +120,7 @@ ofxOceanodeParameter<ofColor>::ofxOceanodeParameter(){
 }
 
 template<>
-ofxOceanodeParameter<ofFloatColor>::ofxOceanodeParameter(){
+void ofxOceanodeParameter<ofFloatColor>::registerDragFunctions(){
 	parameter = nullptr;
 	normalDrag = [](ofParameter<ofFloatColor> &p, int drag){
 		float brightness = p->getBrightness() + (0.001f * drag);

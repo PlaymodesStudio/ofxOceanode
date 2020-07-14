@@ -57,9 +57,15 @@ void ofxOceanodeCanvas::draw(bool *open){
         const ImVec2 NODE_WINDOW_PADDING(8.0f, 7.0f);
         
         // Create our child canvas
-        
+        offsetToCenter = glm::vec2(int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
         ImGui::Text("[%d,%d]",int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
-
+        ImGui::SameLine();
+        float fps = ofGetFrameRate();
+        if(fps>=60.0) ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.0,1.0,0.0,0.5));
+        else if(fps>30.0) ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1.0,0.5,0.0,0.5));
+        else ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1.0,0.0,0.0,0.5));
+        ImGui::Text("%d fps",int(fps));
+        ImGui::PopStyleColor();
         ImGui::SameLine(ImGui::GetContentRegionAvail().x-20.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
@@ -102,8 +108,26 @@ void ofxOceanodeCanvas::draw(bool *open){
             
             if (recenterCanvas )
             {
-                scrolling.x = ImGui::GetContentRegionAvail().x/2.0f;
-                scrolling.y = ImGui::GetContentRegionAvail().y/2.0f;
+                if(!ImGui::GetIO().KeyShift)
+                {
+                    scrolling.x = ImGui::GetContentRegionAvail().x/2.0f;
+                    scrolling.y = ImGui::GetContentRegionAvail().y/2.0f;
+                }
+                else
+                {
+                    vector<ofxOceanodeNode*> allNodes = container->getAllModules();
+                    glm::vec2 centerOfMass = glm::vec2(0.0f,0.0f);
+                    glm::vec2 currentNodeCenter;
+                    glm::vec2 currentNodeRectangle;
+                    for(int i=0;i<allNodes.size();i++)
+                    {
+                        currentNodeRectangle =  glm::vec2(allNodes[i]->getNodeGui().getRectangle().width,allNodes[i]->getNodeGui().getRectangle().height);
+                        currentNodeCenter = allNodes[i]->getNodeGui().getPosition() + currentNodeRectangle/2.0f  ;
+                        centerOfMass = centerOfMass + currentNodeCenter;
+                    }
+                    scrolling.x = (ImGui::GetContentRegionAvail().x/2.0f) - (centerOfMass.x/allNodes.size());
+                    scrolling.y = (ImGui::GetContentRegionAvail().y/2.0f) - (centerOfMass.y/allNodes.size());
+                }
             }
 
             for (float x = fmodf(scrolling.x, GRID_SZ); x < canvas_sz.x; x += GRID_SZ)
@@ -129,16 +153,24 @@ void ofxOceanodeCanvas::draw(bool *open){
 				it = nodesDrawingOrder.erase(it);
 			}
 		}
-		for(auto &i : erasedPositions){
-			//We reorder the list do that this selected node goes to the top layer;
-			for_each(nodesDrawingOrder.begin(), nodesDrawingOrder.end(), [i](std::pair<const string, int> &orderPair){
-				if(orderPair.second > i) orderPair.second--;
-			});
-		}
+        while(erasedPositions.size() != 0){
+            auto max_e = std::max_element(erasedPositions.begin(), erasedPositions.end());
+            auto i = *max_e;
+            for_each(nodesDrawingOrder.begin(), nodesDrawingOrder.end(), [i](std::pair<const string, int> &orderPair){
+                if(orderPair.second > i) orderPair.second--;
+            });
+            erasedPositions.erase(max_e);
+        }
 		
 		
 		//Draw List layers
 		draw_list->ChannelsSplit(max(nodesDrawingOrder.size(), (size_t)2)*2 + 1); //We have foreground + background of each node + connections on the background
+        
+        
+        //reorder nodesInThisFrame, so they are in correct drawing order, for the interaction to work properly
+        std::sort(nodesInThisFrame.begin(), nodesInThisFrame.end(), [this](std::pair<std::string, ofxOceanodeNode*> a, std::pair<std::string, ofxOceanodeNode*> b){
+            return nodesDrawingOrder[a.first] > nodesDrawingOrder[b.first];
+        });
 		
         // Display nodes
         //Iterating over the map gives errors as we are removing elements from the map during the iteration.
@@ -180,6 +212,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                 draw_list->ChannelsSetCurrent(nodeDrawChannel); // Background
                 ImGui::SetCursorScreenPos(node_rect_min);
                 bool interacting_node = ImGui::IsItemActive();
+                bool connectionCanBeInteracted = !ImGui::IsAnyItemActive() && ImGui::IsWindowHovered();
                 ImGui::InvisibleButton("node", size);
                 
                 if (ImGui::IsItemHovered())
@@ -198,19 +231,13 @@ void ofxOceanodeCanvas::draw(bool *open){
                     }
                 };
                 
-                if((deselectAllNodesExcept != nodeId && deselectAllNodesExcept != "")){
-                    nodeGui.setSelected(false);
-                }else{
-                    deselectAllNodesExcept = "";
-                }
-                
                 bool toCheckPress = nodeGui.getSelected() && lastSelectedNode != nodeId ? ImGui::IsMouseReleased(0) : ImGui::IsMouseClicked(0);
                 
                 if(toCheckPress && ImGui::IsItemHovered(ImGuiHoveredFlags_None)){
                     if(nodeGui.getSelected() && lastSelectedNode == nodeId) lastSelectedNode = "";
                     if(!someDragAppliedToSelection || !nodeGui.getSelected()){
                         if(!ImGui::GetIO().KeyShift){
-                            deselectAllNodesExcept = nodeId;
+                            deselectAllNodes();
                             nodeGui.setSelected(true);
 							
 							//We reorder the list do that this selected node goes to the top layer;
@@ -245,7 +272,6 @@ void ofxOceanodeCanvas::draw(bool *open){
                 
                 ImU32 node_hd_color = (isSelectedOrSelecting) ? IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,160) : IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,64);
                 
-                
                 if(nodeGui.getExpanded()){
                     draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
                 }
@@ -253,80 +279,81 @@ void ofxOceanodeCanvas::draw(bool *open){
                 
                 //draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(0, 0, 0, 255), 4.0f);
                 
-                
-                int NODE_BULLET_MIN_SIZE = 3;
-                int NODE_BULLET_MAX_SIZE = 10;
-                int NODE_BULLET_GROW_DIST = 10;
-                
-                for (auto &absParam : node->getParameters()){
-					auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
-                    //TODO: Check if parameter is plugable
-                    auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
-                    //TODO: only grow bulllets that the temporal connection is plugable to.
-                    auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
-                    auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
-                    draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
-                    if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node")){
-                        connectionIsDoable = true;
-                        if(ImGui::IsMouseClicked(0)){
-                            isCreatingConnection = true;
-                            if(param->hasInConnection()){ //Parmaeter has sink connected
-                                auto inConnection = param->getInConnection();
-                                tempSourceParameter = &inConnection->getSourceParameter();
-                                if(!ImGui::GetIO().KeyAlt){
-                                    inConnection->deleteSelf();
-                                }
-                            }else{
-                                tempSinkParameter = param.get();
-                            }
-                        }else if(ImGui::IsMouseReleased(0) && isCreatingConnection){
-                            isCreatingConnection = false;
-                            if(tempSinkParameter != nullptr){
-                                tempSinkParameter = nullptr;
-                                ofLog() << "Cannot create a conection from Sink to Sink";
-                            }
-                            else if(tempSourceParameter != nullptr){
-                                if(tempSourceParameter != param.get()){ //Is the same parameter, no conection between them
-                                    //Remove previous connection connected to that parameter.
-                                    if(param->hasInConnection()){
-                                        param->getInConnection()->deleteSelf();
+                if(nodeGui.getExpanded()){
+                    int NODE_BULLET_MIN_SIZE = 3;
+                    int NODE_BULLET_MAX_SIZE = 10;
+                    int NODE_BULLET_GROW_DIST = 10;
+                    
+                    for (auto &absParam : node->getParameters()){
+                        auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
+                        //TODO: Check if parameter is plugable
+                        auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
+                        //TODO: only grow bulllets that the temporal connection is plugable to.
+                        auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
+                        auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
+                        draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
+                        if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
+                            connectionIsDoable = true;
+                            if(ImGui::IsMouseClicked(0)){
+                                isCreatingConnection = true;
+                                if(param->hasInConnection()){ //Parmaeter has sink connected
+                                    auto inConnection = param->getInConnection();
+                                    tempSourceParameter = &inConnection->getSourceParameter();
+                                    if(!ImGui::GetIO().KeyAlt){
+                                        inConnection->deleteSelf();
                                     }
-                                    container->createConnection(*tempSourceParameter, *param);
+                                }else{
+                                    tempSinkParameter = param.get();
                                 }
-                                else{
-                                    ofLog() << "Cannot create connection with same parameter";
+                            }else if(ImGui::IsMouseReleased(0) && isCreatingConnection){
+                                isCreatingConnection = false;
+                                if(tempSinkParameter != nullptr){
+                                    tempSinkParameter = nullptr;
+                                    ofLog() << "Cannot create a conection from Sink to Sink";
                                 }
-                                tempSourceParameter = nullptr;
+                                else if(tempSourceParameter != nullptr){
+                                    if(tempSourceParameter != param.get()){ //Is the same parameter, no conection between them
+                                        //Remove previous connection connected to that parameter.
+                                        if(param->hasInConnection()){
+                                            param->getInConnection()->deleteSelf();
+                                        }
+                                        container->createConnection(*tempSourceParameter, *param);
+                                    }
+                                    else{
+                                        ofLog() << "Cannot create connection with same parameter";
+                                    }
+                                    tempSourceParameter = nullptr;
+                                }
                             }
                         }
                     }
-                }
-                for (auto &absParam : node->getParameters()){
-					auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
-                    //TODO: Check if parameter is plugable
-                    auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
-                    //TODO: only grow bulllets that the temporal connection is plugable to.
-                    auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
-                    auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
-                    draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
-                    if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node")){
-                        if(ImGui::IsMouseClicked(0)){
-                            isCreatingConnection = true;
-                            tempSourceParameter = param.get();
-                        }else if(ImGui::IsMouseReleased(0) && isCreatingConnection){
-                            isCreatingConnection = false;
-                            if(tempSourceParameter != nullptr){
-                                tempSourceParameter = nullptr;
-                                ofLog() << "Cannot create a conection from Source to Source";
-                            }
-                            if(tempSinkParameter != nullptr){
-                                if(tempSinkParameter != param.get()){ //Is the same parameter, no conection between them
-                                    container->createConnection(*param, *tempSinkParameter);
+                    for (auto &absParam : node->getParameters()){
+                        auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
+                        //TODO: Check if parameter is plugable
+                        auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
+                        //TODO: only grow bulllets that the temporal connection is plugable to.
+                        auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
+                        auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
+                        draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
+                        if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
+                            if(ImGui::IsMouseClicked(0)){
+                                isCreatingConnection = true;
+                                tempSourceParameter = param.get();
+                            }else if(ImGui::IsMouseReleased(0) && isCreatingConnection){
+                                isCreatingConnection = false;
+                                if(tempSourceParameter != nullptr){
+                                    tempSourceParameter = nullptr;
+                                    ofLog() << "Cannot create a conection from Source to Source";
                                 }
-                                else{
-                                    ofLog() << "Cannot create connection with same parameter";
+                                if(tempSinkParameter != nullptr){
+                                    if(tempSinkParameter != param.get()){ //Is the same parameter, no conection between them
+                                        container->createConnection(*param, *tempSinkParameter);
+                                    }
+                                    else{
+                                        ofLog() << "Cannot create connection with same parameter";
+                                    }
+                                    tempSinkParameter = nullptr;
                                 }
-                                tempSinkParameter = nullptr;
                             }
                         }
                     }
@@ -392,6 +419,7 @@ void ofxOceanodeCanvas::draw(bool *open){
             numTimesPopup++;
             
             bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
+            bool isEnterReleased = ImGui::IsKeyReleased(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
             for(int i = 0; i < categoriesVector.size(); i++){
                 if(numTimesPopup == 1){
                     ImGui::SetNextTreeNodeOpen(false);
@@ -426,7 +454,8 @@ void ofxOceanodeCanvas::draw(bool *open){
                             
                             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
                             
-                            if(ImGui::Selectable(op.c_str()) || isEnterPressed)
+                            
+                            if( ImGui::Selectable(op.c_str()) || ( searchField!="" && isEnterReleased) )
                             {
                                 unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
                                 if (type)
@@ -437,11 +466,10 @@ void ofxOceanodeCanvas::draw(bool *open){
                                 ImGui::PopStyleColor();
                                 ImGui::CloseCurrentPopup();
                                 isEnterPressed = false; //Next options we dont want to create them;
+                                searchField="";
                                 break;
                             }
                             ImGui::PopStyleColor();
-                            
-                            
                         }
                     }
                     //ImGui::CloseCurrentPopup();
@@ -535,12 +563,14 @@ void ofxOceanodeCanvas::draw(bool *open){
             if(container->getParameterGroupNodesMap().count(param.getGroupHierarchyNames().front())){
                 return container->getParameterGroupNodesMap().at(param.getGroupHierarchyNames().front())->getNodeGui().getSourceConnectionPositionFromParameter(param);
             }
+            return glm::vec2();
             //TODO: Throw exception
         };
         auto getSinkConnectionPositionFromParameter = [this](ofxOceanodeAbstractParameter& param) -> glm::vec2{
             if(container->getParameterGroupNodesMap().count(param.getGroupHierarchyNames().front())){
                 return container->getParameterGroupNodesMap().at(param.getGroupHierarchyNames().front())->getNodeGui().getSinkConnectionPositionFromParameter(param);
             }
+            return glm::vec2();
             //TODO: Throw exception
         };
         

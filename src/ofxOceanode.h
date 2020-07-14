@@ -17,10 +17,12 @@
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeTypesRegistry.h"
+#include "ofxOceanodeScope.h"
 
 //#include "ofxOceanodeAbstractTimeline.h"
 
 #include "ofxImGuiSimple.h"
+#include "router.h"
 
 class ofxOceanode {
 public:
@@ -44,8 +46,9 @@ public:
     };
     
     template<typename T>
-    void registerType(){
+    void registerType(string name = typeid(T).name()){
         typesRegistry->registerType<T>();
+        nodeRegistry->registerModel<router<T>>("Router", name, nullptr);
     };
     
     template<typename T>
@@ -72,6 +75,7 @@ private:
     
     shared_ptr<ofxOceanodeNodeRegistry> nodeRegistry;
     shared_ptr<ofxOceanodeTypesRegistry> typesRegistry;
+    ofxOceanodeScope* scope;
     
 //    vector<ofxOceanodeAbstractTimeline> timelines;
     

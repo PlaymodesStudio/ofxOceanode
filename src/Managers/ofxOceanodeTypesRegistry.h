@@ -21,8 +21,8 @@ public:
     ofxOceanodeTypesRegistry();
     ~ofxOceanodeTypesRegistry(){};
     
-    static ofxOceanodeTypesRegistry &getInstance(){
-        static ofxOceanodeTypesRegistry instance;
+    static shared_ptr<ofxOceanodeTypesRegistry> getInstance(){
+        static shared_ptr<ofxOceanodeTypesRegistry> instance(new ofxOceanodeTypesRegistry);
         return instance;
     }
     
@@ -40,7 +40,6 @@ public:
         
         routerCreator rCreator = [this](ofxOceanodeNode* routerNode) -> shared_ptr<ofAbstractParameter>{
             auto castedRouter = dynamic_cast<router<T>*>(&routerNode->getNodeModel());
-            string routerTName = typeid(router<T>).name();
             if(castedRouter != NULL){
                 auto castedRouter = dynamic_cast<router<T>*>(&routerNode->getNodeModel());
                 auto paramRef = dynamic_pointer_cast<ofParameter<T>>(castedRouter->getValue().newReference());
@@ -106,14 +105,39 @@ inline void ofxOceanodeTypesRegistry::registerType<void>(){
     
     registryColector.push_back(std::move(creator));
     
-    routerCreator rCreator = [](ofxOceanodeNode* routerNode) -> shared_ptr<ofAbstractParameter>{
-        string routerTypeName = typeid(dynamic_cast<abstractRouter*>(&routerNode->getNodeModel())).name();
-        if(routerTypeName != typeid(router<void>).name()){
-            auto castedRouter = dynamic_cast<router<void>*>(&routerNode->getNodeModel());
-            auto param = make_shared<ofParameter<void>>();
-            param->set(castedRouter->getNameParam().get());
+    routerCreator rCreator = [this](ofxOceanodeNode* routerNode) -> shared_ptr<ofAbstractParameter>{
+        auto castedRouter = dynamic_cast<router<void>*>(&routerNode->getNodeModel());
+        if(castedRouter != NULL){
+           auto castedRouter = dynamic_cast<router<void>*>(&routerNode->getNodeModel());
+           auto paramRef = dynamic_pointer_cast<ofParameter<void>>(castedRouter->getValue().newReference());
+           auto param = make_shared<ofParameter<void>>();
+           param->set(castedRouter->getNameParam().get());
+           listeners.push(paramRef->newListener([this, paramRef, param](){
+               param->trigger();
+           }));
+           listeners.push(param->newListener([this, paramRef, param](){
+               paramRef->trigger();
+           }));
+           listeners.push(castedRouter->getNameParam().newListener([this, param](string &s){
+               param->setName(s);
+           }));
+           return param;
         }
+        return nullptr;
     };
+    
+    routerColector.push_back(std::move(rCreator));
+    
+    absParamCreator aPCreator = [](ofAbstractParameter &p) -> shared_ptr<ofxOceanodeAbstractParameter>{
+        if(p.valueType() == typeid(void).name()){
+            auto oceaParam = make_shared<ofxOceanodeParameter<void>>();
+            oceaParam->bindParameter(p.cast<void>());
+            return oceaParam;
+        }
+        return nullptr;
+    };
+    
+    absParamColector.push_back(std::move(aPCreator));
 }
 
 #endif /* ofxOceanodeTypesRegistry_h */
