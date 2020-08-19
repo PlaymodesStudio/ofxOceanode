@@ -116,10 +116,10 @@ private:
     string presetPath;
     ofParameter<int> bank;
     int previousBank;
-    ofAbstractParameter* bankDropdown;
+    shared_ptr<ofxOceanodeParameter<int>> bankDropdown;
     vector<string> bankNames;
     ofParameter<int> preset;
-    ofAbstractParameter* presetDropdown;
+    shared_ptr<ofxOceanodeParameter<int>> presetDropdown;
     int currentPreset;
     ofParameter<string> savePresetField;
     vector<string> presetsInBank;

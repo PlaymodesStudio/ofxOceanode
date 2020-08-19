@@ -137,7 +137,7 @@ void ofxOceanodeNodeMacro::setup(){
         }
     }
 	
-    addParameterDropdown(bank, "Bank", 0, bankNames, ofxOceanodeParameterFlags_DisableSavePreset);
+    bankDropdown = addParameterDropdown(bank, "Bank", 0, bankNames, ofxOceanodeParameterFlags_DisableSavePreset);
     auto BankNamePos = std::find(bankNames.begin(), bankNames.end(), "Other");
     if(BankNamePos != bankNames.end()){
         bank.set(std::distance(bankNames.begin(), BankNamePos));
@@ -165,7 +165,7 @@ void ofxOceanodeNodeMacro::setup(){
     
     addParameter(savePreset.set("Save Preset?", false));
     
-    addParameterDropdown(preset, "Preset", 0, presetsInBank);
+    presetDropdown = addParameterDropdown(preset, "Preset", 0, presetsInBank);
     
 	addParameter(savePresetField.set("Save Preset", ""), ofxOceanodeParameterFlags_DisableSavePreset);
     
@@ -190,15 +190,14 @@ void ofxOceanodeNodeMacro::setup(){
             for(auto &p : presets){
                 presetsInBank.push_back(p.second);
             }
-            string  tempStr;
-            for(auto opt : presetsInBank)
-                tempStr += opt + "-|-";
-            tempStr.erase(tempStr.end()-3, tempStr.end());
-            if(tempStr != presetDropdown->castGroup().getString(0).get()){ //Added a bank
-                presetDropdown->castGroup().getString(0) = tempStr;
-                string paramName = presetDropdown->getName();
-                dropdownChanged.notify(paramName);
-            }
+            
+            presetDropdown->setDropdownOptions(presetsInBank);
+            preset.setMax(presetsInBank.size() - 1);
+//            if(tempStr != presetDropdown->castGroup().getString(0).get()){ //Added a bank
+//                presetDropdown->castGroup().getString(0) = tempStr;
+//                string paramName = presetDropdown->getName();
+//                dropdownChanged.notify(paramName);
+//            }
             preset = 0;
             previousBank = bank;
         }
@@ -217,19 +216,21 @@ void ofxOceanodeNodeMacro::setup(){
             
             ofStringReplace(newPresetName, " ", "_");
             presetsInBank.push_back(newPresetName);
+            presetDropdown->setDropdownOptions(presetsInBank);
+            preset.setMax(presetsInBank.size());
             container->savePreset("MacroPresets/" + bankNames[bank] + "/" + newPresetName + "/");
             ofDirectory dir;
             dir.open("MacroPresets/" + bankNames[bank] + "/" + newPresetName);
-            presetLastChanged.clear();
-            for(int i = 0; i < dir.listDir(); i++){
-                presetLastChanged[dir.getPath(i)] = std::filesystem::last_write_time(ofToDataPath(dir.getPath(i)));
-            }
+//            presetLastChanged.clear();
+//            for(int i = 0; i < dir.listDir(); i++){
+//                presetLastChanged[dir.getPath(i)] = std::filesystem::last_write_time(ofToDataPath(dir.getPath(i)));
+//            }
             s = "";
         }
     }));
     
     presetActionsListeners.push(preset.newListener([this](int &i){
-        if(i != 0){
+        if(i > 0 && i <= preset.getMax()){
             if(savePreset){
                 container->savePreset("MacroPresets/" + bankNames[bank] + "/" + presetsInBank[i]);
                 savePreset = false;
@@ -238,10 +239,10 @@ void ofxOceanodeNodeMacro::setup(){
             }
             ofDirectory dir;
             dir.open("MacroPresets/" + bankNames[bank] + "/" + presetsInBank[i] + "/");
-            presetLastChanged.clear();
-            for(int i = 0; i < dir.listDir(); i++){
-                presetLastChanged[dir.getPath(i)] = std::filesystem::last_write_time(ofToDataPath(dir.getPath(i)));
-            }
+//            presetLastChanged.clear();
+//            for(int i = 0; i < dir.listDir(); i++){
+//                presetLastChanged[dir.getPath(i)] = std::filesystem::last_write_time(ofToDataPath(dir.getPath(i)));
+//            }
         }
     }));
     
@@ -314,6 +315,6 @@ void ofxOceanodeNodeMacro::loadBeforeConnections(ofJson &json){
         if(BankNamePos != bankNames.end())
             bank.set(std::distance(bankNames.begin(), BankNamePos));
     }
-//    else deserializeParameter(json, *bankDropdown);
-//    deserializeParameter(json, *presetDropdown);
+    else ofDeserialize(json, bank);
+    ofDeserialize(json, preset);
 }
