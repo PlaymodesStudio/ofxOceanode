@@ -311,7 +311,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                     ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
                     // PARAM COLOR
                     //////////////
-                }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
+                }else if(absParam.valueType() == typeid(ofColor).name()){
                     auto tempCast = absParam.cast<ofColor>().getParameter();
                     if(drag != 0){
                         if(ImGui::GetIO().KeyShift) absParam.cast<ofColor>().applyPrecisionDrag(drag);
