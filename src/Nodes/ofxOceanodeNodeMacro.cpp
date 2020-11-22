@@ -116,6 +116,88 @@ void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
 void ofxOceanodeNodeMacro::setup(){
     addParameter(showWindow.set("Show", true));
     
+    /*addParameter(presetControl.set("Preset Control Gui", [this](){
+        bool addBank = false;
+        
+        if (ImGui::Button("Load Subpatch..."))
+            ImGui::OpenPopup("loadSubpatchMenu");
+        if (ImGui::BeginPopup("loadSubpatchMenu"))
+        {
+            if (ImGui::BeginMenu("First Bank")) {
+                if (ImGui::MenuItem("A Preset")) {ofLog() << "Load a preset";}
+                if (ImGui::MenuItem("Ohter Preset")) {ofLog() << "Load other preset";}
+                if (ImGui::MenuItem("Some other Preset")) {ofLog() << "Load some other preset";}
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("Second Bank")) {
+                if (ImGui::MenuItem("A Preset")) {ofLog() << "Load a preset";}
+                if (ImGui::MenuItem("Ohter Preset")) {ofLog() << "Load other preset";}
+                if (ImGui::MenuItem("Some other Preset")) {ofLog() << "Load some other preset";}
+                ImGui::EndMenu();
+            }
+            if (ImGui::MenuItem("Add Bank")) {
+                addBank = true;
+            }
+//            ImGui::MenuItem("(demo menu)", NULL, false, false);
+//            if (ImGui::MenuItem("New")) {}
+//            if (ImGui::MenuItem("Open", "Ctrl+O")) {}
+//            if (ImGui::BeginMenu("Open Recent"))
+//            {
+//                ImGui::MenuItem("fish_hat.c");
+//                ImGui::MenuItem("fish_hat.inl");
+//                ImGui::MenuItem("fish_hat.h");
+//                if (ImGui::BeginMenu("More.."))
+//                {
+//                    ImGui::MenuItem("Hello");
+//                    ImGui::MenuItem("Sailor");
+//                    ImGui::EndMenu();
+//                }
+//                ImGui::EndMenu();
+//            }
+//            if (ImGui::MenuItem("Save", "Ctrl+S")) {}
+//            if (ImGui::MenuItem("Save As..")) {}
+            
+            ImGui::EndPopup();
+        }
+        
+        if(addBank){
+            ImGui::OpenPopup("Add New Macro Bank");
+        }
+                
+        if(ImGui::BeginPopupModal("Add New Macro Bank", NULL, ImGuiWindowFlags_AlwaysAutoResize)){
+            static char cString[256];
+            if (ImGui::InputText("Bank Name", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
+            {
+//                string proposedNewName(cString);
+//                ofStringReplace(proposedNewName, " ", "_");
+//                if(find(banks.begin(), banks.end(), proposedNewName) == banks.end()){
+//                    if(proposedNewName != ""){
+//                        banks.push_back(proposedNewName);
+//                        currentBank = banks.size()-1;
+//                        currentPreset[banks[currentBank]] = "";
+//                    }
+                    ImGui::CloseCurrentPopup();
+//                }
+//                strcpy(cString, "");
+            }
+            if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsItemActive()){
+                strcpy(cString, "");
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+        
+        
+        if (ImGui::Button("Save Subpatch")){}
+        
+        ImGui::SameLine();
+        
+        if (ImGui::Button("Save As"))
+            ImGui::OpenPopup("newSubpatchPopup");
+        
+    }));
+     */
+    
 //    registry->registerModel<inlet<vector<float>>>("I/O");
 //    registry->registerModel<outlet<vector<float>>>("I/O");
 //    registry->registerModel<inlet<ofTexture*>>("I/O");

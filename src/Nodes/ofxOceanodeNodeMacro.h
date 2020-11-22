@@ -126,6 +126,9 @@ private:
     ofParameter<string> presetName;
     ofParameter<bool> savePreset;
     
+    
+    ofParameter<std::function<void()>> presetControl;
+    
     std::unordered_map<string, std::time_t> presetLastChanged;
     std::time_t bankLastChanged;
     std::time_t presetsInBankLastChanged;
