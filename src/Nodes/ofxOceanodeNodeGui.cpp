@@ -82,6 +82,11 @@ bool ofxOceanodeNodeGui::constructGui(){
         
         auto startPos = ImGui::GetCursorScreenPos();
         
+        if(inputPositions.size() != getParameters().size()){
+            inputPositions.resize(getParameters().size());
+            outputPositions.resize(getParameters().size());
+        }
+        
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
             string uniqueId = absParam.getName();
@@ -385,8 +390,8 @@ bool ofxOceanodeNodeGui::constructGui(){
                     ImGui::EndPopup();
                 }
                 
-                inputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
-                outputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
+                inputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
+                outputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
                 
                 ImGui::PopStyleColor(6);
             }
@@ -397,10 +402,10 @@ bool ofxOceanodeNodeGui::constructGui(){
     ImGui::EndGroup();
     if(expanded){
         for(auto &inPos : inputPositions){
-            inPos.second.x = ImGui::GetItemRectMin().x;
+            inPos.x = ImGui::GetItemRectMin().x;
         }
         for(auto &outPos : outputPositions){
-            outPos.second.x = ImGui::GetItemRectMax().x;
+            outPos.x = ImGui::GetItemRectMax().x;
         }
     }else{
         auto numParams = getParameters().size();
@@ -408,8 +413,8 @@ bool ofxOceanodeNodeGui::constructGui(){
             ofAbstractParameter &absParam = getParameters().get(i);
             string uniqueId = absParam.getName();
             float yPos = numParams == 1 ? ImGui::GetItemRectSize().y / 2 : ImGui::GetItemRectSize().y * ((float)i/(numParams-1));
-            inputPositions[uniqueId] = glm::vec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + yPos);
-            outputPositions[uniqueId] = glm::vec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + yPos);
+            inputPositions[i] = glm::vec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + yPos);
+            outputPositions[i] = glm::vec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + yPos);
         }
     }
     if(deleteModule){
@@ -448,11 +453,11 @@ void ofxOceanodeNodeGui::disable(){
 }
 
 glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter){
-    return outputPositions[parameter.getName()];
+    return outputPositions[getParameters().getPosition(parameter.getName())];
 }
 
 glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter){
-    return inputPositions[parameter.getName()];
+    return inputPositions[getParameters().getPosition(parameter.getName())];
 }
 
 #endif
