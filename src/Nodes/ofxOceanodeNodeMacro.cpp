@@ -235,7 +235,10 @@ void ofxOceanodeNodeMacro::setup(){
                 container->savePreset("MacroPresets/" + bankNames[bank] + "/" + presetsInBank[i]);
                 savePreset = false;
             }else{
-                container->loadPreset("MacroPresets/" + bankNames[bank] + "/" + presetsInBank[i]);
+                if(i != currentPreset){
+                    container->loadPreset("MacroPresets/" + bankNames[bank] + "/" + presetsInBank[i]);
+                    currentPreset = i;
+                }
             }
             ofDirectory dir;
             dir.open("MacroPresets/" + bankNames[bank] + "/" + presetsInBank[i] + "/");
