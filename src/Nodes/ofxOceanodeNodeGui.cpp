@@ -124,6 +124,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
                 
+                bool isItemEditableByText = false; //Used for set focus via mouse or key
                 
                 // PARAM FLOAT
                 ///////////////
@@ -152,6 +153,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast = tempCast;
                     }
+                    isItemEditableByText = true;
                 }
                 // PARAM VECTOR < FLOAT >
                 /////////////////////////
@@ -179,6 +181,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                             tempCast = vector<float>(1, ofClamp(temp, tempCast.getMin()[0], tempCast.getMax()[0]));
                         }
+                        isItemEditableByText = true;
                     }else{
                         ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
                     }
@@ -211,6 +214,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                         if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space)))
                             tempCast = tempCast;
                         
+                        isItemEditableByText = true;
                     }else{
                         auto vector_getter = [](void* vec, int idx, const char** out_text)
                         {
@@ -252,6 +256,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                             tempCast = vector<int>(1, ofClamp(temp, tempCast.getMin()[0], tempCast.getMax()[0]));
                         }
+                        isItemEditableByText = true;
                     }
                     else{
                         std::vector<float> floatVec(tempCast.get().begin(), tempCast.get().end());
@@ -299,6 +304,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                         tempCast = cString;
                     }
                     delete[] cString;
+                    isItemEditableByText = true;
                     // PARAM CHAR
                     /////////////
                 }else if(absParam.valueType() == typeid(char).name()){
@@ -348,8 +354,10 @@ bool ofxOceanodeNodeGui::constructGui(){
                     ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
                 }
                 
-                if(ImGui::IsItemClicked(1)){
-                    ImGui::OpenPopup("Param Popup");
+                if (isItemEditableByText){
+                    if ((ImGui::IsItemHovered() && !ImGui::IsItemEdited() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter))) || ImGui::IsItemClicked(1)){
+                        ImGui::SetKeyboardFocusHere(-1);
+                    }
                 }
                 
                 if(ImGui::BeginPopup("Param Popup")){
