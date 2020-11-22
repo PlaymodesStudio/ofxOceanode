@@ -97,7 +97,7 @@ template<>
 inline void ofxOceanodeTypesRegistry::registerType<void>(){
     registryCreator creator = [](ofxOceanodeContainer &container, ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active) -> ofxOceanodeAbstractConnection*
     {
-        if(source.type() == typeid(ofParameter<void>).name()){
+        if(source.valueType() == typeid(void).name()){
             return container.connectConnection(source.cast<void>(), sink.cast<void>(), active);
         }
         return nullptr;
