@@ -23,6 +23,7 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
      changedBpmListener = container->changedBpmEvent.newListener([this](float newBpm){
 #ifndef OFXOCEANODE_USE_BPM_DETECTION
          bpm = newBpm;
+         container->setBpm(bpm);
 #endif
      });
 
@@ -49,8 +50,10 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
 }
 
 void ofxOceanodeBPMController::draw(){
-    if (ImGui::DragFloat("BPM", &bpm, 0.005))
-    {
+    ImGui::DragFloat("BPM", &bpm, 0.005);
+    //TODO: Implement better this hack
+    // Maybe discard and reset value when not presed enter??
+    if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
         container->setBpm(bpm);
     }
     if (ImGui::Button("Reset Phase")){
@@ -74,8 +77,10 @@ void ofxOceanodeBPMController::draw(){
                 }
                 else{
                     float newBpm = 60.0/averageInterval;
-                    if(newBpm != oldBpm)
+                    if(newBpm != oldBpm){
                         bpm = 60.0/averageInterval;
+                        container->setBpm(bpm);
+                    }
                     oldBpm = newBpm;
                 }
             }

@@ -62,8 +62,8 @@ private:
     
     ofxOceanodeNode& node;
     
-    map<string, glm::vec2> inputPositions;
-    map<string, glm::vec2> outputPositions;
+    vector<glm::vec2> inputPositions;
+    vector<glm::vec2> outputPositions;
     
     ofColor color;
     ofRectangle guiRect;

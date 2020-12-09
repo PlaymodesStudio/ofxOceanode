@@ -82,6 +82,11 @@ bool ofxOceanodeNodeGui::constructGui(){
         
         auto startPos = ImGui::GetCursorScreenPos();
         
+        if(inputPositions.size() != getParameters().size()){
+            inputPositions.resize(getParameters().size());
+            outputPositions.resize(getParameters().size());
+        }
+        
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
             string uniqueId = absParam.getName();
@@ -119,6 +124,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
                 
+                bool isItemEditableByText = false; //Used for set focus via mouse or key
                 
                 // PARAM FLOAT
                 ///////////////
@@ -147,6 +153,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast = tempCast;
                     }
+                    isItemEditableByText = true;
                 }
                 // PARAM VECTOR < FLOAT >
                 /////////////////////////
@@ -174,6 +181,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                             tempCast = vector<float>(1, ofClamp(temp, tempCast.getMin()[0], tempCast.getMax()[0]));
                         }
+                        isItemEditableByText = true;
                     }else{
                         ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
                     }
@@ -206,6 +214,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                         if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space)))
                             tempCast = tempCast;
                         
+                        isItemEditableByText = true;
                     }else{
                         auto vector_getter = [](void* vec, int idx, const char** out_text)
                         {
@@ -247,6 +256,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                             tempCast = vector<int>(1, ofClamp(temp, tempCast.getMin()[0], tempCast.getMax()[0]));
                         }
+                        isItemEditableByText = true;
                     }
                     else{
                         std::vector<float> floatVec(tempCast.get().begin(), tempCast.get().end());
@@ -294,13 +304,14 @@ bool ofxOceanodeNodeGui::constructGui(){
                         tempCast = cString;
                     }
                     delete[] cString;
+                    isItemEditableByText = true;
                     // PARAM CHAR
                     /////////////
                 }else if(absParam.valueType() == typeid(char).name()){
                     ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
                     // PARAM COLOR
                     //////////////
-                }else if(absParam.type() == typeid(ofParameter<ofColor>).name()){
+                }else if(absParam.valueType() == typeid(ofColor).name()){
                     auto tempCast = absParam.cast<ofColor>().getParameter();
                     if(drag != 0){
                         if(ImGui::GetIO().KeyShift) absParam.cast<ofColor>().applyPrecisionDrag(drag);
@@ -343,8 +354,10 @@ bool ofxOceanodeNodeGui::constructGui(){
                     ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
                 }
                 
-                if(ImGui::IsItemClicked(1)){
-                    ImGui::OpenPopup("Param Popup");
+                if (isItemEditableByText){
+                    if ((ImGui::IsItemHovered() && !ImGui::IsItemEdited() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter))) || ImGui::IsItemClicked(1)){
+                        ImGui::SetKeyboardFocusHere(-1);
+                    }
                 }
                 
                 if(ImGui::BeginPopup("Param Popup")){
@@ -385,8 +398,8 @@ bool ofxOceanodeNodeGui::constructGui(){
                     ImGui::EndPopup();
                 }
                 
-                inputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
-                outputPositions[uniqueId] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
+                inputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
+                outputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
                 
                 ImGui::PopStyleColor(6);
             }
@@ -397,10 +410,10 @@ bool ofxOceanodeNodeGui::constructGui(){
     ImGui::EndGroup();
     if(expanded){
         for(auto &inPos : inputPositions){
-            inPos.second.x = ImGui::GetItemRectMin().x;
+            inPos.x = ImGui::GetItemRectMin().x;
         }
         for(auto &outPos : outputPositions){
-            outPos.second.x = ImGui::GetItemRectMax().x;
+            outPos.x = ImGui::GetItemRectMax().x;
         }
     }else{
         auto numParams = getParameters().size();
@@ -408,8 +421,8 @@ bool ofxOceanodeNodeGui::constructGui(){
             ofAbstractParameter &absParam = getParameters().get(i);
             string uniqueId = absParam.getName();
             float yPos = numParams == 1 ? ImGui::GetItemRectSize().y / 2 : ImGui::GetItemRectSize().y * ((float)i/(numParams-1));
-            inputPositions[uniqueId] = glm::vec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + yPos);
-            outputPositions[uniqueId] = glm::vec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + yPos);
+            inputPositions[i] = glm::vec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + yPos);
+            outputPositions[i] = glm::vec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + yPos);
         }
     }
     if(deleteModule){
@@ -448,11 +461,11 @@ void ofxOceanodeNodeGui::disable(){
 }
 
 glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter){
-    return outputPositions[parameter.getName()];
+    return outputPositions[getParameters().getPosition(parameter.getName())];
 }
 
 glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter){
-    return inputPositions[parameter.getName()];
+    return inputPositions[getParameters().getPosition(parameter.getName())];
 }
 
 #endif
