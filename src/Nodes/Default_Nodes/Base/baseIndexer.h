@@ -9,55 +9,44 @@
 #ifndef baseIndexer_h
 #define baseIndexer_h
 
-#include "ofMain.h"
-#include "ofxOceanodeNodeModel.h"
+#include <vector>
 
-class baseIndexer : public ofxOceanodeNodeModel{
+class baseIndexer{
 public:
-    baseIndexer(int numIndexs, string name);
+    baseIndexer(int numIndexs = 100);
     ~baseIndexer(){};
     
-    void putParametersInParametersGroup();
+    std::vector<float> getIndexs(){return indexs;};
     
-    bool areNewIndexs(){
-        return newIndexsFlag;
-        newIndexsFlag = false;
-    };
-    vector<float> getIndexs(){return indexs;};;
+    void recomputeIndexs();
+    void indexRandChanged(float val);
+    void indexShuffleChanged(float val);
+    void indexCountChanged(int newIndexCount);
     
-    virtual void indexCountChanged(int &newIndexCount);
-    
-protected:
-    vector<float>       indexs;
-    virtual void        newIndexs(){
-        newIndexsFlag = true;
-    };
-    
-    ofParameter<int>  indexCount;
-    ofParameter<float>  numWaves_Param; //Desphase Quantity
-    ofParameter<float>   indexInvert_Param;
-    ofParameter<int>    symmetry_Param;
-    ofParameter<float>  indexRand_Param;
-    ofParameter<float>    indexOffset_Param;
-    ofParameter<int>    indexQuant_Param;
-    ofParameter<float>  combination_Param;
-    ofParameter<int>    modulo_Param;
+    float    numWaves_Param; //Desphase Quantity
+    bool    normalize_Param;
+    float    indexInvert_Param;
+    int      symmetry_Param;
+    float    indexRand_Param;
+    bool    wrapShuffle_Param;
+    float   indexShuffle_Param;
+    float    indexOffset_Param;
+    int      indexQuant_Param;
+    float    combination_Param;
+    int      modulo_Param;
     
 private:
-    void parameterBoolListener(bool &b){recomputeIndexs();};
-    void parameterFloatListener(float &f){recomputeIndexs();};
-    void parameterIntListener(int &i){recomputeIndexs();};
-    void recomputeIndexs();
-    void indexRandChanged(float &val);
+    std::vector<float>       indexs;
+    int      indexCount;
     
-    ofEventListeners listeners;
-    
-    vector<int>         indexRand;
-    vector<int>         randomizedIndexes;
-    vector<float>       randPositions;
+    std::vector<int>    indexRand;
+    std::vector<int>    indexShuffle;
+    std::vector<int>    randomizedIndexes;
+    std::vector<float>  randPositions;
     float               indexRand_Param_previous;
-    bool newIndexsFlag;
-    int previousIndexCount;
+    float               indexShuffle_Param_previous;
+    
+    int                 previousIndexCount;
 };
 
 #endif /* baseIndexer_h */
