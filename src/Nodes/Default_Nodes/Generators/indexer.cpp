@@ -143,10 +143,12 @@ void indexer::indexCountChanged(int &newIndexCount){
     float indexQuantNormalized = (float)indexQuant_Param / (float)indexQuant_Param.getMax();
     indexQuant_Param.setMax(indexCount);
     indexQuant_Param = ofClamp(indexQuantNormalized * indexCount, indexQuant_Param.getMin(), indexQuant_Param.getMax());
+    getOceanodeParameter(indexQuant_Param).setDefaultValue(indexCount);
     
     float indexModuloNormalized = (float)modulo_Param / (float)modulo_Param.getMax();
     modulo_Param.setMax(indexCount);
     modulo_Param = ofClamp(indexModuloNormalized * indexCount, modulo_Param.getMin(), modulo_Param.getMax());
+    getOceanodeParameter(modulo_Param).setDefaultValue(indexCount);
     
     //TODO: Update default values of parameters
     indexsOut = base.getIndexs();

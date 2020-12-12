@@ -95,6 +95,11 @@ public:
         return static_cast<ofxOceanodeAbstractParameter&>(parameters.get(name)).cast<ParameterType>().getParameter();
     }
     
+    template<typename ParameterType>
+    ofxOceanodeParameter<ParameterType>& getOceanodeParameter(ofParameter<ParameterType> p){
+        return static_cast<ofxOceanodeAbstractParameter&>(parameters.get(p.getName())).cast<ParameterType>();
+    }
+    
     ofEvent<std::pair<ofJson, string>> deserializeParameterEvent;
     
 protected:

@@ -120,6 +120,8 @@ public:
 		}
 	}
 	ofParameter<ParameterType> & getParameter(){return *parameter;}
+    
+    void setDefaultValue(ParameterType v){defaultValue = v;};
 	ParameterType getDefaultValue(){return defaultValue;};
 	
 	void setDropdownOptions(std::vector<std::string> op){dropdownOptions = op;};
