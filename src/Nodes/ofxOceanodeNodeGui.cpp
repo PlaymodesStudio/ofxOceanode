@@ -103,13 +103,18 @@ bool ofxOceanodeNodeGui::constructGui(){
                 
                 int drag = 0;
                 bool resetValue = false;
-                if(ImGui::IsItemActive() && ImGui::IsMouseDragging(0, 0.1f)){
-                    drag = ImGui::GetIO().MouseDelta.x;
-                }
                 if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)){
                     resetValue = true;
-                }else if(ImGui::IsItemClicked(1)){
+                    valueHasBeenReseted = true;
+                }
+                else if(ImGui::IsItemActive() && ImGui::IsMouseDragging(0, 0.1f) && !valueHasBeenReseted){
+                    drag = ImGui::GetIO().MouseDelta.x;
+                }
+                else if(ImGui::IsItemClicked(1)){
                     ImGui::OpenPopup("Param Popup");
+                }
+                else if(valueHasBeenReseted && ImGui::IsMouseReleased(0)){
+                    valueHasBeenReseted = false;
                 }
                 
                 
