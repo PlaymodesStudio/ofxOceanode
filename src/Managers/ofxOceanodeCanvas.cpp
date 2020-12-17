@@ -212,7 +212,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                 draw_list->ChannelsSetCurrent(nodeDrawChannel); // Background
                 ImGui::SetCursorScreenPos(node_rect_min);
                 bool interacting_node = ImGui::IsItemActive();
-                bool connectionCanBeInteracted = !ImGui::IsAnyItemActive() && ImGui::IsWindowHovered();
+                bool connectionCanBeInteracted = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
                 ImGui::InvisibleButton("node", size);
                 
                 if (ImGui::IsItemHovered())
@@ -294,6 +294,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                             if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
                                 connectionIsDoable = true;
                                 if(ImGui::IsMouseClicked(0)){
+                                    nodeGui.setSelected(false); //Deselect node if we are making connections
                                     isCreatingConnection = true;
                                     if(param->hasInConnection()){ //Parmaeter has sink connected
                                         auto inConnection = param->getInConnection();
@@ -336,6 +337,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                             draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
                             if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
                                 if(ImGui::IsMouseClicked(0)){
+                                    nodeGui.setSelected(false); //Deselect node if we are making connections
                                     isCreatingConnection = true;
                                     tempSourceParameter = param.get();
                                 }else if(ImGui::IsMouseReleased(0) && isCreatingConnection){
@@ -530,81 +532,83 @@ void ofxOceanodeCanvas::draw(bool *open){
         draw_list->ChannelsMerge();
         
         // Scrolling
-        if(ImGui::IsMouseDragging(0, 0.0f)){
-            if (ImGui::IsWindowHovered()){
-                if(ImGui::GetIO().KeySuper && !isCreatingConnection){//MultiSelect not allowed when connecting connectio
-                    if(!isSelecting){
-                        selectInitialPoint = ImGui::GetMousePos() - ImGui::GetIO().MouseDelta - offset;
-                        isSelecting  = true;
-                    }
-                    selectEndPoint = ImGui::GetMousePos() - offset;
-                    selectedRect = ofRectangle(selectInitialPoint, selectEndPoint);
-                    entireSelect =  selectInitialPoint.y < selectEndPoint.y;
-                    canvasHasScolled = true; //HACK to not remove selection on mouse release
-                }
-                if((!isSelecting && !isCreatingConnection) || (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space)))){
-                    scrolling = scrolling + ImGui::GetIO().MouseDelta;
-                    if(glm::vec2(ImGui::GetIO().MouseDelta) != glm::vec2(0,0)) canvasHasScolled = true;
-                    if(isSelecting && !ImGui::GetIO().KeySuper){
-                        selectInitialPoint = selectInitialPoint +  ImGui::GetIO().MouseDelta;
-                        selectEndPoint = selectEndPoint + ImGui::GetIO().MouseDelta;
+        if(ImGui::IsWindowFocused()){
+            if(ImGui::IsMouseDragging(0, 0.0f)){
+                if (ImGui::IsWindowHovered()){
+                    if(ImGui::GetIO().KeySuper && !isCreatingConnection){//MultiSelect not allowed when connecting connectio
+                        if(!isSelecting){
+                            selectInitialPoint = ImGui::GetMousePos() - ImGui::GetIO().MouseDelta - offset;
+                            isSelecting  = true;
+                        }
+                        selectEndPoint = ImGui::GetMousePos() - offset;
                         selectedRect = ofRectangle(selectInitialPoint, selectEndPoint);
-                        entireSelect = glm::vec2(selectedRect.getTopLeft()) == selectInitialPoint;
+                        entireSelect =  selectInitialPoint.y < selectEndPoint.y;
+                        canvasHasScolled = true; //HACK to not remove selection on mouse release
                     }
+                    if((!isSelecting && !isCreatingConnection) || (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space)))){
+                        scrolling = scrolling + ImGui::GetIO().MouseDelta;
+                        if(glm::vec2(ImGui::GetIO().MouseDelta) != glm::vec2(0,0)) canvasHasScolled = true;
+                        if(isSelecting && !ImGui::GetIO().KeySuper){
+                            selectInitialPoint = selectInitialPoint +  ImGui::GetIO().MouseDelta;
+                            selectEndPoint = selectEndPoint + ImGui::GetIO().MouseDelta;
+                            selectedRect = ofRectangle(selectInitialPoint, selectEndPoint);
+                            entireSelect = glm::vec2(selectedRect.getTopLeft()) == selectInitialPoint;
+                        }
+                    }
+                }else if(someSelectedModuleMove != "" && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)){
+                    moveSelectedModulesWithDrag = ImGui::GetIO().MouseDelta;
+                    if(moveSelectedModulesWithDrag != glm::vec2(0,0))
+                        someDragAppliedToSelection = true;
                 }
-            }else if(someSelectedModuleMove != "" && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)){
-                moveSelectedModulesWithDrag = ImGui::GetIO().MouseDelta;
-                if(moveSelectedModulesWithDrag != glm::vec2(0,0))
-                    someDragAppliedToSelection = true;
             }
-        }
-        
-        if(isSelecting){
-            //TODO: Change colors
-            if(selectInitialPoint.y < selectEndPoint.y){ //From top to bottom;
-                draw_list->AddRectFilled(selectInitialPoint + offset, selectEndPoint + offset, IM_COL32(255,127,0,30));
-            }else{
-                draw_list->AddRectFilled(selectInitialPoint + offset, selectEndPoint + offset, IM_COL32(0,125,255,30));
+            
+            if(isSelecting){
+                //TODO: Change colors
+                if(selectInitialPoint.y < selectEndPoint.y){ //From top to bottom;
+                    draw_list->AddRectFilled(selectInitialPoint + offset, selectEndPoint + offset, IM_COL32(255,127,0,30));
+                }else{
+                    draw_list->AddRectFilled(selectInitialPoint + offset, selectEndPoint + offset, IM_COL32(0,125,255,30));
+                }
             }
-        }
-        
-        
-        if(ImGui::IsMouseReleased(0)){
-            if(canvasHasScolled){
-                canvasHasScolled = false;
-            }else if(!isAnyNodeHovered && !someDragAppliedToSelection){
-                deselectAllNodes();
+            
+            
+            if(ImGui::IsMouseReleased(0)){
+                if(canvasHasScolled){
+                    canvasHasScolled = false;
+                }else if(!isAnyNodeHovered && !someDragAppliedToSelection){
+                    deselectAllNodes();
+                }
+                someDragAppliedToSelection = false;
+                moveSelectedModulesWithDrag = glm::vec2(0,0);
             }
-            someDragAppliedToSelection = false;
-            moveSelectedModulesWithDrag = glm::vec2(0,0);
-        }
-        
-        if(ImGui::GetIO().KeySuper){
-            if(ImGui::IsKeyPressed('C')){
-                container->copySelectedModulesWithConnections();
-                deselectAllNodes();
-            }else if(ImGui::IsKeyPressed('V')){
-                deselectAllNodes();
-                container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset, ImGui::GetIO().KeyShift);
-            }else if(ImGui::IsKeyPressed('X')){
-                container->cutSelectedModulesWithConnections();
-            }else if(ImGui::IsKeyPressed('D')){
-                container->copySelectedModulesWithConnections();
-                deselectAllNodes();
-                container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset, ImGui::GetIO().KeyShift);
-            }else if(ImGui::IsKeyPressed('A')){
-                selectAllNodes();
+            
+            if(ImGui::GetIO().KeySuper){
+                if(ImGui::IsKeyPressed('C')){
+                    container->copySelectedModulesWithConnections();
+                    deselectAllNodes();
+                }else if(ImGui::IsKeyPressed('V')){
+                    deselectAllNodes();
+                    container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset, ImGui::GetIO().KeyShift);
+                }else if(ImGui::IsKeyPressed('X')){
+                    container->cutSelectedModulesWithConnections();
+                }else if(ImGui::IsKeyPressed('D')){
+                    container->copySelectedModulesWithConnections();
+                    deselectAllNodes();
+                    container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset, ImGui::GetIO().KeyShift);
+                }else if(ImGui::IsKeyPressed('A')){
+                    selectAllNodes();
+                }
             }
-        }
-        else if(ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace)) && !ImGui::IsAnyItemActive()){
-            container->deleteSelectedModules();
-        }
-        
-        if (isCreatingConnection && !ImGui::IsMouseDown(0)){
-            //Destroy temporal connection
-            tempSourceParameter = nullptr;
-            tempSinkParameter = nullptr;
-            isCreatingConnection = false;
+            else if(ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace)) && !ImGui::IsAnyItemActive()){
+                container->deleteSelectedModules();
+            }
+            
+            if (isCreatingConnection && !ImGui::IsMouseDown(0)){
+                //Destroy temporal connection
+                tempSourceParameter = nullptr;
+                tempSinkParameter = nullptr;
+                isCreatingConnection = false;
+            }
         }
         
         ImGui::PopItemWidth();
