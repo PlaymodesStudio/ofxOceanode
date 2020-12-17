@@ -39,7 +39,7 @@ void ranger::setup(){
 
 void ranger::recalculate()
 {
-    auto getElementFromIndex = [this](const vector<float> f, int index) -> float{
+    auto getElementFromIndex = [this](const vector<float> &f, int index) -> float{
         if(index < f.size()){
             return f[index];
         }else{

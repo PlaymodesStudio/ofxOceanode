@@ -110,7 +110,10 @@ void baseIndexer::recomputeIndexs(){
         if(!normalize_Param) indexf += 0.5f; //For centering non normalized
         
         float value = float(((indexf)/(double)(toDivide))*((double)numWaves_Param*((double)indexCount/(double)newNumOfPixels))*((double)symmetry_Param+1));
-        while (value > 1) value -= 1;
+        if (value > 1) {
+            int trunc = std::trunc(value);
+            value -= (trunc == value) ? trunc-1 : trunc;
+        }
         indexs[i] = value;
     }
 }
