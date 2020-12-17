@@ -103,15 +103,15 @@ void baseIndexer::recomputeIndexs(){
         if(modulo_Param != indexCount)
             indexf = std::fmod(indexf, modulo_Param);
         
-        int shifted_i = i + std::round(indexOffset_Param);
-        if(shifted_i < 0) shifted_i += indexCount;
-        shifted_i %= indexCount;
+//        int shifted_i = i + std::round(indexOffset_Param);
+//        if(shifted_i < 0) shifted_i += indexCount;
+//        shifted_i %= indexCount;
         int toDivide = normalize_Param ? indexCount - 1 : indexCount;
         if(!normalize_Param) indexf += 0.5f; //For centering non normalized
         
         float value = float(((indexf)/(double)(toDivide))*((double)numWaves_Param*((double)indexCount/(double)newNumOfPixels))*((double)symmetry_Param+1));
         while (value > 1) value -= 1;
-        indexs[shifted_i] = value;
+        indexs[i] = value;
     }
 }
 
