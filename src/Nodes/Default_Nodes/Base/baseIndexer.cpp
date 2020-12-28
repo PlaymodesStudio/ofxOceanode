@@ -44,6 +44,8 @@ void baseIndexer::indexCountChanged(int _indexCount){
         std::shuffle(indexRand.begin(), indexRand.end(), std::mt19937(std::random_device()()));
         std::shuffle(indexShuffle.begin(), indexShuffle.end(), std::mt19937(std::random_device()()));
         
+        indexShuffleChanged(indexShuffle_Param);
+        indexRandChanged(indexRand_Param);
         recomputeIndexs();
     }
     previousIndexCount = indexCount;
