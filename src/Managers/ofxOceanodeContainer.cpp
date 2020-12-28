@@ -868,7 +868,13 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
         }else if(absParam.valueType() == typeid(int).name()){
             ofParameter<int> castedParam = absParam.cast<int>().getParameter();
-            castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
+            if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_FLOAT){
+                castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
+            }
+            else if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT32 || m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT64){
+                ofClamp(m.getArgAsInt(0), castedParam.getMin(), castedParam.getMax());
+            }
+            
         }else if(absParam.valueType() == typeid(bool).name()){
             absParam.cast<bool>().getParameter() = m.getArgAsBool(0);
         }else if(absParam.valueType() == typeid(void).name()){
