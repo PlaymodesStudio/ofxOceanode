@@ -164,11 +164,13 @@ void ofxOceanodeCanvas::draw(bool *open){
 		
 		
 		//Draw List layers
-		draw_list->ChannelsSplit(max(nodesDrawingOrder.size(), (size_t)2)*2 + 1); //We have foreground + background of each node + connections on the background
+		draw_list->ChannelsSplit(max(nodesInThisFrame.size(), (size_t)2)*2 + 1); //We have foreground + background of each node + connections on the background
         
         
         //reorder nodesInThisFrame, so they are in correct drawing order, for the interaction to work properly
         std::sort(nodesInThisFrame.begin(), nodesInThisFrame.end(), [this](std::pair<std::string, ofxOceanodeNode*> a, std::pair<std::string, ofxOceanodeNode*> b){
+            if (nodesDrawingOrder.count(a.first) == 0) nodesDrawingOrder[a.first] = nodesDrawingOrder.size();
+            if (nodesDrawingOrder.count(b.first) == 0) nodesDrawingOrder[b.first] = nodesDrawingOrder.size();
             return nodesDrawingOrder[a.first] > nodesDrawingOrder[b.first];
         });
 		
