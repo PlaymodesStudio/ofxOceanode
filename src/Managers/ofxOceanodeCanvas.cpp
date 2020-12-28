@@ -564,6 +564,8 @@ void ofxOceanodeCanvas::draw(bool *open){
                 }
             }
             
+            scrolling = scrolling + glm::vec2(ImGui::GetIO().MouseWheelH, ImGui::GetIO().MouseWheel);
+            
             if(isSelecting){
                 //TODO: Change colors
                 if(selectInitialPoint.y < selectEndPoint.y){ //From top to bottom;
