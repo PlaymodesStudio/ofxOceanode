@@ -26,6 +26,7 @@ public:
         
 private:
     void phasorInListener(vector<float> &phasor);
+    void manualPhasorIn();
     vector<baseOscillator> baseOsc;
     
     template <typename T>

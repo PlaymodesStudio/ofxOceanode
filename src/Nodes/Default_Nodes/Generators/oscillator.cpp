@@ -19,26 +19,31 @@ void oscillator::setup(){
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].phaseOffset_Param = getValueForPosition(val, i);
         }
+        manualPhasorIn();
     }));
     listeners.push(randomAdd_Param.newListener([&](vector<float> &val){
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].randomAdd_Param = getValueForPosition(val, i);
         }
+        manualPhasorIn();
     }));
     listeners.push(scale_Param.newListener([&](vector<float> &val){
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].scale_Param = getValueForPosition(val, i);
         }
+        manualPhasorIn();
     }));
     listeners.push(offset_Param.newListener([&](vector<float> &val){
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].offset_Param = getValueForPosition(val, i);
         }
+        manualPhasorIn();
     }));
     listeners.push(pow_Param.newListener([&](vector<float> &val){
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].pow_Param = getValueForPosition(val, i);
         }
+        manualPhasorIn();
     }));
     listeners.push(biPow_Param.newListener([&](vector<float> &val){
         for(int i = 0; i < baseOsc.size(); i++){
@@ -49,31 +54,37 @@ void oscillator::setup(){
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].quant_Param = getValueForPosition(val, i);
         }
+        manualPhasorIn();
     }));
     listeners.push(pulseWidth_Param.newListener([&](vector<float> &val){
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].pulseWidth_Param = getValueForPosition(val, i);
         }
+        manualPhasorIn();
     }));
     listeners.push(skew_Param.newListener([&](vector<float> &val){
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].skew_Param = getValueForPosition(val, i);
         }
+        manualPhasorIn();
     }));
     listeners.push(amplitude_Param.newListener([&](vector<float> &val){
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].amplitude_Param = getValueForPosition(val, i);
         }
+        manualPhasorIn();
     }));
     listeners.push(invert_Param.newListener([&](vector<float> &val){
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].invert_Param = getValueForPosition(val, i);
         }
+        manualPhasorIn();
     }));
     listeners.push(roundness_Param.newListener([&](vector<float> &val){
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].roundness_Param = getValueForPosition(val, i);
         }
+        manualPhasorIn();
     }));
     listeners.push(index_Param.newListener([&](vector<float> &val){
         if(val.size() != baseOsc.size()){
@@ -82,6 +93,7 @@ void oscillator::setup(){
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].setIndexNormalized(getValueForPosition(val, i));
         }
+        manualPhasorIn();
     }));
     
     
@@ -131,4 +143,11 @@ void oscillator::phasorInListener(vector<float> &phasor){
         result[i] = baseOsc[i].computeFunc(getValueForPosition(phasor, i));
     }
     output = result;
+}
+
+void oscillator::manualPhasorIn(){
+    if(!getOceanodeParameter(phasorIn).hasInConnection()){
+        vector<float> phasorCopy(phasorIn.get());
+        phasorInListener(phasorCopy);
+    }
 }
