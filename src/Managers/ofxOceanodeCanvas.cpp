@@ -314,15 +314,29 @@ void ofxOceanodeCanvas::draw(bool *open){
                                         ofLog() << "Cannot create a conection from Sink to Sink";
                                     }
                                     else if(tempSourceParameter != nullptr){
-                                        if(tempSourceParameter != param.get()){ //Is the same parameter, no conection between them
-                                            //Remove previous connection connected to that parameter.
-                                            if(param->hasInConnection()){
-                                                param->getInConnection()->deleteSelf();
-                                            }
-                                            container->createConnection(*tempSourceParameter, *param);
+                                        if(tempSourceParameter == param.get()){ //Is the same parameter, no conection between them
+                                             ofLog() << "Cannot create connection with same parameter";
                                         }
                                         else{
-                                            ofLog() << "Cannot create connection with same parameter";
+                                            bool hasInverseConnection = false;
+                                            if(param->hasOutConnections()){
+                                                for(auto c : param->getOutConnections()){
+                                                    if(&c->getSinkParameter() == tempSourceParameter){
+                                                        hasInverseConnection = true;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            if(hasInverseConnection){
+                                                ofLog() << "Cannot create connection Already connected the other way arround";
+                                            }
+                                            else{
+                                                //Remove previous connection connected to that parameter.
+                                                if(param->hasInConnection()){
+                                                    param->getInConnection()->deleteSelf();
+                                                }
+                                                container->createConnection(*tempSourceParameter, *param);
+                                            }
                                         }
                                         tempSourceParameter = nullptr;
                                     }
@@ -349,11 +363,20 @@ void ofxOceanodeCanvas::draw(bool *open){
                                         ofLog() << "Cannot create a conection from Source to Source";
                                     }
                                     if(tempSinkParameter != nullptr){
-                                        if(tempSinkParameter != param.get()){ //Is the same parameter, no conection between them
-                                            container->createConnection(*param, *tempSinkParameter);
+                                        if(tempSinkParameter == param.get()){ //Is the same parameter, no conection between them
+                                             ofLog() << "Cannot create connection with same parameter";
                                         }
                                         else{
-                                            ofLog() << "Cannot create connection with same parameter";
+                                            bool hasInverseConnection = false;
+                                            if(param->hasInConnection()){
+                                                hasInverseConnection = &param->getInConnection()->getSourceParameter() == tempSinkParameter;
+                                            }
+                                            if(hasInverseConnection){
+                                                ofLog() << "Cannot create connection Already connected the other way arround";
+                                            }
+                                            else{
+                                                container->createConnection(*param, *tempSinkParameter);
+                                            }
                                         }
                                         tempSinkParameter = nullptr;
                                     }
