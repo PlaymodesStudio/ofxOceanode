@@ -19,6 +19,10 @@ testNode::testNode(shared_ptr<testController> tController) : controller(tControl
     addParameter(colorParam.set("Color", ofColor::red, ofColor::white, ofColor::black));
     addParameter(intModParam.set("Custom", nullptr));
     
+    addInspectorParameter(inspectorColor.set("Node Color", ofColor::purple));
+    
+    color = inspectorColor;
+    
     listener = voidParam.newListener([&](){
         customClass* c = new customClass();
         intModParam = c;
@@ -31,5 +35,13 @@ testNode::testNode(shared_ptr<testController> tController) : controller(tControl
     
     listener3 = controller->newValue.newListener([&](float &f){
         floatParam = f;
+    });
+    
+    listener4 = floatParam.newListener([this](float &f){
+        ofLog() << "evnet" << floatParam;
+    });
+    
+    listener5 = inspectorColor.newListener([this](ofColor &c){
+        color = c;
     });
 }
