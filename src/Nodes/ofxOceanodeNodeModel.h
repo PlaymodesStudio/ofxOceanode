@@ -28,6 +28,7 @@ public:
     
     //get parameterGroup
     ofParameterGroup &getParameterGroup(){return parameters;};
+    ofParameterGroup &getInspectorParameterGroup(){return inspectorParameters;};
     
     //getters
     string nodeName(){return nameIdentifier;};
@@ -60,6 +61,10 @@ public:
     //For Macro
     virtual bool receiveOscMessage(ofxOscMessage &m){return false;};
     virtual void setContainer(ofxOceanodeContainer* container){};
+    
+    void addInspectorParameter(ofAbstractParameter& p){
+        inspectorParameters.add(p);
+    }
     
     shared_ptr<ofxOceanodeAbstractParameter> addParameter(ofAbstractParameter& p, ofxOceanodeParameterFlags flags = 0);
 	
@@ -109,6 +114,7 @@ private:
     string nameIdentifier;
     unsigned int numIdentifier;
 	ofParameterGroup parameters;
+    ofParameterGroup inspectorParameters;
     ofEventListeners eventListeners;
 };
 
