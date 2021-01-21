@@ -429,60 +429,38 @@ void ofxOceanodeCanvas::draw(bool *open){
         }
         
         // Draw New Node menu
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
-        if (ImGui::BeginPopup("New Node"))
+        bool popop_close_button = true;
+        if (ImGui::BeginPopupModal("New Node", &popop_close_button, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
         {
             char * cString = new char[256];
             strcpy(cString, searchField.c_str());
             
-            if(ImGui::InputText("?", cString, 256)){
+            if(ImGui::InputText("Search", cString, 256)){
                 searchField = cString;
             }
             
             if(numTimesPopup == 1){//!(!ImGui::IsItemClicked() && ImGui::IsMouseDown(0)) && searchField == ""){
                 ImGui::SetKeyboardFocusHere(-1);
+                numTimesPopup++;
+            }else{
+                numTimesPopup++;
             }
-            
-            numTimesPopup++;
             
             bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
             bool isEnterReleased = ImGui::IsKeyReleased(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
-            for(int i = 0; i < categoriesVector.size(); i++){
-                if(numTimesPopup == 1){
-                    ImGui::SetNextTreeNodeOpen(false);
-                }
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f,0.45f,0.0f,0.5f));
-                ImGui::Button("##colorTree",ImVec2(5,0));
-                ImGui::PopStyleColor();
-                ImGui::SameLine();
-                
-                if(searchField != "") ImGui::SetNextTreeNodeOpen(true);
-                
-                if(ImGui::TreeNode(categoriesVector[i].c_str()))
-                {
+    
+            if(searchField != ""){
+                string firstSearchResult = "";
+                for(int i = 0; i < categoriesVector.size(); i++){
                     for(auto &op : options[i])
                     {
-                        bool showThis = false;
-                        if(searchField != ""){
-                            string lowercaseName = op;
-                            std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
-                            if(ofStringTimesInString(op, searchField) || ofStringTimesInString(lowercaseName, searchField)){
-                                showThis = true;
-                            }
-                        }else{
-                            showThis = true;
-                        }
-                        if(showThis)
-                        {
-                            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f,0.45f,0.0f,0.5f));
-                            ImGui::Button("##colorBand",ImVec2(5,0));
-                            ImGui::SameLine();
-                            ImGui::PopStyleColor();
-                            
+                        string lowercaseName = op;
+                        std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
+                        if(ofStringTimesInString(op, searchField) || ofStringTimesInString(lowercaseName, searchField)){
                             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
-                            
-                            
-                            if( ImGui::Selectable(op.c_str()) || ( searchField!="" && isEnterReleased) )
+                            if(ImGui::Selectable(op.c_str()) || (ImGui::IsItemFocused() && isEnterPressed))
                             {
                                 unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
                                 if (type)
@@ -493,16 +471,81 @@ void ofxOceanodeCanvas::draw(bool *open){
                                 ImGui::PopStyleColor();
                                 ImGui::CloseCurrentPopup();
                                 isEnterPressed = false; //Next options we dont want to create them;
-                                searchField="";
+                                break;
+                            }
+                            if(firstSearchResult == "") firstSearchResult = op;
+                            ImGui::PopStyleColor();
+                        }
+                    }
+                }
+                //Without any focus we create the first result
+                if(isEnterPressed){
+                    unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(firstSearchResult);
+                    if (type)
+                    {
+                        auto &node = container->createNode(std::move(type));
+                        node.getNodeGui().setPosition(newNodeClickPos - offset);
+                    }
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+                
+            
+            
+            ImGui::Separator();
+            
+            if(ImGui::BeginMenu("Modules")){
+                bool selectedModule = false;
+                for(int i = 0; i < categoriesVector.size() && !selectedModule; i++){
+                    if(ImGui::BeginMenu(categoriesVector[i].c_str()))
+                    {
+                        for(auto &op : options[i])
+                        {
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
+                            if( ImGui::MenuItem(op.c_str()) || (ImGui::IsItemFocused() && isEnterPressed))
+                            {
+                                unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
+                                if (type)
+                                {
+                                    auto &node = container->createNode(std::move(type));
+                                    node.getNodeGui().setPosition(newNodeClickPos - offset);
+                                }
+                                ImGui::PopStyleColor();
+                                selectedModule = true;
                                 break;
                             }
                             ImGui::PopStyleColor();
                         }
+                        ImGui::EndMenu();
                     }
-                    //ImGui::CloseCurrentPopup();
-                    ImGui::TreePop();
                 }
+                ImGui::EndMenu();
+                if(selectedModule) ImGui::CloseCurrentPopup();
             }
+            
+            //TODO: Implement
+            if(ImGui::BeginMenu("Module Groups")){
+                ImGui::MenuItem("Example 1");
+                ImGui::MenuItem("Example 2");
+                ImGui::MenuItem("Example 3");
+                ImGui::EndMenu();
+            }
+            
+            if(ImGui::BeginMenu("Macros")){
+                ImGui::MenuItem("Example 1");
+                ImGui::MenuItem("Example 2");
+                ImGui::MenuItem("Example 3");
+                ImGui::EndMenu();
+            }
+            
+            //TODO: How to add scripts?
+            if(ImGui::BeginMenu("Scripts")){
+                ImGui::MenuItem("Example 1");
+                ImGui::MenuItem("Example 2");
+                ImGui::MenuItem("Example 3");
+                ImGui::EndMenu();
+            }
+            
             ImGui::EndPopup();
         }
         ImGui::PopStyleVar();
