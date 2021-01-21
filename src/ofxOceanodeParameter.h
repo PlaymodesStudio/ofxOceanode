@@ -65,6 +65,9 @@ public:
     bool hasInConnection(){return inConnection != nullptr;};
     ofxOceanodeAbstractConnection* getInConnection(){return inConnection;};
     
+    bool hasOutConnections(){return outConnections.size() != 0;};
+    std::vector<ofxOceanodeAbstractConnection*> getOutConnections(){return outConnections;};
+    
     void setInConnection(ofxOceanodeAbstractConnection* c){inConnection = c;};
     void addOutConnection(ofxOceanodeAbstractConnection* c){outConnections.push_back(c);};
     
