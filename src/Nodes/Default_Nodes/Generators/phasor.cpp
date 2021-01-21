@@ -29,6 +29,9 @@ void phasor::setup(){
     parameterAutoSettersListeners.push(loop_Param.newListener([&](bool &val){
         basePh.setLoop(val);
     }));
+    parameterAutoSettersListeners.push(multiTrigger_Param.newListener([&](bool &val){
+           basePh.setMultiTrigger(val);
+    }));
 
     addParameter(bpm_Param.set("BPM", 120, 0, 999), ofxOceanodeParameterFlags_DisableSavePreset);
     addParameter(beatsDiv_Param.set("Div", {2}, {1}, {512}));
@@ -37,6 +40,8 @@ void phasor::setup(){
     addParameter(resetPhase_Param.set("Reset"));
     addParameter(loop_Param.set("Loop", true));
     addOutputParameter(phasorMonitor.set("Phase", {0}, {0}, {1}));
+    
+    addInspectorParameter(multiTrigger_Param.set("Multi Trigger", false));
     
     resetPhaseListener = resetPhase_Param.newListener([&](){
         if(!selfTrigger)
@@ -57,7 +62,7 @@ void phasor::update(ofEventArgs &e)
 }
 
 void phasor::resetPhase(){
-    resetPhase_Param.trigger();
+    basePh.resetPhasor(true);
 }
 
 void phasor::setBpm(float bpm){

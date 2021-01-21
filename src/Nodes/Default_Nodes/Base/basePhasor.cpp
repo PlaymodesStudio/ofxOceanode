@@ -20,13 +20,15 @@ basePhasor::basePhasor(){
     beatsDiv_Param = vector<float>(1, 1);
     initPhase_Param = 0;
     loop_Param = true;
+    multiTrigger = false;
     bpm_Param_inThread = 120.00;
     beatsMult_Param_inThread = vector<float>(1, 1);
     beatsDiv_Param_inThread = vector<float>(1, 1);
     initPhase_Param_inThread = 0;
     loop_Param_inThread = true;
+    multiTrigger_inThread = false;
     numPhasors = 1;
-    stopPhasor = vector<bool>(1, false);
+    stopPhasor = vector<bool>(1, true);
 }
 
 basePhasor::~basePhasor(){
@@ -40,9 +42,18 @@ vector<float> basePhasor::getPhasors(){
     return vector<float>(momentaryPhasor.begin(), momentaryPhasor.end());
 }
 
-void basePhasor::resetPhasor(){
-    fill(stopPhasor.begin(), stopPhasor.end(), false);
-    fill(phasor.begin(), phasor.end(), 0);
+void basePhasor::resetPhasor(bool global){
+    if(multiTrigger && !global){
+        if(stopPhasor.back() == true){
+            stopPhasor.back() = false;
+        }else{
+            resizePhasors(numPhasors+1);
+            stopPhasor.back() = false;
+        }
+    }else if((loop_Param && global) || !global){
+        fill(stopPhasor.begin(), stopPhasor.end(), false);
+        fill(phasor.begin(), phasor.end(), 0);
+    }
 }
 
 void basePhasor::threadedFunction(){
@@ -53,6 +64,8 @@ void basePhasor::threadedFunction(){
         beatsDiv_Param_channel.tryReceive(beatsDiv_Param_inThread);
         initPhase_Param_channel.tryReceive(initPhase_Param_inThread);
         loop_Param_channel.tryReceive(loop_Param_inThread);
+        multiTrigger_channel.tryReceive(multiTrigger_inThread);
+        vector<float> removePhasors;
         for(int i = 0; i < numPhasors; i++){
             //tue phasor that goes from 0 to 1 at desired frequency
             double freq = (double)bpm_Param_inThread/(double)60;
@@ -70,6 +83,9 @@ void basePhasor::threadedFunction(){
                 ofNotifyEvent(phasorCycleIndex, i);
                 if(!loop_Param_inThread){
                     stopPhasor[i] = true;
+                    if(multiTrigger_inThread && numPhasors > 1 && removePhasors.size() < numPhasors-1){
+                        removePhasors.push_back(i);
+                    }
                 }
             }
             if(loop_Param_inThread){
@@ -87,6 +103,13 @@ void basePhasor::threadedFunction(){
             //take the initPhase_Param as a phase offset param
             phasorMod[i] += initPhase_Param_inThread;
             phasorMod[i] -= (int)phasorMod[i];
+        }
+        
+        for(int i = removePhasors.size()-1; i >= 0; i--){
+            phasor.erase(phasor.begin() + removePhasors[i]);
+            phasorMod.erase(phasorMod.begin() + removePhasors[i]);
+            stopPhasor.erase(stopPhasor.begin() + removePhasors[i]);
+            numPhasors--;
         }
         
         phasorToSend.send((phasorMod));
