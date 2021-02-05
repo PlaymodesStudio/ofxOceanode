@@ -55,6 +55,56 @@ private:
     bool isPersistent;
 };
 
+template<typename T>
+class ofxOceanodeCustomConnection : public ofxOceanodeAbstractConnection{
+public:
+    ofxOceanodeCustomConnection(ofxOceanodeParameter<T>& pSource, ofxOceanodeAbstractParameter& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()){
+        parameterEventListener = pSource.getParameter().newListener([&](T &p){
+            passValueFunc();
+        });
+        sinkParameter->connectedParameter();
+        passValueFunc();
+    }
+    
+    ~ofxOceanodeCustomConnection(){
+        sinkParameter->disconnectedParameter();
+    };
+    
+private:
+    void passValueFunc(){
+        if(active){
+            sinkParameter->receiveParameter(&sourceParameter);
+        }
+    }
+    ofParameter<T>& sourceParameter;
+    ofEventListener parameterEventListener;
+};
+
+template<>
+class ofxOceanodeCustomConnection<void> : public ofxOceanodeAbstractConnection{
+public:
+    ofxOceanodeCustomConnection(ofxOceanodeParameter<void>& pSource, ofxOceanodeAbstractParameter& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()){
+        parameterEventListener = pSource.getParameter().newListener([&](){
+            passValueFunc();
+        });
+        sinkParameter->connectedParameter();
+        passValueFunc();
+    }
+    
+    ~ofxOceanodeCustomConnection(){
+        sinkParameter->disconnectedParameter();
+    };
+    
+private:
+    void passValueFunc(){
+        if(active){
+            sinkParameter->receiveParameter(&sourceParameter);
+        }
+    }
+    ofParameter<void>& sourceParameter;
+    ofEventListener parameterEventListener;
+};
+
 template<typename Tsource, typename Tsink, typename Enable = void>
 class ofxOceanodeConnection: public ofxOceanodeAbstractConnection{
 public:

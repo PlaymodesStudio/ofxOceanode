@@ -12,6 +12,41 @@
 
 class ofxOceanodeAbstractConnection;
 
+class BaseConnectionFunction{
+public:
+    virtual ~BaseConnectionFunction() {}
+    
+    virtual void execute(ofAbstractParameter *p) = 0;
+};
+
+template <typename T>
+class ConnectionFunction : public BaseConnectionFunction{
+  typedef std::function<void(const T &val)> FuncType;
+  
+  public:
+    ConnectionFunction() {}
+    ConnectionFunction(FuncType f) : f_(f) {}
+    void execute(ofAbstractParameter *p) {
+        if(f_) f_(p->cast<T>().get());
+    }
+private:
+    FuncType f_;
+};
+
+template <>
+class ConnectionFunction<void> : public BaseConnectionFunction{
+  typedef std::function<void()> FuncType;
+  
+  public:
+    ConnectionFunction() {}
+    ConnectionFunction(FuncType f) : f_(f) {}
+    void execute(ofAbstractParameter *p) {
+        if(f_) f_();
+    }
+private:
+    FuncType f_;
+};
+
 typedef int ofxOceanodeParameterFlags;
 
 enum ofxOceanodeParameterFlags_
@@ -78,6 +113,33 @@ public:
     
     bool isScoped(){return hasScope;};
     void setScoped(bool b){hasScope = b;};
+    
+    template <typename T>
+    void addReceiveFunc(std::function<void(const T &val)> cmd){
+       connnectionFunctions.insert(std::pair<std::string, std::shared_ptr<BaseConnectionFunction>>(typeid(T).name(), std::make_shared<ConnectionFunction<T>>(cmd)));
+    }
+    
+    bool receiveParameter(ofAbstractParameter *p){
+        auto it = connnectionFunctions.find(p->valueType());
+        if(it != connnectionFunctions.end())
+        {
+            it->second->execute(p);
+            return true;
+        }
+        return false;
+    }
+    
+    void addConnectFunc(std::function<void()> func){
+        if(!connectFunction) connectFunction = func;
+    }
+    
+    void connectedParameter(){if(connectFunction) connectFunction();};
+    
+    void addDisconnectFunc(std::function<void()> func){
+        if(!disconnectFunction) disconnectFunction = func;
+    }
+    
+    void disconnectedParameter(){if(disconnectFunction) disconnectFunction();};
 	
 protected:
 	virtual const ofParameterGroup getFirstParent() const = 0;
@@ -89,6 +151,10 @@ private:
     std::vector<ofxOceanodeAbstractConnection*> outConnections;
 	ofxOceanodeParameterFlags flags;
     bool hasScope;
+    
+    std::map<std::string, std::shared_ptr<BaseConnectionFunction>> connnectionFunctions;
+    std::function<void()> connectFunction;
+    std::function<void()> disconnectFunction;
 };
 
 template<typename ParameterType>

@@ -27,7 +27,7 @@ public:
     testNode(shared_ptr<testController> tController);
     ~testNode(){};
     
-    void update(ofEventArgs &a){ofLog() << floatParam;};
+    void update(ofEventArgs &a){};
 
     void setBpm(float _bpm) override {bpm = _bpm;};
     

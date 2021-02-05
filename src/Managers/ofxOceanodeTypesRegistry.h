@@ -29,7 +29,12 @@ public:
         registryCreator creator = [](ofxOceanodeContainer &container, ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active) -> ofxOceanodeAbstractConnection*
             {
                 if(source.valueType() == typeid(T).name()){
-                    return container.connectConnection(source.cast<T>(), sink.cast<T>(), active);
+                    if(sink.valueType() == typeid(T).name()){
+                        return container.connectConnection(source.cast<T>(), sink.cast<T>(), active);
+                    }
+                    else{
+                        return container.connectCustomConnection(source.cast<T>(), sink, active);
+                    }
                 }
                 return nullptr;
             };

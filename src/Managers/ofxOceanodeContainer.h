@@ -66,6 +66,18 @@ public:
         }));
         return connectionRef;
     }
+    
+    template<typename T>
+    ofxOceanodeAbstractConnection* connectCustomConnection(ofxOceanodeParameter<T>& source, ofxOceanodeAbstractParameter &sink, bool active = true){
+        if(!sink.receiveParameter(&source.getParameter())) return nullptr;
+        connections.push_back(move(make_unique<ofxOceanodeCustomConnection<T>>(source, sink, active)));
+        auto connectionRef = connections.back().get();
+        destroyConnectionListeners.push(connectionRef->destroyConnection.newListener([this, connectionRef](){
+            connections.erase(std::find_if(connections.begin(), connections.end(), [connectionRef](std::unique_ptr<ofxOceanodeAbstractConnection> const &c){return c.get() == connectionRef;}));
+        }));
+        return connectionRef;
+    }
+    
     ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter, bool active = true);
     ofxOceanodeAbstractConnection* createConnection(ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active = true);
     
