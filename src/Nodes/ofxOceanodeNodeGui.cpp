@@ -402,12 +402,11 @@ bool ofxOceanodeNodeGui::constructGui(){
                     ImGui::Separator();
                     ImGui::EndPopup();
                 }
-                
-                inputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
-                outputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
-                
                 ImGui::PopStyleColor(6);
             }
+            inputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
+            outputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
+            
             ImGui::PopID();
         } //endFor
     }else{}
