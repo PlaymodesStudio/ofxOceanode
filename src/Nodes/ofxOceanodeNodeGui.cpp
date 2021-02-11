@@ -344,7 +344,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                         else absParam.cast<ofFloatColor>().applyNormalDrag(drag);
                     }
                     
-                    if (ImGui::ColorEdit3(hiddenUniqueId.c_str(), (float*)&tempCast.get().r))
+                    if (ImGui::ColorEdit4(hiddenUniqueId.c_str(), (float*)&tempCast.get().r, ImGuiColorEditFlags_Float))
                     {
                         tempCast = tempCast;
                     }

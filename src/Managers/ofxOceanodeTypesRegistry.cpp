@@ -16,6 +16,8 @@ ofxOceanodeTypesRegistry::ofxOceanodeTypesRegistry(){
     this->registerType<char>();
     this->registerType<vector<float>>();
     this->registerType<vector<int>>();
+    this->registerType<ofColor>();
+    this->registerType<ofFloatColor>();
 }
 
 ofxOceanodeAbstractConnection* ofxOceanodeTypesRegistry::createCustomTypeConnection(ofxOceanodeContainer &container, ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active){
