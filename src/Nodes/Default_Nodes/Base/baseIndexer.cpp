@@ -10,6 +10,7 @@
 #include <numeric>
 #include <cmath>
 #include <random>
+#include <algorithm>
 
 baseIndexer::baseIndexer(int numIndexs){
     indexCount = numIndexs;
@@ -150,7 +151,7 @@ void baseIndexer::indexShuffleChanged(float val){
             }
         }else{
             for(int i = 0; i < indexCount; i++){
-                randPositions[i] = indexShuffle[i]*abs(val) + i*(1-abs(val));
+                randPositions[i] = (indexShuffle[i]*val) + (i*(1-val));
             }
         }
         
