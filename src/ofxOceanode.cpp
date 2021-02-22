@@ -38,6 +38,7 @@ void ofxOceanode::setup(){
 
 void ofxOceanode::update(){
     container->update();
+    controls->update();
 }
 
 void ofxOceanode::draw(){
