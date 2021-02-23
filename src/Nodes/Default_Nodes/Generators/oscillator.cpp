@@ -136,7 +136,7 @@ void oscillator::resize(int newSize){
 };
 
 void oscillator::phasorInListener(vector<float> &phasor){
-    if(phasor.size() != baseOsc.size() && phasor.size() != 1 && index_Param->size() == 1){
+    if(phasor.size() != baseOsc.size() && index_Param->size() == 1){
         resize(phasor.size());
     }
     for(int i = 0; i < baseOsc.size(); i++){
