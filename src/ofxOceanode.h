@@ -56,6 +56,11 @@ public:
         return controls->addController<T>();
     }
     
+    template<typename T>
+    shared_ptr<T> getController(){
+        return controls->get<T>();
+    }
+    
    template<typename T>
     void registerScope(std::function<void(ofxOceanodeAbstractParameter* p, ImVec2 size)> func){
         ofxOceanodeScope::getInstance()->addScopeFunc([func](ofxOceanodeAbstractParameter *p, ImVec2 size) -> bool{

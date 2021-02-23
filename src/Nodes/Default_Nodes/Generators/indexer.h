@@ -10,11 +10,13 @@
 #define indexer_h
 
 #include "baseIndexer.h"
+#include "ofxOceanodeNodeModel.h"
 
-class indexer : public baseIndexer{
+class indexer : public ofxOceanodeNodeModel{
 public:
-    indexer() : baseIndexer(100, "Indexer"){};
+    indexer() : ofxOceanodeNodeModel("Indexer"){};
     ~indexer(){};
+    
     void setup() override;
     void update(ofEventArgs &e) override;
     
@@ -24,25 +26,26 @@ public:
     void presetHasLoaded() override;
 
 private:
-    void indexCountChanged(int &newIndexCount) override;
+    void indexCountChanged(int &newIndexCount);
     
-    template <typename T>
-    T getValueForPosition(const vector<T> &param, int index){
-        if(param.size() == 1 || param.size() <= index){
-            return param[0];
-        }
-        else{
-            return param[index];
-        }
-    }
-
-    virtual void newIndexs() override;
-    
+    ofParameter<int>  indexCount;
+    ofParameter<float>  numWaves_Param; //Desphase Quantity
+    ofParameter<float>   indexInvert_Param;
+    ofParameter<int>    symmetry_Param;
+    ofParameter<bool>   wrapShuffle_Param;
+    ofParameter<float>   indexShuffle_Param;
+    ofParameter<float>  indexRand_Param;
+    ofParameter<float>    indexOffset_Param;
+    ofParameter<int>    indexQuant_Param;
+    ofParameter<float>  combination_Param;
+    ofParameter<int>    modulo_Param;
+    ofParameter<bool>   normalize_Param;
     
     ofParameter<vector<float>>      indexsOut;
-    vector<float> result;
     
     ofEventListeners paramListeners;
+    
+    baseIndexer base;
 };
 
 #endif /* indexer_h */

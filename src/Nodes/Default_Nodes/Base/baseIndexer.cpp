@@ -8,46 +8,33 @@
 
 #include "baseIndexer.h"
 #include <numeric>
+#include <cmath>
+#include <random>
+#include <algorithm>
 
-baseIndexer::baseIndexer(int numIndexs, string name) : ofxOceanodeNodeModel(name){
-    indexCount.set("Size", numIndexs, 1, 99999);
+baseIndexer::baseIndexer(int numIndexs){
+    indexCount = numIndexs;
     previousIndexCount = indexCount;
     indexs.resize(indexCount, 0);
     indexRand.resize(indexCount , 0);
     iota(indexRand.begin(), indexRand.end(), 0);
+    indexShuffle.resize(indexCount , 0);
+    iota(indexShuffle.begin(), indexShuffle.end(), 0);
     randPositions.resize(indexCount);
     randomizedIndexes.resize(indexCount);
     iota(randomizedIndexes.begin(), randomizedIndexes.end(), 0);
     indexRand_Param_previous = 0;
-    
-    numWaves_Param.set("NWaves", 1, 0, indexCount);
-    indexInvert_Param.set("Invert", 0, 0, 1);
-    symmetry_Param.set("Sym", 0, 0, indexCount/2);
-    indexRand_Param.set("Random", 0, -1, 1);
-    indexOffset_Param.set("Offset", 0, -indexCount/2, indexCount/2);
-    indexQuant_Param.set("Quant", indexCount, 1, indexCount);
-    combination_Param.set("Comb", 0, 0, 1);
-    modulo_Param.set("Modulo", indexCount, 1, indexCount);
-    
-    recomputeIndexs();
-
-    listeners.push(indexRand_Param.newListener(this, &baseIndexer::indexRandChanged));
-    listeners.push(indexCount.newListener(this, &baseIndexer::indexCountChanged));
-    listeners.push(numWaves_Param.newListener(this, &baseIndexer::parameterFloatListener));
-    listeners.push(indexInvert_Param.newListener(this, &baseIndexer::parameterFloatListener));
-    listeners.push(symmetry_Param.newListener(this, &baseIndexer::parameterIntListener));
-    listeners.push(indexRand_Param.newListener(this, &baseIndexer::parameterFloatListener));
-    listeners.push(indexOffset_Param.newListener(this, &baseIndexer::parameterFloatListener));
-    listeners.push(indexQuant_Param.newListener(this, &baseIndexer::parameterIntListener));
-    listeners.push(combination_Param.newListener(this, &baseIndexer::parameterFloatListener));
-    listeners.push(modulo_Param.newListener(this, &baseIndexer::parameterIntListener));
+    indexShuffle_Param_previous = 0;
 }
 
-void baseIndexer::indexCountChanged(int &indexCount){
+void baseIndexer::indexCountChanged(int _indexCount){
+    indexCount = _indexCount;
     if(indexCount != previousIndexCount){
         indexs.resize(indexCount, 0);
         indexRand.resize(indexCount);
         iota(indexRand.begin(), indexRand.end(), 0);
+        indexShuffle.resize(indexCount , 0);
+        iota(indexShuffle.begin(), indexShuffle.end(), 0);
         randomizedIndexes.resize(indexCount);
         randPositions.resize(indexCount);
         iota(randomizedIndexes.begin(), randomizedIndexes.end(), 0);
@@ -55,56 +42,14 @@ void baseIndexer::indexCountChanged(int &indexCount){
         indexRand_Param = 0;
         indexRand_Param = indexRand_temp_store;
 
-        random_shuffle(indexRand.begin(), indexRand.end());
-
+        std::shuffle(indexRand.begin(), indexRand.end(), std::mt19937(std::random_device()()));
+        std::shuffle(indexShuffle.begin(), indexShuffle.end(), std::mt19937(std::random_device()()));
         
-        numWaves_Param.setMax(indexCount);
-        numWaves_Param = ofClamp(numWaves_Param, numWaves_Param.getMin(), numWaves_Param.getMax());
-        string name1 = numWaves_Param.getName();
-        ofNotifyEvent(parameterChangedMinMax, name1);
-        
-        symmetry_Param.setMax(indexCount/2);
-        symmetry_Param = ofClamp(symmetry_Param, symmetry_Param.getMin(), symmetry_Param.getMax());
-        string name11 = symmetry_Param.getName();
-        ofNotifyEvent(parameterChangedMinMax, name11);
-
-        indexOffset_Param.setMin(-indexCount/2);
-        indexOffset_Param.setMax(indexCount/2);
-        indexOffset_Param = ofClamp(indexOffset_Param, indexOffset_Param.getMin(), indexOffset_Param.getMax());
-        string name2 = indexOffset_Param.getName();
-        ofNotifyEvent(parameterChangedMinMax, name2);
-        
-        float indexQuantNormalized = (float)indexQuant_Param / (float)indexQuant_Param.getMax();
-        indexQuant_Param.setMax(indexCount);
-        string name3 = indexQuant_Param.getName();
-        ofNotifyEvent(parameterChangedMinMax, name3);
-        indexQuant_Param = ofClamp(indexQuantNormalized * indexCount, indexQuant_Param.getMin(), indexQuant_Param.getMax());
-        
-        
-        float indexModuloNormalized = (float)modulo_Param / (float)modulo_Param.getMax();
-        modulo_Param.setMax(indexCount);
-        string name4 = modulo_Param.getName();
-        ofNotifyEvent(parameterChangedMinMax, name4);
-        modulo_Param = ofClamp(indexModuloNormalized * indexCount, modulo_Param.getMin(), modulo_Param.getMax());
-        
+        indexShuffleChanged(indexShuffle_Param);
+        indexRandChanged(indexRand_Param);
         recomputeIndexs();
     }
     previousIndexCount = indexCount;
-}
-
-void baseIndexer::putParametersInParametersGroup(){
-    addParameter(indexCount);
-	addParameter(numWaves_Param)->registerSpeedDrag([](ofParameter<float> &p, int drag){
-		float closestp = drag > 0 ? floor(p) : ceil(p);
-		p = ofClamp(closestp + drag, p.getMin(), p.getMax());
-	});
-    addParameter(indexInvert_Param);
-    addParameter(symmetry_Param);
-    addParameter(indexRand_Param);
-    addParameter(indexOffset_Param);
-    addParameter(indexQuant_Param);
-    addParameter(combination_Param);
-    addParameter(modulo_Param);
 }
 
 void baseIndexer::recomputeIndexs(){
@@ -114,7 +59,7 @@ void baseIndexer::recomputeIndexs(){
         //QUANTIZE
         int newNumOfPixels = indexQuant_Param;
         
-        index = floor(index/((float)indexCount/(float)newNumOfPixels));
+        index = (int)(index/((float)indexCount/(float)newNumOfPixels));
         
         
         while(symmetry_Param > newNumOfPixels-1)
@@ -140,17 +85,17 @@ void baseIndexer::recomputeIndexs(){
         }
         
         //COMB
-        index = abs(((index%2)*indexCount*combination_Param)-index);
+        index = std::abs(((index%2)*indexCount*combination_Param)-index);
+        
+        //Shufle
+        if (indexShuffle_Param > 0){
+            index = randomizedIndexes[index-1] + 1;
+        }
         
         //Random
-        double indexf;
-        if(indexRand_Param < 0)
-            indexf = randomizedIndexes[index-1] + 1;
-        else if(indexRand_Param > 0)
+        double indexf = index;
+        if(indexRand_Param > 0)
             indexf = double(index)*(1-indexRand_Param) + (double(indexRand[index-1] + 1)*indexRand_Param);
-        else{
-            indexf = index;
-        }
         
         //INVERSE
         double nonInvertIndex = indexf-1.0f;
@@ -158,31 +103,60 @@ void baseIndexer::recomputeIndexs(){
         indexf = indexInvert_Param*invertedIndex + (1-indexInvert_Param)*nonInvertIndex;
         
         //Modulo
-        if(modulo_Param != modulo_Param.getMax())
-            indexf = fmod(indexf, modulo_Param);
+        if(modulo_Param != indexCount)
+            indexf = std::fmod(indexf, modulo_Param);
         
-        int shifted_i = i + round(indexOffset_Param);
-        if(shifted_i < 0) shifted_i += indexCount;
-        shifted_i %= indexCount;
-        indexs[shifted_i] = fmod(float(((indexf)/(double)(indexCount))*((double)numWaves_Param*((double)indexCount/(double)newNumOfPixels))*((double)symmetry_Param+1)), 1);
+//        int shifted_i = i + std::round(indexOffset_Param);
+//        if(shifted_i < 0) shifted_i += indexCount;
+//        shifted_i %= indexCount;
+        int toDivide = normalize_Param ? indexCount - 1 : indexCount;
+        if(!normalize_Param) indexf += 0.5f; //For centering non normalized
+        
+        float value = float(((indexf)/(double)(toDivide))*((double)numWaves_Param*((double)indexCount/(double)newNumOfPixels))*((double)symmetry_Param+1));
+        if (value > 1) {
+            int trunc = std::trunc(value);
+            value -= (trunc == value) ? trunc-1 : trunc;
+        }
+        indexs[i] = value;
     }
-    newIndexs();
 }
 
-void baseIndexer::indexRandChanged(float &val){
+void baseIndexer::indexRandChanged(float val){
     if(indexRand_Param_previous == 0){
-        random_shuffle(indexRand.begin(), indexRand.end());
-        iota(randomizedIndexes.begin(), randomizedIndexes.end(), 0);
+        std::shuffle(indexRand.begin(), indexRand.end(), std::mt19937(std::random_device()()));
     }
     indexRand_Param_previous = val;
-    
-    if(val < 0){
-        for(int i = 0; i < indexCount; i++){
-            randPositions[i] = indexRand[i]*abs(indexRand_Param) + i*(1-abs(indexRand_Param));
-        }
+}
 
+void baseIndexer::indexShuffleChanged(float val){
+    if(indexShuffle_Param_previous == 0){
+        std::shuffle(indexShuffle.begin(), indexShuffle.end(), std::mt19937(std::random_device()()));
+        iota(randomizedIndexes.begin(), randomizedIndexes.end(), 0);
+    }
+    indexShuffle_Param_previous = val;
+    
+    if(val > 0){
+        //FIXME: wrapping algorithm making index jump, can be fixed?
+        if (wrapShuffle_Param) {
+            for(int i = 0; i < indexCount; i++){
+                if (std::abs(indexShuffle[i] - i) > ((float)indexCount/2.0f)) {
+                    bool is_i_min = std::min(i, indexShuffle[i]) == i;
+                    int mod_i = is_i_min ? i + (indexCount) : i;
+                    int mod_indexRand = is_i_min ? indexShuffle[i] : indexShuffle[i] + (indexCount);
+                    randPositions[i] = mod_indexRand*abs(val) + mod_i*(1-abs(val));
+                    if (randPositions[i] > (indexCount-0.5)) randPositions[i] -= (indexCount);
+                }else{
+                    randPositions[i] = indexShuffle[i]*abs(val) + i*(1-abs(val));
+                }
+            }
+        }else{
+            for(int i = 0; i < indexCount; i++){
+                randPositions[i] = (indexShuffle[i]*val) + (i*(1-val));
+            }
+        }
+        
         std::sort(
                   randomizedIndexes.begin(), randomizedIndexes.end(),
-                  [&](std::size_t a, std::size_t b) { return randPositions[a] < randPositions[b]; });
+                  [&](std::size_t a, std::size_t b) { return randPositions[a] < randPositions[b];});
     }
 }

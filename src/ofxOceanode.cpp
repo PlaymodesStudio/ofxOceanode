@@ -38,6 +38,7 @@ void ofxOceanode::setup(){
 
 void ofxOceanode::update(){
     container->update();
+    controls->update();
 }
 
 void ofxOceanode::draw(){
@@ -78,8 +79,8 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     if (opt_fullscreen)
     {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(viewport->GetWorkPos());
-        ImGui::SetNextWindowSize(viewport->GetWorkSize());
+        ImGui::SetNextWindowPos(viewport->WorkPos);
+        ImGui::SetNextWindowSize(viewport->WorkSize);
         ImGui::SetNextWindowViewport(viewport->ID);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);

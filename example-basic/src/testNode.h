@@ -26,6 +26,8 @@ class testNode : public ofxOceanodeNodeModel {
 public:
     testNode(shared_ptr<testController> tController);
     ~testNode(){};
+    
+    void update(ofEventArgs &a){};
 
     void setBpm(float _bpm) override {bpm = _bpm;};
     
@@ -33,6 +35,8 @@ private:
     ofEventListener listener;
     ofEventListener listener2;
     ofEventListener listener3;
+    ofEventListener listener4;
+    ofEventListener listener5;
     
     ofParameter<customClass*> intModParam;
     ofParameter<int> intParam;
@@ -41,7 +45,9 @@ private:
     ofParameter<void>   voidParam;
     ofParameter<string> textParam;
     ofParameter<char> labelParam;
-    ofParameter<ofColor>  colorParam;
+    ofParameter<ofFloatColor>  colorParam;
+    
+    ofParameter<ofColor> inspectorColor;
     
     shared_ptr<testController> controller;
     

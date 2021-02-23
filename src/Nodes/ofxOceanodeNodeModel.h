@@ -28,6 +28,7 @@ public:
     
     //get parameterGroup
     ofParameterGroup &getParameterGroup(){return parameters;};
+    ofParameterGroup &getInspectorParameterGroup(){return inspectorParameters;};
     
     //getters
     string nodeName(){return nameIdentifier;};
@@ -60,6 +61,10 @@ public:
     //For Macro
     virtual bool receiveOscMessage(ofxOscMessage &m){return false;};
     virtual void setContainer(ofxOceanodeContainer* container){};
+    
+    void addInspectorParameter(ofAbstractParameter& p){
+        inspectorParameters.add(p);
+    }
     
     shared_ptr<ofxOceanodeAbstractParameter> addParameter(ofAbstractParameter& p, ofxOceanodeParameterFlags flags = 0);
 	
@@ -95,6 +100,11 @@ public:
         return static_cast<ofxOceanodeAbstractParameter&>(parameters.get(name)).cast<ParameterType>().getParameter();
     }
     
+    template<typename ParameterType>
+    ofxOceanodeParameter<ParameterType>& getOceanodeParameter(ofParameter<ParameterType> p){
+        return static_cast<ofxOceanodeAbstractParameter&>(parameters.get(p.getName())).cast<ParameterType>();
+    }
+    
     ofEvent<std::pair<ofJson, string>> deserializeParameterEvent;
     
 protected:
@@ -104,6 +114,7 @@ private:
     string nameIdentifier;
     unsigned int numIdentifier;
 	ofParameterGroup parameters;
+    ofParameterGroup inspectorParameters;
     ofEventListeners eventListeners;
 };
 

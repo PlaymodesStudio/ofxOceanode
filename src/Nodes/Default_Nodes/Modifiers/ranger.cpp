@@ -12,34 +12,37 @@ float maxRange =  10000.000;
 
 void ranger::setup(){
     color = ofColor::white;
-    addParameter(input.set("Input", {0}, {minRange}, {maxRange}));
+    addParameter(input.set("Input", {0}, {0}, {1}));
     addParameter(minInput.set("Min In", {0}, {minRange}, {maxRange}));
     addParameter(maxInput.set("Max In", {1}, {minRange}, {maxRange}));
     addParameter(minOutput.set("Min Out", {0}, {minRange}, {maxRange}));
     addParameter(maxOutput.set("Max Out", {1}, {minRange}, {maxRange}));
-    addOutputParameter(output.set("Output", {0}, {minRange}, {maxRange}));
-    
+    addOutputParameter(output.set("Output", {0}, {0}, {1}));
     
     listeners.push(input.newListener([&](vector<float> &vf){
         recalculate();
     }));
     listeners.push(minInput.newListener([&](vector<float> &f){
         recalculate();
+        input.setMin(vector<float>(1, *std::max_element(f.begin(), f.end())));
     }));
     listeners.push(maxInput.newListener([&](vector<float> &f){
         recalculate();
+        input.setMax(vector<float>(1, *std::max_element(f.begin(), f.end())));
     }));
     listeners.push(minOutput.newListener([&](vector<float> &f){
         recalculate();
+        output.setMin(vector<float>(1, *std::max_element(f.begin(), f.end())));
     }));
     listeners.push(maxOutput.newListener([&](vector<float> &f){
         recalculate();
+        output.setMax(vector<float>(1, *std::max_element(f.begin(), f.end())));
     }));
 }
 
 void ranger::recalculate()
 {
-    auto getElementFromIndex = [this](const vector<float> f, int index) -> float{
+    auto getElementFromIndex = [this](const vector<float> &f, int index) -> float{
         if(index < f.size()){
             return f[index];
         }else{

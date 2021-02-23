@@ -75,6 +75,8 @@ private:
     bool expanded;
     bool selected = false;
     
+    bool valueHasBeenReseted = false;
+    
 #ifdef OFXOCEANODE_USE_MIDI
     bool isListeningMidi;
 #endif

@@ -54,6 +54,9 @@ public:
     ofJson saveParametersToJson(bool persistentPreset = false);
     bool loadParametersFromJson(ofJson json, bool persistentPreset = false);
     
+    void saveInspectorParametersToJson(ofJson &json);
+    void loadInspectorParametersFromJson(ofJson json);
+    
     void setBpm(float bpm);
     void resetPhase();
     
@@ -66,6 +69,7 @@ public:
     ofEvent<void> deleteModule;
     
     ofParameterGroup& getParameters();
+    ofParameterGroup& getInspectorParameters();
 private:
     std::unique_ptr<ofxOceanodeNodeModel> nodeModel;
 #ifndef OFXOCEANODE_HEADLESS

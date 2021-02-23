@@ -118,6 +118,7 @@ bool ofxOceanodeNode::loadConfig(string filename, bool persistentPreset){
     
     nodeModel->presetRecallBeforeSettingParameters(json);
     loadParametersFromJson(json, persistentPreset);
+    loadInspectorParametersFromJson(json);
     nodeModel->presetRecallAfterSettingParameters(json);
     return true;
 }
@@ -125,6 +126,7 @@ bool ofxOceanodeNode::loadConfig(string filename, bool persistentPreset){
 void ofxOceanodeNode::saveConfig(string filename, bool persistentPreset){
     ofStringReplace(filename, " ", "_");
     ofJson json = saveParametersToJson(persistentPreset);
+    saveInspectorParametersToJson(json);
     nodeModel->presetSave(json);
     ofSavePrettyJson(filename, json);
 }
@@ -162,6 +164,20 @@ bool ofxOceanodeNode::loadParametersFromJson(ofJson json, bool persistentPreset)
     return true;
 }
 
+void ofxOceanodeNode::saveInspectorParametersToJson(ofJson &json){
+    for(int i = 0; i < getInspectorParameters().size(); i++){
+        ofSerialize(json, getInspectorParameters().get(i));
+    }
+}
+
+void ofxOceanodeNode::loadInspectorParametersFromJson(ofJson json){
+    for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
+        if(getInspectorParameters().contains(it.key())){
+            ofDeserialize(json, getInspectorParameters().get(it.key()));
+        }
+    }
+}
+
 void ofxOceanodeNode::deserializeParameter(ofJson &json, ofxOceanodeAbstractParameter &p, bool persistentPreset){
     if((((!persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) || (persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject)))) && json.count(p.getEscapedName()) && !p.hasInConnection()){
         if(p.valueType() == typeid(vector<float>).name()){
@@ -194,6 +210,10 @@ void ofxOceanodeNode::resetPhase(){
 
 ofParameterGroup& ofxOceanodeNode::getParameters(){
     return nodeModel->getParameterGroup();
+}
+
+ofParameterGroup& ofxOceanodeNode::getInspectorParameters(){
+    return nodeModel->getInspectorParameterGroup();
 }
 
 void ofxOceanodeNode::setActive(bool act){

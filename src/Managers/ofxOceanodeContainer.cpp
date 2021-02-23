@@ -868,7 +868,13 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
         }else if(absParam.valueType() == typeid(int).name()){
             ofParameter<int> castedParam = absParam.cast<int>().getParameter();
-            castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
+            if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_FLOAT){
+                castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
+            }
+            else if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT32 || m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT64){
+                ofClamp(m.getArgAsInt(0), castedParam.getMin(), castedParam.getMax());
+            }
+            
         }else if(absParam.valueType() == typeid(bool).name()){
             absParam.cast<bool>().getParameter() = m.getArgAsBool(0);
         }else if(absParam.valueType() == typeid(void).name()){
@@ -1363,9 +1369,7 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
 
 ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active){
     ofxOceanodeAbstractConnection* connection = nullptr;
-    if(source.valueType() == sink.valueType()){
-        connection = typesRegistry->createCustomTypeConnection(*this, source, sink, active);
-    }else if(source.valueType() == typeid(float).name()){
+    if(source.valueType() == typeid(float).name()){
         if(sink.valueType() == typeid(int).name()){
             connection = connectConnection(source.cast<float>(), sink.cast<int>(), active);
         }
@@ -1378,6 +1382,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanod
         else if(sink.valueType() == typeid(bool).name()){
             connection = connectConnection(source.cast<float>(), sink.cast<bool>(), active);
         }
+        else{
+            connection = connectCustomConnection(source.cast<float>(), sink, active);
+        }
     }else if(source.valueType() == typeid(int).name()){
         if(sink.valueType() == typeid(float).name()){
             connection = connectConnection(source.cast<int>(), sink.cast<float>(), active);
@@ -1387,6 +1394,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanod
         }
         else if(sink.valueType() == typeid(vector<int>).name()){
             connection = connectConnection(source.cast<int>(), sink.cast<vector<int>>(), active);
+        }
+        else{
+            connection = connectCustomConnection(source.cast<int>(), sink, active);
         }
     }else if(source.valueType() == typeid(vector<float>).name()){
         if(sink.valueType() == typeid(float).name()){
@@ -1398,6 +1408,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanod
         else if(sink.valueType() == typeid(vector<int>).name()){
             connection = connectConnection(source.cast<vector<float>>(), sink.cast<vector<int>>(), active);
         }
+        else{
+            connection = connectCustomConnection(source.cast<vector<float>>(), sink, active);
+        }
     }else if(source.valueType() == typeid(vector<int>).name()){
         if(sink.valueType() == typeid(float).name()){
             connection = connectConnection(source.cast<vector<int>>(), sink.cast<float>(), active);
@@ -1407,6 +1420,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanod
         }
         else if(sink.valueType() == typeid(vector<float>).name()){
             connection = connectConnection(source.cast<vector<int>>(), sink.cast<vector<float>>(), active);
+        }
+        else{
+            connection = connectCustomConnection(source.cast<vector<int>>(), sink, active);
         }
     }else if(source.valueType() == typeid(void).name()){
         if(sink.valueType() == typeid(bool).name()){
@@ -1421,6 +1437,12 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanod
         else if(sink.valueType() == typeid(bool).name()){
             connection = connectConnection(source.cast<void>(), sink.cast<bool>(), active);
         }
+        else{
+            connection = connectCustomConnection(source.cast<void>(), sink, active);
+        }
+    }
+    if(connection == nullptr){
+        connection = typesRegistry->createCustomTypeConnection(*this, source, sink, active);
     }
     return connection;
 }

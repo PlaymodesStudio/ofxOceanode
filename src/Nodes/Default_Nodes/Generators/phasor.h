@@ -64,6 +64,7 @@ private:
     ofParameter<float>  initPhase_Param;
     ofParameter<vector<float>>  phasorMonitor;
     ofParameter<bool>   loop_Param;
+    ofParameter<bool>   multiTrigger_Param;
     ofParameter<void>   resetPhase_Param;
     float phaseOffset;
     

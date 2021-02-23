@@ -45,6 +45,7 @@ public:
     void removeParameter(ofxOceanodeAbstractParameter* p);
     
     void addScopeFunc(scopeFunc f){scopeTypes.push_back(f);};
+    const std::vector<scopeFunc> getScopedTypes(){return scopeTypes;};
     
 private:
     std::vector<scopeFunc> scopeTypes;

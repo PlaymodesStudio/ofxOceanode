@@ -49,16 +49,21 @@ public:
         initPhase_Param_channel.send(initPhase_Param);
     }
     
-    void setLoop(float loop){
+    void setLoop(bool loop){
         loop_Param = loop;
         loop_Param_channel.send(loop_Param);
+    }
+    
+    void setMultiTrigger(bool mTrigger){
+        multiTrigger = mTrigger;
+        multiTrigger_channel.send(multiTrigger);
     }
 
     vector<float> getPhasors();
     float getPhasor(){
         return getPhasors()[0];
     }
-    void  resetPhasor();
+    void  resetPhasor(bool global = false);
     
     ofEvent<void> phasorCycle;
     ofEvent<int> phasorCycleIndex;
@@ -77,9 +82,11 @@ private:
     
     void resizePhasors(int n){
         numPhasors = n;
-        phasor.resize(n);
-        phasorMod.resize(n);
-        resetPhasor();
+        phasor.resize(n, 0);
+        phasorMod.resize(n, 0);
+//        fill(stopPhasor.begin(), stopPhasor.end(), false);
+//        fill(phasor.begin(), phasor.end(), 0);
+        //resetPhasor();
         stopPhasor.resize(n, !loop_Param);
     }
     
@@ -109,18 +116,21 @@ private:
     vector<float>    beatsDiv_Param;
     float  initPhase_Param;
     bool   loop_Param;
+    bool    multiTrigger;
     
     ofThreadChannel<float>    bpm_Param_channel;
     ofThreadChannel<vector<float>>    beatsMult_Param_channel;
     ofThreadChannel<vector<float>>    beatsDiv_Param_channel;
     ofThreadChannel<float>  initPhase_Param_channel;
     ofThreadChannel<bool>   loop_Param_channel;
+    ofThreadChannel<bool>   multiTrigger_channel;
     
     float    bpm_Param_inThread;
     vector<float>    beatsMult_Param_inThread;
     vector<float>    beatsDiv_Param_inThread;
     float  initPhase_Param_inThread;
     bool   loop_Param_inThread;
+    bool    multiTrigger_inThread;
 };
 
 #endif /* basePhasor_h */

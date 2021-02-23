@@ -164,11 +164,13 @@ void ofxOceanodeCanvas::draw(bool *open){
 		
 		
 		//Draw List layers
-		draw_list->ChannelsSplit(max(nodesDrawingOrder.size(), (size_t)2)*2 + 1); //We have foreground + background of each node + connections on the background
+		draw_list->ChannelsSplit(max(nodesInThisFrame.size(), (size_t)2)*2 + 1); //We have foreground + background of each node + connections on the background
         
         
         //reorder nodesInThisFrame, so they are in correct drawing order, for the interaction to work properly
         std::sort(nodesInThisFrame.begin(), nodesInThisFrame.end(), [this](std::pair<std::string, ofxOceanodeNode*> a, std::pair<std::string, ofxOceanodeNode*> b){
+            if (nodesDrawingOrder.count(a.first) == 0) nodesDrawingOrder[a.first] = nodesDrawingOrder.size();
+            if (nodesDrawingOrder.count(b.first) == 0) nodesDrawingOrder[b.first] = nodesDrawingOrder.size();
             return nodesDrawingOrder[a.first] > nodesDrawingOrder[b.first];
         });
 		
@@ -212,7 +214,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                 draw_list->ChannelsSetCurrent(nodeDrawChannel); // Background
                 ImGui::SetCursorScreenPos(node_rect_min);
                 bool interacting_node = ImGui::IsItemActive();
-                bool connectionCanBeInteracted = !ImGui::IsAnyItemActive() && ImGui::IsWindowHovered();
+                bool connectionCanBeInteracted = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
                 ImGui::InvisibleButton("node", size);
                 
                 if (ImGui::IsItemHovered())
@@ -294,6 +296,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                             if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
                                 connectionIsDoable = true;
                                 if(ImGui::IsMouseClicked(0)){
+                                    nodeGui.setSelected(false); //Deselect node if we are making connections
                                     isCreatingConnection = true;
                                     if(param->hasInConnection()){ //Parmaeter has sink connected
                                         auto inConnection = param->getInConnection();
@@ -311,15 +314,29 @@ void ofxOceanodeCanvas::draw(bool *open){
                                         ofLog() << "Cannot create a conection from Sink to Sink";
                                     }
                                     else if(tempSourceParameter != nullptr){
-                                        if(tempSourceParameter != param.get()){ //Is the same parameter, no conection between them
-                                            //Remove previous connection connected to that parameter.
-                                            if(param->hasInConnection()){
-                                                param->getInConnection()->deleteSelf();
-                                            }
-                                            container->createConnection(*tempSourceParameter, *param);
+                                        if(tempSourceParameter == param.get()){ //Is the same parameter, no conection between them
+                                             ofLog() << "Cannot create connection with same parameter";
                                         }
                                         else{
-                                            ofLog() << "Cannot create connection with same parameter";
+                                            bool hasInverseConnection = false;
+                                            if(param->hasOutConnections()){
+                                                for(auto c : param->getOutConnections()){
+                                                    if(&c->getSinkParameter() == tempSourceParameter){
+                                                        hasInverseConnection = true;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            if(hasInverseConnection){
+                                                ofLog() << "Cannot create connection Already connected the other way arround";
+                                            }
+                                            else{
+                                                //Remove previous connection connected to that parameter.
+                                                if(param->hasInConnection()){
+                                                    param->getInConnection()->deleteSelf();
+                                                }
+                                                container->createConnection(*tempSourceParameter, *param);
+                                            }
                                         }
                                         tempSourceParameter = nullptr;
                                     }
@@ -336,6 +353,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                             draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
                             if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
                                 if(ImGui::IsMouseClicked(0)){
+                                    nodeGui.setSelected(false); //Deselect node if we are making connections
                                     isCreatingConnection = true;
                                     tempSourceParameter = param.get();
                                 }else if(ImGui::IsMouseReleased(0) && isCreatingConnection){
@@ -345,11 +363,20 @@ void ofxOceanodeCanvas::draw(bool *open){
                                         ofLog() << "Cannot create a conection from Source to Source";
                                     }
                                     if(tempSinkParameter != nullptr){
-                                        if(tempSinkParameter != param.get()){ //Is the same parameter, no conection between them
-                                            container->createConnection(*param, *tempSinkParameter);
+                                        if(tempSinkParameter == param.get()){ //Is the same parameter, no conection between them
+                                             ofLog() << "Cannot create connection with same parameter";
                                         }
                                         else{
-                                            ofLog() << "Cannot create connection with same parameter";
+                                            bool hasInverseConnection = false;
+                                            if(param->hasInConnection()){
+                                                hasInverseConnection = &param->getInConnection()->getSourceParameter() == tempSinkParameter;
+                                            }
+                                            if(hasInverseConnection){
+                                                ofLog() << "Cannot create connection Already connected the other way arround";
+                                            }
+                                            else{
+                                                container->createConnection(*param, *tempSinkParameter);
+                                            }
                                         }
                                         tempSinkParameter = nullptr;
                                     }
@@ -402,60 +429,38 @@ void ofxOceanodeCanvas::draw(bool *open){
         }
         
         // Draw New Node menu
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
-        if (ImGui::BeginPopup("New Node"))
+        bool popop_close_button = true;
+        if (ImGui::BeginPopupModal("New Node", &popop_close_button, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
         {
             char * cString = new char[256];
             strcpy(cString, searchField.c_str());
             
-            if(ImGui::InputText("?", cString, 256)){
+            if(ImGui::InputText("Search", cString, 256)){
                 searchField = cString;
             }
             
             if(numTimesPopup == 1){//!(!ImGui::IsItemClicked() && ImGui::IsMouseDown(0)) && searchField == ""){
                 ImGui::SetKeyboardFocusHere(-1);
+                numTimesPopup++;
+            }else{
+                numTimesPopup++;
             }
-            
-            numTimesPopup++;
             
             bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
             bool isEnterReleased = ImGui::IsKeyReleased(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
-            for(int i = 0; i < categoriesVector.size(); i++){
-                if(numTimesPopup == 1){
-                    ImGui::SetNextTreeNodeOpen(false);
-                }
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f,0.45f,0.0f,0.5f));
-                ImGui::Button("##colorTree",ImVec2(5,0));
-                ImGui::PopStyleColor();
-                ImGui::SameLine();
-                
-                if(searchField != "") ImGui::SetNextTreeNodeOpen(true);
-                
-                if(ImGui::TreeNode(categoriesVector[i].c_str()))
-                {
+    
+            if(searchField != ""){
+                string firstSearchResult = "";
+                for(int i = 0; i < categoriesVector.size(); i++){
                     for(auto &op : options[i])
                     {
-                        bool showThis = false;
-                        if(searchField != ""){
-                            string lowercaseName = op;
-                            std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
-                            if(ofStringTimesInString(op, searchField) || ofStringTimesInString(lowercaseName, searchField)){
-                                showThis = true;
-                            }
-                        }else{
-                            showThis = true;
-                        }
-                        if(showThis)
-                        {
-                            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f,0.45f,0.0f,0.5f));
-                            ImGui::Button("##colorBand",ImVec2(5,0));
-                            ImGui::SameLine();
-                            ImGui::PopStyleColor();
-                            
+                        string lowercaseName = op;
+                        std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
+                        if(ofStringTimesInString(op, searchField) || ofStringTimesInString(lowercaseName, searchField)){
                             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
-                            
-                            
-                            if( ImGui::Selectable(op.c_str()) || ( searchField!="" && isEnterReleased) )
+                            if(ImGui::Selectable(op.c_str()) || (ImGui::IsItemFocused() && isEnterPressed))
                             {
                                 unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
                                 if (type)
@@ -466,16 +471,81 @@ void ofxOceanodeCanvas::draw(bool *open){
                                 ImGui::PopStyleColor();
                                 ImGui::CloseCurrentPopup();
                                 isEnterPressed = false; //Next options we dont want to create them;
-                                searchField="";
+                                break;
+                            }
+                            if(firstSearchResult == "") firstSearchResult = op;
+                            ImGui::PopStyleColor();
+                        }
+                    }
+                }
+                //Without any focus we create the first result
+                if(isEnterPressed){
+                    unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(firstSearchResult);
+                    if (type)
+                    {
+                        auto &node = container->createNode(std::move(type));
+                        node.getNodeGui().setPosition(newNodeClickPos - offset);
+                    }
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+                
+            
+            
+            ImGui::Separator();
+            
+            if(ImGui::BeginMenu("Modules")){
+                bool selectedModule = false;
+                for(int i = 0; i < categoriesVector.size() && !selectedModule; i++){
+                    if(ImGui::BeginMenu(categoriesVector[i].c_str()))
+                    {
+                        for(auto &op : options[i])
+                        {
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
+                            if( ImGui::MenuItem(op.c_str()) || (ImGui::IsItemFocused() && isEnterPressed))
+                            {
+                                unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
+                                if (type)
+                                {
+                                    auto &node = container->createNode(std::move(type));
+                                    node.getNodeGui().setPosition(newNodeClickPos - offset);
+                                }
+                                ImGui::PopStyleColor();
+                                selectedModule = true;
                                 break;
                             }
                             ImGui::PopStyleColor();
                         }
+                        ImGui::EndMenu();
                     }
-                    //ImGui::CloseCurrentPopup();
-                    ImGui::TreePop();
                 }
+                ImGui::EndMenu();
+                if(selectedModule) ImGui::CloseCurrentPopup();
             }
+            
+            //TODO: Implement
+            if(ImGui::BeginMenu("Module Groups")){
+                ImGui::MenuItem("Example 1");
+                ImGui::MenuItem("Example 2");
+                ImGui::MenuItem("Example 3");
+                ImGui::EndMenu();
+            }
+            
+            if(ImGui::BeginMenu("Macros")){
+                ImGui::MenuItem("Example 1");
+                ImGui::MenuItem("Example 2");
+                ImGui::MenuItem("Example 3");
+                ImGui::EndMenu();
+            }
+            
+            //TODO: How to add scripts?
+            if(ImGui::BeginMenu("Scripts")){
+                ImGui::MenuItem("Example 1");
+                ImGui::MenuItem("Example 2");
+                ImGui::MenuItem("Example 3");
+                ImGui::EndMenu();
+            }
+            
             ImGui::EndPopup();
         }
         ImGui::PopStyleVar();
@@ -530,81 +600,85 @@ void ofxOceanodeCanvas::draw(bool *open){
         draw_list->ChannelsMerge();
         
         // Scrolling
-        if(ImGui::IsMouseDragging(0, 0.0f)){
-            if (ImGui::IsWindowHovered()){
-                if(ImGui::GetIO().KeySuper && !isCreatingConnection){//MultiSelect not allowed when connecting connectio
-                    if(!isSelecting){
-                        selectInitialPoint = ImGui::GetMousePos() - ImGui::GetIO().MouseDelta - offset;
-                        isSelecting  = true;
-                    }
-                    selectEndPoint = ImGui::GetMousePos() - offset;
-                    selectedRect = ofRectangle(selectInitialPoint, selectEndPoint);
-                    entireSelect =  selectInitialPoint.y < selectEndPoint.y;
-                    canvasHasScolled = true; //HACK to not remove selection on mouse release
-                }
-                if((!isSelecting && !isCreatingConnection) || (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space)))){
-                    scrolling = scrolling + ImGui::GetIO().MouseDelta;
-                    if(glm::vec2(ImGui::GetIO().MouseDelta) != glm::vec2(0,0)) canvasHasScolled = true;
-                    if(isSelecting && !ImGui::GetIO().KeySuper){
-                        selectInitialPoint = selectInitialPoint +  ImGui::GetIO().MouseDelta;
-                        selectEndPoint = selectEndPoint + ImGui::GetIO().MouseDelta;
+        if(ImGui::IsWindowFocused()){
+            if(ImGui::IsMouseDragging(0, 0.0f)){
+                if (ImGui::IsWindowHovered()){
+                    if(ImGui::GetIO().KeySuper && !isCreatingConnection){//MultiSelect not allowed when connecting connectio
+                        if(!isSelecting){
+                            selectInitialPoint = ImGui::GetMousePos() - ImGui::GetIO().MouseDelta - offset;
+                            isSelecting  = true;
+                        }
+                        selectEndPoint = ImGui::GetMousePos() - offset;
                         selectedRect = ofRectangle(selectInitialPoint, selectEndPoint);
-                        entireSelect = glm::vec2(selectedRect.getTopLeft()) == selectInitialPoint;
+                        entireSelect =  selectInitialPoint.y < selectEndPoint.y;
+                        canvasHasScolled = true; //HACK to not remove selection on mouse release
                     }
+                    if((!isSelecting && !isCreatingConnection) || (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space)))){
+                        scrolling = scrolling + ImGui::GetIO().MouseDelta;
+                        if(glm::vec2(ImGui::GetIO().MouseDelta) != glm::vec2(0,0)) canvasHasScolled = true;
+                        if(isSelecting && !ImGui::GetIO().KeySuper){
+                            selectInitialPoint = selectInitialPoint +  ImGui::GetIO().MouseDelta;
+                            selectEndPoint = selectEndPoint + ImGui::GetIO().MouseDelta;
+                            selectedRect = ofRectangle(selectInitialPoint, selectEndPoint);
+                            entireSelect = glm::vec2(selectedRect.getTopLeft()) == selectInitialPoint;
+                        }
+                    }
+                }else if(someSelectedModuleMove != "" && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)){
+                    moveSelectedModulesWithDrag = ImGui::GetIO().MouseDelta;
+                    if(moveSelectedModulesWithDrag != glm::vec2(0,0))
+                        someDragAppliedToSelection = true;
                 }
-            }else if(someSelectedModuleMove != "" && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)){
-                moveSelectedModulesWithDrag = ImGui::GetIO().MouseDelta;
-                if(moveSelectedModulesWithDrag != glm::vec2(0,0))
-                    someDragAppliedToSelection = true;
             }
-        }
-        
-        if(isSelecting){
-            //TODO: Change colors
-            if(selectInitialPoint.y < selectEndPoint.y){ //From top to bottom;
-                draw_list->AddRectFilled(selectInitialPoint + offset, selectEndPoint + offset, IM_COL32(255,127,0,30));
-            }else{
-                draw_list->AddRectFilled(selectInitialPoint + offset, selectEndPoint + offset, IM_COL32(0,125,255,30));
+            
+            scrolling = scrolling + glm::vec2(ImGui::GetIO().MouseWheelH, ImGui::GetIO().MouseWheel);
+            
+            if(isSelecting){
+                //TODO: Change colors
+                if(selectInitialPoint.y < selectEndPoint.y){ //From top to bottom;
+                    draw_list->AddRectFilled(selectInitialPoint + offset, selectEndPoint + offset, IM_COL32(255,127,0,30));
+                }else{
+                    draw_list->AddRectFilled(selectInitialPoint + offset, selectEndPoint + offset, IM_COL32(0,125,255,30));
+                }
             }
-        }
-        
-        
-        if(ImGui::IsMouseReleased(0)){
-            if(canvasHasScolled){
-                canvasHasScolled = false;
-            }else if(!isAnyNodeHovered && !someDragAppliedToSelection){
-                deselectAllNodes();
+            
+            
+            if(ImGui::IsMouseReleased(0)){
+                if(canvasHasScolled){
+                    canvasHasScolled = false;
+                }else if(!isAnyNodeHovered && !someDragAppliedToSelection){
+                    deselectAllNodes();
+                }
+                someDragAppliedToSelection = false;
+                moveSelectedModulesWithDrag = glm::vec2(0,0);
             }
-            someDragAppliedToSelection = false;
-            moveSelectedModulesWithDrag = glm::vec2(0,0);
-        }
-        
-        if(ImGui::GetIO().KeySuper){
-            if(ImGui::IsKeyPressed('C')){
-                container->copySelectedModulesWithConnections();
-                deselectAllNodes();
-            }else if(ImGui::IsKeyPressed('V')){
-                deselectAllNodes();
-                container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset, ImGui::GetIO().KeyShift);
-            }else if(ImGui::IsKeyPressed('X')){
-                container->cutSelectedModulesWithConnections();
-            }else if(ImGui::IsKeyPressed('D')){
-                container->copySelectedModulesWithConnections();
-                deselectAllNodes();
-                container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset, ImGui::GetIO().KeyShift);
-            }else if(ImGui::IsKeyPressed('A')){
-                selectAllNodes();
+            
+            if(ImGui::GetIO().KeySuper){
+                if(ImGui::IsKeyPressed('C')){
+                    container->copySelectedModulesWithConnections();
+                    deselectAllNodes();
+                }else if(ImGui::IsKeyPressed('V')){
+                    deselectAllNodes();
+                    container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset, ImGui::GetIO().KeyShift);
+                }else if(ImGui::IsKeyPressed('X')){
+                    container->cutSelectedModulesWithConnections();
+                }else if(ImGui::IsKeyPressed('D')){
+                    container->copySelectedModulesWithConnections();
+                    deselectAllNodes();
+                    container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset, ImGui::GetIO().KeyShift);
+                }else if(ImGui::IsKeyPressed('A')){
+                    selectAllNodes();
+                }
             }
-        }
-        else if(ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace)) && !ImGui::IsAnyItemActive()){
-            container->deleteSelectedModules();
-        }
-        
-        if (isCreatingConnection && !ImGui::IsMouseDown(0)){
-            //Destroy temporal connection
-            tempSourceParameter = nullptr;
-            tempSinkParameter = nullptr;
-            isCreatingConnection = false;
+            else if(ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace)) && !ImGui::IsAnyItemActive()){
+                container->deleteSelectedModules();
+            }
+            
+            if (isCreatingConnection && !ImGui::IsMouseDown(0)){
+                //Destroy temporal connection
+                tempSourceParameter = nullptr;
+                tempSinkParameter = nullptr;
+                isCreatingConnection = false;
+            }
         }
         
         ImGui::PopItemWidth();
