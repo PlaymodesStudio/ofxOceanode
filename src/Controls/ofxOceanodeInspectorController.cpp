@@ -131,7 +131,11 @@ void ofxOceanodeInspectorController::draw(){
                             auto tempCast = absParam.cast<float>();
                             
                             auto temp = tempCast.get();
-                            ImGui::SliderFloat(hiddenUniqueId.c_str(), &temp, tempCast.getMin(), tempCast.getMax(), "%.4f");
+                            if(tempCast.getMin() == std::numeric_limits<float>::lowest() || tempCast.getMax() == std::numeric_limits<float>::max()){
+                                ImGui::DragFloat(hiddenUniqueId.c_str(), &temp, 0.001, tempCast.getMin(), tempCast.getMax());
+                            }else{
+                                ImGui::SliderFloat(hiddenUniqueId.c_str(), &temp, tempCast.getMin(), tempCast.getMax(), "%.4f");
+                            }
                             
                             //TODO: Implement better this hack
                             // Maybe discard and reset value when not presed enter??
@@ -157,7 +161,11 @@ void ofxOceanodeInspectorController::draw(){
                             if(true)//absParam.cast<int>().getDropdownOptions().size() == 0)
                             {
                                 auto temp = tempCast.get();
-                                ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin(),tempCast.getMax());
+                                if(tempCast.getMin() == std::numeric_limits<int>::lowest() || tempCast.getMax() == std::numeric_limits<int>::max()){
+                                    ImGui::DragInt(hiddenUniqueId.c_str(), &temp, 1, tempCast.getMin(), tempCast.getMax());
+                                }else{
+                                    ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin(),tempCast.getMax());
+                                }
                                 
                                 if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                                     tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
@@ -404,7 +412,11 @@ void ofxOceanodeInspectorController::draw(){
                             }
                             
                             auto temp = tempCast.get();
-                            ImGui::SliderFloat(hiddenUniqueId.c_str(), &temp, tempCast.getMin(), tempCast.getMax(), "%.4f");
+                            if(tempCast.getMin() == std::numeric_limits<float>::lowest() || tempCast.getMax() == std::numeric_limits<float>::max()){
+                                ImGui::DragFloat(hiddenUniqueId.c_str(), &temp, 0.001, tempCast.getMin(), tempCast.getMax());
+                            }else{
+                                ImGui::SliderFloat(hiddenUniqueId.c_str(), &temp, tempCast.getMin(), tempCast.getMax(), "%.4f");
+                            }
                             
                             //TODO: Implement better this hack
                             // Maybe discard and reset value when not presed enter??
@@ -484,7 +496,11 @@ void ofxOceanodeInspectorController::draw(){
                                 }
                                 
                                 auto temp = tempCast.get();
-                                ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin(),tempCast.getMax());
+                                if(tempCast.getMin() == std::numeric_limits<int>::lowest() || tempCast.getMax() == std::numeric_limits<int>::max()){
+                                    ImGui::DragInt(hiddenUniqueId.c_str(), &temp, 1, tempCast.getMin(), tempCast.getMax());
+                                }else{
+                                    ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin(),tempCast.getMax());
+                                }
                                 
                                 if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                                     tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());

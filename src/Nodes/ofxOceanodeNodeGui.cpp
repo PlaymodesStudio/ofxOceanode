@@ -148,7 +148,11 @@ bool ofxOceanodeNodeGui::constructGui(){
                     }
                     
                     auto temp = tempCast.get();
-                    ImGui::SliderFloat(hiddenUniqueId.c_str(), &temp, tempCast.getMin(), tempCast.getMax(), "%.4f");
+                    if(tempCast.getMin() == std::numeric_limits<float>::lowest() || tempCast.getMax() == std::numeric_limits<float>::max()){
+                        ImGui::DragFloat(hiddenUniqueId.c_str(), &temp, 0.001, tempCast.getMin(), tempCast.getMax());
+                    }else{
+                        ImGui::SliderFloat(hiddenUniqueId.c_str(), &temp, tempCast.getMin(), tempCast.getMax(), "%.4f");
+                    }
                     
                     //TODO: Implement better this hack
                     // Maybe discard and reset value when not presed enter??
@@ -178,10 +182,11 @@ bool ofxOceanodeNodeGui::constructGui(){
                         }
                         
                         auto temp = tempCast.get()[0];
-                        ImGui::SliderFloat(hiddenUniqueId.c_str(),
-                                           &temp,
-                                           tempCast.getMin()[0],
-                                           tempCast.getMax()[0], "%.4f");
+                        if(tempCast.getMin()[0] == std::numeric_limits<float>::lowest() || tempCast.getMax()[0] == std::numeric_limits<float>::max()){
+                            ImGui::DragFloat(hiddenUniqueId.c_str(), &temp, 0.001, tempCast.getMin()[0], tempCast.getMax()[0]);
+                        }else{
+                            ImGui::SliderFloat(hiddenUniqueId.c_str(), &temp, tempCast.getMin()[0], tempCast.getMax()[0], "%.4f");
+                        }
                         
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                             tempCast = vector<float>(1, ofClamp(temp, tempCast.getMin()[0], tempCast.getMax()[0]));
@@ -212,7 +217,11 @@ bool ofxOceanodeNodeGui::constructGui(){
                         }
                         
                         auto temp = tempCast.get();
-                        ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin(),tempCast.getMax());
+                        if(tempCast.getMin() == std::numeric_limits<int>::lowest() || tempCast.getMax() == std::numeric_limits<int>::max()){
+                            ImGui::DragInt(hiddenUniqueId.c_str(), &temp, 1, tempCast.getMin(), tempCast.getMax());
+                        }else{
+                            ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin(),tempCast.getMax());
+                        }
                         
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()))
                             tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
@@ -256,7 +265,11 @@ bool ofxOceanodeNodeGui::constructGui(){
                         }
                         
                         auto temp = tempCast.get()[0];
-                        ImGui::SliderInt(hiddenUniqueId.c_str(),&temp,tempCast.getMin()[0],tempCast.getMax()[0]);
+                        if(tempCast.getMin()[0] == std::numeric_limits<int>::lowest() || tempCast.getMax()[0] == std::numeric_limits<int>::max()){
+                            ImGui::DragInt(hiddenUniqueId.c_str(), &temp, 1, tempCast.getMin()[0], tempCast.getMax()[0]);
+                        }else{
+                            ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin()[0], tempCast.getMax()[0]);
+                        }
                         
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                             tempCast = vector<int>(1, ofClamp(temp, tempCast.getMin()[0], tempCast.getMax()[0]));
