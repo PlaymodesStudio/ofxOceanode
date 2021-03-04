@@ -105,6 +105,10 @@ public:
         return static_cast<ofxOceanodeAbstractParameter&>(parameters.get(p.getName())).cast<ParameterType>();
     }
     
+    bool removeParameter(string parameterName){
+        parameters.remove(parameterName);
+    }
+    
     ofEvent<std::pair<ofJson, string>> deserializeParameterEvent;
     
 protected:
