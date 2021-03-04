@@ -1,5 +1,7 @@
-ofxOceanode
+ofxOceanode // Macros Rework
 =====================================
+
+In this branch we are redoing macros, it's important to know that does not work with current openframeworks bugs, so you need to use [this branch](https://github.com/PlaymodesStudio/openFrameworks/tree/bugfix-ofParameter_change_name).
 
 Oceanode is an openframeworks addon used to quickly create projects using "dataflow like" programming.
 The main idea of oceanode became a logic step as we wanted to export our LFO based control to everithing we could imagine.
