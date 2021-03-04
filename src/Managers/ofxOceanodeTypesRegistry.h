@@ -64,8 +64,11 @@ public:
                 listeners.push(param->newListener([this, paramRef, param](T &val){
                     paramRef->set(param->get());
                 }));
-                listeners.push(castedRouter->getNameParam().newListener([this, param](string &s){
-                    param->setName(s);
+                auto &nameParam = castedRouter->getNameParam();
+                listeners.push(nameParam.newListener([this, param, nameParam](string &s){
+                    if(!param->setName(s)){
+                        s = param->getName();
+                    }
                 }));
                 return param;
             }

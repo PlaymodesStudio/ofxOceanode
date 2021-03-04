@@ -345,16 +345,17 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
         auto newCreatedParam = typesRegistry->createRouterFromType(node);
         string paramName = newCreatedParam->getName();
         while (getParameterGroup().contains(paramName)) {
-            paramName += paramName;
+            paramName = "_" + paramName;
         }
         newCreatedParam->setName(paramName);
         addParameter(*newCreatedParam.get());
         
+        ofParameter<string> nameParamFromRouter = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
+        nameParamFromRouter = paramName;
+        
         parameterGroupChanged.notify(this);
-        deleteListeners.push(node->deleteModule.newListener([this, node](){
-            string nodeName = node->getParameters().getName();
-            //getParameters().remove(nodeName);
-            inoutListeners.erase(nodeName);
+        deleteListeners.push(node->deleteModule.newListener([this, nameParamFromRouter](){
+            getParameterGroup().remove(nameParamFromRouter);
         }, 0));
     }
 }

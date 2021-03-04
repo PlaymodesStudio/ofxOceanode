@@ -72,7 +72,7 @@ public:
     virtual ~ofxOceanodeAbstractParameter(){};
 	
 	virtual std::string getName() const = 0;
-	virtual void setName(const std::string & name) = 0;
+	virtual bool setName(const std::string & name) = 0;
 	virtual std::string toString() const = 0;
 	virtual void fromString(const std::string & str) = 0;
 	
@@ -93,6 +93,7 @@ public:
 	virtual bool isSerializable() const = 0;
 	virtual bool isReadOnly() const = 0;
 	virtual std::shared_ptr<ofAbstractParameter> newReference() const = 0;
+    virtual ofEvent<std::string>& nameChangedEvent() = 0;
 	
 	ofxOceanodeParameterFlags getFlags(){return flags;};
 	void setFlags(ofxOceanodeParameterFlags f){flags = f;};
@@ -171,7 +172,7 @@ public:
 	
 	//Overrided
 	std::string getName() const { return parameter->getName();}
-	void setName(const std::string& name ) { parameter->setName(name); }
+	bool setName(const std::string& name ) { return parameter->setName(name); }
 	std::string toString() const { return parameter->toString();}
 	void fromString(const std::string& str) { return parameter->fromString(str);}
 	std::string valueType() const { return parameter->valueType(); };
@@ -179,6 +180,7 @@ public:
 	bool isSerializable() const { return parameter->isSerializable();}
 	bool isReadOnly() const { return parameter->isReadOnly();}
 	std::shared_ptr<ofAbstractParameter> newReference() const { return std::make_shared<ofxOceanodeParameter<ParameterType>>(*this);}
+    ofEvent<std::string>& nameChangedEvent() {return parameter->nameChangedEvent();}
 	
 	//Custom
 	void bindParameter(ofParameter<ParameterType> &p){
@@ -235,7 +237,7 @@ public:
 	
 	//Overrided
 	std::string getName() const { return parameter->getName();}
-	void setName(const std::string& name ) { parameter->setName(name); }
+	bool setName(const std::string& name ) { return parameter->setName(name); }
 	std::string toString() const { return parameter->toString();}
 	void fromString(const std::string& str) { return parameter->fromString(str);}
 	std::string valueType() const { return parameter->valueType(); };
@@ -243,6 +245,7 @@ public:
 	bool isSerializable() const { return parameter->isSerializable();}
 	bool isReadOnly() const { return parameter->isReadOnly();}
 	std::shared_ptr<ofAbstractParameter> newReference() const { return std::make_shared<ofxOceanodeParameter<void>>(*this);}
+    ofEvent<std::string>& nameChangedEvent() {return parameter->nameChangedEvent();}
 	
 	//Custom
 	void bindParameter(ofParameter<void> &p){

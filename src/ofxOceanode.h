@@ -46,9 +46,9 @@ public:
     };
     
     template<typename T>
-    void registerType(string name = typeid(T).name()){
+    void registerType(string name = typeid(T).name(), T defaultValue = T()){
         typesRegistry->registerType<T>();
-        nodeRegistry->registerModel<router<T>>("Router", name, T());
+        nodeRegistry->registerModel<router<T>>("Router", name, defaultValue);
     };
     
     template<typename T>

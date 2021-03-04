@@ -22,9 +22,9 @@ ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
     this->registerModel<switcher>("Modifiers");
     this->registerModel<ofxOceanodeNodeMacro>("MACRO");
     
-    this->registerModel<router<vector<float>>>("Router", "v_f", vector<float>(1, 0), vector<float>(1, 0), vector<float>(1, 1));
+    this->registerModel<router<vector<float>>>("Router", "v_f", 0, 0, 1);
     this->registerModel<router<float>>("Router", "f", 0, 0, 1);
-    this->registerModel<router<vector<int>>>("Router", "v_i", vector<int>(1, 0), vector<int>(1, 0), vector<int>(1, 1));
+    this->registerModel<router<vector<int>>>("Router", "v_i", 0, 0, 1);
     this->registerModel<router<int>>("Router", "i", 0, 0, 1);
     this->registerModel<router<string>>("Router", "s", "string");
     this->registerModel<router<bool>>("Router", "b", false);
