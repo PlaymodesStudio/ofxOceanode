@@ -49,6 +49,7 @@ void oscillator::setup(){
         for(int i = 0; i < baseOsc.size(); i++){
             baseOsc[i].biPow_Param = getValueForPosition(val, i);
         }
+		manualPhasorIn();
     }));
     listeners.push(quant_Param.newListener([&](vector<int> &val){
         for(int i = 0; i < baseOsc.size(); i++){
