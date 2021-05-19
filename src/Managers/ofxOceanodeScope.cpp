@@ -48,6 +48,24 @@ void ofxOceanodeScope::setup(){
 
         return false;
     });
+    scopeTypes.push_back([](ofxOceanodeAbstractParameter *p, ImVec2 size) -> bool{
+        // FLOAT PARAM
+        if(p->valueType() == typeid(float).name())
+        {
+            auto param = p->cast<float>().getParameter();
+            auto size2 = ImGui::GetContentRegionAvail();
+
+            ImGui::ProgressBar((param.get() - param.getMin()) / (param.getMax() - param.getMin()), size2, "");
+            
+            if(ImGui::IsItemHovered()){
+                ImGui::BeginTooltip();
+                ImGui::Text("%3f", param.get());
+                ImGui::EndTooltip();
+            }
+            return true;
+        }
+        return false;
+    });
 }
 
 void ofxOceanodeScope::draw(){
