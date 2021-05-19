@@ -10,7 +10,7 @@
 void reindexer::setup(){
     color = ofColor::orange;
     addParameter(input.set("Input", {0}, {0}, {1}));
-	addParameter(indexs.set("Indexs", {0}, {0}, {INT_MAX}));
+	addParameter(indexs.set("Indexs", {0}, {0}, {FLT_MAX}));
     addOutputParameter(output.set("Output", {0}, {0}, {1}));
     
 	eventListeners.push(input.newListener(this, &reindexer::calculateReindex));
