@@ -865,14 +865,14 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
 		ofxOceanodeAbstractParameter& absParam = static_cast<ofxOceanodeAbstractParameter &>(_absParam);
         if(absParam.valueType() == typeid(float).name()){
             ofParameter<float> castedParam = absParam.cast<float>().getParameter();
-            castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
+			castedParam = ofClamp(m.getArgAsFloat(0), castedParam.getMin(), castedParam.getMax());
         }else if(absParam.valueType() == typeid(int).name()){
             ofParameter<int> castedParam = absParam.cast<int>().getParameter();
             if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_FLOAT){
                 castedParam = ofMap(m.getArgAsFloat(0), 0, 1, castedParam.getMin(), castedParam.getMax(), true);
             }
             else if(m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT32 || m.getArgType(0) == ofxOscArgType::OFXOSC_TYPE_INT64){
-                ofClamp(m.getArgAsInt(0), castedParam.getMin(), castedParam.getMax());
+                castedParam = ofClamp(m.getArgAsInt(0), castedParam.getMin(), castedParam.getMax());
             }
             
         }else if(absParam.valueType() == typeid(bool).name()){
@@ -889,7 +889,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                 vector<float> tempVec;
                 tempVec.resize(m.getNumArgs(), 0);
                 for(int i = 0; i < tempVec.size(); i++){
-                    tempVec[i] = ofMap(m.getArgAsFloat(i), 0, 1, castedParam.getMin()[0], castedParam.getMax()[0], true);
+					tempVec[i] = ofClamp(m.getArgAsFloat(i), castedParam.getMin()[0], castedParam.getMax()[0]);
                 }
                 castedParam = tempVec;
             }
