@@ -26,6 +26,26 @@ shared_ptr<ofxOceanodeAbstractParameter> ofxOceanodeNodeModel::addParameter(ofAb
     return dynamic_pointer_cast<ofxOceanodeAbstractParameter>(*(parameters.end()-1));
 }
 
+void ofxOceanodeNodeModel::deserializeParameter(ofJson &json, ofAbstractParameter &p){
+	if(p.valueType() == typeid(vector<float>).name()){
+		float value = 0;
+		if(json[p.getEscapedName()].is_string()){
+			p.cast<vector<float>>() = vector<float>(1, ofToFloat(json[p.getEscapedName()]));
+		}else{
+			p.cast<vector<float>>() = vector<float>(1, float(json[p.getEscapedName()]));
+		}
+	}
+	else if(p.valueType() == typeid(vector<int>).name()){
+		if(json[p.getEscapedName()].is_string()){
+			p.cast<vector<int>>() = vector<int>(1, ofToInt(json[p.getEscapedName()]));
+		}else{
+			p.cast<vector<int>>() = vector<int>(1, int(json[p.getEscapedName()]));
+		}
+	}else{
+		ofDeserialize(json, p);
+	}
+}
+
 //parameterInfo& ofxOceanodeNodeModel::addParameterToGroupAndInfo(ofAbstractParameter& p){
 //    addParameter(p);
 //    if(parametersInfo.count(p.getName()) == 0) parametersInfo[p.getName()] = parameterInfo();
