@@ -8,35 +8,27 @@
 #ifndef reindexer_h
 #define reindexer_h
 
-#include "ofxOceanodeNodeModelExternalWindow.h"
+#include "ofxOceanodeNodeModel.h"
 
-class reindexer : public ofxOceanodeNodeModelExternalWindow{
+class reindexer : public ofxOceanodeNodeModel{
 public:
-    reindexer() : ofxOceanodeNodeModelExternalWindow("Reindexer"){};
+    reindexer() : ofxOceanodeNodeModel("Reindexer"){};
     ~reindexer(){};
     void setup() override;
-    
-    void presetSave(ofJson &json) override;
-    void presetRecallAfterSettingParameters(ofJson &json) override;
+	
+	void update(ofEventArgs &a) override;
     
 private:
-    void drawInExternalWindow(ofEventArgs &e) override;
-    void keyPressed(ofKeyEventArgs &a) override;
-    void mousePressed(ofMouseEventArgs &a) override;
+    ofEventListeners eventListeners;
+	
+	void calculateReindex(vector<float> &vf);
     
-    void inputListener(vector<float> &vf);
-    ofEventListener inputListenerEvent;
-    void outputSizeListener(int &f);
-    ofEventListener outputSizeListenerEvent;
-    
-    vector<vector<bool>> reindexGrid;
-    vector<vector<bool>>    identityReindexMatrix;
-    deque<vector<vector<bool>>>   identityStore;
-    bool isReindexIdentity;
-    void reindexChanged();
-    
+	
+	vector<float> tempOutput;
+	bool alreadyCalculated;
+	
     ofParameter<vector<float>> input;
-    ofParameter<int>    outputSize;
+	ofParameter<vector<float>> indexs;
     ofParameter<vector<float>> output;
 };
 
