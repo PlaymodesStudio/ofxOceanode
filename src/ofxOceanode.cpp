@@ -177,6 +177,17 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             }
             ImGui::EndMenu();
         }
+		
+		if(ImGui::BeginMenu("Config"))
+        {
+            float f = ofGetFrameRate();
+            if(ImGui::SliderFloat("FPS", &f, 1, 10000)){ofSetFrameRate(f);}
+            bool b = false;
+            if(ImGui::Checkbox("V Sync", &b)){ofSetVerticalSync(b);};
+            ImGui::MenuItem("Show Histograms");
+            ImGui::EndMenu();
+        }
+		
         if(ImGui::BeginMenu("Help"))
         {
             ImGui::MenuItem("Show User Manual", "CMD+L", &showManual);

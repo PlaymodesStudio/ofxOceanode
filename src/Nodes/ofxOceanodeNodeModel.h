@@ -54,10 +54,7 @@ public:
     virtual void presetHasLoaded(){};
     virtual void loadBeforeConnections(ofJson &json){};
     
-    void deserializeParameter(ofJson &json, ofAbstractParameter &p){
-        auto pair = std::make_pair(json, p.getName());
-        deserializeParameterEvent.notify(pair);
-    }
+	void deserializeParameter(ofJson &json, ofAbstractParameter &p);
     
     ofColor getColor(){return color;};
     
