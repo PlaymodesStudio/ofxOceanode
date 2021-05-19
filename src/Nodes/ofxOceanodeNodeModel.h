@@ -23,6 +23,7 @@ public:
     virtual ~ofxOceanodeNodeModel(){};
     
     virtual void setup(){};
+	virtual void setup(string additionalInfo){};
     virtual void update(ofEventArgs &e){};
     virtual void draw(ofEventArgs &e){};
     
@@ -43,9 +44,11 @@ public:
     virtual void resetPhase(){};
     
     virtual void presetSave(ofJson &json){};
+	virtual void macroSave(ofJson &json, string path){};
     virtual void presetRecallBeforeSettingParameters(ofJson &json){};
     virtual void presetRecallAfterSettingParameters(ofJson &json){};
     virtual void loadCustomPersistent(ofJson &json){};
+	virtual void macroLoad(ofJson &json, string path){};
     
     virtual void presetWillBeLoaded(){};
     virtual void presetHasLoaded(){};

@@ -45,7 +45,8 @@ public:
     
     
     ofxOceanodeNode* createNodeFromName(string name, int identifier = -1, bool isPersistent = false);
-    ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier = -1, bool isPersistent = false);
+    ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier = -1, bool isPersistent = false, string additionalInfo = "");
+	ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, string additionalInfo){return createNode(std::move(nodeModel), -1, false, additionalInfo);}
     
     template<typename ModelType>
     ofxOceanodeNode& createPersistentNode(){

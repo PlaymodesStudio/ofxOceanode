@@ -21,7 +21,7 @@ public:
     ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel);
     ~ofxOceanodeNode();
     
-    void setup();
+	void setup(string additionalInfo);
     void update(ofEventArgs &e);
     void draw(ofEventArgs &e);
     

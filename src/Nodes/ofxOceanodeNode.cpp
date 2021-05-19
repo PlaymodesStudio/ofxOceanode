@@ -20,8 +20,12 @@ ofxOceanodeNode::~ofxOceanodeNode(){
     
 }
 
-void ofxOceanodeNode::setup(){
-    nodeModel->setup();
+void ofxOceanodeNode::setup(string additionalInfo){
+	if(additionalInfo == ""){
+		nodeModel->setup();
+	}else{
+		nodeModel->setup(additionalInfo);
+	}
     active = true;
 }
 
@@ -60,19 +64,60 @@ void ofxOceanodeNode::deleteSelf(){
 }
 
 bool ofxOceanodeNode::loadPreset(string presetFolderPath){
-    return loadConfig(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json");
+	string filename = presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json";
+	string escapedFilename = filename;
+	ofStringReplace(escapedFilename, " ", "_");
+	ofJson json = ofLoadJson(escapedFilename);
+	if(json.empty()) json = ofLoadJson(filename);
+	
+	if(json.empty()) return false;
+	
+	if(false)
+		nodeModel->loadCustomPersistent(json);
+	
+	nodeModel->presetRecallBeforeSettingParameters(json);
+	loadParametersFromJson(json, false);
+	loadInspectorParametersFromJson(json);
+	nodeModel->presetRecallAfterSettingParameters(json);
+	return true;
 }
 
 void ofxOceanodeNode::savePreset(string presetFolderPath){
-    saveConfig(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json");
+    string filename = presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json";
+	ofStringReplace(filename, " ", "_");
+    ofJson json = saveParametersToJson(false);
+    saveInspectorParametersToJson(json);
+    nodeModel->presetSave(json);
+	nodeModel->macroSave(json, presetFolderPath);
+    ofSavePrettyJson(filename, json);
 }
 
 bool ofxOceanodeNode::loadPersistentPreset(string presetFolderPath){
-    return loadConfig(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json", true);
+    string filename = presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json";
+	string escapedFilename = filename;
+	ofStringReplace(escapedFilename, " ", "_");
+	ofJson json = ofLoadJson(escapedFilename);
+	if(json.empty()) json = ofLoadJson(filename);
+	
+	if(json.empty()) return false;
+	
+	nodeModel->loadCustomPersistent(json);
+	
+	nodeModel->presetRecallBeforeSettingParameters(json);
+	loadParametersFromJson(json, true);
+	loadInspectorParametersFromJson(json);
+	nodeModel->presetRecallAfterSettingParameters(json);
+	return true;
 }
 
 void ofxOceanodeNode::savePersistentPreset(string presetFolderPath){
-    saveConfig(presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json", true);
+	string filename = presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json";
+	ofStringReplace(filename, " ", "_");
+    ofJson json = saveParametersToJson(true);
+    saveInspectorParametersToJson(json);
+    nodeModel->presetSave(json);
+	nodeModel->macroSave(json, presetFolderPath);
+    ofSavePrettyJson(filename, json);
 }
 
 void ofxOceanodeNode::presetWillBeLoaded(){
@@ -93,6 +138,7 @@ void ofxOceanodeNode::loadPresetBeforeConnections(string presetFolderPath){
     if(json.empty()) return;
     
     nodeModel->loadBeforeConnections(json);
+	nodeModel->macroLoad(json, presetFolderPath);
 }
 
 bool ofxOceanodeNode::loadConfig(string filename, bool persistentPreset){
@@ -124,11 +170,7 @@ bool ofxOceanodeNode::loadConfig(string filename, bool persistentPreset){
 }
 
 void ofxOceanodeNode::saveConfig(string filename, bool persistentPreset){
-    ofStringReplace(filename, " ", "_");
-    ofJson json = saveParametersToJson(persistentPreset);
-    saveInspectorParametersToJson(json);
-    nodeModel->presetSave(json);
-    ofSavePrettyJson(filename, json);
+    
 }
 
 ofJson ofxOceanodeNode::saveParametersToJson(bool persistentPreset){

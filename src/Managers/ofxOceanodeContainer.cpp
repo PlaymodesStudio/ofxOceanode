@@ -115,7 +115,7 @@ ofxOceanodeNode* ofxOceanodeContainer::createNodeFromName(string name, int ident
     return nullptr;
 }
 
-ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier, bool isPersistent){
+ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier, bool isPersistent, string additionalInfo){
     auto &collection = !isPersistent ? dynamicNodes : persistentNodes;
     int toBeCreatedId = identifier;
     string nodeToBeCreatedName = nodeModel->nodeName();
@@ -127,7 +127,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     nodeModel->setNumIdentifier(toBeCreatedId);
     nodeModel->setContainer(this);
     auto node = make_shared<ofxOceanodeNode>(move(nodeModel));
-    node->setup();
+	node->setup(additionalInfo);
 #ifndef OFXOCEANODE_HEADLESS
         auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);
 #ifdef OFXOCEANODE_USE_MIDI
@@ -534,8 +534,18 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
             ofSaveJson(presetFolderPath + "/" + escapedNodeName + "_" + ofToString(newNodeId) + ".json", tempJson);
         }
     }
+	
+	//Change Local macro names to match duplicated
+	ofDirectory dir;
+	dir.open(presetFolderPath);
+	for(auto &f : dir.getFiles()){
+		if(ofStringTimesInString(f.getFileName(), "Macro") && f.isDirectory()){
+			string sourceMappedModuleId = ofSplitString(f.getFileName(), "_").back();
+			ofDirectory dir2(presetFolderPath + "/" + f.getFileName());
+			dir2.moveTo(presetFolderPath + "/Macro_" + ofToString(moduleConverter["Macro"][ofToInt(sourceMappedModuleId)]), true);
+		}
+	}
 
-    
 
     for(auto node : newCreatedNodes){
         node->loadPresetBeforeConnections(presetFolderPath);
@@ -581,6 +591,7 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
 
 void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanodeNode*> nodes, glm::vec2 referencePosition){
     string presetFolderPath = "clipboardPreset";
+	ofDirectory::removeDirectory(presetFolderPath, true);
     ofLog()<< "Save Clipboard Preset";
     
     vector<string> nodeAsParentNames;

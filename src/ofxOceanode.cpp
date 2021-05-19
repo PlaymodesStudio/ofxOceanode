@@ -32,7 +32,7 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Indexer_1/NumWaves");
     //        timelines.emplace_back("Mapper_1/Min_Input");
     gui.setup(nullptr);
-    
+	ofxOceanodeShared::readMacros();
     StyleColorsOceanode();
 }
 

@@ -450,6 +450,8 @@ void ofxOceanodeCanvas::draw(bool *open){
             
             bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
             bool isEnterReleased = ImGui::IsKeyReleased(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
+			
+			// TODO: Get all things, nodes, collections, macros, scripts;
     
             if(searchField != ""){
                 string firstSearchResult = "";
@@ -532,9 +534,30 @@ void ofxOceanodeCanvas::draw(bool *open){
             }
             
             if(ImGui::BeginMenu("Macros")){
-                ImGui::MenuItem("Example 1");
-                ImGui::MenuItem("Example 2");
-                ImGui::MenuItem("Example 3");
+				auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
+				
+				std::function<void(macroCategory)> drawCategory =
+				[this, offset, &drawCategory](macroCategory category){
+					for(auto d : category.categories){
+						if(ImGui::BeginMenu(d.name.c_str())){
+							drawCategory(d);
+							ImGui::EndMenu();
+						}
+					}
+					for(auto m : category.macros){
+						if(ImGui::MenuItem(m.first.c_str())){
+							unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
+							if (type)
+							{
+								auto &node = container->createNode(std::move(type), m.second);
+								node.getNodeGui().setPosition(newNodeClickPos - offset);
+							}
+						}
+					}
+				};
+				
+				drawCategory(macroDirectoryStructure);
+				
                 ImGui::EndMenu();
             }
             

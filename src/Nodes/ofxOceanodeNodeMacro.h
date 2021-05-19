@@ -9,69 +9,8 @@
 #define ofxOceanodeNodeMacro_h
 
 #include "ofxOceanode.h"
+#include "ofxOceanodeShared.h"
 #include "router.h"
-
-//template<typename T, typename Enable = void>
-//class router : public ofxOceanodeNodeModel{
-//public:
-//    router(string name) : ofxOceanodeNodeModel(name){};// + " " + typeid(T).name()){};
-//    void setup(){
-//        setupValueParameter();
-//        addParameter(value);
-//        addParameter(min.set("Min", "0"), ofxOceanodeParameterFlags_DisableInConnection);
-//        addParameter(max.set("Max", "1"), ofxOceanodeParameterFlags_DisableInConnection);
-//    }
-//
-//    void setupValueParameter(){
-//        value.set({0});
-//        value.setMin({0});
-//        value.setMax({1});
-//    }
-//
-//protected:
-//    ofParameter<T> value;
-//    ofParameter<string> min;
-//    ofParameter<string> max;
-//};
-//
-//template<>
-//class router<ofTexture*> : public ofxOceanodeNodeModel{
-//public:
-//    router(string name) : ofxOceanodeNodeModel(name + " Tex"){};// + " " + typeid(T).name()){};
-//    void setup(){
-//        setupValueParameter();
-//           addParameter(value);
-//    }
-//
-//    void setupValueParameter(){
-//        value.set(nullptr);
-//    }
-//
-//protected:
-//    ofParameter<ofTexture*> value;
-//};
-//
-//template<typename T>
-//class inlet : public router<T>{
-//public:
-//    inlet() : router<T>("Inlet"){};
-//    void setup(){
-//        this->value.setName("Input");
-//        router<T>::setup();
-//        //this->valueInfo->acceptInConnection = false;
-//    }
-//};
-//
-//template<typename T>
-//class outlet : public router<T>{
-//public:
-//    outlet() : router<T>("Outlet"){};
-//    void setup(){
-//        this->value.setName("Output");
-//        router<T>::setup();
-//        //this->valueInfo->acceptOutConnection = false;
-//    }
-//};
 
 class ofxOscMessage;
 
@@ -80,14 +19,15 @@ public:
     ofxOceanodeNodeMacro();
     ~ofxOceanodeNodeMacro(){};
     
-    void setup();
+	void setup(){setup("");};
+	void setup(string additionalInfo);
     void update(ofEventArgs &a);
     void draw(ofEventArgs &a);
     
     void setContainer(ofxOceanodeContainer* container);
-    
-    void presetSave(ofJson &json);
-    void loadBeforeConnections(ofJson &json);
+	
+	void macroSave(ofJson &json, string path);
+	void macroLoad(ofJson &json, string path);
     
     void setBpm(float bpm){container->setBpm(bpm);};
     void resetPhase(){container->resetPhase();};
@@ -100,6 +40,8 @@ public:
     
 private:
     void newNodeCreated(ofxOceanodeNode* &node);
+	void loadMacroInsideCategory(int newPresetIndex);
+	void updateCurrentCategoryFromPath(string path);
     
 #ifndef OFXOCEANODE_HEADLESS
     ofxOceanodeCanvas canvas;
@@ -111,8 +53,10 @@ private:
     ofEventListener newNodeListener;
     std::unordered_map<string, ofEventListeners> inoutListeners;
     ofEventListeners deleteListeners;
+	
+	ofEventListener macroUpdatedListener;
     
-    ofParameter<bool> showWindow;
+    bool showWindow;
     string presetPath;
     ofParameter<int> bank;
     int previousBank;
@@ -125,13 +69,18 @@ private:
     vector<string> presetsInBank;
     ofParameter<string> presetName;
     ofParameter<bool> savePreset;
+	
+	bool localPreset;
+	string nextPresetPath;
+	string currentMacro;
+	string currentMacroPath;
+	deque<string> currentCategory;
+	macroCategory currentCategoryMacro;
+	deque<string> saveAsTempCategory;
     
     
     ofParameter<std::function<void()>> presetControl;
-    
-    std::unordered_map<string, std::time_t> presetLastChanged;
-    std::time_t bankLastChanged;
-    std::time_t presetsInBankLastChanged;
+
     
     ofEventListeners presetActionsListeners;
     
