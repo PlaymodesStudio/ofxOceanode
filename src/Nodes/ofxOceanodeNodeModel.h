@@ -107,6 +107,7 @@ public:
     
     bool removeParameter(string parameterName){
         parameters.remove(parameterName);
+		return true;
     }
     
     ofEvent<std::pair<ofJson, string>> deserializeParameterEvent;
