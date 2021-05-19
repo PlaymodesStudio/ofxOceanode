@@ -28,29 +28,48 @@ ofxOceanodeNodesController::ofxOceanodeNodesController(shared_ptr<ofxOceanodeCon
 //     changedBpmListener = container->changedBpmEvent.newListener([this](float newBpm){
 //    }
     
+//    //Get node registry to update newly registered nodes
+//    auto const &models = container->getRegistry()->getRegisteredModels();
+//    auto const &categories = container->getRegistry()->getCategories();
+//    auto const &categoriesModelsAssociation = container->getRegistry()->getRegisteredModelsCategoryAssociation();
+//
+//    // buil node categories vector for browsing on them
+//    categoriesVector = vector<string>(categories.begin(), categories.end());
+//
+//    options = vector<vector<string>>(categories.size());
+//    for(int i = 0; i < categories.size(); i++){
+//        options.push_back(vector<string>());
+//        for(auto &model : models){
+//            if(categoriesModelsAssociation.at(model.first) == categoriesVector[i]){
+//                options[i].push_back(model.first);
+//            }
+//        }
+//        std::sort(options[i].begin(), options[i].end());
+//    }
+}
+
+void ofxOceanodeNodesController::draw()
+{
+    // ADD NEW NODES
+    
     //Get node registry to update newly registered nodes
     auto const &models = container->getRegistry()->getRegisteredModels();
     auto const &categories = container->getRegistry()->getCategories();
     auto const &categoriesModelsAssociation = container->getRegistry()->getRegisteredModelsCategoryAssociation();
 
-    // buil node categories vector for browsing on them
+    // build node categories vector for browsing on them
     categoriesVector = vector<string>(categories.begin(), categories.end());
     
     options = vector<vector<string>>(categories.size());
     for(int i = 0; i < categories.size(); i++){
         options.push_back(vector<string>());
         for(auto &model : models){
-            if(categoriesModelsAssociation.at(model.first) == categoriesVector[i]){
+			if(categoriesModelsAssociation.at(model.first) == categoriesVector[i]){
                 options[i].push_back(model.first);
             }
         }
         std::sort(options[i].begin(), options[i].end());
     }
-}
-
-void ofxOceanodeNodesController::draw()
-{
-    // ADD NEW NODES
     
     if(ImGui::TreeNode("+ Nodes"))
     {

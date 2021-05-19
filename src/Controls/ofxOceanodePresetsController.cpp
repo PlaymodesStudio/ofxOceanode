@@ -160,16 +160,21 @@ void ofxOceanodePresetsController::draw(){
         if(presetName != "-") savePreset(currentPreset[banks[currentBank]],banks[currentBank]);
     }
     ImGui::SameLine();
+	
+	bool firstSaveAsOpen = false;
     if(ImGui::Button("[SA]")){
-        ImGui::OpenPopup("Save preset as :");
-    }
-   ImGui::PopStyleColor(1);
-
-    ImGui::SetNextWindowSize(ImVec2(200,100));
+		ImGui::OpenPopup("Save preset as :");
+		firstSaveAsOpen = true;
+	}
+	ImGui::PopStyleColor(1);
+	
+	ImGui::SetNextWindowSize(ImVec2(200,100));
     if(ImGui::BeginPopupModal("Save preset as :", NULL)){
         static char cString[256];
         
-//        ImGui::SetKeyboardFocusHere(0);
+		if(firstSaveAsOpen){
+			ImGui::SetKeyboardFocusHere(0);
+		}
         
         if (ImGui::InputText("##Preset Name : ", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
         {
