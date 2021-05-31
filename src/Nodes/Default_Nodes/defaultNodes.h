@@ -17,6 +17,7 @@
 #include "reindexer.h"
 #include "smoother.h"
 #include "switcher.h"
+#include "curve.h"
 #include "ofxOceanodeNodeMacro.h"
 
 #endif /* defaultNodes_h */

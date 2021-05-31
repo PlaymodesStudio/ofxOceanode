@@ -20,6 +20,7 @@ ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
     this->registerModel<reindexer>("Modifiers");
     this->registerModel<smoother>("Modifiers");
     this->registerModel<switcher>("Modifiers");
+	this->registerModel<curve>("Modifiers");
     this->registerModel<ofxOceanodeNodeMacro>("MACRO");
     
     this->registerModel<router<vector<float>>>("Router", "v_f", 0, 0, 1);
