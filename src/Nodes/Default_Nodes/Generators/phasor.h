@@ -61,7 +61,7 @@ private:
     ofParameter<float>  bpm_Param;
     ofParameter<vector<float>>    beatsMult_Param;
     ofParameter<vector<float>>    beatsDiv_Param;
-    ofParameter<float>  initPhase_Param;
+    ofParameter<vector<float>>  initPhase_Param;
     ofParameter<vector<float>>  phasorMonitor;
     ofParameter<bool>   loop_Param;
     ofParameter<bool>   multiTrigger_Param;

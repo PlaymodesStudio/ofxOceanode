@@ -44,9 +44,10 @@ public:
         checkChangedSize();
     }
     
-    void setInitPhase(float initPhase){
+    void setInitPhase(vector<float> initPhase){
         initPhase_Param = initPhase;
         initPhase_Param_channel.send(initPhase_Param);
+		checkChangedSize();
     }
     
     void setLoop(bool loop){
@@ -73,7 +74,9 @@ public:
             resizePhasors(beatsMult_Param.size());
         }else if(beatsDiv_Param.size() != 1 && beatsDiv_Param.size() != numPhasors){
             resizePhasors(beatsDiv_Param.size());
-        }else if(beatsDiv_Param.size() == 1 && beatsMult_Param.size() == 1 && numPhasors != 1){
+        }else if(initPhase_Param.size() != 1 && initPhase_Param.size() != numPhasors){
+            resizePhasors(initPhase_Param.size());
+        }else if(beatsDiv_Param.size() == 1 && beatsMult_Param.size() == 1 && initPhase_Param.size() == 1 && numPhasors != 1){
             resizePhasors(1);
         }
     }
@@ -114,21 +117,21 @@ private:
     float    bpm_Param;
     vector<float>    beatsMult_Param;
     vector<float>    beatsDiv_Param;
-    float  initPhase_Param;
+    vector<float>  initPhase_Param;
     bool   loop_Param;
     bool    multiTrigger;
     
     ofThreadChannel<float>    bpm_Param_channel;
     ofThreadChannel<vector<float>>    beatsMult_Param_channel;
     ofThreadChannel<vector<float>>    beatsDiv_Param_channel;
-    ofThreadChannel<float>  initPhase_Param_channel;
+    ofThreadChannel<vector<float>>  initPhase_Param_channel;
     ofThreadChannel<bool>   loop_Param_channel;
     ofThreadChannel<bool>   multiTrigger_channel;
     
     float    bpm_Param_inThread;
     vector<float>    beatsMult_Param_inThread;
     vector<float>    beatsDiv_Param_inThread;
-    float  initPhase_Param_inThread;
+    vector<float>  initPhase_Param_inThread;
     bool   loop_Param_inThread;
     bool    multiTrigger_inThread;
 };
