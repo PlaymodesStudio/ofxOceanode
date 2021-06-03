@@ -18,13 +18,13 @@ basePhasor::basePhasor(){
     bpm_Param = 120.00;
     beatsMult_Param = vector<float>(1, 1);
     beatsDiv_Param = vector<float>(1, 1);
-    initPhase_Param = 0;
+    initPhase_Param = vector<float>(1, 0);
     loop_Param = true;
     multiTrigger = false;
     bpm_Param_inThread = 120.00;
     beatsMult_Param_inThread = vector<float>(1, 1);
     beatsDiv_Param_inThread = vector<float>(1, 1);
-    initPhase_Param_inThread = 0;
+    initPhase_Param_inThread = vector<float>(1, 0);;
     loop_Param_inThread = true;
     multiTrigger_inThread = false;
     numPhasors = 1;
@@ -101,7 +101,7 @@ void basePhasor::threadedFunction(){
             phasorMod[i] = phasor[i];
             
             //take the initPhase_Param as a phase offset param
-            phasorMod[i] += initPhase_Param_inThread;
+            phasorMod[i] += getValueForIndex(initPhase_Param_inThread, i);
             phasorMod[i] -= (int)phasorMod[i];
         }
         
