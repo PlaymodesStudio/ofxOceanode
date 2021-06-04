@@ -12,8 +12,10 @@
 
 class basePhasor: public ofThread{
 public:
-    basePhasor();
+	basePhasor() {};
     ~basePhasor();
+
+	void setup();
     
     void setBpm(float bpm){
         bpm_Param = bpm;
@@ -83,14 +85,16 @@ public:
     
 private:
     
-    void resizePhasors(int n){
-        numPhasors = n;
-        phasor.resize(n, 0);
-        phasorMod.resize(n, 0);
-//        fill(stopPhasor.begin(), stopPhasor.end(), false);
-//        fill(phasor.begin(), phasor.end(), 0);
-        //resetPhasor();
-        stopPhasor.resize(n, !loop_Param);
+	void resizePhasors(int n) {
+		if (n > 0) {
+			numPhasors = n;
+			phasor.resize(n, 0);
+			phasorMod.resize(n, 0);
+			//        fill(stopPhasor.begin(), stopPhasor.end(), false);
+			//        fill(phasor.begin(), phasor.end(), 0);
+					//resetPhasor();
+			stopPhasor.resize(n, !loop_Param);
+		}
     }
     
     float getValueForIndex(vector<float> &vf, int i){

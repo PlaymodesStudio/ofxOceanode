@@ -14,6 +14,7 @@ phasor::phasor() : ofxOceanodeNodeModel("Phasor")
 }
 
 void phasor::setup(){
+	basePh.setup();
     parameterAutoSettersListeners.push(bpm_Param.newListener([&](float &val){
         basePh.setBpm(val);
     }));

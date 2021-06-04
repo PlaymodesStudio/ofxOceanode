@@ -9,12 +9,10 @@
 #include "basePhasor.h"
 
 
-basePhasor::basePhasor(){
+void basePhasor::setup(){
     phasor = vector<double>(1, 0);
     phasorMod = vector<double>(1, 0);
     momentaryPhasor = vector<double>(1, 0);
-    timer.setPeriodicEvent(1000000);
-    startThread();
     bpm_Param = 120.00;
     beatsMult_Param = vector<float>(1, 1);
     beatsDiv_Param = vector<float>(1, 1);
@@ -29,6 +27,8 @@ basePhasor::basePhasor(){
     multiTrigger_inThread = false;
     numPhasors = 1;
     stopPhasor = vector<bool>(1, true);
+	timer.setPeriodicEvent(1000000);
+	startThread();
 }
 
 basePhasor::~basePhasor(){
