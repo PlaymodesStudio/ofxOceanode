@@ -19,17 +19,17 @@ public:
     switcher() : ofxOceanodeNodeModel("Switcher Float"){};
     ~switcher(){};
     void setup() override;
-    
-    void changedSwitch(int &i);
-    void changedInput();
+	
+	void update(ofEventArgs &a) override;
 
 private:
     
     ofEventListeners listeners;
+	
+	ofParameter<int> numInputs;
     
-    ofParameter<vector<float>>  input1;
-    ofParameter<vector<float>>  input2;
-    ofParameter<float>  switchSelector;
+    vector<ofParameter<vector<float>>>  inputs;
+    ofParameter<vector<float>>  switchSelector;
     ofParameter<vector<float>>  output;
 };
 
