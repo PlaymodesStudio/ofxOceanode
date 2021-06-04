@@ -12,7 +12,7 @@
 
 void ofxOceanodeAbstractParameter::removeAllConnections(){
     if(inConnection != nullptr) inConnection->deleteSelf();
-    for(auto c : outConnections) c->deleteSelf();
+    while(outConnections.size() != 0) outConnections.front()->deleteSelf();
     
     if(hasScope) ofxOceanodeScope::getInstance()->removeParameter(this);
 };
