@@ -30,6 +30,22 @@ class ofxMidiOut;
 class ofxMidiListener;
 #endif
 
+class ofxOceanodeComment{
+public:
+	ofxOceanodeComment(glm::vec2 _pos = glm::vec2(0, 0), glm::vec2 _size = glm::vec2(400, 400)) : position(_pos), size(_size){
+		text = "Comment";
+		color = ofFloatColor(1, 1, 1, 1);
+		textColor = ofFloatColor(0, 0, 0, 1);
+	};
+	
+	string text;
+	glm::vec2 size;
+	glm::vec2 position;
+	ofFloatColor color;
+	ofFloatColor textColor;
+	bool openPopupInNext;
+};
+
 
 class ofxOceanodeContainer {
 public:
@@ -136,6 +152,8 @@ public:
     
     const vector<unique_ptr<ofxOceanodeAbstractConnection>>& getAllConnections(){return connections;};
     const std::unordered_map<string, ofxOceanodeNode*> & getParameterGroupNodesMap(){return parameterGroupNodesMap;};
+	
+	vector<ofxOceanodeComment> &getComments(){return comments;};
 #endif
     
     void setCanvasID(string s){canvasID = s;};
@@ -180,6 +198,8 @@ private:
     void midiBindingBound(const void * sender, string &portName);
 #endif
     string canvasID;
+	
+	vector<ofxOceanodeComment> comments;
 };
 
 #endif /* ofxOceanodeContainer_h */

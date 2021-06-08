@@ -166,6 +166,45 @@ void ofxOceanodeCanvas::draw(bool *open){
 		//Draw List layers
 		draw_list->ChannelsSplit(max(nodesInThisFrame.size(), (size_t)2)*2 + 1); //We have foreground + background of each node + connections on the background
         
+		draw_list->ChannelsSetCurrent(0);
+		int removeIndex = -1;
+		for(int i = 0; i < container->getComments().size(); i++){
+			auto &c = container->getComments()[i];
+			ImGui::PushID(("Comment " + ofToString(i)).c_str());
+			glm::vec2 currentPosition = c.position + offset;
+			draw_list->AddRectFilled(currentPosition, currentPosition + glm::vec2(c.size.x, 15), IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 255));
+			draw_list->AddText(currentPosition, IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255), c.text.c_str());
+			draw_list->AddRectFilled(currentPosition + glm::vec2(0, 15), currentPosition + c.size, IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 100));
+			//	draw_list->AddTriangleFilled(currentPosition + size - ImVec2(10, 0),
+			//								 currentPosition + size - ImVec2(0, 10),
+			//								 currentPosition + size,
+			//								 IM_COL32(color.r*255, color.g*255, color.b*255, 255));
+			if(c.openPopupInNext){
+				ImGui::OpenPopup("Comment");
+				c.openPopupInNext = false;
+			}
+			if(ImGui::BeginPopup("Comment")){
+				char * cString = new char[1024];
+				strcpy(cString, c.text.c_str());
+				if (ImGui::InputText("Text", cString, 1024, ImGuiInputTextFlags_EnterReturnsTrue))
+				{
+					c.text = cString;
+				}
+				delete[] cString;
+				ImGui::DragFloat2("Position", &c.position.x);
+				ImGui::DragFloat2("Size", &c.size.x);
+				ImGui::ColorEdit3("Color", &c.color.r);
+				ImGui::ColorEdit3("TextColor", &c.textColor.r);
+				if(ImGui::Button("Remove")){
+					removeIndex = i;
+				}
+				ImGui::EndPopup();
+			}
+			ImGui::PopID();
+		}
+		if(removeIndex != -1){
+			container->getComments().erase(container->getComments().begin() + removeIndex);
+		}
         
         //reorder nodesInThisFrame, so they are in correct drawing order, for the interaction to work properly
         std::sort(nodesInThisFrame.begin(), nodesInThisFrame.end(), [this](std::pair<std::string, ofxOceanodeNode*> a, std::pair<std::string, ofxOceanodeNode*> b){
@@ -404,28 +443,38 @@ void ofxOceanodeCanvas::draw(bool *open){
         // Open context menu
         if (!ImGui::IsAnyItemHovered() && ImGui::IsWindowHovered() && ImGui::IsMouseClicked(1))
         {
-            newNodeClickPos = ImGui::GetMousePos();
-            ImGui::OpenPopup("New Node");
-            searchField = "";
-            numTimesPopup = 0;
-            
-            //Get node registry to update newly registered nodes
-            auto const &models = container->getRegistry()->getRegisteredModels();
-            auto const &categories = container->getRegistry()->getCategories();
-            auto const &categoriesModelsAssociation = container->getRegistry()->getRegisteredModelsCategoryAssociation();
-            
-            categoriesVector = vector<string>(categories.begin(), categories.end());
-            
-            options = vector<vector<string>>(categories.size());
-            for(int i = 0; i < categories.size(); i++){
-                options.push_back(vector<string>());
-                for(auto &model : models){
-                    if(categoriesModelsAssociation.at(model.first) == categoriesVector[i]){
-                        options[i].push_back(model.first);
-                    }
-                }
-                std::sort(options[i].begin(), options[i].end());
-            }
+			newNodeClickPos = ImGui::GetMousePos();
+			bool commentClicked = false;
+			for(auto &c : container->getComments()){
+				if(ofRectangle(c.position.x, c.position.y, c.size.x, 15).inside(newNodeClickPos-offset)){
+					c.openPopupInNext = true;
+					commentClicked = true;
+				}
+				if(commentClicked) break;
+			}
+			if(!commentClicked){
+				ImGui::OpenPopup("New Node");
+				searchField = "";
+				numTimesPopup = 0;
+				
+				//Get node registry to update newly registered nodes
+				auto const &models = container->getRegistry()->getRegisteredModels();
+				auto const &categories = container->getRegistry()->getCategories();
+				auto const &categoriesModelsAssociation = container->getRegistry()->getRegisteredModelsCategoryAssociation();
+				
+				categoriesVector = vector<string>(categories.begin(), categories.end());
+				
+				options = vector<vector<string>>(categories.size());
+				for(int i = 0; i < categories.size(); i++){
+					options.push_back(vector<string>());
+					for(auto &model : models){
+						if(categoriesModelsAssociation.at(model.first) == categoriesVector[i]){
+							options[i].push_back(model.first);
+						}
+					}
+					std::sort(options[i].begin(), options[i].end());
+				}
+			}
         }
         
         // Draw New Node menu
@@ -545,6 +594,10 @@ void ofxOceanodeCanvas::draw(bool *open){
                 ImGui::MenuItem("Example 3");
                 ImGui::EndMenu();
             }
+			
+			if(ImGui::Selectable("Comment")){
+				container->getComments().emplace_back(newNodeClickPos - offset);
+			}
             
             ImGui::EndPopup();
         }
