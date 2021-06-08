@@ -1445,6 +1445,12 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanod
         else if(sink.valueType() == typeid(float).name()){
             connection = connectConnection(source.cast<void>(), sink.cast<float>(), active);
         }
+		else if(sink.valueType() == typeid(vector<int>).name()){
+            connection = connectConnection(source.cast<void>(), sink.cast<vector<int>>(), active);
+        }
+		else if(sink.valueType() == typeid(vector<float>).name()){
+            connection = connectConnection(source.cast<void>(), sink.cast<vector<float>>(), active);
+        }
         else if(sink.valueType() == typeid(bool).name()){
             connection = connectConnection(source.cast<void>(), sink.cast<bool>(), active);
         }
