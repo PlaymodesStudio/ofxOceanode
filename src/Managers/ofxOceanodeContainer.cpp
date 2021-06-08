@@ -442,6 +442,25 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     }
     
     resetPhase();
+	
+	json = ofLoadJson(presetFolderPath + "/comments.json");
+	if(!json.empty()){
+		comments.resize(json["NumComments"]);
+		for (int i = 0; i < comments.size(); i++) {
+			auto &c = comments[i];
+			c.text = json["Comments"][i]["Text"];
+			c.size.x = json["Comments"][i]["Size"]["X"];
+			c.size.y = json["Comments"][i]["Size"]["Y"];
+			c.position.x = json["Comments"][i]["Pos"]["X"];
+			c.position.y = json["Comments"][i]["Pos"]["Y"];
+			c.color.r = json["Comments"][i]["Color"]["R"];
+			c.color.g = json["Comments"][i]["Color"]["G"];
+			c.color.b = json["Comments"][i]["Color"]["B"];
+			c.textColor.r = json["Comments"][i]["TextColor"]["R"];
+			c.textColor.g = json["Comments"][i]["TextColor"]["G"];
+			c.textColor.b = json["Comments"][i]["TextColor"]["B"];
+		}
+	}
     
     return true;
 }
@@ -507,6 +526,24 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
     }
     ofSavePrettyJson(presetFolderPath + "/midi.json", json);
 #endif
+	
+	json.clear();
+	json["NumComments"] = comments.size();
+	for(int i = 0; i < comments.size(); i++){
+		auto &c = comments[i];
+		json["Comments"][i]["Text"] = c.text;
+		json["Comments"][i]["Size"]["X"] = c.size.x;
+		json["Comments"][i]["Size"]["Y"] = c.size.y;
+		json["Comments"][i]["Pos"]["X"] = c.position.x;
+		json["Comments"][i]["Pos"]["Y"] = c.position.y;
+		json["Comments"][i]["Color"]["R"] = c.color.r;
+		json["Comments"][i]["Color"]["G"] = c.color.g;
+		json["Comments"][i]["Color"]["B"] = c.color.b;
+		json["Comments"][i]["TextColor"]["R"] = c.textColor.r;
+		json["Comments"][i]["TextColor"]["G"] = c.textColor.g;
+		json["Comments"][i]["TextColor"]["B"] = c.textColor.b;
+	}
+	ofSavePrettyJson(presetFolderPath + "/comments.json", json);
 }
 
 bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referencePosition, bool allowOutsideInputs){
