@@ -37,6 +37,8 @@ public:
         container->receiveOscMessage(m);
         return true;};
 #endif
+	
+	shared_ptr<ofxOceanodeContainer> getContainer() {return container;};
     
 private:
     void newNodeCreated(ofxOceanodeNode* &node);

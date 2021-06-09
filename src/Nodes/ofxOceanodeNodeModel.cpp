@@ -8,6 +8,7 @@
 
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeTypesRegistry.h"
+#include "ofxOceanodeContainer.h"
 
 ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name){
     parameters.setName(_name);
@@ -45,6 +46,10 @@ void ofxOceanodeNodeModel::deserializeParameter(ofJson &json, ofAbstractParamete
 		ofDeserialize(json, p);
 	}
 }
+
+void ofxOceanodeNodeModel::setContainer(ofxOceanodeContainer* container){
+	canvasID = container->getCanvasID();
+};
 
 //parameterInfo& ofxOceanodeNodeModel::addParameterToGroupAndInfo(ofAbstractParameter& p){
 //    addParameter(p);

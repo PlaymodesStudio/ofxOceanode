@@ -36,7 +36,8 @@ void curve::setup() {
 void curve::draw(ofEventArgs &args){
 	
 	if(showWindow){
-		if(ImGui::Begin(("Curve " + ofToString(getNumIdentifier())).c_str(), (bool *)&showWindow.get())){
+		string modCanvasID = canvasID == "Canvas" ? "" : (canvasID + "/");
+		if(ImGui::Begin((modCanvasID + "Curve " + ofToString(getNumIdentifier())).c_str(), (bool *)&showWindow.get())){
 			ImGui::SameLine();
 			ImGui::BeginGroup();
 			

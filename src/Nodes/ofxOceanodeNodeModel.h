@@ -60,7 +60,7 @@ public:
     
     //For Macro
     virtual bool receiveOscMessage(ofxOscMessage &m){return false;};
-    virtual void setContainer(ofxOceanodeContainer* container){};
+	virtual void setContainer(ofxOceanodeContainer* container);
     
     void addInspectorParameter(ofAbstractParameter& p){
         inspectorParameters.add(p);
@@ -114,6 +114,7 @@ public:
     
 protected:
     ofColor color;
+	string canvasID;
     
 private:
     string nameIdentifier;
