@@ -87,13 +87,7 @@ private:
     
 	void resizePhasors(int n) {
 		if (n > 0) {
-			numPhasors = n;
-			phasor.resize(n, 0);
-			phasorMod.resize(n, 0);
-			//        fill(stopPhasor.begin(), stopPhasor.end(), false);
-			//        fill(phasor.begin(), phasor.end(), 0);
-					//resetPhasor();
-			stopPhasor.resize(n, !loop_Param);
+			resize = n;
 		}
     }
     
@@ -138,6 +132,8 @@ private:
     vector<float>  initPhase_Param_inThread;
     bool   loop_Param_inThread;
     bool    multiTrigger_inThread;
+
+	int resize;
 };
 
 #endif /* basePhasor_h */

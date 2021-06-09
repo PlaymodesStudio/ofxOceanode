@@ -26,6 +26,7 @@ void basePhasor::setup(){
     loop_Param_inThread = true;
     multiTrigger_inThread = false;
     numPhasors = 1;
+	resize = -1;
     stopPhasor = vector<bool>(1, true);
 	timer.setPeriodicEvent(1000000);
 	startThread();
@@ -59,6 +60,13 @@ void basePhasor::resetPhasor(bool global){
 void basePhasor::threadedFunction(){
     while(isThreadRunning()){
         timer.waitNext();
+		if (resize > 0) {
+			numPhasors = resize;
+			phasor.resize(resize, 0);
+			phasorMod.resize(resize, 0);
+			stopPhasor.resize(resize, !loop_Param);
+			resize = -1;
+		}
         bpm_Param_channel.tryReceive(bpm_Param_inThread);
         beatsMult_Param_channel.tryReceive(beatsMult_Param_inThread);
         beatsDiv_Param_channel.tryReceive(beatsDiv_Param_inThread);
