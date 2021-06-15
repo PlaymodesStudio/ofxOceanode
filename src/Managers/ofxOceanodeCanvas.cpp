@@ -652,6 +652,7 @@ void ofxOceanodeCanvas::draw(bool *open){
         
         draw_list->ChannelsMerge();
         
+		moveSelectedModulesWithDrag = glm::vec2(0,0);
         // Scrolling
         if(ImGui::IsWindowFocused()){
             if(ImGui::IsMouseDragging(0, 0.0f)){
@@ -666,7 +667,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                         entireSelect =  selectInitialPoint.y < selectEndPoint.y;
                         canvasHasScolled = true; //HACK to not remove selection on mouse release
                     }
-                    if((!isSelecting && !isCreatingConnection) || (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space)))){
+                    if((!isSelecting && !isCreatingConnection && someSelectedModuleMove == "") || (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space)))){
                         scrolling = scrolling + ImGui::GetIO().MouseDelta;
                         if(glm::vec2(ImGui::GetIO().MouseDelta) != glm::vec2(0,0)) canvasHasScolled = true;
                         if(isSelecting && !ImGui::GetIO().KeySuper){
@@ -676,11 +677,17 @@ void ofxOceanodeCanvas::draw(bool *open){
                             entireSelect = glm::vec2(selectedRect.getTopLeft()) == selectInitialPoint;
                         }
                     }
-                }else if(someSelectedModuleMove != "" && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)){
-                    moveSelectedModulesWithDrag = ImGui::GetIO().MouseDelta;
-                    if(moveSelectedModulesWithDrag != glm::vec2(0,0))
-                        someDragAppliedToSelection = true;
-                }
+				}else if(ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)){
+					if(ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space))){
+						scrolling = scrolling + ImGui::GetIO().MouseDelta;
+                        if(glm::vec2(ImGui::GetIO().MouseDelta) != glm::vec2(0,0)) canvasHasScolled = true;
+					}
+					else if(someSelectedModuleMove != ""){
+						moveSelectedModulesWithDrag = ImGui::GetIO().MouseDelta;
+						if(moveSelectedModulesWithDrag != glm::vec2(0,0))
+							someDragAppliedToSelection = true;
+					}
+				}
             }
             
             scrolling = scrolling + glm::vec2(ImGui::GetIO().MouseWheelH, ImGui::GetIO().MouseWheel);
