@@ -9,20 +9,29 @@
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeScope.h"
 #include "ofxOceanodeNode.h"
+#include "ofxOceanodeNodeModel.h"
+#include "ofxOceanodeNodeMacro.h"
 #include "imgui.h"
 
 void ofxOceanodeInspectorController::draw(){
     vector<pair<string, ofxOceanodeNode*>> nodesInThisFrame = vector<pair<string, ofxOceanodeNode*>>(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
     
     vector<pair<string, ofxOceanodeNode*>> selectedNodes;
-    
-    for(auto nodePair : nodesInThisFrame)
-    {
-        auto &nodeGui = nodePair.second->getNodeGui();
-        if(nodeGui.getSelected()){
-            selectedNodes.push_back(nodePair);
-        }
-    }
+	
+	std::function<void(vector<pair<string, ofxOceanodeNode*>>)> getSelectedModules = [&selectedNodes, &getSelectedModules](vector<pair<string, ofxOceanodeNode*>> nodes){
+		for(auto nodePair : nodes)
+		{
+			auto &nodeGui = nodePair.second->getNodeGui();
+			if(nodeGui.getSelected()){
+				selectedNodes.push_back(nodePair);
+			}
+			if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&nodePair.second->getNodeModel())) {
+				getSelectedModules(vector<pair<string, ofxOceanodeNode*>>(m->getContainer()->getParameterGroupNodesMap().begin(), m->getContainer()->getParameterGroupNodesMap().end()));
+			}
+		}
+	};
+	
+	getSelectedModules(nodesInThisFrame);
     
     if(selectedNodes.size() > 0){
         //Order nodes by name
@@ -454,10 +463,11 @@ void ofxOceanodeInspectorController::draw(){
                                 }
                                 
                                 auto temp = tempCast.get()[0];
-                                ImGui::SliderFloat(hiddenUniqueId.c_str(),
-                                                   &temp,
-                                                   tempCast.getMin()[0],
-                                                   tempCast.getMax()[0], "%.4f");
+								if(tempCast.getMin()[0] == std::numeric_limits<float>::lowest() || tempCast.getMax()[0] == std::numeric_limits<float>::max()){
+									ImGui::DragFloat(hiddenUniqueId.c_str(), &temp, 0.001, tempCast.getMin()[0], tempCast.getMax()[0]);
+								}else{
+									ImGui::SliderFloat(hiddenUniqueId.c_str(), &temp, tempCast.getMin()[0], tempCast.getMax()[0], "%.4f");
+								}
                                 
                                 if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                                     tempCast = vector<float>(1, ofClamp(temp, tempCast.getMin()[0], tempCast.getMax()[0]));
