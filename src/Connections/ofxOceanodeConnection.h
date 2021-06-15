@@ -292,7 +292,7 @@ public:
 private:
     void passValueFunc(){
         if(active){
-            bool newValue = (sourceParameter > ((sourceParameter.getMax() - sourceParameter.getMin())/2.0 + sourceParameter.getMin())) ? true : false;
+            bool newValue = (sourceParameter > 0.00f) ? true : false;
             if(newValue != sinkParameter) sinkParameter = newValue;
         }
     }
