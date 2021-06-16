@@ -18,10 +18,29 @@ void curve::setup() {
 	
 	addInspectorParameter(numVerticalDivisions.set("Vert Div", 10, 1, 1000));
 	addInspectorParameter(numHorizontalDivisions.set("Hor Div", 2, 1, 1000));
+	
+	addInspectorParameter(minX.set("Min X", 0, -FLT_MAX, FLT_MAX));
+	addInspectorParameter(maxX.set("Max X", 1, -FLT_MAX, FLT_MAX));
+	
+	addInspectorParameter(minY.set("Min Y", 0, -FLT_MAX, FLT_MAX));
+	addInspectorParameter(maxY.set("Max Y", 1, -FLT_MAX, FLT_MAX));
 
     listeners.push(input.newListener([&](vector<float> &vf){
         recalculate();
     }));
+	
+	listeners.push(minX.newListener([this](float &f){
+		input.setMin(vector<float>(1, f));
+	}));
+	listeners.push(maxX.newListener([this](float &f){
+		input.setMax(vector<float>(1, f));
+	}));
+	listeners.push(minY.newListener([this](float &f){
+		output.setMin(vector<float>(1, f));
+	}));
+	listeners.push(maxY.newListener([this](float &f){
+		output.setMax(vector<float>(1, f));
+	}));
 	
 	points.emplace_back(0, 0);
 	points.emplace_back(1, 1);
@@ -31,6 +50,8 @@ void curve::setup() {
 	
 	points.front().firstCreated = false;
 	points.back().firstCreated = false;
+	
+	lines.emplace_back();
 }
 
 void curve::draw(ofEventArgs &args){
@@ -109,6 +130,7 @@ void curve::draw(ofEventArgs &args){
 				createPoint = false;
 				points.emplace_back(normalizePoint(ImGui::GetMousePos()));
 				points.back().drag = 3;
+				lines.emplace_back();
 			}
 			
 			std::sort(points.begin(), points.end(), [](curvePoint &p1, curvePoint &p2){
@@ -119,6 +141,8 @@ void curve::draw(ofEventArgs &args){
 			int indexToRemove = -1;
 			for(int i = 0; i < points.size(); i++){
 				auto &p = points[i];
+				bool useCp1 = (i > 0) && lines[i-1].type == LINE_BEZIER;
+				bool useCp2 = (i < points.size()-1) && lines[i].type == LINE_BEZIER;
 				if(p.firstCreated){
 					//Edit control points on creation
 					auto tangent = glm::normalize(points[i+1].point - points[i-1].point);
@@ -183,11 +207,11 @@ void curve::draw(ofEventArgs &args){
 						p.drag = 3;
 						someItemClicked = true;
 					}
-					else if(mouseToCp1Distance < 5){
+					else if(mouseToCp1Distance < 5 && useCp1){
 						p.drag = 1;
 						someItemClicked = true;
 					}
-					else if(mouseToCp2Distance < 5){
+					else if(mouseToCp2Distance < 5 && useCp2){
 						p.drag = 2;
 						someItemClicked = true;
 					}
@@ -201,14 +225,42 @@ void curve::draw(ofEventArgs &args){
 				if(ImGui::BeginPopup(("##PointPopup " + ofToString(i)).c_str())){
 					auto pointCopy = p.point;
 					bool pointEdited = false;
-					if(ImGui::SliderFloat("X", &p.point.x, 0, 1)) pointEdited = true;
-					if(ImGui::SliderFloat("Y", &p.point.y, 0, 1)) pointEdited = true;
+					float tempFloat = ofMap(p.point.x, 0, 1, minX, maxX);
+					if(ImGui::SliderFloat("X", &tempFloat, minX, maxX)){
+						p.point.x = ofMap(tempFloat, minX, maxX, 0, 1);
+						pointEdited = true;
+					}
+					tempFloat = ofMap(p.point.y, 0, 1, minY, maxY);
+					if(ImGui::SliderFloat("Y", &tempFloat, minY, maxY)){
+						p.point.y = ofMap(tempFloat, minY, maxY, 0, 1);
+						pointEdited = true;
+					}
 					if(pointEdited){
 						p.cp1 = p.cp1 - pointCopy + p.point;
 						p.cp2 = p.cp2 - pointCopy + p.point;
 						p.cp1 = glm::clamp(p.cp1, glm::vec2(0, 0), glm::vec2(p.point.x, 1));
 						p.cp2 = glm::clamp(p.cp2, glm::vec2(p.point.x, 0), glm::vec2(1, 1));
 					}
+					
+					ImGui::Spacing();
+					
+					if(i > 0){
+						int elem = lines[i-1].type;
+						const char* elems_names[2] = { "Bezier", "Hold"};
+						if(ImGui::SliderInt("Line L", &elem, 0, 2 - 1, elems_names[elem])){
+							lines[i-1].type = static_cast<lineType>(elem);
+						}
+					}
+					
+					if(i < lines.size()){
+						int elem = lines[i].type;
+						const char* elems_names[2] = { "Bezier", "Hold"};
+						if(ImGui::SliderInt("Line R", &elem, 0, 2 - 1, elems_names[elem])){
+							lines[i].type = static_cast<lineType>(elem);
+						}
+					}
+					
+					ImGui::Spacing();
 					
 					if(ImGui::Selectable("Remove")){
 						ImGui::CloseCurrentPopup();
@@ -229,28 +281,35 @@ void curve::draw(ofEventArgs &args){
 			
 			draw_list->AddLine(denormalizePoint(glm::vec2(0, points[0].point.y)), denormalizePoint(points[0].point), IM_COL32(10, 10, 10, 255));
 			for(int i = 0; i < points.size()-1; i++){
-				draw_list->AddBezierCurve(denormalizePoint(points[i].point),
-										  denormalizePoint(points[i].cp2),
-										  denormalizePoint(points[i+1].cp1),
-										  denormalizePoint(points[i+1].point), IM_COL32(255, 127, 0, 127), 2);
+				if(lines[i].type == LINE_BEZIER){
+					draw_list->AddBezierCurve(denormalizePoint(points[i].point),
+											  denormalizePoint(points[i].cp2),
+											  denormalizePoint(points[i+1].cp1),
+											  denormalizePoint(points[i+1].point), IM_COL32(255, 127, 0, 127), 2);
+				}else if(lines[i].type == LINE_HOLD){
+					auto p1 = denormalizePoint(points[i].point);
+					auto p2 = denormalizePoint(points[i+1].point);
+					draw_list->AddLine(p1, glm::vec2(p2.x, p1.y), IM_COL32(255, 127, 0, 127), 2);
+					draw_list->AddLine(glm::vec2(p2.x, p1.y), p2, IM_COL32(255, 127, 0, 127), 2);
+				}
 				
 //				draw_list->AddLine(denormalizePoint(points[i].point), denormalizePoint(points[i+1].point), IM_COL32(10, 10, 10, 255));
 			}
 			
 			for(int i = 0; i < points.size(); i++){
 				auto &p = points[i];
-				if(i != 0){
+				if((i > 0) && lines[i-1].type == LINE_BEZIER){
 					draw_list->AddLine(denormalizePoint(p.cp1), denormalizePoint(p.point), IM_COL32(15, 15, 15, 255));
 				}
-				if(i != points.size()-1){
+				if((i < points.size()-1) && lines[i].type == LINE_BEZIER){
 					draw_list->AddLine(denormalizePoint(p.cp2), denormalizePoint(p.point), IM_COL32(15, 15, 15, 255));
 				}
 				
 				draw_list->AddCircleFilled(denormalizePoint(p.point), 5, IM_COL32(0, 0, 0, 255));
-				if(i != 0){
+				if((i > 0) && lines[i-1].type == LINE_BEZIER){
 					draw_list->AddCircleFilled(denormalizePoint(p.cp1), 5, IM_COL32(0, 255, 255, 127));
 				}
-				if(i != points.size()-1){
+				if((i < points.size()-1) && lines[i].type == LINE_BEZIER){
 					draw_list->AddCircleFilled(denormalizePoint(p.cp2), 5, IM_COL32(255, 0, 255, 127));
 				}
 			}
@@ -258,7 +317,8 @@ void curve::draw(ofEventArgs &args){
 			draw_list->AddLine(denormalizePoint(points.back().point), denormalizePoint(glm::vec2(1, points.back().point.y)), IM_COL32(10, 10, 10, 255));
 			
 			for(auto &v : input.get()){
-				draw_list->AddLine(denormalizePoint(glm::vec2(v, 0)), denormalizePoint(glm::vec2(v, 1)), IM_COL32(127, 127, 127, 127));
+				auto mv = ofMap(v, minX, maxX, 0, 1);
+				draw_list->AddLine(denormalizePoint(glm::vec2(mv, 0)), denormalizePoint(glm::vec2(mv, 1)), IM_COL32(127, 127, 127, 127));
 			}
 			
 			for(auto &p : debugPoints){
@@ -304,7 +364,7 @@ void curve::recalculate()
 	debugPoints.resize(input->size());
 	vector<float> tempOut(input->size());
 	for(int i = 0; i < input->size(); i++){
-		auto &p = input->at(i);
+		auto p = ofMap(input->at(i), minX, maxX, 0, 1);
 		// TODO: updatejar debug point
 		if(p <= points[0].point.x){
 			tempOut[i] = points[0].point.y;
@@ -315,9 +375,15 @@ void curve::recalculate()
 		}else{
 			for(int j = 1; j < points.size(); j++){
 				if(p < points[j].point.x){
-					debugPoints[i] = getYfromXCubicBezier(points[j-1].point, points[j-1].cp2, points[j].cp1, points[j].point, p);
-					tempOut[i] = debugPoints[i].y;
-//					tempOut[i] = ofMap(p, points[j-1].point.x, points[j].point.x, points[j-1].point.y, points[j].point.y);
+					if(lines[j-1].type == LINE_BEZIER){
+						debugPoints[i] = getYfromXCubicBezier(points[j-1].point, points[j-1].cp2, points[j].cp1, points[j].point, p);
+						tempOut[i] = ofMap(debugPoints[i].y, 0, 1, minY, maxY);
+						//					tempOut[i] = ofMap(p, points[j-1].point.x, points[j].point.x, points[j-1].point.y, points[j].point.y);
+					}
+					else{
+						debugPoints[i] = glm::vec2(p, points[j-1].point.y);
+						tempOut[i] = ofMap(debugPoints[i].y, 0, 1, minY, maxY);
+					}
 					break;
 				}
 			}
@@ -336,11 +402,15 @@ void curve::presetSave(ofJson &json){
 		json["Points"][i]["Cp2"]["x"] = points[i].cp2.x;
 		json["Points"][i]["Cp2"]["y"] = points[i].cp2.y;
 	}
+	for(int i = 0; i < lines.size(); i++){
+		json["Lines"][i]["Type"] = lines[i].type;
+	}
 }
 
 void curve::presetRecallAfterSettingParameters(ofJson &json){
 	try{
 		points.resize(json["NumPoints"]);
+		lines.resize(points.size()-1);
 		for(int i = 0; i < points.size(); i++){
 			points[i].point.x = json["Points"][i]["Point"]["x"];
 			points[i].point.y = json["Points"][i]["Point"]["y"];
@@ -349,6 +419,9 @@ void curve::presetRecallAfterSettingParameters(ofJson &json){
 			points[i].cp2.x = json["Points"][i]["Cp2"]["x"];
 			points[i].cp2.y = json["Points"][i]["Cp2"]["y"];
 			points[i].firstCreated = false;
+		}
+		for(int i = 0; i < lines.size(); i++){
+			lines[i].type = static_cast<lineType>(json["Lines"][i]["Type"]);
 		}
 	}
 	catch (ofJson::exception& e)

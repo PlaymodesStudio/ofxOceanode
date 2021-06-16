@@ -39,6 +39,15 @@ struct curvePoint{
 	bool firstCreated;
 };
 
+enum lineType{
+	LINE_BEZIER,
+	LINE_HOLD
+};
+
+struct line{
+	lineType type = LINE_BEZIER;
+};
+
 class curve : public ofxOceanodeNodeModel{
 public:
     curve() : ofxOceanodeNodeModel("Curve"){};
@@ -62,11 +71,15 @@ private:
 	ofParameter<int> numVerticalDivisions;
 	ofParameter<int> numHorizontalDivisions;
 	
+	ofParameter<float> minX, maxX, minY, maxY;
+	
 	vector<glm::vec2> debugPoints;
 	
 	vector<curvePoint> points;
 	bool createPoint = false;
 	curvePoint* popupPoint;
+	
+	vector<line> lines;
 };
 
 
