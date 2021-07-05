@@ -58,7 +58,7 @@ void switcher::update(ofEventArgs &a)
 	std::transform(fswitch.begin(),
 				   fswitch.end(),
 				   fswitch.begin(),
-				   [this](auto& c){
+				   [this](float& c){
 		return c*(numInputs-1);
 	});
 	
@@ -67,7 +67,7 @@ void switcher::update(ofEventArgs &a)
 	std::transform(finterpol.begin(),
 				   finterpol.end(),
 				   finterpol.begin(),
-				   [](auto& c){
+				   [](float& c){
 		return c - ((std::trunc(c) == c) ? std::trunc(c)-1 : std::trunc(c));
 	});
 	
