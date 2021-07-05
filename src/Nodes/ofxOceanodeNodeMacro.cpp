@@ -21,14 +21,18 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 		container->loadPreset(nextPresetPath);
 		nextPresetPath = "";
 	}
-    container->update();
+	if(active){
+		container->update();
+	}
 }
 
 void ofxOceanodeNodeMacro::draw(ofEventArgs &a){
     if(showWindow){
         canvas.draw(&showWindow);
     }
-    container->draw();
+	if(active){
+		container->draw();
+	}
 }
 
 void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
@@ -38,6 +42,7 @@ void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
 }
 
 void ofxOceanodeNodeMacro::setup(string additionalInfo){
+	addParameter(active.set("Active", true));
     auto presetControlRef = addParameter(presetControl.set("Preset Control Gui", [this](){
         bool addBank = false;
 		

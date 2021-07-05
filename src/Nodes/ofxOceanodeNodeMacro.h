@@ -79,7 +79,8 @@ private:
 	deque<string> currentCategory;
 	macroCategory currentCategoryMacro;
 	deque<string> saveAsTempCategory;
-    
+	
+	ofParameter<bool> active;
     
     ofParameter<std::function<void()>> presetControl;
 
