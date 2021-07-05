@@ -120,6 +120,9 @@ void basePhasor::threadedFunction(){
             numPhasors--;
         }
         
+		//Clear threadChannel before filling it.
+		vector<double> oldPhasor;
+		while(phasorToSend.tryReceive(oldPhasor));
         phasorToSend.send((phasorMod));
     }
 }
