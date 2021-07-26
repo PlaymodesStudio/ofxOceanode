@@ -367,10 +367,10 @@ void curve::recalculate()
 		auto p = ofMap(input->at(i), minX, maxX, 0, 1);
 		// TODO: updatejar debug point
 		if(p <= points[0].point.x){
-			tempOut[i] = points[0].point.y;
+			tempOut[i] = ofMap(points[0].point.y, 0, 1, minY, maxY);
 			debugPoints[i] = glm::vec2(p, points[0].point.y);
 		}else if(p >= points.back().point.x){
-			tempOut[i] = points.back().point.y;
+			tempOut[i] = ofMap(points.back().point.y, 0, 1, minY, maxY);
 			debugPoints[i] = glm::vec2(p, points.back().point.y);
 		}else{
 			for(int j = 1; j < points.size(); j++){
