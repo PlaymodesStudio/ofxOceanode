@@ -1066,26 +1066,28 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             }
 #endif
         }else if(splitAddress[0] == "presetLoadi"){ //Load preset by number
+			if(m.getArgAsInt(0) != 0){
 #ifndef OFXOCEANODE_HEADLESS
-            auto toSendPair = make_pair(splitAddress[1], m.getArgAsInt(0));
-            loadPresetNumEvent.notify(toSendPair);
+				auto toSendPair = make_pair(splitAddress[1], m.getArgAsInt(0));
+				loadPresetNumEvent.notify(toSendPair);
 #else
-            string bankName = splitAddress[1];
-            ofDirectory dir;
-            map<int, string> presets;
-            dir.open("Presets/" + bankName);
-            if(!dir.exists())
-                return;
-            dir.sort();
-            int numPresets = dir.listDir();
-            for ( int i = 0 ; i < numPresets; i++){
-                if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(0)){
-                    string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
-                    loadPreset("Presets/" + bankAndPreset);
-                    break;
-                }
-            }
+				string bankName = splitAddress[1];
+				ofDirectory dir;
+				map<int, string> presets;
+				dir.open("Presets/" + bankName);
+				if(!dir.exists())
+					return;
+				dir.sort();
+				int numPresets = dir.listDir();
+				for ( int i = 0 ; i < numPresets; i++){
+					if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(0)){
+						string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
+						loadPreset("Presets/" + bankAndPreset);
+						break;
+					}
+				}
 #endif
+			}
 //        }else if(splitAddress[0] == "presetSave"){
 //            savePreset("Presets/" + splitAddress[1] + "/" + m.getArgAsString(0));
         }else if(splitAddress[0] == "Global"){
