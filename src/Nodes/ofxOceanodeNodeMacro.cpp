@@ -191,7 +191,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 				if(!nameExists)
 				{
 					if(strcmp(proposedNewName.c_str(), "") != 0){
-						string saveAsCategoryWithSlash = "../../../data/Macros/";
+						string saveAsCategoryWithSlash = "/Macros/";
 						for(auto s : saveAsTempCategory) saveAsCategoryWithSlash = saveAsCategoryWithSlash + s + "/";
 						container->savePreset(saveAsCategoryWithSlash + string(proposedNewName));
 						localPreset = false;
@@ -389,11 +389,15 @@ void ofxOceanodeNodeMacro::loadMacroInsideCategory(int newPresetIndex){
 }
 
 void ofxOceanodeNodeMacro::updateCurrentCategoryFromPath(string path){
+#ifdef TARGET_WIN32
+	vector<string> splittedInfo = ofSplitString(path, "\\");
+#else
 	vector<string> splittedInfo = ofSplitString(path, "/");
+#endif
 	currentCategory.clear();
 	currentMacro = splittedInfo.back();
 	for(int i = splittedInfo.size() - 2; i >= 0; i--){
-		if(splittedInfo[i] != "Macros"){
+		if(splittedInfo[i] != "Macros" && splittedInfo[i] != "data") {
 			currentCategory.push_front(splittedInfo[i]);
 		}else{
 			break;
