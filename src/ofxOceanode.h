@@ -60,6 +60,10 @@ public:
     shared_ptr<T> getController(){
         return controls->get<T>();
     }
+
+	void loadPreset(std::string preset) {
+		container->loadPreset(preset);
+	}
     
    template<typename T>
     void registerScope(std::function<void(ofxOceanodeAbstractParameter* p, ImVec2 size)> func){
