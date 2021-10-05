@@ -266,5 +266,6 @@ private:
 	ofxOceanodeParameterFlags flags = 0;
 };
 
+#include "ofxOceanodeParameter.inl"
 
 #endif /* ofxOceanodeParameter_h */
