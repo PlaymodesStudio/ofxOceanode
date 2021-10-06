@@ -24,12 +24,10 @@ public:
         //            phasorIn = vector1;
         //            phasorIn = 0;
         //        }
-        seedChanged = vector<bool>(baseChOsc.size(), true);
+        seedChanged = true;
     }
     
-    void resetPhase(){
-        seedChanged = vector<bool>(baseChOsc.size(), true);
-    }
+	void resetPhase();
     
 private:
     void phasorInListener(vector<float> &phasor);
@@ -70,8 +68,8 @@ private:
     
     ofEventListeners listeners;
     
-    vector<bool> seedChanged;
-    vector<float> oldPhasor;
+    bool seedChanged;
+    float oldPhasor;
     float desiredLength;
 };
 

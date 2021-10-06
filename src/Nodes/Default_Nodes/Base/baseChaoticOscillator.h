@@ -17,8 +17,8 @@ public:
     
     void setIndexNormalized(float index){indexNormalized = index;};
 
-    void setSeed(int seed);
-    void deactivateSeed();
+	void nextSeed(int seed);
+	void restartSeedSequence(int _seed);
 
     float  phaseOffset_Param;
     float  pow_Param;

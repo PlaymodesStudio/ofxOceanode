@@ -21,32 +21,18 @@ baseChaoticOscillator::baseChaoticOscillator(){
     newRandom = newRandomNotModulated = dist(mt);
     oldRandom = oldRandomNotModulated = dist(mt);
     futureRandom = futureRandomNotModulated = dist(mt);
-    computePreInterp(pastRandom);
-    computePreInterp(newRandom);
-    computePreInterp(oldRandom);
-    computePreInterp(futureRandom);
+	modulateNewRandom();
     accumulateCycles = 0;
 }
 
-void baseChaoticOscillator::setSeed(int seed){
-    accumulateCycles = 0;
-    setSeedFlag = true;
-    mt.seed(seed);
-    oldPhasor = -1;
-}
-
-void baseChaoticOscillator::deactivateSeed(){
-    std::random_device rd;
-    setSeedFlag = true;
-    mt.seed(rd());
+void baseChaoticOscillator::nextSeed(int seed_){
+	if(seed_ != seed){
+		setSeedFlag = true;
+		seed = seed_;
+	}
 }
 
 float baseChaoticOscillator::computeFunc(float phasor){
-//    if(setSeedFlag){
-//        phasor = 0;
-//        setSeedFlag = false;
-//    }
-    
     float linPhase = phasor + (indexNormalized*length_Param) + phaseOffset_Param;
     linPhase = fmod(linPhase, 1);
     
@@ -82,26 +68,37 @@ float baseChaoticOscillator::computeFunc(float phasor){
     
     float val = 0;
     if(linPhase < oldPhasor){
+		if(setSeedFlag){
+			//std::cout << indexNormalized*4 << " | " << phasor << " / " << linPhase << " - " << oldPhasor << std::endl;
+			if(seed == 0){
+				std::random_device rd;
+				mt.seed(rd());
+			}else{
+				mt.seed(seed);
+			}
+			
+			float indexPosShifted = (fmod(indexNormalized, 1))*length_Param;
+			if(indexPosShifted == floor(indexPosShifted)) indexPosShifted-=1;
+			for(int i = 0; i < floor(indexPosShifted); i++){
+				dist(mt);
+			}
+			
+			setSeedFlag = false;
+		}
         pastRandom = oldRandom;
-        pastRandom = oldRandomNotModulated;
+        pastRandomNotModulated = oldRandomNotModulated;
         oldRandom = newRandom;
         oldRandomNotModulated = newRandomNotModulated;
         newRandom = futureRandom;
         newRandomNotModulated = futureRandomNotModulated;
-        float indexPosShifted = (1-fmod(indexNormalized+phaseOffset_Param, 1))*length_Param;
-        if(indexPosShifted == floor(indexPosShifted)) indexPosShifted-=1;
-        if(accumulateCycles >= floor(indexPosShifted)){
-            if(customDiscreteDistribution.size() > 1){
-                std::discrete_distribution<int> disdist(customDiscreteDistribution.begin(), customDiscreteDistribution.end());
-                futureRandom = (float)disdist(mt)/(customDiscreteDistribution.size()-1);
-            }else{
-                futureRandom = dist(mt);
-            }
-            futureRandomNotModulated = futureRandom;
-            computePreInterp(futureRandom);
-        }else{
-            accumulateCycles++;
-        }
+		if(customDiscreteDistribution.size() > 1){
+			std::discrete_distribution<int> disdist(customDiscreteDistribution.begin(), customDiscreteDistribution.end());
+			futureRandom = (float)disdist(mt)/(customDiscreteDistribution.size()-1);
+		}else{
+			futureRandom = dist(mt);
+		}
+		futureRandomNotModulated = futureRandom;
+		computePreInterp(futureRandom);
     }
     //rand2
     float lin_interp = oldRandom*(1-linPhase) + newRandom*linPhase;
@@ -151,9 +148,14 @@ void baseChaoticOscillator::computePreInterp(float &value){
     value = ofClamp(value, 0.0, 1.0);
     
     //Quantization
-    if(quant_Param < 255){
-        value = (1.0/((float)quant_Param-1))*float(floor(value*quant_Param));
+    if(quant_Param == 1){
+		value = 0;
+	}
+	else if(quant_Param > 1){
+		value = (1.0/((float)quant_Param-1))*float(floor(value*quant_Param));
     }
+	
+	value = ofMap(value, 0.0, 1.0, 0.1, 0.9);
 }
 
 void baseChaoticOscillator::computeMultiplyMod(float &value){
@@ -195,5 +197,28 @@ void baseChaoticOscillator::modulateNewRandom(){
     computePreInterp(newRandom);
     futureRandom = futureRandomNotModulated;
     computePreInterp(futureRandom);
-    
+}
+
+void baseChaoticOscillator::restartSeedSequence(int _seed){
+	seed = _seed;
+	if(seed == 0){
+		std::random_device rd;
+		mt.seed(rd());
+	}else{
+		mt.seed(seed);
+	}
+	
+	float indexPosShifted = (fmod(indexNormalized, 1))*length_Param;
+	if(indexPosShifted == floor(indexPosShifted)) indexPosShifted-=1;
+	for(int i = 0; i < floor(indexPosShifted); i++){
+		dist(mt);
+	}
+	
+	pastRandom = pastRandomNotModulated = dist(mt);
+    oldRandom = oldRandomNotModulated = dist(mt);
+    newRandom = newRandomNotModulated = dist(mt);
+    futureRandom = futureRandomNotModulated = dist(mt);
+	modulateNewRandom();
+	oldPhasor = -1;
+	setSeedFlag = false;
 }
