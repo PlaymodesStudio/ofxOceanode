@@ -110,7 +110,7 @@ void oscillator::setup(){
     addParameter(offset_Param.set("Offset", {0}, {-1}, {1}));
     addParameter(pow_Param.set("Pow", {0}, {-1}, {1}));
     addParameter(biPow_Param.set("BiPow", {0}, {-1}, {1}));
-    addParameter(quant_Param.set("Quant", {255}, {2}, {255}));
+    addParameter(quant_Param.set("Quant", {0}, {0}, {INT_MAX}));
     addParameter(amplitude_Param.set("Fader", {1}, {0}, {1}));
     addParameter(invert_Param.set("Invert", {0}, {0}, {1}));
     addOutputParameter(output.set("Output", {0}, {0}, {1}));
