@@ -23,6 +23,7 @@
 
 #include "ofxImGuiSimple.h"
 #include "router.h"
+#include "portal.h"
 
 class ofxOceanode {
 public:
@@ -49,6 +50,7 @@ public:
     void registerType(string name = typeid(T).name(), T defaultValue = T()){
         typesRegistry->registerType<T>();
         nodeRegistry->registerModel<router<T>>("Router", name, defaultValue);
+		nodeRegistry->registerModel<portal<T>>("Portal", name, defaultValue);
     };
     
     template<typename T>

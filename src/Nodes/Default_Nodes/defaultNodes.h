@@ -19,5 +19,6 @@
 #include "switcher.h"
 #include "curve.h"
 #include "ofxOceanodeNodeMacro.h"
+#include "portal.h"
 
 #endif /* defaultNodes_h */

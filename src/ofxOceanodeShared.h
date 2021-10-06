@@ -8,6 +8,8 @@
 #ifndef ofxOceanodeShared_h
 #define ofxOceanodeShared_h
 
+#include "portal.h"
+
 struct macroCategory{
 	macroCategory(std::string _name = "Parent") : name(_name){};
 	std::string name;
@@ -93,6 +95,26 @@ public:
 	static ofEvent<string>& getMacroUpdatedEvent(){
 		return getInstance().macroUpdatedEvent;
 	}
+	
+	static void addPortal(abstractPortal* _portal){
+		getInstance().portals.push_back(_portal);
+	}
+	
+	static void removePortal(abstractPortal* _portal){
+		getInstance().portals.erase(std::remove(getInstance().portals.begin(), getInstance().portals.end(), _portal));
+	}
+	
+	static void portalUpdated(abstractPortal* _portal){
+		//if(getInstance().alreadyUpdatingPortals) return;
+		getInstance().alreadyUpdatingPortals = true;
+		for(auto p : getInstance().portals){
+			p->match(_portal);
+//			if(p != _portal && p->getName() == _portal->getName()){
+//				p->setValue(_portal->getValue());
+//			}
+		}
+		getInstance().alreadyUpdatingPortals = false;
+	}
     
 private:
     ofxOceanodeShared(){};
@@ -123,6 +145,9 @@ private:
 	macroCategory macroDirectoryStructure;
 	
 	ofEvent<string> macroUpdatedEvent;
+	
+	vector<abstractPortal*> portals;
+	bool alreadyUpdatingPortals = false;
 };
 
 #endif /* ofxOceanodeShared_h */
