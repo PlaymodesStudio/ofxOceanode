@@ -1117,12 +1117,14 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             string moduleId = ofSplitString(moduleName, "_").back();
             moduleName.erase(moduleName.rfind(moduleId)-1);
             ofStringReplace(moduleName, "_", " ");
+			bool validOSC = false;
             if(dynamicNodes.count(moduleName) == 1){
                 if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
                     ofParameterGroup& groupParam = dynamicNodes[moduleName][ofToInt(moduleId)]->getParameters();
                     if(groupParam.contains(splitAddress[1])){
                         ofAbstractParameter &absParam = groupParam.get(splitAddress[1]);
                         setParameterFromMidiMessage(absParam, m);
+						validOSC = true;
                     }
                 }
             }
@@ -1132,9 +1134,24 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                     if(groupParam.contains(splitAddress[1])){
                         ofAbstractParameter &absParam = groupParam.get(splitAddress[1]);
                         setParameterFromMidiMessage(absParam, m);
+						validOSC = true;
                     }
                 }
             }
+			if(!validOSC){
+				string moduleName = splitAddress[0];
+				string moduleId = ofSplitString(moduleName, "_").back();
+				moduleName.erase(moduleName.find(moduleId)-1);
+				ofStringReplace(moduleName, "_", " ");
+				if(dynamicNodes.count(moduleName) == 1){
+					if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
+						string newAddress;
+						for(int i = 1; i < splitAddress.size(); i++) newAddress += "/" + splitAddress[i];
+						m.setAddress(newAddress);
+						dynamicNodes[moduleName][ofToInt(moduleId)]->getNodeModel().receiveOscMessage(m);
+					}
+				}
+			}
         }
     }
     else if(splitAddress.size() == 3){
