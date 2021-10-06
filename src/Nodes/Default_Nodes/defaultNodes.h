@@ -19,5 +19,7 @@
 #include "switcher.h"
 #include "curve.h"
 #include "ofxOceanodeNodeMacro.h"
+#include "noise.h"
+#include "randomGenerator.h"
 
 #endif /* defaultNodes_h */

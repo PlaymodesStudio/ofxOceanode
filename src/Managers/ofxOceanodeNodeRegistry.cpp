@@ -22,6 +22,8 @@ ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
     this->registerModel<switcher>("Modifiers");
 	this->registerModel<curve>("Modifiers");
     this->registerModel<ofxOceanodeNodeMacro>("MACRO");
+	this->registerModel<noise>("Generators");
+	this->registerModel<randomGenerator>("Generators");
     
     this->registerModel<router<vector<float>>>("Router", "v_f", 0, 0, 1);
     this->registerModel<router<float>>("Router", "f", 0, 0, 1);
