@@ -570,7 +570,11 @@ void ofxOceanodeInspectorController::draw(){
                                 }
                                 
                                 auto temp = tempCast.get()[0];
-                                ImGui::SliderInt(hiddenUniqueId.c_str(),&temp,tempCast.getMin()[0],tempCast.getMax()[0]);
+                                if(tempCast.getMin()[0] == std::numeric_limits<int>::lowest() || tempCast.getMax()[0] == std::numeric_limits<int>::max()){
+									ImGui::DragInt(hiddenUniqueId.c_str(), &temp, 1, tempCast.getMin()[0], tempCast.getMax()[0]);
+								}else{
+									ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin()[0], tempCast.getMax()[0]);
+								}
                                 
                                 if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
                                     tempCast = vector<int>(1, ofClamp(temp, tempCast.getMin()[0], tempCast.getMax()[0]));
