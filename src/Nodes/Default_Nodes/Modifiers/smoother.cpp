@@ -19,7 +19,8 @@ void smoother::setup() {
     isFirstInput = true;
 }
 
-void smoother::inputListener(vector<float> &vf){
+void smoother::update(ofEventArgs &a){
+	vector<float> vf = input.get();
     if(isFirstInput){
         output = vf;
         previousInput = vf;

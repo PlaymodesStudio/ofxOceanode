@@ -15,13 +15,15 @@ public:
     smoother() : ofxOceanodeNodeModel("Smoother"){};
     ~smoother(){};
     void setup() override;
+	
+	void update(ofEventArgs &a);
     
     void presetRecallBeforeSettingParameters(ofJson &json){
         isFirstInput = true;
     };
     
 private:
-    void inputListener(vector<float> &vf);
+	void inputListener(vector<float> &vf){};
     ofEventListener inputEventListener;
     
     ofParameter<vector<float>>  input;
