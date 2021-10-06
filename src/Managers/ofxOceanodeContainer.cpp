@@ -206,7 +206,7 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             }
             
             for(auto identifier : vector_of_dynamic_identifiers){
-                string stringIdentifier = ofToString(identifier);
+                string stringIdentifier = ofToString(identifier, 2, '0');
                 if(json.find(moduleName) != json.end() && json[moduleName].find(stringIdentifier) != json[moduleName].end()){
                     vector<float> readArray = json[moduleName][stringIdentifier];
 #ifndef OFXOCEANODE_HEADLESS
@@ -476,7 +476,7 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 #ifndef OFXOCEANODE_HEADLESS
                 pos = node.second->getNodeGui().getPosition();
 #endif
-            json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y};
+            json[nodeTypeMap.first][ofToString(node.first, 2, '0')] = {pos.x, pos.y};
         }
     }
     for(auto &nodeTypeMap : persistentNodes){
@@ -567,7 +567,7 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
             string escapedNodeName = nodeType.key();
             ofStringReplace(escapedNodeName, " ", "_");
             moduleConverter[escapedNodeName][ofToInt(nodeId.key())] = newNodeId;
-            ofJson tempJson = ofLoadJson(presetFolderPath + "/" + escapedNodeName + "_" + ofToString(nodeId.key()) + ".json");
+            ofJson tempJson = ofLoadJson(presetFolderPath + "/" + escapedNodeName + "_" + ofToString(ofToInt(nodeId.key())) + ".json");
             ofSaveJson(presetFolderPath + "/" + escapedNodeName + "_" + ofToString(newNodeId) + ".json", tempJson);
         }
     }
@@ -640,7 +640,7 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
 #ifndef OFXOCEANODE_HEADLESS
         pos = node->getNodeGui().getPosition();
 #endif
-        json[node->getNodeModel().nodeName()][ofToString(node->getNodeModel().getNumIdentifier())] = {pos.x - referencePosition.x, pos.y - referencePosition.y};
+        json[node->getNodeModel().nodeName()][ofToString(node->getNodeModel().getNumIdentifier(), 2, '0')] = {pos.x - referencePosition.x, pos.y - referencePosition.y};
     }
     ofSavePrettyJson(presetFolderPath + "/modules.json", json);
     
