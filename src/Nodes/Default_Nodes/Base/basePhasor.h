@@ -125,6 +125,7 @@ private:
     ofThreadChannel<vector<float>>  initPhase_Param_channel;
     ofThreadChannel<bool>   loop_Param_channel;
     ofThreadChannel<bool>   multiTrigger_channel;
+	ofThreadChannel<bool>	reset_channel;
     
     float    bpm_Param_inThread;
     vector<float>    beatsMult_Param_inThread;
@@ -132,6 +133,7 @@ private:
     vector<float>  initPhase_Param_inThread;
     bool   loop_Param_inThread;
     bool    multiTrigger_inThread;
+	bool reset_inThread;
 
 	int resize;
 };

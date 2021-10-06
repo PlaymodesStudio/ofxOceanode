@@ -25,6 +25,7 @@ void basePhasor::setup(){
     initPhase_Param_inThread = vector<float>(1, 0);;
     loop_Param_inThread = true;
     multiTrigger_inThread = false;
+	reset_inThread = false;
     numPhasors = 1;
 	resize = -1;
     stopPhasor = vector<bool>(1, true);
@@ -40,6 +41,7 @@ basePhasor::~basePhasor(){
 
 vector<float> basePhasor::getPhasors(){
     while(phasorToSend.tryReceive(momentaryPhasor));
+	reset_channel.send(false);
     return vector<float>(momentaryPhasor.begin(), momentaryPhasor.end());
 }
 
@@ -54,6 +56,7 @@ void basePhasor::resetPhasor(bool global){
     }else if((loop_Param && global) || !global){
         fill(stopPhasor.begin(), stopPhasor.end(), false);
         fill(phasor.begin(), phasor.end(), 0);
+		reset_channel.send(true);
     }
 }
 
@@ -73,37 +76,43 @@ void basePhasor::threadedFunction(){
         initPhase_Param_channel.tryReceive(initPhase_Param_inThread);
         loop_Param_channel.tryReceive(loop_Param_inThread);
         multiTrigger_channel.tryReceive(multiTrigger_inThread);
+		reset_channel.tryReceive(reset_inThread);
         vector<float> removePhasors;
         for(int i = 0; i < numPhasors; i++){
-            //tue phasor that goes from 0 to 1 at desired frequency
-            double freq = (double)bpm_Param_inThread/(double)60;
-            freq = freq * (double)getValueForIndex(beatsMult_Param_inThread, i);
-            auto beats_div_val = (double)getValueForIndex(beatsDiv_Param_inThread, i);
-            if(beats_div_val == 0) beats_div_val = 0.0001;
-            freq = (double)freq / beats_div_val;
-            double increment = (1.0f/(double)((double)(1000.0)/(double)freq));
-            
-            phasor[i] = phasor[i] + increment;
-            if(i == 0 && (phasor[0] >= 1 || phasor[0] < 0)){
-                ofNotifyEvent(phasorCycle);
-            }
-            if(phasor[i] >= 1 || phasor[i] < 0){
-                ofNotifyEvent(phasorCycleIndex, i);
-                if(!loop_Param_inThread){
-                    stopPhasor[i] = true;
-                    if(multiTrigger_inThread && numPhasors > 1 && removePhasors.size() < numPhasors-1){
-                        removePhasors.push_back(i);
+            if(reset_inThread){
+                phasor[i] = 0;
+            }else{
+                //tue phasor that goes from 0 to 1 at desired frequency
+                double freq = (double)bpm_Param_inThread/(double)60;
+                freq = freq * (double)getValueForIndex(beatsMult_Param_inThread, i);
+                auto beats_div_val = (double)getValueForIndex(beatsDiv_Param_inThread, i);
+                if(beats_div_val == 0) beats_div_val = 0.0001;
+                freq = (double)freq / beats_div_val;
+                double increment = (1.0f/(double)((double)(1000.0)/(double)freq));
+                
+                phasor[i] = phasor[i] + increment;
+                if(i == 0 && (phasor[0] >= 1 || phasor[0] < 0)){
+                    ofNotifyEvent(phasorCycle);
+                }
+                if(phasor[i] >= 1 || phasor[i] < 0){
+                    ofNotifyEvent(phasorCycleIndex, i);
+                    if(!loop_Param_inThread){
+                        stopPhasor[i] = true;
+                        if(multiTrigger_inThread && numPhasors > 1 && removePhasors.size() < numPhasors-1){
+                            removePhasors.push_back(i);
+                        }
                     }
                 }
+                if(loop_Param_inThread){
+                    stopPhasor[i] = false;
+                }
+                
+                if(stopPhasor[i]) phasor[i] = 0;
+                
+                if(phasor[i] < 0) phasor[i] += 1.0f;
+                phasor[i] -= (int)phasor[i];
+                
             }
-            if(loop_Param_inThread){
-                stopPhasor[i] = false;
-            }
-            
-            if(stopPhasor[i]) phasor[i] = 0;
-            
-            if(phasor[i] < 0) phasor[i] += 1.0f;
-            phasor[i] -= (int)phasor[i];
             
             //Assign a copy of the phasor to add initPhase
             phasorMod[i] = phasor[i];
