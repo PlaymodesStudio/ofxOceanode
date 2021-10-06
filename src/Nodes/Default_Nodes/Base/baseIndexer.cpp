@@ -57,7 +57,7 @@ void baseIndexer::recomputeIndexs(){
         int index = i;
         
         //QUANTIZE
-        int newNumOfPixels = indexQuant_Param;
+		int newNumOfPixels = indexQuant_Param < 1 ? 1 : indexQuant_Param;
         
         index = (int)(index/((float)indexCount/(float)newNumOfPixels));
         
@@ -75,7 +75,7 @@ void baseIndexer::recomputeIndexs(){
         int veusSym = newNumOfPixels/(symmetry_Param+1);
         index = veusSym-abs((((int)(index/veusSym)%2) * veusSym)-(index%veusSym));
         
-        
+        	
         if(newNumOfPixels % 2 == 0){
             index += odd ? 1 : 0;
         }
