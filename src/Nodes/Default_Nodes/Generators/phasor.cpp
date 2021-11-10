@@ -11,27 +11,28 @@ phasor::phasor() : ofxOceanodeNodeModel("Phasor")
     phaseOffset = 0;
     color = ofColor::red;
     selfTrigger = false;
+    basePh = make_shared<basePhasor>();
 }
 
 void phasor::setup(){
-	basePh.setup();
+	basePh->setup();
     parameterAutoSettersListeners.push(bpm_Param.newListener([&](float &val){
-        basePh.setBpm(val);
+        basePh->setBpm(val);
     }));
     parameterAutoSettersListeners.push(initPhase_Param.newListener([&](vector<float> &val){
-        basePh.setInitPhase(val);
+        basePh->setInitPhase(val);
     }));
     parameterAutoSettersListeners.push(beatsMult_Param.newListener([&](vector<float> &val){
-        basePh.setBeatsMult(val);
+        basePh->setBeatsMult(val);
     }));
     parameterAutoSettersListeners.push(beatsDiv_Param.newListener([&](vector<float> &val){
-        basePh.setBeatsDiv(val);
+        basePh->setBeatsDiv(val);
     }));
     parameterAutoSettersListeners.push(loop_Param.newListener([&](bool &val){
-        basePh.setLoop(val);
+        basePh->setLoop(val);
     }));
     parameterAutoSettersListeners.push(multiTrigger_Param.newListener([&](bool &val){
-           basePh.setMultiTrigger(val);
+           basePh->setMultiTrigger(val);
     }));
 
     addParameter(bpm_Param.set("BPM", 120, 0, 999), ofxOceanodeParameterFlags_DisableSavePreset);
@@ -46,12 +47,12 @@ void phasor::setup(){
     
     resetPhaseListener = resetPhase_Param.newListener([&](){
         if(!selfTrigger)
-            basePh.resetPhasor();
+            basePh->resetPhasor();
         else
             selfTrigger = false;
     });
     
-    cycleListener = basePh.phasorCycle.newListener([this](){
+    cycleListener = basePh->phasorCycle.newListener([this](){
         selfTrigger = true;
         resetPhase_Param.trigger();
     });
@@ -59,11 +60,11 @@ void phasor::setup(){
 
 void phasor::update(ofEventArgs &e)
 {
-    phasorMonitor = basePh.getPhasors();
+    phasorMonitor = basePh->getPhasors();
 }
 
 void phasor::resetPhase(){
-    basePh.resetPhasor(true);
+    basePh->resetPhasor(true);
 }
 
 void phasor::setBpm(float bpm){

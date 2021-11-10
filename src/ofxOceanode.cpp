@@ -33,10 +33,12 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Mapper_1/Min_Input");
     gui.setup(nullptr);
 	ofxOceanodeShared::readMacros();
+    oceanodeTime.setup(container, controls->get<ofxOceanodeBPMController>());
     StyleColorsOceanode();
 }
 
 void ofxOceanode::update(){
+    oceanodeTime.update();
     container->update();
     controls->update();
 }

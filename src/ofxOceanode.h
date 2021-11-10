@@ -98,6 +98,8 @@ private:
     shared_ptr<ofxOceanodeTypesRegistry> typesRegistry;
     ofxOceanodeScope* scope;
     
+    ofxOceanodeTime oceanodeTime;
+    
 //    vector<ofxOceanodeAbstractTimeline> timelines;
     
     ofxImGuiSimple gui;

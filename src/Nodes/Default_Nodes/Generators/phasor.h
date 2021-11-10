@@ -10,6 +10,27 @@
 #include "ofxOceanodeNodeModel.h"
 #include "basePhasor.h"
 
+class counter : public ofxOceanodeNodeModel{
+public:
+    counter() : ofxOceanodeNodeModel("Counter"){}
+    
+    void setup() override{
+        addOutputParameter(output.set("Out", 0, 0, FLT_MAX));
+        
+        time = 0;
+    }
+    
+    void update(ofEventArgs &a) override{
+        output = time;
+    }
+    
+    void setTime(float t){time = t;};
+    
+private:
+    float time;
+    ofParameter<float> output;
+};
+
 class simpleNumberGenerator : public ofxOceanodeNodeModel{
 public:
     simpleNumberGenerator() : ofxOceanodeNodeModel("Number"){
@@ -33,9 +54,9 @@ class phasor : public ofxOceanodeNodeModel{
 public:
     phasor();
     ~phasor(){};
-    float getPhasor(){return basePh.getPhasor();};
-    vector<float> getPhasors(){return basePh.getPhasors();};
-    void  resetPhasor(){basePh.resetPhasor();};
+    float getPhasor(){return basePh->getPhasor();};
+    vector<float> getPhasors(){return basePh->getPhasors();};
+    void  resetPhasor(){basePh->resetPhasor();};
     float getBpm(){return bpm_Param;};
     float getBeatsMult(){return beatsMult_Param->at(0);};
     float getBeatsDiv(){return beatsDiv_Param->at(0);};
@@ -54,8 +75,10 @@ public:
     void resetPhase() override;
     void setBpm(float bpm) override;
     
+    shared_ptr<basePhasor> getBasePhasor(){return basePh;};
+    
 private:
-    basePhasor basePh;
+    shared_ptr<basePhasor> basePh;
 
 
     ofParameter<float>  bpm_Param;

@@ -10,7 +10,7 @@
 #define basePhasor_h
 #include "ofMain.h"
 
-class basePhasor: public ofThread{
+class basePhasor{
 public:
 	basePhasor() {};
     ~basePhasor();
@@ -83,6 +83,9 @@ public:
         }
     }
     
+    void threadedFunction();
+    void advanceForFrameRate(float framerate);
+    
 private:
     
 	void resizePhasors(int n) {
@@ -102,8 +105,6 @@ private:
     int numPhasors;
     
     ofTimer timer;
-    
-    void threadedFunction() override;
 
     vector<double>  phasor;
     vector<double>  phasorMod;

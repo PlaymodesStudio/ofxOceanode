@@ -47,6 +47,9 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
 
     soundStream.setup(settings);
 #endif
+    
+    timeParameters = nullptr;
+    scrub = 0;
 }
 
 void ofxOceanodeBPMController::draw(){
@@ -89,6 +92,48 @@ void ofxOceanodeBPMController::draw(){
     #ifdef OFXOCEANODE_USE_BPM_DETECTION
     ImGui::Toggle("Auto BPM", &useDetection);
     #endif
+    
+    if(timeParameters != nullptr){
+        ImGui::Separator();
+        ImGui::Separator();
+        ImGui::Text("TIME");
+        ImGui::Text("----- %f -----", timeParameters->getFloat("Time").get());
+        
+        ImGui::Separator();
+        auto fm = timeParameters->getBool("Frame Mode");
+        if(ImGui::Checkbox("Frame Mode", (bool*)&fm.get())){
+            fm = fm;
+        }
+        auto fi = timeParameters->getInt("Frame Interval");
+        if(ImGui::SliderInt("Frame Interval", (int*)&fi.get(), 1, 600)){
+            fi = fi;
+        }
+        ImGui::Separator();
+        auto p = timeParameters->getBool("Is Playing");
+        if(ImGui::Checkbox("Playing", (bool*)&p.get())){
+            p = p;
+        }
+        
+        if(ImGui::Button("Play")){
+            p = true;
+        }
+        if(ImGui::Button("Pause")){
+            p = false;
+        }
+        if(ImGui::Button("Reset")){
+            timeParameters->getVoid("Stop").trigger();
+            p = true;
+        }
+        if(ImGui::Button("Stop")){
+            timeParameters->getVoid("Stop").trigger();
+        }
+        ImGui::DragFloat("Scrub", &scrub, 0.001, -100, 100);
+        if(ImGui::IsMouseReleased(0)){
+            scrub = 0;
+        }else if(scrub != 0){
+            timeParameters->getFloat("Scrub") = scrub;
+        }
+    }
 }
 
 void ofxOceanodeBPMController::audioIn(ofSoundBuffer &input){
@@ -101,6 +146,12 @@ void ofxOceanodeBPMController::audioIn(ofSoundBuffer &input){
     }
     oldBpm = bpmDetection.bpm;
 #endif
+}
+
+void ofxOceanodeBPMController::setBPM(float _bpm){
+    oldBpm = bpm;
+    bpm = _bpm;
+    container->setBpm(bpm);
 }
 
 #endif
