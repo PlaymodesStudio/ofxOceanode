@@ -731,7 +731,7 @@ void ofxOceanodeInspectorController::draw(){
                 for(int i=0 ; i<nodeGui.getParameters().size(); i++){
                     ofxOceanodeAbstractParameter &p = static_cast<ofxOceanodeAbstractParameter&>(nodeGui.getParameters().get(i));
                     if((p.getFlags() & ofxOceanodeParameterFlags_DisableInConnection)){
-                        auto size = ImVec2(ImGui::GetContentRegionAvailWidth(), 100);
+                        auto size = ImVec2(ImGui::GetContentRegionAvail().x, 100);
                         
                         ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(nodeGui.getColor()*0.75f));
                         ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(nodeGui.getColor()*0.75f));

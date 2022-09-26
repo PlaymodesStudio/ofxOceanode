@@ -105,7 +105,7 @@ void ofxOceanodeScope::draw(){
             auto &p = scopedParameters[i];
             auto itemHeight = (p.sizeRelative / scopedParameters.size() * windowHeight) - 2.5;
 
-            auto size = ImVec2(ImGui::GetContentRegionAvailWidth(), itemHeight);
+            auto size = ImVec2(ImGui::GetContentRegionAvail().x, itemHeight);
             
             ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(p.color*0.75f));
             ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(p.color*0.75f));
@@ -136,7 +136,7 @@ void ofxOceanodeScope::draw(){
             // f() function to properly draw each scope item
             for(auto f : scopeTypes)
             {
-                if(f(p.parameter, ImVec2(ImGui::GetContentRegionAvailWidth(), itemHeight))) break;
+                if(f(p.parameter, ImVec2(ImGui::GetContentRegionAvail().x, itemHeight))) break;
             }
             
             ImGui::PopStyleColor(5);

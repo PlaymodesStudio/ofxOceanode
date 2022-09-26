@@ -36,6 +36,7 @@ public:
 		text = "Comment";
 		color = ofFloatColor(1, 1, 1, 1);
 		textColor = ofFloatColor(0, 0, 0, 1);
+        openPopupInNext = false;
 	};
 	
 	string text;

@@ -46,6 +46,8 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     bpmDetection.setup("default",settings.bufferSize,256,settings.sampleRate);
 
     soundStream.setup(settings);
+    
+    useDetection = true;
 #endif
     
     timeParameters = nullptr;
@@ -90,7 +92,9 @@ void ofxOceanodeBPMController::draw(){
         }
     }
     #ifdef OFXOCEANODE_USE_BPM_DETECTION
-    ImGui::Toggle("Auto BPM", &useDetection);
+    ImGui::Separator();
+    ImGui::Separator();
+    ImGui::Checkbox("Auto BPM", &useDetection);
     #endif
     
     if(timeParameters != nullptr){
@@ -142,6 +146,7 @@ void ofxOceanodeBPMController::audioIn(ofSoundBuffer &input){
     if(oldBpm != bpmDetection.bpm){
         if(useDetection){
             bpm = bpmDetection.bpm;
+            if(bpm > 0) container->setBpm(bpm);
         }
     }
     oldBpm = bpmDetection.bpm;

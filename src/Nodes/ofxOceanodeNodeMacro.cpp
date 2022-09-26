@@ -11,7 +11,7 @@
 ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
     presetPath = "";
     currentPreset = -1;
-	showWindow = true;
+	showWindow = false;
 	localPreset = true;
 }
 
@@ -335,6 +335,8 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
             getParameterGroup().remove(nameParamFromRouter);
         }, 0));
     }
+    ofEventArgs args;
+    node->update(args);
 }
 
 void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
