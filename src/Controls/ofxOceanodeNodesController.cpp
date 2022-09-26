@@ -93,7 +93,7 @@ void ofxOceanodeNodesController::draw()
             ImGui::PopStyleColor();
             ImGui::SameLine();
             
-            if(searchField != "") ImGui::SetNextTreeNodeOpen(true);
+            if(searchField != "") ImGui::SetNextItemOpen(true);
             if(ImGui::TreeNode(categoriesVector[i].c_str()))
             {
                 for(auto &op : options[i])
