@@ -12,8 +12,8 @@ void switcher::setup(){
     color = ofColor::white;
 	
 	addInspectorParameter(numInputs.set("Num Inputs", 5, 2, INT_MAX));
-	
-    addParameter(switchSelector.set("Switch", {0}, {0}, {1}));
+    addInspectorParameter(normalizedSelector.set("Norm Selector", true));
+    addParameter(switchSelector.set("Switch", {0}, {0}, {FLT_MAX}));
 	addOutputParameter(output.set("Output", {0}, {0}, {1}));
 	inputs.resize(numInputs);
 	for(int i = 0; i < numInputs; i++){
@@ -54,6 +54,16 @@ void switcher::update(ofEventArgs &a)
     });
 	
 	vector<float> fswitch = switchSelector;
+    
+    if(!normalizedSelector){
+        for(int i = 0; i < fswitch.size(); i++){
+            fswitch[i] /= (numInputs-1);
+        }
+    }
+    
+    for(int i = 0; i < fswitch.size(); i++){
+        fswitch[i] = ofClamp(fswitch[i], 0, 1);
+    }
 	
 	std::transform(fswitch.begin(),
 				   fswitch.end(),

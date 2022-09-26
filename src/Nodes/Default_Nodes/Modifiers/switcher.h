@@ -21,6 +21,10 @@ public:
     void setup() override;
 	
 	void update(ofEventArgs &a) override;
+    
+    void loadBeforeConnections(ofJson &json) override{
+        deserializeParameter(json, numInputs);
+    }
 
 private:
     
@@ -28,6 +32,7 @@ private:
 	
 	ofParameter<int> numInputs;
     
+    ofParameter<bool> normalizedSelector;
     vector<ofParameter<vector<float>>>  inputs;
     ofParameter<vector<float>>  switchSelector;
     ofParameter<vector<float>>  output;
