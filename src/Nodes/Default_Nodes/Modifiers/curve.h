@@ -70,6 +70,9 @@ private:
 	
 	ofParameter<int> numVerticalDivisions;
 	ofParameter<int> numHorizontalDivisions;
+    
+    ofParameter<bool> adaptEdges;
+    ofParameter<bool> proportionalControlPoints;
 	
 	ofParameter<float> minX, maxX, minY, maxY;
 	

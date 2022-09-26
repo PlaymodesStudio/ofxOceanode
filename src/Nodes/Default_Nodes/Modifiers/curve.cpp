@@ -15,6 +15,9 @@ void curve::setup() {
     addParameter(input.set("Input", {0}, {0}, {1}));
 	addParameter(showWindow.set("Show", true));
     addOutputParameter(output.set("Output", {0}, {0}, {1}));
+    
+    addInspectorParameter(adaptEdges.set("Adapt Edges", false));
+    addInspectorParameter(proportionalControlPoints.set("Proportionsl Control Points", false));
 	
 	addInspectorParameter(numVerticalDivisions.set("Vert Div", 10, 1, 1000));
 	addInspectorParameter(numHorizontalDivisions.set("Hor Div", 2, 1, 1000));
@@ -105,9 +108,6 @@ void curve::draw(ofEventArgs &args){
 			}
 			ImGui::PopItemWidth();
 			ImGui::EndChild();
-			ImGui::PopStyleColor();
-			ImGui::PopStyleVar(2);
-			ImGui::EndGroup();
 			
 			auto normalizePoint = [win_pos, canvas_sz](glm::vec2 p) -> glm::vec2{
 				return glm::vec2(ofMap(p.x, win_pos.x, win_pos.x+canvas_sz.x, 0, 1),
@@ -146,18 +146,20 @@ void curve::draw(ofEventArgs &args){
 				if(p.firstCreated){
 					//Edit control points on creation
 					auto tangent = glm::normalize(points[i+1].point - points[i-1].point);
-					p.cp1 = p.point - (tangent * glm::distance(p.point, points[i-1].point)/4);
-					p.cp2 = p.point + (tangent * glm::distance(p.point, points[i+1].point)/4);
+                    float sizeCp1 = proportionalControlPoints ? glm::distance(p.point, points[i-1].point)/4 : 0.05;
+                    float sizeCp2 = proportionalControlPoints ? glm::distance(p.point, points[i+1].point)/4 : 0.05;
+					p.cp1 = p.point - (tangent * sizeCp1);
+					p.cp2 = p.point + (tangent * sizeCp2);
 					
-					if(i == 1){
-						points[i-1].cp2 = points[i-1].point + (tangent * glm::distance(p.point, points[i-1].point)/4);
+					if(adaptEdges && i == 1 && adaptEdges){
+						points[i-1].cp2 = points[i-1].point + (tangent * sizeCp1);
 						auto ccp2 = glm::closestPointOnLine(points[i-1].cp2, points[i-1].point, p.point);
 						points[i-1].cp2 = ccp2 + (ccp2 - points[i-1].cp2);
 						points[i-1].cp2 = glm::clamp(points[i-1].cp2, glm::vec2(points[i-1].point.x, 0), glm::vec2(1, 1));
 					}
 					
-					if(i == points.size() - 2){
-						points[i+1].cp1 = points[i+1].point - (tangent * glm::distance(p.point, points[i+1].point)/4);
+					if(adaptEdges && i == points.size() - 2){
+						points[i+1].cp1 = points[i+1].point - (tangent * sizeCp2);
 						auto ccp1 = glm::closestPointOnLine(points[i+1].cp1, points[i+1].point, p.point);
 						points[i+1].cp1 = ccp1 + (ccp1 - points[i+1].cp1);
 						points[i+1].cp1 = glm::clamp(points[i+1].cp1, glm::vec2(0, 0), glm::vec2(points[i+1].point.x, 1));
@@ -190,6 +192,9 @@ void curve::draw(ofEventArgs &args){
 						p.cp1 = p.cp1 - p.point + normalizedPos;
 						p.cp2 = p.cp2 - p.point + normalizedPos;
 						p.point = normalizedPos;
+                        
+                        //TODO: Comprova control point dels veins
+                        //TODO: no deixar moure mes enllà dels veins?
 					}
 					
 					p.cp1 = glm::clamp(p.cp1, glm::vec2(points[i-1].point.x, 0), glm::vec2(p.point.x, 1));
@@ -324,6 +329,9 @@ void curve::draw(ofEventArgs &args){
 			for(auto &p : debugPoints){
 				draw_list->AddCircleFilled(denormalizePoint(p), 3, IM_COL32(255, 0, 0, 255));
 			}
+            ImGui::PopStyleColor();
+            ImGui::PopStyleVar(2);
+            ImGui::EndGroup();
 		}
 		ImGui::End();
 	}
