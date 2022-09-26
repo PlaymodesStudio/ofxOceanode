@@ -143,6 +143,7 @@ void ofxOceanodeCanvas::draw(bool *open){
 		vector<pair<string, ofxOceanodeNode*>> nodesInThisFrame = vector<pair<string, ofxOceanodeNode*>>(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
 		
 		//Look for deleted Nodes in drawing nodes order map
+        //TODO: optimize
 		vector<int> erasedPositions;
 		for(auto it = nodesDrawingOrder.begin() ; it != nodesDrawingOrder.end(); ){
 			string nodeId = it->first;
@@ -205,11 +206,17 @@ void ofxOceanodeCanvas::draw(bool *open){
 		if(removeIndex != -1){
 			container->getComments().erase(container->getComments().begin() + removeIndex);
 		}
+		
+		for(auto &n : nodesInThisFrame){
+			if(nodesDrawingOrder.count(n.first) == 0){
+				nodesDrawingOrder[n.first] = nodesDrawingOrder.size();
+			}
+		}
         
         //reorder nodesInThisFrame, so they are in correct drawing order, for the interaction to work properly
         std::sort(nodesInThisFrame.begin(), nodesInThisFrame.end(), [this](std::pair<std::string, ofxOceanodeNode*> a, std::pair<std::string, ofxOceanodeNode*> b){
-            if (nodesDrawingOrder.count(a.first) == 0) nodesDrawingOrder[a.first] = nodesDrawingOrder.size();
-            if (nodesDrawingOrder.count(b.first) == 0) nodesDrawingOrder[b.first] = nodesDrawingOrder.size();
+//            if (nodesDrawingOrder.count(a.first) == 0) nodesDrawingOrder[a.first] = nodesDrawingOrder.size();
+//            if (nodesDrawingOrder.count(b.first) == 0) nodesDrawingOrder[b.first] = nodesDrawingOrder.size();
             return nodesDrawingOrder[a.first] > nodesDrawingOrder[b.first];
         });
 		
@@ -782,7 +789,9 @@ void ofxOceanodeCanvas::draw(bool *open){
         ImGui::PopStyleVar(2);
         ImGui::EndGroup();
         
-    }
+                }else{
+                    deselectAllNodes();
+                }
     ImGui::End();
     
     //TODO: Find better way to to this, when macro created, recoverr focus on canvas, should be its parent. something like. container->getParentCanvas? Or set a id in canvas as "Parent Canvas".
