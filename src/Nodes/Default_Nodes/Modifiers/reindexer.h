@@ -27,9 +27,11 @@ private:
 	vector<float> tempOutput;
 	bool alreadyCalculated;
 	
+    ofParameter<bool> normIndexs;
     ofParameter<vector<float>> input;
 	ofParameter<vector<float>> indexs;
     ofParameter<vector<float>> output;
+    ofParameter<int> mode;
 };
 
 #endif /* reindexer_h */
