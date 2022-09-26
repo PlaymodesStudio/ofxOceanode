@@ -35,6 +35,7 @@ float baseRandomGenerator::computeFunc(float phasor){
     
     float val = 0;
     if(linPhase < oldPhasor){
+        oldRandomValue = randomValue;
 		if(setSeedFlag){
 			//std::cout << indexNormalized*4 << " | " << phasor << " / " << linPhase << " - " << oldPhasor << std::endl;
 			if(seed == 0){
@@ -52,14 +53,28 @@ float baseRandomGenerator::computeFunc(float phasor){
 			
 			setSeedFlag = false;
 		}
-		if(customDiscreteDistribution.size() > 1){
-			std::discrete_distribution<int> disdist(customDiscreteDistribution.begin(), customDiscreteDistribution.end());
-			randomValueNotModulated = (float)disdist(mt)/(customDiscreteDistribution.size()-1);
-		}else{
-			randomValueNotModulated = dist(mt);
-		}
-		randomValue = randomValueNotModulated;
-		computePreInterp(randomValue);
+        if(customDiscreteDistribution.size() > 1){
+            std::discrete_distribution<int> disdist(customDiscreteDistribution.begin(), customDiscreteDistribution.end());
+            randomValueNotModulated = (float)disdist(mt)/(customDiscreteDistribution.size()-1);
+        }else{
+            randomValueNotModulated = dist(mt);
+        }
+        randomValue = randomValueNotModulated;
+        computePreInterp(randomValue);
+        
+        //Si es repeat recalcula
+        if(nonRepeat && quant_Param != 1){
+            while(randomValue == oldRandomValue){
+                if(customDiscreteDistribution.size() > 1){
+                    std::discrete_distribution<int> disdist(customDiscreteDistribution.begin(), customDiscreteDistribution.end());
+                    randomValueNotModulated = (float)disdist(mt)/(customDiscreteDistribution.size()-1);
+                }else{
+                    randomValueNotModulated = dist(mt);
+                }
+                randomValue = randomValueNotModulated;
+                computePreInterp(randomValue);
+            }
+        }
     }
 	
 	val = randomValue;

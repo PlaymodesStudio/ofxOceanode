@@ -78,8 +78,11 @@ void randomGenerator::setup(){
         }
         seedChanged = true;
     }));
-    
-    
+    listeners.push(nonRepeat.newListener([this](bool &b){
+        for(int i = 0; i < baseChGen.size(); i++){
+            baseChGen[i].nonRepeat = b;
+        }
+    }));
     
     addParameter(phasorIn.set("Phase", {0}, {0}, {1}));
     addParameter(index_Param.set("Index", {0}, {0}, {1}));
@@ -95,6 +98,8 @@ void randomGenerator::setup(){
     addParameter(max_Param.set("Max", {1}, {-FLT_MAX}, {FLT_MAX}));
     
     addOutputParameter(output.set("Output", {0}, {0}, {1}));
+    
+    addInspectorParameter(nonRepeat.set("Non Repeating", false));
     
     listeners.push(phasorIn.newListener(this, &randomGenerator::phasorInListener));
     desiredLength = 1;
@@ -112,6 +117,7 @@ void randomGenerator::resize(int newSize){
     max_Param = max_Param;
     customDiscreteDistribution_Param = customDiscreteDistribution_Param;
     seed = seed;
+    nonRepeat = nonRepeat;
     seedChanged = true;
     
     length_Param.setMax({static_cast<float>(newSize)});

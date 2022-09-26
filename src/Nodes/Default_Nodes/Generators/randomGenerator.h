@@ -59,6 +59,8 @@ private:
     ofParameter<vector<float>>  output;
     ofParameter<vector<int>> seed;
     
+    ofParameter<bool>   nonRepeat;
+    
     vector<float> result;
     
     ofEventListeners listeners;

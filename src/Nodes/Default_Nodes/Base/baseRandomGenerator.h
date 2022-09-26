@@ -29,6 +29,7 @@ public:
     float  min_Param;
     float  max_Param;
     int    length_Param;
+    bool   nonRepeat;
     
     std::vector<float> customDiscreteDistribution;
     
@@ -47,6 +48,7 @@ private:
     float randomValue;
     
     float randomValueNotModulated;
+    float oldRandomValue;
     
     int seed;
     std::mt19937 mt;
