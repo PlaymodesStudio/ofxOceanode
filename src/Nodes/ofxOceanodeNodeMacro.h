@@ -40,6 +40,14 @@ public:
 	
 	shared_ptr<ofxOceanodeContainer> getContainer() {return container;};
     
+    void activate(){
+        active = true;
+    }
+    
+    void deactivate(){
+        active = false;
+    }
+    
 private:
     void newNodeCreated(ofxOceanodeNode* &node);
 	void loadMacroInsideCategory(int newPresetIndex);
@@ -57,6 +65,7 @@ private:
     ofEventListeners deleteListeners;
 	
 	ofEventListener macroUpdatedListener;
+    ofEventListener activeListener;
     
     bool showWindow;
     string presetPath;

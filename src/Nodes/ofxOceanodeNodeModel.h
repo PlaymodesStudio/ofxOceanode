@@ -64,6 +64,9 @@ public:
     virtual void presetHasLoaded(){};
     virtual void loadBeforeConnections(ofJson &json){};
     
+    virtual void deactivate(){};
+    virtual void activate(){};
+    
 	void deserializeParameter(ofJson &json, ofAbstractParameter &p);
     
     ofColor getColor(){return color;};

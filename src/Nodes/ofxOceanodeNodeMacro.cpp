@@ -43,6 +43,13 @@ void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
 
 void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	addParameter(active.set("Active", true));
+    activeListener = active.newListener([this](bool &b){
+        if(b){
+            container->activate();
+        }else{
+            container->deactivate();
+        }
+    });
     auto presetControlRef = addParameter(presetControl.set("Preset Control Gui", [this](){
         bool addBank = false;
 		

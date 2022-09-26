@@ -60,6 +60,8 @@ public:
     void update();
     void draw();
     
+    void activate();
+    void deactivate();
     
     ofxOceanodeNode* createNodeFromName(string name, int identifier = -1, bool isPersistent = false);
     ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier = -1, bool isPersistent = false, string additionalInfo = "");

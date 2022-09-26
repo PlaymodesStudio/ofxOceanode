@@ -104,6 +104,38 @@ void ofxOceanodeContainer::draw(){
     }
 }
 
+void ofxOceanodeContainer::activate(){
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            //if(node.second->getActive())
+                node.second->getNodeModel().activate();
+        }
+    }
+    
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            //if(node.second->getActive())
+                node.second->getNodeModel().activate();
+        }
+    }
+}
+
+void ofxOceanodeContainer::deactivate(){
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            //if(node.second->getActive())
+                node.second->getNodeModel().deactivate();
+        }
+    }
+    
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            //if(node.second->getActive())
+                node.second->getNodeModel().deactivate();
+        }
+    }
+}
+
 ofxOceanodeNode* ofxOceanodeContainer::createNodeFromName(string name, int identifier, bool isPersistent){
     unique_ptr<ofxOceanodeNodeModel> type = registry->create(name);
     
