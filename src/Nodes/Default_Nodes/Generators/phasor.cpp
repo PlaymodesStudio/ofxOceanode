@@ -12,6 +12,9 @@ phasor::phasor() : ofxOceanodeNodeModel("Phasor")
     color = ofColor::red;
     selfTrigger = false;
     basePh = make_shared<basePhasor>();
+    parameterAutoSettersListeners.push(basePh->audioUpdate.newListener([this](vector<float> &vf){
+        phasorMonitor = vf;
+    }));
 }
 
 void phasor::setup(){
@@ -34,6 +37,9 @@ void phasor::setup(){
     parameterAutoSettersListeners.push(multiTrigger_Param.newListener([&](bool &val){
            basePh->setMultiTrigger(val);
     }));
+    parameterAutoSettersListeners.push(audioRate_Param.newListener([&](bool &val){
+           basePh->setAudioRate(val);
+    }));
 
     addParameter(bpm_Param.set("BPM", 120, 0, 999), ofxOceanodeParameterFlags_DisableSavePreset);
     addParameter(beatsDiv_Param.set("Div", {2}, {1}, {512}));
@@ -44,6 +50,7 @@ void phasor::setup(){
     addOutputParameter(phasorMonitor.set("Phase", {0}, {0}, {1}));
     
     addInspectorParameter(multiTrigger_Param.set("Multi Trigger", false));
+    addInspectorParameter(audioRate_Param.set("Audio Rate", false));
     
     resetPhaseListener = resetPhase_Param.newListener([&](){
         if(!selfTrigger)
@@ -60,7 +67,8 @@ void phasor::setup(){
 
 void phasor::update(ofEventArgs &e)
 {
-    phasorMonitor = basePh->getPhasors();
+    if(!basePh->isAudio())
+        phasorMonitor = basePh->getPhasors();
 }
 
 void phasor::resetPhase(){

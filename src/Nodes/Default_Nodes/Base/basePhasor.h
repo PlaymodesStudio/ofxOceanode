@@ -61,6 +61,9 @@ public:
         multiTrigger = mTrigger;
         multiTrigger_channel.send(multiTrigger);
     }
+    void setAudioRate(bool aRate){
+        audioRate = aRate;
+    }
 
     vector<float> getPhasors();
     float getPhasor(){
@@ -70,6 +73,7 @@ public:
     
     ofEvent<void> phasorCycle;
     ofEvent<int> phasorCycleIndex;
+    ofEvent<vector<float>> audioUpdate;
     
     void checkChangedSize(){
         if(beatsMult_Param.size() != 1 && beatsMult_Param.size() != numPhasors){
@@ -83,8 +87,9 @@ public:
         }
     }
     
-    void threadedFunction();
+    void threadedFunction(double microseconds = 1000);
     void advanceForFrameRate(float framerate);
+    bool isAudio(){return audioRate;};
     
 private:
     
@@ -119,6 +124,7 @@ private:
     vector<float>  initPhase_Param;
     bool   loop_Param;
     bool    multiTrigger;
+    bool    audioRate;
     
     ofThreadChannel<float>    bpm_Param_channel;
     ofThreadChannel<vector<float>>    beatsMult_Param_channel;

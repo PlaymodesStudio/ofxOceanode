@@ -12,8 +12,10 @@
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxImGuiSimple.h"
+#include "imgui.h"
 #include "ofxOceanodeParameter.h"
 #include "ofxOceanodeScope.h"
+#include "ofxOceanodeTime.h"
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node) : container(_container), node(_node){
     color = node.getColor();
@@ -364,6 +366,16 @@ bool ofxOceanodeNodeGui::constructGui(){
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast = tempCast;
                     }
+                }else if(absParam.valueType() == typeid(time_t).name()){
+					auto tm_ = *std::localtime(&absParam.cast<time_t>().getParameter().get());
+					std::stringstream str;
+					constexpr int bufsize = 256;
+					char buf[bufsize];
+				
+					if (strftime(buf,bufsize, "%d/%m/%Y-%H:%M:%S", &tm_) != 0){
+						str << buf;
+					}
+					ImGui::Text("%s", str.str().c_str());
                 }
                 // UNKNOWN PARAM
                 ////////////////
@@ -390,13 +402,13 @@ bool ofxOceanodeNodeGui::constructGui(){
                         }
                     }
                     ImGui::Separator();
-                    if(true){ //Param is not timelined
+                    if(!absParam.isTimelined()){ //Param is not timelined
                         if(ImGui::Selectable("Add to Timeline")){
-                            
+                            ofxOceanodeTime::getInstance()->addParameter(&absParam,getColor());
                         }
                     }else{
                         if(ImGui::Selectable("Remove from Timeline")){
-                            
+                            ofxOceanodeTime::getInstance()->removeParameter(&absParam);
                         }
                     }
 #ifdef OFXOCEANODE_USE_MIDI

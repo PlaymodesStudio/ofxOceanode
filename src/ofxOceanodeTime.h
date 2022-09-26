@@ -14,6 +14,19 @@
 
 class ofxOceanodeContainer;
 
+class ofxOceanodeTimelinedItem {
+public:
+    ofxOceanodeTimelinedItem(ofxOceanodeAbstractParameter* p, ofColor c = ofColor::white, float h = 10) : parameter(p), color(c), height(h){
+        open = false;
+    };
+    ~ofxOceanodeTimelinedItem(){};
+    
+    ofxOceanodeAbstractParameter* parameter;
+    ofColor color;
+    float height;
+    bool open;
+};
+
 class ofxOceanodeTime : public ofThread{
 public:
     ofxOceanodeTime(){};
@@ -21,8 +34,15 @@ public:
         stopThread();
         waitForThread(true);
     };
+    
+    static ofxOceanodeTime* getInstance(){
+           static ofxOceanodeTime instance;
+           return &instance;
+       }
+    
     void setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOceanodeBPMController> contr);
     
+    void draw();
     
     void togglePlay(){
         isPlaying = !isPlaying;
@@ -33,6 +53,11 @@ public:
     }
     
     void update();
+    void audioIn(ofSoundBuffer & input);
+    
+    void addParameter(ofxOceanodeAbstractParameter* p, ofColor _color);
+    void removeParameter(ofxOceanodeAbstractParameter* p);
+    
 private:
     void threadedFunction() override;
     
@@ -52,11 +77,18 @@ private:
     ofTimer timer;
     
     vector<shared_ptr<basePhasor>> phasorsInThread;
+    vector<shared_ptr<basePhasor>> phasorsInThread2;
     
     ofThreadChannel<vector<shared_ptr<basePhasor>>> phasorChannel;
+    ofThreadChannel<vector<shared_ptr<basePhasor>>> phasorChannel2;
     
     shared_ptr<ofxOceanodeContainer> container;
     shared_ptr<ofxOceanodeBPMController> controller;
+    
+    ofSoundStream soundStream;
+    
+    std::vector<ofxOceanodeTimelinedItem> timlinedParameters;
+    float windowHeight;
 };
 
 #endif /* ofxOceanodeTime_h */

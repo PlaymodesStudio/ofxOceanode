@@ -76,7 +76,6 @@ public:
     void setBpm(float bpm) override;
     
     shared_ptr<basePhasor> getBasePhasor(){return basePh;};
-    
 private:
     shared_ptr<basePhasor> basePh;
 
@@ -89,6 +88,7 @@ private:
     ofParameter<bool>   loop_Param;
     ofParameter<bool>   multiTrigger_Param;
     ofParameter<void>   resetPhase_Param;
+    ofParameter<bool>   audioRate_Param;
     float phaseOffset;
     
     ofEventListeners parameterAutoSettersListeners;

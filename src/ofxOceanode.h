@@ -18,6 +18,7 @@
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeTypesRegistry.h"
 #include "ofxOceanodeScope.h"
+#include "ofxOceanodeTime.h"
 
 //#include "ofxOceanodeAbstractTimeline.h"
 
@@ -78,6 +79,10 @@ public:
         });
     }
     
+    void togglePlay(){
+        oceanodeTime->togglePlay();
+    }
+    
     //TODO: Clean
     // From imgui_demo.cpp
     //-----------------------------------------------------------------------------
@@ -99,7 +104,7 @@ private:
     shared_ptr<ofxOceanodeTypesRegistry> typesRegistry;
     ofxOceanodeScope* scope;
     
-    ofxOceanodeTime oceanodeTime;
+    ofxOceanodeTime* oceanodeTime;
     
 //    vector<ofxOceanodeAbstractTimeline> timelines;
     

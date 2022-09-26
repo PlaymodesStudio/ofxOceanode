@@ -19,6 +19,7 @@ void basePhasor::setup(){
     initPhase_Param = vector<float>(1, 0);
     loop_Param = true;
     multiTrigger = false;
+    audioRate = false;
     bpm_Param_inThread = 120.00;
     beatsMult_Param_inThread = vector<float>(1, 1);
     beatsDiv_Param_inThread = vector<float>(1, 1);
@@ -57,7 +58,7 @@ void basePhasor::resetPhasor(bool global){
     momentaryPhasor = phasor;
 }
 
-void basePhasor::threadedFunction(){
+void basePhasor::threadedFunction(double microseconds){
 		if (resize > 0) {
 			numPhasors = resize;
 			phasor.resize(resize, 0);
@@ -84,7 +85,7 @@ void basePhasor::threadedFunction(){
                 auto beats_div_val = (double)getValueForIndex(beatsDiv_Param_inThread, i);
                 if(beats_div_val == 0) beats_div_val = 0.0001;
                 freq = (double)freq / beats_div_val;
-                double increment = (1.0f/(double)((double)(1000.0)/(double)freq));
+                double increment = (1.0f/(double)((double)(microseconds)/(double)freq));
                 
                 phasor[i] = phasor[i] + increment;
                 if(i == 0 && (phasor[0] >= 1 || phasor[0] < 0)){
@@ -192,4 +193,8 @@ void basePhasor::advanceForFrameRate(float framerate){
         numPhasors--;
     }
     momentaryPhasor = phasorMod;
+    if(isAudio()){
+        vector<float> tvec = vector<float>(phasorMod.begin(), phasorMod.end());
+        audioUpdate.notify(this, tvec);
+    }
 }

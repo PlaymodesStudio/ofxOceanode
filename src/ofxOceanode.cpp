@@ -14,6 +14,7 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry = make_shared<ofxOceanodeNodeRegistry>();
     typesRegistry = ofxOceanodeTypesRegistry::getInstance();
     scope = ofxOceanodeScope::getInstance();
+    oceanodeTime = ofxOceanodeTime::getInstance();
     firstDraw = true;
     settingsLoaded = false;
 }
@@ -33,12 +34,12 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Mapper_1/Min_Input");
     gui.setup(nullptr);
 	ofxOceanodeShared::readMacros();
-    oceanodeTime.setup(container, controls->get<ofxOceanodeBPMController>());
+    oceanodeTime->setup(container, controls->get<ofxOceanodeBPMController>());
     StyleColorsOceanode();
 }
 
 void ofxOceanode::update(){
-    oceanodeTime.update();
+    oceanodeTime->update();
     container->update();
     controls->update();
 }
