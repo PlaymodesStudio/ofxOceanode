@@ -15,6 +15,16 @@
 class ofxOceanodeContainer;
 class ofxOscMessage;
 
+typedef int ofxOceanodeNodeModelFlags;
+
+enum ofxOceanodeNodeModelFlags_
+{
+    ofxOceanodeNodeModelFlags_None              = 0,
+    ofxOceanodeNodeModelFlags_WaitForFrame      = 1 << 0,   //
+    ofxOceanodeNodeModelFlags_FrameDone         = 1 << 1,   //
+    ofxOceanodeNodeModelFlags_ForceFrameMode    = 1 << 2
+};
+
 class ofxOceanodeNodeModel {
 public:
     using customGuiRegion = ofParameter<std::function<void()>>;
@@ -112,6 +122,9 @@ public:
     
     ofEvent<std::pair<ofJson, string>> deserializeParameterEvent;
     
+    ofxOceanodeNodeModelFlags getFlags(){return flags;};
+    void setFlags(ofxOceanodeNodeModelFlags f){flags = f;};
+    
 protected:
     ofColor color;
 	string canvasID;
@@ -122,6 +135,7 @@ private:
 	ofParameterGroup parameters;
     ofParameterGroup inspectorParameters;
     ofEventListeners eventListeners;
+    ofxOceanodeNodeModelFlags flags;
 };
 
 #endif /* ofxOceanodeNodeModel_h */

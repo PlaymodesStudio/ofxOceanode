@@ -68,6 +68,7 @@ public:
 		flags = 0;
         inConnection = nullptr;
         hasScope = false;
+        hasTimeline = false;
 	};
     virtual ~ofxOceanodeAbstractParameter(){};
 	
@@ -115,6 +116,9 @@ public:
     bool isScoped(){return hasScope;};
     void setScoped(bool b){hasScope = b;};
     
+    bool isTimelined(){return hasTimeline;};
+    void setTimelined(bool b){hasTimeline = b;};
+    
     template <typename T>
     void addReceiveFunc(std::function<void(const T &val)> cmd){
        connnectionFunctions.insert(std::pair<std::string, std::shared_ptr<BaseConnectionFunction>>(typeid(T).name(), std::make_shared<ConnectionFunction<T>>(cmd)));
@@ -151,7 +155,7 @@ private:
     ofxOceanodeAbstractConnection* inConnection;
     std::vector<ofxOceanodeAbstractConnection*> outConnections;
 	ofxOceanodeParameterFlags flags;
-    bool hasScope;
+    bool hasScope, hasTimeline;
     
     std::map<std::string, std::shared_ptr<BaseConnectionFunction>> connnectionFunctions;
     std::function<void()> connectFunction;
