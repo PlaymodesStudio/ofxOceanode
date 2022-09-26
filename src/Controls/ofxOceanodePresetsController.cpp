@@ -9,6 +9,7 @@
 
 #include "ofxOceanodePresetsController.h"
 #include "ofxOceanodeContainer.h"
+#include "ofxOceanodeShared.h"
 #include "imgui.h"
 
 int mouseAction=0;
@@ -101,6 +102,12 @@ void ofxOceanodePresetsController::draw(){
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
 
     ImGui::Separator();
+	
+	if(ImGui::Button("Reload Macros")){
+		ofxOceanodeShared::updateMacrosStructure();
+	}
+	
+	ImGui::Separator();
 
     if(ImGui::Button("[+]")){
         ImGui::OpenPopup("Add New Bank");
