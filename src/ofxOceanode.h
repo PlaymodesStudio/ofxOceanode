@@ -22,6 +22,7 @@
 //#include "ofxOceanodeAbstractTimeline.h"
 
 #include "ofxImGuiSimple.h"
+#include "imgui.h"
 #include "router.h"
 
 class ofxOceanode {
