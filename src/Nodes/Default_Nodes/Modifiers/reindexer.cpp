@@ -10,9 +10,9 @@
 void reindexer::setup(){
     color = ofColor::orange;
     addInspectorParameter(normIndexs.set("Normalized Indexs", true));
-    addParameter(input.set("Input", {0}, {0}, {1}));
+    addParameter(input.set("Input", {0}, {-FLT_MAX}, {FLT_MAX}));
 	addParameter(indexs.set("Indexs", {0}, {0}, {FLT_MAX}));
-    addOutputParameter(output.set("Output", {0}, {0}, {1}));
+    addOutputParameter(output.set("Output", {0}, {-FLT_MAX}, {FLT_MAX}));
     
     addInspectorParameter(mode.set("Mode 0-Normal / 1-Inverse", 0, 0, 1));
     
