@@ -195,7 +195,11 @@ bool ofxOceanodeNodeGui::constructGui(){
                         }
                         isItemEditableByText = true;
                     }else{
-                        ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
+                        if(tempCast.getMin()[0] == std::numeric_limits<float>::lowest() || tempCast.getMax()[0] == std::numeric_limits<float>::max()){
+                            ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, *std::min_element(tempCast->begin(), tempCast->end()), *std::max_element(tempCast->begin(), tempCast->end()));
+                        }else{
+                            ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
+                        }
                     }
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast = tempCast;
@@ -280,7 +284,11 @@ bool ofxOceanodeNodeGui::constructGui(){
                     }
                     else{
                         std::vector<float> floatVec(tempCast.get().begin(), tempCast.get().end());
-                        ImGui::PlotHistogram(hiddenUniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
+                        if(tempCast.getMin()[0] == std::numeric_limits<int>::lowest() || tempCast.getMax()[0] == std::numeric_limits<int>::max()){
+                            ImGui::PlotHistogram(hiddenUniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, *std::min_element(tempCast->begin(), tempCast->end()), *std::max_element(tempCast->begin(), tempCast->end()));
+                        }else{
+                            ImGui::PlotHistogram(hiddenUniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
+                        }
                     }
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space)))
                         tempCast = tempCast;
