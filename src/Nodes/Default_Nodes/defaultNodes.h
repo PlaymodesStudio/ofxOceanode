@@ -21,5 +21,6 @@
 #include "ofxOceanodeNodeMacro.h"
 #include "noise.h"
 #include "randomGenerator.h"
+#include "portal.h"
 
 #endif /* defaultNodes_h */
