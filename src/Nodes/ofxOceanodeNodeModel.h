@@ -128,6 +128,8 @@ public:
     ofxOceanodeNodeModelFlags getFlags(){return flags;};
     void setFlags(ofxOceanodeNodeModelFlags f){flags = f;};
     
+    string getParents();
+    
 protected:
     ofColor color;
 	string canvasID;

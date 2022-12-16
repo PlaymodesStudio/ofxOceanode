@@ -69,3 +69,7 @@ void ofxOceanodeNodeModel::setContainer(ofxOceanodeContainer* container){
 //
 //    return parametersInfo[p.getName()];
 //}
+
+string ofxOceanodeNodeModel::getParents(){
+    return canvasID;
+}
