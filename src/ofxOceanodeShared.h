@@ -105,13 +105,10 @@ public:
 	}
 	
 	static void portalUpdated(abstractPortal* _portal){
-		//if(getInstance().alreadyUpdatingPortals) return;
+		if(getInstance().alreadyUpdatingPortals) return;
 		getInstance().alreadyUpdatingPortals = true;
 		for(auto p : getInstance().portals){
 			p->match(_portal);
-//			if(p != _portal && p->getName() == _portal->getName()){
-//				p->setValue(_portal->getValue());
-//			}
 		}
 		getInstance().alreadyUpdatingPortals = false;
 	}
