@@ -114,6 +114,11 @@ public:
     }
     
     template<typename ParameterType>
+    ofParameter<ParameterType>& getInspectorParameter(string name){
+        return inspectorParameters.get(name).cast<ParameterType>();
+    }
+    
+    template<typename ParameterType>
     ofxOceanodeParameter<ParameterType>& getOceanodeParameter(ofParameter<ParameterType> p){
         return static_cast<ofxOceanodeAbstractParameter&>(parameters.get(p.getName())).cast<ParameterType>();
     }
