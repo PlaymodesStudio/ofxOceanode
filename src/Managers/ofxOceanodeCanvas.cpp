@@ -590,15 +590,15 @@ void ofxOceanodeCanvas::draw(bool *open){
             if(ImGui::BeginMenu("Macros")){
 				auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
 				
-				std::function<void(macroCategory)> drawCategory =
-				[this, offset, &drawCategory](macroCategory category){
-					for(auto d : category.categories){
-						if(ImGui::BeginMenu(d.name.c_str())){
+				std::function<void(shared_ptr<macroCategory>)> drawCategory =
+				[this, offset, &drawCategory](shared_ptr<macroCategory> category){
+					for(auto d : category->categories){
+						if(ImGui::BeginMenu(d->name.c_str())){
 							drawCategory(d);
 							ImGui::EndMenu();
 						}
 					}
-					for(auto m : category.macros){
+					for(auto m : category->macros){
 						if(ImGui::MenuItem(m.first.c_str())){
 							unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
 							if (type)
