@@ -80,6 +80,7 @@ private:
     vector<string> presetsInBank;
     ofParameter<string> presetName;
     ofParameter<bool> savePreset;
+    ofParameter<bool> resetPhaseOnActive;
 	
 	bool localPreset;
 	string nextPresetPath;
@@ -90,6 +91,7 @@ private:
 	deque<string> saveAsTempCategory;
 	
 	ofParameter<bool> active;
+    bool lastActiveState;
     
     ofParameter<std::function<void()>> presetControl;
 

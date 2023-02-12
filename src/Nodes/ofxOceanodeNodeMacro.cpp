@@ -13,6 +13,7 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
     currentPreset = -1;
 	showWindow = false;
 	localPreset = true;
+    lastActiveState = true;
 }
 
 void ofxOceanodeNodeMacro::update(ofEventArgs &a){
@@ -44,11 +45,15 @@ void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
 void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	addParameter(active.set("Active", true));
     activeListener = active.newListener([this](bool &b){
-        if(b){
-            container->activate();
-        }else{
-            container->deactivate();
+        if(lastActiveState != b){
+            if(b){
+                container->activate();
+                if(resetPhaseOnActive) container->resetPhase();
+            }else{
+                container->deactivate();
+            }
         }
+        lastActiveState = b;
     });
     auto presetControlRef = addParameter(presetControl.set("Preset Control Gui", [this](){
         bool addBank = false;
@@ -321,6 +326,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			container->loadPreset(currentMacroPath);
 		}
 	});
+    addInspectorParameter(resetPhaseOnActive.set("Reset Ph on Active", false));
 }
 
 void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
