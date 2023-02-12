@@ -33,7 +33,7 @@ void ofxOceanodeScope::setup(){
 
             if(param->size() == 1 && size.x > size.y)
             {
-                ImGui::ProgressBar((param.get()[0] - param.getMin()[0]) / (param.getMax()[0] - param.getMin()[0]), size2, "");
+                ImGui::ProgressBar((param.get()[0] - param.getMin()[0]) / (param.getMax()[0] - param.getMin()[0]), size, "");
 
                 if(ImGui::IsItemHovered()){
                     ImGui::BeginTooltip();
@@ -42,9 +42,9 @@ void ofxOceanodeScope::setup(){
                 }
             }else{
                 if(param.getMin()[0] == std::numeric_limits<float>::lowest() || param.getMax()[0] == std::numeric_limits<float>::max()){
-                    ImGui::PlotHistogram((p->getName()).c_str(), &param.get()[0], param->size(), 0, NULL, *std::min_element(param->begin(), param->end()), *std::max_element(param->begin(), param->end()), size2);
+                    ImGui::PlotHistogram("", &param.get()[0], param->size(), 0, NULL, *std::min_element(param->begin(), param->end()), *std::max_element(param->begin(), param->end()), size);
                 }else{
-                    ImGui::PlotHistogram((p->getName()).c_str(), &param.get()[0], param->size(), 0, NULL, param.getMin()[0], param.getMax()[0], size2);
+                    ImGui::PlotHistogram("", &param.get()[0], param->size(), 0, NULL, param.getMin()[0], param.getMax()[0], size);
                 }
             }
             return true;
@@ -59,7 +59,7 @@ void ofxOceanodeScope::setup(){
             auto param = p->cast<float>().getParameter();
             auto size2 = ImGui::GetContentRegionAvail();
 
-            ImGui::ProgressBar((param.get() - param.getMin()) / (param.getMax() - param.getMin()), size2, "");
+            ImGui::ProgressBar((param.get() - param.getMin()) / (param.getMax() - param.getMin()), size, "");
             
             if(ImGui::IsItemHovered()){
                 ImGui::BeginTooltip();
@@ -140,7 +140,7 @@ void ofxOceanodeScope::draw(){
             // f() function to properly draw each scope item
             for(auto f : scopeTypes)
             {
-                if(f(p.parameter, ImVec2(ImGui::GetContentRegionAvail().x, itemHeight))) break;
+                if(f(p.parameter, ImVec2(ImGui::GetContentRegionAvail().x, itemHeight-(ImGui::GetFrameHeight()*2.1)))) break;
             }
             
             ImGui::PopStyleColor(5);
