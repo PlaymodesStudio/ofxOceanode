@@ -54,6 +54,7 @@ public:
     
     void update();
     void audioIn(ofSoundBuffer & input);
+    void audioOut(ofSoundBuffer & output);
     
     void addParameter(ofxOceanodeAbstractParameter* p, ofColor _color);
     void removeParameter(ofxOceanodeAbstractParameter* p);

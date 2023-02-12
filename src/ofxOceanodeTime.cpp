@@ -68,15 +68,15 @@ void ofxOceanodeTime::setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOc
     // settings.api = ofSoundDevice::Api::PULSE;
 
     // or by name
-    auto devices = soundStream.getMatchingDevices("Microphone");
+    auto devices = soundStream.getMatchingDevices("Speakers");
     if(!devices.empty()){
-        settings.setInDevice(devices[0]);
+        settings.setOutDevice(devices[0]);
     }
 
-    settings.setInListener(this);
+    settings.setOutListener(this);
     settings.sampleRate = 44100;
-    settings.numOutputChannels = 0;
-    settings.numInputChannels = 1;
+    settings.numOutputChannels = 1;
+    settings.numInputChannels = 0;
     settings.bufferSize = 256;
     soundStream.setup(settings);
 }
@@ -140,6 +140,16 @@ void ofxOceanodeTime::threadedFunction(){
 }
 
 void ofxOceanodeTime::audioIn(ofSoundBuffer & input){
+    phasorChannel2.tryReceive(phasorsInThread2);
+    for(auto p : phasorsInThread2){
+        if(p->isAudio())
+            p->advanceForFrameRate(44100.0/256.0);
+        else
+            p->threadedFunction(44100.0/256.0);
+    }
+}
+
+void ofxOceanodeTime::audioOut(ofSoundBuffer & input){
     phasorChannel2.tryReceive(phasorsInThread2);
     for(auto p : phasorsInThread2){
         if(p->isAudio())
