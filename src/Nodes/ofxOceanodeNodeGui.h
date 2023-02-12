@@ -43,6 +43,8 @@ public:
     ofColor getColor(){return color;};
     
     bool getExpanded(){return expanded;};
+    void setExpanded(bool e){expanded = e;};
+    
     
     void setSelected(bool b){selected = b;};
     bool getSelected(){return selected;};

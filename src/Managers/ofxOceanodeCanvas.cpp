@@ -252,9 +252,7 @@ void ofxOceanodeCanvas::draw(bool *open){
                 ImVec2 node_rect_max = node_rect_min + size;
                 ImVec2 node_rect_header = node_rect_min + ImVec2(size.x,29);
                 
-                if(nodeGui.getExpanded()){
-                    nodeGui.setSize(size);
-                }
+                nodeGui.setSize(size);
                 
                 // Display node box
                 draw_list->ChannelsSetCurrent(nodeDrawChannel); // Background
@@ -320,9 +318,9 @@ void ofxOceanodeCanvas::draw(bool *open){
                 
                 ImU32 node_hd_color = (isSelectedOrSelecting) ? IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,160) : IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,64);
                 
-                if(nodeGui.getExpanded()){
+                //if(nodeGui.getExpanded()){
                     draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
-                }
+                //}
                 draw_list->AddRectFilled(node_rect_min, node_rect_header, node_hd_color, 4.0f);
                 
                 //draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(0, 0, 0, 255), 4.0f);

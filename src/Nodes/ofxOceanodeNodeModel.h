@@ -93,7 +93,7 @@ public:
 	
 	template<typename ParameterType>
 	shared_ptr<ofxOceanodeParameter<ParameterType>> addOutputParameter(ofParameter<ParameterType>& p, ofxOceanodeParameterFlags flags = 0){
-		auto oceaParam = addParameter(p, flags | ofxOceanodeParameterFlags_DisableInConnection);
+		auto oceaParam = addParameter(p, flags | ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisplayMinimized);
 		return oceaParam;
 	}
     

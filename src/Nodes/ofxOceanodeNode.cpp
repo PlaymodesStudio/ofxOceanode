@@ -79,6 +79,9 @@ bool ofxOceanodeNode::loadPreset(string presetFolderPath){
 	loadParametersFromJson(json, false);
 	loadInspectorParametersFromJson(json);
 	nodeModel->presetRecallAfterSettingParameters(json);
+    if(json.count("expanded") == 1){
+        nodeGui->setExpanded(json["expanded"]);
+    }
 	return true;
 }
 
@@ -89,6 +92,7 @@ void ofxOceanodeNode::savePreset(string presetFolderPath){
     saveInspectorParametersToJson(json);
     nodeModel->presetSave(json);
 	nodeModel->macroSave(json, presetFolderPath);
+    json["expanded"] = nodeGui->getExpanded();
     ofSavePrettyJson(filename, json);
 }
 

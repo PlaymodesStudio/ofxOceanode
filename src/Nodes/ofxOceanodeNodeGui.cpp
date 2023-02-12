@@ -78,16 +78,16 @@ bool ofxOceanodeNodeGui::constructGui(){
         ImGui::EndPopup();
     }
     
+    if(inputPositions.size() != getParameters().size()){
+        inputPositions.resize(getParameters().size());
+        outputPositions.resize(getParameters().size());
+    }
+    
     if(expanded){
         
         ImGui::Spacing();
         
         auto startPos = ImGui::GetCursorScreenPos();
-        
-        if(inputPositions.size() != getParameters().size()){
-            inputPositions.resize(getParameters().size());
-            outputPositions.resize(getParameters().size());
-        }
         
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
@@ -442,7 +442,30 @@ bool ofxOceanodeNodeGui::constructGui(){
             
             ImGui::PopID();
         } //endFor
-    }else{}
+    }else{
+        ImGui::Spacing();
+        for(int i=0 ; i<getParameters().size(); i++){
+            ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
+            if((absParam.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized)){
+                auto size = ImVec2(210, ImGui::GetFrameHeight()*2);
+                
+                ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()*0.5f));
+                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()*0.5f));
+                ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()*0.5f));
+                ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(node.getColor()*.25f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
+                
+
+                for(auto f : ofxOceanodeScope::getInstance()->getScopedTypes())
+                {
+                    if(f(&absParam, size)) break;
+                }
+                
+                ImGui::PopStyleColor(6);
+            }
+        }
+    }
     
     ImGui::EndGroup();
     if(expanded){
