@@ -80,6 +80,9 @@ private:
     vector<string> presetsInBank;
     ofParameter<string> presetName;
     ofParameter<bool> savePreset;
+    
+    ofParameter<ofColor> colorParam;
+    ofEventListener colorListener;
     ofParameter<bool> resetPhaseOnActive;
 	
 	bool localPreset;
@@ -89,6 +92,7 @@ private:
 	deque<string> currentCategory;
 	shared_ptr<macroCategory> currentCategoryMacro;
 	deque<string> saveAsTempCategory;
+    ofParameter<string> localName;
 	
 	ofParameter<bool> active;
     bool lastActiveState;

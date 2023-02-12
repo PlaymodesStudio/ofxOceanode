@@ -37,7 +37,7 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
     moveSelectedModulesWithDrag = glm::vec2(0,0);
 }
 
-void ofxOceanodeCanvas::draw(bool *open){
+void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     //Draw Guis
     
     // Draw a list of nodes on the left side
@@ -49,7 +49,9 @@ void ofxOceanodeCanvas::draw(bool *open){
     bool connectionIsDoable = false;
     
     ImGui::SetNextWindowDockID(ofxOceanodeShared::getDockspaceID(), ImGuiCond_FirstUseEver);
-    if(ImGui::Begin(uniqueID.c_str(), open)){
+    string windowName = uniqueID;
+    if(title != "") windowName = "(" + title + ") " + windowName;
+    if(ImGui::Begin(windowName.c_str(), open)){
         ImGui::SameLine();
         ImGui::BeginGroup();
         
@@ -80,7 +82,7 @@ void ofxOceanodeCanvas::draw(bool *open){
         
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(60, 60, 60, 200));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(color.r/4, color.g/4, color.b/4, 200));
         ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
         ImGui::PushItemWidth(120.0f);
         

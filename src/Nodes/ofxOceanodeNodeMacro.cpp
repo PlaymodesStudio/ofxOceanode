@@ -9,6 +9,7 @@
 #include "ofxOceanodeShared.h"
 
 ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
+    color = ofColor::black;
     presetPath = "";
     currentPreset = -1;
 	showWindow = false;
@@ -29,7 +30,7 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 
 void ofxOceanodeNodeMacro::draw(ofEventArgs &a){
     if(showWindow){
-        canvas.draw(&showWindow);
+        canvas.draw(&showWindow, color, localPreset ? localName.get() : currentMacro);
     }
 	if(active){
 		container->draw();
@@ -72,7 +73,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 		ImGui::Checkbox("Show Window", &showWindow);
 		
 		if(localPreset){
-			ImGui::Text("Local");
+			ImGui::Text(localName->c_str());
 		}else{
 			ImGui::Text("%s", currentMacro.c_str());
 		}
@@ -326,6 +327,13 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			container->loadPreset(currentMacroPath);
 		}
 	});
+    
+    
+    addInspectorParameter(colorParam.set("Color", color));
+    colorListener = colorParam.newListener([this](ofColor &c){
+        color = c;
+    });
+    addInspectorParameter(localName.set("Local Name", "Local"));
     addInspectorParameter(resetPhaseOnActive.set("Reset Ph on Active", false));
 }
 
