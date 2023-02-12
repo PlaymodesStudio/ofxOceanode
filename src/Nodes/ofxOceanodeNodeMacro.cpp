@@ -77,29 +77,29 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 		if(ImGui::BeginPopup("Macro")){
 			auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
 			
-			std::function<bool(macroCategory)> drawCategory =
-			[this, &addBank, &drawCategory](macroCategory category) -> bool{
-				for(auto d : category.categories){
-					if(ImGui::BeginMenu(d.name.c_str())){
+			std::function<bool(shared_ptr<macroCategory>)> drawCategory =
+			[this, &addBank, &drawCategory](shared_ptr<macroCategory> category) -> bool{
+				for(auto d : category->categories){
+					if(ImGui::BeginMenu(d->name.c_str())){
 						if(drawCategory(d)){
 							if(currentCategory.size() == 0){
 								currentCategoryMacro = d;
 							}
-							currentCategory.push_front(d.name);
+							currentCategory.push_front(d->name);
 							ImGui::EndMenu();
 							return true;
 						}
 						ImGui::EndMenu();
 					}
 				}
-				if(category.categories.size() != 0){
+				if(category->categories.size() != 0){
 					//TOD
 					if(ImGui::MenuItem("Add Bank")){
 						// TODO: Where? CurrentCategory?
 						addBank = true;
 					}
 				}
-				for(auto m : category.macros){
+				for(auto m : category->macros){
 					if(ImGui::MenuItem(m.first.c_str())){
 						nextPresetPath = m.second;
 						currentMacroPath = m.second;
@@ -187,11 +187,11 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 				auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
 				for(int i = 0 ; i < saveAsTempCategory.size(); i++){
 					string categoryNameToCompare = saveAsTempCategory[i];
-					macroDirectoryStructure = *std::find_if(macroDirectoryStructure.categories.begin(), macroDirectoryStructure.categories.end(),
-															[categoryNameToCompare](macroCategory &mc){return mc.name == categoryNameToCompare;});
+					macroDirectoryStructure = *std::find_if(macroDirectoryStructure->categories.begin(), macroDirectoryStructure->categories.end(),
+															[categoryNameToCompare](shared_ptr<macroCategory> &mc){return mc->name == categoryNameToCompare;});
 				}
 				// TODO: Check if name exists with find_if
-//				if(macroDirectoryStructure.macros.count(proposedNewName) != 0){
+//				if(macroDirectoryStructure->macros.count(proposedNewName) != 0){
 //					nameExists = true;
 //				}
 				
@@ -246,18 +246,18 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			if(ImGui::BeginPopup("Choose Category")){
 				auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
 				
-				std::function<bool(macroCategory)> drawCategory =
-				[this, &drawCategory](macroCategory category) -> bool{
-					for(auto d : category.categories){
-						if(d.categories.size() == 0){
-							if(ImGui::MenuItem(d.name.c_str())){
+				std::function<bool(shared_ptr<macroCategory>)> drawCategory =
+				[this, &drawCategory](shared_ptr<macroCategory> category) -> bool{
+					for(auto d : category->categories){
+						if(d->categories.size() == 0){
+							if(ImGui::MenuItem(d->name.c_str())){
 								saveAsTempCategory.clear();
-								saveAsTempCategory.push_front(d.name);
+								saveAsTempCategory.push_front(d->name);
 								return true;
 							}
-						}else if(ImGui::BeginMenu(d.name.c_str())){
+						}else if(ImGui::BeginMenu(d->name.c_str())){
 							if(drawCategory(d)){
-								saveAsTempCategory.push_front(d.name);
+								saveAsTempCategory.push_front(d->name);
 								ImGui::EndMenu();
 								return true;
 							}
@@ -374,14 +374,22 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 		auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
 		for(int i = 0 ; i < currentCategory.size(); i++){
 			string categoryNameToCompare = currentCategory[i];
-			macroDirectoryStructure = *std::find_if(macroDirectoryStructure.categories.begin(), macroDirectoryStructure.categories.end(),
-													[categoryNameToCompare](macroCategory &mc){return mc.name == categoryNameToCompare;});
+			macroDirectoryStructure = *std::find_if(macroDirectoryStructure->categories.begin(), macroDirectoryStructure->categories.end(),
+                                                    [categoryNameToCompare](shared_ptr<macroCategory> &mc){return mc->name == categoryNameToCompare;});
+//            auto result = std::find_if(macroDirectoryStructure->categories.begin(), macroDirectoryStructure->categories.end(),
+//                                                    [categoryNameToCompare](macroCategory &mc){return mc.name == categoryNameToCompare;});
+//            macroDirectoryStructure->name = (*result).name;
+//            macroDirectoryStructure->macros = (*result).macros;
+//            macroDirectoryStructure->categories.clear();
+//            for(auto c : (*result).categories){
+//                macroDirectoryStructure->categories.push_back(c);
+//            }
 		}
 		currentCategoryMacro = macroDirectoryStructure;
-		auto iter = std::find_if(currentCategoryMacro.macros.begin(), currentCategoryMacro.macros.end(), [this](const std::pair<string, string> &pair){
+		auto iter = std::find_if(currentCategoryMacro->macros.begin(), currentCategoryMacro->macros.end(), [this](const std::pair<string, string> &pair){
 			return pair.first == currentMacro;
 		});
-		if(iter != currentCategoryMacro.macros.end()){
+		if(iter != currentCategoryMacro->macros.end()){
 			// TODO: Carregar o to load?
 			container->loadPreset(iter->second);
 			currentMacroPath = iter->second;
@@ -390,10 +398,10 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 }
 
 void ofxOceanodeNodeMacro::loadMacroInsideCategory(int newPresetIndex){
-	if(newPresetIndex < currentCategoryMacro.macros.size() && currentCategoryMacro.macros[newPresetIndex].first != currentMacro){
-		nextPresetPath = currentCategoryMacro.macros[newPresetIndex].second;
+	if(newPresetIndex < currentCategoryMacro->macros.size() && currentCategoryMacro->macros[newPresetIndex].first != currentMacro){
+		nextPresetPath = currentCategoryMacro->macros[newPresetIndex].second;
 		currentMacroPath = nextPresetPath;
-		currentMacro = currentCategoryMacro.macros[newPresetIndex].first;
+		currentMacro = currentCategoryMacro->macros[newPresetIndex].first;
 	}
 }
 
@@ -416,8 +424,8 @@ void ofxOceanodeNodeMacro::updateCurrentCategoryFromPath(string path){
 	auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
 	for(int i = 0 ; i < currentCategory.size(); i++){
 		string categoryNameToCompare = currentCategory[i];
-		macroDirectoryStructure = *std::find_if(macroDirectoryStructure.categories.begin(), macroDirectoryStructure.categories.end(),
-												[categoryNameToCompare](macroCategory &mc){return mc.name == categoryNameToCompare;});
+		macroDirectoryStructure = *std::find_if(macroDirectoryStructure->categories.begin(), macroDirectoryStructure->categories.end(),
+                                                [categoryNameToCompare](shared_ptr<macroCategory> &mc){return mc->name == categoryNameToCompare;});
 	}
 	currentCategoryMacro = macroDirectoryStructure;
 }

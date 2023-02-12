@@ -86,7 +86,7 @@ private:
 	string currentMacro;
 	string currentMacroPath;
 	deque<string> currentCategory;
-	macroCategory currentCategoryMacro;
+	shared_ptr<macroCategory> currentCategoryMacro;
 	deque<string> saveAsTempCategory;
 	
 	ofParameter<bool> active;

@@ -13,8 +13,8 @@
 struct macroCategory{
 	macroCategory(std::string _name = "Parent") : name(_name){};
 	std::string name;
-	std::vector<pair<string, string>> macros;
-	std::vector<macroCategory> categories;
+	std::vector<std::pair<string, string>> macros;
+	std::vector<std::shared_ptr<macroCategory>> categories;
 };
 
 class ofxOceanodeShared{
@@ -52,7 +52,7 @@ public:
         }
     }
 	
-	static macroCategory getMacroDirectoryStructure(){
+	static std::shared_ptr<macroCategory> getMacroDirectoryStructure(){
 		return getInstance().macroDirectoryStructure;
 	}
 	
@@ -61,11 +61,11 @@ public:
 		if(!dir.doesDirectoryExist("Macros")){
 			dir.createDirectory("Macros");
 		}
-		getInstance().macroDirectoryStructure = macroCategory();
+		getInstance().macroDirectoryStructure = make_shared<macroCategory>();
 		readDirectory("Macros", getInstance().macroDirectoryStructure);
 	}
 	
-	static void readDirectory(string dirName, macroCategory &category){
+	static void readDirectory(string dirName, std::shared_ptr<macroCategory> category){
 		ofDirectory dir;
 		dir.open(dirName);
 		dir.sort();
@@ -73,13 +73,13 @@ public:
 			if(folder.isDirectory()){
 				ofDirectory dir2(folder.path());
 				dir2.sort();
-				if(dir2.size() != 0 && !dir2.getFile(0).isDirectory()){
-					category.macros.emplace_back(make_pair(folder.getFileName(), folder.path()));
+				if(dir2.size() != 0 && (!dir2.getFile(0).isDirectory() ||
+                                        (dir2.getFile(0).isDirectory() && ofStringTimesInString(dir2.getName(0), "Macro_") > 0))){
+					category->macros.emplace_back(make_pair(folder.getFileName(), folder.path()));
 				}else{
-					category.categories.emplace_back(folder.getFileName());
-					readDirectory(folder.path(), category.categories.back());
+					category->categories.push_back(make_shared<macroCategory>(folder.getFileName()));
+					readDirectory(folder.path(), category->categories.back());
 				}
-				
 			}
 		}
 	}
@@ -139,7 +139,7 @@ private:
     unsigned int centralNode_id = 0;
     unsigned int leftNode_id = 0;
 	
-	macroCategory macroDirectoryStructure;
+    std::shared_ptr<macroCategory> macroDirectoryStructure;
 	
 	ofEvent<string> macroUpdatedEvent;
 	
