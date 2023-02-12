@@ -402,7 +402,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                     ImGui::Separator();
                     if(!absParam.isScoped()){ //Param is not scoped
                         if(ImGui::Selectable("Add to Scope")){
-                            ofxOceanodeScope::getInstance()->addParameter(&absParam,getColor());
+                            ofxOceanodeScope::getInstance()->addParameter(&absParam,node.getColor());
                         }
                     }else{
                         if(ImGui::Selectable("Remove from Scope")){
@@ -412,7 +412,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                     ImGui::Separator();
                     if(!absParam.isTimelined()){ //Param is not timelined
                         if(ImGui::Selectable("Add to Timeline")){
-                            ofxOceanodeTime::getInstance()->addParameter(&absParam,getColor());
+                            ofxOceanodeTime::getInstance()->addParameter(&absParam,node.getColor());
                         }
                     }else{
                         if(ImGui::Selectable("Remove from Timeline")){
