@@ -14,7 +14,7 @@ abstractPortal::abstractPortal(string typelabel) : ofxOceanodeNodeModel("Portal 
 	ofxOceanodeShared::addPortal(this);
 	
 	addParameter(name.set("Name", typelabel));
-    addInspectorParameter(local.set("Local", false));
+    addInspectorParameter(local.set("Local", true));
 }
 
 abstractPortal::~abstractPortal(){

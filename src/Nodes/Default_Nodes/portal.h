@@ -44,9 +44,9 @@ class portal : public abstractPortal{
 public:
 	portal(string typelabel, T val, bool minmax = false) : abstractPortal(typelabel){
 		if(minmax){
-			addParameter(value.set("Value", val, std::numeric_limits<T>::lowest(), std::numeric_limits<T>::max()));
+			addParameter(value.set("Value", val, std::numeric_limits<T>::lowest(), std::numeric_limits<T>::max()), ofxOceanodeParameterFlags_DisplayMinimized);
 		}else{
-			addParameter(value.set("Value", val));
+			addParameter(value.set("Value", val), ofxOceanodeParameterFlags_DisplayMinimized);
 		}
 	}
 	
@@ -80,14 +80,14 @@ class portal<std::vector<T>> : public abstractPortal{
 public:
 	portal(string typelabel, T val, bool minmax = false) : abstractPortal(typelabel){
 		if(minmax){
-			addParameter(value.set("Value", std::vector<T>(1, val), std::vector<T>(1, std::numeric_limits<T>::lowest()), std::vector<T>(1, std::numeric_limits<T>::max())));
+			addParameter(value.set("Value", std::vector<T>(1, val), std::vector<T>(1, std::numeric_limits<T>::lowest()), std::vector<T>(1, std::numeric_limits<T>::max())), ofxOceanodeParameterFlags_DisplayMinimized);
 		}else{
-			addParameter(value.set("Value", std::vector<T>(1, val)));
+			addParameter(value.set("Value", std::vector<T>(1, val)), ofxOceanodeParameterFlags_DisplayMinimized);
 		}
 	}
 	
 	portal(string typelabel, vector<T> val) : abstractPortal(typelabel){
-		addParameter(value.set("Value", val));
+		addParameter(value.set("Value", val), ofxOceanodeParameterFlags_DisplayMinimized);
 	}
 	
 	void setup(){
@@ -118,7 +118,7 @@ template<>
 class portal<void> : public abstractPortal{
 public:
 	portal(string typelabel) : abstractPortal(typelabel){
-		addParameter(value.set("Value"));
+		addParameter(value.set("Value"), ofxOceanodeParameterFlags_DisplayMinimized);
 	}
 	
 	void setup(){
