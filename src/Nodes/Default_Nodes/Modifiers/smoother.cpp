@@ -34,7 +34,9 @@ void smoother::update(ofEventArgs &a){
             float tensionValue = tension.get().size() == 1 ? tension.get()[0] : tension.get()[i];
             float step = abs(previousInput[i] - vf[i]);
             
-            if(tensionValue > 0.5){
+            if(tensionValue == 0){
+                newSmoothing = smoothingValue;
+            }else if(tensionValue > 0.5){
                 tensionValue = ofMap(tensionValue, .5, 1, 0, .5);
                 newSmoothing = ofLerp(smoothingValue, 0, (step * tensionValue));
             }else if(tensionValue <= 0.5){
