@@ -53,6 +53,7 @@ void baseIndexer::indexCountChanged(int _indexCount){
 }
 
 void baseIndexer::recomputeIndexs(){
+    std::vector<float> tempIndexs(indexCount);
     for (int i = 0; i < indexCount ; i++){
         int index = i;
         
@@ -106,18 +107,24 @@ void baseIndexer::recomputeIndexs(){
         if(modulo_Param != indexCount)
             indexf = std::fmod(indexf, modulo_Param);
         
-//        int shifted_i = i + std::round(indexOffset_Param);
-//        if(shifted_i < 0) shifted_i += indexCount;
-//        shifted_i %= indexCount;
         int toDivide = normalize_Param ? indexCount - 1 : indexCount;
         if(!normalize_Param) indexf += 0.5f; //For centering non normalized
         
-        float value = float(((indexf)/(double)(toDivide))*((double)numWaves_Param*((double)indexCount/(double)newNumOfPixels))*((double)symmetry_Param+1));
-        if (value > 1) {
-            int trunc = std::trunc(value);
-            value -= (trunc == value) ? trunc-1 : trunc;
         }
-        indexs[i] = value;
+            float value = float(((indexf)/(double)(toDivide))*((double)numWaves_Param*((double)indexCount/(double)newNumOfPixels))*((double)symmetry_Param+1));
+            if (value > 1) {
+                int trunc = std::trunc(value);
+                value -= (trunc == value) ? trunc-1 : trunc;
+            }
+            tempIndexs[i] = value;
+    }
+    for (int i = 0; i < indexCount ; i++){
+        float index = i - indexOffset_Param;
+        int indexL = floor(index) - indexCount * floor((floor(index)) / indexCount);
+        int indexH = ceil(index) - indexCount * floor((ceil(index)) / indexCount);
+        float lowVal = tempIndexs[indexL];
+        float highVal = tempIndexs[indexH];
+        indexs[i] = lowVal + (highVal-lowVal) * (index - floor(index));
     }
 }
 

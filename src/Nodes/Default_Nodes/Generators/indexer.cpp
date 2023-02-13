@@ -24,7 +24,7 @@ void indexer::setup() {
     //addParameter(wrapShuffle_Param.set("Wrap", false));
     addParameter(indexShuffle_Param.set("Shuffle", 0, 0, 1));
     addParameter(indexRand_Param.set("Random", 0, 0, 1));
-    //addParameter(indexOffset_Param.set("Offset", 0, -indexCount/2, indexCount/2));
+    addParameter(indexOffset_Param.set("Offset", 0, -indexCount/2, indexCount/2));
     addParameter(indexQuant_Param.set("Quant", indexCount, 1, indexCount));
     addParameter(combination_Param.set("Comb", 0, 0, 1));
     addParameter(modulo_Param.set("Modulo", indexCount, 1, indexCount));
