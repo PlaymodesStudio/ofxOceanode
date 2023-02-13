@@ -45,6 +45,7 @@ public:
 	ofFloatColor color;
 	ofFloatColor textColor;
 	bool openPopupInNext;
+    vector<ofxOceanodeNode*> nodes;
 };
 
 
