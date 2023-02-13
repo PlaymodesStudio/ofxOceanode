@@ -443,3 +443,36 @@ void ofxOceanodeNodeMacro::updateCurrentCategoryFromPath(string path){
 	}
 	currentCategoryMacro = macroDirectoryStructure;
 }
+
+void ofxOceanodeNodeMacro::loadBeforeConnections(ofJson &json){
+//    container->loadPreset_loadNodes(currentMacroPath);
+//    container->loadPreset_deactivateConnections();
+//    container->loadPreset_loadBeforeConnections(currentMacroPath);
+}
+
+void ofxOceanodeNodeMacro::presetRecallBeforeSettingParameters(ofJson &json){
+//    container->loadPreset_loadNodePreset(currentMacroPath);
+//    container->loadPreset_loadConnections(currentMacroPath);
+}
+
+void ofxOceanodeNodeMacro::presetRecallAfterSettingParameters(ofJson &json){
+//    container->loadPreset_midiBindings(currentMacroPath);
+//    container->loadPreset_loadNodePreset(currentMacroPath);
+//    container->loadPreset_loadComments(currentMacroPath);
+}
+
+void ofxOceanodeNodeMacro::presetWillBeLoaded(){
+//    container->loadPreset_presetWillBeLoaded();
+}
+
+void ofxOceanodeNodeMacro::presetHasLoaded(){
+//    container->loadPreset_presetHasLoaded();
+}
+
+void ofxOceanodeNodeMacro::activateConnections(){
+//    container->loadPreset_activateConnections();
+}
+
+void ofxOceanodeNodeMacro::deactivateConnections(){
+//    container->loadPreset_deactivateConnections();
+}

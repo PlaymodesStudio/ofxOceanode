@@ -46,6 +46,9 @@ public:
     void presetHasLoaded();
     void loadPresetBeforeConnections(string presetFolderPath);
     
+    void activateConnections();
+    void deactivateConnections();
+    
     void deserializeParameter(ofJson &json, ofxOceanodeAbstractParameter &p, bool persistentPreset = false);
     
     bool loadConfig(string filename, bool persistentPreset = false);

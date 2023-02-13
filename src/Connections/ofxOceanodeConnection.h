@@ -30,6 +30,7 @@ public:
     void setActive(bool a){
         active = a;
         if(active) passValueFunc();
+        else restoreValue();
     }
     
     void deleteSelf(){
@@ -47,6 +48,7 @@ protected:
     bool active;
     
     virtual void passValueFunc() = 0;
+    virtual void restoreValue() = 0;
     
     ofxOceanodeAbstractParameter* sourceParameter;
     ofxOceanodeAbstractParameter* sinkParameter;
@@ -67,7 +69,7 @@ public:
     }
     
     ~ofxOceanodeCustomConnection(){
-        sinkParameter->disconnectedParameter();
+        restoreValue();
     };
     
 private:
@@ -75,6 +77,9 @@ private:
         if(active){
             sinkParameter->receiveParameter(&sourceParameter);
         }
+    }
+    void restoreValue(){
+        sinkParameter->disconnectedParameter();
     }
     ofParameter<T>& sourceParameter;
     ofEventListener parameterEventListener;
@@ -92,7 +97,7 @@ public:
     }
     
     ~ofxOceanodeCustomConnection(){
-        sinkParameter->disconnectedParameter();
+        restoreValue();
     };
     
 private:
@@ -100,6 +105,9 @@ private:
         if(active){
             sinkParameter->receiveParameter(&sourceParameter);
         }
+    }
+    void restoreValue(){
+        sinkParameter->disconnectedParameter();
     }
     ofParameter<void>& sourceParameter;
     ofEventListener parameterEventListener;
@@ -116,7 +124,7 @@ public:
         passValueFunc();
     }
     ~ofxOceanodeConnection(){
-        sinkParameter.set(beforeConnectionValue);
+        restoreValue();
     };
     
 private:
@@ -124,6 +132,9 @@ private:
         if(active){
             sinkParameter = sourceParameter;
         }
+    }
+    void restoreValue(){
+        sinkParameter.set(beforeConnectionValue);
     }
     ofEventListener parameterEventListener;
     ofParameter<Tsource>& sourceParameter;
@@ -142,7 +153,7 @@ public:
         passValueFunc();
     }
     ~ofxOceanodeConnection(){
-        sinkParameter.set(beforeConnectionValue);
+        restoreValue();
     };
     
 private:
@@ -150,6 +161,9 @@ private:
         if(active){
             sinkParameter = vector<_Tsink>(sourceParameter->begin(), sourceParameter->end());
         }
+    }
+    void restoreValue(){
+        sinkParameter.set(beforeConnectionValue);
     }
     ofEventListener parameterEventListener;
     ofParameter<vector<_Tsource>>& sourceParameter;
@@ -174,7 +188,7 @@ public:
         passValueFunc();
     }
     ~ofxOceanodeConnection(){
-        sinkParameter.set(beforeConnectionValue);
+        restoreValue();
     };
     
 private:
@@ -182,6 +196,9 @@ private:
         if(active){
             sinkParameter = vector<_Tsink>(1, sourceParameter);
         }
+    }
+    void restoreValue(){
+        sinkParameter.set(beforeConnectionValue);
     }
     ofEventListener parameterEventListener;
     ofParameter<_Tsource>& sourceParameter;
@@ -200,7 +217,7 @@ public:
         passValueFunc();
     }
     ~ofxOceanodeConnection(){
-        sinkParameter.set(beforeConnectionValue);
+        restoreValue();
     };
     
 private:
@@ -208,6 +225,9 @@ private:
         if(active && sourceParameter->size() > 0){
             sinkParameter = sourceParameter.get()[0];
         }
+    }
+    void restoreValue(){
+        sinkParameter.set(beforeConnectionValue);
     }
     ofEventListener parameterEventListener;
     ofParameter<vector<_Tsource>>& sourceParameter;
@@ -232,6 +252,8 @@ private:
             sinkParameter = sinkParameter;
         }
     }
+    void restoreValue(){
+    }
     ofEventListener parameterEventListener;
     ofParameter<void>& sourceParameter;
     ofParameter<T>&  sinkParameter;
@@ -252,6 +274,8 @@ private:
         if(active){
             sinkParameter.trigger();
         }
+    }
+    void restoreValue(){
     }
     ofEventListener parameterEventListener;
     ofParameter<void>& sourceParameter;
@@ -274,6 +298,8 @@ private:
             sinkParameter = !sinkParameter;
         }
     }
+    void restoreValue(){
+    }
     ofEventListener parameterEventListener;
     ofParameter<void>& sourceParameter;
     ofParameter<bool>&  sinkParameter;
@@ -295,6 +321,8 @@ private:
             bool newValue = (sourceParameter > 0.00f) ? true : false;
             if(newValue != sinkParameter) sinkParameter = newValue;
         }
+    }
+    void restoreValue(){
     }
     ofEventListener parameterEventListener;
     ofParameter<float>& sourceParameter;

@@ -29,6 +29,15 @@ public:
 	void macroSave(ofJson &json, string path);
 	void macroLoad(ofJson &json, string path);
     
+    void loadBeforeConnections(ofJson &json) override;
+    void presetRecallBeforeSettingParameters(ofJson &json) override;
+    void presetRecallAfterSettingParameters(ofJson &json) override;
+    void presetWillBeLoaded() override;
+    void presetHasLoaded() override;
+    
+    void activateConnections() override;
+    void deactivateConnections() override;
+    
     void setBpm(float bpm){container->setBpm(bpm);};
     void resetPhase(){container->resetPhase();};
     

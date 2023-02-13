@@ -64,6 +64,9 @@ public:
     virtual void presetHasLoaded(){};
     virtual void loadBeforeConnections(ofJson &json){};
     
+    virtual void activateConnections(){};
+    virtual void deactivateConnections(){};
+    
     virtual void deactivate(){};
     virtual void activate(){};
     

@@ -132,6 +132,14 @@ void ofxOceanodeNode::presetHasLoaded(){
     nodeModel->presetHasLoaded();
 }
 
+void ofxOceanodeNode::activateConnections(){
+    nodeModel->activateConnections();
+}
+
+void ofxOceanodeNode::deactivateConnections(){
+    nodeModel->deactivateConnections();
+}
+
 void ofxOceanodeNode::loadPresetBeforeConnections(string presetFolderPath){
     string filename = presetFolderPath + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json";
     string escapedFilename = filename;

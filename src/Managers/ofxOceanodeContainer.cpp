@@ -118,6 +118,9 @@ void ofxOceanodeContainer::activate(){
                 node.second->getNodeModel().activate();
         }
     }
+    for(auto &connection : connections){
+        connection->setActive(true);
+    }
 }
 
 void ofxOceanodeContainer::deactivate(){
@@ -133,6 +136,9 @@ void ofxOceanodeContainer::deactivate(){
             //if(node.second->getActive())
                 node.second->getNodeModel().deactivate();
         }
+    }
+    for(auto &connection : connections){
+        connection->setActive(false);
     }
 }
 
@@ -205,21 +211,47 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     ofStringReplace(presetFolderPath, " ", "_");
     ofLog()<<"Load Preset " << presetFolderPath;
     
+    loadPreset_presetWillBeLoaded();
+
+    loadPreset_loadNodes(presetFolderPath);
+    
+    loadPreset_deactivateConnections();
+    
+    loadPreset_loadBeforeConnections(presetFolderPath);
+    
+    loadPreset_loadConnections(presetFolderPath);
+    
+    loadPreset_midiBindings(presetFolderPath);
+    
+    loadPreset_loadNodePreset(presetFolderPath);
+    
+    loadPreset_activateConnections();
+    
+    loadPreset_loadComments(presetFolderPath);
+    
+    loadPreset_presetHasLoaded();
+    
+    resetPhase();
+    
+    return true;
+}
+
+
+void ofxOceanodeContainer::loadPreset_presetWillBeLoaded(){
     for(auto &nodeTypeMap : dynamicNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->presetWillBeLoaded();
+            for(auto &node : nodeTypeMap.second){
+                node.second->presetWillBeLoaded();
+            }
         }
-    }
     
-    for(auto &nodeTypeMap : persistentNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->presetWillBeLoaded();
+        for(auto &nodeTypeMap : persistentNodes){
+            for(auto &node : nodeTypeMap.second){
+                node.second->presetWillBeLoaded();
+            }
         }
-    }
-    
-    //Read new nodes in preset
-    //Check if the nodes exists and update them, (or update all at the end)
-    //Create new modules and update them (or update at end)
+}
+
+void ofxOceanodeContainer::loadPreset_loadNodes(string presetFolderPath){
     ofJson json = ofLoadJson(presetFolderPath + "/modules.json");
     if(!json.empty()){;
         for(auto &models : registry->getRegisteredModels()){
@@ -318,9 +350,41 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         dynamicNodes.clear();
 
     }
+}
+
+void ofxOceanodeContainer::loadPreset_deactivateConnections(){
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->deactivateConnections();
+        }
+    }
     
-    json.clear();
-    json = ofLoadJson(presetFolderPath + "/connections.json");
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->deactivateConnections();
+        }
+    }
+    for(auto &connection : connections){
+        connection->setActive(false);
+    }
+}
+
+void ofxOceanodeContainer::loadPreset_loadBeforeConnections(string presetFolderPath){
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->loadPresetBeforeConnections(presetFolderPath);
+        }
+    }
+    
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->loadPresetBeforeConnections(presetFolderPath);
+        }
+    }
+}
+
+void ofxOceanodeContainer::loadPreset_loadConnections(string presetFolderPath){
+    ofJson json = ofLoadJson(presetFolderPath + "/connections.json");
     for(int i = 0; i < connections.size();){
         string sourceParameter = connections[i]->getSourceParameter().getName();
         string sourceModule = connections[i]->getSourceParameter().getGroupHierarchyNames()[0];
@@ -365,25 +429,6 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         oldConnectionsInfo[i][2] = connections[i]->getSinkParameter().getGroupHierarchyNames()[0];
 
     }
-    
-    for(auto &connection : connections){
-        connection->setActive(false);
-    }
-    
-    
-    for(auto &nodeTypeMap : dynamicNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->loadPresetBeforeConnections(presetFolderPath);
-        }
-    }
-    
-    for(auto &nodeTypeMap : persistentNodes){
-        for(auto &node : nodeTypeMap.second){
-            node.second->loadPresetBeforeConnections(presetFolderPath);
-        }
-    }
-    
-
     for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
         for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
             for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
@@ -391,9 +436,9 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
                     bool connectionExist = false;
                     for(int i = 0; i < oldConnectionsInfo.size(); i++){
                         if(!(oldConnectionsInfo[i][0] != sourceModule.key()
-                           || oldConnectionsInfo[i][1] != sourceParameter.key()
-                           || oldConnectionsInfo[i][2] != sinkModule.key()
-                           || oldConnectionsInfo[i][3] != sinkParameter.key())){
+                             || oldConnectionsInfo[i][1] != sourceParameter.key()
+                             || oldConnectionsInfo[i][2] != sinkModule.key()
+                             || oldConnectionsInfo[i][3] != sinkParameter.key())){
                             oldConnectionsInfo.erase(oldConnectionsInfo.begin()+i);
                             connectionExist = true;
                             break;
@@ -406,10 +451,12 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             }
         }
     }
-    
+}
+
+void ofxOceanodeContainer::loadPreset_midiBindings(string presetFolderPath){
 #ifdef OFXOCEANODE_USE_MIDI
     //TODO: No remove old connections
-    json.clear();
+    ofJson json;
     for(auto &bindingVec : midiBindings){
         for(auto &binding : bindingVec.second){
             for(auto &midiInPair : midiIns){
@@ -444,7 +491,9 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
         }
     }
 #endif
-    
+}
+
+void ofxOceanodeContainer::loadPreset_loadNodePreset(string presetFolderPath){
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->loadPreset(presetFolderPath);
@@ -454,13 +503,23 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->loadPreset(presetFolderPath);
+        }
+    }
+}
+
+void ofxOceanodeContainer::loadPreset_activateConnections(){
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            node.second->activateConnections();
         }
     }
     
     for(auto &connection : connections){
         connection->setActive(true);
     }
-    
+}
+
+void ofxOceanodeContainer::loadPreset_presetHasLoaded(){
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->presetHasLoaded();
@@ -472,29 +531,27 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
             node.second->presetHasLoaded();
         }
     }
-    
-    resetPhase();
-	
-	json = ofLoadJson(presetFolderPath + "/comments.json");
-	if(!json.empty()){
-		comments.resize(json["NumComments"]);
-		for (int i = 0; i < comments.size(); i++) {
-			auto &c = comments[i];
-			c.text = json["Comments"][i]["Text"];
-			c.size.x = json["Comments"][i]["Size"]["X"];
-			c.size.y = json["Comments"][i]["Size"]["Y"];
-			c.position.x = json["Comments"][i]["Pos"]["X"];
-			c.position.y = json["Comments"][i]["Pos"]["Y"];
-			c.color.r = json["Comments"][i]["Color"]["R"];
-			c.color.g = json["Comments"][i]["Color"]["G"];
-			c.color.b = json["Comments"][i]["Color"]["B"];
-			c.textColor.r = json["Comments"][i]["TextColor"]["R"];
-			c.textColor.g = json["Comments"][i]["TextColor"]["G"];
-			c.textColor.b = json["Comments"][i]["TextColor"]["B"];
-		}
-	}
-    
-    return true;
+}
+
+void ofxOceanodeContainer::loadPreset_loadComments(string presetFolderPath){
+    ofJson json = ofLoadJson(presetFolderPath + "/comments.json");
+    if(!json.empty()){
+        comments.resize(json["NumComments"]);
+        for (int i = 0; i < comments.size(); i++) {
+            auto &c = comments[i];
+            c.text = json["Comments"][i]["Text"];
+            c.size.x = json["Comments"][i]["Size"]["X"];
+            c.size.y = json["Comments"][i]["Size"]["Y"];
+            c.position.x = json["Comments"][i]["Pos"]["X"];
+            c.position.y = json["Comments"][i]["Pos"]["Y"];
+            c.color.r = json["Comments"][i]["Color"]["R"];
+            c.color.g = json["Comments"][i]["Color"]["G"];
+            c.color.b = json["Comments"][i]["Color"]["B"];
+            c.textColor.r = json["Comments"][i]["TextColor"]["R"];
+            c.textColor.g = json["Comments"][i]["TextColor"]["G"];
+            c.textColor.b = json["Comments"][i]["TextColor"]["B"];
+        }
+    }
 }
 
 void ofxOceanodeContainer::savePreset(string presetFolderPath){

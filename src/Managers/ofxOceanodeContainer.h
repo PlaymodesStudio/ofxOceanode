@@ -107,6 +107,18 @@ public:
     bool loadPreset(string presetFolderPath);
     void savePreset(string presetFolderPath);
     
+    void loadPreset_presetWillBeLoaded();
+    void loadPreset_loadNodes(string presetFolderPath);
+    void loadPreset_deactivateConnections();
+    void loadPreset_loadBeforeConnections(string presetFolderPath);
+    void loadPreset_loadConnections(string presetFolderPath);
+    void loadPreset_midiBindings(string presetFolderPath);
+    void loadPreset_loadNodePreset(string presetFolderPath);
+    void loadPreset_activateConnections();
+    void loadPreset_presetHasLoaded();
+    void loadPreset_loadComments(string presetFolderPath);
+    
+    
     bool loadClipboardModulesAndConnections(glm::vec2 referencePosition, bool allowOutsideInputs);
     void saveClipboardModulesAndConnections(vector<ofxOceanodeNode*> nodes, glm::vec2 referencePosition);
     
