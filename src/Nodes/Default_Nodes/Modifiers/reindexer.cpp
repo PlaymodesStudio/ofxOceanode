@@ -28,7 +28,7 @@ void reindexer::update(ofEventArgs &a){
 
 void reindexer::calculateReindex(vector<float> &vf){
 	if(mode == 0){
-		if(indexs->size() < 2) return;
+		if(indexs->size() < 2 || input->size() < 2) return;
 		tempOutput.resize(indexs->size());
 		for(int i = 0; i < tempOutput.size(); i++){
 			float floatIndex = indexs.get()[i];
@@ -38,7 +38,7 @@ void reindexer::calculateReindex(vector<float> &vf){
 		}
 		output = tempOutput;
     }else{
-        if(indexs->size() < 2) return;
+        if(indexs->size() < 2 || indexs->size() != input->size()) return;
         tempOutput.resize(input->size());
         for(int i = 0; i < tempOutput.size(); i++){
             float floatIndex = indexs.get()[i];
