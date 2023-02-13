@@ -767,7 +767,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 				}
             }
             
-            scrolling = scrolling + glm::vec2(ImGui::GetIO().MouseWheelH, ImGui::GetIO().MouseWheel);
+            //TODO: Scroll amount in config
+            if(ImGui::IsWindowHovered()){
+                scrolling = scrolling + glm::vec2(ImGui::GetIO().MouseWheelH * 10, ImGui::GetIO().MouseWheel * 10);
+            }
             
             if(isSelecting){
                 //TODO: Change colors
