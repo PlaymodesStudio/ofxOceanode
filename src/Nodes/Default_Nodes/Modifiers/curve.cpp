@@ -208,7 +208,7 @@ void curve::draw(ofEventArgs &args){
 					auto mouseToPointDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), pointPos);
 					auto mouseToCp1Distance = glm::distance(glm::vec2(ImGui::GetMousePos()), cp1Pos);
 					auto mouseToCp2Distance = glm::distance(glm::vec2(ImGui::GetMousePos()), cp2Pos);
-					if(mouseToPointDistance < 5){
+					if(mouseToPointDistance < 10){
 						p.drag = 3;
 						someItemClicked = true;
 					}
@@ -222,7 +222,7 @@ void curve::draw(ofEventArgs &args){
 					}
 				}else if(ImGui::IsItemClicked(1)){
 					auto mouseToPointDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), pointPos);
-					if(mouseToPointDistance < 5){
+					if(mouseToPointDistance < 10){
 						ImGui::OpenPopup(("##PointPopup " + ofToString(i)).c_str());
 					}
 				}
