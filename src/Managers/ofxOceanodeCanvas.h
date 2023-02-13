@@ -36,6 +36,8 @@ public:
     glm::vec2 getOffsetToCenter(){return offsetToCenter;};
     void setScrolling(glm::vec2 o){scrolling = o;}
     
+    void bringOnTop(){onTop = true;};
+    
 private:
     glm::vec3 getMatrixScale(const glm::mat4 &m);
     glm::mat4 translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector);
@@ -90,6 +92,7 @@ private:
     string uniqueID;
     string parentID;
     bool isFirstDraw = true;
+    bool onTop = false;
 };
 
 #endif

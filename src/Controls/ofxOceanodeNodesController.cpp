@@ -17,6 +17,7 @@
 #include "imgui_internal.h"
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeCanvas.h"
+#include "ofxOceanodeNodeMacro.h"
 
 ofxOceanodeNodesController::ofxOceanodeNodesController(shared_ptr<ofxOceanodeContainer> _container,
                                                         ofxOceanodeCanvas* _canvas)
@@ -161,33 +162,59 @@ void ofxOceanodeNodesController::draw()
         }
 
         ImGui::Separator();
-
+        
+        
         bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
-        for(auto node : allNodes)
-        {
-            bool showThis = false;
-            if(searchFieldMyNodes != ""){
-                string lowercaseName = node->getParameters().getName();
-                std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
-                if(ofStringTimesInString(node->getParameters().getName(), searchFieldMyNodes) || ofStringTimesInString(lowercaseName, searchFieldMyNodes)){
+        std::function<void(vector<ofxOceanodeNode*>, ofxOceanodeCanvas*)> listNodes = [this, &isEnterPressed, &listNodes](vector<ofxOceanodeNode*> nodes, ofxOceanodeCanvas* _canvas = nullptr){
+            for(auto node : nodes)
+            {
+                bool showThis = false;
+                if(searchFieldMyNodes != ""){
+                    string lowercaseName = node->getParameters().getName();
+                    std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
+                    if(ofStringTimesInString(node->getParameters().getName(), searchFieldMyNodes) || ofStringTimesInString(lowercaseName, searchFieldMyNodes)){
+                        showThis = true;
+                    }
+                }else{
                     showThis = true;
                 }
-            }else{
-                showThis = true;
-            }
-            if(showThis)
-            {
-                if(ImGui::Selectable(node->getParameters().getName().c_str()) || isEnterPressed)
+                if(showThis)
                 {
-                    // get the size of the node to be able to center properly
-                    glm::vec2 nodeSize = glm::vec2(node->getNodeGui().getRectangle().getWidth(),node->getNodeGui().getRectangle().getHeight());
-                    canvas->setScrolling(-(canvas->getOffsetToCenter()-canvas->getScrolling())-node->getNodeGui().getPosition()-nodeSize/2.0f);
-                    ImGui::CloseCurrentPopup();
-                    isEnterPressed = false; //Next options we dont want to create them;
-                    break;
+                    if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
+                        string name = (node->getParameters().getName() + " // " + m->getInspectorParameter<string>("Local Name").get());
+                        if(ImGui::Selectable(name.c_str()) || isEnterPressed)
+                        {
+                            // get the size of the node to be able to center properly
+                            glm::vec2 nodeSize = glm::vec2(node->getNodeGui().getRectangle().getWidth(),node->getNodeGui().getRectangle().getHeight());
+                            
+                            _canvas->bringOnTop();
+                            _canvas->setScrolling(-(_canvas->getOffsetToCenter()-_canvas->getScrolling())-node->getNodeGui().getPosition()-nodeSize/2.0f);
+                            ImGui::CloseCurrentPopup();
+                            isEnterPressed = false; //Next options we dont want to create them;
+                            break;
+                        }
+                        if(ImGui::TreeNode((name + "_").c_str())){
+                            listNodes(m->getContainer()->getAllModules(), m->getCanvas());
+                            ImGui::TreePop();
+                        }
+                    }
+                    else if(ImGui::Selectable(node->getParameters().getName().c_str()) || isEnterPressed)
+                    {
+                        // get the size of the node to be able to center properly
+                        glm::vec2 nodeSize = glm::vec2(node->getNodeGui().getRectangle().getWidth(),node->getNodeGui().getRectangle().getHeight());
+                        
+                        _canvas->bringOnTop();
+                        _canvas->setScrolling(-(_canvas->getOffsetToCenter()-_canvas->getScrolling())-node->getNodeGui().getPosition()-nodeSize/2.0f);
+                        ImGui::CloseCurrentPopup();
+                        isEnterPressed = false; //Next options we dont want to create them;
+                        //break;
+                    }
                 }
             }
-        }
+        };
+        
+        listNodes(allNodes, canvas);
+
         ImGui::TreePop();
     }
 }

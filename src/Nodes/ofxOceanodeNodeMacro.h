@@ -39,6 +39,7 @@ public:
 #endif
 	
 	shared_ptr<ofxOceanodeContainer> getContainer() {return container;};
+    ofxOceanodeCanvas* getCanvas() {return &canvas;};
     
     void activate(){
         active = true;

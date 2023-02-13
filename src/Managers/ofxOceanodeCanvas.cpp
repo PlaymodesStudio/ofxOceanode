@@ -39,7 +39,14 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
 
 void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     //Draw Guis
-    
+    bool _open = true;
+    if(onTop){
+        if(open == NULL)
+            open = &_open;
+        else
+            *open = true;
+    }
+    onTop = false;
     // Draw a list of nodes on the left side
     bool open_context_menu = false;
     string node_hovered_in_list = "";
