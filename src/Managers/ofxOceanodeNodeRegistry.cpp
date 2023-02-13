@@ -33,6 +33,9 @@ ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
     this->registerModel<router<string>>("Router", "s", "string");
     this->registerModel<router<bool>>("Router", "b", false);
     this->registerModel<router<void>>("Router", "v");
+    this->registerModel<router<char>>("Router", "c", ' ');
+    this->registerModel<router<ofColor>>("Router", "color", ofColor::black);
+    this->registerModel<router<ofFloatColor>>("Router", "color_f", ofFloatColor::black);
 	
 	this->registerModel<portal<vector<float>>>("Portal", "v_f", 0, true);
     this->registerModel<portal<float>>("Portal", "f", 0, true);
@@ -41,6 +44,9 @@ ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
     this->registerModel<portal<string>>("Portal", "s", "string");
     this->registerModel<portal<bool>>("Portal", "b", false);
     this->registerModel<portal<void>>("Portal", "v");
+    this->registerModel<portal<char>>("Portal", "c", ' ');
+    this->registerModel<portal<ofColor>>("Portal", "color", ofColor::black);
+    this->registerModel<portal<ofFloatColor>>("Portal", "color_f", ofFloatColor::black);
 }
 
 std::unique_ptr<ofxOceanodeNodeModel> ofxOceanodeNodeRegistry::create(const string typeName){
