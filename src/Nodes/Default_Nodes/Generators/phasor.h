@@ -39,7 +39,7 @@ public:
     ~simpleNumberGenerator(){};
     
     void setup(){
-        addParameter(value.set("Value", 0, 0, 1));
+        addParameter(value.set("Value", 0, -FLT_MAX, FLT_MAX));
     }
     
     void update(ofEventArgs &a){
