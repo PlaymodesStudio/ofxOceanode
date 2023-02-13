@@ -34,6 +34,7 @@ public:
     int      indexQuant_Param;
     float    combination_Param;
     int      modulo_Param;
+    bool    discrete_Param;
     
 private:
     std::vector<float>       indexs;

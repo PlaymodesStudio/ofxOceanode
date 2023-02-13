@@ -28,7 +28,14 @@ void indexer::setup() {
     addParameter(indexQuant_Param.set("Quant", indexCount, 1, indexCount));
     addParameter(combination_Param.set("Comb", 0, 0, 1));
     addParameter(modulo_Param.set("Modulo", indexCount, 1, indexCount));
-    addOutputParameter(indexsOut.set("Output", {0}, {0}, {1}));
+    
+    addInspectorParameter(discrete_Param.set("Discrete", false));
+    
+    if(discrete_Param){
+        addOutputParameter(indexsOut.set("Output", {0}, {-FLT_MAX}, {FLT_MAX}));
+    }else{
+        addOutputParameter(indexsOut.set("Output", {0}, {0}, {1}));
+    }
     
     base.numWaves_Param = numWaves_Param;
     base.normalize_Param = normalize_Param;
@@ -41,6 +48,7 @@ void indexer::setup() {
     base.indexQuant_Param = indexQuant_Param;
     base.combination_Param = combination_Param;
     base.modulo_Param = modulo_Param;
+    base.discrete_Param = discrete_Param;
     
     base.recomputeIndexs();
     
@@ -102,6 +110,18 @@ void indexer::setup() {
         base.modulo_Param = i;
         base.recomputeIndexs();
         indexsOut = base.getIndexs();
+    }));
+    paramListeners.push(discrete_Param.newListener([this](bool &b){
+        base.discrete_Param = b;
+        base.recomputeIndexs();
+        indexsOut = base.getIndexs();
+        if(b){
+            indexsOut.setMin(vector<float>(1, -FLT_MAX));
+            indexsOut.setMax(vector<float>(1, FLT_MAX));
+        }else{
+            indexsOut.setMin(vector<float>(1, 0));
+            indexsOut.setMax(vector<float>(1, 1));
+        }
     }));
     
     indexsOut = base.getIndexs();

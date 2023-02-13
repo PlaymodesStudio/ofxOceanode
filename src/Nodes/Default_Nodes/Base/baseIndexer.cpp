@@ -110,13 +110,17 @@ void baseIndexer::recomputeIndexs(){
         int toDivide = normalize_Param ? indexCount - 1 : indexCount;
         if(!normalize_Param) indexf += 0.5f; //For centering non normalized
         
+        if(discrete_Param){
+            tempIndexs[i] = indexf;
         }
+        else{
             float value = float(((indexf)/(double)(toDivide))*((double)numWaves_Param*((double)indexCount/(double)newNumOfPixels))*((double)symmetry_Param+1));
             if (value > 1) {
                 int trunc = std::trunc(value);
                 value -= (trunc == value) ? trunc-1 : trunc;
             }
             tempIndexs[i] = value;
+        }
     }
     for (int i = 0; i < indexCount ; i++){
         float index = i - indexOffset_Param;

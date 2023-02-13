@@ -40,6 +40,7 @@ private:
     ofParameter<float>  combination_Param;
     ofParameter<int>    modulo_Param;
     ofParameter<bool>   normalize_Param;
+    ofParameter<bool>    discrete_Param;
     
     ofParameter<vector<float>>      indexsOut;
     
