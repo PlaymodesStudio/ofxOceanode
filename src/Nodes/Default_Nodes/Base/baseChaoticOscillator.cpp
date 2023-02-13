@@ -23,6 +23,7 @@ baseChaoticOscillator::baseChaoticOscillator(){
     futureRandom = futureRandomNotModulated = dist(mt);
 	modulateNewRandom();
     accumulateCycles = 0;
+    setSeedFlag = false;
 }
 
 void baseChaoticOscillator::nextSeed(int seed_){
