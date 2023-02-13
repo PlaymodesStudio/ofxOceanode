@@ -97,10 +97,17 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         
         bool selectionHasBeenMade = false;
+        bool newComment = false;
         if(ImGui::IsMouseReleased(0)){
             if(isSelecting){
                 isSelecting = false;
-                selectionHasBeenMade = true;
+                if(ImGui::GetIO().KeyAlt){
+//                    container->getComments().emplace_back(selectedRect.position, glm::vec2(selectedRect.width, selectedRect.height));
+                    newComment = true;
+                }
+//                    else{
+                    selectionHasBeenMade = true;
+//                }
             }else{
                 //selectedRect = ofRectangle(0,0,0,0);
             }
@@ -180,7 +187,24 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		int removeIndex = -1;
 		for(int i = 0; i < container->getComments().size(); i++){
 			auto &c = container->getComments()[i];
-			ImGui::PushID(("Comment " + ofToString(i)).c_str());
+//            ImGui::BeginGroup();
+            ImGui::PushID(("Comment " + ofToString(i)).c_str());
+//            ImGui::Text("%s", c.text.c_str());
+//            
+//            ImGui::SameLine(c.size.x - 30);
+//            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(220,220,220,255)));
+//            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(ImColor(0, 0, 0,0)));
+//            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
+//            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(ImColor(0, 0, 0,0)));
+//
+//            if (ImGui::Button("x"))
+//            {
+//                removeIndex = i;
+//            }
+//            ImGui::PopStyleColor(4);
+//
+//            ImGui::EndGroup();
+			
 			glm::vec2 currentPosition = c.position + offset;
 			draw_list->AddRectFilled(currentPosition, currentPosition + glm::vec2(c.size.x, 15), IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 255));
 			draw_list->AddText(currentPosition, IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255), c.text.c_str());
@@ -450,6 +474,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
             ImGui::PopID();
 		}
+        
+        if(newComment){
+            auto &comment = container->getComments().emplace_back(selectedRect.position, glm::vec2(selectedRect.width, selectedRect.height));
+            comment.nodes = container->getSelectedModules();
+//            for(auto &a : container->getSelectedModules()) ofLog() << a->getParameters().getName();
+            deselectAllNodes();
+        }
+
         
         
         
