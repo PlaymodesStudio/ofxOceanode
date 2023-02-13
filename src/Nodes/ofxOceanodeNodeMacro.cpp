@@ -204,7 +204,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 				if(!nameExists)
 				{
 					if(strcmp(proposedNewName.c_str(), "") != 0){
-						string saveAsCategoryWithSlash = "/Macros/";
+                        string saveAsCategoryWithSlash = ofToDataPath("Macros/", true);
 						for(auto s : saveAsTempCategory) saveAsCategoryWithSlash = saveAsCategoryWithSlash + s + "/";
 						container->savePreset(saveAsCategoryWithSlash + string(proposedNewName));
 						localPreset = false;
