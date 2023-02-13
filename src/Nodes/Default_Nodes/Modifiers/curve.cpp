@@ -196,9 +196,9 @@ void curve::draw(ofEventArgs &args){
                         //TODO: Comprova control point dels veins
                         //TODO: no deixar moure mes enllà dels veins?
 					}
-					
-					p.cp1 = glm::clamp(p.cp1, glm::vec2(points[i-1].point.x, 0), glm::vec2(p.point.x, 1));
-					p.cp2 = glm::clamp(p.cp2, glm::vec2(p.point.x, 0), glm::vec2(points[i+1].point.x, 1));
+				
+                    if(i < 0) p.cp1 = glm::clamp(p.cp1, glm::vec2(points[i-1].point.x, 0), glm::vec2(p.point.x, 1));
+					if(i > points.size()-1) p.cp2 = glm::clamp(p.cp2, glm::vec2(p.point.x, 0), glm::vec2(points[i+1].point.x, 1));
 					
 				}
 				glm::vec2 pointPos = denormalizePoint(p.point);
@@ -251,16 +251,16 @@ void curve::draw(ofEventArgs &args){
 					
 					if(i > 0){
 						int elem = lines[i-1].type;
-						const char* elems_names[2] = { "Bezier", "Hold"};
-						if(ImGui::SliderInt("Line L", &elem, 0, 2 - 1, elems_names[elem])){
+						const char* elems_names[3] = { "Bezier", "Hold", "Linear"};
+						if(ImGui::SliderInt("Line L", &elem, 0, 3 - 1, elems_names[elem])){
 							lines[i-1].type = static_cast<lineType>(elem);
 						}
 					}
 					
 					if(i < lines.size()){
 						int elem = lines[i].type;
-						const char* elems_names[2] = { "Bezier", "Hold"};
-						if(ImGui::SliderInt("Line R", &elem, 0, 2 - 1, elems_names[elem])){
+						const char* elems_names[3] = { "Bezier", "Hold", "Linear"};
+						if(ImGui::SliderInt("Line R", &elem, 0, 3 - 1, elems_names[elem])){
 							lines[i].type = static_cast<lineType>(elem);
 						}
 					}
@@ -297,6 +297,11 @@ void curve::draw(ofEventArgs &args){
 					draw_list->AddLine(p1, glm::vec2(p2.x, p1.y), IM_COL32(255, 127, 0, 127), 2);
 					draw_list->AddLine(glm::vec2(p2.x, p1.y), p2, IM_COL32(255, 127, 0, 127), 2);
 				}
+                else if(lines[i].type == LINE_LINEAR){
+                    auto p1 = denormalizePoint(points[i].point);
+                    auto p2 = denormalizePoint(points[i+1].point);
+                    draw_list->AddLine(p1, p2, IM_COL32(255, 127, 0, 127), 2);
+                }
 				
 //				draw_list->AddLine(denormalizePoint(points[i].point), denormalizePoint(points[i+1].point), IM_COL32(10, 10, 10, 255));
 			}
@@ -386,12 +391,15 @@ void curve::recalculate()
 					if(lines[j-1].type == LINE_BEZIER){
 						debugPoints[i] = getYfromXCubicBezier(points[j-1].point, points[j-1].cp2, points[j].cp1, points[j].point, p);
 						tempOut[i] = ofMap(debugPoints[i].y, 0, 1, minY, maxY);
-						//					tempOut[i] = ofMap(p, points[j-1].point.x, points[j].point.x, points[j-1].point.y, points[j].point.y);
 					}
-					else{
+					else if(lines[j-1].type == LINE_HOLD){
 						debugPoints[i] = glm::vec2(p, points[j-1].point.y);
 						tempOut[i] = ofMap(debugPoints[i].y, 0, 1, minY, maxY);
 					}
+                    else if(lines[j-1].type == LINE_LINEAR){
+                        debugPoints[i] = glm::mix(points[j-1].point, points[j].point, ofMap(p, points[j-1].point.x, points[j].point.x, 0, 1));
+                        tempOut[i] = ofMap(debugPoints[i].y, 0, 1, minY, maxY);
+                    }
 					break;
 				}
 			}

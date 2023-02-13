@@ -41,11 +41,12 @@ struct curvePoint{
 
 enum lineType{
 	LINE_BEZIER,
-	LINE_HOLD
+	LINE_HOLD,
+    LINE_LINEAR
 };
 
 struct line{
-	lineType type = LINE_BEZIER;
+	lineType type = LINE_LINEAR;
 };
 
 class curve : public ofxOceanodeNodeModel{
