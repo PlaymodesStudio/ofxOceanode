@@ -231,12 +231,15 @@ void curve::draw(ofEventArgs &args){
 					auto pointCopy = p.point;
 					bool pointEdited = false;
 					float tempFloat = ofMap(p.point.x, 0, 1, minX, maxX);
-					if(ImGui::SliderFloat("X", &tempFloat, minX, maxX)){
-						p.point.x = ofMap(tempFloat, minX, maxX, 0, 1);
-						pointEdited = true;
-					}
+                    ImGui::SliderFloat("X", &tempFloat, minX, maxX);
+                    if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
+                        p.point.x = ofMap(tempFloat, minX, maxX, 0, 1);
+                        pointEdited = true;
+                    }
+                    
 					tempFloat = ofMap(p.point.y, 0, 1, minY, maxY);
-					if(ImGui::SliderFloat("Y", &tempFloat, minY, maxY)){
+                    ImGui::SliderFloat("Y", &tempFloat, minY, maxY);
+                    if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
 						p.point.y = ofMap(tempFloat, minY, maxY, 0, 1);
 						pointEdited = true;
 					}
