@@ -127,6 +127,7 @@ void indexer::presetHasLoaded(){
 }
 
 void indexer::indexCountChanged(int &newIndexCount){
+    if(indexCount < 2) return;
     base.indexCountChanged(newIndexCount);
     
     numWaves_Param.setMax(indexCount);
