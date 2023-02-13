@@ -118,7 +118,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         {
             ImU32 GRID_COLOR = IM_COL32(90, 90, 90, 40);
             ImU32 GRID_COLOR_CENTER = IM_COL32(30, 30, 30, 80);
-            float GRID_SZ = 64.0f;
+            float GRID_SZ = 114.0f;
             ImVec2 win_pos = ImGui::GetCursorScreenPos();
             ImVec2 canvas_sz = ImGui::GetContentRegionAvail();
             
