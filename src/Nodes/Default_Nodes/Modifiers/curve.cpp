@@ -17,7 +17,7 @@ void curve::setup() {
     addOutputParameter(output.set("Output", {0}, {0}, {1}));
     
     addInspectorParameter(adaptEdges.set("Adapt Edges", false));
-    addInspectorParameter(proportionalControlPoints.set("Proportionsl Control Points", false));
+    addInspectorParameter(proportionalControlPoints.set("Proportional Control Points", false));
 	
 	addInspectorParameter(numVerticalDivisions.set("Vert Div", 10, 1, 1000));
 	addInspectorParameter(numHorizontalDivisions.set("Hor Div", 2, 1, 1000));
