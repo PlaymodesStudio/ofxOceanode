@@ -53,82 +53,88 @@ void baseIndexer::indexCountChanged(int _indexCount){
 }
 
 void baseIndexer::recomputeIndexs(){
-    std::vector<float> tempIndexs(indexCount);
-    for (int i = 0; i < indexCount ; i++){
-        int index = i;
-        
-        //QUANTIZE
-		int newNumOfPixels = indexQuant_Param < 1 ? 1 : indexQuant_Param;
-        
-        index = (int)(index/((float)indexCount/(float)newNumOfPixels));
-        
-        
-        while(symmetry_Param > newNumOfPixels-1)
-            symmetry_Param--;
-        
-        bool odd = false;
-        //if((abs(indexOffset_Param) - (int)abs(indexOffset_Param)) > 0.5) odd = !odd;
-        
-        if((int)((index)/(newNumOfPixels/(symmetry_Param+1)))%2 == 1) odd = true;
-        
-        
-        //SYMMETRY santi
-        int veusSym = newNumOfPixels/(symmetry_Param+1);
-        index = veusSym-abs((((int)(index/veusSym)%2) * veusSym)-(index%veusSym));
-        
-        	
-        if(newNumOfPixels % 2 == 0){
-            index += odd ? 1 : 0;
-        }
-        else if(symmetry_Param > 0){
-            index += indexInvert_Param > 0.5 ? 0 : 1;
-            index %= newNumOfPixels;;
-        }
-        
-        //COMB
-        index = std::abs(((index%2)*indexCount*combination_Param)-index);
-        
-        //Shufle
-        if (indexShuffle_Param > 0){
-            index = randomizedIndexes[index-1] + 1;
-        }
-        
-        //Random
-        double indexf = index;
-        if(indexRand_Param > 0)
-            indexf = double(index)*(1-indexRand_Param) + (double(indexRand[index-1] + 1)*indexRand_Param);
-        
-        //INVERSE
-        double nonInvertIndex = indexf-1.0f;
-        double invertedIndex = ((double)newNumOfPixels/double(symmetry_Param+1))-indexf;
-        indexf = indexInvert_Param*invertedIndex + (1-indexInvert_Param)*nonInvertIndex;
-        
-        //Modulo
-        if(modulo_Param != indexCount)
-            indexf = std::fmod(indexf, modulo_Param);
-        
-        int toDivide = normalize_Param ? indexCount - 1 : indexCount;
-        if(!normalize_Param) indexf += 0.5f; //For centering non normalized
-        
-        if(discrete_Param){
-            tempIndexs[i] = indexf;
-        }
-        else{
-            float value = float(((indexf)/(double)(toDivide))*((double)numWaves_Param*((double)indexCount/(double)newNumOfPixels))*((double)symmetry_Param+1));
-            if (value > 1) {
-                int trunc = std::trunc(value);
-                value -= (trunc == value) ? trunc-1 : trunc;
-            }
-            tempIndexs[i] = value;
-        }
+    if(indexCount == 1){
+        indexs = {0};
     }
-    for (int i = 0; i < indexCount ; i++){
-        float index = i - indexOffset_Param;
-        int indexL = floor(index) - indexCount * floor((floor(index)) / indexCount);
-        int indexH = ceil(index) - indexCount * floor((ceil(index)) / indexCount);
-        float lowVal = tempIndexs[indexL];
-        float highVal = tempIndexs[indexH];
-        indexs[i] = lowVal + (highVal-lowVal) * (index - floor(index));
+    else
+    {
+        std::vector<float> tempIndexs(indexCount);
+        for (int i = 0; i < indexCount ; i++){
+            int index = i;
+            
+            //QUANTIZE
+            int newNumOfPixels = indexQuant_Param < 1 ? 1 : indexQuant_Param;
+            
+            index = (int)(index/((float)indexCount/(float)newNumOfPixels));
+            
+            
+            while(symmetry_Param > newNumOfPixels-1)
+                symmetry_Param--;
+            
+            bool odd = false;
+            //if((abs(indexOffset_Param) - (int)abs(indexOffset_Param)) > 0.5) odd = !odd;
+            
+            if((int)((index)/(newNumOfPixels/(symmetry_Param+1)))%2 == 1) odd = true;
+            
+            
+            //SYMMETRY santi
+            int veusSym = newNumOfPixels/(symmetry_Param+1);
+            index = veusSym-abs((((int)(index/veusSym)%2) * veusSym)-(index%veusSym));
+            
+            
+            if(newNumOfPixels % 2 == 0){
+                index += odd ? 1 : 0;
+            }
+            else if(symmetry_Param > 0){
+                index += indexInvert_Param > 0.5 ? 0 : 1;
+                index %= newNumOfPixels;;
+            }
+            
+            //COMB
+            index = std::abs(((index%2)*indexCount*combination_Param)-index);
+            
+            //Shufle
+            if (indexShuffle_Param > 0){
+                index = randomizedIndexes[index-1] + 1;
+            }
+            
+            //Random
+            double indexf = index;
+            if(indexRand_Param > 0)
+                indexf = double(index)*(1-indexRand_Param) + (double(indexRand[index-1] + 1)*indexRand_Param);
+            
+            //INVERSE
+            double nonInvertIndex = indexf-1.0f;
+            double invertedIndex = ((double)newNumOfPixels/double(symmetry_Param+1))-indexf;
+            indexf = indexInvert_Param*invertedIndex + (1-indexInvert_Param)*nonInvertIndex;
+            
+            //Modulo
+            if(modulo_Param != indexCount)
+                indexf = std::fmod(indexf, modulo_Param);
+            
+            int toDivide = normalize_Param ? indexCount - 1 : indexCount;
+            if(!normalize_Param) indexf += 0.5f; //For centering non normalized
+            
+            if(discrete_Param){
+                tempIndexs[i] = indexf;
+            }
+            else{
+                float value = float(((indexf)/(double)(toDivide))*((double)numWaves_Param*((double)indexCount/(double)newNumOfPixels))*((double)symmetry_Param+1));
+                if (value > 1) {
+                    int trunc = std::trunc(value);
+                    value -= (trunc == value) ? trunc-1 : trunc;
+                }
+                tempIndexs[i] = value;
+            }
+        }
+        for (int i = 0; i < indexCount ; i++){
+            float index = i - indexOffset_Param;
+            int indexL = floor(index) - indexCount * floor((floor(index)) / indexCount);
+            int indexH = ceil(index) - indexCount * floor((ceil(index)) / indexCount);
+            float lowVal = tempIndexs[indexL];
+            float highVal = tempIndexs[indexH];
+            indexs[i] = lowVal + (highVal-lowVal) * (index - floor(index));
+        }
     }
 }
 

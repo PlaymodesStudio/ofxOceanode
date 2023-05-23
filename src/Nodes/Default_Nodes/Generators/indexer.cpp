@@ -11,7 +11,7 @@
 void indexer::setup() {
     color = ofColor::orange;
     
-    addParameter(indexCount.set("Size", 100, 2, 99999));
+    addParameter(indexCount.set("Size", 100, 1, 99999));
     addParameter(numWaves_Param.set("NWaves", 1, 0, indexCount))
     ->registerSpeedDrag([](ofParameter<float> &p, int drag){
         float closestp = drag > 0 ? floor(p) : ceil(p);
@@ -147,29 +147,30 @@ void indexer::presetHasLoaded(){
 }
 
 void indexer::indexCountChanged(int &newIndexCount){
-    if(indexCount < 2) return;
     base.indexCountChanged(newIndexCount);
-    
-    numWaves_Param.setMax(indexCount);
-    //TODO: optimize
-    numWaves_Param = numWaves_Param >= numWaves_Param.getMax() ? numWaves_Param.getMax() : numWaves_Param.get();
-    
-    symmetry_Param.setMax(indexCount/2);
-    symmetry_Param = ofClamp(symmetry_Param, symmetry_Param.getMin(), symmetry_Param.getMax());
-
-    indexOffset_Param.setMin(-indexCount/2);
-    indexOffset_Param.setMax(indexCount/2);
-    indexOffset_Param = ofClamp(indexOffset_Param, indexOffset_Param.getMin(), indexOffset_Param.getMax());
-    
-    float indexQuantNormalized = (float)indexQuant_Param / (float)indexQuant_Param.getMax();
-    indexQuant_Param.setMax(indexCount);
-    indexQuant_Param = ofClamp(indexQuantNormalized * indexCount, indexQuant_Param.getMin(), indexQuant_Param.getMax());
-    getOceanodeParameter(indexQuant_Param).setDefaultValue(indexCount);
-    
-    float indexModuloNormalized = (float)modulo_Param / (float)modulo_Param.getMax();
-    modulo_Param.setMax(indexCount);
-    modulo_Param = ofClamp(indexModuloNormalized * indexCount, modulo_Param.getMin(), modulo_Param.getMax());
-    getOceanodeParameter(modulo_Param).setDefaultValue(indexCount);
+    if(indexCount > 1){
+        
+        numWaves_Param.setMax(indexCount);
+        //TODO: optimize
+        numWaves_Param = numWaves_Param >= numWaves_Param.getMax() ? numWaves_Param.getMax() : numWaves_Param.get();
+        
+        symmetry_Param.setMax(indexCount/2);
+        symmetry_Param = ofClamp(symmetry_Param, symmetry_Param.getMin(), symmetry_Param.getMax());
+        
+        indexOffset_Param.setMin(-indexCount/2);
+        indexOffset_Param.setMax(indexCount/2);
+        indexOffset_Param = ofClamp(indexOffset_Param, indexOffset_Param.getMin(), indexOffset_Param.getMax());
+        
+        float indexQuantNormalized = (float)indexQuant_Param / (float)indexQuant_Param.getMax();
+        indexQuant_Param.setMax(indexCount);
+        indexQuant_Param = ofClamp(indexQuantNormalized * indexCount, indexQuant_Param.getMin(), indexQuant_Param.getMax());
+        getOceanodeParameter(indexQuant_Param).setDefaultValue(indexCount);
+        
+        float indexModuloNormalized = (float)modulo_Param / (float)modulo_Param.getMax();
+        modulo_Param.setMax(indexCount);
+        modulo_Param = ofClamp(indexModuloNormalized * indexCount, modulo_Param.getMin(), modulo_Param.getMax());
+        getOceanodeParameter(modulo_Param).setDefaultValue(indexCount);
+    }
     
     //TODO: Update default values of parameters
     indexsOut = base.getIndexs();
