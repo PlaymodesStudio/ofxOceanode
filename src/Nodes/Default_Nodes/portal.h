@@ -32,6 +32,10 @@ public:
     }
 	
 	virtual void match(abstractPortal* p) = 0;
+    
+    bool isMatching(abstractPortal *p){
+        return type() == p->type() && getName() == p->getName() && checkLocal(p);
+    }
 	
 protected:
 	ofParameter<string> name;

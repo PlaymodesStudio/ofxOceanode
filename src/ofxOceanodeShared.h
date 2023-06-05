@@ -105,12 +105,18 @@ public:
 	}
 	
 	static void portalUpdated(abstractPortal* _portal){
-		if(getInstance().alreadyUpdatingPortals) return;
-		getInstance().alreadyUpdatingPortals = true;
-		for(auto p : getInstance().portals){
-			p->match(_portal);
-		}
-		getInstance().alreadyUpdatingPortals = false;
+        if(find_if(getInstance().currentUpdatingPortals.begin(), getInstance().currentUpdatingPortals.end(), [_portal](abstractPortal* _p){
+            return _p->isMatching(_portal);
+        }) == getInstance().currentUpdatingPortals.end()){
+            getInstance().currentUpdatingPortals.push_back(_portal);
+            for(auto p : getInstance().portals){
+                p->match(_portal);
+            }
+            getInstance().currentUpdatingPortals.erase(std::remove(getInstance().currentUpdatingPortals.begin(),
+                                                                   getInstance().currentUpdatingPortals.end(),
+                                                                   _portal),
+                                                                   getInstance().currentUpdatingPortals.end());
+        }
 	}
     
 private:
@@ -144,7 +150,7 @@ private:
 	ofEvent<string> macroUpdatedEvent;
 	
 	vector<abstractPortal*> portals;
-	bool alreadyUpdatingPortals = false;
+    vector<abstractPortal*> currentUpdatingPortals;
 };
 
 #endif /* ofxOceanodeShared_h */
