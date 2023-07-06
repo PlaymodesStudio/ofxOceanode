@@ -229,7 +229,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }
             }
             
-            if(ImGui::IsMouseClicked(1)){
+            if(ImGui::IsItemClicked(1)){
                 c.openPopupInNext = true;
             }
             
