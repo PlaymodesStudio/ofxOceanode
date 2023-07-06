@@ -32,6 +32,7 @@ private:
 	ofParameter<vector<float>> indexs;
     ofParameter<vector<float>> output;
     ofParameter<int> mode;
+    ofParameter<bool> allowEmpty;
 };
 
 #endif /* reindexer_h */
