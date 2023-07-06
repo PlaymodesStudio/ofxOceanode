@@ -213,6 +213,26 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 			//								 currentPosition + size - ImVec2(0, 10),
 			//								 currentPosition + size,
 			//								 IM_COL32(color.r*255, color.g*255, color.b*255, 255));
+            ImGui::SetCursorScreenPos(currentPosition);
+            ImGui::InvisibleButton("Inv Button", ImVec2(c.size.x, 15));
+            
+            if(ImGui::IsItemActive()){
+                ofRectangle rect(c.position, c.size.x, c.size.y);
+                c.position = c.position + ImGui::GetIO().MouseDelta;
+                if(!ImGui::GetIO().KeyAlt){
+                    for(auto nodePair : nodesInThisFrame)
+                    {
+                        if(rect.inside(nodePair.second->getNodeGui().getRectangle())){
+                            nodePair.second->getNodeGui().setPosition(nodePair.second->getNodeGui().getPosition() + ImGui::GetIO().MouseDelta);
+                        }
+                    }
+                }
+            }
+            
+            if(ImGui::IsMouseClicked(1)){
+                c.openPopupInNext = true;
+            }
+            
 			if(c.openPopupInNext){
 				ImGui::OpenPopup("Comment");
 				c.openPopupInNext = false;
