@@ -420,8 +420,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         
         if(newComment){
             auto &comment = container->getComments().emplace_back(selectedRect.position, glm::vec2(selectedRect.width, selectedRect.height));
-            comment.nodes = container->getSelectedModules();
-//            for(auto &a : container->getSelectedModules()) ofLog() << a->getParameters().getName();
             deselectAllNodes();
         }
 
@@ -442,13 +440,23 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ofRectangle rect(c.position, c.size.x, c.size.y);
                 c.position = c.position + ImGui::GetIO().MouseDelta;
                 if(!ImGui::GetIO().KeyAlt){
-                    for(auto nodePair : nodesInThisFrame)
-                    {
-                        if(rect.inside(nodePair.second->getNodeGui().getRectangle())){
-                            nodePair.second->getNodeGui().setPosition(nodePair.second->getNodeGui().getPosition() + ImGui::GetIO().MouseDelta);
+                    if(c.nodes.size() == 0){
+                        for(auto nodePair : nodesInThisFrame)
+                        {
+                            if(rect.inside(nodePair.second->getNodeGui().getRectangle())){
+                                c.nodes.push_back(nodePair.second);
+                            }
                         }
                     }
+                    for(auto n : c.nodes){
+                        n->getNodeGui().setPosition(n->getNodeGui().getPosition() + ImGui::GetIO().MouseDelta);
+                    }
+                }else{
+                    c.nodes.clear();
                 }
+            }else{
+                c.nodes.clear();
+                c.nodes.clear();
             }
             
             if(ImGui::IsItemClicked(1)){
