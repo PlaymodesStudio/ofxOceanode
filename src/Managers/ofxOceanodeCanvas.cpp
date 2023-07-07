@@ -181,84 +181,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		
 		
 		//Draw List layers
-		draw_list->ChannelsSplit(max(nodesInThisFrame.size(), (size_t)2)*2 + 1); //We have foreground + background of each node + connections on the background
-        
-		draw_list->ChannelsSetCurrent(0);
-		int removeIndex = -1;
-		for(int i = 0; i < container->getComments().size(); i++){
-			auto &c = container->getComments()[i];
-//            ImGui::BeginGroup();
-            ImGui::PushID(("Comment " + ofToString(i)).c_str());
-//            ImGui::Text("%s", c.text.c_str());
-//            
-//            ImGui::SameLine(c.size.x - 30);
-//            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(220,220,220,255)));
-//            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(ImColor(0, 0, 0,0)));
-//            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
-//            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(ImColor(0, 0, 0,0)));
-//
-//            if (ImGui::Button("x"))
-//            {
-//                removeIndex = i;
-//            }
-//            ImGui::PopStyleColor(4);
-//
-//            ImGui::EndGroup();
-			
-			glm::vec2 currentPosition = c.position + offset;
-			draw_list->AddRectFilled(currentPosition, currentPosition + glm::vec2(c.size.x, 15), IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 255));
-			draw_list->AddText(currentPosition, IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255), c.text.c_str());
-			draw_list->AddRectFilled(currentPosition + glm::vec2(0, 15), currentPosition + c.size, IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 100));
-			//	draw_list->AddTriangleFilled(currentPosition + size - ImVec2(10, 0),
-			//								 currentPosition + size - ImVec2(0, 10),
-			//								 currentPosition + size,
-			//								 IM_COL32(color.r*255, color.g*255, color.b*255, 255));
-            ImGui::SetCursorScreenPos(currentPosition);
-            ImGui::InvisibleButton("Inv Button", ImVec2(c.size.x, 15));
-            
-            if(ImGui::IsItemActive()){
-                ofRectangle rect(c.position, c.size.x, c.size.y);
-                c.position = c.position + ImGui::GetIO().MouseDelta;
-                if(!ImGui::GetIO().KeyAlt){
-                    for(auto nodePair : nodesInThisFrame)
-                    {
-                        if(rect.inside(nodePair.second->getNodeGui().getRectangle())){
-                            nodePair.second->getNodeGui().setPosition(nodePair.second->getNodeGui().getPosition() + ImGui::GetIO().MouseDelta);
-                        }
-                    }
-                }
-            }
-            
-            if(ImGui::IsItemClicked(1)){
-                c.openPopupInNext = true;
-            }
-            
-			if(c.openPopupInNext){
-				ImGui::OpenPopup("Comment");
-				c.openPopupInNext = false;
-			}
-			if(ImGui::BeginPopup("Comment")){
-				char * cString = new char[1024];
-				strcpy(cString, c.text.c_str());
-				if (ImGui::InputText("Text", cString, 1024, ImGuiInputTextFlags_EnterReturnsTrue))
-				{
-					c.text = cString;
-				}
-				delete[] cString;
-				ImGui::DragFloat2("Position", &c.position.x);
-				ImGui::DragFloat2("Size", &c.size.x);
-				ImGui::ColorEdit3("Color", &c.color.r);
-				ImGui::ColorEdit3("TextColor", &c.textColor.r);
-				if(ImGui::Button("Remove")){
-					removeIndex = i;
-				}
-				ImGui::EndPopup();
-			}
-			ImGui::PopID();
-		}
-		if(removeIndex != -1){
-			container->getComments().erase(container->getComments().begin() + removeIndex);
-		}
+		draw_list->ChannelsSplit(max(nodesInThisFrame.size(), (size_t)2)*2 + 1 + 1); //We have foreground + background of each node + connections + comments on the background
 		
 		for(auto &n : nodesInThisFrame){
 			if(nodesDrawingOrder.count(n.first) == 0){
@@ -284,7 +207,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 			
 			int nodeDrawChannel = 1;
 			if(nodesDrawingOrder.count(nodeId) != 0){
-				nodeDrawChannel = (nodesDrawingOrder[nodeId] * 2) + 1; //We have two channels per node, and we have to shift 1 position to get the connecitons channel
+				nodeDrawChannel = (nodesDrawingOrder[nodeId] * 2) + 2; //We have two channels per node, and we have to shift 2 position to draw on top of connections and comments
 			}else{
 				nodesDrawingOrder[nodeId] = nodesDrawingOrder.size();
 			}
@@ -502,7 +425,62 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             deselectAllNodes();
         }
 
-        
+        draw_list->ChannelsSetCurrent(0);
+        int removeIndex = -1;
+        for(int i = 0; i < container->getComments().size(); i++){
+            auto &c = container->getComments()[i];
+            ImGui::PushID(("Comment " + ofToString(i)).c_str());
+            
+            glm::vec2 currentPosition = c.position + offset;
+            draw_list->AddRectFilled(currentPosition, currentPosition + glm::vec2(c.size.x, 15), IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 255));
+            draw_list->AddText(currentPosition, IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255), c.text.c_str());
+            draw_list->AddRectFilled(currentPosition + glm::vec2(0, 15), currentPosition + c.size, IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 100));
+            ImGui::SetCursorScreenPos(currentPosition);
+            ImGui::InvisibleButton("Inv Button", ImVec2(c.size.x, 15));
+            
+            if(ImGui::IsItemActive()){
+                ofRectangle rect(c.position, c.size.x, c.size.y);
+                c.position = c.position + ImGui::GetIO().MouseDelta;
+                if(!ImGui::GetIO().KeyAlt){
+                    for(auto nodePair : nodesInThisFrame)
+                    {
+                        if(rect.inside(nodePair.second->getNodeGui().getRectangle())){
+                            nodePair.second->getNodeGui().setPosition(nodePair.second->getNodeGui().getPosition() + ImGui::GetIO().MouseDelta);
+                        }
+                    }
+                }
+            }
+            
+            if(ImGui::IsItemClicked(1)){
+                c.openPopupInNext = true;
+            }
+            
+            if(c.openPopupInNext){
+                ImGui::OpenPopup("Comment");
+                c.openPopupInNext = false;
+            }
+            if(ImGui::BeginPopup("Comment")){
+                char * cString = new char[1024];
+                strcpy(cString, c.text.c_str());
+                if (ImGui::InputText("Text", cString, 1024, ImGuiInputTextFlags_EnterReturnsTrue))
+                {
+                    c.text = cString;
+                }
+                delete[] cString;
+                ImGui::DragFloat2("Position", &c.position.x);
+                ImGui::DragFloat2("Size", &c.size.x);
+                ImGui::ColorEdit3("Color", &c.color.r);
+                ImGui::ColorEdit3("TextColor", &c.textColor.r);
+                if(ImGui::Button("Remove")){
+                    removeIndex = i;
+                }
+                ImGui::EndPopup();
+            }
+            ImGui::PopID();
+        }
+        if(removeIndex != -1){
+            container->getComments().erase(container->getComments().begin() + removeIndex);
+        }
         
         
         
@@ -709,7 +687,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         };
         
         // Display links
-        draw_list->ChannelsSetCurrent(0); // Background
+        draw_list->ChannelsSetCurrent(1); // Background
         for(auto &connection : container->getAllConnections()){
             glm::vec2 p1 = getSourceConnectionPositionFromParameter(connection->getSourceParameter()) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
             glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter()) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
