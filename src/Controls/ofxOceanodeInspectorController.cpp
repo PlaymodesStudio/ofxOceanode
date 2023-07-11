@@ -67,6 +67,23 @@ void ofxOceanodeInspectorController::draw(){
                 ImGui::Text(nodeId.c_str(), "%s");
                 ImGui::PopStyleColor();
             }
+            bool sameDescription = true;
+            for(auto nodePair : selectedNodesWithoutFirst){
+                if(selectedNodes[0].second->getNodeModel().getDescription() != nodePair.second->getNodeModel().getDescription()){
+                    sameDescription = false;
+                }
+            }
+            if(sameDescription){
+                if(selectedNodes[0].second->getNodeModel().getDescription() != ""){
+                    ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 21.0f);
+                    ImGui::SetNextItemOpen(false, ImGuiCond_Appearing);
+                    if(ImGui::TreeNode("Description")){
+                        ImGui::TextWrapped(selectedNodes[0].second->getNodeModel().getDescription().c_str(), "%s");
+                        ImGui::TreePop();
+                    }
+                    ImGui::PopStyleVar();
+                }
+            }
             ImGui::TreePop();
         }
         

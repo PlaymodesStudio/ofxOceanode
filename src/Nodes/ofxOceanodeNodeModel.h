@@ -73,6 +73,7 @@ public:
 	void deserializeParameter(ofJson &json, ofAbstractParameter &p);
     
     ofColor getColor(){return color;};
+    string getDescription(){return description;};
     
     //For Macro
     virtual bool receiveOscMessage(ofxOscMessage &m){return false;};
@@ -141,6 +142,7 @@ public:
 protected:
     ofColor color;
 	string canvasID;
+    string description;
     
 private:
     string nameIdentifier;
