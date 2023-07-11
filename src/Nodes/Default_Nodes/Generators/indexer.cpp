@@ -10,6 +10,7 @@
 
 void indexer::setup() {
     color = ofColor::orange;
+    description = "Creates a distributed vector of indices";
     
     addParameter(indexCount.set("Size", 100, 1, 99999));
     addParameter(numWaves_Param.set("NWaves", 1, 0, indexCount))

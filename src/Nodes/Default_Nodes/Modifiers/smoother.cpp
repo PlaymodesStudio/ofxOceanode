@@ -9,6 +9,7 @@
 
 void smoother::setup() {
     color = ofColor::green;
+    description = "Uses moving average to smooth the signal with custom laggy tension implementation";
     addParameter(input.set("Input", {0}, {0}, {1}));
     addParameter(smoothing.set("Smooth", {0.5}, {0}, {1}));
     addParameter(tension.set("Tension", {0}, {-1}, {1}));

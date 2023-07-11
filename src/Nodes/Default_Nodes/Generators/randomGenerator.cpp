@@ -9,6 +9,8 @@
 
 void randomGenerator::setup(){
     color = ofColor(0, 200, 255);
+    description = "Generates discreate values when Phasor changed from < 0.5 to > 0.5";
+    
     seedChanged = true;
     baseChGen.resize(1);
     result.resize(1);

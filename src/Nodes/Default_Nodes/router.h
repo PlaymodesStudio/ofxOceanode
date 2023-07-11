@@ -13,6 +13,7 @@
 class abstractRouter : public ofxOceanodeNodeModel{
 public:
     abstractRouter(string typelabel) : ofxOceanodeNodeModel("Router " + typelabel){
+        description = "To Send " + typelabel + " values to and from a macro and it's parent";
         addParameter(nameParam.set("Name", typelabel));
     };
     ~abstractRouter(){};

@@ -10,6 +10,7 @@ phasor::phasor() : ofxOceanodeNodeModel("Phasor")
 {
     phaseOffset = 0;
     color = ofColor::red;
+    description = "This module calculates a looping signal.\n\nBPM -> Derived from master BPM.\nDiv -> Divison of the BPM.\nMult -> Mult of BPM.\nInit Ph -> The starting point of the loop.\nReset -> Makes the loop start at the begining.\nLoop -> when the loop has ended returns to start if true.\nPhase -> The calculated value";
     selfTrigger = false;
     basePh = make_shared<basePhasor>();
     parameterAutoSettersListeners.push(basePh->audioUpdate.newListener([this](vector<float> &vf){

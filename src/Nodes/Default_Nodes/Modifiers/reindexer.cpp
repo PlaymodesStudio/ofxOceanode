@@ -9,6 +9,7 @@
 
 void reindexer::setup(){
     color = ofColor::orange;
+    description = "Rearanges a vector with the defined indices in the Indexs parameter. If a not exact position is given, it linearly interpolates between the closest";
     addInspectorParameter(normIndexs.set("Normalized Indexs", true));
     addParameter(input.set("Input", {0}, {-FLT_MAX}, {FLT_MAX}));
 	addParameter(indexs.set("Indexs", {0}, {0}, {FLT_MAX}));

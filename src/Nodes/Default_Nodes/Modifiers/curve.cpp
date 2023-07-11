@@ -12,6 +12,7 @@
 
 void curve::setup() {
     color = ofColor::white;
+    description = "Used to create functions than transforms an input following the curve to an output";
     addParameter(input.set("Input", {0}, {0}, {1}));
 	addParameter(showWindow.set("Show", true));
     addOutputParameter(output.set("Output", {0}, {0}, {1}));

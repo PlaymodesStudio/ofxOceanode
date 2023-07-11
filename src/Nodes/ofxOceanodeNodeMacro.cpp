@@ -10,6 +10,7 @@
 
 ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
     color = ofColor::black;
+    description = "Encapsulation of a graph";
     presetPath = "";
     currentPreset = -1;
 	showWindow = false;

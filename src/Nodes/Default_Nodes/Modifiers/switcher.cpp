@@ -10,6 +10,7 @@
 
 void switcher::setup(){
     color = ofColor::white;
+    description = "Select one of the inputs to send to the output (with linear interpolation)";
 	
 	addInspectorParameter(numInputs.set("Num Inputs", 5, 2, INT_MAX));
     addInspectorParameter(normalizedSelector.set("Norm Selector", true));

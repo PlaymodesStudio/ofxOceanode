@@ -9,6 +9,7 @@
 
 void chaoticOscillator::setup(){
     color = ofColor(0, 200, 255);
+    description = "Generates smooth interpolated random values with a periodicity based on phasor";
     seedChanged = true;
     baseChOsc.resize(1);
     result.resize(1);

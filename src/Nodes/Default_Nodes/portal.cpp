@@ -11,6 +11,7 @@
 
 
 abstractPortal::abstractPortal(string typelabel) : ofxOceanodeNodeModel("Portal " + typelabel){
+    description = "To Send " + typelabel + " values anywhere in the patch. Either in the same canvas (local) or in all macros and parents (global)";
 	ofxOceanodeShared::addPortal(this);
 	
 	addParameter(name.set("Name", typelabel));

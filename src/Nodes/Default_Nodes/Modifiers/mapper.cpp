@@ -10,6 +10,7 @@
 
 void mapper::setup() {
     color = ofColor::white;
+    description = "Simple map() function. Maps input range to output range";
     addParameter(input.set("Input", {0}, {0}, {1}));
     addParameter(minInput.set("Min In", {0}, {0}, {1}));
     addParameter(maxInput.set("Max In", {1}, {0}, {1}));

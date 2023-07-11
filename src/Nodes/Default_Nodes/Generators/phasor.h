@@ -12,7 +12,10 @@
 
 class counter : public ofxOceanodeNodeModel{
 public:
-    counter() : ofxOceanodeNodeModel("Counter"){}
+    counter() : ofxOceanodeNodeModel("Counter"){
+        color = ofColor::red;
+        description = "Counts the elapsed time since reset has been preset or the app started";
+    }
     
     void setup() override{
         addOutputParameter(output.set("Out", 0, 0, FLT_MAX));
@@ -35,6 +38,7 @@ class simpleNumberGenerator : public ofxOceanodeNodeModel{
 public:
     simpleNumberGenerator() : ofxOceanodeNodeModel("Number"){
         color = ofColor::red;
+        description = "Sends a value every frame";
     };
     ~simpleNumberGenerator(){};
     

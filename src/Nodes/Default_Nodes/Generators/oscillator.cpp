@@ -9,6 +9,7 @@
 
 void oscillator::setup(){
     color = ofColor(0, 127, 255);
+    description = "Calculates an oscillating signal based on a phase. Phase triggers the calculation. When no phase is connected, any other parameter triggers de calculation";
     baseOsc.resize(1);
     result.resize(1);
     

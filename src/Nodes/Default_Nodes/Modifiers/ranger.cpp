@@ -12,6 +12,7 @@ float maxRange =  10000.000;
 
 void ranger::setup(){
     color = ofColor::white;
+    description = "Same as mapper but for non normalized values";
     addParameter(input.set("Input", {0}, {0}, {1}));
     addParameter(minInput.set("Min In", {0}, {-FLT_MAX}, {FLT_MAX}));
     addParameter(maxInput.set("Max In", {1}, {-FLT_MAX}, {FLT_MAX}));

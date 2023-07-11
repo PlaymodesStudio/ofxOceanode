@@ -15,6 +15,7 @@ public:
     noise() : ofxOceanodeNodeModel("Noise"){};
     void setup(){
         color = ofColor(0, 200, 255);
+        description = "Creates a Perlin noise based on a always changing input";
         addParameter(input.set("Input", {0}, {0}, {FLT_MAX}));
         addParameter(index.set("Index", {0}, {0}, {1}));
         addParameter(scale.set("Scale", 1, 0, FLT_MAX));
