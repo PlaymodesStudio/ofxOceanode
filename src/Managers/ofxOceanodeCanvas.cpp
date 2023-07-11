@@ -581,6 +581,41 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         }
                     }
                 }
+                ImGui::Separator();
+                std::function<void(shared_ptr<macroCategory>)> drawFoundCategory =
+                [this, offset, &drawFoundCategory, &isEnterPressed, &firstSearchResult](shared_ptr<macroCategory> category){
+                    for(auto d : category->categories){
+                        drawFoundCategory(d);
+                    }
+                    for(auto m : category->macros){
+                        string lowercaseName = m.first;
+                        std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
+                        if(ofStringTimesInString(m.first, searchField) || ofStringTimesInString(lowercaseName, searchField)){
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
+                            if(ImGui::Selectable(m.first.c_str()) || (ImGui::IsItemFocused() && isEnterPressed))
+                            {
+                                unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
+                                if (type)
+                                {
+                                    auto &node = container->createNode(std::move(type), m.second);
+                                    node.getNodeGui().setPosition(newNodeClickPos - offset);
+                                }
+                                ImGui::PopStyleColor();
+                                ImGui::CloseCurrentPopup();
+                                isEnterPressed = false; //Next options we dont want to create them;
+                                break;
+                            }
+                            if(firstSearchResult == "") firstSearchResult = m.first;
+                            ImGui::PopStyleColor();
+                        }
+                    }
+                };
+                ImGui::Separator();
+                
+                
+                auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
+                drawFoundCategory(macroDirectoryStructure);
+                
                 //Without any focus we create the first result
                 if(isEnterPressed){
                     unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(firstSearchResult);
