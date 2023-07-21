@@ -11,8 +11,9 @@
 #include "glm/gtx/closest_point.hpp"
 
 void curve::setup() {
-    color = ofColor::white;
+    color = ofColor(255,128,0,255);
     description = "Used to create functions than transforms an input following the curve to an output";
+    addParameter(curveName.set("Name",""));
     addParameter(input.set("Input", {0}, {0}, {1}));
 	addParameter(showWindow.set("Show", true));
     addOutputParameter(output.set("Output", {0}, {0}, {1}));
@@ -28,6 +29,10 @@ void curve::setup() {
 	
 	addInspectorParameter(minY.set("Min Y", 0, -FLT_MAX, FLT_MAX));
 	addInspectorParameter(maxY.set("Max Y", 1, -FLT_MAX, FLT_MAX));
+    addInspectorParameter(colorParam.set("Color", color));
+    colorListener = colorParam.newListener([this](ofColor &c){
+        color = c;
+    });
 
     listeners.push(input.newListener([&](vector<float> &vf){
         recalculate();
@@ -62,14 +67,19 @@ void curve::draw(ofEventArgs &args){
 	
 	if(showWindow){
 		string modCanvasID = canvasID == "Canvas" ? "" : (canvasID + "/");
-		if(ImGui::Begin((modCanvasID + "Curve " + ofToString(getNumIdentifier())).c_str(), (bool *)&showWindow.get())){
+		if(ImGui::Begin((ofToString(curveName) + "_" + modCanvasID + "Curve " + ofToString(getNumIdentifier())).c_str(), (bool *)&showWindow.get()))
+        {
 			ImGui::SameLine();
 			ImGui::BeginGroup();
 			
 			const ImVec2 NODE_WINDOW_PADDING(8.0f, 7.0f);
 			
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0,1.0,1.0,1.0));
+            ImGui::Text(ofToString(curveName).c_str());
+            ImGui::PopStyleColor();
+            ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
 			if(ImGui::Button("[Clear]"))
 			{
 				points.clear();
@@ -294,17 +304,17 @@ void curve::draw(ofEventArgs &args){
 					draw_list->AddBezierCurve(denormalizePoint(points[i].point),
 											  denormalizePoint(points[i].cp2),
 											  denormalizePoint(points[i+1].cp1),
-											  denormalizePoint(points[i+1].point), IM_COL32(255, 127, 0, 127), 2);
+											  denormalizePoint(points[i+1].point), IM_COL32(color.r, color.g, color.b, 200), 2);
 				}else if(lines[i].type == LINE_HOLD){
 					auto p1 = denormalizePoint(points[i].point);
 					auto p2 = denormalizePoint(points[i+1].point);
-					draw_list->AddLine(p1, glm::vec2(p2.x, p1.y), IM_COL32(255, 127, 0, 127), 2);
-					draw_list->AddLine(glm::vec2(p2.x, p1.y), p2, IM_COL32(255, 127, 0, 127), 2);
+					draw_list->AddLine(p1, glm::vec2(p2.x, p1.y), IM_COL32(color.r, color.g, color.b, 200), 2);
+					draw_list->AddLine(glm::vec2(p2.x, p1.y), p2, IM_COL32(color.r, color.g, color.b, 200), 2);
 				}
                 else if(lines[i].type == LINE_LINEAR){
                     auto p1 = denormalizePoint(points[i].point);
                     auto p2 = denormalizePoint(points[i+1].point);
-                    draw_list->AddLine(p1, p2, IM_COL32(255, 127, 0, 127), 2);
+                    draw_list->AddLine(p1, p2, IM_COL32(color.r, color.g, color.b, 200), 2);
                 }
 				
 //				draw_list->AddLine(denormalizePoint(points[i].point), denormalizePoint(points[i+1].point), IM_COL32(10, 10, 10, 255));

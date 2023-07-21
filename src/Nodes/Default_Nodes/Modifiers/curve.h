@@ -76,7 +76,7 @@ private:
     ofParameter<bool> proportionalControlPoints;
 	
 	ofParameter<float> minX, maxX, minY, maxY;
-	
+    
 	vector<glm::vec2> debugPoints;
 	
 	vector<curvePoint> points;
@@ -84,6 +84,12 @@ private:
 	curvePoint* popupPoint;
 	
 	vector<line> lines;
+    
+    ofParameter<string> curveName;
+    ofParameter<ofColor> colorParam;
+    ofColor color;
+    ofEventListener colorListener;
+
 };
 
 
