@@ -115,9 +115,9 @@ void ofxOceanodeTime::update(){
             if(ofGetFrameNum() % frameInterval == 0 || forceFrameMode){
                 float targetFR = ofGetTargetFrameRate();
                 if(targetFR == 0) targetFR = 60;
-                time += (1.0f/ofGetTargetFrameRate());
+                time += (1.0f/targetFR);
                 for(auto p : phasors){
-                    p->advanceForFrameRate(ofGetTargetFrameRate());
+                    p->advanceForFrameRate(targetFR);
                 }
             }
         }else{
@@ -140,22 +140,26 @@ void ofxOceanodeTime::threadedFunction(){
 }
 
 void ofxOceanodeTime::audioIn(ofSoundBuffer & input){
-    phasorChannel2.tryReceive(phasorsInThread2);
-    for(auto p : phasorsInThread2){
-        if(p->isAudio())
-            p->advanceForFrameRate(44100.0/256.0);
-        else
-            p->threadedFunction(44100.0/256.0);
+    if(!frameMode){
+        phasorChannel2.tryReceive(phasorsInThread2);
+        for(auto p : phasorsInThread2){
+            if(p->isAudio())
+                p->advanceForFrameRate(44100.0/256.0);
+            else
+                p->threadedFunction(44100.0/256.0);
+        }
     }
 }
 
 void ofxOceanodeTime::audioOut(ofSoundBuffer & input){
-    phasorChannel2.tryReceive(phasorsInThread2);
-    for(auto p : phasorsInThread2){
-        if(p->isAudio())
-            p->advanceForFrameRate(44100.0/256.0);
-        else
-            p->threadedFunction(44100.0/256.0);
+    if(!frameMode){
+        phasorChannel2.tryReceive(phasorsInThread2);
+        for(auto p : phasorsInThread2){
+            if(p->isAudio())
+                p->advanceForFrameRate(44100.0/256.0);
+            else
+                p->threadedFunction(44100.0/256.0);
+        }
     }
 }
 
