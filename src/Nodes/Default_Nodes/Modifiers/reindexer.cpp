@@ -29,8 +29,18 @@ void reindexer::update(ofEventArgs &a){
 }
 
 void reindexer::calculateReindex(vector<float> &vf){
+    tempOutput.clear();
+    if((indexs->size() == 0 || input->size() == 0) && !allowEmpty) return;
+
 	if(mode == 0){
-		if((indexs->size() < 2 || input->size() < 2) && !allowEmpty) return;
+        if(indexs->size() == 1) {  // Special case: indexs has only one element
+                   float floatIndex = indexs.get()[0];
+                   if(normIndexs) floatIndex *= (input->size() - 1);
+                   floatIndex = ofClamp(floatIndex, 0, input->size() - 1);
+                   float result = ofLerp(input->at(floor(floatIndex)), input->at(ceil(floatIndex)), fmod(floatIndex, 1.0f));
+                   output = {result};
+                   return;
+               }
 		tempOutput.resize(indexs->size());
 		for(int i = 0; i < tempOutput.size(); i++){
 			float floatIndex = indexs.get()[i];
