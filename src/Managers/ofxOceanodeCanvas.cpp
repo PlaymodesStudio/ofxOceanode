@@ -75,10 +75,83 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         else ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1.0,0.0,0.0,0.5));
         ImGui::Text("%d fps",int(fps));
         ImGui::PopStyleColor();
-        ImGui::SameLine(ImGui::GetContentRegionAvail().x-20.0f);
+        
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+        int numComments = container->getComments().size();
+        int numCommentsAbove10 = numComments-10;
+        if(numComments<10)
+        {
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x-28*(numComments+1));
+        }
+        else
+        {
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x - (28*(10)) -(36*(numCommentsAbove10+1)));
+        }
 
+        // to track where to scroll when hovering over comments in canvas we need to have a :
+        // ** returnToOldScrolling boolean which indicates if we should go back to the scrolling before had a hover
+        // ** itemHovered indicates which is the element that has been hovered, to check when we get a "no hover" if
+        // the no-hovered is the one that we used for getting the old scroll
+        // ** scrollBeforeHover to store the scroll position before the hovering movements
+        
+        returnToOldScrolling=false;
+        
+        for(int i=0;i<numComments;i++)
+        {
+            auto &c = container->getComments()[i];
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(c.color.r,c.color.g,c.color.b,1.0));
+            if(ImGui::Button(("[" + ofToString(i+1) + "]").c_str()))
+            {
+                scrolling.x = -c.position.x;
+                scrolling.y = -c.position.y;
+                itemHovered=-1;
+                returnToOldScrolling=false;
+            }
+            ImGui::PopStyleColor();
+
+            if(ImGui::IsItemHovered())
+            {
+                if(itemHovered==-1)
+                {
+                    scrollBeforeHover = scrolling;
+                    itemHovered=i;
+                }
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0,1.0,1.0,1.0));
+                ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(c.color.r,c.color.g,c.color.b,1.0));
+                ImGui::SetTooltip(c.text.c_str());
+                ImGui::PopStyleColor();
+                ImGui::PopStyleColor();
+
+                scrolling.x = -c.position.x;
+                scrolling.y = -c.position.y;
+                
+            }
+            else
+            {
+                // moving the scroll with the numeric keys
+                if(!ImGui::IsAnyItemActive() && ImGui::IsKeyDown(ImGuiKey('1'+i)))
+                {
+                    scrolling.x = -c.position.x;
+                    scrolling.y = -c.position.y;
+                    scrollBeforeHover = scrolling;
+
+                }
+                else if(i==itemHovered)
+                {
+                    returnToOldScrolling=true;
+                    itemHovered=-1;
+                }
+            }
+            ImGui::SameLine();
+
+        }
+        
+        if(returnToOldScrolling)
+        {
+            scrolling = scrollBeforeHover;
+        }
+                
         bool recenterCanvas = false;
         if(ImGui::Button("[C]") || isFirstDraw)
         {

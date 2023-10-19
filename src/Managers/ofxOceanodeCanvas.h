@@ -77,8 +77,13 @@ private:
     bool inited = false;
     
     glm::vec2 scrolling = glm::vec2(0.0f, 0.0f);
+    glm::vec2 scrollBeforeHover = glm::vec2(0.0f, 0.0f);
+    bool returnToOldScrolling=false;
+    int itemHovered=-1;
+    
     glm::vec2 scrollingOffset = glm::vec2(0.0f, 0.0f);
     glm::vec2 offsetToCenter = glm::vec2(0.0f, 0.0f);
+
     bool show_grid = true;
     
     string node_selected = "";
@@ -93,6 +98,7 @@ private:
     string parentID;
     bool isFirstDraw = true;
     bool onTop = false;
+    
 };
 
 #endif
