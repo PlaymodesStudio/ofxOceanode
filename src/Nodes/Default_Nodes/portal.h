@@ -41,6 +41,7 @@ protected:
 	ofParameter<string> name;
     ofParameter<bool> local;
 	ofEventListener listener;
+    bool settingViaMatch;
 };
 
 template<typename T>
@@ -71,7 +72,11 @@ public:
 	void match(abstractPortal* p){
 		if(type() == p->type() && getName() == p->getName()){
             if(checkLocal(p))
+            {
+                settingViaMatch = true;
                 setValue(dynamic_cast<portal<T>*>(p)->getValue());
+                settingViaMatch = false;
+            }
 		}
 	}
 	
@@ -110,7 +115,9 @@ public:
 	
 	void match(abstractPortal* p){
 		if(type() == p->type() && getName() == p->getName() && checkLocal(p)){
+            settingViaMatch = true;
 			setValue(dynamic_cast<portal<std::vector<T>>*>(p)->getValue());
+            settingViaMatch = false;
 		}
 	}
 	
@@ -133,7 +140,9 @@ public:
 	
 	void match(abstractPortal* p){
 		if(type() == p->type() && getName() == p->getName() && checkLocal(p)){
+            settingViaMatch = true;
 			value.trigger();
+            settingViaMatch = false;
 		}
 	}
 private:
