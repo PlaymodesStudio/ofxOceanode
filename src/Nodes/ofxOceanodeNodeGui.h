@@ -49,6 +49,9 @@ public:
     void setSelected(bool b){selected = b;};
     bool getSelected(){return selected;};
     
+    void setVisibility(bool b){visible = b;};
+    bool getVisibility(){return visible;};
+    
     glm::vec2 getSourceConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter);
     glm::vec2 getSinkConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter);
     
@@ -76,6 +79,7 @@ private:
     
     bool expanded;
     bool selected = false;
+    bool visible;
     
     bool valueHasBeenReseted = false;
     
