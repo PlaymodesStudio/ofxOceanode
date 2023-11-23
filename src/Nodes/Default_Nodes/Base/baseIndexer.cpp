@@ -28,6 +28,10 @@ baseIndexer::baseIndexer(int numIndexs){
 }
 
 void baseIndexer::indexCountChanged(int _indexCount){
+    if(_indexCount < 1)
+    {
+        _indexCount=1;
+    }
     indexCount = _indexCount;
     if(indexCount != previousIndexCount){
         indexs.resize(indexCount, 0);
@@ -41,7 +45,7 @@ void baseIndexer::indexCountChanged(int _indexCount){
         float indexRand_temp_store = indexRand_Param;
         indexRand_Param = 0;
         indexRand_Param = indexRand_temp_store;
-
+        
         std::shuffle(indexRand.begin(), indexRand.end(), std::mt19937(std::random_device()()));
         std::shuffle(indexShuffle.begin(), indexShuffle.end(), std::mt19937(std::random_device()()));
         
