@@ -22,6 +22,12 @@ public:
     
     void draw(){
         //https://github.com/ocornut/imgui/issues/300
+        if(ImGui::Button("[Clear]"))
+        {
+            messagesBuffer.clear();
+        }
+        ImGui::Separator();
+        ImGui::BeginChild("logWindow");
         auto messagesCopy = messagesBuffer;
         for(auto &l : messagesCopy){
             ImGui::TextUnformatted(l.c_str());
@@ -34,6 +40,7 @@ public:
         while(messagesBuffer.size() > MAX_MESSAGES){
             messagesBuffer.pop_front();
         }
+        ImGui::EndChild();
     }
     
     /// \brief Log a message.
