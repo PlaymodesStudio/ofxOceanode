@@ -54,6 +54,28 @@ private:
     ofParameter<float> value;
 };
 
+class simpleNormalizedNumberGenerator : public ofxOceanodeNodeModel{
+public:
+    simpleNormalizedNumberGenerator() : ofxOceanodeNodeModel("Number01"){
+        color = ofColor::red;
+        description = "Sends a normalized [0..1] value every frame";
+    };
+    ~simpleNormalizedNumberGenerator(){};
+    
+    void setup(){
+        addParameter(value.set("Value", 0, 0, 1));
+    }
+    
+    void update(ofEventArgs &a){
+        value = value;
+    }
+    
+private:
+    ofParameter<float> value;
+};
+
+
+
 class phasor : public ofxOceanodeNodeModel{
 public:
     phasor();
