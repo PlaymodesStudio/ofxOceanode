@@ -84,8 +84,8 @@ void ofxOceanodeTime::setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOc
 void ofxOceanodeTime::update(){
     bool forceFrameMode = false;
     vector<shared_ptr<basePhasor>> phasors;
-    vector<counter*> counters;
-    std::function<void(shared_ptr<ofxOceanodeContainer>)> getPhasorsFromContainer = [this, &phasors, &getPhasorsFromContainer, &counters, &forceFrameMode](shared_ptr<ofxOceanodeContainer> c){
+    vector<timeGenerator*> timeGenerators;
+    std::function<void(shared_ptr<ofxOceanodeContainer>)> getPhasorsFromContainer = [this, &phasors, &getPhasorsFromContainer, &timeGenerators, &forceFrameMode](shared_ptr<ofxOceanodeContainer> c){
         for(auto &n : c->getAllModules()){
             ofxOceanodeNodeModel *model = &n->getNodeModel();
 //            if(model->getFlags() & ofxOceanodeNodeModelFlags_ForceFrameMode){
@@ -94,8 +94,8 @@ void ofxOceanodeTime::update(){
             if(dynamic_cast<phasor*>(model) != nullptr){
                 phasors.push_back(dynamic_cast<phasor*>(model)->getBasePhasor());
             }
-            else if(dynamic_cast<counter*>(model) != nullptr){
-                counters.push_back(dynamic_cast<counter*>(model));
+            else if(dynamic_cast<timeGenerator*>(model) != nullptr){
+                timeGenerators.push_back(dynamic_cast<timeGenerator*>(model));
             }
             else if(dynamic_cast<ofxOceanodeNodeMacro*>(model) != nullptr){
                 getPhasorsFromContainer(dynamic_cast<ofxOceanodeNodeMacro*>(model)->getContainer());
@@ -107,9 +107,10 @@ void ofxOceanodeTime::update(){
     phasorChannel.send(phasors);
     phasorChannel2.send(phasors);
     
-    for(auto c : counters){
+    for(auto c : timeGenerators){
         c->setTime(time);
     }
+    
     if(isPlaying){
         if(frameMode || forceFrameMode){
             if(ofGetFrameNum() % frameInterval == 0 || forceFrameMode){

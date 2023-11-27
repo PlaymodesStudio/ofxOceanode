@@ -10,29 +10,125 @@
 #include "ofxOceanodeNodeModel.h"
 #include "basePhasor.h"
 
-class counter : public ofxOceanodeNodeModel{
+class timeGenerator : public ofxOceanodeNodeModel{
 public:
-    counter() : ofxOceanodeNodeModel("Counter"){
+    timeGenerator(string s) : ofxOceanodeNodeModel(s)
+    {
         color = ofColor::red;
-        description = "Counts the elapsed time since reset has been preset or the app started";
     }
     
     void setup() override{
-        addOutputParameter(output.set("Out", 0, 0, FLT_MAX));
-        
         time = 0;
     }
-    
-    void update(ofEventArgs &a) override{
-        output = time;
-    }
-    
-    void setTime(float t){time = t;};
-    
+    void    setTime(float t) {time = t;};
+    float   getTime() {return time;};
+
 private:
     float time;
-    ofParameter<float> output;
 };
+
+
+
+class counter : public timeGenerator{
+public:
+    counter() : timeGenerator("Counter"){
+        description = "Counts the elapsed time since reset has been preset or the app started";
+    }
+    void setup() override{
+        timeGenerator::setup();
+        phaseOffset=0;
+
+        addParameter(resetWithPhaseReset.set("RstWPhs",false));
+        addParameter(resetCounter.set("Reset"));
+        addOutputParameter(output.set("Out", 0, 0, FLT_MAX));        
+
+        listeners.push(resetCounter.newListener([this](){
+            rstCounter();
+        }));
+ 
+    }
+    
+    void resetPhase() override
+    {
+        if(resetWithPhaseReset)
+        {
+            rstCounter();
+        }
+    }
+
+    void update(ofEventArgs &a) override
+    {
+        output = getTime()-phaseOffset;
+    }
+    
+    void rstCounter()
+    {
+        phaseOffset=getTime();
+    }
+    
+    
+private:
+    ofEventListeners listeners;
+
+    ofParameter<float> output;
+    ofParameter<bool> resetWithPhaseReset;
+    ofParameter<void> resetCounter;
+    float phaseOffset;
+        
+        
+};
+
+
+class ramp : public timeGenerator {
+public:
+    ramp() : timeGenerator("Ramp") {
+        description = "Generates a linear ramp from 0 to 1 over a specified duration in milliseconds. The ramp starts when triggered and holds at 1 until reset by another trigger.";
+    }
+
+    void setup() override {
+        timeGenerator::setup();
+        addParameter(trigger.set("Trigger"));
+        addParameter(rampDurationMs.set("Ms", 1000, 0, FLT_MAX));
+        addOutputParameter(output.set("Out", 0, 0, 1));
+        rampStartTime = 0;
+        isRamping = false;
+
+        // Add listener for the trigger
+        listeners.push(trigger.newListener([this]() {
+            startRamp();
+        }));
+    }
+
+    void update(ofEventArgs &a) override {
+        if (isRamping) {
+            float elapsedTime = (getTime() - rampStartTime) * 1000.0f;
+            if (elapsedTime < rampDurationMs) {
+                output = elapsedTime / rampDurationMs;
+            } else {
+                output = 1;
+                isRamping = false; // Ramp completed
+            }
+        }
+    }
+
+private:
+    void startRamp() {
+        rampStartTime = getTime();
+        isRamping = true;
+        output = 0;
+    }
+
+    ofEventListeners listeners;
+    ofParameter<void> trigger;
+    ofParameter<float> output;
+    ofParameter<float> rampDurationMs; // Duration in milliseconds
+    bool isRamping;
+    float rampStartTime; // Time in seconds
+};
+
+
+
+
 
 class simpleNumberGenerator : public ofxOceanodeNodeModel{
 public:
@@ -53,6 +149,8 @@ public:
 private:
     ofParameter<float> value;
 };
+
+
 
 class simpleNormalizedNumberGenerator : public ofxOceanodeNodeModel{
 public:
