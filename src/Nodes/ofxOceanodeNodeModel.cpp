@@ -10,10 +10,26 @@
 #include "ofxOceanodeTypesRegistry.h"
 #include "ofxOceanodeContainer.h"
 
+ofColor colorFromString(const std::string& input) {
+    // Hash the input string
+    std::hash<std::string> hasher;
+    auto hashedValue = hasher(input);
+
+    // Use the hashed value to seed the random generator
+    std::srand(hashedValue);
+
+    // Generate random HSL values
+    float hue = static_cast<float>(std::rand()) / RAND_MAX * 255;
+    float saturation = 255;//static_cast<float>(std::rand()) / RAND_MAX * 255;
+    float lightness = 255;//static_cast<float>(std::rand()) / RAND_MAX * 255;
+
+    // Return the color
+    return ofColor::fromHsb(hue, saturation, lightness);
+}
+
 ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name){
     parameters.setName(_name);
-    color = ofColor(ofRandom(255), ofRandom(255), ofRandom(255));
-    color.setBrightness(255);
+    color = colorFromString(_name);
     numIdentifier = -1;
     flags = 0;
 }
