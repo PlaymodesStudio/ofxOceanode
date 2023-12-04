@@ -160,7 +160,7 @@ void ofxOceanodePresetsController::draw(){
     if(ImGui::Button("[+]")){}
     ImGui::SameLine();
     if(ImGui::Button("[-]")){
-        deletePreset(presetName,banks[currentBank]);
+        ImGui::OpenPopup("Delete Preset?");
     }
     ImGui::SameLine();
     if(ImGui::Button("[S]")){
@@ -173,9 +173,26 @@ void ofxOceanodePresetsController::draw(){
 		ImGui::OpenPopup("Save preset as :");
 		firstSaveAsOpen = true;
 	}
+    
 	ImGui::PopStyleColor(1);
 	
+    if (ImGui::BeginPopupModal("Delete Preset?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::Text("%s", (presetName + "\n").c_str());
+        ImGui::Separator();
+        
+        if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
+            ImGui::CloseCurrentPopup();
+            deletePreset(presetName,banks[currentBank]);
+        }
+        ImGui::SetItemDefaultFocus();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120,0))) { ImGui::CloseCurrentPopup(); }
+        ImGui::EndPopup();
+    }
+    
 	ImGui::SetNextWindowSize(ImVec2(200,100));
+    
     if(ImGui::BeginPopupModal("Save preset as :", NULL)){
         static char cString[256];
         
@@ -412,24 +429,27 @@ void ofxOceanodePresetsController::deletePreset(string presetName, string bankNa
     string myPath = "./Presets/" + banks[currentBank] +"/" + ofToString(n+1) +  "--" + presetName;
     dir.open(myPath);
     cout << dir.getAbsolutePath() << endl;
-    if(std::filesystem::remove_all(dir.getAbsolutePath()))
+    
+    if(true)
     {
-        // delete data
-        cout << "Deleted :" << dir.getAbsolutePath() << endl;
-        bankPresets[banks[currentBank]].erase(find(bankPresets[banks[currentBank]].begin(),bankPresets[banks[currentBank]].end(),currentPreset[banks[currentBank]]));
-        
-        // rename needed data and folders
-        string dirPath = "./Presets/" + banks[currentBank];
-        ofDirectory dir;
-        dir.open(dirPath);
-        cout << dir.getAbsolutePath() << endl;
-        for(int i=n;i<bankPresets[banks[currentBank]].size();i++){
-            string oldPresentName =  ofToString(i+2) +  "--" + bankPresets[banks[currentBank]][i];
-            string newPresentName =  ofToString(i+1) +  "--" + bankPresets[banks[currentBank]][i];
-            cout << "renaming "<< oldPresentName << " to " << newPresentName << endl;
-            std::filesystem::rename(dir.getAbsolutePath()+"/"+oldPresentName,dir.getAbsolutePath()+"/" + newPresentName);
+        if(std::filesystem::remove_all(dir.getAbsolutePath()))
+        {
+            // delete data
+            cout << "Deleted :" << dir.getAbsolutePath() << endl;
+            bankPresets[banks[currentBank]].erase(find(bankPresets[banks[currentBank]].begin(),bankPresets[banks[currentBank]].end(),currentPreset[banks[currentBank]]));
+            
+            // rename needed data and folders
+            string dirPath = "./Presets/" + banks[currentBank];
+            ofDirectory dir;
+            dir.open(dirPath);
+            cout << dir.getAbsolutePath() << endl;
+            for(int i=n;i<bankPresets[banks[currentBank]].size();i++){
+                string oldPresentName =  ofToString(i+2) +  "--" + bankPresets[banks[currentBank]][i];
+                string newPresentName =  ofToString(i+1) +  "--" + bankPresets[banks[currentBank]][i];
+                cout << "renaming "<< oldPresentName << " to " << newPresentName << endl;
+                std::filesystem::rename(dir.getAbsolutePath()+"/"+oldPresentName,dir.getAbsolutePath()+"/" + newPresentName);
+            }
         }
-
     }
     update();
     
