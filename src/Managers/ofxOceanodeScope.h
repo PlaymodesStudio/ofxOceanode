@@ -46,11 +46,12 @@ public:
     
     void addScopeFunc(scopeFunc f){scopeTypes.push_back(f);};
     const std::vector<scopeFunc> getScopedTypes(){return scopeTypes;};
-    
+
 private:
     std::vector<scopeFunc> scopeTypes;
     std::vector<ofxOceanodeScopeItem> scopedParameters;
     
+    float windowWidth;
     float windowHeight;
 };
 

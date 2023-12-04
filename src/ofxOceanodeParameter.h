@@ -56,7 +56,8 @@ enum ofxOceanodeParameterFlags_
 	ofxOceanodeParameterFlags_DisableSaveProject  	= 1 << 1,   // Parameter not stored in project
 	ofxOceanodeParameterFlags_DisableInConnection   = 1 << 2,   // Parameter cannot be connected from
 	ofxOceanodeParameterFlags_DisableOutConnection  = 1 << 3,   // Parameter cannot connect to
-    ofxOceanodeParameterFlags_DisplayMinimized      = 1 << 4    // Scope Parameter when node minimized
+    ofxOceanodeParameterFlags_DisplayMinimized      = 1 << 4,   // Scope Parameter when node minimized
+    ofxOceanodeParameterFlags_ScopeKeepAspectRatio  = 1 << 5    // Scope Parameter keeps Aspect Ratio 
 //	ofxOceanodeParameterFlags_CollapsingHeader    = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_NoAutoOpenOnLog// Callback on pressing TAB (for completion handling)
 };
 
