@@ -132,6 +132,11 @@ public:
 		return true;
     }
     
+    bool removeInspectorParameter(string parameterName){
+        inspectorParameters.remove(parameterName);
+        return true;
+    }
+    
     ofEvent<std::pair<ofJson, string>> deserializeParameterEvent;
     
     ofxOceanodeNodeModelFlags getFlags(){return flags;};
