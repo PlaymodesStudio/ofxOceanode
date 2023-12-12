@@ -15,7 +15,7 @@ class ofxOceanodeNode;
 class ofxOceanodeAbstractParameter;
 
 #include "ofEvents.h"
-#include "ofParameterGroup.h"
+#include "ofParameter.h"
 #include "ofAppBaseWindow.h"
 
 using namespace std;
