@@ -18,7 +18,7 @@ class ofxOceanodeAbstractParameter;
 
 class ofxOceanodeNode {
 public:
-    ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel);
+    ofxOceanodeNode(std::unique_ptr<ofxOceanodeNodeModel> && _nodeModel);
     ~ofxOceanodeNode();
     
 	void setup(string additionalInfo);
