@@ -16,6 +16,7 @@ abstractPortal::abstractPortal(string typelabel) : ofxOceanodeNodeModel("Portal 
 	
 	addParameter(name.set("Name", typelabel));
     addInspectorParameter(local.set("Local", true));
+    settingViaMatch = false;
 }
 
 abstractPortal::~abstractPortal(){
@@ -23,5 +24,7 @@ abstractPortal::~abstractPortal(){
 }
 
 void abstractPortal::portalUpdated(){
-	ofxOceanodeShared::portalUpdated(this);
+    if(!settingViaMatch){
+        ofxOceanodeShared::portalUpdated(this);
+    }
 }
