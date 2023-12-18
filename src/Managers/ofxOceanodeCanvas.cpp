@@ -809,7 +809,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter()) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
             glm::vec2  controlPoint(0,0);
             controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
-            draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 200, 128), 2.0f);
+            draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 200, 128), 2.0f);
         }
         if(tempSourceParameter != nullptr || tempSinkParameter != nullptr){
             glm::vec2 p1, p2;
@@ -830,7 +830,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }else{
                 c = IM_COL32(255, 255, 255, 64);
             }
-            draw_list->AddBezierCurve(p1, p1 + controlPoint, p2 - controlPoint, p2, c, linkWidth);
+            draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, c, linkWidth);
         }
         
         draw_list->ChannelsMerge();

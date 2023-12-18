@@ -301,7 +301,7 @@ void curve::draw(ofEventArgs &args){
 			draw_list->AddLine(denormalizePoint(glm::vec2(0, points[0].point.y)), denormalizePoint(points[0].point), IM_COL32(10, 10, 10, 255));
 			for(int i = 0; i < points.size()-1; i++){
 				if(lines[i].type == LINE_BEZIER){
-					draw_list->AddBezierCurve(denormalizePoint(points[i].point),
+                    draw_list->AddBezierCubic(denormalizePoint(points[i].point),
 											  denormalizePoint(points[i].cp2),
 											  denormalizePoint(points[i+1].cp1),
 											  denormalizePoint(points[i+1].point), IM_COL32(color.r, color.g, color.b, 200), 2);
