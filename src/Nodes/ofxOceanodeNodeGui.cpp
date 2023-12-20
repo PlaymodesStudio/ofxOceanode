@@ -92,6 +92,7 @@ bool ofxOceanodeNodeGui::constructGui(){
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
             string uniqueId = absParam.getName();
+            if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::BeginDisabled();
             ImGui::PushID(uniqueId.c_str());
             if(absParam.valueType() == typeid(std::function<void()>).name()){
                 absParam.cast<std::function<void()>>().getParameter().get()();
@@ -441,6 +442,7 @@ bool ofxOceanodeNodeGui::constructGui(){
             outputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
             
             ImGui::PopID();
+            if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::EndDisabled();
         } //endFor
     }else{
         ImGui::Spacing();
