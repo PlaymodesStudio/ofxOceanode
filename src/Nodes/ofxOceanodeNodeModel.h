@@ -144,6 +144,12 @@ public:
     
     string getParents();
     
+    ofEvent<void> deleteModule;
+    
+    void deleteSelf(){
+        deleteModule.notify();
+    }
+    
 protected:
     ofColor color;
 	string canvasID;

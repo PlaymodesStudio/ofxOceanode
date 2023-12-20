@@ -14,7 +14,11 @@
 #include "ofxOceanodeNodeGui.h"
 #endif
 
-ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){}
+ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){
+    nodeModelListeners.push(nodeModel->deleteModule.newListener([this](){
+        deleteSelf();
+    }));
+}
 
 ofxOceanodeNode::~ofxOceanodeNode(){
     for(auto &p : getParameters()) dynamic_pointer_cast<ofxOceanodeAbstractParameter>(p)->removeAllConnections();
