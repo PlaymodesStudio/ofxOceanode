@@ -41,6 +41,23 @@ public:
         }
     }
     
+    template<typename ModelType, typename... Args>
+    void unregisterModel(string const category, Args... args){
+        static_assert(std::is_base_of<ofxOceanodeNodeModel, ModelType>::value, "Must pass a subclass of ofxOceanodeNodeModel to registerType");
+        
+        registryItemCloner cloner = [args...](){
+            return std::make_unique<ModelType>(args...);
+        };
+        
+        const string name = cloner()->nodeName();
+        
+        if (registeredModelCreators.count(name) == 1)
+        {
+            registeredModelCreators.erase(name);
+            registeredModelsCategory.erase(name);
+        }
+    }
+    
     std::unique_ptr<ofxOceanodeNodeModel> create(const string typeName);
     
     registeredModelsMap const & getRegisteredModels();
