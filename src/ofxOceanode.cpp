@@ -9,6 +9,7 @@
 #include "ofxOceanodeTheme.h"
 #include "ofxOceanodeShared.h"
 #include "imgui_internal.h"
+#include "defaultNodes.h"
 
 ofxOceanode::ofxOceanode(){
     nodeRegistry = make_shared<ofxOceanodeNodeRegistry>();
@@ -17,6 +18,61 @@ ofxOceanode::ofxOceanode(){
     oceanodeTime = ofxOceanodeTime::getInstance();
     firstDraw = true;
     settingsLoaded = false;
+    
+    //Register default types
+    typesRegistry->registerType<float>();
+    typesRegistry->registerType<int>();
+    typesRegistry->registerType<bool>();
+    typesRegistry->registerType<void>();
+    typesRegistry->registerType<string>();
+    typesRegistry->registerType<char>();
+    typesRegistry->registerType<vector<float>>();
+    typesRegistry->registerType<vector<int>>();
+    typesRegistry->registerType<ofColor>();
+    typesRegistry->registerType<ofFloatColor>();
+    
+    //Register default nodes
+    nodeRegistry->registerModel<oscillator>("Generators");
+    nodeRegistry->registerModel<chaoticOscillator>("Generators");
+    nodeRegistry->registerModel<phasor>("Generators");
+    nodeRegistry->registerModel<simpleNumberGenerator>("Generators");
+    nodeRegistry->registerModel<simpleNormalizedNumberGenerator>("Generators");
+    nodeRegistry->registerModel<counter>("Generators");
+    nodeRegistry->registerModel<ramp>("Generators");
+    nodeRegistry->registerModel<mapper>("Modifiers");
+    nodeRegistry->registerModel<ranger>("Modifiers");
+    nodeRegistry->registerModel<indexer>("Generators");
+    nodeRegistry->registerModel<reindexer>("Modifiers");
+    nodeRegistry->registerModel<smoother>("Modifiers");
+    nodeRegistry->registerModel<switcher>("Modifiers");
+    nodeRegistry->registerModel<curve>("Modifiers");
+    nodeRegistry->registerModel<ofxOceanodeNodeMacro>("MACRO");
+    nodeRegistry->registerModel<noise>("Generators");
+    nodeRegistry->registerModel<randomGenerator>("Generators");
+
+    //Register default Routers
+    nodeRegistry->registerModel<router<vector<float>>>("Router", "v_f", 0, 0, 1);
+    nodeRegistry->registerModel<router<float>>("Router", "f", 0, 0, 1);
+    nodeRegistry->registerModel<router<vector<int>>>("Router", "v_i", 0, 0, 1);
+    nodeRegistry->registerModel<router<int>>("Router", "i", 0, 0, 1);
+    nodeRegistry->registerModel<router<string>>("Router", "s", "string");
+    nodeRegistry->registerModel<router<bool>>("Router", "b", false);
+    nodeRegistry->registerModel<router<void>>("Router", "v");
+    nodeRegistry->registerModel<router<char>>("Router", "c", ' ');
+    nodeRegistry->registerModel<router<ofColor>>("Router", "color", ofColor::black);
+    nodeRegistry->registerModel<router<ofFloatColor>>("Router", "color_f", ofFloatColor::black);
+    
+    //Register default Portals
+    nodeRegistry->registerModel<portal<vector<float>>>("Portal", "v_f", 0, true);
+    nodeRegistry->registerModel<portal<float>>("Portal", "f", 0, true);
+    nodeRegistry->registerModel<portal<vector<int>>>("Portal", "v_i", 0, true);
+    nodeRegistry->registerModel<portal<int>>("Portal", "i", 0, true);
+    nodeRegistry->registerModel<portal<string>>("Portal", "s", "string");
+    nodeRegistry->registerModel<portal<bool>>("Portal", "b", false);
+    nodeRegistry->registerModel<portal<void>>("Portal", "v");
+    nodeRegistry->registerModel<portal<char>>("Portal", "c", ' ');
+    nodeRegistry->registerModel<portal<ofColor>>("Portal", "color", ofColor::black);
+    nodeRegistry->registerModel<portal<ofFloatColor>>("Portal", "color_f", ofFloatColor::black);
 }
 
 

@@ -10,45 +10,7 @@
 #include "defaultNodes.h"
 
 ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
-    this->registerModel<oscillator>("Generators");
-    this->registerModel<chaoticOscillator>("Generators");
-    this->registerModel<phasor>("Generators");
-    this->registerModel<simpleNumberGenerator>("Generators");
-    this->registerModel<simpleNormalizedNumberGenerator>("Generators");
-    this->registerModel<counter>("Generators");
-    this->registerModel<ramp>("Generators");
-    this->registerModel<mapper>("Modifiers");
-    this->registerModel<ranger>("Modifiers");
-    this->registerModel<indexer>("Generators");
-    this->registerModel<reindexer>("Modifiers");
-    this->registerModel<smoother>("Modifiers");
-    this->registerModel<switcher>("Modifiers");
-	this->registerModel<curve>("Modifiers");
-    this->registerModel<ofxOceanodeNodeMacro>("MACRO");
-	this->registerModel<noise>("Generators");
-	this->registerModel<randomGenerator>("Generators");
-    
-    this->registerModel<router<vector<float>>>("Router", "v_f", 0, 0, 1);
-    this->registerModel<router<float>>("Router", "f", 0, 0, 1);
-    this->registerModel<router<vector<int>>>("Router", "v_i", 0, 0, 1);
-    this->registerModel<router<int>>("Router", "i", 0, 0, 1);
-    this->registerModel<router<string>>("Router", "s", "string");
-    this->registerModel<router<bool>>("Router", "b", false);
-    this->registerModel<router<void>>("Router", "v");
-    this->registerModel<router<char>>("Router", "c", ' ');
-    this->registerModel<router<ofColor>>("Router", "color", ofColor::black);
-    this->registerModel<router<ofFloatColor>>("Router", "color_f", ofFloatColor::black);
-	
-	this->registerModel<portal<vector<float>>>("Portal", "v_f", 0, true);
-    this->registerModel<portal<float>>("Portal", "f", 0, true);
-    this->registerModel<portal<vector<int>>>("Portal", "v_i", 0, true);
-    this->registerModel<portal<int>>("Portal", "i", 0, true);
-    this->registerModel<portal<string>>("Portal", "s", "string");
-    this->registerModel<portal<bool>>("Portal", "b", false);
-    this->registerModel<portal<void>>("Portal", "v");
-    this->registerModel<portal<char>>("Portal", "c", ' ');
-    this->registerModel<portal<ofColor>>("Portal", "color", ofColor::black);
-    this->registerModel<portal<ofFloatColor>>("Portal", "color_f", ofFloatColor::black);
+
 }
 
 std::unique_ptr<ofxOceanodeNodeModel> ofxOceanodeNodeRegistry::create(const string typeName){
