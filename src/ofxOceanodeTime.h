@@ -92,4 +92,28 @@ private:
     float windowHeight;
 };
 
+class Timestamp {
+public:
+    Timestamp();
+    
+    Timestamp(int64_t microsecondsSinceEpoch);
+
+    uint64_t epochMicroseconds() const;
+
+    void update();
+    
+    void substractMs(float ms);
+    
+    // Comparison operators
+    bool operator==(const Timestamp& other) const;
+    bool operator!=(const Timestamp& other) const;
+    bool operator<(const Timestamp& other) const;
+    bool operator<=(const Timestamp& other) const;
+    bool operator>(const Timestamp& other) const;
+    bool operator>=(const Timestamp& other) const;
+
+private:
+    std::chrono::time_point<std::chrono::system_clock> currentTime;
+};
+
 #endif /* ofxOceanodeTime_h */
