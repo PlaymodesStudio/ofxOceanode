@@ -143,7 +143,7 @@ private:
 };
 
 template<typename _Tsource, typename _Tsink>
-class ofxOceanodeConnection<vector<_Tsource>, vector<_Tsink>, typename std::enable_if<!std::is_same<_Tsource, _Tsink>::value>::type>: public ofxOceanodeAbstractConnection{
+class ofxOceanodeConnection<vector<_Tsource>, vector<_Tsink>, typename std::enable_if<!std::is_same<_Tsource, _Tsink>::value && (std::is_same<_Tsource, _Tsink>::value || std::is_convertible<_Tsource, _Tsink>::value)>::type>: public ofxOceanodeAbstractConnection{
 public:
     ofxOceanodeConnection(ofxOceanodeParameter<vector<_Tsource>>& pSource, ofxOceanodeParameter<vector<_Tsink>>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()), sinkParameter(pSink.getParameter()){
         beforeConnectionValue = sinkParameter.get();
@@ -178,7 +178,7 @@ template<typename T, typename A>
 struct is_std_vector<std::vector<T,A>> : std::true_type {};
 
 template<typename _Tsource, typename _Tsink>
-class ofxOceanodeConnection<_Tsource, vector<_Tsink>, typename std::enable_if<!is_std_vector<_Tsource>::value && !std::is_same<_Tsource, void>::value>::type>: public ofxOceanodeAbstractConnection{
+class ofxOceanodeConnection<_Tsource, vector<_Tsink>, typename std::enable_if<!std::is_same<_Tsource, void>::value && (std::is_same<_Tsource, _Tsink>::value || std::is_convertible<_Tsource, _Tsink>::value)>::type>: public ofxOceanodeAbstractConnection{
 public:
     ofxOceanodeConnection(ofxOceanodeParameter<_Tsource>& pSource, ofxOceanodeParameter<vector<_Tsink>>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()), sinkParameter(pSink.getParameter()){
         beforeConnectionValue = sinkParameter.get();
@@ -207,7 +207,7 @@ private:
 };
 
 template<typename _Tsource, typename _Tsink>
-class ofxOceanodeConnection<vector<_Tsource>, _Tsink, typename std::enable_if<!is_std_vector<_Tsink>::value>::type>: public ofxOceanodeAbstractConnection{
+class ofxOceanodeConnection<vector<_Tsource>, _Tsink, typename std::enable_if<std::is_same<_Tsource, _Tsink>::value || std::is_convertible<_Tsource, _Tsink>::value>::type>: public ofxOceanodeAbstractConnection{
 public:
     ofxOceanodeConnection(ofxOceanodeParameter<vector<_Tsource>>& pSource, ofxOceanodeParameter<_Tsink>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()), sinkParameter(pSink.getParameter()){
         beforeConnectionValue = sinkParameter.get();
