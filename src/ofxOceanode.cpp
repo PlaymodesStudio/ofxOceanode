@@ -73,6 +73,39 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<portal<char>>("Portal", "c", ' ');
     nodeRegistry->registerModel<portal<ofColor>>("Portal", "color", ofColor::black);
     nodeRegistry->registerModel<portal<ofFloatColor>>("Portal", "color_f", ofFloatColor::black);
+    
+    //Register default BufferNodes
+    nodeRegistry->registerModel<bufferNode<vector<float>>>("Portal", "v_f", 0, true);
+    nodeRegistry->registerModel<bufferNode<float>>("Portal", "f", 0, true);
+    nodeRegistry->registerModel<bufferNode<vector<int>>>("Portal", "v_i", 0, true);
+    nodeRegistry->registerModel<bufferNode<int>>("Portal", "i", 0, true);
+    nodeRegistry->registerModel<bufferNode<string>>("Portal", "s", "string");
+    nodeRegistry->registerModel<bufferNode<bool>>("Portal", "b", false);
+    nodeRegistry->registerModel<bufferNode<char>>("Portal", "c", ' ');
+    nodeRegistry->registerModel<bufferNode<ofColor>>("Portal", "color", ofColor::black);
+    nodeRegistry->registerModel<bufferNode<ofFloatColor>>("Portal", "color_f", ofFloatColor::black);
+    
+    //Register defalut BufferHeaders
+    nodeRegistry->registerModel<bufferHeader<vector<float>>>("Portal", "v_f", vector<float>(1, 0), false);
+    nodeRegistry->registerModel<bufferHeader<float>>("Portal", "f", 0, true);
+    nodeRegistry->registerModel<bufferHeader<vector<int>>>("Portal", "v_i", vector<int>(1, 0), false);
+    nodeRegistry->registerModel<bufferHeader<int>>("Portal", "i", 0, true);
+    nodeRegistry->registerModel<bufferHeader<string>>("Portal", "s", "string");
+    nodeRegistry->registerModel<bufferHeader<bool>>("Portal", "b", false);
+    nodeRegistry->registerModel<bufferHeader<char>>("Portal", "c", ' ');
+    nodeRegistry->registerModel<bufferHeader<ofColor>>("Portal", "color", ofColor::black);
+    nodeRegistry->registerModel<bufferHeader<ofFloatColor>>("Portal", "color_f", ofFloatColor::black);
+    
+    //Register default BufferTpes
+    registerType<buffer<float>*>("buffer_f");
+    registerType<buffer<int>*>("buffer_i");
+    registerType<buffer<bool>*>("buffer_b");
+    registerType<buffer<string>*>("buffer_s");
+    registerType<buffer<char>*>("buffer_c");
+    registerType<buffer<vector<float>>*>("buffer_v_f");
+    registerType<buffer<vector<int>>*>("buffer_v_i");
+    registerType<buffer<ofColor>*>("buffer_color");
+    registerType<buffer<ofFloatColor>*>("buffer_color_f");
 }
 
 

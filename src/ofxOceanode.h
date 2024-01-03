@@ -26,6 +26,8 @@
 #include "imgui.h"
 #include "router.h"
 #include "portal.h"
+#include "bufferNode.h"
+#include "bufferHeader.h"
 
 class ofxOceanode {
 public:
@@ -53,6 +55,22 @@ public:
         typesRegistry->registerType<T>();
         nodeRegistry->registerModel<router<T>>("Router", name, defaultValue);
 		nodeRegistry->registerModel<portal<T>>("Portal", name, defaultValue);
+    };
+    
+    template<typename T1, typename T2 = T1>
+    void registerTypeWithBufferAndHeader(string name = typeid(T1).name(), T1 defaultValue = T1(),
+                      std::function<void(T1&, T2&)> bufferAssignFunction = [](T1 &data, T2 &container){container = data;},
+                      std::function<T1(T2&)> bufferReturnFunction = [](T2 &container)->T1{return container;},
+                      std::function<bool(T1&)> bufferCheckFunction = [](T1 &data)->bool{return true;}){
+        typesRegistry->registerType<T1>();
+        nodeRegistry->registerModel<router<T1>>("Router", name, defaultValue);
+        nodeRegistry->registerModel<portal<T1>>("Portal", name, defaultValue);
+        nodeRegistry->registerModel<bufferNode<T1, T2>>("Buffer", name, defaultValue, false, bufferAssignFunction, bufferReturnFunction, bufferCheckFunction);
+        typesRegistry->registerType<buffer<T1, T2>*>();
+        nodeRegistry->registerModel<router<buffer<T1, T2>*>>("Router", "buffer_" + name, nullptr);
+        nodeRegistry->registerModel<portal<buffer<T1, T2>*>>("Portal", "buffer_" + name, nullptr);
+        nodeRegistry->registerModel<bufferHeader<T1, T2>>("Header", name, defaultValue);
+//        registerType<std::vector<T1>>("v_" + name, std::vector<T1>(1, defaultValue));
     };
     
     template<typename T>
