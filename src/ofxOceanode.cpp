@@ -30,6 +30,7 @@ ofxOceanode::ofxOceanode(){
     typesRegistry->registerType<vector<int>>();
     typesRegistry->registerType<ofColor>();
     typesRegistry->registerType<ofFloatColor>();
+    typesRegistry->registerType<Timestamp>();
     
     //Register default nodes
     nodeRegistry->registerModel<oscillator>("Generators");
