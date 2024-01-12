@@ -31,7 +31,7 @@ public:
                          ofxOceanodeParameterFlags_DisplayMinimized);
         }
         
-        addInspectorParameter(calcOnUpdate.set("Calculate On Update", false));
+        addInspectorParameter(calcOnUpdate.set("Calculate On Update", true));
         addInspectorParameter(offsetAsPosition.set("Offset as Position", false));
     }
     
