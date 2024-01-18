@@ -79,7 +79,7 @@ public:
                 if(multixDelaysInMs[numCopies-1-i] >= 0)
                 {
                     if(offsetAsPosition){
-                        temp.push_back(bufferInput.get()->getFrame((int)floor(multixDelaysInMs[numCopies-1-i])).getObjectRef());
+                        temp.push_back(bufferInput.get()->getFrame((int)floor(multixDelaysInMs[numCopies-1-i]), true).getObjectRef());
                     }else{
                         temp.push_back(bufferInput.get()->getClosestFrameDelayMs(multixDelaysInMs[numCopies-1-i], true).getObjectRef());
                     }

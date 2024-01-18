@@ -18,8 +18,15 @@ public:
     }
     ~buffer(){}
     
-    bufferFrame<T1, T2> &getFrame(int position){
-        return frames[position];
+    bufferFrame<T1, T2> &getFrame(int position, bool fromTail = false){
+        if(position < getSize()){
+            if(fromTail){
+                return frames[getSize()-1-position];
+            }else{
+                return frames[position];
+            }
+        }
+        return frames[0];
     }
     
     bufferFrame<T1, T2> &getFrame(float pct){
