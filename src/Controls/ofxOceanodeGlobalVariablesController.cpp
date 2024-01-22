@@ -97,7 +97,7 @@ void globalVariablesGroup::removeParameter(std::string parameterName){
 }
 
 ofxOceanodeGlobalVariablesController::ofxOceanodeGlobalVariablesController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("Global Variables"){
-
+    load();
 }
 
 void ofxOceanodeGlobalVariablesController::draw(){
