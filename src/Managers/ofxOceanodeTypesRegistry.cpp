@@ -8,16 +8,7 @@
 #include "ofxOceanodeTypesRegistry.h"
 
 ofxOceanodeTypesRegistry::ofxOceanodeTypesRegistry(){
-    this->registerType<float>();
-    this->registerType<int>();
-    this->registerType<bool>();
-    this->registerType<void>();
-    this->registerType<string>();
-    this->registerType<char>();
-    this->registerType<vector<float>>();
-    this->registerType<vector<int>>();
-    this->registerType<ofColor>();
-    this->registerType<ofFloatColor>();
+    
 }
 
 ofxOceanodeAbstractConnection* ofxOceanodeTypesRegistry::createCustomTypeConnection(ofxOceanodeContainer &container, ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active){

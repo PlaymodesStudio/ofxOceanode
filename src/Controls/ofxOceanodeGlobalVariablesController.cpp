@@ -97,7 +97,7 @@ void globalVariablesGroup::removeParameter(std::string parameterName){
 }
 
 ofxOceanodeGlobalVariablesController::ofxOceanodeGlobalVariablesController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("Global Variables"){
-
+    load();
 }
 
 void ofxOceanodeGlobalVariablesController::draw(){
@@ -189,7 +189,6 @@ void ofxOceanodeGlobalVariablesController::draw(){
                 ImGui::SliderInt("Type", &type, 0, Type_COUNT - 1, type_name); // Use ImGuiSliderFlags_NoInput flag to 
                 static char cString[255];
                 bool enterPressed = false;
-                ImGui::SetKeyboardFocusHere();
                 if(ImGui::InputText("Name", cString, 255, ImGuiInputTextFlags_EnterReturnsTrue)){
                     enterPressed = true;
                 }
@@ -225,7 +224,6 @@ void ofxOceanodeGlobalVariablesController::draw(){
                     strcpy(cString, "");
                     ImGui::CloseCurrentPopup();
                 }
-                ImGui::SetItemDefaultFocus();
                 ImGui::SameLine();
                 if (ImGui::Button("Cancel", ImVec2(120, 0))) {
                     strcpy(cString, "");
@@ -267,7 +265,13 @@ void ofxOceanodeGlobalVariablesController::draw(){
     if(ImGui::BeginPopupModal("New Global Variables Group", &unusedOpen, ImGuiWindowFlags_AlwaysAutoResize)){
         ImGui::Text("%s", "Type the global variable group name");
         static char cString[255];
+
+        bool enterPressed = false;
         if(ImGui::InputText("Name", cString, 255, ImGuiInputTextFlags_EnterReturnsTrue)){
+            enterPressed = true;
+        }
+        
+        if (ImGui::Button("OK", ImVec2(120, 0)) || enterPressed) {
             string proposedNewName(cString);
             if(proposedNewName != "" && find_if(groups.begin(), groups.end(), [proposedNewName](const auto &group){return group->name == proposedNewName;}) == groups.end()){
                 groups.emplace_back(std::make_shared<globalVariablesGroup>(proposedNewName, container))->registerModule();
@@ -276,7 +280,8 @@ void ofxOceanodeGlobalVariablesController::draw(){
             strcpy(cString, "");
         }
         
-        if (ImGui::Button("Cancel", ImVec2(240, 0))) {
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) {
             strcpy(cString, "");
             ImGui::CloseCurrentPopup();
         }

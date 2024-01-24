@@ -34,6 +34,20 @@ public:
                     if(sink.valueType() == typeid(T).name()){
                         return container.connectConnection(source.cast<T>(), sink.cast<T>(), active);
                     }
+                    else if(sink.valueType() == typeid(std::vector<T>).name()){
+                        return container.connectConnection(source.cast<T>(), sink.cast<std::vector<T>>(), active);
+                    }
+                    else{
+                        return container.connectCustomConnection(source.cast<T>(), sink, active);
+                    }
+                }
+                else if(source.valueType() == typeid(std::vector<T>).name()){
+                    if(sink.valueType() == typeid(T).name()){
+                        return container.connectConnection(source.cast<std::vector<T>>(), sink.cast<T>(), active);
+                    }
+                    else if(sink.valueType() == typeid(std::vector<T>).name()){
+                        return container.connectConnection(source.cast<std::vector<T>>(), sink.cast<std::vector<T>>(), active);
+                    }
                     else{
                         return container.connectCustomConnection(source.cast<T>(), sink, active);
                     }

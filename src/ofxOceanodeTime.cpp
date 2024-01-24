@@ -318,3 +318,52 @@ void ofxOceanodeTime::removeParameter(ofxOceanodeAbstractParameter* p){
 //    }
     
 }
+
+Timestamp::Timestamp() : currentTime(std::chrono::system_clock::now()) {
+    
+}
+
+Timestamp::Timestamp(int64_t microsecondsSinceEpoch) {
+    currentTime = std::chrono::system_clock::time_point(std::chrono::microseconds(microsecondsSinceEpoch));
+}
+
+uint64_t Timestamp::epochMicroseconds() const {
+    auto epoch = currentTime.time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::microseconds>(epoch).count();
+}
+
+void Timestamp::update() {
+    currentTime = std::chrono::system_clock::now();
+}
+
+void Timestamp::substractMs(float ms){
+    // Convert milliseconds to microseconds for higher precision
+    auto microDuration = std::chrono::microseconds(static_cast<int64_t>(ms * 1000.0f));
+    
+    // Subtract the duration from the current time
+    currentTime -= microDuration;
+}
+
+bool Timestamp::operator==(const Timestamp& other) const {
+    return currentTime == other.currentTime;
+}
+
+bool Timestamp::operator!=(const Timestamp& other) const {
+    return currentTime != other.currentTime;
+}
+
+bool Timestamp::operator<(const Timestamp& other) const {
+    return currentTime < other.currentTime;
+}
+
+bool Timestamp::operator<=(const Timestamp& other) const {
+    return currentTime <= other.currentTime;
+}
+
+bool Timestamp::operator>(const Timestamp& other) const {
+    return currentTime > other.currentTime;
+}
+
+bool Timestamp::operator>=(const Timestamp& other) const {
+    return currentTime >= other.currentTime;
+}
