@@ -13,7 +13,7 @@
 
 class globalVariables : public ofxOceanodeNodeModel{
 public:
-    globalVariables(std::string _name, std::weak_ptr<globalVariablesGroup> _group) : ofxOceanodeNodeModel("Info " + _name), name(_name), group(_group){
+    globalVariables(std::string _name, std::weak_ptr<globalVariablesGroup> _group) : ofxOceanodeNodeModel("Globals " + _name), name(_name), group(_group){
         description = "Contains all the variables stored globally for the " + name + " category";
     };
     ~globalVariables(){

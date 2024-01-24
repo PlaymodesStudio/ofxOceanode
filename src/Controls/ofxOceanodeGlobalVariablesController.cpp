@@ -165,14 +165,14 @@ void ofxOceanodeGlobalVariablesController::draw(){
                 }
                 
                 ImGui::SameLine(150 + 60);
-                if(ImGui::Button("Remove")){
+                if(ImGui::Button("[-]")){
                     group->removeParameter(absParam.getName());
                 }
                 
                 ImGui::PopID();
             }
 
-            if(ImGui::Button("Add Variable")){
+            if(ImGui::Button("[+]")){
                 ImGui::OpenPopup("New Variable");
             }
             
@@ -248,15 +248,15 @@ void ofxOceanodeGlobalVariablesController::draw(){
     
     ImGui::Separator();
     
-    if(ImGui::Button("Add Group")){
+    if(ImGui::Button("[New Group]")){
         ImGui::OpenPopup("New Global Variables Group");
     }
-    
-    if(ImGui::Button("Save")){
+    ImGui::SameLine();
+    if(ImGui::Button("[Save]")){
         save();
     }
-    
-    if(ImGui::Button("Load")){
+    ImGui::SameLine();
+    if(ImGui::Button("[Load]")){
         load();
     }
     
