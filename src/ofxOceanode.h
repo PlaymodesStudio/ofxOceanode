@@ -40,6 +40,8 @@ public:
     
     void draw();
     
+    void exit();
+    
     template<typename T>
     void registerModel(string category = "Default"){
         nodeRegistry->registerModel<T>(category);

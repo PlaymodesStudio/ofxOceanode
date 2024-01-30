@@ -160,6 +160,10 @@ void ofxOceanode::draw(){
     gui.draw();
 }
 
+void ofxOceanode::exit(){
+    container->clearContainer();
+}
+
 void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 {
     static bool opt_fullscreen_persistant = true;
