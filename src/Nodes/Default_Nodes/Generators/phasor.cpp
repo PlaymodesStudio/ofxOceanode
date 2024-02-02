@@ -56,13 +56,12 @@ void phasor::setup(){
     resetPhaseListener = resetPhase_Param.newListener([&](){
         if(!selfTrigger)
             basePh->resetPhasor();
-        else
-            selfTrigger = false;
     });
     
     cycleListener = basePh->phasorCycle.newListener([this](){
         selfTrigger = true;
         resetPhase_Param.trigger();
+        selfTrigger = false;
     });
 }
 
