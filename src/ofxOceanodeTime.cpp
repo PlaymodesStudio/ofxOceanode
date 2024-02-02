@@ -104,7 +104,11 @@ void ofxOceanodeTime::update(){
     };
     
     getPhasorsFromContainer(container);
+    //Clear all stored phasors inside the threadChannel, to only allow 1 value to be stored in it.
+    vector<shared_ptr<basePhasor>> oldPhasors;
+    while(phasorChannel.tryReceive(oldPhasors));
     phasorChannel.send(phasors);
+    while(phasorChannel2.tryReceive(oldPhasors));
     phasorChannel2.send(phasors);
     
     for(auto c : timeGenerators){
