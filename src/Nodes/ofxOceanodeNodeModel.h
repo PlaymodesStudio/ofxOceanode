@@ -91,6 +91,7 @@ public:
 		auto oceaParam = make_shared<ofxOceanodeParameter<ParameterType>>();
 		oceaParam->bindParameter(p);
 		oceaParam->setFlags(flags);
+        oceaParam->setNodeModel(this);
 		parameters.add(*oceaParam);
 		return dynamic_pointer_cast<ofxOceanodeParameter<ParameterType>>(*(parameters.end()-1));
 	}

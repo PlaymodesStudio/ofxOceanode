@@ -11,6 +11,7 @@
 #include "ofParameter.h"
 
 class ofxOceanodeAbstractConnection;
+class ofxOceanodeNodeModel;
 
 class BaseConnectionFunction{
 public:
@@ -148,6 +149,9 @@ public:
     }
     
     void disconnectedParameter(){if(disconnectFunction) disconnectFunction();};
+    
+    void setNodeModel(ofxOceanodeNodeModel* _nodeModel){nodeModel = _nodeModel;};
+    ofxOceanodeNodeModel* getNodeModel(){return nodeModel;};
 	
 protected:
 	virtual const ofParameterGroup getFirstParent() const = 0;
@@ -163,6 +167,8 @@ private:
     std::map<std::string, std::shared_ptr<BaseConnectionFunction>> connnectionFunctions;
     std::function<void()> connectFunction;
     std::function<void()> disconnectFunction;
+    
+    ofxOceanodeNodeModel* nodeModel;
 };
 
 template<typename ParameterType>
