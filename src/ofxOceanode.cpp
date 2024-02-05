@@ -62,6 +62,7 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<router<char>>("Router", "c", ' ');
     nodeRegistry->registerModel<router<ofColor>>("Router", "color", ofColor::black);
     nodeRegistry->registerModel<router<ofFloatColor>>("Router", "color_f", ofFloatColor::black);
+    nodeRegistry->registerModel<router<Timestamp>>("Router", "timestamp", Timestamp());
     
     //Register default Portals
     nodeRegistry->registerModel<portal<vector<float>>>("Portal", "v_f", 0, true);
@@ -74,6 +75,7 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<portal<char>>("Portal", "c", ' ');
     nodeRegistry->registerModel<portal<ofColor>>("Portal", "color", ofColor::black);
     nodeRegistry->registerModel<portal<ofFloatColor>>("Portal", "color_f", ofFloatColor::black);
+    nodeRegistry->registerModel<portal<Timestamp>>("Router", "timestamp", Timestamp());
     
     //Register default BufferNodes
     nodeRegistry->registerModel<bufferNode<vector<float>>>("Portal", "v_f", 0, true);
