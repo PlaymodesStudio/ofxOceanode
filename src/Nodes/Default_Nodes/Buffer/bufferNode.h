@@ -26,12 +26,13 @@ public:
     
     void setup() override{
         addParameter(input.set("Input", T1()));
+        addParameter(rec.set("Rec", true));
         addParameter(timestamp.set("Timestamp", Timestamp()));
         addParameter(maxSize.set("Max Size", 100, 1, INT_MAX));
         addParameter(output.set("Output", myBuffer.get()));
         
         listeners.push(input.newListener([this](T1 &object){
-            if(checkFunction(object)){
+            if(checkFunction(object) && rec){
                 if(getOceanodeParameter(timestamp).hasInConnection()){
                     myBuffer->addFrame(input.get(), timestamp);
                 }else{ //TODO: Use ofxOceanodeTime time reference
@@ -56,6 +57,7 @@ private:
     ofEventListener sizeListener;
     
     ofParameter<T1> input;
+    ofParameter<bool> rec;
     ofParameter<Timestamp> timestamp;
     
     ofParameter<int> maxSize;
@@ -85,12 +87,13 @@ public:
     ~bufferNode(){}
     
     void setup() override{
+        addParameter(rec.set("Rec", true));
         addParameter(timestamp.set("Timestamp", Timestamp()));
         addParameter(maxSize.set("Max Size", 100, 1, INT_MAX));
         addParameter(output.set("Output", myBuffer.get()));
         
         listeners.push(input.newListener([this](std::vector<T> &object){
-            if(checkFunction(object)){
+            if(checkFunction(object) && rec){
                 if(getOceanodeParameter(timestamp).hasInConnection()){
                     myBuffer->addFrame(input.get(), timestamp);
                 }else{
@@ -115,6 +118,7 @@ private:
     ofEventListener sizeListener;
     
     ofParameter<std::vector<T>> input;
+    ofParameter<bool> rec;
     ofParameter<Timestamp> timestamp;
     
     ofParameter<int> maxSize;
