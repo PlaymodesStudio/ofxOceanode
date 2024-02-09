@@ -32,7 +32,7 @@ void globalVariablesGroup::registerModule(){
 void globalVariablesGroup::addNode(globalVariables *node){
     nodes.push_back(node);
     for(int i = 0; i < parameters.size(); i++){
-        node->addParameter(*parameters[i], ofxOceanodeParameterFlags_ReadOnly);
+        node->addParameter(*parameters[i], ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
     }
 }
 
@@ -44,7 +44,7 @@ void globalVariablesGroup::addFloatParameter(std::string parameterName, float va
     ofParameter<float> tempParam;
     parameters.push_back(tempParam.set(parameterName, value, -FLT_MAX, FLT_MAX).newReference());
     for(auto &node : nodes){
-        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly);
+        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
     }
 }
 
@@ -52,7 +52,7 @@ void globalVariablesGroup::addIntParameter(std::string parameterName, int value)
     ofParameter<int> tempParam;
     parameters.push_back(tempParam.set(parameterName, value, INT_MIN, INT_MAX).newReference());
     for(auto &node : nodes){
-        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly);
+        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
     }
 }
 
@@ -60,7 +60,7 @@ void globalVariablesGroup::addBoolParameter(std::string parameterName, bool valu
     ofParameter<bool> tempParam;
     parameters.push_back(tempParam.set(parameterName, value).newReference());
     for(auto &node : nodes){
-        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly);
+        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
     }
 }
 
@@ -68,7 +68,7 @@ void globalVariablesGroup::addStringParameter(std::string parameterName, std::st
     ofParameter<std::string> tempParam;
     parameters.push_back(tempParam.set(parameterName, value).newReference());
     for(auto &node : nodes){
-        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly);
+        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
     }
 }
 
@@ -76,7 +76,7 @@ void globalVariablesGroup::addOfColorParameter(std::string parameterName, ofColo
     ofParameter<ofColor> tempParam;
     parameters.push_back(tempParam.set(parameterName, value).newReference());
     for(auto &node : nodes){
-        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly);
+        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
     }
 }
 
@@ -84,7 +84,7 @@ void globalVariablesGroup::addOfFloatColorParameter(std::string parameterName, o
     ofParameter<ofFloatColor> tempParam;
     parameters.push_back(tempParam.set(parameterName, value).newReference());
     for(auto &node : nodes){
-        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly);
+        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
     }
 }
 
