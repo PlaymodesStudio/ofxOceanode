@@ -19,7 +19,8 @@ public:
         myBuffer = nullptr;
         addParameter(bufferInput.set("Buffer Input", nullptr));
         addParameter(numCopies.set("Copies", 1, 1, INT_MAX));
-        addParameter(offset.set("Offset", {1000/60}, {0.0}, {FLT_MAX}));
+        addParameter(offset.set("Offset", {1000.0/60.0}, {0.0}, {FLT_MAX}));
+        addParameter(overflow.set("Overflow",false));
         
         if(minmax){
             addParameter(output.set("Output", std::vector<T1>(1, val),
@@ -74,14 +75,29 @@ public:
             
             std::vector<T1> temp;
             
+            overflow=false;
             for(int i = numCopies-1; i >=0; i--)
             {
                 if(multixDelaysInMs[numCopies-1-i] >= 0)
                 {
-                    if(offsetAsPosition){
-                        temp.push_back(bufferInput.get()->getFrame((int)floor(multixDelaysInMs[numCopies-1-i]), true).getObjectRef());
-                    }else{
-                        temp.push_back(bufferInput.get()->getClosestFrameDelayMs(multixDelaysInMs[numCopies-1-i], true).getObjectRef());
+                    if(offsetAsPosition)
+                    {
+                        int frameToGet = (int)floor(multixDelaysInMs[numCopies-1-i]);
+                        temp.push_back(bufferInput.get()->getFrame(frameToGet, true).getObjectRef());
+                        // check for buffer overflow
+                        if(frameToGet>=bufferInput.get()->getSize()) overflow=true;
+                    }
+                    else
+                    {
+                        float frameDelayToGet = multixDelaysInMs[numCopies-1-i];
+                        temp.push_back(bufferInput.get()->getClosestFrameDelayMs(frameDelayToGet, true).getObjectRef());
+                        // check for buffer overflow
+                        Timestamp firstTimestampOnBuffer = bufferInput.get()->getLastFrameTimestamp();
+                        Timestamp timestampToCompare = bufferInput.get()->getFirstFrameTimestamp();;
+                        //timestampToCompare.update(); //Get now;
+                        timestampToCompare.substractMs(frameDelayToGet);
+                        if(timestampToCompare<=firstTimestampOnBuffer) overflow=true;
+                            
                     }
                 }
             }
@@ -96,6 +112,7 @@ private:
     ofParameter<buffer<T1, T2>*> bufferInput;
     ofParameter<int> numCopies;
     ofParameter<vector<float>> offset;
+    ofParameter<bool> overflow;
     ofParameter<std::vector<T1>> output;
     
     ofParameter<bool> calcOnUpdate;
