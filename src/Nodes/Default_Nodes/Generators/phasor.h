@@ -88,25 +88,36 @@ public:
     void setup() override {
         timeGenerator::setup();
         addParameter(trigger.set("Trigger"));
+        addParameter(reset.set("Reset"));
         addParameter(rampDurationMs.set("Ms", 1000, 0, FLT_MAX));
         addOutputParameter(output.set("Out", 0, 0, 1));
+        addParameter(isRamping.set("IsRamping",false));
+        addOutputParameter(isRampFinish.set("Finish",false));
         rampStartTime = 0;
         isRamping = false;
-
+        isRampFinish = false;
+        lastTNum = 0;
+        
         // Add listener for the trigger
         listeners.push(trigger.newListener([this]() {
             startRamp();
+        }));
+        // Add listener for the reset
+        listeners.push(reset.newListener([this]() {
+            stopRamp();
         }));
     }
 
     void update(ofEventArgs &a) override {
         if (isRamping) {
+            isRampFinish=false;
             float elapsedTime = (getTime() - rampStartTime) * 1000.0f;
             if (elapsedTime < rampDurationMs) {
                 output = elapsedTime / rampDurationMs;
             } else {
                 output = 1;
                 isRamping = false; // Ramp completed
+                isRampFinish=true;
             }
         }
     }
@@ -115,15 +126,25 @@ private:
     void startRamp() {
         rampStartTime = getTime();
         isRamping = true;
+        isRampFinish = false;
+        output = 0;
+    }
+    void stopRamp() {
+        isRamping = false;
+        isRampFinish = false;
         output = 0;
     }
 
     ofEventListeners listeners;
     ofParameter<void> trigger;
-    ofParameter<float> output;
+    ofParameter<void> reset;
     ofParameter<float> rampDurationMs; // Duration in milliseconds
-    bool isRamping;
+    ofParameter<float> output;
+    ofParameter<bool> isRamping;
+    ofParameter<bool> isRampFinish;
+    
     float rampStartTime; // Time in seconds
+    float lastTNum;
 };
 
 
