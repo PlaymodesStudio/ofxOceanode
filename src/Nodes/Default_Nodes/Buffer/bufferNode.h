@@ -31,6 +31,8 @@ public:
         addParameter(maxSize.set("Max Size", 100, 1, INT_MAX));
         addParameter(output.set("Output", myBuffer.get()));
         
+        addInspectorParameter(lastFrameMs.set("Last Frame Ms",0,0,FLT_MAX));
+        
         listeners.push(input.newListener([this](T1 &object){
             if(checkFunction(object) && rec){
                 if(getOceanodeParameter(timestamp).hasInConnection()){
@@ -39,6 +41,8 @@ public:
                     myBuffer->addFrame(input.get(), Timestamp(getTime() * 1000000));
                 }
             }
+            lastFrameMs = myBuffer->getFirstFrameTimestamp().epochMilliseconds() - myBuffer->getLastFrameTimestamp().epochMilliseconds();
+            
         }));
         
         sizeListener = maxSize.newListener([this](int &_maxSize){
@@ -63,6 +67,8 @@ private:
     ofParameter<int> maxSize;
     
     ofParameter<buffer<T1, T2>*> output;
+    
+    ofParameter<float> lastFrameMs;
     
     std::unique_ptr<buffer<T1, T2>> myBuffer;
 };
