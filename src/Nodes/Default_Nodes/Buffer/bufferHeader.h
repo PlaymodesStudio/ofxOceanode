@@ -60,7 +60,7 @@ public:
     
     void recalculate(){
         if(bufferInput.get() != nullptr && bufferInput.get()->getSize() > 0){
-            if(offset->size() != numCopies){
+            if((offset->size() != numCopies)&&(numCopies>0)){
                 vector<float> vf(numCopies);
                 for(int i = 0; i < numCopies; i++)
                 {
