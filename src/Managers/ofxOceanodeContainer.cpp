@@ -583,9 +583,9 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
     for(auto &connection : connections){
         if(!connection->getIsPersistent()){
             string sourceName = connection->getSourceParameter().getName();
-            string sourceParentName = connection->getSourceParameter().getGroupHierarchyNames()[0];
+            string sourceParentName = connection->getSourceParameter().getNodeModel()->getParameterGroup().getEscapedName();
             string sinkName = connection->getSinkParameter().getName();
-            string sinkParentName = connection->getSinkParameter().getGroupHierarchyNames()[0];
+            string sinkParentName = connection->getSinkParameter().getNodeModel()->getParameterGroup().getEscapedName();
             json[sourceParentName][sourceName][sinkParentName][sinkName];
         }
     }
