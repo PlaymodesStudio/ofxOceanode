@@ -58,6 +58,14 @@ public:
         active = false;
     }
     
+    void activateWindow(){
+        showWindow = true;
+    }
+    
+    string getCurrentMacroName(){
+        return currentMacro;
+    }
+    
 private:
     void newNodeCreated(ofxOceanodeNode* &node);
 	void loadMacroInsideCategory(int newPresetIndex);

@@ -18,6 +18,7 @@
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeCanvas.h"
 #include "ofxOceanodeNodeMacro.h"
+#include "portal.h"
 
 ofxOceanodeNodesController::ofxOceanodeNodesController(shared_ptr<ofxOceanodeContainer> _container,
                                                         ofxOceanodeCanvas* _canvas)
@@ -165,58 +166,73 @@ void ofxOceanodeNodesController::draw()
         
         
         bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
-        std::function<void(vector<ofxOceanodeNode*>, ofxOceanodeCanvas*)> listNodes = [this, &isEnterPressed, &listNodes](vector<ofxOceanodeNode*> nodes, ofxOceanodeCanvas* _canvas = nullptr){
-            for(auto node : nodes)
+        std::function<void(vector<ofxOceanodeNode*>, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*)> listNodes = [this, &isEnterPressed, &listNodes](vector<ofxOceanodeNode*> nodes, ofxOceanodeCanvas* _canvas = nullptr, ofxOceanodeNodeMacro* _macro = nullptr){
+            vector<int> order(nodes.size());
+            vector<string> displayNames(nodes.size());
+            std::iota(order.begin(), order.end(), 0);
+            for(int i = 0; i < nodes.size(); i++){
+                string nodeName = nodes[i]->getParameters().getName();
+                if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&nodes[i]->getNodeModel())) {
+                    if(m->getParameter<bool>("Local")){
+                        nodeName = (nodes[i]->getParameters().getName() + " // " + m->getInspectorParameter<string>("Local Name").get());
+                    }else{
+                        nodeName = (nodes[i]->getParameters().getName() + " // " + m->getCurrentMacroName());
+                    }
+
+                }else if(abstractPortal* m = dynamic_cast<abstractPortal*>(&nodes[i]->getNodeModel())) {
+                    nodeName = (nodes[i]->getNodeModel().nodeName() + " // " + m->getParameter<string>("Name").get() + " // " + ofToString(nodes[i]->getNodeModel().getNumIdentifier()));
+                }
+                displayNames[i] = nodeName;
+            }
+            
+            std::sort(order.begin(), order.end(), [displayNames](const int & a, const int & b) -> bool
+                {
+                    return displayNames[a] < displayNames[b];
+                });
+            
+            for(auto currentIdx : order)
             {
                 bool showThis = false;
-                string macroName = "";
+
+                string nodeName = displayNames[currentIdx];
+                ofxOceanodeNode* node = nodes[currentIdx];
+                
                 if(searchFieldMyNodes != ""){
-                    string lowercaseName = node->getParameters().getName();
+                    string lowercaseName = nodeName;
                     std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
-                    if(ofStringTimesInString(node->getParameters().getName(), searchFieldMyNodes) || ofStringTimesInString(lowercaseName, searchFieldMyNodes)){
+                    if(ofStringTimesInString(nodeName, searchFieldMyNodes) || ofStringTimesInString(lowercaseName, searchFieldMyNodes)){
                         showThis = true;
                     }
                 }else{
                     showThis = true;
                 }
-                if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
-                    macroName = (node->getParameters().getName() + " // " + m->getInspectorParameter<string>("Local Name").get());
-                    if(ImGui::TreeNode((macroName + "_").c_str())){
-                        listNodes(m->getContainer()->getAllModules(), m->getCanvas());
-                        ImGui::TreePop();
-                    }
-                }
+                
                 if(showThis)
                 {
-                    if (macroName != "") {
-                        if(ImGui::Selectable(macroName.c_str()) || isEnterPressed)
-                        {
-                            // get the size of the node to be able to center properly
-                            glm::vec2 nodeSize = glm::vec2(node->getNodeGui().getRectangle().getWidth(),node->getNodeGui().getRectangle().getHeight());
-                            
-                            _canvas->bringOnTop();
-                            _canvas->setScrolling(-(_canvas->getOffsetToCenter()-_canvas->getScrolling())-node->getNodeGui().getPosition()-nodeSize/2.0f);
-                            ImGui::CloseCurrentPopup();
-                            isEnterPressed = false; //Next options we dont want to create them;
-                            break;
-                        }
-                    }
-                    else if(ImGui::Selectable(node->getParameters().getName().c_str()) || isEnterPressed)
+                    if(ImGui::Selectable(nodeName.c_str()) || isEnterPressed)
                     {
                         // get the size of the node to be able to center properly
                         glm::vec2 nodeSize = glm::vec2(node->getNodeGui().getRectangle().getWidth(),node->getNodeGui().getRectangle().getHeight());
                         
+                        if(_macro != nullptr){
+                            _macro->activateWindow();
+                        }
                         _canvas->bringOnTop();
                         _canvas->setScrolling(-(_canvas->getOffsetToCenter()-_canvas->getScrolling())-node->getNodeGui().getPosition()-nodeSize/2.0f);
-                        ImGui::CloseCurrentPopup();
                         isEnterPressed = false; //Next options we dont want to create them;
-                        //break;
+                        break;
+                    }
+                }
+                if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
+                    if(ImGui::TreeNode((nodeName + "_").c_str())){
+                        listNodes(m->getContainer()->getAllModules(), m->getCanvas(), m);
+                        ImGui::TreePop();
                     }
                 }
             }
         };
         
-        listNodes(allNodes, canvas);
+        listNodes(allNodes, canvas, nullptr);
 
         ImGui::TreePop();
     }
