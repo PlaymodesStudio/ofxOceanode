@@ -169,6 +169,7 @@ void ofxOceanodeNodesController::draw()
             for(auto node : nodes)
             {
                 bool showThis = false;
+                string macroName = "";
                 if(searchFieldMyNodes != ""){
                     string lowercaseName = node->getParameters().getName();
                     std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
@@ -178,11 +179,17 @@ void ofxOceanodeNodesController::draw()
                 }else{
                     showThis = true;
                 }
+                if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
+                    macroName = (node->getParameters().getName() + " // " + m->getInspectorParameter<string>("Local Name").get());
+                    if(ImGui::TreeNode((macroName + "_").c_str())){
+                        listNodes(m->getContainer()->getAllModules(), m->getCanvas());
+                        ImGui::TreePop();
+                    }
+                }
                 if(showThis)
                 {
-                    if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
-                        string name = (node->getParameters().getName() + " // " + m->getInspectorParameter<string>("Local Name").get());
-                        if(ImGui::Selectable(name.c_str()) || isEnterPressed)
+                    if (macroName != "") {
+                        if(ImGui::Selectable(macroName.c_str()) || isEnterPressed)
                         {
                             // get the size of the node to be able to center properly
                             glm::vec2 nodeSize = glm::vec2(node->getNodeGui().getRectangle().getWidth(),node->getNodeGui().getRectangle().getHeight());
@@ -192,10 +199,6 @@ void ofxOceanodeNodesController::draw()
                             ImGui::CloseCurrentPopup();
                             isEnterPressed = false; //Next options we dont want to create them;
                             break;
-                        }
-                        if(ImGui::TreeNode((name + "_").c_str())){
-                            listNodes(m->getContainer()->getAllModules(), m->getCanvas());
-                            ImGui::TreePop();
                         }
                     }
                     else if(ImGui::Selectable(node->getParameters().getName().c_str()) || isEnterPressed)
