@@ -55,6 +55,13 @@ void ofxOceanodeInspectorController::draw(){
         ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 0.0f);
         
         
+        if(ImGui::Button("CLEAR SELECTION")){
+            for(auto nodePair : selectedNodes)
+            {
+                nodePair.second->getNodeGui().setSelected(false);
+            }
+        }
+        
         //Draw Selected Names
         ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
         if(ImGui::TreeNode("Selected Nodes")){
