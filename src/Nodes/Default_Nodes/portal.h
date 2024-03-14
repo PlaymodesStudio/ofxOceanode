@@ -31,7 +31,7 @@ public:
         return (!isLocal() && !p->isLocal()) || (isLocal() && p->isLocal() && getParents() == p->getParents());
     }
 	
-	virtual void match(abstractPortal* p) = 0;
+	virtual bool match(abstractPortal* p) = 0;
     
     bool isMatching(abstractPortal *p){
         return type() == p->type() && getName() == p->getName() && checkLocal(p);
@@ -41,6 +41,7 @@ protected:
 	ofParameter<string> name;
     ofParameter<bool> local;
 	ofEventListener listener;
+    ofEventListener nameListener;
     bool settingViaMatch;
 };
 
@@ -69,15 +70,17 @@ public:
 		value = t;
 	}
 	
-	void match(abstractPortal* p){
+	bool match(abstractPortal* p){
 		if(type() == p->type() && getName() == p->getName()){
             if(checkLocal(p))
             {
                 settingViaMatch = true;
                 setValue(dynamic_cast<portal<T>*>(p)->getValue());
                 settingViaMatch = false;
+                return true;
             }
 		}
+        return false;
 	}
 	
 private:
@@ -113,12 +116,14 @@ public:
 		value = t;
 	}
 	
-	void match(abstractPortal* p){
+	bool match(abstractPortal* p){
 		if(type() == p->type() && getName() == p->getName() && checkLocal(p)){
             settingViaMatch = true;
 			setValue(dynamic_cast<portal<std::vector<T>>*>(p)->getValue());
             settingViaMatch = false;
+            return true;
 		}
+        return false;
 	}
 	
 private:
@@ -138,12 +143,14 @@ public:
 		});
 	}
 	
-	void match(abstractPortal* p){
+	bool match(abstractPortal* p){
 		if(type() == p->type() && getName() == p->getName() && checkLocal(p)){
             settingViaMatch = true;
 			value.trigger();
             settingViaMatch = false;
+            return true;
 		}
+        return false;
 	}
 private:
 	ofParameter<void> value;
