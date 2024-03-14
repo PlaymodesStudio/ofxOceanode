@@ -164,8 +164,36 @@ void ofxOceanodeNodesController::draw()
 
         ImGui::Separator();
         
+        std::function<int(vector<ofxOceanodeNode*>)> countNodes = [this, &countNodes](vector<ofxOceanodeNode*> nodes) -> int{
+            int count = 0;
+            for(int i = 0; i < nodes.size(); i++){
+                string nodeName = nodes[i]->getParameters().getName();
+                if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&nodes[i]->getNodeModel())) {
+                    if(m->isLocal()){
+                        nodeName = (nodes[i]->getParameters().getName() + " // " + m->getInspectorParameter<string>("Local Name").get());
+                    }else{
+                        nodeName = (nodes[i]->getParameters().getName() + " // " + m->getCurrentMacroName());
+                    }
+                    count += countNodes(m->getContainer()->getAllModules());
+                }else if(abstractPortal* m = dynamic_cast<abstractPortal*>(&nodes[i]->getNodeModel())) {
+                    nodeName = (nodes[i]->getNodeModel().nodeName() + " // " + m->getParameter<string>("Name").get() + " // " + ofToString(nodes[i]->getNodeModel().getNumIdentifier()));
+                }
+                
+                if(searchFieldMyNodes != ""){
+                    string lowercaseName = nodeName;
+                    std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
+                    if(ofStringTimesInString(nodeName, searchFieldMyNodes) || ofStringTimesInString(lowercaseName, searchFieldMyNodes)){
+                        count++;
+                    }
+                }else{
+                    count++;
+                }
+            }
+            return count;
+        };
         
-        std::function<void(vector<ofxOceanodeNode*>, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*)> listNodes = [this, &listNodes](vector<ofxOceanodeNode*> nodes, ofxOceanodeCanvas* _canvas = nullptr, ofxOceanodeNodeMacro* _macro = nullptr){
+        
+        std::function<void(vector<ofxOceanodeNode*>, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*)> listNodes = [this, &listNodes, countNodes](vector<ofxOceanodeNode*> nodes, ofxOceanodeCanvas* _canvas = nullptr, ofxOceanodeNodeMacro* _macro = nullptr){
             vector<int> order(nodes.size());
             vector<string> displayNames(nodes.size());
             std::iota(order.begin(), order.end(), 0);
@@ -222,9 +250,11 @@ void ofxOceanodeNodesController::draw()
                     }
                 }
                 if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
-                    if(ImGui::TreeNode((nodeName + "_").c_str())){
-                        listNodes(m->getContainer()->getAllModules(), m->getCanvas(), m);
-                        ImGui::TreePop();
+                    if(countNodes(m->getContainer()->getAllModules()) > 0){
+                        if(ImGui::TreeNode((nodeName + "_").c_str())){
+                            listNodes(m->getContainer()->getAllModules(), m->getCanvas(), m);
+                            ImGui::TreePop();
+                        }
                     }
                 }
             }
