@@ -66,6 +66,10 @@ public:
         return currentMacro;
     }
     
+    bool isLocal(){
+        return localPreset;
+    }
+    
 private:
     void newNodeCreated(ofxOceanodeNode* &node);
 	void loadMacroInsideCategory(int newPresetIndex);

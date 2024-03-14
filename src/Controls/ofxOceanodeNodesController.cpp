@@ -173,7 +173,7 @@ void ofxOceanodeNodesController::draw()
             for(int i = 0; i < nodes.size(); i++){
                 string nodeName = nodes[i]->getParameters().getName();
                 if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&nodes[i]->getNodeModel())) {
-                    if(m->getParameter<bool>("Local")){
+                    if(m->isLocal()){
                         nodeName = (nodes[i]->getParameters().getName() + " // " + m->getInspectorParameter<string>("Local Name").get());
                     }else{
                         nodeName = (nodes[i]->getParameters().getName() + " // " + m->getCurrentMacroName());
