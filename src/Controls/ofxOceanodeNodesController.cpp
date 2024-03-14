@@ -165,8 +165,7 @@ void ofxOceanodeNodesController::draw()
         ImGui::Separator();
         
         
-        bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
-        std::function<void(vector<ofxOceanodeNode*>, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*)> listNodes = [this, &isEnterPressed, &listNodes](vector<ofxOceanodeNode*> nodes, ofxOceanodeCanvas* _canvas = nullptr, ofxOceanodeNodeMacro* _macro = nullptr){
+        std::function<void(vector<ofxOceanodeNode*>, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*)> listNodes = [this, &listNodes](vector<ofxOceanodeNode*> nodes, ofxOceanodeCanvas* _canvas = nullptr, ofxOceanodeNodeMacro* _macro = nullptr){
             vector<int> order(nodes.size());
             vector<string> displayNames(nodes.size());
             std::iota(order.begin(), order.end(), 0);
@@ -209,7 +208,7 @@ void ofxOceanodeNodesController::draw()
                 
                 if(showThis)
                 {
-                    if(ImGui::Selectable(nodeName.c_str()) || isEnterPressed)
+                    if(ImGui::Selectable(nodeName.c_str()))
                     {
                         // get the size of the node to be able to center properly
                         glm::vec2 nodeSize = glm::vec2(node->getNodeGui().getRectangle().getWidth(),node->getNodeGui().getRectangle().getHeight());
@@ -219,7 +218,6 @@ void ofxOceanodeNodesController::draw()
                         }
                         _canvas->bringOnTop();
                         _canvas->setScrolling(-(_canvas->getOffsetToCenter()-_canvas->getScrolling())-node->getNodeGui().getPosition()-nodeSize/2.0f);
-                        isEnterPressed = false; //Next options we dont want to create them;
                         break;
                     }
                 }
