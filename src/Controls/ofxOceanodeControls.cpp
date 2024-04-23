@@ -26,7 +26,7 @@
 #endif
 
 
-ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _container,ofxOceanodeCanvas* _canvas)
+ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _container, ofxOceanodeCanvas* _canvas, ofParameter<int> & _receiverPort)
 {
     container = _container;
     controllers.push_back(make_shared<ofxOceanodePresetsController>(container));
@@ -40,7 +40,7 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     ofSetLoggerChannel(logger);
 
 #ifdef OFXOCEANODE_USE_OSC
-    controllers.push_back(make_shared<ofxOceanodeOSCController>(container));
+    controllers.push_back(make_shared<ofxOceanodeOSCController>(_receiverPort));
 #endif
     
 #ifdef OFXOCEANODE_USE_MIDI

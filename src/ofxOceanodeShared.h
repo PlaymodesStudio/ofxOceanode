@@ -110,6 +110,14 @@ public:
         }
 	}
     
+    static void requestPortalUpdate(abstractPortal* _portal){
+        for(auto p : getInstance().portals){
+            if(_portal->match(p)){
+                break;
+            }
+        }
+    }
+    
 private:
     ofxOceanodeShared(){};
     

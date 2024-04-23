@@ -135,6 +135,14 @@ private:
     void showHelpPopUp();
     bool firstDraw;
     bool settingsLoaded;
+    
+    ofParameter<int> oscReceiverPort;
+#ifdef OFXOCEANODE_USE_OSC
+    ofxOscReceiver oscReceiver;
+    ofEventListener receiverPortChanged;
+    
+    void receiveOsc();
+#endif
 };
 
 #endif /* ofxOceanode_h */

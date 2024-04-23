@@ -57,9 +57,6 @@ void ofxOceanodeContainer::clearContainer(){
 
 void ofxOceanodeContainer::update(){
     ofEventArgs args;
-#ifdef OFXOCEANODE_USE_OSC
-    receiveOsc();
-#endif
 #ifdef OFXOCEANODE_USE_MIDI
     for(auto &paramBinds : midiBindings){
         for(auto &bind : paramBinds.second){
@@ -980,22 +977,6 @@ void ofxOceanodeContainer::resetPhase(){
 
 #ifdef OFXOCEANODE_USE_OSC
 
-void ofxOceanodeContainer::setupOscSender(string host, int port){
-    oscSender.setup(host, port);
-}
-
-void ofxOceanodeContainer::setupOscReceiver(int port){
-    oscReceiver.setup(port);
-}
-
-void ofxOceanodeContainer::receiveOsc(){
-    while(oscReceiver.hasWaitingMessages()){
-        ofxOscMessage m;
-        oscReceiver.getNextMessage(m);
-        receiveOscMessage(m);
-    }
-}
-
 void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
 	//Todo: Fix for ofxOceanodeParameter
     auto setParameterFromMidiMessage = [this](ofAbstractParameter& _absParam, ofxOscMessage& m){
@@ -1565,6 +1546,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanod
         }
         else if(sink.valueType() == typeid(vector<int>).name()){
             connection = connectConnection(source.cast<vector<float>>(), sink.cast<vector<int>>(), active);
+        }
+        else if(sink.valueType() == typeid(bool).name()){
+            connection = connectConnection(source.cast<vector<float>>(), sink.cast<bool>(), active);
         }
         else{
             connection = connectCustomConnection(source.cast<vector<float>>(), sink, active);

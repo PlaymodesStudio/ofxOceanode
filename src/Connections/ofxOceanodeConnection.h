@@ -329,6 +329,31 @@ private:
     ofParameter<bool>&  sinkParameter;
 };
 
+template<>
+class ofxOceanodeConnection<vector<float>, bool>: public ofxOceanodeAbstractConnection{
+public:
+    ofxOceanodeConnection(ofxOceanodeParameter<vector<float>>& pSource, ofxOceanodeParameter<bool>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()), sinkParameter(pSink.getParameter()){
+        parameterEventListener = sourceParameter.newListener([&](vector<float> &f){
+            passValueFunc();
+        });
+    }
+    ~ofxOceanodeConnection(){};
+    
+private:
+    void passValueFunc(){
+        if(active){
+            if(sourceParameter->size() > 0){
+                bool newValue = (sourceParameter->at(0) > 0.00f) ? true : false;
+                if(newValue != sinkParameter) sinkParameter = newValue;
+            }
+        }
+    }
+    void restoreValue(){
+    }
+    ofEventListener parameterEventListener;
+    ofParameter<vector<float>>& sourceParameter;
+    ofParameter<bool>&  sinkParameter;
+};
 
 
 #endif /* ofxOceanodeConnection_h */

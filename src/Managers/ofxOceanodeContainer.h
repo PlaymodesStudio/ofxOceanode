@@ -138,9 +138,6 @@ public:
     ofEvent<ofxOceanodeNode*> newNodeCreated;
     
 #ifdef OFXOCEANODE_USE_OSC
-    void setupOscSender(string host, int port);
-    void setupOscReceiver(int port);
-    void receiveOsc();
     void receiveOscMessage(ofxOscMessage &m);
 #endif
     
@@ -194,11 +191,6 @@ private:
     ofParameter<glm::mat4> transformationMatrix;
     float bpm;
     float phase;
-    
-#ifdef OFXOCEANODE_USE_OSC
-    ofxOscSender oscSender;
-    ofxOscReceiver oscReceiver;
-#endif
     
 #ifdef OFXOCEANODE_USE_MIDI
     bool isListeningMidi;

@@ -19,6 +19,12 @@ ofxOceanode::ofxOceanode(){
     firstDraw = true;
     settingsLoaded = false;
     
+#ifdef OFXOCEANODE_USE_OSC
+    receiverPortChanged = oscReceiverPort.newListener([this](int &i){
+        oscReceiver.setup(oscReceiverPort);
+    });
+#endif
+    
     //Register default types
     typesRegistry->registerType<float>();
     typesRegistry->registerType<int>();
@@ -119,7 +125,7 @@ void ofxOceanode::setup(){
     canvas.setup();
     scope->setup();
     //controls = make_unique<ofxOceanodeControls>(container);
-    controls = make_unique<ofxOceanodeControls>(container,&canvas);
+    controls = make_unique<ofxOceanodeControls>(container,&canvas, oscReceiverPort);
     //        timelines.emplace_back("Phasor_1/Beats_Div");
     //        timelines.emplace_back("Oscillator_1/Pow");
     //        timelines.emplace_back("Indexer_1/NumWaves");
@@ -131,6 +137,9 @@ void ofxOceanode::setup(){
 }
 
 void ofxOceanode::update(){
+#ifdef OFXOCEANODE_USE_OSC
+    receiveOsc();
+#endif
     oceanodeTime->update();
     container->update();
     controls->update();
@@ -375,5 +384,14 @@ void ofxOceanode::showHelpPopUp()
     }
 }
 
+#ifdef OFXOCEANODE_USE_OSC
+void ofxOceanode::receiveOsc(){
+    while(oscReceiver.hasWaitingMessages()){
+        ofxOscMessage m;
+        oscReceiver.getNextMessage(m);
+        container->receiveOscMessage(m);
+    }
+}
+#endif
 
 
