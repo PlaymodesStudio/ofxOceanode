@@ -19,7 +19,7 @@ class ofxOceanodeCanvas;
 class ofxOceanodeControls{
 public:
 
-    ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _container,ofxOceanodeCanvas* _canvas);
+    ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _container, ofxOceanodeCanvas* _canvas, ofParameter<int> & _receiverPort);
     ~ofxOceanodeControls(){};
     
     void draw();
