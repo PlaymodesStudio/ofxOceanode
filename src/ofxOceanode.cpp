@@ -394,4 +394,13 @@ void ofxOceanode::receiveOsc(){
 }
 #endif
 
+void ofxOceanode::loadPreset(std::string presetPathRelativeToData){ //call preset via path
+    ofxOceanodeShared::startedLoadingPreset();
+    container->loadPreset(presetPathRelativeToData);
+    ofxOceanodeShared::finishedLoadingPreset();
+}
 
+void ofxOceanode::loadPreset(std::string bank, std::string name){ //call preset via bank and name
+    auto toSendPair = make_pair(name, bank);
+    container->loadPresetEvent.notify(toSendPair);
+}
