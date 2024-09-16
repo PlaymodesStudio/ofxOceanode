@@ -118,6 +118,30 @@ public:
         }
     }
     
+    static ofEvent<void>& getPresetWillBeLoadedEvent(){
+        return getInstance().presetWillBeLoadedEvent;
+    }
+    
+    static ofEvent<void>& getPresetHasLoadedEvent(){
+        return getInstance().presetHasLoadedEvent;
+    }
+    
+    static void startedLoadingPreset(){
+//        ofLog() << "shared starting loading preset";
+        getInstance().presetWillBeLoadedEvent.notify();
+        getInstance().presetLoading = true;
+    }
+    
+    static void finishedLoadingPreset(){
+//        ofLog() << "shared finished loading preset";
+        getInstance().presetLoading = false;
+        getInstance().presetHasLoadedEvent.notify();
+    }
+    
+    static bool isPresetLoading(){
+        return getInstance().presetLoading;
+    }
+    
 private:
     ofxOceanodeShared(){};
     
@@ -147,6 +171,9 @@ private:
     std::shared_ptr<macroCategory> macroDirectoryStructure;
 	
 	ofEvent<string> macroUpdatedEvent;
+    bool presetLoading;
+    ofEvent<void> presetWillBeLoadedEvent;
+    ofEvent<void> presetHasLoadedEvent;
 	
 	vector<abstractPortal*> portals;
     vector<abstractPortal*> currentUpdatingPortals;

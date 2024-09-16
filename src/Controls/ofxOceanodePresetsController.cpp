@@ -403,7 +403,9 @@ void ofxOceanodePresetsController::loadPreset(string name, string bank){
                                );
     
     string myPath = "./Presets/" + banks[currentBank] +"/" + ofToString(presetIndex+1) +  "--" + name;
+    ofxOceanodeShared::startedLoadingPreset();
     container->loadPreset(myPath);
+    ofxOceanodeShared::finishedLoadingPreset();
 }
 
 void ofxOceanodePresetsController::savePreset(string name, string bank)
