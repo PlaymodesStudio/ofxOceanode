@@ -85,9 +85,9 @@ public:
         return controls->get<T>();
     }
 
-	void loadPreset(std::string preset) {
-		container->loadPreset(preset);
-	}
+    void loadPreset(std::string presetPathRelativeToData); //call preset via path
+    
+    void loadPreset(std::string bank, std::string name); //call preset via bank and name
     
    template<typename T>
     void registerScope(std::function<void(ofxOceanodeAbstractParameter* p, ImVec2 size)> func){

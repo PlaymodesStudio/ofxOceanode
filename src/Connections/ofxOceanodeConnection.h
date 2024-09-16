@@ -30,7 +30,6 @@ public:
     void setActive(bool a){
         active = a;
         if(active) passValueFunc();
-        else restoreValue();
     }
     
     void deleteSelf(){

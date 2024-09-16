@@ -704,7 +704,16 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             if(ImGui::BeginMenu("Modules")){
                 bool selectedModule = false;
                 for(int i = 0; i < categoriesVector.size() && !selectedModule; i++){
-                    if(ImGui::BeginMenu(categoriesVector[i].c_str()))
+                    vector<string> subcategoriesSplit = ofSplitString(categoriesVector[i], "/");
+                    int openedMenus = 0;
+                    for(auto subCategory : subcategoriesSplit){
+                        if(ImGui::BeginMenu(subCategory.c_str())){
+                            openedMenus++;
+                        }else{
+                            break;
+                        }
+                    }
+                    if(openedMenus == subcategoriesSplit.size())
                     {
                         for(auto &op : options[i])
                         {
@@ -723,6 +732,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             }
                             ImGui::PopStyleColor();
                         }
+                    }
+                    for(int i = 0; i < openedMenus; i++){
                         ImGui::EndMenu();
                     }
                 }
