@@ -81,7 +81,11 @@ public:
 	virtual std::string toString() const = 0;
 	virtual void fromString(const std::string & str) = 0;
 	
+    virtual std::string type() const = 0;
+    virtual std::string getEscapedName() const = 0;
 	virtual std::string valueType() const = 0;
+    
+    virtual bool isInit() const = 0;
 	
 	virtual void setParent(ofParameterGroup & _parent) = 0;
 	
@@ -98,6 +102,7 @@ public:
 	virtual bool isSerializable() const = 0;
 	virtual bool isReadOnly() const = 0;
 	virtual std::shared_ptr<ofAbstractParameter> newReference() const = 0;
+    virtual bool isReferenceTo(const ofAbstractParameter & other) const = 0;
     virtual ofEvent<std::string>& nameChangedEvent() = 0;
 	
 	ofxOceanodeParameterFlags getFlags(){return flags;};
@@ -156,6 +161,7 @@ public:
 protected:
 	virtual const ofParameterGroup getFirstParent() const = 0;
 	virtual void setSerializable(bool serializable)=0;
+    virtual std::string escape(const std::string & str) const = 0;
 	virtual const void* getInternalObject() const = 0;
 	
 private:
@@ -188,11 +194,15 @@ public:
 	bool setName(const std::string& name ) { return parameter->setName(name); }
 	std::string toString() const { return parameter->toString();}
 	void fromString(const std::string& str) { return parameter->fromString(str);}
+    std::string type() const {return parameter->type(); }
+    std::string getEscapedName() const {return parameter->getEscapedName(); }
 	std::string valueType() const { return parameter->valueType(); };
+    bool isInit() const { return parameter->isInit(); }
 	void setParent(ofParameterGroup &_parent) { parameter->setParent(_parent);}
 	bool isSerializable() const { return parameter->isSerializable();}
 	bool isReadOnly() const { return parameter->isReadOnly();}
 	std::shared_ptr<ofAbstractParameter> newReference() const { return std::make_shared<ofxOceanodeParameter<ParameterType>>(*this);}
+    bool isReferenceTo(const ofAbstractParameter & other) const { return parameter->isReferenceTo(other);}
     ofEvent<std::string>& nameChangedEvent() {return parameter->nameChangedEvent();}
 	
 	//Custom
@@ -228,6 +238,7 @@ public:
 protected:
 	const ofParameterGroup getFirstParent() const { return parameter->getFirstParent();}
 	void setSerializable(bool serializable) { parameter->setSerializable(serializable);}
+    std::string escape(const std::string & str) const { return "";}
 	const void* getInternalObject() const { return parameter->getInternalObject();}
 	
 private:
@@ -253,11 +264,15 @@ public:
 	bool setName(const std::string& name ) { return parameter->setName(name); }
 	std::string toString() const { return parameter->toString();}
 	void fromString(const std::string& str) { return parameter->fromString(str);}
+    std::string type() const {return parameter->type(); }
+    std::string getEscapedName() const {return parameter->getEscapedName(); }
 	std::string valueType() const { return parameter->valueType(); };
+    bool isInit() const { return parameter->isInit(); }
 	void setParent(ofParameterGroup &_parent) { parameter->setParent(_parent);}
 	bool isSerializable() const { return parameter->isSerializable();}
 	bool isReadOnly() const { return parameter->isReadOnly();}
 	std::shared_ptr<ofAbstractParameter> newReference() const { return std::make_shared<ofxOceanodeParameter<void>>(*this);}
+    bool isReferenceTo(const ofAbstractParameter & other) const { return parameter->isReferenceTo(other);}
     ofEvent<std::string>& nameChangedEvent() {return parameter->nameChangedEvent();}
 	
 	//Custom
@@ -272,6 +287,7 @@ public:
 protected:
 	const ofParameterGroup getFirstParent() const { return parameter->getFirstParent();}
 	void setSerializable(bool serializable) { parameter->setSerializable(serializable);}
+    std::string escape(const std::string & str) const { return "";}
 	const void* getInternalObject() const { return parameter->getInternalObject();}
 	
 private:
