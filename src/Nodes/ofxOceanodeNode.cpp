@@ -252,7 +252,9 @@ void ofxOceanodeNode::deserializeParameter(ofJson &json, ofxOceanodeAbstractPara
             }else{
                 p.cast<vector<int>>().getParameter() = vector<int>(1, int(json[p.getEscapedName()]));
             }
-		}else{
+		}else if(p.valueType() == typeid(std::string).name()){
+            p.cast<std::string>().getParameter() = json[p.getEscapedName()].get<std::string>();
+        }else{
 			ofDeserialize(json, p);
 		}
     }
