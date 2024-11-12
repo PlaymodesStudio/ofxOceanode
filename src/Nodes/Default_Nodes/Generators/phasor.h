@@ -88,6 +88,7 @@ public:
     void setup() override {
         timeGenerator::setup();
         addParameter(trigger.set("Trigger"));
+        addParameter(triggerFloat.set("Trigger_F",0,0,1));
         addParameter(reset.set("Reset"));
         addParameter(rampDurationMs.set("Ms", 1000, 0, FLT_MAX));
         addOutputParameter(output.set("Out", 0, 0, 1));
@@ -105,6 +106,13 @@ public:
         // Add listener for the reset
         listeners.push(reset.newListener([this]() {
             stopRamp();
+        }));
+        // Add listener for the trigger Float
+        listeners.push(triggerFloat.newListener([this](float &f) {
+            if(triggerFloat==1.0)
+            {
+                startRamp();
+            }
         }));
     }
 
@@ -137,6 +145,7 @@ private:
 
     ofEventListeners listeners;
     ofParameter<void> trigger;
+    ofParameter<float> triggerFloat;
     ofParameter<void> reset;
     ofParameter<float> rampDurationMs; // Duration in milliseconds
     ofParameter<float> output;
