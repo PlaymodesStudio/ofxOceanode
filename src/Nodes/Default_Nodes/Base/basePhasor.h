@@ -9,6 +9,7 @@
 #ifndef basePhasor_h
 #define basePhasor_h
 #include "ofMain.h"
+#include "ofTimer.h"
 
 class basePhasor{
 public:
