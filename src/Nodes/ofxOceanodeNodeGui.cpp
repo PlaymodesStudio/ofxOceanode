@@ -325,10 +325,10 @@ bool ofxOceanodeNodeGui::constructGui(){
                     ///////////////
                 }else if(absParam.valueType() == typeid(string).name()){
                     auto tempCast = absParam.cast<string>().getParameter();
-                    char * cString = new char[256];
+                    char * cString = new char[1024];
                     strcpy(cString, tempCast.get().c_str());
                     auto result = false;
-                    if (ImGui::InputText(hiddenUniqueId.c_str(), cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
+                    if (ImGui::InputText(hiddenUniqueId.c_str(), cString, 1024, ImGuiInputTextFlags_EnterReturnsTrue))
                     {
                         tempCast = cString;
                     }
