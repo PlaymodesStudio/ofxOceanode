@@ -121,7 +121,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 }
                 
                 
-                ImGui::SameLine(60);
+                ImGui::SameLine(90);
                 ImGui::SetNextItemWidth(150);
                 
                 string hiddenUniqueId = "##" + uniqueId;
