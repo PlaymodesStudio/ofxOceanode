@@ -518,22 +518,8 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
             paramName = "_" + paramName;
         }
         newCreatedParam->setName(paramName);
-
-        // Check if it's an output router by looking at value parameter connections
-        auto& params = node->getParameters();
-        auto valueParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get("Value"));
-        if(valueParam){
-            // If it has no input connections it's an output router
-            if(!valueParam->hasInConnection()){
-                // Add it as an output parameter with proper flags
-                addParameter(*newCreatedParam.get(),
-                    ofxOceanodeParameterFlags_DisableInConnection |
-                    ofxOceanodeParameterFlags_DisplayMinimized);
-            }else{
-                addParameter(*newCreatedParam.get());
-            }
-        }
-
+        addParameter(*newCreatedParam.get());
+        
         ofParameter<string> nameParamFromRouter = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
         nameParamFromRouter = paramName;
         
