@@ -543,9 +543,16 @@ void ofxOceanodeNodeMacro::updateRouterConnections() {
     
     for(auto* node : nodes) {
         if(!node) continue;
+        
+        //sugerencia de Frigo:
+        /*
         if(node->getNodeModel().nodeName().find("Router") == 0) {
-            updateRouterInfo(node);
-        }
+                    updateRouterInfo(node);
+                }
+         */
+        if(dynamic_cast<abstractRouter*>(&node->getNodeModel()) != nullptr) {
+                    updateRouterInfo(node);
+                }
     }
 }
 
@@ -574,7 +581,8 @@ bool ofxOceanodeNodeMacro::checkIsInputRouter(ofxOceanodeNode* node) {
     if(!valueParam) return false;
     
     // Input routers have their value output connected to other nodes
-    return valueParam->hasOutConnections() && !valueParam->hasInConnection();
+    //return valueParam->hasOutConnections() && !valueParam->hasInConnection();
+    return !valueParam->hasInConnection();
 }
 
 void ofxOceanodeNodeMacro::storeRouterSnapshot(int slot) {
