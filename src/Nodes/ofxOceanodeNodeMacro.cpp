@@ -1075,6 +1075,27 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path) {
                 currentMacro = json["Macro"].get<string>();
                 currentMacroPath = json.value("MacroPath", "");
                 
+                if(currentMacroPath.empty()) {
+                    auto currentCategoryVec = json["CategoryStruct"].get<deque<string>>();
+                    currentCategory = currentCategoryVec;
+                    currentMacro = json["Macro"];
+                    auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
+                    for(int i = 0 ; i < currentCategory.size(); i++){
+                        string categoryNameToCompare = currentCategory[i];
+                        macroDirectoryStructure = *std::find_if(macroDirectoryStructure->categories.begin(), macroDirectoryStructure->categories.end(),
+                                                                [categoryNameToCompare](shared_ptr<macroCategory> &mc){return mc->name == categoryNameToCompare;});
+                    }
+                    currentCategoryMacro = macroDirectoryStructure;
+                    auto iter = std::find_if(currentCategoryMacro->macros.begin(), currentCategoryMacro->macros.end(), [this](const std::pair<string, string> &pair){
+                        return pair.first == currentMacro;
+                    });
+                    if(iter != currentCategoryMacro->macros.end()){
+                        // TODO: Carregar o to load?
+                        //                    container->loadPreset(iter->second);
+                        currentMacroPath = iter->second;
+                    }
+                }
+                
                 if(!currentMacroPath.empty()) {
                     container->loadPreset_presetWillBeLoaded();
                     container->loadPreset(currentMacroPath);
