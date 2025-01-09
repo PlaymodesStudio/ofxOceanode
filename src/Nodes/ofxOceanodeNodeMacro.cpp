@@ -84,9 +84,9 @@ void ofxOceanodeNodeMacro::draw(ofEventArgs &a){
     if(showWindow){
         canvas.draw(&showWindow, color, localPreset ? localName.get() : currentMacro);
     }
-	if(active){
-		container->draw();
-	}
+    if(active){
+        container->draw();
+    }
 }
 
 void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
@@ -97,8 +97,8 @@ void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
 
 // Main setup
 void ofxOceanodeNodeMacro::setup(string additionalInfo) {
-   ofLogNotice("Loading") << "=== SETUP BEGIN ===";
-   ofLogNotice("Loading") << "Additional info: " << additionalInfo;
+   //ofLogNotice("Loading") << "=== SETUP BEGIN ===";
+   //ofLogNotice("Loading") << "Additional info: " << additionalInfo;
    
    initializeContainer(additionalInfo);
    initializeParameters();
@@ -122,7 +122,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo) {
        loadSnapshotsFromPath(additionalInfo);
    }
    
-   ofLogNotice("Loading") << "=== SETUP END ===";
+   //ofLogNotice("Loading") << "=== SETUP END ===";
 }
 
 // Container initialization
@@ -135,10 +135,10 @@ void ofxOceanodeNodeMacro::initializeContainer(const string& additionalInfo) {
     
     if(additionalInfo != "") {
         localPreset = false;
-        ofLogNotice("MacroSetup") << "Loading from: " << additionalInfo;
+        //ofLogNotice("MacroSetup") << "Loading from: " << additionalInfo;
         
         string snapshotsFile = ofFilePath::removeTrailingSlash(additionalInfo) + "/snapshots.json";
-        ofLogNotice("MacroSetup") << "Looking for snapshots at: " << snapshotsFile;
+        //ofLogNotice("MacroSetup") << "Looking for snapshots at: " << snapshotsFile;
         
         // Clear existing snapshots
         snapshots.clear();
@@ -151,8 +151,8 @@ void ofxOceanodeNodeMacro::initializeContainer(const string& additionalInfo) {
                     SnapshotData snapshot;
                     loadSnapshotFromJson(snapshot, item.value());
                     snapshots[slot] = snapshot;
-                    ofLogNotice("MacroSetup") << "Loaded snapshot " << slot << " with "
-                                            << snapshot.routerValues.size() << " values";
+                    //ofLogNotice("MacroSetup") << "Loaded snapshot " << slot << " with "
+                    //                        << snapshot.routerValues.size() << " values";
                 }
             } catch(const std::exception& e) {
                 ofLogError("MacroSetup") << "Error loading snapshots: " << e.what();
@@ -225,6 +225,12 @@ void ofxOceanodeNodeMacro::initializeEventListeners() {
             loadRouterSnapshot(slot);
         }
     });
+}
+
+void ofxOceanodeNodeMacro::clearAllSnapshots() {
+    snapshots.clear();
+    currentSnapshotSlot = -1;
+    saveSnapshots();
 }
 
 // Core GUI components
@@ -310,7 +316,7 @@ void ofxOceanodeNodeMacro::renderBankCreationModal() {
 
 void ofxOceanodeNodeMacro::renderSaveControls(bool& firstSaveAsOpen) {
    if(ImGui::Button("Save")) {
-       ofLog() << "Save current preset and notify other macros";
+       //ofLog() << "Save current preset and notify other macros";
        if(currentMacroPath == "" || localPreset) {
            ImGui::OpenPopup("Save Macro As :");
            firstSaveAsOpen = true;
@@ -589,7 +595,14 @@ void ofxOceanodeNodeMacro::storeRouterSnapshot(int slot) {
     updateRouterConnections();
     
     SnapshotData snapshotData;
-    snapshotData.name = "Snapshot " + ofToString(slot);
+    
+    // Preserve existing name if the slot already exists
+    auto existingSnapshot = snapshots.find(slot);
+    if(existingSnapshot != snapshots.end()) {
+        snapshotData.name = existingSnapshot->second.name;
+    } else {
+        snapshotData.name = "Snapshot " + ofToString(slot);
+    }
     
     for(auto& routerPair : routerNodes) {
         auto& router = routerPair.second;
@@ -969,30 +982,89 @@ void ofxOceanodeNodeMacro::onMatrixSizeChanged(int& value) {
 }
 
 void ofxOceanodeNodeMacro::renderInspectorInterface() {
+    // Global clear button in the inspector
+    if(ImGui::Button("Clear All Snapshots", ImVec2(130, 0))) {
+        ImGui::OpenPopup("Clear All Snapshots?");
+    }
+    
+    // Handle clear all confirmation popup
+    if(ImGui::BeginPopupModal("Clear All Snapshots?", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Are you sure you want to clear all snapshots?\nThis action cannot be undone.");
+        ImGui::Separator();
+        
+        if(ImGui::Button("Yes", ImVec2(120, 0))) {
+            clearAllSnapshots();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if(ImGui::Button("Cancel", ImVec2(120, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
     if(snapshots.empty()) {
         ImGui::Text("No snapshots stored");
         return;
     }
-    
-    for(auto& pair : snapshots) {
-        ImGui::PushID(pair.first);
+
+    for(auto it = snapshots.begin(); it != snapshots.end();) {
+        ImGui::PushID(it->first);
+        
+        bool shouldDelete = false;
         char nameBuf[256];
-        strcpy(nameBuf, pair.second.name.c_str());
+        strcpy(nameBuf, it->second.name.c_str());
         
-        ImGui::Text("Slot %d", pair.first);
+        // Slot number
+        ImGui::Text("Slot %d", it->first);
         
+        // Name input
         ImGui::SetNextItemWidth(150);
         if(ImGui::InputText("##name", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue)) {
-            pair.second.name = nameBuf;
+            it->second.name = nameBuf;
         }
         
+        // Load button
         ImGui::SameLine();
         if(ImGui::Button("Load")) {
-            loadRouterSnapshot(pair.first);
+            loadRouterSnapshot(it->first);
+        }
+        
+        // Clear button with confirmation
+        ImGui::SameLine();
+        if(ImGui::Button("Clear")) {
+            ImGui::OpenPopup("Clear Snapshot?");
+        }
+        
+        // Confirmation popup for individual clear
+        if(ImGui::BeginPopup("Clear Snapshot?")) {
+            ImGui::Text("Clear snapshot %d (%s)?", it->first, it->second.name.c_str());
+            ImGui::Separator();
+            
+            if(ImGui::Button("Yes", ImVec2(120, 0))) {
+                shouldDelete = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if(ImGui::Button("Cancel", ImVec2(120, 0))) {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
         }
         
         ImGui::PopID();
         ImGui::Separator();
+        
+        // Handle deletion if confirmed
+        if(shouldDelete) {
+            if(currentSnapshotSlot == it->first) {
+                currentSnapshotSlot = -1;
+            }
+            it = snapshots.erase(it);
+            saveSnapshots(); // Save the updated state
+        } else {
+            ++it;
+        }
     }
 }
 
@@ -1174,36 +1246,36 @@ void ofxOceanodeNodeMacro::loadSnapshotFromJson(SnapshotData& snapshot, const of
 }
 
 void ofxOceanodeNodeMacro::loadMacroInsideCategory(int newPresetIndex){
-	if(newPresetIndex < currentCategoryMacro->macros.size() && currentCategoryMacro->macros[newPresetIndex].first != currentMacro){
-		nextPresetPath = currentCategoryMacro->macros[newPresetIndex].second;
-		currentMacroPath = nextPresetPath;
-		currentMacro = currentCategoryMacro->macros[newPresetIndex].first;
-	}
+    if(newPresetIndex < currentCategoryMacro->macros.size() && currentCategoryMacro->macros[newPresetIndex].first != currentMacro){
+        nextPresetPath = currentCategoryMacro->macros[newPresetIndex].second;
+        currentMacroPath = nextPresetPath;
+        currentMacro = currentCategoryMacro->macros[newPresetIndex].first;
+    }
 }
 
 void ofxOceanodeNodeMacro::updateCurrentCategoryFromPath(string path){
 #ifdef TARGET_WIN32
-	vector<string> splittedInfo = ofSplitString(path, "\\");
+    vector<string> splittedInfo = ofSplitString(path, "\\");
 #else
-	vector<string> splittedInfo = ofSplitString(path, "/");
+    vector<string> splittedInfo = ofSplitString(path, "/");
 #endif
-	currentCategory.clear();
-	currentMacro = splittedInfo.back();
-	for(int i = splittedInfo.size() - 2; i >= 0; i--){
-		if(splittedInfo[i] != "Macros" && splittedInfo[i] != "data") {
-			currentCategory.push_front(splittedInfo[i]);
-		}else{
-			break;
-		}
-	}
-	
-	auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
-	for(int i = 0 ; i < currentCategory.size(); i++){
-		string categoryNameToCompare = currentCategory[i];
-		macroDirectoryStructure = *std::find_if(macroDirectoryStructure->categories.begin(), macroDirectoryStructure->categories.end(),
+    currentCategory.clear();
+    currentMacro = splittedInfo.back();
+    for(int i = splittedInfo.size() - 2; i >= 0; i--){
+        if(splittedInfo[i] != "Macros" && splittedInfo[i] != "data") {
+            currentCategory.push_front(splittedInfo[i]);
+        }else{
+            break;
+        }
+    }
+    
+    auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
+    for(int i = 0 ; i < currentCategory.size(); i++){
+        string categoryNameToCompare = currentCategory[i];
+        macroDirectoryStructure = *std::find_if(macroDirectoryStructure->categories.begin(), macroDirectoryStructure->categories.end(),
                                                 [categoryNameToCompare](shared_ptr<macroCategory> &mc){return mc->name == categoryNameToCompare;});
-	}
-	currentCategoryMacro = macroDirectoryStructure;
+    }
+    currentCategoryMacro = macroDirectoryStructure;
 }
 
 

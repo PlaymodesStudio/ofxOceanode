@@ -111,6 +111,8 @@ protected:
     void loadSnapshotsFromPath(const string& path);
     void loadSnapshotFromJson(SnapshotData& snapshot, const ofJson& json);
     void updateMacroDirectoryStructure();
+    void clearAllSnapshots();
+    void setupSnapshotInspectorParameters();
 
     // Router Value Management
     std::map<string, RouterSnapshot> captureRouterValues();
