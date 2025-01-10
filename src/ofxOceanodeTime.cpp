@@ -47,6 +47,19 @@ void ofxOceanodeTime::setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOc
             }
         }
     }));
+
+    checkNodeModel = [this](ofxOceanodeNode* node)
+    {
+        ofxOceanodeNodeModel *nodeModel = &node->getNodeModel();
+        if(dynamic_cast<timeGenerator*>(nodeModel) != nullptr){
+            dynamic_cast<timeGenerator*>(nodeModel)->setTime(time);
+        }
+        else if(dynamic_cast<ofxOceanodeNodeMacro*>(nodeModel) != nullptr){
+            newNodeInMacroListener.push(dynamic_cast<ofxOceanodeNodeMacro*>(nodeModel)->getContainer()->newNodeCreated.newListener(checkNodeModel));
+        }
+    };
+
+    newNodeListener = container->newNodeCreated.newListener(checkNodeModel);
     
     controller->setTimeGroup(&parameters);
     

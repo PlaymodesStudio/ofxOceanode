@@ -13,6 +13,7 @@
 #include "ofxOceanodeBPMController.h"
 
 class ofxOceanodeContainer;
+class ofxOceanodeNode;
 
 class ofxOceanodeTimelinedItem {
 public:
@@ -64,6 +65,8 @@ private:
     
     ofParameterGroup parameters;
     ofEventListeners listeners;
+    ofEventListener newNodeListener;
+    ofEventListeners newNodeInMacroListener;
     
     ofParameter<bool> isPlaying;
     ofParameter<void> stop;
@@ -90,6 +93,8 @@ private:
     
     std::vector<ofxOceanodeTimelinedItem> timlinedParameters;
     float windowHeight;
+    
+    std::function<void(ofxOceanodeNode*)> checkNodeModel;
 };
 
 class Timestamp {
