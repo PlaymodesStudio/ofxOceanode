@@ -29,7 +29,10 @@ public:
     
     void setActive(bool a){
         active = a;
-        if(active) passValueFunc();
+        if(active)
+        {
+            if(dynamic_cast<ofxOceanodeParameter<void>*>(sourceParameter)==nullptr) passValueFunc();
+        }
     }
     
     void deleteSelf(){
