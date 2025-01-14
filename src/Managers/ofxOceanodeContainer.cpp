@@ -11,6 +11,7 @@
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeTypesRegistry.h"
 #include "ofxOceanodeNodeModel.h"
+#include "ofxOceanodeShared.h"
 
 #ifdef OFXOCEANODE_USE_MIDI
 #include "ofxOceanodeMidiBinding.h"
@@ -1130,7 +1131,9 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
             for ( int i = 0 ; i < numPresets; i++){
                 if(ofSplitString(dir.getName(i), "--")[1] == m.getArgAsString(0)){
                     string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
+                    ofxOceanodeShared::startedLoadingPreset();
                     loadPreset("Presets/" + bankAndPreset);
+                    ofxOceanodeShared::finishedLoadingPreset();
                     break;
                 }
             }
@@ -1152,7 +1155,9 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
 				for ( int i = 0 ; i < numPresets; i++){
 					if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(0)){
 						string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
+                        ofxOceanodeShared::startedLoadingPreset();
 						loadPreset("Presets/" + bankAndPreset);
+                        ofxOceanodeShared::finishedLoadingPreset();
 						break;
 					}
 				}
@@ -1361,7 +1366,10 @@ bool ofxOceanodeContainer::cutSelectedModulesWithConnections(){
 }
 
 bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 position, bool allowOutsideInputs){
-    return loadClipboardModulesAndConnections(position, allowOutsideInputs);
+    ofxOceanodeShared::startedLoadingPreset();
+    bool b_sucess = loadClipboardModulesAndConnections(position, allowOutsideInputs);
+    ofxOceanodeShared::finishedLoadingPreset();
+    return b_sucess;
 }
 
 bool ofxOceanodeContainer::deleteSelectedModules(){
