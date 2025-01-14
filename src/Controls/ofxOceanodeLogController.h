@@ -21,6 +21,11 @@ public:
     ~ofxOceanodeLogController(){};
     
     void draw(){
+        std::string message;
+        while(messageChannel.tryReceive(message)){
+            messagesBuffer.push_back(message);
+        }
+        
         //https://github.com/ocornut/imgui/issues/300
         if(ImGui::Button("[Clear]"))
         {
@@ -48,7 +53,7 @@ public:
     /// \param module The target module.
     /// \param message The log message.
     virtual void log(ofLogLevel level, const string & module, const string & message){
-        messagesBuffer.push_back(message);
+        messageChannel.send(message);
     }
     
     /// \brief Log a message.
@@ -84,6 +89,8 @@ public:
 private:
     deque<string>  messagesBuffer;
     int oldSize;
+    
+    ofThreadChannel<string> messageChannel;
 };
 
 
