@@ -10,6 +10,7 @@
 
 #include "ofxOceanodeBaseController.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 
 #define MAX_MESSAGES 1000
 
@@ -17,6 +18,7 @@ class ofxOceanodeLogController: public ofxOceanodeBaseController, public ofBaseL
 public:
     ofxOceanodeLogController() : ofxOceanodeBaseController("Log"){
         oldSize = 0;
+        hasToScroll = false;
     }
     ~ofxOceanodeLogController(){};
     
@@ -26,26 +28,39 @@ public:
             messagesBuffer.push_back(message);
         }
         
-        //https://github.com/ocornut/imgui/issues/300
         if(ImGui::Button("[Clear]"))
         {
             messagesBuffer.clear();
         }
-        ImGui::Separator();
-        ImGui::BeginChild("logWindow");
-        auto messagesCopy = messagesBuffer;
-        for(auto &l : messagesCopy){
-            ImGui::TextUnformatted(l.c_str());
+        
+        std::string combinedMessages;
+        for(auto &s : messagesBuffer){
+            combinedMessages += s + "\n";
         }
-        if(messagesCopy.size() != oldSize){
-            ImGui::SetScrollHereY();
+        
+        ImGui::InputTextMultiline("##LogText", (char *)combinedMessages.c_str(), combinedMessages.size(), ImGui::GetContentRegionAvail(), ImGuiInputTextFlags_ReadOnly);
+        
+        if(hasToScroll){
+            //https://github.com/ocornut/imgui/issues/5484
+            ImGuiContext& g = *GImGui;
+            const char* child_window_name = NULL;
+            ImFormatStringToTempBuffer(&child_window_name, NULL, "%s/%s_%08X", g.CurrentWindow->Name, "##LogText", ImGui::GetID("##LogText"));
+            ImGuiWindow* child_window = ImGui::FindWindowByName(child_window_name);
+            if(child_window != NULL){
+                ImGui::SetScrollY(child_window, child_window->ScrollMax.y);
+                hasToScroll = false;
+            }
         }
-        oldSize = messagesCopy.size();
+        
+        if(messagesBuffer.size() != oldSize){
+            hasToScroll = true;
+        }
+        
+        oldSize = messagesBuffer.size();
         
         while(messagesBuffer.size() > MAX_MESSAGES){
             messagesBuffer.pop_front();
         }
-        ImGui::EndChild();
     }
     
     /// \brief Log a message.
@@ -89,6 +104,7 @@ public:
 private:
     deque<string>  messagesBuffer;
     int oldSize;
+    bool hasToScroll;
     
     ofThreadChannel<string> messageChannel;
 };
