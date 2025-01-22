@@ -10,6 +10,15 @@
 
 #include "portal.h"
 
+typedef int ofxOceanodeConfigurationFlags;
+
+enum ofxOceanodeConfigurationFlags_
+{
+    ofxOceanodeConfigurationFlags_None              = 0,
+    ofxOceanodeConfigurationFlags_DisableRenderAll  = 1 << 0,   //Only render visible nodes
+    ofxOceanodeConfigurationFlags_DisableHistograms = 2 << 1    // Do not display histograms in vectors
+};
+
 struct macroCategory{
 	macroCategory(std::string _name = "Parent") : name(_name){};
 	std::string name;
@@ -142,6 +151,14 @@ public:
         return getInstance().presetLoading;
     }
     
+    static int getConfigurationFlags(){
+        return getInstance().configurationFlags;
+    }
+    
+    static void setConfigurationFlags(ofxOceanodeConfigurationFlags f){
+        getInstance().configurationFlags = f;
+    }
+    
 private:
     ofxOceanodeShared(){};
     
@@ -177,6 +194,8 @@ private:
 	
 	vector<abstractPortal*> portals;
     vector<abstractPortal*> currentUpdatingPortals;
+    
+    ofxOceanodeConfigurationFlags configurationFlags;
 };
 
 #endif /* ofxOceanodeShared_h */

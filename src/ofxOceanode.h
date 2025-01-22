@@ -116,6 +116,9 @@ public:
     // from their title bar (or by holding SHIFT if io.ConfigDockingWithShift is set).
     // DockSpace() is only useful to construct to a central location for your application.
     void ShowExampleAppDockSpace(bool* p_open);
+    
+    void disableRenderAll();
+    void disableRenderHistograms();
 
 private:
     ofxOceanodeCanvas canvas;

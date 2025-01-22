@@ -273,9 +273,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             auto &nodeGui = node->getNodeGui();
             string nodeId = nodePair.first;
             
-            if(!ofRectangle(ImGui::GetWindowPos() - offset, ImGui::GetWindowWidth(), ImGui::GetWindowHeight()).intersects(nodeGui.getRectangle()) && nodeGui.getRectangle().getWidth() > 0){
-                nodeGui.setVisibility(false);
-                continue;
+            if(ofxOceanodeShared::getConfigurationFlags() & ofxOceanodeConfigurationFlags_DisableRenderAll){
+                if(!ofRectangle(ImGui::GetWindowPos() - offset, ImGui::GetWindowWidth(), ImGui::GetWindowHeight()).intersects(nodeGui.getRectangle()) && nodeGui.getRectangle().getWidth() > 0){
+                    nodeGui.setVisibility(false);
+                    continue;
+                }
             }
             nodeGui.setVisibility(true);
             
