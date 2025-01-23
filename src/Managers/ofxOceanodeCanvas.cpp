@@ -272,6 +272,15 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             auto node = nodePair.second;
             auto &nodeGui = node->getNodeGui();
             string nodeId = nodePair.first;
+            
+            if(ofxOceanodeShared::getConfigurationFlags() & ofxOceanodeConfigurationFlags_DisableRenderAll){
+                if(!ofRectangle(ImGui::GetWindowPos() - offset, ImGui::GetWindowWidth(), ImGui::GetWindowHeight()).intersects(nodeGui.getRectangle()) && nodeGui.getRectangle().getWidth() > 0){
+                    nodeGui.setVisibility(false);
+                    continue;
+                }
+            }
+            nodeGui.setVisibility(true);
+            
             ImGui::PushID(nodeId.c_str());
 			
 			int nodeDrawChannel = 1;
@@ -794,24 +803,34 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImGui::PopStyleVar();
         //ImGui::PopStyleColor();
         
-        auto getSourceConnectionPositionFromParameter = [this](ofxOceanodeAbstractParameter& param) -> glm::vec2{
+        auto getSourceConnectionPositionFromParameter = [this, offset](ofxOceanodeAbstractParameter& param) -> glm::vec2{
             vector<ofxOceanodeNode*> allModules = container->getAllModules();
             auto foundNode = std::find_if(allModules.begin(), allModules.end(), [&param](ofxOceanodeNode* &node){
                 return &node->getNodeModel() == param.getNodeModel();
             });
             if(foundNode != allModules.end()){
-                return (*foundNode)->getNodeGui().getSourceConnectionPositionFromParameter(param);
+                auto &gui = (*foundNode)->getNodeGui();
+                if(gui.getVisibility()){
+                    return gui.getSourceConnectionPositionFromParameter(param);
+                }else{
+                    return gui.getPosition() + offset + glm::vec2(gui.getRectangle().getWidth(), gui.getRectangle().getHeight()/2);
+                }
             }
             return glm::vec2();
             //TODO: Throw exception
         };
-        auto getSinkConnectionPositionFromParameter = [this](ofxOceanodeAbstractParameter& param) -> glm::vec2{
+        auto getSinkConnectionPositionFromParameter = [this, offset](ofxOceanodeAbstractParameter& param) -> glm::vec2{
             vector<ofxOceanodeNode*> allModules = container->getAllModules();
             auto foundNode = std::find_if(allModules.begin(), allModules.end(), [&param](ofxOceanodeNode* &node){
                 return &node->getNodeModel() == param.getNodeModel();
             });
             if(foundNode != allModules.end()){
-                return (*foundNode)->getNodeGui().getSinkConnectionPositionFromParameter(param);
+                auto &gui = (*foundNode)->getNodeGui();
+                if(gui.getVisibility()){
+                    return gui.getSinkConnectionPositionFromParameter(param);
+                }else{
+                    return gui.getPosition() + offset + glm::vec2(0, gui.getRectangle().getHeight()/2);
+                }
             }
             return glm::vec2();
             //TODO: Throw exception

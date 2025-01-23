@@ -292,7 +292,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             if(ImGui::SliderFloat("FPS", &f, 1, 10000)){ofSetFrameRate(f);}
             bool b = false;
             if(ImGui::Checkbox("V Sync", &b)){ofSetVerticalSync(b);};
-            ImGui::MenuItem("Show Histograms");
+            ofxOceanodeConfigurationFlags configurationFlags = ofxOceanodeShared::getConfigurationFlags();
+            ImGui::CheckboxFlags("Disable Full Render", &configurationFlags, ofxOceanodeConfigurationFlags_DisableRenderAll);
+            ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
+            ofxOceanodeShared::setConfigurationFlags(configurationFlags);
             ImGui::EndMenu();
         }
 		
@@ -403,4 +406,12 @@ void ofxOceanode::loadPreset(std::string presetPathRelativeToData){ //call prese
 void ofxOceanode::loadPreset(std::string bank, std::string name){ //call preset via bank and name
     auto toSendPair = make_pair(name, bank);
     container->loadPresetEvent.notify(toSendPair);
+}
+
+void ofxOceanode::disableRenderAll(){
+    ofxOceanodeShared::setConfigurationFlags(ofxOceanodeShared::getConfigurationFlags() | ofxOceanodeConfigurationFlags_DisableRenderAll);
+}
+
+void ofxOceanode::disableRenderHistograms(){
+    ofxOceanodeShared::setConfigurationFlags(ofxOceanodeShared::getConfigurationFlags() | ofxOceanodeConfigurationFlags_DisableRenderAll);
 }

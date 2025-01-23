@@ -206,7 +206,6 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
 }
 
 bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
-    ofStringReplace(presetFolderPath, " ", "_");
     ofLog()<<"Load Preset " << presetFolderPath;
     
     loadPreset_presetWillBeLoaded();
@@ -553,7 +552,6 @@ void ofxOceanodeContainer::loadPreset_loadComments(string presetFolderPath){
 }
 
 void ofxOceanodeContainer::savePreset(string presetFolderPath){
-    ofStringReplace(presetFolderPath, " ", "_");
     ofLog()<<"Save Preset " << presetFolderPath;
     
     ofJson json;

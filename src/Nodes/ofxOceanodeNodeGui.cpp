@@ -20,10 +20,11 @@
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node) : container(_container), node(_node){
     color = node.getColor();
     //color.setBrightness(255);
-    guiRect = ofRectangle(10, 10, 10, 10);
+    guiRect = ofRectangle(10, 10, 0, 0);
     guiToBeDestroyed = false;
     lastExpandedState = true;
     isGuiCreated = false;
+    visible = true;
     
     expanded = true;
 #ifdef OFXOCEANODE_USE_MIDI
