@@ -18,6 +18,7 @@ ofxOceanode::ofxOceanode(){
     oceanodeTime = ofxOceanodeTime::getInstance();
     firstDraw = true;
     settingsLoaded = false;
+    showMode = false;
     
 #ifdef OFXOCEANODE_USE_OSC
     receiverPortChanged = oscReceiverPort.newListener([this](int &i){
@@ -149,10 +150,14 @@ void ofxOceanode::draw(){
     gui.begin();
     bool showDocker = true;
     ShowExampleAppDockSpace(&showDocker);
-    scope->draw();
-    container->draw();
-    controls->draw();
-    canvas.draw();
+    if(showMode){
+        drawShowModeWindow();
+    }else{
+        scope->draw();
+        container->draw();
+        controls->draw();
+        canvas.draw();
+    }
     //        for(auto &t : timelines){
     //            t.draw();
     //        }
@@ -295,6 +300,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             ofxOceanodeConfigurationFlags configurationFlags = ofxOceanodeShared::getConfigurationFlags();
             ImGui::CheckboxFlags("Disable Full Render", &configurationFlags, ofxOceanodeConfigurationFlags_DisableRenderAll);
             ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
+            ImGui::Checkbox("Show Mode", &showMode);
             ofxOceanodeShared::setConfigurationFlags(configurationFlags);
             ImGui::EndMenu();
         }
@@ -385,6 +391,22 @@ void ofxOceanode::showHelpPopUp()
         ImGui::Text("%s", " - Press CMD+A to select are nodes");
         ImGui::EndPopup();
     }
+}
+
+void ofxOceanode::drawShowModeWindow(){
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(255, 127, 0, 255));
+    if(ImGui::Begin("#FPS")){
+        std::string text = ofToString(ofGetFrameRate());
+        auto windowWidth = ImGui::GetWindowSize().x;
+        auto windowHeight = ImGui::GetWindowSize().y;
+        auto textWidth   = ImGui::CalcTextSize(text.c_str()).x;
+
+        ImGui::SetCursorPosX((windowWidth - textWidth) * 0.5f);
+        ImGui::SetCursorPosY(windowHeight * 0.5f);
+        ImGui::Text("%s", text.c_str());
+    }
+    ImGui::End();
+    ImGui::PopStyleColor();
 }
 
 #ifdef OFXOCEANODE_USE_OSC

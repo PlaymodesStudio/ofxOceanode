@@ -119,6 +119,9 @@ public:
     
     void disableRenderAll();
     void disableRenderHistograms();
+    
+    void setShowMode(bool b){showMode = b;}
+    void toggleShowMode(){showMode = !showMode;}
 
 private:
     ofxOceanodeCanvas canvas;
@@ -138,6 +141,9 @@ private:
     void showHelpPopUp();
     bool firstDraw;
     bool settingsLoaded;
+    bool showMode;
+    
+    void drawShowModeWindow();
     
     ofParameter<int> oscReceiverPort;
 #ifdef OFXOCEANODE_USE_OSC
