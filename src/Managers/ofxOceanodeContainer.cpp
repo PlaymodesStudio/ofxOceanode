@@ -1339,6 +1339,25 @@ vector<ofxOceanodeNode*> ofxOceanodeContainer::getAllModules(){
     return modulesToCopy;
 }
 
+ofxOceanodeNodeGui* ofxOceanodeContainer::getGuiFromModel(ofxOceanodeNodeModel* model){
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second)
+        {
+            if(&node.second->getNodeModel() == model){
+                return &node.second->getNodeGui();
+            }
+        }
+    }
+    for(auto &nodeTypeMap : persistentNodes){
+        for(auto &node : nodeTypeMap.second){
+            if(&node.second->getNodeModel() == model){
+                return &node.second->getNodeGui();
+            }
+        }
+    }
+    return nullptr;
+}
+
 
 bool ofxOceanodeContainer::copySelectedModulesWithConnections(){
     vector<ofxOceanodeNode*> modulesToCopy = getSelectedModules();

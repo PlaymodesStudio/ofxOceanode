@@ -13,6 +13,7 @@
 #include "ofxOceanodeContainer.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
+#include <unordered_set>
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -228,25 +229,29 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		vector<pair<string, ofxOceanodeNode*>> nodesInThisFrame = vector<pair<string, ofxOceanodeNode*>>(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
 		
 		//Look for deleted Nodes in drawing nodes order map
-        //TODO: optimize
-		vector<int> erasedPositions;
-		for(auto it = nodesDrawingOrder.begin() ; it != nodesDrawingOrder.end(); ){
-			string nodeId = it->first;
-			if(find_if(nodesInThisFrame.begin(), nodesInThisFrame.end(), [nodeId](pair<string, ofxOceanodeNode*> &pair){return pair.first == nodeId;}) != nodesInThisFrame.end()){
-				++it;
-			}else{
-				erasedPositions.push_back(it->second);
-				it = nodesDrawingOrder.erase(it);
-			}
-		}
-        while(erasedPositions.size() != 0){
-            auto max_e = std::max_element(erasedPositions.begin(), erasedPositions.end());
-            auto i = *max_e;
-            for_each(nodesDrawingOrder.begin(), nodesDrawingOrder.end(), [i](std::pair<const string, int> &orderPair){
-                if(orderPair.second > i) orderPair.second--;
-            });
-            erasedPositions.erase(max_e);
+        // Create a set of valid node IDs for quick lookup
+        std::unordered_set<std::string> validNodeIds;
+        for (const auto& node : nodesInThisFrame) {
+            validNodeIds.insert(node.first);
         }
+        
+        // Temporary vector to store valid nodes with their updated indices
+        std::vector<std::pair<std::string, int>> updatedNodes;
+        updatedNodes.reserve(nodesDrawingOrder.size());
+        
+        // Filter out invalid nodes and prepare for reordering
+        for (const auto& [nodeId, index] : nodesDrawingOrder) {
+            if (validNodeIds.count(nodeId)) {
+                updatedNodes.emplace_back(nodeId, index);
+            }
+        }
+        
+        // Rebuild the map and update indices
+        nodesDrawingOrder.clear();
+        for (int newIndex = 0; newIndex < updatedNodes.size(); ++newIndex) {
+            nodesDrawingOrder[updatedNodes[newIndex].first] = newIndex;
+        }
+        
 		
 		
 		//Draw List layers
@@ -258,15 +263,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 			}
 		}
         
-        //reorder nodesInThisFrame, so they are in correct drawing order, for the interaction to work properly
-        std::sort(nodesInThisFrame.begin(), nodesInThisFrame.end(), [this](std::pair<std::string, ofxOceanodeNode*> a, std::pair<std::string, ofxOceanodeNode*> b){
-//            if (nodesDrawingOrder.count(a.first) == 0) nodesDrawingOrder[a.first] = nodesDrawingOrder.size();
-//            if (nodesDrawingOrder.count(b.first) == 0) nodesDrawingOrder[b.first] = nodesDrawingOrder.size();
-            return nodesDrawingOrder[a.first] > nodesDrawingOrder[b.first];
-        });
-		
-        // Display nodes
-        //Iterating over the map gives errors as we are removing elements from the map during the iteration.
+        vector<pair<string, ofxOceanodeNode*>> nodesVisibleInThisFrame;
+        
         for(auto nodePair : nodesInThisFrame)
         {
             auto node = nodePair.second;
@@ -279,7 +277,24 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     continue;
                 }
             }
+            nodesVisibleInThisFrame.push_back(nodePair);
             nodeGui.setVisibility(true);
+        }
+        
+        //reorder nodesInThisFrame, so they are in correct drawing order, for the interaction to work properly
+        std::sort(nodesVisibleInThisFrame.begin(), nodesVisibleInThisFrame.end(), [this](std::pair<std::string, ofxOceanodeNode*> a, std::pair<std::string, ofxOceanodeNode*> b){
+//            if (nodesDrawingOrder.count(a.first) == 0) nodesDrawingOrder[a.first] = nodesDrawingOrder.size();
+//            if (nodesDrawingOrder.count(b.first) == 0) nodesDrawingOrder[b.first] = nodesDrawingOrder.size();
+            return nodesDrawingOrder[a.first] > nodesDrawingOrder[b.first];
+        });
+		
+        // Display nodes
+        //Iterating over the map gives errors as we are removing elements from the map during the iteration.
+        for(auto nodePair : nodesVisibleInThisFrame)
+        {
+            auto node = nodePair.second;
+            auto &nodeGui = node->getNodeGui();
+            string nodeId = nodePair.first;
             
             ImGui::PushID(nodeId.c_str());
 			
@@ -804,32 +819,24 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         //ImGui::PopStyleColor();
         
         auto getSourceConnectionPositionFromParameter = [this, offset](ofxOceanodeAbstractParameter& param) -> glm::vec2{
-            vector<ofxOceanodeNode*> allModules = container->getAllModules();
-            auto foundNode = std::find_if(allModules.begin(), allModules.end(), [&param](ofxOceanodeNode* &node){
-                return &node->getNodeModel() == param.getNodeModel();
-            });
-            if(foundNode != allModules.end()){
-                auto &gui = (*foundNode)->getNodeGui();
-                if(gui.getVisibility()){
-                    return gui.getSourceConnectionPositionFromParameter(param);
+            auto gui = container->getGuiFromModel(param.getNodeModel());
+            if(gui != nullptr){
+                if(gui->getVisibility()){
+                    return gui->getSourceConnectionPositionFromParameter(param);
                 }else{
-                    return gui.getPosition() + offset + glm::vec2(gui.getRectangle().getWidth(), gui.getRectangle().getHeight()/2);
+                    return gui->getPosition() + offset + glm::vec2(gui->getRectangle().getWidth(), gui->getRectangle().getHeight()/2);
                 }
             }
             return glm::vec2();
             //TODO: Throw exception
         };
         auto getSinkConnectionPositionFromParameter = [this, offset](ofxOceanodeAbstractParameter& param) -> glm::vec2{
-            vector<ofxOceanodeNode*> allModules = container->getAllModules();
-            auto foundNode = std::find_if(allModules.begin(), allModules.end(), [&param](ofxOceanodeNode* &node){
-                return &node->getNodeModel() == param.getNodeModel();
-            });
-            if(foundNode != allModules.end()){
-                auto &gui = (*foundNode)->getNodeGui();
-                if(gui.getVisibility()){
-                    return gui.getSinkConnectionPositionFromParameter(param);
+            auto gui = container->getGuiFromModel(param.getNodeModel());
+            if(gui != nullptr){
+                if(gui->getVisibility()){
+                    return gui->getSinkConnectionPositionFromParameter(param);
                 }else{
-                    return gui.getPosition() + offset + glm::vec2(0, gui.getRectangle().getHeight()/2);
+                    return gui->getPosition() + offset + glm::vec2(0, gui->getRectangle().getHeight()/2);
                 }
             }
             return glm::vec2();
@@ -838,12 +845,27 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         
         // Display links
         draw_list->ChannelsSetCurrent(1); // Background
-        for(auto &connection : container->getAllConnections()){
-            glm::vec2 p1 = getSourceConnectionPositionFromParameter(connection->getSourceParameter()) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
-            glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter()) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
-            glm::vec2  controlPoint(0,0);
-            controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
-            draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 200, 128), 2.0f);
+        
+        std::vector<ofxOceanodeAbstractConnection*> drawnConnections;
+        
+        for(auto nodePair : nodesVisibleInThisFrame)
+        {
+            for (auto &absParam : nodePair.second->getParameters()){
+                auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
+                auto connections = param->getOutConnections();
+                if(param->getInConnection() != nullptr) connections.push_back(param->getInConnection());
+                for(auto connection : connections){
+                    if(std::find(drawnConnections.begin(), drawnConnections.end(), connection) == drawnConnections.end()){
+                        glm::vec2 p1 = getSourceConnectionPositionFromParameter(connection->getSourceParameter()) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
+                        glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter()) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
+                        glm::vec2  controlPoint(0,0);
+                        controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
+                        draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 200, 128), 2.0f);
+                        drawnConnections.push_back(connection);
+                    }
+                }
+
+            }
         }
         if(tempSourceParameter != nullptr || tempSinkParameter != nullptr){
             glm::vec2 p1, p2;
