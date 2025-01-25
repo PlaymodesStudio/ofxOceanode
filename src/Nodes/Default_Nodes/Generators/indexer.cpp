@@ -148,10 +148,6 @@ void indexer::presetHasLoaded(){
 }
 
 void indexer::indexCountChanged(int &newIndexCount){
-    if(newIndexCount<1)
-    {
-        ofLog() << "WARNING !! Indexer tried to set a size < 0 . BaseIndexer will set size to 1";
-    }
     base.indexCountChanged(newIndexCount);
     if(indexCount > 1)
     {
