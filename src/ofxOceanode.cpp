@@ -394,9 +394,14 @@ void ofxOceanode::showHelpPopUp()
 }
 
 void ofxOceanode::drawShowModeWindow(){
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(255, 127, 0, 255));
+    float fps = ofGetFrameRate();
+    if(fps>=60.0) ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 200, 0, 255));
+    else if((fps>=50)&&(fps<60)) ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(150, 200, 0, 255));
+    else if((fps>=30)&&(fps<50)) ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(255, 100, 0, 255));
+    else ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(220, 0, 0, 255));
+    
     if(ImGui::Begin("#FPS")){
-        std::string text = ofToString(ofGetFrameRate());
+        std::string text = ofToString(fps);
         auto windowWidth = ImGui::GetWindowSize().x;
         auto windowHeight = ImGui::GetWindowSize().y;
         auto textWidth   = ImGui::CalcTextSize(text.c_str()).x;
