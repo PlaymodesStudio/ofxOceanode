@@ -288,6 +288,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             return nodesDrawingOrder[a.first] > nodesDrawingOrder[b.first];
         });
 		
+        std::unordered_set<std::string> deletedIds;
         // Display nodes
         //Iterating over the map gives errors as we are removing elements from the map during the iteration.
         for(auto nodePair : nodesVisibleInThisFrame)
@@ -507,6 +508,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     if(someSelectedModuleMove != "" && nodeGui.getSelected())
                         nodeGui.setPosition(nodeGui.getPosition() + moveSelectedModulesWithDrag);
                 }
+            }
+            else{
+                deletedIds.insert(nodeId);
             }
             ImGui::PopID();
 		}
@@ -850,6 +854,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         
         for(auto nodePair : nodesVisibleInThisFrame)
         {
+            if(deletedIds.count(nodePair.first) != 0) continue;
             for (auto &absParam : nodePair.second->getParameters()){
                 auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
                 auto connections = param->getOutConnections();
