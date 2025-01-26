@@ -262,6 +262,7 @@ void ofxOceanodePresetsController::draw(){
 
     ImGuiStyle style = ImGui::GetStyle();
 
+    sort(banks.begin(), banks.end());
     for(int b=0;b<banks.size();b++)
     {
         if(b==currentBank)
