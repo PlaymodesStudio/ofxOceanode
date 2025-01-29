@@ -632,13 +632,13 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 }
 
 bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referencePosition, bool allowOutsideInputs){
-    string presetFolderPath = "clipboardPreset";
+    of::filesystem::path presetFolderPath = of::filesystem::current_path() / "clipboardPreset";
     ofLog()<<"Load Clipboard Preset";
     
     map<string, map<int, int>> moduleConverter;
     vector<ofxOceanodeNode*> newCreatedNodes;
     
-    ofJson json = ofLoadJson(presetFolderPath + "/modules.json");
+    ofJson json = ofLoadJson(presetFolderPath / "modules.json");
     for (ofJson::iterator nodeType = json.begin(); nodeType != json.end(); ++nodeType) {
         for(ofJson::iterator nodeId = nodeType.value().begin(); nodeId != nodeType.value().end(); ++nodeId){
             ofLog() << nodeType.key() << " " << nodeId.key();
@@ -652,8 +652,8 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
             string escapedNodeName = nodeType.key();
             ofStringReplace(escapedNodeName, " ", "_");
             moduleConverter[escapedNodeName][ofToInt(nodeId.key())] = newNodeId;
-            ofJson tempJson = ofLoadJson(presetFolderPath + "/" + escapedNodeName + "_" + ofToString(ofToInt(nodeId.key())) + ".json");
-            ofSaveJson(presetFolderPath + "/" + escapedNodeName + "_" + ofToString(newNodeId) + ".json", tempJson);
+            ofJson tempJson = ofLoadJson(presetFolderPath / (escapedNodeName + "_" + ofToString(ofToInt(nodeId.key())) + ".json"));
+            ofSaveJson(presetFolderPath / (escapedNodeName + "_" + ofToString(newNodeId) + ".json"), tempJson);
         }
     }
 	
@@ -663,8 +663,8 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
 	for(auto &f : dir.getFiles()){
 		if(ofStringTimesInString(f.getFileName(), "Macro") && f.isDirectory()){
 			string sourceMappedModuleId = ofSplitString(f.getFileName(), "_").back();
-			ofDirectory dir2(presetFolderPath + "/" + f.getFileName());
-			dir2.moveTo(presetFolderPath + "/Macro_" + ofToString(moduleConverter["Macro"][ofToInt(sourceMappedModuleId)]), true);
+            ofDirectory dir2(presetFolderPath / f.getFileName());
+            dir2.moveTo(presetFolderPath / ("Macro_" + ofToString(moduleConverter["Macro"][ofToInt(sourceMappedModuleId)])), true);
 		}
 	}
 
@@ -675,7 +675,7 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
     
     
     json.clear();
-    json = ofLoadJson(presetFolderPath + "/connections.json");
+    json = ofLoadJson(presetFolderPath / "connections.json");
     for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
         for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
             for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
@@ -712,8 +712,8 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
 }
 
 void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanodeNode*> nodes, glm::vec2 referencePosition){
-    string presetFolderPath = "clipboardPreset";
-	ofDirectory::removeDirectory(presetFolderPath, true);
+    of::filesystem::path presetFolderPath = of::filesystem::current_path() / "clipboardPreset";
+    ofDirectory::removeDirectory(presetFolderPath, true, false);
     ofLog()<< "Save Clipboard Preset";
     
     vector<string> nodeAsParentNames;
@@ -727,7 +727,7 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
 #endif
         json[node->getNodeModel().nodeName()][ofToString(node->getNodeModel().getNumIdentifier(), 2, '0')] = {pos.x - referencePosition.x, pos.y - referencePosition.y};
     }
-    ofSavePrettyJson(presetFolderPath + "/modules.json", json);
+    ofSavePrettyJson(presetFolderPath / "modules.json", json);
     
     //TODO: search for connections in each parameter of the node? instead of searching all connections? try performance
     json.clear();
@@ -745,7 +745,7 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
         }
     }
     
-    ofSavePrettyJson(presetFolderPath + "/connections.json", json);
+    ofSavePrettyJson(presetFolderPath / "/connections.json", json);
     
     for(auto &node : nodes){
         node->savePreset(presetFolderPath);
