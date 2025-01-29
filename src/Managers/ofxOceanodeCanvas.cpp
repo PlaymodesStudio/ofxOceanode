@@ -271,14 +271,19 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             auto &nodeGui = node->getNodeGui();
             string nodeId = nodePair.first;
             
+            bool visibleNode = true;
             if(ofxOceanodeShared::getConfigurationFlags() & ofxOceanodeConfigurationFlags_DisableRenderAll){
                 if(!ofRectangle(ImGui::GetWindowPos() - offset, ImGui::GetWindowWidth(), ImGui::GetWindowHeight()).intersects(nodeGui.getRectangle()) && nodeGui.getRectangle().getWidth() > 0){
-                    nodeGui.setVisibility(false);
-                    continue;
+                    if(!nodeGui.getSelected())
+                        visibleNode = false;
                 }
             }
-            nodesVisibleInThisFrame.push_back(nodePair);
-            nodeGui.setVisibility(true);
+            if(visibleNode){
+                nodesVisibleInThisFrame.push_back(nodePair);
+                nodeGui.setVisibility(true);
+            }else{
+                nodeGui.setVisibility(false);
+            }
         }
         
         //reorder nodesInThisFrame, so they are in correct drawing order, for the interaction to work properly
