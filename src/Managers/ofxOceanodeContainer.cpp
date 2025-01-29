@@ -745,7 +745,7 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
         }
     }
     
-    ofSavePrettyJson(presetFolderPath / "/connections.json", json);
+    ofSavePrettyJson(presetFolderPath / "connections.json", json);
     
     for(auto &node : nodes){
         node->savePreset(presetFolderPath);
