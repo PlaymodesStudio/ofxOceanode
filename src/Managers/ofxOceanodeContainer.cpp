@@ -344,8 +344,13 @@ void ofxOceanodeContainer::loadPreset_loadNodes(string presetFolderPath){
         }
         //TODO: Only delete not persistent in the map
         parameterGroupNodesMap.clear();
-        dynamicNodes.clear();
-
+        std::vector<std::shared_ptr<ofxOceanodeNode>> allNodes;
+        for(auto &nodeTypeMap : dynamicNodes){
+            for(auto &node : nodeTypeMap.second){
+                allNodes.push_back(node.second);
+            }
+        }
+        for(auto n : allNodes) n->deleteSelf();
     }
 }
 
