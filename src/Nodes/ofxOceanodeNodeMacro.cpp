@@ -923,9 +923,9 @@ void ofxOceanodeNodeMacro::renderSnapshotMatrix() {
             }
             else if(hasData) {
                 //ofLogNotice("Matrix") << "Setting YELLOW for slot " << slot;
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.0f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.5f, 0.0f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.6f, 0.0f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.4f, 0.0f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.5f, 0.0f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.6f, 0.0f, 1.0f));
             }
             else {
                 //ofLogNotice("Matrix") << "Setting GRAY for slot " << slot;
@@ -938,7 +938,7 @@ void ofxOceanodeNodeMacro::renderSnapshotMatrix() {
 
             string label = (hasData && showSnapshotNames) ? snapshots[slot].name : ofToString(slot);
 
-            if(ImGui::Button(label.c_str(), ImVec2(buttonSize, buttonSize))) {
+            if(ImGui::Button(label.c_str(), ImVec2(buttonSize, buttonSize/1.5))) {
                 if(ImGui::GetIO().KeyShift) {
                     storeRouterSnapshot(slot);
                 } else {
