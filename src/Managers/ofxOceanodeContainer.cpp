@@ -431,6 +431,7 @@ void ofxOceanodeContainer::loadPreset_loadConnections(string presetFolderPath){
         oldConnectionsInfo[i][2] = connections[i]->getSinkParameter().getGroupHierarchyNames()[0];
 
     }
+    std::vector<string> notCreatedConnectionInfo;
     for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
         for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
             for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
@@ -448,10 +449,18 @@ void ofxOceanodeContainer::loadPreset_loadConnections(string presetFolderPath){
                     }
                     if(!connectionExist){
                         auto connection = createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key(), false);
+                        if(connection == nullptr){ //Connection could not be made
+                            notCreatedConnectionInfo.push_back(sourceModule.key() + "/" + sourceParameter.key() + " -> " + sinkModule.key() + "/" + sinkParameter.key());
+                        }
                     }
                 }
             }
         }
+    }
+    if(notCreatedConnectionInfo.size() != 0){
+        std::string message = "ERROR\nCOULD NOT CREATE CONNECTIONS\nIN " + getCanvasID();
+        for(auto l : notCreatedConnectionInfo) message += "\n" + l;
+        ofSystemAlertDialog(message);
     }
 }
 
