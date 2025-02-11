@@ -67,7 +67,8 @@ void baseIndexer::recomputeIndexs(){
             int index = i;
             
             //QUANTIZE
-            int newNumOfPixels = indexQuant_Param < 1 ? 1 : indexQuant_Param;
+			int validIndexQuant = std::min(indexCount, indexQuant_Param);
+            int newNumOfPixels = validIndexQuant < 1 ? 1 : validIndexQuant;
             
             index = (int)(index/((float)indexCount/(float)newNumOfPixels));
             
