@@ -40,7 +40,7 @@ void ofxOceanodeScope::setup(){
                     ImGui::Text("%3f", param.get()[0]);
                     ImGui::EndTooltip();
                 }
-            }else{
+            }else if(param->size()>0){
                 if(param.getMin()[0] == std::numeric_limits<float>::lowest() || param.getMax()[0] == std::numeric_limits<float>::max()){
                     ImGui::PlotHistogram("", &param.get()[0], param->size(), 0, NULL, *std::min_element(param->begin(), param->end()), *std::max_element(param->begin(), param->end()), size);
                 }else{
