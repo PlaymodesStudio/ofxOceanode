@@ -431,6 +431,7 @@ void ofxOceanodeContainer::loadPreset_loadConnections(string presetFolderPath){
         oldConnectionsInfo[i][2] = connections[i]->getSinkParameter().getGroupHierarchyNames()[0];
 
     }
+    std::vector<string> notCreatedConnectionInfo;
     for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
         for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
             for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
@@ -448,10 +449,18 @@ void ofxOceanodeContainer::loadPreset_loadConnections(string presetFolderPath){
                     }
                     if(!connectionExist){
                         auto connection = createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key(), false);
+                        if(connection == nullptr){ //Connection could not be made
+                            notCreatedConnectionInfo.push_back(sourceModule.key() + "/" + sourceParameter.key() + " -> " + sinkModule.key() + "/" + sinkParameter.key());
+                        }
                     }
                 }
             }
         }
+    }
+    if(notCreatedConnectionInfo.size() != 0){
+        std::string message = "ERROR\nCOULD NOT CREATE CONNECTIONS\nIN " + getCanvasID();
+        for(auto l : notCreatedConnectionInfo) message += "\n" + l;
+        ofSystemAlertDialog(message);
     }
 }
 
@@ -638,6 +647,7 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 
 bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referencePosition, bool allowOutsideInputs){
     of::filesystem::path presetFolderPath = of::filesystem::current_path() / "clipboardPreset";
+    of::filesystem::path tempLoadFolderPath = presetFolderPath / "tempLoad";
     ofLog()<<"Load Clipboard Preset";
     
     map<string, map<int, int>> moduleConverter;
@@ -658,7 +668,7 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
             ofStringReplace(escapedNodeName, " ", "_");
             moduleConverter[escapedNodeName][ofToInt(nodeId.key())] = newNodeId;
             ofJson tempJson = ofLoadJson(presetFolderPath / (escapedNodeName + "_" + ofToString(ofToInt(nodeId.key())) + ".json"));
-            ofSaveJson(presetFolderPath / (escapedNodeName + "_" + ofToString(newNodeId) + ".json"), tempJson);
+            ofSaveJson(tempLoadFolderPath / (escapedNodeName + "_" + ofToString(newNodeId) + ".json"), tempJson);
         }
     }
 	
@@ -669,13 +679,13 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
 		if(ofStringTimesInString(f.getFileName(), "Macro") && f.isDirectory()){
 			string sourceMappedModuleId = ofSplitString(f.getFileName(), "_").back();
             ofDirectory dir2(presetFolderPath / f.getFileName());
-            dir2.moveTo(presetFolderPath / ("Macro_" + ofToString(moduleConverter["Macro"][ofToInt(sourceMappedModuleId)])), true);
+            dir2.copyTo(tempLoadFolderPath / ("Macro_" + ofToString(moduleConverter["Macro"][ofToInt(sourceMappedModuleId)])), true);
 		}
 	}
 
 
     for(auto node : newCreatedNodes){
-        node->loadPresetBeforeConnections(presetFolderPath);
+        node->loadPresetBeforeConnections(tempLoadFolderPath);
     }
     
     
@@ -706,12 +716,14 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
     }
 //
     for(auto node : newCreatedNodes){
-        node->loadPreset(presetFolderPath);
+        node->loadPreset(tempLoadFolderPath);
     }
     
     for(auto node : newCreatedNodes){
         node->presetHasLoaded();
     }
+    
+    ofDirectory::removeDirectory(tempLoadFolderPath, true);
 
     return true;
 }

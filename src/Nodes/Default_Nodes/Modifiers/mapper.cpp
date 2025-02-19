@@ -37,23 +37,26 @@ void mapper::setup() {
 
 void mapper::recalculate()
 {
-    auto getElementFromIndex = [this](const vector<float> &f, int index) -> float{
-        if(index < f.size()){
-            return f[index];
-        }else{
-            return f[0];
-        }
-    };
+	if(minInput.get().size()!=0 && maxInput.get().size()!=0 && minOutput.get().size()!=0 && maxOutput.get().size()!=0 && input.get().size()!=0 )
+	{
+		auto getElementFromIndex = [this](const vector<float> &f, int index) -> float{
+				if(index < f.size() ){
+					return f[index];
+				}else{
+					return f[0];
+				}
+		};
     
-    
-    vector<float> tempOut(max({input->size(), minInput->size(), maxInput->size(), minOutput->size(), maxOutput->size()}), 0);
-    for(int i = 0; i < tempOut.size(); i++){
-		if(getElementFromIndex(minInput, i) == getElementFromIndex(maxInput, i)){
-			tempOut[i] = getElementFromIndex(input, i) < getElementFromIndex(minInput, i) ? getElementFromIndex(minOutput, i) : getElementFromIndex(maxOutput, i);
-		}else{
-			tempOut[i] = ofMap(getElementFromIndex(input, i), getElementFromIndex(minInput, i), getElementFromIndex(maxInput, i), getElementFromIndex(minOutput, i), getElementFromIndex(maxOutput, i), true);
+		vector<float> tempOut(max({input->size(), minInput->size(), maxInput->size(), minOutput->size(), maxOutput->size()}), 0);
+		for(int i = 0; i < tempOut.size(); i++){
+			if(getElementFromIndex(minInput, i) == getElementFromIndex(maxInput, i)){
+				tempOut[i] = getElementFromIndex(input, i) < getElementFromIndex(minInput, i) ? getElementFromIndex(minOutput, i) : getElementFromIndex(maxOutput, i);
+			}else{
+				tempOut[i] = ofMap(getElementFromIndex(input, i), getElementFromIndex(minInput, i), getElementFromIndex(maxInput, i), getElementFromIndex(minOutput, i), getElementFromIndex(maxOutput, i), true);
+			}
 		}
-    }
-    output = tempOut;
+		output = tempOut;
+	}
+	
 }
 
