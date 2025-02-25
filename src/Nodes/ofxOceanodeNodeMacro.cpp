@@ -1128,7 +1128,7 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path) {
        json["Macro"] = currentMacro;
        json["MacroPath"] = currentMacroPath;
        
-       container->savePreset(currentMacroPath);
+       //container->savePreset(currentMacroPath);
    }
 }
 
