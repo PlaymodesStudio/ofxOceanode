@@ -109,6 +109,27 @@ public:
         return op;
     }
     
+    shared_ptr<ofxOceanodeParameter<vector<int>>> addParameterDropdown(ofParameter<vector<int>> &dropdownSelector, string name, int defaultPos, vector<string> options, ofxOceanodeParameterFlags flags = 0){
+        dropdownSelector.set(name, {defaultPos}, {0}, vector<int>(1, options.size()-1));
+        auto op = addParameter(dropdownSelector, flags);
+        op->setDropdownOptions(options);
+        return op;
+    }
+    
+    shared_ptr<ofxOceanodeParameter<float>> addParameterDropdown(ofParameter<float> &dropdownSelector, string name, int defaultPos, vector<string> options, ofxOceanodeParameterFlags flags = 0){
+        dropdownSelector.set(name, defaultPos, 0, options.size()-1);
+        auto op = addParameter(dropdownSelector, flags);
+        op->setDropdownOptions(options);
+        return op;
+    }
+    
+    shared_ptr<ofxOceanodeParameter<vector<float>>> addParameterDropdown(ofParameter<vector<float>> &dropdownSelector, string name, int defaultPos, vector<string> options, ofxOceanodeParameterFlags flags = 0){
+        dropdownSelector.set(name, {(float)defaultPos}, {0}, vector<float>(1, options.size()-1));
+        auto op = addParameter(dropdownSelector, flags);
+        op->setDropdownOptions(options);
+        return op;
+    }
+    
     shared_ptr<ofxOceanodeParameter<std::function<void()>>> addCustomRegion(customGuiRegion &p, std::function<void()> func){
         return addParameter(p.set(func), ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisableOutConnection | ofxOceanodeParameterFlags_DisableSavePreset | ofxOceanodeParameterFlags_DisableSaveProject);
     }
