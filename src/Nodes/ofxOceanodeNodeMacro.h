@@ -3,7 +3,7 @@
 //  example-basic
 //
 //  Created by Eduard Frigola Bagué on 20/06/2019.
-//
+//	Snapshot management added by Santi Vilanova on January 2025
 
 #ifndef ofxOceanodeNodeMacro_h
 #define ofxOceanodeNodeMacro_h
