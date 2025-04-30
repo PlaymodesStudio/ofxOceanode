@@ -671,16 +671,20 @@ void ofxOceanodeNodeMacro::updateRouterConnections() {
 
 void ofxOceanodeNodeMacro::updateRouterInfo(ofxOceanodeNode* node) {
 	auto& params = node->getParameters();
-	auto valueParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get("Value"));
 	
-	if(valueParam) {
-		RouterInfo info;
-		info.node = node;
-		info.routerName = static_cast<abstractRouter&>(node->getNodeModel()).getNameParam().get();
-		info.parameterType = valueParam->valueType();
-		info.isInput = checkIsInputRouter(node);
+	// Check if "Value" parameter exists before trying to access it
+	if(params.contains("Value")) {
+		auto valueParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get("Value"));
 		
-		routerNodes[info.routerName] = info;
+		if(valueParam) {
+			RouterInfo info;
+			info.node = node;
+			info.routerName = static_cast<abstractRouter&>(node->getNodeModel()).getNameParam().get();
+			info.parameterType = valueParam->valueType();
+			info.isInput = checkIsInputRouter(node);
+			
+			routerNodes[info.routerName] = info;
+		}
 	}
 }
 
