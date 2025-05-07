@@ -552,7 +552,7 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 			auto currentCategoryVec = json["CategoryStruct"].get<deque<string>>();
 			currentCategory = currentCategoryVec;
 			currentMacro = json["Macro"];
-			//currentMacroPath = json.value("MacroPath", "");
+			currentMacroPath = "";
 
 			if(currentMacroPath.empty()) {
 				auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
