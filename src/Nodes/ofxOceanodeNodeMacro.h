@@ -192,7 +192,8 @@ private:
 	
 	ofParameter<bool> active;
 	ofParameter<std::function<void()>> presetControl;
-	
+	ofParameter<std::function<void()>> presetNaming;
+
 	// Snapshot-related Parameters
 	ofParameter<std::function<void()>> snapshotInspector;
 	ofParameter<int> matrixRows;

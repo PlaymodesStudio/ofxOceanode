@@ -97,6 +97,7 @@ void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
 }
 
 void ofxOceanodeNodeMacro::setup(string additionalInfo){
+	
 	// Core parameters
 	addParameter(active.set("Active", true));
 	activeListener = active.newListener([this](bool &b){
@@ -110,57 +111,10 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 		}
 		lastActiveState = b;
 	});
-	
-	// Add snapshot parameters
-	addParameter(activeSnapshotSlot.set("Snapshot", -1, -1, 64));
-	addInspectorParameter(matrixRows.set("Snapshot Rows", 2, 1, 8));
-	addInspectorParameter(matrixCols.set("Snapshot Cols", 8, 1, 8));
-	addInspectorParameter(buttonSize.set("Button Size", 28.0f, 15.0f, 60.0f));
-	addInspectorParameter(showSnapshotNames.set("Show Names", true));
-	addInspectorParameter(addSnapshotButton.set("Add Snapshot"));
-	
-	// Add snapshot inspector
-	addInspectorParameter(snapshotInspector.set("Snapshot Names", [this]() {
-		renderInspectorInterface();
-	}));
-	
-	// Setup snapshot event listeners
-	addSnapshotListener = addSnapshotButton.newListener([this](){
-		int newSlot = snapshots.size();
-		storeRouterSnapshot(newSlot);
-	});
-	
-	matrixSizeListener = matrixRows.newListener([this](int& value){
-		onMatrixSizeChanged(value);
-	});
-	
-	activeSnapshotSlotListener = activeSnapshotSlot.newListener([this](int& slot){
-		if(slot >= 0) {
-			loadRouterSnapshot(slot);
-		}
-	});
-	
-	// Setup preset control
+
 	auto presetControlRef = addParameter(presetControl.set("Preset Control Gui", [this](){
+		
 		bool addBank = false;
-		
-		if(ImGui::Checkbox("Local Macro", &localPreset)){
-			if(currentMacro == ""){
-				localPreset = true;
-			}
-			if(!localPreset){
-				container->loadPreset(currentMacroPath);
-			}
-		}
-		ImGui::SameLine();
-		ImGui::Checkbox("Show Window", &showWindow);
-		
-		// Render snapshot matrix
-		if(showSnapshotMatrix) {
-			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
-			renderSnapshotMatrix();
-			ImGui::PopStyleVar();
-		}
 		
 		if(localPreset){
 			ImGui::Text(localName->c_str());
@@ -215,23 +169,23 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 		if(addBank){
 			ImGui::OpenPopup("Add New Macro Bank");
 		}
-				
+		
 		if(ImGui::BeginPopupModal("Add New Macro Bank", NULL, ImGuiWindowFlags_AlwaysAutoResize)){
 			static char cString[256];
 			if (ImGui::InputText("Bank Name", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
 			{
-//                string proposedNewName(cString);
-//                ofStringReplace(proposedNewName, " ", "_");
-//                if(find(banks.begin(), banks.end(), proposedNewName) == banks.end()){
-//                    if(proposedNewName != ""){
-//                        banks.push_back(proposedNewName);
-//                        currentBank = banks.size()-1;
-//                        currentPreset[banks[currentBank]] = "";
-//                    }
+				//                string proposedNewName(cString);
+				//                ofStringReplace(proposedNewName, " ", "_");
+				//                if(find(banks.begin(), banks.end(), proposedNewName) == banks.end()){
+				//                    if(proposedNewName != ""){
+				//                        banks.push_back(proposedNewName);
+				//                        currentBank = banks.size()-1;
+				//                        currentPreset[banks[currentBank]] = "";
+				//                    }
 				ImGui::CloseCurrentPopup();
 				//TODO: New Bank
-//                }
-//                strcpy(cString, "");
+				//                }
+				//                strcpy(cString, "");
 			}
 			if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsItemActive()){
 				strcpy(cString, "");
@@ -240,10 +194,19 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			ImGui::EndPopup();
 		}
 		
+		if(ImGui::Checkbox("Is Local?", &localPreset)){
+			if(currentMacro == ""){
+				localPreset = true;
+			}
+			if(!localPreset){
+				container->loadPreset(currentMacroPath);
+			}
+		}
 		ImGui::SameLine();
+		ImGui::Checkbox("Show Window?", &showWindow);
 		
 		bool firstSaveAsOpen = false;
-		if (ImGui::Button("Save")){
+		if (ImGui::Button("[Save]")){
 			ofLog() << "Save current preset and notify other macros";
 			// If we try to save a new macro or a local preset, the save macro as window apears
 			if(currentMacroPath == "" || localPreset){
@@ -258,7 +221,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 		
 		ImGui::SameLine();
 		
-		if (ImGui::Button("Save As")){
+		if (ImGui::Button("[Save As]")){
 			ImGui::OpenPopup("Save Macro As :");
 			firstSaveAsOpen = true;
 		}
@@ -376,10 +339,60 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			}
 			ImGui::EndPopup();
 		}
+
+		
+		ImGui::Text(". . . . . . . . . . . . . . . . .");
+
+	}));
+	
+	
+	
+	// Add snapshot parameters
+	addParameter(activeSnapshotSlot.set("Snapshot", -1, -1, 64));
+	
+	
+	addInspectorParameter(matrixRows.set("Snapshot Rows", 2, 1, 8));
+	addInspectorParameter(matrixCols.set("Snapshot Cols", 8, 1, 8));
+	addInspectorParameter(buttonSize.set("Button Size", 28.0f, 15.0f, 60.0f));
+	addInspectorParameter(showSnapshotNames.set("Show Names", true));
+	addInspectorParameter(addSnapshotButton.set("Add Snapshot"));
+	
+	// Add snapshot inspector
+	addInspectorParameter(snapshotInspector.set("Snapshot Names", [this]() {
+		renderInspectorInterface();
+	}));
+	
+	// Setup snapshot event listeners
+	addSnapshotListener = addSnapshotButton.newListener([this](){
+		int newSlot = snapshots.size();
+		storeRouterSnapshot(newSlot);
+	});
+	
+	matrixSizeListener = matrixRows.newListener([this](int& value){
+		onMatrixSizeChanged(value);
+	});
+	
+	activeSnapshotSlotListener = activeSnapshotSlot.newListener([this](int& slot){
+		if(slot >= 0) {
+			loadRouterSnapshot(slot);
+		}
+	});
+	
+	// Setup preset control
+	auto presetNamingRef = addParameter(presetNaming.set("Preset Naming Gui", [this](){
+
+//		ImGui::SameLine();
+		// Render snapshot matrix
+		if(showSnapshotMatrix) {
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
+			renderSnapshotMatrix();
+			ImGui::PopStyleVar();
+		}
+
+		
 		
 //		ImGui::PopStyleColor(1);
-		ImGui::Spacing();
-		ImGui::Spacing();
+		ImGui::Text(". . . . . . . . . . . . . . . . .");
 	}));
 	
 	presetControlRef->addReceiveFunc<int>([this](const int &i){
@@ -798,9 +811,9 @@ void ofxOceanodeNodeMacro::renderSnapshotMatrix() {
 			
 			// Set button colors based on state
 			if(isActive) {
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.4f, 0.0f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.5f, 0.0f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.6f, 0.0f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.0f, 0.0f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.7f, 0.0f, 0.0f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
 			}
 			else if(hasData) {
 				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.4f, 0.0f, 1.0f));
@@ -1038,7 +1051,7 @@ void ofxOceanodeNodeMacro::storeRouterSnapshot(int slot) {
 	if(existingSnapshot != snapshots.end()) {
 		snapshotData.name = existingSnapshot->second.name;
 	} else {
-		snapshotData.name = "Snapshot " + ofToString(slot);
+		snapshotData.name = ofToString(slot);
 	}
 	
 	for(auto& routerPair : routerNodes) {
