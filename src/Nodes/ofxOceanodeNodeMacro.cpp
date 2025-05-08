@@ -75,6 +75,7 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 	if(nextPresetPath != ""){
 		localPreset = false;
         isLoadingPreset = true;
+        if(clearContainerOnLoad) container->clearContainer();
 		container->loadPreset(nextPresetPath);
         isLoadingPreset = false;
 		nextPresetPath = "";
@@ -437,6 +438,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	macroUpdatedListener = ofxOceanodeShared::getMacroUpdatedEvent().newListener([this](string &s){
 		ofLog() << s;
 		if(s == currentMacroPath && !localPreset){
+            if(clearContainerOnLoad) container->clearContainer();
 			container->loadPreset(currentMacroPath);
 		}
 	});
@@ -447,6 +449,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	});
 	addInspectorParameter(localName.set("Local Name", "Local"));
 	addInspectorParameter(resetPhaseOnActive.set("Reset Ph on Active", false));
+    addInspectorParameter(clearContainerOnLoad.set("Clear Container on Load Preset", false));
 }
 
 void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
@@ -572,6 +575,8 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 }
 */
 void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
+    deserializeParameter(json, clearContainerOnLoad);
+    if(clearContainerOnLoad) container->clearContainer();
     isLoadingPreset = true;
 	try {
 		localPreset = json.value("LocalPreset", true);

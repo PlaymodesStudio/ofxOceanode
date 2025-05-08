@@ -179,6 +179,8 @@ private:
 	
 	ofParameter<ofColor> colorParam;
 	ofParameter<bool> resetPhaseOnActive;
+    
+    ofParameter<bool> clearContainerOnLoad;
 	
 	bool localPreset;
 	bool lastActiveState;
