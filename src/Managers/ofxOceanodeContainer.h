@@ -136,6 +136,7 @@ public:
     ofEvent<float> changedBpmEvent;
     ofEvent<void> saveCurrentPresetEvent;
     ofEvent<ofxOceanodeNode*> newNodeCreated;
+    ofEvent<void> allNodesCreated;
     
 #ifdef OFXOCEANODE_USE_OSC
     void receiveOscMessage(ofxOscMessage &m);

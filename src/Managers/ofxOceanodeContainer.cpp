@@ -364,6 +364,7 @@ void ofxOceanodeContainer::loadPreset_loadNodes(string presetFolderPath){
         }
         for(auto n : allNodes) n->deleteSelf();
     }
+    allNodesCreated.notify(this);
 }
 
 void ofxOceanodeContainer::loadPreset_deactivateConnections(){

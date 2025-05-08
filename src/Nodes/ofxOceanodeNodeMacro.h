@@ -93,6 +93,7 @@ public:
 private:
 	// Node Management
 	void newNodeCreated(ofxOceanodeNode* &node);
+    void allNodesCreated();
 	void loadMacroInsideCategory(int newPresetIndex);
 	void updateCurrentCategoryFromPath(string path);
 	
@@ -189,6 +190,10 @@ private:
 	shared_ptr<macroCategory> currentCategoryMacro;
 	deque<string> saveAsTempCategory;
 	ofParameter<string> localName;
+    
+    ofEventListener allNodesCreatedListener;
+    bool isLoadingPreset;
+    std::vector<ofxOceanodeNode*> toCreateRouters;
 	
 	ofParameter<bool> active;
 	ofParameter<std::function<void()>> presetControl;

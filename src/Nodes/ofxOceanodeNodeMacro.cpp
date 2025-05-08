@@ -17,6 +17,7 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
 	showWindow = false;
 	localPreset = true;
 	lastActiveState = true;
+    isLoadingPreset = false;
 	
 	// Initialize snapshot system members
 	currentSnapshotSlot = -1;
@@ -73,7 +74,9 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
 void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 	if(nextPresetPath != ""){
 		localPreset = false;
+        isLoadingPreset = true;
 		container->loadPreset(nextPresetPath);
+        isLoadingPreset = false;
 		nextPresetPath = "";
 	}
 	if(active){
@@ -414,13 +417,16 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	// Initialize container
 	container = make_shared<ofxOceanodeContainer>(registry, typesRegistry);
 	newNodeListener = container->newNodeCreated.newListener(this, &ofxOceanodeNodeMacro::newNodeCreated);
+    allNodesCreatedListener = container->allNodesCreated.newListener(this, &ofxOceanodeNodeMacro::allNodesCreated);
 	
 	canvas.setContainer(container);
 	canvas.setup("Macro " + ofToString(getNumIdentifier()), canvasParentID);
 	
 	if(additionalInfo != ""){
 		localPreset = false;
+        isLoadingPreset = true;
 		container->loadPreset(additionalInfo);
+        isLoadingPreset = false;
 		updateCurrentCategoryFromPath(additionalInfo);
 		currentMacroPath = additionalInfo;
 		
@@ -446,6 +452,10 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 	string nodeName = node->getParameters().getName();
 	if(ofSplitString(nodeName, " ")[0] == "Router"){
+        if(isLoadingPreset){
+            toCreateRouters.push_back(node);
+            return;
+        }
 		auto newCreatedParam = typesRegistry->createRouterFromType(node);
 		string paramName = newCreatedParam->getName();
 		while (getParameterGroup().contains(paramName)) {
@@ -467,6 +477,38 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 	}
 	ofEventArgs args;
 	node->update(args);
+}
+
+void ofxOceanodeNodeMacro::allNodesCreated(){
+    //sort all nodes by y position
+    std::sort(toCreateRouters.begin(), toCreateRouters.end(), [](ofxOceanodeNode* node1, ofxOceanodeNode* node2){
+                                                                    return node1->getNodeGui().getPosition().y < node2->getNodeGui().getPosition().y;
+                                                                });
+    
+    for(auto node : toCreateRouters){
+        auto newCreatedParam = typesRegistry->createRouterFromType(node);
+        string paramName = newCreatedParam->getName();
+        while (getParameterGroup().contains(paramName)) {
+            paramName = "_" + paramName;
+        }
+        newCreatedParam->setName(paramName);
+        addParameter(*newCreatedParam.get());
+        
+        ofParameter<string> nameParamFromRouter = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
+        nameParamFromRouter = paramName;
+        
+        parameterGroupChanged.notify(this);
+        deleteListeners.push(node->deleteModule.newListener([this, nameParamFromRouter](){
+            getParameterGroup().remove(nameParamFromRouter);
+        }, 0));
+        
+        // Update router info for snapshots
+        updateRouterInfo(node);
+        
+        ofEventArgs args;
+        node->update(args);
+    }
+    toCreateRouters.clear();
 }
 
 void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
@@ -530,6 +572,7 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 }
 */
 void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
+    isLoadingPreset = true;
 	try {
 		localPreset = json.value("LocalPreset", true);
 		
@@ -592,6 +635,7 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 		localPreset = true;
 		container->loadPreset(path + "/" + nodeName() + "_" + ofToString(getNumIdentifier()));
 	}
+    isLoadingPreset = false;
 }
 
 void ofxOceanodeNodeMacro::loadMacroInsideCategory(int newPresetIndex){
