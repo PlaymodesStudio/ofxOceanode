@@ -51,9 +51,6 @@ ofxOceanodeContainer::~ofxOceanodeContainer(){
 }
 
 void ofxOceanodeContainer::clearContainer(){
-    for(auto &c : connections){
-        c->deleteSelf();
-    }
     connections.clear();
     
     std::vector<shared_ptr<ofxOceanodeNode>> toDelete;
