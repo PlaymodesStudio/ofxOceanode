@@ -131,6 +131,7 @@ private:
 	void updateMacroDirectoryStructure();
 	void clearAllSnapshots();
 	void setupSnapshotInspectorParameters();
+	
 
 	// Router Value Management
 	std::map<string, RouterSnapshot> captureRouterValues();
