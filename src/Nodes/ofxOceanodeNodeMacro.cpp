@@ -575,7 +575,11 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 }
 */
 void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
-    deserializeParameter(json, clearContainerOnLoad);
+    if(json.count(clearContainerOnLoad.getEscapedName()) == 0){
+        clearContainerOnLoad = false;
+    }else{
+        deserializeParameter(json, clearContainerOnLoad);
+    }
     if(clearContainerOnLoad) container->clearContainer();
     isLoadingPreset = true;
 	try {
