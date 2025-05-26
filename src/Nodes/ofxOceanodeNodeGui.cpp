@@ -398,12 +398,14 @@ bool ofxOceanodeNodeGui::constructGui(){
                     // PARAM STRING
                     ///////////////
                 }else if(absParam.valueType() == typeid(string).name()){
-                    auto tempCast = absParam.cast<string>().getParameter();
-                    char * cString = new char[1024];
-                    strcpy(cString, tempCast.get().c_str());
-                    auto result = false;
-                    if (ImGui::InputText(hiddenUniqueId.c_str(), cString, 1024, ImGuiInputTextFlags_EnterReturnsTrue))
-                    {
+					string tempCast = absParam.cast<string>().getParameter();
+					size_t bufferSize = max(static_cast<size_t>(1024), tempCast.length() + 256);
+					char * cString = new char[bufferSize];
+					strncpy(cString, tempCast.c_str(), bufferSize - 1);
+					cString[bufferSize - 1] = '\0';
+					auto result = false;
+					if (ImGui::InputText(hiddenUniqueId.c_str(), cString, bufferSize, ImGuiInputTextFlags_EnterReturnsTrue))
+					{
                         tempCast = cString;
                     }
                     delete[] cString;
