@@ -395,13 +395,13 @@ bool ofxOceanodeNodeGui::constructGui(){
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast.trigger();
                     }
-                    // PARAM STRING
-                    ///////////////
+				// PARAM STRING
+				///////////////
                 }else if(absParam.valueType() == typeid(string).name()){
-					string tempCast = absParam.cast<string>().getParameter();
-					size_t bufferSize = max(static_cast<size_t>(1024), tempCast.length() + 256);
+					auto tempCast = absParam.cast<string>().getParameter();
+					size_t bufferSize = max(static_cast<size_t>(1024), tempCast.get().length() + 256);
 					char * cString = new char[bufferSize];
-					strncpy(cString, tempCast.c_str(), bufferSize - 1);
+					strncpy(cString, tempCast.get().c_str(), bufferSize - 1);
 					cString[bufferSize - 1] = '\0';
 					auto result = false;
 					if (ImGui::InputText(hiddenUniqueId.c_str(), cString, bufferSize, ImGuiInputTextFlags_EnterReturnsTrue))
