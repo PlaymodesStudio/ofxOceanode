@@ -40,7 +40,9 @@ enum lineType2{
 
 struct line2{
 	lineType2 type = LINE2_TENSION;
-	float tensionExponent = 1.0f;
+	float tensionExponent = 1.0f;  // Now controls asymmetry parameter ν
+	float inflectionX = 0.5f;      // Normalized position 0-1 within segment
+	float segmentB = 6.0f;         // Per-segment B parameter (default 6.0)
 };
 
 class curve2 : public ofxOceanodeNodeModel{
@@ -56,6 +58,13 @@ public:
 	void presetRecallAfterSettingParameters(ofJson &json);
 
 private:
+    // Parameter limits as class constants
+    static constexpr float MIN_B_PARAMETER = 0.01f;
+    static constexpr float MAX_B_PARAMETER = 100.0f;
+    static constexpr float MIN_INFLECTION_X = 0.01f;
+    static constexpr float MAX_INFLECTION_X = 0.99f;
+    static constexpr float MIN_ASYMMETRY = 0.02f;
+    static constexpr float MAX_ASYMMETRY = 10.0f;  // Changed from 100.0
     
     ofEventListeners listeners;
     
@@ -83,13 +92,31 @@ private:
 	int tensionDragSegmentIndex = -1;
 	float tensionDragStartExponent = 1.0f;
 	
+	// Cmd+drag (Ctrl+drag on non-Mac) B parameter control variables
+	bool bDragActive = false;
+	glm::vec2 bDragStartPos;
+	int bDragSegmentIndex = -1;
+	float bDragStartValue = 6.0f;
+	
 	// Point highlighting system
 	int hoveredPointIndex = -1;
+	
+	// Segment hover detection system
+	int hoveredSegmentIndex = -1;
     
     ofParameter<string> curveName;
     ofParameter<ofColor> colorParam;
     ofColor color;
     ofEventListener colorListener;
+    
+    // Global logistic parameters
+    ofParameter<float> globalQ;  // Global scaling parameter (default 1.0)
+    
+    // Snap to grid functionality
+    ofParameter<bool> snapToGrid;  // Enable/disable snap to grid
+    
+    // Show info toggle functionality
+    ofParameter<bool> showInfo;  // Enable/disable text area visibility
 
 };
 
