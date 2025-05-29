@@ -107,14 +107,25 @@ void curve2::draw(ofEventArgs &args){
             ImGui::PopStyleColor();
             ImGui::SameLine();
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
-			if(ImGui::Button("[Clear]"))
+			if(ImGui::Button("[Reset]"))
 			{
+				// Clear existing points and lines
 				points.clear();
+				lines.clear();
+				
+				// Create default curve with 2 points: (0,0) and (1,1)
 				points.emplace_back(0, 0);
 				points.emplace_back(1, 1);
 				
+				// Set points as not newly created
 				points.front().firstCreated = false;
 				points.back().firstCreated = false;
+				
+				// Create default line segment with default values
+				lines.emplace_back();
+				
+				// Trigger recalculation of the curve
+				recalculate();
 			}
 			ImGui::PopStyleColor();
 			ImGui::PopStyleVar();
@@ -149,7 +160,7 @@ void curve2::draw(ofEventArgs &args){
 			// Create our child canvas with calculated height
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(50, 50, 50, 200));
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(25, 25, 25, 200));
 			ImGui::BeginChild("scrolling_region", ImVec2(0, curveEditorHeight), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
 			ImGui::PushItemWidth(120.0f);
 			
