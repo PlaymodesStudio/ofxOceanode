@@ -35,7 +35,7 @@ struct curvePoint2{
 
 enum lineType2{
 	LINE2_HOLD,
-    LINE2_TENSION
+	LINE2_TENSION
 };
 
 struct line2{
@@ -50,12 +50,10 @@ struct CurveData {
 	vector<curvePoint2> points;
 	vector<line2> lines;
 	
-	// Per-curve parameters (no individual name parameter)
+	// Per-curve parameters
+	ofParameter<string> name;
 	ofParameter<ofColor> color;
 	ofParameter<bool> enabled;
-	ofParameter<float> opacity;
-	ofParameter<float> minY;
-	ofParameter<float> maxY;
 	ofParameter<float> globalQ;  // Per-curve Q parameter
 	
 	CurveData() {
@@ -66,128 +64,126 @@ struct CurveData {
 		points.back().firstCreated = false;
 		lines.emplace_back();
 		
-		// Set default parameter values (no name parameter)
+		// Set default parameter values
+		name.set("Name", "Curve");
 		color.set("Color", ofColor(255, 128, 0, 255));
 		enabled.set("Enabled", true);
-		opacity.set("Opacity", 1.0f, 0.0f, 1.0f);
-		minY.set("Min Y", 0, -FLT_MAX, FLT_MAX);
-		maxY.set("Max Y", 1, -FLT_MAX, FLT_MAX);
 		globalQ.set("Global Q", 1.0f, 0.1f, 5.0f);
 	}
 };
 
 class curve2 : public ofxOceanodeNodeModel{
 public:
-    curve2();
-    ~curve2(){};
-    void setup() override;
+	curve2();
+	~curve2(){};
+	void setup() override;
 	void draw(ofEventArgs &args) override;
 	
 	void recalculate();
 	
 	void presetSave(ofJson &json);
 	void presetRecallAfterSettingParameters(ofJson &json);
-
+	
 private:
-    // Parameter limits as class constants
-    static constexpr float MIN_B_PARAMETER = 0.01f;
-    static constexpr float MAX_B_PARAMETER = 100.0f;
-    static constexpr float MIN_INFLECTION_X = 0.01f;
-    static constexpr float MAX_INFLECTION_X = 0.99f;
-    static constexpr float MIN_ASYMMETRY = 0.02f;
-    static constexpr float MAX_ASYMMETRY = 10.0f;  // Changed from 100.0
-    
-    ofEventListeners listeners;
-    
-    ofParameter<vector<float>>  input;
- ofParameter<bool> showWindow;
-    vector<ofParameter<vector<float>>> outputs;
- 
- ofParameter<int> numVerticalDivisions;
- ofParameter<int> numHorizontalDivisions;
-    
- // Global parameters (apply to all curves)
- ofParameter<float> minX, maxX;
-    
- vector<glm::vec2> debugPoints;
- 
- // Multi-curve support
- ofParameter<int> numCurves;      // Number of curves (default: 1)
- ofParameter<int> activeCurve;    // Currently selected curve index
- vector<CurveData> curves;        // Vector of curve data
- 
- // Legacy single-curve compatibility (references to active curve)
- vector<curvePoint2>& points;     // Reference to active curve points
- vector<line2>& lines;            // Reference to active curve lines
- 
- bool createPoint = false;
- curvePoint2* popupPoint;
- 
- // Shift+drag tension control variables
- bool tensionDragActive = false;
- glm::vec2 tensionDragStartPos;
- int tensionDragSegmentIndex = -1;
- float tensionDragStartExponent = 1.0f;
- 
- // Cmd+drag (Ctrl+drag on non-Mac) B parameter control variables
- bool bDragActive = false;
- glm::vec2 bDragStartPos;
- int bDragSegmentIndex = -1;
- float bDragStartValue = 6.0f;
- 
- // Point highlighting system
- int hoveredPointIndex = -1;
- 
- // Segment hover detection system
- int hoveredSegmentIndex = -1;
- 
- // PHASE 5: Curve selection and visual feedback system
- int hoveredCurveIndex = -1;        // Which inactive curve is being hovered
- bool showCurveLabels = true;       // Show curve names in editor
- float curveHitTestRadius = 8.0f;   // Distance threshold for curve selection
- 
- // Performance optimization flags
- bool needsRedraw = true;           // Flag to minimize unnecessary redraws
- int lastFrameMouseX = -1;          // Mouse position tracking for optimization
- int lastFrameMouseY = -1;
-    
-    // Legacy compatibility parameters (now reference active curve)
-    ofParameter<ofColor>& colorParam;
-    ofParameter<float>& minY;
-    ofParameter<float>& maxY;
-    ofParameter<float>& globalQ;
-    
-    ofColor color;
-    ofEventListener colorListener;
-    
-    // Snap to grid functionality
-    ofParameter<bool> snapToGrid;  // Enable/disable snap to grid
-    
-    // Show info toggle functionality
-    ofParameter<bool> showInfo;  // Enable/disable text area visibility
-    
-    // Inspector GUI parameter for tabbed interface
-    ofParameter<std::function<void()>> inspectorGui;
-    
-    // Curve management methods
-    void addCurve();
-    void removeCurve(int index);
-    void resizeCurves(int newCount);
-    CurveData& getCurrentCurve();
-    const CurveData& getCurrentCurve() const;
-    
-    // Output management methods
-    void addOutput();
-    void removeOutput();
-    void resizeOutputs(int count);
-    
-    // Parameter listeners
-    void onNumCurvesChanged(int& newCount);
-    void onActiveCurveChanged(int& newIndex);
-    
-    // Inspector interface rendering
-    void renderInspectorInterface();
-
+	// Parameter limits as class constants
+	static constexpr float MIN_B_PARAMETER = 0.01f;
+	static constexpr float MAX_B_PARAMETER = 100.0f;
+	static constexpr float MIN_INFLECTION_X = 0.01f;
+	static constexpr float MAX_INFLECTION_X = 0.99f;
+	static constexpr float MIN_ASYMMETRY = 0.02f;
+	static constexpr float MAX_ASYMMETRY = 10.0f;  // Changed from 100.0
+	
+	ofEventListeners listeners;
+	
+	ofParameter<vector<float>>  input;
+	ofParameter<bool> showWindow;
+	vector<ofParameter<vector<float>>> outputs;
+	ofParameter<vector<float>> allCurvesOutput;  // Consolidated output parameter
+	
+	ofParameter<int> numVerticalDivisions;
+	ofParameter<int> numHorizontalDivisions;
+	
+	// Global parameters (apply to all curves)
+	ofParameter<float> minX, maxX;
+	
+	vector<glm::vec2> debugPoints;
+	
+	// Multi-curve support
+	ofParameter<int> numCurves;      // Number of curves (default: 1)
+	ofParameter<int> activeCurve;    // Currently selected curve index (-1 = None, 0+ = curve index)
+	vector<CurveData> curves;        // Vector of curve data
+	
+	// Legacy single-curve compatibility (pointers to active curve)
+	vector<curvePoint2>* points;     // Pointer to active curve points
+	vector<line2>* lines;            // Pointer to active curve lines
+	
+	bool createPoint = false;
+	curvePoint2* popupPoint;
+	
+	// Shift+drag tension control variables
+	bool tensionDragActive = false;
+	glm::vec2 tensionDragStartPos;
+	int tensionDragSegmentIndex = -1;
+	float tensionDragStartExponent = 1.0f;
+	
+	// Cmd+drag (Ctrl+drag on non-Mac) B parameter control variables
+	bool bDragActive = false;
+	glm::vec2 bDragStartPos;
+	int bDragSegmentIndex = -1;
+	float bDragStartValue = 6.0f;
+	
+	// Point highlighting system
+	int hoveredPointIndex = -1;
+	
+	// Segment hover detection system
+	int hoveredSegmentIndex = -1;
+	
+	// PHASE 5: Curve selection and visual feedback system
+	int hoveredCurveIndex = -1;        // Which inactive curve is being hovered
+	bool showCurveLabels = true;       // Show curve names in editor
+	float curveHitTestRadius = 8.0f;   // Distance threshold for curve selection
+	
+	// Performance optimization flags
+	bool needsRedraw = true;           // Flag to minimize unnecessary redraws
+	int lastFrameMouseX = -1;          // Mouse position tracking for optimization
+	int lastFrameMouseY = -1;
+	
+	// Legacy compatibility parameters (now point to active curve)
+	ofParameter<ofColor>* colorParam;
+	ofParameter<float>* globalQ;
+	
+	ofColor color;
+	ofEventListener colorListener;
+	
+	// Snap to grid functionality
+	ofParameter<bool> snapToGrid;  // Enable/disable snap to grid
+	
+	// Show info toggle functionality
+	ofParameter<bool> showInfo;  // Enable/disable text area visibility
+	
+	// Inspector GUI parameter for tabbed interface
+	ofParameter<std::function<void()>> inspectorGui;
+	
+	// Curve management methods
+	void addCurve();
+	void removeCurve(int index);
+	void resizeCurves(int newCount);
+	CurveData& getCurrentCurve();
+	const CurveData& getCurrentCurve() const;
+	int findNextAvailableCurveNumber();
+	
+	// Output management methods
+	void addOutput();
+	void removeOutput();
+	void resizeOutputs(int count);
+	
+	// Parameter listeners
+	void onNumCurvesChanged(int& newCount);
+	void onActiveCurveChanged(int& newIndex);
+	
+	// Inspector interface rendering
+	void renderInspectorInterface();
+	
 };
 
 
