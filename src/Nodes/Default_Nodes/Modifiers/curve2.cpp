@@ -35,7 +35,7 @@ void drawDottedLine(ImDrawList* drawList, ImVec2 start, ImVec2 end, ImU32 color,
 
 void curve2::setup() {
     color = ofColor(255,128,0,255);
-    description = "Advanced curve editor with asymmetric logistic segments. Double-click: Create points | Drag: Move points | Right-click: Delete | Shift+drag: Asymmetry (vertical) + Inflection (horizontal) | Ctrl+drag: B parameter (vertical) + Inflection (horizontal) | Visual feedback: Yellow=Inflection, Cyan=Asymmetry, Red=B parameter | Snap to Grid: Enable for precise grid-aligned positioning";
+    description = "Advanced curve editor with asymmetric logistic segments. \n| Double-click: Create points \n| Drag: Move points \n| Right-click: Delete \n| Shift+drag: Asymmetry (vertical) + Inflection (horizontal) \n| Ctrl+drag: B parameter (horizontal) \n| Visual feedback: Yellow=Inflection, Cyan=Asymmetry, Red=B parameter \n| Snap to Grid: Enable for precise grid-aligned positioning";
     addParameter(curveName.set("Name",""));
     addParameter(input.set("Input", {0}, {0}, {1}));
 	addParameter(showWindow.set("Show", true));
@@ -187,14 +187,16 @@ void curve2::draw(ofEventArgs &args){
 				ImU32 GRID_COLOR = IM_COL32(120, 120, 120, 60);
 				ImVec2 cell_sz = visual_canvas_sz / ImVec2(numHorizontalDivisions, numVerticalDivisions);
 
-				for (float x = cell_sz.x; x < visual_canvas_sz.x; x += cell_sz.x)
+				// Draw vertical lines (skip first and last by starting at cell_sz.x and stopping before visual_canvas_sz.x)
+				for (float x = cell_sz.x; x < visual_canvas_sz.x - cell_sz.x * 0.5f; x += cell_sz.x)
 					draw_list->AddLine(ImVec2(x, 0.0f) + visual_win_pos, ImVec2(x, visual_canvas_sz.y) + visual_win_pos, GRID_COLOR);
-				for (float y = cell_sz.y; y < visual_canvas_sz.y; y += cell_sz.y)
+				// Draw horizontal lines (skip first and last by starting at cell_sz.y and stopping before visual_canvas_sz.y)
+				for (float y = cell_sz.y; y < visual_canvas_sz.y - cell_sz.y * 0.5f; y += cell_sz.y)
 					draw_list->AddLine(ImVec2(0.0f, y) + visual_win_pos, ImVec2(visual_canvas_sz.x, y) + visual_win_pos, GRID_COLOR);
 			}
 			
 			// Draw visual area boundary to show the safe zone effect
-			ImU32 BOUNDARY_COLOR = IM_COL32(80, 80, 80, 128);
+			ImU32 BOUNDARY_COLOR = IM_COL32(10, 10, 10, 128);
 			draw_list->AddRect(visual_win_pos,
 							   ImVec2(visual_win_pos.x + visual_canvas_sz.x, visual_win_pos.y + visual_canvas_sz.y),
 							   BOUNDARY_COLOR, 0.0f, 0, 2.0f);
@@ -679,32 +681,42 @@ void curve2::draw(ofEventArgs &args){
 			
 			draw_list->AddLine(denormalizePoint(glm::vec2(0, points[0].point.y)), denormalizePoint(points[0].point), IM_COL32(10, 10, 10, 255));
 			for(int i = 0; i < points.size()-1; i++){
-				// Determine if this segment should be highlighted in white
-				bool highlightSegment = false;
+				// Determine segment color based on drag state
+				bool whiteHighlight = false;
+				bool orangeHighlight = false;
 				
-				// Check for tension drag highlighting
+				// Check for tension drag highlighting (shift+drag) - use white
 				if(tensionDragActive && tensionDragSegmentIndex == i){
-					highlightSegment = true;
+					whiteHighlight = true;
 				}
 				
-				// Check for B parameter drag highlighting
+				// Check for B parameter drag highlighting (ctrl+drag) - use white
 				if(bDragActive && bDragSegmentIndex == i){
-					highlightSegment = true;
+					whiteHighlight = true;
 				}
 				
-				// Check for point drag highlighting (highlight segments connected to dragged point)
-				for(int p = 0; p < points.size(); p++){
-					if(points[p].drag == 3){
-						// Highlight segments connected to the dragged point
-						if((p == i) || (p == i + 1)){
-							highlightSegment = true;
-							break;
+				// Check for normal point drag highlighting - use orange
+				if(!whiteHighlight){
+					for(int p = 0; p < points.size(); p++){
+						if(points[p].drag == 3){
+							// Highlight segments connected to the dragged point in orange
+							if((p == i) || (p == i + 1)){
+								orangeHighlight = true;
+								break;
+							}
 						}
 					}
 				}
 				
 				// Choose color based on highlighting state
-				ImU32 segmentColor = highlightSegment ? IM_COL32(255, 255, 255, 255) : IM_COL32(color.r, color.g, color.b, 200);
+				ImU32 segmentColor;
+				if(whiteHighlight){
+					segmentColor = IM_COL32(255, 255, 255, 255); // White for shift/ctrl drag
+				} else if(orangeHighlight){
+					segmentColor = IM_COL32(color.r, color.g, color.b, 255); // Orange for normal drag
+				} else {
+					segmentColor = IM_COL32(color.r, color.g, color.b, 200); // Default orange with transparency
+				}
 				
 				if(lines[i].type == LINE2_HOLD){
 					auto p1 = denormalizePoint(points[i].point);
@@ -1077,3 +1089,4 @@ void curve2::presetRecallAfterSettingParameters(ofJson &json){
 	}
 	
 }
+
