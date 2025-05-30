@@ -1442,7 +1442,6 @@ void curve2::recalculate()
 			fill(tempOut.begin(), tempOut.end(), 0.0f);
 			// DIAGNOSTIC: Check shared_ptr before assignment
 			if(outputs[curveIdx]) {
-				ofLogNotice("curve2::recalculate") << "Setting disabled curve " << curveIdx << " output to zero";
 				*outputs[curveIdx] = tempOut;
 			} else {
 				ofLogError("curve2::recalculate") << "NULL shared_ptr for disabled curve " << curveIdx;
@@ -1661,13 +1660,8 @@ void curve2::presetRecallAfterSettingParameters(ofJson &json){
 //				}
 //			}
 			
-			// Set active curve
-			if(json.contains("ActiveCurve")){
-				int activeIdx = json["ActiveCurve"];
-				if(activeIdx >= 0 && activeIdx < curves.size()){
-					activeCurve.set(activeIdx);
-				}
-			}
+			// Always set active curve to "none" (-1) when loading presets
+			activeCurve.set(-1);
 			
 			// Restore consolidated output parameter if available
 			if(json.contains("AllCurvesOutput")){
@@ -1742,7 +1736,7 @@ void curve2::presetRecallAfterSettingParameters(ofJson &json){
 //			}
 			
 			numCurves.set(1);
-			activeCurve.set(0);
+			activeCurve.set(-1);
 			activeCurve.setMax(0);
 		}
 		
