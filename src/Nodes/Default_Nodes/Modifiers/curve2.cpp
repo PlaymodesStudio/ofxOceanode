@@ -33,37 +33,69 @@ void drawDottedLine(ImDrawList* drawList, ImVec2 start, ImVec2 end, ImU32 color,
     }
 }
 
+curve2::curve2() : ofxOceanodeNodeModel("curve2"),
+                   points(*(new vector<curvePoint2>())),
+                   lines(*(new vector<line2>())),
+                   colorParam(*(new ofParameter<ofColor>())),
+                   minY(*(new ofParameter<float>())),
+                   maxY(*(new ofParameter<float>())),
+                   globalQ(*(new ofParameter<float>())) {
+    // Initialize with one curve
+    curves.resize(1);
+    
+    // PHASE 5: Initialize new variables
+    hoveredCurveIndex = -1;
+    showCurveLabels = true;
+    curveHitTestRadius = 8.0f;
+    needsRedraw = true;
+    lastFrameMouseX = -1;
+    lastFrameMouseY = -1;
+    
+    // Update references to point to the first curve (safe reference assignment)
+    const_cast<vector<curvePoint2>&>(points) = curves[0].points;
+    const_cast<vector<line2>&>(lines) = curves[0].lines;
+    const_cast<ofParameter<ofColor>&>(colorParam) = curves[0].color;
+    const_cast<ofParameter<float>&>(minY) = curves[0].minY;
+    const_cast<ofParameter<float>&>(maxY) = curves[0].maxY;
+    const_cast<ofParameter<float>&>(globalQ) = curves[0].globalQ;
+}
+
 void curve2::setup() {
     color = ofColor(255,128,0,255);
     description = "Advanced curve editor with asymmetric logistic segments. \n| Double-click: Create points \n| Drag: Move points \n| Right-click: Delete \n| Shift+drag: Asymmetry (vertical) + Inflection (horizontal) \n| Ctrl+drag: B parameter (horizontal) \n| Visual feedback: Yellow=Inflection, Cyan=Asymmetry, Red=B parameter \n| Snap to Grid: Enable for precise grid-aligned positioning";
-    addParameter(curveName.set("Name",""));
+    
+    // Initialize multi-curve system
+    addParameter(numCurves.set("Num Curves", 1, 1, 16));
+    addParameter(activeCurve.set("Active Curve", 0, 0, 0));
+    
+    // Set up parameters
     addParameter(input.set("Input", {0}, {0}, {1}));
-	addParameter(showWindow.set("Show", true));
-    addOutputParameter(output.set("Output", {0}, {0}, {1}));
+ addParameter(showWindow.set("Show", true));
     
-	
-	addInspectorParameter(numHorizontalDivisions.set("Hor Div", 8, 1, 512));
-	addInspectorParameter(numVerticalDivisions.set("Vert Div", 4, 1, 512));
-	
-	addInspectorParameter(minX.set("Min X", 0, -FLT_MAX, FLT_MAX));
-	addInspectorParameter(maxX.set("Max X", 1, -FLT_MAX, FLT_MAX));
-	
-	addInspectorParameter(minY.set("Min Y", 0, -FLT_MAX, FLT_MAX));
-	addInspectorParameter(maxY.set("Max Y", 1, -FLT_MAX, FLT_MAX));
-    addInspectorParameter(colorParam.set("Color", color));
-    colorListener = colorParam.newListener([this](ofColor &c){
-        color = c;
-    });
+    // Initialize outputs based on numCurves
+    outputs.resize(numCurves.get());
+    for(int i = 0; i < outputs.size(); i++){
+        addOutputParameter(outputs[i].set("Output " + ofToString(i + 1), {0}, {0}, {1}));
+    }
     
-    // Initialize global logistic parameters
-    globalQ.set("Global Q (Scaling)", 1.0f, 0.1f, 5.0f);
-    
-    // Initialize snap to grid parameter
-    addInspectorParameter(snapToGrid.set("Snap to Grid", false));
-    
-    // Initialize show info parameter
-    addInspectorParameter(showInfo.set("Show Info", false));
+	   // Initialize parameters (but don't add them to inspector yet)
+	   numHorizontalDivisions.set("Hor Div", 8, 1, 512);
+	   numVerticalDivisions.set("Vert Div", 4, 1, 512);
+	   minX.set("Min X", 0, -FLT_MAX, FLT_MAX);
+	   maxX.set("Max X", 1, -FLT_MAX, FLT_MAX);
+	   snapToGrid.set("Snap to Grid", false);
+	   showInfo.set("Show Info", false);
+	   
+	   colorListener = colorParam.newListener([this](ofColor &c){
+	       color = c;
+	   });
+	   
+	   // Add the tabbed inspector GUI
+	   addInspectorParameter(inspectorGui.set("Inspector", [this](){
+	       renderInspectorInterface();
+	   }));
 
+    // Set up listeners
     listeners.push(input.newListener([&](vector<float> &vf){
         recalculate();
     }));
@@ -75,27 +107,32 @@ void curve2::setup() {
 		input.setMax(vector<float>(1, f));
 	}));
 	listeners.push(minY.newListener([this](float &f){
-		output.setMin(vector<float>(1, f));
+		for(auto& output : outputs){
+			output.setMin(vector<float>(1, f));
+		}
 	}));
 	listeners.push(maxY.newListener([this](float &f){
-		output.setMax(vector<float>(1, f));
+		for(auto& output : outputs){
+			output.setMax(vector<float>(1, f));
+		}
 	}));
 	
-	points.emplace_back(0, 0);
-	points.emplace_back(1, 1);
-	
-	points.front().firstCreated = false;
-	points.back().firstCreated = false;
-	
-	lines.emplace_back();
+	// Multi-curve listeners
+	listeners.push(numCurves.newListener([this](int &newCount){
+		onNumCurvesChanged(newCount);
+	}));
+	listeners.push(activeCurve.newListener([this](int &newIndex){
+		onActiveCurveChanged(newIndex);
+	}));
 }
 
 void curve2::draw(ofEventArgs &args){
 	
 	if(showWindow){
 		string modCanvasID = canvasID == "Canvas" ? "" : (canvasID + "/");
-		if(ImGui::Begin((ofToString(curveName) + "_" + modCanvasID + "Curve2 " + ofToString(getNumIdentifier())).c_str(), (bool *)&showWindow.get()))
-        {
+		string windowTitle = modCanvasID + "Curve2 " + ofToString(getNumIdentifier());
+		if(ImGui::Begin(windowTitle.c_str(), (bool *)&showWindow.get()))
+		      {
 			ImGui::SameLine();
 			ImGui::BeginGroup();
 			
@@ -103,8 +140,9 @@ void curve2::draw(ofEventArgs &args){
 			
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0,1.0,1.0,1.0));
-            ImGui::Text(ofToString(curveName).c_str());
-            ImGui::PopStyleColor();
+		          // Display simple curve identification by index
+		          ImGui::Text(("Curve " + ofToString(activeCurve.get() + 1)).c_str());
+		          ImGui::PopStyleColor();
             ImGui::SameLine();
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
 			if(ImGui::Button("[Reset]"))
@@ -247,25 +285,29 @@ void curve2::draw(ofEventArgs &args){
 				}
 			}
 			
-			// Point hover detection system
+			// PHASE 5: Enhanced hover detection system with curve selection
 			hoveredPointIndex = -1;
 			hoveredSegmentIndex = -1;
+			hoveredCurveIndex = -1;
+			
 			if(canvasHovered){
 				glm::vec2 mousePos = glm::vec2(ImGui::GetMousePos());
 				glm::vec2 normalizedMousePos = safeNormalizePoint(mousePos);
 				
-				// First check for point hover (higher priority)
-				for(int i = 0; i < points.size(); i++){
-					glm::vec2 pointPos = denormalizePoint(points[i].point);
-					float mouseToPointDistance = glm::distance(mousePos, pointPos);
-					if(mouseToPointDistance < 15){ // Increased hover detection radius
-						hoveredPointIndex = i;
-						break;
+				// First check for point hover on active curve (highest priority)
+				if(activeCurve.get() < curves.size() && curves[activeCurve.get()].enabled.get()){
+					for(int i = 0; i < points.size(); i++){
+						glm::vec2 pointPos = denormalizePoint(points[i].point);
+						float mouseToPointDistance = glm::distance(mousePos, pointPos);
+						if(mouseToPointDistance < 15){ // Increased hover detection radius
+							hoveredPointIndex = i;
+							break;
+						}
 					}
 				}
 				
-				// If no point is hovered, check for segment hover
-				if(hoveredPointIndex == -1){
+				// If no point is hovered, check for segment hover on active curve
+				if(hoveredPointIndex == -1 && activeCurve.get() < curves.size() && curves[activeCurve.get()].enabled.get()){
 					for(int i = 0; i < points.size()-1; i++){
 						if(normalizedMousePos.x >= points[i].point.x &&
 						   normalizedMousePos.x <= points[i+1].point.x &&
@@ -275,9 +317,62 @@ void curve2::draw(ofEventArgs &args){
 						}
 					}
 				}
+				
+				// PHASE 5: If no active curve elements are hovered, check for inactive curve hover
+				if(hoveredPointIndex == -1 && hoveredSegmentIndex == -1){
+					float closestDistance = curveHitTestRadius;
+					int closestCurveIndex = -1;
+					
+					// Check all inactive curves for hover
+					for(int curveIdx = 0; curveIdx < curves.size(); curveIdx++){
+						auto& curve = curves[curveIdx];
+						
+						// Skip disabled curves and active curve
+						if(!curve.enabled.get() || curveIdx == activeCurve.get()) continue;
+						
+						// Check distance to curve segments
+						for(int i = 0; i < curve.points.size()-1; i++){
+							// For performance, only check curves within X range
+							if(normalizedMousePos.x < curve.points[i].point.x - 0.05f ||
+							   normalizedMousePos.x > curve.points[i+1].point.x + 0.05f) continue;
+							
+							if(curve.lines[i].type == LINE2_HOLD){
+								// Simple distance check for HOLD segments
+								glm::vec2 p1 = denormalizePoint(curve.points[i].point);
+								glm::vec2 p2 = denormalizePoint(curve.points[i+1].point);
+								glm::vec2 segmentMid = glm::vec2(p2.x, p1.y); // Hold creates L-shape
+								float distToSegment = glm::distance(mousePos, segmentMid);
+								if(distToSegment < closestDistance){
+									closestDistance = distToSegment;
+									closestCurveIndex = curveIdx;
+								}
+							}
+							else if(curve.lines[i].type == LINE2_TENSION){
+								// Sample-based distance check for TENSION curves (optimized)
+								int numSamples = 5; // Reduced samples for performance
+								for(int sample = 0; sample <= numSamples; sample++){
+									float t = (float)sample / numSamples;
+									float segmentX = glm::mix(curve.points[i].point.x, curve.points[i+1].point.x, t);
+									
+									// Quick approximation of curve Y value
+									float segmentY = glm::mix(curve.points[i].point.y, curve.points[i+1].point.y, t);
+									
+									glm::vec2 curvePoint = denormalizePoint(glm::vec2(segmentX, segmentY));
+									float distToCurve = glm::distance(mousePos, curvePoint);
+									if(distToCurve < closestDistance){
+										closestDistance = distToCurve;
+										closestCurveIndex = curveIdx;
+									}
+								}
+							}
+						}
+					}
+					
+					hoveredCurveIndex = closestCurveIndex;
+				}
 			}
 			
-			// Double-click to add point
+			// PHASE 5: Enhanced click handling with curve selection
 			if(canvasDoubleClicked){
 				glm::vec2 newPointPos = safeNormalizePoint(ImGui::GetMousePos());
 				
@@ -295,6 +390,12 @@ void curve2::draw(ofEventArgs &args){
 				points.emplace_back(newPointPos);
 				points.back().drag = 3;
 				lines.emplace_back();
+			}
+			// PHASE 5: Single-click curve selection
+			else if(canvasClicked && hoveredCurveIndex >= 0 && hoveredCurveIndex != activeCurve.get()){
+				// Switch to the clicked inactive curve
+				activeCurve = hoveredCurveIndex;
+				// Visual feedback will be handled by the hover system
 			}
 			
 			std::sort(points.begin(), points.end(), [](curvePoint2 &p1, curvePoint2 &p2){
@@ -679,111 +780,238 @@ void curve2::draw(ofEventArgs &args){
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(50, 50, 50, 200));
 			
-			draw_list->AddLine(denormalizePoint(glm::vec2(0, points[0].point.y)), denormalizePoint(points[0].point), IM_COL32(10, 10, 10, 255));
-			for(int i = 0; i < points.size()-1; i++){
-				// Determine segment color based on drag state
-				bool whiteHighlight = false;
-				bool orangeHighlight = false;
+			// ========================================================================
+			// PHASE 4: Multi-curve rendering system
+			// ========================================================================
+			// This implementation provides:
+			// - All enabled curves are drawn simultaneously with different colors/opacity
+			// - Active curve is highlighted with full opacity and thicker lines (3px)
+			// - Inactive curves are dimmed (50% opacity) with thinner lines (1.5px)
+			// - Only the active curve shows interactive points for editing
+			// - Proper layering: inactive curves drawn first, active curve on top
+			// - Each curve uses its own color, opacity, and mathematical parameters
+			// ========================================================================
+			
+			// Draw all enabled curves with proper visual hierarchy
+			
+			// First pass: Draw all inactive curves (background layer)
+			for(int curveIdx = 0; curveIdx < curves.size(); curveIdx++){
+				auto& curve = curves[curveIdx];
 				
-				// Check for tension drag highlighting (shift+drag) - use white
-				if(tensionDragActive && tensionDragSegmentIndex == i){
-					whiteHighlight = true;
+				// Skip disabled curves
+				if(!curve.enabled.get()) continue;
+				
+				// Skip active curve (will be drawn in second pass)
+				if(curveIdx == activeCurve.get()) continue;
+				
+				// PHASE 5: Enhanced visual feedback for inactive curves
+				float inactiveOpacity = curve.opacity.get() * 0.5f;
+				float lineWidth = 1.5f;
+				
+				// PHASE 5: Highlight hovered inactive curve
+				if(curveIdx == hoveredCurveIndex){
+					inactiveOpacity = curve.opacity.get() * 0.8f; // Increase opacity when hovered
+					lineWidth = 2.5f; // Thicker line when hovered
+					
+					// PHASE 5: Set cursor to hand when hovering over selectable curve
+					ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 				}
 				
-				// Check for B parameter drag highlighting (ctrl+drag) - use white
-				if(bDragActive && bDragSegmentIndex == i){
-					whiteHighlight = true;
+				ofColor curveColor = curve.color.get();
+				ImU32 inactiveCurveColor = IM_COL32(curveColor.r, curveColor.g, curveColor.b, (int)(255 * inactiveOpacity));
+				
+				// Draw curve start extension line
+				if(!curve.points.empty()){
+					draw_list->AddLine(denormalizePoint(glm::vec2(0, curve.points[0].point.y)),
+									   denormalizePoint(curve.points[0].point),
+									   IM_COL32(curveColor.r * 0.4f, curveColor.g * 0.4f, curveColor.b * 0.4f, (int)(255 * inactiveOpacity)));
 				}
 				
-				// Check for normal point drag highlighting - use orange
-				if(!whiteHighlight){
-					for(int p = 0; p < points.size(); p++){
-						if(points[p].drag == 3){
-							// Highlight segments connected to the dragged point in orange
-							if((p == i) || (p == i + 1)){
-								orangeHighlight = true;
-								break;
+				// Draw curve segments
+				for(int i = 0; i < curve.points.size()-1; i++){
+					if(curve.lines[i].type == LINE2_HOLD){
+						auto p1 = denormalizePoint(curve.points[i].point);
+						auto p2 = denormalizePoint(curve.points[i+1].point);
+						draw_list->AddLine(p1, glm::vec2(p2.x, p1.y), inactiveCurveColor, lineWidth); // PHASE 5: Dynamic line width
+						draw_list->AddLine(glm::vec2(p2.x, p1.y), p2, inactiveCurveColor, lineWidth);
+					}
+					else if(curve.lines[i].type == LINE2_TENSION){
+						// Draw asymmetric logistic curve for inactive curves
+						float segmentB = curve.lines[i].segmentB;
+						int baseSegments = 30; // Reduced segments for inactive curves for performance
+						int adaptiveSegments = std::max(baseSegments, (int)(segmentB * 1.5f));
+						const int maxSegments = 300;
+						const int numSegments = std::min(adaptiveSegments, maxSegments);
+						
+						glm::vec2 prevPoint = curve.points[i].point;
+						
+						// Asymmetric logistic parameters
+						float A = curve.points[i].point.y;
+						float K = curve.points[i+1].point.y;
+						float M = curve.lines[i].inflectionX;
+						float nu = curve.lines[i].tensionExponent;
+						float B = curve.lines[i].segmentB;
+						float Q = curve.globalQ.get();
+						
+						// Calculate normalization values at segment endpoints
+						auto logisticFunction = [&](float x) -> float {
+							float logisticTerm = 1.0f + Q * exp(-B * (x - M));
+							return A + (K - A) / pow(logisticTerm, 1.0f / nu);
+						};
+						
+						float logistic_0 = logisticFunction(0.0f);
+						float logistic_1 = logisticFunction(1.0f);
+						float logisticRange = logistic_1 - logistic_0;
+						bool useNormalization = abs(logisticRange) > 1e-6f;
+						
+						for(int seg = 1; seg <= numSegments; seg++){
+							float normalizedX = (float)seg / numSegments;
+							float segmentX = glm::mix(curve.points[i].point.x, curve.points[i+1].point.x, normalizedX);
+							
+							float resultY;
+							if(useNormalization){
+								float raw_logistic = logisticFunction(normalizedX);
+								resultY = A + (K - A) * (raw_logistic - logistic_0) / logisticRange;
+							} else {
+								resultY = A + (K - A) * normalizedX;
+							}
+							
+							glm::vec2 currentPoint = glm::vec2(segmentX, resultY);
+							auto p1 = denormalizePoint(prevPoint);
+							auto p2 = denormalizePoint(currentPoint);
+							draw_list->AddLine(p1, p2, inactiveCurveColor, lineWidth); // PHASE 5: Dynamic line width
+							
+							prevPoint = currentPoint;
+						}
+					}
+				}
+				
+				// Draw curve end extension line
+				if(!curve.points.empty()){
+					draw_list->AddLine(denormalizePoint(curve.points.back().point),
+									   denormalizePoint(glm::vec2(1, curve.points.back().point.y)),
+									   IM_COL32(curveColor.r * 0.4f, curveColor.g * 0.4f, curveColor.b * 0.4f, (int)(255 * inactiveOpacity)));
+				}
+			}
+			
+			// Second pass: Draw active curve (foreground layer) with full interactivity
+			if(activeCurve.get() < curves.size() && curves[activeCurve.get()].enabled.get()){
+				auto& activeCurveData = curves[activeCurve.get()];
+				ofColor activeCurveColor = activeCurveData.color.get();
+				float activeOpacity = activeCurveData.opacity.get();
+				
+				// Draw active curve start extension line
+				draw_list->AddLine(denormalizePoint(glm::vec2(0, points[0].point.y)), denormalizePoint(points[0].point), IM_COL32(10, 10, 10, 255));
+				
+				for(int i = 0; i < points.size()-1; i++){
+					// Determine segment color based on drag state for active curve
+					bool whiteHighlight = false;
+					bool activeHighlight = false;
+					
+					// Check for tension drag highlighting (shift+drag) - use white
+					if(tensionDragActive && tensionDragSegmentIndex == i){
+						whiteHighlight = true;
+					}
+					
+					// Check for B parameter drag highlighting (ctrl+drag) - use white
+					if(bDragActive && bDragSegmentIndex == i){
+						whiteHighlight = true;
+					}
+					
+					// Check for normal point drag highlighting - use active curve color
+					if(!whiteHighlight){
+						for(int p = 0; p < points.size(); p++){
+							if(points[p].drag == 3){
+								// Highlight segments connected to the dragged point
+								if((p == i) || (p == i + 1)){
+									activeHighlight = true;
+									break;
+								}
 							}
 						}
 					}
-				}
-				
-				// Choose color based on highlighting state
-				ImU32 segmentColor;
-				if(whiteHighlight){
-					segmentColor = IM_COL32(255, 255, 255, 255); // White for shift/ctrl drag
-				} else if(orangeHighlight){
-					segmentColor = IM_COL32(color.r, color.g, color.b, 255); // Orange for normal drag
-				} else {
-					segmentColor = IM_COL32(color.r, color.g, color.b, 200); // Default orange with transparency
-				}
-				
-				if(lines[i].type == LINE2_HOLD){
-					auto p1 = denormalizePoint(points[i].point);
-					auto p2 = denormalizePoint(points[i+1].point);
-					draw_list->AddLine(p1, glm::vec2(p2.x, p1.y), segmentColor, 2);
-					draw_list->AddLine(glm::vec2(p2.x, p1.y), p2, segmentColor, 2);
-				}
-				else if(lines[i].type == LINE2_TENSION){
-					// Draw asymmetric logistic curve with proper normalization
-					// Adaptive resolution based on B parameter - more segments for steeper curves
-					// This prevents polygonal appearance when B values are high (60-100)
-					float segmentB = lines[i].segmentB;
-					int baseSegments = 50;
-					int adaptiveSegments = std::max(baseSegments, (int)(segmentB * 2.0f)); // 2 segments per B unit
-					// Cap maximum segments to prevent performance issues
-					const int maxSegments = 500;
-					const int numSegments = std::min(adaptiveSegments, maxSegments);
 					
-					glm::vec2 prevPoint = points[i].point;
+					// Choose color based on highlighting state for active curve
+					ImU32 segmentColor;
+					float lineWidth = 3.0f; // Thicker lines for active curve
 					
-					// Asymmetric logistic parameters
-					float A = points[i].point.y;      // Y value of segment start point
-					float K = points[i+1].point.y;    // Y value of segment end point
-					float M = lines[i].inflectionX;   // Inflection point X position (0-1)
-					float nu = lines[i].tensionExponent; // Asymmetry parameter ν
-					float B = lines[i].segmentB;      // Per-segment B parameter
-					float Q = globalQ.get();          // Global Q parameter
+					if(whiteHighlight){
+						segmentColor = IM_COL32(255, 255, 255, 255); // White for shift/ctrl drag
+					} else if(activeHighlight){
+						segmentColor = IM_COL32(activeCurveColor.r, activeCurveColor.g, activeCurveColor.b, 255); // Full opacity for drag
+					} else {
+						segmentColor = IM_COL32(activeCurveColor.r, activeCurveColor.g, activeCurveColor.b, (int)(255 * activeOpacity)); // Normal active curve opacity
+					}
 					
-					// Calculate normalization values at segment endpoints
-					auto logisticFunction = [&](float x) -> float {
-						float logisticTerm = 1.0f + Q * exp(-B * (x - M));
-						return A + (K - A) / pow(logisticTerm, 1.0f / nu);
-					};
-					
-					float logistic_0 = logisticFunction(0.0f); // Value at segment start
-					float logistic_1 = logisticFunction(1.0f); // Value at segment end
-					float logisticRange = logistic_1 - logistic_0;
-					
-					// Handle edge case where logistic range is very small
-					bool useNormalization = abs(logisticRange) > 1e-6f;
-					
-					for(int seg = 1; seg <= numSegments; seg++){
-						float normalizedX = (float)seg / numSegments;
+					if(lines[i].type == LINE2_HOLD){
+						auto p1 = denormalizePoint(points[i].point);
+						auto p2 = denormalizePoint(points[i+1].point);
+						draw_list->AddLine(p1, glm::vec2(p2.x, p1.y), segmentColor, lineWidth);
+						draw_list->AddLine(glm::vec2(p2.x, p1.y), p2, segmentColor, lineWidth);
+					}
+					else if(lines[i].type == LINE2_TENSION){
+						// Draw asymmetric logistic curve with proper normalization for active curve
+						// Adaptive resolution based on B parameter - more segments for steeper curves
+						float segmentB = lines[i].segmentB;
+						int baseSegments = 50;
+						int adaptiveSegments = std::max(baseSegments, (int)(segmentB * 2.0f)); // 2 segments per B unit
+						// Cap maximum segments to prevent performance issues
+						const int maxSegments = 500;
+						const int numSegments = std::min(adaptiveSegments, maxSegments);
 						
-						// Calculate normalized X position within the segment
-						float segmentX = glm::mix(points[i].point.x, points[i+1].point.x, normalizedX);
+						glm::vec2 prevPoint = points[i].point;
 						
-						float resultY;
-						if(useNormalization){
-							// Apply normalized logistic function to guarantee endpoint continuity
-							float raw_logistic = logisticFunction(normalizedX);
-							resultY = A + (K - A) * (raw_logistic - logistic_0) / logisticRange;
-						} else {
-							// Fall back to linear interpolation if logistic range is too small
-							resultY = A + (K - A) * normalizedX;
+						// Asymmetric logistic parameters
+						float A = points[i].point.y;      // Y value of segment start point
+						float K = points[i+1].point.y;    // Y value of segment end point
+						float M = lines[i].inflectionX;   // Inflection point X position (0-1)
+						float nu = lines[i].tensionExponent; // Asymmetry parameter ν
+						float B = lines[i].segmentB;      // Per-segment B parameter
+						float Q = globalQ.get();          // Global Q parameter
+						
+						// Calculate normalization values at segment endpoints
+						auto logisticFunction = [&](float x) -> float {
+							float logisticTerm = 1.0f + Q * exp(-B * (x - M));
+							return A + (K - A) / pow(logisticTerm, 1.0f / nu);
+						};
+						
+						float logistic_0 = logisticFunction(0.0f); // Value at segment start
+						float logistic_1 = logisticFunction(1.0f); // Value at segment end
+						float logisticRange = logistic_1 - logistic_0;
+						
+						// Handle edge case where logistic range is very small
+						bool useNormalization = abs(logisticRange) > 1e-6f;
+						
+						for(int seg = 1; seg <= numSegments; seg++){
+							float normalizedX = (float)seg / numSegments;
+							
+							// Calculate normalized X position within the segment
+							float segmentX = glm::mix(points[i].point.x, points[i+1].point.x, normalizedX);
+							
+							float resultY;
+							if(useNormalization){
+								// Apply normalized logistic function to guarantee endpoint continuity
+								float raw_logistic = logisticFunction(normalizedX);
+								resultY = A + (K - A) * (raw_logistic - logistic_0) / logisticRange;
+							} else {
+								// Fall back to linear interpolation if logistic range is too small
+								resultY = A + (K - A) * normalizedX;
+							}
+							
+							glm::vec2 currentPoint = glm::vec2(segmentX, resultY);
+							
+							// Draw line segment from previous point to current point
+							auto p1 = denormalizePoint(prevPoint);
+							auto p2 = denormalizePoint(currentPoint);
+							draw_list->AddLine(p1, p2, segmentColor, lineWidth);
+							
+							prevPoint = currentPoint;
 						}
-						
-						glm::vec2 currentPoint = glm::vec2(segmentX, resultY);
-						
-						// Draw line segment from previous point to current point
-						auto p1 = denormalizePoint(prevPoint);
-						auto p2 = denormalizePoint(currentPoint);
-						draw_list->AddLine(p1, p2, segmentColor, 2);
-						
-						prevPoint = currentPoint;
 					}
 				}
+				
+				// Draw active curve end extension line
+				draw_list->AddLine(denormalizePoint(points.back().point), denormalizePoint(glm::vec2(1, points.back().point.y)), IM_COL32(10, 10, 10, 255));
 			}
 			
 			// Draw vertical line at inflection point during Shift+drag OR CTRL+drag operations OR hover with modifier keys
@@ -927,22 +1155,75 @@ void curve2::draw(ofEventArgs &args){
 				}
 			}
 			
-			for(int i = 0; i < points.size(); i++){
-				auto &p = points[i];
-				glm::vec2 pointPos = denormalizePoint(p.point);
-				
-				if(i == hoveredPointIndex){
-					// Draw highlighted point with larger radius and different color
-					draw_list->AddCircleFilled(pointPos, 8, IM_COL32(255, 255, 255, 255)); // White highlight
-					draw_list->AddCircle(pointPos, 8, IM_COL32(color.r, color.g, color.b, 255), 0, 2); // Colored outline
-					draw_list->AddCircleFilled(pointPos, 5, IM_COL32(0, 0, 0, 255)); // Original black center
-				} else {
-					// Draw normal point
-					draw_list->AddCircleFilled(pointPos, 5, IM_COL32(0, 0, 0, 255));
+			// PHASE 5: Draw curve name labels
+			if(showCurveLabels){
+				// Draw labels for all enabled curves
+				for(int curveIdx = 0; curveIdx < curves.size(); curveIdx++){
+					auto& curve = curves[curveIdx];
+					
+					// Skip disabled curves
+					if(!curve.enabled.get()) continue;
+					
+					// Use simple index-based curve identification
+					string curveName = "Curve " + ofToString(curveIdx + 1);
+					
+					// Determine label position and color
+					ofColor curveColor = curve.color.get();
+					ImU32 labelColor;
+					float labelOpacity = 0.8f;
+					
+					if(curveIdx == activeCurve.get()){
+						// Active curve: full opacity, add "[ACTIVE]" suffix
+						curveName += " [ACTIVE]";
+						labelColor = IM_COL32(curveColor.r, curveColor.g, curveColor.b, (int)(255 * labelOpacity));
+					} else if(curveIdx == hoveredCurveIndex){
+						// Hovered curve: higher opacity, add "[CLICK TO SELECT]" suffix
+						curveName += " [CLICK TO SELECT]";
+						labelOpacity = 1.0f;
+						labelColor = IM_COL32(curveColor.r, curveColor.g, curveColor.b, (int)(255 * labelOpacity));
+					} else {
+						// Inactive curve: lower opacity
+						labelOpacity = 0.6f;
+						labelColor = IM_COL32(curveColor.r, curveColor.g, curveColor.b, (int)(255 * labelOpacity));
+					}
+					
+					// Position label in top-left area, stacked vertically
+					ImVec2 labelPos = ImVec2(visual_win_pos.x + 10, visual_win_pos.y + 10 + curveIdx * 20);
+					
+					// Add background for better readability
+					ImVec2 textSize = ImGui::CalcTextSize(curveName.c_str());
+					draw_list->AddRectFilled(
+						ImVec2(labelPos.x - 2, labelPos.y - 2),
+						ImVec2(labelPos.x + textSize.x + 2, labelPos.y + textSize.y + 2),
+						IM_COL32(0, 0, 0, 120) // Semi-transparent black background
+					);
+					
+					// Draw the label text
+					draw_list->AddText(labelPos, labelColor, curveName.c_str());
 				}
 			}
 			
-			draw_list->AddLine(denormalizePoint(points.back().point), denormalizePoint(glm::vec2(1, points.back().point.y)), IM_COL32(10, 10, 10, 255));
+			// PHASE 4: Only draw interactive points for the active curve
+			// Inactive curves are display-only (no points shown)
+			if(activeCurve.get() < curves.size() && curves[activeCurve.get()].enabled.get()){
+				auto& activeCurveData = curves[activeCurve.get()];
+				ofColor activeCurveColor = activeCurveData.color.get();
+				
+				for(int i = 0; i < points.size(); i++){
+					auto &p = points[i];
+					glm::vec2 pointPos = denormalizePoint(p.point);
+					
+					if(i == hoveredPointIndex){
+						// Draw highlighted point with larger radius and different color
+						draw_list->AddCircleFilled(pointPos, 8, IM_COL32(255, 255, 255, 255)); // White highlight
+						draw_list->AddCircle(pointPos, 8, IM_COL32(activeCurveColor.r, activeCurveColor.g, activeCurveColor.b, 255), 0, 2); // Active curve colored outline
+						draw_list->AddCircleFilled(pointPos, 5, IM_COL32(0, 0, 0, 255)); // Original black center
+					} else {
+						// Draw normal point for active curve
+						draw_list->AddCircleFilled(pointPos, 5, IM_COL32(0, 0, 0, 255));
+					}
+				}
+			}
 			
 			for(auto &v : input.get()){
 				auto mv = ofMap(v, minX, maxX, 0, 1);
@@ -965,128 +1246,603 @@ void curve2::draw(ofEventArgs &args){
 
 void curve2::recalculate()
 {
+	// PHASE 5: Performance optimization - early exit if no input
+	if(input->empty()) return;
+	
 	debugPoints.resize(input->size());
-	vector<float> tempOut(input->size());
-	for(int i = 0; i < input->size(); i++){
-		auto p = ofMap(input->at(i), minX, maxX, 0, 1);
-		if(p <= points[0].point.x){
-			tempOut[i] = ofMap(points[0].point.y, 0, 1, minY, maxY);
-			debugPoints[i] = glm::vec2(p, points[0].point.y);
-		}else if(p >= points.back().point.x){
-			tempOut[i] = ofMap(points.back().point.y, 0, 1, minY, maxY);
-			debugPoints[i] = glm::vec2(p, points.back().point.y);
-		}else{
-			for(int j = 1; j < points.size(); j++){
-				if(p < points[j].point.x){
-					if(lines[j-1].type == LINE2_HOLD){
-						debugPoints[i] = glm::vec2(p, points[j-1].point.y);
-						tempOut[i] = ofMap(debugPoints[i].y, 0, 1, minY, maxY);
+	
+	// PHASE 5: Performance optimization - cache input size
+	const size_t inputSize = input->size();
+	
+	// Process each curve and generate its corresponding output
+	for(int curveIdx = 0; curveIdx < curves.size() && curveIdx < outputs.size(); curveIdx++){
+		auto& curve = curves[curveIdx];
+		
+		// PHASE 5: Error handling - validate curve data
+		if(curve.points.empty()){
+			// Initialize with default points if empty
+			curve.points.emplace_back(0, 0);
+			curve.points.emplace_back(1, 1);
+			curve.points.front().firstCreated = false;
+			curve.points.back().firstCreated = false;
+			curve.lines.emplace_back();
+		}
+		
+		vector<float> tempOut(inputSize);
+		
+		// PHASE 5: Performance optimization - early exit for disabled curves
+		if(!curve.enabled.get()){
+			// Output zero values for disabled curves
+			fill(tempOut.begin(), tempOut.end(), 0.0f);
+			outputs[curveIdx] = tempOut;
+			continue;
+		}
+		
+		for(int i = 0; i < input->size(); i++){
+			auto p = ofMap(input->at(i), minX, maxX, 0, 1);
+			if(p <= curve.points[0].point.x){
+				tempOut[i] = ofMap(curve.points[0].point.y, 0, 1, curve.minY, curve.maxY);
+				// Only update debug points for active curve
+				if(curveIdx == activeCurve.get()){
+					debugPoints[i] = glm::vec2(p, curve.points[0].point.y);
+				}
+			}else if(p >= curve.points.back().point.x){
+				tempOut[i] = ofMap(curve.points.back().point.y, 0, 1, curve.minY, curve.maxY);
+				// Only update debug points for active curve
+				if(curveIdx == activeCurve.get()){
+					debugPoints[i] = glm::vec2(p, curve.points.back().point.y);
+				}
+			}else{
+				for(int j = 1; j < curve.points.size(); j++){
+					if(p < curve.points[j].point.x){
+						if(curve.lines[j-1].type == LINE2_HOLD){
+							float resultY = curve.points[j-1].point.y;
+							tempOut[i] = ofMap(resultY, 0, 1, curve.minY, curve.maxY);
+							// Only update debug points for active curve
+							if(curveIdx == activeCurve.get()){
+								debugPoints[i] = glm::vec2(p, resultY);
+							}
+						}
+						else if(curve.lines[j-1].type == LINE2_TENSION){
+							// Calculate normalized X position within the segment
+							float normalizedX = ofMap(p, curve.points[j-1].point.x, curve.points[j].point.x, 0, 1);
+							
+							// Asymmetric logistic parameters
+							float A = curve.points[j-1].point.y;      // Y value of segment start point
+							float K = curve.points[j].point.y;        // Y value of segment end point
+							float M = curve.lines[j-1].inflectionX;   // Inflection point X position (0-1)
+							float nu = curve.lines[j-1].tensionExponent; // Asymmetry parameter ν
+							float B = curve.lines[j-1].segmentB;      // Per-segment B parameter
+							float Q = curve.globalQ.get();            // Per-curve Q parameter
+							
+							// Calculate normalization values at segment endpoints
+							auto logisticFunction = [&](float x) -> float {
+								float logisticTerm = 1.0f + Q * exp(-B * (x - M));
+								return A + (K - A) / pow(logisticTerm, 1.0f / nu);
+							};
+							
+							float logistic_0 = logisticFunction(0.0f); // Value at segment start
+							float logistic_1 = logisticFunction(1.0f); // Value at segment end
+							float logisticRange = logistic_1 - logistic_0;
+							
+							float resultY;
+							// Handle edge case where logistic range is very small
+							if(abs(logisticRange) > 1e-6f){
+								// Apply normalized logistic function to guarantee endpoint continuity
+								float raw_logistic = logisticFunction(normalizedX);
+								resultY = A + (K - A) * (raw_logistic - logistic_0) / logisticRange;
+							} else {
+								// Fall back to linear interpolation if logistic range is too small
+								resultY = A + (K - A) * normalizedX;
+							}
+							
+							tempOut[i] = ofMap(resultY, 0, 1, curve.minY, curve.maxY);
+							// Only update debug points for active curve
+							if(curveIdx == activeCurve.get()){
+								debugPoints[i] = glm::vec2(p, resultY);
+							}
+						}
+						break;
 					}
-                    else if(lines[j-1].type == LINE2_TENSION){
-                        // Calculate normalized X position within the segment
-                        float normalizedX = ofMap(p, points[j-1].point.x, points[j].point.x, 0, 1);
-                        
-                        // Asymmetric logistic parameters
-                        float A = points[j-1].point.y;      // Y value of segment start point
-                        float K = points[j].point.y;        // Y value of segment end point
-                        float M = lines[j-1].inflectionX;   // Inflection point X position (0-1)
-                        float nu = lines[j-1].tensionExponent; // Asymmetry parameter ν
-                        float B = lines[j-1].segmentB;      // Per-segment B parameter
-                        float Q = globalQ.get();            // Global Q parameter
-                        
-                        // Calculate normalization values at segment endpoints
-                        auto logisticFunction = [&](float x) -> float {
-                            float logisticTerm = 1.0f + Q * exp(-B * (x - M));
-                            return A + (K - A) / pow(logisticTerm, 1.0f / nu);
-                        };
-                        
-                        float logistic_0 = logisticFunction(0.0f); // Value at segment start
-                        float logistic_1 = logisticFunction(1.0f); // Value at segment end
-                        float logisticRange = logistic_1 - logistic_0;
-                        
-                        float resultY;
-                        // Handle edge case where logistic range is very small
-                        if(abs(logisticRange) > 1e-6f){
-                            // Apply normalized logistic function to guarantee endpoint continuity
-                            float raw_logistic = logisticFunction(normalizedX);
-                            resultY = A + (K - A) * (raw_logistic - logistic_0) / logisticRange;
-                        } else {
-                            // Fall back to linear interpolation if logistic range is too small
-                            resultY = A + (K - A) * normalizedX;
-                        }
-                        
-                        debugPoints[i] = glm::vec2(p, resultY);
-                        tempOut[i] = ofMap(debugPoints[i].y, 0, 1, minY, maxY);
-                    }
-					break;
 				}
 			}
 		}
+		outputs[curveIdx] = tempOut;
 	}
-	output = tempOut;
 }
 
 void curve2::presetSave(ofJson &json){
-	json["NumPoints"] = points.size();
-	for(int i = 0; i < points.size(); i++){
-		json["Points"][i]["Point"]["x"] = points[i].point.x;
-		json["Points"][i]["Point"]["y"] = points[i].point.y;
+	// Save multi-curve data
+	json["NumCurves"] = curves.size();
+	json["NumOutputs"] = outputs.size();
+	json["ActiveCurve"] = activeCurve.get();
+	
+	for(int curveIdx = 0; curveIdx < curves.size(); curveIdx++){
+		auto& curve = curves[curveIdx];
+		auto& curveJson = json["Curves"][curveIdx];
+		
+		// Save curve metadata (no individual names)
+		curveJson["Color"]["r"] = curve.color.get().r;
+		curveJson["Color"]["g"] = curve.color.get().g;
+		curveJson["Color"]["b"] = curve.color.get().b;
+		curveJson["Color"]["a"] = curve.color.get().a;
+		curveJson["Enabled"] = curve.enabled.get();
+		curveJson["Opacity"] = curve.opacity.get();
+		curveJson["MinY"] = curve.minY.get();
+		curveJson["MaxY"] = curve.maxY.get();
+		curveJson["GlobalQ"] = curve.globalQ.get();
+		
+		// Save points
+		curveJson["NumPoints"] = curve.points.size();
+		for(int i = 0; i < curve.points.size(); i++){
+			curveJson["Points"][i]["Point"]["x"] = curve.points[i].point.x;
+			curveJson["Points"][i]["Point"]["y"] = curve.points[i].point.y;
+		}
+		
+		// Save lines
+		for(int i = 0; i < curve.lines.size(); i++){
+			curveJson["Lines"][i]["Type"] = curve.lines[i].type;
+			curveJson["Lines"][i]["TensionExponent"] = curve.lines[i].tensionExponent;
+			curveJson["Lines"][i]["InflectionX"] = curve.lines[i].inflectionX;
+			curveJson["Lines"][i]["SegmentB"] = curve.lines[i].segmentB;
+		}
 	}
-	for(int i = 0; i < lines.size(); i++){
-		json["Lines"][i]["Type"] = lines[i].type;
-		json["Lines"][i]["TensionExponent"] = lines[i].tensionExponent;
-		json["Lines"][i]["InflectionX"] = lines[i].inflectionX;
-		json["Lines"][i]["SegmentB"] = lines[i].segmentB;
+	
+	// Backward compatibility: save active curve as legacy format
+	if(!curves.empty()){
+		auto& activeCurveData = getCurrentCurve();
+		json["NumPoints"] = activeCurveData.points.size();
+		for(int i = 0; i < activeCurveData.points.size(); i++){
+			json["Points"][i]["Point"]["x"] = activeCurveData.points[i].point.x;
+			json["Points"][i]["Point"]["y"] = activeCurveData.points[i].point.y;
+		}
+		for(int i = 0; i < activeCurveData.lines.size(); i++){
+			json["Lines"][i]["Type"] = activeCurveData.lines[i].type;
+			json["Lines"][i]["TensionExponent"] = activeCurveData.lines[i].tensionExponent;
+			json["Lines"][i]["InflectionX"] = activeCurveData.lines[i].inflectionX;
+			json["Lines"][i]["SegmentB"] = activeCurveData.lines[i].segmentB;
+		}
+		json["GlobalQ"] = activeCurveData.globalQ.get();
 	}
-	// Save global logistic parameters
-	json["GlobalQ"] = globalQ.get();
 }
 
 void curve2::presetRecallAfterSettingParameters(ofJson &json){
 	try{
-		points.resize(json["NumPoints"]);
-		lines.resize(points.size()-1);
-		for(int i = 0; i < points.size(); i++){
-			points[i].point.x = json["Points"][i]["Point"]["x"];
-			points[i].point.y = json["Points"][i]["Point"]["y"];
-			points[i].firstCreated = false;
+		// Check if this is a new multi-curve format
+		if(json.contains("NumCurves") && json.contains("Curves")){
+			// Load multi-curve format
+			int numCurvesFromJson = json["NumCurves"];
+			curves.resize(numCurvesFromJson);
+			
+			// Load outputs count (default to numCurves for backward compatibility)
+			int numOutputsFromJson = json.contains("NumOutputs") ? static_cast<int>(json["NumOutputs"]) : numCurvesFromJson;
+			resizeOutputs(numOutputsFromJson);
+			
+			for(int curveIdx = 0; curveIdx < numCurvesFromJson; curveIdx++){
+				auto& curveJson = json["Curves"][curveIdx];
+				auto& curve = curves[curveIdx];
+				
+				// Load curve metadata (no individual names)
+				if(curveJson.contains("Color")){
+					ofColor loadedColor;
+					loadedColor.r = curveJson["Color"]["r"];
+					loadedColor.g = curveJson["Color"]["g"];
+					loadedColor.b = curveJson["Color"]["b"];
+					loadedColor.a = curveJson["Color"]["a"];
+					curve.color.set(loadedColor);
+				}
+				if(curveJson.contains("Enabled")){
+					curve.enabled.set(curveJson["Enabled"]);
+				}
+				if(curveJson.contains("Opacity")){
+					curve.opacity.set(curveJson["Opacity"]);
+				}
+				if(curveJson.contains("MinY")){
+					curve.minY.set(curveJson["MinY"]);
+				}
+				if(curveJson.contains("MaxY")){
+					curve.maxY.set(curveJson["MaxY"]);
+				}
+				if(curveJson.contains("GlobalQ")){
+					curve.globalQ.set(curveJson["GlobalQ"]);
+				}
+				
+				// Load points
+				if(curveJson.contains("NumPoints")){
+					int numPoints = curveJson["NumPoints"];
+					curve.points.resize(numPoints);
+					curve.lines.resize(numPoints - 1);
+					
+					for(int i = 0; i < numPoints; i++){
+						curve.points[i].point.x = curveJson["Points"][i]["Point"]["x"];
+						curve.points[i].point.y = curveJson["Points"][i]["Point"]["y"];
+						curve.points[i].firstCreated = false;
+					}
+					
+					// Load lines
+					for(int i = 0; i < curve.lines.size(); i++){
+						curve.lines[i].type = static_cast<lineType2>(curveJson["Lines"][i]["Type"]);
+						
+						if(curveJson["Lines"][i].contains("TensionExponent")){
+							curve.lines[i].tensionExponent = curveJson["Lines"][i]["TensionExponent"];
+						} else {
+							curve.lines[i].tensionExponent = 1.0f;
+						}
+						
+						if(curveJson["Lines"][i].contains("InflectionX")){
+							curve.lines[i].inflectionX = curveJson["Lines"][i]["InflectionX"];
+						} else {
+							curve.lines[i].inflectionX = 0.5f;
+						}
+						
+						if(curveJson["Lines"][i].contains("SegmentB")){
+							curve.lines[i].segmentB = curveJson["Lines"][i]["SegmentB"];
+						} else {
+							curve.lines[i].segmentB = 6.0f;
+						}
+					}
+				}
+			}
+			
+			// Set active curve
+			if(json.contains("ActiveCurve")){
+				int activeIdx = json["ActiveCurve"];
+				if(activeIdx >= 0 && activeIdx < curves.size()){
+					activeCurve.set(activeIdx);
+				}
+			}
+			
+			// Update numCurves parameter
+			numCurves.set(curves.size());
+			activeCurve.setMax(curves.size() - 1);
 		}
-		for(int i = 0; i < lines.size(); i++){
-			lines[i].type = static_cast<lineType2>(json["Lines"][i]["Type"]);
-			// Load tension exponent with backward compatibility
-			if(json["Lines"][i].contains("TensionExponent")){
-				lines[i].tensionExponent = json["Lines"][i]["TensionExponent"];
-			} else {
-				lines[i].tensionExponent = 1.0f; // Default value for old presets
+		else {
+			// Load legacy single-curve format
+			curves.resize(1);
+			auto& curve = curves[0];
+			
+			// For legacy format, ensure we have one output
+			resizeOutputs(1);
+			
+			curve.points.resize(json["NumPoints"]);
+			curve.lines.resize(curve.points.size()-1);
+			
+			for(int i = 0; i < curve.points.size(); i++){
+				curve.points[i].point.x = json["Points"][i]["Point"]["x"];
+				curve.points[i].point.y = json["Points"][i]["Point"]["y"];
+				curve.points[i].firstCreated = false;
 			}
-			// Load inflection point with backward compatibility
-			if(json["Lines"][i].contains("InflectionX")){
-				lines[i].inflectionX = json["Lines"][i]["InflectionX"];
-			} else {
-				lines[i].inflectionX = 0.5f; // Default value for old presets
+			
+			for(int i = 0; i < curve.lines.size(); i++){
+				curve.lines[i].type = static_cast<lineType2>(json["Lines"][i]["Type"]);
+				
+				if(json["Lines"][i].contains("TensionExponent")){
+					curve.lines[i].tensionExponent = json["Lines"][i]["TensionExponent"];
+				} else {
+					curve.lines[i].tensionExponent = 1.0f;
+				}
+				
+				if(json["Lines"][i].contains("InflectionX")){
+					curve.lines[i].inflectionX = json["Lines"][i]["InflectionX"];
+				} else {
+					curve.lines[i].inflectionX = 0.5f;
+				}
+				
+				if(json["Lines"][i].contains("SegmentB")){
+					curve.lines[i].segmentB = json["Lines"][i]["SegmentB"];
+				} else if(json["Lines"][i].contains("SegmentQ")){
+					curve.lines[i].segmentB = 6.0f;
+				} else {
+					curve.lines[i].segmentB = 6.0f;
+				}
 			}
-			// Load per-segment B with backward compatibility
-			if(json["Lines"][i].contains("SegmentB")){
-				lines[i].segmentB = json["Lines"][i]["SegmentB"];
-			} else if(json["Lines"][i].contains("SegmentQ")){
-				// Backward compatibility: if old SegmentQ exists, use default B value
-				lines[i].segmentB = 6.0f; // Use default B value for old presets
+			
+			// Load global logistic parameters
+			if(json.contains("GlobalQ")){
+				curve.globalQ.set(json["GlobalQ"]);
 			} else {
-				lines[i].segmentB = 6.0f; // Default value for old presets
+				curve.globalQ.set(1.0f);
 			}
+			
+			numCurves.set(1);
+			activeCurve.set(0);
+			activeCurve.setMax(0);
 		}
 		
-		// Load global logistic parameters with backward compatibility
-		if(json.contains("GlobalQ")){
-			globalQ.set(json["GlobalQ"]);
-		} else {
-			globalQ.set(1.0f); // Default value for old presets
-		}
+		// Update references to active curve
+		int currentActiveCurve = activeCurve.get();
+		onActiveCurveChanged(currentActiveCurve);
 	}
 	catch (ofJson::exception& e)
 	{
 		ofLog() << e.what();
 	}
-	
+}
+
+// Curve management methods implementation
+void curve2::addCurve() {
+    curves.emplace_back();
+    // No individual curve names - curves identified by index only
+    // Update activeCurve parameter max value
+    activeCurve.setMax(curves.size() - 1);
+}
+
+void curve2::removeCurve(int index) {
+    if (curves.size() <= 1 || index < 0 || index >= curves.size()) {
+        return; // Cannot remove if only one curve or invalid index
+    }
+    
+    curves.erase(curves.begin() + index);
+    
+    // Update activeCurve parameter max value
+    activeCurve.setMax(curves.size() - 1);
+    
+    // Adjust active curve if necessary
+    if (activeCurve >= curves.size()) {
+        activeCurve = curves.size() - 1;
+    }
+}
+
+void curve2::resizeCurves(int newCount) {
+    if (newCount < 1) newCount = 1;
+    if (newCount > 16) newCount = 16;
+    
+    int currentCount = curves.size();
+    
+    if (newCount > currentCount) {
+        // Add new curves
+        for (int i = currentCount; i < newCount; i++) {
+            addCurve();
+        }
+    } else if (newCount < currentCount) {
+        // Remove curves from the end
+        for (int i = currentCount - 1; i >= newCount; i--) {
+            removeCurve(i);
+        }
+    }
+}
+
+CurveData& curve2::getCurrentCurve() {
+    int index = activeCurve.get();
+    if (index < 0 || index >= curves.size()) {
+        index = 0;
+    }
+    return curves[index];
+}
+
+const CurveData& curve2::getCurrentCurve() const {
+    int index = activeCurve.get();
+    if (index < 0 || index >= curves.size()) {
+        index = 0;
+    }
+    return curves[index];
+}
+
+void curve2::onNumCurvesChanged(int& newCount) {
+    resizeCurves(newCount);
+    resizeOutputs(newCount);
+}
+
+void curve2::onActiveCurveChanged(int& newIndex) {
+    // PHASE 5: Enhanced error handling and bounds checking
+    if (curves.empty()) {
+        // Initialize with default curve if empty
+        curves.resize(1);
+        newIndex = 0;
+        activeCurve = newIndex;
+    } else if (newIndex < 0 || newIndex >= curves.size()) {
+        newIndex = std::max(0, std::min((int)curves.size() - 1, newIndex));
+        activeCurve = newIndex;
+    }
+    
+    // PHASE 5: Additional validation - ensure curve has valid data
+    auto& targetCurve = curves[newIndex];
+    if (targetCurve.points.empty()) {
+        // Initialize with default points if empty
+        targetCurve.points.emplace_back(0, 0);
+        targetCurve.points.emplace_back(1, 1);
+        targetCurve.points.front().firstCreated = false;
+        targetCurve.points.back().firstCreated = false;
+        targetCurve.lines.emplace_back();
+    }
+    
+    // Update references to point to the new active curve
+    const_cast<vector<curvePoint2>&>(points) = curves[newIndex].points;
+    const_cast<vector<line2>&>(lines) = curves[newIndex].lines;
+    const_cast<ofParameter<ofColor>&>(colorParam) = curves[newIndex].color;
+    const_cast<ofParameter<float>&>(minY) = curves[newIndex].minY;
+    const_cast<ofParameter<float>&>(maxY) = curves[newIndex].maxY;
+    const_cast<ofParameter<float>&>(globalQ) = curves[newIndex].globalQ;
+    
+    // Update color
+    color = colorParam.get();
+    
+    // PHASE 5: Reset hover states when switching curves
+    hoveredPointIndex = -1;
+    hoveredSegmentIndex = -1;
+    hoveredCurveIndex = -1;
+    
+    // Trigger recalculation
+    recalculate();
+}
+
+// Output management methods implementation
+void curve2::addOutput() {
+    int newIndex = outputs.size();
+    outputs.emplace_back();
+    addOutputParameter(outputs[newIndex].set("Output " + ofToString(newIndex + 1), {0}, {0}, {1}));
+}
+
+void curve2::removeOutput() {
+    if (outputs.size() <= 1) {
+        return; // Cannot remove if only one output
+    }
+    
+    int lastIndex = outputs.size() - 1;
+    removeParameter("Output " + ofToString(lastIndex + 1));
+    outputs.pop_back();
+}
+
+void curve2::resizeOutputs(int count) {
+    if (count < 1) count = 1;
+    if (count > 16) count = 16;
+    
+    int currentCount = outputs.size();
+    
+    if (count > currentCount) {
+        // Add new outputs
+        for (int i = currentCount; i < count; i++) {
+            addOutput();
+        }
+    } else if (count < currentCount) {
+        // Remove outputs from the end
+        for (int i = currentCount - 1; i >= count; i--) {
+            removeOutput();
+        }
+    }
+}
+
+void curve2::renderInspectorInterface() {
+    // Single unified inspector interface without tabs
+    
+    // Global Parameters Section (includes curve management)
+    if (ImGui::CollapsingHeader("Global Parameters", ImGuiTreeNodeFlags_DefaultOpen)) {
+        float minXVal = minX.get();
+        if (ImGui::SliderFloat("Min X", &minXVal, -1000.0f, 1000.0f)) {
+            minX = minXVal;
+        }
+        float maxXVal = maxX.get();
+        if (ImGui::SliderFloat("Max X", &maxXVal, -1000.0f, 1000.0f)) {
+            maxX = maxXVal;
+        }
+        int horDiv = numHorizontalDivisions.get();
+        if (ImGui::SliderInt("Horizontal Divisions", &horDiv, 1, 512)) {
+            numHorizontalDivisions = horDiv;
+        }
+        int vertDiv = numVerticalDivisions.get();
+        if (ImGui::SliderInt("Vertical Divisions", &vertDiv, 1, 512)) {
+            numVerticalDivisions = vertDiv;
+        }
+        bool snapGrid = snapToGrid.get();
+        if (ImGui::Checkbox("Snap to Grid", &snapGrid)) {
+            snapToGrid = snapGrid;
+        }
+        bool showInfoVal = showInfo.get();
+        if (ImGui::Checkbox("Show Info", &showInfoVal)) {
+            showInfo = showInfoVal;
+        }
+        
+        // Add curve labels toggle
+        if (ImGui::Checkbox("Show Curve Labels", &showCurveLabels)) {
+            // Toggle handled by direct assignment
+        }
+        
+        ImGui::Separator();
+        
+        // Curve management controls integrated into Global Parameters
+        // Active curve selection dropdown
+        string activeCurveName = "Curve " + ofToString(activeCurve.get() + 1);
+        if (ImGui::BeginCombo("Active Curve", activeCurveName.c_str())) {
+            for (int i = 0; i < curves.size(); i++) {
+                bool isSelected = (activeCurve.get() == i);
+                string curveName = "Curve " + ofToString(i + 1);
+                if (ImGui::Selectable(curveName.c_str(), isSelected)) {
+                    activeCurve = i;
+                }
+                if (isSelected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+        
+        // Add/Remove curve buttons
+        ImGui::SameLine();
+        if (ImGui::Button("Add Curve") && curves.size() < 16) {
+            addCurve();
+            numCurves = curves.size();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Remove Curve") && curves.size() > 1) {
+            removeCurve(activeCurve.get());
+            numCurves = curves.size();
+        }
+    }
+    
+    // Active Curve Properties Section
+    if (ImGui::CollapsingHeader("Active Curve Properties", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto& currentCurve = getCurrentCurve();
+        
+        // Curve color
+        float colorArray[4] = {
+            currentCurve.color.get().r / 255.0f,
+            currentCurve.color.get().g / 255.0f,
+            currentCurve.color.get().b / 255.0f,
+            currentCurve.color.get().a / 255.0f
+        };
+        if (ImGui::ColorEdit4("Color", colorArray)) {
+            currentCurve.color = ofColor(
+                colorArray[0] * 255,
+                colorArray[1] * 255,
+                colorArray[2] * 255,
+                colorArray[3] * 255
+            );
+        }
+        
+        // Curve enabled/disabled
+        bool enabled = currentCurve.enabled.get();
+        if (ImGui::Checkbox("Enabled", &enabled)) {
+            currentCurve.enabled = enabled;
+        }
+        
+        // Curve opacity
+        float opacity = currentCurve.opacity.get();
+        if (ImGui::SliderFloat("Opacity", &opacity, 0.0f, 1.0f)) {
+            currentCurve.opacity = opacity;
+        }
+        
+        // Y range
+        float minYVal = currentCurve.minY.get();
+        float maxYVal = currentCurve.maxY.get();
+        if (ImGui::SliderFloat("Min Y", &minYVal, -1000.0f, 1000.0f)) {
+            currentCurve.minY = minYVal;
+            recalculate();
+        }
+        if (ImGui::SliderFloat("Max Y", &maxYVal, -1000.0f, 1000.0f)) {
+            currentCurve.maxY = maxYVal;
+            recalculate();
+        }
+        
+        // Global Q parameter
+        float globalQVal = currentCurve.globalQ.get();
+        if (ImGui::SliderFloat("Global Q", &globalQVal, 0.1f, 5.0f)) {
+            currentCurve.globalQ = globalQVal;
+            recalculate();
+        }
+    }
+    
+    // Curve Editor Information Section
+    if (ImGui::CollapsingHeader("Curve Editor Info")) {
+        ImGui::Text("Use the main curve editor window for interactive editing.");
+        ImGui::Text("Double-click: Create points | Drag: Move points | Right-click: Delete");
+        ImGui::Text("Shift+drag: Asymmetry (vertical) + Inflection (horizontal)");
+        ImGui::Text("Ctrl+drag: B parameter (horizontal)");
+        
+        // Show current curve statistics
+        auto& currentCurve = getCurrentCurve();
+        ImGui::Separator();
+        ImGui::Text("Current Curve Info:");
+        ImGui::Text("Points: %d", (int)currentCurve.points.size());
+        ImGui::Text("Segments: %d", (int)currentCurve.lines.size());
+        
+        // Show point list
+        if (ImGui::CollapsingHeader("Point List")) {
+            for (int i = 0; i < currentCurve.points.size(); i++) {
+                float pointX = ofMap(currentCurve.points[i].point.x, 0, 1, minX, maxX);
+                float pointY = ofMap(currentCurve.points[i].point.y, 0, 1, currentCurve.minY, currentCurve.maxY);
+                ImGui::Text("Point %d: (%.3f, %.3f)", i, pointX, pointY);
+            }
+        }
+    }
 }
 
