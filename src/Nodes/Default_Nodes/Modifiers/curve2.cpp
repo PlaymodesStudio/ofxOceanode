@@ -40,7 +40,6 @@ curve2::curve2() : ofxOceanodeNodeModel("curve2") {
 	// Set default name for first curve
 	curves[0].name.set("Name", "Curve 1");
 	
-	// PHASE 5: Initialize new variables
 	hoveredCurveIndex = -1;
 	showCurveLabels = false;
 	curveHitTestRadius = 8.0f;
@@ -74,10 +73,12 @@ void curve2::setup() {
 	// Initialize outputs based on numCurves
 	outputs.resize(numCurves.get());
 	for(int i = 0; i < outputs.size(); i++){
+		outputs[i] = make_shared<ofParameter<vector<float>>>();
 		string outputName = (i < curves.size()) ? curves[i].name.get() : ("Curve " + ofToString(i + 1));
-		addOutputParameter(outputs[i].set(outputName, {0}, {0}, {1}));
+		if(outputs[i]) {
+			addOutputParameter(outputs[i]->set(outputName, {0}, {0}, {1}));
+		}
 	}
-	
 	
 	// Initialize parameters (but don't add them to inspector yet)
 	numHorizontalDivisions.set("Hor Div", 8, 1, 512);
@@ -91,8 +92,6 @@ void curve2::setup() {
 		colorListener = colorParam->newListener([this](ofColor &c){
 			color = c;
 		});
-	} else {
-		ofLogWarning("curve2::setup") << "Cannot setup color listener - colorParam is NULL";
 	}
 	
 	// Add the tabbed inspector GUI
@@ -136,7 +135,6 @@ void curve2::draw(ofEventArgs &args){
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
 
-			// New layout order: [+] [-] [Reset] [Dropdown] [Enabled] [Color] [Name]
 			if (ImGui::Button("[+]") && curves.size() < 16) {
 				addCurve();
 				numCurves = curves.size();
@@ -155,13 +153,7 @@ void curve2::draw(ofEventArgs &args){
 			ImGui::SameLine();
 			if(ImGui::Button("[Reset]"))
 			{
-				ofLogNotice("curve2::draw") << "Reset button clicked";
-				ofLogNotice("curve2::draw") << "activeCurve: " << activeCurve.get();
-				ofLogNotice("curve2::draw") << "points pointer: " << (points ? "valid" : "NULL");
-				ofLogNotice("curve2::draw") << "lines pointer: " << (lines ? "valid" : "NULL");
-				
 				if(points != nullptr && lines != nullptr){
-					ofLogNotice("curve2::draw") << "Pointers valid, resetting curve";
 					// Clear existing points and lines
 					points->clear();
 					lines->clear();
@@ -179,8 +171,6 @@ void curve2::draw(ofEventArgs &args){
 					
 					// Trigger recalculation of the curve
 					recalculate();
-				} else {
-					ofLogWarning("curve2::draw") << "Cannot reset - no active curve selected (points or lines is NULL)";
 				}
 			}
 			if (ImGui::IsItemHovered()) {
@@ -283,8 +273,8 @@ void curve2::draw(ofEventArgs &args){
 					if (!newName.empty()) {
 						currentCurve.name = newName;
 						// Update output parameter name
-						if (activeCurve.get() < outputs.size()) {
-							outputs[activeCurve.get()].setName(newName);
+						if (activeCurve.get() < outputs.size() && outputs[activeCurve.get()]) {
+							outputs[activeCurve.get()]->setName(newName);
 						}
 					}
 				}
@@ -360,11 +350,11 @@ void curve2::draw(ofEventArgs &args){
 					draw_list->AddLine(ImVec2(0.0f, y) + visual_win_pos, ImVec2(visual_canvas_sz.x, y) + visual_win_pos, GRID_COLOR);
 			}
 			
-			// Draw visual area boundary to show the safe zone effect
-			ImU32 BOUNDARY_COLOR = IM_COL32(10, 10, 10, 128);
-			draw_list->AddRect(visual_win_pos,
-							   ImVec2(visual_win_pos.x + visual_canvas_sz.x, visual_win_pos.y + visual_canvas_sz.y),
-							   BOUNDARY_COLOR, 0.0f, 0, 2.0f);
+//			// Draw visual area boundary to show the safe zone effect
+//			ImU32 BOUNDARY_COLOR = IM_COL32(10, 10, 10, 128);
+//			draw_list->AddRect(visual_win_pos,
+//							   ImVec2(visual_win_pos.x + visual_canvas_sz.x, visual_win_pos.y + visual_canvas_sz.y),
+//							   BOUNDARY_COLOR, 0.0f, 0, 2.0f);
 			
 			// Make the ENTIRE canvas area interactive (including safe zone) - this is the key fix!
 			ImGui::InvisibleButton("canvas", canvas_sz);
@@ -406,22 +396,14 @@ void curve2::draw(ofEventArgs &args){
 			};
 			
 			if(ImGui::IsMouseReleased(0)){
-				ofLogNotice("curve2::draw") << "Mouse released - checking points pointer";
-				ofLogNotice("curve2::draw") << "activeCurve: " << activeCurve.get();
-				ofLogNotice("curve2::draw") << "points pointer: " << (points ? "valid" : "NULL");
-				
 				if(points != nullptr){
-					ofLogNotice("curve2::draw") << "Points valid, processing " << points->size() << " points";
 					for(int i = 0; i < points->size(); i++){
 						(*points)[i].drag = 0;
 						(*points)[i].firstCreated = false;
 					}
-				} else {
-					ofLogNotice("curve2::draw") << "Points is NULL - skipping mouse release processing";
 				}
 			}
 			
-			// PHASE 5: Enhanced hover detection system with curve selection
 			hoveredPointIndex = -1;
 			hoveredSegmentIndex = -1;
 			hoveredCurveIndex = -1;
@@ -527,8 +509,6 @@ void curve2::draw(ofEventArgs &args){
 				points->emplace_back(newPointPos);
 				points->back().drag = 3;
 				lines->emplace_back();
-			} else if(canvasDoubleClicked && (points == nullptr || lines == nullptr)){
-				ofLogNotice("curve2::draw") << "Skipping double-click point creation - no active curve selected";
 			}
 			// PHASE 5: Single-click curve selection
 			else if(canvasClicked && hoveredCurveIndex >= 0 && hoveredCurveIndex != activeCurve.get()){
@@ -1065,11 +1045,8 @@ void curve2::draw(ofEventArgs &args){
 				ofColor activeCurveColor = activeCurveData.color.get();
 				
 				// Draw active curve start extension line
-				// CRITICAL FIX: Add safety check for empty points vector
 				if (points != nullptr && !points->empty()) {
 					draw_list->AddLine(denormalizePoint(glm::vec2(0, (*points)[0].point.y)), denormalizePoint((*points)[0].point), IM_COL32(10, 10, 10, 255));
-				} else {
-					ofLogError("curve2::draw") << "CRASH PREVENTED: Attempted to access points[0] on empty vector or NULL pointer. activeCurve: " << activeCurve.get() << ", curves.size(): " << curves.size();
 				}
 				
 				if(points != nullptr && lines != nullptr){
@@ -1377,7 +1354,8 @@ void curve2::draw(ofEventArgs &args){
 			}
 			
 			// Draw vertices based on selection mode
-			if(activeCurve.get() == -1){
+			//if(activeCurve.get() == -1){
+			{
 				// "None" selected: Draw all vertices from all enabled curves as visual reference (no interaction)
 				for(int curveIdx = 0; curveIdx < curves.size(); curveIdx++){
 					auto& curve = curves[curveIdx];
@@ -1396,7 +1374,7 @@ void curve2::draw(ofEventArgs &args){
 					}
 				}
 			}
-			else if(activeCurve.get() >= 0 && activeCurve.get() < curves.size() && curves[activeCurve.get()].enabled.get() && points != nullptr){
+			if(activeCurve.get() >= 0 && activeCurve.get() < curves.size() && curves[activeCurve.get()].enabled.get() && points != nullptr){
 				// Specific curve selected: Draw interactive points for the active curve only
 				auto& activeCurveData = curves[activeCurve.get()];
 				ofColor activeCurveColor = activeCurveData.color.get();
@@ -1412,7 +1390,7 @@ void curve2::draw(ofEventArgs &args){
 						draw_list->AddCircleFilled(pointPos, 5, IM_COL32(0, 0, 0, 255)); // Original black center
 					} else {
 						// Draw normal point for active curve
-						draw_list->AddCircleFilled(pointPos, 5, IM_COL32(0, 0, 0, 255));
+						draw_list->AddCircleFilled(pointPos, 5, IM_COL32(activeCurveColor.r, activeCurveColor.g, activeCurveColor.b,255));
 					}
 				}
 			}
@@ -1422,9 +1400,6 @@ void curve2::draw(ofEventArgs &args){
 				draw_list->AddLine(denormalizePoint(glm::vec2(mv, 0)), denormalizePoint(glm::vec2(mv, 1)), IM_COL32(127, 127, 127, 127));
 			}
 			
-			//			for(auto &p : debugPoints){
-			//				draw_list->AddCircleFilled(denormalizePoint(p), 3, IM_COL32(255, 255, 255, 128));
-			//			}
 			
 			// Pop the style vars that were re-pushed for drawing operations
 			ImGui::PopStyleColor();
@@ -1438,12 +1413,8 @@ void curve2::draw(ofEventArgs &args){
 
 void curve2::recalculate()
 {
-	// PHASE 5: Performance optimization - early exit if no input
 	if(input.get().empty()) return;
 	
-	debugPoints.resize(input.get().size());
-	
-	// PHASE 5: Performance optimization - cache input size
 	const size_t inputSize = input.get().size();
 	
 	// Initialize consolidated output structure - simple vector with one value per curve
@@ -1469,7 +1440,13 @@ void curve2::recalculate()
 		if(!curve.enabled.get()){
 			// Output zero values for disabled curves
 			fill(tempOut.begin(), tempOut.end(), 0.0f);
-			outputs[curveIdx] = tempOut;
+			// DIAGNOSTIC: Check shared_ptr before assignment
+			if(outputs[curveIdx]) {
+				ofLogNotice("curve2::recalculate") << "Setting disabled curve " << curveIdx << " output to zero";
+				*outputs[curveIdx] = tempOut;
+			} else {
+				ofLogError("curve2::recalculate") << "NULL shared_ptr for disabled curve " << curveIdx;
+			}
 			// Update consolidated output with zero for this curve
 			consolidatedOutput[curveIdx] = 0.0f;
 			continue;
@@ -1479,26 +1456,14 @@ void curve2::recalculate()
 			auto p = ofMap(input.get().at(i), minX.get(), maxX.get(), 0, 1);
 			if(p <= curve.points[0].point.x){
 				tempOut[i] = curve.points[0].point.y; // Direct 0-1 range output
-				// Only update debug points for active curve
-				if(curveIdx == activeCurve.get()){
-					debugPoints[i] = glm::vec2(p, curve.points[0].point.y);
-				}
 			}else if(p >= curve.points.back().point.x){
 				tempOut[i] = curve.points.back().point.y; // Direct 0-1 range output
-				// Only update debug points for active curve
-				if(curveIdx == activeCurve.get()){
-					debugPoints[i] = glm::vec2(p, curve.points.back().point.y);
-				}
 			}else{
 				for(int j = 1; j < curve.points.size(); j++){
 					if(p < curve.points[j].point.x){
 						if(curve.lines[j-1].type == LINE2_HOLD){
 							float resultY = curve.points[j-1].point.y;
 							tempOut[i] = resultY; // Direct 0-1 range output
-							// Only update debug points for active curve
-							if(curveIdx == activeCurve.get()){
-								debugPoints[i] = glm::vec2(p, resultY);
-							}
 						}
 						else if(curve.lines[j-1].type == LINE2_TENSION){
 							// Calculate normalized X position within the segment
@@ -1534,10 +1499,6 @@ void curve2::recalculate()
 							}
 							
 							tempOut[i] = resultY; // Direct 0-1 range output
-							// Only update debug points for active curve
-							if(curveIdx == activeCurve.get()){
-								debugPoints[i] = glm::vec2(p, resultY);
-							}
 						}
 						break;
 					}
@@ -1548,7 +1509,9 @@ void curve2::recalculate()
 				consolidatedOutput[curveIdx] = tempOut[i];
 			}
 		}
-		outputs[curveIdx] = tempOut;
+		if(outputs[curveIdx]) {
+			*outputs[curveIdx] = tempOut;
+		}
 	}
 	
 	// Update the consolidated output parameter
@@ -1593,22 +1556,22 @@ void curve2::presetSave(ofJson &json){
 		}
 	}
 	
-	// Backward compatibility: save active curve as legacy format
-	if(!curves.empty()){
-		auto& activeCurveData = getCurrentCurve();
-		json["NumPoints"] = activeCurveData.points.size();
-		for(int i = 0; i < activeCurveData.points.size(); i++){
-			json["Points"][i]["Point"]["x"] = activeCurveData.points[i].point.x;
-			json["Points"][i]["Point"]["y"] = activeCurveData.points[i].point.y;
-		}
-		for(int i = 0; i < activeCurveData.lines.size(); i++){
-			json["Lines"][i]["Type"] = activeCurveData.lines[i].type;
-			json["Lines"][i]["TensionExponent"] = activeCurveData.lines[i].tensionExponent;
-			json["Lines"][i]["InflectionX"] = activeCurveData.lines[i].inflectionX;
-			json["Lines"][i]["SegmentB"] = activeCurveData.lines[i].segmentB;
-		}
-		json["GlobalQ"] = activeCurveData.globalQ.get();
-	}
+//	// Backward compatibility: save active curve as legacy format
+//	if(!curves.empty()){
+//		auto& activeCurveData = getCurrentCurve();
+//		json["NumPoints"] = activeCurveData.points.size();
+//		for(int i = 0; i < activeCurveData.points.size(); i++){
+//			json["Points"][i]["Point"]["x"] = activeCurveData.points[i].point.x;
+//			json["Points"][i]["Point"]["y"] = activeCurveData.points[i].point.y;
+//		}
+//		for(int i = 0; i < activeCurveData.lines.size(); i++){
+//			json["Lines"][i]["Type"] = activeCurveData.lines[i].type;
+//			json["Lines"][i]["TensionExponent"] = activeCurveData.lines[i].tensionExponent;
+//			json["Lines"][i]["InflectionX"] = activeCurveData.lines[i].inflectionX;
+//			json["Lines"][i]["SegmentB"] = activeCurveData.lines[i].segmentB;
+//		}
+//		json["GlobalQ"] = activeCurveData.globalQ.get();
+//	}
 }
 
 void curve2::presetRecallAfterSettingParameters(ofJson &json){
@@ -1618,10 +1581,6 @@ void curve2::presetRecallAfterSettingParameters(ofJson &json){
 			// Load multi-curve format
 			int numCurvesFromJson = json["NumCurves"];
 			curves.resize(numCurvesFromJson);
-			
-			// Load outputs count (default to numCurves for backward compatibility)
-			int numOutputsFromJson = json.contains("NumOutputs") ? static_cast<int>(json["NumOutputs"]) : numCurvesFromJson;
-			resizeOutputs(numOutputsFromJson);
 			
 			for(int curveIdx = 0; curveIdx < numCurvesFromJson; curveIdx++){
 				auto& curveJson = json["Curves"][curveIdx];
@@ -1685,12 +1644,22 @@ void curve2::presetRecallAfterSettingParameters(ofJson &json){
 					}
 				}
 			}
+
+			
+			// Load outputs count (default to numCurves for backward compatibility)
+			int numOutputsFromJson = json.contains("NumOutputs") ? static_cast<int>(json["NumOutputs"]) : numCurvesFromJson;
+			resizeOutputs(numOutputsFromJson);
 			
 			// BUGFIX: Synchronize output parameter names with loaded curve names
 			// This fixes the issue where output parameter names were set before curve names were loaded
-			for(int i = 0; i < outputs.size() && i < curves.size(); i++) {
-				outputs[i].setName(curves[i].name.get());
-			}
+//			for(int i = 0; i < outputs.size() && i < curves.size(); i++) {
+//				if(outputs[i]) {
+//					ofLogNotice("curve2::loadFromJson") << "Setting output " << i << " name to: " << curves[i].name.get();
+//					outputs[i]->setName(curves[i].name.get());
+//				} else {
+//					ofLogError("curve2::loadFromJson") << "NULL shared_ptr for output " << i;
+//				}
+//			}
 			
 			// Set active curve
 			if(json.contains("ActiveCurve")){
@@ -1764,13 +1733,13 @@ void curve2::presetRecallAfterSettingParameters(ofJson &json){
 					curve.lines[i].segmentB = 6.0f;
 				}
 			}
-			
-			// Load global logistic parameters
-			if(json.contains("GlobalQ")){
-				curve.globalQ.set(json["GlobalQ"]);
-			} else {
-				curve.globalQ.set(1.0f);
-			}
+//			
+//			// Load global logistic parameters
+//			if(json.contains("GlobalQ")){
+//				curve.globalQ.set(json["GlobalQ"]);
+//			} else {
+//				curve.globalQ.set(1.0f);
+//			}
 			
 			numCurves.set(1);
 			activeCurve.set(0);
@@ -1792,10 +1761,6 @@ void curve2::presetRecallAfterSettingParameters(ofJson &json){
 
 // Curve management methods implementation
 void curve2::addCurve() {
-	ofLogNotice("curve2::addCurve") << "Adding new curve. Current curves count: " << curves.size();
-	ofLogNotice("curve2::addCurve") << "Current activeCurve: " << activeCurve.get();
-	ofLogNotice("curve2::addCurve") << "Current points vector size: " << (points != nullptr ? points->size() : -1);
-	
 	curves.emplace_back();
 	
 	// Set default name for new curve using gap-aware naming
@@ -1803,19 +1768,11 @@ void curve2::addCurve() {
 	int availableNumber = findNextAvailableCurveNumber();
 	curves[newCurveIndex].name.set("Name", "Curve " + ofToString(availableNumber));
 	
-	ofLogNotice("curve2::addCurve") << "After emplace_back. New curves count: " << curves.size();
-	ofLogNotice("curve2::addCurve") << "New curve points size: " << curves.back().points.size();
-	
 	// Update activeCurve parameter max value
 	activeCurve.setMax(curves.size() - 1);
 	
-	// CRITICAL FIX: Switch to the newly added curve and update pointers
-	ofLogNotice("curve2::addCurve") << "Switching to new curve index: " << newCurveIndex;
+	// Switch to the newly added curve and update pointers
 	activeCurve = newCurveIndex;  // Auto-select new curve (not "None")
-	
-	ofLogNotice("curve2::addCurve") << "After switching - activeCurve: " << activeCurve.get();
-	ofLogNotice("curve2::addCurve") << "After switching - points vector size: " << (points != nullptr ? points->size() : -1);
-	
 }
 
 void curve2::removeCurve(int index) {
@@ -1841,8 +1798,8 @@ void curve2::removeCurve(int index) {
     
     // Update remaining output parameter names to match new indices
     for (int i = index; i < outputs.size(); i++) {
-        if (i < curves.size()) {
-            outputs[i].setName(curves[i].name.get());
+        if (i < curves.size() && outputs[i]) {
+            outputs[i]->setName(curves[i].name.get());
         }
     }
     
@@ -1911,13 +1868,8 @@ void curve2::onNumCurvesChanged(int& newCount) {
 }
 
 void curve2::onActiveCurveChanged(int& newIndex) {
-	ofLogNotice("curve2::onActiveCurveChanged") << "Called with newIndex: " << newIndex;
-	ofLogNotice("curve2::onActiveCurveChanged") << "Current curves.size(): " << curves.size();
-	ofLogNotice("curve2::onActiveCurveChanged") << "Current points ptr size: " << (points != nullptr ? points->size() : -1);
-	
 	// Handle "None" selection (-1)
 	if (newIndex == -1) {
-		ofLogNotice("curve2::onActiveCurveChanged") << "None selected - overview mode";
 		// Set pointers to nullptr to indicate no active curve
 		points = nullptr;
 		lines = nullptr;
@@ -1933,15 +1885,13 @@ void curve2::onActiveCurveChanged(int& newIndex) {
 		return;
 	}
 	
-	// PHASE 5: Enhanced error handling and bounds checking
+	// Enhanced error handling and bounds checking
 	if (curves.empty()) {
-		ofLogWarning("curve2::onActiveCurveChanged") << "Curves vector is empty, initializing with default curve";
 		// Initialize with default curve if empty
 		curves.resize(1);
 		newIndex = 0;
 		activeCurve = newIndex;
 	} else if (newIndex < -1 || newIndex >= curves.size()) {
-		ofLogWarning("curve2::onActiveCurveChanged") << "Invalid newIndex: " << newIndex << ", clamping to valid range";
 		newIndex = std::max(-1, std::min((int)curves.size() - 1, newIndex));
 		activeCurve = newIndex;
 		
@@ -1958,19 +1908,16 @@ void curve2::onActiveCurveChanged(int& newIndex) {
 		}
 	}
 	
-	// PHASE 5: Additional validation - ensure curve has valid data
+	// Additional validation - ensure curve has valid data
 	auto& targetCurve = curves[newIndex];
-	ofLogNotice("curve2::onActiveCurveChanged") << "Target curve[" << newIndex << "] points.size(): " << targetCurve.points.size();
 	
 	if (targetCurve.points.empty()) {
-		ofLogWarning("curve2::onActiveCurveChanged") << "Target curve has empty points, initializing with defaults";
 		// Initialize with default points if empty
 		targetCurve.points.emplace_back(0, 0);
 		targetCurve.points.emplace_back(1, 1);
 		targetCurve.points.front().firstCreated = false;
 		targetCurve.points.back().firstCreated = false;
 		targetCurve.lines.emplace_back();
-		ofLogNotice("curve2::onActiveCurveChanged") << "After initialization, points.size(): " << targetCurve.points.size();
 	}
 	
 	// Update pointers to point to the new active curve
@@ -1979,16 +1926,12 @@ void curve2::onActiveCurveChanged(int& newIndex) {
 	colorParam = &curves[newIndex].color;
 	globalQ = &curves[newIndex].globalQ;
 	
-	ofLogNotice("curve2::onActiveCurveChanged") << "Pointers updated. New points size: " << (points != nullptr ? points->size() : -1);
-	
 	// Update color
 	if(colorParam != nullptr){
 		color = colorParam->get();
-	} else {
-		ofLogWarning("curve2::onActiveCurveChanged") << "Cannot update color - colorParam is NULL";
 	}
 	
-	// PHASE 5: Reset hover states when switching curves
+	// Reset hover states when switching curves
 	hoveredPointIndex = -1;
 	hoveredSegmentIndex = -1;
 	hoveredCurveIndex = -1;
@@ -2000,9 +1943,13 @@ void curve2::onActiveCurveChanged(int& newIndex) {
 // Output management methods implementation
 void curve2::addOutput() {
 	int newIndex = outputs.size();
-	outputs.emplace_back();
+	// Create new shared_ptr with proper initialization
+	outputs.emplace_back(make_shared<ofParameter<vector<float>>>());
 	string outputName = (newIndex < curves.size()) ? curves[newIndex].name.get() : ("Curve " + ofToString(newIndex + 1));
-	addOutputParameter(outputs[newIndex].set(outputName, {0}, {0}, {1}));
+	
+	if(outputs[newIndex]) {
+		addOutputParameter(outputs[newIndex]->set(outputName, {0}, {0}, {1}));
+	}
 }
 
 void curve2::removeOutput() {
@@ -2013,14 +1960,8 @@ void curve2::removeOutput() {
 	int lastIndex = outputs.size() - 1;
 	string outputName = (lastIndex < curves.size()) ? curves[lastIndex].name.get() : ("Curve " + ofToString(lastIndex + 1));
 	
-	ofLogNotice("curve2::removeOutput") << "Removing output at index: " << lastIndex;
-	ofLogNotice("curve2::removeOutput") << "Output name: " << outputName;
-	ofLogNotice("curve2::removeOutput") << "Current outputs.size(): " << outputs.size();
-	
 	removeParameter(outputName);
 	outputs.pop_back();
-	
-	ofLogNotice("curve2::removeOutput") << "After removal - outputs.size(): " << outputs.size();
 }
 
 void curve2::resizeOutputs(int count) {
@@ -2029,24 +1970,17 @@ void curve2::resizeOutputs(int count) {
 	
 	int currentCount = outputs.size();
 	
-	ofLogNotice("curve2::resizeOutputs") << "Resizing outputs from " << currentCount << " to " << count;
-	
 	if (count > currentCount) {
 		// Add new outputs
-		ofLogNotice("curve2::resizeOutputs") << "Adding " << (count - currentCount) << " new outputs";
 		for (int i = currentCount; i < count; i++) {
 			addOutput();
 		}
 	} else if (count < currentCount) {
 		// Remove outputs from the end
-		ofLogNotice("curve2::resizeOutputs") << "Removing " << (currentCount - count) << " outputs from the end";
 		for (int i = currentCount - 1; i >= count; i--) {
-			ofLogNotice("curve2::resizeOutputs") << "Removing output at index: " << i;
 			removeOutput();
 		}
 	}
-	
-	ofLogNotice("curve2::resizeOutputs") << "Final outputs.size(): " << outputs.size();
 	
 	// Update consolidated output parameter size to match new curve count
 	// Initialize with simple vector structure

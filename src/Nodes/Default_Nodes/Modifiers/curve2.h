@@ -13,6 +13,8 @@
 
 #include "ofxOceanodeNodeModel.h"
 
+//---------------------------------------------------------------
+
 struct curvePoint2{
 	curvePoint2(){
 		drag = 0;
@@ -33,10 +35,14 @@ struct curvePoint2{
 	bool firstCreated;
 };
 
+//---------------------------------------------------------------
+
 enum lineType2{
 	LINE2_HOLD,
 	LINE2_TENSION
 };
+
+//---------------------------------------------------------------
 
 struct line2{
 	lineType2 type = LINE2_TENSION;
@@ -44,6 +50,8 @@ struct line2{
 	float inflectionX = 0.5f;      // Normalized position 0-1 within segment
 	float segmentB = 6.0f;         // Per-segment B parameter (default 6.0)
 };
+
+//---------------------------------------------------------------
 
 // CurveData structure to encapsulate all curve-specific data
 struct CurveData {
@@ -72,6 +80,8 @@ struct CurveData {
 	}
 };
 
+//---------------------------------------------------------------
+
 class curve2 : public ofxOceanodeNodeModel{
 public:
 	curve2();
@@ -97,7 +107,8 @@ private:
 	
 	ofParameter<vector<float>>  input;
 	ofParameter<bool> showWindow;
-	vector<ofParameter<vector<float>>> outputs;
+	//vector<ofParameter<vector<float>>> outputs;
+	vector<shared_ptr<ofParameter<vector<float>>>> outputs;
 	ofParameter<vector<float>> allCurvesOutput;  // Consolidated output parameter
 	
 	ofParameter<int> numVerticalDivisions;
@@ -106,7 +117,6 @@ private:
 	// Global parameters (apply to all curves)
 	ofParameter<float> minX, maxX;
 	
-	vector<glm::vec2> debugPoints;
 	
 	// Multi-curve support
 	ofParameter<int> numCurves;      // Number of curves (default: 1)
@@ -138,7 +148,6 @@ private:
 	// Segment hover detection system
 	int hoveredSegmentIndex = -1;
 	
-	// PHASE 5: Curve selection and visual feedback system
 	int hoveredCurveIndex = -1;        // Which inactive curve is being hovered
 	bool showCurveLabels = true;       // Show curve names in editor
 	float curveHitTestRadius = 8.0f;   // Distance threshold for curve selection
