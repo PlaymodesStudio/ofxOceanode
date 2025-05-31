@@ -49,6 +49,7 @@ struct line2{
 	float tensionExponent = 1.0f;  // Now controls asymmetry parameter ν
 	float inflectionX = 0.5f;      // Normalized position 0-1 within segment
 	float segmentB = 6.0f;         // Per-segment B parameter (default 6.0)
+	float segmentQ = 1.0f;         // Per-segment Q parameter (default 1.0)
 };
 
 //---------------------------------------------------------------
@@ -189,6 +190,11 @@ private:
 	// Parameter listeners
 	void onNumCurvesChanged(int& newCount);
 	void onActiveCurveChanged(int& newIndex);
+	
+	// Q optimization methods
+	void optimizeSegmentQValues();
+	float calculateCurvatureDiscontinuity(int segmentIndex);
+	float evaluateSegmentAt(int segmentIndex, float x);
 	
 	// Inspector interface rendering
 	void renderInspectorInterface();

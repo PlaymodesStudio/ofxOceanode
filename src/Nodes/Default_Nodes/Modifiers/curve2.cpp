@@ -506,9 +506,27 @@ void curve2::draw(ofEventArgs &args){
 					newPointPos.y = round(newPointPos.y / gridSpacingY) * gridSpacingY;
 				}
 				
+				// Find which segment is being split to inherit its parameters
+				int splitSegmentIndex = -1;
+				for(int i = 0; i < points->size()-1; i++){
+					if(newPointPos.x >= (*points)[i].point.x && newPointPos.x <= (*points)[i+1].point.x){
+						splitSegmentIndex = i;
+						break;
+					}
+				}
+				
 				points->emplace_back(newPointPos);
 				points->back().drag = 3;
-				lines->emplace_back();
+				
+				// Create new line segment with inherited parameters from the split segment
+				if(splitSegmentIndex >= 0 && splitSegmentIndex < lines->size()){
+					// Inherit all parameters from the segment being split
+					line2 newLine = (*lines)[splitSegmentIndex];
+					lines->emplace_back(newLine);
+				} else {
+					// Fallback to default parameters if no segment found
+					lines->emplace_back();
+				}
 			}
 			// PHASE 5: Single-click curve selection
 			else if(canvasClicked && hoveredCurveIndex >= 0 && hoveredCurveIndex != activeCurve.get()){
@@ -606,6 +624,9 @@ void curve2::draw(ofEventArgs &args){
 								if(ImGui::SliderFloat("Segment B L", &(*lines)[i-1].segmentB, MIN_B_PARAMETER, MAX_B_PARAMETER, "%.2f")){
 									recalculate();
 								}
+								if(ImGui::SliderFloat("Segment Q L", &(*lines)[i-1].segmentQ, 0.1f, 5.0f, "%.2f")){
+									recalculate();
+								}
 							}
 						}
 						
@@ -625,6 +646,9 @@ void curve2::draw(ofEventArgs &args){
 									recalculate();
 								}
 								if(ImGui::SliderFloat("Segment B R", &(*lines)[i].segmentB, MIN_B_PARAMETER, MAX_B_PARAMETER, "%.2f")){
+									recalculate();
+								}
+								if(ImGui::SliderFloat("Segment Q R", &(*lines)[i].segmentQ, 0.1f, 5.0f, "%.2f")){
 									recalculate();
 								}
 							}
@@ -1474,7 +1498,7 @@ void curve2::recalculate()
 							float M = curve.lines[j-1].inflectionX;   // Inflection point X position (0-1)
 							float nu = curve.lines[j-1].tensionExponent; // Asymmetry parameter ν
 							float B = curve.lines[j-1].segmentB;      // Per-segment B parameter
-							float Q = curve.globalQ.get();            // Per-curve Q parameter
+							float Q = curve.lines[j-1].segmentQ;      // Per-segment Q parameter (FIXED: no longer global)
 							
 							// Calculate normalization values at segment endpoints
 							auto logisticFunction = [&](float x) -> float {
@@ -1552,6 +1576,7 @@ void curve2::presetSave(ofJson &json){
 			curveJson["Lines"][i]["TensionExponent"] = curve.lines[i].tensionExponent;
 			curveJson["Lines"][i]["InflectionX"] = curve.lines[i].inflectionX;
 			curveJson["Lines"][i]["SegmentB"] = curve.lines[i].segmentB;
+			curveJson["Lines"][i]["SegmentQ"] = curve.lines[i].segmentQ;
 		}
 	}
 	
@@ -1640,6 +1665,12 @@ void curve2::presetRecallAfterSettingParameters(ofJson &json){
 						} else {
 							curve.lines[i].segmentB = 6.0f;
 						}
+						
+						if(curveJson["Lines"][i].contains("SegmentQ")){
+							curve.lines[i].segmentQ = curveJson["Lines"][i]["SegmentQ"];
+						} else {
+							curve.lines[i].segmentQ = 1.0f;
+						}
 					}
 				}
 			}
@@ -1721,10 +1752,14 @@ void curve2::presetRecallAfterSettingParameters(ofJson &json){
 				
 				if(json["Lines"][i].contains("SegmentB")){
 					curve.lines[i].segmentB = json["Lines"][i]["SegmentB"];
-				} else if(json["Lines"][i].contains("SegmentQ")){
-					curve.lines[i].segmentB = 6.0f;
 				} else {
 					curve.lines[i].segmentB = 6.0f;
+				}
+				
+				if(json["Lines"][i].contains("SegmentQ")){
+					curve.lines[i].segmentQ = json["Lines"][i]["SegmentQ"];
+				} else {
+					curve.lines[i].segmentQ = 1.0f;
 				}
 			}
 //			
@@ -2030,7 +2065,155 @@ void curve2::renderInspectorInterface() {
 			currentCurve.globalQ = globalQVal;
 			recalculate();
 		}
+		
+		// Add Q optimization button
+		if (ImGui::Button("Optimize Q Values")) {
+			optimizeSegmentQValues();
+		}
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Automatically optimize segment Q values for smoother transitions");
+		}
 	}
 	}
 	
 
+
+// Q optimization methods implementation
+void curve2::optimizeSegmentQValues() {
+	if(activeCurve.get() < 0 || activeCurve.get() >= curves.size()) return;
+	
+	auto& curve = curves[activeCurve.get()];
+	if(curve.points.size() < 3 || curve.lines.size() < 2) return; // Need at least 3 points for optimization
+	
+	// Optimize Q values for each segment to minimize curvature discontinuities
+	for(int i = 0; i < curve.lines.size(); i++) {
+		if(curve.lines[i].type != LINE2_TENSION) continue;
+		
+		float bestQ = curve.lines[i].segmentQ;
+		float minDiscontinuity = calculateCurvatureDiscontinuity(i);
+		
+		// Test different Q values to find the one that minimizes discontinuity
+		for(float testQ = 0.1f; testQ <= 5.0f; testQ += 0.1f) {
+			float originalQ = curve.lines[i].segmentQ;
+			curve.lines[i].segmentQ = testQ;
+			
+			float discontinuity = calculateCurvatureDiscontinuity(i);
+			if(discontinuity < minDiscontinuity) {
+				minDiscontinuity = discontinuity;
+				bestQ = testQ;
+			}
+			
+			curve.lines[i].segmentQ = originalQ; // Restore original value
+		}
+		
+		// Apply the best Q value found
+		curve.lines[i].segmentQ = bestQ;
+	}
+	
+	// Trigger recalculation with optimized values
+	recalculate();
+}
+
+float curve2::calculateCurvatureDiscontinuity(int segmentIndex) {
+	if(activeCurve.get() < 0 || activeCurve.get() >= curves.size()) return 0.0f;
+	
+	auto& curve = curves[activeCurve.get()];
+	if(segmentIndex < 0 || segmentIndex >= curve.lines.size()) return 0.0f;
+	if(curve.lines[segmentIndex].type != LINE2_TENSION) return 0.0f;
+	
+	// Calculate curvature discontinuity at segment boundaries
+	float totalDiscontinuity = 0.0f;
+	
+	// Check discontinuity at the start of the segment (with previous segment)
+	if(segmentIndex > 0 && curve.lines[segmentIndex-1].type == LINE2_TENSION) {
+		// Sample derivatives at the boundary point
+		float epsilon = 0.001f;
+		
+		// Get the boundary point
+		float boundaryX = curve.points[segmentIndex].point.x;
+		
+		// Calculate derivative from previous segment (approaching from left)
+		float leftX1 = boundaryX - epsilon;
+		float leftX2 = boundaryX;
+		float leftY1 = evaluateSegmentAt(segmentIndex-1, leftX1);
+		float leftY2 = evaluateSegmentAt(segmentIndex-1, leftX2);
+		float leftDerivative = (leftY2 - leftY1) / epsilon;
+		
+		// Calculate derivative from current segment (approaching from right)
+		float rightX1 = boundaryX;
+		float rightX2 = boundaryX + epsilon;
+		float rightY1 = evaluateSegmentAt(segmentIndex, rightX1);
+		float rightY2 = evaluateSegmentAt(segmentIndex, rightX2);
+		float rightDerivative = (rightY2 - rightY1) / epsilon;
+		
+		// Add squared difference of derivatives as discontinuity measure
+		totalDiscontinuity += (leftDerivative - rightDerivative) * (leftDerivative - rightDerivative);
+	}
+	
+	// Check discontinuity at the end of the segment (with next segment)
+	if(segmentIndex < curve.lines.size()-1 && curve.lines[segmentIndex+1].type == LINE2_TENSION) {
+		// Similar calculation for the end boundary
+		float epsilon = 0.001f;
+		float boundaryX = curve.points[segmentIndex+1].point.x;
+		
+		float leftX1 = boundaryX - epsilon;
+		float leftX2 = boundaryX;
+		float leftY1 = evaluateSegmentAt(segmentIndex, leftX1);
+		float leftY2 = evaluateSegmentAt(segmentIndex, leftX2);
+		float leftDerivative = (leftY2 - leftY1) / epsilon;
+		
+		float rightX1 = boundaryX;
+		float rightX2 = boundaryX + epsilon;
+		float rightY1 = evaluateSegmentAt(segmentIndex+1, rightX1);
+		float rightY2 = evaluateSegmentAt(segmentIndex+1, rightX2);
+		float rightDerivative = (rightY2 - rightY1) / epsilon;
+		
+		totalDiscontinuity += (leftDerivative - rightDerivative) * (leftDerivative - rightDerivative);
+	}
+	
+	return totalDiscontinuity;
+}
+
+float curve2::evaluateSegmentAt(int segmentIndex, float x) {
+	if(activeCurve.get() < 0 || activeCurve.get() >= curves.size()) return 0.0f;
+	
+	auto& curve = curves[activeCurve.get()];
+	if(segmentIndex < 0 || segmentIndex >= curve.lines.size()) return 0.0f;
+	
+	// Normalize X to segment-relative position
+	float segmentStartX = curve.points[segmentIndex].point.x;
+	float segmentEndX = curve.points[segmentIndex+1].point.x;
+	float normalizedX = (x - segmentStartX) / (segmentEndX - segmentStartX);
+	normalizedX = std::max(0.0f, std::min(1.0f, normalizedX));
+	
+	if(curve.lines[segmentIndex].type == LINE2_HOLD) {
+		return curve.points[segmentIndex].point.y;
+	} else if(curve.lines[segmentIndex].type == LINE2_TENSION) {
+		// Asymmetric logistic parameters
+		float A = curve.points[segmentIndex].point.y;
+		float K = curve.points[segmentIndex+1].point.y;
+		float M = curve.lines[segmentIndex].inflectionX;
+		float nu = curve.lines[segmentIndex].tensionExponent;
+		float B = curve.lines[segmentIndex].segmentB;
+		float Q = curve.lines[segmentIndex].segmentQ;
+		
+		// Calculate logistic function
+		auto logisticFunction = [&](float x) -> float {
+			float logisticTerm = 1.0f + Q * exp(-B * (x - M));
+			return A + (K - A) / pow(logisticTerm, 1.0f / nu);
+		};
+		
+		float logistic_0 = logisticFunction(0.0f);
+		float logistic_1 = logisticFunction(1.0f);
+		float logisticRange = logistic_1 - logistic_0;
+		
+		if(abs(logisticRange) > 1e-6f) {
+			float raw_logistic = logisticFunction(normalizedX);
+			return A + (K - A) * (raw_logistic - logistic_0) / logisticRange;
+		} else {
+			return A + (K - A) * normalizedX;
+		}
+	}
+	
+	return 0.0f;
+}
