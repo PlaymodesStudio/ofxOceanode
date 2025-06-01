@@ -116,8 +116,9 @@ private:
 	ofParameter<int> numVerticalDivisions;
 	ofParameter<int> numHorizontalDivisions;
 	
-	// Global parameters (apply to all curves)
-	ofParameter<float> minX, maxX;
+	// Global constants (apply to all curves)
+	static constexpr float minX = 0.0f;
+	static constexpr float maxX = 1.0f;
 	
 	
 	// Multi-curve support

@@ -76,12 +76,9 @@ void curve2::setup() {
 		recalculate();
 	}));
 	
-	listeners.push(minX.newListener([this](float &f){
-		input.setMin(vector<float>(1, f));
-	}));
-	listeners.push(maxX.newListener([this](float &f){
-		input.setMax(vector<float>(1, f));
-	}));
+	// Set input parameter bounds to use constants
+	input.setMin(vector<float>(1, minX));
+	input.setMax(vector<float>(1, maxX));
 	
 	// Multi-curve listeners
 	listeners.push(numCurves.newListener([this](int &newCount){
@@ -517,10 +514,10 @@ void curve2::draw(ofEventArgs &args){
 					}
 					
 					if(ImGui::BeginPopup(("##PointPopup " + ofToString(i)).c_str())){
-						float tempFloat = ofMap(p.point.x, 0, 1, minX.get(), maxX.get());
-						ImGui::SliderFloat("X", &tempFloat, minX.get(), maxX.get());
+						float tempFloat = ofMap(p.point.x, 0, 1, minX, maxX);
+						ImGui::SliderFloat("X", &tempFloat, minX, maxX);
 						if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-							p.point.x = ofMap(tempFloat, minX.get(), maxX.get(), 0, 1);
+							p.point.x = ofMap(tempFloat, minX, maxX, 0, 1);
 						}
 						
 						// Y value editing (0-1 range)
@@ -799,7 +796,7 @@ void curve2::draw(ofEventArgs &args){
 					ImGui::SameLine();
 					
 					// Point coordinates (0-1 range)
-					float pointX = ofMap((*points)[activePointIndex].point.x, 0, 1, minX.get(), maxX.get());
+					float pointX = ofMap((*points)[activePointIndex].point.x, 0, 1, minX, maxX);
 					float pointY = (*points)[activePointIndex].point.y; // Direct 0-1 range
 					
 					ImGui::PushItemWidth(80);
@@ -1386,7 +1383,7 @@ void curve2::recalculate()
 		}
 		
 		for(int i = 0; i < input.get().size(); i++){
-			auto p = ofMap(input.get().at(i), minX.get(), maxX.get(), 0, 1);
+			auto p = ofMap(input.get().at(i), minX, maxX, 0, 1);
 			if(p <= curve.points[0].point.x){
 				tempOut[i] = curve.points[0].point.y; // Direct 0-1 range output
 			}else if(p >= curve.points.back().point.x){
@@ -1937,14 +1934,9 @@ void curve2::renderInspectorInterface() {
 	
 	// Global Parameters Section (includes curve management)
 	if (ImGui::CollapsingHeader("Global Parameters", ImGuiTreeNodeFlags_DefaultOpen)) {
-		float minXVal = minX.get();
-		if (ImGui::SliderFloat("Min X", &minXVal, -1000.0f, 1000.0f)) {
-			minX = minXVal;
-		}
-		float maxXVal = maxX.get();
-		if (ImGui::SliderFloat("Max X", &maxXVal, -1000.0f, 1000.0f)) {
-			maxX = maxXVal;
-		}
+		// X range is now fixed at [0.0, 1.0] - no longer configurable
+		ImGui::Text("X Range: [%.1f, %.1f] (fixed)", minX, maxX);
+		
 		int horDiv = numHorizontalDivisions.get();
 		if (ImGui::SliderInt("Horizontal Divisions", &horDiv, 1, 512)) {
 			numHorizontalDivisions = horDiv;
