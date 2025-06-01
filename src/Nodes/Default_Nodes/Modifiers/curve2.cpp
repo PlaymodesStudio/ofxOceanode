@@ -244,10 +244,24 @@ void curve2::draw(ofEventArgs &args){
 				if (ImGui::InputText("##Name", nameBuffer, sizeof(nameBuffer))) {
 					string newName = string(nameBuffer);
 					if (!newName.empty()) {
-						currentCurve.name = newName;
+						// Check for duplicate names and add "_" if necessary
+						string finalName = newName;
+						bool nameExists = true;
+						while (nameExists) {
+							nameExists = false;
+							for (int i = 0; i < curves.size(); i++) {
+								if (i != activeCurve.get() && curves[i].name.get() == finalName) {
+									nameExists = true;
+									finalName += "_";
+									break;
+								}
+							}
+						}
+						
+						currentCurve.name = finalName;
 						// Update output parameter name
 						if (activeCurve.get() < outputs.size() && outputs[activeCurve.get()]) {
-							outputs[activeCurve.get()]->setName(newName);
+							outputs[activeCurve.get()]->setName(finalName);
 						}
 					}
 				}
@@ -1675,6 +1689,28 @@ void curve2::addCurve() {
 	int newCurveIndex = curves.size() - 1;
 	int availableNumber = findNextAvailableCurveNumber();
 	curves[newCurveIndex].name.set("Name", "Curve " + ofToString(availableNumber));
+	
+	// Set color progression: new curve gets previous curve's color + 20% hue
+	if (newCurveIndex > 0) {
+		// Get the color of the previous curve (last existing curve)
+		ofColor prevColor = curves[newCurveIndex - 1].color.get();
+		
+		// Convert RGB to HSV
+		ofColor hsvColor = prevColor;
+		float hue, saturation, brightness;
+		hsvColor.getHsb(hue, saturation, brightness);
+		
+		hue += 25.0f;
+		if (hue > 255.0f) {
+			hue = fmod(hue, 256.0f);  // Wrap around using modulo
+		}
+		
+		// Convert back to RGB and set the new curve's color
+		ofColor newColor;
+		newColor.setHsb(hue, saturation, brightness, prevColor.a);  // Keep same alpha
+		curves[newCurveIndex].color.set(newColor);
+	}
+	// If this is the first curve (newCurveIndex == 0), keep the default orange color from CurveData constructor
 	
 	// Update activeCurve parameter max value
 	activeCurve.setMax(curves.size() - 1);
