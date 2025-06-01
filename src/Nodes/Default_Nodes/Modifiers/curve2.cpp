@@ -7,31 +7,8 @@
 //
 
 #include "curve2.h"
-#include "imgui.h"
 #include "glm/gtx/closest_point.hpp"
 
-// Helper function to draw dotted lines
-void drawDottedLine(ImDrawList* drawList, ImVec2 start, ImVec2 end, ImU32 color, float dashLength = 5.0f, float gapLength = 10.0f) {
-	ImVec2 direction = ImVec2(end.x - start.x, end.y - start.y);
-	float totalLength = sqrt(direction.x * direction.x + direction.y * direction.y);
-	
-	if (totalLength == 0) return;
-	
-	direction.x /= totalLength;
-	direction.y /= totalLength;
-	
-	float currentPos = 0;
-	while (currentPos < totalLength) {
-		float dashEnd = std::min(currentPos + dashLength, totalLength);
-		
-		ImVec2 dashStart = ImVec2(start.x + direction.x * currentPos, start.y + direction.y * currentPos);
-		ImVec2 dashEndPos = ImVec2(start.x + direction.x * dashEnd, start.y + direction.y * dashEnd);
-		
-		drawList->AddLine(dashStart, dashEndPos, color, 2.0f);
-		
-		currentPos += dashLength + gapLength;
-	}
-}
 
 curve2::curve2() : ofxOceanodeNodeModel("curve2") {
 	// Initialize with one curve
@@ -40,7 +17,6 @@ curve2::curve2() : ofxOceanodeNodeModel("curve2") {
 	// Set default name for first curve
 	curves[0].name.set("Name", "Curve 1");
 	
-	hoveredCurveIndex = -1;
 	showCurveLabels = false;
 	curveHitTestRadius = 8.0f;
 	needsRedraw = true;
@@ -59,17 +35,13 @@ void curve2::setup() {
 	description = "Advanced curve editor with asymmetric logistic segments. \n| Double-click: Create points \n| Drag: Move points \n| Right-click: Delete \n| Shift+drag: Asymmetry (vertical) + Inflection (horizontal) \n| Ctrl+drag: B parameter (horizontal) \n| Visual feedback: Yellow=Inflection, Cyan=Asymmetry, Red=B parameter \n| Snap to Grid: Enable for precise grid-aligned positioning";
 	
 	// Initialize multi-curve system
-	//addParameter(numCurves.set("Num Curves", 1, 1, 16));
 	numCurves=1;
-	//addParameter(activeCurve.set("Active Curve", 0, -1, 0));
-	
+
 	// Set up parameters
 	addParameter(input.set("Input", {0}, {0}, {1}));
 	addParameter(showWindow.set("Show", true));
-	// Initialize consolidated output parameter
 	addOutputParameter(allCurvesOutput.set("All Curves", {0}, {0}, {1}));
-
-	
+		
 	// Initialize outputs based on numCurves
 	outputs.resize(numCurves.get());
 	for(int i = 0; i < outputs.size(); i++){
@@ -134,7 +106,7 @@ void curve2::draw(ofEventArgs &args){
 			
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
-
+			
 			if (ImGui::Button("[+]") && curves.size() < 16) {
 				addCurve();
 				numCurves = curves.size();
@@ -178,9 +150,10 @@ void curve2::draw(ofEventArgs &args){
 			}
 			ImGui::SameLine();
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0,1.0,1.0,1.0));
+			
 			// Active curve selection dropdown with curve names
 			string activeCurveName = (activeCurve.get() == -1) ? "None" :
-				((activeCurve.get() < curves.size()) ? curves[activeCurve.get()].name.get() : "Invalid");
+			((activeCurve.get() < curves.size()) ? curves[activeCurve.get()].name.get() : "Invalid");
 			ImGui::SetNextItemWidth(120.0f);
 			if (ImGui::BeginCombo("##ActiveCurveEditor", activeCurveName.c_str())) {
 				// Add "None" option
@@ -337,7 +310,6 @@ void curve2::draw(ofEventArgs &args){
 			if (visual_canvas_sz.y < 50.0f) visual_canvas_sz.y = 50.0f;
 			
 			// Display grid only in the visual area
-			if (true)
 			{
 				ImU32 GRID_COLOR = IM_COL32(120, 120, 120, 60);
 				ImVec2 cell_sz = visual_canvas_sz / ImVec2(numHorizontalDivisions, numVerticalDivisions);
@@ -350,11 +322,11 @@ void curve2::draw(ofEventArgs &args){
 					draw_list->AddLine(ImVec2(0.0f, y) + visual_win_pos, ImVec2(visual_canvas_sz.x, y) + visual_win_pos, GRID_COLOR);
 			}
 			
-//			// Draw visual area boundary to show the safe zone effect
-//			ImU32 BOUNDARY_COLOR = IM_COL32(10, 10, 10, 128);
-//			draw_list->AddRect(visual_win_pos,
-//							   ImVec2(visual_win_pos.x + visual_canvas_sz.x, visual_win_pos.y + visual_canvas_sz.y),
-//							   BOUNDARY_COLOR, 0.0f, 0, 2.0f);
+			//			// Draw visual area boundary to show the safe zone effect
+			//			ImU32 BOUNDARY_COLOR = IM_COL32(10, 10, 10, 128);
+			//			draw_list->AddRect(visual_win_pos,
+			//							   ImVec2(visual_win_pos.x + visual_canvas_sz.x, visual_win_pos.y + visual_canvas_sz.y),
+			//							   BOUNDARY_COLOR, 0.0f, 0, 2.0f);
 			
 			// Make the ENTIRE canvas area interactive (including safe zone) - this is the key fix!
 			ImGui::InvisibleButton("canvas", canvas_sz);
@@ -406,7 +378,6 @@ void curve2::draw(ofEventArgs &args){
 			
 			hoveredPointIndex = -1;
 			hoveredSegmentIndex = -1;
-			hoveredCurveIndex = -1;
 			
 			// Only enable hover interactions when a specific curve is selected (not "None")
 			if(canvasHovered && activeCurve.get() >= 0){
@@ -435,59 +406,6 @@ void curve2::draw(ofEventArgs &args){
 							break;
 						}
 					}
-				}
-				
-				// PHASE 5: If no active curve elements are hovered, check for inactive curve hover
-				if(hoveredPointIndex == -1 && hoveredSegmentIndex == -1){
-					float closestDistance = curveHitTestRadius;
-					int closestCurveIndex = -1;
-					
-					// Check all inactive curves for hover
-					for(int curveIdx = 0; curveIdx < curves.size(); curveIdx++){
-						auto& curve = curves[curveIdx];
-						
-						// Skip disabled curves and active curve
-						if(!curve.enabled.get() || curveIdx == activeCurve.get()) continue;
-						
-						// Check distance to curve segments
-						for(int i = 0; i < curve.points.size()-1; i++){
-							// For performance, only check curves within X range
-							if(normalizedMousePos.x < curve.points[i].point.x - 0.05f ||
-							   normalizedMousePos.x > curve.points[i+1].point.x + 0.05f) continue;
-							
-							if(curve.lines[i].type == LINE2_HOLD){
-								// Simple distance check for HOLD segments
-								glm::vec2 p1 = denormalizePoint(curve.points[i].point);
-								glm::vec2 p2 = denormalizePoint(curve.points[i+1].point);
-								glm::vec2 segmentMid = glm::vec2(p2.x, p1.y); // Hold creates L-shape
-								float distToSegment = glm::distance(mousePos, segmentMid);
-								if(distToSegment < closestDistance){
-									closestDistance = distToSegment;
-									closestCurveIndex = curveIdx;
-								}
-							}
-							else if(curve.lines[i].type == LINE2_TENSION){
-								// Sample-based distance check for TENSION curves (optimized)
-								int numSamples = 5; // Reduced samples for performance
-								for(int sample = 0; sample <= numSamples; sample++){
-									float t = (float)sample / numSamples;
-									float segmentX = glm::mix(curve.points[i].point.x, curve.points[i+1].point.x, t);
-									
-									// Quick approximation of curve Y value
-									float segmentY = glm::mix(curve.points[i].point.y, curve.points[i+1].point.y, t);
-									
-									glm::vec2 curvePoint = denormalizePoint(glm::vec2(segmentX, segmentY));
-									float distToCurve = glm::distance(mousePos, curvePoint);
-									if(distToCurve < closestDistance){
-										closestDistance = distToCurve;
-										closestCurveIndex = curveIdx;
-									}
-								}
-							}
-						}
-					}
-					
-					hoveredCurveIndex = closestCurveIndex;
 				}
 			}
 			
@@ -528,13 +446,7 @@ void curve2::draw(ofEventArgs &args){
 					lines->emplace_back();
 				}
 			}
-			// PHASE 5: Single-click curve selection
-			else if(canvasClicked && hoveredCurveIndex >= 0 && hoveredCurveIndex != activeCurve.get()){
-				// Switch to the clicked inactive curve
-				activeCurve = hoveredCurveIndex;
-				// Visual feedback will be handled by the hover system
-			}
-			
+						
 			// Declare someItemClicked in broader scope so it can be used by all interaction code
 			bool someItemClicked = false;
 			
@@ -655,7 +567,7 @@ void curve2::draw(ofEventArgs &args){
 						}
 						
 						ImGui::Separator();
-						ImGui::Text("Global Logistic Parameters:");
+						ImGui::Text("Curve Properties:");
 						if(globalQ != nullptr){
 							float tempQ = globalQ->get();
 							
@@ -669,7 +581,7 @@ void curve2::draw(ofEventArgs &args){
 						
 						ImGui::Spacing();
 						
-						if(ImGui::Selectable("Remove")){
+						if(ImGui::Selectable("[Remove]")){
 							ImGui::CloseCurrentPopup();
 							indexToRemove = i;
 						}
@@ -822,10 +734,7 @@ void curve2::draw(ofEventArgs &args){
 				bDragActive = false;
 				bDragSegmentIndex = -1;
 			}
-			
-			// Single-click point creation removed - no longer supported
-			// Point creation now only available via double-click with Shift or Control modifier
-			
+						
 			ImGui::EndChild();
 			ImGui::PopStyleColor();
 			ImGui::PopStyleVar(2);
@@ -969,22 +878,13 @@ void curve2::draw(ofEventArgs &args){
 				if(activeCurve.get() >= 0) {
 					// When a specific curve is selected, inactive curves at 50% alpha with single line width
 					inactiveOpacity = 0.5f;
-					lineWidth = 1.0f;
+					lineWidth = 1.5f;
 				} else {
 					// When "None" is selected, all curves at full opacity with single line width
 					inactiveOpacity = 1.0f;
-					lineWidth = 1.0f;
+					lineWidth = 1.5f;
 				}
-				
-				// PHASE 5: Highlight hovered inactive curve
-				if(curveIdx == hoveredCurveIndex){
-					inactiveOpacity = 0.8f; // Increase opacity when hovered
-					lineWidth = 2.5f; // Thicker line when hovered
-					
-					// PHASE 5: Set cursor to hand when hovering over selectable curve
-					ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-				}
-				
+								
 				ofColor curveColor = curve.color.get();
 				ImU32 inactiveCurveColor = IM_COL32(curveColor.r, curveColor.g, curveColor.b, (int)(255 * inactiveOpacity));
 				
@@ -1350,12 +1250,8 @@ void curve2::draw(ofEventArgs &args){
 						// Active curve: full opacity, add "[ACTIVE]" suffix
 						curveName += " [ACTIVE]";
 						labelColor = IM_COL32(curveColor.r, curveColor.g, curveColor.b, (int)(255 * labelOpacity));
-					} else if(curveIdx == hoveredCurveIndex){
-						// Hovered curve: higher opacity, add "[CLICK TO SELECT]" suffix
-						curveName += " [CLICK TO SELECT]";
-						labelOpacity = 1.0f;
-						labelColor = IM_COL32(curveColor.r, curveColor.g, curveColor.b, (int)(255 * labelOpacity));
-					} else {
+					}
+					else {
 						// Inactive curve: lower opacity
 						labelOpacity = 0.6f;
 						labelColor = IM_COL32(curveColor.r, curveColor.g, curveColor.b, (int)(255 * labelOpacity));
@@ -1377,8 +1273,8 @@ void curve2::draw(ofEventArgs &args){
 				}
 			}
 			
-			// Draw vertices based on selection mode
-			//if(activeCurve.get() == -1){
+			// Always Draw vertices for refernce for editing the curves
+			if(true)
 			{
 				// "None" selected: Draw all vertices from all enabled curves as visual reference (no interaction)
 				for(int curveIdx = 0; curveIdx < curves.size(); curveIdx++){
@@ -1398,6 +1294,7 @@ void curve2::draw(ofEventArgs &args){
 					}
 				}
 			}
+			// Interactive drawing points
 			if(activeCurve.get() >= 0 && activeCurve.get() < curves.size() && curves[activeCurve.get()].enabled.get() && points != nullptr){
 				// Specific curve selected: Draw interactive points for the active curve only
 				auto& activeCurveData = curves[activeCurve.get()];
@@ -1423,7 +1320,6 @@ void curve2::draw(ofEventArgs &args){
 				auto mv = ofMap(v, minX, maxX, 0, 1);
 				draw_list->AddLine(denormalizePoint(glm::vec2(mv, 0)), denormalizePoint(glm::vec2(mv, 1)), IM_COL32(127, 127, 127, 127));
 			}
-			
 			
 			// Pop the style vars that were re-pushed for drawing operations
 			ImGui::PopStyleColor();
@@ -1579,23 +1475,6 @@ void curve2::presetSave(ofJson &json){
 			curveJson["Lines"][i]["SegmentQ"] = curve.lines[i].segmentQ;
 		}
 	}
-	
-//	// Backward compatibility: save active curve as legacy format
-//	if(!curves.empty()){
-//		auto& activeCurveData = getCurrentCurve();
-//		json["NumPoints"] = activeCurveData.points.size();
-//		for(int i = 0; i < activeCurveData.points.size(); i++){
-//			json["Points"][i]["Point"]["x"] = activeCurveData.points[i].point.x;
-//			json["Points"][i]["Point"]["y"] = activeCurveData.points[i].point.y;
-//		}
-//		for(int i = 0; i < activeCurveData.lines.size(); i++){
-//			json["Lines"][i]["Type"] = activeCurveData.lines[i].type;
-//			json["Lines"][i]["TensionExponent"] = activeCurveData.lines[i].tensionExponent;
-//			json["Lines"][i]["InflectionX"] = activeCurveData.lines[i].inflectionX;
-//			json["Lines"][i]["SegmentB"] = activeCurveData.lines[i].segmentB;
-//		}
-//		json["GlobalQ"] = activeCurveData.globalQ.get();
-//	}
 }
 
 void curve2::presetRecallAfterSettingParameters(ofJson &json){
@@ -1674,7 +1553,7 @@ void curve2::presetRecallAfterSettingParameters(ofJson &json){
 					}
 				}
 			}
-
+			
 			
 			// Load outputs count (default to numCurves for backward compatibility)
 			int numOutputsFromJson = json.contains("NumOutputs") ? static_cast<int>(json["NumOutputs"]) : numCurvesFromJson;
@@ -1682,14 +1561,14 @@ void curve2::presetRecallAfterSettingParameters(ofJson &json){
 			
 			// BUGFIX: Synchronize output parameter names with loaded curve names
 			// This fixes the issue where output parameter names were set before curve names were loaded
-//			for(int i = 0; i < outputs.size() && i < curves.size(); i++) {
-//				if(outputs[i]) {
-//					ofLogNotice("curve2::loadFromJson") << "Setting output " << i << " name to: " << curves[i].name.get();
-//					outputs[i]->setName(curves[i].name.get());
-//				} else {
-//					ofLogError("curve2::loadFromJson") << "NULL shared_ptr for output " << i;
-//				}
-//			}
+			//			for(int i = 0; i < outputs.size() && i < curves.size(); i++) {
+			//				if(outputs[i]) {
+			//					ofLogNotice("curve2::loadFromJson") << "Setting output " << i << " name to: " << curves[i].name.get();
+			//					outputs[i]->setName(curves[i].name.get());
+			//				} else {
+			//					ofLogError("curve2::loadFromJson") << "NULL shared_ptr for output " << i;
+			//				}
+			//			}
 			
 			// Always set active curve to "none" (-1) when loading presets
 			activeCurve.set(-1);
@@ -1762,13 +1641,13 @@ void curve2::presetRecallAfterSettingParameters(ofJson &json){
 					curve.lines[i].segmentQ = 1.0f;
 				}
 			}
-//			
-//			// Load global logistic parameters
-//			if(json.contains("GlobalQ")){
-//				curve.globalQ.set(json["GlobalQ"]);
-//			} else {
-//				curve.globalQ.set(1.0f);
-//			}
+			//
+			//			// Load global logistic parameters
+			//			if(json.contains("GlobalQ")){
+			//				curve.globalQ.set(json["GlobalQ"]);
+			//			} else {
+			//				curve.globalQ.set(1.0f);
+			//			}
 			
 			numCurves.set(1);
 			activeCurve.set(-1);
@@ -1805,51 +1684,51 @@ void curve2::addCurve() {
 }
 
 void curve2::removeCurve(int index) {
-    if (curves.size() <= 1 || index < 0 || index >= curves.size()) {
-        return;
-    }
-    
-    // Remove the specific output parameter BEFORE removing the curve
-    if (index < outputs.size()) {
-        string outputName = curves[index].name.get();
-        removeParameter(outputName);
-        outputs.erase(outputs.begin() + index);
-    }
-    
-    // Remove the curve from the vector
-    curves.erase(curves.begin() + index);
-    
-    // Update activeCurve bounds and value
-    activeCurve.setMax(curves.size() - 1);
-    if (activeCurve >= curves.size()) {
-        activeCurve = curves.size() - 1;
-    }
-    
-    // Update remaining output parameter names to match new indices
-    for (int i = index; i < outputs.size(); i++) {
-        if (i < curves.size() && outputs[i]) {
-            outputs[i]->setName(curves[i].name.get());
-        }
-    }
-    
-    // Update consolidated output
-    vector<float> consolidatedDefault(curves.size(), 0.0f);
-    allCurvesOutput = consolidatedDefault;
+	if (curves.size() <= 1 || index < 0 || index >= curves.size()) {
+		return;
+	}
+	
+	// Remove the specific output parameter BEFORE removing the curve
+	if (index < outputs.size()) {
+		string outputName = curves[index].name.get();
+		removeParameter(outputName);
+		outputs.erase(outputs.begin() + index);
+	}
+	
+	// Remove the curve from the vector
+	curves.erase(curves.begin() + index);
+	
+	// Update activeCurve bounds and value
+	activeCurve.setMax(curves.size() - 1);
+	if (activeCurve >= curves.size()) {
+		activeCurve = curves.size() - 1;
+	}
+	
+	// Update remaining output parameter names to match new indices
+	for (int i = index; i < outputs.size(); i++) {
+		if (i < curves.size() && outputs[i]) {
+			outputs[i]->setName(curves[i].name.get());
+		}
+	}
+	
+	// Update consolidated output
+	vector<float> consolidatedDefault(curves.size(), 0.0f);
+	allCurvesOutput = consolidatedDefault;
 }
 
 int curve2::findNextAvailableCurveNumber() {
-    for(int i = 1; i <= curves.size() + 1; i++) {
-        string candidateName = "Curve " + ofToString(i);
-        bool nameExists = false;
-        for(auto& curve : curves) {
-            if(curve.name.get() == candidateName) {
-                nameExists = true;
-                break;
-            }
-        }
-        if(!nameExists) return i;
-    }
-    return curves.size() + 1; // Fallback
+	for(int i = 1; i <= curves.size() + 1; i++) {
+		string candidateName = "Curve " + ofToString(i);
+		bool nameExists = false;
+		for(auto& curve : curves) {
+			if(curve.name.get() == candidateName) {
+				nameExists = true;
+				break;
+			}
+		}
+		if(!nameExists) return i;
+	}
+	return curves.size() + 1; // Fallback
 }
 
 void curve2::resizeCurves(int newCount) {
@@ -1908,7 +1787,7 @@ void curve2::onActiveCurveChanged(int& newIndex) {
 		// Reset hover states
 		hoveredPointIndex = -1;
 		hoveredSegmentIndex = -1;
-		hoveredCurveIndex = -1;
+//		hoveredCurveIndex = -1;
 		
 		// No recalculation needed for overview mode
 		return;
@@ -1932,7 +1811,7 @@ void curve2::onActiveCurveChanged(int& newIndex) {
 			globalQ = nullptr;
 			hoveredPointIndex = -1;
 			hoveredSegmentIndex = -1;
-			hoveredCurveIndex = -1;
+//			hoveredCurveIndex = -1;
 			return;
 		}
 	}
@@ -1963,7 +1842,7 @@ void curve2::onActiveCurveChanged(int& newIndex) {
 	// Reset hover states when switching curves
 	hoveredPointIndex = -1;
 	hoveredSegmentIndex = -1;
-	hoveredCurveIndex = -1;
+//	hoveredCurveIndex = -1;
 	
 	// Trigger recalculation
 	recalculate();
@@ -2065,155 +1944,28 @@ void curve2::renderInspectorInterface() {
 			currentCurve.globalQ = globalQVal;
 			recalculate();
 		}
-		
-		// Add Q optimization button
-		if (ImGui::Button("Optimize Q Values")) {
-			optimizeSegmentQValues();
-		}
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("Automatically optimize segment Q values for smoother transitions");
-		}
 	}
-	}
-	
-
-
-// Q optimization methods implementation
-void curve2::optimizeSegmentQValues() {
-	if(activeCurve.get() < 0 || activeCurve.get() >= curves.size()) return;
-	
-	auto& curve = curves[activeCurve.get()];
-	if(curve.points.size() < 3 || curve.lines.size() < 2) return; // Need at least 3 points for optimization
-	
-	// Optimize Q values for each segment to minimize curvature discontinuities
-	for(int i = 0; i < curve.lines.size(); i++) {
-		if(curve.lines[i].type != LINE2_TENSION) continue;
-		
-		float bestQ = curve.lines[i].segmentQ;
-		float minDiscontinuity = calculateCurvatureDiscontinuity(i);
-		
-		// Test different Q values to find the one that minimizes discontinuity
-		for(float testQ = 0.1f; testQ <= 5.0f; testQ += 0.1f) {
-			float originalQ = curve.lines[i].segmentQ;
-			curve.lines[i].segmentQ = testQ;
-			
-			float discontinuity = calculateCurvatureDiscontinuity(i);
-			if(discontinuity < minDiscontinuity) {
-				minDiscontinuity = discontinuity;
-				bestQ = testQ;
-			}
-			
-			curve.lines[i].segmentQ = originalQ; // Restore original value
-		}
-		
-		// Apply the best Q value found
-		curve.lines[i].segmentQ = bestQ;
-	}
-	
-	// Trigger recalculation with optimized values
-	recalculate();
 }
 
-float curve2::calculateCurvatureDiscontinuity(int segmentIndex) {
-	if(activeCurve.get() < 0 || activeCurve.get() >= curves.size()) return 0.0f;
+// Helper function to draw dotted lines
+void curve2::drawDottedLine(ImDrawList* drawList, ImVec2 start, ImVec2 end, ImU32 color, float dashLength, float gapLength) {
+	ImVec2 direction = ImVec2(end.x - start.x, end.y - start.y);
+	float totalLength = sqrt(direction.x * direction.x + direction.y * direction.y);
 	
-	auto& curve = curves[activeCurve.get()];
-	if(segmentIndex < 0 || segmentIndex >= curve.lines.size()) return 0.0f;
-	if(curve.lines[segmentIndex].type != LINE2_TENSION) return 0.0f;
+	if (totalLength == 0) return;
 	
-	// Calculate curvature discontinuity at segment boundaries
-	float totalDiscontinuity = 0.0f;
+	direction.x /= totalLength;
+	direction.y /= totalLength;
 	
-	// Check discontinuity at the start of the segment (with previous segment)
-	if(segmentIndex > 0 && curve.lines[segmentIndex-1].type == LINE2_TENSION) {
-		// Sample derivatives at the boundary point
-		float epsilon = 0.001f;
+	float currentPos = 0;
+	while (currentPos < totalLength) {
+		float dashEnd = std::min(currentPos + dashLength, totalLength);
 		
-		// Get the boundary point
-		float boundaryX = curve.points[segmentIndex].point.x;
+		ImVec2 dashStart = ImVec2(start.x + direction.x * currentPos, start.y + direction.y * currentPos);
+		ImVec2 dashEndPos = ImVec2(start.x + direction.x * dashEnd, start.y + direction.y * dashEnd);
 		
-		// Calculate derivative from previous segment (approaching from left)
-		float leftX1 = boundaryX - epsilon;
-		float leftX2 = boundaryX;
-		float leftY1 = evaluateSegmentAt(segmentIndex-1, leftX1);
-		float leftY2 = evaluateSegmentAt(segmentIndex-1, leftX2);
-		float leftDerivative = (leftY2 - leftY1) / epsilon;
+		drawList->AddLine(dashStart, dashEndPos, color, 2.0f);
 		
-		// Calculate derivative from current segment (approaching from right)
-		float rightX1 = boundaryX;
-		float rightX2 = boundaryX + epsilon;
-		float rightY1 = evaluateSegmentAt(segmentIndex, rightX1);
-		float rightY2 = evaluateSegmentAt(segmentIndex, rightX2);
-		float rightDerivative = (rightY2 - rightY1) / epsilon;
-		
-		// Add squared difference of derivatives as discontinuity measure
-		totalDiscontinuity += (leftDerivative - rightDerivative) * (leftDerivative - rightDerivative);
+		currentPos += dashLength + gapLength;
 	}
-	
-	// Check discontinuity at the end of the segment (with next segment)
-	if(segmentIndex < curve.lines.size()-1 && curve.lines[segmentIndex+1].type == LINE2_TENSION) {
-		// Similar calculation for the end boundary
-		float epsilon = 0.001f;
-		float boundaryX = curve.points[segmentIndex+1].point.x;
-		
-		float leftX1 = boundaryX - epsilon;
-		float leftX2 = boundaryX;
-		float leftY1 = evaluateSegmentAt(segmentIndex, leftX1);
-		float leftY2 = evaluateSegmentAt(segmentIndex, leftX2);
-		float leftDerivative = (leftY2 - leftY1) / epsilon;
-		
-		float rightX1 = boundaryX;
-		float rightX2 = boundaryX + epsilon;
-		float rightY1 = evaluateSegmentAt(segmentIndex+1, rightX1);
-		float rightY2 = evaluateSegmentAt(segmentIndex+1, rightX2);
-		float rightDerivative = (rightY2 - rightY1) / epsilon;
-		
-		totalDiscontinuity += (leftDerivative - rightDerivative) * (leftDerivative - rightDerivative);
-	}
-	
-	return totalDiscontinuity;
-}
-
-float curve2::evaluateSegmentAt(int segmentIndex, float x) {
-	if(activeCurve.get() < 0 || activeCurve.get() >= curves.size()) return 0.0f;
-	
-	auto& curve = curves[activeCurve.get()];
-	if(segmentIndex < 0 || segmentIndex >= curve.lines.size()) return 0.0f;
-	
-	// Normalize X to segment-relative position
-	float segmentStartX = curve.points[segmentIndex].point.x;
-	float segmentEndX = curve.points[segmentIndex+1].point.x;
-	float normalizedX = (x - segmentStartX) / (segmentEndX - segmentStartX);
-	normalizedX = std::max(0.0f, std::min(1.0f, normalizedX));
-	
-	if(curve.lines[segmentIndex].type == LINE2_HOLD) {
-		return curve.points[segmentIndex].point.y;
-	} else if(curve.lines[segmentIndex].type == LINE2_TENSION) {
-		// Asymmetric logistic parameters
-		float A = curve.points[segmentIndex].point.y;
-		float K = curve.points[segmentIndex+1].point.y;
-		float M = curve.lines[segmentIndex].inflectionX;
-		float nu = curve.lines[segmentIndex].tensionExponent;
-		float B = curve.lines[segmentIndex].segmentB;
-		float Q = curve.lines[segmentIndex].segmentQ;
-		
-		// Calculate logistic function
-		auto logisticFunction = [&](float x) -> float {
-			float logisticTerm = 1.0f + Q * exp(-B * (x - M));
-			return A + (K - A) / pow(logisticTerm, 1.0f / nu);
-		};
-		
-		float logistic_0 = logisticFunction(0.0f);
-		float logistic_1 = logisticFunction(1.0f);
-		float logisticRange = logistic_1 - logistic_0;
-		
-		if(abs(logisticRange) > 1e-6f) {
-			float raw_logistic = logisticFunction(normalizedX);
-			return A + (K - A) * (raw_logistic - logistic_0) / logisticRange;
-		} else {
-			return A + (K - A) * normalizedX;
-		}
-	}
-	
-	return 0.0f;
 }

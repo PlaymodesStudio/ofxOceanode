@@ -12,6 +12,7 @@
 #pragma once
 
 #include "ofxOceanodeNodeModel.h"
+#include "imgui.h"
 
 //---------------------------------------------------------------
 
@@ -149,7 +150,6 @@ private:
 	// Segment hover detection system
 	int hoveredSegmentIndex = -1;
 	
-	int hoveredCurveIndex = -1;        // Which inactive curve is being hovered
 	bool showCurveLabels = true;       // Show curve names in editor
 	float curveHitTestRadius = 8.0f;   // Distance threshold for curve selection
 	
@@ -191,14 +191,9 @@ private:
 	void onNumCurvesChanged(int& newCount);
 	void onActiveCurveChanged(int& newIndex);
 	
-	// Q optimization methods
-	void optimizeSegmentQValues();
-	float calculateCurvatureDiscontinuity(int segmentIndex);
-	float evaluateSegmentAt(int segmentIndex, float x);
-	
 	// Inspector interface rendering
 	void renderInspectorInterface();
-	
+	void drawDottedLine(ImDrawList* drawList, ImVec2 start, ImVec2 end, ImU32 color, float dashLength = 5.0f, float gapLength = 10.0f);
 };
 
 
