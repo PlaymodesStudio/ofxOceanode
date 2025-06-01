@@ -9,6 +9,480 @@
 #include "curve2.h"
 #include "glm/gtx/closest_point.hpp"
 
+//---------------------------------------------------------------
+// StandardCoordinateTransformer Implementation
+//---------------------------------------------------------------
+
+StandardCoordinateTransformer::StandardCoordinateTransformer()
+    : visualWinPos(0, 0)
+    , visualCanvasSize(0, 0)
+    , canvasWinPos(0, 0)
+    , canvasSize(0, 0)
+    , gridSnappingEnabled(false)
+    , horizontalDivisions(10)
+    , verticalDivisions(10)
+{
+}
+
+glm::vec2 StandardCoordinateTransformer::normalizePoint(const glm::vec2& point) const {
+    return glm::vec2(
+        ofMap(point.x, visualWinPos.x, visualWinPos.x + visualCanvasSize.x, 0, 1),
+        ofMap(point.y, visualWinPos.y, visualWinPos.y + visualCanvasSize.y, 1, 0)
+    );
+}
+
+glm::vec2 StandardCoordinateTransformer::denormalizePoint(const glm::vec2& point) const {
+    return glm::vec2(
+        ofMap(point.x, 0, 1, visualWinPos.x, visualWinPos.x + visualCanvasSize.x),
+        ofMap(point.y, 1, 0, visualWinPos.y, visualWinPos.y + visualCanvasSize.y)
+    );
+}
+
+glm::vec2 StandardCoordinateTransformer::safeNormalizePoint(const glm::vec2& point) const {
+    // Check if mouse is within the entire canvas (including safe zone)
+    if (point.x >= canvasWinPos.x && point.x <= canvasWinPos.x + canvasSize.x &&
+        point.y >= canvasWinPos.y && point.y <= canvasWinPos.y + canvasSize.y) {
+        
+        // Clamp mouse position to visual area boundaries
+        float clampedX = std::max(visualWinPos.x, std::min(visualWinPos.x + visualCanvasSize.x, point.x));
+        float clampedY = std::max(visualWinPos.y, std::min(visualWinPos.y + visualCanvasSize.y, point.y));
+        
+        // Normalize the clamped position
+        return glm::vec2(
+            ofMap(clampedX, visualWinPos.x, visualWinPos.x + visualCanvasSize.x, 0, 1),
+            ofMap(clampedY, visualWinPos.y, visualWinPos.y + visualCanvasSize.y, 1, 0)
+        );
+    }
+    
+    // If outside entire canvas, use regular normalization
+    return glm::vec2(
+        ofMap(point.x, visualWinPos.x, visualWinPos.x + visualCanvasSize.x, 0, 1),
+        ofMap(point.y, visualWinPos.y, visualWinPos.y + visualCanvasSize.y, 1, 0)
+    );
+}
+
+void StandardCoordinateTransformer::setVisualBounds(const ImVec2& winPos, const ImVec2& canvasSize) {
+    visualWinPos = winPos;
+    visualCanvasSize = canvasSize;
+}
+
+void StandardCoordinateTransformer::setCanvasBounds(const ImVec2& winPos, const ImVec2& canvasSize) {
+    canvasWinPos = winPos;
+    this->canvasSize = canvasSize;
+}
+
+void StandardCoordinateTransformer::setGridSnapping(bool enabled, int horizontalDivs, int verticalDivs) {
+    gridSnappingEnabled = enabled;
+    horizontalDivisions = horizontalDivs;
+    verticalDivisions = verticalDivs;
+}
+
+glm::vec2 StandardCoordinateTransformer::snapToGrid(const glm::vec2& point) const {
+    if (!gridSnappingEnabled) {
+        return point;
+    }
+    
+    // Snap to grid divisions
+    float snappedX = std::round(point.x * horizontalDivisions) / horizontalDivisions;
+    float snappedY = std::round(point.y * verticalDivisions) / verticalDivisions;
+    
+    return glm::vec2(snappedX, snappedY);
+}
+
+bool StandardCoordinateTransformer::isWithinCanvas(const glm::vec2& point) const {
+    return point.x >= canvasWinPos.x && point.x <= canvasWinPos.x + canvasSize.x &&
+           point.y >= canvasWinPos.y && point.y <= canvasWinPos.y + canvasSize.y;
+}
+
+bool StandardCoordinateTransformer::isWithinVisualArea(const glm::vec2& point) const {
+    return point.x >= visualWinPos.x && point.x <= visualWinPos.x + visualCanvasSize.x &&
+           point.y >= visualWinPos.y && point.y <= visualWinPos.y + visualCanvasSize.y;
+}
+
+//---------------------------------------------------------------
+// StandardCanvasLayout Implementation
+//---------------------------------------------------------------
+
+StandardCanvasLayout::StandardCanvasLayout()
+    : safeZonePadding(DEFAULT_SAFE_ZONE_PADDING) {
+}
+
+void StandardCanvasLayout::calculateLayout(const ImVec2& availableSize, ImVec2& canvasPos, ImVec2& canvasSize,
+                                         ImVec2& visualPos, ImVec2& visualSize) {
+    // Get the available space
+    canvasPos = ImGui::GetCursorScreenPos();
+    canvasSize = availableSize;
+    
+    // Visual drawing area (smaller, centered within the canvas)
+    visualPos = ImVec2(canvasPos.x + safeZonePadding, canvasPos.y + safeZonePadding);
+    visualSize = ImVec2(canvasSize.x - 2 * safeZonePadding, canvasSize.y - 2 * safeZonePadding);
+    
+    // Ensure visual area is not negative
+    if (visualSize.x < 50.0f) visualSize.x = 50.0f;
+    if (visualSize.y < 50.0f) visualSize.y = 50.0f;
+}
+
+void StandardCanvasLayout::renderGrid(ImDrawList* drawList, const ImVec2& visualPos, const ImVec2& visualSize,
+                                    int horizontalDivs, int verticalDivs) {
+    ImU32 GRID_COLOR = IM_COL32(120, 120, 120, 60);
+    ImVec2 cell_sz = ImVec2(visualSize.x / horizontalDivs, visualSize.y / verticalDivs);
+    
+    // Draw vertical lines (skip first and last by starting at cell_sz.x and stopping before visualSize.x)
+    for (float x = cell_sz.x; x < visualSize.x - cell_sz.x * 0.5f; x += cell_sz.x)
+        drawList->AddLine(ImVec2(x, 0.0f) + visualPos, ImVec2(x, visualSize.y) + visualPos, GRID_COLOR);
+    
+    // Draw horizontal lines (skip first and last by starting at cell_sz.y and stopping before visualSize.y)
+    for (float y = cell_sz.y; y < visualSize.y - cell_sz.y * 0.5f; y += cell_sz.y)
+        drawList->AddLine(ImVec2(0.0f, y) + visualPos, ImVec2(visualSize.x, y) + visualPos, GRID_COLOR);
+}
+
+void StandardCanvasLayout::renderBackground(ImDrawList* drawList, const ImVec2& canvasPos, const ImVec2& canvasSize) {
+    // Optional: Could add background rendering here if needed
+    // Currently not used in the original implementation
+}
+
+float StandardCanvasLayout::getSafeZonePadding() const {
+    return safeZonePadding;
+}
+
+void StandardCanvasLayout::setSafeZonePadding(float padding) {
+    safeZonePadding = padding;
+}
+
+float StandardCanvasLayout::calculateWindowHeight(const ImVec2& windowSize, bool showInfoPanel) const {
+    if (showInfoPanel) {
+        // Current behavior - calculate widget height and subtract from total
+        float widgetAreaHeight = 0.0f;
+        
+        // Estimate widget area height based on content
+        // Base height for "Curve Parameters" text and spacing
+        widgetAreaHeight += ImGui::GetTextLineHeight() + ImGui::GetStyle().ItemSpacing.y * 2;
+        
+        // Height for separator
+        widgetAreaHeight += 1.0f + ImGui::GetStyle().ItemSpacing.y;
+        
+        // Height for parameter display (2-3 lines of text)
+        widgetAreaHeight += ImGui::GetTextLineHeight() * 3 + ImGui::GetStyle().ItemSpacing.y * 2;
+        
+        // Add some padding for safety
+        widgetAreaHeight += ImGui::GetStyle().WindowPadding.y * 2;
+        
+        return std::max(50.0f, windowSize.y - widgetAreaHeight);
+    } else {
+        // Use all available height for curve area
+        return std::max(50.0f, windowSize.y);
+    }
+}
+
+//---------------------------------------------------------------
+// ShowAllCurveManager Implementation
+//---------------------------------------------------------------
+
+ShowAllCurveManager::ShowAllCurveManager()
+    : curves(nullptr), activeCurve(nullptr), numCurves(nullptr), outputs(nullptr) {
+}
+
+void ShowAllCurveManager::setCurveData(std::vector<CurveData>* curvesPtr, ofParameter<int>* activeCurvePtr,
+                                      ofParameter<int>* numCurvesPtr, std::vector<std::shared_ptr<ofParameter<std::vector<float>>>>* outputsPtr) {
+    curves = curvesPtr;
+    activeCurve = activeCurvePtr;
+    numCurves = numCurvesPtr;
+    outputs = outputsPtr;
+}
+
+void ShowAllCurveManager::setCallbacks(std::function<void()> recalculate, std::function<void()> addCurve, std::function<void(int)> removeCurve) {
+    recalculateCallback = recalculate;
+    addCurveCallback = addCurve;
+    removeCurveCallback = removeCurve;
+}
+
+void ShowAllCurveManager::renderInterface() {
+    if (!curves || !activeCurve || !numCurves || !outputs) return;
+    
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+    
+    handleAddCurve();
+    ImGui::SameLine();
+    handleRemoveCurve();
+    ImGui::SameLine();
+    handleResetCurve();
+    ImGui::SameLine();
+    
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0,1.0,1.0,1.0));
+    renderCurveSelector();
+    ImGui::PopStyleColor();
+    
+    renderCurveProperties();
+    
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor();
+}
+
+void ShowAllCurveManager::handleAddCurve() {
+    if (ImGui::Button("[+]") && validateCurveLimit()) {
+        if (addCurveCallback) {
+            addCurveCallback();
+        } else {
+            handleCurveAddition();
+        }
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Add Curve");
+    }
+}
+
+void ShowAllCurveManager::handleRemoveCurve() {
+    if (ImGui::Button("[-]") && curves->size() > 1) {
+        if (removeCurveCallback) {
+            removeCurveCallback(activeCurve->get());
+        } else {
+            handleCurveRemoval(activeCurve->get());
+        }
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Remove Curve");
+    }
+}
+
+void ShowAllCurveManager::handleResetCurve() {
+    if(ImGui::Button("[Reset]")) {
+        if(activeCurve->get() >= 0 && activeCurve->get() < curves->size()) {
+            auto& currentCurve = (*curves)[activeCurve->get()];
+            
+            // Clear existing points and lines
+            currentCurve.points.clear();
+            currentCurve.lines.clear();
+            
+            // Create default curve with 2 points: (0,0) and (1,1)
+            currentCurve.points.emplace_back(0, 0);
+            currentCurve.points.emplace_back(1, 1);
+            
+            // Set points as not newly created
+            currentCurve.points.front().firstCreated = false;
+            currentCurve.points.back().firstCreated = false;
+            
+            // Create default line segment with default values
+            currentCurve.lines.emplace_back();
+            
+            // Trigger recalculation
+            if (recalculateCallback) {
+                recalculateCallback();
+            }
+        }
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Reset Curve");
+    }
+}
+
+void ShowAllCurveManager::renderCurveSelector() {
+    // Active curve selection dropdown with curve names
+    string activeCurveName = (activeCurve->get() == -1) ? "None" :
+        ((activeCurve->get() < curves->size()) ? (*curves)[activeCurve->get()].name.get() : "Invalid");
+    
+    ImGui::SetNextItemWidth(120.0f);
+    if (ImGui::BeginCombo("##ActiveCurveEditor", activeCurveName.c_str())) {
+        // Add "None" option
+        bool isNoneSelected = (activeCurve->get() == -1);
+        if (ImGui::Selectable("None", isNoneSelected)) {
+            *activeCurve = -1;
+        }
+        if (isNoneSelected) {
+            ImGui::SetItemDefaultFocus();
+        }
+        
+        // Add curve options with color indicators and names
+        for (int i = 0; i < curves->size(); i++) {
+            bool isSelected = (activeCurve->get() == i);
+            string curveName = (*curves)[i].name.get();
+            
+            // Draw color indicator
+            ofColor curveColor = (*curves)[i].color.get();
+            ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            drawList->AddRectFilled(
+                ImVec2(cursorPos.x + 2, cursorPos.y + 2),
+                ImVec2(cursorPos.x + 12, cursorPos.y + 12),
+                IM_COL32(curveColor.r, curveColor.g, curveColor.b, 255)
+            );
+            
+            // Add spacing for color indicator
+            ImGui::Dummy(ImVec2(16, 0));
+            ImGui::SameLine();
+            
+            if (ImGui::Selectable(curveName.c_str(), isSelected)) {
+                *activeCurve = i;
+            }
+            if (isSelected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+}
+
+void ShowAllCurveManager::renderCurveProperties() {
+    // Add curve parameters on the same line (only when a curve is selected)
+    if(activeCurve->get() >= 0 && activeCurve->get() < curves->size()) {
+        auto& currentCurve = (*curves)[activeCurve->get()];
+        
+        ImGui::SameLine();
+        
+        // Enabled checkbox (compact)
+        bool enabled = currentCurve.enabled.get();
+        if (ImGui::Checkbox("##Enabled", &enabled)) {
+            currentCurve.enabled = enabled;
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Enabled");
+        }
+        
+        ImGui::SameLine();
+        
+        // Color parameter (compact)
+        float colorArray[4] = {
+            currentCurve.color.get().r / 255.0f,
+            currentCurve.color.get().g / 255.0f,
+            currentCurve.color.get().b / 255.0f,
+            currentCurve.color.get().a / 255.0f
+        };
+        ImGui::SetNextItemWidth(60.0f);
+        if (ImGui::ColorEdit4("##Color", colorArray, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel)) {
+            currentCurve.color = ofColor(
+                colorArray[0] * 255,
+                colorArray[1] * 255,
+                colorArray[2] * 255,
+                colorArray[3] * 255
+            );
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Color");
+        }
+        
+        ImGui::SameLine();
+        
+        // Name text input
+        char nameBuffer[256];
+        string currentName = currentCurve.name.get();
+        strncpy(nameBuffer, currentName.c_str(), sizeof(nameBuffer) - 1);
+        nameBuffer[sizeof(nameBuffer) - 1] = '\0';
+        
+        ImGui::SetNextItemWidth(100.0f);
+        if (ImGui::InputText("##Name", nameBuffer, sizeof(nameBuffer))) {
+            string newName = string(nameBuffer);
+            if (!newName.empty()) {
+                // Check for duplicate names and add "_" if necessary
+                string finalName = generateUniqueName(newName);
+                currentCurve.name = finalName;
+                
+                // Update output parameter name
+                if (activeCurve->get() < outputs->size() && (*outputs)[activeCurve->get()]) {
+                    (*outputs)[activeCurve->get()]->setName(finalName);
+                }
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Curve Name");
+        }
+    }
+}
+
+void ShowAllCurveManager::renderCurveControls() {
+    renderInterface();
+}
+
+bool ShowAllCurveManager::handleCurveSelection(int& activeCurveIndex) {
+    // This is handled by renderCurveSelector() through the dropdown
+    return false;
+}
+
+bool ShowAllCurveManager::handleCurveAddition() {
+    if (!validateCurveLimit()) return false;
+    
+    // Create new curve with default data
+    curves->emplace_back();
+    auto& newCurve = curves->back();
+    
+    // Set unique name
+    int curveNumber = curves->size();
+    string baseName = "Curve " + ofToString(curveNumber);
+    newCurve.name = generateUniqueName(baseName);
+    
+    // Set unique color (cycle through predefined colors)
+    ofColor colors[] = {
+        ofColor(255, 128, 0),   // Orange
+        ofColor(0, 255, 128),   // Green
+        ofColor(128, 0, 255),   // Purple
+        ofColor(255, 255, 0),   // Yellow
+        ofColor(0, 255, 255),   // Cyan
+        ofColor(255, 0, 255),   // Magenta
+        ofColor(128, 255, 0),   // Lime
+        ofColor(255, 0, 128)    // Pink
+    };
+    newCurve.color = colors[(curves->size() - 1) % 8];
+    
+    *numCurves = curves->size();
+    return true;
+}
+
+bool ShowAllCurveManager::handleCurveRemoval(int curveIndex) {
+    if (curves->size() <= 1 || curveIndex < 0 || curveIndex >= curves->size()) {
+        return false;
+    }
+    
+    // Remove the curve
+    curves->erase(curves->begin() + curveIndex);
+    
+    // Adjust active curve index if necessary
+    if (activeCurve->get() >= curves->size()) {
+        *activeCurve = curves->size() - 1;
+    } else if (activeCurve->get() == curveIndex && curveIndex > 0) {
+        *activeCurve = curveIndex - 1;
+    }
+    
+    *numCurves = curves->size();
+    return true;
+}
+
+void ShowAllCurveManager::renderCurveProperties(CurveData& curve) {
+    // This is handled by renderCurveProperties() method
+}
+
+bool ShowAllCurveManager::validateCurveName(const std::string& name, int excludeIndex) {
+    if (name.empty()) return false;
+    
+    for (int i = 0; i < curves->size(); i++) {
+        if (i != excludeIndex && (*curves)[i].name.get() == name) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool ShowAllCurveManager::validateCurveLimit() const {
+    return curves->size() < 16;
+}
+
+std::string ShowAllCurveManager::generateUniqueName(const std::string& baseName) const {
+    string finalName = baseName;
+    bool nameExists = true;
+    while (nameExists) {
+        nameExists = false;
+        for (int i = 0; i < curves->size(); i++) {
+            if ((*curves)[i].name.get() == finalName) {
+                nameExists = true;
+                finalName += "_";
+                break;
+            }
+        }
+    }
+    return finalName;
+}
+
+//---------------------------------------------------------------
+// curve2 Implementation
+//---------------------------------------------------------------
 
 curve2::curve2() : ofxOceanodeNodeModel("curve2") {
 	// Initialize with one curve
@@ -20,14 +494,15 @@ curve2::curve2() : ofxOceanodeNodeModel("curve2") {
 	showCurveLabels = false;
 	curveHitTestRadius = 8.0f;
 	needsRedraw = true;
-	lastFrameMouseX = -1;
-	lastFrameMouseY = -1;
 	
 	// Initialize pointers to point to the first curve
 	points = &curves[0].points;
 	lines = &curves[0].lines;
 	colorParam = &curves[0].color;
 	globalQ = &curves[0].globalQ;
+	
+	// Initialize modular architecture components
+	initializeComponents();
 }
 
 void curve2::setup() {
@@ -39,7 +514,8 @@ void curve2::setup() {
 
 	// Set up parameters
 	addParameter(input.set("Input", {0}, {0}, {1}));
-	addParameter(showWindow.set("Show", true));
+	addParameter(showWindowAll.set("Show All", true));
+	addParameter(showWindowSplit.set("Show Split", false));
 	addOutputParameter(allCurvesOutput.set("All Curves", {0}, {0}, {1}));
 		
 	// Initialize outputs based on numCurves
@@ -55,8 +531,6 @@ void curve2::setup() {
 	// Initialize parameters (but don't add them to inspector yet)
 	numHorizontalDivisions.set("Hor Div", 8, 1, 512);
 	numVerticalDivisions.set("Vert Div", 4, 1, 512);
-	minX.set("Min X", 0, -FLT_MAX, FLT_MAX);
-	maxX.set("Max X", 1, -FLT_MAX, FLT_MAX);
 	snapToGrid.set("Snap to Grid", false);
 	showInfo.set("Show Info", false);
 	
@@ -89,212 +563,61 @@ void curve2::setup() {
 	}));
 }
 
+void curve2::initializeComponents() {
+	// Initialize the coordinate transformer component
+	coordinateTransformer = std::make_shared<StandardCoordinateTransformer>();
+	
+	// Initialize the canvas layout component
+	canvasLayout = std::make_shared<StandardCanvasLayout>();
+	
+	// Initialize the curve manager component
+	curveManager = std::make_shared<ShowAllCurveManager>();
+	curveManager->setCurveData(&curves, &activeCurve, &numCurves, &outputs);
+	curveManager->setCallbacks(
+		[this]() { recalculate(); },  // recalculate callback
+		[this]() { addCurve(); numCurves = curves.size(); },  // add curve callback
+		[this](int index) { removeCurve(index); numCurves = curves.size(); }  // remove curve callback
+	);
+	
+	// Initialize the visual feedback component
+	visualFeedback = std::make_shared<StandardVisualFeedback>();
+	visualFeedback->setCoordinateTransformer(coordinateTransformer);
+	visualFeedback->setShowInfo(showInfo.get());
+	
+	// Initialize the point interaction handler component
+	pointHandler = std::make_shared<StandardPointInteractionHandler>();
+	pointHandler->setCoordinateTransformer(coordinateTransformer);
+	pointHandler->setRecalculateCallback([this]() { recalculate(); });
+	
+	// Initialize the parameter controller component
+	parameterController = std::make_shared<StandardParameterController>();
+	parameterController->setCoordinateTransformer(coordinateTransformer);
+	parameterController->setRecalculateCallback([this]() { recalculate(); });
+	
+	// Initialize the curve renderer component
+	curveRenderer = std::make_shared<MultiCurveRenderer>();
+	curveRenderer->setCoordinateTransformer(coordinateTransformer);
+	curveRenderer->setRenderQuality(MultiCurveRenderer::RenderQuality::MEDIUM);
+}
+
 void curve2::draw(ofEventArgs &args){
 	
-	if(showWindow){
+	if(showWindowAll){
 		string modCanvasID = canvasID == "Canvas" ? "" : (canvasID + "/");
 		string windowTitle = modCanvasID + "Curve2 " + ofToString(getNumIdentifier());
-		if(ImGui::Begin(windowTitle.c_str(), (bool *)&showWindow.get()))
+		if(ImGui::Begin(windowTitle.c_str(), (bool *)&showWindowAll.get()))
 		{
 			ImGui::SameLine();
 			ImGui::BeginGroup();
 			
 			const ImVec2 NODE_WINDOW_PADDING(8.0f, 7.0f);
 			
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+			// Render curve management interface using the ShowAllCurveManager component
+			curveManager->renderInterface();
 			
-			if (ImGui::Button("[+]") && curves.size() < 16) {
-				addCurve();
-				numCurves = curves.size();
-			}
-			if (ImGui::IsItemHovered()) {
-				ImGui::SetTooltip("Add Curve");
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("[-]") && curves.size() > 1) {
-				removeCurve(activeCurve.get());
-				numCurves = curves.size();
-			}
-			if (ImGui::IsItemHovered()) {
-				ImGui::SetTooltip("Remove Curve");
-			}
-			ImGui::SameLine();
-			if(ImGui::Button("[Reset]"))
-			{
-				if(points != nullptr && lines != nullptr){
-					// Clear existing points and lines
-					points->clear();
-					lines->clear();
-					
-					// Create default curve with 2 points: (0,0) and (1,1)
-					points->emplace_back(0, 0);
-					points->emplace_back(1, 1);
-					
-					// Set points as not newly created
-					points->front().firstCreated = false;
-					points->back().firstCreated = false;
-					
-					// Create default line segment with default values
-					lines->emplace_back();
-					
-					// Trigger recalculation of the curve
-					recalculate();
-				}
-			}
-			if (ImGui::IsItemHovered()) {
-				ImGui::SetTooltip("Reset Curve");
-			}
-			ImGui::SameLine();
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0,1.0,1.0,1.0));
-			
-			// Active curve selection dropdown with curve names
-			string activeCurveName = (activeCurve.get() == -1) ? "None" :
-			((activeCurve.get() < curves.size()) ? curves[activeCurve.get()].name.get() : "Invalid");
-			ImGui::SetNextItemWidth(120.0f);
-			if (ImGui::BeginCombo("##ActiveCurveEditor", activeCurveName.c_str())) {
-				// Add "None" option
-				bool isNoneSelected = (activeCurve.get() == -1);
-				if (ImGui::Selectable("None", isNoneSelected)) {
-					activeCurve = -1;
-				}
-				if (isNoneSelected) {
-					ImGui::SetItemDefaultFocus();
-				}
-				
-				// Add curve options with color indicators and names
-				for (int i = 0; i < curves.size(); i++) {
-					bool isSelected = (activeCurve.get() == i);
-					string curveName = curves[i].name.get();
-					
-					// Draw color indicator
-					ofColor curveColor = curves[i].color.get();
-					ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-					ImDrawList* drawList = ImGui::GetWindowDrawList();
-					drawList->AddRectFilled(
-											ImVec2(cursorPos.x + 2, cursorPos.y + 2),
-											ImVec2(cursorPos.x + 12, cursorPos.y + 12),
-											IM_COL32(curveColor.r, curveColor.g, curveColor.b, 255)
-											);
-					
-					// Add spacing for color indicator
-					ImGui::Dummy(ImVec2(16, 0));
-					ImGui::SameLine();
-					
-					if (ImGui::Selectable(curveName.c_str(), isSelected)) {
-						activeCurve = i;
-					}
-					if (isSelected) {
-						ImGui::SetItemDefaultFocus();
-					}
-				}
-				ImGui::EndCombo();
-			}
-			ImGui::PopStyleColor();
-			
-			// Add curve parameters on the same line (only when a curve is selected)
-			if(activeCurve.get() >= 0 && activeCurve.get() < curves.size()) {
-				auto& currentCurve = curves[activeCurve.get()];
-				
-				ImGui::SameLine();
-				
-				// Enabled checkbox (compact)
-				bool enabled = currentCurve.enabled.get();
-				if (ImGui::Checkbox("##Enabled", &enabled)) {
-					currentCurve.enabled = enabled;
-				}
-				if (ImGui::IsItemHovered()) {
-					ImGui::SetTooltip("Enabled");
-				}
-				
-				ImGui::SameLine();
-				
-				// Color parameter (compact)
-				float colorArray[4] = {
-					currentCurve.color.get().r / 255.0f,
-					currentCurve.color.get().g / 255.0f,
-					currentCurve.color.get().b / 255.0f,
-					currentCurve.color.get().a / 255.0f
-				};
-				ImGui::SetNextItemWidth(60.0f);
-				if (ImGui::ColorEdit4("##Color", colorArray, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel)) {
-					currentCurve.color = ofColor(
-												 colorArray[0] * 255,
-												 colorArray[1] * 255,
-												 colorArray[2] * 255,
-												 colorArray[3] * 255
-												 );
-				}
-				if (ImGui::IsItemHovered()) {
-					ImGui::SetTooltip("Color");
-				}
-				
-				ImGui::SameLine();
-				
-				// Name text input
-				char nameBuffer[256];
-				string currentName = currentCurve.name.get();
-				strncpy(nameBuffer, currentName.c_str(), sizeof(nameBuffer) - 1);
-				nameBuffer[sizeof(nameBuffer) - 1] = '\0';
-				
-				ImGui::SetNextItemWidth(100.0f);
-				if (ImGui::InputText("##Name", nameBuffer, sizeof(nameBuffer))) {
-					string newName = string(nameBuffer);
-					if (!newName.empty()) {
-						// Check for duplicate names and add "_" if necessary
-						string finalName = newName;
-						bool nameExists = true;
-						while (nameExists) {
-							nameExists = false;
-							for (int i = 0; i < curves.size(); i++) {
-								if (i != activeCurve.get() && curves[i].name.get() == finalName) {
-									nameExists = true;
-									finalName += "_";
-									break;
-								}
-							}
-						}
-						
-						currentCurve.name = finalName;
-						// Update output parameter name
-						if (activeCurve.get() < outputs.size() && outputs[activeCurve.get()]) {
-							outputs[activeCurve.get()]->setName(finalName);
-						}
-					}
-				}
-				if (ImGui::IsItemHovered()) {
-					ImGui::SetTooltip("Curve Name");
-				}
-			}
-			ImGui::PopStyleVar();
-			ImGui::PopStyleColor(); // Pop the grayed text color from line 132
-			
-			// Calculate available height for curve editor
+			// Calculate available height for curve editor using canvas layout component
 			ImVec2 windowSize = ImGui::GetContentRegionAvail();
-			float curveEditorHeight;
-			
-			if (showInfo) {
-				// Current behavior - calculate widget height and subtract from total
-				float widgetAreaHeight = 0.0f;
-				
-				// Estimate widget area height based on content
-				// Base height for "Curve Parameters" text and spacing
-				widgetAreaHeight += ImGui::GetTextLineHeight() + ImGui::GetStyle().ItemSpacing.y * 2;
-				
-				// Height for separator
-				widgetAreaHeight += 1.0f + ImGui::GetStyle().ItemSpacing.y;
-				
-				// Height for parameter display (2-3 lines of text)
-				widgetAreaHeight += ImGui::GetTextLineHeight() * 3 + ImGui::GetStyle().ItemSpacing.y * 2;
-				
-				// Add some padding for safety
-				widgetAreaHeight += ImGui::GetStyle().WindowPadding.y * 2;
-				
-				curveEditorHeight = std::max(50.0f, windowSize.y - widgetAreaHeight);
-			} else {
-				// Use all available height for curve area
-				curveEditorHeight = std::max(50.0f, windowSize.y);
-			}
+			float curveEditorHeight = canvasLayout->calculateWindowHeight(windowSize, showInfo);
 			
 			// Create our child canvas with calculated height
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
@@ -305,40 +628,14 @@ void curve2::draw(ofEventArgs &args){
 			
 			ImDrawList* draw_list = ImGui::GetWindowDrawList();
 			
-			// Safe zone padding - creates an invisible interaction area around the visual curve editor
-			const float SAFE_ZONE_PADDING = 10.0f;
+			// Calculate canvas layout using the canvas layout component
+			ImVec2 available_sz = ImGui::GetContentRegionAvail();
+			ImVec2 win_pos, canvas_sz, visual_win_pos, visual_canvas_sz;
+			canvasLayout->calculateLayout(available_sz, win_pos, canvas_sz, visual_win_pos, visual_canvas_sz);
 			
-			// Get the available space
-			ImVec2 win_pos = ImGui::GetCursorScreenPos();
-			ImVec2 canvas_sz = ImGui::GetContentRegionAvail();
-			
-			// Visual drawing area (smaller, centered within the canvas)
-			ImVec2 visual_win_pos = ImVec2(win_pos.x + SAFE_ZONE_PADDING, win_pos.y + SAFE_ZONE_PADDING);
-			ImVec2 visual_canvas_sz = ImVec2(canvas_sz.x - 2 * SAFE_ZONE_PADDING, canvas_sz.y - 2 * SAFE_ZONE_PADDING);
-			
-			// Ensure visual area is not negative
-			if (visual_canvas_sz.x < 50.0f) visual_canvas_sz.x = 50.0f;
-			if (visual_canvas_sz.y < 50.0f) visual_canvas_sz.y = 50.0f;
-			
-			// Display grid only in the visual area
-			{
-				ImU32 GRID_COLOR = IM_COL32(120, 120, 120, 60);
-				ImVec2 cell_sz = visual_canvas_sz / ImVec2(numHorizontalDivisions, numVerticalDivisions);
-				
-				// Draw vertical lines (skip first and last by starting at cell_sz.x and stopping before visual_canvas_sz.x)
-				for (float x = cell_sz.x; x < visual_canvas_sz.x - cell_sz.x * 0.5f; x += cell_sz.x)
-					draw_list->AddLine(ImVec2(x, 0.0f) + visual_win_pos, ImVec2(x, visual_canvas_sz.y) + visual_win_pos, GRID_COLOR);
-				// Draw horizontal lines (skip first and last by starting at cell_sz.y and stopping before visual_canvas_sz.y)
-				for (float y = cell_sz.y; y < visual_canvas_sz.y - cell_sz.y * 0.5f; y += cell_sz.y)
-					draw_list->AddLine(ImVec2(0.0f, y) + visual_win_pos, ImVec2(visual_canvas_sz.x, y) + visual_win_pos, GRID_COLOR);
-			}
-			
-			//			// Draw visual area boundary to show the safe zone effect
-			//			ImU32 BOUNDARY_COLOR = IM_COL32(10, 10, 10, 128);
-			//			draw_list->AddRect(visual_win_pos,
-			//							   ImVec2(visual_win_pos.x + visual_canvas_sz.x, visual_win_pos.y + visual_canvas_sz.y),
-			//							   BOUNDARY_COLOR, 0.0f, 0, 2.0f);
-			
+			// Render grid using the canvas layout component
+			canvasLayout->renderGrid(draw_list, visual_win_pos, visual_canvas_sz, numHorizontalDivisions, numVerticalDivisions);
+
 			// Make the ENTIRE canvas area interactive (including safe zone) - this is the key fix!
 			ImGui::InvisibleButton("canvas", canvas_sz);
 			bool canvasHovered = ImGui::IsItemHovered();
@@ -347,68 +644,26 @@ void curve2::draw(ofEventArgs &args){
 			
 			ImGui::PopItemWidth();
 			
-			// Use visual coordinates for all curve calculations and drawing
-			auto normalizePoint = [visual_win_pos, visual_canvas_sz](glm::vec2 p) -> glm::vec2{
-				return glm::vec2(ofMap(p.x, visual_win_pos.x, visual_win_pos.x+visual_canvas_sz.x, 0, 1),
-								 ofMap(p.y, visual_win_pos.y, visual_win_pos.y+visual_canvas_sz.y, 1, 0));
-			};
+			// Configure coordinate transformer with current bounds
+			coordinateTransformer->setVisualBounds(visual_win_pos, visual_canvas_sz);
+			coordinateTransformer->setCanvasBounds(win_pos, canvas_sz);
+			coordinateTransformer->setGridSnapping(snapToGrid.get(), numHorizontalDivisions.get(), numVerticalDivisions.get());
 			
-			auto denormalizePoint = [visual_win_pos, visual_canvas_sz](glm::vec2 p) -> glm::vec2{
-				return glm::vec2(ofMap(p.x, 0, 1, visual_win_pos.x, visual_win_pos.x+visual_canvas_sz.x),
-								 ofMap(p.y, 1, 0, visual_win_pos.y, visual_win_pos.y+visual_canvas_sz.y));
-			};
+			// Direct use of coordinate transformer components (lambdas removed for cleaner architecture)
 			
-			// Safe zone aware normalize function - clamps coordinates to visual area when in safe zone
-			auto safeNormalizePoint = [visual_win_pos, visual_canvas_sz, win_pos, canvas_sz](glm::vec2 p) -> glm::vec2{
-				// Check if mouse is within the entire canvas (including safe zone)
-				if (p.x >= win_pos.x && p.x <= win_pos.x + canvas_sz.x &&
-					p.y >= win_pos.y && p.y <= win_pos.y + canvas_sz.y) {
-					
-					// Clamp mouse position to visual area boundaries
-					float clampedX = std::max(visual_win_pos.x, std::min(visual_win_pos.x + visual_canvas_sz.x, p.x));
-					float clampedY = std::max(visual_win_pos.y, std::min(visual_win_pos.y + visual_canvas_sz.y, p.y));
-					
-					// Normalize the clamped position
-					return glm::vec2(ofMap(clampedX, visual_win_pos.x, visual_win_pos.x+visual_canvas_sz.x, 0, 1),
-									 ofMap(clampedY, visual_win_pos.y, visual_win_pos.y+visual_canvas_sz.y, 1, 0));
-				}
-				
-				// If outside entire canvas, use regular normalization
-				return glm::vec2(ofMap(p.x, visual_win_pos.x, visual_win_pos.x+visual_canvas_sz.x, 0, 1),
-								 ofMap(p.y, visual_win_pos.y, visual_win_pos.y+visual_canvas_sz.y, 1, 0));
-			};
-			
-			if(ImGui::IsMouseReleased(0)){
-				if(points != nullptr){
-					for(int i = 0; i < points->size(); i++){
-						(*points)[i].drag = 0;
-						(*points)[i].firstCreated = false;
-					}
-				}
-			}
-			
+			// PHASE 5: Point interaction handling using StandardPointInteractionHandler component
 			hoveredPointIndex = -1;
 			hoveredSegmentIndex = -1;
+			bool someItemClicked = false;
 			
-			// Only enable hover interactions when a specific curve is selected (not "None")
-			if(canvasHovered && activeCurve.get() >= 0){
-				glm::vec2 mousePos = glm::vec2(ImGui::GetMousePos());
-				glm::vec2 normalizedMousePos = safeNormalizePoint(mousePos);
-				
-				// First check for point hover on active curve (highest priority)
-				if(activeCurve.get() < curves.size() && curves[activeCurve.get()].enabled.get() && points != nullptr){
-					for(int i = 0; i < points->size(); i++){
-						glm::vec2 pointPos = denormalizePoint((*points)[i].point);
-						float mouseToPointDistance = glm::distance(mousePos, pointPos);
-						if(mouseToPointDistance < 15){ // Increased hover detection radius
-							hoveredPointIndex = i;
-							break;
-						}
-					}
-				}
+			// Only process point interactions when a curve is selected and pointHandler is available
+			if(activeCurve.get() >= 0 && points != nullptr && lines != nullptr && pointHandler){
+				// Detect hovered point using the component
+				hoveredPointIndex = pointHandler->detectHoveredPoint(glm::vec2(ImGui::GetMousePos()), *points);
 				
 				// If no point is hovered, check for segment hover on active curve
-				if(hoveredPointIndex == -1 && activeCurve.get() < curves.size() && curves[activeCurve.get()].enabled.get() && points != nullptr && lines != nullptr){
+				if(hoveredPointIndex == -1 && canvasHovered && activeCurve.get() < curves.size() && curves[activeCurve.get()].enabled.get()){
+					glm::vec2 normalizedMousePos = coordinateTransformer->safeNormalizePoint(glm::vec2(ImGui::GetMousePos()));
 					for(int i = 0; i < points->size()-1; i++){
 						if(normalizedMousePos.x >= (*points)[i].point.x &&
 						   normalizedMousePos.x <= (*points)[i+1].point.x &&
@@ -418,332 +673,48 @@ void curve2::draw(ofEventArgs &args){
 						}
 					}
 				}
+				
+				// Create interaction context
+				StandardPointInteractionHandler::InteractionContext context;
+				context.snapToGrid = snapToGrid.get();
+				context.horizontalDivisions = numHorizontalDivisions.get();
+				context.verticalDivisions = numVerticalDivisions.get();
+				context.minX = minX;
+				context.maxX = maxX;
+				
+				// Process point interactions using the component
+				auto result = pointHandler->processInteraction(canvasHovered, canvasClicked, canvasDoubleClicked, *points, *lines, context);
+				
+				// Update state based on interaction result
+				if(result.hoveredPointIndex >= 0){
+					hoveredPointIndex = result.hoveredPointIndex;
+				}
+				someItemClicked = pointHandler->hasItemClicked();
+				
+				// Trigger recalculation if needed
+				if(result.needsRecalculation){
+					recalculate();
+				}
 			}
 			
-			// PHASE 5: Enhanced click handling with curve selection
-			if(canvasDoubleClicked && activeCurve.get() >= 0 && points != nullptr && lines != nullptr){
-				glm::vec2 newPointPos = safeNormalizePoint(ImGui::GetMousePos());
-				
-				// Apply snap to grid if enabled
-				if(snapToGrid){
-					// Calculate grid spacing
-					float gridSpacingX = 1.0f / numHorizontalDivisions;
-					float gridSpacingY = 1.0f / numVerticalDivisions;
-					
-					// Snap to nearest grid point
-					newPointPos.x = round(newPointPos.x / gridSpacingX) * gridSpacingX;
-					newPointPos.y = round(newPointPos.y / gridSpacingY) * gridSpacingY;
-				}
-				
-				// Find which segment is being split to inherit its parameters
-				int splitSegmentIndex = -1;
-				for(int i = 0; i < points->size()-1; i++){
-					if(newPointPos.x >= (*points)[i].point.x && newPointPos.x <= (*points)[i+1].point.x){
-						splitSegmentIndex = i;
-						break;
-					}
-				}
-				
-				points->emplace_back(newPointPos);
-				points->back().drag = 3;
-				
-				// Create new line segment with inherited parameters from the split segment
-				if(splitSegmentIndex >= 0 && splitSegmentIndex < lines->size()){
-					// Inherit all parameters from the segment being split
-					line2 newLine = (*lines)[splitSegmentIndex];
-					lines->emplace_back(newLine);
-				} else {
-					// Fallback to default parameters if no segment found
-					lines->emplace_back();
-				}
-			}
-						
-			// Declare someItemClicked in broader scope so it can be used by all interaction code
-			bool someItemClicked = false;
-			
-			// Only process point interactions when a curve is selected
-			if(activeCurve.get() >= 0 && points != nullptr && lines != nullptr){
-				std::sort(points->begin(), points->end(), [](curvePoint2 &p1, curvePoint2 &p2){
-					return p1.point.x < p2.point.x;
-				});
-				
-				int indexToRemove = -1;
-				for(int i = 0; i < points->size(); i++){
-					auto &p = (*points)[i];
-					
-					if(ImGui::IsMouseDragging(0) && p.drag != 0){
-						if(p.drag == 3){
-							// Use safe zone aware normalization - allows dragging to continue even when mouse is outside visual area
-							glm::vec2 normalizedPos = glm::clamp(safeNormalizePoint(ImGui::GetMousePos()), 0.0f, 1.0f);
-							
-							// Apply snap to grid if enabled
-							if(snapToGrid){
-								// Calculate grid spacing
-								float gridSpacingX = 1.0f / numHorizontalDivisions;
-								float gridSpacingY = 1.0f / numVerticalDivisions;
-								
-								// Snap to nearest grid point
-								normalizedPos.x = round(normalizedPos.x / gridSpacingX) * gridSpacingX;
-								normalizedPos.y = round(normalizedPos.y / gridSpacingY) * gridSpacingY;
-							}
-							
-							// Legacy key-based snapping (X and Y keys for individual axis snapping)
-							if(ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_X))){
-								normalizedPos.x = round(normalizedPos.x * numHorizontalDivisions) / numHorizontalDivisions;
-							}
-							if(ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Y))){
-								normalizedPos.y = round(normalizedPos.y * numVerticalDivisions) / numVerticalDivisions;
-							}
-							
-							p.point = normalizedPos;
-						}
-					}
-					
-					glm::vec2 pointPos = denormalizePoint(p.point);
-					if(canvasClicked && !someItemClicked){
-						auto mouseToPointDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), pointPos);
-						if(mouseToPointDistance < 15){ // Increased selection radius
-							p.drag = 3;
-							someItemClicked = true;
-						}
-					}else if(ImGui::IsMouseClicked(1) && canvasHovered){
-						// Use hovered point for right-click if available, otherwise check distance
-						if(hoveredPointIndex == i || (hoveredPointIndex == -1 && glm::distance(glm::vec2(ImGui::GetMousePos()), pointPos) < 15)){
-							ImGui::OpenPopup(("##PointPopup " + ofToString(i)).c_str());
-						}
-					}
-					
-					if(ImGui::BeginPopup(("##PointPopup " + ofToString(i)).c_str())){
-						float tempFloat = ofMap(p.point.x, 0, 1, minX, maxX);
-						ImGui::SliderFloat("X", &tempFloat, minX, maxX);
-						if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-							p.point.x = ofMap(tempFloat, minX, maxX, 0, 1);
-						}
-						
-						// Y value editing (0-1 range)
-						tempFloat = p.point.y;
-						ImGui::SliderFloat("Y", &tempFloat, 0.0f, 1.0f);
-						if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-							p.point.y = tempFloat;
-						}
-						
-						ImGui::Spacing();
-						
-						if(i > 0 && lines != nullptr){
-							int elem = (*lines)[i-1].type;
-							const char* elems_names[2] = { "Hold", "Tension"};
-							if(ImGui::SliderInt("Line L", &elem, 0, 1, elems_names[elem])){
-								(*lines)[i-1].type = static_cast<lineType2>(elem);
-							}
-							
-							// Show asymmetric logistic controls for TENSION segments
-							if((*lines)[i-1].type == LINE2_TENSION){
-								if(ImGui::SliderFloat("Asymmetry L", &(*lines)[i-1].tensionExponent, MIN_ASYMMETRY, MAX_ASYMMETRY, "%.3f")){
-									recalculate();
-								}
-								if(ImGui::SliderFloat("Inflection L", &(*lines)[i-1].inflectionX, 0.0f, 1.0f, "%.3f")){
-									recalculate();
-								}
-								if(ImGui::SliderFloat("Segment B L", &(*lines)[i-1].segmentB, MIN_B_PARAMETER, MAX_B_PARAMETER, "%.2f")){
-									recalculate();
-								}
-								if(ImGui::SliderFloat("Segment Q L", &(*lines)[i-1].segmentQ, 0.1f, 5.0f, "%.2f")){
-									recalculate();
-								}
-							}
-						}
-						
-						if(lines != nullptr && i < lines->size()){
-							int elem = (*lines)[i].type;
-							const char* elems_names[2] = { "Hold", "Tension"};
-							if(ImGui::SliderInt("Line R", &elem, 0, 1, elems_names[elem])){
-								(*lines)[i].type = static_cast<lineType2>(elem);
-							}
-							
-							// Show asymmetric logistic controls for TENSION segments
-							if((*lines)[i].type == LINE2_TENSION){
-								if(ImGui::SliderFloat("Asymmetry R", &(*lines)[i].tensionExponent, MIN_ASYMMETRY, MAX_ASYMMETRY, "%.3f")){
-									recalculate();
-								}
-								if(ImGui::SliderFloat("Inflection R", &(*lines)[i].inflectionX, 0.0f, 1.0f, "%.3f")){
-									recalculate();
-								}
-								if(ImGui::SliderFloat("Segment B R", &(*lines)[i].segmentB, MIN_B_PARAMETER, MAX_B_PARAMETER, "%.2f")){
-									recalculate();
-								}
-								if(ImGui::SliderFloat("Segment Q R", &(*lines)[i].segmentQ, 0.1f, 5.0f, "%.2f")){
-									recalculate();
-								}
-							}
-						}
-						
-						ImGui::Separator();
-						ImGui::Text("Curve Properties:");
-						if(globalQ != nullptr){
-							float tempQ = globalQ->get();
-							
-							if(ImGui::SliderFloat("Q (Scaling)", &tempQ, 0.1f, 5.0f, "%.1f")) {
-								globalQ->set(tempQ);
-								recalculate();
-							}
-						} else {
-							ImGui::Text("Q (Scaling): N/A (no active curve)");
-						}
-						
-						ImGui::Spacing();
-						
-						if(ImGui::Selectable("[Remove]")){
-							ImGui::CloseCurrentPopup();
-							indexToRemove = i;
-						}
-						ImGui::EndPopup();
-					}
-				}
-				
-				if(indexToRemove != -1 && points != nullptr && lines != nullptr){
-					points->erase(points->begin()+indexToRemove);
-					if(indexToRemove < lines->size()){
-						lines->erase(lines->begin()+indexToRemove);
-					}
-				}
-			} // End of active curve check for point interactions
-			
-			// Shift+drag interaction for asymmetric logistic curve adjustment (tension/asymmetry control)
-			if(activeCurve.get() >= 0 && points != nullptr && lines != nullptr && ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_LeftShift)) && !someItemClicked && canvasHovered){
-				if(ImGui::IsMouseDragging(0)){
-					if(!tensionDragActive){
-						// Start new tension drag operation
-						tensionDragActive = true;
-						tensionDragStartPos = safeNormalizePoint(ImGui::GetMousePos());
-						tensionDragSegmentIndex = -1;
-						
-						// Find which segment the mouse is over
-						for(int i = 0; i < points->size()-1; i++){
-							if(tensionDragStartPos.x >= (*points)[i].point.x && tensionDragStartPos.x <= (*points)[i+1].point.x && (*lines)[i].type == LINE2_TENSION){
-								tensionDragSegmentIndex = i;
-								tensionDragStartExponent = (*lines)[i].tensionExponent;
-								break;
-							}
-						}
-					}
-					
-					// Continue existing tension drag operation
-					if(tensionDragActive && tensionDragSegmentIndex >= 0){
-						glm::vec2 currentMousePos = safeNormalizePoint(ImGui::GetMousePos());
-						
-						// Calculate drag deltas
-						float deltaX = currentMousePos.x - tensionDragStartPos.x;
-						float deltaY = currentMousePos.y - tensionDragStartPos.y;
-						
-						// Horizontal drag: Set inflection point X position within segment (0.0 to 1.0)
-						float segmentStartX = (*points)[tensionDragSegmentIndex].point.x;
-						float segmentEndX = (*points)[tensionDragSegmentIndex + 1].point.x;
-						float segmentWidth = segmentEndX - segmentStartX;
-						
-						if(segmentWidth > 0.0001f){
-							// Map current mouse X to xsegment-relative position
-							float relativeX = (currentMousePos.x - segmentStartX) / segmentWidth;
-							// Constrain to avoid edge issues
-							(*lines)[tensionDragSegmentIndex].inflectionX = std::max(MIN_INFLECTION_X, std::min(MAX_INFLECTION_X, relativeX));
-						}
-						
-						// Vertical drag: Simple height mapping for asymmetry parameter
-						// Enhanced mapping: Split curve area into two zones for better precision
-						float normalizedY = (currentMousePos.y - 0.0f) / (1.0f - 0.0f); // Mouse Y position within curve area (0.0 to 1.0)
-						
-						// Define asymmetry range
-						const float minAsymmetry = MIN_ASYMMETRY;
-						const float maxAsymmetry = MAX_ASYMMETRY;
-						float asymmetry;
-						
-						// Split the curve area height into two zones:
-						// Lower half (bottom 50%): Maps from 1 (middle) to 0.02 (bottom)
-						// Upper half (top 50%): Maps from 1 (middle) to 100 (top)
-						if (normalizedY <= 0.5f) {
-							// Lower half: map from 1 (at middle) to 0.02 (at bottom)
-							// normalizedY 0.0 (bottom) -> asymmetry = 0.02 (minimum)
-							// normalizedY 0.5 (middle) -> asymmetry = 1.0
-							float lowerHalfY = normalizedY / 0.5f; // 0.0 to 1.0
-							asymmetry = minAsymmetry + lowerHalfY * (1.0f - minAsymmetry);
-						} else {
-							// Upper half: map from 1 (at middle) to 100 (at top)
-							// normalizedY 0.5 (middle) -> asymmetry = 1.0
-							// normalizedY 1.0 (top) -> asymmetry = 100.0 (maximum)
-							float upperHalfY = (normalizedY - 0.5f) / 0.5f; // 0.0 to 1.0
-							asymmetry = 1.0f + upperHalfY * (maxAsymmetry - 1.0f);
-						}
-						
-						(*lines)[tensionDragSegmentIndex].tensionExponent = asymmetry;
-						
-						// Clamp to valid range
-						(*lines)[tensionDragSegmentIndex].tensionExponent = std::max(minAsymmetry, std::min(maxAsymmetry, (*lines)[tensionDragSegmentIndex].tensionExponent));
-						
-						recalculate();
-					}
-				} else {
-					// Reset tension drag state when not dragging
-					tensionDragActive = false;
-					tensionDragSegmentIndex = -1;
-				}
-			} else {
-				// Reset tension drag state when Shift is not pressed
-				tensionDragActive = false;
-				tensionDragSegmentIndex = -1;
+			// Reset drag states on mouse release
+			if(ImGui::IsMouseReleased(0) && pointHandler){
+				pointHandler->resetDragStates();
 			}
 			
-			// Ctrl+drag interaction for B parameter control (all platforms)
-			bool ctrlPressed = ImGui::GetIO().KeyCtrl;
+			// ========================================================================
+			// PHASE 6: Parameter Control System
+			// ========================================================================
+			// Handle Shift+drag and Ctrl+drag parameter operations using the modular
+			// StandardParameterController component
+			// ========================================================================
 			
-			if(activeCurve.get() >= 0 && points != nullptr && lines != nullptr && ctrlPressed && !someItemClicked && canvasHovered){
-				if(ImGui::IsMouseDragging(0)){
-					if(!bDragActive){
-						// Start new B parameter drag operation
-						bDragActive = true;
-						bDragStartPos = safeNormalizePoint(ImGui::GetMousePos());
-						bDragSegmentIndex = -1;
-						
-						// Find which segment the mouse is over
-						for(int i = 0; i < points->size()-1; i++){
-							if(bDragStartPos.x >= (*points)[i].point.x && bDragStartPos.x <= (*points)[i+1].point.x && (*lines)[i].type == LINE2_TENSION){
-								bDragSegmentIndex = i;
-								bDragStartValue = (*lines)[i].segmentB;
-								break;
-							}
-						}
-					}
-					
-					// Continue existing B parameter drag operation
-					if(bDragActive && bDragSegmentIndex >= 0){
-						glm::vec2 currentMousePos = safeNormalizePoint(ImGui::GetMousePos());
-						
-						// X-position-based B parameter mapping within segment
-						float segmentStartX = (*points)[bDragSegmentIndex].point.x;
-						float segmentEndX = (*points)[bDragSegmentIndex + 1].point.x;
-						float segmentWidth = segmentEndX - segmentStartX;
-						
-						if(segmentWidth > 0.0001f){
-							// Map current mouse X position within segment to B parameter range
-							float relativeX = (currentMousePos.x - segmentStartX) / segmentWidth;
-							// Clamp to segment bounds
-							relativeX = std::max(0.0f, std::min(1.0f, relativeX));
-							
-							// Linear interpolation: B = maxB - relativeX * (maxB - minB)
-							const float minB = MIN_B_PARAMETER;
-							const float maxB = MAX_B_PARAMETER;
-							(*lines)[bDragSegmentIndex].segmentB = maxB - relativeX * (maxB - minB);
-						}
-						
-						recalculate();
-					}
-				} else {
-					// Reset B drag state when not dragging
-					bDragActive = false;
-					bDragSegmentIndex = -1;
-				}
-			} else {
-				// Reset B drag state when Ctrl is not pressed
-				bDragActive = false;
-				bDragSegmentIndex = -1;
+			if(activeCurve.get() >= 0 && points != nullptr && lines != nullptr && parameterController){
+				bool shiftPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_LeftShift));
+				bool ctrlPressed = ImGui::GetIO().KeyCtrl;
+				
+				// Handle parameter drag operations through the component
+				parameterController->handleParameterDrag(shiftPressed, ctrlPressed, canvasHovered, someItemClicked, *points, *lines);
 			}
 						
 			ImGui::EndChild();
@@ -773,15 +744,15 @@ void curve2::draw(ofEventArgs &args){
 				}
 				
 				// Check for active tension dragging
-				if(tensionDragActive && tensionDragSegmentIndex >= 0){
+				if(parameterController && parameterController->isTensionDragActive() && parameterController->getTensionDragSegmentIndex() >= 0){
 					showSegmentInfo = true;
-					activeSegmentIndex = tensionDragSegmentIndex;
+					activeSegmentIndex = parameterController->getTensionDragSegmentIndex();
 				}
 				
 				// Check for active B parameter dragging
-				if(bDragActive && bDragSegmentIndex >= 0){
+				if(parameterController && parameterController->isBDragActive() && parameterController->getBDragSegmentIndex() >= 0){
 					showSegmentInfo = true;
-					activeSegmentIndex = bDragSegmentIndex;
+					activeSegmentIndex = parameterController->getBDragSegmentIndex();
 				}
 				
 				// If no active dragging, use hovered point
@@ -873,415 +844,53 @@ void curve2::draw(ofEventArgs &args){
 			
 			// Draw all enabled curves with proper visual hierarchy
 			
-			// First pass: Draw all inactive curves (background layer)
-			for(int curveIdx = 0; curveIdx < curves.size(); curveIdx++){
-				auto& curve = curves[curveIdx];
+			// ========================================================================
+			// PHASE 3: Multi-Curve Rendering using MultiCurveRenderer component
+			// ========================================================================
+			// This implementation provides:
+			// - Two-pass rendering system (inactive curves at 50% opacity, active curve at full opacity)
+			// - Hold segment rendering (simple horizontal-then-vertical line segments)
+			// - Tension segment rendering (complex asymmetric logistic curves with adaptive resolution)
+			// - Extension lines (dotted lines extending curves to canvas edges)
+			// - Curve drawing with proper color management and line widths
+			// ========================================================================
+			
+			if(curveRenderer){
+				// Setup render context
+				MultiCurveRenderer::RenderContext renderContext;
+				renderContext.canvasPos = visual_win_pos;
+				renderContext.canvasSize = visual_canvas_sz;
+				renderContext.performanceMode = false;
+				renderContext.quality = MultiCurveRenderer::RenderQuality::MEDIUM;
 				
-				// Skip disabled curves
-				if(!curve.enabled.get()) continue;
-				
-				// Skip active curve (will be drawn in second pass) unless "None" is selected
-				if(activeCurve.get() >= 0 && curveIdx == activeCurve.get()) continue;
-				
-				// Enhanced visual feedback for inactive curves
-				float inactiveOpacity;
-				float lineWidth;
-				if(activeCurve.get() >= 0) {
-					// When a specific curve is selected, inactive curves at 50% alpha with single line width
-					inactiveOpacity = 0.5f;
-					lineWidth = 1.5f;
+				// Render all curves using the MultiCurveRenderer component
+				curveRenderer->renderCurves(draw_list, curves, activeCurve.get(), renderContext, parameterController);
+			}
+			
+			// ========================================================================
+			// PHASE 4: Visual Feedback Rendering using StandardVisualFeedback component
+			// ========================================================================
+			// This implementation provides:
+			// - Dotted yellow lines for inflection points during drag operations
+			// - Dotted cyan lines for asymmetry values during parameter adjustments
+			// - Dotted red lines for B parameter positions during curve modifications
+			// - Curve name labels with proper color coding and opacity
+			// - Point highlighting and input value indicators
+			// ========================================================================
+			
+			if(visualFeedback && points != nullptr && lines != nullptr){
+				// Update component state with current interaction states from parameterController
+				if(parameterController){
+					visualFeedback->updateDragStates(parameterController->isTensionDragActive(), parameterController->isBDragActive(),
+													parameterController->getTensionDragSegmentIndex(), parameterController->getBDragSegmentIndex());
 				} else {
-					// When "None" is selected, all curves at full opacity with single line width
-					inactiveOpacity = 1.0f;
-					lineWidth = 1.5f;
+					visualFeedback->updateDragStates(false, false, -1, -1);
 				}
-								
-				ofColor curveColor = curve.color.get();
-				ImU32 inactiveCurveColor = IM_COL32(curveColor.r, curveColor.g, curveColor.b, (int)(255 * inactiveOpacity));
+				visualFeedback->updateHoverStates(hoveredSegmentIndex, hoveredPointIndex, canvasHovered);
 				
-				// Draw curve start extension line
-				if(!curve.points.empty()){
-					draw_list->AddLine(denormalizePoint(glm::vec2(0, curve.points[0].point.y)),
-									   denormalizePoint(curve.points[0].point),
-									   IM_COL32(curveColor.r * 0.4f, curveColor.g * 0.4f, curveColor.b * 0.4f, (int)(255 * inactiveOpacity)));
-				}
-				
-				// Draw curve segments
-				for(int i = 0; i < curve.points.size()-1; i++){
-					if(curve.lines[i].type == LINE2_HOLD){
-						auto p1 = denormalizePoint(curve.points[i].point);
-						auto p2 = denormalizePoint(curve.points[i+1].point);
-						draw_list->AddLine(p1, glm::vec2(p2.x, p1.y), inactiveCurveColor, lineWidth); // PHASE 5: Dynamic line width
-						draw_list->AddLine(glm::vec2(p2.x, p1.y), p2, inactiveCurveColor, lineWidth);
-					}
-					else if(curve.lines[i].type == LINE2_TENSION){
-						// Draw asymmetric logistic curve for inactive curves
-						float segmentB = curve.lines[i].segmentB;
-						int baseSegments = 30; // Reduced segments for inactive curves for performance
-						int adaptiveSegments = std::max(baseSegments, (int)(segmentB * 1.5f));
-						const int maxSegments = 300;
-						const int numSegments = std::min(adaptiveSegments, maxSegments);
-						
-						glm::vec2 prevPoint = curve.points[i].point;
-						
-						// Asymmetric logistic parameters
-						float A = curve.points[i].point.y;
-						float K = curve.points[i+1].point.y;
-						float M = curve.lines[i].inflectionX;
-						float nu = curve.lines[i].tensionExponent;
-						float B = curve.lines[i].segmentB;
-						float Q = curve.globalQ.get();
-						
-						// Calculate normalization values at segment endpoints
-						auto logisticFunction = [&](float x) -> float {
-							float logisticTerm = 1.0f + Q * exp(-B * (x - M));
-							return A + (K - A) / pow(logisticTerm, 1.0f / nu);
-						};
-						
-						float logistic_0 = logisticFunction(0.0f);
-						float logistic_1 = logisticFunction(1.0f);
-						float logisticRange = logistic_1 - logistic_0;
-						bool useNormalization = abs(logisticRange) > 1e-6f;
-						
-						for(int seg = 1; seg <= numSegments; seg++){
-							float normalizedX = (float)seg / numSegments;
-							float segmentX = glm::mix(curve.points[i].point.x, curve.points[i+1].point.x, normalizedX);
-							
-							float resultY;
-							if(useNormalization){
-								float raw_logistic = logisticFunction(normalizedX);
-								resultY = A + (K - A) * (raw_logistic - logistic_0) / logisticRange;
-							} else {
-								resultY = A + (K - A) * normalizedX;
-							}
-							
-							glm::vec2 currentPoint = glm::vec2(segmentX, resultY);
-							auto p1 = denormalizePoint(prevPoint);
-							auto p2 = denormalizePoint(currentPoint);
-							draw_list->AddLine(p1, p2, inactiveCurveColor, lineWidth); // PHASE 5: Dynamic line width
-							
-							prevPoint = currentPoint;
-						}
-					}
-				}
-				
-				// Draw curve end extension line
-				if(!curve.points.empty()){
-					draw_list->AddLine(denormalizePoint(curve.points.back().point),
-									   denormalizePoint(glm::vec2(1, curve.points.back().point.y)),
-									   IM_COL32(curveColor.r * 0.4f, curveColor.g * 0.4f, curveColor.b * 0.4f, (int)(255 * inactiveOpacity)));
-				}
-			}
-			
-			// Second pass: Draw active curve (foreground layer) with full interactivity
-			// Only draw if a specific curve is selected (not "None")
-			if(activeCurve.get() >= 0 && activeCurve.get() < curves.size() && curves[activeCurve.get()].enabled.get()){
-				auto& activeCurveData = curves[activeCurve.get()];
-				ofColor activeCurveColor = activeCurveData.color.get();
-				
-				// Draw active curve start extension line
-				if (points != nullptr && !points->empty()) {
-					draw_list->AddLine(denormalizePoint(glm::vec2(0, (*points)[0].point.y)), denormalizePoint((*points)[0].point), IM_COL32(10, 10, 10, 255));
-				}
-				
-				if(points != nullptr && lines != nullptr){
-					for(int i = 0; i < points->size()-1; i++){
-						// Determine segment color based on drag state for active curve
-						bool whiteHighlight = false;
-						bool activeHighlight = false;
-						
-						// Check for tension drag highlighting (shift+drag) - use white
-						if(tensionDragActive && tensionDragSegmentIndex == i){
-							whiteHighlight = true;
-						}
-						
-						// Check for B parameter drag highlighting (ctrl+drag) - use white
-						if(bDragActive && bDragSegmentIndex == i){
-							whiteHighlight = true;
-						}
-						
-						// Check for normal point drag highlighting - use active curve color
-						if(!whiteHighlight && points != nullptr){
-							for(int p = 0; p < points->size(); p++){
-								if((*points)[p].drag == 3){
-									// Highlight segments connected to the dragged point
-									if((p == i) || (p == i + 1)){
-										activeHighlight = true;
-										break;
-									}
-								}
-							}
-						}
-						
-						// Choose color based on highlighting state for active curve
-						ImU32 segmentColor;
-						float lineWidth = 2.0f; // Double line width for active curve
-						
-						if(whiteHighlight){
-							segmentColor = IM_COL32(255, 255, 255, 255); // White for shift/ctrl drag
-						} else if(activeHighlight){
-							segmentColor = IM_COL32(activeCurveColor.r, activeCurveColor.g, activeCurveColor.b, 255); // Full opacity for drag
-						} else {
-							segmentColor = IM_COL32(activeCurveColor.r, activeCurveColor.g, activeCurveColor.b, 255); // Full opacity for active curve
-						}
-						
-						if((*lines)[i].type == LINE2_HOLD){
-							auto p1 = denormalizePoint((*points)[i].point);
-							auto p2 = denormalizePoint((*points)[i+1].point);
-							draw_list->AddLine(p1, glm::vec2(p2.x, p1.y), segmentColor, lineWidth);
-							draw_list->AddLine(glm::vec2(p2.x, p1.y), p2, segmentColor, lineWidth);
-						}
-						else if((*lines)[i].type == LINE2_TENSION){
-							// Draw asymmetric logistic curve with proper normalization for active curve
-							// Adaptive resolution based on B parameter - more segments for steeper curves
-							float segmentB = (*lines)[i].segmentB;
-							int baseSegments = 50;
-							int adaptiveSegments = std::max(baseSegments, (int)(segmentB * 2.0f)); // 2 segments per B unit
-							// Cap maximum segments to prevent performance issues
-							const int maxSegments = 500;
-							const int numSegments = std::min(adaptiveSegments, maxSegments);
-							
-							glm::vec2 prevPoint = (*points)[i].point;
-							
-							// Asymmetric logistic parameters
-							float A = (*points)[i].point.y;      // Y value of segment start point
-							float K = (*points)[i+1].point.y;    // Y value of segment end point
-							float M = (*lines)[i].inflectionX;   // Inflection point X position (0-1)
-							float nu = (*lines)[i].tensionExponent; // Asymmetry parameter ν
-							float B = (*lines)[i].segmentB;      // Per-segment B parameter
-							float Q = (globalQ != nullptr) ? globalQ->get() : 1.0f;          // Global Q parameter
-							
-							// Calculate normalization values at segment endpoints
-							auto logisticFunction = [&](float x) -> float {
-								float logisticTerm = 1.0f + Q * exp(-B * (x - M));
-								return A + (K - A) / pow(logisticTerm, 1.0f / nu);
-							};
-							
-							float logistic_0 = logisticFunction(0.0f); // Value at segment start
-							float logistic_1 = logisticFunction(1.0f); // Value at segment end
-							float logisticRange = logistic_1 - logistic_0;
-							
-							// Handle edge case where logistic range is very small
-							bool useNormalization = abs(logisticRange) > 1e-6f;
-							
-							for(int seg = 1; seg <= numSegments; seg++){
-								float normalizedX = (float)seg / numSegments;
-								
-								// Calculate normalized X position within the segment
-								float segmentX = glm::mix((*points)[i].point.x, (*points)[i+1].point.x, normalizedX);
-								
-								float resultY;
-								if(useNormalization){
-									// Apply normalized logistic function to guarantee endpoint continuity
-									float raw_logistic = logisticFunction(normalizedX);
-									resultY = A + (K - A) * (raw_logistic - logistic_0) / logisticRange;
-								} else {
-									// Fall back to linear interpolation if logistic range is too small
-									resultY = A + (K - A) * normalizedX;
-								}
-								
-								glm::vec2 currentPoint = glm::vec2(segmentX, resultY);
-								
-								// Draw line segment from previous point to current point
-								auto p1 = denormalizePoint(prevPoint);
-								auto p2 = denormalizePoint(currentPoint);
-								draw_list->AddLine(p1, p2, segmentColor, lineWidth);
-								
-								prevPoint = currentPoint;
-							}
-						}
-					}
-				}
-				
-				// Draw active curve end extension line
-				if(points != nullptr && !points->empty()){
-					draw_list->AddLine(denormalizePoint(points->back().point), denormalizePoint(glm::vec2(1, points->back().point.y)), IM_COL32(10, 10, 10, 255));
-				}
-			}
-			
-			// Draw vertical line at inflection point during Shift+drag OR CTRL+drag operations OR hover with modifier keys
-			bool showInflectionLine = false;
-			int inflectionSegmentIndex = -1;
-			
-			// Check for active drag operations
-			if((tensionDragActive && tensionDragSegmentIndex >= 0) ||
-			   (bDragActive && bDragSegmentIndex >= 0)){
-				showInflectionLine = true;
-				inflectionSegmentIndex = tensionDragActive ? tensionDragSegmentIndex : bDragSegmentIndex;
-			}
-			// Check for hover with modifier keys
-			else if(hoveredSegmentIndex >= 0 && canvasHovered &&
-					(ImGui::GetIO().KeyShift || ImGui::GetIO().KeyCtrl)){
-				showInflectionLine = true;
-				inflectionSegmentIndex = hoveredSegmentIndex;
-			}
-			
-			if(showInflectionLine && inflectionSegmentIndex >= 0 && points != nullptr && lines != nullptr){
-				
-				// Ensure segment index is valid
-				if(inflectionSegmentIndex < lines->size()){
-					// Get the current segment being modified
-					float segmentStartX = (*points)[inflectionSegmentIndex].point.x;
-					float segmentEndX = (*points)[inflectionSegmentIndex + 1].point.x;
-					
-					// Calculate the actual X position of the inflection point
-					float inflectionX = (*lines)[inflectionSegmentIndex].inflectionX;
-					float lineX = segmentStartX + inflectionX * (segmentEndX - segmentStartX);
-					
-					// Convert to screen coordinates
-					glm::vec2 lineTopPoint = denormalizePoint(glm::vec2(lineX, 0.0f));
-					glm::vec2 lineBottomPoint = denormalizePoint(glm::vec2(lineX, 1.0f));
-					
-					// Draw dotted vertical line with semi-transparent yellow color
-					drawDottedLine(draw_list, lineTopPoint, lineBottomPoint, IM_COL32(255, 255, 0, 64));
-				}
-			}
-			
-			// Draw cyan horizontal line for asymmetry value during Shift+drag OR CTRL+drag operations OR hover with modifier keys
-			bool showAsymmetryLine = false;
-			int asymmetrySegmentIndex = -1;
-			
-			// Check for active drag operations
-			if((tensionDragActive && tensionDragSegmentIndex >= 0) ||
-			   (bDragActive && bDragSegmentIndex >= 0)){
-				showAsymmetryLine = true;
-				asymmetrySegmentIndex = tensionDragActive ? tensionDragSegmentIndex : bDragSegmentIndex;
-			}
-			// Check for hover with modifier keys
-			else if(hoveredSegmentIndex >= 0 && canvasHovered &&
-					(ImGui::GetIO().KeyShift || ImGui::GetIO().KeyCtrl)){
-				showAsymmetryLine = true;
-				asymmetrySegmentIndex = hoveredSegmentIndex;
-			}
-			
-			if(showAsymmetryLine && asymmetrySegmentIndex >= 0 && lines != nullptr){
-				// Ensure segment index is valid
-				if(asymmetrySegmentIndex < lines->size()){
-					// Get current asymmetry value
-					float currentAsymmetry = (*lines)[asymmetrySegmentIndex].tensionExponent;
-					
-					// Define asymmetry range (same as in the drag calculation)
-					const float minAsymmetry = MIN_ASYMMETRY;
-					const float maxAsymmetry = MAX_ASYMMETRY;
-					
-					// Map asymmetry value to Y position using enhanced split-zone mapping
-					// This mirrors the enhanced drag mapping for consistent visual feedback
-					float lineY;
-					
-					if (currentAsymmetry <= 1.0f) {
-						// Lower zone: asymmetry 0.02-1.0 maps to Y 0.0-0.5 (bottom to middle)
-						float normalizedAsymmetry = (currentAsymmetry - minAsymmetry) / (1.0f - minAsymmetry);
-						lineY = normalizedAsymmetry * 0.5f; // Scale to lower half (0.0 to 0.5)
-					} else {
-						// Upper zone: asymmetry 1.0-100.0 maps to Y 0.5-1.0 (middle to top)
-						float normalizedAsymmetry = (currentAsymmetry - 1.0f) / (maxAsymmetry - 1.0f);
-						lineY = 0.5f + normalizedAsymmetry * 0.5f; // Scale to upper half (0.5 to 1.0)
-					}
-					
-					// Clamp to valid range
-					lineY = std::max(0.0f, std::min(1.0f, lineY));
-					
-					// Convert to screen coordinates
-					glm::vec2 lineLeftPoint = denormalizePoint(glm::vec2(0.0f, lineY));
-					glm::vec2 lineRightPoint = denormalizePoint(glm::vec2(1.0f, lineY));
-					
-					// Draw dotted horizontal line with semi-transparent cyan color
-					drawDottedLine(draw_list, lineLeftPoint, lineRightPoint, IM_COL32(0, 255, 255, 64));
-				}
-			}
-			
-			// Draw red vertical line for B parameter position during Shift+drag OR CTRL+drag operations OR hover with modifier keys
-			bool showBParameterLine = false;
-			int bParameterSegmentIndex = -1;
-			
-			// Check for active drag operations
-			if((tensionDragActive && tensionDragSegmentIndex >= 0) ||
-			   (bDragActive && bDragSegmentIndex >= 0)){
-				showBParameterLine = true;
-				bParameterSegmentIndex = tensionDragActive ? tensionDragSegmentIndex : bDragSegmentIndex;
-			}
-			// Check for hover with modifier keys
-			else if(hoveredSegmentIndex >= 0 && canvasHovered &&
-					(ImGui::GetIO().KeyShift || ImGui::GetIO().KeyCtrl)){
-				showBParameterLine = true;
-				bParameterSegmentIndex = hoveredSegmentIndex;
-			}
-			
-			if(showBParameterLine && bParameterSegmentIndex >= 0 && points != nullptr && lines != nullptr){
-				// Ensure segment index is valid
-				if(bParameterSegmentIndex < lines->size()){
-					// Get the current segment being modified
-					float segmentStartX = (*points)[bParameterSegmentIndex].point.x;
-					float segmentEndX = (*points)[bParameterSegmentIndex + 1].point.x;
-					float segmentWidth = segmentEndX - segmentStartX;
-					
-					// Get current B parameter value
-					float currentB = (*lines)[bParameterSegmentIndex].segmentB;
-					
-					// Map B parameter (0.01 to 100.0) to normalized position within segment (0.0 to 1.0)
-					// This represents where the B parameter affects the curve steepness within the segment
-					const float minB = MIN_B_PARAMETER;
-					const float maxB = MAX_B_PARAMETER;
-					
-					// Normalize B value to 0.0-1.0 range
-					float normalizedB = (currentB - minB) / (maxB - minB);
-					normalizedB = std::max(0.0f, std::min(1.0f, normalizedB));
-					
-					// Calculate the actual X position of the B parameter line within the segment
-					// The line position directly represents the normalized B parameter value (inverted for intuitive behavior)
-					float lineX = segmentStartX + (1.0f - normalizedB) * segmentWidth;
-					
-					// Convert to screen coordinates
-					glm::vec2 lineTopPoint = denormalizePoint(glm::vec2(lineX, 0.0f));
-					glm::vec2 lineBottomPoint = denormalizePoint(glm::vec2(lineX, 1.0f));
-					
-					// Draw dotted vertical line with semi-transparent red color
-					drawDottedLine(draw_list, lineTopPoint, lineBottomPoint, IM_COL32(255, 0, 0, 64));
-				}
-			}
-			
-			// PHASE 5: Draw curve name labels
-			if(showCurveLabels){
-				// Draw labels for all enabled curves
-				for(int curveIdx = 0; curveIdx < curves.size(); curveIdx++){
-					auto& curve = curves[curveIdx];
-					
-					// Skip disabled curves
-					if(!curve.enabled.get()) continue;
-					
-					// Use actual curve name
-					string curveName = curve.name.get();
-					
-					// Determine label position and color
-					ofColor curveColor = curve.color.get();
-					ImU32 labelColor;
-					float labelOpacity = 0.8f;
-					
-					if(curveIdx == activeCurve.get()){
-						// Active curve: full opacity, add "[ACTIVE]" suffix
-						curveName += " [ACTIVE]";
-						labelColor = IM_COL32(curveColor.r, curveColor.g, curveColor.b, (int)(255 * labelOpacity));
-					}
-					else {
-						// Inactive curve: lower opacity
-						labelOpacity = 0.6f;
-						labelColor = IM_COL32(curveColor.r, curveColor.g, curveColor.b, (int)(255 * labelOpacity));
-					}
-					
-					// Position label in top-left area, stacked vertically
-					ImVec2 labelPos = ImVec2(visual_win_pos.x + 10, visual_win_pos.y + 10 + curveIdx * 20);
-					
-					// Add background for better readability
-					ImVec2 textSize = ImGui::CalcTextSize(curveName.c_str());
-					draw_list->AddRectFilled(
-											 ImVec2(labelPos.x - 2, labelPos.y - 2),
-											 ImVec2(labelPos.x + textSize.x + 2, labelPos.y + textSize.y + 2),
-											 IM_COL32(0, 0, 0, 120) // Semi-transparent black background
-											 );
-					
-					// Draw the label text
-					draw_list->AddText(labelPos, labelColor, curveName.c_str());
-				}
+				// Render all visual feedback components
+				visualFeedback->renderFeedback(draw_list, *points, *lines, curves,
+											 activeCurve.get(), showCurveLabels, visual_win_pos);
 			}
 			
 			// Always Draw vertices for refernce for editing the curves
@@ -1297,7 +906,7 @@ void curve2::draw(ofEventArgs &args){
 					ofColor curveColor = curve.color.get();
 					
 					for(int i = 0; i < curve.points.size(); i++){
-						glm::vec2 pointPos = denormalizePoint(curve.points[i].point);
+						glm::vec2 pointPos = coordinateTransformer->denormalizePoint(curve.points[i].point);
 						
 						// Draw small, non-interactive vertices with curve color
 						draw_list->AddCircleFilled(pointPos, 3, IM_COL32(curveColor.r, curveColor.g, curveColor.b, 180));
@@ -1313,7 +922,7 @@ void curve2::draw(ofEventArgs &args){
 				
 				for(int i = 0; i < points->size(); i++){
 					auto &p = (*points)[i];
-					glm::vec2 pointPos = denormalizePoint(p.point);
+					glm::vec2 pointPos = coordinateTransformer->denormalizePoint(p.point);
 					
 					if(i == hoveredPointIndex){
 						// Draw highlighted point with larger radius and different color
@@ -1329,7 +938,7 @@ void curve2::draw(ofEventArgs &args){
 			
 			for(auto &v : input.get()){
 				auto mv = ofMap(v, minX, maxX, 0, 1);
-				draw_list->AddLine(denormalizePoint(glm::vec2(mv, 0)), denormalizePoint(glm::vec2(mv, 1)), IM_COL32(127, 127, 127, 127));
+				draw_list->AddLine(coordinateTransformer->denormalizePoint(glm::vec2(mv, 0)), coordinateTransformer->denormalizePoint(glm::vec2(mv, 1)), IM_COL32(127, 127, 127, 127));
 			}
 			
 			// Pop the style vars that were re-pushed for drawing operations
@@ -1337,6 +946,18 @@ void curve2::draw(ofEventArgs &args){
 			ImGui::PopStyleVar(2);
 			
 			ImGui::EndGroup();
+		}
+		ImGui::End();
+	}
+	
+	// New split window functionality
+	if(showWindowSplit){
+		string modCanvasID = canvasID == "Canvas" ? "" : (canvasID + "/");
+		string splitWindowTitle = modCanvasID + "Curve2 Split " + ofToString(getNumIdentifier());
+		if(ImGui::Begin(splitWindowTitle.c_str(), (bool *)&showWindowSplit.get()))
+		{
+			// Empty window for now as requested
+			ImGui::Text("Split view window - coming soon!");
 		}
 		ImGui::End();
 	}
@@ -1572,14 +1193,6 @@ void curve2::presetRecallAfterSettingParameters(ofJson &json){
 			
 			// BUGFIX: Synchronize output parameter names with loaded curve names
 			// This fixes the issue where output parameter names were set before curve names were loaded
-			//			for(int i = 0; i < outputs.size() && i < curves.size(); i++) {
-			//				if(outputs[i]) {
-			//					ofLogNotice("curve2::loadFromJson") << "Setting output " << i << " name to: " << curves[i].name.get();
-			//					outputs[i]->setName(curves[i].name.get());
-			//				} else {
-			//					ofLogError("curve2::loadFromJson") << "NULL shared_ptr for output " << i;
-			//				}
-			//			}
 			
 			// Always set active curve to "none" (-1) when loading presets
 			activeCurve.set(-1);
@@ -1652,13 +1265,6 @@ void curve2::presetRecallAfterSettingParameters(ofJson &json){
 					curve.lines[i].segmentQ = 1.0f;
 				}
 			}
-			//
-			//			// Load global logistic parameters
-			//			if(json.contains("GlobalQ")){
-			//				curve.globalQ.set(json["GlobalQ"]);
-			//			} else {
-			//				curve.globalQ.set(1.0f);
-			//			}
 			
 			numCurves.set(1);
 			activeCurve.set(-1);
@@ -1820,8 +1426,7 @@ void curve2::onActiveCurveChanged(int& newIndex) {
 		// Reset hover states
 		hoveredPointIndex = -1;
 		hoveredSegmentIndex = -1;
-//		hoveredCurveIndex = -1;
-		
+
 		// No recalculation needed for overview mode
 		return;
 	}
@@ -1844,7 +1449,6 @@ void curve2::onActiveCurveChanged(int& newIndex) {
 			globalQ = nullptr;
 			hoveredPointIndex = -1;
 			hoveredSegmentIndex = -1;
-//			hoveredCurveIndex = -1;
 			return;
 		}
 	}
@@ -1875,8 +1479,7 @@ void curve2::onActiveCurveChanged(int& newIndex) {
 	// Reset hover states when switching curves
 	hoveredPointIndex = -1;
 	hoveredSegmentIndex = -1;
-//	hoveredCurveIndex = -1;
-	
+
 	// Trigger recalculation
 	recalculate();
 }
@@ -1975,6 +1578,301 @@ void curve2::renderInspectorInterface() {
 	}
 }
 
+//---------------------------------------------------------------
+// StandardVisualFeedback Implementation
+//---------------------------------------------------------------
+
+StandardVisualFeedback::StandardVisualFeedback()
+    : showInfo(true)
+    , tensionDragActive(false)
+    , bDragActive(false)
+    , tensionDragSegmentIndex(-1)
+    , bDragSegmentIndex(-1)
+    , hoveredSegmentIndex(-1)
+    , hoveredPointIndex(-1)
+    , canvasHovered(false) {
+}
+
+void StandardVisualFeedback::setCoordinateTransformer(std::shared_ptr<ICoordinateTransformer> transformer) {
+    coordinateTransformer = transformer;
+}
+
+void StandardVisualFeedback::setShowInfo(bool show) {
+    showInfo = show;
+}
+
+void StandardVisualFeedback::updateDragStates(bool tensionActive, bool bActive, int tensionSegment, int bSegment) {
+    tensionDragActive = tensionActive;
+    bDragActive = bActive;
+    tensionDragSegmentIndex = tensionSegment;
+    bDragSegmentIndex = bSegment;
+}
+
+void StandardVisualFeedback::updateHoverStates(int hoveredSegment, int hoveredPoint, bool canvasHover) {
+    hoveredSegmentIndex = hoveredSegment;
+    hoveredPointIndex = hoveredPoint;
+    canvasHovered = canvasHover;
+}
+
+void StandardVisualFeedback::renderFeedback(ImDrawList* drawList, const std::vector<curvePoint2>& points,
+                                          const std::vector<line2>& lines, const std::vector<CurveData>& curves,
+                                          int activeCurveIndex, bool showLabels, const ImVec2& visualWinPos) {
+    if (!coordinateTransformer) return;
+    
+    // Store visual window position for label rendering
+    this->visualWinPos = visualWinPos;
+    
+    // Render all visual feedback components
+    renderInflectionLines(drawList, points, lines);
+    renderAsymmetryLines(drawList, points, lines);
+    renderBParameterLines(drawList, points, lines);
+    renderCurveLabels(drawList, curves, activeCurveIndex, showLabels);
+    renderPointHighlights(drawList, points, hoveredPointIndex, -1);
+}
+
+void StandardVisualFeedback::renderInflectionLines(ImDrawList* drawList, const std::vector<curvePoint2>& points,
+                                                  const std::vector<line2>& lines) {
+    if (!coordinateTransformer) return;
+    
+    // Draw vertical line at inflection point during Shift+drag OR CTRL+drag operations OR hover with modifier keys
+    bool showInflectionLine = false;
+    int inflectionSegmentIndex = -1;
+    
+    // Check for active drag operations
+    if((tensionDragActive && tensionDragSegmentIndex >= 0) ||
+       (bDragActive && bDragSegmentIndex >= 0)){
+        showInflectionLine = true;
+        inflectionSegmentIndex = tensionDragActive ? tensionDragSegmentIndex : bDragSegmentIndex;
+    }
+    // Check for hover with modifier keys
+    else if(hoveredSegmentIndex >= 0 && canvasHovered &&
+            (ImGui::GetIO().KeyShift || ImGui::GetIO().KeyCtrl)){
+        showInflectionLine = true;
+        inflectionSegmentIndex = hoveredSegmentIndex;
+    }
+    
+    if(showInflectionLine && inflectionSegmentIndex >= 0 && !points.empty() && !lines.empty()){
+        // Ensure segment index is valid
+        if(inflectionSegmentIndex < lines.size()){
+            // Get the current segment being modified
+            float segmentStartX = points[inflectionSegmentIndex].point.x;
+            float segmentEndX = points[inflectionSegmentIndex + 1].point.x;
+            
+            // Calculate the actual X position of the inflection point
+            float inflectionX = lines[inflectionSegmentIndex].inflectionX;
+            float lineX = segmentStartX + inflectionX * (segmentEndX - segmentStartX);
+            
+            // Convert to screen coordinates
+            glm::vec2 lineTopPoint = coordinateTransformer->denormalizePoint(glm::vec2(lineX, 0.0f));
+            glm::vec2 lineBottomPoint = coordinateTransformer->denormalizePoint(glm::vec2(lineX, 1.0f));
+            
+            // Draw dotted vertical line with semi-transparent yellow color
+            drawDottedLine(drawList, lineTopPoint, lineBottomPoint, IM_COL32(255, 255, 0, 64));
+        }
+    }
+}
+
+void StandardVisualFeedback::renderAsymmetryLines(ImDrawList* drawList, const std::vector<curvePoint2>& points,
+                                                 const std::vector<line2>& lines) {
+    if (!coordinateTransformer) return;
+    
+    // Draw cyan horizontal line for asymmetry value during Shift+drag OR CTRL+drag operations OR hover with modifier keys
+    bool showAsymmetryLine = false;
+    int asymmetrySegmentIndex = -1;
+    
+    // Check for active drag operations
+    if((tensionDragActive && tensionDragSegmentIndex >= 0) ||
+       (bDragActive && bDragSegmentIndex >= 0)){
+        showAsymmetryLine = true;
+        asymmetrySegmentIndex = tensionDragActive ? tensionDragSegmentIndex : bDragSegmentIndex;
+    }
+    // Check for hover with modifier keys
+    else if(hoveredSegmentIndex >= 0 && canvasHovered &&
+            (ImGui::GetIO().KeyShift || ImGui::GetIO().KeyCtrl)){
+        showAsymmetryLine = true;
+        asymmetrySegmentIndex = hoveredSegmentIndex;
+    }
+    
+    if(showAsymmetryLine && asymmetrySegmentIndex >= 0 && !lines.empty()){
+        // Ensure segment index is valid
+        if(asymmetrySegmentIndex < lines.size()){
+            // Get current asymmetry value
+            float currentAsymmetry = lines[asymmetrySegmentIndex].tensionExponent;
+            
+            // Define asymmetry range (same as in the drag calculation)
+            const float minAsymmetry = MIN_ASYMMETRY;
+            const float maxAsymmetry = MAX_ASYMMETRY;
+            
+            // Map asymmetry value to Y position using enhanced split-zone mapping
+            // This mirrors the enhanced drag mapping for consistent visual feedback
+            float lineY;
+            
+            if (currentAsymmetry <= 1.0f) {
+                // Lower zone: asymmetry 0.02-1.0 maps to Y 0.0-0.5 (bottom to middle)
+                float normalizedAsymmetry = (currentAsymmetry - minAsymmetry) / (1.0f - minAsymmetry);
+                lineY = normalizedAsymmetry * 0.5f; // Scale to lower half (0.0 to 0.5)
+            } else {
+                // Upper zone: asymmetry 1.0-100.0 maps to Y 0.5-1.0 (middle to top)
+                float normalizedAsymmetry = (currentAsymmetry - 1.0f) / (maxAsymmetry - 1.0f);
+                lineY = 0.5f + normalizedAsymmetry * 0.5f; // Scale to upper half (0.5 to 1.0)
+            }
+            
+            // Clamp to valid range
+            lineY = std::max(0.0f, std::min(1.0f, lineY));
+            
+            // Convert to screen coordinates
+            glm::vec2 lineLeftPoint = coordinateTransformer->denormalizePoint(glm::vec2(0.0f, lineY));
+            glm::vec2 lineRightPoint = coordinateTransformer->denormalizePoint(glm::vec2(1.0f, lineY));
+            
+            // Draw dotted horizontal line with semi-transparent cyan color
+            drawDottedLine(drawList, lineLeftPoint, lineRightPoint, IM_COL32(0, 255, 255, 64));
+        }
+    }
+}
+
+void StandardVisualFeedback::renderBParameterLines(ImDrawList* drawList, const std::vector<curvePoint2>& points,
+                                                  const std::vector<line2>& lines) {
+    if (!coordinateTransformer) return;
+    
+    // Draw red vertical line for B parameter position during Shift+drag OR CTRL+drag operations OR hover with modifier keys
+    bool showBParameterLine = false;
+    int bParameterSegmentIndex = -1;
+    
+    // Check for active drag operations
+    if((tensionDragActive && tensionDragSegmentIndex >= 0) ||
+       (bDragActive && bDragSegmentIndex >= 0)){
+        showBParameterLine = true;
+        bParameterSegmentIndex = tensionDragActive ? tensionDragSegmentIndex : bDragSegmentIndex;
+    }
+    // Check for hover with modifier keys
+    else if(hoveredSegmentIndex >= 0 && canvasHovered &&
+            (ImGui::GetIO().KeyShift || ImGui::GetIO().KeyCtrl)){
+        showBParameterLine = true;
+        bParameterSegmentIndex = hoveredSegmentIndex;
+    }
+    
+    if(showBParameterLine && bParameterSegmentIndex >= 0 && !points.empty() && !lines.empty()){
+        // Ensure segment index is valid
+        if(bParameterSegmentIndex < lines.size()){
+            // Get the current segment being modified
+            float segmentStartX = points[bParameterSegmentIndex].point.x;
+            float segmentEndX = points[bParameterSegmentIndex + 1].point.x;
+            float segmentWidth = segmentEndX - segmentStartX;
+            
+            // Get current B parameter value
+            float currentB = lines[bParameterSegmentIndex].segmentB;
+            
+            // Map B parameter (0.01 to 100.0) to normalized position within segment (0.0 to 1.0)
+            // This represents where the B parameter affects the curve steepness within the segment
+            const float minB = MIN_B_PARAMETER;
+            const float maxB = MAX_B_PARAMETER;
+            
+            // Normalize B value to 0.0-1.0 range
+            float normalizedB = (currentB - minB) / (maxB - minB);
+            normalizedB = std::max(0.0f, std::min(1.0f, normalizedB));
+            
+            // Calculate the actual X position of the B parameter line within the segment
+            // The line position directly represents the normalized B parameter value (inverted for intuitive behavior)
+            float lineX = segmentStartX + (1.0f - normalizedB) * segmentWidth;
+            
+            // Convert to screen coordinates
+            glm::vec2 lineTopPoint = coordinateTransformer->denormalizePoint(glm::vec2(lineX, 0.0f));
+            glm::vec2 lineBottomPoint = coordinateTransformer->denormalizePoint(glm::vec2(lineX, 1.0f));
+            
+            // Draw dotted vertical line with semi-transparent red color
+            drawDottedLine(drawList, lineTopPoint, lineBottomPoint, IM_COL32(255, 0, 0, 64));
+        }
+    }
+}
+
+void StandardVisualFeedback::renderPointHighlights(ImDrawList* drawList, const std::vector<curvePoint2>& points,
+                                                   int hoveredPointIndex, int selectedPointIndex) {
+    if (!coordinateTransformer) return;
+    
+    // Point highlighting is handled in the main curve rendering for now
+    // This method is kept for interface compliance and future enhancements
+}
+
+void StandardVisualFeedback::renderCurveLabels(ImDrawList* drawList, const std::vector<CurveData>& curves,
+                                              int activeCurveIndex, bool showLabels) {
+    if (!coordinateTransformer || !showLabels) return;
+    
+    // Draw labels for all enabled curves
+    for(int curveIdx = 0; curveIdx < curves.size(); curveIdx++){
+        const auto& curve = curves[curveIdx];
+        
+        // Skip disabled curves
+        if(!curve.enabled.get()) continue;
+        
+        // Use actual curve name
+        string curveName = curve.name.get();
+        
+        // Determine label position and color
+        ofColor curveColor = curve.color.get();
+        ImU32 labelColor;
+        float labelOpacity = 0.8f;
+        
+        if(curveIdx == activeCurveIndex){
+            // Active curve: full opacity, add "[ACTIVE]" suffix
+            curveName += " [ACTIVE]";
+            labelColor = IM_COL32(curveColor.r, curveColor.g, curveColor.b, (int)(255 * labelOpacity));
+        }
+        else {
+            // Inactive curve: lower opacity
+            labelOpacity = 0.6f;
+            labelColor = IM_COL32(curveColor.r, curveColor.g, curveColor.b, (int)(255 * labelOpacity));
+        }
+        
+        // Position label in top-left area, stacked vertically
+        // Use the visual window position stored in renderFeedback
+        ImVec2 labelPos = ImVec2(visualWinPos.x + 10, visualWinPos.y + 10 + curveIdx * 20);
+        
+        // Add background for better readability
+        ImVec2 textSize = ImGui::CalcTextSize(curveName.c_str());
+        drawList->AddRectFilled(
+                                ImVec2(labelPos.x - 2, labelPos.y - 2),
+                                ImVec2(labelPos.x + textSize.x + 2, labelPos.y + textSize.y + 2),
+                                IM_COL32(0, 0, 0, 120) // Semi-transparent black background
+                                );
+        
+        // Draw the label text
+        drawList->AddText(labelPos, labelColor, curveName.c_str());
+    }
+}
+
+void StandardVisualFeedback::renderInputValueIndicator(ImDrawList* drawList, float inputValue, const ImVec2& canvasPos,
+                                                      const ImVec2& canvasSize) {
+    if (!coordinateTransformer) return;
+    
+    // Input value indicator implementation would go here
+    // This is kept for interface compliance and future enhancements
+}
+
+void StandardVisualFeedback::drawDottedLine(ImDrawList* drawList, ImVec2 start, ImVec2 end, ImU32 color,
+                                           float dashLength, float gapLength) {
+    ImVec2 direction = ImVec2(end.x - start.x, end.y - start.y);
+    float totalLength = sqrt(direction.x * direction.x + direction.y * direction.y);
+    
+    if (totalLength == 0) return;
+    
+    direction.x /= totalLength;
+    direction.y /= totalLength;
+    
+    float currentPos = 0;
+    while (currentPos < totalLength) {
+        float dashEnd = std::min(currentPos + dashLength, totalLength);
+        
+        ImVec2 dashStart = ImVec2(start.x + direction.x * currentPos, start.y + direction.y * currentPos);
+        ImVec2 dashEndPos = ImVec2(start.x + direction.x * dashEnd, start.y + direction.y * dashEnd);
+        
+        drawList->AddLine(dashStart, dashEndPos, color, 2.0f);
+        
+        currentPos += dashLength + gapLength;
+    }
+}
+
+//---------------------------------------------------------------
+
 // Helper function to draw dotted lines
 void curve2::drawDottedLine(ImDrawList* drawList, ImVec2 start, ImVec2 end, ImU32 color, float dashLength, float gapLength) {
 	ImVec2 direction = ImVec2(end.x - start.x, end.y - start.y);
@@ -1996,4 +1894,933 @@ void curve2::drawDottedLine(ImDrawList* drawList, ImVec2 start, ImVec2 end, ImU3
 		
 		currentPos += dashLength + gapLength;
 	}
+}
+
+//---------------------------------------------------------------
+// StandardPointInteractionHandler Implementation
+//---------------------------------------------------------------
+
+StandardPointInteractionHandler::StandardPointInteractionHandler() 
+    : someItemClicked(false)
+    , hoveredPointIndex(-1)
+    , indexToRemove(-1)
+{
+}
+
+void StandardPointInteractionHandler::setCoordinateTransformer(std::shared_ptr<ICoordinateTransformer> transformer) {
+    coordinateTransformer = transformer;
+}
+
+void StandardPointInteractionHandler::setRecalculateCallback(std::function<void()> callback) {
+    recalculateCallback = callback;
+}
+
+void StandardPointInteractionHandler::resetDragStates() {
+    someItemClicked = false;
+    hoveredPointIndex = -1;
+    indexToRemove = -1;
+}
+
+int StandardPointInteractionHandler::detectHoveredPoint(const glm::vec2& mousePos, const std::vector<curvePoint2>& points, float detectionRadius) {
+    if (!coordinateTransformer) return -1;
+    
+    for (int i = 0; i < points.size(); i++) {
+        glm::vec2 pointPos = coordinateTransformer->denormalizePoint(points[i].point);
+        float mouseToPointDistance = glm::distance(mousePos, pointPos);
+        if (mouseToPointDistance < detectionRadius) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void StandardPointInteractionHandler::sortPointsByX(std::vector<curvePoint2>& points) {
+    std::sort(points.begin(), points.end(), [](curvePoint2 &p1, curvePoint2 &p2){
+        return p1.point.x < p2.point.x;
+    });
+}
+
+bool StandardPointInteractionHandler::validatePointRemoval(const std::vector<curvePoint2>& points, int pointIndex) {
+    // Ensure minimum 2 points remain
+    return points.size() > 2 && pointIndex >= 0 && pointIndex < points.size();
+}
+
+glm::vec2 StandardPointInteractionHandler::applyGridSnapping(const glm::vec2& point, const InteractionContext& context) {
+    if (!context.snapToGrid) return point;
+    
+    // Calculate grid spacing
+    float gridSpacingX = 1.0f / context.horizontalDivisions;
+    float gridSpacingY = 1.0f / context.verticalDivisions;
+    
+    // Snap to nearest grid point
+    glm::vec2 snappedPoint;
+    snappedPoint.x = round(point.x / gridSpacingX) * gridSpacingX;
+    snappedPoint.y = round(point.y / gridSpacingY) * gridSpacingY;
+    
+    return snappedPoint;
+}
+
+bool StandardPointInteractionHandler::handlePointCreation(std::vector<curvePoint2>& points, std::vector<line2>& lines, const glm::vec2& mousePos) {
+    if (!coordinateTransformer) return false;
+    
+    glm::vec2 newPointPos = coordinateTransformer->safeNormalizePoint(mousePos);
+    
+    // Find which segment is being split to inherit its parameters
+    int splitSegmentIndex = -1;
+    for (int i = 0; i < points.size() - 1; i++) {
+        if (newPointPos.x >= points[i].point.x && newPointPos.x <= points[i + 1].point.x) {
+            splitSegmentIndex = i;
+            break;
+        }
+    }
+    
+    points.emplace_back(newPointPos);
+    points.back().drag = 3;
+    
+    // Create new line segment with inherited parameters from the split segment
+    if (splitSegmentIndex >= 0 && splitSegmentIndex < lines.size()) {
+        // Inherit all parameters from the segment being split
+        line2 newLine = lines[splitSegmentIndex];
+        lines.emplace_back(newLine);
+    } else {
+        // Fallback to default parameters if no segment found
+        lines.emplace_back();
+    }
+    
+    return true;
+}
+
+bool StandardPointInteractionHandler::handlePointDrag(std::vector<curvePoint2>& points, const MouseState& mouseState) {
+    if (!coordinateTransformer) return false;
+    
+    bool stateChanged = false;
+    for (int i = 0; i < points.size(); i++) {
+        auto &p = points[i];
+        
+        if (mouseState.isDragging && p.drag != 0) {
+            if (p.drag == 3) {
+                // Use safe zone aware normalization - allows dragging to continue even when mouse is outside visual area
+                glm::vec2 normalizedPos = glm::clamp(coordinateTransformer->safeNormalizePoint(mouseState.position), 0.0f, 1.0f);
+                
+                // Legacy key-based snapping (X and Y keys for individual axis snapping)
+                if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_X))) {
+                    normalizedPos.x = round(normalizedPos.x * 8) / 8; // Default to 8 divisions
+                }
+                if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Y))) {
+                    normalizedPos.y = round(normalizedPos.y * 4) / 4; // Default to 4 divisions
+                }
+                
+                p.point = normalizedPos;
+                stateChanged = true;
+            }
+        }
+    }
+    
+    return stateChanged;
+}
+
+void StandardPointInteractionHandler::renderCoordinateSliders(curvePoint2& point, float minX, float maxX) {
+    float tempFloat = ofMap(point.point.x, 0, 1, minX, maxX);
+    ImGui::SliderFloat("X", &tempFloat, minX, maxX);
+    if (ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())) {
+        point.point.x = ofMap(tempFloat, minX, maxX, 0, 1);
+    }
+    
+    // Y value editing (0-1 range)
+    tempFloat = point.point.y;
+    ImGui::SliderFloat("Y", &tempFloat, 0.0f, 1.0f);
+    if (ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())) {
+        point.point.y = tempFloat;
+    }
+}
+
+void StandardPointInteractionHandler::renderLineControls(std::vector<line2>& lines, int pointIndex) {
+    if (pointIndex > 0 && lines.size() > 0) {
+        int elem = lines[pointIndex-1].type;
+        const char* elems_names[2] = { "Hold", "Tension"};
+        if (ImGui::SliderInt("Line L", &elem, 0, 1, elems_names[elem])) {
+            lines[pointIndex-1].type = static_cast<lineType2>(elem);
+        }
+        
+        // Show asymmetric logistic controls for TENSION segments
+        if (lines[pointIndex-1].type == LINE2_TENSION) {
+            if (ImGui::SliderFloat("Asymmetry L", &lines[pointIndex-1].tensionExponent, MIN_ASYMMETRY, MAX_ASYMMETRY, "%.3f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+            if (ImGui::SliderFloat("Inflection L", &lines[pointIndex-1].inflectionX, 0.0f, 1.0f, "%.3f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+            if (ImGui::SliderFloat("Segment B L", &lines[pointIndex-1].segmentB, MIN_B_PARAMETER, MAX_B_PARAMETER, "%.2f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+            if (ImGui::SliderFloat("Segment Q L", &lines[pointIndex-1].segmentQ, 0.1f, 5.0f, "%.2f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+        }
+    }
+    
+    if (lines.size() > 0 && pointIndex < lines.size()) {
+        int elem = lines[pointIndex].type;
+        const char* elems_names[2] = { "Hold", "Tension"};
+        if (ImGui::SliderInt("Line R", &elem, 0, 1, elems_names[elem])) {
+            lines[pointIndex].type = static_cast<lineType2>(elem);
+        }
+        
+        // Show asymmetric logistic controls for TENSION segments
+        if (lines[pointIndex].type == LINE2_TENSION) {
+            if (ImGui::SliderFloat("Asymmetry R", &lines[pointIndex].tensionExponent, MIN_ASYMMETRY, MAX_ASYMMETRY, "%.3f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+            if (ImGui::SliderFloat("Inflection R", &lines[pointIndex].inflectionX, 0.0f, 1.0f, "%.3f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+            if (ImGui::SliderFloat("Segment B R", &lines[pointIndex].segmentB, MIN_B_PARAMETER, MAX_B_PARAMETER, "%.2f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+            if (ImGui::SliderFloat("Segment Q R", &lines[pointIndex].segmentQ, 0.1f, 5.0f, "%.2f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+        }
+    }
+}
+
+void StandardPointInteractionHandler::renderCurveProperties(ofParameter<float>* globalQ) {
+    ImGui::Separator();
+    ImGui::Text("Curve Properties:");
+    if (globalQ != nullptr) {
+        float tempQ = globalQ->get();
+        
+        if (ImGui::SliderFloat("Q (Scaling)", &tempQ, 0.1f, 5.0f, "%.1f")) {
+            globalQ->set(tempQ);
+            if (recalculateCallback) recalculateCallback();
+        }
+    } else {
+        ImGui::Text("Q (Scaling): N/A (no active curve)");
+    }
+}
+
+void StandardPointInteractionHandler::renderPointContextMenu(curvePoint2& point, std::vector<line2>& lines, int pointIndex) {
+    // Coordinate sliders
+    float tempFloat = point.point.x;
+    ImGui::SliderFloat("X", &tempFloat, 0.0f, 1.0f);
+    if (ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())) {
+        point.point.x = tempFloat;
+    }
+    
+    tempFloat = point.point.y;
+    ImGui::SliderFloat("Y", &tempFloat, 0.0f, 1.0f);
+    if (ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())) {
+        point.point.y = tempFloat;
+    }
+    
+    ImGui::Spacing();
+    
+    // Line controls for left segment
+    if (pointIndex > 0 && lines.size() > 0) {
+        int elem = lines[pointIndex-1].type;
+        const char* elems_names[2] = { "Hold", "Tension"};
+        if (ImGui::SliderInt("Line L", &elem, 0, 1, elems_names[elem])) {
+            lines[pointIndex-1].type = static_cast<lineType2>(elem);
+        }
+        
+        if (lines[pointIndex-1].type == LINE2_TENSION) {
+            if (ImGui::SliderFloat("Asymmetry L", &lines[pointIndex-1].tensionExponent, MIN_ASYMMETRY, MAX_ASYMMETRY, "%.3f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+            if (ImGui::SliderFloat("Inflection L", &lines[pointIndex-1].inflectionX, 0.0f, 1.0f, "%.3f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+            if (ImGui::SliderFloat("Segment B L", &lines[pointIndex-1].segmentB, MIN_B_PARAMETER, MAX_B_PARAMETER, "%.2f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+            if (ImGui::SliderFloat("Segment Q L", &lines[pointIndex-1].segmentQ, 0.1f, 5.0f, "%.2f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+        }
+    }
+    
+    // Line controls for right segment
+    if (lines.size() > 0 && pointIndex < lines.size()) {
+        int elem = lines[pointIndex].type;
+        const char* elems_names[2] = { "Hold", "Tension"};
+        if (ImGui::SliderInt("Line R", &elem, 0, 1, elems_names[elem])) {
+            lines[pointIndex].type = static_cast<lineType2>(elem);
+        }
+        
+        if (lines[pointIndex].type == LINE2_TENSION) {
+            if (ImGui::SliderFloat("Asymmetry R", &lines[pointIndex].tensionExponent, MIN_ASYMMETRY, MAX_ASYMMETRY, "%.3f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+            if (ImGui::SliderFloat("Inflection R", &lines[pointIndex].inflectionX, 0.0f, 1.0f, "%.3f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+            if (ImGui::SliderFloat("Segment B R", &lines[pointIndex].segmentB, MIN_B_PARAMETER, MAX_B_PARAMETER, "%.2f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+            if (ImGui::SliderFloat("Segment Q R", &lines[pointIndex].segmentQ, 0.1f, 5.0f, "%.2f")) {
+                if (recalculateCallback) recalculateCallback();
+            }
+        }
+    }
+    
+    ImGui::Separator();
+    ImGui::Text("Curve Properties:");
+    ImGui::Text("Q (Scaling): Handled by main curve interface");
+    
+    ImGui::Spacing();
+    
+    if (ImGui::Selectable("[Remove]")) {
+        ImGui::CloseCurrentPopup();
+        indexToRemove = pointIndex;
+    }
+}
+
+StandardPointInteractionHandler::InteractionResult StandardPointInteractionHandler::handleMouseInteraction(
+    const MouseState& mouseState, std::vector<curvePoint2>& points, std::vector<line2>& lines) {
+    
+    InteractionResult result;
+    result.stateChanged = false;
+    result.needsRecalculation = false;
+    result.needsRedraw = false;
+    result.hoveredPointIndex = -1;
+    
+    // Reset states on mouse release
+    if (!mouseState.leftButtonDown) {
+        for (int i = 0; i < points.size(); i++) {
+            points[i].drag = 0;
+            points[i].firstCreated = false;
+        }
+        result.stateChanged = true;
+    }
+    
+    // Detect hovered point
+    result.hoveredPointIndex = detectHoveredPoint(mouseState.position, points);
+    hoveredPointIndex = result.hoveredPointIndex;
+    
+    // Handle point creation on double-click
+    if (mouseState.leftButtonDoubleClicked) {
+        if (handlePointCreation(points, lines, mouseState.position)) {
+            result.stateChanged = true;
+            result.needsRecalculation = true;
+        }
+    }
+    
+    // Sort points by X coordinate to maintain curve integrity
+    sortPointsByX(points);
+    
+    // Handle point interactions
+    indexToRemove = -1;
+    someItemClicked = false;
+    
+    for (int i = 0; i < points.size(); i++) {
+        auto &p = points[i];
+        
+        // Handle point dragging
+        if (handlePointDrag(points, mouseState)) {
+            result.stateChanged = true;
+            result.needsRecalculation = true;
+        }
+        
+        // Handle point selection
+        glm::vec2 pointPos = coordinateTransformer->denormalizePoint(p.point);
+        if (mouseState.leftButtonClicked && !someItemClicked) {
+            auto mouseToPointDistance = glm::distance(mouseState.position, pointPos);
+            if (mouseToPointDistance < POINT_DETECTION_RADIUS) {
+                p.drag = 3;
+                someItemClicked = true;
+                result.stateChanged = true;
+            }
+        } else if (mouseState.rightButtonClicked && mouseState.isHovered) {
+            // Use hovered point for right-click if available, otherwise check distance
+            if (hoveredPointIndex == i || (hoveredPointIndex == -1 && glm::distance(mouseState.position, pointPos) < POINT_DETECTION_RADIUS)) {
+                ImGui::OpenPopup(("##PointPopup " + ofToString(i)).c_str());
+            }
+        }
+        
+        // Render context menu
+        if (ImGui::BeginPopup(("##PointPopup " + ofToString(i)).c_str())) {
+            renderPointContextMenu(p, lines, i);
+            ImGui::EndPopup();
+        }
+    }
+    
+    // Handle point removal
+    if (indexToRemove != -1 && validatePointRemoval(points, indexToRemove)) {
+        points.erase(points.begin() + indexToRemove);
+        if (indexToRemove < lines.size()) {
+            lines.erase(lines.begin() + indexToRemove);
+        }
+        result.stateChanged = true;
+        result.needsRecalculation = true;
+        indexToRemove = -1;
+    }
+    
+    return result;
+}
+
+StandardPointInteractionHandler::InteractionResult StandardPointInteractionHandler::processInteraction(
+    bool canvasHovered, bool canvasClicked, bool canvasDoubleClicked,
+    std::vector<curvePoint2>& points, std::vector<line2>& lines,
+    const InteractionContext& context) {
+    
+    // Construct mouse state from ImGui
+    MouseState mouseState;
+    mouseState.position = glm::vec2(ImGui::GetMousePos());
+    mouseState.leftButtonDown = ImGui::IsMouseDown(0);
+    mouseState.leftButtonClicked = canvasClicked;
+    mouseState.leftButtonDoubleClicked = canvasDoubleClicked;
+    mouseState.rightButtonClicked = ImGui::IsMouseClicked(1);
+    mouseState.isDragging = ImGui::IsMouseDragging(0);
+    mouseState.isHovered = canvasHovered;
+    
+    // Apply grid snapping if enabled
+    if (context.snapToGrid && mouseState.leftButtonDoubleClicked) {
+        glm::vec2 normalizedPos = coordinateTransformer->safeNormalizePoint(mouseState.position);
+        glm::vec2 snappedPos = applyGridSnapping(normalizedPos, context);
+        mouseState.position = coordinateTransformer->denormalizePoint(snappedPos);
+    }
+    
+    return handleMouseInteraction(mouseState, points, lines);
+}
+
+//---------------------------------------------------------------
+// StandardParameterController Implementation
+//---------------------------------------------------------------
+
+StandardParameterController::StandardParameterController() 
+    : tensionDragActive(false)
+    , bDragActive(false)
+    , tensionDragSegmentIndex(-1)
+    , bDragSegmentIndex(-1)
+    , tensionDragStartExponent(1.0f)
+    , bDragStartValue(6.0f)
+{
+}
+
+void StandardParameterController::setCoordinateTransformer(std::shared_ptr<ICoordinateTransformer> transformer) {
+    coordinateTransformer = transformer;
+}
+
+void StandardParameterController::setRecalculateCallback(std::function<void()> callback) {
+    recalculateCallback = callback;
+}
+
+bool StandardParameterController::handleParameterDrag(bool shiftPressed, bool ctrlPressed, bool canvasHovered, 
+                                                    bool someItemClicked, std::vector<curvePoint2>& points, 
+                                                    std::vector<line2>& lines) {
+    bool handled = false;
+    
+    // Handle Shift+drag for tension control
+    if (handleTensionDrag(shiftPressed, canvasHovered, someItemClicked, points, lines)) {
+        handled = true;
+    }
+    
+    // Handle Ctrl+drag for B parameter control
+    if (handleBParameterDragControl(ctrlPressed, canvasHovered, someItemClicked, points, lines)) {
+        handled = true;
+    }
+    
+    return handled;
+}
+
+bool StandardParameterController::handleTensionDrag(bool shiftPressed, bool canvasHovered, bool someItemClicked,
+                                                  std::vector<curvePoint2>& points, std::vector<line2>& lines) {
+    if (shiftPressed && !someItemClicked && canvasHovered) {
+        if (ImGui::IsMouseDragging(0)) {
+            if (!tensionDragActive) {
+                // Start new tension drag operation
+                glm::vec2 startPos = coordinateTransformer->safeNormalizePoint(ImGui::GetMousePos());
+                startTensionDrag(startPos, points, lines);
+            }
+            
+            // Continue existing tension drag operation
+            if (tensionDragActive && tensionDragSegmentIndex >= 0) {
+                glm::vec2 currentPos = coordinateTransformer->safeNormalizePoint(ImGui::GetMousePos());
+                updateTensionDrag(currentPos, points, lines);
+                if (recalculateCallback) recalculateCallback();
+            }
+        } else {
+            // Reset tension drag state when not dragging
+            tensionDragActive = false;
+            tensionDragSegmentIndex = -1;
+        }
+        return true;
+    } else {
+        // Reset tension drag state when Shift is not pressed
+        tensionDragActive = false;
+        tensionDragSegmentIndex = -1;
+        return false;
+    }
+}
+
+bool StandardParameterController::handleBParameterDragControl(bool ctrlPressed, bool canvasHovered, bool someItemClicked,
+                                                            std::vector<curvePoint2>& points, std::vector<line2>& lines) {
+    if (ctrlPressed && !someItemClicked && canvasHovered) {
+        if (ImGui::IsMouseDragging(0)) {
+            if (!bDragActive) {
+                // Start new B parameter drag operation
+                glm::vec2 startPos = coordinateTransformer->safeNormalizePoint(ImGui::GetMousePos());
+                startBParameterDragOperation(startPos, points, lines);
+            }
+            
+            // Continue existing B parameter drag operation
+            if (bDragActive && bDragSegmentIndex >= 0) {
+                glm::vec2 currentPos = coordinateTransformer->safeNormalizePoint(ImGui::GetMousePos());
+                updateBParameterDrag(currentPos, points, lines);
+                if (recalculateCallback) recalculateCallback();
+            }
+        } else {
+            // Reset B drag state when not dragging
+            bDragActive = false;
+            bDragSegmentIndex = -1;
+        }
+        return true;
+    } else {
+        // Reset B drag state when Ctrl is not pressed
+        bDragActive = false;
+        bDragSegmentIndex = -1;
+        return false;
+    }
+}
+
+void StandardParameterController::startTensionDrag(const glm::vec2& startPos, std::vector<curvePoint2>& points, 
+                                                  std::vector<line2>& lines) {
+    tensionDragActive = true;
+    tensionDragStartPos = startPos;
+    tensionDragSegmentIndex = -1;
+    
+    // Find which segment the mouse is over
+    for (int i = 0; i < points.size() - 1; i++) {
+        if (startPos.x >= points[i].point.x && startPos.x <= points[i + 1].point.x && lines[i].type == LINE2_TENSION) {
+            tensionDragSegmentIndex = i;
+            tensionDragStartExponent = lines[i].tensionExponent;
+            break;
+        }
+    }
+}
+
+void StandardParameterController::startBParameterDragOperation(const glm::vec2& startPos, std::vector<curvePoint2>& points, 
+                                                             std::vector<line2>& lines) {
+    bDragActive = true;
+    bDragStartPos = startPos;
+    bDragSegmentIndex = -1;
+    
+    // Find which segment the mouse is over
+    for (int i = 0; i < points.size() - 1; i++) {
+        if (startPos.x >= points[i].point.x && startPos.x <= points[i + 1].point.x && lines[i].type == LINE2_TENSION) {
+            bDragSegmentIndex = i;
+            bDragStartValue = lines[i].segmentB;
+            break;
+        }
+    }
+}
+
+void StandardParameterController::updateTensionDrag(const glm::vec2& currentPos, std::vector<curvePoint2>& points, 
+                                                   std::vector<line2>& lines) {
+    if (tensionDragSegmentIndex < 0 || tensionDragSegmentIndex >= lines.size()) return;
+    
+    // Calculate drag deltas
+    float deltaX = currentPos.x - tensionDragStartPos.x;
+    float deltaY = currentPos.y - tensionDragStartPos.y;
+    
+    // Horizontal drag: Set inflection point X position within segment (0.0 to 1.0)
+    float segmentStartX = points[tensionDragSegmentIndex].point.x;
+    float segmentEndX = points[tensionDragSegmentIndex + 1].point.x;
+    float segmentWidth = segmentEndX - segmentStartX;
+    
+    if (segmentWidth > 0.0001f) {
+        // Map current mouse X to segment-relative position
+        float relativeX = (currentPos.x - segmentStartX) / segmentWidth;
+        // Constrain to avoid edge issues
+        lines[tensionDragSegmentIndex].inflectionX = std::max(MIN_INFLECTION_X, std::min(MAX_INFLECTION_X, relativeX));
+    }
+    
+    // Vertical drag: Enhanced split-zone mapping for asymmetry parameter
+    float normalizedY = (currentPos.y - 0.0f) / (1.0f - 0.0f); // Mouse Y position within curve area (0.0 to 1.0)
+    
+    // Define asymmetry range
+    const float minAsymmetry = MIN_ASYMMETRY;
+    const float maxAsymmetry = MAX_ASYMMETRY;
+    float asymmetry;
+    
+    // Split the curve area height into two zones:
+    // Lower half (bottom 50%): Maps from 1 (middle) to 0.02 (bottom)
+    // Upper half (top 50%): Maps from 1 (middle) to 10 (top)
+    if (normalizedY <= 0.5f) {
+        // Lower half: map from 1 (at middle) to 0.02 (at bottom)
+        float lowerHalfY = normalizedY / 0.5f; // 0.0 to 1.0
+        asymmetry = minAsymmetry + lowerHalfY * (1.0f - minAsymmetry);
+    } else {
+        // Upper half: map from 1 (at middle) to 10 (at top)
+        float upperHalfY = (normalizedY - 0.5f) / 0.5f; // 0.0 to 1.0
+        asymmetry = 1.0f + upperHalfY * (maxAsymmetry - 1.0f);
+    }
+    
+    lines[tensionDragSegmentIndex].tensionExponent = asymmetry;
+    
+    // Clamp to valid range
+    lines[tensionDragSegmentIndex].tensionExponent = std::max(minAsymmetry, std::min(maxAsymmetry, lines[tensionDragSegmentIndex].tensionExponent));
+}
+
+void StandardParameterController::updateBParameterDrag(const glm::vec2& currentPos, std::vector<curvePoint2>& points, 
+                                                      std::vector<line2>& lines) {
+    if (bDragSegmentIndex < 0 || bDragSegmentIndex >= lines.size()) return;
+    
+    // X-position-based B parameter mapping within segment
+    float segmentStartX = points[bDragSegmentIndex].point.x;
+    float segmentEndX = points[bDragSegmentIndex + 1].point.x;
+    float segmentWidth = segmentEndX - segmentStartX;
+    
+    if (segmentWidth > 0.0001f) {
+        // Map current mouse X position within segment to B parameter range
+        float relativeX = (currentPos.x - segmentStartX) / segmentWidth;
+        // Clamp to segment bounds
+        relativeX = std::max(0.0f, std::min(1.0f, relativeX));
+        
+        // Linear interpolation: B = maxB - relativeX * (maxB - minB)
+        const float minB = MIN_B_PARAMETER;
+        const float maxB = MAX_B_PARAMETER;
+        lines[bDragSegmentIndex].segmentB = maxB - relativeX * (maxB - minB);
+    }
+}
+
+void StandardParameterController::endParameterDrag() {
+    tensionDragActive = false;
+    bDragActive = false;
+    tensionDragSegmentIndex = -1;
+    bDragSegmentIndex = -1;
+}
+
+int StandardParameterController::detectHoveredSegment(const glm::vec2& mousePos, std::vector<curvePoint2>& points, 
+                                                     std::vector<line2>& lines) {
+    for (int i = 0; i < points.size() - 1; i++) {
+        if (mousePos.x >= points[i].point.x && mousePos.x <= points[i + 1].point.x && lines[i].type == LINE2_TENSION) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// IParameterControlSystem interface implementation
+bool StandardParameterController::handleAsymmetryDrag(const glm::vec2& mousePos, const glm::vec2& mouseDelta,
+                                                     std::vector<line2>& lines, int segmentIndex) {
+    if (segmentIndex < 0 || segmentIndex >= lines.size()) return false;
+    
+    // Vertical drag for asymmetry control
+    float normalizedY = mousePos.y;
+    const float minAsymmetry = MIN_ASYMMETRY;
+    const float maxAsymmetry = MAX_ASYMMETRY;
+    float asymmetry;
+    
+    if (normalizedY <= 0.5f) {
+        float lowerHalfY = normalizedY / 0.5f;
+        asymmetry = minAsymmetry + lowerHalfY * (1.0f - minAsymmetry);
+    } else {
+        float upperHalfY = (normalizedY - 0.5f) / 0.5f;
+        asymmetry = 1.0f + upperHalfY * (maxAsymmetry - 1.0f);
+    }
+    
+    lines[segmentIndex].tensionExponent = std::max(minAsymmetry, std::min(maxAsymmetry, asymmetry));
+    return true;
+}
+
+bool StandardParameterController::handleInflectionDrag(const glm::vec2& mousePos, const glm::vec2& mouseDelta,
+                                                      std::vector<line2>& lines, int segmentIndex) {
+    if (segmentIndex < 0 || segmentIndex >= lines.size()) return false;
+    
+    // Horizontal drag for inflection control
+    float relativeX = mousePos.x;
+    lines[segmentIndex].inflectionX = std::max(MIN_INFLECTION_X, std::min(MAX_INFLECTION_X, relativeX));
+    return true;
+}
+
+bool StandardParameterController::handleBParameterDrag(const glm::vec2& mousePos, const glm::vec2& mouseDelta,
+                                                      std::vector<line2>& lines, int segmentIndex) {
+    if (segmentIndex < 0 || segmentIndex >= lines.size()) return false;
+    
+    // Horizontal drag for B parameter control
+    float relativeX = mousePos.x;
+    relativeX = std::max(0.0f, std::min(1.0f, relativeX));
+    
+    const float minB = MIN_B_PARAMETER;
+    const float maxB = MAX_B_PARAMETER;
+    lines[segmentIndex].segmentB = maxB - relativeX * (maxB - minB);
+    return true;
+}
+
+void StandardParameterController::startAsymmetryDrag(int segmentIndex, const glm::vec2& startPos, float startValue) {
+    tensionDragActive = true;
+    tensionDragSegmentIndex = segmentIndex;
+    tensionDragStartPos = startPos;
+    tensionDragStartExponent = startValue;
+}
+
+void StandardParameterController::startInflectionDrag(int segmentIndex, const glm::vec2& startPos, float startValue) {
+    // Inflection is handled as part of tension drag
+    tensionDragActive = true;
+    tensionDragSegmentIndex = segmentIndex;
+    tensionDragStartPos = startPos;
+}
+
+void StandardParameterController::startBParameterDrag(int segmentIndex, const glm::vec2& startPos, float startValue) {
+    bDragActive = true;
+    bDragSegmentIndex = segmentIndex;
+    bDragStartPos = startPos;
+    bDragStartValue = startValue;
+}
+
+void StandardParameterController::endAllDrags() {
+    endParameterDrag();
+}
+
+bool StandardParameterController::isAnyDragActive() const {
+    return tensionDragActive || bDragActive;
+}
+
+int StandardParameterController::getActiveDragSegment() const {
+    if (tensionDragActive) return tensionDragSegmentIndex;
+    if (bDragActive) return bDragSegmentIndex;
+    return -1;
+}
+
+//---------------------------------------------------------------
+// MultiCurveRenderer Implementation
+//---------------------------------------------------------------
+
+MultiCurveRenderer::MultiCurveRenderer() 
+    : renderQuality(RenderQuality::MEDIUM) {
+}
+
+void MultiCurveRenderer::renderCurves(ImDrawList* drawList, const std::vector<CurveData>& curves,
+                                     int activeCurveIndex, const RenderContext& context,
+                                     std::shared_ptr<StandardParameterController> parameterController) {
+    if (!coordinateTransformer) return;
+    
+    // First pass: Draw all enabled curves as inactive (background layer) with reduced opacity
+    const float inactiveOpacity = MultiCurveRenderer::INACTIVE_OPACITY;
+    const float inactiveLineWidth = MultiCurveRenderer::INACTIVE_LINE_WIDTH;
+    
+    for(int curveIdx = 0; curveIdx < curves.size(); curveIdx++){
+        const auto& curve = curves[curveIdx];
+        
+        // Skip disabled curves
+        if(!curve.enabled.get()) continue;
+        
+        // Skip active curve in first pass (will be drawn in second pass)
+        if(curveIdx == activeCurveIndex) continue;
+        
+        renderSingleCurve(drawList, curve, false, context, nullptr);
+    }
+    
+    // Second pass: Draw active curve (foreground layer) with full interactivity
+    // Only draw if a specific curve is selected (not "None")
+    if(activeCurveIndex >= 0 && activeCurveIndex < curves.size() && curves[activeCurveIndex].enabled.get()){
+        const auto& activeCurveData = curves[activeCurveIndex];
+        renderSingleCurve(drawList, activeCurveData, true, context, parameterController);
+    }
+}
+
+void MultiCurveRenderer::renderSingleCurve(ImDrawList* drawList, const CurveData& curve,
+                                          bool isActive, const RenderContext& context,
+                                          std::shared_ptr<StandardParameterController> parameterController) {
+    if (!coordinateTransformer || curve.points.empty()) return;
+    
+    const ofColor curveColor = curve.color.get();
+    const float lineWidth = isActive ? MultiCurveRenderer::ACTIVE_LINE_WIDTH : MultiCurveRenderer::INACTIVE_LINE_WIDTH;
+    
+    // Render extension lines
+    renderExtensionLines(drawList, curve.points, curveColor, isActive);
+    
+    // Render curve segments
+    for(int i = 0; i < curve.points.size()-1; i++){
+        // Determine segment color based on drag state for active curve
+        bool whiteHighlight = false;
+        bool activeHighlight = false;
+        
+        if(isActive && parameterController){
+            // Check for tension drag highlighting (shift+drag) - use white
+            if(parameterController->isTensionDragActive() && parameterController->getTensionDragSegmentIndex() == i){
+                whiteHighlight = true;
+            }
+            
+            // Check for B parameter drag highlighting (ctrl+drag) - use white
+            if(parameterController->isBDragActive() && parameterController->getBDragSegmentIndex() == i){
+                whiteHighlight = true;
+            }
+            
+            // Check for normal point drag highlighting - use active curve color
+            if(!whiteHighlight){
+                for(int p = 0; p < curve.points.size(); p++){
+                    if(curve.points[p].drag == 3){
+                        // Highlight segments connected to the dragged point
+                        if((p == i) || (p == i + 1)){
+                            activeHighlight = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Calculate segment color
+        ImU32 segmentColor = calculateSegmentColor(curveColor, isActive, whiteHighlight, activeHighlight);
+        
+        // Render segment based on type
+        if(curve.lines[i].type == LINE2_HOLD){
+            renderHoldSegment(drawList, curve.points[i], curve.points[i+1], segmentColor, lineWidth);
+        }
+        else if(curve.lines[i].type == LINE2_TENSION){
+            renderTensionSegment(drawList, curve.points[i], curve.points[i+1], 
+                               curve.lines[i], curve.globalQ.get(), isActive, segmentColor, lineWidth);
+        }
+    }
+}
+
+void MultiCurveRenderer::renderTensionSegment(ImDrawList* drawList, const curvePoint2& p1, const curvePoint2& p2,
+                                             const line2& lineData, float globalQ, bool isActive,
+                                             ImU32 segmentColor, float lineWidth) {
+    if (!coordinateTransformer) return;
+    
+    // Calculate adaptive segments based on B parameter and active state
+    int numSegments = calculateAdaptiveSegments(lineData.segmentB, isActive);
+    
+    renderLogisticCurve(drawList, p1, p2, lineData, globalQ, segmentColor, lineWidth, numSegments);
+}
+
+void MultiCurveRenderer::renderHoldSegment(ImDrawList* drawList, const curvePoint2& p1, const curvePoint2& p2,
+                                          ImU32 segmentColor, float lineWidth) {
+    if (!coordinateTransformer) return;
+    
+    auto denormP1 = coordinateTransformer->denormalizePoint(p1.point);
+    auto denormP2 = coordinateTransformer->denormalizePoint(p2.point);
+    
+    // Draw horizontal then vertical line segments
+    drawList->AddLine(denormP1, glm::vec2(denormP2.x, denormP1.y), segmentColor, lineWidth);
+    drawList->AddLine(glm::vec2(denormP2.x, denormP1.y), denormP2, segmentColor, lineWidth);
+}
+
+void MultiCurveRenderer::renderExtensionLines(ImDrawList* drawList, const std::vector<curvePoint2>& points,
+                                             const ofColor& curveColor, bool isActive) {
+    if (!coordinateTransformer || points.empty()) return;
+    
+    if(isActive){
+        // Draw active curve extension lines in black
+        // Start extension line
+        drawList->AddLine(coordinateTransformer->denormalizePoint(glm::vec2(0, points[0].point.y)), 
+                         coordinateTransformer->denormalizePoint(points[0].point), 
+                         IM_COL32(10, 10, 10, 255));
+        
+        // End extension line
+        drawList->AddLine(coordinateTransformer->denormalizePoint(points.back().point), 
+                         coordinateTransformer->denormalizePoint(glm::vec2(1, points.back().point.y)), 
+                         IM_COL32(10, 10, 10, 255));
+    } else {
+        // Draw inactive curve extension lines with reduced opacity
+        const float inactiveOpacity = MultiCurveRenderer::INACTIVE_OPACITY;
+        ImU32 extensionColor = IM_COL32(curveColor.r * 0.4f, curveColor.g * 0.4f, curveColor.b * 0.4f, 
+                                       (int)(255 * inactiveOpacity));
+        
+        // End extension line only for inactive curves
+        drawList->AddLine(coordinateTransformer->denormalizePoint(points.back().point),
+                         coordinateTransformer->denormalizePoint(glm::vec2(1, points.back().point.y)),
+                         extensionColor);
+    }
+}
+
+int MultiCurveRenderer::calculateAdaptiveSegments(float segmentB, bool isActive) const {
+    int baseSegments = isActive ? MultiCurveRenderer::BASE_SEGMENTS_ACTIVE : MultiCurveRenderer::BASE_SEGMENTS_INACTIVE;
+    int maxSegments = isActive ? MultiCurveRenderer::MAX_SEGMENTS_ACTIVE : MultiCurveRenderer::MAX_SEGMENTS_INACTIVE;
+    
+    // Adaptive resolution based on B parameter - more segments for steeper curves
+    float multiplier = isActive ? 2.0f : 1.5f;
+    int adaptiveSegments = std::max(baseSegments, (int)(segmentB * multiplier));
+    
+    return std::min(adaptiveSegments, maxSegments);
+}
+
+ImU32 MultiCurveRenderer::calculateSegmentColor(const ofColor& curveColor, bool isActive, 
+                                               bool whiteHighlight, bool activeHighlight) const {
+    if(whiteHighlight){
+        return IM_COL32(255, 255, 255, 255); // White for shift/ctrl drag
+    } else if(activeHighlight || isActive){
+        return IM_COL32(curveColor.r, curveColor.g, curveColor.b, 255); // Full opacity
+    } else {
+        // Inactive curve with reduced opacity
+        return IM_COL32(curveColor.r, curveColor.g, curveColor.b, (int)(255 * MultiCurveRenderer::INACTIVE_OPACITY));
+    }
+}
+
+void MultiCurveRenderer::setCoordinateTransformer(std::shared_ptr<ICoordinateTransformer> transformer) {
+    coordinateTransformer = transformer;
+}
+
+void MultiCurveRenderer::setRenderQuality(RenderQuality quality) {
+    renderQuality = quality;
+}
+
+void MultiCurveRenderer::setHighlightedSegments(const std::vector<int>& segmentIndices) {
+    highlightedSegments = segmentIndices;
+}
+
+float MultiCurveRenderer::calculateLogisticFunction(float x, float A, float K, float M, float nu, float B, float Q) const {
+    float logisticTerm = 1.0f + Q * exp(-B * (x - M));
+    return A + (K - A) / pow(logisticTerm, 1.0f / nu);
+}
+
+bool MultiCurveRenderer::shouldUseNormalization(float logisticRange) const {
+    return abs(logisticRange) > 1e-6f;
+}
+
+void MultiCurveRenderer::renderLogisticCurve(ImDrawList* drawList, const curvePoint2& p1, const curvePoint2& p2,
+                                            const line2& lineData, float globalQ, ImU32 segmentColor,
+                                            float lineWidth, int numSegments) {
+    if (!coordinateTransformer) return;
+    
+    glm::vec2 prevPoint = p1.point;
+    
+    // Asymmetric logistic parameters
+    float A = p1.point.y;      // Y value of segment start point
+    float K = p2.point.y;      // Y value of segment end point
+    float M = lineData.inflectionX;   // Inflection point X position (0-1)
+    float nu = lineData.tensionExponent; // Asymmetry parameter ν
+    float B = lineData.segmentB;      // Per-segment B parameter
+    float Q = globalQ;          // Global Q parameter
+    
+    // Calculate normalization values at segment endpoints
+    auto logisticFunction = [&](float x) -> float {
+        return calculateLogisticFunction(x, A, K, M, nu, B, Q);
+    };
+    
+    float logistic_0 = logisticFunction(0.0f); // Value at segment start
+    float logistic_1 = logisticFunction(1.0f); // Value at segment end
+    float logisticRange = logistic_1 - logistic_0;
+    
+    // Handle edge case where logistic range is very small
+    bool useNormalization = shouldUseNormalization(logisticRange);
+    
+    for(int seg = 1; seg <= numSegments; seg++){
+        float normalizedX = (float)seg / numSegments;
+        
+        // Calculate normalized X position within the segment
+        float segmentX = glm::mix(p1.point.x, p2.point.x, normalizedX);
+        
+        float resultY;
+        if(useNormalization){
+            // Apply normalized logistic function to guarantee endpoint continuity
+            float raw_logistic = logisticFunction(normalizedX);
+            resultY = A + (K - A) * (raw_logistic - logistic_0) / logisticRange;
+        } else {
+            // Fall back to linear interpolation if logistic range is too small
+            resultY = A + (K - A) * normalizedX;
+        }
+        
+        glm::vec2 currentPoint = glm::vec2(segmentX, resultY);
+        
+        // Draw line segment from previous point to current point
+        auto denormP1 = coordinateTransformer->denormalizePoint(prevPoint);
+        auto denormP2 = coordinateTransformer->denormalizePoint(currentPoint);
+        drawList->AddLine(denormP1, denormP2, segmentColor, lineWidth);
+        
+        prevPoint = currentPoint;
+    }
 }
