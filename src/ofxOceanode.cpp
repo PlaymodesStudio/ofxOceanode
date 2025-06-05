@@ -153,6 +153,7 @@ void ofxOceanode::draw(){
     ShowExampleAppDockSpace(&showDocker);
     if(showMode){
         drawShowModeWindow();
+		container->draw();
     }else{
         scope->draw();
         container->draw();
