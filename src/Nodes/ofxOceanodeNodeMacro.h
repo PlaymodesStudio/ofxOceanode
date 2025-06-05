@@ -133,7 +133,7 @@ private:
 	void setupSnapshotInspectorParameters();
 	
 	// Parameter Resending
-	void resendRouterParameters();
+	void resendAllParameters();
 	
 
 	// Router Value Management
