@@ -117,7 +117,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			if(b){
 				container->activate();
 				if(resetPhaseOnActive) container->resetPhase();
-				if(resendOnActive) resendAllParameters();
+				if(resendOnActive) resendRouterParameters();
 								
 			}else{
 				container->deactivate();
@@ -459,7 +459,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	});
 	addInspectorParameter(localName.set("Local Name", "Local"));
 	addInspectorParameter(resetPhaseOnActive.set("Reset Ph on Active", false));
-	addInspectorParameter(resendOnActive.set("Resend Param values on Active", false)); // NEW: Add the toggle
+	addInspectorParameter(resendOnActive.set("Resend Router values on Active", false)); // NEW: Add the toggle
     addInspectorParameter(clearContainerOnLoad.set("Clear Container on Load Preset", false));
 }
 
@@ -525,89 +525,99 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
     toCreateRouters.clear();
 }
 
-void ofxOceanodeNodeMacro::resendAllParameters() {
-	if(!container) return;
+void ofxOceanodeNodeMacro::resendRouterParameters() {
+	// Update router connections to ensure we have current info
+	updateRouterConnections();
 	
-	auto modules = container->getAllModules();
-	if(modules.empty()) return;
+	if(routerNodes.empty()) {
+		ofLogVerbose("Macro") << "No router nodes found for parameter resending";
+		return;
+	}
 	
-	// Iterate through all modules in the container
-	for(auto* module : modules) {
-		if(!module) continue;
+	// Iterate through all router nodes and resend their current values
+	for(auto& routerPair : routerNodes) {
+		auto& router = routerPair.second;
 		
-		auto& paramGroup = module->getParameters();
+		// Skip output routers - we only want to resend input router values
+		if(!router.isInput) continue;
 		
-		// Iterate through all parameters in each module
-		for(size_t i = 0; i < paramGroup.size(); i++) {
-			auto* abstractParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&paramGroup.get(i));
-			if(!abstractParam) continue;
+		auto& params = router.node->getParameters();
+		
+		// Check if "Value" parameter exists
+		if(!params.contains("Value")) continue;
+		
+		auto valueParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get("Value"));
+		if(!valueParam) continue;
+		
+		try {
+			// Trigger parameter change event by setting the parameter to its current value
+			string valueType = valueParam->valueType();
 			
-			// Skip parameters that have incoming connections (they receive values from other nodes)
-			if(abstractParam->hasInConnection()) continue;
-			
-			// Trigger parameter change event to resend the current value
-			try {
-				// Different parameter types need different handling
-				string valueType = abstractParam->valueType();
-				
-				if(valueType == typeid(float).name()) {
-					auto& param = abstractParam->cast<float>().getParameter();
-					float currentValue = param.get();
-					param.set(currentValue); // This triggers the parameter change event
-				}
-				else if(valueType == typeid(vector<float>).name()) {
-					auto& param = abstractParam->cast<vector<float>>().getParameter();
-					vector<float> currentValue = param.get();
-					param.set(currentValue);
-				}
-				else if(valueType == typeid(int).name()) {
-					auto& param = abstractParam->cast<int>().getParameter();
-					int currentValue = param.get();
-					param.set(currentValue);
-				}
-				else if(valueType == typeid(vector<int>).name()) {
-					auto& param = abstractParam->cast<vector<int>>().getParameter();
-					vector<int> currentValue = param.get();
-					param.set(currentValue);
-				}
-				else if(valueType == typeid(bool).name()) {
-					auto& param = abstractParam->cast<bool>().getParameter();
-					bool currentValue = param.get();
-					param.set(currentValue);
-				}
-				else if(valueType == typeid(vector<bool>).name()) {
-					auto& param = abstractParam->cast<vector<bool>>().getParameter();
-					vector<bool> currentValue = param.get();
-					param.set(currentValue);
-				}
-				else if(valueType == typeid(string).name()) {
-					auto& param = abstractParam->cast<string>().getParameter();
-					string currentValue = param.get();
-					param.set(currentValue);
-				}
-				else if(valueType == typeid(vector<string>).name()) {
-					auto& param = abstractParam->cast<vector<string>>().getParameter();
-					vector<string> currentValue = param.get();
-					param.set(currentValue);
-				}
-				else if(valueType == typeid(ofColor).name()) {
-					auto& param = abstractParam->cast<ofColor>().getParameter();
-					ofColor currentValue = param.get();
-					param.set(currentValue);
-				}
-				else if(valueType == typeid(ofFloatColor).name()) {
-					auto& param = abstractParam->cast<ofFloatColor>().getParameter();
-					ofFloatColor currentValue = param.get();
-					param.set(currentValue);
-				}
-				// Note: void parameters (triggers) don't need resending as they don't hold state
-			} catch(const std::exception& e) {
-				ofLogError("Macro") << "Error resending parameter '" << abstractParam->getName() << "': " << e.what();
+			if(valueType == typeid(float).name()) {
+				auto& param = valueParam->cast<float>().getParameter();
+				float currentValue = param.get();
+				param.set(currentValue);
 			}
+			else if(valueType == typeid(vector<float>).name()) {
+				auto& param = valueParam->cast<vector<float>>().getParameter();
+				vector<float> currentValue = param.get();
+				param.set(currentValue);
+			}
+			else if(valueType == typeid(int).name()) {
+				auto& param = valueParam->cast<int>().getParameter();
+				int currentValue = param.get();
+				param.set(currentValue);
+			}
+			else if(valueType == typeid(vector<int>).name()) {
+				auto& param = valueParam->cast<vector<int>>().getParameter();
+				vector<int> currentValue = param.get();
+				param.set(currentValue);
+			}
+			else if(valueType == typeid(bool).name()) {
+				auto& param = valueParam->cast<bool>().getParameter();
+				bool currentValue = param.get();
+				param.set(currentValue);
+			}
+			else if(valueType == typeid(vector<bool>).name()) {
+				auto& param = valueParam->cast<vector<bool>>().getParameter();
+				vector<bool> currentValue = param.get();
+				param.set(currentValue);
+			}
+			else if(valueType == typeid(string).name()) {
+				auto& param = valueParam->cast<string>().getParameter();
+				string currentValue = param.get();
+				param.set(currentValue);
+			}
+			else if(valueType == typeid(vector<string>).name()) {
+				auto& param = valueParam->cast<vector<string>>().getParameter();
+				vector<string> currentValue = param.get();
+				param.set(currentValue);
+			}
+			else if(valueType == typeid(ofColor).name()) {
+				auto& param = valueParam->cast<ofColor>().getParameter();
+				ofColor currentValue = param.get();
+				param.set(currentValue);
+			}
+			else if(valueType == typeid(ofFloatColor).name()) {
+				auto& param = valueParam->cast<ofFloatColor>().getParameter();
+				ofFloatColor currentValue = param.get();
+				param.set(currentValue);
+			}
+			else if(valueType == typeid(void).name()) {
+				// For trigger parameters, we trigger them once
+				auto& param = valueParam->cast<void>().getParameter();
+				param.trigger();
+			}
+			
+			ofLogVerbose("Macro") << "Resent router parameter: " << router.routerName;
+			
+		} catch(const std::exception& e) {
+			ofLogError("Macro") << "Error resending router parameter '" << router.routerName << "': " << e.what();
 		}
 	}
 	
-	ofLogVerbose("Macro") << "Resent all parameters for macro: " << (localPreset ? localName.get() : currentMacro);
+	ofLogVerbose("Macro") << "Resent " << routerNodes.size() << " router parameters for macro: "
+						  << (localPreset ? localName.get() : currentMacro);
 }
 
 void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
