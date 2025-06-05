@@ -132,9 +132,6 @@ private:
 	void clearAllSnapshots();
 	void setupSnapshotInspectorParameters();
 	
-	// Parameter Resending
-	void resendAllParameters();
-	
 
 	// Router Value Management
 	std::map<string, RouterSnapshot> captureRouterValues();
@@ -183,7 +180,6 @@ private:
 	
 	ofParameter<ofColor> colorParam;
 	ofParameter<bool> resetPhaseOnActive;
-	ofParameter<bool> resendOnActive;
     
     ofParameter<bool> clearContainerOnLoad;
 	
