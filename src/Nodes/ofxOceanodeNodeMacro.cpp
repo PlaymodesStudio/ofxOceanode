@@ -26,6 +26,8 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
 	showSnapshotNames.set("Show Names", true);
 	buttonSize.set("Button Size", 28.0f, 15.0f, 60.0f);
 	showSnapshotMatrix = true;
+	retriggerSnapshotOnActive.set("Retrigger Snapshot on Active", false);
+
 	
 	// Add minimized view update callback
 	minimizedViewCallback = [this](ImVec2 size) {
@@ -117,6 +119,10 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			if(b){
 				container->activate();
 				if(resetPhaseOnActive) container->resetPhase();
+				if(retriggerSnapshotOnActive && currentSnapshotSlot >= 0) {
+									// Retrigger the current snapshot to fire its parameters again
+									loadRouterSnapshot(currentSnapshotSlot);
+								}
 			}else{
 				container->deactivate();
 			}
@@ -368,6 +374,8 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	addInspectorParameter(buttonSize.set("Button Size", 28.0f, 15.0f, 60.0f));
 	addInspectorParameter(showSnapshotNames.set("Show Names", true));
 	addInspectorParameter(addSnapshotButton.set("Add Snapshot"));
+	addInspectorParameter(retriggerSnapshotOnActive.set("Retrigger Snapshot on Active", false));
+
 	
 	// Add snapshot inspector
 	addInspectorParameter(snapshotInspector.set("Snapshot Names", [this]() {
@@ -556,6 +564,9 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 		json["Macro"] = currentMacro;
 		json["MacroPath"] = currentMacroPath;
 	}
+	
+	json["RetriggerSnapshotOnActive"] = retriggerSnapshotOnActive.get();
+
 }
 
 /**
@@ -600,6 +611,13 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 	}else{
 		deserializeParameter(json, clearContainerOnLoad);
 	}
+	
+	if(json.count("RetriggerSnapshotOnActive") == 0){
+			retriggerSnapshotOnActive = false;
+		}else{
+			retriggerSnapshotOnActive = json["RetriggerSnapshotOnActive"].get<bool>();
+		}
+	
 	if(clearContainerOnLoad) container->clearContainer();
 	isLoadingPreset = true;
 	

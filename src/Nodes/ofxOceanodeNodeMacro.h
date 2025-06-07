@@ -210,6 +210,7 @@ private:
 	ofParameter<void> addSnapshotButton;
 	ofParameter<int> activeSnapshotSlot;
 	ofParameter<float> buttonSize;
+	ofParameter<bool> retriggerSnapshotOnActive; 
 	bool showSnapshotMatrix;
 	int currentSnapshotSlot;
 	
