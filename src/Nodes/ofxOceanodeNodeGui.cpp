@@ -524,24 +524,43 @@ bool ofxOceanodeNodeGui::constructGui(){
         ImGui::Spacing();
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
-            if((absParam.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized)){
-                auto size = ImVec2(210, ImGui::GetFrameHeight()*2);
-                
-                ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()*0.5f));
-                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()*0.5f));
-                ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()*0.5f));
-                ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(node.getColor()*.25f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
-                
-
-                for(auto f : ofxOceanodeScope::getInstance()->getScopedTypes())
-                {
-                    if(f(&absParam, size)) break;
-                }
-                
-                ImGui::PopStyleColor(6);
-            }
+			if((absParam.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized)){
+				
+				ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()*0.5f));
+				ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()*0.5f));
+				ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()*0.5f));
+				ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(node.getColor()*.25f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
+				
+				ImVec2 size;
+				if(absParam.valueType() == typeid(ofTexture*).name())
+				{
+					bool keepAspectRatio = (absParam.getFlags() & ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
+					if(keepAspectRatio)
+					{
+						auto tempCast = absParam.cast<ofTexture*>().getParameter();
+						float ar = tempCast.get()->getWidth() / tempCast.get()->getHeight();
+						size = ImVec2(240,240/ar);
+					}
+					else
+					{
+						size = ImVec2(240, 240);
+					}
+				}
+				else size = ImVec2(240,30);
+				
+				ImGui::BeginChild("Scope In Node", size, true);
+				
+				for(auto f : ofxOceanodeScope::getInstance()->getScopedTypes())
+				{
+					if(f(&absParam, size)) break;
+				}
+				
+				ImGui::PopStyleColor(6);
+				ImGui::EndChild();
+				
+			}
         }
     }
     
