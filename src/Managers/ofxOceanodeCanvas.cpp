@@ -536,6 +536,15 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             draw_list->AddText(currentPosition, IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255), c.text.c_str());
             draw_list->AddRectFilled(currentPosition + glm::vec2(0, 15), currentPosition + c.size, IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 100));
             ImGui::SetCursorScreenPos(currentPosition);
+			// trying to avoid a crash on ImGui::InvisibleButton
+			// IM_ASSERT(size_arg.x != 0.0f && size_arg.y != 0.0f);
+			// if size of x or y is 0 -> crash !
+			// This could happen if accidentally creating a "comment" with click+option without dragging = size = 0
+			if(c.size.x==0 || c.size.y==0)
+			{
+				c.size.x = 256;
+				c.size.y = 15;
+			}
             ImGui::InvisibleButton("Inv Button", ImVec2(c.size.x, 15));
             
             if(ImGui::IsItemActive()){
