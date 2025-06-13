@@ -520,88 +520,124 @@ bool ofxOceanodeNodeGui::constructGui(){
             ImGui::PopID();
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::EndDisabled();
         } //endFor
-    }else{
+    }
+	else
+	{
+		ImGui::Spacing();
 		
-        ImGui::Spacing();
-        
-        // First pass: calculate total height needed for all minimized parameters
-        float totalHeight = 0;
-        float spacing = 0; // Spacing between child windows
-        std::vector<ImVec2> paramSizes;
-        
-        for(int i=0 ; i<getParameters().size(); i++)
-		{
-            ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
-            if((absParam.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized))
-			{
-                ImVec2 size;
-                if(absParam.valueType() == typeid(ofTexture*).name())
-                {
-                    bool keepAspectRatio = (absParam.getFlags() & ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
-                    if(keepAspectRatio)
-                    {
-                        auto tempCast = absParam.cast<ofTexture*>().getParameter();
-                        float ar = tempCast.get()->getWidth() / tempCast.get()->getHeight();
-                        size = ImVec2(240,240/ar);
-                    }
-                    else
-                    {
-                        size = ImVec2(240, 240);
-                    }
-                }
-                else size = ImVec2(240,30);
-                
-                paramSizes.push_back(size);
-                totalHeight += size.y + spacing;
-            }
-        }
-        
-        // Remove last spacing if we added any parameters
-        if(totalHeight > 0) totalHeight -= spacing;
-        
-        // Second pass: render child windows with proper positioning
-        float currentY = 0;
-        int minimizedParamIndex = 0;
-        
-        for(int i=0 ; i<getParameters().size(); i++)
+		// First pass: calculate total height needed for all minimized parameters
+		float totalHeight = 0;
+		float spacing = 2; // Spacing between parameters
+		std::vector<ImVec2> paramSizes;
+		
+		for(int i=0 ; i<getParameters().size(); i++)
 		{
 			ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
 			if((absParam.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized))
 			{
+				ImVec2 size;
+				if(absParam.valueType() == typeid(ofTexture*).name())
+				{
+					bool keepAspectRatio = (absParam.getFlags() & ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
+					if(keepAspectRatio)
+					{
+						auto tempCast = absParam.cast<ofTexture*>().getParameter();
+						float ar = tempCast.get()->getWidth() / tempCast.get()->getHeight();
+						size = ImVec2(240,240/ar);
+					}
+					else
+					{
+						size = ImVec2(240, 240);
+					}
+				}
+				else size = ImVec2(240,30);
+				
+				paramSizes.push_back(size);
+				totalHeight += size.y + spacing;
+			}
+		}
+		
+		// Remove last spacing if we added any parameters
+		if(totalHeight > 0) totalHeight -= spacing;
+		
+		// Second pass: render parameters with proper positioning
+		float currentY = 0;
+		int minimizedParamIndex = 0;
+		
+		for(int i=0 ; i<getParameters().size(); i++)
+		{
+			ofxOceanodeAbstractParameter &absParam2 = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
+			if((absParam2.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized))
+			{
+				// Style setup for minimized parameters
+				ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()*0.5f));
+				ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()*0.5f));
+				ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()*0.5f));
+				ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()*0.5f));
+				ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(node.getColor()*.25f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
+				
+				ImVec2 size = paramSizes[minimizedParamIndex];
+				
+				// Set cursor position for this parameter
+				if(currentY > 0) {
+					ImGui::SetCursorPosY(ImGui::GetCursorPosY() + currentY);
+				}
+				
+				// Get the position where we'll draw
+				ImVec2 pos = ImGui::GetCursorScreenPos();
+				ImDrawList* draw_list = ImGui::GetWindowDrawList();
+				
+				// Draw background manually
+				ImU32 bg_color = ImGui::GetColorU32(ImGuiCol_ChildBg);
+				ImU32 border_color = ImGui::GetColorU32(ImGuiCol_Border);
+				draw_list->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), bg_color);
+				draw_list->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), border_color);
+				
+				// Create a clipping rectangle to constrain drawing
+				ImGui::PushClipRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), true);
+				
+				// Save current cursor position
+				ImVec2 savedCursorPos = ImGui::GetCursorPos();
+				
+				// Position cursor inside the "fake child" area for rendering
+				ImGui::SetCursorScreenPos(pos);
+				
+				// Render the content using scope functions
+				// IMPORTANT: We must break after the first scope function that handles the parameter
+				// to avoid multiple renderings. Each scope function returns true if it handled the parameter.
+								
 				for(auto f : ofxOceanodeScope::getInstance()->getScopedTypes())
 				{
-					ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()*0.5f));
-					ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()*0.5f));
-					ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()*0.5f));
-					ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(node.getColor()*.25f));
-					ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
-					ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
-					
-					ImVec2 size = paramSizes[minimizedParamIndex];
-					
-					// Set cursor position for this child window
-					if(currentY > 0) {
-						ImGui::SetCursorPosY(ImGui::GetCursorPosY() + currentY);
+					if(f(&absParam2, size))
+					{
+						break; // Stop after first successful handler
 					}
-					
-					// Create unique ID for each child window
-					std::string childId = "ScopeInNode_" + std::to_string(i) + "_" + absParam.getName();
-					ImGui::BeginChild(childId.c_str(), size, true);
-					
-					f(&absParam, size);
-					
-					ImGui::PopStyleColor(6);
-					ImGui::EndChild();
-					
-					// Update Y position for next child window
-					currentY = spacing;
 				}
+								
+				// Restore clipping
+				ImGui::PopClipRect();
+				
+				// Restore cursor position and advance it by the size we used
+				ImGui::SetCursorPos(savedCursorPos);
+				ImGui::SetCursorPosY(savedCursorPos.y + size.y);
+				
+				ImGui::PopStyleColor(7);
+				
+				// Update Y position for next parameter
+				currentY = spacing;
 				minimizedParamIndex++;
 			}
 		}
-    }
-    
-    ImGui::EndGroup();
+		
+		// Add an invisible item to ensure the group has the correct height
+		if(totalHeight > 0) {
+			ImGui::InvisibleButton("##nodesize", ImVec2(240, 0.1f));
+		}
+	}
+				
+				ImGui::EndGroup();
     if(expanded){
         for(auto &inPos : inputPositions){
             inPos.x = ImGui::GetItemRectMin().x;
@@ -610,11 +646,21 @@ bool ofxOceanodeNodeGui::constructGui(){
             outPos.x = ImGui::GetItemRectMax().x;
         }
     }else{
-        auto numParams = getParameters().size();
-        for(int i=0 ; i < numParams; i++){
-            ofAbstractParameter &absParam = getParameters().get(i);
-            string uniqueId = absParam.getName();
-            float yPos = numParams == 1 ? ImGui::GetItemRectSize().y / 2 : ImGui::GetItemRectSize().y * ((float)i/(numParams-1));
+        // Count only parameters with DisplayMinimized flag
+        int minimizedParamCount = 0;
+        std::vector<int> minimizedParamIndices;
+        for(int i=0 ; i < getParameters().size(); i++){
+            ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
+            if(absParam.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized){
+                minimizedParamIndices.push_back(i);
+                minimizedParamCount++;
+            }
+        }
+        
+        // Position slots only for minimized parameters
+        for(int j=0 ; j < minimizedParamIndices.size(); j++){
+            int i = minimizedParamIndices[j];
+            float yPos = minimizedParamCount == 1 ? ImGui::GetItemRectSize().y / 2 : ImGui::GetItemRectSize().y * ((float)j/(minimizedParamCount-1));
             inputPositions[i] = glm::vec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + yPos);
             outputPositions[i] = glm::vec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + yPos);
         }
