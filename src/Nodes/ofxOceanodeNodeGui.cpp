@@ -521,47 +521,84 @@ bool ofxOceanodeNodeGui::constructGui(){
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::EndDisabled();
         } //endFor
     }else{
+		
         ImGui::Spacing();
-        for(int i=0 ; i<getParameters().size(); i++){
+        
+        // First pass: calculate total height needed for all minimized parameters
+        float totalHeight = 0;
+        float spacing = 0; // Spacing between child windows
+        std::vector<ImVec2> paramSizes;
+        
+        for(int i=0 ; i<getParameters().size(); i++)
+		{
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
-			if((absParam.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized)){
-				
-				ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()*0.5f));
-				ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()*0.5f));
-				ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()*0.5f));
-				ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(node.getColor()*.25f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
-				
-				ImVec2 size;
-				if(absParam.valueType() == typeid(ofTexture*).name())
-				{
-					bool keepAspectRatio = (absParam.getFlags() & ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
-					if(keepAspectRatio)
-					{
-						auto tempCast = absParam.cast<ofTexture*>().getParameter();
-						float ar = tempCast.get()->getWidth() / tempCast.get()->getHeight();
-						size = ImVec2(240,240/ar);
-					}
-					else
-					{
-						size = ImVec2(240, 240);
-					}
-				}
-				else size = ImVec2(240,30);
-				
-				ImGui::BeginChild("Scope In Node", size, true);
-				
+            if((absParam.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized))
+			{
+                ImVec2 size;
+                if(absParam.valueType() == typeid(ofTexture*).name())
+                {
+                    bool keepAspectRatio = (absParam.getFlags() & ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
+                    if(keepAspectRatio)
+                    {
+                        auto tempCast = absParam.cast<ofTexture*>().getParameter();
+                        float ar = tempCast.get()->getWidth() / tempCast.get()->getHeight();
+                        size = ImVec2(240,240/ar);
+                    }
+                    else
+                    {
+                        size = ImVec2(240, 240);
+                    }
+                }
+                else size = ImVec2(240,30);
+                
+                paramSizes.push_back(size);
+                totalHeight += size.y + spacing;
+            }
+        }
+        
+        // Remove last spacing if we added any parameters
+        if(totalHeight > 0) totalHeight -= spacing;
+        
+        // Second pass: render child windows with proper positioning
+        float currentY = 0;
+        int minimizedParamIndex = 0;
+        
+        for(int i=0 ; i<getParameters().size(); i++)
+		{
+			ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
+			if((absParam.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized))
+			{
 				for(auto f : ofxOceanodeScope::getInstance()->getScopedTypes())
 				{
-					if(f(&absParam, size)) break;
+					ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()*0.5f));
+					ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()*0.5f));
+					ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()*0.5f));
+					ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(node.getColor()*.25f));
+					ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
+					ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
+					
+					ImVec2 size = paramSizes[minimizedParamIndex];
+					
+					// Set cursor position for this child window
+					if(currentY > 0) {
+						ImGui::SetCursorPosY(ImGui::GetCursorPosY() + currentY);
+					}
+					
+					// Create unique ID for each child window
+					std::string childId = "ScopeInNode_" + std::to_string(i) + "_" + absParam.getName();
+					ImGui::BeginChild(childId.c_str(), size, true);
+					
+					f(&absParam, size);
+					
+					ImGui::PopStyleColor(6);
+					ImGui::EndChild();
+					
+					// Update Y position for next child window
+					currentY = spacing;
 				}
-				
-				ImGui::PopStyleColor(6);
-				ImGui::EndChild();
-				
+				minimizedParamIndex++;
 			}
-        }
+		}
     }
     
     ImGui::EndGroup();
