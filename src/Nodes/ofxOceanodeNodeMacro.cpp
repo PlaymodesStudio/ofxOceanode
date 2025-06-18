@@ -638,7 +638,7 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 			// First check for snapshots.json file in the local macro folder
 			string snapshotsFilePath = localPath + "/snapshots.json";
 			if(ofFile::doesFileExist(snapshotsFilePath)) {
-				ofLog() << "Loading snapshots from file: " << snapshotsFilePath;
+				//ofLog() << "Loading snapshots from file: " << snapshotsFilePath;
 				loadSnapshotsFromPath(localPath);
 			}
 			// If no separate file, check for embedded snapshots (backward compatibility)
@@ -1103,10 +1103,10 @@ void ofxOceanodeNodeMacro::loadSnapshotsFromPath(const string& path) {
 	   snapshotsFile = ofFilePath::removeTrailingSlash(path) + "/snapshots.json";
    }
    
-   ofLog() << "Checking for snapshots at: " << snapshotsFile;
+   //ofLog() << "Checking for snapshots at: " << snapshotsFile;
    
    if(ofFile::doesFileExist(snapshotsFile)) {
-	   ofLog() << "Found snapshots file, loading...";
+	   //ofLog() << "Found snapshots file, loading...";
 	   try {
 		   ofJson snapshotsJson = ofLoadJson(snapshotsFile);
 		   snapshots.clear();
@@ -1115,14 +1115,14 @@ void ofxOceanodeNodeMacro::loadSnapshotsFromPath(const string& path) {
 			   SnapshotData snapshot;
 			   loadSnapshotFromJson(snapshot, item.value());
 			   snapshots[slot] = snapshot;
-			   ofLog() << "Loaded snapshot for slot " << slot << " with name " << snapshot.name;
+			   //ofLog() << "Loaded snapshot for slot " << slot << " with name " << snapshot.name;
 		   }
-		   ofLog() << "Loaded " << snapshots.size() << " snapshots from " << snapshotsFile;
+		   //ofLog() << "Loaded " << snapshots.size() << " snapshots from " << snapshotsFile;
 	   } catch(const std::exception& e) {
 		   ofLogError("Macro") << "Error loading snapshots: " << e.what();
 	   }
    } else {
-	   ofLogWarning("Macro") << "Snapshots file does not exist: " << snapshotsFile;
+	   //ofLogWarning("Macro") << "Snapshots file does not exist: " << snapshotsFile;
    }
 }
 
