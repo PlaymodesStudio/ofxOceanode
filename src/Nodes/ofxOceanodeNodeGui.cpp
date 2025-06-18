@@ -646,21 +646,28 @@ bool ofxOceanodeNodeGui::constructGui(){
             outPos.x = ImGui::GetItemRectMax().x;
         }
     }else{
-        // Count only parameters with DisplayMinimized flag
-        int minimizedParamCount = 0;
-        std::vector<int> minimizedParamIndices;
-        for(int i=0 ; i < getParameters().size(); i++){
-            ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
-            if(absParam.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized){
-                minimizedParamIndices.push_back(i);
-                minimizedParamCount++;
-            }
-        }
-        
-        // Position slots only for minimized parameters
-        for(int j=0 ; j < minimizedParamIndices.size(); j++){
-            int i = minimizedParamIndices[j];
-            float yPos = minimizedParamCount == 1 ? ImGui::GetItemRectSize().y / 2 : ImGui::GetItemRectSize().y * ((float)j/(minimizedParamCount-1));
+		auto numParams = getParameters().size();
+// from here
+				for(int i=0 ; i < numParams; i++){
+					ofAbstractParameter &absParam = getParameters().get(i);
+					string uniqueId = absParam.getName();
+					float yPos = numParams == 1 ? ImGui::GetItemRectSize().y / 2 : ImGui::GetItemRectSize().y * ((float)i/(numParams-1));
+// to here
+//        // Count only parameters with DisplayMinimized flag
+//        int minimizedParamCount = 0;
+//        std::vector<int> minimizedParamIndices;
+//        for(int i=0 ; i < getParameters().size(); i++){
+//            ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
+//            if(absParam.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized){
+//                minimizedParamIndices.push_back(i);
+//                minimizedParamCount++;
+//            }
+//        }
+//        
+//        // Position slots only for minimized parameters
+//        for(int j=0 ; j < minimizedParamIndices.size(); j++){
+//            int i = minimizedParamIndices[j];
+//            float yPos = minimizedParamCount == 1 ? ImGui::GetItemRectSize().y / 2 : ImGui::GetItemRectSize().y * ((float)j/(minimizedParamCount-1));
             inputPositions[i] = glm::vec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + yPos);
             outputPositions[i] = glm::vec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + yPos);
         }
