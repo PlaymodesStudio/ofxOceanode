@@ -225,7 +225,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 		
 		bool firstSaveAsOpen = false;
 		if (ImGui::Button("[Save]")){
-			ofLog() << "Save current preset and notify other macros";
+			//ofLog() << "Save current preset and notify other macros";
 			// If we try to save a new macro or a local preset, the save macro as window apears
 			if(currentMacroPath == "" || localPreset){
 				ImGui::OpenPopup("Save Macro As :");
@@ -452,7 +452,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	}
 	
 	macroUpdatedListener = ofxOceanodeShared::getMacroUpdatedEvent().newListener([this](string &s){
-		ofLog() << s;
+		//ofLog() << s;
 		if(s == currentMacroPath && !localPreset){
             if(clearContainerOnLoad) container->clearContainer();
 			container->loadPreset(currentMacroPath);
@@ -638,12 +638,12 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 			// First check for snapshots.json file in the local macro folder
 			string snapshotsFilePath = localPath + "/snapshots.json";
 			if(ofFile::doesFileExist(snapshotsFilePath)) {
-				ofLog() << "Loading snapshots from file: " << snapshotsFilePath;
+				//ofLog() << "Loading snapshots from file: " << snapshotsFilePath;
 				loadSnapshotsFromPath(localPath);
 			}
 			// If no separate file, check for embedded snapshots (backward compatibility)
 			else if(json.contains("Snapshots") && !json["Snapshots"].is_null()) {
-				ofLog() << "Loading snapshots from embedded JSON";
+				//ofLog() << "Loading snapshots from embedded JSON";
 				for(const auto& item : json["Snapshots"].items()) {
 					int slot = ofToInt(item.key());
 					SnapshotData snapshot;
@@ -1069,7 +1069,7 @@ void ofxOceanodeNodeMacro::saveSnapshots() {
 	if(!localPreset && !currentMacroPath.empty()) {
 		string filename = ofFilePath::removeTrailingSlash(currentMacroPath) + "/snapshots.json";
 		ofSavePrettyJson(filename, snapshotsJson);
-		ofLog() << "Saved global snapshots to: " << filename;
+		//ofLog() << "Saved global snapshots to: " << filename;
 	}
 	// For local macros
 	else if(localPreset) {
@@ -1090,7 +1090,7 @@ void ofxOceanodeNodeMacro::saveSnapshots() {
 		
 		string snapshotsFilePath = localPath + "/snapshots.json";
 		ofSavePrettyJson(snapshotsFilePath, snapshotsJson);
-		ofLog() << "Saved local snapshots to: " << snapshotsFilePath;
+		//ofLog() << "Saved local snapshots to: " << snapshotsFilePath;
 	}
 }
 
@@ -1103,10 +1103,10 @@ void ofxOceanodeNodeMacro::loadSnapshotsFromPath(const string& path) {
 	   snapshotsFile = ofFilePath::removeTrailingSlash(path) + "/snapshots.json";
    }
    
-   ofLog() << "Checking for snapshots at: " << snapshotsFile;
+   //ofLog() << "Checking for snapshots at: " << snapshotsFile;
    
    if(ofFile::doesFileExist(snapshotsFile)) {
-	   ofLog() << "Found snapshots file, loading...";
+	   //ofLog() << "Found snapshots file, loading...";
 	   try {
 		   ofJson snapshotsJson = ofLoadJson(snapshotsFile);
 		   snapshots.clear();
@@ -1115,14 +1115,14 @@ void ofxOceanodeNodeMacro::loadSnapshotsFromPath(const string& path) {
 			   SnapshotData snapshot;
 			   loadSnapshotFromJson(snapshot, item.value());
 			   snapshots[slot] = snapshot;
-			   ofLog() << "Loaded snapshot for slot " << slot << " with name " << snapshot.name;
+			   //ofLog() << "Loaded snapshot for slot " << slot << " with name " << snapshot.name;
 		   }
-		   ofLog() << "Loaded " << snapshots.size() << " snapshots from " << snapshotsFile;
+		   //ofLog() << "Loaded " << snapshots.size() << " snapshots from " << snapshotsFile;
 	   } catch(const std::exception& e) {
 		   ofLogError("Macro") << "Error loading snapshots: " << e.what();
 	   }
    } else {
-	   ofLogWarning("Macro") << "Snapshots file does not exist: " << snapshotsFile;
+	   //ofLogWarning("Macro") << "Snapshots file does not exist: " << snapshotsFile;
    }
 }
 
