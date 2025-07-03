@@ -15,6 +15,7 @@ public:
     abstractRouter(string typelabel) : ofxOceanodeNodeModel("Router " + typelabel){
         description = "To Send " + typelabel + " values to and from a macro and it's parent";
         addParameter(nameParam.set("Name", typelabel));
+        addInspectorParameter(snapshotExclude.set("Exclude From Snapshots", false));
     };
     ~abstractRouter(){};
     
@@ -29,8 +30,11 @@ public:
     string type(){
         return typeid(*this).name();
     }
+    
+    bool isExcludeFromSnapshot(){return snapshotExclude;}
 protected:
     ofParameter<string> nameParam;
+    ofParameter<bool> snapshotExclude;
 };
 
 template<typename T>

@@ -852,6 +852,9 @@ void ofxOceanodeNodeMacro::loadRouterSnapshot(int slot) {
 		auto& params = router.node->getParameters();
 		auto valueParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get("Value"));
 		if(!valueParam) continue;
+        abstractRouter* absRouter = dynamic_cast<abstractRouter*>(&router.node->getNodeModel());
+        if(absRouter == nullptr) continue;
+        if(absRouter->isExcludeFromSnapshot()) continue;
 		
 		try {
 			if(valueParam->valueType() == typeid(float).name()) {
@@ -1223,6 +1226,9 @@ void ofxOceanodeNodeMacro::storeRouterSnapshot(int slot) {
 		auto& params = router.node->getParameters();
 		auto valueParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get("Value"));
 		if(!valueParam) continue;
+        abstractRouter* absRouter = dynamic_cast<abstractRouter*>(&router.node->getNodeModel());
+        if(absRouter == nullptr) continue;
+        if(absRouter->isExcludeFromSnapshot()) continue;
 
 		RouterSnapshot snapshot;
 		snapshot.type = valueParam->valueType();
