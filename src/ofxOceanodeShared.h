@@ -158,6 +158,22 @@ public:
     static void setConfigurationFlags(ofxOceanodeConfigurationFlags f){
         getInstance().configurationFlags = f;
     }
+	
+	template<typename T>
+	static vector<portal<T>*> getAllPortals() {
+		vector<portal<T>*> typedPortals;
+		
+		for (auto* abstractPortal : getInstance().portals) {
+			if (abstractPortal != nullptr) {
+				auto* typedPortal = dynamic_cast<portal<T>*>(abstractPortal);
+				if (typedPortal != nullptr) {
+					typedPortals.push_back(typedPortal);
+				}
+			}
+		}
+		
+		return typedPortals;
+	}
     
 private:
     ofxOceanodeShared(){};
