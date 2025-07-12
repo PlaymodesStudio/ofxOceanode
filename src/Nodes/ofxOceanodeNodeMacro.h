@@ -61,6 +61,8 @@ public:
 	void setBpm(float bpm){container->setBpm(bpm);};
 	void resetPhase(){container->resetPhase();};
 	
+	void syncSnapshotsFromDisk();
+
 #ifdef OFXOCEANODE_USE_OSC
 	bool receiveOscMessage(ofxOscMessage &m) override{
 		container->receiveOscMessage(m);
@@ -131,6 +133,8 @@ private:
 	void updateMacroDirectoryStructure();
 	void clearAllSnapshots();
 	void setupSnapshotInspectorParameters();
+	string calculateSnapshotHash();
+
 	
 
 	// Router Value Management
@@ -161,6 +165,8 @@ private:
 	ofEventListeners deleteListeners;
 	ofEventListeners presetActionsListeners;
 	ofEventListener activeSnapshotSlotListener;
+	ofEventListener snapshotUpdatedListener;
+		
 	std::unordered_map<string, ofEventListeners> inoutListeners;
 	
 	// Basic Parameters
@@ -213,6 +219,7 @@ private:
 	ofParameter<bool> retriggerSnapshotOnActive; 
 	bool showSnapshotMatrix;
 	int currentSnapshotSlot;
+	string lastSnapshotHash;
 	
 	// Collections
 	std::map<std::string, RouterInfo> routerNodes;
