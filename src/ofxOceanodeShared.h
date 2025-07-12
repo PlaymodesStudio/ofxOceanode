@@ -105,6 +105,15 @@ public:
 		return getInstance().macroUpdatedEvent;
 	}
 	
+	static ofEvent<string>& getSnapshotUpdatedEvent() {
+			static ofEvent<string> snapshotUpdatedEvent;
+			return snapshotUpdatedEvent;
+		}
+		
+		static void snapshotUpdated(const string& macroPath) {
+			ofNotifyEvent(getSnapshotUpdatedEvent(), const_cast<string&>(macroPath));
+		}
+	
 	static void addPortal(abstractPortal* _portal){
 		getInstance().portals.push_back(_portal);
 	}
