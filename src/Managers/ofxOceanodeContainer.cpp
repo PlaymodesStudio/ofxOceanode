@@ -1892,51 +1892,58 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 			// Audio types (SuperCollider related)
 			} else if(extConn.routerType == "ScBus") {
 				routerTypeName = "Router ScBus";
-			} else if(extConn.routerType == "ChannelRouter") {
-				routerTypeName = "SC ChannelRouter*";
-			} else if(extConn.routerType == "DBAPRouter") {
-				routerTypeName = "SC DBAPRouter13";
-
-			// Time types
-			} else if(extConn.routerType == "timestamp") {
+			}
+			
+			else if(extConn.routerType == "timestamp") {
 				routerTypeName = "Router timestamp";
 
 			// Fallback for unknown types
 			} else {
-				// Try to find a matching router in the registry
-				auto registry = macroContainer->getRegistry();
-				if(registry) {
-					auto models = registry->getRegisteredModels();
+				ofLogWarning("DEBUG") << "No explicit mapping for type: " << extConn.routerType;
+	
+	// Try to find a matching router in the registry
+	auto registry = macroContainer->getRegistry();
+	if(registry) {
+		auto models = registry->getRegisteredModels();
+		
+		// First, try exact match with "Router " prefix
+		string searchName = "Router " + extConn.routerType;
+		if(models.count(searchName) > 0) {
+			routerTypeName = searchName;
+			ofLogNotice("DEBUG") << "Found exact match: " << routerTypeName;
+		} else {
+			// Look for partial matches
+			bool found = false;
+			ofLogNotice("DEBUG") << "Searching for partial matches for: " << extConn.routerType;
+			
+			for(auto& model : models) {
+				if(model.first.find("Router") != string::npos) {
+					ofLogVerbose("DEBUG") << "Checking: " << model.first << " against " << extConn.routerType;
 					
-					// Look for exact type match first
-					string searchName = "Router " + extConn.routerType;
-					if(models.count(searchName) > 0) {
-						routerTypeName = searchName;
-					} else {
-						// Look for partial matches
-						bool found = false;
-						for(auto& model : models) {
-							if(model.first.find("Router") != string::npos &&
-							   model.first.find(extConn.routerType) != string::npos) {
-								routerTypeName = model.first;
-								found = true;
-								break;
-							}
-						}
-						
-						if(!found) {
-							// Ultimate fallback to float
-							routerTypeName = "Router f";
-							ofLogWarning("Encapsulation") << "Unknown router type '" << extConn.routerType
-														 << "', using Router f as fallback";
-						}
+					// Try different matching strategies
+					if(model.first.find(extConn.routerType) != string::npos ||
+					   extConn.routerType.find(model.first.substr(7)) != string::npos) { // Skip "Router " prefix
+						routerTypeName = model.first;
+						found = true;
+						ofLogNotice("DEBUG") << "Found partial match: " << routerTypeName;
+						break;
 					}
-				} else {
-					// No registry access, use float fallback
-					routerTypeName = "Router f";
-					ofLogWarning("Encapsulation") << "No registry access, using Router f for type: " << extConn.routerType;
 				}
 			}
+			
+			if(!found) {
+				// Ultimate fallback to float
+				routerTypeName = "Router f";
+				ofLogWarning("DEBUG") << "No match found, using Router f as fallback";
+			}
+		}
+	} else {
+		routerTypeName = "Router f";
+		ofLogError("DEBUG") << "No registry access, using Router f fallback";
+	}
+}
+			ofLogNotice("DEBUG") << "Final router type: " << routerTypeName;
+			
 			
 			ofLogNotice("Encapsulation") << "Creating router: " << routerTypeName << " for " << extConn.routerName;
 			
@@ -1987,11 +1994,15 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 				continue;
 			}
 			
-			// Connect router to internal parameter
 			auto& routerParams = routerNode->getParameters();
 			if(routerParams.contains("Value")) {
 				auto routerParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&routerParams.get("Value"));
 				if(routerParam) {
+					ofLogNotice("DEBUG") << "Router param type: " << routerParam->valueType();
+					ofLogNotice("DEBUG") << "Internal param type: " << internalParam->valueType();
+					ofLogNotice("DEBUG") << "Router param name: " << routerParam->getName();
+					ofLogNotice("DEBUG") << "Internal param name: " << internalParam->getName();
+					
 					if(extConn.isIncoming) {
 						// Input: router → internal parameter
 						auto conn = macroContainer->createConnection(*routerParam, *internalParam);
@@ -2000,6 +2011,8 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 														<< " → " << extConn.internalParamName;
 						} else {
 							ofLogError("Encapsulation") << "Failed to create input connection for " << extConn.routerName;
+							ofLogError("DEBUG") << "Connection types: " << routerParam->valueType()
+											   << " -> " << internalParam->valueType();
 						}
 					} else {
 						// Output: internal parameter → router
@@ -2009,6 +2022,8 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 														<< " → output router " << extConn.routerName;
 						} else {
 							ofLogError("Encapsulation") << "Failed to create output connection for " << extConn.routerName;
+							ofLogError("DEBUG") << "Connection types: " << internalParam->valueType()
+											   << " -> " << routerParam->valueType();
 						}
 					}
 				} else {
@@ -2016,6 +2031,10 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 				}
 			} else {
 				ofLogError("Encapsulation") << "Router does not have Value parameter";
+				ofLogError("DEBUG") << "Available router parameters:";
+				for(auto& param : routerParams) {
+					ofLogError("DEBUG") << "  - " << param->getName() << " (" << param->valueType() << ")";
+				}
 			}
 			
 			routerIndex++;
@@ -2127,8 +2146,13 @@ ofxOceanodeNode* ofxOceanodeContainer::getNodeFromParameter(ofxOceanodeAbstractP
 	return nullptr;
 }
 
+// Fix the getParameterTypeName method to properly handle nodePort:
+
 string ofxOceanodeContainer::getParameterTypeName(ofxOceanodeAbstractParameter& param) {
 	string fullType = param.valueType();
+	
+	// Add debug logging for unknown types
+	ofLogNotice("DEBUG") << "Parameter '" << param.getName() << "' has type: " << fullType;
 	
 	// Basic C++ types
 	if(fullType == typeid(float).name()) return "float";
@@ -2154,14 +2178,65 @@ string ofxOceanodeContainer::getParameterTypeName(ofxOceanodeAbstractParameter& 
 	if(fullType == typeid(ofPolyline).name()) return "ofPolyline";
 	if(fullType == typeid(vector<ofPolyline>).name()) return "vector<ofPolyline>";
 	
-	// For custom types, try to extract a meaningful name from the mangled type name
-	// This is a fallback for types we don't explicitly know about
-	string demangledType = fullType;
+	// SuperCollider types - FIXED MAPPING
+	if(fullType.find("nodePort") != string::npos) {
+		ofLogNotice("DEBUG") << "Found nodePort type: " << fullType << " -> mapping to ScBus";
+		return "ScBus";  // nodePort should map to ScBus router
+	}
 	
-	// Try to extract class name from mangled name (this is compiler-specific)
-	// For now, just log the unknown type and use float as fallback
-	ofLogWarning("Encapsulation") << "Unknown parameter type: " << fullType << ", defaulting to float";
-	ofLogWarning("Encapsulation") << "Consider adding this type to getParameterTypeName() method";
+	if(fullType.find("ScBus") != string::npos) {
+		ofLogNotice("DEBUG") << "Found ScBus type: " << fullType;
+		return "ScBus";
+	}
 	
+	// Check for other custom types by pattern matching
+	if(fullType.find("VideoFrame") != string::npos) {
+		return "VideoFrame";
+	}
+	
+	if(fullType.find("VideoBuffer") != string::npos) {
+		return "VideoBuffer";
+	}
+	
+	if(fullType.find("Fatline") != string::npos) {
+		return "Fatline";
+	}
+	
+	if(fullType.find("timestamp") != string::npos) {
+		return "timestamp";
+	}
+	
+	// For any unknown type, log it and try extraction
+	ofLogWarning("DEBUG") << "Unknown parameter type: " << fullType;
+	ofLogWarning("DEBUG") << "Parameter name: " << param.getName();
+	
+	// Try to extract a meaningful name from the type string
+	string extractedType = fullType;
+	
+	// Remove C++ name mangling numbers (like "8nodePort" -> "nodePort")
+	string cleanType = fullType;
+	if(!cleanType.empty() && isdigit(cleanType[0])) {
+		// Find first non-digit character
+		size_t firstAlpha = cleanType.find_first_not_of("0123456789");
+		if(firstAlpha != string::npos) {
+			cleanType = cleanType.substr(firstAlpha);
+		}
+	}
+	
+	// Check the cleaned type against known patterns
+	if(cleanType == "nodePort") {
+		ofLogNotice("DEBUG") << "Cleaned type is nodePort -> mapping to ScBus";
+		return "ScBus";
+	}
+	
+	ofLogNotice("DEBUG") << "Cleaned type: " << cleanType;
+	
+	// If we have a cleaned meaningful name, use it
+	if(!cleanType.empty() && cleanType != fullType) {
+		return cleanType;
+	}
+	
+	// Ultimate fallback
+	ofLogWarning("DEBUG") << "Using float fallback for type: " << fullType;
 	return "float";
 }
