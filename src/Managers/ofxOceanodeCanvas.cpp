@@ -1000,7 +1000,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset, ImGui::GetIO().KeyShift);
                 }else if(ImGui::IsKeyPressed((ImGuiKey)'A')){
                     selectAllNodes();
-                }
+				}else if(ImGui::IsKeyPressed((ImGuiKey)'E')){
+					container->encapsulateSelectedNodes();
+				}
             }
             else if(ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace)) && !ImGui::IsAnyItemActive()){
                 container->deleteSelectedModules();
