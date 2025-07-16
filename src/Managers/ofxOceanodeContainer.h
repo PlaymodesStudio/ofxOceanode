@@ -18,6 +18,8 @@
 class ofxOceanodeNodeModel;
 class ofxOceanodeNodeRegistry;
 class ofxOceanodeTypesRegistry;
+class ofxOceanodeNodeMacro;
+
 
 #ifdef OFXOCEANODE_USE_OSC
 #include "ofxOsc.h"
@@ -63,6 +65,7 @@ public:
     
     void activate();
     void deactivate();
+
     
     ofxOceanodeNode* createNodeFromName(string name, int identifier = -1, bool isPersistent = false);
     ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier = -1, bool isPersistent = false, string additionalInfo = "");
@@ -130,6 +133,10 @@ public:
     
     void setBpm(float _bpm);
     void resetPhase();
+	
+	// Node encapsulation functionality
+	void encapsulateSelectedNodes(const string& macroName = "Encapsulated");
+
     
     ofEvent<pair<string, string>> loadPresetEvent;
     ofEvent<pair<string, int>> loadPresetNumEvent;
@@ -209,6 +216,23 @@ private:
     void midiBindingBound(const void * sender, string &portName);
 #endif
     string canvasID;
+	
+	// Encapsulation support structures and methods
+	struct ExternalConnection {
+		ofxOceanodeAbstractParameter* externalParam;  // Parameter outside selection (stays valid)
+		string internalNodeName;    // Name of the internal node (to find after paste)
+		string internalParamName;   // Name of the internal parameter (to find after paste)
+		bool isIncoming;           // true: external->internal, false: internal->external
+		string routerName;         // Generated name for router
+		string routerType;         // Parameter type for router creation
+	};
+		
+		vector<ExternalConnection> analyzeExternalConnections(vector<ofxOceanodeNode*> selectedNodes);
+		void createRoutersAndReconnect(ofxOceanodeNode* macroNode, vector<ExternalConnection>& connections);
+		string generateRouterName(const string& paramName, const string& nodeName, bool isInput);
+		ofxOceanodeNode* getNodeFromParameter(ofxOceanodeAbstractParameter& param);
+		bool isNodeInList(ofxOceanodeNode* node, vector<ofxOceanodeNode*>& nodeList);
+		string getParameterTypeName(ofxOceanodeAbstractParameter& param);
 	
 	vector<ofxOceanodeComment> comments;
 };

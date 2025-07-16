@@ -12,6 +12,8 @@
 #include "ofxOceanodeTypesRegistry.h"
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeShared.h"
+#include "ofxOceanodeNodeMacro.h"
+
 
 #ifdef OFXOCEANODE_USE_MIDI
 #include "ofxOceanodeMidiBinding.h"
@@ -1645,4 +1647,521 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanod
         connection = typesRegistry->createCustomTypeConnection(*this, source, sink, active);
     }
     return connection;
+}
+
+
+///////////////////////ENCAPSULATE
+///
+///
+
+
+void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
+	// 1. Validate selection
+	auto selectedNodes = getSelectedModules();
+	if(selectedNodes.empty()) {
+		ofLogWarning("Encapsulation") << "No nodes selected for encapsulation";
+		return;
+	}
+	
+	ofLogNotice("Encapsulation") << "Encapsulating " << selectedNodes.size() << " nodes";
+	
+	// 2. Calculate center position for macro placement
+	glm::vec2 centerPos(0, 0);
+	for(auto node : selectedNodes) {
+#ifndef OFXOCEANODE_HEADLESS
+		centerPos += node->getNodeGui().getPosition();
+#endif
+	}
+	if(!selectedNodes.empty()) {
+		centerPos /= selectedNodes.size();
+	}
+	
+	// 3. Analyze external connections BEFORE cutting
+	auto externalConnections = analyzeExternalConnections(selectedNodes);
+	ofLogNotice("Encapsulation") << "Found " << externalConnections.size() << " external connections";
+	
+	// 4. Cut selected nodes
+	if(!cutSelectedModulesWithConnections()) {
+		ofLogError("Encapsulation") << "Failed to cut selected nodes";
+		return;
+	}
+	
+	// 5. Create macro node
+	auto macroNode = createNodeFromName("Macro");
+	if(!macroNode) {
+		ofLogError("Encapsulation") << "Failed to create macro node";
+		return;
+	}
+	
+#ifndef OFXOCEANODE_HEADLESS
+	macroNode->getNodeGui().setPosition(centerPos);
+	macroNode->getNodeGui().setSelected(true);
+#endif
+	
+	// 6. Get macro internals
+	auto macroModel = dynamic_cast<ofxOceanodeNodeMacro*>(&macroNode->getNodeModel());
+	if(!macroModel) {
+		ofLogError("Encapsulation") << "Failed to cast to macro model";
+		macroNode->deleteSelf();
+		return;
+	}
+	
+	auto macroContainer = macroModel->getContainer();
+	if(!macroContainer) {
+		ofLogError("Encapsulation") << "Failed to get macro container";
+		macroNode->deleteSelf();
+		return;
+	}
+	
+	// 7. Paste nodes inside macro
+	if(!macroContainer->pasteModulesAndConnectionsInPosition(glm::vec2(0, 0), false)) {
+		ofLogWarning("Encapsulation") << "Failed to paste nodes inside macro";
+	}
+	
+	// 8. Create routers and reconnect
+	if(!externalConnections.empty()) {
+		createRoutersAndReconnect(macroNode, externalConnections);
+	}
+	
+	ofLogNotice("Encapsulation") << "Encapsulation completed successfully";
+}
+
+// Also, let's create a simpler version of analyzeExternalConnections with more debugging:
+
+vector<ofxOceanodeContainer::ExternalConnection> ofxOceanodeContainer::analyzeExternalConnections(vector<ofxOceanodeNode*> selectedNodes) {
+	vector<ExternalConnection> externals;
+	
+	ofLogNotice("Encapsulation") << "Analyzing " << connections.size() << " total connections...";
+	
+	for(auto& connection : connections) {
+		if(!connection) continue;
+		
+		auto sourceNode = getNodeFromParameter(connection->getSourceParameter());
+		auto sinkNode = getNodeFromParameter(connection->getSinkParameter());
+		
+		if(!sourceNode || !sinkNode) continue;
+		
+		bool sourceSelected = isNodeInList(sourceNode, selectedNodes);
+		bool sinkSelected = isNodeInList(sinkNode, selectedNodes);
+		
+		// Skip internal connections (both nodes selected)
+		if(sourceSelected && sinkSelected) continue;
+		
+		// Skip unrelated connections (neither node selected)
+		if(!sourceSelected && !sinkSelected) continue;
+		
+		ExternalConnection extConn;
+		extConn.routerType = getParameterTypeName(connection->getSourceParameter());
+		
+		if(sourceSelected && !sinkSelected) {
+			// Outgoing: selected → external (need output router)
+			extConn.externalParam = &connection->getSinkParameter();
+			extConn.internalNodeName = sourceNode->getParameters().getName();
+			extConn.internalParamName = connection->getSourceParameter().getName();
+			extConn.isIncoming = false;
+			extConn.routerName = generateRouterName(
+				connection->getSourceParameter().getName(),
+				sourceNode->getParameters().getName(),
+				false
+			);
+			externals.push_back(extConn);
+			
+			ofLogNotice("Encapsulation") << "Outgoing: " << extConn.internalNodeName << "."
+										<< extConn.internalParamName << " → external (" << extConn.routerType << ")";
+		}
+		else if(!sourceSelected && sinkSelected) {
+			// Incoming: external → selected (need input router)
+			extConn.externalParam = &connection->getSourceParameter();
+			extConn.internalNodeName = sinkNode->getParameters().getName();
+			extConn.internalParamName = connection->getSinkParameter().getName();
+			extConn.isIncoming = true;
+			extConn.routerName = generateRouterName(
+				connection->getSinkParameter().getName(),
+				sinkNode->getParameters().getName(),
+				true
+			);
+			externals.push_back(extConn);
+			
+			ofLogNotice("Encapsulation") << "Incoming: external → " << extConn.internalNodeName
+										<< "." << extConn.internalParamName << " (" << extConn.routerType << ")";
+		}
+	}
+	
+	return externals;
+}
+
+
+void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode, vector<ExternalConnection>& connections) {
+	auto macroModel = dynamic_cast<ofxOceanodeNodeMacro*>(&macroNode->getNodeModel());
+	if(!macroModel) {
+		ofLogError("Encapsulation") << "Invalid macro model for router creation";
+		return;
+	}
+	
+	auto macroContainer = macroModel->getContainer();
+	if(!macroContainer) {
+		ofLogError("Encapsulation") << "Invalid macro container for router creation";
+		return;
+	}
+	
+	ofLogNotice("Encapsulation") << "Creating " << connections.size() << " routers inside macro...";
+	
+	// Get all nodes inside the macro
+	auto macroNodes = macroContainer->getAllModules();
+	ofLogNotice("Encapsulation") << "Found " << macroNodes.size() << " nodes inside macro";
+	
+	int routerIndex = 0;
+	vector<ofxOceanodeNode*> createdRouters;
+	
+	// Create routers and connect them
+	for(auto& extConn : connections) {
+		try {
+			// Map parameter types to actual router names from the registry
+			string routerTypeName;
+
+			// Basic types
+			if(extConn.routerType == "float") {
+				routerTypeName = "Router f";
+			} else if(extConn.routerType == "vector<float>") {
+				routerTypeName = "Router v_f";
+			} else if(extConn.routerType == "int") {
+				routerTypeName = "Router i";
+			} else if(extConn.routerType == "vector<int>") {
+				routerTypeName = "Router v_i";
+			} else if(extConn.routerType == "bool") {
+				routerTypeName = "Router b";
+			} else if(extConn.routerType == "vector<bool>") {
+				routerTypeName = "Router v_b"; // if it exists
+			} else if(extConn.routerType == "string") {
+				routerTypeName = "Router s";
+			} else if(extConn.routerType == "vector<string>") {
+				routerTypeName = "Router v_s"; // if it exists
+			} else if(extConn.routerType == "char") {
+				routerTypeName = "Router c";
+			} else if(extConn.routerType == "void") {
+				routerTypeName = "Router v";
+
+			// Color types
+			} else if(extConn.routerType == "ofColor") {
+				routerTypeName = "Router color";
+			} else if(extConn.routerType == "ofFloatColor") {
+				routerTypeName = "Router color_f";
+
+			// Buffer types
+			} else if(extConn.routerType == "buffer<float>") {
+				routerTypeName = "Router buffer_f";
+			} else if(extConn.routerType == "buffer<int>") {
+				routerTypeName = "Router buffer_i";
+			} else if(extConn.routerType == "buffer<bool>") {
+				routerTypeName = "Router buffer_b";
+			} else if(extConn.routerType == "buffer<string>") {
+				routerTypeName = "Router buffer_s";
+			} else if(extConn.routerType == "buffer<vector<float>>") {
+				routerTypeName = "Router buffer_v_f";
+			} else if(extConn.routerType == "buffer<vector<int>>") {
+				routerTypeName = "Router buffer_v_i";
+			} else if(extConn.routerType == "buffer<ofColor>") {
+				routerTypeName = "Router buffer_color";
+			} else if(extConn.routerType == "buffer<ofFloatColor>") {
+				routerTypeName = "Router buffer_color_f";
+			} else if(extConn.routerType == "buffer<char>") {
+				routerTypeName = "Router buffer_c";
+
+			// Graphics types
+			} else if(extConn.routerType == "ofTexture") {
+				routerTypeName = "Router Texture";
+			} else if(extConn.routerType == "buffer<ofTexture>") {
+				routerTypeName = "Router buffer_Texture";
+			} else if(extConn.routerType == "VideoFrame") {
+				routerTypeName = "Router VideoFrame";
+			} else if(extConn.routerType == "VideoBuffer") {
+				routerTypeName = "Router VideoBuffer";
+			} else if(extConn.routerType == "glm::mat4") {
+				routerTypeName = "Router mat4";
+
+			// Geometry types
+			} else if(extConn.routerType == "ofPolyline") {
+				routerTypeName = "Router Polyline";
+			} else if(extConn.routerType == "vector<ofPolyline>") {
+				routerTypeName = "Router v_Poly";
+			} else if(extConn.routerType == "Fatline") {
+				routerTypeName = "Router Fatline";
+			} else if(extConn.routerType == "vector<Fatline>") {
+				routerTypeName = "Router v_Fatline";
+
+			// Audio types (SuperCollider related)
+			} else if(extConn.routerType == "ScBus") {
+				routerTypeName = "Router ScBus";
+			} else if(extConn.routerType == "ChannelRouter") {
+				routerTypeName = "SC ChannelRouter*";
+			} else if(extConn.routerType == "DBAPRouter") {
+				routerTypeName = "SC DBAPRouter13";
+
+			// Time types
+			} else if(extConn.routerType == "timestamp") {
+				routerTypeName = "Router timestamp";
+
+			// Fallback for unknown types
+			} else {
+				// Try to find a matching router in the registry
+				auto registry = macroContainer->getRegistry();
+				if(registry) {
+					auto models = registry->getRegisteredModels();
+					
+					// Look for exact type match first
+					string searchName = "Router " + extConn.routerType;
+					if(models.count(searchName) > 0) {
+						routerTypeName = searchName;
+					} else {
+						// Look for partial matches
+						bool found = false;
+						for(auto& model : models) {
+							if(model.first.find("Router") != string::npos &&
+							   model.first.find(extConn.routerType) != string::npos) {
+								routerTypeName = model.first;
+								found = true;
+								break;
+							}
+						}
+						
+						if(!found) {
+							// Ultimate fallback to float
+							routerTypeName = "Router f";
+							ofLogWarning("Encapsulation") << "Unknown router type '" << extConn.routerType
+														 << "', using Router f as fallback";
+						}
+					}
+				} else {
+					// No registry access, use float fallback
+					routerTypeName = "Router f";
+					ofLogWarning("Encapsulation") << "No registry access, using Router f for type: " << extConn.routerType;
+				}
+			}
+			
+			ofLogNotice("Encapsulation") << "Creating router: " << routerTypeName << " for " << extConn.routerName;
+			
+			auto routerNode = macroContainer->createNodeFromName(routerTypeName);
+			if(!routerNode) {
+				ofLogError("Encapsulation") << "Failed to create router: " << routerTypeName;
+				continue;
+			}
+			
+			createdRouters.push_back(routerNode);
+			
+			// Set router name
+			auto routerModel = dynamic_cast<abstractRouter*>(&routerNode->getNodeModel());
+			if(routerModel) {
+				routerModel->getNameParam() = extConn.routerName;
+				ofLogNotice("Encapsulation") << "Set router name to: " << extConn.routerName;
+			}
+			
+#ifndef OFXOCEANODE_HEADLESS
+			// Position router appropriately
+			if(extConn.isIncoming) {
+				routerNode->getNodeGui().setPosition(glm::vec2(-400, routerIndex * 100));
+			} else {
+				routerNode->getNodeGui().setPosition(glm::vec2(600, routerIndex * 100));
+			}
+#endif
+			
+			// Find the internal parameter in the pasted nodes
+			ofxOceanodeAbstractParameter* internalParam = nullptr;
+			
+			// Look for the node by name in the macro
+			for(auto node : macroNodes) {
+				if(node->getParameters().getName() == extConn.internalNodeName) {
+					// Found the node, now find the parameter
+					auto& nodeParams = node->getParameters();
+					if(nodeParams.contains(extConn.internalParamName)) {
+						internalParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&nodeParams.get(extConn.internalParamName));
+						ofLogNotice("Encapsulation") << "Found internal parameter: " << extConn.internalNodeName
+													<< "." << extConn.internalParamName;
+						break;
+					}
+				}
+			}
+			
+			if(!internalParam) {
+				ofLogError("Encapsulation") << "Could not find internal parameter: " << extConn.internalNodeName
+										   << "." << extConn.internalParamName;
+				continue;
+			}
+			
+			// Connect router to internal parameter
+			auto& routerParams = routerNode->getParameters();
+			if(routerParams.contains("Value")) {
+				auto routerParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&routerParams.get("Value"));
+				if(routerParam) {
+					if(extConn.isIncoming) {
+						// Input: router → internal parameter
+						auto conn = macroContainer->createConnection(*routerParam, *internalParam);
+						if(conn) {
+							ofLogNotice("Encapsulation") << "Connected input router " << extConn.routerName
+														<< " → " << extConn.internalParamName;
+						} else {
+							ofLogError("Encapsulation") << "Failed to create input connection for " << extConn.routerName;
+						}
+					} else {
+						// Output: internal parameter → router
+						auto conn = macroContainer->createConnection(*internalParam, *routerParam);
+						if(conn) {
+							ofLogNotice("Encapsulation") << "Connected " << extConn.internalParamName
+														<< " → output router " << extConn.routerName;
+						} else {
+							ofLogError("Encapsulation") << "Failed to create output connection for " << extConn.routerName;
+						}
+					}
+				} else {
+					ofLogError("Encapsulation") << "Failed to cast router Value parameter";
+				}
+			} else {
+				ofLogError("Encapsulation") << "Router does not have Value parameter";
+			}
+			
+			routerIndex++;
+			
+		} catch(const std::exception& e) {
+			ofLogError("Encapsulation") << "Exception creating/connecting router: " << e.what();
+		}
+	}
+	
+	// Update everything to process the new routers
+	ofEventArgs args;
+	for(auto router : createdRouters) {
+		router->update(args);
+	}
+	macroNode->update(args);
+	
+	// Give time for macro to process routers and expose them as parameters
+	ofSleepMillis(100);
+	macroNode->update(args);
+	
+	// Now reconnect external connections to macro parameters
+	ofLogNotice("Encapsulation") << "Reconnecting external connections...";
+	
+	auto& macroParams = macroNode->getParameters();
+	ofLogNotice("Encapsulation") << "Available macro parameters:";
+	for(auto& param : macroParams) {
+		ofLogNotice("Encapsulation") << "  - " << param->getName();
+	}
+	
+	int reconnectedCount = 0;
+	for(auto& extConn : connections) {
+		try {
+			if(macroParams.contains(extConn.routerName)) {
+				auto macroParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&macroParams.get(extConn.routerName));
+				if(macroParam && extConn.externalParam) {
+					if(extConn.isIncoming) {
+						// Incoming: external → macro input
+						auto conn = createConnection(*extConn.externalParam, *macroParam);
+						if(conn) {
+							ofLogNotice("Encapsulation") << "Reconnected incoming: external → " << extConn.routerName;
+							reconnectedCount++;
+						} else {
+							ofLogError("Encapsulation") << "Failed to reconnect incoming to " << extConn.routerName;
+						}
+					} else {
+						// Outgoing: macro output → external
+						auto conn = createConnection(*macroParam, *extConn.externalParam);
+						if(conn) {
+							ofLogNotice("Encapsulation") << "Reconnected outgoing: " << extConn.routerName << " → external";
+							reconnectedCount++;
+						} else {
+							ofLogError("Encapsulation") << "Failed to reconnect outgoing from " << extConn.routerName;
+						}
+					}
+				} else {
+					ofLogError("Encapsulation") << "Invalid macro parameter or external parameter for " << extConn.routerName;
+				}
+			} else {
+				ofLogError("Encapsulation") << "Macro parameter not found: " << extConn.routerName;
+			}
+		} catch(const std::exception& e) {
+			ofLogError("Encapsulation") << "Exception reconnecting: " << e.what();
+		}
+	}
+	
+	ofLogNotice("Encapsulation") << "Completed: " << reconnectedCount << "/" << connections.size() << " connections restored";
+}
+
+bool ofxOceanodeContainer::isNodeInList(ofxOceanodeNode* node, vector<ofxOceanodeNode*>& nodeList) {
+	return std::find(nodeList.begin(), nodeList.end(), node) != nodeList.end();
+}
+
+string ofxOceanodeContainer::generateRouterName(const string& paramName, const string& nodeName, bool isInput) {
+	
+	// Extract clean node name (remove ID suffix)
+	string cleanNodeName = nodeName;
+	auto underscorePos = cleanNodeName.find_last_of('_');
+	if(underscorePos != string::npos) {
+		string possibleId = cleanNodeName.substr(underscorePos + 1);
+		bool isNumeric = !possibleId.empty() &&
+			std::all_of(possibleId.begin(), possibleId.end(), ::isdigit);
+		if(isNumeric) {
+			cleanNodeName = cleanNodeName.substr(0, underscorePos);
+		}
+	}
+	
+	// Replace spaces with underscores in node name
+	ofStringReplace(cleanNodeName, " ", "_");
+	
+	// Clean parameter name
+	string cleanParamName = paramName;
+	ofStringReplace(cleanParamName, " ", "_");
+	
+	return cleanNodeName + "_" + cleanParamName;
+}
+
+ofxOceanodeNode* ofxOceanodeContainer::getNodeFromParameter(ofxOceanodeAbstractParameter& param) {
+	// Use the nodeModel to get the parameter group name
+	auto nodeModel = param.getNodeModel();
+	if(!nodeModel) return nullptr;
+	
+	string paramGroupName = nodeModel->getParameterGroup().getEscapedName();
+	
+	auto it = parameterGroupNodesMap.find(paramGroupName);
+	if(it != parameterGroupNodesMap.end()) {
+		return it->second;
+	}
+	
+	return nullptr;
+}
+
+string ofxOceanodeContainer::getParameterTypeName(ofxOceanodeAbstractParameter& param) {
+	string fullType = param.valueType();
+	
+	// Basic C++ types
+	if(fullType == typeid(float).name()) return "float";
+	if(fullType == typeid(int).name()) return "int";
+	if(fullType == typeid(bool).name()) return "bool";
+	if(fullType == typeid(string).name()) return "string";
+	if(fullType == typeid(char).name()) return "char";
+	if(fullType == typeid(void).name()) return "void";
+	
+	// Vector types
+	if(fullType == typeid(vector<float>).name()) return "vector<float>";
+	if(fullType == typeid(vector<int>).name()) return "vector<int>";
+	if(fullType == typeid(vector<bool>).name()) return "vector<bool>";
+	if(fullType == typeid(vector<string>).name()) return "vector<string>";
+	
+	// Color types
+	if(fullType == typeid(ofColor).name()) return "ofColor";
+	if(fullType == typeid(ofFloatColor).name()) return "ofFloatColor";
+	
+	// Graphics types
+	if(fullType == typeid(ofTexture).name()) return "ofTexture";
+	if(fullType == typeid(glm::mat4).name()) return "glm::mat4";
+	if(fullType == typeid(ofPolyline).name()) return "ofPolyline";
+	if(fullType == typeid(vector<ofPolyline>).name()) return "vector<ofPolyline>";
+	
+	// For custom types, try to extract a meaningful name from the mangled type name
+	// This is a fallback for types we don't explicitly know about
+	string demangledType = fullType;
+	
+	// Try to extract class name from mangled name (this is compiler-specific)
+	// For now, just log the unknown type and use float as fallback
+	ofLogWarning("Encapsulation") << "Unknown parameter type: " << fullType << ", defaulting to float";
+	ofLogWarning("Encapsulation") << "Consider adding this type to getParameterTypeName() method";
+	
+	return "float";
 }
