@@ -142,6 +142,11 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 		if(ImGui::IsItemClicked(1)){
 			ImGui::OpenPopup("Macro");
 		}
+		
+		ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));  // Dark background
+		ImGui::PushStyleColor(ImGuiCol_Text,     ImVec4(0.7f, 0.7f, 0.7f, 0.7f));  // White text
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 1.0f)); // Hovered button
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
 		if(ImGui::BeginPopup("Macro")){
 			auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
 			
@@ -183,6 +188,8 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			
 			ImGui::EndPopup();
 		}
+		ImGui::PopStyleColor(3);
+		ImGui::PopStyleVar();
 		
 		if(addBank){
 			ImGui::OpenPopup("Add New Macro Bank");
