@@ -38,7 +38,7 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
     moveSelectedModulesWithDrag = glm::vec2(0,0);
 	
 	NODE_WINDOW_PADDING = glm::vec2(8.0f,7.0f);
-	GRID_SIZE = (NODE_WIDTH_TEXT+NODE_WIDTH_WIDGET+2*NODE_WINDOW_PADDING.x)/4;
+	updateGridSize();
 
 }
 

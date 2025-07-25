@@ -44,6 +44,7 @@ public:
 	int getGridSize(){return GRID_SIZE;};
 	// (nodeWidthTotal should be % by 4 as we use it for GRID_SIZE / snaping
 	int getTotalNodeWidth(){return NODE_WIDTH_TEXT+NODE_WIDTH_WIDGET+2*NODE_WINDOW_PADDING.x;};
+	void updateGridSize(){GRID_SIZE = getTotalNodeWidth()/4;};
 	
 private:
     glm::vec3 getMatrixScale(const glm::mat4 &m);
