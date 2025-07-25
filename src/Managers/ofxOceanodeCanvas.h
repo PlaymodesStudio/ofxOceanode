@@ -72,7 +72,20 @@ private:
     vector<string> categoriesVector;
     vector<vector<string>> options;
     string searchField = "";
+    string lastSearchField = "";
     int numTimesPopup = 0;
+    
+    // Search result navigation
+    struct SearchResultItem {
+        string name;
+        string type; // "node" or "macro"
+        string macroPath; // only used for macros
+        
+        SearchResultItem(const string& n, const string& t, const string& mp = "")
+            : name(n), type(t), macroPath(mp) {}
+    };
+    vector<SearchResultItem> filteredSearchResults;
+    int selectedSearchResultIndex = -1;
     
     bool inited = false;
     

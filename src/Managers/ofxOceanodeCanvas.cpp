@@ -618,7 +618,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 			if(!commentClicked){
 				ImGui::OpenPopup("New Node");
 				searchField = "";
+				lastSearchField = "";
 				numTimesPopup = 0;
+				selectedSearchResultIndex = -1;
+				filteredSearchResults.clear();
 				
 				//Get node registry to update newly registered nodes
 				auto const &models = container->getRegistry()->getRegisteredModels();
@@ -651,6 +654,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             
             if(ImGui::InputText("Search", cString, 256)){
                 searchField = cString;
+                // Reset selection when search text changes
+                if(searchField != lastSearchField) {
+                    selectedSearchResultIndex = -1;
+                    lastSearchField = searchField;
+                }
             }
             
             if(numTimesPopup == 1){//!(!ImGui::IsItemClicked() && ImGui::IsMouseDown(0)) && searchField == ""){
@@ -662,78 +670,172 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             
             bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
             bool isEnterReleased = ImGui::IsKeyReleased(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
-			
-			// TODO: Get all things, nodes, collections, macros, scripts;
+            
+            // Handle arrow key navigation
+            bool isUpPressed = ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow));
+            bool isDownPressed = ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow));
+   
+   // TODO: Get all things, nodes, collections, macros, scripts;
     
             if(searchField != ""){
-                string firstSearchResult = "";
+                // Build filtered search results list with scoring
+                filteredSearchResults.clear();
+                
+                // Create a scoring function for search relevance
+                auto calculateSearchScore = [](const string& itemName, const string& searchTerm) -> int {
+                    if(itemName.empty() || searchTerm.empty()) return 0;
+                    
+                    string lowerItemName = itemName;
+                    string lowerSearchTerm = searchTerm;
+                    std::transform(lowerItemName.begin(), lowerItemName.end(), lowerItemName.begin(), ::tolower);
+                    std::transform(lowerSearchTerm.begin(), lowerSearchTerm.end(), lowerSearchTerm.begin(), ::tolower);
+                    
+                    // Exact match (case-insensitive) gets highest score
+                    if(lowerItemName == lowerSearchTerm) {
+                        return 1000;
+                    }
+                    
+                    // Prefix match gets high score
+                    if(lowerItemName.find(lowerSearchTerm) == 0) {
+                        // Shorter names with prefix matches get higher scores
+                        return 800 - (int)lowerItemName.length();
+                    }
+                    
+                    // Substring match gets lower score
+                    size_t pos = lowerItemName.find(lowerSearchTerm);
+                    if(pos != string::npos) {
+                        // Earlier position in string gets higher score
+                        // Shorter names get higher scores
+                        return 400 - (int)pos - (int)lowerItemName.length();
+                    }
+                    
+                    return 0; // No match
+                };
+                
+                // Collect scored results
+                vector<pair<SearchResultItem, int>> scoredResults;
+                
+                // Add matching nodes with scores
                 for(int i = 0; i < categoriesVector.size(); i++){
                     for(auto &op : options[i])
                     {
-                        string lowercaseName = op;
-                        std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
-                        if(ofStringTimesInString(op, searchField) || ofStringTimesInString(lowercaseName, searchField)){
-                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
-                            if(ImGui::Selectable(op.c_str()) || (ImGui::IsItemFocused() && isEnterPressed))
-                            {
-                                unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
-                                if (type)
-                                {
-                                    auto &node = container->createNode(std::move(type));
-                                    node.getNodeGui().setPosition(newNodeClickPos - offset);
-                                }
-                                ImGui::PopStyleColor();
-                                ImGui::CloseCurrentPopup();
-                                isEnterPressed = false; //Next options we dont want to create them;
-                                break;
-                            }
-                            if(firstSearchResult == "") firstSearchResult = op;
-                            ImGui::PopStyleColor();
+                        int score = calculateSearchScore(op, searchField);
+                        if(score > 0){
+                            scoredResults.push_back(make_pair(SearchResultItem(op, "node"), score));
                         }
                     }
                 }
-                ImGui::Separator();
-                std::function<void(shared_ptr<macroCategory>)> drawFoundCategory =
-                [this, offset, &drawFoundCategory, &isEnterPressed, &firstSearchResult](shared_ptr<macroCategory> category){
+                
+                // Add matching macros with scores
+                std::function<void(shared_ptr<macroCategory>)> collectMacros =
+    [this, &collectMacros, &scoredResults, &calculateSearchScore](shared_ptr<macroCategory> category){
                     for(auto d : category->categories){
-                        drawFoundCategory(d);
+                        collectMacros(d);
                     }
                     for(auto m : category->macros){
-                        string lowercaseName = m.first;
-                        std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
-                        if(ofStringTimesInString(m.first, searchField) || ofStringTimesInString(lowercaseName, searchField)){
-                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
-                            if(ImGui::Selectable(m.first.c_str()) || (ImGui::IsItemFocused() && isEnterPressed))
-                            {
-                                unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
-                                if (type)
-                                {
-                                    auto &node = container->createNode(std::move(type), m.second);
-                                    node.getNodeGui().setPosition(newNodeClickPos - offset);
-                                }
-                                ImGui::PopStyleColor();
-                                ImGui::CloseCurrentPopup();
-                                isEnterPressed = false; //Next options we dont want to create them;
-                                break;
-                            }
-                            if(firstSearchResult == "") firstSearchResult = m.first;
-                            ImGui::PopStyleColor();
+                        int score = calculateSearchScore(m.first, searchField);
+                        if(score > 0){
+                            scoredResults.push_back(make_pair(SearchResultItem(m.first, "macro", m.second), score));
                         }
                     }
                 };
-                ImGui::Separator();
-                
                 
                 auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
-                drawFoundCategory(macroDirectoryStructure);
+                collectMacros(macroDirectoryStructure);
                 
-                //Without any focus we create the first result
-                if(isEnterPressed){
-                    unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(firstSearchResult);
-                    if (type)
-                    {
-                        auto &node = container->createNode(std::move(type));
-                        node.getNodeGui().setPosition(newNodeClickPos - offset);
+                // Sort by score (highest first)
+                std::sort(scoredResults.begin(), scoredResults.end(),
+                    [](const pair<SearchResultItem, int>& a, const pair<SearchResultItem, int>& b) {
+                        return a.second > b.second;
+                    });
+                
+                // Extract sorted results
+                for(const auto& scoredResult : scoredResults) {
+                    filteredSearchResults.push_back(scoredResult.first);
+                }
+                
+                // Handle arrow key navigation
+                if(isUpPressed && selectedSearchResultIndex > 0) {
+                    selectedSearchResultIndex--;
+                } else if(isDownPressed && selectedSearchResultIndex < (int)filteredSearchResults.size() - 1) {
+                    selectedSearchResultIndex++;
+                } else if((isUpPressed || isDownPressed) && selectedSearchResultIndex == -1 && !filteredSearchResults.empty()) {
+                    selectedSearchResultIndex = isDownPressed ? 0 : filteredSearchResults.size() - 1;
+                }
+                
+                // Clamp selection index to valid range
+                if(selectedSearchResultIndex >= (int)filteredSearchResults.size()) {
+                    selectedSearchResultIndex = filteredSearchResults.size() - 1;
+                }
+                if(selectedSearchResultIndex < -1) {
+                    selectedSearchResultIndex = -1;
+                }
+                
+                // Display search results
+                for(int i = 0; i < filteredSearchResults.size(); i++) {
+                    const auto& result = filteredSearchResults[i];
+                    bool isSelected = (i == selectedSearchResultIndex);
+                    
+                    // Highlight selected item
+                    if(isSelected) {
+                        ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.43f, 0.19f, 0.0f, 0.8f));
+                        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.86f,0.38f, 0.0f, 0.6f));
+                        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.8f, 0.3f, 0.0f, 0.6f));
+                    }
+                    
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.6f, 0.6f, 0.6f,1.0f)));
+                    
+                    bool itemClicked = ImGui::Selectable(result.name.c_str(), isSelected);
+                    bool itemActivated = itemClicked || (isSelected && isEnterPressed);
+                    
+                    if(itemClicked) {
+                        selectedSearchResultIndex = i;
+                    }
+                    
+                    if(itemActivated) {
+                        if(result.type == "node") {
+                            unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(result.name);
+                            if (type) {
+                                auto &node = container->createNode(std::move(type));
+                                node.getNodeGui().setPosition(newNodeClickPos - offset);
+                            }
+                        } else if(result.type == "macro") {
+                            unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
+                            if (type) {
+                                auto &node = container->createNode(std::move(type), result.macroPath);
+                                node.getNodeGui().setPosition(newNodeClickPos - offset);
+                            }
+                        }
+                        ImGui::PopStyleColor();
+                        if(isSelected) {
+                            ImGui::PopStyleColor(3);
+                        }
+                        ImGui::CloseCurrentPopup();
+                        isEnterPressed = false;
+                        break;
+                    }
+                    
+                    ImGui::PopStyleColor();
+                    if(isSelected) {
+                        ImGui::PopStyleColor(3);
+                    }
+                }
+                
+                // Handle Enter key when no specific item is selected (fallback to first result)
+                if(isEnterPressed && selectedSearchResultIndex == -1 && !filteredSearchResults.empty()) {
+                    const auto& firstResult = filteredSearchResults[0];
+                    if(firstResult.type == "node") {
+                        unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(firstResult.name);
+                        if (type) {
+                            auto &node = container->createNode(std::move(type));
+                            node.getNodeGui().setPosition(newNodeClickPos - offset);
+                        }
+                    } else if(firstResult.type == "macro") {
+                        unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
+                        if (type) {
+                            auto &node = container->createNode(std::move(type), firstResult.macroPath);
+                            node.getNodeGui().setPosition(newNodeClickPos - offset);
+                        }
                     }
                     ImGui::CloseCurrentPopup();
                 }
