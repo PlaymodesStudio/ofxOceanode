@@ -52,6 +52,15 @@ ofxOceanodeContainer::~ofxOceanodeContainer(){
 
 void ofxOceanodeContainer::clearContainer(){
     connections.clear();
+    
+    std::vector<shared_ptr<ofxOceanodeNode>> toDelete;
+    for(auto &nodeTypeMap : dynamicNodes){
+        for(auto &node : nodeTypeMap.second){
+            toDelete.push_back(node.second);
+        }
+    }
+    for(auto td : toDelete) td->deleteSelf();
+    
     dynamicNodes.clear();
     persistentNodes.clear();
 }
@@ -352,6 +361,7 @@ void ofxOceanodeContainer::loadPreset_loadNodes(string presetFolderPath){
         }
         for(auto n : allNodes) n->deleteSelf();
     }
+    allNodesCreated.notify(this);
 }
 
 void ofxOceanodeContainer::loadPreset_deactivateConnections(){

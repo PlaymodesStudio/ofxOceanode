@@ -118,6 +118,10 @@ public:
     size_t getSize(){
         return frames.size();
     }
+	
+	void clear(){
+		frames.clear();
+	}
     
 private:
     size_t maxSize;

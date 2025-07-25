@@ -136,19 +136,19 @@ void ofxOceanodeScope::draw(){
                 if(i<scopedParameters.size()-1) std::swap(scopedParameters[i],scopedParameters[i+1]);
                 
             }
-            ImGui::SameLine();
-            bool keepAspectRatio = (p.parameter->getFlags() & ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
-            if(keepAspectRatio)ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0,0.5,0.0,1.0));
-            else ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
-            if(ImGui::Button("[AR]##KeepAspectRatio"))
-            {
-                
-                if(keepAspectRatio){
-                    p.parameter->setFlags(p.parameter->getFlags()&~ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
-                }
-                else p.parameter->setFlags(p.parameter->getFlags()|ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
-            }
-            ImGui::PopStyleColor();
+//            ImGui::SameLine();
+//            bool keepAspectRatio = (p.parameter->getFlags() & ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
+//            if(keepAspectRatio)ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0,0.5,0.0,1.0));
+//            else ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+//            if(ImGui::Button("[AR]##KeepAspectRatio"))
+//            {
+//                
+//                if(keepAspectRatio){
+//                    p.parameter->setFlags(p.parameter->getFlags()&~ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
+//                }
+//                else p.parameter->setFlags(p.parameter->getFlags()|ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
+//            }
+//            ImGui::PopStyleColor();
 
 
             // f() function to properly draw each scope item

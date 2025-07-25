@@ -90,6 +90,7 @@ public:
         addParameter(trigger.set("Trigger"));
         addParameter(triggerFloat.set("Trigger_F",0,0,1));
         addParameter(reset.set("Reset"));
+        addParameter(forceFinish.set("Force Fin"));
         addParameter(rampDurationMs.set("Ms", 1000, 0, FLT_MAX));
         addOutputParameter(output.set("Out", 0, 0, 1));
         addParameter(isRamping.set("IsRamping",false));
@@ -113,6 +114,9 @@ public:
             {
                 startRamp();
             }
+        }));
+        listeners.push(forceFinish.newListener([this](){
+            finishRamp();
         }));
     }
 
@@ -142,6 +146,11 @@ private:
         isRampFinish = false;
         output = 0;
     }
+    void finishRamp() {
+        isRamping = false;
+        isRampFinish = true;
+        output = 1;
+    }
 
     ofEventListeners listeners;
     ofParameter<void> trigger;
@@ -151,6 +160,7 @@ private:
     ofParameter<float> output;
     ofParameter<bool> isRamping;
     ofParameter<bool> isRampFinish;
+    ofParameter<void> forceFinish;
     
     float rampStartTime; // Time in seconds
     float lastTNum;

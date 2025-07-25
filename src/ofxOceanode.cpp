@@ -54,6 +54,7 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<smoother>("Modifiers");
     nodeRegistry->registerModel<switcher>("Modifiers");
     nodeRegistry->registerModel<curve>("Modifiers");
+	nodeRegistry->registerModel<curve2>("Modifiers");
     nodeRegistry->registerModel<ofxOceanodeNodeMacro>("MACRO");
     nodeRegistry->registerModel<noise>("Generators");
     nodeRegistry->registerModel<randomGenerator>("Generators");
@@ -152,6 +153,7 @@ void ofxOceanode::draw(){
     ShowExampleAppDockSpace(&showDocker);
     if(showMode){
         drawShowModeWindow();
+		container->draw();
     }else{
         scope->draw();
         container->draw();

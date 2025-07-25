@@ -27,6 +27,8 @@ public:
     void setup() override{
         addParameter(input.set("Input", T1()));
         addParameter(rec.set("Rec", true));
+		addParameter(clearBuffer.set("Clear"));
+
         addParameter(timestamp.set("Timestamp", Timestamp()));
         addParameter(maxSize.set("Max Size", 100, 1, INT_MAX));
         addParameter(output.set("Output", myBuffer.get()));
@@ -44,7 +46,11 @@ public:
             lastFrameMs = myBuffer->getFirstFrameTimestamp().epochMilliseconds() - myBuffer->getLastFrameTimestamp().epochMilliseconds();
             
         }));
-        
+
+		listeners.push(clearBuffer.newListener([this](){
+			myBuffer->clear();
+		}));
+
         sizeListener = maxSize.newListener([this](int &_maxSize){
             myBuffer->setMaxSize(_maxSize);
         });
@@ -63,6 +69,8 @@ private:
     ofParameter<T1> input;
     ofParameter<bool> rec;
     ofParameter<Timestamp> timestamp;
+	ofParameter<void> clearBuffer;
+
     
     ofParameter<int> maxSize;
     
@@ -108,6 +116,7 @@ public:
             }
         }));
         
+		
         sizeListener = maxSize.newListener([this](int &_maxSize){
             myBuffer->setMaxSize(_maxSize);
         });
@@ -115,6 +124,10 @@ public:
         myBuffer->setMaxSize(maxSize);
     }
     
+	void clear()
+	{
+		myBuffer->clear();
+	}
 private:
     std::function<void(std::vector<T>&, std::vector<T>&)> assignFunction;
     std::function<std::vector<T>(std::vector<T>&)> returnFunction;

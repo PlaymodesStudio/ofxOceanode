@@ -256,10 +256,13 @@ void ofxOceanodeInspectorController::draw(){
                         //////////////
                         }else if(absParam.valueType() == typeid(string).name()){
                             auto tempCast = absParam.cast<string>();
-                            char * cString = new char[256];
-                            strcpy(cString, tempCast.get().c_str());
+                            string currentText = tempCast.get();
+                            size_t bufferSize = max(static_cast<size_t>(1024), currentText.length() + 256);
+                            char * cString = new char[bufferSize];
+                            strncpy(cString, currentText.c_str(), bufferSize - 1);
+                            cString[bufferSize - 1] = '\0';
                             auto result = false;
-                            if (ImGui::InputText(hiddenUniqueId.c_str(), cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
+                            if (ImGui::InputText(hiddenUniqueId.c_str(), cString, bufferSize, ImGuiInputTextFlags_EnterReturnsTrue))
                             {
                                 tempCast = cString;
                                 for(auto nodePair : selectedNodesWithoutFirst){
@@ -658,10 +661,13 @@ void ofxOceanodeInspectorController::draw(){
                             ///////////////
                         }else if(absParam.valueType() == typeid(string).name()){
                             auto tempCast = absParam.cast<string>().getParameter();
-                            char * cString = new char[256];
-                            strcpy(cString, tempCast.get().c_str());
+                            string currentText = tempCast.get();
+                            size_t bufferSize = max(static_cast<size_t>(1024), currentText.length() + 256);
+                            char * cString = new char[bufferSize];
+                            strncpy(cString, currentText.c_str(), bufferSize - 1);
+                            cString[bufferSize - 1] = '\0';
                             auto result = false;
-                            if (ImGui::InputText(hiddenUniqueId.c_str(), cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
+                            if (ImGui::InputText(hiddenUniqueId.c_str(), cString, bufferSize, ImGuiInputTextFlags_EnterReturnsTrue))
                             {
                                 tempCast = cString;
                                 for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<string>().getParameter() = tempCast;
