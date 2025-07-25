@@ -39,12 +39,19 @@ public:
 	// node dimensions
 	void setNodeWidthText(int n){NODE_WIDTH_TEXT = n;};
 	int getNodeWidthText(){return NODE_WIDTH_TEXT;};
+	
 	void setNodeWidthWidget(int n){NODE_WIDTH_WIDGET = n;};
 	int getNodeWidthWidget(){return NODE_WIDTH_WIDGET;};
+	
+	void setGridDivisions(int n){gridDivisions= n;};
+	int getGridDivisions(){return gridDivisions;};
+
 	int getGridSize(){return GRID_SIZE;};
 	// (nodeWidthTotal should be % by 4 as we use it for GRID_SIZE / snaping
 	int getTotalNodeWidth(){return NODE_WIDTH_TEXT+NODE_WIDTH_WIDGET+2*NODE_WINDOW_PADDING.x;};
-	void updateGridSize(){GRID_SIZE = getTotalNodeWidth()/4;};
+	void updateGridSize(){GRID_SIZE = getTotalNodeWidth()/gridDivisions;};
+	
+	
 	
 private:
     glm::vec3 getMatrixScale(const glm::mat4 &m);
@@ -127,6 +134,7 @@ private:
 	int NODE_WIDTH_TEXT = 90;
 	int NODE_WIDTH_WIDGET = 150;
 	int GRID_SIZE;
+	int gridDivisions;
 	glm::vec2 NODE_WINDOW_PADDING;
 };
 
