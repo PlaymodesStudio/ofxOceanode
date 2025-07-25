@@ -121,8 +121,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                     valueHasBeenReseted = false;
                 }
                 
-				// TODO : retrieve this widths from Canvas node Widths
-				// [ node width ] : 90 pixels for the name and 150 for the "widget"
+				// [ node width ] : this was 90 pixels for the name and 150 for the "widget"
 				ImGui::SameLine(nodeWidthText);
 				ImGui::SetNextItemWidth(nodeWidthWidget);
                 
@@ -382,11 +381,13 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                     {
                         tempCast = tempCast;
                     }
+					ImVec2 sizeCB = ImGui::GetItemRectSize();
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast = !tempCast;
                     }
 					ImGui::SameLine();
-					ImGui::Dummy(ImVec2(nodeWidthWidget-ImGui::GetFrameHeight(),ImGui::GetFrameHeight()));
+					ImGui::Dummy(ImVec2(nodeWidthWidget-sizeCB.x-8,ImGui::GetFrameHeight()));
+					
                     // PARAM VOID
                     /////////////
                 }else if(absParam.valueType() == typeid(void).name()){
@@ -395,11 +396,12 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                     {
                         tempCast.trigger();
                     }
+					ImVec2 sizeCB = ImGui::GetItemRectSize();
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast.trigger();
                     }
 					ImGui::SameLine();
-					ImGui::Dummy(ImVec2(nodeWidthWidget-ImGui::GetFrameHeight(),ImGui::GetFrameHeight()));
+					ImGui::Dummy(ImVec2(nodeWidthWidget-sizeCB.x-8,ImGui::GetFrameHeight()));
 				// PARAM STRING
 				///////////////
                 }else if(absParam.valueType() == typeid(string).name()){
