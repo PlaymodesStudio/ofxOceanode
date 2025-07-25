@@ -81,116 +81,91 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImGui::Text("%d fps",int(fps));
         ImGui::PopStyleColor();
         
-		// [S]NAP [C]ENTER
+		// [S]NAP
 		// Push appropriate text color for [S] button based on snap_to_grid state
+		
 		ImGui::SameLine();
-		bool colorPushed = snap_to_grid;
-		if(colorPushed) {
+		if(snap_to_grid) {
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.86f, 0.38f, 0.0f, 1.0f)); // Orange when enabled
 		}
+		else ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.4,0.4,0.4,1.0));
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
 
 		if(ImGui::Button("[S]"))
 		{
 			snap_to_grid = !snap_to_grid;
 		}
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
+
+		// [C]ENTER
 		
-		// Pop the color if we pushed it
-		if(colorPushed) {
-			ImGui::PopStyleColor();
-		}
+		ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.4,0.4,0.4,1.0));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
+
 		ImGui::SameLine();
 		bool recenterCanvas = false;
 		if(ImGui::Button("[C]") || isFirstDraw)
 		{
 			recenterCanvas = true;
 		}
+		// Pop the color & style
+		ImGui::PopStyleColor();
 		ImGui::PopStyleVar();
 
 		// COMMENTS
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+		ImGui::SetNextItemWidth(90);
 		
         int numComments = container->getComments().size();
-        int numCommentsAbove10 = numComments-10;
-        /*
-		if(numComments<10)
-        {
-            //ImGui::SameLine(ImGui::GetContentRegionAvail().x-28*(numComments+2));
-			
-        }
-        else
-        {
-            ImGui::SameLine(ImGui::GetContentRegionAvail().x - (28*(10)) -(36*(numCommentsAbove10+2)));
-        }
-		*/
-		
-        // to track where to scroll when hovering over comments in canvas we need to have a :
-        // ** returnToOldScrolling boolean which indicates if we should go back to the scrolling before had a hover
-        // ** itemHovered indicates which is the element that has been hovered, to check when we get a "no hover" if
-        // the no-hovered is the one that we used for getting the old scroll
-        // ** scrollBeforeHover to store the scroll position before the hovering movements
         
-        returnToOldScrolling=false;
-        
-        for(int i=0;i<numComments;i++)
+        if(numComments > 0)
         {
-			ImGui::SameLine();
-            auto &c = container->getComments()[i];
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(c.color.r,c.color.g,c.color.b,1.0));
-            if(ImGui::Button(("[" + ofToString(i+1) + "]").c_str()))
+            ImGui::SameLine();
+            
+            // Create dropdown for comment navigation
+            if(ImGui::BeginCombo("##CommentDropdown", "Go To..."))
             {
+                for(int i = 0; i < numComments; i++)
+                {
+                    auto &c = container->getComments()[i];
+                    
+                    // Create display text: "[1] Comment text"
+                    string displayText = "[" + ofToString(i+1) + "] " + c.text;
+                    
+                    // Apply comment color to the item
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(c.color.r, c.color.g, c.color.b, 1.0));
+                    
+                    if(ImGui::Selectable(displayText.c_str()))
+                    {
+                        // Navigate to comment position
+                        scrolling.x = -c.position.x;
+                        scrolling.y = -c.position.y;
+                    }
+                    
+                    ImGui::PopStyleColor();
+                }
+                ImGui::EndCombo();
+            }
+        }
+        
+        // Preserve keyboard shortcut functionality for numeric keys 1-9
+        for(int i = 0; i < numComments && i < 9; i++)
+        {
+            if(!ImGui::IsAnyItemActive() && ImGui::IsKeyDown(ImGuiKey('1'+i)))
+            {
+                auto &c = container->getComments()[i];
                 scrolling.x = -c.position.x;
                 scrolling.y = -c.position.y;
-                itemHovered=-1;
-                returnToOldScrolling=false;
             }
-            ImGui::PopStyleColor();
-
-			// draw tool-tip if hovered
-            if(ImGui::IsItemHovered())
-            {
-                if(itemHovered==-1)
-                {
-                    scrollBeforeHover = scrolling;
-                    itemHovered=i;
-                }
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0,1.0,1.0,1.0));
-                ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(c.color.r,c.color.g,c.color.b,1.0));
-                ImGui::SetTooltip(c.text.c_str());
-                ImGui::PopStyleColor(2);
-
-                scrolling.x = -c.position.x;
-                scrolling.y = -c.position.y;
-                
-            }
-            else
-            {
-                // moving the scroll with the numeric keys
-                if(!ImGui::IsAnyItemActive() && ImGui::IsKeyDown(ImGuiKey('1'+i)))
-                {
-                    scrolling.x = -c.position.x;
-                    scrolling.y = -c.position.y;
-                    scrollBeforeHover = scrolling;
-
-                }
-                else if(i==itemHovered)
-                {
-                    returnToOldScrolling=true;
-                    itemHovered=-1;
-                }
-            }
-        }//end for all comments
-        
-		ImGui::PopStyleColor();
-		ImGui::PopStyleVar();
-
-		
-        if(returnToOldScrolling)
-        {
-            scrolling = scrollBeforeHover;
         }
+        
+  ImGui::PopStyleColor();
+  ImGui::PopStyleVar();
 		        
+		// MAIN CANVAS
+		
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(color.r/4, color.g/4, color.b/4, 200));
@@ -612,6 +587,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ImGui::OpenPopup("Comment");
                 c.openPopupInNext = false;
             }
+			ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));  // Dark background
+			ImGui::PushStyleColor(ImGuiCol_Text,     ImVec4(0.7f, 0.7f, 0.7f, 0.7f));  // White text
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 1.0f)); // Hovered button
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+
             if(ImGui::BeginPopup("Comment")){
                 char * cString = new char[1024];
                 strcpy(cString, c.text.c_str());
@@ -624,11 +604,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ImGui::DragFloat2("Size", &c.size.x);
                 ImGui::ColorEdit3("Color", &c.color.r);
                 ImGui::ColorEdit3("TextColor", &c.textColor.r);
-                if(ImGui::Button("Remove")){
+                if(ImGui::Button("[Remove]")){
                     removeIndex = i;
                 }
                 ImGui::EndPopup();
             }
+			ImGui::PopStyleColor(3);
+			ImGui::PopStyleVar();
+
             ImGui::PopID();
         }
         if(removeIndex != -1){
