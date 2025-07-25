@@ -480,6 +480,12 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                     }
                 }
                 
+				// Push custom style colors
+				ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));  // Dark background
+				ImGui::PushStyleColor(ImGuiCol_Text,     ImVec4(0.7f, 0.7f, 0.7f, 0.7f));  // White text
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 1.0f)); // Hovered button
+				ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
+				
                 if(ImGui::BeginPopup("Param Popup")){
                     ImGui::Separator();
                     if(!absParam.isScoped()){ //Param is not scoped
@@ -512,11 +518,26 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
 #endif
 #ifdef OFXOCEANODE_USE_OSC
                     ImGui::Separator();
-                    ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
+					ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.08f, 0.08f, 0.08f, 1.0f));  // Dark background
+					ImGui::PushStyleColor(ImGuiCol_Text,     ImVec4(0.7f, 0.7f, 0.7f, 0.7f));  // White text
+
+                    //ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
+					ImGui::Text("OSC Address");
+					if (ImGui::IsItemHovered())
+					{
+						string tt = getParameters().getEscapedName() + "/" +absParam.getEscapedName();
+						ImGui::SetTooltip(tt.c_str());
+					}
+					ImGui::PopStyleColor(2);
+
 #endif
                     ImGui::Separator();
                     ImGui::EndPopup();
                 }
+				// Always pop the same number you pushed
+				ImGui::PopStyleColor(3);
+				ImGui::PopStyleVar();
+
                 ImGui::PopStyleColor(6);
             }
             inputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
