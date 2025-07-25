@@ -79,11 +79,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         int numCommentsAbove10 = numComments-10;
         if(numComments<10)
         {
-            ImGui::SameLine(ImGui::GetContentRegionAvail().x-28*(numComments+1));
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x-28*(numComments+2));
         }
         else
         {
-            ImGui::SameLine(ImGui::GetContentRegionAvail().x - (28*(10)) -(36*(numCommentsAbove10+1)));
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x - (28*(10)) -(36*(numCommentsAbove10+2)));
         }
 
         // to track where to scroll when hovering over comments in canvas we need to have a :
@@ -148,8 +148,51 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         {
             scrolling = scrollBeforeHover;
         }
-                
-        bool recenterCanvas = false;
+        
+        // Calculate proper position for [S] and [C] buttons
+        // Each button is approximately 28 pixels wide, so we need 56 pixels total for both buttons
+        float buttonWidth = 28.0f;
+        float totalButtonsWidth = buttonWidth * 2; // [S] and [C] buttons
+        float totalAvailableWidth = ImGui::GetContentRegionAvail().x;
+        
+        if(numComments == 0) {
+            // No comments: Position buttons at the rightmost edge
+            float buttonStartPos = totalAvailableWidth - totalButtonsWidth;
+            if(buttonStartPos < 0) buttonStartPos = 0; // Ensure we don't go negative
+            ImGui::SameLine(buttonStartPos);
+        } else {
+            // With comments: Position buttons after comments but ensure they remain visible
+            // The cursor is already positioned after the last comment due to ImGui::SameLine() in the loop
+            // We need to check if there's enough space for both buttons
+            float remainingWidth = ImGui::GetContentRegionAvail().x;
+            
+            if(remainingWidth >= totalButtonsWidth) {
+                // Enough space: just continue from current position
+                // No need to call SameLine() as we're already positioned after the last comment
+            } else {
+                // Not enough space: position at rightmost possible location
+                float buttonStartPos = totalAvailableWidth - totalButtonsWidth;
+                if(buttonStartPos < 0) buttonStartPos = 0;
+                ImGui::SameLine(buttonStartPos);
+            }
+        }
+        // Push appropriate text color for [S] button based on snap_to_grid state
+        bool colorPushed = snap_to_grid;
+        if(colorPushed) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.86f, 0.38f, 0.0f, 1.0f)); // Orange when enabled
+        }
+        
+        if(ImGui::Button("[S]"))
+        {
+            snap_to_grid = !snap_to_grid;
+        }
+        
+        // Pop the color if we pushed it
+        if(colorPushed) {
+            ImGui::PopStyleColor();
+        }
+        ImGui::SameLine();
+  bool recenterCanvas = false;
         if(ImGui::Button("[C]") || isFirstDraw)
         {
             recenterCanvas = true;
@@ -510,8 +553,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         node_selected = nodeId;
                     if (node_moving_active && ImGui::IsMouseDragging(0, 0.0f) && !node_widgets_active)
                         someSelectedModuleMove = nodeId;
-                    if(someSelectedModuleMove != "" && nodeGui.getSelected())
-                        nodeGui.setPosition(nodeGui.getPosition() + moveSelectedModulesWithDrag);
+                    if(someSelectedModuleMove != "" && nodeGui.getSelected()) {
+                        glm::vec2 newPosition = nodeGui.getPosition() + moveSelectedModulesWithDrag;
+                        // During dragging, allow free movement without snapping
+                        nodeGui.setPosition(newPosition);
+                    }
                 }
             }
             else{
@@ -1079,6 +1125,17 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }else if(!isAnyNodeHovered && !someDragAppliedToSelection){
                     deselectAllNodes();
                 }
+                
+                // Apply snap-to-grid when drag operation ends
+                if(snap_to_grid && someDragAppliedToSelection){
+                    // Find and snap all selected nodes to grid
+                    for(auto &n : container->getParameterGroupNodesMap()){
+                        if(n.second->getNodeGui().getSelected()){
+                            n.second->getNodeGui().setPosition(snapToGrid(n.second->getNodeGui().getPosition()));
+                        }
+                    }
+                }
+                
                 someDragAppliedToSelection = false;
                 moveSelectedModulesWithDrag = glm::vec2(0,0);
             }
@@ -1162,6 +1219,18 @@ glm::vec2 ofxOceanodeCanvas::screenToCanvas(glm::vec2 p){
 glm::vec2 ofxOceanodeCanvas::canvasToScreen(glm::vec2 p){
     glm::vec4 result = glm::inverse(transformationMatrix->get()) * glm::vec4(p, 0, 1);
     return result;
+}
+
+glm::vec2 ofxOceanodeCanvas::snapToGrid(glm::vec2 position){
+    if(!snap_to_grid) return position;
+    
+    const float GRID_SZ = 128.0f/2; // 64 pixels, matching the grid size
+    
+    // Snap to nearest grid point
+    float snappedX = round(position.x / GRID_SZ) * GRID_SZ;
+    float snappedY = round(position.y / GRID_SZ) * GRID_SZ;
+    
+    return glm::vec2(snappedX, snappedY);
 }
 
 glm::vec3 ofxOceanodeCanvas::getMatrixScale(const glm::mat4 &m){

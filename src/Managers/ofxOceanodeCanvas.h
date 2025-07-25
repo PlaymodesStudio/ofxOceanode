@@ -44,6 +44,7 @@ private:
     
     glm::vec2 screenToCanvas(glm::vec2 p);
     glm::vec2 canvasToScreen(glm::vec2 p);
+    glm::vec2 snapToGrid(glm::vec2 position);
     
     shared_ptr<ofxOceanodeContainer> container;
     
@@ -98,6 +99,7 @@ private:
     glm::vec2 offsetToCenter = glm::vec2(0.0f, 0.0f);
 
     bool show_grid = true;
+    bool snap_to_grid = false;
     
     string node_selected = "";
     glm::vec2 newNodeClickPos;
