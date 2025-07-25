@@ -36,7 +36,7 @@ ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
     
 }
 
-bool ofxOceanodeNodeGui::constructGui(){
+bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
     string moduleName = getParameters().getName();
     ImGui::BeginGroup(); // Lock horizontal position
     
@@ -103,7 +103,7 @@ bool ofxOceanodeNodeGui::constructGui(){
                 
                 ImGui::SetItemAllowOverlap();
                 ImGui::SameLine(-1);
-                ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(51, ImGui::GetFrameHeight())); //Used to check later behaviours
+				ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
                 
                 int drag = 0;
                 bool resetValue = false;
@@ -121,9 +121,10 @@ bool ofxOceanodeNodeGui::constructGui(){
                     valueHasBeenReseted = false;
                 }
                 
-                
-                ImGui::SameLine(90);
-                ImGui::SetNextItemWidth(150);
+				// TODO : retrieve this widths from Canvas node Widths
+				// [ node width ] : 90 pixels for the name and 150 for the "widget"
+				ImGui::SameLine(nodeWidthText);
+				ImGui::SetNextItemWidth(nodeWidthWidget);
                 
                 string hiddenUniqueId = "##" + uniqueId;
                 ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()*0.5f));
@@ -384,6 +385,8 @@ bool ofxOceanodeNodeGui::constructGui(){
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast = !tempCast;
                     }
+					ImGui::SameLine();
+					ImGui::Dummy(ImVec2(nodeWidthWidget-ImGui::GetFrameHeight(),ImGui::GetFrameHeight()));
                     // PARAM VOID
                     /////////////
                 }else if(absParam.valueType() == typeid(void).name()){
@@ -395,6 +398,8 @@ bool ofxOceanodeNodeGui::constructGui(){
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast.trigger();
                     }
+					ImGui::SameLine();
+					ImGui::Dummy(ImVec2(nodeWidthWidget-ImGui::GetFrameHeight(),ImGui::GetFrameHeight()));
 				// PARAM STRING
 				///////////////
                 }else if(absParam.valueType() == typeid(string).name()){
@@ -543,14 +548,14 @@ bool ofxOceanodeNodeGui::constructGui(){
 					{
 						auto tempCast = absParam.cast<ofTexture*>().getParameter();
 						float ar = tempCast.get()->getWidth() / tempCast.get()->getHeight();
-						size = ImVec2(240,240/ar);
+						size = ImVec2(nodeWidthText+nodeWidthWidget,nodeWidthText+nodeWidthWidget/ar);
 					}
 					else
 					{
-						size = ImVec2(240, 240);
+						size = ImVec2(nodeWidthText+nodeWidthWidget, nodeWidthText+nodeWidthWidget);
 					}
 				}
-				else size = ImVec2(240,30);
+				else size = ImVec2(nodeWidthText+nodeWidthWidget,30);
 				
 				paramSizes.push_back(size);
 				totalHeight += size.y + spacing;
@@ -631,9 +636,9 @@ bool ofxOceanodeNodeGui::constructGui(){
 			}
 		}
 		
-		// Add an invisible item to ensure the group has the correct height
+		// Add an invisible item to ensure the group has the correct size
 		if(totalHeight > 0) {
-			ImGui::InvisibleButton("##nodesize", ImVec2(240, 0.1f));
+			ImGui::InvisibleButton("##nodesize", ImVec2(nodeWidthText+nodeWidthWidget, 0.1f));
 		}
 	}
 				

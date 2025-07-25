@@ -36,6 +36,10 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
     
     scrolling = glm::vec2(0,0);
     moveSelectedModulesWithDrag = glm::vec2(0,0);
+	
+	NODE_WINDOW_PADDING = glm::vec2(8.0f,7.0f);
+	GRID_SIZE = (NODE_WIDTH_TEXT+NODE_WIDTH_WIDGET+2*NODE_WINDOW_PADDING.x)/4;
+
 }
 
 void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
@@ -58,10 +62,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     if(ImGui::Begin(windowName.c_str(), open)){
         ImGui::SameLine();
         ImGui::BeginGroup();
-        
-        const float NODE_SLOT_RADIUS = 4.0f;
-        const ImVec2 NODE_WINDOW_PADDING(8.0f, 7.0f);
-        
+                
         // Create our child canvas
         offsetToCenter = glm::vec2(int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
         ImGui::Text("[%d,%d]",int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
@@ -155,21 +156,27 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         float totalButtonsWidth = buttonWidth * 2; // [S] and [C] buttons
         float totalAvailableWidth = ImGui::GetContentRegionAvail().x;
         
-        if(numComments == 0) {
+        if(numComments == 0)
+		{
             // No comments: Position buttons at the rightmost edge
             float buttonStartPos = totalAvailableWidth - totalButtonsWidth;
             if(buttonStartPos < 0) buttonStartPos = 0; // Ensure we don't go negative
             ImGui::SameLine(buttonStartPos);
-        } else {
+        }
+		else
+		{
             // With comments: Position buttons after comments but ensure they remain visible
             // The cursor is already positioned after the last comment due to ImGui::SameLine() in the loop
             // We need to check if there's enough space for both buttons
             float remainingWidth = ImGui::GetContentRegionAvail().x;
             
-            if(remainingWidth >= totalButtonsWidth) {
+            if(remainingWidth >= totalButtonsWidth)
+			{
                 // Enough space: just continue from current position
                 // No need to call SameLine() as we're already positioned after the last comment
-            } else {
+            }
+			else
+			{
                 // Not enough space: position at rightmost possible location
                 float buttonStartPos = totalAvailableWidth - totalButtonsWidth;
                 if(buttonStartPos < 0) buttonStartPos = 0;
@@ -192,7 +199,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             ImGui::PopStyleColor();
         }
         ImGui::SameLine();
-  bool recenterCanvas = false;
+		bool recenterCanvas = false;
         if(ImGui::Button("[C]") || isFirstDraw)
         {
             recenterCanvas = true;
@@ -231,7 +238,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         {
             ImU32 GRID_COLOR = IM_COL32(90, 90, 90, 40);
             ImU32 GRID_COLOR_CENTER = IM_COL32(30, 30, 30, 80);
-            float GRID_SZ = 128.0f/2;
             ImVec2 win_pos = ImGui::GetCursorScreenPos();
             ImVec2 canvas_sz = ImGui::GetContentRegionAvail();
             
@@ -259,9 +265,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }
             }
 
-            for (float x = fmodf(scrolling.x, GRID_SZ); x < canvas_sz.x; x += GRID_SZ)
+            for (float x = fmodf(scrolling.x, GRID_SIZE); x < canvas_sz.x; x += GRID_SIZE)
                 draw_list->AddLine(ImVec2(x, 0.0f) + win_pos, ImVec2(x, canvas_sz.y) + win_pos, GRID_COLOR);
-            for (float y = fmodf(scrolling.y, GRID_SZ); y < canvas_sz.y; y += GRID_SZ)
+            for (float y = fmodf(scrolling.y, GRID_SIZE); y < canvas_sz.y; y += GRID_SIZE)
                 draw_list->AddLine(ImVec2(0.0f, y) + win_pos, ImVec2(canvas_sz.x, y) + win_pos, GRID_COLOR);
             
             ImVec2 origin = ImVec2(win_pos.x + scrolling.x, win_pos.y + scrolling.y );
@@ -362,7 +368,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             
             
             //Draw Parameters
-            if(nodeGui.constructGui()){
+			if(nodeGui.constructGui(NODE_WIDTH_TEXT,NODE_WIDTH_WIDGET)){
                 
                 // Save the size of what we have emitted and whether any of the widgets are being used
                 bool node_widgets_active = (!old_any_active && ImGui::IsAnyItemActive());
@@ -691,7 +697,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         
         // Draw New Node menu
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
         bool popop_close_button = true;
         if (ImGui::BeginPopupModal("New Node", &popop_close_button, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
         {
@@ -1223,12 +1229,10 @@ glm::vec2 ofxOceanodeCanvas::canvasToScreen(glm::vec2 p){
 
 glm::vec2 ofxOceanodeCanvas::snapToGrid(glm::vec2 position){
     if(!snap_to_grid) return position;
-    
-    const float GRID_SZ = 128.0f/2; // 64 pixels, matching the grid size
-    
-    // Snap to nearest grid point
-    float snappedX = round(position.x / GRID_SZ) * GRID_SZ;
-    float snappedY = round(position.y / GRID_SZ) * GRID_SZ;
+	
+	// Snap to nearest grid point
+	float snappedX = round(position.x / GRID_SIZE) * GRID_SIZE;
+	float snappedY = round(position.y / GRID_SIZE) * GRID_SIZE;
     
     return glm::vec2(snappedX, snappedY);
 }

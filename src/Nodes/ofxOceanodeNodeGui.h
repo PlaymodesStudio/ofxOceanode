@@ -28,7 +28,7 @@ public:
     void update(ofEventArgs &e){};
     void draw(ofEventArgs &e){};
     
-    bool constructGui();
+    bool constructGui(int nodeWidthText, int nodeWidthWidget);
     
     void setPosition(glm::vec2 position);
     void setSize(glm::vec2 size);

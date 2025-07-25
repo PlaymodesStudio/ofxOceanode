@@ -10,7 +10,6 @@
 #define ofxOceanodeCanvas_h
 
 #ifndef OFXOCEANODE_HEADLESS
-
 #include "ofMain.h"
 
 class ofxOceanodeContainer;
@@ -21,7 +20,6 @@ class ofxOceanodeCanvas{
 public:
     //ofxOceanodeCanvas(){};
     ~ofxOceanodeCanvas(){};
-    
     
     void setup(string _uid = "Canvas", string _pid = "");
     void update(){};
@@ -38,6 +36,15 @@ public:
     
     void bringOnTop(){onTop = true;};
     
+	// node dimensions
+	void setNodeWidthText(int n){NODE_WIDTH_TEXT = n;};
+	int getNodeWidthText(){return NODE_WIDTH_TEXT;};
+	void setNodeWidthWidget(int n){NODE_WIDTH_WIDGET = n;};
+	int getNodeWidthWidget(){return NODE_WIDTH_WIDGET;};
+	int getGridSize(){return GRID_SIZE;};
+	// (nodeWidthTotal should be % by 4 as we use it for GRID_SIZE / snaping
+	int getTotalNodeWidth(){return NODE_WIDTH_TEXT+NODE_WIDTH_WIDGET+2*NODE_WINDOW_PADDING.x;};
+	
 private:
     glm::vec3 getMatrixScale(const glm::mat4 &m);
     glm::mat4 translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector);
@@ -113,7 +120,13 @@ private:
     string parentID;
     bool isFirstDraw = true;
     bool onTop = false;
-    
+	
+	// node dimensions (nodeWidthTotal should be % by 4)
+	float NODE_SLOT_RADIUS = 4.0f;
+	int NODE_WIDTH_TEXT = 90;
+	int NODE_WIDTH_WIDGET = 150;
+	int GRID_SIZE;
+	glm::vec2 NODE_WINDOW_PADDING;
 };
 
 #endif
