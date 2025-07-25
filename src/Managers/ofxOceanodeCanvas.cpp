@@ -64,9 +64,15 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImGui::BeginGroup();
                 
         // Create our child canvas
-        offsetToCenter = glm::vec2(int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
-        ImGui::Text("[%d,%d]",int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
+		offsetToCenter = glm::vec2(int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
+		
+		// CANVAS POSITION
+		ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1.0,1.0,1.0,0.5));
+		ImGui::Text("[%d,%d]",int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
         ImGui::SameLine();
+		ImGui::PopStyleColor();
+		
+		// FPS
         float fps = ofGetFrameRate();
         if(fps>=60.0) ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.0,1.0,0.0,0.5));
         else if(fps>30.0) ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1.0,0.5,0.0,0.5));
@@ -74,19 +80,50 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImGui::Text("%d fps",int(fps));
         ImGui::PopStyleColor();
         
+		// [S]NAP [C]ENTER
+		// Push appropriate text color for [S] button based on snap_to_grid state
+		ImGui::SameLine();
+		bool colorPushed = snap_to_grid;
+		if(colorPushed) {
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.86f, 0.38f, 0.0f, 1.0f)); // Orange when enabled
+		}
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
+
+		if(ImGui::Button("[S]"))
+		{
+			snap_to_grid = !snap_to_grid;
+		}
+		
+		// Pop the color if we pushed it
+		if(colorPushed) {
+			ImGui::PopStyleColor();
+		}
+		ImGui::SameLine();
+		bool recenterCanvas = false;
+		if(ImGui::Button("[C]") || isFirstDraw)
+		{
+			recenterCanvas = true;
+		}
+		ImGui::PopStyleVar();
+
+		// COMMENTS
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+		
         int numComments = container->getComments().size();
         int numCommentsAbove10 = numComments-10;
-        if(numComments<10)
+        /*
+		if(numComments<10)
         {
-            ImGui::SameLine(ImGui::GetContentRegionAvail().x-28*(numComments+2));
+            //ImGui::SameLine(ImGui::GetContentRegionAvail().x-28*(numComments+2));
+			
         }
         else
         {
             ImGui::SameLine(ImGui::GetContentRegionAvail().x - (28*(10)) -(36*(numCommentsAbove10+2)));
         }
-
+		*/
+		
         // to track where to scroll when hovering over comments in canvas we need to have a :
         // ** returnToOldScrolling boolean which indicates if we should go back to the scrolling before had a hover
         // ** itemHovered indicates which is the element that has been hovered, to check when we get a "no hover" if
@@ -97,6 +134,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         
         for(int i=0;i<numComments;i++)
         {
+			ImGui::SameLine();
             auto &c = container->getComments()[i];
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(c.color.r,c.color.g,c.color.b,1.0));
             if(ImGui::Button(("[" + ofToString(i+1) + "]").c_str()))
@@ -108,6 +146,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
             ImGui::PopStyleColor();
 
+			// draw tool-tip if hovered
             if(ImGui::IsItemHovered())
             {
                 if(itemHovered==-1)
@@ -118,8 +157,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0,1.0,1.0,1.0));
                 ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(c.color.r,c.color.g,c.color.b,1.0));
                 ImGui::SetTooltip(c.text.c_str());
-                ImGui::PopStyleColor();
-                ImGui::PopStyleColor();
+                ImGui::PopStyleColor(2);
 
                 scrolling.x = -c.position.x;
                 scrolling.y = -c.position.y;
@@ -141,95 +179,38 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     itemHovered=-1;
                 }
             }
-            ImGui::SameLine();
-
-        }
+        }//end for all comments
         
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
+
+		
         if(returnToOldScrolling)
         {
             scrolling = scrollBeforeHover;
         }
-        
-        // Calculate proper position for [S] and [C] buttons
-        // Each button is approximately 28 pixels wide, so we need 56 pixels total for both buttons
-        float buttonWidth = 28.0f;
-        float totalButtonsWidth = buttonWidth * 2; // [S] and [C] buttons
-        float totalAvailableWidth = ImGui::GetContentRegionAvail().x;
-        
-        if(numComments == 0)
-		{
-            // No comments: Position buttons at the rightmost edge
-            float buttonStartPos = totalAvailableWidth - totalButtonsWidth;
-            if(buttonStartPos < 0) buttonStartPos = 0; // Ensure we don't go negative
-            ImGui::SameLine(buttonStartPos);
-        }
-		else
-		{
-            // With comments: Position buttons after comments but ensure they remain visible
-            // The cursor is already positioned after the last comment due to ImGui::SameLine() in the loop
-            // We need to check if there's enough space for both buttons
-            float remainingWidth = ImGui::GetContentRegionAvail().x;
-            
-            if(remainingWidth >= totalButtonsWidth)
-			{
-                // Enough space: just continue from current position
-                // No need to call SameLine() as we're already positioned after the last comment
-            }
-			else
-			{
-                // Not enough space: position at rightmost possible location
-                float buttonStartPos = totalAvailableWidth - totalButtonsWidth;
-                if(buttonStartPos < 0) buttonStartPos = 0;
-                ImGui::SameLine(buttonStartPos);
-            }
-        }
-        // Push appropriate text color for [S] button based on snap_to_grid state
-        bool colorPushed = snap_to_grid;
-        if(colorPushed) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.86f, 0.38f, 0.0f, 1.0f)); // Orange when enabled
-        }
-        
-        if(ImGui::Button("[S]"))
-        {
-            snap_to_grid = !snap_to_grid;
-        }
-        
-        // Pop the color if we pushed it
-        if(colorPushed) {
-            ImGui::PopStyleColor();
-        }
-        ImGui::SameLine();
-		bool recenterCanvas = false;
-        if(ImGui::Button("[C]") || isFirstDraw)
-        {
-            recenterCanvas = true;
-        }
-        ImGui::PopStyleColor();
-        ImGui::PopStyleVar();
-        
+		        
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(color.r/4, color.g/4, color.b/4, 200));
-        ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
+        
+		ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
         ImGui::PushItemWidth(120.0f);
         
         ImVec2 offset = ImGui::GetCursorScreenPos() + scrolling;
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         
+		// COMMENT CREATION WITH ALT MOUSE
+		
         bool selectionHasBeenMade = false;
         bool newComment = false;
         if(ImGui::IsMouseReleased(0)){
             if(isSelecting){
                 isSelecting = false;
                 if(ImGui::GetIO().KeyAlt){
-//                    container->getComments().emplace_back(selectedRect.position, glm::vec2(selectedRect.width, selectedRect.height));
                     newComment = true;
                 }
-//                    else{
                     selectionHasBeenMade = true;
-//                }
-            }else{
-                //selectedRect = ofRectangle(0,0,0,0);
             }
         }
         
