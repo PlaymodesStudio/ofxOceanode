@@ -54,14 +54,6 @@ void ofxOceanodeInspectorController::draw(){
         
         ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 0.0f);
         
-        
-        if(ImGui::Button("CLEAR SELECTION")){
-            for(auto nodePair : selectedNodes)
-            {
-                nodePair.second->getNodeGui().setSelected(false);
-            }
-        }
-        
         //Draw Selected Names
         ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
         if(ImGui::TreeNode("Selected Nodes")){
@@ -74,6 +66,12 @@ void ofxOceanodeInspectorController::draw(){
                 ImGui::Text(nodeId.c_str(), "%s");
                 ImGui::PopStyleColor();
             }
+			if(ImGui::Button("[Clear Selection]")){
+				for(auto nodePair : selectedNodes)
+				{
+					nodePair.second->getNodeGui().setSelected(false);
+				}
+			}
             bool sameDescription = true;
             for(auto nodePair : selectedNodesWithoutFirst){
                 if(selectedNodes[0].second->getNodeModel().getDescription() != nodePair.second->getNodeModel().getDescription()){
