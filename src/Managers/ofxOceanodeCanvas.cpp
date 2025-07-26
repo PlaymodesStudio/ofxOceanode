@@ -109,30 +109,118 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		{
 			recenterCanvas = true;
 		}
-		// Pop the color & style
 		ImGui::PopStyleColor();
 		ImGui::PopStyleVar();
 
 		// COMMENTS
+		
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
 		ImGui::SetNextItemWidth(90);
 		
         int numComments = container->getComments().size();
         
+        // Initialize checkbox states if needed
+        if(commentCheckboxStates.size() != numComments) {
+            // Handle size changes - this should mainly happen during initialization
+            // or if comments were added/removed outside the normal deletion flow
+            if(commentCheckboxStates.size() > numComments) {
+                // More states than comments - clean up excess entries
+                for(int i = numComments; i < commentCheckboxStates.size(); i++) {
+                    if(i < commentToSlot.size() && commentToSlot[i] != -1) {
+                        keyboardSlots[commentToSlot[i]] = -1;
+                    }
+                }
+            }
+            
+            commentCheckboxStates.resize(numComments, false);
+            commentToSlot.resize(numComments, -1);
+            
+            // Validate existing assignments after resize
+            for(int slot = 0; slot < MAX_KEYBOARD_SLOTS; slot++) {
+                if(keyboardSlots[slot] >= numComments) {
+                    keyboardSlots[slot] = -1;
+                }
+            }
+        }
+        
+        // Initialize keyboard slots if needed
+        if(keyboardSlots.size() != MAX_KEYBOARD_SLOTS) {
+            keyboardSlots.resize(MAX_KEYBOARD_SLOTS, -1);
+        }
+        
         if(numComments > 0)
         {
             ImGui::SameLine();
             
             // Create dropdown for comment navigation
+            // Set size constraints to show more items before scrolling (approximately double the default)
+            ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, ImGui::GetTextLineHeightWithSpacing() * 24));
             if(ImGui::BeginCombo("##CommentDropdown", "Go To..."))
             {
                 for(int i = 0; i < numComments; i++)
                 {
                     auto &c = container->getComments()[i];
                     
-                    // Create display text: "[1] Comment text"
-                    string displayText = "[" + ofToString(i+1) + "] " + c.text;
+                    // Checkbox for keyboard shortcut assignment
+                    bool isChecked = commentCheckboxStates[i];
+                    string checkboxId = "##checkbox" + ofToString(i);
+                    
+                    if(ImGui::Checkbox(checkboxId.c_str(), &isChecked))
+                    {
+                        if(isChecked && !commentCheckboxStates[i])
+                        {
+                            // Trying to activate checkbox - check if we have available slots
+                            int availableSlot = -1;
+                            for(int slot = 0; slot < MAX_KEYBOARD_SLOTS; slot++)
+                            {
+                                if(keyboardSlots[slot] == -1)
+                                {
+                                    availableSlot = slot;
+                                    break;
+                                }
+                            }
+                            
+                            if(availableSlot != -1)
+                            {
+                                // Assign to available slot
+                                commentCheckboxStates[i] = true;
+                                keyboardSlots[availableSlot] = i;
+                                commentToSlot[i] = availableSlot;
+                            }
+                            else
+                            {
+                                // No available slots - revert checkbox
+                                isChecked = false;
+                            }
+                        }
+                        else if(!isChecked && commentCheckboxStates[i])
+                        {
+                            // Deactivating checkbox - free up the slot
+                            int slot = commentToSlot[i];
+                            if(slot != -1)
+                            {
+                                keyboardSlots[slot] = -1;
+                                commentToSlot[i] = -1;
+                            }
+                            commentCheckboxStates[i] = false;
+                        }
+                    }
+                    
+                    ImGui::SameLine();
+                    
+                    // Create display text with keyboard shortcut if assigned
+                    string displayText;
+                    if(commentCheckboxStates[i] && commentToSlot[i] != -1)
+                    {
+                        int keyNum = (commentToSlot[i] + 1) % 10; // 0 becomes 10, others stay 1-9
+                        if(keyNum == 0) keyNum = 10;
+                        displayText = "[" + ofToString(keyNum == 10 ? 0 : keyNum) + "] " + c.text;
+                    }
+                    else
+                    {
+                        displayText = c.text;
+                    }
                     
                     // Apply comment color to the item
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(c.color.r, c.color.g, c.color.b, 1.0));
@@ -150,14 +238,21 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
         }
         
-        // Preserve keyboard shortcut functionality for numeric keys 1-9
-        for(int i = 0; i < numComments && i < 9; i++)
+        // Keyboard shortcut functionality for numeric keys 1-0 using slot-based system
+        for(int slot = 0; slot < MAX_KEYBOARD_SLOTS; slot++)
         {
-            if(!ImGui::IsAnyItemActive() && ImGui::IsKeyDown(ImGuiKey('1'+i)))
+            int commentIndex = keyboardSlots[slot];
+            if(commentIndex != -1 && commentIndex < numComments)
             {
-                auto &c = container->getComments()[i];
-                scrolling.x = -c.position.x;
-                scrolling.y = -c.position.y;
+                // Map slot to key: slot 0-8 -> keys 1-9, slot 9 -> key 0
+                int keyCode = (slot < 9) ? ('1' + slot) : '0';
+                
+                if(!ImGui::IsAnyItemActive() && ImGui::IsKeyDown(ImGuiKey(keyCode)))
+                {
+                    auto &c = container->getComments()[commentIndex];
+                    scrolling.x = -c.position.x;
+                    scrolling.y = -c.position.y;
+                }
             }
         }
         
@@ -615,7 +710,46 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             ImGui::PopID();
         }
         if(removeIndex != -1){
+            // Before deleting the comment, handle keyboard slot cleanup properly
+            // to maintain stable assignments for remaining comments
+            
+            // 1. If the deleted comment had a keyboard slot, free it
+            if(removeIndex < commentCheckboxStates.size() &&
+               commentCheckboxStates[removeIndex] &&
+               removeIndex < commentToSlot.size() &&
+               commentToSlot[removeIndex] != -1) {
+                int slotToFree = commentToSlot[removeIndex];
+                keyboardSlots[slotToFree] = -1;
+            }
+            
+            // 2. Update all keyboard slot assignments for comments that will shift indices
+            // Comments with index > removeIndex will shift down by 1
+            for(int slot = 0; slot < MAX_KEYBOARD_SLOTS; slot++) {
+                if(keyboardSlots[slot] > removeIndex) {
+                    keyboardSlots[slot]--; // Decrement the comment index in the slot
+                }
+            }
+            
+            // 3. Now delete the comment
             container->getComments().erase(container->getComments().begin() + removeIndex);
+            
+            // 4. Update the tracking vectors to match the new comment count
+            // Remove the deleted comment's entries and shift remaining ones
+            if(removeIndex < commentCheckboxStates.size()) {
+                commentCheckboxStates.erase(commentCheckboxStates.begin() + removeIndex);
+            }
+            if(removeIndex < commentToSlot.size()) {
+                commentToSlot.erase(commentToSlot.begin() + removeIndex);
+            }
+            
+            // 5. Update commentToSlot mappings for comments that shifted indices
+            for(int i = removeIndex; i < commentToSlot.size(); i++) {
+                if(commentToSlot[i] != -1) {
+                    // This comment's index shifted down by 1, but its slot assignment stays the same
+                    // The keyboardSlots array was already updated in step 2
+                    // commentToSlot[i] already contains the correct slot number
+                }
+            }
         }
         
         

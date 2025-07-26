@@ -136,6 +136,12 @@ private:
 	int GRID_SIZE;
 	int gridDivisions;
 	glm::vec2 NODE_WINDOW_PADDING;
+	
+	// Comment checkbox system for keyboard shortcuts
+	vector<bool> commentCheckboxStates;  // Track which comments have checkboxes enabled
+	vector<int> keyboardSlots;           // Maps keyboard slots (0-9) to comment indices (-1 = empty)
+	vector<int> commentToSlot;           // Maps comment indices to keyboard slots (-1 = not assigned)
+	static const int MAX_KEYBOARD_SLOTS = 10;
 };
 
 #endif
