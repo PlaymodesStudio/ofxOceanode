@@ -58,6 +58,7 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<ofxOceanodeNodeMacro>("MACRO");
     nodeRegistry->registerModel<noise>("Generators");
     nodeRegistry->registerModel<randomGenerator>("Generators");
+    nodeRegistry->registerModel<universalMonitor>("Monitor");
 
     //Register default Routers
     nodeRegistry->registerModel<router<vector<float>>>("Router", "v_f", 0, 0, 1);
@@ -304,6 +305,21 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
             ImGui::Checkbox("Show Mode", &showMode);
             ofxOceanodeShared::setConfigurationFlags(configurationFlags);
+			
+			int tw = canvas.getNodeWidthText();
+			int ww = canvas.getNodeWidthWidget();
+			int gd = canvas.getGridDivisions();
+			
+			if(ImGui::SliderInt("Node Text Width", &tw, 32, 128)) canvas.updateGridSize();
+			if(ImGui::SliderInt("Node Widget Width", &ww, 64, 256)) canvas.updateGridSize();
+			if(ImGui::SliderInt("Grid Divs",&gd,0,16))
+			{
+				canvas.setGridDivisions(gd);
+				canvas.updateGridSize();
+			}
+			canvas.setNodeWidthText(tw);
+			canvas.setNodeWidthWidget(ww);
+			
             ImGui::EndMenu();
         }
 		
