@@ -218,23 +218,35 @@ private:
     string canvasID;
 	
 	// Encapsulation support structures and methods
-	struct ExternalConnection {
-		ofxOceanodeAbstractParameter* externalParam;  // Parameter outside selection (stays valid)
-		string internalNodeName;    // Name of the internal node (to find after paste)
-		string internalParamName;   // Name of the internal parameter (to find after paste)
-		bool isIncoming;           // true: external->internal, false: internal->external
-		string routerName;         // Generated name for router
-		string routerType;         // Parameter type for router creation
-	};
+		struct InternalConnection {
+			string nodeName;    // Name of the internal node
+			string paramName;   // Name of the internal parameter
+		};
 		
+		struct ExternalConnection {
+			// For input routers (external → multiple internals)
+			ofxOceanodeAbstractParameter* externalParam;  // Single external parameter (for inputs)
+			vector<InternalConnection> internalConnections; // Multiple internal connections (for inputs)
+			
+			// For output routers (single internal → multiple externals)
+			InternalConnection internalConnection;  // Single internal connection (for outputs)
+			vector<ofxOceanodeAbstractParameter*> externalConnections; // Multiple external parameters (for outputs)
+			
+			bool isIncoming;           // true: external->internal, false: internal->external
+			string routerName;         // Generated name for router
+			string routerType;         // Parameter type for router creation
+		};
+			
 		vector<ExternalConnection> analyzeExternalConnections(vector<ofxOceanodeNode*> selectedNodes);
 		void createRoutersAndReconnect(ofxOceanodeNode* macroNode, vector<ExternalConnection>& connections);
-		string generateRouterName(const string& paramName, const string& nodeName, bool isInput);
+		string generateRouterName(const string& paramName, map<string, int>& nameCounters);
+		string mapParameterTypeToRouterName(const string& paramType);
 		ofxOceanodeNode* getNodeFromParameter(ofxOceanodeAbstractParameter& param);
 		bool isNodeInList(ofxOceanodeNode* node, vector<ofxOceanodeNode*>& nodeList);
 		string getParameterTypeName(ofxOceanodeAbstractParameter& param);
-	
-	vector<ofxOceanodeComment> comments;
-};
+		ofxOceanodeAbstractParameter* findInternalParameter(const vector<ofxOceanodeNode*>& macroNodes, const InternalConnection& internalConn);
+		
+		vector<ofxOceanodeComment> comments;
+	};
 
 #endif /* ofxOceanodeContainer_h */
