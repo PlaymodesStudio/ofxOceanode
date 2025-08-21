@@ -240,11 +240,15 @@ private:
 		vector<ExternalConnection> analyzeExternalConnections(vector<ofxOceanodeNode*> selectedNodes);
 		void createRoutersAndReconnect(ofxOceanodeNode* macroNode, vector<ExternalConnection>& connections);
 		string generateRouterName(const string& paramName, map<string, int>& nameCounters);
+	string extractNodeType(const string& nodeName);
+	void ensureMacroParametersExposed(const vector<ofxOceanodeNode*>& macroNodes);
+
 		string mapParameterTypeToRouterName(const string& paramType);
 		ofxOceanodeNode* getNodeFromParameter(ofxOceanodeAbstractParameter& param);
 		bool isNodeInList(ofxOceanodeNode* node, vector<ofxOceanodeNode*>& nodeList);
 		string getParameterTypeName(ofxOceanodeAbstractParameter& param);
 		ofxOceanodeAbstractParameter* findInternalParameter(const vector<ofxOceanodeNode*>& macroNodes, const InternalConnection& internalConn);
+	
 		
 		vector<ofxOceanodeComment> comments;
 	};

@@ -1676,17 +1676,36 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 		centerPos /= selectedNodes.size();
 	}
 	
-	// 3. Analyze external connections BEFORE cutting
+	// 3. CRITICAL FIX: Store node information BEFORE cutting them
+	// We need to preserve the node info before the nodes are deleted
+	struct NodeInfo {
+		string originalName;
+		string nodeType;
+		glm::vec2 position;
+	};
+	
+	vector<NodeInfo> originalNodeInfo;
+	for(auto node : selectedNodes) {
+		NodeInfo info;
+		info.originalName = node->getParameters().getName();
+		info.nodeType = node->getNodeModel().nodeName();
+#ifndef OFXOCEANODE_HEADLESS
+		info.position = node->getNodeGui().getPosition();
+#endif
+		originalNodeInfo.push_back(info);
+	}
+	
+	// 4. Analyze external connections BEFORE cutting (nodes are still valid)
 	auto externalConnections = analyzeExternalConnections(selectedNodes);
 	ofLogNotice("Encapsulation") << "Found " << externalConnections.size() << " external connections";
 	
-	// 4. Cut selected nodes
+	// 5. Cut selected nodes (this deletes them from memory)
 	if(!cutSelectedModulesWithConnections()) {
 		ofLogError("Encapsulation") << "Failed to cut selected nodes";
 		return;
 	}
 	
-	// 5. Create macro node
+	// 6. Create macro node
 	auto macroNode = createNodeFromName("Macro");
 	if(!macroNode) {
 		ofLogError("Encapsulation") << "Failed to create macro node";
@@ -1698,7 +1717,7 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 	macroNode->getNodeGui().setSelected(true);
 #endif
 	
-	// 6. Get macro internals
+	// 7. Get macro internals
 	auto macroModel = dynamic_cast<ofxOceanodeNodeMacro*>(&macroNode->getNodeModel());
 	if(!macroModel) {
 		ofLogError("Encapsulation") << "Failed to cast to macro model";
@@ -1713,13 +1732,160 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 		return;
 	}
 	
-	// 7. Paste nodes inside macro
+	// 8. Paste nodes inside macro
 	if(!macroContainer->pasteModulesAndConnectionsInPosition(glm::vec2(0, 0), false)) {
 		ofLogWarning("Encapsulation") << "Failed to paste nodes inside macro";
 	}
 	
-	// 8. Create routers and reconnect
+	// CRITICAL FIX: Replace the node mapping section in encapsulateSelectedNodes()
+	// The issue is that the mapping logic doesn't work correctly with macros
+
+	// 9. FIXED: Update external connections using stored node info
 	if(!externalConnections.empty()) {
+		auto macroNodes = macroContainer->getAllModules();
+		
+		// MACRO-AWARE FIX: Ensure any macro nodes have their parameters properly exposed
+		ensureMacroParametersExposed(macroNodes);
+		
+		// Create a mapping from original node names to new node names
+		// CRITICAL FIX: Use a smarter mapping strategy for macros
+		map<string, string> nodeNameMapping;
+		
+		ofLogNotice("Encapsulation") << "Creating node name mapping from stored info...";
+		
+		// For macros, we need to match based on exposed parameters, not just type and order
+		// because the order might change and macros have unique parameter sets
+		
+		// Collect the pasted nodes by type
+		map<string, vector<ofxOceanodeNode*>> pastedNodesByType;
+		for(auto node : macroNodes) {
+			string nodeType = node->getNodeModel().nodeName();
+			pastedNodesByType[nodeType].push_back(node);
+		}
+		
+		// For each original node, find its best match in the pasted nodes
+		for(size_t i = 0; i < originalNodeInfo.size(); i++) {
+			const auto& origInfo = originalNodeInfo[i];
+			string originalName = origInfo.originalName;
+			string nodeType = origInfo.nodeType;
+			
+			if(nodeType == "Macro") {
+				// SPECIAL HANDLING FOR MACROS: Match by parameter similarity
+				ofLogNotice("Encapsulation") << "Finding macro match for: " << originalName;
+				
+				// Find which parameters this original macro was involved in
+				set<string> originalMacroParams;
+				for(const auto& extConn : externalConnections) {
+					if(extConn.isIncoming) {
+						for(const auto& internalConn : extConn.internalConnections) {
+							if(internalConn.nodeName == originalName) {
+								originalMacroParams.insert(internalConn.paramName);
+							}
+						}
+					} else {
+						if(extConn.internalConnection.nodeName == originalName) {
+							originalMacroParams.insert(extConn.internalConnection.paramName);
+						}
+					}
+				}
+				
+				ofLogNotice("Encapsulation") << "Original macro " << originalName << " used parameters:";
+				for(const auto& param : originalMacroParams) {
+					ofLogNotice("Encapsulation") << "  - " << param;
+				}
+				
+				// Find the best matching macro among the pasted ones
+				ofxOceanodeNode* bestMatch = nullptr;
+				int bestScore = -1;
+				
+				for(auto pastedMacro : pastedNodesByType[nodeType]) {
+					if(nodeNameMapping.find(pastedMacro->getParameters().getName()) != nodeNameMapping.end()) {
+						continue; // Already mapped
+					}
+					
+					auto& pastedParams = pastedMacro->getParameters();
+					int score = 0;
+					
+					ofLogNotice("Encapsulation") << "Checking pasted macro: " << pastedMacro->getParameters().getName();
+					ofLogNotice("Encapsulation") << "Available parameters:";
+					for(auto& param : pastedParams) {
+						ofLogNotice("Encapsulation") << "  - " << param->getName();
+						if(originalMacroParams.count(param->getName()) > 0) {
+							score++;
+							ofLogNotice("Encapsulation") << "    MATCH!";
+						}
+					}
+					
+					ofLogNotice("Encapsulation") << "Score: " << score << "/" << originalMacroParams.size();
+					
+					if(score > bestScore) {
+						bestScore = score;
+						bestMatch = pastedMacro;
+					}
+				}
+				
+				if(bestMatch) {
+					string newName = bestMatch->getParameters().getName();
+					nodeNameMapping[originalName] = newName;
+					// Mark this pasted node as used by adding reverse mapping
+					nodeNameMapping[newName] = originalName;
+					
+					ofLogNotice("Encapsulation") << "MACRO MATCH: " << originalName << " → " << newName
+						<< " (score: " << bestScore << "/" << originalMacroParams.size() << ")";
+				} else {
+					ofLogError("Encapsulation") << "No good match found for macro: " << originalName;
+				}
+			} else {
+				// Regular node logic (unchanged)
+				if(pastedNodesByType[nodeType].size() > 0) {
+					// Count how many nodes of this type we've seen before this one
+					int typeIndex = 0;
+					for(size_t j = 0; j < i; j++) {
+						if(originalNodeInfo[j].nodeType == nodeType) {
+							typeIndex++;
+						}
+					}
+					
+					if(typeIndex < pastedNodesByType[nodeType].size()) {
+						string newName = pastedNodesByType[nodeType][typeIndex]->getParameters().getName();
+						nodeNameMapping[originalName] = newName;
+						
+						ofLogNotice("Encapsulation") << "REGULAR MATCH: " << originalName << " → " << newName;
+					}
+				}
+			}
+		}
+		
+		// Update external connections using the mapping
+		for(auto& extConn : externalConnections) {
+			if(extConn.isIncoming) {
+				// Update input router internal connections
+				for(auto& internalConn : extConn.internalConnections) {
+					string originalName = internalConn.nodeName;
+					
+					if(nodeNameMapping.find(originalName) != nodeNameMapping.end()) {
+						string newName = nodeNameMapping[originalName];
+						if(newName != originalName) {
+							ofLogNotice("Encapsulation") << "Updated input: " << originalName << " → " << newName;
+							internalConn.nodeName = newName;
+						}
+					}
+				}
+			} else {
+				// Update output router internal connection
+				string originalName = extConn.internalConnection.nodeName;
+				
+				if(nodeNameMapping.find(originalName) != nodeNameMapping.end()) {
+					string newName = nodeNameMapping[originalName];
+					if(newName != originalName) {
+						ofLogNotice("Encapsulation") << "Updated output: " << originalName << " → " << newName;
+						extConn.internalConnection.nodeName = newName;
+					}
+				}
+			}
+		}
+		
+		// 10. Create routers and reconnect
 		createRoutersAndReconnect(macroNode, externalConnections);
 	}
 	
@@ -1728,131 +1894,174 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 
 vector<ofxOceanodeContainer::ExternalConnection> ofxOceanodeContainer::analyzeExternalConnections(vector<ofxOceanodeNode*> selectedNodes) {
 	// For input routers: group by external parameter (one external → multiple internals)
- map<ofxOceanodeAbstractParameter*, ExternalConnection> inputRouters;
- 
- // For output routers: group by internal parameter (one internal → multiple externals)
- map<pair<string, string>, ExternalConnection> outputRouters; // Key: {nodeName, paramName}
- 
- // Track router names to avoid conflicts within this encapsulation
- map<string, int> nameCounters;
- 
- ofLogNotice("Encapsulation") << "Analyzing " << connections.size() << " total connections...";
- 
- for(auto& connection : connections) {
-	 if(!connection) continue;
-	 
-	 auto sourceNode = getNodeFromParameter(connection->getSourceParameter());
-	 auto sinkNode = getNodeFromParameter(connection->getSinkParameter());
-	 
-	 if(!sourceNode || !sinkNode) continue;
-	 
-	 bool sourceSelected = isNodeInList(sourceNode, selectedNodes);
-	 bool sinkSelected = isNodeInList(sinkNode, selectedNodes);
-	 
-	 // Skip internal connections (both nodes selected)
-	 if(sourceSelected && sinkSelected) continue;
-	 
-	 // Skip unrelated connections (neither node selected)
-	 if(!sourceSelected && !sinkSelected) continue;
-	 
-	 if(sourceSelected && !sinkSelected) {
-		 // Outgoing: selected → external (need output router)
-		 // Group by INTERNAL parameter (source), not external parameter (sink)
-		 
-		 string internalNodeName = sourceNode->getParameters().getName();
-		 string internalParamName = connection->getSourceParameter().getName();
-		 auto internalKey = make_pair(internalNodeName, internalParamName);
-		 
-		 auto it = outputRouters.find(internalKey);
-		 if(it != outputRouters.end()) {
-			 // Add this external connection to the existing router
-			 it->second.externalConnections.push_back(&connection->getSinkParameter());
-			 ofLogNotice("Encapsulation") << "Added external connection to output router: "
-				 << it->second.routerName << " -> external";
-		 } else {
-			 // Create new output router entry
-			 ExternalConnection extConn;
-			 extConn.routerType = getParameterTypeName(connection->getSourceParameter());
-			 extConn.isIncoming = false;
-			 extConn.routerName = generateRouterName(
-				 connection->getSourceParameter().getName(),
-				 nameCounters
-			 );
-			 
-			 // Set the single internal connection
-			 extConn.internalConnection.nodeName = internalNodeName;
-			 extConn.internalConnection.paramName = internalParamName;
-			 
-			 // Add the first external connection
-			 extConn.externalConnections.push_back(&connection->getSinkParameter());
-			 
-			 outputRouters[internalKey] = extConn;
-			 
-			 ofLogNotice("Encapsulation") << "Created output router: " << extConn.routerName
-				 << " for internal param (" << extConn.routerType << ")";
-		 }
-	 }
-	 else if(!sourceSelected && sinkSelected) {
-		 // Incoming: external → selected (need input router)
-		 // Group by EXTERNAL parameter (source), as before
-		 
-		 auto externalParam = &connection->getSourceParameter();
-		 
-		 auto it = inputRouters.find(externalParam);
-		 if(it != inputRouters.end()) {
-			 // Add this internal connection to the existing router
-			 it->second.internalConnections.push_back({
-				 sinkNode->getParameters().getName(),
-				 connection->getSinkParameter().getName()
-			 });
-			 ofLogNotice("Encapsulation") << "Added to existing input router: "
-				 << it->second.routerName << " -> " << connection->getSinkParameter().getName();
-		 } else {
-			 // Create new input router entry
-			 ExternalConnection extConn;
-			 extConn.routerType = getParameterTypeName(connection->getSourceParameter());
-			 extConn.externalParam = externalParam;
-			 extConn.isIncoming = true;
-			 extConn.routerName = generateRouterName(
-				 connection->getSinkParameter().getName(),
-				 nameCounters
-			 );
-			 
-			 // Add the first internal connection
-			 extConn.internalConnections.push_back({
-				 sinkNode->getParameters().getName(),
-				 connection->getSinkParameter().getName()
-			 });
-			 
-			 inputRouters[externalParam] = extConn;
-			 
-			 ofLogNotice("Encapsulation") << "Created input router: " << extConn.routerName
-				 << " for external param (" << extConn.routerType << ")";
-		 }
-	 }
- }
- 
- // Convert maps to vector
- vector<ExternalConnection> externals;
- 
- // Add input routers
- for(auto& pair : inputRouters) {
-	 externals.push_back(pair.second);
-	 ofLogNotice("Encapsulation") << "Input router " << pair.second.routerName
-		 << " will handle " << pair.second.internalConnections.size() << " internal connections";
- }
- 
- // Add output routers
- for(auto& pair : outputRouters) {
-	 externals.push_back(pair.second);
-	 ofLogNotice("Encapsulation") << "Output router " << pair.second.routerName
-		 << " will handle " << pair.second.externalConnections.size() << " external connections";
- }
- 
- return externals;
+	map<ofxOceanodeAbstractParameter*, ExternalConnection> inputRouters;
+	
+	// For output routers: group by internal parameter (one internal → multiple externals)
+	map<pair<string, string>, ExternalConnection> outputRouters; // Key: {nodeName, paramName}
+	
+	// Track router names to avoid conflicts within this encapsulation
+	map<string, int> nameCounters;
+	
+	ofLogNotice("Encapsulation") << "=== DEBUGGING CONNECTION ANALYSIS ===";
+	ofLogNotice("Encapsulation") << "Total connections in container: " << connections.size();
+	ofLogNotice("Encapsulation") << "Selected nodes for encapsulation: " << selectedNodes.size();
+	
+	// First, let's see what nodes exist in the container
+	ofLogNotice("Encapsulation") << "ALL NODES in container:";
+	for(auto& nodeTypeMap : dynamicNodes) {
+		for(auto& node : nodeTypeMap.second) {
+			ofLogNotice("Encapsulation") << "  - " << node.second->getParameters().getName()
+				<< " (type: " << node.second->getNodeModel().nodeName() << ")";
+		}
+	}
+	
+	// Check if any of our selected nodes are macros or routers
+	ofLogNotice("Encapsulation") << "SELECTED NODES details:";
+	for(auto node : selectedNodes) {
+		ofLogNotice("Encapsulation") << "  - " << node->getParameters().getName()
+			<< " (type: " << node->getNodeModel().nodeName() << ")";
+		
+		// Check if this is a router or macro
+		if(node->getNodeModel().nodeName().find("Router") != string::npos) {
+			ofLogWarning("Encapsulation") << "    WARNING: Selected node is a router!";
+		}
+		if(node->getNodeModel().nodeName().find("Macro") != string::npos) {
+			ofLogWarning("Encapsulation") << "    WARNING: Selected node is a macro!";
+		}
+	}
+	
+	ofLogNotice("Encapsulation") << "ANALYZING ALL CONNECTIONS:";
+	
+	int connectionIndex = 0;
+	for(auto& connection : connections) {
+		if(!connection) continue;
+		
+		auto sourceNode = getNodeFromParameter(connection->getSourceParameter());
+		auto sinkNode = getNodeFromParameter(connection->getSinkParameter());
+		
+		if(!sourceNode || !sinkNode) {
+			ofLogWarning("Encapsulation") << "Connection " << connectionIndex << ": Could not find nodes";
+			connectionIndex++;
+			continue;
+		}
+		
+		bool sourceSelected = isNodeInList(sourceNode, selectedNodes);
+		bool sinkSelected = isNodeInList(sinkNode, selectedNodes);
+		
+		string sourceNodeName = sourceNode->getParameters().getName();
+		string sinkNodeName = sinkNode->getParameters().getName();
+		string sourceParamName = connection->getSourceParameter().getName();
+		string sinkParamName = connection->getSinkParameter().getName();
+		
+		ofLogNotice("Encapsulation") << "Connection " << connectionIndex << ": "
+			<< sourceNodeName << "." << sourceParamName << " -> "
+			<< sinkNodeName << "." << sinkParamName;
+		ofLogNotice("Encapsulation") << "  Source selected: " << (sourceSelected ? "YES" : "NO")
+			<< ", Sink selected: " << (sinkSelected ? "YES" : "NO");
+		
+		// Check if this connection involves existing routers
+		bool sourceIsRouter = sourceNodeName.find("Router") != string::npos;
+		bool sinkIsRouter = sinkNodeName.find("Router") != string::npos;
+		bool sourceIsMacro = sourceNodeName.find("Macro") != string::npos;
+		bool sinkIsMacro = sinkNodeName.find("Macro") != string::npos;
+		
+		if(sourceIsRouter || sinkIsRouter || sourceIsMacro || sinkIsMacro) {
+			ofLogWarning("Encapsulation") << "  -> INVOLVES EXISTING ROUTER/MACRO: "
+				<< "src_router=" << sourceIsRouter << ", sink_router=" << sinkIsRouter
+				<< ", src_macro=" << sourceIsMacro << ", sink_macro=" << sinkIsMacro;
+		}
+		
+		// Skip internal connections (both nodes selected)
+		if(sourceSelected && sinkSelected) {
+			ofLogNotice("Encapsulation") << "  -> INTERNAL CONNECTION (preserved)";
+			connectionIndex++;
+			continue;
+		}
+		
+		// Skip unrelated connections (neither node selected)
+		if(!sourceSelected && !sinkSelected) {
+			ofLogNotice("Encapsulation") << "  -> UNRELATED CONNECTION (ignored)";
+			connectionIndex++;
+			continue;
+		}
+		
+		// This is an external connection we need to handle
+		if(sourceSelected && !sinkSelected) {
+			ofLogNotice("Encapsulation") << "  -> OUTGOING CONNECTION (needs output router)";
+			
+			// Check if sink is a router from previous encapsulation
+			if(sinkIsRouter) {
+				ofLogError("Encapsulation") << "    ERROR: Trying to connect to existing router! This might cause issues.";
+				ofLogError("Encapsulation") << "    Sink: " << sinkNodeName << "." << sinkParamName;
+			}
+			
+			string fullInternalNodeName = sourceNodeName;
+			string originalInternalParamName = sourceParamName;
+			auto internalKey = make_pair(fullInternalNodeName, originalInternalParamName);
+			
+			auto it = outputRouters.find(internalKey);
+			if(it != outputRouters.end()) {
+				it->second.externalConnections.push_back(&connection->getSinkParameter());
+			} else {
+				ExternalConnection extConn;
+				extConn.routerType = getParameterTypeName(connection->getSourceParameter());
+				extConn.isIncoming = false;
+				extConn.routerName = generateRouterName(originalInternalParamName, nameCounters);
+				extConn.internalConnection.nodeName = fullInternalNodeName;
+				extConn.internalConnection.paramName = originalInternalParamName;
+				extConn.externalConnections.push_back(&connection->getSinkParameter());
+				
+				outputRouters[internalKey] = extConn;
+				ofLogNotice("Encapsulation") << "    Created output router: " << extConn.routerName;
+			}
+		}
+		else if(!sourceSelected && sinkSelected) {
+			ofLogNotice("Encapsulation") << "  -> INCOMING CONNECTION (needs input router)";
+			
+			// Check if source is a router from previous encapsulation
+			if(sourceIsRouter) {
+				ofLogError("Encapsulation") << "    ERROR: Source is existing router! This might cause issues.";
+				ofLogError("Encapsulation") << "    Source: " << sourceNodeName << "." << sourceParamName;
+			}
+			
+			auto externalParam = &connection->getSourceParameter();
+			string fullInternalNodeName = sinkNodeName;
+			string originalInternalParamName = sinkParamName;
+			
+			auto it = inputRouters.find(externalParam);
+			if(it != inputRouters.end()) {
+				it->second.internalConnections.push_back({fullInternalNodeName, originalInternalParamName});
+			} else {
+				ExternalConnection extConn;
+				extConn.routerType = getParameterTypeName(connection->getSourceParameter());
+				extConn.externalParam = externalParam;
+				extConn.isIncoming = true;
+				extConn.routerName = generateRouterName(originalInternalParamName, nameCounters);
+				extConn.internalConnections.push_back({fullInternalNodeName, originalInternalParamName});
+				
+				inputRouters[externalParam] = extConn;
+				ofLogNotice("Encapsulation") << "    Created input router: " << extConn.routerName;
+			}
+		}
+		
+		connectionIndex++;
+	}
+	
+	// Convert maps to vector
+	vector<ExternalConnection> externals;
+	for(auto& pair : inputRouters) {
+		externals.push_back(pair.second);
+	}
+	for(auto& pair : outputRouters) {
+		externals.push_back(pair.second);
+	}
+	
+	ofLogNotice("Encapsulation") << "=== ANALYSIS COMPLETE ===";
+	ofLogNotice("Encapsulation") << "Will create " << externals.size() << " routers";
+	
+	return externals;
 }
 
-// Updated createRoutersAndReconnect method to handle the new structure
 void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode, vector<ExternalConnection>& connections) {
 	auto macroModel = dynamic_cast<ofxOceanodeNodeMacro*>(&macroNode->getNodeModel());
 	if(!macroModel) {
@@ -1866,11 +2075,16 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 		return;
 	}
 	
-	//ofLogNotice("Encapsulation") << "Creating " << connections.size() << " routers inside macro...";
+	ofLogNotice("Encapsulation") << "=== CREATING ROUTERS INSIDE MACRO ===";
+	ofLogNotice("Encapsulation") << "Creating " << connections.size() << " routers inside macro...";
 	
 	// Get all nodes inside the macro
 	auto macroNodes = macroContainer->getAllModules();
-	//ofLogNotice("Encapsulation") << "Found " << macroNodes.size() << " nodes inside macro";
+	ofLogNotice("Encapsulation") << "Found " << macroNodes.size() << " nodes inside macro:";
+	for(auto node : macroNodes) {
+		ofLogNotice("Encapsulation") << "  - " << node->getParameters().getName()
+			<< " (type: " << node->getNodeModel().nodeName() << ")";
+	}
 	
 	int routerIndex = 0;
 	vector<ofxOceanodeNode*> createdRouters;
@@ -1880,7 +2094,8 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 		try {
 			string routerTypeName = mapParameterTypeToRouterName(extConn.routerType);
 			
-			//ofLogNotice("Encapsulation") << "Creating router: " << routerTypeName << " for " << extConn.routerName;
+			ofLogNotice("Encapsulation") << "Creating router " << (routerIndex + 1) << "/" << connections.size()
+				<< ": " << routerTypeName << " named '" << extConn.routerName << "'";
 			
 			auto routerNode = macroContainer->createNodeFromName(routerTypeName);
 			if(!routerNode) {
@@ -1894,47 +2109,122 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 			auto routerModel = dynamic_cast<abstractRouter*>(&routerNode->getNodeModel());
 			if(routerModel) {
 				routerModel->getNameParam() = extConn.routerName;
-				//ofLogNotice("Encapsulation") << "Set router name to: " << extConn.routerName;
+				ofLogNotice("Encapsulation") << "Set router name to: " << extConn.routerName;
 			}
 			
-#ifndef OFXOCEANODE_HEADLESS
-			// Position router appropriately
-			if(extConn.isIncoming) {
-				routerNode->getNodeGui().setPosition(glm::vec2(-400, routerIndex * 100));
-			} else {
-				routerNode->getNodeGui().setPosition(glm::vec2(600, routerIndex * 100));
-			}
-#endif
+			#ifndef OFXOCEANODE_HEADLESS
+						// SMART POSITIONING: Position router near its connected nodes
+						glm::vec2 routerPos(0, 0);
+						int connectedNodeCount = 0;
+						
+						if(extConn.isIncoming) {
+							// Input router: position near the average of all internal nodes it connects to
+							for(const auto& internalConn : extConn.internalConnections) {
+								// Find the internal node this router will connect to
+								for(auto node : macroNodes) {
+									if(node->getParameters().getName() == internalConn.nodeName) {
+										routerPos += node->getNodeGui().getPosition();
+										connectedNodeCount++;
+										break;
+									}
+								}
+							}
+							
+							if(connectedNodeCount > 0) {
+								routerPos /= connectedNodeCount;
+								// Offset input routers to the left of the connected nodes
+								routerPos.x -= 200;
+							} else {
+								// Fallback position for input routers
+								routerPos = glm::vec2(-200, routerIndex * 80);
+							}
+						} else {
+							// Output router: position near the single internal node it connects from
+							for(auto node : macroNodes) {
+								if(node->getParameters().getName() == extConn.internalConnection.nodeName) {
+									routerPos = node->getNodeGui().getPosition();
+									// Offset output routers to the right of the connected node
+									routerPos.x += 300;
+									connectedNodeCount = 1;
+									break;
+								}
+							}
+							
+							if(connectedNodeCount == 0) {
+								// Fallback position for output routers
+								routerPos = glm::vec2(400, routerIndex * 80);
+							}
+						}
+						
+						// Add some vertical spacing if multiple routers would overlap
+						routerPos.y += (routerIndex % 3) * 60; // Slight vertical offset for multiple routers
+						
+						routerNode->getNodeGui().setPosition(routerPos);
+						
+						ofLogNotice("Encapsulation") << "Positioned " << (extConn.isIncoming ? "input" : "output")
+							<< " router '" << extConn.routerName << "' at (" << routerPos.x << ", " << routerPos.y << ")";
+			#endif
 			
 			// Get router's Value parameter
 			auto& routerParams = routerNode->getParameters();
+			if(!routerParams.contains("Value")) {
+				ofLogError("Encapsulation") << "Router does not have Value parameter!";
+				ofLogError("Encapsulation") << "Available parameters:";
+				for(auto& param : routerParams) {
+					ofLogError("Encapsulation") << "  - " << param->getName();
+				}
+				continue;
+			}
+			
 			auto routerParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&routerParams.get("Value"));
 			if(!routerParam) {
-				ofLogError("Encapsulation") << "Router does not have Value parameter";
+				ofLogError("Encapsulation") << "Could not cast Value parameter to ofxOceanodeAbstractParameter";
 				continue;
 			}
 			
 			if(extConn.isIncoming) {
 				// Input router: connect to multiple internal parameters
+				ofLogNotice("Encapsulation") << "Connecting input router to " << extConn.internalConnections.size() << " internal parameters:";
 				for(const auto& internalConn : extConn.internalConnections) {
 					ofxOceanodeAbstractParameter* internalParam = findInternalParameter(macroNodes, internalConn);
 					if(internalParam) {
+						// Check if target parameter already has a connection
+						if(internalParam->hasInConnection()) {
+							ofLogError("Encapsulation") << "ERROR: Target parameter " << internalConn.nodeName
+								<< "." << internalConn.paramName << " already has an input connection!";
+							ofLogError("Encapsulation") << "This should not happen - investigating connection analysis...";
+							continue;
+						}
+						
 						auto conn = macroContainer->createConnection(*routerParam, *internalParam);
 						if(conn) {
-							//ofLogNotice("Encapsulation") << "Connected input router " << extConn.routerName
-							//	<< " → " << internalConn.nodeName << "." << internalConn.paramName;
+							ofLogNotice("Encapsulation") << "  ✓ Connected input router '" << extConn.routerName
+								<< "' → " << internalConn.nodeName << "." << internalConn.paramName;
+						} else {
+							ofLogError("Encapsulation") << "  ✗ Failed to connect input router '" << extConn.routerName
+								<< "' → " << internalConn.nodeName << "." << internalConn.paramName;
 						}
+					} else {
+						ofLogError("Encapsulation") << "  ✗ Could not find internal parameter: "
+							<< internalConn.nodeName << "." << internalConn.paramName;
 					}
 				}
 			} else {
 				// Output router: connect from single internal parameter
+				ofLogNotice("Encapsulation") << "Connecting output router from internal parameter:";
 				ofxOceanodeAbstractParameter* internalParam = findInternalParameter(macroNodes, extConn.internalConnection);
 				if(internalParam) {
 					auto conn = macroContainer->createConnection(*internalParam, *routerParam);
 					if(conn) {
-						//ofLogNotice("Encapsulation") << "Connected " << extConn.internalConnection.nodeName
-						//	<< "." << extConn.internalConnection.paramName << " → output router " << extConn.routerName;
+						ofLogNotice("Encapsulation") << "  ✓ Connected " << extConn.internalConnection.nodeName
+							<< "." << extConn.internalConnection.paramName << " → output router '" << extConn.routerName << "'";
+					} else {
+						ofLogError("Encapsulation") << "  ✗ Failed to connect " << extConn.internalConnection.nodeName
+							<< "." << extConn.internalConnection.paramName << " → output router '" << extConn.routerName << "'";
 					}
+				} else {
+					ofLogError("Encapsulation") << "  ✗ Could not find internal parameter: "
+						<< extConn.internalConnection.nodeName << "." << extConn.internalConnection.paramName;
 				}
 			}
 			
@@ -1957,24 +2247,33 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 	macroNode->update(args);
 	
 	// Now reconnect external connections to macro parameters
-	//ofLogNotice("Encapsulation") << "Reconnecting external connections...";
+	ofLogNotice("Encapsulation") << "=== RECONNECTING EXTERNAL CONNECTIONS ===";
 	
 	auto& macroParams = macroNode->getParameters();
+	ofLogNotice("Encapsulation") << "Available macro parameters:";
+	for(auto& param : macroParams) {
+		ofLogNotice("Encapsulation") << "  - " << param->getName() << " (" << param->valueType() << ")";
+	}
 	
 	int reconnectedCount = 0;
 	for(auto& extConn : connections) {
 		try {
 			if(macroParams.contains(extConn.routerName)) {
 				auto macroParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&macroParams.get(extConn.routerName));
-				if(!macroParam) continue;
+				if(!macroParam) {
+					ofLogError("Encapsulation") << "Could not cast macro parameter: " << extConn.routerName;
+					continue;
+				}
 				
 				if(extConn.isIncoming) {
 					// Incoming: external → macro input (single connection)
 					if(extConn.externalParam) {
 						auto conn = createConnection(*extConn.externalParam, *macroParam);
 						if(conn) {
-							//ofLogNotice("Encapsulation") << "Reconnected incoming: external → " << extConn.routerName;
+							ofLogNotice("Encapsulation") << "  ✓ Reconnected incoming: external → " << extConn.routerName;
 							reconnectedCount++;
+						} else {
+							ofLogError("Encapsulation") << "  ✗ Failed to reconnect incoming to " << extConn.routerName;
 						}
 					}
 				} else {
@@ -1983,8 +2282,10 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 						if(externalParam) {
 							auto conn = createConnection(*macroParam, *externalParam);
 							if(conn) {
-								//ofLogNotice("Encapsulation") << "Reconnected outgoing: " << extConn.routerName << " → external";
+								ofLogNotice("Encapsulation") << "  ✓ Reconnected outgoing: " << extConn.routerName << " → external";
 								reconnectedCount++;
+							} else {
+								ofLogError("Encapsulation") << "  ✗ Failed to reconnect outgoing from " << extConn.routerName;
 							}
 						}
 					}
@@ -1997,7 +2298,8 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 		}
 	}
 	
-	//ofLogNotice("Encapsulation") << "Completed: " << reconnectedCount << " connections restored";
+	ofLogNotice("Encapsulation") << "=== ENCAPSULATION COMPLETE ===";
+	ofLogNotice("Encapsulation") << "Successfully reconnected: " << reconnectedCount << " connections";
 }
 
 bool ofxOceanodeContainer::isNodeInList(ofxOceanodeNode* node, vector<ofxOceanodeNode*>& nodeList) {
@@ -2007,15 +2309,28 @@ bool ofxOceanodeContainer::isNodeInList(ofxOceanodeNode* node, vector<ofxOceanod
 string ofxOceanodeContainer::generateRouterName(const string& paramName, map<string, int>& nameCounters) {
 	// Clean parameter name
 	string cleanParamName = paramName;
+	ofStringReplace(cleanParamName, ".", "_");
 	ofStringReplace(cleanParamName, " ", "_");
+	
+	// Remove consecutive underscores and trim
+	while(cleanParamName.find("__") != string::npos) {
+		ofStringReplace(cleanParamName, "__", "_");
+	}
+	if(!cleanParamName.empty() && cleanParamName[0] == '_') {
+		cleanParamName = cleanParamName.substr(1);
+	}
+	if(!cleanParamName.empty() && cleanParamName.back() == '_') {
+		cleanParamName = cleanParamName.substr(0, cleanParamName.length() - 1);
+	}
+	if(cleanParamName.empty()) {
+		cleanParamName = "Param";
+	}
 	
 	// Check if this name already exists in this encapsulation
 	if(nameCounters.find(cleanParamName) == nameCounters.end()) {
-		// First time using this parameter name - no number suffix
 		nameCounters[cleanParamName] = 1;
 		return cleanParamName;
 	} else {
-		// Name already exists, increment counter and add suffix
 		nameCounters[cleanParamName]++;
 		return cleanParamName + "_" + ofToString(nameCounters[cleanParamName]);
 	}
@@ -2204,16 +2519,110 @@ ofxOceanodeAbstractParameter* ofxOceanodeContainer::findInternalParameter(
 	const vector<ofxOceanodeNode*>& macroNodes,
 	const InternalConnection& internalConn) {
 	
+	ofLogVerbose("Encapsulation") << "Looking for internal parameter: " << internalConn.nodeName << "." << internalConn.paramName;
+	
 	for(auto node : macroNodes) {
 		if(node->getParameters().getName() == internalConn.nodeName) {
 			auto& nodeParams = node->getParameters();
-			if(nodeParams.contains(internalConn.paramName)) {
-				return dynamic_cast<ofxOceanodeAbstractParameter*>(&nodeParams.get(internalConn.paramName));
+			
+			ofLogVerbose("Encapsulation") << "Found matching node: " << internalConn.nodeName;
+			
+			// MACRO-AWARE FIX: Check if this is a macro node
+			bool isMacroNode = (node->getNodeModel().nodeName() == "Macro");
+			
+			if(isMacroNode) {
+				ofLogNotice("Encapsulation") << "Node is a macro, looking for exposed parameter: " << internalConn.paramName;
+				
+				// For macro nodes, the exposed router parameters appear directly in the parameter group
+				// after the macro has processed its internal routers
+				
+				// Force an update to ensure all router parameters are exposed
+				ofEventArgs args;
+				node->update(args);
+				
+				// Small delay to allow parameter exposure to complete
+				ofSleepMillis(50);
+				node->update(args);
+				
+				// Now check for the parameter
+				if(nodeParams.contains(internalConn.paramName)) {
+					auto param = dynamic_cast<ofxOceanodeAbstractParameter*>(&nodeParams.get(internalConn.paramName));
+					if(param) {
+						ofLogNotice("Encapsulation") << "✓ Found macro exposed parameter: " << internalConn.paramName;
+						return param;
+					} else {
+						ofLogError("Encapsulation") << "✗ Found parameter but failed to cast: " << internalConn.paramName;
+					}
+				} else {
+					ofLogError("Encapsulation") << "✗ Macro parameter not found: " << internalConn.paramName;
+					ofLogError("Encapsulation") << "Available macro parameters:";
+					for(auto& param : nodeParams) {
+						ofLogError("Encapsulation") << "  - '" << param->getName() << "'";
+					}
+				}
+			} else {
+				// Regular node logic (unchanged)
+				ofLogVerbose("Encapsulation") << "Regular node, available parameters:";
+				for(auto& param : nodeParams) {
+					ofLogVerbose("Encapsulation") << "  - '" << param->getName() << "'";
+				}
+				
+				if(nodeParams.contains(internalConn.paramName)) {
+					auto param = dynamic_cast<ofxOceanodeAbstractParameter*>(&nodeParams.get(internalConn.paramName));
+					if(param) {
+						ofLogVerbose("Encapsulation") << "✓ Found and cast parameter: " << internalConn.paramName;
+						return param;
+					} else {
+						ofLogError("Encapsulation") << "✗ Found parameter but failed to cast: " << internalConn.paramName;
+					}
+				} else {
+					ofLogError("Encapsulation") << "✗ Parameter not found in node: " << internalConn.paramName;
+				}
 			}
+			break;
 		}
 	}
 	
 	ofLogError("Encapsulation") << "Could not find internal parameter: "
 		<< internalConn.nodeName << "." << internalConn.paramName;
 	return nullptr;
+}
+
+string ofxOceanodeContainer::extractNodeType(const string& nodeName) {
+	// Extract base type from node name (e.g., "Vector Item Operations 2" → "Vector Item Operations")
+	string nodeType = nodeName;
+	auto lastSpacePos = nodeType.find_last_of(' ');
+	if(lastSpacePos != string::npos) {
+		string possibleId = nodeType.substr(lastSpacePos + 1);
+		bool isNumeric = !possibleId.empty() && std::all_of(possibleId.begin(), possibleId.end(), ::isdigit);
+		if(isNumeric) {
+			nodeType = nodeType.substr(0, lastSpacePos);
+		}
+	}
+	return nodeType;
+}
+
+void ofxOceanodeContainer::ensureMacroParametersExposed(const vector<ofxOceanodeNode*>& macroNodes) {
+	ofLogNotice("Encapsulation") << "Ensuring macro parameters are exposed...";
+	
+	// Force multiple updates to ensure all macro router parameters are exposed
+	for(int i = 0; i < 3; i++) {
+		ofEventArgs args;
+		for(auto node : macroNodes) {
+			if(node->getNodeModel().nodeName() == "Macro") {
+				node->update(args);
+			}
+		}
+		ofSleepMillis(25); // Small delay between updates
+	}
+	
+	// Log final parameter state
+	for(auto node : macroNodes) {
+		if(node->getNodeModel().nodeName() == "Macro") {
+			ofLogNotice("Encapsulation") << "Macro " << node->getParameters().getName() << " exposed parameters:";
+			for(auto& param : node->getParameters()) {
+				ofLogNotice("Encapsulation") << "  - " << param->getName() << " (" << param->valueType() << ")";
+			}
+		}
+	}
 }
