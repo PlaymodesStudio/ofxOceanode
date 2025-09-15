@@ -183,6 +183,14 @@ public:
 		
 		return typedPortals;
 	}
+	
+	static std::string getCurrentPresetName(){
+		return getInstance().currentPresetName;
+	}
+
+	static void setCurrentPresetName(const std::string& presetName){
+		getInstance().currentPresetName = presetName;
+	}
     
 private:
     ofxOceanodeShared(){};
@@ -211,6 +219,7 @@ private:
     unsigned int leftNode_id = 0;
 	
     std::shared_ptr<macroCategory> macroDirectoryStructure;
+	std::string currentPresetName = "";
 	
 	ofEvent<string> macroUpdatedEvent;
     bool presetLoading;
