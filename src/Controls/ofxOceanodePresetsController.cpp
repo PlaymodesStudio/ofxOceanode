@@ -407,6 +407,7 @@ void ofxOceanodePresetsController::loadPreset(string name, string bank){
     ofxOceanodeShared::startedLoadingPreset();
     container->loadPreset(myPath);
     ofxOceanodeShared::finishedLoadingPreset();
+	ofxOceanodeShared::setCurrentPresetName(name);
 }
 
 void ofxOceanodePresetsController::savePreset(string name, string bank)
