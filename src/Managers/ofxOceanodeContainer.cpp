@@ -2378,7 +2378,6 @@ string ofxOceanodeContainer::getParameterTypeName(ofxOceanodeAbstractParameter& 
 	if(fullType == typeid(ofFloatColor).name()) return "ofFloatColor";
 	
 	// Graphics types
-	if(fullType == typeid(ofTexture).name()) return "ofTexture";
 	if(fullType == typeid(ofTexture*).name()) return "P9ofTexture*";
 	if(fullType == typeid(glm::mat4).name()) return "glm::mat4";
 	if(fullType == typeid(ofPolyline).name()) return "ofPolyline";
@@ -2473,7 +2472,6 @@ string ofxOceanodeContainer::mapParameterTypeToRouterName(const string& paramTyp
 	if(paramType == "buffer<char>") return "Router buffer_c";
 	
 	// Graphics types
-	if(paramType == "ofTexture") return "Router Texture";
 	if(paramType == "P9ofTexture*") return "Router Texture";
 	if(paramType == "buffer<ofTexture>") return "Router buffer_Texture";
 	if(paramType == "VideoFrame") return "Router VideoFrame";
