@@ -32,6 +32,7 @@ public:
     }
 	
 	virtual bool match(abstractPortal* p) = 0;
+	virtual void resendValue() = 0;
     
     bool isMatching(abstractPortal *p){
         return type() == p->type() && getName() == p->getName() && checkLocal(p);
@@ -40,6 +41,7 @@ public:
 protected:
 	ofParameter<string> name;
     ofParameter<bool> local;
+	ofParameter<bool> resendOnNameChange;
 	ofEventListener listener;
     ofEventListener nameListener;
     bool settingViaMatch;
@@ -68,6 +70,12 @@ public:
 	
 	void setValue(T t){
 		value = t;
+	}
+	
+	void resendValue() override {
+		if(resendOnNameChange) {
+			portalUpdated();
+		}
 	}
 	
 	bool match(abstractPortal* p){
@@ -116,6 +124,12 @@ public:
 		value = t;
 	}
 	
+	void resendValue() override {
+		if(resendOnNameChange) {
+			portalUpdated();
+		}
+	}
+	
 	bool match(abstractPortal* p){
 		if(type() == p->type() && getName() == p->getName() && checkLocal(p)){
             settingViaMatch = true;
@@ -141,6 +155,12 @@ public:
 		listener = value.newListener([this](){
 			portalUpdated();
 		});
+	}
+	
+	void resendValue() override {
+		if(resendOnNameChange) {
+			value.trigger();
+		}
 	}
 	
 	bool match(abstractPortal* p){
