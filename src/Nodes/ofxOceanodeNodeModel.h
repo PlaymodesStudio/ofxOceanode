@@ -22,7 +22,9 @@ enum ofxOceanodeNodeModelFlags_
     ofxOceanodeNodeModelFlags_None              = 0,
     ofxOceanodeNodeModelFlags_WaitForFrame      = 1 << 0,   //
     ofxOceanodeNodeModelFlags_FrameDone         = 1 << 1,   //
-    ofxOceanodeNodeModelFlags_ForceFrameMode    = 1 << 2
+    ofxOceanodeNodeModelFlags_ForceFrameMode    = 1 << 2,
+	ofxOceanodeNodeModelFlags_TransparentNode   = 1 << 3    //
+
 };
 
 class ofxOceanodeNodeModel {
