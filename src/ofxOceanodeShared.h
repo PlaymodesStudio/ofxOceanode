@@ -191,6 +191,14 @@ public:
 	static void setCurrentPresetName(const std::string& presetName){
 		getInstance().currentPresetName = presetName;
 	}
+	
+	static std::string getCurrentPresetPath(){
+		return getInstance().currentPresetPath;
+	}
+
+	static void setCurrentPresetPath(const std::string& presetPath){
+		getInstance().currentPresetPath = presetPath;
+	}
     
 private:
     ofxOceanodeShared(){};
@@ -230,6 +238,9 @@ private:
     vector<abstractPortal*> currentUpdatingPortals;
     
     ofxOceanodeConfigurationFlags configurationFlags;
+	
+	std::string currentPresetPath = "";
+
 };
 
 #endif /* ofxOceanodeShared_h */
