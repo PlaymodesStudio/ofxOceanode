@@ -38,46 +38,52 @@ ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
 
 bool ofxOceanodeNodeGui::constructGui(){
     string moduleName = getParameters().getName();
+	
+	bool isTransparent = (node.getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
+
     ImGui::BeginGroup(); // Lock horizontal position
     
     bool deleteModule = false;
     
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
-    
-    if(ImGui::ArrowButton("expand", expanded ? ImGuiDir_Down : ImGuiDir_Right)){
-        expanded = !expanded;
-    }
-    ImGui::PopStyleColor();
-    
-    ImGui::SameLine();
-    ImGui::Text("%s", moduleName.c_str());
-    
-    ImGui::SameLine(guiRect.width - 30);
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(220,220,220,255)));
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(ImColor(0, 0, 0,0)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(ImColor(0, 0, 0,0)));
-
-    if (ImGui::Button("x"))
-    {
-        ImGui::OpenPopup("Delete?");
-    }
-    ImGui::PopStyleColor(4);
-    
-    if (ImGui::BeginPopupModal("Delete?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        ImGui::Text("%s", (moduleName + "\n").c_str());
-        ImGui::Separator();
-        
-        if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
-            ImGui::CloseCurrentPopup();
-            deleteModule = true;
-        }
-        ImGui::SetItemDefaultFocus();
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(120,0))) { ImGui::CloseCurrentPopup(); }
-        ImGui::EndPopup();
-    }
+	if (!isTransparent) {
+		
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
+		
+		if(ImGui::ArrowButton("expand", expanded ? ImGuiDir_Down : ImGuiDir_Right)){
+			expanded = !expanded;
+		}
+		ImGui::PopStyleColor();
+		
+		ImGui::SameLine();
+		ImGui::Text("%s", moduleName.c_str());
+		
+		ImGui::SameLine(guiRect.width - 30);
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(220,220,220,255)));
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(ImColor(0, 0, 0,0)));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(ImColor(0, 0, 0,0)));
+		
+		if (ImGui::Button("x"))
+		{
+			ImGui::OpenPopup("Delete?");
+		}
+		ImGui::PopStyleColor(4);
+		
+		if (ImGui::BeginPopupModal("Delete?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::Text("%s", (moduleName + "\n").c_str());
+			ImGui::Separator();
+			
+			if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
+				ImGui::CloseCurrentPopup();
+				deleteModule = true;
+			}
+			ImGui::SetItemDefaultFocus();
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel", ImVec2(120,0))) { ImGui::CloseCurrentPopup(); }
+			ImGui::EndPopup();
+		}
+	}
     
     if(inputPositions.size() != getParameters().size()){
         inputPositions.resize(getParameters().size());
