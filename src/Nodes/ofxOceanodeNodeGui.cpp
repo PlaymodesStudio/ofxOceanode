@@ -96,7 +96,50 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::BeginDisabled();
             ImGui::PushID(uniqueId.c_str());
             if(absParam.valueType() == typeid(std::function<void()>).name()){
-                absParam.cast<std::function<void()>>().getParameter().get()();
+                // Check if this is a separator by looking at the parameter name
+                if(uniqueId.find("SEPARATOR:|") == 0){
+                    // Parse separator data: "SEPARATOR:|label|r,g,b,a"
+                    vector<string> parts = ofSplitString(uniqueId, "|");
+                    string label = parts.size() > 1 ? parts[1] : "";
+                    ofColor color(200, 200, 200, 255); // default
+                    
+                    if(parts.size() > 2){
+                        vector<string> colorParts = ofSplitString(parts[2], ",");
+                        if(colorParts.size() >= 4){
+                            color.r = ofToInt(colorParts[0]);
+                            color.g = ofToInt(colorParts[1]);
+                            color.b = ofToInt(colorParts[2]);
+                            color.a = ofToInt(colorParts[3]);
+                        }
+                    }
+                    
+                    // Render separator with label and background highlight
+                    if(!label.empty()){
+                        ImVec2 p = ImGui::GetCursorScreenPos();
+                        float w = guiRect.width;
+                        
+                        // Draw the text
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(color.r/255.0f, color.g/255.0f, color.b/255.0f, color.a/255.0f));
+                        ImGui::TextUnformatted(label.c_str());
+                        ImGui::PopStyleColor();
+                        
+                        // Get the size of the rendered text
+                        ImVec2 textSize = ImGui::CalcTextSize(label.c_str());
+                        
+                        // Draw a semi-transparent rectangle behind/below the text (25% opacity)
+                        ImU32 bgCol = IM_COL32(color.r, color.g, color.b, color.a * 0.15f);
+                        ImGui::GetWindowDrawList()->AddRectFilled(
+                            ImVec2(p.x, p.y),
+                            ImVec2(p.x + w - 16 , p.y + textSize.y),
+                            bgCol
+                        );
+                        
+                        ImGui::Dummy(ImVec2(0, 2));
+                    }
+                }else{
+                    // Regular custom region function
+                    absParam.cast<std::function<void()>>().getParameter().get()();
+                }
             }else{
                 
                 ImGui::Text("%s", uniqueId.c_str());

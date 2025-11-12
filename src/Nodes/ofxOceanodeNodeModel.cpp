@@ -92,3 +92,22 @@ void ofxOceanodeNodeModel::setContainer(ofxOceanodeContainer* container){
 string ofxOceanodeNodeModel::getParents(){
     return canvasID;
 }
+
+void ofxOceanodeNodeModel::addSeparator(string name, ofColor color){
+    ofParameter<std::function<void()>> separator;
+    
+#ifndef OFXOCEANODE_HEADLESS
+    // Store the label and color as a string that will be parsed in the GUI
+    // Format: "SEPARATOR:|label|r,g,b,a"
+    string separatorData = "SEPARATOR:|" + name + "|" +
+                          ofToString((int)color.r) + "," +
+                          ofToString((int)color.g) + "," +
+                          ofToString((int)color.b) + "," +
+                          ofToString((int)color.a);
+    separator.setName(separatorData);
+    addCustomRegion(separator, [](){});  // Empty function, rendering will be handled by GUI
+#else
+    // In headless mode, just add an empty function
+    addCustomRegion(separator, [](){});
+#endif
+}

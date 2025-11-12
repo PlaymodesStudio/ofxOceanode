@@ -134,6 +134,8 @@ public:
         return addParameter(p.set(func), ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisableOutConnection | ofxOceanodeParameterFlags_DisableSavePreset | ofxOceanodeParameterFlags_DisableSaveProject);
     }
     
+    void addSeparator(string name = "", ofColor color = ofColor(200, 200, 200, 255));
+    
     template<typename ParameterType>
     ofParameter<ParameterType>& getParameter(string name){
         return static_cast<ofxOceanodeAbstractParameter&>(parameters.get(name)).cast<ParameterType>().getParameter();
