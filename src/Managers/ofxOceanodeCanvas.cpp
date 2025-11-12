@@ -36,6 +36,8 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
     
     scrolling = glm::vec2(0,0);
     moveSelectedModulesWithDrag = glm::vec2(0,0);
+    
+    duplicatedConnection == nullptr;
 }
 
 void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
@@ -423,6 +425,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                         if(!ImGui::GetIO().KeyAlt){
                                             inConnection->deleteSelf();
                                         }
+                                        else{
+                                            duplicatedConnection = inConnection;
+                                        }
                                     }else{
                                         tempSinkParameter = param.get();
                                     }
@@ -450,14 +455,31 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                                 ofLog() << "Cannot create connection Already connected the other way arround";
                                             }
                                             else{
-                                                //Remove previous connection connected to that parameter.
+                                                //Remove previous connection connected to that parameter without restoring value.
+                                                //And change the before value from the previous connection to the new connection
                                                 if(param->hasInConnection()){
-                                                    param->getInConnection()->deleteSelf();
+                                                    ofxOceanodeAbstractConnection *oldConnection = param->getInConnection();
+                                                    oldConnection->doNotRestore();
+                                                    ofxOceanodeAbstractParameter &oldParameterConnection = oldConnection->getSinkParameter();
+                                                    oldConnection->deleteSelf();
+                                                    ofxOceanodeAbstractConnection* newConnection = container->createConnection(*tempSourceParameter, *param);
+                                                    if(newConnection != nullptr){
+                                                        newConnection->reInitSinkParameter(oldParameterConnection);
+                                                    }
                                                 }
-                                                container->createConnection(*tempSourceParameter, *param);
+                                                else{
+                                                    container->createConnection(*tempSourceParameter, *param);
+                                                }
+                                                
+                                                if(duplicatedConnection != nullptr){
+                                                    if(!ImGui::GetIO().KeyAlt)
+                                                        duplicatedConnection->deleteSelf();
+                                                    duplicatedConnection == nullptr;
+                                                }
                                             }
                                         }
                                         tempSourceParameter = nullptr;
+                                        duplicatedConnection = nullptr;
                                     }
                                 }
                             }
@@ -479,6 +501,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                     isCreatingConnection = false;
                                     if(tempSourceParameter != nullptr){
                                         tempSourceParameter = nullptr;
+                                        duplicatedConnection = nullptr;
                                         ofLog() << "Cannot create a conection from Source to Source";
                                     }
                                     if(tempSinkParameter != nullptr){
@@ -1009,6 +1032,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             if (isCreatingConnection && !ImGui::IsMouseDown(0)){
                 //Destroy temporal connection
                 tempSourceParameter = nullptr;
+                duplicatedConnection = nullptr;
                 tempSinkParameter = nullptr;
                 isCreatingConnection = false;
             }

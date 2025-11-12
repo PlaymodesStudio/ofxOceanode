@@ -20,6 +20,7 @@ public:
         active = _active;
         sourceParameter->addOutConnection(this);
         sinkParameter->setInConnection(this);
+        b_doRestore = true;
     };
 
     virtual ~ofxOceanodeAbstractConnection(){
@@ -44,10 +45,14 @@ public:
     
     bool getIsPersistent(){return isPersistent;};
     void setIsPersistent(bool p){isPersistent = p;};
+    void doNotRestore(){b_doRestore = false;};
+    
+    virtual bool reInitSinkParameter(ofxOceanodeAbstractParameter &connection){return false;};
     
     ofEvent<void> destroyConnection;
 protected:
     bool active;
+    bool b_doRestore;
     
     virtual void passValueFunc() = 0;
     virtual void restoreValue() = 0;
@@ -128,6 +133,15 @@ public:
     ~ofxOceanodeConnection(){
         restoreValue();
     };
+   
+    bool reInitSinkParameter(ofxOceanodeAbstractParameter &parameter) override{
+        if(typeid(parameter) == typeid(ofxOceanodeParameter<Tsink>)){
+            beforeConnectionValue = parameter.cast<Tsink>().getParameter().getInit();
+            sinkParameter.setInit(beforeConnectionValue);
+            return true;
+        }
+        return false;
+    }
     
 private:
     void passValueFunc(){
@@ -136,7 +150,12 @@ private:
         }
     }
     void restoreValue(){
-        sinkParameter.set(beforeConnectionValue);
+        if(b_doRestore){
+            sinkParameter.set(beforeConnectionValue);
+        }
+        else{
+            sinkParameter.setInit(beforeConnectionValue);
+        }
     }
     ofEventListener parameterEventListener;
     ofParameter<Tsource>& sourceParameter;
@@ -149,6 +168,7 @@ class ofxOceanodeConnection<vector<_Tsource>, vector<_Tsink>, typename std::enab
 public:
     ofxOceanodeConnection(ofxOceanodeParameter<vector<_Tsource>>& pSource, ofxOceanodeParameter<vector<_Tsink>>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()), sinkParameter(pSink.getParameter()){
         beforeConnectionValue = sinkParameter.get();
+//        sinkParameter.setInit(sinkParameter.get());
         parameterEventListener = sourceParameter.newListener([&](vector<_Tsource> &vf){
             passValueFunc();
         });
@@ -158,6 +178,15 @@ public:
         restoreValue();
     };
     
+    bool reInitSinkParameter(ofxOceanodeAbstractParameter &parameter) override{
+        if(typeid(parameter) == typeid(ofxOceanodeParameter<vector<_Tsink>>)){
+            beforeConnectionValue = parameter.cast<vector<_Tsink>>().getParameter().getInit();
+            sinkParameter.setInit(beforeConnectionValue);
+            return true;
+        }
+        return false;
+    }
+    
 private:
     void passValueFunc(){
         if(active){
@@ -165,7 +194,12 @@ private:
         }
     }
     void restoreValue(){
-        sinkParameter.set(beforeConnectionValue);
+        if(b_doRestore){
+            sinkParameter.set(beforeConnectionValue);
+        }
+        else{
+            sinkParameter.setInit(beforeConnectionValue);
+        }
     }
     ofEventListener parameterEventListener;
     ofParameter<vector<_Tsource>>& sourceParameter;
@@ -184,6 +218,7 @@ class ofxOceanodeConnection<_Tsource, vector<_Tsink>, typename std::enable_if<!s
 public:
     ofxOceanodeConnection(ofxOceanodeParameter<_Tsource>& pSource, ofxOceanodeParameter<vector<_Tsink>>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()), sinkParameter(pSink.getParameter()){
         beforeConnectionValue = sinkParameter.get();
+//        sinkParameter.setInit(sinkParameter.get());
         parameterEventListener = sourceParameter.newListener([&](_Tsource &f){
             passValueFunc();
         });
@@ -193,6 +228,15 @@ public:
         restoreValue();
     };
     
+    bool reInitSinkParameter(ofxOceanodeAbstractParameter &parameter) override{
+        if(typeid(parameter) == typeid(ofxOceanodeParameter<vector<_Tsink>>)){
+            beforeConnectionValue = parameter.cast<vector<_Tsink>>().getParameter().getInit();
+            sinkParameter.setInit(beforeConnectionValue);
+            return true;
+        }
+        return false;
+    }
+    
 private:
     void passValueFunc(){
         if(active){
@@ -200,7 +244,12 @@ private:
         }
     }
     void restoreValue(){
-        sinkParameter.set(beforeConnectionValue);
+        if(b_doRestore){
+            sinkParameter.set(beforeConnectionValue);
+        }
+        else{
+            sinkParameter.setInit(beforeConnectionValue);
+        }
     }
     ofEventListener parameterEventListener;
     ofParameter<_Tsource>& sourceParameter;
@@ -213,6 +262,7 @@ class ofxOceanodeConnection<vector<_Tsource>, _Tsink, typename std::enable_if<st
 public:
     ofxOceanodeConnection(ofxOceanodeParameter<vector<_Tsource>>& pSource, ofxOceanodeParameter<_Tsink>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()), sinkParameter(pSink.getParameter()){
         beforeConnectionValue = sinkParameter.get();
+//        sinkParameter.setInit(sinkParameter.get());
         parameterEventListener = sourceParameter.newListener([&](vector<_Tsource> &vf){
             passValueFunc();
         });
@@ -222,6 +272,14 @@ public:
         restoreValue();
     };
     
+    bool reInitSinkParameter(ofxOceanodeAbstractParameter &parameter) override{
+        if(typeid(parameter) == typeid(ofxOceanodeParameter<_Tsink>)){
+            beforeConnectionValue = parameter.cast<_Tsink>().getParameter().getInit();
+            return true;
+        }
+        return false;
+    }
+    
 private:
     void passValueFunc(){
         if(active && sourceParameter->size() > 0){
@@ -229,7 +287,12 @@ private:
         }
     }
     void restoreValue(){
-        sinkParameter.set(beforeConnectionValue);
+        if(b_doRestore){
+            sinkParameter.set(beforeConnectionValue);
+        }
+        else{
+            sinkParameter.setInit(beforeConnectionValue);
+        }
     }
     ofEventListener parameterEventListener;
     ofParameter<vector<_Tsource>>& sourceParameter;

@@ -16,6 +16,7 @@
 class ofxOceanodeContainer;
 class ofxOceanodeNodeGui;
 class ofxOceanodeAbstractParameter;
+class ofxOceanodeAbstractConnection;
 
 class ofxOceanodeCanvas{
 public:
@@ -93,6 +94,7 @@ private:
     bool isCreatingConnection;
     ofxOceanodeAbstractParameter* tempSourceParameter = nullptr;
     ofxOceanodeAbstractParameter* tempSinkParameter = nullptr;
+    ofxOceanodeAbstractConnection* duplicatedConnection = nullptr;
     
     string uniqueID;
     string parentID;
