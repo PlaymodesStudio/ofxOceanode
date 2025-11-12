@@ -111,3 +111,25 @@ void ofxOceanodeNodeModel::addSeparator(string name, ofColor color){
     addCustomRegion(separator, [](){});
 #endif
 }
+
+void ofxOceanodeNodeModel::removeSeparator(string _name)
+{
+	// Build the separator pattern to search for
+	string separatorPattern = "SEPARATOR:|" + _name + "|";
+	
+	// Collect parameters to remove (avoid iterator invalidation)
+	vector<string> paramsToRemove;
+	
+	for (auto & p : parameters) {
+		string paramName = p.get()->getName();
+		// Check if this parameter is the separator we're looking for
+		if (paramName.find(separatorPattern) == 0) {
+			paramsToRemove.push_back(p.get()->getEscapedName());
+		}
+	}
+	
+	// Now safely remove the collected parameters
+	for (const auto& paramEscName : paramsToRemove) {
+		removeParameter(paramEscName);
+	}
+}
