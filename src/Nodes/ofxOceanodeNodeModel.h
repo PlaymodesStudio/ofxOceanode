@@ -95,6 +95,17 @@ public:
 		parameters.add(*oceaParam);
 		return dynamic_pointer_cast<ofxOceanodeParameter<ParameterType>>(*(parameters.end()-1));
 	}
+    
+    template<typename ParameterType>
+    shared_ptr<ofxOceanodeParameter<ParameterType>> addParameter(std::shared_ptr<ofParameter<ParameterType>> p, ofxOceanodeParameterFlags flags = 0){
+        //TODO: Review if we loose the data?
+        auto oceaParam = make_shared<ofxOceanodeParameter<ParameterType>>();
+        oceaParam->bindParameter(p);
+        oceaParam->setFlags(flags);
+        oceaParam->setNodeModel(this);
+        parameters.add(*oceaParam);
+        return dynamic_pointer_cast<ofxOceanodeParameter<ParameterType>>(*(parameters.end()-1));
+    }
 	
 	template<typename ParameterType>
 	shared_ptr<ofxOceanodeParameter<ParameterType>> addOutputParameter(ofParameter<ParameterType>& p, ofxOceanodeParameterFlags flags = 0){

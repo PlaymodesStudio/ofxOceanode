@@ -32,6 +32,12 @@ struct globalVariablesGroup : std::enable_shared_from_this<globalVariablesGroup>
     
     string name;
     std::vector<std::shared_ptr<ofAbstractParameter>> parameters;
+    std::vector<std::shared_ptr<ofParameter<float>>> floatParameters;
+    std::vector<std::shared_ptr<ofParameter<int>>> intParameters;
+    std::vector<std::shared_ptr<ofParameter<bool>>> boolParameters;
+    std::vector<std::shared_ptr<ofParameter<string>>> stringParameters;
+    std::vector<std::shared_ptr<ofParameter<ofColor>>> colorParameters;
+    std::vector<std::shared_ptr<ofParameter<ofFloatColor>>> fcolorParameters;
     vector<globalVariables*> nodes;
     
     shared_ptr<ofxOceanodeContainer> container;

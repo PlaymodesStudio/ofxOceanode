@@ -213,6 +213,10 @@ public:
 			defaultValue = p;
 		}
 	}
+    void bindParameter(std::shared_ptr<ofParameter<ParameterType>> &p){
+        parameter = p;
+        defaultValue = p.get()->get();
+    }
 	ofParameter<ParameterType> & getParameter(){return *parameter;}
     
     void setDefaultValue(ParameterType v){defaultValue = v;};

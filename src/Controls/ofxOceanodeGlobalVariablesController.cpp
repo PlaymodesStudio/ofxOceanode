@@ -31,9 +31,12 @@ void globalVariablesGroup::registerModule(){
 
 void globalVariablesGroup::addNode(globalVariables *node){
     nodes.push_back(node);
-    for(int i = 0; i < parameters.size(); i++){
-        node->addParameter(*parameters[i], ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
-    }
+    for(auto &p : floatParameters) node->addFloatParameter(p);
+    for(auto &p : intParameters) node->addIntParameter(p);
+    for(auto &p : boolParameters) node->addBoolParameter(p);
+    for(auto &p : stringParameters) node->addStringParameter(p);
+    for(auto &p : colorParameters) node->addOfColorParameter(p);
+    for(auto &p : fcolorParameters) node->addOfFloatColorParameter(p);
 }
 
 void globalVariablesGroup::removeNode(globalVariables *node){
@@ -41,50 +44,50 @@ void globalVariablesGroup::removeNode(globalVariables *node){
 }
 
 void globalVariablesGroup::addFloatParameter(std::string parameterName, float value){
-    ofParameter<float> tempParam;
-    parameters.push_back(tempParam.set(parameterName, value, -FLT_MAX, FLT_MAX).newReference());
+    auto createdParam = floatParameters.emplace_back(new ofParameter<float>(parameterName, value, -FLT_MAX, FLT_MAX));
+    parameters.push_back(createdParam);
     for(auto &node : nodes){
-        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
+        node->addFloatParameter(createdParam);
     }
 }
 
 void globalVariablesGroup::addIntParameter(std::string parameterName, int value){
-    ofParameter<int> tempParam;
-    parameters.push_back(tempParam.set(parameterName, value, INT_MIN, INT_MAX).newReference());
+    auto createdParam = intParameters.emplace_back(new ofParameter<int>(parameterName, value, INT_MIN, INT_MAX));
+    parameters.push_back(createdParam);
     for(auto &node : nodes){
-        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
+        node->addIntParameter(createdParam);
     }
 }
 
 void globalVariablesGroup::addBoolParameter(std::string parameterName, bool value){
-    ofParameter<bool> tempParam;
-    parameters.push_back(tempParam.set(parameterName, value).newReference());
+    auto createdParam = boolParameters.emplace_back(new ofParameter<bool>(parameterName, value));
+    parameters.push_back(createdParam);
     for(auto &node : nodes){
-        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
+        node->addBoolParameter(createdParam);
     }
 }
 
 void globalVariablesGroup::addStringParameter(std::string parameterName, std::string value){
-    ofParameter<std::string> tempParam;
-    parameters.push_back(tempParam.set(parameterName, value).newReference());
+    auto createdParam = stringParameters.emplace_back(new ofParameter<std::string>(parameterName, value));
+    parameters.push_back(createdParam);
     for(auto &node : nodes){
-        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
+        node->addStringParameter(createdParam);
     }
 }
 
 void globalVariablesGroup::addOfColorParameter(std::string parameterName, ofColor value){
-    ofParameter<ofColor> tempParam;
-    parameters.push_back(tempParam.set(parameterName, value).newReference());
+    auto createdParam = colorParameters.emplace_back(new ofParameter<ofColor>(parameterName, value));
+    parameters.push_back(createdParam);
     for(auto &node : nodes){
-        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
+        node->addOfColorParameter(createdParam);
     }
 }
 
 void globalVariablesGroup::addOfFloatColorParameter(std::string parameterName, ofFloatColor value){
-    ofParameter<ofFloatColor> tempParam;
-    parameters.push_back(tempParam.set(parameterName, value).newReference());
+    auto createdParam = fcolorParameters.emplace_back(new ofParameter<ofFloatColor>(parameterName, value));
+    parameters.push_back(createdParam);
     for(auto &node : nodes){
-        node->addParameter(tempParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
+        node->addOfFloatColorParameter(createdParam);
     }
 }
 
@@ -94,6 +97,12 @@ void globalVariablesGroup::removeParameter(std::string parameterName){
         node->removeParameter(parameterName);
     }
     parameters.erase(std::remove_if(parameters.begin(), parameters.end(), [parameterName](auto &parameter){return parameter->getName() == parameterName;}), parameters.end());
+    floatParameters.erase(std::remove_if(floatParameters.begin(), floatParameters.end(), [parameterName](auto &parameter){return parameter->getName() == parameterName;}), floatParameters.end());
+    intParameters.erase(std::remove_if(intParameters.begin(), intParameters.end(), [parameterName](auto &parameter){return parameter->getName() == parameterName;}), intParameters.end());
+    boolParameters.erase(std::remove_if(boolParameters.begin(), boolParameters.end(), [parameterName](auto &parameter){return parameter->getName() == parameterName;}), boolParameters.end());
+    stringParameters.erase(std::remove_if(stringParameters.begin(), stringParameters.end(), [parameterName](auto &parameter){return parameter->getName() == parameterName;}), stringParameters.end());
+    colorParameters.erase(std::remove_if(colorParameters.begin(), colorParameters.end(), [parameterName](auto &parameter){return parameter->getName() == parameterName;}), colorParameters.end());
+    fcolorParameters.erase(std::remove_if(fcolorParameters.begin(), fcolorParameters.end(), [parameterName](auto &parameter){return parameter->getName() == parameterName;}), fcolorParameters.end());
 }
 
 ofxOceanodeGlobalVariablesController::ofxOceanodeGlobalVariablesController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("Global Variables"){
