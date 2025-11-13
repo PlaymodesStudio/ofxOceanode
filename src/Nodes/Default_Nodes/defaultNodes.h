@@ -18,7 +18,7 @@
 #include "smoother.h"
 #include "switcher.h"
 #include "curve.h"
-//#include "curve2.h"
+#include "curve2.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "noise.h"
 #include "randomGenerator.h"
