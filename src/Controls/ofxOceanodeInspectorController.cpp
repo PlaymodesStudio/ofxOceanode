@@ -13,24 +13,10 @@
 #include "ofxOceanodeNodeMacro.h"
 #include "imgui.h"
 
-std::map<std::string, std::vector<std::string>> ofxOceanodeInspectorController::inspectorDropdownOptions;
-
-void ofxOceanodeInspectorController::registerInspectorDropdown(const std::string& nodeTypeName, const std::string& paramName, const std::vector<std::string>& options) {
-	std::string key = nodeTypeName + "::" + paramName;
-	inspectorDropdownOptions[key] = options;
-}
-
-std::vector<std::string> ofxOceanodeInspectorController::getInspectorDropdownOptions(const std::string& nodeTypeName, const std::string& paramName) {
-	std::string key = nodeTypeName + "::" + paramName;
-	auto it = inspectorDropdownOptions.find(key);
-	return (it != inspectorDropdownOptions.end()) ? it->second : std::vector<std::string>();
-}
-
 void ofxOceanodeInspectorController::draw(){
     vector<pair<string, ofxOceanodeNode*>> nodesInThisFrame = vector<pair<string, ofxOceanodeNode*>>(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
     
     vector<pair<string, ofxOceanodeNode*>> selectedNodes;
-	
 	
 	std::function<void(vector<pair<string, ofxOceanodeNode*>>)> getSelectedModules = [&selectedNodes, &getSelectedModules](vector<pair<string, ofxOceanodeNode*>> nodes){
 		for(auto nodePair : nodes)
@@ -200,66 +186,37 @@ void ofxOceanodeInspectorController::draw(){
                             }
                             isItemEditableByText = true;
                         }
-						// PARAM INT
-						/////////////
-						else if(absParam.valueType() == typeid(int).name())
-						{
-							auto tempCast = absParam.cast<int>();
-							
-							// Check for dropdown options using the new system
-							std::string nodeTypeName = selectedNodes[0].second->getNodeModel().nodeName();
-							std::vector<std::string> dropdownOptions = getInspectorDropdownOptions(nodeTypeName, absParam.getName());
-							
-							if(dropdownOptions.empty()) // Regular int parameter
-							{
-								auto temp = tempCast.get();
-								if(tempCast.getMin() == std::numeric_limits<int>::lowest() || tempCast.getMax() == std::numeric_limits<int>::max()){
-									ImGui::DragInt(hiddenUniqueId.c_str(), &temp, 1, tempCast.getMin(), tempCast.getMax());
-								}else{
-									ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin(),tempCast.getMax());
-								}
-								
-								if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-									tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
-									for(auto nodePair : selectedNodesWithoutFirst){
-										nodePair.second->getInspectorParameters().getInt(absParam.getName()) = tempCast;
-									}
-								}
-								
-								if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
-									tempCast = tempCast;
-									for(auto nodePair : selectedNodesWithoutFirst){
-										nodePair.second->getInspectorParameters().getInt(absParam.getName()) = tempCast;
-									}
-								}
-								
-								isItemEditableByText = true;
-							}
-							else // Dropdown parameter
-							{
-								auto vector_getter = [](void* vec, int idx, const char** out_text)
-								{
-									auto& vector = *static_cast<std::vector<std::string>*>(vec);
-									if (idx < 0 || idx >= static_cast<int>(vector.size())) { return false; }
-									*out_text = vector.at(idx).c_str();
-									return true;
-								};
-								
-								if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.get(), vector_getter, static_cast<void*>(&dropdownOptions), dropdownOptions.size())){
-									tempCast = ofClamp(tempCast, tempCast.getMin(), tempCast.getMax());
-									for(auto nodePair : selectedNodesWithoutFirst){
-										nodePair.second->getInspectorParameters().getInt(absParam.getName()) = tempCast;
-									}
-								}
-								
-								if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
-									tempCast = tempCast;
-									for(auto nodePair : selectedNodesWithoutFirst){
-										nodePair.second->getInspectorParameters().getInt(absParam.getName()) = tempCast;
-									}
-								}
-							}
-						}
+                        // PARAM INT
+                        /////////////
+                        else if(absParam.valueType() == typeid(int).name())
+                        {
+                            auto tempCast = absParam.cast<int>();
+                            if(true)//absParam.cast<int>().getDropdownOptions().size() == 0)
+                            {
+                                auto temp = tempCast.get();
+                                if(tempCast.getMin() == std::numeric_limits<int>::lowest() || tempCast.getMax() == std::numeric_limits<int>::max()){
+                                    ImGui::DragInt(hiddenUniqueId.c_str(), &temp, 1, tempCast.getMin(), tempCast.getMax());
+                                }else{
+                                    ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin(),tempCast.getMax());
+                                }
+                                
+                                if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
+                                    tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
+                                    for(auto nodePair : selectedNodesWithoutFirst){
+                                        nodePair.second->getInspectorParameters().getInt(absParam.getName()) = tempCast;
+                                    }
+                                }
+                                
+                                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                                    tempCast = tempCast;
+                                    for(auto nodePair : selectedNodesWithoutFirst){
+                                        nodePair.second->getInspectorParameters().getInt(absParam.getName()) = tempCast;
+                                    }
+                                }
+                                
+                                isItemEditableByText = true;
+                            }
+                        }
                         // PARAM BOOL
                         /////////////
                         else if(absParam.valueType() == typeid(bool).name()){
@@ -836,6 +793,3 @@ void ofxOceanodeInspectorController::draw(){
         ImGui::Text("No Nodes Selected", "%s");
     }
 }
-
-   
-
