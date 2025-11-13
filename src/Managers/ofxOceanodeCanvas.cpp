@@ -393,15 +393,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 
                 ImU32 node_hd_color = (isSelectedOrSelecting) ? IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,160) : IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,64);
                 
-				// Check if this node should be rendered transparently
-				bool isTransparent = (node->getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
-
-				if (!isTransparent) {
-					//if(nodeGui.getExpanded()){
-						draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
-					//}
-					draw_list->AddRectFilled(node_rect_min, node_rect_header, node_hd_color, 4.0f);
-				}
+                //if(nodeGui.getExpanded()){
+                    draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
+                //}
+                draw_list->AddRectFilled(node_rect_min, node_rect_header, node_hd_color, 4.0f);
                 
                 //draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(0, 0, 0, 255), 4.0f);
                 
