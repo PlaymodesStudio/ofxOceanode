@@ -37,6 +37,9 @@ public:
     void bringOnTop(){onTop = true;};
     
 	// node dimensions
+	int getNodeWidth(){return NODE_WIDTH_TEXT+NODE_WIDTH_WIDGET;};
+	void setNodeWidth(int ww, int tw){NODE_WIDTH_WIDGET=ww;NODE_WIDTH_TEXT=tw;};
+	
 	void setNodeWidthText(int n){NODE_WIDTH_TEXT = n;};
 	int getNodeWidthText(){return NODE_WIDTH_TEXT;};
 	
