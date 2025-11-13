@@ -72,7 +72,7 @@ public:
         nodeRegistry->registerModel<router<buffer<T1, T2>*>>("Router", "buffer_" + name, nullptr);
         nodeRegistry->registerModel<portal<buffer<T1, T2>*>>("Portal", "buffer_" + name, nullptr);
         nodeRegistry->registerModel<bufferHeader<T1, T2>>("Header", name, defaultValue);
-//        registerType<std::vector<T1>>("v_" + name, std::vector<T1>(1, defaultValue));
+        registerType<std::vector<T1>>("v_" + name, std::vector<T1>(1, defaultValue));
     };
     
     template<typename T>
