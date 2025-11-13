@@ -54,7 +54,7 @@ public:
     
     template<typename T>
     void registerType(string name = typeid(T).name(), T defaultValue = T()){
-        typesRegistry->registerType<T>();
+        typesRegistry->registerType<T>(name);
         nodeRegistry->registerModel<router<T>>("Router", name, defaultValue);
 		nodeRegistry->registerModel<portal<T>>("Portal", name, defaultValue);
     };
@@ -64,11 +64,11 @@ public:
                       std::function<void(T1&, T2&)> bufferAssignFunction = [](T1 &data, T2 &container){container = data;},
                       std::function<T1(T2&)> bufferReturnFunction = [](T2 &container)->T1{return container;},
                       std::function<bool(T1&)> bufferCheckFunction = [](T1 &data)->bool{return true;}){
-        typesRegistry->registerType<T1>();
+        typesRegistry->registerType<T1>(name);
         nodeRegistry->registerModel<router<T1>>("Router", name, defaultValue);
         nodeRegistry->registerModel<portal<T1>>("Portal", name, defaultValue);
         nodeRegistry->registerModel<bufferNode<T1, T2>>("Buffer", name, defaultValue, false, bufferAssignFunction, bufferReturnFunction, bufferCheckFunction);
-        typesRegistry->registerType<buffer<T1, T2>*>();
+        typesRegistry->registerType<buffer<T1, T2>*>("buffer_" + name);
         nodeRegistry->registerModel<router<buffer<T1, T2>*>>("Router", "buffer_" + name, nullptr);
         nodeRegistry->registerModel<portal<buffer<T1, T2>*>>("Portal", "buffer_" + name, nullptr);
         nodeRegistry->registerModel<bufferHeader<T1, T2>>("Header", name, defaultValue);

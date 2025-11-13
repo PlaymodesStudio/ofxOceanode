@@ -2004,7 +2004,7 @@ vector<ofxOceanodeContainer::ExternalConnection> ofxOceanodeContainer::analyzeEx
 				it->second.externalConnections.push_back(&connection->getSinkParameter());
 			} else {
 				ExternalConnection extConn;
-				extConn.routerType = getParameterTypeName(connection->getSourceParameter());
+				extConn.routerType = connection->getSourceParameter().valueType();
 				extConn.isIncoming = false;
 				extConn.routerName = generateRouterName(originalInternalParamName, nameCounters);
 				extConn.internalConnection.nodeName = fullInternalNodeName;
@@ -2033,7 +2033,7 @@ vector<ofxOceanodeContainer::ExternalConnection> ofxOceanodeContainer::analyzeEx
 				it->second.internalConnections.push_back({fullInternalNodeName, originalInternalParamName});
 			} else {
 				ExternalConnection extConn;
-				extConn.routerType = getParameterTypeName(connection->getSourceParameter());
+                extConn.routerType = connection->getSourceParameter().valueType();
 				extConn.externalParam = externalParam;
 				extConn.isIncoming = true;
 				extConn.routerName = generateRouterName(originalInternalParamName, nameCounters);
@@ -2092,7 +2092,7 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 	// Create routers and connect them appropriately
 	for(auto& extConn : connections) {
 		try {
-			string routerTypeName = mapParameterTypeToRouterName(extConn.routerType);
+            string routerTypeName = "Router " + macroContainer->getTypesRegistry()->getTypeNameFromTypeDescription(extConn.routerType);
 			
 			ofLogNotice("Encapsulation") << "Creating router " << (routerIndex + 1) << "/" << connections.size()
 				<< ": " << routerTypeName << " named '" << extConn.routerName << "'";
@@ -2352,168 +2352,6 @@ ofxOceanodeNode* ofxOceanodeContainer::getNodeFromParameter(ofxOceanodeAbstractP
 }
 
 // Fix the getParameterTypeName method to properly handle nodePort:
-
-string ofxOceanodeContainer::getParameterTypeName(ofxOceanodeAbstractParameter& param) {
-	string fullType = param.valueType();
-	
-	// Add debug logging for unknown types
-	//ofLogNotice("DEBUG") << "Parameter '" << param.getName() << "' has type: " << fullType;
-	
-	// Basic C++ types
-	if(fullType == typeid(float).name()) return "float";
-	if(fullType == typeid(int).name()) return "int";
-	if(fullType == typeid(bool).name()) return "bool";
-	if(fullType == typeid(string).name()) return "string";
-	if(fullType == typeid(char).name()) return "char";
-	if(fullType == typeid(void).name()) return "void";
-	
-	// Vector types
-	if(fullType == typeid(vector<float>).name()) return "vector<float>";
-	if(fullType == typeid(vector<int>).name()) return "vector<int>";
-	if(fullType == typeid(vector<bool>).name()) return "vector<bool>";
-	if(fullType == typeid(vector<string>).name()) return "vector<string>";
-	
-	// Color types
-	if(fullType == typeid(ofColor).name()) return "ofColor";
-	if(fullType == typeid(ofFloatColor).name()) return "ofFloatColor";
-	
-	// Graphics types
-	if(fullType == typeid(ofTexture*).name()) return "P9ofTexture*";
-	if(fullType == typeid(glm::mat4).name()) return "glm::mat4";
-	if(fullType == typeid(ofPolyline).name()) return "ofPolyline";
-	if(fullType == typeid(vector<ofPolyline>).name()) return "vector<ofPolyline>";
-	
-	// SuperCollider types - FIXED MAPPING
-	if(fullType.find("nodePort") != string::npos) {
-		ofLogNotice("DEBUG") << "Found nodePort type: " << fullType << " -> mapping to ScBus";
-		return "ScBus";  // nodePort should map to ScBus router
-	}
-	
-	if(fullType.find("ScBus") != string::npos) {
-		ofLogNotice("DEBUG") << "Found ScBus type: " << fullType;
-		return "ScBus";
-	}
-	
-	// Check for other custom types by pattern matching
-	if(fullType.find("VideoFrame") != string::npos) {
-		return "VideoFrame";
-	}
-	
-	if(fullType.find("VideoBuffer") != string::npos) {
-		return "VideoBuffer";
-	}
-	
-	if(fullType.find("Fatline") != string::npos) {
-		return "Fatline";
-	}
-	
-	if(fullType.find("timestamp") != string::npos) {
-		return "timestamp";
-	}
-	
-	// For any unknown type, log it and try extraction
-	ofLogWarning("DEBUG") << "Unknown parameter type: " << fullType;
-	ofLogWarning("DEBUG") << "Parameter name: " << param.getName();
-	
-	// Try to extract a meaningful name from the type string
-	string extractedType = fullType;
-	
-	// Remove C++ name mangling numbers (like "8nodePort" -> "nodePort")
-	string cleanType = fullType;
-	if(!cleanType.empty() && isdigit(cleanType[0])) {
-		// Find first non-digit character
-		size_t firstAlpha = cleanType.find_first_not_of("0123456789");
-		if(firstAlpha != string::npos) {
-			cleanType = cleanType.substr(firstAlpha);
-		}
-	}
-	
-	// Check the cleaned type against known patterns
-	if(cleanType == "nodePort") {
-		ofLogNotice("DEBUG") << "Cleaned type is nodePort -> mapping to ScBus";
-		return "ScBus";
-	}
-	
-	ofLogNotice("DEBUG") << "Cleaned type: " << cleanType;
-	
-	// If we have a cleaned meaningful name, use it
-	if(!cleanType.empty() && cleanType != fullType) {
-		return cleanType;
-	}
-	
-	// Ultimate fallback
-	ofLogWarning("DEBUG") << "Using float fallback for type: " << fullType;
-	return "float";
-}
-
-string ofxOceanodeContainer::mapParameterTypeToRouterName(const string& paramType) {
-	// Basic types
-	if(paramType == "float") return "Router f";
-	if(paramType == "vector<float>") return "Router v_f";
-	if(paramType == "int") return "Router i";
-	if(paramType == "vector<int>") return "Router v_i";
-	if(paramType == "bool") return "Router b";
-	if(paramType == "string") return "Router s";
-	if(paramType == "void") return "Router v";
-	
-	// Color types
-	if(paramType == "ofColor") return "Router color";
-	if(paramType == "ofFloatColor") return "Router color_f";
-	
-	// Buffer types
-	if(paramType == "buffer<float>") return "Router buffer_f";
-	if(paramType == "buffer<int>") return "Router buffer_i";
-	if(paramType == "buffer<bool>") return "Router buffer_b";
-	if(paramType == "buffer<string>") return "Router buffer_s";
-	if(paramType == "buffer<vector<float>>") return "Router buffer_v_f";
-	if(paramType == "buffer<vector<int>>") return "Router buffer_v_i";
-	if(paramType == "buffer<ofColor>") return "Router buffer_color";
-	if(paramType == "buffer<ofFloatColor>") return "Router buffer_color_f";
-	if(paramType == "buffer<char>") return "Router buffer_c";
-	
-	// Graphics types
-	if(paramType == "P9ofTexture*") return "Router Texture";
-	if(paramType == "buffer<ofTexture>") return "Router buffer_Texture";
-	if(paramType == "VideoFrame") return "Router VideoFrame";
-	if(paramType == "VideoBuffer") return "Router VideoBuffer";
-	if(paramType == "glm::mat4") return "Router mat4";
-	
-	// Geometry types
-	if(paramType == "ofPolyline") return "Router Polyline";
-	if(paramType == "vector<ofPolyline>") return "Router v_Poly";
-	if(paramType == "Fatline") return "Router Fatline";
-	if(paramType == "vector<Fatline>") return "Router v_Fatline";
-	
-	// Audio types
-	if(paramType == "ScBus") return "Router ScBus";
-	if(paramType == "timestamp") return "Router timestamp";
-	
-	// Try to find matching router in registry for unknown types
-	auto registry = getRegistry();
-	if(registry) {
-		auto models = registry->getRegisteredModels();
-		
-		// First, try exact match with "Router " prefix
-		string searchName = "Router " + paramType;
-		if(models.count(searchName) > 0) {
-			return searchName;
-		}
-		
-		// Look for partial matches
-		for(auto& model : models) {
-			if(model.first.find("Router") != string::npos) {
-				if(model.first.find(paramType) != string::npos ||
-				   paramType.find(model.first.substr(7)) != string::npos) {
-					return model.first;
-				}
-			}
-		}
-	}
-	
-	// Ultimate fallback
-	ofLogWarning("Encapsulation") << "No router mapping found for type: " << paramType << ", using Router f";
-	return "Router f";
-}
 
 ofxOceanodeAbstractParameter* ofxOceanodeContainer::findInternalParameter(
 	const vector<ofxOceanodeNode*>& macroNodes,
