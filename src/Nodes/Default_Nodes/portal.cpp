@@ -16,13 +16,10 @@ abstractPortal::abstractPortal(string typelabel) : ofxOceanodeNodeModel("Portal 
 	
 	addParameter(name.set("Name", typelabel));
     addInspectorParameter(local.set("Local", true));
-	addInspectorParameter(resendOnNameChange.set("Resend On Name Change", false));
-
     settingViaMatch = false;
     
     nameListener = name.newListener([this](string &s){
         ofxOceanodeShared::requestPortalUpdate(this);
-		resendValue();
     });
 }
 
