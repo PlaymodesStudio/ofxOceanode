@@ -12,15 +12,8 @@
 #include "ofxOceanodeShared.h"
 #include "router.h"
 
-#include "ofxOceanodeNodeRegistry.h"
-#include "ofxOceanodeTypesRegistry.h"
-#ifndef OFXOCEANODE_HEADLESS
-#include "imgui.h"
-#endif
-
 #ifdef OFXOCEANODE_USE_OSC
 class ofxOscMessage;
-class ofxOceanodeContainer;
 #endif
 
 // Data Structures for Snapshots
