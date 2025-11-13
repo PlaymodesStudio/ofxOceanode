@@ -36,7 +36,7 @@ ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
     
 }
 
-bool ofxOceanodeNodeGui::constructGui(){
+bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
     string moduleName = getParameters().getName();
 	
 	bool isTransparent = (node.getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
@@ -102,14 +102,57 @@ bool ofxOceanodeNodeGui::constructGui(){
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::BeginDisabled();
             ImGui::PushID(uniqueId.c_str());
             if(absParam.valueType() == typeid(std::function<void()>).name()){
-                absParam.cast<std::function<void()>>().getParameter().get()();
+                // Check if this is a separator by looking at the parameter name
+                if(uniqueId.find("SEPARATOR:|") == 0){
+                    // Parse separator data: "SEPARATOR:|label|r,g,b,a"
+                    vector<string> parts = ofSplitString(uniqueId, "|");
+                    string label = parts.size() > 1 ? parts[1] : "";
+                    ofColor color(200, 200, 200, 255); // default
+                    
+                    if(parts.size() > 2){
+                        vector<string> colorParts = ofSplitString(parts[2], ",");
+                        if(colorParts.size() >= 4){
+                            color.r = ofToInt(colorParts[0]);
+                            color.g = ofToInt(colorParts[1]);
+                            color.b = ofToInt(colorParts[2]);
+                            color.a = ofToInt(colorParts[3]);
+                        }
+                    }
+                    
+                    // Render separator with label and background highlight
+                    if(!label.empty()){
+                        ImVec2 p = ImGui::GetCursorScreenPos();
+                        float w = guiRect.width;
+                        
+                        // Draw the text
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(color.r/255.0f, color.g/255.0f, color.b/255.0f, color.a/255.0f));
+                        ImGui::TextUnformatted(label.c_str());
+                        ImGui::PopStyleColor();
+                        
+                        // Get the size of the rendered text
+                        ImVec2 textSize = ImGui::CalcTextSize(label.c_str());
+                        
+                        // Draw a semi-transparent rectangle behind/below the text (25% opacity)
+                        ImU32 bgCol = IM_COL32(color.r, color.g, color.b, color.a * 0.15f);
+                        ImGui::GetWindowDrawList()->AddRectFilled(
+                            ImVec2(p.x, p.y),
+                            ImVec2(p.x + w - 16 , p.y + textSize.y),
+                            bgCol
+                        );
+                        
+                        ImGui::Dummy(ImVec2(0, 2));
+                    }
+                }else{
+                    // Regular custom region function
+                    absParam.cast<std::function<void()>>().getParameter().get()();
+                }
             }else{
                 
                 ImGui::Text("%s", uniqueId.c_str());
                 
                 ImGui::SetItemAllowOverlap();
                 ImGui::SameLine(-1);
-                ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(51, ImGui::GetFrameHeight())); //Used to check later behaviours
+				ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
                 
                 int drag = 0;
                 bool resetValue = false;
@@ -127,9 +170,9 @@ bool ofxOceanodeNodeGui::constructGui(){
                     valueHasBeenReseted = false;
                 }
                 
-                
-                ImGui::SameLine(90);
-                ImGui::SetNextItemWidth(150);
+				// [ node width ] : this was 90 pixels for the name and 150 for the "widget"
+				ImGui::SameLine(nodeWidthText);
+				ImGui::SetNextItemWidth(nodeWidthWidget);
                 
                 string hiddenUniqueId = "##" + uniqueId;
                 ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()*0.5f));
@@ -387,9 +430,13 @@ bool ofxOceanodeNodeGui::constructGui(){
                     {
                         tempCast = tempCast;
                     }
+					ImVec2 sizeCB = ImGui::GetItemRectSize();
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast = !tempCast;
                     }
+					ImGui::SameLine();
+					ImGui::Dummy(ImVec2(nodeWidthWidget-sizeCB.x-8,ImGui::GetFrameHeight()));
+					
                     // PARAM VOID
                     /////////////
                 }else if(absParam.valueType() == typeid(void).name()){
@@ -398,9 +445,12 @@ bool ofxOceanodeNodeGui::constructGui(){
                     {
                         tempCast.trigger();
                     }
+					ImVec2 sizeCB = ImGui::GetItemRectSize();
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast.trigger();
                     }
+					ImGui::SameLine();
+					ImGui::Dummy(ImVec2(nodeWidthWidget-sizeCB.x-8,ImGui::GetFrameHeight()));
 				// PARAM STRING
 				///////////////
                 }else if(absParam.valueType() == typeid(string).name()){
@@ -481,6 +531,12 @@ bool ofxOceanodeNodeGui::constructGui(){
                     }
                 }
                 
+				// Push custom style colors
+				ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));  // Dark background
+				ImGui::PushStyleColor(ImGuiCol_Text,     ImVec4(0.7f, 0.7f, 0.7f, 0.7f));  // White text
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 1.0f)); // Hovered button
+				ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
+				
                 if(ImGui::BeginPopup("Param Popup")){
                     ImGui::Separator();
                     if(!absParam.isScoped()){ //Param is not scoped
@@ -513,11 +569,26 @@ bool ofxOceanodeNodeGui::constructGui(){
 #endif
 #ifdef OFXOCEANODE_USE_OSC
                     ImGui::Separator();
-                    ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
+					ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.08f, 0.08f, 0.08f, 1.0f));  // Dark background
+					ImGui::PushStyleColor(ImGuiCol_Text,     ImVec4(0.7f, 0.7f, 0.7f, 0.7f));  // White text
+
+                    //ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
+					ImGui::Text("OSC Address");
+					if (ImGui::IsItemHovered())
+					{
+						string tt = getParameters().getEscapedName() + "/" +absParam.getEscapedName();
+						ImGui::SetTooltip(tt.c_str());
+					}
+					ImGui::PopStyleColor(2);
+
 #endif
                     ImGui::Separator();
                     ImGui::EndPopup();
                 }
+				// Always pop the same number you pushed
+				ImGui::PopStyleColor(3);
+				ImGui::PopStyleVar();
+
                 ImGui::PopStyleColor(6);
             }
             inputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
@@ -549,14 +620,14 @@ bool ofxOceanodeNodeGui::constructGui(){
 					{
 						auto tempCast = absParam.cast<ofTexture*>().getParameter();
 						float ar = tempCast.get()->getWidth() / tempCast.get()->getHeight();
-						size = ImVec2(240,240/ar);
+						size = ImVec2(nodeWidthText+nodeWidthWidget,nodeWidthText+nodeWidthWidget/ar);
 					}
 					else
 					{
-						size = ImVec2(240, 240);
+						size = ImVec2(nodeWidthText+nodeWidthWidget, nodeWidthText+nodeWidthWidget);
 					}
 				}
-				else size = ImVec2(240,30);
+				else size = ImVec2(nodeWidthText+nodeWidthWidget,30);
 				
 				paramSizes.push_back(size);
 				totalHeight += size.y + spacing;
@@ -637,9 +708,9 @@ bool ofxOceanodeNodeGui::constructGui(){
 			}
 		}
 		
-		// Add an invisible item to ensure the group has the correct height
+		// Add an invisible item to ensure the group has the correct size
 		if(totalHeight > 0) {
-			ImGui::InvisibleButton("##nodesize", ImVec2(240, 0.1f));
+			ImGui::InvisibleButton("##nodesize", ImVec2(nodeWidthText+nodeWidthWidget, 0.1f));
 		}
 	}
 				
