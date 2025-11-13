@@ -137,6 +137,8 @@ private:
     
     ofxOceanodeTime* oceanodeTime;
     
+    int desiredFPS = 60;
+    
 //    vector<ofxOceanodeAbstractTimeline> timelines;
     
     ofxImGuiSimple gui;
