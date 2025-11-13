@@ -418,7 +418,6 @@ void ofxOceanodePresetsController::savePreset(string name, string bank)
                      );
     string myPath = "./Presets/" + banks[currentBank] +"/" + ofToString(presetIndex+1) +  "--" + name;
     container->savePreset(myPath);
-	ofxOceanodeShared::setCurrentPresetPath(myPath);
 }
 void ofxOceanodePresetsController::deletePreset(string presetName, string bankName)
 {
