@@ -280,30 +280,21 @@ void ofxOceanodeInspectorController::draw(){
                             }
                         // PARAM VOID
                         /////////////
-						}else if(absParam.valueType() == typeid(void).name()){
-							auto tempCast = absParam.cast<void>();
-							
-							// Add styling to make the button visible
-							ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
-							ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
-							ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
-							
-							if (ImGui::Button(hiddenUniqueId.c_str(), ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight())))
-							{
-								tempCast.trigger();
-								for(auto nodePair : selectedNodesWithoutFirst){
-									nodePair.second->getInspectorParameters().getVoid(absParam.getName()) = tempCast;
-								}
-							}
-							
-							ImGui::PopStyleColor(3);
-							
-							if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
-								tempCast.trigger();
-								for(auto nodePair : selectedNodesWithoutFirst){
-									nodePair.second->getInspectorParameters().getVoid(absParam.getName()) = tempCast;
-								}
-							}
+                        }else if(absParam.valueType() == typeid(void).name()){
+                            auto tempCast = absParam.cast<void>();
+                            if (ImGui::Button(hiddenUniqueId.c_str(), ImVec2(ImGui::GetFrameHeight(), 0)))
+                            {
+                                tempCast.trigger();
+                                for(auto nodePair : selectedNodesWithoutFirst){
+                                    nodePair.second->getInspectorParameters().getVoid(absParam.getName()) = tempCast;
+                                }
+                            }
+                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                                tempCast.trigger();
+                                for(auto nodePair : selectedNodesWithoutFirst){
+                                    nodePair.second->getInspectorParameters().getVoid(absParam.getName()) = tempCast;
+                                }
+                            }
                         // PARAM STRING
                         //////////////
                         }else if(absParam.valueType() == typeid(string).name()){
@@ -696,30 +687,19 @@ void ofxOceanodeInspectorController::draw(){
                             }
                             // PARAM VOID
                             /////////////
-						}else if(absParam.valueType() == typeid(void).name()){
-							auto tempCast = absParam.cast<void>().getParameter();
-							
-							// Add styling to make the button visible
-							ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
-							ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
-							ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
-							
-							if (ImGui::Button(hiddenUniqueId.c_str(), ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight())))
-							{
-								tempCast.trigger();
-								for(auto nodePair : selectedNodesWithoutFirst){
-									static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<void>().getParameter().trigger();
-								}
-							}
-							
-							ImGui::PopStyleColor(3);
-							
-							if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
-								tempCast.trigger();
-								for(auto nodePair : selectedNodesWithoutFirst){
-									static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<void>().getParameter().trigger();
-								}
-							}
+                        }else if(absParam.valueType() == typeid(void).name()){
+                            auto tempCast = absParam.cast<void>().getParameter();
+                            if (ImGui::Button(hiddenUniqueId.c_str(), ImVec2(ImGui::GetFrameHeight(), 0)))
+                            {
+                                tempCast.trigger();
+                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<void>().getParameter().trigger();
+                                }
+                            }
+                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                                tempCast.trigger();
+                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<void>().getParameter().trigger();
+                                }
+                            }
                             // PARAM STRING
                             ///////////////
                         }else if(absParam.valueType() == typeid(string).name()){
