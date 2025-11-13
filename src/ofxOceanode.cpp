@@ -27,17 +27,17 @@ ofxOceanode::ofxOceanode(){
 #endif
     
     //Register default types
-    typesRegistry->registerType<float>();
-    typesRegistry->registerType<int>();
-    typesRegistry->registerType<bool>();
-    typesRegistry->registerType<void>();
-    typesRegistry->registerType<string>();
-    typesRegistry->registerType<char>();
-    typesRegistry->registerType<vector<float>>();
-    typesRegistry->registerType<vector<int>>();
-    typesRegistry->registerType<ofColor>();
-    typesRegistry->registerType<ofFloatColor>();
-    typesRegistry->registerType<Timestamp>();
+    typesRegistry->registerType<float>("f");
+    typesRegistry->registerType<int>("i");
+    typesRegistry->registerType<bool>("b");
+    typesRegistry->registerType<void>("v");
+    typesRegistry->registerType<string>("s");
+    typesRegistry->registerType<char>("c");
+    typesRegistry->registerType<vector<float>>("v_f");
+    typesRegistry->registerType<vector<int>>("v_i");
+    typesRegistry->registerType<ofColor>("color");
+    typesRegistry->registerType<ofFloatColor>("color_f");
+    typesRegistry->registerType<Timestamp>("timestamp");
     
     //Register default nodes
     nodeRegistry->registerModel<oscillator>("Generators");
