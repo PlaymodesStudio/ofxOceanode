@@ -319,7 +319,17 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			canvas.setNodeWidthText(tw);
 			canvas.setNodeWidthWidget(ww);
 			
-            ImGui::EndMenu();
+			ImGui::Separator();
+			
+			if(ImGui::Button("Save Config")){
+				saveConfig();
+			}
+			ImGui::SameLine();
+			if(ImGui::Button("Load Config")){
+				loadConfig();
+			}
+			
+		          ImGui::EndMenu();
         }
 		
         if(ImGui::BeginMenu("Help"))
@@ -458,4 +468,83 @@ void ofxOceanode::disableRenderAll(){
 
 void ofxOceanode::disableRenderHistograms(){
     ofxOceanodeShared::setConfigurationFlags(ofxOceanodeShared::getConfigurationFlags() | ofxOceanodeConfigurationFlags_DisableRenderAll);
+}
+
+void ofxOceanode::saveConfig(){
+    ofJson config;
+    
+    // Save FPS
+    config["fps"] = ofGetFrameRate();
+    
+    // Save V Sync (we can't query current state, so we'll save false as default)
+    config["vsync"] = false;
+    
+    // Save configuration flags
+    config["configurationFlags"] = ofxOceanodeShared::getConfigurationFlags();
+    
+    // Save Show Mode
+    config["showMode"] = showMode;
+    
+    // Save canvas settings
+    config["nodeTextWidth"] = canvas.getNodeWidthText();
+    config["nodeWidgetWidth"] = canvas.getNodeWidthWidget();
+    config["gridDivisions"] = canvas.getGridDivisions();
+    
+    // Create config directory if it doesn't exist
+    string configDir = ofToDataPath("config", true);
+    ofDirectory dir(configDir);
+    if(!dir.exists()){
+        dir.create(true);
+    }
+    
+    // Save to file
+    string configPath = ofToDataPath("config/config.json", true);
+    ofSavePrettyJson(configPath, config);
+}
+
+void ofxOceanode::loadConfig(){
+    string configPath = ofToDataPath("config/config.json", true);
+    
+    // Check if config file exists
+    ofFile configFile(configPath);
+    if(!configFile.exists()){
+        return; // Use defaults if file doesn't exist
+    }
+    
+    // Load JSON
+    ofJson config = ofLoadJson(configPath);
+    
+    // Load FPS
+    if(config.contains("fps")){
+        ofSetFrameRate(config["fps"].get<float>());
+    }
+    
+    // Load V Sync
+    if(config.contains("vsync")){
+        ofSetVerticalSync(config["vsync"].get<bool>());
+    }
+    
+    // Load configuration flags
+    if(config.contains("configurationFlags")){
+        ofxOceanodeShared::setConfigurationFlags(config["configurationFlags"].get<ofxOceanodeConfigurationFlags>());
+    }
+    
+    // Load Show Mode
+    if(config.contains("showMode")){
+        showMode = config["showMode"].get<bool>();
+    }
+    
+    // Load canvas settings
+    if(config.contains("nodeTextWidth")){
+        canvas.setNodeWidthText(config["nodeTextWidth"].get<int>());
+    }
+    
+    if(config.contains("nodeWidgetWidth")){
+        canvas.setNodeWidthWidget(config["nodeWidgetWidth"].get<int>());
+    }
+    
+    if(config.contains("gridDivisions")){
+        canvas.setGridDivisions(config["gridDivisions"].get<int>());
+        canvas.updateGridSize();
+    }
 }
