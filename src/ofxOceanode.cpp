@@ -334,6 +334,11 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
             ImGui::Checkbox("Show Mode", &showMode);
             ofxOceanodeShared::setConfigurationFlags(configurationFlags);
+		    bool snap = canvas.getSnapToGrid();
+			if(ImGui::Checkbox("Snap To Grid",&snap))
+			{
+				canvas.setSnapToGrid(snap);
+			}
 			
 			int tw = canvas.getNodeWidthText();
 			int ww = canvas.getNodeWidthWidget();
@@ -519,7 +524,8 @@ void ofxOceanode::saveConfig(){
     config["nodeTextWidth"] = canvas.getNodeWidthText();
     config["nodeWidgetWidth"] = canvas.getNodeWidthWidget();
     config["gridDivisions"] = canvas.getGridDivisions();
-    
+	config["snapToGrid"] = canvas.getSnapToGrid();
+	
     // Create config directory if it doesn't exist
     string configDir = ofToDataPath("config", true);
     ofDirectory dir(configDir);
@@ -583,4 +589,7 @@ void ofxOceanode::loadConfig(){
         canvas.setGridDivisions(config["gridDivisions"].get<int>());
         canvas.updateGridSize();
     }
+	if(config.contains("snapToGrid")){
+		canvas.setSnapToGrid(config["snapToGrid"].get<bool>());
+	}
 }
