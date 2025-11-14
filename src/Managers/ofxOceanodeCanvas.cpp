@@ -958,12 +958,12 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 numTimesPopup++;
             }
             
-            bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
-            bool isEnterReleased = ImGui::IsKeyReleased(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
+            bool isEnterPressed = ImGui::IsKeyDown((ImGuiKey_Enter)); //Select first option if enter is pressed
+            bool isEnterReleased = ImGui::IsKeyReleased((ImGuiKey_Enter)); //Select first option if enter is pressed
             
             // Handle arrow key navigation
-            bool isUpPressed = ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow));
-            bool isDownPressed = ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow));
+            bool isUpPressed = ImGui::IsKeyPressed((ImGuiKey_UpArrow));
+            bool isDownPressed = ImGui::IsKeyPressed((ImGuiKey_DownArrow));
    
    // TODO: Get all things, nodes, collections, macros, scripts;
     
@@ -1347,7 +1347,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         entireSelect =  selectInitialPoint.y < selectEndPoint.y;
                         canvasHasScolled = true; //HACK to not remove selection on mouse release
                     }
-                    if((!isSelecting && !isCreatingConnection && someSelectedModuleMove == "") || (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space)))){
+                    if((!isSelecting && !isCreatingConnection && someSelectedModuleMove == "") || (ImGui::IsKeyDown((ImGuiKey_Space)))){
                         scrolling = scrolling + ImGui::GetIO().MouseDelta;
                         if(glm::vec2(ImGui::GetIO().MouseDelta) != glm::vec2(0,0)) canvasHasScolled = true;
 #ifdef TARGET_OSX
@@ -1362,7 +1362,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         }
                     }
 				}else if(ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)){
-					if(ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space))){
+					if(ImGui::IsKeyDown((ImGuiKey_Space))){
 						scrolling = scrolling + ImGui::GetIO().MouseDelta;
                         if(glm::vec2(ImGui::GetIO().MouseDelta) != glm::vec2(0,0)) canvasHasScolled = true;
 					}
@@ -1421,17 +1421,17 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 #else
             if(ImGui::GetIO().KeyCtrl){
 #endif
-                if(ImGui::IsKeyPressed((ImGuiKey)'C')){
+                if(ImGui::IsKeyPressed(ImGuiKey_C)){
                     container->copySelectedModulesWithConnections();
                     deselectAllNodes();
-                }else if(ImGui::IsKeyPressed((ImGuiKey)'V') && !ImGui::IsAnyItemActive()){
+                }else if(ImGui::IsKeyPressed(ImGuiKey_V) && !ImGui::IsAnyItemActive()){
                     deselectAllNodes();
                     glm::vec2 pastePosition = ImGui::GetMousePos() - offset;
                     if(snap_to_grid) pastePosition = snapToGrid(pastePosition);
                     container->pasteModulesAndConnectionsInPosition(pastePosition, ImGui::GetIO().KeyShift);
                 }else if(ImGui::IsKeyPressed((ImGuiKey)'X')){
                     container->cutSelectedModulesWithConnections();
-                }else if(ImGui::IsKeyPressed((ImGuiKey)'D')){
+                }else if(ImGui::IsKeyPressed(ImGuiKey_D)){
                     container->copySelectedModulesWithConnections();
                     deselectAllNodes();
                     glm::vec2 pastePosition = ImGui::GetMousePos() - offset;
@@ -1443,7 +1443,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 					container->encapsulateSelectedNodes();
 				}
             }
-            else if(ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace)) && !ImGui::IsAnyItemActive()){
+            else if(ImGui::IsKeyPressed((ImGuiKey_Backspace)) && !ImGui::IsAnyItemActive()){
                 container->deleteSelectedModules();
             }
             

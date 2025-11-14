@@ -190,7 +190,7 @@ void ofxOceanodeInspectorController::draw(){
                                     nodePair.second->getInspectorParameters().getFloat(absParam.getName()) = tempCast;
                                 }
                             }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                                 tempCast = tempCast;
                                 for(auto nodePair : selectedNodesWithoutFirst){
                                     nodePair.second->getInspectorParameters().getFloat(absParam.getName()) = tempCast;
@@ -224,7 +224,7 @@ void ofxOceanodeInspectorController::draw(){
 									}
 								}
 								
-								if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+								if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
 									tempCast = tempCast;
 									for(auto nodePair : selectedNodesWithoutFirst){
 										nodePair.second->getInspectorParameters().getInt(absParam.getName()) = tempCast;
@@ -250,7 +250,7 @@ void ofxOceanodeInspectorController::draw(){
 									}
 								}
 								
-								if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+								if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
 									tempCast = tempCast;
 									for(auto nodePair : selectedNodesWithoutFirst){
 										nodePair.second->getInspectorParameters().getInt(absParam.getName()) = tempCast;
@@ -270,7 +270,7 @@ void ofxOceanodeInspectorController::draw(){
                                     nodePair.second->getInspectorParameters().getBool(absParam.getName()) = tempCast;
                                 }
                             }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                                 tempCast = !tempCast;
                                 for(auto nodePair : selectedNodesWithoutFirst){
                                     nodePair.second->getInspectorParameters().getBool(absParam.getName()) = tempCast;
@@ -296,7 +296,7 @@ void ofxOceanodeInspectorController::draw(){
 							
 							ImGui::PopStyleColor(3);
 							
-							if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+							if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
 								tempCast.trigger();
 								for(auto nodePair : selectedNodesWithoutFirst){
 									nodePair.second->getInspectorParameters().getVoid(absParam.getName()) = tempCast;
@@ -339,7 +339,7 @@ void ofxOceanodeInspectorController::draw(){
                                     nodePair.second->getInspectorParameters().getColor(absParam.getName()) = tempCast;
                                 }
                             }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                                 tempCast = tempCast;
                                 for(auto nodePair : selectedNodesWithoutFirst){
                                     nodePair.second->getInspectorParameters().getColor(absParam.getName()) = tempCast;
@@ -357,7 +357,7 @@ void ofxOceanodeInspectorController::draw(){
                                     nodePair.second->getInspectorParameters().getFloatColor(absParam.getName()) = tempCast;
                                 }
                             }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                                 tempCast = tempCast;
                                 for(auto nodePair : selectedNodesWithoutFirst){
                                     nodePair.second->getInspectorParameters().getFloatColor(absParam.getName()) = tempCast;
@@ -372,7 +372,7 @@ void ofxOceanodeInspectorController::draw(){
                         }
                         
                         if (isItemEditableByText){
-                            if ((ImGui::IsItemHovered() && !ImGui::IsItemEdited() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter))) || ImGui::IsItemClicked(1)){
+                            if ((ImGui::IsItemHovered() && !ImGui::IsItemEdited() && ImGui::IsKeyPressed((ImGuiKey_Enter))) || ImGui::IsItemClicked(1)){
                                 ImGui::SetKeyboardFocusHere(-1);
                             }
                         }
@@ -511,7 +511,7 @@ void ofxOceanodeInspectorController::draw(){
                                 for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<float>().getParameter() = tempCast;
                                 }
                             }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                                 tempCast = tempCast;
                                 for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<float>().getParameter() = tempCast;
                                 }
@@ -555,7 +555,7 @@ void ofxOceanodeInspectorController::draw(){
                             }else{
                                 //ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
                             }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                                 tempCast = tempCast;
                                 for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<vector<float>>().getParameter() = tempCast;
                                 }
@@ -595,7 +595,7 @@ void ofxOceanodeInspectorController::draw(){
                                     }
                                 }
                                 
-                                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                                     tempCast = tempCast;
                                     for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<int>().getParameter() = tempCast;
                                     }
@@ -618,7 +618,7 @@ void ofxOceanodeInspectorController::draw(){
                                     }
                                 }
                                 
-                                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                                     tempCast = tempCast;
                                     for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<int>().getParameter() = tempCast;
                                     }
@@ -664,7 +664,7 @@ void ofxOceanodeInspectorController::draw(){
 //                                std::vector<float> floatVec(tempCast.get().begin(), tempCast.get().end());
 //                                ImGui::PlotHistogram(hiddenUniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
                             }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                                 tempCast = tempCast;
                                 for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<vector<int>>().getParameter() = tempCast;
                                 }
@@ -687,7 +687,7 @@ void ofxOceanodeInspectorController::draw(){
                                 for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<bool>().getParameter() = tempCast;
                                 }
                             }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                                 tempCast = !tempCast;
                                 for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<bool>().getParameter() = tempCast;
                                 }
@@ -712,7 +712,7 @@ void ofxOceanodeInspectorController::draw(){
 							
 							ImGui::PopStyleColor(3);
 							
-							if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+							if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
 								tempCast.trigger();
 								for(auto nodePair : selectedNodesWithoutFirst){
 									static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<void>().getParameter().trigger();
@@ -760,7 +760,7 @@ void ofxOceanodeInspectorController::draw(){
                                 for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<ofColor>().getParameter() = tempCast;
                                 }
                             }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                                 tempCast = tempCast;
                                 for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<ofColor>().getParameter() = tempCast;
                                 }
@@ -784,7 +784,7 @@ void ofxOceanodeInspectorController::draw(){
                                 for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<ofFloatColor>().getParameter() = tempCast;
                                 }
                             }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                                 tempCast = tempCast;
                                 for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<ofFloatColor>().getParameter() = tempCast;
                                 }
@@ -798,7 +798,7 @@ void ofxOceanodeInspectorController::draw(){
                         }
                         
                         if (isItemEditableByText){
-                            if ((ImGui::IsItemHovered() && !ImGui::IsItemEdited() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter))) || ImGui::IsItemClicked(1)){
+                            if ((ImGui::IsItemHovered() && !ImGui::IsItemEdited() && ImGui::IsKeyPressed((ImGuiKey_Enter))) || ImGui::IsItemClicked(1)){
                                 ImGui::SetKeyboardFocusHere(-1);
                             }
                         }

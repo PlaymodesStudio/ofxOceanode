@@ -85,8 +85,8 @@ void ofxOceanodeNodesController::draw()
             searchField = cString;
         }
         ImGui::Separator();
-        bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
-        bool isEnterReleased = ImGui::IsKeyReleased(ImGui::GetKeyIndex(ImGuiKey_Enter));
+        bool isEnterPressed = ImGui::IsKeyDown(ImGuiKey_Enter); //Select first option if enter is pressed
+        bool isEnterReleased = ImGui::IsKeyReleased(ImGuiKey_Enter);
 
         for(int i = 0; i < categoriesVector.size(); i++)
         {

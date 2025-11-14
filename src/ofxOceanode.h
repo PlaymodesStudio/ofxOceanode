@@ -22,7 +22,7 @@
 
 //#include "ofxOceanodeAbstractTimeline.h"
 
-#include "ofxImGuiSimple.h"
+#include "ofxImGui.h"
 #include "imgui.h"
 #include "router.h"
 #include "portal.h"
@@ -142,7 +142,7 @@ private:
     
 //    vector<ofxOceanodeAbstractTimeline> timelines;
     
-    ofxImGuiSimple gui;
+    ofxImGui::Gui gui;
     void showManualWindow(bool *b);
     void showHelpPopUp();
     bool firstDraw;

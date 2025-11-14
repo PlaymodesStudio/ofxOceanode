@@ -181,7 +181,7 @@ void ofxOceanodePresetsController::draw(){
         ImGui::Text("%s", (presetName + "\n").c_str());
         ImGui::Separator();
         
-        if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
+        if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown((ImGuiKey_Enter))) {
             ImGui::CloseCurrentPopup();
             deletePreset(presetName,banks[currentBank]);
         }
@@ -232,7 +232,7 @@ void ofxOceanodePresetsController::draw(){
                 ImGui::OpenPopup("Preset name already exists.");
                 if(ImGui::BeginPopupModal("Preset name already exists.", NULL,ImGuiWindowFlags_AlwaysAutoResize))
                 {
-                    if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
+                    if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown((ImGuiKey_Enter))) {
                         ImGui::CloseCurrentPopup();
                     }
                 }
