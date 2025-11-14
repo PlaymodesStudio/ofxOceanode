@@ -192,6 +192,14 @@ public:
 		getInstance().currentPresetName = presetName;
 	}
 	
+	static string getCurrentBankName(){
+		return getInstance().currentBankName;
+	}
+	
+	static void setCurrentBankName(const string& bankName){
+		getInstance().currentBankName = bankName;
+	}
+
 	static std::string getCurrentPresetPath(){
 		return getInstance().currentPresetPath;
 	}
@@ -226,20 +234,21 @@ private:
     unsigned int centralNode_id = 0;
     unsigned int leftNode_id = 0;
 	
-    std::shared_ptr<macroCategory> macroDirectoryStructure;
-	std::string currentPresetName = "";
-	
+    shared_ptr<macroCategory> macroDirectoryStructure;
 	ofEvent<string> macroUpdatedEvent;
-    bool presetLoading;
+    
+	bool presetLoading;
     ofEvent<void> presetWillBeLoadedEvent;
     ofEvent<void> presetHasLoadedEvent;
-	
+	string currentPresetName = "";
+	string currentPresetPath = "";
+	string currentBankName = "";
+
 	vector<abstractPortal*> portals;
     vector<abstractPortal*> currentUpdatingPortals;
     
     ofxOceanodeConfigurationFlags configurationFlags;
 	
-	std::string currentPresetPath = "";
 
 };
 
