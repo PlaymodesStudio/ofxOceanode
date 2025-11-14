@@ -1333,11 +1333,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         if(ImGui::IsWindowFocused()){
             if(ImGui::IsMouseDragging(0, 0.0f)){
                 if (ImGui::IsWindowHovered()){
-#ifdef TARGET_OSX
-                    if(ImGui::GetIO().KeySuper && !isCreatingConnection){//MultiSelect not allowed when connecting connectio
-#else
                     if(ImGui::GetIO().KeyCtrl && !isCreatingConnection){
-#endif
                         if(!isSelecting){
                             selectInitialPoint = ImGui::GetMousePos() - ImGui::GetIO().MouseDelta - offset;
                             isSelecting  = true;
@@ -1350,11 +1346,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     if((!isSelecting && !isCreatingConnection && someSelectedModuleMove == "") || (ImGui::IsKeyDown((ImGuiKey_Space)))){
                         scrolling = scrolling + ImGui::GetIO().MouseDelta;
                         if(glm::vec2(ImGui::GetIO().MouseDelta) != glm::vec2(0,0)) canvasHasScolled = true;
-#ifdef TARGET_OSX
-                        if(isSelecting && !ImGui::GetIO().KeySuper){
-#else
                         if(isSelecting && !ImGui::GetIO().KeyCtrl){
-#endif
                             selectInitialPoint = selectInitialPoint +  ImGui::GetIO().MouseDelta;
                             selectEndPoint = selectEndPoint + ImGui::GetIO().MouseDelta;
                             selectedRect = ofRectangle(selectInitialPoint, selectEndPoint);
@@ -1416,11 +1408,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 moveSelectedModulesWithDrag = glm::vec2(0,0);
             }
             
-#ifdef TARGET_OSX
-            if(ImGui::GetIO().KeySuper){
-#else
             if(ImGui::GetIO().KeyCtrl){
-#endif
                 if(ImGui::IsKeyPressed(ImGuiKey_C)){
                     container->copySelectedModulesWithConnections();
                     deselectAllNodes();
