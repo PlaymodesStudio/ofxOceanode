@@ -144,3 +144,5 @@ Build Status
 Linux, macOS [![Build Status](https://travis-ci.org/PlaymodesStudio/ofxOceanode.svg?branch=master)](https://travis-ci.org/PlaymodesStudio/ofxOceanode)
 Windows [![Build status](https://ci.appveyor.com/api/projects/status/wwcmfntgs1l5858c/branch/master?svg=true)](https://ci.appveyor.com/project/eduardfrigola/ofxoceanode/branch/master)
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/PlaymodesStudio/ofxOceanode)
+
