@@ -147,6 +147,7 @@ private:
     bool firstDraw;
     bool settingsLoaded;
     bool showMode;
+	bool snapToGrid;
     
     void drawShowModeWindow();
     
