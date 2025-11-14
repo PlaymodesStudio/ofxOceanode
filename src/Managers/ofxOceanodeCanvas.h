@@ -10,7 +10,6 @@
 #define ofxOceanodeCanvas_h
 
 #ifndef OFXOCEANODE_HEADLESS
-
 #include "ofMain.h"
 
 class ofxOceanodeContainer;
@@ -21,7 +20,6 @@ class ofxOceanodeCanvas{
 public:
     //ofxOceanodeCanvas(){};
     ~ofxOceanodeCanvas(){};
-    
     
     void setup(string _uid = "Canvas", string _pid = "");
     void update(){};
@@ -38,12 +36,33 @@ public:
     
     void bringOnTop(){onTop = true;};
     
+	// node dimensions
+	int getNodeWidth(){return NODE_WIDTH_TEXT+NODE_WIDTH_WIDGET;};
+	void setNodeWidth(int ww, int tw){NODE_WIDTH_WIDGET=ww;NODE_WIDTH_TEXT=tw;};
+	
+	void setNodeWidthText(int n){NODE_WIDTH_TEXT = n;};
+	int getNodeWidthText(){return NODE_WIDTH_TEXT;};
+	
+	void setNodeWidthWidget(int n){NODE_WIDTH_WIDGET = n;};
+	int getNodeWidthWidget(){return NODE_WIDTH_WIDGET;};
+	
+	void setGridDivisions(int n){gridDivisions= n;};
+	int getGridDivisions(){return gridDivisions;};
+
+	int getGridSize(){return GRID_SIZE;};
+	// (nodeWidthTotal should be % by 4 as we use it for GRID_SIZE / snaping
+	int getTotalNodeWidth(){return NODE_WIDTH_TEXT+NODE_WIDTH_WIDGET+2*NODE_WINDOW_PADDING.x;};
+	void updateGridSize(){GRID_SIZE = getTotalNodeWidth()/gridDivisions;};
+	
+	
+	
 private:
     glm::vec3 getMatrixScale(const glm::mat4 &m);
     glm::mat4 translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector);
     
     glm::vec2 screenToCanvas(glm::vec2 p);
     glm::vec2 canvasToScreen(glm::vec2 p);
+    glm::vec2 snapToGrid(glm::vec2 position);
     
     shared_ptr<ofxOceanodeContainer> container;
     
@@ -72,7 +91,20 @@ private:
     vector<string> categoriesVector;
     vector<vector<string>> options;
     string searchField = "";
+    string lastSearchField = "";
     int numTimesPopup = 0;
+    
+    // Search result navigation
+    struct SearchResultItem {
+        string name;
+        string type; // "node" or "macro"
+        string macroPath; // only used for macros
+        
+        SearchResultItem(const string& n, const string& t, const string& mp = "")
+            : name(n), type(t), macroPath(mp) {}
+    };
+    vector<SearchResultItem> filteredSearchResults;
+    int selectedSearchResultIndex = -1;
     
     bool inited = false;
     
@@ -85,6 +117,7 @@ private:
     glm::vec2 offsetToCenter = glm::vec2(0.0f, 0.0f);
 
     bool show_grid = true;
+    bool snap_to_grid = false;
     
     string node_selected = "";
     glm::vec2 newNodeClickPos;
@@ -98,7 +131,20 @@ private:
     string parentID;
     bool isFirstDraw = true;
     bool onTop = false;
-    
+	
+	// node dimensions (nodeWidthTotal should be % by 4)
+	float NODE_SLOT_RADIUS = 4.0f;
+	int NODE_WIDTH_TEXT = 90;
+	int NODE_WIDTH_WIDGET = 150;
+	int GRID_SIZE;
+	int gridDivisions;
+	glm::vec2 NODE_WINDOW_PADDING;
+	
+	// Comment checkbox system for keyboard shortcuts
+	vector<bool> commentCheckboxStates;  // Track which comments have checkboxes enabled
+	vector<int> keyboardSlots;           // Maps keyboard slots (0-9) to comment indices (-1 = empty)
+	vector<int> commentToSlot;           // Maps comment indices to keyboard slots (-1 = not assigned)
+	static const int MAX_KEYBOARD_SLOTS = 10;
 };
 
 #endif
