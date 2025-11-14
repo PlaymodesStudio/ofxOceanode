@@ -145,13 +145,11 @@ public:
     }
     
     static void startedLoadingPreset(){
-//        ofLog() << "shared starting loading preset";
         getInstance().presetWillBeLoadedEvent.notify();
         getInstance().presetLoading = true;
     }
     
     static void finishedLoadingPreset(){
-//        ofLog() << "shared finished loading preset";
         getInstance().presetLoading = false;
         getInstance().presetHasLoadedEvent.notify();
     }
