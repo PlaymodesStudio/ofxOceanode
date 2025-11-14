@@ -257,7 +257,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             if(commentIndex != -1 && commentIndex < numComments)
             {
                 // Map slot to key: slot 0-8 -> keys 1-9, slot 9 -> key 0
-                int keyCode = (slot < 9) ? ('1' + slot) : '0';
+                int keyCode = (slot < 9) ? (ImGuiKey_1 + slot) : ImGuiKey_0;
                 
                 if(!ImGui::IsAnyItemActive() && ImGui::IsKeyDown(ImGuiKey(keyCode)))
                 {
