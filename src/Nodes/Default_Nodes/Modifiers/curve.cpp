@@ -194,10 +194,10 @@ void curve::draw(ofEventArgs &args){
 					}
 					if(p.drag == 3){
 						glm::vec2 normalizedPos = glm::clamp(normalizePoint(ImGui::GetMousePos()), 0.0f, 1.0f);
-						if(ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_X))){
+						if(ImGui::IsKeyDown((ImGuiKey_X))){
 							normalizedPos.x = round(normalizedPos.x * numHorizontalDivisions) / numHorizontalDivisions;
 						}
-						if(ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Y))){
+						if(ImGui::IsKeyDown((ImGuiKey_Y))){
 							normalizedPos.y = round(normalizedPos.y * numVerticalDivisions) / numVerticalDivisions;
 						}
 						p.cp1 = p.cp1 - p.point + normalizedPos;

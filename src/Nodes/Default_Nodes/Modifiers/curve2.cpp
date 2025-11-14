@@ -710,7 +710,7 @@ void curve2::draw(ofEventArgs &args){
 			// ========================================================================
 			
 			if(activeCurve.get() >= 0 && points != nullptr && lines != nullptr && parameterController){
-				bool shiftPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_LeftShift));
+				bool shiftPressed = ImGui::IsKeyDown((ImGuiKey_LeftShift));
 				bool ctrlPressed = ImGui::GetIO().KeyCtrl;
 				
 				// Handle parameter drag operations through the component
@@ -2003,10 +2003,10 @@ bool StandardPointInteractionHandler::handlePointDrag(std::vector<curvePoint2>& 
                 glm::vec2 normalizedPos = glm::clamp(coordinateTransformer->safeNormalizePoint(mouseState.position), 0.0f, 1.0f);
                 
                 // Legacy key-based snapping (X and Y keys for individual axis snapping)
-                if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_X))) {
+                if (ImGui::IsKeyDown((ImGuiKey_X))) {
                     normalizedPos.x = round(normalizedPos.x * 8) / 8; // Default to 8 divisions
                 }
-                if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Y))) {
+                if (ImGui::IsKeyDown((ImGuiKey_Y))) {
                     normalizedPos.y = round(normalizedPos.y * 4) / 4; // Default to 4 divisions
                 }
                 
