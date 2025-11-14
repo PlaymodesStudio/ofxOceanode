@@ -54,7 +54,8 @@ public:
 	int getTotalNodeWidth(){return NODE_WIDTH_TEXT+NODE_WIDTH_WIDGET+2*NODE_WINDOW_PADDING.x;};
 	void updateGridSize(){GRID_SIZE = getTotalNodeWidth()/gridDivisions;};
 	
-	
+	void setSnapToGrid(bool b){snap_to_grid=b;};
+	bool getSnapToGrid(){return snap_to_grid;};
 	
 private:
     glm::vec3 getMatrixScale(const glm::mat4 &m);
@@ -118,7 +119,7 @@ private:
 
     bool show_grid = true;
     bool snap_to_grid = false;
-    
+	
     string node_selected = "";
     glm::vec2 newNodeClickPos;
 	std::map<string, int> nodesDrawingOrder;
