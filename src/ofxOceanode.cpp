@@ -135,10 +135,10 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Oscillator_1/Pow");
     //        timelines.emplace_back("Indexer_1/NumWaves");
     //        timelines.emplace_back("Mapper_1/Min_Input");
-    gui.setup(nullptr, false, ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable, false);
+    OceanodeTheme* oceanodeTheme = new OceanodeTheme();
+    gui.setup(oceanodeTheme, false, ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable, false);
 	ofxOceanodeShared::readMacros();
     oceanodeTime->setup(container, controls->get<ofxOceanodeBPMController>());
-    StyleColorsOceanode();
 }
 
 void ofxOceanode::update(){
