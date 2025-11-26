@@ -12,6 +12,7 @@
 #include "ofxOceanodeTypesRegistry.h"
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeShared.h"
+#include "ofxOceanodeScope.h"
 
 #ifdef OFXOCEANODE_USE_MIDI
 #include "ofxOceanodeMidiBinding.h"
@@ -237,6 +238,8 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     
     loadPreset_presetHasLoaded();
     
+	ofxOceanodeScope::getInstance()->loadScope(presetFolderPath + "/scope_config.json", this);
+	
     resetPhase();
     
     return true;

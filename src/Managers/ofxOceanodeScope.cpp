@@ -9,6 +9,11 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "ofxOceanodeParameter.h"
+#include "ofxOceanodeNodeModel.h"
+#include "ofxOceanodeContainer.h"
+#include "ofxOceanodeNode.h"
+#include "ofUtils.h"
+#include "ofxOceanodeShared.h"
 
 // https://github.com/ocornut/imgui/issues/1720
 bool Splitter(int splitNum, bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size = -1.0f)
@@ -76,6 +81,14 @@ void ofxOceanodeScope::draw(){
 
     if(scopedParameters.size() > 0){
         ImGui::Begin("Scopes", NULL, ImGuiWindowFlags_NoScrollbar);
+        
+        // Apply saved window configuration on first frame after load
+        if(windowConfig.hasConfig){
+            ImGui::SetWindowPos(ImVec2(windowConfig.posX, windowConfig.posY), ImGuiCond_Once);
+            ImGui::SetWindowSize(ImVec2(windowConfig.width, windowConfig.height), ImGuiCond_Once);
+            windowConfig.hasConfig = false; // Only apply once
+        }
+        
         windowWidth = ImGui::GetContentRegionAvail().x;
         windowHeight = ImGui::GetContentRegionAvail().y;
         for(int i = 0; i < scopedParameters.size()-1; i++){
@@ -103,6 +116,9 @@ void ofxOceanodeScope::draw(){
                     scopedParameters[i].sizeRelative += topInc * scopedParameters.size() / windowHeight;
                     scopedParameters[i+1].sizeRelative += bottomInc * scopedParameters.size() / windowHeight;
                 }
+                
+                // Auto-save after splitter change
+                saveScope();
             }
         }
         for(int i = 0; i < scopedParameters.size(); i++)
@@ -122,19 +138,27 @@ void ofxOceanodeScope::draw(){
             if(ImGui::Button("x##RemoveScope"))
             {
                 ofxOceanodeScope::getInstance()->removeParameter(p.parameter);
+                // Auto-save is called inside removeParameter()
             }
             ImGui::SameLine();
             ImGui::Text((p.parameter->getGroupHierarchyNames().front() + "/" + p.parameter->getName()).c_str());
             ImGui::SameLine();
             if(ImGui::Button("[^]##MoveScopeUp"))
             {
-                if(i>0) std::swap(scopedParameters[i],scopedParameters[i-1]);
+                if(i>0){
+                    std::swap(scopedParameters[i],scopedParameters[i-1]);
+                    // Auto-save after moving parameter up
+                    saveScope();
+                }
             }
             ImGui::SameLine();
             if(ImGui::Button("[v]##MoveScopeDown"))
             {
-                if(i<scopedParameters.size()-1) std::swap(scopedParameters[i],scopedParameters[i+1]);
-                
+                if(i<scopedParameters.size()-1){
+                    std::swap(scopedParameters[i],scopedParameters[i+1]);
+                    // Auto-save after moving parameter down
+                    saveScope();
+                }
             }
 //            ImGui::SameLine();
 //            bool keepAspectRatio = (p.parameter->getFlags() & ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
@@ -160,6 +184,28 @@ void ofxOceanodeScope::draw(){
             ImGui::PopStyleColor(5);
             ImGui::EndChild();
         }
+        
+        // Check for window position/size changes and auto-save
+        ImVec2 currentPos = ImGui::GetWindowPos();
+        ImVec2 currentSize = ImGui::GetWindowSize();
+        
+        if(lastWindowConfig.hasConfig){
+            bool posChanged = (currentPos.x != lastWindowConfig.posX || currentPos.y != lastWindowConfig.posY);
+            bool sizeChanged = (currentSize.x != lastWindowConfig.width || currentSize.y != lastWindowConfig.height);
+            
+            if(posChanged || sizeChanged){
+                // Auto-save after window position/size change
+                saveScope();
+            }
+        }
+        
+        // Update last window config for next frame
+        lastWindowConfig.hasConfig = true;
+        lastWindowConfig.posX = currentPos.x;
+        lastWindowConfig.posY = currentPos.y;
+        lastWindowConfig.width = currentSize.x;
+        lastWindowConfig.height = currentSize.y;
+        
         ImGui::End();
     }
 }
@@ -167,6 +213,9 @@ void ofxOceanodeScope::draw(){
 void ofxOceanodeScope::addParameter(ofxOceanodeAbstractParameter* p, ofColor _color){
     p->setScoped(true);
     scopedParameters.emplace_back(p,_color);
+    
+    // Auto-save after adding parameter
+    saveScope();
 }
 
 void ofxOceanodeScope::removeParameter(ofxOceanodeAbstractParameter* p){
@@ -178,4 +227,244 @@ void ofxOceanodeScope::removeParameter(ofxOceanodeAbstractParameter* p){
         sp.sizeRelative += ((sizeBackup - 1) / scopedParameters.size());
     }
     
+    // Auto-save after removing parameter
+    //saveScope();
+}
+
+
+void ofxOceanodeScope::saveScope(const std::string& filepath){
+    // Use preset path if no filepath provided
+    std::string actualPath;
+    if(filepath.empty()){
+        std::string presetPath = ofxOceanodeShared::getCurrentPresetPath();
+        if(!presetPath.empty()){
+            actualPath = presetPath + "/scope_config.json";
+        } else {
+            actualPath = ofToDataPath(saveFilePath); // Fallback to default
+        }
+    } else {
+        actualPath = filepath;
+    }
+    
+    ofLogNotice("ofxOceanodeScope") << "Starting save operation to: " << actualPath;
+    
+    ofJson json;
+    
+    // Save window configuration
+    json["window"]["posX"] = ImGui::GetWindowPos().x;
+    json["window"]["posY"] = ImGui::GetWindowPos().y;
+    json["window"]["width"] = ImGui::GetWindowSize().x;
+    json["window"]["height"] = ImGui::GetWindowSize().y;
+    
+    ofLogNotice("ofxOceanodeScope") << "Window config - Position: ("
+        << json["window"]["posX"] << ", " << json["window"]["posY"]
+        << "), Size: (" << json["window"]["width"] << "x" << json["window"]["height"] << ")";
+    
+    // Save scoped parameters
+    json["parameters"] = ofJson::array();
+    ofLogNotice("ofxOceanodeScope") << "Saving " << scopedParameters.size() << " parameter(s)";
+    
+    for(const auto& item : scopedParameters){
+        ofJson paramJson;
+        paramJson["path"] = item.parameter->getGroupHierarchyNames().front() + "/" + item.parameter->getName();
+        paramJson["sizeRelative"] = item.sizeRelative;
+        json["parameters"].push_back(paramJson);
+        
+        ofLogNotice("ofxOceanodeScope") << "  Parameter: " << paramJson["path"]
+            << " (sizeRelative: " << item.sizeRelative << ")";
+    }
+    
+    // Save to file (silently - no error messages for auto-save)
+    ofSavePrettyJson(actualPath, json);
+    
+    ofLogNotice("ofxOceanodeScope") << "Save operation completed successfully";
+}
+
+void ofxOceanodeScope::loadScope(const std::string& filepath, ofxOceanodeContainer* container){
+    ofLogNotice("ofxOceanodeScope") << "loadScope called with container: "
+        << (container != nullptr ? "PROVIDED" : "NULL");
+    
+    // Use preset path if no filepath provided
+    std::string actualPath;
+    if(filepath.empty()){
+        std::string presetPath = ofxOceanodeShared::getCurrentPresetPath();
+        if(!presetPath.empty()){
+            actualPath = presetPath + "/scope_config.json";
+        } else {
+            actualPath = ofToDataPath(saveFilePath); // Fallback to default
+        }
+    } else {
+        actualPath = filepath;
+    }
+    
+    // Check if file exists
+    ofFile file(actualPath);
+    if(!file.exists()){
+        ofLogError("ofxOceanodeScope") << "Cannot load scope: file does not exist: " << actualPath;
+        return;
+    }
+    
+    // Load JSON
+    ofJson json;
+    try {
+        json = ofLoadJson(actualPath);
+    } catch (const std::exception& e) {
+        ofLogError("ofxOceanodeScope") << "Error loading scope file: " << e.what();
+        return;
+    }
+    
+    // Load window configuration
+    if(json.contains("window")){
+        windowConfig.hasConfig = true;
+        windowConfig.posX = json["window"]["posX"];
+        windowConfig.posY = json["window"]["posY"];
+        windowConfig.width = json["window"]["width"];
+        windowConfig.height = json["window"]["height"];
+    }
+    
+    // Clear existing scoped parameters
+    for(auto& item : scopedParameters){
+        item.parameter->setScoped(false);
+    }
+    scopedParameters.clear();
+    
+    // Clear and load parameter data
+    loadedParameterData.clear();
+    
+    if(json.contains("parameters") && json["parameters"].is_array()){
+        for(const auto& paramJson : json["parameters"]){
+            ofxOceanodeScopeParameterData data;
+            data.parameterPath = paramJson["path"];
+            data.sizeRelative = paramJson["sizeRelative"];
+            loadedParameterData.push_back(data);
+            
+            ofLogNotice("ofxOceanodeScope") << "Loaded scope parameter config: " << data.parameterPath
+                                            << " (size: " << data.sizeRelative << ")";
+        }
+    }
+    
+    ofLogNotice("ofxOceanodeScope") << "Loaded scope configuration from: " << actualPath
+                                    << " (" << loadedParameterData.size() << " parameters)";
+    
+    ofLogNotice("ofxOceanodeScope") << "Checking container recreation: container is "
+        << (container != nullptr ? "NOT NULL" : "NULL")
+        << ", loadedParameterData has " << loadedParameterData.size() << " items";
+    
+    // If container is provided, automatically recreate scoped parameters
+    if(container != nullptr && !loadedParameterData.empty()){
+        ofLogNotice("ofxOceanodeScope") << "Attempting to recreate " << loadedParameterData.size() << " scoped parameters from container";
+        
+        int successCount = 0;
+        int failureCount = 0;
+        
+        // Get all nodes from container
+        vector<ofxOceanodeNode*> allNodes = container->getAllModules();
+        
+        ofLogNotice("ofxOceanodeScope") << "=== Starting parameter recreation ===";
+        ofLogNotice("ofxOceanodeScope") << "Total nodes in container: " << allNodes.size();
+        
+        // For each loaded parameter data
+        for(const auto& paramData : loadedParameterData){
+            // Parse the parameter path (format: "group/paramName")
+            size_t slashPos = paramData.parameterPath.find('/');
+            if(slashPos == std::string::npos){
+                ofLogWarning("ofxOceanodeScope") << "Invalid parameter path format: " << paramData.parameterPath;
+                failureCount++;
+                continue;
+            }
+            
+            std::string groupName = paramData.parameterPath.substr(0, slashPos);
+            std::string paramName = paramData.parameterPath.substr(slashPos + 1);
+            
+            ofLogNotice("ofxOceanodeScope") << "\n--- Searching for parameter: " << paramData.parameterPath;
+            ofLogNotice("ofxOceanodeScope") << "    Looking for groupName: '" << groupName << "' and paramName: '" << paramName << "'";
+            
+            // Search for the node with matching group hierarchy
+            bool found = false;
+            for(auto* node : allNodes){
+                ofParameterGroup& params = node->getParameters();
+                
+                ofLogNotice("ofxOceanodeScope") << "  Checking node with parameter group name: '" << params.getName() << "'";
+                
+                // The key insight: we need to check if ANY parameter in this node has
+                // getGroupHierarchyNames().front() == groupName
+                // So let's iterate through all parameters and check their hierarchy
+                for(int i = 0; i < params.size(); i++){
+                    ofAbstractParameter& absParam = params.get(i);
+                    
+                    // Try to cast to oceanode parameter to access getGroupHierarchyNames()
+                    auto* oceanodeParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&absParam);
+                    if(oceanodeParam != nullptr){
+                        // Get the group hierarchy for this parameter
+                        vector<string> hierarchyNames = oceanodeParam->getGroupHierarchyNames();
+                        
+                        if(!hierarchyNames.empty()){
+                            std::string paramHierarchyName = hierarchyNames.front();
+                            
+                            // Debug: log the first parameter we check in each node
+                            if(i == 0){
+                                ofLogNotice("ofxOceanodeScope") << "    First param hierarchy name: '" << paramHierarchyName
+                                    << "' (param: '" << absParam.getName() << "')";
+                            }
+                            
+                            // Check if this parameter's hierarchy matches what we're looking for
+                            if(paramHierarchyName == groupName){
+                                ofLogNotice("ofxOceanodeScope") << "    ✓ Found matching hierarchy name: '" << paramHierarchyName << "'";
+                                
+                                // Now search for the specific parameter by name in this node
+                                for(int j = 0; j < params.size(); j++){
+                                    ofAbstractParameter& targetParam = params.get(j);
+                                    ofLogNotice("ofxOceanodeScope") << "      Checking param: '" << targetParam.getName() << "'";
+                                    
+                                    if(targetParam.getName() == paramName){
+                                        ofLogNotice("ofxOceanodeScope") << "      ✓ Found matching parameter name: '" << paramName << "'";
+                                        
+                                        // Found the parameter! Add it to scope
+                                        auto* targetOceanodeParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&targetParam);
+                                        if(targetOceanodeParam != nullptr){
+                                            // Add parameter with node color
+                                            addParameter(targetOceanodeParam, node->getColor());
+                                            
+                                            // Set the sizeRelative from loaded data
+                                            // Find the just-added parameter in scopedParameters
+                                            if(!scopedParameters.empty()){
+                                                scopedParameters.back().sizeRelative = paramData.sizeRelative;
+                                            }
+                                            
+                                            ofLogNotice("ofxOceanodeScope") << "      ✓✓✓ Successfully recreated scoped parameter: "
+                                                << paramData.parameterPath << " (sizeRelative: " << paramData.sizeRelative << ")";
+                                            successCount++;
+                                            found = true;
+                                            break;
+                                        } else {
+                                            ofLogWarning("ofxOceanodeScope") << "      ✗ Parameter is not an ofxOceanodeAbstractParameter";
+                                        }
+                                    }
+                                }
+                                
+                                // If we found the matching node, break out of parameter iteration
+                                if(found) break;
+                            }
+                        }
+                    }
+                }
+                
+                if(found) break;
+            }
+            
+            if(!found){
+                ofLogWarning("ofxOceanodeScope") << "Could not find parameter in container: " << paramData.parameterPath;
+                failureCount++;
+            }
+        }
+        
+        ofLogNotice("ofxOceanodeScope") << "Parameter recreation complete: " << successCount
+            << " succeeded, " << failureCount << " failed";
+    } else {
+        if(container == nullptr){
+            ofLogNotice("ofxOceanodeScope") << "Skipping parameter recreation: container is NULL";
+        } else if(loadedParameterData.empty()){
+            ofLogNotice("ofxOceanodeScope") << "Skipping parameter recreation: no loaded parameter data";
+        }
+    }
 }
