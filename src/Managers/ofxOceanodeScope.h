@@ -33,6 +33,7 @@ struct ofxOceanodeScopeWindowConfig {
     float posY = 0;
     float width = 800;
     float height = 600;
+    unsigned int dockID = 0;  // ImGuiID type
 };
 
 struct ofxOceanodeScopeParameterData {
@@ -80,6 +81,7 @@ private:
     // Auto-save functionality
     std::string saveFilePath = "scope_config.json";
     ofxOceanodeScopeWindowConfig lastWindowConfig;
+    bool isLoadingScope = false;
 };
 
 #endif /* ofxOceanodeScope_h */

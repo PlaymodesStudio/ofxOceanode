@@ -80,13 +80,21 @@ void ofxOceanodeScope::setup(){
 void ofxOceanodeScope::draw(){
 
     if(scopedParameters.size() > 0){
+        // Apply dock state BEFORE ImGui::Begin()
+        if(windowConfig.hasConfig && windowConfig.dockID != 0){
+            ofLogNotice("ofxOceanodeScope") << "RESTORE: Setting dockID to " << windowConfig.dockID;
+            ImGui::SetNextWindowDockID(windowConfig.dockID, ImGuiCond_Always);
+        } else if(windowConfig.hasConfig && windowConfig.dockID == 0){
+            ofLogNotice("ofxOceanodeScope") << "RESTORE: DockID is 0 (undocked), not setting dock state";
+        }
+        
         ImGui::Begin("Scopes", NULL, ImGuiWindowFlags_NoScrollbar);
         
         // Apply saved window configuration on first frame after load
         if(windowConfig.hasConfig){
-            ImGui::SetWindowPos(ImVec2(windowConfig.posX, windowConfig.posY), ImGuiCond_Once);
-            ImGui::SetWindowSize(ImVec2(windowConfig.width, windowConfig.height), ImGuiCond_Once);
-            windowConfig.hasConfig = false; // Only apply once
+            ImGui::SetWindowPos(ImVec2(windowConfig.posX, windowConfig.posY), ImGuiCond_Always);
+            ImGui::SetWindowSize(ImVec2(windowConfig.width, windowConfig.height), ImGuiCond_Always);
+            windowConfig.hasConfig = false; // Only apply once per preset load
         }
         
         windowWidth = ImGui::GetContentRegionAvail().x;
@@ -118,6 +126,7 @@ void ofxOceanodeScope::draw(){
                 }
                 
                 // Auto-save after splitter change
+                ofLogNotice("ofxOceanodeScope") << "SAVE TRIGGER: Splitter change";
                 saveScope();
             }
         }
@@ -148,6 +157,7 @@ void ofxOceanodeScope::draw(){
                 if(i>0){
                     std::swap(scopedParameters[i],scopedParameters[i-1]);
                     // Auto-save after moving parameter up
+                    ofLogNotice("ofxOceanodeScope") << "SAVE TRIGGER: Move parameter up";
                     saveScope();
                 }
             }
@@ -157,6 +167,7 @@ void ofxOceanodeScope::draw(){
                 if(i<scopedParameters.size()-1){
                     std::swap(scopedParameters[i],scopedParameters[i+1]);
                     // Auto-save after moving parameter down
+                    ofLogNotice("ofxOceanodeScope") << "SAVE TRIGGER: Move parameter down";
                     saveScope();
                 }
             }
@@ -185,16 +196,21 @@ void ofxOceanodeScope::draw(){
             ImGui::EndChild();
         }
         
-        // Check for window position/size changes and auto-save
+        // Check for window position/size/dock changes and auto-save
         ImVec2 currentPos = ImGui::GetWindowPos();
         ImVec2 currentSize = ImGui::GetWindowSize();
+        ImGuiID currentDockID = ImGui::GetWindowDockID();
         
         if(lastWindowConfig.hasConfig){
             bool posChanged = (currentPos.x != lastWindowConfig.posX || currentPos.y != lastWindowConfig.posY);
             bool sizeChanged = (currentSize.x != lastWindowConfig.width || currentSize.y != lastWindowConfig.height);
+            bool dockChanged = (currentDockID != lastWindowConfig.dockID);
             
-            if(posChanged || sizeChanged){
-                // Auto-save after window position/size change
+            if(posChanged || sizeChanged || dockChanged){
+                // Auto-save after window position/size/dock change
+                if(posChanged) ofLogNotice("ofxOceanodeScope") << "SAVE TRIGGER: Position changed";
+                if(sizeChanged) ofLogNotice("ofxOceanodeScope") << "SAVE TRIGGER: Size changed";
+                if(dockChanged) ofLogNotice("ofxOceanodeScope") << "SAVE TRIGGER: Dock changed from " << lastWindowConfig.dockID << " to " << currentDockID;
                 saveScope();
             }
         }
@@ -205,6 +221,7 @@ void ofxOceanodeScope::draw(){
         lastWindowConfig.posY = currentPos.y;
         lastWindowConfig.width = currentSize.x;
         lastWindowConfig.height = currentSize.y;
+        lastWindowConfig.dockID = currentDockID;
         
         ImGui::End();
     }
@@ -214,8 +231,11 @@ void ofxOceanodeScope::addParameter(ofxOceanodeAbstractParameter* p, ofColor _co
     p->setScoped(true);
     scopedParameters.emplace_back(p,_color);
     
-    // Auto-save after adding parameter
-    saveScope();
+    // Auto-save after adding parameter (but not during load)
+    if(!isLoadingScope){
+        ofLogNotice("ofxOceanodeScope") << "SAVE TRIGGER: Add parameter";
+        saveScope();
+    }
 }
 
 void ofxOceanodeScope::removeParameter(ofxOceanodeAbstractParameter* p){
@@ -227,8 +247,10 @@ void ofxOceanodeScope::removeParameter(ofxOceanodeAbstractParameter* p){
         sp.sizeRelative += ((sizeBackup - 1) / scopedParameters.size());
     }
     
-    // Auto-save after removing parameter
-    //saveScope();
+    // Auto-save after removing parameter (but not during load)
+    if(!isLoadingScope){
+        //saveScope();
+    }
 }
 
 
@@ -255,10 +277,13 @@ void ofxOceanodeScope::saveScope(const std::string& filepath){
     json["window"]["posY"] = ImGui::GetWindowPos().y;
     json["window"]["width"] = ImGui::GetWindowSize().x;
     json["window"]["height"] = ImGui::GetWindowSize().y;
+    ImGuiID currentDockID = ImGui::GetWindowDockID();
+    json["window"]["dockID"] = (int)currentDockID;
     
     ofLogNotice("ofxOceanodeScope") << "Window config - Position: ("
         << json["window"]["posX"] << ", " << json["window"]["posY"]
-        << "), Size: (" << json["window"]["width"] << "x" << json["window"]["height"] << ")";
+        << "), Size: (" << json["window"]["width"] << "x" << json["window"]["height"]
+        << "), DockID: " << currentDockID << " (" << (currentDockID == 0 ? "UNDOCKED" : "DOCKED") << ")";
     
     // Save scoped parameters
     json["parameters"] = ofJson::array();
@@ -320,6 +345,14 @@ void ofxOceanodeScope::loadScope(const std::string& filepath, ofxOceanodeContain
         windowConfig.posY = json["window"]["posY"];
         windowConfig.width = json["window"]["width"];
         windowConfig.height = json["window"]["height"];
+        
+        if(json["window"].contains("dockID")){
+            windowConfig.dockID = json["window"]["dockID"];
+            ofLogNotice("ofxOceanodeScope") << "Loaded dockID from JSON: " << windowConfig.dockID
+                << " (" << (windowConfig.dockID == 0 ? "UNDOCKED" : "DOCKED") << ")";
+        } else {
+            ofLogWarning("ofxOceanodeScope") << "No dockID found in JSON";
+        }
     }
     
     // Clear existing scoped parameters
@@ -362,6 +395,9 @@ void ofxOceanodeScope::loadScope(const std::string& filepath, ofxOceanodeContain
         
         ofLogNotice("ofxOceanodeScope") << "=== Starting parameter recreation ===";
         ofLogNotice("ofxOceanodeScope") << "Total nodes in container: " << allNodes.size();
+        
+        // Set flag to prevent auto-save during parameter recreation
+        isLoadingScope = true;
         
         // For each loaded parameter data
         for(const auto& paramData : loadedParameterData){
@@ -460,6 +496,9 @@ void ofxOceanodeScope::loadScope(const std::string& filepath, ofxOceanodeContain
         
         ofLogNotice("ofxOceanodeScope") << "Parameter recreation complete: " << successCount
             << " succeeded, " << failureCount << " failed";
+        
+        // Clear flag after recreation complete
+        isLoadingScope = false;
     } else {
         if(container == nullptr){
             ofLogNotice("ofxOceanodeScope") << "Skipping parameter recreation: container is NULL";
