@@ -9,10 +9,8 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "ofxOceanodeParameter.h"
-#include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeNode.h"
-#include "ofUtils.h"
 #include "ofxOceanodeShared.h"
 
 // https://github.com/ocornut/imgui/issues/1720

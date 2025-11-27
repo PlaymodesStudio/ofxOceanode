@@ -11,7 +11,7 @@
 #include <functional>
 #include <iostream>
 #include <vector>
-#include "ofColor.h"
+#include "ofMain.h"
 
 class ofxOceanodeAbstractParameter;
 class ofxOceanodeContainer;
