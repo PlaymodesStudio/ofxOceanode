@@ -128,6 +128,9 @@ public:
     void updatePersistent();
     void saveCurrentPreset();
     
+    void saveScope(const std::string& presetPath);
+    void loadScope(const std::string& presetPath);
+    
     void setBpm(float _bpm);
     void resetPhase();
     
@@ -176,6 +179,15 @@ public:
     string getCanvasID(){return canvasID;};
     
 private:
+    ofxOceanodeAbstractParameter* resolveParameterFromPath(const std::string& paramPath);
+    
+    struct ParsedParameterPath {
+        std::string groupName;
+        std::string paramName;
+        bool isValid;
+    };
+	
+    ParsedParameterPath parseParameterPath(const std::string& path);
     
     //NodeModel;
     std::unordered_map<string, nodeContainerWithId> dynamicNodes;

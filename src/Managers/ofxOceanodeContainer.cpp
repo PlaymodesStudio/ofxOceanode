@@ -45,6 +45,9 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     }
     isListeningMidi = false;
 #endif
+    
+    // Note: Scope change callback is now set per-preset in loadPreset()
+    // to ensure correct preset path is captured
 }
 
 ofxOceanodeContainer::~ofxOceanodeContainer(){
@@ -218,6 +221,10 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
 bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     ofLog()<<"Load Preset " << presetFolderPath;
     
+    // Disable scope auto-save during preset loading to prevent saving empty scope
+    // when nodes are deleted
+    ofxOceanodeScope::getInstance()->setScopeChangedCallback(nullptr);
+    
     loadPreset_presetWillBeLoaded();
 
     loadPreset_loadNodes(presetFolderPath);
@@ -238,12 +245,165 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     
     loadPreset_presetHasLoaded();
     
-	ofxOceanodeScope::getInstance()->loadScope(presetFolderPath + "/scope_config.json", this);
+	loadScope(presetFolderPath);
 	
-    resetPhase();
-    
+	resetPhase();
+	
+	// Re-enable scope auto-save callback AFTER all loading is complete
+	// This must be the LAST step to avoid saving during any deferred cleanup
+	// Capture presetFolderPath by value to ensure we save to the correct location
+	ofxOceanodeScope::getInstance()->setScopeChangedCallback([this, presetFolderPath]() {
+		if(!presetFolderPath.empty()) {
+			saveScope(presetFolderPath);
+		}
+	});
+	   
     return true;
 }
+
+void ofxOceanodeContainer::saveScope(const std::string& presetPath) {
+    // Get scope state from scope
+    auto scopeState = ofxOceanodeScope::getInstance()->getScopeState();
+    
+    // Convert to JSON
+    ofJson json = scopeState.toJson();
+    
+    // Save to file
+    std::string filepath = presetPath + "/scope_config.json";
+    ofSavePrettyJson(filepath, json);
+    
+    ofLogNotice("ofxOceanodeContainer") << "Saved scope configuration to: " << filepath;
+}
+
+void ofxOceanodeContainer::loadScope(const std::string& presetPath) {
+    std::string filepath = presetPath + "/scope_config.json";
+    
+    // Check if file exists
+    ofFile file(filepath);
+    if(!file.exists()) {
+        ofLogNotice("ofxOceanodeContainer") << "No scope config file found at: " << filepath;
+        return;
+    }
+    
+    // Load JSON
+    ofJson json;
+    try {
+        json = ofLoadJson(filepath);
+    } catch (const std::exception& e) {
+        ofLogError("ofxOceanodeContainer") << "Error loading scope file: " << e.what();
+        return;
+    }
+    
+    // Parse to scope state
+    ofxOceanodeScopeState scopeState = ofxOceanodeScopeState::fromJson(json);
+    
+    // Clear existing scope
+    ofxOceanodeScope::getInstance()->clearScopedParameters();
+    
+    // Set window configuration
+    ofxOceanodeScope::getInstance()->setWindowConfig(scopeState.windowConfig);
+    
+    // Resolve and add parameters
+    int successCount = 0;
+    int failureCount = 0;
+    
+    for(const auto& paramData : scopeState.parameters) {
+        // Resolve parameter
+        auto* param = resolveParameterFromPath(paramData.parameterPath);
+        
+        if(param != nullptr) {
+            // Find the node that owns this parameter to get its color
+            ofColor nodeColor = ofColor::white; // default
+            
+            // Search for the node
+            vector<ofxOceanodeNode*> allNodes = getAllModules();
+            for(auto* node : allNodes) {
+                ofParameterGroup& params = node->getParameters();
+                for(int i = 0; i < params.size(); i++) {
+                    if(&params.get(i) == static_cast<ofAbstractParameter*>(param)) {
+                        nodeColor = node->getColor();
+                        break;
+                    }
+                }
+            }
+            
+            // Add to scope
+            ofxOceanodeScope::getInstance()->addParameter(param, nodeColor);
+            
+            // Set size relative (access the last added item)
+            auto& scopedParams = ofxOceanodeScope::getInstance()->getScopedParameters();
+            if(!scopedParams.empty()) {
+                scopedParams.back().sizeRelative = paramData.sizeRelative;
+            }
+            
+            successCount++;
+        } else {
+            ofLogWarning("ofxOceanodeContainer") << "Could not resolve parameter: " 
+                                                  << paramData.parameterPath;
+            failureCount++;
+        }
+    }
+    
+    ofLogNotice("ofxOceanodeContainer") << "Loaded scope: " << successCount 
+                                        << " parameters loaded, " << failureCount << " failed";
+}
+
+ofxOceanodeContainer::ParsedParameterPath ofxOceanodeContainer::parseParameterPath(
+    const std::string& path) {
+    
+    ParsedParameterPath result;
+    result.isValid = false;
+    
+    size_t slashPos = path.find('/');
+    if(slashPos == std::string::npos) {
+        return result;
+    }
+    
+    result.groupName = path.substr(0, slashPos);
+    result.paramName = path.substr(slashPos + 1);
+    result.isValid = true;
+    
+    return result;
+}
+
+ofxOceanodeAbstractParameter* ofxOceanodeContainer::resolveParameterFromPath(
+    const std::string& paramPath) {
+    
+    // Parse the path
+    auto parsed = parseParameterPath(paramPath);
+    if(!parsed.isValid) {
+        return nullptr;
+    }
+    
+    // Get all nodes
+    vector<ofxOceanodeNode*> allNodes = getAllModules();
+    
+    // Search for matching parameter
+    for(auto* node : allNodes) {
+        ofParameterGroup& params = node->getParameters();
+        
+        // Check each parameter in the node
+        for(int i = 0; i < params.size(); i++) {
+            ofAbstractParameter& absParam = params.get(i);
+            
+            // Try to cast to oceanode parameter
+            auto* oceanodeParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&absParam);
+            if(oceanodeParam != nullptr) {
+                // Check if hierarchy matches
+                vector<string> hierarchyNames = oceanodeParam->getGroupHierarchyNames();
+                if(!hierarchyNames.empty() && hierarchyNames.front() == parsed.groupName) {
+                    // Check if parameter name matches
+                    if(absParam.getName() == parsed.paramName) {
+                        return oceanodeParam;
+                    }
+                }
+            }
+        }
+    }
+    
+    return nullptr;
+}
+
 
 
 void ofxOceanodeContainer::loadPreset_presetWillBeLoaded(){

@@ -11,7 +11,8 @@
 #include <functional>
 #include <iostream>
 #include <vector>
-#include "ofMain.h"
+#include "ofColor.h"
+#include "ofJson.h"
 
 class ofxOceanodeAbstractParameter;
 class ofxOceanodeContainer;
@@ -27,6 +28,7 @@ public:
     float sizeRelative;
 };
 
+// load / save scopes data structures
 struct ofxOceanodeScopeWindowConfig {
     bool hasConfig = false;
     float posX = 0;
@@ -34,11 +36,17 @@ struct ofxOceanodeScopeWindowConfig {
     float width = 800;
     float height = 600;
 };
-
 struct ofxOceanodeScopeParameterData {
     std::string parameterPath;  // group hierarchy + name
     float sizeRelative;
-    // Future: Add more parameter-specific data here as needed
+};
+struct ofxOceanodeScopeState {
+    ofxOceanodeScopeWindowConfig windowConfig;
+    std::vector<ofxOceanodeScopeParameterData> parameters;
+    
+    // Serialization helpers
+    ofJson toJson() const;
+    static ofxOceanodeScopeState fromJson(const ofJson& json);
 };
 
 class ofxOceanodeScope {
@@ -61,11 +69,18 @@ public:
     
     void addScopeFunc(scopeFunc f){scopeTypes.push_back(f);};
     const std::vector<scopeFunc> getScopedTypes(){return scopeTypes;};
-    
-    void saveScope(const std::string& filepath = "");
-    void loadScope(const std::string& filepath = "", ofxOceanodeContainer* container = nullptr);
-    
-    const std::vector<ofxOceanodeScopeParameterData>& getLoadedParameterData() const { return loadedParameterData; }
+
+	// load / save scopes
+    ofxOceanodeScopeState getScopeState() const;
+    void setScopeState(const ofxOceanodeScopeState& state);
+    ofxOceanodeScopeWindowConfig getWindowConfig() const;
+    void setWindowConfig(const ofxOceanodeScopeWindowConfig& config);
+    void clearScopedParameters();
+    // Callback for scope changes (for auto-save)
+    using ScopeChangedCallback = std::function<void()>;
+    void setScopeChangedCallback(ScopeChangedCallback callback);
+    // Accessor for container to get scoped parameters (for setting sizeRelative)
+    std::vector<ofxOceanodeScopeItem>& getScopedParameters() { return scopedParameters; }
 
 private:
     std::vector<scopeFunc> scopeTypes;
@@ -77,9 +92,11 @@ private:
     ofxOceanodeScopeWindowConfig windowConfig;
     std::vector<ofxOceanodeScopeParameterData> loadedParameterData;
     
-    // Auto-save functionality
+    // // load / save scopes : Auto-save functionality
     std::string saveFilePath = "scope_config.json";
     ofxOceanodeScopeWindowConfig lastWindowConfig;
+    ScopeChangedCallback scopeChangedCallback;
+    void notifyScopeChanged();
 };
 
 #endif /* ofxOceanodeScope_h */
