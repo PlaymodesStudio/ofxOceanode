@@ -12,6 +12,7 @@
 #include "ofxOceanodeTypesRegistry.h"
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeShared.h"
+#include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeScope.h"
 
 #ifdef OFXOCEANODE_USE_MIDI
@@ -261,21 +262,50 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     return true;
 }
 
-void ofxOceanodeContainer::saveScope(const std::string& presetPath) {
-    // Get scope state from scope
-    auto scopeState = ofxOceanodeScope::getInstance()->getScopeState();
-    
-    // Convert to JSON
-    ofJson json = scopeState.toJson();
-    
-    // Save to file
-    std::string filepath = presetPath + "/scope_config.json";
-    ofSavePrettyJson(filepath, json);
-    
-    ofLogNotice("ofxOceanodeContainer") << "Saved scope configuration to: " << filepath;
+void ofxOceanodeContainer::saveScope(const std::string& presetPath)
+{
+	ofLog()<<"Save Scope Preset Path" << presetPath << " Canvas ID : " << getCanvasID() << endl;
+	if (!getCanvasID().empty() && getCanvasID() != "Canvas" && getCanvasID() != "0")
+	{
+		return;
+	}
+		
+	// Get scope state from scope
+	auto scopeState = ofxOceanodeScope::getInstance()->getScopeState();
+	
+	// Convert to JSON
+	ofJson json = scopeState.toJson();
+	
+	// Save to file
+	std::string filepath = presetPath + "/scope_config.json";
+	ofSavePrettyJson(filepath, json);
+	
+	ofLogNotice("ofxOceanodeContainer") << "Saved scope configuration to: " << filepath;
+	ofLogNotice("ofxOceanodeContainer") << "Saved " << scopeState.parameters.size() << " scoped parameter(s):";
+	for (const auto& data : scopeState.parameters) {
+		std::string fullPath = data.canvasID;
+		if (!fullPath.empty() && fullPath != "Canvas" && fullPath != "0") {
+			fullPath += " > ";
+		} else {
+			fullPath = "";
+		}
+		fullPath += data.nodeName + " / " + data.paramName;
+		ofLogNotice("ofxOceanodeContainer") << "  - " << fullPath;
+	}
 }
 
 void ofxOceanodeContainer::loadScope(const std::string& presetPath) {
+    // Only load scope for root canvas - skip if path contains Macro_ (same logic as saveScope)
+    vector<std::string> pathStrings = ofSplitString(presetPath,"/");
+    int numPathsString = pathStrings.size();
+    string lastPath = pathStrings[numPathsString-1];
+    size_t macroPos = lastPath.find("Macro_");
+    if (macroPos != string::npos)
+    {
+        // Skip loading for macro containers
+        return;
+    }
+    
     std::string filepath = presetPath + "/scope_config.json";
     
     // Check if file exists
@@ -297,6 +327,10 @@ void ofxOceanodeContainer::loadScope(const std::string& presetPath) {
     // Parse to scope state
     ofxOceanodeScopeState scopeState = ofxOceanodeScopeState::fromJson(json);
     
+    // DEBUG: Log total parameters to process
+    ofLogNotice("ofxOceanodeContainer::loadScope") << "===== STARTING SCOPE LOAD =====";
+    ofLogNotice("ofxOceanodeContainer::loadScope") << "Total parameters in config: " << scopeState.parameters.size();
+    
     // Clear existing scope
     ofxOceanodeScope::getInstance()->clearScopedParameters();
     
@@ -306,29 +340,38 @@ void ofxOceanodeContainer::loadScope(const std::string& presetPath) {
     // Resolve and add parameters
     int successCount = 0;
     int failureCount = 0;
+    int iterationCount = 0;
     
     for(const auto& paramData : scopeState.parameters) {
-        // Resolve parameter
-        auto* param = resolveParameterFromPath(paramData.parameterPath);
+        iterationCount++;
         
-        if(param != nullptr) {
-            // Find the node that owns this parameter to get its color
+        // DEBUG: Log each iteration
+        ofLogNotice("ofxOceanodeContainer::loadScope") << "-----";
+        ofLogNotice("ofxOceanodeContainer::loadScope") << "Processing parameter #" << iterationCount << " of " << scopeState.parameters.size();
+        ofLogNotice("ofxOceanodeContainer::loadScope") << "  canvasID: '" << paramData.canvasID << "'";
+        ofLogNotice("ofxOceanodeContainer::loadScope") << "  parameterPath: '" << paramData.parameterPath << "'";
+        ofLogNotice("ofxOceanodeContainer::loadScope") << "  sizeRelative: " << paramData.sizeRelative;
+        
+        // Resolve parameter with canvasID awareness
+        ofLogNotice("ofxOceanodeContainer::loadScope") << "  Calling resolveParameterFromPath...";
+        auto resolved = resolveParameterFromPath(paramData.parameterPath, paramData.canvasID);
+        
+        // DEBUG: Log resolution result
+        if(resolved.parameter != nullptr) {
+            ofLogNotice("ofxOceanodeContainer::loadScope") << "  ✅ Parameter FOUND: " << resolved.parameter->getName();
+        } else {
+            ofLogNotice("ofxOceanodeContainer::loadScope") << "  ❌ Parameter NOT FOUND";
+        }
+        
+        if(resolved.parameter != nullptr) {
+            // Get color from the resolved node
             ofColor nodeColor = ofColor::white; // default
-            
-            // Search for the node
-            vector<ofxOceanodeNode*> allNodes = getAllModules();
-            for(auto* node : allNodes) {
-                ofParameterGroup& params = node->getParameters();
-                for(int i = 0; i < params.size(); i++) {
-                    if(&params.get(i) == static_cast<ofAbstractParameter*>(param)) {
-                        nodeColor = node->getColor();
-                        break;
-                    }
-                }
+            if(resolved.node != nullptr) {
+                nodeColor = resolved.node->getColor();
             }
             
             // Add to scope
-            ofxOceanodeScope::getInstance()->addParameter(param, nodeColor);
+            ofxOceanodeScope::getInstance()->addParameter(resolved.parameter, nodeColor);
             
             // Set size relative (access the last added item)
             auto& scopedParams = ofxOceanodeScope::getInstance()->getScopedParameters();
@@ -344,8 +387,29 @@ void ofxOceanodeContainer::loadScope(const std::string& presetPath) {
         }
     }
     
-    ofLogNotice("ofxOceanodeContainer") << "Loaded scope: " << successCount 
+    // DEBUG: Log loop completion
+    ofLogNotice("ofxOceanodeContainer::loadScope") << "===== LOOP COMPLETED =====";
+    ofLogNotice("ofxOceanodeContainer::loadScope") << "Expected to process: " << scopeState.parameters.size() << " parameters";
+    ofLogNotice("ofxOceanodeContainer::loadScope") << "Actually iterated: " << iterationCount << " times";
+    ofLogNotice("ofxOceanodeContainer::loadScope") << "Successfully resolved: " << successCount << " parameters";
+    ofLogNotice("ofxOceanodeContainer::loadScope") << "Failed to resolve: " << failureCount << " parameters";
+    
+    ofLogNotice("ofxOceanodeContainer") << "Loaded scope: " << successCount
                                         << " parameters loaded, " << failureCount << " failed";
+    
+    if (successCount > 0) {
+        ofLogNotice("ofxOceanodeContainer") << "Successfully loaded parameter(s):";
+        for (const auto& data : scopeState.parameters) {
+            std::string fullPath = data.canvasID;
+            if (!fullPath.empty() && fullPath != "Canvas" && fullPath != "0") {
+                fullPath += " > ";
+            } else {
+                fullPath = "";
+            }
+            fullPath += data.nodeName + " / " + data.paramName;
+            ofLogNotice("ofxOceanodeContainer") << "  - " << fullPath;
+        }
+    }
 }
 
 ofxOceanodeContainer::ParsedParameterPath ofxOceanodeContainer::parseParameterPath(
@@ -366,21 +430,135 @@ ofxOceanodeContainer::ParsedParameterPath ofxOceanodeContainer::parseParameterPa
     return result;
 }
 
-ofxOceanodeAbstractParameter* ofxOceanodeContainer::resolveParameterFromPath(
-    const std::string& paramPath) {
+ofxOceanodeContainer::ResolvedParameter ofxOceanodeContainer::resolveParameterFromPath(
+    const std::string& paramPath,
+    const std::string& canvasID) {
+    
+    // DIAGNOSTIC: Log function entry
+    ofLogNotice("ofxOceanodeContainer") << "[DEBUG] ========== resolveParameterFromPath called ==========";
+    ofLogNotice("ofxOceanodeContainer") << "[DEBUG]   paramPath: '" << paramPath << "'";
+    ofLogNotice("ofxOceanodeContainer") << "[DEBUG]   canvasID: '" << canvasID << "'";
+    ofLogNotice("ofxOceanodeContainer") << "[DEBUG]   this container's canvasID: '" << getCanvasID() << "'";
     
     // Parse the path
     auto parsed = parseParameterPath(paramPath);
     if(!parsed.isValid) {
-        return nullptr;
+        ofLogNotice("ofxOceanodeContainer") << "[DEBUG] Path parsing failed";
+        return ResolvedParameter();
     }
     
-    // Get all nodes
-    vector<ofxOceanodeNode*> allNodes = getAllModules();
+    ofLogNotice("ofxOceanodeContainer") << "[DEBUG]   parsed.groupName: '" << parsed.groupName << "'";
+    ofLogNotice("ofxOceanodeContainer") << "[DEBUG]   parsed.paramName: '" << parsed.paramName << "'";
+    
+    // Determine which container to search in based on canvasID
+    ofxOceanodeContainer* targetContainer = this;
+    
+    // If canvasID is not empty and not "Canvas" or "0", we need to find the macro
+    if(!canvasID.empty() && canvasID != "Canvas" && canvasID != "0") {
+        ofLogNotice("ofxOceanodeContainer") << "[DEBUG] Searching for macro with canvasID: '" << canvasID << "'";
+        
+        // Split canvasID by " / " to handle nested macros
+        vector<string> canvasLevels = ofSplitString(canvasID, " / ");
+        ofLogNotice("ofxOceanodeContainer") << "[DEBUG] Split canvasID into " << canvasLevels.size() << " levels";
+        
+        // Start from root container
+        ofxOceanodeContainer* currentContainer = this;
+        bool allLevelsFound = true;
+        bool foundMacro = false;
+        
+        // Build accumulated path as we traverse
+        string accumulatedPath = "";
+        
+        // Traverse each level of the hierarchy
+        int levelIndex = 0;
+        for(const auto& levelName : canvasLevels) {
+            levelIndex++;
+            
+            // Build the accumulated path for this level
+            if(levelIndex == 1) {
+                accumulatedPath = levelName;
+            } else {
+                accumulatedPath += " / " + levelName;
+            }
+            
+            ofLogNotice("ofxOceanodeContainer") << "[DEBUG] Level " << levelIndex << "/" << canvasLevels.size()
+                                                << ": Searching for '" << accumulatedPath << "'";
+            
+            vector<ofxOceanodeNode*> nodesAtLevel = currentContainer->getAllModules();
+            ofLogNotice("ofxOceanodeContainer") << "[DEBUG]   Container has " << nodesAtLevel.size() << " nodes";
+            bool levelFound = false;
+            
+            // Search for macro with matching canvasID at this level
+            int nodeIndex = 0;
+            for(auto* node : nodesAtLevel) {
+                nodeIndex++;
+                ofLogNotice("ofxOceanodeContainer") << "[DEBUG]     Examining node #" << nodeIndex
+                                                    << ": " << node->getParameters().getName();
+                
+                // Try to cast to macro node
+                if(ofxOceanodeNodeMacro* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
+                    ofLogNotice("ofxOceanodeContainer") << "[DEBUG]       -> This IS a macro node";
+                    
+                    auto macroContainer = macro->getContainer();
+                    if(macroContainer != nullptr) {
+                        string macroCanvasID = macroContainer->getCanvasID();
+                        ofLogNotice("ofxOceanodeContainer") << "[DEBUG]       -> Macro's canvasID: '" << macroCanvasID << "'";
+                        
+                        // Compare the accumulated path against the macro's full canvasID
+                        if(macroCanvasID == accumulatedPath) {
+                            ofLogNotice("ofxOceanodeContainer") << "[DEBUG]       -> MATCH! Moving into this macro's container";
+                            // Found the macro for this level, move into its container
+                            currentContainer = macroContainer.get();
+                            levelFound = true;
+                            break;
+                        } else {
+                            ofLogNotice("ofxOceanodeContainer") << "[DEBUG]       -> No match ('" << macroCanvasID
+                                                                 << "' != '" << accumulatedPath << "')";
+                        }
+                    } else {
+                        ofLogNotice("ofxOceanodeContainer") << "[DEBUG]       -> Macro has no container (nullptr)";
+                    }
+                } else {
+                    ofLogNotice("ofxOceanodeContainer") << "[DEBUG]       -> NOT a macro node";
+                }
+            }
+            
+            if(!levelFound) {
+                allLevelsFound = false;
+                ofLogWarning("ofxOceanodeContainer") << "Could not find macro with path: " << accumulatedPath
+                                                      << " in hierarchy: " << canvasID;
+                break;
+            }
+        }
+        
+        if(allLevelsFound) {
+            targetContainer = currentContainer;
+            foundMacro = true;
+            ofLogNotice("ofxOceanodeContainer") << "[DEBUG] Successfully traversed all " << canvasLevels.size()
+                                                << " levels of hierarchy";
+            ofLogNotice("ofxOceanodeContainer") << "[DEBUG] Using target container with canvasID: '"
+                                                << targetContainer->getCanvasID() << "'";
+        }
+        
+        if(!foundMacro) {
+            ofLogWarning("ofxOceanodeContainer") << "[DEBUG] Could not find macro with name: " << canvasID
+                                                  << ", falling back to root container";
+        }
+    }
+    
+    // Get all nodes from the target container
+    vector<ofxOceanodeNode*> allNodes = targetContainer->getAllModules();
+    ofLogNotice("ofxOceanodeContainer") << "[DEBUG] Searching for parameter in target container";
+    ofLogNotice("ofxOceanodeContainer") << "[DEBUG]   Target container has " << allNodes.size() << " nodes";
     
     // Search for matching parameter
+    int searchNodeIndex = 0;
     for(auto* node : allNodes) {
+        searchNodeIndex++;
+        ofLogNotice("ofxOceanodeContainer") << "[DEBUG]   Searching node #" << searchNodeIndex << ": " << node->getParameters().getName();
+        
         ofParameterGroup& params = node->getParameters();
+        ofLogNotice("ofxOceanodeContainer") << "[DEBUG]     Node has " << params.size() << " parameters";
         
         // Check each parameter in the node
         for(int i = 0; i < params.size(); i++) {
@@ -391,17 +569,42 @@ ofxOceanodeAbstractParameter* ofxOceanodeContainer::resolveParameterFromPath(
             if(oceanodeParam != nullptr) {
                 // Check if hierarchy matches
                 vector<string> hierarchyNames = oceanodeParam->getGroupHierarchyNames();
+                string hierarchyStr = "";
+                for(const auto& name : hierarchyNames) {
+                    if(!hierarchyStr.empty()) hierarchyStr += " > ";
+                    hierarchyStr += name;
+                }
+                
+                ofLogNotice("ofxOceanodeContainer") << "[DEBUG]       Param: " << absParam.getName()
+                                                    << " (hierarchy: " << hierarchyStr << ")";
+                
                 if(!hierarchyNames.empty() && hierarchyNames.front() == parsed.groupName) {
+                    ofLogNotice("ofxOceanodeContainer") << "[DEBUG]       -> Hierarchy MATCH! (front: '"
+                                                        << hierarchyNames.front() << "' == '" << parsed.groupName << "')";
+                    
                     // Check if parameter name matches
                     if(absParam.getName() == parsed.paramName) {
-                        return oceanodeParam;
+                        ofLogNotice("ofxOceanodeContainer") << "[DEBUG]       -> Parameter name MATCH!";
+                        ofLogNotice("ofxOceanodeContainer") << "[DEBUG] ========== FOUND PARAMETER! ==========";
+                        return ResolvedParameter(oceanodeParam, node);
+                    } else {
+                        ofLogNotice("ofxOceanodeContainer") << "[DEBUG]       -> Parameter name mismatch ('"
+                                                            << absParam.getName() << "' != '" << parsed.paramName << "')";
+                    }
+                } else {
+                    if(hierarchyNames.empty()) {
+                        ofLogNotice("ofxOceanodeContainer") << "[DEBUG]       -> No hierarchy (empty)";
+                    } else {
+                        ofLogNotice("ofxOceanodeContainer") << "[DEBUG]       -> Hierarchy mismatch (front: '"
+                                                            << hierarchyNames.front() << "' != '" << parsed.groupName << "')";
                     }
                 }
             }
         }
     }
     
-    return nullptr;
+    ofLogNotice("ofxOceanodeContainer") << "[DEBUG] ========== Parameter NOT FOUND ==========";
+    return ResolvedParameter();
 }
 
 
@@ -739,7 +942,7 @@ void ofxOceanodeContainer::loadPreset_loadComments(string presetFolderPath){
 }
 
 void ofxOceanodeContainer::savePreset(string presetFolderPath){
-    ofLog()<<"Save Preset " << presetFolderPath;
+    ofLog()<<"Save Preset " << presetFolderPath << " Canvas ID : " << getCanvasID() << endl;
     
     ofJson json;
     for(auto &nodeTypeMap : dynamicNodes){
@@ -816,6 +1019,9 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 		json["Comments"][i]["TextColor"]["B"] = c.textColor.b;
 	}
 	ofSavePrettyJson(presetFolderPath + "/comments.json", json);
+	
+	saveScope(presetFolderPath);
+	
 }
 
 bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referencePosition, bool allowOutsideInputs){
@@ -897,7 +1103,7 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
     }
     
     ofDirectory::removeDirectory(tempLoadFolderPath, true);
-
+	
     return true;
 }
 
