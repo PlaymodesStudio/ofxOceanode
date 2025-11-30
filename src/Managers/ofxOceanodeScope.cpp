@@ -401,14 +401,7 @@ ofJson ofxOceanodeScopeState::toJson() const {
 
 ofxOceanodeScopeState ofxOceanodeScopeState::fromJson(const ofJson& json) {
     ofxOceanodeScopeState state;
-    
-    // Log raw JSON array size at start
-    if(json.contains("parameters") && json["parameters"].is_array()) {
-        ofLogNotice("ofxOceanodeScopeState::fromJson") << "JSON contains " << json["parameters"].size() << " parameters";
-    } else {
-        ofLogNotice("ofxOceanodeScopeState::fromJson") << "JSON contains no parameters array";
-    }
-    
+        
     // Window config
     if(json.contains("window")) {
         state.windowConfig.hasConfig = true;
@@ -423,9 +416,6 @@ ofxOceanodeScopeState ofxOceanodeScopeState::fromJson(const ofJson& json) {
         int paramIndex = 0;
         for(const auto& paramJson : json["parameters"]) {
             ofxOceanodeScopeParameterData data;
-            
-            ofLogNotice("ofxOceanodeScopeState::fromJson") << "Parsing parameter #" << paramIndex;
-            
             // Try new format first
             if(paramJson.contains("canvasID") && paramJson.contains("nodeName") && paramJson.contains("paramName")) {
                 data.canvasID = paramJson["canvasID"];
@@ -433,26 +423,7 @@ ofxOceanodeScopeState ofxOceanodeScopeState::fromJson(const ofJson& json) {
                 data.paramName = paramJson["paramName"];
                 // Populate parameterPath for backward compatibility with resolution logic
                 data.parameterPath = data.nodeName + "/" + data.paramName;
-                
-                ofLogNotice("ofxOceanodeScopeState::fromJson") << "  canvasID='" << data.canvasID << "', nodeName='" << data.nodeName << "', paramName='" << data.paramName << "'";
-            }
-            // Fallback to old format for backward compatibility
-            else if(paramJson.contains("path")) {
-                data.parameterPath = paramJson["path"];
-                
-                ofLogNotice("ofxOceanodeScopeState::fromJson") << "  Using legacy path: '" << data.parameterPath << "'";
-                
-                // Parse legacy path to extract components
-                vector<string> parts = ofSplitString(data.parameterPath, "/");
-                if(parts.size() >= 2) {
-                    data.nodeName = parts[0];
-                    data.paramName = parts[1];
-                    data.canvasID = "0"; // Assume root canvas for legacy data
-                }
-            }
-            else {
-                ofLogWarning("ofxOceanodeScopeState::fromJson") << "  Parameter #" << paramIndex << " has NO valid format (no canvasID/nodeName/paramName or path)";
-            }
+			}
             
             if(paramJson.contains("sizeRelative")) {
                 data.sizeRelative = paramJson["sizeRelative"];
@@ -461,12 +432,8 @@ ofxOceanodeScopeState ofxOceanodeScopeState::fromJson(const ofJson& json) {
             }
             
             state.parameters.push_back(data);
-            ofLogNotice("ofxOceanodeScopeState::fromJson") << "  Added parameter #" << paramIndex << " to state";
             paramIndex++;
         }
-        
-        ofLogNotice("ofxOceanodeScopeState::fromJson") << "Total parameters added to state: " << state.parameters.size();
     }
-    
     return state;
 }
