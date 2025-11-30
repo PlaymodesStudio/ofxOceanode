@@ -179,7 +179,15 @@ public:
     string getCanvasID(){return canvasID;};
     
 private:
-    ofxOceanodeAbstractParameter* resolveParameterFromPath(const std::string& paramPath);
+    struct ResolvedParameter {
+        ofxOceanodeAbstractParameter* parameter;
+        ofxOceanodeNode* node;
+        
+        ResolvedParameter() : parameter(nullptr), node(nullptr) {}
+        ResolvedParameter(ofxOceanodeAbstractParameter* p, ofxOceanodeNode* n) : parameter(p), node(n) {}
+    };
+    
+    ResolvedParameter resolveParameterFromPath(const std::string& paramPath, const std::string& canvasID = "");
     
     struct ParsedParameterPath {
         std::string groupName;
