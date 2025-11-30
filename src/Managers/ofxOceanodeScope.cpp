@@ -132,17 +132,14 @@ void ofxOceanodeScope::draw(){
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
             ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(0.0,0.0,0.0,0.0));
             
-            std::string fullPath = p.getFullPath();
-			ImGui::BeginChild(("Child_" + p.canvasID +"/" + fullPath).c_str(), size, true);
+            ImGui::BeginChild(("Child_" + p.parameter->getGroupHierarchyNames().front() + "/" + p.parameter->getName()).c_str(), size, true);
             if(ImGui::Button("x##RemoveScope"))
             {
                 ofxOceanodeScope::getInstance()->removeParameter(p.parameter);
                 // Auto-save is called inside removeParameter()
             }
             ImGui::SameLine();
-            if(p.canvasID=="Canvas") ImGui::Text(fullPath.c_str());
-			else ImGui::Text((p.canvasID +" / " +fullPath).c_str());
-			
+            ImGui::Text((p.parameter->getGroupHierarchyNames().front() + "/" + p.parameter->getName()).c_str());
             ImGui::SameLine();
             if(ImGui::Button("[^]##MoveScopeUp"))
             {
@@ -211,32 +208,11 @@ void ofxOceanodeScope::draw(){
     }
 }
 
-void ofxOceanodeScope::addParameter(
-    ofxOceanodeAbstractParameter* p,
-    ofColor _color,
-    const std::string& canvasID,
-    const std::string& nodeName
-){
+void ofxOceanodeScope::addParameter(ofxOceanodeAbstractParameter* p, ofColor _color){
     p->setScoped(true);
+    scopedParameters.emplace_back(p,_color);
     
-    // If canvasID/nodeName not provided, extract from parameter
-    std::string actualCanvasID = canvasID;
-    std::string actualNodeName = nodeName;
-    
-    if(actualCanvasID.empty() || actualNodeName.empty()) {
-        if(p->getNodeModel() != nullptr) {
-            actualCanvasID = p->getNodeModel()->getParents();
-            
-            auto hierarchyNames = p->getGroupHierarchyNames();
-            if(!hierarchyNames.empty()) {
-                actualNodeName = hierarchyNames.front();
-            }
-        }
-    }
-    
-    scopedParameters.emplace_back(p, _color, 1.0f, actualCanvasID, actualNodeName);
-    
-    // Auto-save after adding parameter 
+    // Auto-save after adding parameter
     notifyScopeChanged();
 }
 
@@ -269,16 +245,9 @@ ofxOceanodeScopeState ofxOceanodeScope::getScopeState() const {
     // Export parameter data
     for(const auto& item : scopedParameters) {
         ofxOceanodeScopeParameterData paramData;
-        
-        // New format with full path
-        paramData.canvasID = item.canvasID;
-        paramData.nodeName = item.cachedNodeName;
-        paramData.paramName = item.parameter->getName();
+        paramData.parameterPath = item.parameter->getGroupHierarchyNames().front() 
+                                 + "/" + item.parameter->getName();
         paramData.sizeRelative = item.sizeRelative;
-        
-        // Backward compatibility: also set legacy path
-        paramData.parameterPath = item.cachedNodeName + "/" + item.parameter->getName();
-        
         state.parameters.push_back(paramData);
     }
     
@@ -317,42 +286,6 @@ ofxOceanodeScopeWindowConfig ofxOceanodeScope::getWindowConfig() const {
     return windowConfig;
 }
 
-// Helper method implementations for full path display
-std::string ofxOceanodeScopeItem::getFullPath() const {
-    std::string fullPath;
-    
-    // Build path from canvasID hierarchy
-    if(!canvasID.empty() && canvasID != "0") {
-        // Parse canvasID to build readable macro path
-        // Example: "0.2.5" -> "Macro2 > Macro5 > "
-        vector<string> levels = ofSplitString(canvasID, ".");
-        
-        // Skip the root "0" level
-        for(size_t i = 1; i < levels.size(); i++) {
-            fullPath += "Macro" + levels[i] + " > ";
-        }
-    }
-    
-    // Append node name and parameter name
-    fullPath += cachedNodeName + " / " + parameter->getName();
-    
-    return fullPath;
-}
-
-std::string ofxOceanodeScopeParameterData::getFullPath() const {
-    std::string fullPath;
-    
-    if(!canvasID.empty() && canvasID != "0") {
-        vector<string> levels = ofSplitString(canvasID, ".");
-        for(size_t i = 1; i < levels.size(); i++) {
-            fullPath += "Macro" + levels[i] + " > ";
-        }
-    }
-    
-    fullPath += nodeName + " / " + paramName;
-    return fullPath;
-}
-
 void ofxOceanodeScope::setWindowConfig(const ofxOceanodeScopeWindowConfig& config) {
     windowConfig = config;
 }
@@ -383,16 +316,8 @@ ofJson ofxOceanodeScopeState::toJson() const {
     json["parameters"] = ofJson::array();
     for(const auto& param : parameters) {
         ofJson paramJson;
-        
-        // New format
-        paramJson["canvasID"] = param.canvasID;
-        paramJson["nodeName"] = param.nodeName;
-        paramJson["paramName"] = param.paramName;
+        paramJson["path"] = param.parameterPath;
         paramJson["sizeRelative"] = param.sizeRelative;
-        
-        // Backward compatibility: also save legacy path
-        paramJson["path"] = param.getLegacyPath();
-        
         json["parameters"].push_back(paramJson);
     }
     
@@ -401,13 +326,6 @@ ofJson ofxOceanodeScopeState::toJson() const {
 
 ofxOceanodeScopeState ofxOceanodeScopeState::fromJson(const ofJson& json) {
     ofxOceanodeScopeState state;
-    
-    // Log raw JSON array size at start
-    if(json.contains("parameters") && json["parameters"].is_array()) {
-        ofLogNotice("ofxOceanodeScopeState::fromJson") << "JSON contains " << json["parameters"].size() << " parameters";
-    } else {
-        ofLogNotice("ofxOceanodeScopeState::fromJson") << "JSON contains no parameters array";
-    }
     
     // Window config
     if(json.contains("window")) {
@@ -420,52 +338,12 @@ ofxOceanodeScopeState ofxOceanodeScopeState::fromJson(const ofJson& json) {
     
     // Parameters
     if(json.contains("parameters") && json["parameters"].is_array()) {
-        int paramIndex = 0;
         for(const auto& paramJson : json["parameters"]) {
             ofxOceanodeScopeParameterData data;
-            
-            ofLogNotice("ofxOceanodeScopeState::fromJson") << "Parsing parameter #" << paramIndex;
-            
-            // Try new format first
-            if(paramJson.contains("canvasID") && paramJson.contains("nodeName") && paramJson.contains("paramName")) {
-                data.canvasID = paramJson["canvasID"];
-                data.nodeName = paramJson["nodeName"];
-                data.paramName = paramJson["paramName"];
-                // Populate parameterPath for backward compatibility with resolution logic
-                data.parameterPath = data.nodeName + "/" + data.paramName;
-                
-                ofLogNotice("ofxOceanodeScopeState::fromJson") << "  canvasID='" << data.canvasID << "', nodeName='" << data.nodeName << "', paramName='" << data.paramName << "'";
-            }
-            // Fallback to old format for backward compatibility
-            else if(paramJson.contains("path")) {
-                data.parameterPath = paramJson["path"];
-                
-                ofLogNotice("ofxOceanodeScopeState::fromJson") << "  Using legacy path: '" << data.parameterPath << "'";
-                
-                // Parse legacy path to extract components
-                vector<string> parts = ofSplitString(data.parameterPath, "/");
-                if(parts.size() >= 2) {
-                    data.nodeName = parts[0];
-                    data.paramName = parts[1];
-                    data.canvasID = "0"; // Assume root canvas for legacy data
-                }
-            }
-            else {
-                ofLogWarning("ofxOceanodeScopeState::fromJson") << "  Parameter #" << paramIndex << " has NO valid format (no canvasID/nodeName/paramName or path)";
-            }
-            
-            if(paramJson.contains("sizeRelative")) {
-                data.sizeRelative = paramJson["sizeRelative"];
-            } else {
-                data.sizeRelative = 1.0f;
-            }
-            
+            data.parameterPath = paramJson["path"];
+            data.sizeRelative = paramJson["sizeRelative"];
             state.parameters.push_back(data);
-            ofLogNotice("ofxOceanodeScopeState::fromJson") << "  Added parameter #" << paramIndex << " to state";
-            paramIndex++;
         }
-        
-        ofLogNotice("ofxOceanodeScopeState::fromJson") << "Total parameters added to state: " << state.parameters.size();
     }
     
     return state;

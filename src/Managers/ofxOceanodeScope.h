@@ -20,31 +20,12 @@ class ImVec2;
 
 class ofxOceanodeScopeItem {
 public:
-    ofxOceanodeScopeItem(
-        ofxOceanodeAbstractParameter* p,
-        ofColor c = ofColor::white,
-        float s = 1,
-        const std::string& canvasId = "",
-        const std::string& nodeName = ""
-    ) : parameter(p),
-        color(c),
-        sizeRelative(s),
-        canvasID(canvasId),
-        cachedNodeName(nodeName) {};
-    
+    ofxOceanodeScopeItem(ofxOceanodeAbstractParameter* p, ofColor c = ofColor::white, float s = 1) : parameter(p), color(c), sizeRelative(s){};
     ~ofxOceanodeScopeItem(){};
     
-    // Existing fields
     ofxOceanodeAbstractParameter* parameter;
     ofColor color;
     float sizeRelative;
-    
-    // New fields for full path tracking
-    std::string canvasID;          // Full macro hierarchy (e.g., "0.2.5")
-    std::string cachedNodeName;    // Node name at time of scoping
-    
-    // Helper method to construct full display path
-    std::string getFullPath() const;
 };
 
 // load / save scopes data structures
@@ -56,19 +37,8 @@ struct ofxOceanodeScopeWindowConfig {
     float height = 600;
 };
 struct ofxOceanodeScopeParameterData {
-    std::string parameterPath;  // DEPRECATED - kept for backward compatibility
-    std::string canvasID;       // Full macro hierarchy (e.g., "0.2.5")
-    std::string nodeName;       // Node name
-    std::string paramName;      // Parameter name
+    std::string parameterPath;  // group hierarchy + name
     float sizeRelative;
-    
-    // Backward compatibility: generate old-style path for legacy loading
-    std::string getLegacyPath() const {
-        return nodeName + "/" + paramName;
-    }
-    
-    // Forward compatibility: generate new full path
-    std::string getFullPath() const;
 };
 struct ofxOceanodeScopeState {
     ofxOceanodeScopeWindowConfig windowConfig;
@@ -94,12 +64,7 @@ public:
     void setup();
     void draw();
     
-    void addParameter(
-        ofxOceanodeAbstractParameter* p,
-        ofColor _color,
-        const std::string& canvasID = "",
-        const std::string& nodeName = ""
-    );
+    void addParameter(ofxOceanodeAbstractParameter* p, ofColor _color);
     void removeParameter(ofxOceanodeAbstractParameter* p);
     
     void addScopeFunc(scopeFunc f){scopeTypes.push_back(f);};
