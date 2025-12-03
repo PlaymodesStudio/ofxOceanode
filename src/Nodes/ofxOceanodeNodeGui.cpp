@@ -541,7 +541,16 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                     ImGui::Separator();
                     if(!absParam.isScoped()){ //Param is not scoped
                         if(ImGui::Selectable("Add to Scope")){
-                            ofxOceanodeScope::getInstance()->addParameter(&absParam,node.getColor());
+                            // Extract full path information
+                            std::string canvasID = absParam.getNodeModel()->getParents();
+                            std::string nodeName = absParam.getGroupHierarchyNames().front();
+                            
+                            ofxOceanodeScope::getInstance()->addParameter(
+                                &absParam,
+                                node.getColor(),
+                                canvasID,
+                                nodeName
+                            );
                         }
                     }else{
                         if(ImGui::Selectable("Remove from Scope")){
