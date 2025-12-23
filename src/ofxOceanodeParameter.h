@@ -157,11 +157,12 @@ public:
     
     void setNodeModel(ofxOceanodeNodeModel* _nodeModel){nodeModel = _nodeModel;};
     ofxOceanodeNodeModel* getNodeModel(){return nodeModel;};
+    
+    virtual bool setFromInitofAbstract(ofxOceanodeAbstractParameter &param) = 0;
 	
 protected:
 	virtual const ofParameterGroup getFirstParent() const = 0;
 	virtual void setSerializable(bool serializable)=0;
-    virtual std::string escape(const std::string & str) const = 0;
 	virtual const void* getInternalObject() const = 0;
 	
 private:
@@ -238,11 +239,19 @@ public:
 	void applyNormalDrag(int drag){normalDrag(*parameter.get(), drag);};
 	void applyPrecisionDrag(int drag){precisionDrag(*parameter.get(), drag);};
 	void applySpeedDrag(int drag){speedDrag(*parameter.get(), drag);};
+    
+    bool setFromInitofAbstract(ofxOceanodeAbstractParameter &param){
+        if(typeid(param) == typeid(ofxOceanodeParameter<ParameterType>)){
+            getParameter() = param.cast<ParameterType>().getParameter().getInit();
+            return true;
+        }
+        return false;
+    }
 	
 protected:
 	const ofParameterGroup getFirstParent() const { return parameter->getFirstParent();}
 	void setSerializable(bool serializable) { parameter->setSerializable(serializable);}
-    std::string escape(const std::string & str) const { return "";}
+//    std::string escape(const std::string & str) const { return parameter->escale(str);}
 	const void* getInternalObject() const { return parameter->getInternalObject();}
 	
 private:
@@ -287,11 +296,15 @@ public:
 	
 	ofxOceanodeParameterFlags getFlags();
 	void setFlags(ofxOceanodeParameterFlags f){flags = f;};
+    
+    bool setFromInitofAbstract(ofxOceanodeAbstractParameter &param){
+        return false;
+    }
 	
 protected:
 	const ofParameterGroup getFirstParent() const { return parameter->getFirstParent();}
 	void setSerializable(bool serializable) { parameter->setSerializable(serializable);}
-    std::string escape(const std::string & str) const { return "";}
+//    std::string escape(const std::string & str) const { return parameter->escape(str);}
 	const void* getInternalObject() const { return parameter->getInternalObject();}
 	
 private:

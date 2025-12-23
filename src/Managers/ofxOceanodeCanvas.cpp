@@ -466,6 +466,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                                     if(newConnection != nullptr){
                                                         newConnection->reInitSinkParameter(oldParameterConnection);
                                                     }
+                                                    else{
+                                                        param->setFromInitofAbstract(oldParameterConnection);
+                                                    }
                                                 }
                                                 else{
                                                     container->createConnection(*tempSourceParameter, *param);
