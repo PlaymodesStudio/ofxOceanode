@@ -441,7 +441,7 @@ void ofxOceanodeInspectorController::draw(){
                         
                         ImGui::Text("%s", uniqueId.c_str());
                         
-                        ImGui::SetItemAllowOverlap();
+                        ImGui::SetNextItemAllowOverlap();
                         ImGui::SameLine(-1);
                         ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(51, ImGui::GetFrameHeight())); //Used to check later behaviours
                         
