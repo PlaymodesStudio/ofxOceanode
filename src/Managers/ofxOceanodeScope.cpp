@@ -254,35 +254,40 @@ void ofxOceanodeScope::removeParameter(ofxOceanodeAbstractParameter* p){
 
 ofxOceanodeScopeState ofxOceanodeScope::getScopeState() const {
     ofxOceanodeScopeState state;
-    
-    // Export window config (from ImGui if window is open)
-    if(scopedParameters.size() > 0) {
-        state.windowConfig.hasConfig = true;
-        state.windowConfig.posX = ImGui::GetWindowPos().x;
-        state.windowConfig.posY = ImGui::GetWindowPos().y;
-        state.windowConfig.width = ImGui::GetWindowSize().x;
-        state.windowConfig.height = ImGui::GetWindowSize().y;
-    } else {
-        state.windowConfig = windowConfig;
-    }
-    
-    // Export parameter data
-    for(const auto& item : scopedParameters) {
-        ofxOceanodeScopeParameterData paramData;
-        
-        // New format with full path
-        paramData.canvasID = item.canvasID;
-        paramData.nodeName = item.cachedNodeName;
-        paramData.paramName = item.parameter->getName();
-        paramData.sizeRelative = item.sizeRelative;
-        
-        // Backward compatibility: also set legacy path
-        paramData.parameterPath = item.cachedNodeName + "/" + item.parameter->getName();
-        
-        state.parameters.push_back(paramData);
-    }
-    
-    return state;
+	ImGuiContext& g = *GImGui;
+	
+	// to avoid bad access when closing app, we check if there is an ImGui context window before getting scope state as it might be non existing
+	if(g.CurrentWindow!=NULL)
+	{
+		// Export window config (from ImGui if window is open)
+		if(scopedParameters.size() > 0) {
+			state.windowConfig.hasConfig = true;
+			state.windowConfig.posX = ImGui::GetWindowPos().x;
+			state.windowConfig.posY = ImGui::GetWindowPos().y;
+			state.windowConfig.width = ImGui::GetWindowSize().x;
+			state.windowConfig.height = ImGui::GetWindowSize().y;
+		} else {
+			state.windowConfig = windowConfig;
+		}
+		
+		// Export parameter data
+		for(const auto& item : scopedParameters) {
+			ofxOceanodeScopeParameterData paramData;
+			
+			// New format with full path
+			paramData.canvasID = item.canvasID;
+			paramData.nodeName = item.cachedNodeName;
+			paramData.paramName = item.parameter->getName();
+			paramData.sizeRelative = item.sizeRelative;
+			
+			// Backward compatibility: also set legacy path
+			paramData.parameterPath = item.cachedNodeName + "/" + item.parameter->getName();
+			
+			state.parameters.push_back(paramData);
+		}
+		
+	}
+	return state;
 }
 
 void ofxOceanodeScope::setScopeState(const ofxOceanodeScopeState& state) {
