@@ -266,31 +266,29 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
 
 void ofxOceanodeContainer::saveScope(const std::string& presetPath)
 {
-//	ofLog()<<"Save Scope Preset Path" << presetPath << " Canvas ID : " << getCanvasID() << endl;
-//	if (!getCanvasID().empty() && getCanvasID() != "Canvas" && getCanvasID() != "0")
-//	{
-//		return;
-//	}
-		
 	// Get scope state from scope
 	auto scopeState = ofxOceanodeScope::getInstance()->getScopeState();
 	
-	// Convert to JSON
-	ofJson json = scopeState.toJson();
-	
-	// Save to file
-	std::string filepath = presetPath + "/scope_config.json";
-	ofSavePrettyJson(filepath, json);
-	
-	//ofLogNotice("ofxOceanodeContainer") << "Saved scope configuration to: " << filepath;
-	for (const auto& data : scopeState.parameters) {
-		std::string fullPath = data.canvasID;
-		if (!fullPath.empty() && fullPath != "Canvas" && fullPath != "0") {
-			fullPath += " > ";
-		} else {
-			fullPath = "";
+	// when closing app, we're removing parameters, so we're trying to save the scope, so avoid saving the JSON if scopeState is not valid
+	if(scopeState.windowConfig.hasConfig != false)
+	{
+		// Convert to JSON
+		ofJson json = scopeState.toJson();
+		
+		// Save to file
+		std::string filepath = presetPath + "/scope_config.json";
+		ofSavePrettyJson(filepath, json);
+		
+		//ofLogNotice("ofxOceanodeContainer") << "Saved scope configuration to: " << filepath;
+		for (const auto& data : scopeState.parameters) {
+			std::string fullPath = data.canvasID;
+			if (!fullPath.empty() && fullPath != "Canvas" && fullPath != "0") {
+				fullPath += " > ";
+			} else {
+				fullPath = "";
+			}
+			fullPath += data.nodeName + " / " + data.paramName;
 		}
-		fullPath += data.nodeName + " / " + data.paramName;
 	}
 }
 

@@ -73,6 +73,58 @@ void ofxOceanodeScope::setup(){
         }
         return false;
     });
+	scopeTypes.push_back([](ofxOceanodeAbstractParameter *p, ImVec2 size) -> bool{
+		// VECTOR INT PARAM
+		if(p->valueType() == typeid(std::vector<int>).name())
+		{
+			auto param = p->cast<std::vector<int>>().getParameter();
+			auto size2 = ImGui::GetContentRegionAvail();
+			vector<float> tempValues(param->begin(), param->end());
+
+			if(param->size() == 1 && size.x > size.y)
+			{
+				ImGui::ProgressBar((param.get()[0] - param.getMin()[0]) / (param.getMax()[0] - param.getMin()[0]), size, "");
+
+				if(ImGui::IsItemHovered()){
+					ImGui::BeginTooltip();
+					ImGui::Text("%d", param.get()[0]);
+					ImGui::EndTooltip();
+				}
+			}else if(param->size()>0){
+				if(param.getMin()[0] == std::numeric_limits<int>::lowest() || param.getMax()[0] == std::numeric_limits<int>::max()){
+					ImGui::PlotHistogram("", &tempValues[0], param->size(), 0, NULL, *std::min_element(param->begin(), param->end()), *std::max_element(param->begin(), param->end()), size);
+				}else{
+					ImGui::PlotHistogram("", &tempValues[0], param->size(), 0, NULL, param.getMin()[0], param.getMax()[0], size);
+				}
+			}
+			return true;
+		}
+
+		return false;
+	});
+	scopeTypes.push_back([](ofxOceanodeAbstractParameter *p, ImVec2 size) -> bool{
+		// INT PARAM
+		if(p->valueType() == typeid(int).name())
+		{
+			auto param = p->cast<int>().getParameter();
+			auto size2 = ImGui::GetContentRegionAvail();
+
+			ImGui::ProgressBar((param.get() - param.getMin()) / (param.getMax() - param.getMin()), size, "");
+			
+			if(ImGui::IsItemHovered()){
+				ImGui::BeginTooltip();
+				ImGui::Text("%d", param.get());
+				ImGui::EndTooltip();
+			}
+			return true;
+		}
+		return false;
+	});
+
+//	IMGUI_API void          PlotHistogram(const char* label, const float* values, int values_count, int values_offset = 0, const char* overlay_text = NULL, float scale_min = FLT_MAX, float scale_max = FLT_MAX, ImVec2 graph_size = ImVec2(0, 0), int stride = sizeof(float));
+//	IMGUI_API void          PlotHistogram(const char* label, float (*values_getter)(void* data, int idx), void* data, int values_count, int values_offset = 0, const char* overlay_text = NULL, float scale_min = FLT_MAX, float scale_max = FLT_MAX, ImVec2 graph_size = ImVec2(0, 0));
+
+	
 }
 
 void ofxOceanodeScope::draw(){
@@ -254,35 +306,40 @@ void ofxOceanodeScope::removeParameter(ofxOceanodeAbstractParameter* p){
 
 ofxOceanodeScopeState ofxOceanodeScope::getScopeState() const {
     ofxOceanodeScopeState state;
-    
-    // Export window config (from ImGui if window is open)
-    if(scopedParameters.size() > 0) {
-        state.windowConfig.hasConfig = true;
-        state.windowConfig.posX = ImGui::GetWindowPos().x;
-        state.windowConfig.posY = ImGui::GetWindowPos().y;
-        state.windowConfig.width = ImGui::GetWindowSize().x;
-        state.windowConfig.height = ImGui::GetWindowSize().y;
-    } else {
-        state.windowConfig = windowConfig;
-    }
-    
-    // Export parameter data
-    for(const auto& item : scopedParameters) {
-        ofxOceanodeScopeParameterData paramData;
-        
-        // New format with full path
-        paramData.canvasID = item.canvasID;
-        paramData.nodeName = item.cachedNodeName;
-        paramData.paramName = item.parameter->getName();
-        paramData.sizeRelative = item.sizeRelative;
-        
-        // Backward compatibility: also set legacy path
-        paramData.parameterPath = item.cachedNodeName + "/" + item.parameter->getName();
-        
-        state.parameters.push_back(paramData);
-    }
-    
-    return state;
+	ImGuiContext& g = *GImGui;
+	
+	// to avoid bad access when closing app, we check if there is an ImGui context window before getting scope state as it might be non existing
+	if(g.CurrentWindow!=NULL)
+	{
+		// Export window config (from ImGui if window is open)
+		if(scopedParameters.size() > 0) {
+			state.windowConfig.hasConfig = true;
+			state.windowConfig.posX = ImGui::GetWindowPos().x;
+			state.windowConfig.posY = ImGui::GetWindowPos().y;
+			state.windowConfig.width = ImGui::GetWindowSize().x;
+			state.windowConfig.height = ImGui::GetWindowSize().y;
+		} else {
+			state.windowConfig = windowConfig;
+		}
+		
+		// Export parameter data
+		for(const auto& item : scopedParameters) {
+			ofxOceanodeScopeParameterData paramData;
+			
+			// New format with full path
+			paramData.canvasID = item.canvasID;
+			paramData.nodeName = item.cachedNodeName;
+			paramData.paramName = item.parameter->getName();
+			paramData.sizeRelative = item.sizeRelative;
+			
+			// Backward compatibility: also set legacy path
+			paramData.parameterPath = item.cachedNodeName + "/" + item.parameter->getName();
+			
+			state.parameters.push_back(paramData);
+		}
+		
+	}
+	return state;
 }
 
 void ofxOceanodeScope::setScopeState(const ofxOceanodeScopeState& state) {
