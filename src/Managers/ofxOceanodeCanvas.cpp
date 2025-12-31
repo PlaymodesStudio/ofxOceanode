@@ -137,10 +137,15 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             commentToSlot.resize(numComments, -1);
             
             // Validate existing assignments after resize
-            for(int slot = 0; slot < MAX_KEYBOARD_SLOTS; slot++) {
-                if(keyboardSlots[slot] >= numComments) {
-                    keyboardSlots[slot] = -1;
-                }
+            for(int slot = 0; slot < MAX_KEYBOARD_SLOTS; slot++)
+			{
+				if(slot<keyboardSlots.size())
+				{
+					if(keyboardSlots[slot] >= numComments)
+					{
+						keyboardSlots[slot] = -1;
+					}
+				}
             }
         }
         
@@ -224,8 +229,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     
                     // Apply comment color to the item
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(c.color.r, c.color.g, c.color.b, 1.0));
-                    
-                    if(ImGui::Selectable(displayText.c_str()))
+					string sName = displayText + "##" + ofToString(i);
+					if(ImGui::Selectable(sName.c_str() ))
                     {
                         // Navigate to comment position
                         scrolling.x = -c.position.x;
