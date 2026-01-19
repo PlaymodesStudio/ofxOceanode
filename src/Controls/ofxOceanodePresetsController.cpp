@@ -340,11 +340,12 @@ void ofxOceanodePresetsController::draw(){
                 if ((ImGui::IsItemHovered() && ImGui::IsMouseReleased(0)))
                 {
                     
-                    if(ImGui::GetIO().KeyShift){
+                    /*if(ImGui::GetIO().KeyShift){
                         currentBank = b;
                         currentPreset[banks[b]] = presetName;
                         savePreset(bankPresets[banks[b]][n], banks[b]);
-                    }else if(mouseAction==1)
+                    }else*/
+					if(mouseAction==1)
                     {
                         currentBank = b;
                         currentPreset[banks[b]] = presetName;
