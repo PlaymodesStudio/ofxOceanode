@@ -34,8 +34,8 @@ class ofxOceanodeComment{
 public:
 	ofxOceanodeComment(glm::vec2 _pos = glm::vec2(0, 0), glm::vec2 _size = glm::vec2(265, 20)) : position(_pos), size(_size){
 		text = "-";
-		color = ofFloatColor(1, 1, 1, 1);
-		textColor = ofFloatColor(0, 0, 0, 1);
+		color = ofFloatColor(0, 0, 0, 1);
+		textColor = ofFloatColor(1, 1, 1, 1);
         openPopupInNext = false;
 	};
 	
