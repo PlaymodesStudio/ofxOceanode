@@ -233,8 +233,8 @@ public:
     void setBeatMult(float i){beatsMult_Param = vector<float>(1, i);};
     void setBeatDiv(float i){beatsDiv_Param = vector<float>(1, i);};
     
-    void setup();
-    void update(ofEventArgs &e);
+    void setup() override;
+    void update(ofEventArgs &e) override;
     
     void resetPhase() override;
     void setBpm(float bpm) override;
