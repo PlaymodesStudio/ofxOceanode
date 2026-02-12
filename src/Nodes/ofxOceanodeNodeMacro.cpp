@@ -446,6 +446,13 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	canvas.setContainer(container);
 	canvas.setup("Macro " + ofToString(getNumIdentifier()), canvasParentID);
 	
+	// get Snap params from shared
+	bool b = ofxOceanodeShared::getSnapToGrid();
+	canvas.setSnapToGrid(b);
+	int i = ofxOceanodeShared::getSnapGridDivs();
+	canvas.setGridDivisions(ofxOceanodeShared::getSnapGridDivs());
+	canvas.updateGridSize();
+	
 	if(additionalInfo != ""){
 		localPreset = false;
 		isLoadingPreset = true;

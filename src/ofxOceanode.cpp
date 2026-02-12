@@ -338,6 +338,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			if(ImGui::Checkbox("Snap To Grid",&snap))
 			{
 				canvas.setSnapToGrid(snap);
+				ofxOceanodeShared::setSnapToGrid(snap);
 			}
 			
 			int tw = canvas.getNodeWidthText();
@@ -350,6 +351,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			{
 				canvas.setGridDivisions(gd);
 				canvas.updateGridSize();
+				ofxOceanodeShared::setSnapGridDiv(gd);
 			}
 			canvas.setNodeWidthText(tw);
 			canvas.setNodeWidthWidget(ww);
@@ -584,12 +586,15 @@ void ofxOceanode::loadConfig(){
     if(config.contains("nodeWidgetWidth")){
         canvas.setNodeWidthWidget(config["nodeWidgetWidth"].get<int>());
     }
-    
-    if(config.contains("gridDivisions")){
-        canvas.setGridDivisions(config["gridDivisions"].get<int>());
-        canvas.updateGridSize();
-    }
 	if(config.contains("snapToGrid")){
-		canvas.setSnapToGrid(config["snapToGrid"].get<bool>());
+		bool b = config["gridDivisions"].get<int>();
+		canvas.setSnapToGrid(b);
+		ofxOceanodeShared::setSnapToGrid(b);
+	}
+	if(config.contains("gridDivisions")){
+		int i = config["gridDivisions"].get<int>();
+		canvas.setGridDivisions(i);
+		canvas.updateGridSize();
+		ofxOceanodeShared::setSnapGridDiv(i);
 	}
 }

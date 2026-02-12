@@ -206,6 +206,23 @@ public:
 		getInstance().currentPresetPath = presetPath;
 	}
     
+	// Snap to Grid
+	static void setSnapToGrid(bool b){
+		getInstance().snapToGrid = b;
+	}
+	
+	static void setSnapGridDiv(int i){
+		getInstance().snapGridDiv = i;
+	}
+	
+	static bool getSnapToGrid(){
+		return getInstance().snapToGrid;
+	}
+	
+	static int getSnapGridDivs(){
+		return getInstance().snapGridDiv;
+	}
+	
 private:
     ofxOceanodeShared(){};
     
@@ -247,7 +264,9 @@ private:
     
     ofxOceanodeConfigurationFlags configurationFlags;
 	
-
+	// Snap to Grid
+	bool snapToGrid = false;
+	int snapGridDiv = 4;
 };
 
 #endif /* ofxOceanodeShared_h */
