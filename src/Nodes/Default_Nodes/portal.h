@@ -58,7 +58,7 @@ public:
 		}
 	}
 	
-	void setup(){
+	void setup() override {
 		listener = value.newListener([this](T &t){
 			portalUpdated();
 		});
@@ -78,7 +78,7 @@ public:
 		}
 	}
 	
-	bool match(abstractPortal* p){
+	bool match(abstractPortal* p) override {
 		if(type() == p->type() && getName() == p->getName()){
             if(checkLocal(p))
             {
