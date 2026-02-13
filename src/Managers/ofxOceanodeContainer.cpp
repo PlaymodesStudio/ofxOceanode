@@ -221,10 +221,10 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
 
     loadPreset_loadNodes(presetFolderPath);
     
-    loadPreset_deactivateConnections();
-    
     loadPreset_loadBeforeConnections(presetFolderPath);
     
+    loadPreset_deactivateConnections();
+
     loadPreset_loadConnections(presetFolderPath);
     
     loadPreset_midiBindings(presetFolderPath);
