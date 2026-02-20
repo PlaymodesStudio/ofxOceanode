@@ -101,4 +101,32 @@ protected:
     ofParameter<void> value;
 };
 
+class routerDropdown : public abstractRouter {
+public:
+    routerDropdown() : abstractRouter("Dropdown") {
+        addParameterDropdown(value, "Value", 0, {"..."});
+        addParameter(options.set("Options", {}));
+        optionsListener = options.newListener([this](vector<string> &opts) {
+            if(opts.empty()) return;
+            getOceanodeParameter(value).setDropdownOptions(opts);
+            value.setMin(0);
+            value.setMax((int)opts.size() - 1);
+            if(value.get() >= (int)opts.size()) value = 0;
+        });
+    };
+
+    ofParameter<int> &getValue() { return value; }
+    ofParameter<int> &getMin() { return dummyMin; }
+    ofParameter<int> &getMax() { return dummyMax; }
+    vector<string> getCurrentOptions() { return options.get(); }
+
+private:
+    ofParameter<int> value;
+    ofParameter<vector<string>> options;
+    // router<int> interface compatibility — unused, but needed if createRouterFromType casts
+    ofParameter<int> dummyMin{ofParameter<int>("Min", 0, 0, 0)};
+    ofParameter<int> dummyMax{ofParameter<int>("Max", 0, 0, 0)};
+    ofEventListener optionsListener;
+};
+
 #endif /* router_h */
