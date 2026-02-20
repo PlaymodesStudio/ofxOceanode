@@ -489,6 +489,88 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	addInspectorParameter(clearContainerOnLoad.set("Clear Container on Load Preset", false));
 }
 
+void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
+	shared_ptr<ofAbstractParameter> newCreatedParam;
+
+	// Check for routerDropdown first — it doesn't go through the type registry
+	auto* dropdownRouter = dynamic_cast<routerDropdown*>(&node->getNodeModel());
+	if(dropdownRouter != nullptr){
+		// Build a synced int parameter
+		auto paramRef = dynamic_pointer_cast<ofParameter<int>>(dropdownRouter->getValue().newReference());
+		auto param = make_shared<ofParameter<int>>();
+		param->set(dropdownRouter->getNameParam().get(), paramRef->get(), 0,
+		           max(0, (int)dropdownRouter->getCurrentOptions().size() - 1));
+
+		deleteListeners.push(paramRef->newListener([paramRef, param](int &val){ param->set(paramRef->get()); }));
+		deleteListeners.push(param->newListener([paramRef, param](int &val){ paramRef->set(param->get()); }));
+		deleteListeners.push(dropdownRouter->getNameParam().newListener([param](string &s){
+			param->setName(s);
+		}));
+
+		newCreatedParam = param;
+
+		string paramName = newCreatedParam->getName();
+		while(getParameterGroup().contains(paramName)) paramName = "_" + paramName;
+		newCreatedParam->setName(paramName);
+
+		auto addedAbstract = addParameter(*newCreatedParam.get());
+
+		// Set initial dropdown options on the macro pin
+		auto opts = dropdownRouter->getCurrentOptions();
+		if(!opts.empty()){
+			addedAbstract->cast<int>().setDropdownOptions(opts);
+		}
+
+		// Watch the options parameter on the router node for changes, keep macro pin in sync
+		auto& routerParams = node->getParameters();
+		if(routerParams.contains("Options")){
+			auto& optionsAbstract = routerParams.get("Options");
+			auto* optionsOceaParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&optionsAbstract);
+			if(optionsOceaParam && optionsOceaParam->valueType() == typeid(vector<string>).name()){
+				// Capture shared_ptr to keep addedAbstract alive in lambda
+				dropdownRouterListeners[paramName + "_opts"] =
+					optionsOceaParam->cast<vector<string>>().getParameter().newListener(
+						[addedAbstract, param](vector<string> &newOpts){
+							addedAbstract->cast<int>().setDropdownOptions(newOpts);
+							param->setMax(max(0, (int)newOpts.size() - 1));
+							if(param->get() >= (int)newOpts.size()) param->set(0);
+						}
+					);
+			}
+		}
+
+		ofParameter<string> nameParamFromRouter = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
+		nameParamFromRouter = paramName;
+
+		parameterGroupChanged.notify(this);
+		deleteListeners.push(node->deleteModule.newListener([this, nameParamFromRouter, paramName](){
+			getParameterGroup().remove(nameParamFromRouter);
+			dropdownRouterListeners.erase(paramName);
+			dropdownRouterListeners.erase(paramName + "_opts");
+		}, 0));
+
+		updateRouterInfo(node);
+		return;
+	}
+
+	// Generic path for all other router types
+	newCreatedParam = typesRegistry->createRouterFromType(node);
+	string paramName = newCreatedParam->getName();
+	while(getParameterGroup().contains(paramName)) paramName = "_" + paramName;
+	newCreatedParam->setName(paramName);
+	addParameter(*newCreatedParam.get());
+
+	ofParameter<string> nameParamFromRouter = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
+	nameParamFromRouter = paramName;
+
+	parameterGroupChanged.notify(this);
+	deleteListeners.push(node->deleteModule.newListener([this, nameParamFromRouter](){
+		getParameterGroup().remove(nameParamFromRouter);
+	}, 0));
+
+	updateRouterInfo(node);
+}
+
 void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 	string nodeName = node->getParameters().getName();
 	if(ofSplitString(nodeName, " ")[0] == "Router"){
@@ -496,24 +578,7 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 			toCreateRouters.push_back(node);
 			return;
 		}
-		auto newCreatedParam = typesRegistry->createRouterFromType(node);
-		string paramName = newCreatedParam->getName();
-		while (getParameterGroup().contains(paramName)) {
-			paramName = "_" + paramName;
-		}
-		newCreatedParam->setName(paramName);
-		addParameter(*newCreatedParam.get());
-		
-		ofParameter<string> nameParamFromRouter = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
-		nameParamFromRouter = paramName;
-		
-		parameterGroupChanged.notify(this);
-		deleteListeners.push(node->deleteModule.newListener([this, nameParamFromRouter](){
-			getParameterGroup().remove(nameParamFromRouter);
-		}, 0));
-		
-		// Update router info for snapshots
-		updateRouterInfo(node);
+		processRouterNode(node);
 	}
 	ofEventArgs args;
 	node->update(args);
@@ -524,27 +589,9 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 	std::sort(toCreateRouters.begin(), toCreateRouters.end(), [](ofxOceanodeNode* node1, ofxOceanodeNode* node2){
 		return node1->getNodeGui().getPosition().y < node2->getNodeGui().getPosition().y;
 	});
-	
+
 	for(auto node : toCreateRouters){
-		auto newCreatedParam = typesRegistry->createRouterFromType(node);
-		string paramName = newCreatedParam->getName();
-		while (getParameterGroup().contains(paramName)) {
-			paramName = "_" + paramName;
-		}
-		newCreatedParam->setName(paramName);
-		addParameter(*newCreatedParam.get());
-		
-		ofParameter<string> nameParamFromRouter = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
-		nameParamFromRouter = paramName;
-		
-		parameterGroupChanged.notify(this);
-		deleteListeners.push(node->deleteModule.newListener([this, nameParamFromRouter](){
-			getParameterGroup().remove(nameParamFromRouter);
-		}, 0));
-		
-		// Update router info for snapshots
-		updateRouterInfo(node);
-		
+		processRouterNode(node);
 		ofEventArgs args;
 		node->update(args);
 	}

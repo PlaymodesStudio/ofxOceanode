@@ -120,6 +120,7 @@ private:
 	void renderSnapshotListItem(int slot, SnapshotData& snapshot);
 
 	// Router & Snapshot Management
+	void processRouterNode(ofxOceanodeNode* node);
 	void updateRouterConnections();
 	void updateRouterInfo(ofxOceanodeNode* node);
 	bool checkIsInputRouter(ofxOceanodeNode* node);
@@ -168,6 +169,7 @@ private:
 	ofEventListener snapshotUpdatedListener;
 		
 	std::unordered_map<string, ofEventListeners> inoutListeners;
+	std::unordered_map<string, ofEventListener> dropdownRouterListeners;
 	
 	// Basic Parameters
 	bool showWindow;

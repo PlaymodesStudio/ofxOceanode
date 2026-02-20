@@ -35,6 +35,7 @@ ofxOceanode::ofxOceanode(){
     typesRegistry->registerType<char>("c");
     typesRegistry->registerType<vector<float>>("v_f");
     typesRegistry->registerType<vector<int>>("v_i");
+    typesRegistry->registerType<vector<string>>("v_s");
     typesRegistry->registerType<ofColor>("color");
     typesRegistry->registerType<ofFloatColor>("color_f");
     typesRegistry->registerType<Timestamp>("timestamp");
@@ -65,6 +66,8 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<router<vector<int>>>("Router", "v_i", 0, 0, 1);
     nodeRegistry->registerModel<router<int>>("Router", "i", 0, 0, 1);
     nodeRegistry->registerModel<router<string>>("Router", "s", "string");
+    nodeRegistry->registerModel<router<vector<string>>>("Router", "v_s", "string");
+    nodeRegistry->registerModel<routerDropdown>("Router");
     nodeRegistry->registerModel<router<bool>>("Router", "b", false);
     nodeRegistry->registerModel<router<void>>("Router", "v");
     nodeRegistry->registerModel<router<char>>("Router", "c", ' ');
