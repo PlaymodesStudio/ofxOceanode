@@ -275,6 +275,9 @@ ofParameterGroup& ofxOceanodeNode::getInspectorParameters(){
 void ofxOceanodeNode::setActive(bool act){
     if(act == active) return;
     active = act;
+    nodeModel->setActive(active);
+    if(active) nodeModel->activate();
+    else nodeModel->deactivate();
 #ifndef OFXOCEANODE_HEADLESS
     if(active){
         nodeGui->enable();

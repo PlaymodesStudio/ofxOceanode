@@ -581,7 +581,8 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 		processRouterNode(node);
 	}
 	ofEventArgs args;
-	node->update(args);
+    node->setActive(active);
+    if(active) node->update(args);
 }
 
 void ofxOceanodeNodeMacro::allNodesCreated(){
