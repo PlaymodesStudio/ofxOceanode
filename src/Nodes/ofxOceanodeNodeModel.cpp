@@ -32,6 +32,7 @@ ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name)
     color = colorFromString(_name);
     numIdentifier = -1;
     flags = 0;
+    active = true;
 }
 
 void ofxOceanodeNodeModel::setNumIdentifier(unsigned int num){

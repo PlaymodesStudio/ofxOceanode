@@ -71,6 +71,7 @@ public:
     
     virtual void deactivate(){};
     virtual void activate(){};
+    void setActive(bool _active){active = _active;};
     
 	void deserializeParameter(ofJson &json, ofAbstractParameter &p);
     
@@ -189,6 +190,10 @@ public:
         deleteModule.notify();
     }
     
+    bool getActive(){
+        return active;
+    }
+    
 protected:
     ofColor color;
 	string canvasID;
@@ -201,6 +206,7 @@ private:
     ofParameterGroup inspectorParameters;
     ofEventListeners eventListeners;
     ofxOceanodeNodeModelFlags flags;
+    bool active;
 };
 
 #endif /* ofxOceanodeNodeModel_h */

@@ -516,7 +516,8 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 		updateRouterInfo(node);
 	}
 	ofEventArgs args;
-	node->update(args);
+    node->setActive(active);
+    if(active) node->update(args);
 }
 
 void ofxOceanodeNodeMacro::allNodesCreated(){
