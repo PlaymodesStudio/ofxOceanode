@@ -18,9 +18,16 @@ public:
     ~ofxOceanodeInspectorController(){};
     
     void draw();
+	
+	static void registerInspectorDropdown(const std::string& nodeTypeName, const std::string& paramName, const std::vector<std::string>& options);
+	
+	static std::vector<std::string> getInspectorDropdownOptions(const std::string& nodeTypeName, const std::string& paramName);
+	
     
 private:
     bool valueHasBeenReseted = false;
+	
+	static std::map<std::string, std::vector<std::string>> inspectorDropdownOptions;
 
     template <typename T>
     bool checkSameValue(ofxOceanodeAbstractParameter &a, ofxOceanodeAbstractParameter &b){
@@ -52,6 +59,8 @@ private:
 
     shared_ptr<ofxOceanodeContainer> container;
     ofxOceanodeCanvas* canvas;
+	
+
 };
 
 #endif /* ofxOceanodeInspectorController_h */

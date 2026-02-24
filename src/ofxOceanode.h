@@ -122,6 +122,9 @@ public:
     
     void setShowMode(bool b){showMode = b;}
     void toggleShowMode(){showMode = !showMode;}
+    
+    void saveConfig();
+    void loadConfig();
 
 private:
     ofxOceanodeCanvas canvas;
@@ -134,6 +137,8 @@ private:
     
     ofxOceanodeTime* oceanodeTime;
     
+    int desiredFPS = 60;
+    
 //    vector<ofxOceanodeAbstractTimeline> timelines;
     
     ofxImGuiSimple gui;
@@ -142,6 +147,7 @@ private:
     bool firstDraw;
     bool settingsLoaded;
     bool showMode;
+	bool snapToGrid;
     
     void drawShowModeWindow();
     

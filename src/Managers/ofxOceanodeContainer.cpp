@@ -114,15 +114,13 @@ void ofxOceanodeContainer::draw(){
 void ofxOceanodeContainer::activate(){
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
-            //if(node.second->getActive())
-                node.second->getNodeModel().activate();
+            node.second->setActive(true);
         }
     }
     
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
-            //if(node.second->getActive())
-                node.second->getNodeModel().activate();
+            node.second->setActive(true);
         }
     }
     for(auto &connection : connections){
@@ -133,15 +131,13 @@ void ofxOceanodeContainer::activate(){
 void ofxOceanodeContainer::deactivate(){
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
-            //if(node.second->getActive())
-                node.second->getNodeModel().deactivate();
+            node.second->setActive(false);
         }
     }
     
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
-            //if(node.second->getActive())
-                node.second->getNodeModel().deactivate();
+            node.second->setActive(false);
         }
     }
     for(auto &connection : connections){
@@ -221,10 +217,10 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
 
     loadPreset_loadNodes(presetFolderPath);
     
-    loadPreset_deactivateConnections();
-    
     loadPreset_loadBeforeConnections(presetFolderPath);
     
+    loadPreset_deactivateConnections();
+
     loadPreset_loadConnections(presetFolderPath);
     
     loadPreset_midiBindings(presetFolderPath);

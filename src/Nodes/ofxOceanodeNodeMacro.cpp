@@ -142,6 +142,11 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 		if(ImGui::IsItemClicked(1)){
 			ImGui::OpenPopup("Macro");
 		}
+		
+		ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));  // Dark background
+		ImGui::PushStyleColor(ImGuiCol_Text,     ImVec4(0.7f, 0.7f, 0.7f, 0.7f));  // White text
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 1.0f)); // Hovered button
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
 		if(ImGui::BeginPopup("Macro")){
 			auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
 			
@@ -183,6 +188,8 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			
 			ImGui::EndPopup();
 		}
+		ImGui::PopStyleColor(3);
+		ImGui::PopStyleVar();
 		
 		if(addBank){
 			ImGui::OpenPopup("Add New Macro Bank");
@@ -439,6 +446,13 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	canvas.setContainer(container);
 	canvas.setup("Macro " + ofToString(getNumIdentifier()), canvasParentID);
 	
+	// get Snap params from shared
+	bool b = ofxOceanodeShared::getSnapToGrid();
+	canvas.setSnapToGrid(b);
+	int i = ofxOceanodeShared::getSnapGridDivs();
+	canvas.setGridDivisions(ofxOceanodeShared::getSnapGridDivs());
+	canvas.updateGridSize();
+	
 	if(additionalInfo != ""){
 		localPreset = false;
 		isLoadingPreset = true;
@@ -502,7 +516,8 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 		updateRouterInfo(node);
 	}
 	ofEventArgs args;
-	node->update(args);
+    node->setActive(active);
+    if(active) node->update(args);
 }
 
 void ofxOceanodeNodeMacro::allNodesCreated(){

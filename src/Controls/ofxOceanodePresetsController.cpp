@@ -340,11 +340,12 @@ void ofxOceanodePresetsController::draw(){
                 if ((ImGui::IsItemHovered() && ImGui::IsMouseReleased(0)))
                 {
                     
-                    if(ImGui::GetIO().KeyShift){
+                    /*if(ImGui::GetIO().KeyShift){
                         currentBank = b;
                         currentPreset[banks[b]] = presetName;
                         savePreset(bankPresets[banks[b]][n], banks[b]);
-                    }else if(mouseAction==1)
+                    }else*/
+					if(mouseAction==1)
                     {
                         currentBank = b;
                         currentPreset[banks[b]] = presetName;
@@ -405,8 +406,14 @@ void ofxOceanodePresetsController::loadPreset(string name, string bank){
     
     string myPath = "./Presets/" + banks[currentBank] +"/" + ofToString(presetIndex+1) +  "--" + name;
     ofxOceanodeShared::startedLoadingPreset();
-    container->loadPreset(myPath);
-    ofxOceanodeShared::finishedLoadingPreset();
+	ofxOceanodeShared::setCurrentPresetPath(myPath);
+	ofxOceanodeShared::setCurrentBankName(bank);
+	ofxOceanodeShared::setCurrentPresetName(name);
+    
+	container->loadPreset(myPath);
+
+	ofxOceanodeShared::finishedLoadingPreset();
+	
 }
 
 void ofxOceanodePresetsController::savePreset(string name, string bank)
@@ -417,7 +424,14 @@ void ofxOceanodePresetsController::savePreset(string name, string bank)
                           name)
                      );
     string myPath = "./Presets/" + banks[currentBank] +"/" + ofToString(presetIndex+1) +  "--" + name;
-    container->savePreset(myPath);
+	
+	ofxOceanodeShared::setCurrentPresetPath(myPath);
+	ofxOceanodeShared::setCurrentBankName(bank);
+	ofxOceanodeShared::setCurrentPresetName(name);
+
+	container->savePreset(myPath);
+	
+	
 }
 void ofxOceanodePresetsController::deletePreset(string presetName, string bankName)
 {

@@ -54,7 +54,7 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<smoother>("Modifiers");
     nodeRegistry->registerModel<switcher>("Modifiers");
     nodeRegistry->registerModel<curve>("Modifiers");
-	nodeRegistry->registerModel<curve2>("Modifiers");
+	//nodeRegistry->registerModel<curve2>("Modifiers");
     nodeRegistry->registerModel<ofxOceanodeNodeMacro>("MACRO");
     nodeRegistry->registerModel<noise>("Generators");
     nodeRegistry->registerModel<randomGenerator>("Generators");
@@ -294,9 +294,39 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         }
 		
 		if(ImGui::BeginMenu("Config"))
-        {
-            float f = ofGetFrameRate();
-            if(ImGui::SliderFloat("FPS", &f, 1, 10000)){ofSetFrameRate(f);}
+		       {
+		           // Show actual running FPS (read-only) with color feedback
+		           int currentFPS = (int)ofGetFrameRate();
+		           
+		           // Calculate percentage difference from desired FPS
+		           float fpsDiff = abs(currentFPS - desiredFPS) / (float)desiredFPS * 100.0f;
+		           
+		           // Set colors based on difference
+		           ImVec4 sliderColor;
+		           if(fpsDiff <= 5.0f) {
+		               sliderColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); // Green
+		           } else if(fpsDiff <= 15.0f) {
+		               sliderColor = ImVec4(1.0f, 0.6f, 0.0f, 1.0f); // Orange
+		           } else {
+		               sliderColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); // Red
+		           }
+		           
+		           // Push the color styles for the slider
+		           ImGui::PushStyleColor(ImGuiCol_SliderGrab, sliderColor);
+		           ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(sliderColor.x*0.3f, sliderColor.y*0.3f, sliderColor.z*0.3f, 1.0f));
+		           
+		           // Draw the disabled FPS slider
+		           ImGui::BeginDisabled();
+		           ImGui::SliderInt("FPS", &currentFPS, 0, 240);
+		           ImGui::EndDisabled();
+		           
+		           // Pop the color styles
+		           ImGui::PopStyleColor(2);
+		           
+		           // Editable Desired FPS slider
+		           if(ImGui::SliderInt("Desired FPS", &desiredFPS, 1, 240)){
+		               ofSetFrameRate(desiredFPS);
+		           }
             bool b = false;
             if(ImGui::Checkbox("V Sync", &b)){ofSetVerticalSync(b);};
             ofxOceanodeConfigurationFlags configurationFlags = ofxOceanodeShared::getConfigurationFlags();
@@ -304,7 +334,39 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
             ImGui::Checkbox("Show Mode", &showMode);
             ofxOceanodeShared::setConfigurationFlags(configurationFlags);
-            ImGui::EndMenu();
+		    bool snap = canvas.getSnapToGrid();
+			if(ImGui::Checkbox("Snap To Grid",&snap))
+			{
+				canvas.setSnapToGrid(snap);
+				ofxOceanodeShared::setSnapToGrid(snap);
+			}
+			
+			int tw = canvas.getNodeWidthText();
+			int ww = canvas.getNodeWidthWidget();
+			int gd = canvas.getGridDivisions();
+			
+			if(ImGui::SliderInt("Node Text Width", &tw, 32, 128)) canvas.updateGridSize();
+			if(ImGui::SliderInt("Node Widget Width", &ww, 64, 256)) canvas.updateGridSize();
+			if(ImGui::SliderInt("Grid Divs",&gd,0,16))
+			{
+				canvas.setGridDivisions(gd);
+				canvas.updateGridSize();
+				ofxOceanodeShared::setSnapGridDiv(gd);
+			}
+			canvas.setNodeWidthText(tw);
+			canvas.setNodeWidthWidget(ww);
+			
+			ImGui::Separator();
+			
+			if(ImGui::Button("Save Config")){
+				saveConfig();
+			}
+			ImGui::SameLine();
+			if(ImGui::Button("Load Config")){
+				loadConfig();
+			}
+			
+		          ImGui::EndMenu();
         }
 		
         if(ImGui::BeginMenu("Help"))
@@ -443,4 +505,96 @@ void ofxOceanode::disableRenderAll(){
 
 void ofxOceanode::disableRenderHistograms(){
     ofxOceanodeShared::setConfigurationFlags(ofxOceanodeShared::getConfigurationFlags() | ofxOceanodeConfigurationFlags_DisableRenderAll);
+}
+
+void ofxOceanode::saveConfig(){
+    ofJson config;
+    
+    // Save Desired FPS
+    config["desiredFPS"] = desiredFPS;
+    
+    // Save V Sync (we can't query current state, so we'll save false as default)
+    config["vsync"] = false;
+    
+    // Save configuration flags
+    config["configurationFlags"] = ofxOceanodeShared::getConfigurationFlags();
+    
+    // Save Show Mode
+    config["showMode"] = showMode;
+    
+    // Save canvas settings
+    config["nodeTextWidth"] = canvas.getNodeWidthText();
+    config["nodeWidgetWidth"] = canvas.getNodeWidthWidget();
+    config["gridDivisions"] = canvas.getGridDivisions();
+	config["snapToGrid"] = canvas.getSnapToGrid();
+	
+    // Create config directory if it doesn't exist
+    string configDir = ofToDataPath("config", true);
+    ofDirectory dir(configDir);
+    if(!dir.exists()){
+        dir.create(true);
+    }
+    
+    // Save to file
+    string configPath = ofToDataPath("config/config.json", true);
+    ofSavePrettyJson(configPath, config);
+}
+
+void ofxOceanode::loadConfig(){
+    string configPath = ofToDataPath("config/config.json", true);
+    
+    // Check if config file exists
+    ofFile configFile(configPath);
+    if(!configFile.exists()){
+        return; // Use defaults if file doesn't exist
+    }
+    
+    // Load JSON
+    ofJson config = ofLoadJson(configPath);
+    
+    // Load Desired FPS (with backward compatibility for old "fps" key)
+    if(config.contains("desiredFPS")){
+        desiredFPS = config["desiredFPS"].get<int>();
+        ofSetFrameRate(desiredFPS);
+    }
+    else if(config.contains("fps")){
+        // Backward compatibility: load old "fps" key
+        desiredFPS = static_cast<int>(config["fps"].get<float>());
+        ofSetFrameRate(desiredFPS);
+    }
+    
+    // Load V Sync
+    if(config.contains("vsync")){
+        ofSetVerticalSync(config["vsync"].get<bool>());
+    }
+    
+    // Load configuration flags
+    if(config.contains("configurationFlags")){
+        ofxOceanodeShared::setConfigurationFlags(config["configurationFlags"].get<ofxOceanodeConfigurationFlags>());
+    }
+    
+    // Load Show Mode
+    if(config.contains("showMode")){
+        showMode = config["showMode"].get<bool>();
+    }
+    
+    // Load canvas settings
+    if(config.contains("nodeTextWidth")){
+        canvas.setNodeWidthText(config["nodeTextWidth"].get<int>());
+    }
+    
+    if(config.contains("nodeWidgetWidth")){
+        canvas.setNodeWidthWidget(config["nodeWidgetWidth"].get<int>());
+    }
+	if(config.contains("snapToGrid")){
+		bool b = config["gridDivisions"].get<int>();
+		canvas.setSnapToGrid(b);
+		ofxOceanodeShared::setSnapToGrid(b);
+	}
+	if(config.contains("gridDivisions")){
+		int i = config["gridDivisions"].get<int>();
+		canvas.setGridDivisions(i);
+		canvas.updateGridSize();
+		ofxOceanodeShared::setSnapGridDiv(i);
+	}
 }

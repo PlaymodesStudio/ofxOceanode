@@ -145,13 +145,11 @@ public:
     }
     
     static void startedLoadingPreset(){
-//        ofLog() << "shared starting loading preset";
         getInstance().presetWillBeLoadedEvent.notify();
         getInstance().presetLoading = true;
     }
     
     static void finishedLoadingPreset(){
-//        ofLog() << "shared finished loading preset";
         getInstance().presetLoading = false;
         getInstance().presetHasLoadedEvent.notify();
     }
@@ -183,7 +181,48 @@ public:
 		
 		return typedPortals;
 	}
+	
+	static std::string getCurrentPresetName(){
+		return getInstance().currentPresetName;
+	}
+
+	static void setCurrentPresetName(const std::string& presetName){
+		getInstance().currentPresetName = presetName;
+	}
+	
+	static string getCurrentBankName(){
+		return getInstance().currentBankName;
+	}
+	
+	static void setCurrentBankName(const string& bankName){
+		getInstance().currentBankName = bankName;
+	}
+
+	static std::string getCurrentPresetPath(){
+		return getInstance().currentPresetPath;
+	}
+
+	static void setCurrentPresetPath(const std::string& presetPath){
+		getInstance().currentPresetPath = presetPath;
+	}
     
+	// Snap to Grid
+	static void setSnapToGrid(bool b){
+		getInstance().snapToGrid = b;
+	}
+	
+	static void setSnapGridDiv(int i){
+		getInstance().snapGridDiv = i;
+	}
+	
+	static bool getSnapToGrid(){
+		return getInstance().snapToGrid;
+	}
+	
+	static int getSnapGridDivs(){
+		return getInstance().snapGridDiv;
+	}
+	
 private:
     ofxOceanodeShared(){};
     
@@ -210,17 +249,24 @@ private:
     unsigned int centralNode_id = 0;
     unsigned int leftNode_id = 0;
 	
-    std::shared_ptr<macroCategory> macroDirectoryStructure;
-	
+    shared_ptr<macroCategory> macroDirectoryStructure;
 	ofEvent<string> macroUpdatedEvent;
-    bool presetLoading;
+    
+	bool presetLoading;
     ofEvent<void> presetWillBeLoadedEvent;
     ofEvent<void> presetHasLoadedEvent;
-	
+	string currentPresetName = "";
+	string currentPresetPath = "";
+	string currentBankName = "";
+
 	vector<abstractPortal*> portals;
     vector<abstractPortal*> currentUpdatingPortals;
     
     ofxOceanodeConfigurationFlags configurationFlags;
+	
+	// Snap to Grid
+	bool snapToGrid = false;
+	int snapGridDiv = 4;
 };
 
 #endif /* ofxOceanodeShared_h */

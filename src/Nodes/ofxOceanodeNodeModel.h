@@ -22,7 +22,9 @@ enum ofxOceanodeNodeModelFlags_
     ofxOceanodeNodeModelFlags_None              = 0,
     ofxOceanodeNodeModelFlags_WaitForFrame      = 1 << 0,   //
     ofxOceanodeNodeModelFlags_FrameDone         = 1 << 1,   //
-    ofxOceanodeNodeModelFlags_ForceFrameMode    = 1 << 2
+    ofxOceanodeNodeModelFlags_ForceFrameMode    = 1 << 2,
+	ofxOceanodeNodeModelFlags_TransparentNode   = 1 << 3    //
+
 };
 
 class ofxOceanodeNodeModel {
@@ -69,6 +71,7 @@ public:
     
     virtual void deactivate(){};
     virtual void activate(){};
+    void setActive(bool _active){active = _active;};
     
 	void deserializeParameter(ofJson &json, ofAbstractParameter &p);
     
@@ -145,6 +148,10 @@ public:
         return addParameter(p.set(func), ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisableOutConnection | ofxOceanodeParameterFlags_DisableSavePreset | ofxOceanodeParameterFlags_DisableSaveProject);
     }
     
+	// SEPARATORS FOR THE NODE GUI
+    void addSeparator(string name = "", ofColor color = ofColor(200, 200, 200, 255));
+	void removeSeparator(string name);
+	
     template<typename ParameterType>
     ofParameter<ParameterType>& getParameter(string name){
         return static_cast<ofxOceanodeAbstractParameter&>(parameters.get(name)).cast<ParameterType>().getParameter();
@@ -183,6 +190,10 @@ public:
         deleteModule.notify();
     }
     
+    bool getActive(){
+        return active;
+    }
+    
 protected:
     ofColor color;
 	string canvasID;
@@ -195,6 +206,7 @@ private:
     ofParameterGroup inspectorParameters;
     ofEventListeners eventListeners;
     ofxOceanodeNodeModelFlags flags;
+    bool active;
 };
 
 #endif /* ofxOceanodeNodeModel_h */

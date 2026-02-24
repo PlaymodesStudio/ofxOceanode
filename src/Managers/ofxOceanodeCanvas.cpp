@@ -36,6 +36,11 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
     
     scrolling = glm::vec2(0,0);
     moveSelectedModulesWithDrag = glm::vec2(0,0);
+	
+	NODE_WINDOW_PADDING = glm::vec2(8.0f,7.0f);
+	gridDivisions=4;
+	updateGridSize();
+
     
     duplicatedConnection == nullptr;
 }
@@ -60,14 +65,17 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     if(ImGui::Begin(windowName.c_str(), open)){
         ImGui::SameLine();
         ImGui::BeginGroup();
-        
-        const float NODE_SLOT_RADIUS = 4.0f;
-        const ImVec2 NODE_WINDOW_PADDING(8.0f, 7.0f);
-        
+                
         // Create our child canvas
-        offsetToCenter = glm::vec2(int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
-        ImGui::Text("[%d,%d]",int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
+		offsetToCenter = glm::vec2(int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
+		
+		// CANVAS POSITION
+		ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1.0,1.0,1.0,0.5));
+		ImGui::Text("[%d,%d]",int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
         ImGui::SameLine();
+		ImGui::PopStyleColor();
+		
+		// FPS
         float fps = ofGetFrameRate();
         if(fps>=60.0) ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.0,1.0,0.0,0.5));
         else if(fps>30.0) ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1.0,0.5,0.0,0.5));
@@ -75,113 +83,212 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImGui::Text("%d fps",int(fps));
         ImGui::PopStyleColor();
         
+		// [S]NAP
+		// Push appropriate text color for [S] button based on snap_to_grid state
+		
+		ImGui::SameLine();
+		if(snap_to_grid) {
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.86f, 0.38f, 0.0f, 1.0f)); // Orange when enabled
+		}
+		else ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.4,0.4,0.4,1.0));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
+
+		if(ImGui::Button("[S]"))
+		{
+			snap_to_grid = !snap_to_grid;
+		}
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
+
+		// [C]ENTER
+		
+		ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.4,0.4,0.4,1.0));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
+
+		ImGui::SameLine();
+		bool recenterCanvas = false;
+		if(ImGui::Button("[C]") || isFirstDraw)
+		{
+			recenterCanvas = true;
+		}
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
+
+		// COMMENTS
+		
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+		ImGui::SetNextItemWidth(90);
+		
         int numComments = container->getComments().size();
-        int numCommentsAbove10 = numComments-10;
-        if(numComments<10)
-        {
-            ImGui::SameLine(ImGui::GetContentRegionAvail().x-28*(numComments+1));
-        }
-        else
-        {
-            ImGui::SameLine(ImGui::GetContentRegionAvail().x - (28*(10)) -(36*(numCommentsAbove10+1)));
-        }
-
-        // to track where to scroll when hovering over comments in canvas we need to have a :
-        // ** returnToOldScrolling boolean which indicates if we should go back to the scrolling before had a hover
-        // ** itemHovered indicates which is the element that has been hovered, to check when we get a "no hover" if
-        // the no-hovered is the one that we used for getting the old scroll
-        // ** scrollBeforeHover to store the scroll position before the hovering movements
         
-        returnToOldScrolling=false;
-        
-        for(int i=0;i<numComments;i++)
-        {
-            auto &c = container->getComments()[i];
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(c.color.r,c.color.g,c.color.b,1.0));
-            if(ImGui::Button(("[" + ofToString(i+1) + "]").c_str()))
-            {
-                scrolling.x = -c.position.x;
-                scrolling.y = -c.position.y;
-                itemHovered=-1;
-                returnToOldScrolling=false;
-            }
-            ImGui::PopStyleColor();
-
-            if(ImGui::IsItemHovered())
-            {
-                if(itemHovered==-1)
-                {
-                    scrollBeforeHover = scrolling;
-                    itemHovered=i;
+        // Initialize checkbox states if needed
+        if(commentCheckboxStates.size() != numComments) {
+            // Handle size changes - this should mainly happen during initialization
+            // or if comments were added/removed outside the normal deletion flow
+            if(commentCheckboxStates.size() > numComments) {
+                // More states than comments - clean up excess entries
+                for(int i = numComments; i < commentCheckboxStates.size(); i++) {
+                    if(i < commentToSlot.size() && commentToSlot[i] != -1) {
+                        keyboardSlots[commentToSlot[i]] = -1;
+                    }
                 }
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0,1.0,1.0,1.0));
-                ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(c.color.r,c.color.g,c.color.b,1.0));
-                ImGui::SetTooltip(c.text.c_str());
-                ImGui::PopStyleColor();
-                ImGui::PopStyleColor();
-
-                scrolling.x = -c.position.x;
-                scrolling.y = -c.position.y;
-                
             }
-            else
+            
+            commentCheckboxStates.resize(numComments, false);
+            commentToSlot.resize(numComments, -1);
+            
+            // Validate existing assignments after resize
+            for(int slot = 0; slot < MAX_KEYBOARD_SLOTS; slot++)
+			{
+				if(slot<keyboardSlots.size())
+				{
+					if(keyboardSlots[slot] >= numComments)
+					{
+						keyboardSlots[slot] = -1;
+					}
+				}
+            }
+        }
+        
+        // Initialize keyboard slots if needed
+        if(keyboardSlots.size() != MAX_KEYBOARD_SLOTS) {
+            keyboardSlots.resize(MAX_KEYBOARD_SLOTS, -1);
+        }
+        
+        if(numComments > 0)
+        {
+            ImGui::SameLine();
+            
+            // Create dropdown for comment navigation
+            // Set size constraints to show more items before scrolling (approximately double the default)
+            ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, ImGui::GetTextLineHeightWithSpacing() * 24));
+            if(ImGui::BeginCombo("##CommentDropdown", "Go To..."))
             {
-                // moving the scroll with the numeric keys
-                if(!ImGui::IsAnyItemActive() && ImGui::IsKeyDown(ImGuiKey('1'+i)))
+                for(int i = 0; i < numComments; i++)
                 {
+                    auto &c = container->getComments()[i];
+                    
+                    // Checkbox for keyboard shortcut assignment
+                    bool isChecked = commentCheckboxStates[i];
+                    string checkboxId = "##checkbox" + ofToString(i);
+                    
+                    if(ImGui::Checkbox(checkboxId.c_str(), &isChecked))
+                    {
+                        if(isChecked && !commentCheckboxStates[i])
+                        {
+                            // Trying to activate checkbox - check if we have available slots
+                            int availableSlot = -1;
+                            for(int slot = 0; slot < MAX_KEYBOARD_SLOTS; slot++)
+                            {
+                                if(keyboardSlots[slot] == -1)
+                                {
+                                    availableSlot = slot;
+                                    break;
+                                }
+                            }
+                            
+                            if(availableSlot != -1)
+                            {
+                                // Assign to available slot
+                                commentCheckboxStates[i] = true;
+                                keyboardSlots[availableSlot] = i;
+                                commentToSlot[i] = availableSlot;
+                            }
+                            else
+                            {
+                                // No available slots - revert checkbox
+                                isChecked = false;
+                            }
+                        }
+                        else if(!isChecked && commentCheckboxStates[i])
+                        {
+                            // Deactivating checkbox - free up the slot
+                            int slot = commentToSlot[i];
+                            if(slot != -1)
+                            {
+                                keyboardSlots[slot] = -1;
+                                commentToSlot[i] = -1;
+                            }
+                            commentCheckboxStates[i] = false;
+                        }
+                    }
+                    
+                    ImGui::SameLine();
+                    
+                    // Create display text with keyboard shortcut if assigned
+                    string displayText;
+                    if(commentCheckboxStates[i] && commentToSlot[i] != -1)
+                    {
+                        int keyNum = (commentToSlot[i] + 1) % 10; // 0 becomes 10, others stay 1-9
+                        if(keyNum == 0) keyNum = 10;
+                        displayText = "[" + ofToString(keyNum == 10 ? 0 : keyNum) + "] " + c.text;
+                    }
+                    else
+                    {
+                        displayText = c.text;
+                    }
+                    
+                    // Apply comment color to the item
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(c.color.r, c.color.g, c.color.b, 1.0));
+					string sName = displayText + "##" + ofToString(i);
+					if(ImGui::Selectable(sName.c_str() ))
+                    {
+                        // Navigate to comment position
+                        scrolling.x = -c.position.x;
+                        scrolling.y = -c.position.y;
+                    }
+                    
+                    ImGui::PopStyleColor();
+                }
+                ImGui::EndCombo();
+            }
+        }
+        
+        // Keyboard shortcut functionality for numeric keys 1-0 using slot-based system
+        for(int slot = 0; slot < MAX_KEYBOARD_SLOTS; slot++)
+        {
+            int commentIndex = keyboardSlots[slot];
+            if(commentIndex != -1 && commentIndex < numComments)
+            {
+                // Map slot to key: slot 0-8 -> keys 1-9, slot 9 -> key 0
+                int keyCode = (slot < 9) ? ('1' + slot) : '0';
+                
+                if(!ImGui::IsAnyItemActive() && ImGui::IsKeyDown(ImGuiKey(keyCode)))
+                {
+                    auto &c = container->getComments()[commentIndex];
                     scrolling.x = -c.position.x;
                     scrolling.y = -c.position.y;
-                    scrollBeforeHover = scrolling;
-
-                }
-                else if(i==itemHovered)
-                {
-                    returnToOldScrolling=true;
-                    itemHovered=-1;
                 }
             }
-            ImGui::SameLine();
-
         }
         
-        if(returnToOldScrolling)
-        {
-            scrolling = scrollBeforeHover;
-        }
-                
-        bool recenterCanvas = false;
-        if(ImGui::Button("[C]") || isFirstDraw)
-        {
-            recenterCanvas = true;
-        }
-        ImGui::PopStyleColor();
-        ImGui::PopStyleVar();
-        
+  ImGui::PopStyleColor();
+  ImGui::PopStyleVar();
+		        
+		// MAIN CANVAS
+		
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(color.r/4, color.g/4, color.b/4, 200));
-        ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
+        
+		ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
         ImGui::PushItemWidth(120.0f);
         
         ImVec2 offset = ImGui::GetCursorScreenPos() + scrolling;
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         
+		// COMMENT CREATION WITH ALT MOUSE
+		
         bool selectionHasBeenMade = false;
         bool newComment = false;
         if(ImGui::IsMouseReleased(0)){
             if(isSelecting){
                 isSelecting = false;
                 if(ImGui::GetIO().KeyAlt){
-//                    container->getComments().emplace_back(selectedRect.position, glm::vec2(selectedRect.width, selectedRect.height));
                     newComment = true;
                 }
-//                    else{
                     selectionHasBeenMade = true;
-//                }
-            }else{
-                //selectedRect = ofRectangle(0,0,0,0);
             }
         }
         
@@ -190,7 +297,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         {
             ImU32 GRID_COLOR = IM_COL32(90, 90, 90, 40);
             ImU32 GRID_COLOR_CENTER = IM_COL32(30, 30, 30, 80);
-            float GRID_SZ = 128.0f/2;
             ImVec2 win_pos = ImGui::GetCursorScreenPos();
             ImVec2 canvas_sz = ImGui::GetContentRegionAvail();
             
@@ -218,9 +324,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }
             }
 
-            for (float x = fmodf(scrolling.x, GRID_SZ); x < canvas_sz.x; x += GRID_SZ)
+            for (float x = fmodf(scrolling.x, GRID_SIZE); x < canvas_sz.x; x += GRID_SIZE)
                 draw_list->AddLine(ImVec2(x, 0.0f) + win_pos, ImVec2(x, canvas_sz.y) + win_pos, GRID_COLOR);
-            for (float y = fmodf(scrolling.y, GRID_SZ); y < canvas_sz.y; y += GRID_SZ)
+            for (float y = fmodf(scrolling.y, GRID_SIZE); y < canvas_sz.y; y += GRID_SIZE)
                 draw_list->AddLine(ImVec2(0.0f, y) + win_pos, ImVec2(canvas_sz.x, y) + win_pos, GRID_COLOR);
             
             ImVec2 origin = ImVec2(win_pos.x + scrolling.x, win_pos.y + scrolling.y );
@@ -321,7 +427,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             
             
             //Draw Parameters
-            if(nodeGui.constructGui()){
+			if(nodeGui.constructGui(NODE_WIDTH_TEXT,NODE_WIDTH_WIDGET)){
                 
                 // Save the size of what we have emitted and whether any of the widgets are being used
                 bool node_widgets_active = (!old_any_active && ImGui::IsAnyItemActive());
@@ -395,10 +501,15 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 
                 ImU32 node_hd_color = (isSelectedOrSelecting) ? IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,160) : IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,64);
                 
-                //if(nodeGui.getExpanded()){
-                    draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
-                //}
-                draw_list->AddRectFilled(node_rect_min, node_rect_header, node_hd_color, 4.0f);
+				// Check if this node should be rendered transparently
+				bool isTransparent = (node->getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
+
+				if (!isTransparent) {
+					//if(nodeGui.getExpanded()){
+						draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
+					//}
+					draw_list->AddRectFilled(node_rect_min, node_rect_header, node_hd_color, 4.0f);
+				}
                 
                 //draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(0, 0, 0, 255), 4.0f);
                 
@@ -536,8 +647,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         node_selected = nodeId;
                     if (node_moving_active && ImGui::IsMouseDragging(0, 0.0f) && !node_widgets_active)
                         someSelectedModuleMove = nodeId;
-                    if(someSelectedModuleMove != "" && nodeGui.getSelected())
-                        nodeGui.setPosition(nodeGui.getPosition() + moveSelectedModulesWithDrag);
+                    if(someSelectedModuleMove != "" && nodeGui.getSelected()) {
+                        glm::vec2 newPosition = nodeGui.getPosition() + moveSelectedModulesWithDrag;
+                        // During dragging, allow free movement without snapping
+                        nodeGui.setPosition(newPosition);
+                    }
                 }
             }
             else{
@@ -604,6 +718,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ImGui::OpenPopup("Comment");
                 c.openPopupInNext = false;
             }
+			ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));  // Dark background
+			ImGui::PushStyleColor(ImGuiCol_Text,     ImVec4(0.7f, 0.7f, 0.7f, 0.7f));  // White text
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 1.0f)); // Hovered button
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+
             if(ImGui::BeginPopup("Comment")){
                 char * cString = new char[1024];
                 strcpy(cString, c.text.c_str());
@@ -616,15 +735,57 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ImGui::DragFloat2("Size", &c.size.x);
                 ImGui::ColorEdit3("Color", &c.color.r);
                 ImGui::ColorEdit3("TextColor", &c.textColor.r);
-                if(ImGui::Button("Remove")){
+                if(ImGui::Button("[Remove]")){
                     removeIndex = i;
                 }
                 ImGui::EndPopup();
             }
+			ImGui::PopStyleColor(3);
+			ImGui::PopStyleVar();
+
             ImGui::PopID();
         }
         if(removeIndex != -1){
+            // Before deleting the comment, handle keyboard slot cleanup properly
+            // to maintain stable assignments for remaining comments
+            
+            // 1. If the deleted comment had a keyboard slot, free it
+            if(removeIndex < commentCheckboxStates.size() &&
+               commentCheckboxStates[removeIndex] &&
+               removeIndex < commentToSlot.size() &&
+               commentToSlot[removeIndex] != -1) {
+                int slotToFree = commentToSlot[removeIndex];
+                keyboardSlots[slotToFree] = -1;
+            }
+            
+            // 2. Update all keyboard slot assignments for comments that will shift indices
+            // Comments with index > removeIndex will shift down by 1
+            for(int slot = 0; slot < MAX_KEYBOARD_SLOTS; slot++) {
+                if(keyboardSlots[slot] > removeIndex) {
+                    keyboardSlots[slot]--; // Decrement the comment index in the slot
+                }
+            }
+            
+            // 3. Now delete the comment
             container->getComments().erase(container->getComments().begin() + removeIndex);
+            
+            // 4. Update the tracking vectors to match the new comment count
+            // Remove the deleted comment's entries and shift remaining ones
+            if(removeIndex < commentCheckboxStates.size()) {
+                commentCheckboxStates.erase(commentCheckboxStates.begin() + removeIndex);
+            }
+            if(removeIndex < commentToSlot.size()) {
+                commentToSlot.erase(commentToSlot.begin() + removeIndex);
+            }
+            
+            // 5. Update commentToSlot mappings for comments that shifted indices
+            for(int i = removeIndex; i < commentToSlot.size(); i++) {
+                if(commentToSlot[i] != -1) {
+                    // This comment's index shifted down by 1, but its slot assignment stays the same
+                    // The keyboardSlots array was already updated in step 2
+                    // commentToSlot[i] already contains the correct slot number
+                }
+            }
         }
         
         
@@ -644,7 +805,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 			if(!commentClicked){
 				ImGui::OpenPopup("New Node");
 				searchField = "";
+				lastSearchField = "";
 				numTimesPopup = 0;
+				selectedSearchResultIndex = -1;
+				filteredSearchResults.clear();
 				
 				//Get node registry to update newly registered nodes
 				auto const &models = container->getRegistry()->getRegisteredModels();
@@ -668,7 +832,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         
         // Draw New Node menu
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
         bool popop_close_button = true;
         if (ImGui::BeginPopupModal("New Node", &popop_close_button, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
         {
@@ -677,6 +841,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             
             if(ImGui::InputText("Search", cString, 256)){
                 searchField = cString;
+                // Reset selection when search text changes
+                if(searchField != lastSearchField) {
+                    selectedSearchResultIndex = -1;
+                    lastSearchField = searchField;
+                }
             }
             
             if(numTimesPopup == 1){//!(!ImGui::IsItemClicked() && ImGui::IsMouseDown(0)) && searchField == ""){
@@ -688,78 +857,172 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             
             bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
             bool isEnterReleased = ImGui::IsKeyReleased(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
-			
-			// TODO: Get all things, nodes, collections, macros, scripts;
+            
+            // Handle arrow key navigation
+            bool isUpPressed = ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow));
+            bool isDownPressed = ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow));
+   
+   // TODO: Get all things, nodes, collections, macros, scripts;
     
             if(searchField != ""){
-                string firstSearchResult = "";
+                // Build filtered search results list with scoring
+                filteredSearchResults.clear();
+                
+                // Create a scoring function for search relevance
+                auto calculateSearchScore = [](const string& itemName, const string& searchTerm) -> int {
+                    if(itemName.empty() || searchTerm.empty()) return 0;
+                    
+                    string lowerItemName = itemName;
+                    string lowerSearchTerm = searchTerm;
+                    std::transform(lowerItemName.begin(), lowerItemName.end(), lowerItemName.begin(), ::tolower);
+                    std::transform(lowerSearchTerm.begin(), lowerSearchTerm.end(), lowerSearchTerm.begin(), ::tolower);
+                    
+                    // Exact match (case-insensitive) gets highest score
+                    if(lowerItemName == lowerSearchTerm) {
+                        return 1000;
+                    }
+                    
+                    // Prefix match gets high score
+                    if(lowerItemName.find(lowerSearchTerm) == 0) {
+                        // Shorter names with prefix matches get higher scores
+                        return 800 - (int)lowerItemName.length();
+                    }
+                    
+                    // Substring match gets lower score
+                    size_t pos = lowerItemName.find(lowerSearchTerm);
+                    if(pos != string::npos) {
+                        // Earlier position in string gets higher score
+                        // Shorter names get higher scores
+                        return 400 - (int)pos - (int)lowerItemName.length();
+                    }
+                    
+                    return 0; // No match
+                };
+                
+                // Collect scored results
+                vector<pair<SearchResultItem, int>> scoredResults;
+                
+                // Add matching nodes with scores
                 for(int i = 0; i < categoriesVector.size(); i++){
                     for(auto &op : options[i])
                     {
-                        string lowercaseName = op;
-                        std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
-                        if(ofStringTimesInString(op, searchField) || ofStringTimesInString(lowercaseName, searchField)){
-                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
-                            if(ImGui::Selectable(op.c_str()) || (ImGui::IsItemFocused() && isEnterPressed))
-                            {
-                                unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
-                                if (type)
-                                {
-                                    auto &node = container->createNode(std::move(type));
-                                    node.getNodeGui().setPosition(newNodeClickPos - offset);
-                                }
-                                ImGui::PopStyleColor();
-                                ImGui::CloseCurrentPopup();
-                                isEnterPressed = false; //Next options we dont want to create them;
-                                break;
-                            }
-                            if(firstSearchResult == "") firstSearchResult = op;
-                            ImGui::PopStyleColor();
+                        int score = calculateSearchScore(op, searchField);
+                        if(score > 0){
+                            scoredResults.push_back(make_pair(SearchResultItem(op, "node"), score));
                         }
                     }
                 }
-                ImGui::Separator();
-                std::function<void(shared_ptr<macroCategory>)> drawFoundCategory =
-                [this, offset, &drawFoundCategory, &isEnterPressed, &firstSearchResult](shared_ptr<macroCategory> category){
+                
+                // Add matching macros with scores
+                std::function<void(shared_ptr<macroCategory>)> collectMacros =
+    [this, &collectMacros, &scoredResults, &calculateSearchScore](shared_ptr<macroCategory> category){
                     for(auto d : category->categories){
-                        drawFoundCategory(d);
+                        collectMacros(d);
                     }
                     for(auto m : category->macros){
-                        string lowercaseName = m.first;
-                        std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
-                        if(ofStringTimesInString(m.first, searchField) || ofStringTimesInString(lowercaseName, searchField)){
-                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
-                            if(ImGui::Selectable(m.first.c_str()) || (ImGui::IsItemFocused() && isEnterPressed))
-                            {
-                                unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
-                                if (type)
-                                {
-                                    auto &node = container->createNode(std::move(type), m.second);
-                                    node.getNodeGui().setPosition(newNodeClickPos - offset);
-                                }
-                                ImGui::PopStyleColor();
-                                ImGui::CloseCurrentPopup();
-                                isEnterPressed = false; //Next options we dont want to create them;
-                                break;
-                            }
-                            if(firstSearchResult == "") firstSearchResult = m.first;
-                            ImGui::PopStyleColor();
+                        int score = calculateSearchScore(m.first, searchField);
+                        if(score > 0){
+                            scoredResults.push_back(make_pair(SearchResultItem(m.first, "macro", m.second), score));
                         }
                     }
                 };
-                ImGui::Separator();
-                
                 
                 auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
-                drawFoundCategory(macroDirectoryStructure);
+                collectMacros(macroDirectoryStructure);
                 
-                //Without any focus we create the first result
-                if(isEnterPressed){
-                    unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(firstSearchResult);
-                    if (type)
-                    {
-                        auto &node = container->createNode(std::move(type));
-                        node.getNodeGui().setPosition(newNodeClickPos - offset);
+                // Sort by score (highest first)
+                std::sort(scoredResults.begin(), scoredResults.end(),
+                    [](const pair<SearchResultItem, int>& a, const pair<SearchResultItem, int>& b) {
+                        return a.second > b.second;
+                    });
+                
+                // Extract sorted results
+                for(const auto& scoredResult : scoredResults) {
+                    filteredSearchResults.push_back(scoredResult.first);
+                }
+                
+                // Handle arrow key navigation
+                if(isUpPressed && selectedSearchResultIndex > 0) {
+                    selectedSearchResultIndex--;
+                } else if(isDownPressed && selectedSearchResultIndex < (int)filteredSearchResults.size() - 1) {
+                    selectedSearchResultIndex++;
+                } else if((isUpPressed || isDownPressed) && selectedSearchResultIndex == -1 && !filteredSearchResults.empty()) {
+                    selectedSearchResultIndex = isDownPressed ? 0 : filteredSearchResults.size() - 1;
+                }
+                
+                // Clamp selection index to valid range
+                if(selectedSearchResultIndex >= (int)filteredSearchResults.size()) {
+                    selectedSearchResultIndex = filteredSearchResults.size() - 1;
+                }
+                if(selectedSearchResultIndex < -1) {
+                    selectedSearchResultIndex = -1;
+                }
+                
+                // Display search results
+                for(int i = 0; i < filteredSearchResults.size(); i++) {
+                    const auto& result = filteredSearchResults[i];
+                    bool isSelected = (i == selectedSearchResultIndex);
+                    
+                    // Highlight selected item
+                    if(isSelected) {
+                        ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.43f, 0.19f, 0.0f, 0.8f));
+                        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.86f,0.38f, 0.0f, 0.6f));
+                        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.8f, 0.3f, 0.0f, 0.6f));
+                    }
+                    
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.6f, 0.6f, 0.6f,1.0f)));
+                    
+                    bool itemClicked = ImGui::Selectable(result.name.c_str(), isSelected);
+                    bool itemActivated = itemClicked || (isSelected && isEnterPressed);
+                    
+                    if(itemClicked) {
+                        selectedSearchResultIndex = i;
+                    }
+                    
+                    if(itemActivated) {
+                        if(result.type == "node") {
+                            unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(result.name);
+                            if (type) {
+                                auto &node = container->createNode(std::move(type));
+                                node.getNodeGui().setPosition(newNodeClickPos - offset);
+                            }
+                        } else if(result.type == "macro") {
+                            unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
+                            if (type) {
+                                auto &node = container->createNode(std::move(type), result.macroPath);
+                                node.getNodeGui().setPosition(newNodeClickPos - offset);
+                            }
+                        }
+                        ImGui::PopStyleColor();
+                        if(isSelected) {
+                            ImGui::PopStyleColor(3);
+                        }
+                        ImGui::CloseCurrentPopup();
+                        isEnterPressed = false;
+                        break;
+                    }
+                    
+                    ImGui::PopStyleColor();
+                    if(isSelected) {
+                        ImGui::PopStyleColor(3);
+                    }
+                }
+                
+                // Handle Enter key when no specific item is selected (fallback to first result)
+                if(isEnterPressed && selectedSearchResultIndex == -1 && !filteredSearchResults.empty()) {
+                    const auto& firstResult = filteredSearchResults[0];
+                    if(firstResult.type == "node") {
+                        unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(firstResult.name);
+                        if (type) {
+                            auto &node = container->createNode(std::move(type));
+                            node.getNodeGui().setPosition(newNodeClickPos - offset);
+                        }
+                    } else if(firstResult.type == "macro") {
+                        unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
+                        if (type) {
+                            auto &node = container->createNode(std::move(type), firstResult.macroPath);
+                            node.getNodeGui().setPosition(newNodeClickPos - offset);
+                        }
                     }
                     ImGui::CloseCurrentPopup();
                 }
@@ -1003,6 +1266,17 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }else if(!isAnyNodeHovered && !someDragAppliedToSelection){
                     deselectAllNodes();
                 }
+                
+                // Apply snap-to-grid when drag operation ends
+                if(snap_to_grid && someDragAppliedToSelection){
+                    // Find and snap all selected nodes to grid
+                    for(auto &n : container->getParameterGroupNodesMap()){
+                        if(n.second->getNodeGui().getSelected()){
+                            n.second->getNodeGui().setPosition(snapToGrid(n.second->getNodeGui().getPosition()));
+                        }
+                    }
+                }
+                
                 someDragAppliedToSelection = false;
                 moveSelectedModulesWithDrag = glm::vec2(0,0);
             }
@@ -1087,6 +1361,16 @@ glm::vec2 ofxOceanodeCanvas::screenToCanvas(glm::vec2 p){
 glm::vec2 ofxOceanodeCanvas::canvasToScreen(glm::vec2 p){
     glm::vec4 result = glm::inverse(transformationMatrix->get()) * glm::vec4(p, 0, 1);
     return result;
+}
+
+glm::vec2 ofxOceanodeCanvas::snapToGrid(glm::vec2 position){
+    if(!snap_to_grid) return position;
+	
+	// Snap to nearest grid point
+	float snappedX = round(position.x / GRID_SIZE) * GRID_SIZE;
+	float snappedY = round(position.y / GRID_SIZE) * GRID_SIZE;
+    
+    return glm::vec2(snappedX, snappedY);
 }
 
 glm::vec3 ofxOceanodeCanvas::getMatrixScale(const glm::mat4 &m){

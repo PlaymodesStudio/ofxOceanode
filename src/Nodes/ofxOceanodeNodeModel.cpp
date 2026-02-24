@@ -32,6 +32,7 @@ ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name)
     color = colorFromString(_name);
     numIdentifier = -1;
     flags = 0;
+    active = true;
 }
 
 void ofxOceanodeNodeModel::setNumIdentifier(unsigned int num){
@@ -91,4 +92,45 @@ void ofxOceanodeNodeModel::setContainer(ofxOceanodeContainer* container){
 
 string ofxOceanodeNodeModel::getParents(){
     return canvasID;
+}
+
+void ofxOceanodeNodeModel::addSeparator(string name, ofColor color){
+    ofParameter<std::function<void()>> separator;
+    
+#ifndef OFXOCEANODE_HEADLESS
+    // Store the label and color as a string that will be parsed in the GUI
+    // Format: "SEPARATOR:|label|r,g,b,a"
+    string separatorData = "SEPARATOR:|" + name + "|" +
+                          ofToString((int)color.r) + "," +
+                          ofToString((int)color.g) + "," +
+                          ofToString((int)color.b) + "," +
+                          ofToString((int)color.a);
+    separator.setName(separatorData);
+    addCustomRegion(separator, [](){});  // Empty function, rendering will be handled by GUI
+#else
+    // In headless mode, just add an empty function
+    addCustomRegion(separator, [](){});
+#endif
+}
+
+void ofxOceanodeNodeModel::removeSeparator(string _name)
+{
+	// Build the separator pattern to search for
+	string separatorPattern = "SEPARATOR:|" + _name + "|";
+	
+	// Collect parameters to remove (avoid iterator invalidation)
+	vector<string> paramsToRemove;
+	
+	for (auto & p : parameters) {
+		string paramName = p.get()->getName();
+		// Check if this parameter is the separator we're looking for
+		if (paramName.find(separatorPattern) == 0) {
+			paramsToRemove.push_back(p.get()->getEscapedName());
+		}
+	}
+	
+	// Now safely remove the collected parameters
+	for (const auto& paramEscName : paramsToRemove) {
+		removeParameter(paramEscName);
+	}
 }
