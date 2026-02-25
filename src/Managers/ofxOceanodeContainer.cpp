@@ -729,6 +729,26 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
         node->presetHasLoaded();
     }
     
+    // Load comments
+#ifndef OFXOCEANODE_HEADLESS
+    if(of::filesystem::exists(presetFolderPath / "comments.json")){
+        json.clear();
+        json = ofLoadJson(presetFolderPath / "comments.json");
+        int numComments = json["NumComments"];
+        for(int i = 0; i < numComments; i++){
+            auto &commentJson = json[ofToString(i)];
+            ofxOceanodeComment comment;
+            comment.text = commentJson["text"];
+            comment.position = glm::vec2(commentJson["position"][0], commentJson["position"][1]) + referencePosition;
+            comment.size = glm::vec2(commentJson["size"][0], commentJson["size"][1]);
+            comment.color = ofFloatColor(commentJson["color"][0], commentJson["color"][1], commentJson["color"][2], commentJson["color"][3]);
+            comment.textColor = ofFloatColor(commentJson["textColor"][0], commentJson["textColor"][1], commentJson["textColor"][2], commentJson["textColor"][3]);
+            comment.selected = true; // Select newly pasted comments
+            comments.push_back(comment);
+        }
+    }
+#endif
+    
     ofDirectory::removeDirectory(tempLoadFolderPath, true);
 
     return true;
@@ -773,6 +793,26 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
     for(auto &node : nodes){
         node->savePreset(presetFolderPath);
     }
+    
+    // Save selected comments
+#ifndef OFXOCEANODE_HEADLESS
+    json.clear();
+    json["NumComments"] = 0;
+    int commentIndex = 0;
+    for(auto &c : comments){
+        if(c.selected){
+            auto &commentJson = json[ofToString(commentIndex)];
+            commentJson["text"] = c.text;
+            commentJson["position"] = {c.position.x - referencePosition.x, c.position.y - referencePosition.y};
+            commentJson["size"] = {c.size.x, c.size.y};
+            commentJson["color"] = {c.color.r, c.color.g, c.color.b, c.color.a};
+            commentJson["textColor"] = {c.textColor.r, c.textColor.g, c.textColor.b, c.textColor.a};
+            commentIndex++;
+        }
+    }
+    json["NumComments"] = commentIndex;
+    ofSavePrettyJson(presetFolderPath / "comments.json", json);
+#endif
 }
 
 void ofxOceanodeContainer::savePersistent(){
@@ -1399,9 +1439,29 @@ bool ofxOceanodeContainer::cutSelectedModulesWithConnections(){
     for(auto &node : modulesToCut){
         minPosition = glm::vec2(min(node->getNodeGui().getPosition().x, minPosition.x), min(node->getNodeGui().getPosition().y, minPosition.y));
     }
-    if(modulesToCut.size() == 0) return false;
+    
+#ifndef OFXOCEANODE_HEADLESS
+    // Also consider selected comments for minimum position
+    for(auto &c : comments){
+        if(c.selected){
+            minPosition = glm::vec2(min(c.position.x, minPosition.x), min(c.position.y, minPosition.y));
+        }
+    }
+#endif
+    
+    if(modulesToCut.size() == 0 && getSelectedCommentIndices().size() == 0) return false;
     saveClipboardModulesAndConnections(modulesToCut, minPosition);
     for(auto &m : modulesToCut) m->deleteSelf();
+    
+#ifndef OFXOCEANODE_HEADLESS
+    // Also delete selected comments
+    auto selectedCommentIndices = getSelectedCommentIndices();
+    // Delete in reverse order to maintain correct indices
+    for(int i = selectedCommentIndices.size() - 1; i >= 0; i--){
+        comments.erase(comments.begin() + selectedCommentIndices[i]);
+    }
+#endif
+    
     return true;
 }
 
@@ -1414,8 +1474,34 @@ bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 positi
 
 bool ofxOceanodeContainer::deleteSelectedModules(){
     for(auto &m : getSelectedModules()) m->deleteSelf();
-    if(getSelectedModules().size() > 0) return true;
+    
+#ifndef OFXOCEANODE_HEADLESS
+    // Also delete selected comments
+    auto selectedCommentIndices = getSelectedCommentIndices();
+    // Delete in reverse order to maintain correct indices
+    for(int i = selectedCommentIndices.size() - 1; i >= 0; i--){
+        comments.erase(comments.begin() + selectedCommentIndices[i]);
+    }
+#endif
+    
+    if(getSelectedModules().size() > 0 || selectedCommentIndices.size() > 0) return true;
     return false;
+}
+
+vector<int> ofxOceanodeContainer::getSelectedCommentIndices(){
+    vector<int> selectedIndices;
+    for(int i = 0; i < comments.size(); i++){
+        if(comments[i].selected){
+            selectedIndices.push_back(i);
+        }
+    }
+    return selectedIndices;
+}
+
+void ofxOceanodeContainer::deselectAllComments(){
+    for(auto &c : comments){
+        c.selected = false;
+    }
 }
 
 

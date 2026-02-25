@@ -37,6 +37,7 @@ public:
 		color = ofFloatColor(0, 0, 0, 1);
 		textColor = ofFloatColor(1, 1, 1, 1);
         openPopupInNext = false;
+		selected = false;
 	};
 	
 	string text;
@@ -45,7 +46,12 @@ public:
 	ofFloatColor color;
 	ofFloatColor textColor;
 	bool openPopupInNext;
+	bool selected;
     vector<ofxOceanodeNode*> nodes;
+	
+	ofRectangle getRectangle() const {
+		return ofRectangle(position, size.x, size.y);
+	}
 };
 
 
@@ -170,6 +176,8 @@ public:
     const std::unordered_map<string, ofxOceanodeNode*> & getParameterGroupNodesMap(){return parameterGroupNodesMap;};
 	
 	vector<ofxOceanodeComment> &getComments(){return comments;};
+	vector<int> getSelectedCommentIndices();
+	void deselectAllComments();
 #endif
     
     void setCanvasID(string s){canvasID = s;};

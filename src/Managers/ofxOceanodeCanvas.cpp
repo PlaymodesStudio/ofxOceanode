@@ -290,6 +290,15 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
         }
         
+        // Define selection helper function at this scope so it's accessible to both nodes and comments
+        auto getIsSelectedByRect = [this](ofRectangle rect) -> bool{
+            if(entireSelect){
+                return selectedRect.inside(rect);
+            }else{
+                return selectedRect.intersects(rect);
+            }
+        };
+        
         // Display grid
         if (show_grid)
         {
@@ -449,14 +458,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     open_context_menu |= ImGui::IsMouseClicked(1);
                 }
                 bool node_moving_active = ImGui::IsItemActive();
-                
-                auto getIsSelectedByRect = [this](ofRectangle rect) -> bool{
-                    if(entireSelect){
-                        return selectedRect.inside(rect);
-                    }else{
-                        return selectedRect.intersects(rect);
-                    }
-                };
                 
                 bool toCheckPress = nodeGui.getSelected() && lastSelectedNode != nodeId ? ImGui::IsMouseReleased(0) : ImGui::IsMouseClicked(0);
                 
@@ -632,7 +633,16 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 deletedIds.insert(nodeId);
             }
             ImGui::PopID();
-		}
+  }
+        
+        // Move selected comments along with nodes (once per frame, outside the node loop)
+        if(someSelectedModuleMove != "" && moveSelectedModulesWithDrag != glm::vec2(0,0)){
+            for(auto &c : container->getComments()){
+                if(c.selected){
+                    c.position = c.position + moveSelectedModulesWithDrag;
+                }
+            }
+        }
         
         if(newComment){
             // Snap comment corners to grid if snap_to_grid is enabled
@@ -659,10 +669,26 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             auto &c = container->getComments()[i];
             ImGui::PushID(("Comment " + ofToString(i)).c_str());
             
+            // Handle comment selection during cross-selection
+            if(selectionHasBeenMade){
+                bool fitSelection = getIsSelectedByRect(c.getRectangle());
+                if(!ImGui::GetIO().KeyShift)
+                    c.selected = fitSelection;
+                else if(fitSelection)
+                    c.selected = true;
+            }
+            
+            bool isSelectedOrSelecting = c.selected || (isSelecting && getIsSelectedByRect(c.getRectangle()));
+            
             glm::vec2 currentPosition = c.position + offset;
             draw_list->AddRectFilled(currentPosition, currentPosition + glm::vec2(c.size.x, 15), IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 255));
             draw_list->AddText(currentPosition, IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255), c.text.c_str());
             draw_list->AddRectFilled(currentPosition + glm::vec2(0, 15), currentPosition + c.size, IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 100));
+            
+            // Draw selection border if selected
+            if(isSelectedOrSelecting){
+                draw_list->AddRect(currentPosition, currentPosition + c.size, IM_COL32(255, 127, 0, 255), 0.0f, 0, 2.0f);
+            }
             ImGui::SetCursorScreenPos(currentPosition);
 			// trying to avoid a crash on ImGui::InvisibleButton
 			// IM_ASSERT(size_arg.x != 0.0f && size_arg.y != 0.0f);
@@ -677,36 +703,95 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             
             if(ImGui::IsItemActive()){
                 ofRectangle rect(c.position, c.size.x, c.size.y);
-                c.position = c.position + ImGui::GetIO().MouseDelta;
-                if(!ImGui::GetIO().KeyAlt){
-                    if(c.nodes.size() == 0){
-                        for(auto nodePair : nodesInThisFrame)
-                        {
-                            if(rect.inside(nodePair.second->getNodeGui().getRectangle())){
-                                c.nodes.push_back(nodePair.second);
-                            }
+                glm::vec2 dragDelta = ImGui::GetIO().MouseDelta;
+                
+                // If this comment is selected, move all selected items (nodes + comments)
+                if(c.selected && dragDelta != glm::vec2(0,0)){
+                    // Move all selected nodes
+                    for(auto &n : container->getParameterGroupNodesMap()){
+                        if(n.second->getNodeGui().getSelected()){
+                            n.second->getNodeGui().setPosition(n.second->getNodeGui().getPosition() + dragDelta);
                         }
                     }
-                    for(auto n : c.nodes){
-                        n->getNodeGui().setPosition(n->getNodeGui().getPosition() + ImGui::GetIO().MouseDelta);
+                    // Move all selected comments
+                    for(auto &otherComment : container->getComments()){
+                        if(otherComment.selected){
+                            otherComment.position = otherComment.position + dragDelta;
+                        }
                     }
-                }else{
-                    c.nodes.clear();
+                    someDragAppliedToSelection = true;
+                }
+                // If comment is not selected, use old behavior (move comment and grouped nodes + nested comments)
+                else if(!c.selected){
+                    c.position = c.position + dragDelta;
+                    if(!ImGui::GetIO().KeyAlt){
+                        if(c.nodes.size() == 0){
+                            for(auto nodePair : nodesInThisFrame)
+                            {
+                                if(rect.inside(nodePair.second->getNodeGui().getRectangle())){
+                                    c.nodes.push_back(nodePair.second);
+                                }
+                            }
+                        }
+                        for(auto n : c.nodes){
+                            n->getNodeGui().setPosition(n->getNodeGui().getPosition() + dragDelta);
+                        }
+                        
+                        // Also move any nested comments (comments inside this comment's rectangle)
+                        for(auto &otherComment : container->getComments()){
+                            if(&otherComment != &c){  // Don't move self
+                                // Check if the other comment is inside this comment's rectangle
+                                if(rect.inside(otherComment.getRectangle())){
+                                    otherComment.position = otherComment.position + dragDelta;
+                                }
+                            }
+                        }
+                    }else{
+                        c.nodes.clear();
+                    }
                 }
             }
             
             // Snap comment to grid when drag ends
             if(ImGui::IsItemDeactivated()){
                 if(snap_to_grid){
-                    // Store pre-snap position to calculate the snap delta
-                    glm::vec2 preSnapPosition = c.position;
-                    c.position = snapToGrid(c.position);
-                    
-                    // Calculate the snap delta and apply it to all nodes inside the comment
-                    glm::vec2 snapDelta = c.position - preSnapPosition;
-                    if(snapDelta != glm::vec2(0, 0)){
-                        for(auto n : c.nodes){
-                            n->getNodeGui().setPosition(n->getNodeGui().getPosition() + snapDelta);
+                    // If this comment is selected, snap all selected items
+                    if(c.selected){
+                        // Snap all selected nodes to grid
+                        for(auto &n : container->getParameterGroupNodesMap()){
+                            if(n.second->getNodeGui().getSelected()){
+                                n.second->getNodeGui().setPosition(snapToGrid(n.second->getNodeGui().getPosition()));
+                            }
+                        }
+                        // Snap all selected comments to grid
+                        for(auto &otherComment : container->getComments()){
+                            if(otherComment.selected){
+                                otherComment.position = snapToGrid(otherComment.position);
+                            }
+                        }
+                    }
+                    // If comment is not selected, use old behavior (snap comment and grouped nodes + nested comments)
+                    else{
+                        // Store pre-snap position to calculate the snap delta
+                        glm::vec2 preSnapPosition = c.position;
+                        c.position = snapToGrid(c.position);
+                        
+                        // Calculate the snap delta and apply it to all nodes inside the comment
+                        glm::vec2 snapDelta = c.position - preSnapPosition;
+                        if(snapDelta != glm::vec2(0, 0)){
+                            for(auto n : c.nodes){
+                                n->getNodeGui().setPosition(n->getNodeGui().getPosition() + snapDelta);
+                            }
+                            
+                            // Also snap nested comments (comments inside this comment's rectangle)
+                            ofRectangle rect(preSnapPosition, c.size.x, c.size.y);
+                            for(auto &otherComment : container->getComments()){
+                                if(&otherComment != &c){  // Don't move self
+                                    if(rect.inside(otherComment.getRectangle())){
+                                        otherComment.position = otherComment.position + snapDelta;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1304,6 +1389,12 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             n.second->getNodeGui().setPosition(snapToGrid(n.second->getNodeGui().getPosition()));
                         }
                     }
+                    // Also snap all selected comments to grid
+                    for(auto &c : container->getComments()){
+                        if(c.selected){
+                            c.position = snapToGrid(c.position);
+                        }
+                    }
                 }
                 
                 someDragAppliedToSelection = false;
@@ -1423,11 +1514,15 @@ void ofxOceanodeCanvas::deselectAllNodes(){
     for(auto &n: container->getParameterGroupNodesMap()){
         n.second->getNodeGui().setSelected(false);
     }
+    container->deselectAllComments();
 }
 
 void ofxOceanodeCanvas::selectAllNodes(){
     for(auto &n: container->getParameterGroupNodesMap()){
         n.second->getNodeGui().setSelected(true);
+    }
+    for(auto &c: container->getComments()){
+        c.selected = true;
     }
 }
 
