@@ -635,7 +635,21 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		}
         
         if(newComment){
-            auto &comment = container->getComments().emplace_back(selectedRect.position, glm::vec2(selectedRect.width, selectedRect.height));
+            // Snap comment corners to grid if snap_to_grid is enabled
+            glm::vec2 commentPosition = selectedRect.position;
+            glm::vec2 commentSize = glm::vec2(selectedRect.width, selectedRect.height);
+            
+            if(snap_to_grid){
+                // Snap top-left corner
+                glm::vec2 topLeft = snapToGrid(commentPosition);
+                // Snap bottom-right corner
+                glm::vec2 bottomRight = snapToGrid(commentPosition + commentSize);
+                // Recalculate size based on snapped corners
+                commentPosition = topLeft;
+                commentSize = bottomRight - topLeft;
+            }
+            
+            auto &comment = container->getComments().emplace_back(commentPosition, commentSize);
             deselectAllNodes();
         }
 
@@ -679,8 +693,23 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }else{
                     c.nodes.clear();
                 }
-            }else{
-                c.nodes.clear();
+            }
+            
+            // Snap comment to grid when drag ends
+            if(ImGui::IsItemDeactivated()){
+                if(snap_to_grid){
+                    // Store pre-snap position to calculate the snap delta
+                    glm::vec2 preSnapPosition = c.position;
+                    c.position = snapToGrid(c.position);
+                    
+                    // Calculate the snap delta and apply it to all nodes inside the comment
+                    glm::vec2 snapDelta = c.position - preSnapPosition;
+                    if(snapDelta != glm::vec2(0, 0)){
+                        for(auto n : c.nodes){
+                            n->getNodeGui().setPosition(n->getNodeGui().getPosition() + snapDelta);
+                        }
+                    }
+                }
                 c.nodes.clear();
             }
             
@@ -958,13 +987,17 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(result.name);
                             if (type) {
                                 auto &node = container->createNode(std::move(type));
-                                node.getNodeGui().setPosition(newNodeClickPos - offset);
+                                glm::vec2 nodePosition = newNodeClickPos - offset;
+                                if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
+                                node.getNodeGui().setPosition(nodePosition);
                             }
                         } else if(result.type == "macro") {
                             unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
                             if (type) {
                                 auto &node = container->createNode(std::move(type), result.macroPath);
-                                node.getNodeGui().setPosition(newNodeClickPos - offset);
+                                glm::vec2 nodePosition = newNodeClickPos - offset;
+                                if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
+                                node.getNodeGui().setPosition(nodePosition);
                             }
                         }
                         ImGui::PopStyleColor();
@@ -989,13 +1022,17 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(firstResult.name);
                         if (type) {
                             auto &node = container->createNode(std::move(type));
-                            node.getNodeGui().setPosition(newNodeClickPos - offset);
+                            glm::vec2 nodePosition = newNodeClickPos - offset;
+                            if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
+                            node.getNodeGui().setPosition(nodePosition);
                         }
                     } else if(firstResult.type == "macro") {
                         unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
                         if (type) {
                             auto &node = container->createNode(std::move(type), firstResult.macroPath);
-                            node.getNodeGui().setPosition(newNodeClickPos - offset);
+                            glm::vec2 nodePosition = newNodeClickPos - offset;
+                            if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
+                            node.getNodeGui().setPosition(nodePosition);
                         }
                     }
                     ImGui::CloseCurrentPopup();
@@ -1029,7 +1066,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                 if (type)
                                 {
                                     auto &node = container->createNode(std::move(type));
-                                    node.getNodeGui().setPosition(newNodeClickPos - offset);
+                                    glm::vec2 nodePosition = newNodeClickPos - offset;
+                                    if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
+                                    node.getNodeGui().setPosition(nodePosition);
                                 }
                                 ImGui::PopStyleColor();
                                 selectedModule = true;
@@ -1071,7 +1110,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 							if (type)
 							{
 								auto &node = container->createNode(std::move(type), m.second);
-								node.getNodeGui().setPosition(newNodeClickPos - offset);
+								glm::vec2 nodePosition = newNodeClickPos - offset;
+								if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
+								node.getNodeGui().setPosition(nodePosition);
 							}
 						}
 					}
@@ -1091,7 +1132,21 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
 			
 			if(ImGui::Selectable("Comment")){
-				container->getComments().emplace_back(newNodeClickPos - offset);
+				glm::vec2 commentPosition = newNodeClickPos - offset;
+				glm::vec2 commentSize;
+				
+				// Snap comment position and size to grid if snap_to_grid is enabled
+				if(snap_to_grid){
+					commentPosition = snapToGrid(commentPosition);
+					// Width = gridDivisions * GRID_SIZE (which equals total node width)
+					// Height = 1 * GRID_SIZE (minimum height)
+					commentSize = glm::vec2(gridDivisions * GRID_SIZE, GRID_SIZE);
+				} else {
+					// Use default size from ofxOceanodeComment constructor
+					commentSize = glm::vec2(265, 20);
+				}
+				
+				container->getComments().emplace_back(commentPosition, commentSize);
 			}
             
             ImGui::EndPopup();
@@ -1265,13 +1320,17 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     deselectAllNodes();
                 }else if(ImGui::IsKeyPressed((ImGuiKey)'V') && !ImGui::IsAnyItemActive()){
                     deselectAllNodes();
-                    container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset, ImGui::GetIO().KeyShift);
+                    glm::vec2 pastePosition = ImGui::GetMousePos() - offset;
+                    if(snap_to_grid) pastePosition = snapToGrid(pastePosition);
+                    container->pasteModulesAndConnectionsInPosition(pastePosition, ImGui::GetIO().KeyShift);
                 }else if(ImGui::IsKeyPressed((ImGuiKey)'X')){
                     container->cutSelectedModulesWithConnections();
                 }else if(ImGui::IsKeyPressed((ImGuiKey)'D')){
                     container->copySelectedModulesWithConnections();
                     deselectAllNodes();
-                    container->pasteModulesAndConnectionsInPosition(ImGui::GetMousePos() - offset, ImGui::GetIO().KeyShift);
+                    glm::vec2 pastePosition = ImGui::GetMousePos() - offset;
+                    if(snap_to_grid) pastePosition = snapToGrid(pastePosition);
+                    container->pasteModulesAndConnectionsInPosition(pastePosition, ImGui::GetIO().KeyShift);
                 }else if(ImGui::IsKeyPressed((ImGuiKey)'A')){
                     selectAllNodes();
 				}else if(ImGui::IsKeyPressed((ImGuiKey)'E')){
