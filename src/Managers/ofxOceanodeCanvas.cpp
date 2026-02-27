@@ -671,14 +671,21 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             
             // Handle comment selection during cross-selection
             if(selectionHasBeenMade){
-                bool fitSelection = getIsSelectedByRect(c.getRectangle());
+                // Only select if the comment's rectangle intersects the selection rectangle,
+                // but is NOT completely containing the selection rectangle.
+                // This prevents selecting a large background comment when doing a small cross-selection inside it.
+                bool intersects = selectedRect.intersects(c.getRectangle());
+                bool containsSelection = c.getRectangle().inside(selectedRect);
+                
+                bool fitSelection = intersects && !containsSelection;
+                
                 if(!ImGui::GetIO().KeyShift)
                     c.selected = fitSelection;
                 else if(fitSelection)
                     c.selected = true;
             }
             
-            bool isSelectedOrSelecting = c.selected || (isSelecting && getIsSelectedByRect(c.getRectangle()));
+            bool isSelectedOrSelecting = c.selected;
             
             glm::vec2 currentPosition = c.position + offset;
             draw_list->AddRectFilled(currentPosition, currentPosition + glm::vec2(c.size.x, 15), IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 255));
