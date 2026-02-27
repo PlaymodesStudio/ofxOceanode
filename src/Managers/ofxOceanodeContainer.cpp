@@ -123,9 +123,6 @@ void ofxOceanodeContainer::activate(){
             node.second->setActive(true);
         }
     }
-    for(auto &connection : connections){
-        connection->setActive(true);
-    }
 }
 
 void ofxOceanodeContainer::deactivate(){
@@ -139,9 +136,6 @@ void ofxOceanodeContainer::deactivate(){
         for(auto &node : nodeTypeMap.second){
             node.second->setActive(false);
         }
-    }
-    for(auto &connection : connections){
-        connection->setActive(false);
     }
 }
 
