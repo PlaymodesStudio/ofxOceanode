@@ -21,6 +21,11 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
 	
 	// Initialize snapshot system members
 	currentSnapshotSlot = -1;
+
+	// Initialize inline-rename state
+	routerSortEditingIndex   = -1;
+	routerSortEditNeedsFocus = false;
+	memset(routerSortEditBuf, 0, sizeof(routerSortEditBuf));
 	matrixRows.set("Snapshot Matrix Rows", 2, 1, 8);
 	matrixCols.set("Snapshot Matrix Cols", 8, 1, 8);
 	showSnapshotNames.set("Show Names", true);
@@ -82,11 +87,13 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 		localPreset = false;
 		isLoadingPreset = true;
 		if(clearContainerOnLoad) container->clearContainer();
+		innerPresetLoadingPath = nextPresetPath;
 		container->loadPreset(nextPresetPath);
-		
+		innerPresetLoadingPath = "";
+
 		// Explicitly load snapshots from the global macro path
 		loadSnapshotsFromPath(nextPresetPath);
-		
+
 		isLoadingPreset = false;
 		nextPresetPath = "";
 	}
@@ -456,7 +463,9 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	if(additionalInfo != ""){
 		localPreset = false;
 		isLoadingPreset = true;
+		innerPresetLoadingPath = additionalInfo;
 		container->loadPreset(additionalInfo);
+		innerPresetLoadingPath = "";
 		isLoadingPreset = false;
 		updateCurrentCategoryFromPath(additionalInfo);
 		currentMacroPath = additionalInfo;
@@ -487,12 +496,193 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	addInspectorParameter(localName.set("Local Name", "Local"));
 	addInspectorParameter(resetPhaseOnActive.set("Reset Ph on Active", false));
 	addInspectorParameter(clearContainerOnLoad.set("Clear Container on Load Preset", false));
+
+	// Router sort order inspector region
+	memset(routerSortSepNameBuf, 0, sizeof(routerSortSepNameBuf));
+	addInspectorParameter(routerSortInspector.set("Router Order", [this]() {
+		renderRouterSortInterface();
+	}));
 }
 
+<<<<<<< Updated upstream
+=======
+void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
+	shared_ptr<ofAbstractParameter> newCreatedParam;
+
+	// Check for routerDropdown first — it doesn't go through the type registry
+	auto* dropdownRouter = dynamic_cast<routerDropdown*>(&node->getNodeModel());
+	if(dropdownRouter != nullptr){
+		// Build a synced int parameter
+		auto paramRef = dynamic_pointer_cast<ofParameter<int>>(dropdownRouter->getValue().newReference());
+		auto param = make_shared<ofParameter<int>>();
+		param->set(dropdownRouter->getNameParam().get(), paramRef->get(), 0,
+		           max(0, (int)dropdownRouter->getCurrentOptions().size() - 1));
+
+		deleteListeners.push(paramRef->newListener([paramRef, param](int &val){ param->set(paramRef->get()); }));
+		deleteListeners.push(param->newListener([paramRef, param](int &val){ paramRef->set(param->get()); }));
+		deleteListeners.push(dropdownRouter->getNameParam().newListener([param](string &s){
+			param->setName(s);
+		}));
+
+		newCreatedParam = param;
+
+		string paramName = newCreatedParam->getName();
+		while(getParameterGroup().contains(paramName)) paramName = "_" + paramName;
+		newCreatedParam->setName(paramName);
+
+		auto addedAbstract = addParameter(*newCreatedParam.get());
+
+		// Set initial dropdown options on the macro pin
+		auto opts = dropdownRouter->getCurrentOptions();
+		if(!opts.empty()){
+			addedAbstract->cast<int>().setDropdownOptions(opts);
+		}
+
+		// Watch the options parameter on the router node for changes, keep macro pin in sync
+		auto& routerParams = node->getParameters();
+		if(routerParams.contains("Options")){
+			auto& optionsAbstract = routerParams.get("Options");
+			auto* optionsOceaParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&optionsAbstract);
+			if(optionsOceaParam && optionsOceaParam->valueType() == typeid(vector<string>).name()){
+				// Capture shared_ptr to keep addedAbstract alive in lambda
+				dropdownRouterListeners[paramName + "_opts"] =
+					optionsOceaParam->cast<vector<string>>().getParameter().newListener(
+						[addedAbstract, param](vector<string> &newOpts){
+							addedAbstract->cast<int>().setDropdownOptions(newOpts);
+							param->setMax(max(0, (int)newOpts.size() - 1));
+							if(param->get() >= (int)newOpts.size()) param->set(0);
+						}
+					);
+			}
+		}
+
+		ofParameter<string> nameParamFromRouter = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
+		nameParamFromRouter = paramName;
+
+		parameterGroupChanged.notify(this);
+		deleteListeners.push(node->deleteModule.newListener([this, nameParamFromRouter, paramName](){
+			getParameterGroup().remove(nameParamFromRouter);
+			dropdownRouterListeners.erase(paramName);
+			dropdownRouterListeners.erase(paramName + "_opts");
+		}, 0));
+
+		updateRouterInfo(node);
+
+		// Auto-register in sort order and set up rename/delete tracking.
+		// shared_ptr<string> currentName is shared between the rename listener
+		// and the delete listener so that a rename keeps both in sync.
+		{
+			string rName = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+			if(!isRouterInSortOrder(rName))
+				routerSortOrder.push_back(rName);
+
+			auto currentName = make_shared<string>(rName);
+			auto& nameRef = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
+
+			deleteListeners.push(nameRef.newListener([this, currentName](string& newName) mutable {
+				// Update sort order entry
+				for(auto& e : routerSortOrder)
+					if(!isSortSeparatorEntry(e) && e == *currentName){ e = newName; break; }
+				// Keep routerNodes map in sync so the inspector "isUnknown" check
+				// reflects the new name immediately after a runtime rename.
+				auto nodeIt = routerNodes.find(*currentName);
+				if(nodeIt != routerNodes.end()){
+					RouterInfo info = nodeIt->second;
+					info.routerName = newName;
+					routerNodes.erase(nodeIt);
+					routerNodes[newName] = info;
+				}
+				*currentName = newName;
+			}));
+
+			deleteListeners.push(node->deleteModule.newListener([this, currentName](){
+				routerSortOrder.erase(
+					remove(routerSortOrder.begin(), routerSortOrder.end(), *currentName),
+					routerSortOrder.end());
+			}));
+		}
+		return;
+	}
+
+	// Generic path for all other router types
+	newCreatedParam = typesRegistry->createRouterFromType(node);
+	string paramName = newCreatedParam->getName();
+	while(getParameterGroup().contains(paramName)) paramName = "_" + paramName;
+	newCreatedParam->setName(paramName);
+	addParameter(*newCreatedParam.get());
+
+	ofParameter<string> nameParamFromRouter = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
+	nameParamFromRouter = paramName;
+
+	parameterGroupChanged.notify(this);
+	deleteListeners.push(node->deleteModule.newListener([this, nameParamFromRouter](){
+		getParameterGroup().remove(nameParamFromRouter);
+	}, 0));
+
+	updateRouterInfo(node);
+
+	// Auto-register in sort order and set up rename/delete tracking.
+	// shared_ptr<string> currentName is shared between the rename listener
+	// and the delete listener so that a rename keeps both in sync.
+	{
+		string rName = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+		if(!isRouterInSortOrder(rName))
+			routerSortOrder.push_back(rName);
+
+		auto currentName = make_shared<string>(rName);
+		auto& nameRef = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
+
+		deleteListeners.push(nameRef.newListener([this, currentName](string& newName) mutable {
+			// Update sort order entry
+			for(auto& e : routerSortOrder)
+				if(!isSortSeparatorEntry(e) && e == *currentName){ e = newName; break; }
+			// Keep routerNodes map in sync so the inspector "isUnknown" check
+			// reflects the new name immediately after a runtime rename.
+			auto nodeIt = routerNodes.find(*currentName);
+			if(nodeIt != routerNodes.end()){
+				RouterInfo info = nodeIt->second;
+				info.routerName = newName;
+				routerNodes.erase(nodeIt);
+				routerNodes[newName] = info;
+			}
+			*currentName = newName;
+		}));
+
+		deleteListeners.push(node->deleteModule.newListener([this, currentName](){
+			routerSortOrder.erase(
+				remove(routerSortOrder.begin(), routerSortOrder.end(), *currentName),
+				routerSortOrder.end());
+		}));
+	}
+}
+
+>>>>>>> Stashed changes
 void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 	string nodeName = node->getParameters().getName();
 	if(ofSplitString(nodeName, " ")[0] == "Router"){
 		if(isLoadingPreset){
+			// Pre-load nameParam from the router's preset JSON so that
+			// allNodesCreated() can build routerByName with the correct saved
+			// names instead of the default type labels ("Float", "Int", …).
+			// This mirrors what loadPresetBeforeConnections does (step 3), but
+			// we need the name to be correct already at allNodesCreated() time
+			// (step 2) so our sort-order lookup works.
+			if(!innerPresetLoadingPath.empty()){
+				string escapedName = node->getNodeModel().nodeName();
+				ofStringReplace(escapedName, " ", "_");
+				string filePath = innerPresetLoadingPath + "/" + escapedName
+				    + "_" + ofToString(node->getNodeModel().getNumIdentifier()) + ".json";
+				if(ofFile::doesFileExist(filePath)){
+					ofJson routerJson = ofLoadJson(filePath);
+					if(!routerJson.empty()){
+						// Call abstractRouter::loadBeforeConnections which does
+						// ofDeserialize(json, nameParam) — sets the name param
+						// to the saved value before allNodesCreated() fires.
+						static_cast<abstractRouter*>(&node->getNodeModel())
+						    ->loadBeforeConnections(routerJson);
+					}
+				}
+			}
 			toCreateRouters.push_back(node);
 			return;
 		}
@@ -521,6 +711,7 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 }
 
 void ofxOceanodeNodeMacro::allNodesCreated(){
+<<<<<<< Updated upstream
 	//sort all nodes by y position
 	std::sort(toCreateRouters.begin(), toCreateRouters.end(), [](ofxOceanodeNode* node1, ofxOceanodeNode* node2){
 		return node1->getNodeGui().getPosition().y < node2->getNodeGui().getPosition().y;
@@ -548,7 +739,91 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 		
 		ofEventArgs args;
 		node->update(args);
+=======
+	// Nothing queued → no router nodes were (re)created in this load pass.
+	// This happens when all routers are merely repositioned (not newly created),
+	// i.e. the container already held them from a previous load in the same session.
+	// Leave routerSortOrder unchanged and discard the pending buffer.
+	if(toCreateRouters.empty()){
+		pendingRouterSortOrder.clear();
+		return;
+>>>>>>> Stashed changes
 	}
+
+	// Remove any separator parameters left over from a previous load.
+	// Router parameters clean themselves up via their deleteModule listeners;
+	// separators have no such listener so we remove them manually here.
+	{
+		vector<string> toRemove;
+		for(int i = 0; i < getParameterGroup().size(); i++){
+			const string& pName = getParameterGroup().get(i).getName();
+			if(pName.size() > 11 && pName.substr(0, 11) == "SEPARATOR:|")
+				toRemove.push_back(getParameterGroup().get(i).getEscapedName());
+		}
+		for(const auto& n : toRemove) getParameterGroup().remove(n);
+	}
+
+	// Rebuild routerSortOrder from scratch.
+	// The tracking blocks inside processRouterNode() will push each router
+	// name as it is processed; separators are pushed inline below.
+	routerSortOrder.clear();
+
+	if(!pendingRouterSortOrder.empty()){
+		// ── Sorted path ─────────────────────────────────────────────────────
+		// Router nameParams have been pre-loaded by newNodeCreated(), so the
+		// map keys are the correct saved names, not the default type labels.
+		map<string, ofxOceanodeNode*> routerByName;
+		for(auto* node : toCreateRouters){
+			string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+			routerByName[name] = node;
+		}
+
+		set<ofxOceanodeNode*> processed;
+
+		for(const auto& entry : pendingRouterSortOrder){
+			if(isSortSeparatorEntry(entry)){
+				// Inject separator into the parameter group AND into the active order.
+				addSeparator(getSortSeparatorLabel(entry), getSortSeparatorColor(entry));
+				routerSortOrder.push_back(entry);
+			} else {
+				auto it = routerByName.find(entry);
+				if(it != routerByName.end()){
+					processRouterNode(it->second);   // pushes entry to routerSortOrder
+					ofEventArgs args;
+					it->second->update(args);
+					processed.insert(it->second);
+				}
+				// Entries not found (router was deleted) are silently dropped.
+			}
+		}
+
+		// Routers not listed in the sort order: append in Y-position order
+		// (backward compatibility — new routers added to the inner macro).
+		vector<ofxOceanodeNode*> remaining;
+		for(auto* node : toCreateRouters)
+			if(processed.find(node) == processed.end()) remaining.push_back(node);
+		sort(remaining.begin(), remaining.end(), [](ofxOceanodeNode* a, ofxOceanodeNode* b){
+			return a->getNodeGui().getPosition().y < b->getNodeGui().getPosition().y;
+		});
+		for(auto* node : remaining){
+			processRouterNode(node);
+			ofEventArgs args;
+			node->update(args);
+		}
+	} else {
+		// ── Unsorted path (no saved order) ──────────────────────────────────
+		// Original Y-position sort; routerSortOrder is rebuilt in Y-order.
+		sort(toCreateRouters.begin(), toCreateRouters.end(), [](ofxOceanodeNode* a, ofxOceanodeNode* b){
+			return a->getNodeGui().getPosition().y < b->getNodeGui().getPosition().y;
+		});
+		for(auto* node : toCreateRouters){
+			processRouterNode(node);
+			ofEventArgs args;
+			node->update(args);
+		}
+	}
+
+	pendingRouterSortOrder.clear();
 	toCreateRouters.clear();
 }
 
@@ -588,7 +863,13 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 	}
 	
 	json["RetriggerSnapshotOnActive"] = retriggerSnapshotOnActive.get();
-	
+
+	// Save router sort order
+	if(!routerSortOrder.empty()) {
+		ofJson sortArr = ofJson::array();
+		for(const auto& e : routerSortOrder) sortArr.push_back(e);
+		json["RouterSortOrder"] = sortArr;
+	}
 }
 
 /**
@@ -640,9 +921,12 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 		retriggerSnapshotOnActive = json["RetriggerSnapshotOnActive"].get<bool>();
 	}
 	
+	// Load router sort order before container->loadPreset() so allNodesCreated() can use it
+	loadRouterSortFromJson(json);
+
 	if(clearContainerOnLoad) container->clearContainer();
 	isLoadingPreset = true;
-	
+
 	// Clear existing snapshots to prevent old data persisting
 	snapshots.clear();
 	currentSnapshotSlot = -1;
@@ -652,7 +936,9 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 		
 		if(localPreset){
 			string localPath = path + "/" + nodeName() + "_" + ofToString(getNumIdentifier());
+			innerPresetLoadingPath = localPath;
 			container->loadPreset(localPath);
+			innerPresetLoadingPath = "";
 			
 			// Store the local path for future snapshot saving
 			presetPath = localPath;
@@ -704,11 +990,15 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 				});
 				if(iter != currentCategoryMacro->macros.end()){
 					// TODO: Carregar o to load?
+					innerPresetLoadingPath = iter->second;
 					container->loadPreset(iter->second);
+					innerPresetLoadingPath = "";
 					currentMacroPath = iter->second;
 				}
 			} else {
+				innerPresetLoadingPath = currentMacroPath;
 				container->loadPreset(currentMacroPath);
+				innerPresetLoadingPath = "";
 			}
 			
 			// Load snapshots if they exist
@@ -719,10 +1009,12 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 	} catch (ofJson::exception) {
 		ofLog() << "Cannot get local preset";
 		localPreset = true;
-		
+
 		string localPath = path + "/" + nodeName() + "_" + ofToString(getNumIdentifier());
-		container->loadPreset(path + "/" + nodeName() + "_" + ofToString(getNumIdentifier()));
-		
+		innerPresetLoadingPath = localPath;
+		container->loadPreset(localPath);
+		innerPresetLoadingPath = "";
+
 		// Store the local path for future snapshot saving
 		presetPath = localPath;
 	}
@@ -1393,7 +1685,186 @@ void ofxOceanodeNodeMacro::storeRouterSnapshot(int slot) {
 	}
 	snapshots[slot] = snapshotData;
 	currentSnapshotSlot = slot;
-	
+
 	// Save snapshots to disk immediately for both local and global presets
 	saveSnapshots();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Router Sort Order
+// ─────────────────────────────────────────────────────────────────────────────
+
+bool ofxOceanodeNodeMacro::isSortSeparatorEntry(const string& e) const {
+	return e.size() > 7 && e.substr(0, 7) == "__SEP__";
+}
+
+string ofxOceanodeNodeMacro::getSortSeparatorLabel(const string& e) const {
+	// format: "__SEP__:label"  or  "__SEP__:label:r,g,b,a"
+	size_t first = e.find(':');
+	if(first == string::npos) return "";
+	size_t second = e.find(':', first + 1);
+	return (second == string::npos)
+		? e.substr(first + 1)
+		: e.substr(first + 1, second - first - 1);
+}
+
+ofColor ofxOceanodeNodeMacro::getSortSeparatorColor(const string& e) const {
+	size_t first = e.find(':');
+	if(first == string::npos) return ofColor(200, 200, 200, 255);
+	size_t second = e.find(':', first + 1);
+	if(second == string::npos) return ofColor(200, 200, 200, 255);
+	auto parts = ofSplitString(e.substr(second + 1), ",");
+	if(parts.size() < 4) return ofColor(200, 200, 200, 255);
+	return ofColor(ofToInt(parts[0]), ofToInt(parts[1]), ofToInt(parts[2]), ofToInt(parts[3]));
+}
+
+string ofxOceanodeNodeMacro::makeSortSeparatorEntry(const string& label, const ofColor& c) const {
+	return "__SEP__:" + label + ":" +
+		ofToString((int)c.r) + "," + ofToString((int)c.g) + "," +
+		ofToString((int)c.b) + "," + ofToString((int)c.a);
+}
+
+bool ofxOceanodeNodeMacro::isRouterInSortOrder(const string& name) const {
+	for(const auto& e : routerSortOrder)
+		if(!isSortSeparatorEntry(e) && e == name) return true;
+	return false;
+}
+
+void ofxOceanodeNodeMacro::loadRouterSortFromJson(const ofJson& json) {
+	// Load into the PENDING buffer, not into the active routerSortOrder.
+	// The active routerSortOrder is cleared and rebuilt by allNodesCreated() once
+	// all router nodes have been created and their nameParams pre-loaded.
+	pendingRouterSortOrder.clear();
+	if(json.contains("RouterSortOrder") && json["RouterSortOrder"].is_array()){
+		for(const auto& item : json["RouterSortOrder"])
+			pendingRouterSortOrder.push_back(item.get<string>());
+	}
+}
+
+void ofxOceanodeNodeMacro::renderRouterSortInterface() {
+#ifndef OFXOCEANODE_HEADLESS
+	ImGui::TextDisabled("Drag to reorder, double-click to rename.");
+	ImGui::TextDisabled("Changes apply on next preset load.");
+	ImGui::Spacing();
+
+	int moveFrom = -1, moveTo = -1;
+	// Disable drag-and-drop while a rename is in progress so the InputText
+	// doesn't accidentally get cancelled by an unintended drag gesture.
+	bool anyEditing = (routerSortEditingIndex >= 0);
+
+	for(int i = 0; i < (int)routerSortOrder.size(); i++){
+		ImGui::PushID(i);
+		bool isSep    = isSortSeparatorEntry(routerSortOrder[i]);
+		bool isEditing = (!isSep && routerSortEditingIndex == i);
+
+		string label = isSep
+			? ("\xe2\x94\x80\xe2\x94\x80  " + getSortSeparatorLabel(routerSortOrder[i]) + "  \xe2\x94\x80\xe2\x94\x80")
+			: routerSortOrder[i];
+
+		bool isUnknown = !isSep && (routerNodes.find(routerSortOrder[i]) == routerNodes.end());
+
+		if(isEditing){
+			// ── Inline rename InputText ──────────────────────────────────────
+			if(routerSortEditNeedsFocus){
+				ImGui::SetKeyboardFocusHere();
+				routerSortEditNeedsFocus = false;
+			}
+			ImGui::SetNextItemWidth(-1);
+			bool confirmed = ImGui::InputText("##rename", routerSortEditBuf, sizeof(routerSortEditBuf),
+				ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+
+			if(confirmed){
+				// Apply the rename to the router's nameParam.
+				// The processRouterNode rename listener takes care of updating
+				// routerSortOrder, routerNodes, and the macro parameter name.
+				string newName(routerSortEditBuf);
+				if(!newName.empty() && newName != routerSortOrder[i]){
+					auto it = routerNodes.find(routerSortOrder[i]);
+					if(it != routerNodes.end()){
+						static_cast<abstractRouter*>(&it->second.node->getNodeModel())
+							->getNameParam().set(newName);
+					}
+				}
+				routerSortEditingIndex = -1;
+			} else if(ImGui::IsItemDeactivated()){
+				// Lost focus (Escape or click elsewhere) → cancel silently
+				routerSortEditingIndex = -1;
+			}
+		} else {
+			// ── Normal display ───────────────────────────────────────────────
+			if(isUnknown) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+			if(isSep)     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.85f, 1.0f, 1.0f));
+
+			ImGui::Selectable(label.c_str(), false, ImGuiSelectableFlags_None, ImVec2(0, 0));
+
+			if(isUnknown || isSep) ImGui::PopStyleColor();
+
+			// Double-click enters rename mode (known router entries only)
+			if(!isSep && !isUnknown
+				&& ImGui::IsItemHovered()
+				&& ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)){
+				routerSortEditingIndex   = i;
+				routerSortEditNeedsFocus = true;
+				strncpy(routerSortEditBuf, routerSortOrder[i].c_str(), sizeof(routerSortEditBuf) - 1);
+				routerSortEditBuf[sizeof(routerSortEditBuf) - 1] = '\0';
+			}
+
+			// Drag-drop (disabled while any rename is in progress)
+			if(!anyEditing){
+				if(ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)){
+					ImGui::SetDragDropPayload("ROUTER_SORT_ITEM", &i, sizeof(int));
+					ImGui::Text("%s", label.c_str());
+					ImGui::EndDragDropSource();
+				}
+				if(ImGui::BeginDragDropTarget()){
+					if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ROUTER_SORT_ITEM")){
+						moveFrom = *(const int*)payload->Data;
+						moveTo   = i;
+					}
+					ImGui::EndDragDropTarget();
+				}
+			}
+
+			// Delete button for separators
+			if(isSep){
+				ImGui::SameLine();
+				if(ImGui::SmallButton("x")){
+					routerSortOrder.erase(routerSortOrder.begin() + i);
+					ImGui::PopID();
+					if(moveFrom >= 0 && moveTo >= 0 && moveFrom != moveTo){
+						string item = routerSortOrder[moveFrom];
+						routerSortOrder.erase(routerSortOrder.begin() + moveFrom);
+						int insertAt = (moveFrom < moveTo) ? moveTo - 1 : moveTo;
+						routerSortOrder.insert(routerSortOrder.begin() + insertAt, item);
+					}
+					return;
+				}
+			}
+		}
+
+		ImGui::PopID();
+	}
+
+	// Apply deferred drag-drop move
+	if(moveFrom >= 0 && moveTo >= 0 && moveFrom != moveTo){
+		string item = routerSortOrder[moveFrom];
+		routerSortOrder.erase(routerSortOrder.begin() + moveFrom);
+		int insertAt = (moveFrom < moveTo) ? moveTo - 1 : moveTo;
+		routerSortOrder.insert(routerSortOrder.begin() + insertAt, item);
+	}
+
+	// "Add separator" row
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::SetNextItemWidth(120);
+	ImGui::InputText("##sep_name", routerSortSepNameBuf, sizeof(routerSortSepNameBuf));
+	ImGui::SameLine();
+	if(ImGui::SmallButton("+ Sep")){
+		if(routerSortSepNameBuf[0] != '\0'){
+			routerSortOrder.push_back(makeSortSeparatorEntry(
+				string(routerSortSepNameBuf), ofColor(200, 200, 200, 255)));
+			routerSortSepNameBuf[0] = '\0';
+		}
+	}
+#endif
 }
