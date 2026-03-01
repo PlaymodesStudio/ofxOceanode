@@ -1875,8 +1875,18 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 			}
 		}
 		
+		// Compute minPosition (same logic as cutSelectedModulesWithConnections) for router positioning
+		glm::vec2 minPos(FLT_MAX, FLT_MAX);
+#ifndef OFXOCEANODE_HEADLESS
+		for(const auto& info : originalNodeInfo) {
+			minPos.x = std::min(minPos.x, info.position.x);
+			minPos.y = std::min(minPos.y, info.position.y);
+		}
+#endif
+		if(minPos.x == FLT_MAX) minPos = glm::vec2(0, 0);
+
 		// 10. Create routers and reconnect
-		createRoutersAndReconnect(macroNode, externalConnections);
+		createRoutersAndReconnect(macroNode, externalConnections, minPos);
 	}
 	
 	ofLogNotice("Encapsulation") << "Encapsulation completed successfully";
@@ -2052,7 +2062,7 @@ vector<ofxOceanodeContainer::ExternalConnection> ofxOceanodeContainer::analyzeEx
 	return externals;
 }
 
-void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode, vector<ExternalConnection>& connections) {
+void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode, vector<ExternalConnection>& connections, glm::vec2 minPosition) {
 	auto macroModel = dynamic_cast<ofxOceanodeNodeMacro*>(&macroNode->getNodeModel());
 	if(!macroModel) {
 		ofLogError("Encapsulation") << "Invalid macro model for router creation";
@@ -2103,72 +2113,71 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 			}
 			
 			#ifndef OFXOCEANODE_HEADLESS
-						// SMART POSITIONING: Position router near its connected nodes
 						glm::vec2 routerPos(0, 0);
-						int connectedNodeCount = 0;
-						
+						bool posFound = false;
+
 						if(extConn.isIncoming) {
-							// Input router: position near the average of all internal nodes it connects to
-							for(const auto& internalConn : extConn.internalConnections) {
-								// Find the internal node this router will connect to
-								for(auto node : macroNodes) {
-									if(node->getParameters().getName() == internalConn.nodeName) {
-										routerPos += node->getNodeGui().getPosition();
-										connectedNodeCount++;
-										break;
+							// Input router: position at the external source node's location, translated to macro canvas space
+							if(extConn.externalParam) {
+								auto externalNode = getNodeFromParameter(*extConn.externalParam);
+								if(externalNode) {
+									routerPos = externalNode->getNodeGui().getPosition() - minPosition;
+									posFound = true;
+								}
+							}
+							if(!posFound) {
+								// Fallback: average of target internal nodes, offset left
+								int count = 0;
+								for(const auto& internalConn : extConn.internalConnections) {
+									for(auto node : macroNodes) {
+										if(node->getParameters().getName() == internalConn.nodeName) {
+											routerPos += node->getNodeGui().getPosition();
+											count++;
+											break;
+										}
 									}
 								}
-							}
-							
-							if(connectedNodeCount > 0) {
-								routerPos /= connectedNodeCount;
-								// Offset input routers to the left of the connected nodes
-								routerPos.x -= 200;
-							} else {
-								// Fallback position for input routers
-								routerPos = glm::vec2(-200, routerIndex * 80);
+								if(count > 0) { routerPos /= count; routerPos.x -= 200; }
+								else routerPos = glm::vec2(-200, routerIndex * 80);
 							}
 						} else {
-							// Output router: position near the single internal node it connects from
-							for(auto node : macroNodes) {
-								if(node->getParameters().getName() == extConn.internalConnection.nodeName) {
-									routerPos = node->getNodeGui().getPosition();
-									// Offset output routers to the right of the connected node
-									routerPos.x += 300;
-									connectedNodeCount = 1;
-									break;
+							// Output router: position at the external destination node's location, translated to macro canvas space
+							if(!extConn.externalConnections.empty() && extConn.externalConnections[0]) {
+								auto externalNode = getNodeFromParameter(*extConn.externalConnections[0]);
+								if(externalNode) {
+									routerPos = externalNode->getNodeGui().getPosition() - minPosition;
+									posFound = true;
 								}
 							}
-							
-							if(connectedNodeCount == 0) {
-								// Fallback position for output routers
+							if(!posFound) {
 								routerPos = glm::vec2(400, routerIndex * 80);
 							}
 						}
-						
-						// Add some vertical spacing if multiple routers would overlap
-						routerPos.y += (routerIndex % 3) * 60; // Slight vertical offset for multiple routers
-						
+
 						routerNode->getNodeGui().setPosition(routerPos);
-						
+
 						ofLogNotice("Encapsulation") << "Positioned " << (extConn.isIncoming ? "input" : "output")
 							<< " router '" << extConn.routerName << "' at (" << routerPos.x << ", " << routerPos.y << ")";
 			#endif
-			
-			// Get router's Value parameter
+
+			// Get router's Value/Val parameter (void routers use "Val", typed routers use "Value")
 			auto& routerParams = routerNode->getParameters();
-			if(!routerParams.contains("Value")) {
-				ofLogError("Encapsulation") << "Router does not have Value parameter!";
+			string valParamName = "";
+			if(routerParams.contains("Value"))    valParamName = "Value";
+			else if(routerParams.contains("Val")) valParamName = "Val";
+
+			if(valParamName.empty()) {
+				ofLogError("Encapsulation") << "Router does not have Value/Val parameter!";
 				ofLogError("Encapsulation") << "Available parameters:";
 				for(auto& param : routerParams) {
 					ofLogError("Encapsulation") << "  - " << param->getName();
 				}
 				continue;
 			}
-			
-			auto routerParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&routerParams.get("Value"));
+
+			auto routerParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&routerParams.get(valParamName));
 			if(!routerParam) {
-				ofLogError("Encapsulation") << "Could not cast Value parameter to ofxOceanodeAbstractParameter";
+				ofLogError("Encapsulation") << "Could not cast " << valParamName << " parameter to ofxOceanodeAbstractParameter";
 				continue;
 			}
 			

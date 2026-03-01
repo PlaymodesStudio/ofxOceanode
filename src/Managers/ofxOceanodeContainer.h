@@ -238,7 +238,7 @@ private:
 		};
 			
 		vector<ExternalConnection> analyzeExternalConnections(vector<ofxOceanodeNode*> selectedNodes);
-		void createRoutersAndReconnect(ofxOceanodeNode* macroNode, vector<ExternalConnection>& connections);
+		void createRoutersAndReconnect(ofxOceanodeNode* macroNode, vector<ExternalConnection>& connections, glm::vec2 minPosition = glm::vec2(0, 0));
 		string generateRouterName(const string& paramName, map<string, int>& nameCounters);
 	string extractNodeType(const string& nodeName);
 	void ensureMacroParametersExposed(const vector<ofxOceanodeNode*>& macroNodes);
