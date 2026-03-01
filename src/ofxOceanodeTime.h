@@ -11,6 +11,7 @@
 #include "ofThread.h"
 #include "phasor.h"
 #include "ofxOceanodeBPMController.h"
+#include <chrono>
 
 class ofxOceanodeContainer;
 class ofxOceanodeNode;
@@ -90,7 +91,8 @@ private:
     shared_ptr<ofxOceanodeBPMController> controller;
     
     ofSoundStream soundStream;
-    
+    std::chrono::time_point<std::chrono::steady_clock> lastAudioCallbackTime;
+
     std::vector<ofxOceanodeTimelinedItem> timlinedParameters;
     float windowHeight;
     

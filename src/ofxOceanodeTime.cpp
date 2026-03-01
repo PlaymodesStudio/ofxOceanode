@@ -159,24 +159,41 @@ void ofxOceanodeTime::threadedFunction(){
 
 void ofxOceanodeTime::audioIn(ofSoundBuffer & input){
     if(!frameMode){
+        float nominalRate = (float)input.getSampleRate() / (float)input.getNumFrames();
         phasorChannel2.tryReceive(phasorsInThread2);
         for(auto p : phasorsInThread2){
             if(p->isAudio())
-                p->advanceForFrameRate(44100.0/256.0);
+                p->advanceForFrameRate(nominalRate);
             else
-                p->threadedFunction(44100.0/256.0);
+                p->threadedFunction(nominalRate);
         }
     }
 }
 
 void ofxOceanodeTime::audioOut(ofSoundBuffer & input){
     if(!frameMode){
+        // Measure actual elapsed time between callbacks to get true callback rate.
+        // This is immune to hardware/software sample rate mismatches (e.g. built-in
+        // speakers running at 48kHz while 44100 was requested).
+        auto now = std::chrono::steady_clock::now();
+        float nominalElapsed = (float)input.getNumFrames() / (float)input.getSampleRate();
+        float elapsed;
+        if(lastAudioCallbackTime.time_since_epoch().count() == 0){
+            elapsed = nominalElapsed;
+        } else {
+            elapsed = std::chrono::duration<float>(now - lastAudioCallbackTime).count();
+            // Clamp to [0.5x, 2x] nominal to guard against scheduler glitches
+            elapsed = std::max(nominalElapsed * 0.5f, std::min(nominalElapsed * 2.0f, elapsed));
+        }
+        lastAudioCallbackTime = now;
+        float effectiveRate = 1.0f / elapsed;
+
         phasorChannel2.tryReceive(phasorsInThread2);
         for(auto p : phasorsInThread2){
             if(p->isAudio())
-                p->advanceForFrameRate(44100.0/256.0);
+                p->advanceForFrameRate(effectiveRate);
             else
-                p->threadedFunction(44100.0/256.0);
+                p->threadedFunction(effectiveRate);
         }
     }
 }
