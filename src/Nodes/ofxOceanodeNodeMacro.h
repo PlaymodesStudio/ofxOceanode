@@ -118,6 +118,15 @@ private:
 	void renderSnapshotMatrix();
 	void renderInspectorInterface();
 	void renderSnapshotListItem(int slot, SnapshotData& snapshot);
+	void renderRouterSortInterface();
+
+	// Router Sort Order Helpers
+	bool isSortSeparatorEntry(const std::string& entry) const;
+	std::string getSortSeparatorLabel(const std::string& entry) const;
+	ofColor getSortSeparatorColor(const std::string& entry) const;
+	std::string makeSortSeparatorEntry(const std::string& label, const ofColor& color) const;
+	bool isRouterInSortOrder(const std::string& routerName) const;
+	void loadRouterSortFromJson(const ofJson& json);
 
 	// Router & Snapshot Management
 	void processRouterNode(ofxOceanodeNode* node);
@@ -146,6 +155,11 @@ private:
 	ofJson routerSnapshotToJson(const RouterSnapshot& snapshot);
 	RouterSnapshot jsonToRouterSnapshot(const ofJson& json);
 
+	// Interpolation helpers
+	bool shouldInterpolateType(const std::string& type) const;
+	void applyInterpolatedValues(float t);
+	static float customPow(float base, float exponent);
+
 	// Event Handlers
 	void onMatrixSizeChanged(int& value);
 
@@ -167,9 +181,9 @@ private:
 	ofEventListeners presetActionsListeners;
 	ofEventListener activeSnapshotSlotListener;
 	ofEventListener snapshotUpdatedListener;
+	ofEventListener showSnapshotMatrixListener;
 		
 	std::unordered_map<string, ofEventListeners> inoutListeners;
-	std::unordered_map<string, ofEventListener> dropdownRouterListeners;
 	
 	// Basic Parameters
 	bool showWindow;
@@ -217,16 +231,39 @@ private:
 	ofParameter<bool> showSnapshotNames;
 	ofParameter<void> addSnapshotButton;
 	ofParameter<int> activeSnapshotSlot;
+	shared_ptr<ofxOceanodeAbstractParameter> activeSnapshotSlotParam;
 	ofParameter<float> buttonSize;
 	ofParameter<bool> retriggerSnapshotOnActive; 
-	bool showSnapshotMatrix;
+	ofParameter<bool> showSnapshotMatrix;
 	int currentSnapshotSlot;
 	string lastSnapshotHash;
 	
 	// Collections
 	std::map<std::string, RouterInfo> routerNodes;
 	std::map<int, SnapshotData> snapshots;
-	
+	std::unordered_map<std::string, ofEventListener> dropdownRouterListeners;
+
+	// Interpolation
+	ofParameter<float> interpolationMs;
+	ofParameter<float> interpolationBiPow;
+	bool isInterpolating;
+	uint64_t interpolationStartTime;
+	float interpolationBiPowCapture;
+	std::map<std::string, RouterSnapshot> interpolationStartValues;
+	std::map<std::string, RouterSnapshot> interpolationTargetValues;
+
+	// Router Sort Order
+	std::vector<std::string> routerSortOrder;         // active order, rebuilt each load
+	std::vector<std::string> pendingRouterSortOrder;  // loaded from JSON, consumed by allNodesCreated()
+	std::string innerPresetLoadingPath;               // set before container->loadPreset(), used by newNodeCreated()
+	ofParameter<std::function<void()>> routerSortInspector;
+	char routerSortSepNameBuf[128];
+
+	// Inline-rename state (router sort inspector)
+	int  routerSortEditingIndex;    // index into routerSortOrder being renamed, -1 = none
+	bool routerSortEditNeedsFocus;  // focus the InputText on the first edit frame
+	char routerSortEditBuf[256];    // scratch buffer for the rename InputText
+
 	// Additional Components
 	std::function<void(ImVec2)> minimizedViewCallback;
 };

@@ -101,6 +101,14 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
             string uniqueId = absParam.getName();
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::BeginDisabled();
             ImGui::PushID(uniqueId.c_str());
+            if(absParam.getFlags() & ofxOceanodeParameterFlags_NoGuiWidget){
+                ImGui::Dummy(ImVec2(0, 0));
+                inputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y);
+                outputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y);
+                ImGui::PopID();
+                if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::EndDisabled();
+                continue;
+            }
             if(absParam.valueType() == typeid(std::function<void()>).name()){
                 // Check if this is a separator by looking at the parameter name
                 if(uniqueId.find("SEPARATOR:|") == 0){
