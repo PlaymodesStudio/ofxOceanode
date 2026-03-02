@@ -90,6 +90,18 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 		
 		localPreset = false;
 		isLoadingPreset = true;
+
+		// Load router sort order from the macro folder BEFORE loadPreset() so
+		// allNodesCreated() can apply it (same logic as macroLoad global branch).
+		{
+			string sortOrderFile = nextPresetPath + "/router_sort_order.json";
+			ofJson sortJson;
+			if(ofFile::doesFileExist(sortOrderFile)) {
+				sortJson = ofLoadJson(sortOrderFile);
+			}
+			loadRouterSortFromJson(sortJson);
+		}
+
 		if(clearContainerOnLoad) container->clearContainer();
 		innerPresetLoadingPath = nextPresetPath;
 		container->loadPreset(nextPresetPath);
@@ -267,7 +279,20 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 				firstSaveAsOpen = true;
 			}else{
 				container->savePreset(currentMacroPath);
-				saveSnapshots();  // Add snapshot saving
+				saveSnapshots();
+				// Save router sort order to the macro folder
+				{
+					string sortOrderFile = currentMacroPath + "/router_sort_order.json";
+					if(!routerSortOrder.empty()) {
+						ofJson sortJson;
+						ofJson sortArr = ofJson::array();
+						for(const auto& e : routerSortOrder) sortArr.push_back(e);
+						sortJson["RouterSortOrder"] = sortArr;
+						ofSavePrettyJson(sortOrderFile, sortJson);
+					} else if(ofFile::doesFileExist(sortOrderFile)) {
+						ofFile::removeFile(sortOrderFile);
+					}
+				}
 				ofxOceanodeShared::macroUpdated(currentMacroPath);
 			}
 		}
@@ -318,7 +343,18 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 						currentMacroPath = saveAsCategoryWithSlash + string(proposedNewName);
 						currentCategory = saveAsTempCategory;
 						currentCategoryMacro = macroDirectoryStructure;
-						saveSnapshots();  // Add snapshot saving
+						// Save router sort order to the macro folder
+						{
+							string sortOrderFile = currentMacroPath + "/router_sort_order.json";
+							if(!routerSortOrder.empty()) {
+								ofJson sortJson;
+								ofJson sortArr = ofJson::array();
+								for(const auto& e : routerSortOrder) sortArr.push_back(e);
+								sortJson["RouterSortOrder"] = sortArr;
+								ofSavePrettyJson(sortOrderFile, sortJson);
+							}
+						}
+						saveSnapshots();
 						ofxOceanodeShared::updateMacrosStructure();
 					}
 					strcpy(cString, "");
@@ -492,6 +528,13 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	if(additionalInfo != ""){
 		localPreset = false;
 		isLoadingPreset = true;
+		// Load router sort order from macro folder before loadPreset()
+		{
+			string sortOrderFile = additionalInfo + "/router_sort_order.json";
+			ofJson sortJson;
+			if(ofFile::doesFileExist(sortOrderFile)) sortJson = ofLoadJson(sortOrderFile);
+			loadRouterSortFromJson(sortJson);
+		}
 		innerPresetLoadingPath = additionalInfo;
 		container->loadPreset(additionalInfo);
 		innerPresetLoadingPath = "";
@@ -511,8 +554,14 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	});
 	
 	macroUpdatedListener = ofxOceanodeShared::getMacroUpdatedEvent().newListener([this](string &s){
-		//ofLog() << s;
 		if(s == currentMacroPath && !localPreset){
+			// Load router sort order from macro folder before reloading
+			{
+				string sortOrderFile = currentMacroPath + "/router_sort_order.json";
+				ofJson sortJson;
+				if(ofFile::doesFileExist(sortOrderFile)) sortJson = ofLoadJson(sortOrderFile);
+				loadRouterSortFromJson(sortJson);
+			}
 			if(clearContainerOnLoad) container->clearContainer();
 			container->loadPreset(currentMacroPath);
 		}
@@ -863,12 +912,31 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 		json["CategoryStruct"] = currentCategory;
 		json["Macro"] = currentMacro;
 		json["MacroPath"] = currentMacroPath;
+
+		// For global macros: save router sort order to the macro folder so
+		// it persists independently of which preset loads this macro (and so
+		// "reload macro" from the popup also picks it up).
+		if(!currentMacroPath.empty()) {
+			string sortOrderFile = currentMacroPath + "/router_sort_order.json";
+			if(!routerSortOrder.empty()) {
+				ofJson sortJson;
+				ofJson sortArr = ofJson::array();
+				for(const auto& e : routerSortOrder) sortArr.push_back(e);
+				sortJson["RouterSortOrder"] = sortArr;
+				ofSavePrettyJson(sortOrderFile, sortJson);
+			} else {
+				if(ofFile::doesFileExist(sortOrderFile)) {
+					ofFile::removeFile(sortOrderFile);
+				}
+			}
+		}
 	}
-	
+
 	json["RetriggerSnapshotOnActive"] = retriggerSnapshotOnActive.get();
 
-	// Save router sort order
-	if(!routerSortOrder.empty()) {
+	// Save router sort order for local macros (stored in the preset json).
+	// Global macro sort order is saved to the macro folder above.
+	if(localPreset && !routerSortOrder.empty()) {
 		ofJson sortArr = ofJson::array();
 		for(const auto& e : routerSortOrder) sortArr.push_back(e);
 		json["RouterSortOrder"] = sortArr;
@@ -924,20 +992,21 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 		retriggerSnapshotOnActive = json["RetriggerSnapshotOnActive"].get<bool>();
 	}
 	
-	// Load router sort order before container->loadPreset() so allNodesCreated() can use it
-	loadRouterSortFromJson(json);
-
 	if(clearContainerOnLoad) container->clearContainer();
 	isLoadingPreset = true;
 
 	// Clear existing snapshots to prevent old data persisting
 	snapshots.clear();
 	currentSnapshotSlot = -1;
-	
+
 	try {
 		localPreset = json.value("LocalPreset", true);
-		
+
 		if(localPreset){
+			// For local macros: router sort order is stored in the preset json.
+			// Load it before container->loadPreset() so allNodesCreated() can use it.
+			loadRouterSortFromJson(json);
+
 			string localPath = path + "/" + nodeName() + "_" + ofToString(getNumIdentifier());
 			innerPresetLoadingPath = localPath;
 			container->loadPreset(localPath);
@@ -995,7 +1064,23 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 					return pair.first == currentMacro;
 				});
 				if(iter != currentCategoryMacro->macros.end()){
-					// TODO: Carregar o to load?
+					// For global macros: router sort order is stored in the macro
+					// folder (not the preset json). Load it before loadPreset() so
+					// allNodesCreated() can apply it. Fall back to the preset json
+					// for backward compatibility with old presets that stored it there.
+					{
+						string sortOrderFile = iter->second + "/router_sort_order.json";
+						ofJson sortJson;
+						if(ofFile::doesFileExist(sortOrderFile)) {
+							sortJson = ofLoadJson(sortOrderFile);
+						}
+						if(!sortJson.empty()) {
+							loadRouterSortFromJson(sortJson);
+						} else {
+							// Backward compat: try the preset json
+							loadRouterSortFromJson(json);
+						}
+					}
 					innerPresetLoadingPath = iter->second;
 					container->loadPreset(iter->second);
 					innerPresetLoadingPath = "";
