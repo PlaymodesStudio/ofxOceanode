@@ -18,6 +18,8 @@
 class ofxOceanodeNodeModel;
 class ofxOceanodeNodeRegistry;
 class ofxOceanodeTypesRegistry;
+class ofxOceanodeNodeMacro;
+
 
 #ifdef OFXOCEANODE_USE_OSC
 #include "ofxOsc.h"
@@ -63,6 +65,7 @@ public:
     
     void activate();
     void deactivate();
+
     
     ofxOceanodeNode* createNodeFromName(string name, int identifier = -1, bool isPersistent = false);
     ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier = -1, bool isPersistent = false, string additionalInfo = "");
@@ -130,6 +133,10 @@ public:
     
     void setBpm(float _bpm);
     void resetPhase();
+	
+	// Node encapsulation functionality
+	void encapsulateSelectedNodes(const string& macroName = "Encapsulated");
+
     
     ofEvent<pair<string, string>> loadPresetEvent;
     ofEvent<pair<string, int>> loadPresetNumEvent;
@@ -210,7 +217,40 @@ private:
 #endif
     string canvasID;
 	
-	vector<ofxOceanodeComment> comments;
-};
+	// Encapsulation support structures and methods
+		struct InternalConnection {
+			string nodeName;    // Name of the internal node
+			string paramName;   // Name of the internal parameter
+		};
+		
+		struct ExternalConnection {
+			// For input routers (external → multiple internals)
+			ofxOceanodeAbstractParameter* externalParam;  // Single external parameter (for inputs)
+			vector<InternalConnection> internalConnections; // Multiple internal connections (for inputs)
+			
+			// For output routers (single internal → multiple externals)
+			InternalConnection internalConnection;  // Single internal connection (for outputs)
+			vector<ofxOceanodeAbstractParameter*> externalConnections; // Multiple external parameters (for outputs)
+			
+			bool isIncoming;           // true: external->internal, false: internal->external
+			string routerName;         // Generated name for router
+			string routerType;         // Parameter type for router creation
+		};
+			
+		vector<ExternalConnection> analyzeExternalConnections(vector<ofxOceanodeNode*> selectedNodes);
+		void createRoutersAndReconnect(ofxOceanodeNode* macroNode, vector<ExternalConnection>& connections, glm::vec2 minPosition = glm::vec2(0, 0));
+		string generateRouterName(const string& paramName, map<string, int>& nameCounters);
+	string extractNodeType(const string& nodeName);
+	void ensureMacroParametersExposed(const vector<ofxOceanodeNode*>& macroNodes);
+
+		string mapParameterTypeToRouterName(const string& paramType);
+		ofxOceanodeNode* getNodeFromParameter(ofxOceanodeAbstractParameter& param);
+		bool isNodeInList(ofxOceanodeNode* node, vector<ofxOceanodeNode*>& nodeList);
+		string getParameterTypeName(ofxOceanodeAbstractParameter& param);
+		ofxOceanodeAbstractParameter* findInternalParameter(const vector<ofxOceanodeNode*>& macroNodes, const InternalConnection& internalConn);
+	
+		
+		vector<ofxOceanodeComment> comments;
+	};
 
 #endif /* ofxOceanodeContainer_h */

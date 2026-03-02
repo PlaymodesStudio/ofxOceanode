@@ -27,17 +27,18 @@ ofxOceanode::ofxOceanode(){
 #endif
     
     //Register default types
-    typesRegistry->registerType<float>();
-    typesRegistry->registerType<int>();
-    typesRegistry->registerType<bool>();
-    typesRegistry->registerType<void>();
-    typesRegistry->registerType<string>();
-    typesRegistry->registerType<char>();
-    typesRegistry->registerType<vector<float>>();
-    typesRegistry->registerType<vector<int>>();
-    typesRegistry->registerType<ofColor>();
-    typesRegistry->registerType<ofFloatColor>();
-    typesRegistry->registerType<Timestamp>();
+    typesRegistry->registerType<float>("f");
+    typesRegistry->registerType<int>("i");
+    typesRegistry->registerType<bool>("b");
+    typesRegistry->registerType<void>("v");
+    typesRegistry->registerType<string>("s");
+    typesRegistry->registerType<char>("c");
+    typesRegistry->registerType<vector<float>>("v_f");
+    typesRegistry->registerType<vector<int>>("v_i");
+    typesRegistry->registerType<vector<string>>("v_s");
+    typesRegistry->registerType<ofColor>("color");
+    typesRegistry->registerType<ofFloatColor>("color_f");
+    typesRegistry->registerType<Timestamp>("timestamp");
     
     //Register default nodes
     nodeRegistry->registerModel<oscillator>("Generators");
@@ -65,6 +66,8 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<router<vector<int>>>("Router", "v_i", 0, 0, 1);
     nodeRegistry->registerModel<router<int>>("Router", "i", 0, 0, 1);
     nodeRegistry->registerModel<router<string>>("Router", "s", "string");
+    nodeRegistry->registerModel<router<vector<string>>>("Router", "v_s", "string");
+    nodeRegistry->registerModel<routerDropdown>("Router");
     nodeRegistry->registerModel<router<bool>>("Router", "b", false);
     nodeRegistry->registerModel<router<void>>("Router", "v");
     nodeRegistry->registerModel<router<char>>("Router", "c", ' ');
@@ -294,39 +297,9 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         }
 		
 		if(ImGui::BeginMenu("Config"))
-		       {
-		           // Show actual running FPS (read-only) with color feedback
-		           int currentFPS = (int)ofGetFrameRate();
-		           
-		           // Calculate percentage difference from desired FPS
-		           float fpsDiff = abs(currentFPS - desiredFPS) / (float)desiredFPS * 100.0f;
-		           
-		           // Set colors based on difference
-		           ImVec4 sliderColor;
-		           if(fpsDiff <= 5.0f) {
-		               sliderColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); // Green
-		           } else if(fpsDiff <= 15.0f) {
-		               sliderColor = ImVec4(1.0f, 0.6f, 0.0f, 1.0f); // Orange
-		           } else {
-		               sliderColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); // Red
-		           }
-		           
-		           // Push the color styles for the slider
-		           ImGui::PushStyleColor(ImGuiCol_SliderGrab, sliderColor);
-		           ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(sliderColor.x*0.3f, sliderColor.y*0.3f, sliderColor.z*0.3f, 1.0f));
-		           
-		           // Draw the disabled FPS slider
-		           ImGui::BeginDisabled();
-		           ImGui::SliderInt("FPS", &currentFPS, 0, 240);
-		           ImGui::EndDisabled();
-		           
-		           // Pop the color styles
-		           ImGui::PopStyleColor(2);
-		           
-		           // Editable Desired FPS slider
-		           if(ImGui::SliderInt("Desired FPS", &desiredFPS, 1, 240)){
-		               ofSetFrameRate(desiredFPS);
-		           }
+        {
+            float f = ofGetFrameRate();
+            if(ImGui::SliderFloat("FPS", &f, 1, 10000)){ofSetFrameRate(f);}
             bool b = false;
             if(ImGui::Checkbox("V Sync", &b)){ofSetVerticalSync(b);};
             ofxOceanodeConfigurationFlags configurationFlags = ofxOceanodeShared::getConfigurationFlags();
@@ -356,17 +329,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			canvas.setNodeWidthText(tw);
 			canvas.setNodeWidthWidget(ww);
 			
-			ImGui::Separator();
-			
-			if(ImGui::Button("Save Config")){
-				saveConfig();
-			}
-			ImGui::SameLine();
-			if(ImGui::Button("Load Config")){
-				loadConfig();
-			}
-			
-		          ImGui::EndMenu();
+            ImGui::EndMenu();
         }
 		
         if(ImGui::BeginMenu("Help"))
