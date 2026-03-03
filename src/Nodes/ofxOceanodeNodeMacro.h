@@ -73,11 +73,20 @@ public:
 	ofxOceanodeCanvas* getCanvas() {return &canvas;};
 	
 	void activate(){
-		active = true;
+        if(active){
+            container->activate();
+            if(resetPhaseOnActive) container->resetPhase();
+            if(retriggerSnapshotOnActive && currentSnapshotSlot >= 0) {
+                // Retrigger the current snapshot to fire its parameters again
+                loadRouterSnapshot(currentSnapshotSlot);
+            }
+        }
 	}
 	
 	void deactivate(){
-		active = false;
+        if(active){
+            container->deactivate();
+        }
 	}
 	
 	void activateWindow(){
