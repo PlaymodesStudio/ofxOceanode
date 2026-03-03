@@ -587,7 +587,7 @@ void ofxOceanode::loadConfig(){
         canvas.setNodeWidthWidget(config["nodeWidgetWidth"].get<int>());
     }
 	if(config.contains("snapToGrid")){
-		bool b = config["gridDivisions"].get<int>();
+		bool b = config["snapToGrid"].get<bool>();
 		canvas.setSnapToGrid(b);
 		ofxOceanodeShared::setSnapToGrid(b);
 	}
