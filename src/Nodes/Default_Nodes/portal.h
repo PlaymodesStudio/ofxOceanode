@@ -37,6 +37,10 @@ public:
     bool isMatching(abstractPortal *p){
         return type() == p->type() && getName() == p->getName() && checkLocal(p);
     }
+    
+    void activate() override;
+    
+    void presetHasLoaded() override;
 	
 protected:
 	ofParameter<string> name;
@@ -44,6 +48,7 @@ protected:
 	ofParameter<bool> resendOnNameChange;
 	ofEventListener listener;
     ofEventListener nameListener;
+    ofEventListener localListener;
     bool settingViaMatch;
 };
 
@@ -73,13 +78,13 @@ public:
 	}
 	
 	void resendValue() override {
-		if(resendOnNameChange) {
+		if(!getOceanodeParameter(value).hasOutConnections()) {
 			portalUpdated();
 		}
 	}
 	
 	bool match(abstractPortal* p) override {
-		if(type() == p->type() && getName() == p->getName()){
+		if(type() == p->type() && getName() == p->getName() && p != this){
             if(checkLocal(p))
             {
                 settingViaMatch = true;
@@ -125,13 +130,13 @@ public:
 	}
 	
 	void resendValue() override {
-		if(resendOnNameChange) {
+		if(!getOceanodeParameter(value).hasOutConnections()) {
 			portalUpdated();
 		}
 	}
 	
 	bool match(abstractPortal* p){
-		if(type() == p->type() && getName() == p->getName() && checkLocal(p)){
+		if(type() == p->type() && getName() == p->getName() && checkLocal(p) && p != this){
             settingViaMatch = true;
 			setValue(dynamic_cast<portal<std::vector<T>>*>(p)->getValue());
             settingViaMatch = false;
@@ -158,13 +163,13 @@ public:
 	}
 	
 	void resendValue() override {
-		if(resendOnNameChange) {
+		if(!getOceanodeParameter(value).hasOutConnections()) {
 			value.trigger();
 		}
 	}
 	
 	bool match(abstractPortal* p){
-		if(type() == p->type() && getName() == p->getName() && checkLocal(p)){
+		if(type() == p->type() && getName() == p->getName() && checkLocal(p) && p != this){
             settingViaMatch = true;
 			value.trigger();
             settingViaMatch = false;

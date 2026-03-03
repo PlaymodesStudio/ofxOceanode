@@ -22,7 +22,14 @@ abstractPortal::abstractPortal(string typelabel) : ofxOceanodeNodeModel("Portal 
     
     nameListener = name.newListener([this](string &s){
         ofxOceanodeShared::requestPortalUpdate(this);
-		resendValue();
+        if(resendOnNameChange){
+            resendValue();
+        }
+    });
+    
+    localListener = local.newListener([this](bool &b){
+        ofxOceanodeShared::requestPortalUpdate(this);
+        resendValue();
     });
 }
 
@@ -34,4 +41,14 @@ void abstractPortal::portalUpdated(){
     if(!settingViaMatch){
         ofxOceanodeShared::portalUpdated(this);
     }
+}
+
+void abstractPortal::activate(){
+    ofxOceanodeShared::requestPortalUpdate(this);
+    resendValue();
+}
+
+void abstractPortal::presetHasLoaded(){
+    ofxOceanodeShared::requestPortalUpdate(this);
+    resendValue();
 }
