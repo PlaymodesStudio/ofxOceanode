@@ -12,15 +12,21 @@
 
 abstractPortal::abstractPortal(string typelabel) : ofxOceanodeNodeModel("Portal " + typelabel){
     description = "To Send " + typelabel + " values anywhere in the patch. Either in the same canvas (local) or in all macros and parents (global)";
-	ofxOceanodeShared::addPortal(this);
-	
+    
+    settingViaMatch = false;
+    
 	addParameter(name.set("Name", typelabel));
     addInspectorParameter(local.set("Local", true));
 	addInspectorParameter(resendOnNameChange.set("Resend On Name Change", false));
 
-    settingViaMatch = false;
+    // currentName must be set before addPortal so the map bucket key is correct
+    currentName = typelabel;
+    ofxOceanodeShared::addPortal(this);
     
     nameListener = name.newListener([this](string &s){
+        // Move the portal to the correct bucket in the map registry
+        ofxOceanodeShared::updatePortalName(this, currentName, s);
+        currentName = s;
         ofxOceanodeShared::requestPortalUpdate(this);
         if(resendOnNameChange){
             resendValue();

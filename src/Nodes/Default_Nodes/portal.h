@@ -9,14 +9,15 @@
 #define portal_h
 
 #include "ofxOceanodeNodeModel.h"
+#include <typeindex>
 
 class abstractPortal : public ofxOceanodeNodeModel{
 public:
 	abstractPortal(string typelabel);
 	~abstractPortal();
 	
-	string type(){
-		return typeid(*this).name();
+	std::type_index type() const {
+		return std::type_index(typeid(*this));
 	}
 	
 	void portalUpdated();
@@ -28,6 +29,7 @@ public:
     bool isLocal(){return local;};
     
     bool checkLocal(abstractPortal* p){
+        // getParents() returns the cached canvasID string — already O(1)
         return (!isLocal() && !p->isLocal()) || (isLocal() && p->isLocal() && getParents() == p->getParents());
     }
 	
@@ -35,6 +37,7 @@ public:
 	virtual void resendValue() = 0;
     
     bool isMatching(abstractPortal *p){
+        // Name equality is guaranteed by the map-based lookup in ofxOceanodeShared
         return type() == p->type() && getName() == p->getName() && checkLocal(p);
     }
     
@@ -50,6 +53,7 @@ protected:
     ofEventListener nameListener;
     ofEventListener localListener;
     bool settingViaMatch;
+    std::string currentName; // Tracks current portal name for map-bucket migration
 };
 
 template<typename T>
@@ -84,16 +88,18 @@ public:
 	}
 	
 	bool match(abstractPortal* p) override {
-		if(type() == p->type() && getName() == p->getName() && p != this){
-            if(checkLocal(p))
-            {
-                settingViaMatch = true;
-                setValue(dynamic_cast<portal<T>*>(p)->getValue());
-                settingViaMatch = false;
-                return true;
-            }
+		// getName() == p->getName() is guaranteed by the map-based registry in ofxOceanodeShared
+		if(type() == p->type() && p != this){
+	           if(checkLocal(p))
+	           {
+	               settingViaMatch = true;
+	               // static_cast is safe: type() equality already verified
+	               setValue(static_cast<portal<T>*>(p)->getValue());
+	               settingViaMatch = false;
+	               return true;
+	           }
 		}
-        return false;
+	       return false;
 	}
 	
 private:
@@ -136,13 +142,15 @@ public:
 	}
 	
 	bool match(abstractPortal* p){
-		if(type() == p->type() && getName() == p->getName() && checkLocal(p) && p != this){
-            settingViaMatch = true;
-			setValue(dynamic_cast<portal<std::vector<T>>*>(p)->getValue());
-            settingViaMatch = false;
-            return true;
+		// getName() == p->getName() is guaranteed by the map-based registry in ofxOceanodeShared
+		if(type() == p->type() && checkLocal(p) && p != this){
+	           settingViaMatch = true;
+			// static_cast is safe: type() equality already verified
+			setValue(static_cast<portal<std::vector<T>>*>(p)->getValue());
+	           settingViaMatch = false;
+	           return true;
 		}
-        return false;
+	       return false;
 	}
 	
 private:
@@ -169,13 +177,14 @@ public:
 	}
 	
 	bool match(abstractPortal* p){
-		if(type() == p->type() && getName() == p->getName() && checkLocal(p) && p != this){
-            settingViaMatch = true;
+		// getName() == p->getName() is guaranteed by the map-based registry in ofxOceanodeShared
+		if(type() == p->type() && checkLocal(p) && p != this){
+	           settingViaMatch = true;
 			value.trigger();
-            settingViaMatch = false;
-            return true;
+	           settingViaMatch = false;
+	           return true;
 		}
-        return false;
+	       return false;
 	}
 private:
 	ofParameter<void> value;
