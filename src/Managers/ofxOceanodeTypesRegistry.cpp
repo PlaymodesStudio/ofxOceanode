@@ -34,3 +34,11 @@ shared_ptr<ofxOceanodeAbstractParameter> ofxOceanodeTypesRegistry::createOceanod
     }
     return nullptr;
 }
+
+std::string ofxOceanodeTypesRegistry::getTypeNameFromTypeDescription(std::string description){
+    for(auto functionForType : paramTypeToNameColector){
+        string name = functionForType(description);
+        if(name != "") return name;
+    }
+    return "";
+}
