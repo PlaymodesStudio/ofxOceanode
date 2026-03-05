@@ -59,7 +59,8 @@ enum ofxOceanodeParameterFlags_
 	ofxOceanodeParameterFlags_DisableOutConnection  = 1 << 3,   // Parameter cannot connect to
     ofxOceanodeParameterFlags_DisplayMinimized      = 1 << 4,   // Scope Parameter when node minimized
     ofxOceanodeParameterFlags_ScopeKeepAspectRatio  = 1 << 5,   // Scope Parameter keeps Aspect Ratio
-    ofxOceanodeParameterFlags_ReadOnly              = 1 << 6    // Parameter cannot be interacted
+    ofxOceanodeParameterFlags_ReadOnly              = 1 << 6,   // Parameter cannot be interacted
+    ofxOceanodeParameterFlags_NoGuiWidget           = 1 << 7    // Parameter hidden from node GUI (pin still exists)
 //	ofxOceanodeParameterFlags_CollapsingHeader    = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_NoAutoOpenOnLog// Callback on pressing TAB (for completion handling)
 };
 

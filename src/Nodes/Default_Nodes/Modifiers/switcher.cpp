@@ -16,7 +16,9 @@ void switcher::setup(){
     addInspectorParameter(normalizedSelector.set("Norm Selector", true));
     addParameter(switchSelector.set("Switch", {0}, {0}, {FLT_MAX}));
 	addOutputParameter(output.set("Output", {0}, {0}, {1}));
+	
 	inputs.resize(numInputs);
+	
 	for(int i = 0; i < numInputs; i++){
 		addParameter(inputs[i].set("In " + ofToString(i), {0}, {0}, {1}));
 	}
@@ -39,32 +41,32 @@ void switcher::setup(){
 			}
 		}
 	}));
+	
+	listeners.push(switchSelector.newListener([this](vector<float> &){
+		computeOutput();
+	}));
 }
 
-void switcher::update(ofEventArgs &a)
+void switcher::computeOutput()
 {
-//	int maxSize = std::max_element(inputs.begin(), inputs.end(), [](ofParameter<vector<float>> &pv1, ofParameter<vector<float>> &pv2){
-//		return pv1->size() < pv2->size();
-//	})->get().size();
-	
 	auto getValueForPosition([](ofParameter<vector<float>> &p, int pos) -> float{
-        if(pos < p->size()){
-            return p->at(pos);
-        }
-        return p->at(0);
-    });
+	       if(pos < p->size()){
+	           return p->at(pos);
+	       }
+	       return p->at(0);
+	   });
 	
 	vector<float> fswitch = switchSelector;
-    
-    if(!normalizedSelector){
-        for(int i = 0; i < fswitch.size(); i++){
-            fswitch[i] /= (numInputs-1);
-        }
-    }
-    
-    for(int i = 0; i < fswitch.size(); i++){
-        fswitch[i] = ofClamp(fswitch[i], 0, 1);
-    }
+	   
+	   if(!normalizedSelector){
+	       for(int i = 0; i < fswitch.size(); i++){
+	           fswitch[i] /= (numInputs-1);
+	       }
+	   }
+	   
+	   for(int i = 0; i < fswitch.size(); i++){
+	       fswitch[i] = ofClamp(fswitch[i], 0, 1);
+	   }
 	
 	std::transform(fswitch.begin(),
 				   fswitch.end(),
@@ -81,9 +83,6 @@ void switcher::update(ofEventArgs &a)
 				   [](float& c){
 		return c - ((std::trunc(c) == c) ? std::trunc(c)-1 : std::trunc(c));
 	});
-	
-//	float fswitch = switchSelector*(numInputs-1);
-//	float finterpol = fswitch - ((std::trunc(fswitch) == fswitch) ? std::trunc(fswitch)-1 : std::trunc(fswitch));
 	
 	if(fswitch.size() == 1){
 		if(inputs[floor(fswitch[0])]->size() == inputs[ceil(fswitch[0])]->size()){
@@ -111,4 +110,9 @@ void switcher::update(ofEventArgs &a)
 		}
 		output = tempOutput;
 	}
+}
+
+void switcher::update(ofEventArgs &a)
+{
+	computeOutput();
 }

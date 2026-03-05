@@ -19,14 +19,16 @@ public:
     switcher() : ofxOceanodeNodeModel("Switcher Float"){};
     ~switcher(){};
     void setup() override;
-	
-	void update(ofEventArgs &a) override;
+ 
+ void update(ofEventArgs &a) override;
     
     void loadBeforeConnections(ofJson &json) override{
         deserializeParameter(json, numInputs);
     }
 
 private:
+    
+    void computeOutput();
     
     ofEventListeners listeners;
 	

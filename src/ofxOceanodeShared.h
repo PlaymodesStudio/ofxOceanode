@@ -9,6 +9,7 @@
 #define ofxOceanodeShared_h
 
 #include "portal.h"
+#include <unordered_map>
 
 typedef int ofxOceanodeConfigurationFlags;
 
@@ -115,26 +116,57 @@ public:
 		}
 	
 	static void addPortal(abstractPortal* _portal){
-		getInstance().portals.push_back(_portal);
+		getInstance().portalsMap[_portal->getName()].push_back(_portal);
 	}
 	
 	static void removePortal(abstractPortal* _portal){
-		getInstance().portals.erase(std::remove(getInstance().portals.begin(), getInstance().portals.end(), _portal));
+		auto& map = getInstance().portalsMap;
+		auto it = map.find(_portal->getName());
+		if(it != map.end()){
+			auto& vec = it->second;
+			vec.erase(std::remove(vec.begin(), vec.end(), _portal), vec.end());
+			if(vec.empty()){
+				map.erase(it);
+			}
+		}
+	}
+	
+	static void updatePortalName(abstractPortal* _portal, const std::string& oldName, const std::string& newName){
+		auto& map = getInstance().portalsMap;
+		// Remove from old bucket
+		auto itOld = map.find(oldName);
+		if(itOld != map.end()){
+			auto& vec = itOld->second;
+			vec.erase(std::remove(vec.begin(), vec.end(), _portal), vec.end());
+			if(vec.empty()){
+				map.erase(itOld);
+			}
+		}
+		// Insert into new bucket
+		map[newName].push_back(_portal);
 	}
 	
 	static void portalUpdated(abstractPortal* _portal){
-        for(auto p : getInstance().portals){
-            p->match(_portal);
-        }
+		auto& map = getInstance().portalsMap;
+		auto it = map.find(_portal->getName());
+		if(it != map.end()){
+			for(auto p : it->second){
+				p->match(_portal);
+			}
+		}
 	}
-    
-    static void requestPortalUpdate(abstractPortal* _portal){
-        for(auto p : getInstance().portals){
-            if(_portal->match(p)){
-                break;
-            }
-        }
-    }
+	   
+	static void requestPortalUpdate(abstractPortal* _portal){
+	 auto& map = getInstance().portalsMap;
+	 auto it = map.find(_portal->getName());
+	 if(it != map.end()){
+	  for(auto p : it->second){
+	   if(_portal->match(p)){
+	   	break;
+	   }
+	  }
+	 }
+	}
     
     static ofEvent<void>& getPresetWillBeLoadedEvent(){
         return getInstance().presetWillBeLoadedEvent;
@@ -170,11 +202,13 @@ public:
 	static vector<portal<T>*> getAllPortals() {
 		vector<portal<T>*> typedPortals;
 		
-		for (auto* abstractPortal : getInstance().portals) {
-			if (abstractPortal != nullptr) {
-				auto* typedPortal = dynamic_cast<portal<T>*>(abstractPortal);
-				if (typedPortal != nullptr) {
-					typedPortals.push_back(typedPortal);
+		for (auto& kv : getInstance().portalsMap) {
+			for (auto* abstractP : kv.second) {
+				if (abstractP != nullptr) {
+					auto* typedPortal = dynamic_cast<portal<T>*>(abstractP);
+					if (typedPortal != nullptr) {
+						typedPortals.push_back(typedPortal);
+					}
 				}
 			}
 		}
@@ -259,8 +293,7 @@ private:
 	string currentPresetPath = "";
 	string currentBankName = "";
 
-	vector<abstractPortal*> portals;
-    vector<abstractPortal*> currentUpdatingPortals;
+	std::unordered_map<std::string, std::vector<abstractPortal*>> portalsMap;
     
     ofxOceanodeConfigurationFlags configurationFlags;
 	

@@ -17,6 +17,7 @@ public:
     using registryCreator   = std::function<ofxOceanodeAbstractConnection*(ofxOceanodeContainer &container, ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active)>;
     using routerCreator     = std::function<shared_ptr<ofAbstractParameter>(ofxOceanodeNode* routerNode)>;
     using absParamCreator   = std::function<shared_ptr<ofxOceanodeAbstractParameter> (ofAbstractParameter &p)>;
+    using paramTypeToName   = std::function<std::string(std::string description)>;
     
     ofxOceanodeTypesRegistry();
     ~ofxOceanodeTypesRegistry(){};
@@ -27,7 +28,7 @@ public:
     }
     
     template<typename T>
-    void registerType(){
+    void registerType(std::string name = typeid(T).name()){
         registryCreator creator = [](ofxOceanodeContainer &container, ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active) -> ofxOceanodeAbstractConnection*
             {
                 if(source.valueType() == typeid(T).name()){
@@ -101,22 +102,33 @@ public:
         };
         
         absParamColector.push_back(std::move(aPCreator));
+        
+        paramTypeToName pTtoName = [name](std::string description) -> std::string{
+            if(description == typeid(T).name()){
+                return name;
+            }
+            return "";
+        };
+        
+        paramTypeToNameColector.push_back(std::move(pTtoName));
     }
 	
     ofxOceanodeAbstractConnection* createCustomTypeConnection(ofxOceanodeContainer &container, ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active = true);
     shared_ptr<ofAbstractParameter> createRouterFromType(ofxOceanodeNode* routerNode);
     shared_ptr<ofxOceanodeAbstractParameter> createOceanodeAbstractFromAbstract(ofAbstractParameter &p);
+    std::string getTypeNameFromTypeDescription(std::string description);
     
 private:
     vector<registryCreator> registryColector;
     vector<routerCreator> routerColector;
     vector<absParamCreator> absParamColector;
+    vector<paramTypeToName> paramTypeToNameColector;
     
     ofEventListeners listeners;
 };
 
 template<>
-inline void ofxOceanodeTypesRegistry::registerType<void>(){
+inline void ofxOceanodeTypesRegistry::registerType<void>(std::string name){
     registryCreator creator = [](ofxOceanodeContainer &container, ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active) -> ofxOceanodeAbstractConnection*
     {
         if(source.valueType() == typeid(void).name() && sink.valueType() == typeid(void).name()){
@@ -160,6 +172,15 @@ inline void ofxOceanodeTypesRegistry::registerType<void>(){
     };
     
     absParamColector.push_back(std::move(aPCreator));
+    
+    paramTypeToName pTtoName = [name](std::string description) -> std::string{
+        if(description == typeid(void).name()){
+            return name;
+        }
+        return "";
+    };
+    
+    paramTypeToNameColector.push_back(std::move(pTtoName));
 }
 
 #endif /* ofxOceanodeTypesRegistry_h */
