@@ -11,6 +11,7 @@
 #include "ofxOceanodeBaseController.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeCanvas.h"
+#include "ofxOceanodeShared.h"
 
 // Forward declarations
 class ofxOceanodeNodeMacro;
@@ -51,17 +52,15 @@ private:
         int                   parentIndex,
         vector<MiniMapScopeEntry>& out);
 
-    void renderScopeTree(int entryIndex);
     void renderMinimap(ofxOceanodeContainer* activeContainer, ofxOceanodeCanvas* activeCanvas);
-
-    bool entryMatchesSearch(int entryIndex, const string& lowerQuery) const;
 
     shared_ptr<ofxOceanodeContainer> rootContainer;
     ofxOceanodeCanvas*               rootCanvas;
-    int                              selectedScopeIndex = 0;
     vector<MiniMapScopeEntry>        scopeList;
-    float                            treeHeight = 120.0f;
-    char                             searchBuf[256];
+
+    string               activeCanvasUID;
+    string               lastValidCanvasUID;
+    ofEventListener      activeCanvasListener;
 };
 
 #endif // OFXOCEANODE_HEADLESS

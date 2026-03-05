@@ -256,7 +256,22 @@ public:
 	static int getSnapGridDivs(){
 		return getInstance().snapGridDiv;
 	}
-	
+
+	// Active canvas tracking
+	static void setActiveCanvasUniqueID(const string& uid){
+		auto& inst = getInstance();
+		if(inst.activeCanvasUniqueID != uid){
+			inst.activeCanvasUniqueID = uid;
+			ofNotifyEvent(activeCanvasUniqueIDChangedEvent, inst.activeCanvasUniqueID);
+		}
+	}
+
+	static const string& getActiveCanvasUniqueID(){
+		return getInstance().activeCanvasUniqueID;
+	}
+
+	inline static ofEvent<string> activeCanvasUniqueIDChangedEvent;
+
 private:
     ofxOceanodeShared(){};
     
@@ -300,6 +315,9 @@ private:
 	// Snap to Grid
 	bool snapToGrid = false;
 	int snapGridDiv = 4;
+
+	// Active canvas tracking
+	string activeCanvasUniqueID = "";
 };
 
 #endif /* ofxOceanodeShared_h */

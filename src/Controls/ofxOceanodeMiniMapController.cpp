@@ -19,10 +19,13 @@ ofxOceanodeMiniMapController::ofxOceanodeMiniMapController(
     : ofxOceanodeBaseController("MiniMap")
     , rootContainer(_container)
     , rootCanvas(_canvas)
-    , selectedScopeIndex(0)
-    , treeHeight(120.0f)
 {
-    searchBuf[0] = '\0';
+    activeCanvasListener = ofxOceanodeShared::activeCanvasUniqueIDChangedEvent.newListener([this](string& uid){
+        activeCanvasUID = uid;
+    });
+    // Initialize with current value
+    activeCanvasUID = ofxOceanodeShared::getActiveCanvasUniqueID();
+    lastValidCanvasUID = ofxOceanodeShared::getActiveCanvasUniqueID();
 }
 
 // ---------------------------------------------------------------------------
@@ -107,99 +110,11 @@ void ofxOceanodeMiniMapController::buildScopeList(
 }
 
 // ---------------------------------------------------------------------------
-// renderScopeTree — recursive ImGui tree, replaces the old BeginCombo block
-// ---------------------------------------------------------------------------
-void ofxOceanodeMiniMapController::renderScopeTree(int entryIndex)
-{
-    if (entryIndex < 0 || entryIndex >= (int)scopeList.size()) return;
-
-    const MiniMapScopeEntry& entry = scopeList[entryIndex];
-    bool hasChildren = !entry.childIndices.empty();
-
-    // Search filter logic
-    string lowerQuery = "";
-    bool hasSearch = (searchBuf[0] != '\0');
-    if (hasSearch) {
-        lowerQuery = string(searchBuf);
-        std::transform(lowerQuery.begin(), lowerQuery.end(), lowerQuery.begin(),
-                       [](unsigned char c){ return (char)std::tolower(c); });
-        // If neither this entry nor any descendant matches, skip rendering
-        if (!entryMatchesSearch(entryIndex, lowerQuery)) return;
-    }
-
-    ImGuiTreeNodeFlags flags =
-        ImGuiTreeNodeFlags_SpanAvailWidth;
-
-    if (!hasChildren) {
-        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-    }
-    if (entryIndex == selectedScopeIndex) {
-        flags |= ImGuiTreeNodeFlags_Selected;
-    }
-    // Auto-expand during search so matching children are visible
-    if (hasSearch && hasChildren) {
-        flags |= ImGuiTreeNodeFlags_DefaultOpen;
-    }
-
-    // Enhancement 3: color global (non-local) macro entries
-    bool isGlobal = (entry.macroNode != nullptr && !entry.macroNode->isLocal());
-    if (isGlobal) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.00f, 0.85f, 0.25f, 1.0f));
-    }
-
-    // Use a unique ID per entry to avoid ImGui ID collisions when labels repeat
-    ImGui::PushID(entryIndex);
-    bool nodeOpen = ImGui::TreeNodeEx(entry.label.c_str(), flags);
-    ImGui::PopID();
-
-    if (isGlobal) {
-        ImGui::PopStyleColor();
-    }
-
-    if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
-        selectedScopeIndex = entryIndex;
-    }
-
-    if (hasChildren && nodeOpen) {
-        for (int childIdx : entry.childIndices) {
-            renderScopeTree(childIdx);
-        }
-        ImGui::TreePop();
-    }
-}
-
-// ---------------------------------------------------------------------------
-// entryMatchesSearch — returns true if entry's label or any descendant matches
-// ---------------------------------------------------------------------------
-bool ofxOceanodeMiniMapController::entryMatchesSearch(int entryIndex, const string& lowerQuery) const
-{
-    if (entryIndex < 0 || entryIndex >= (int)scopeList.size()) return false;
-    const MiniMapScopeEntry& entry = scopeList[entryIndex];
-
-    // Check own label (case-insensitive)
-    string lowerLabel = entry.label;
-    std::transform(lowerLabel.begin(), lowerLabel.end(), lowerLabel.begin(),
-                   [](unsigned char c){ return (char)std::tolower(c); });
-    if (lowerLabel.find(lowerQuery) != string::npos) return true;
-
-    // Check descendants recursively
-    for (int childIdx : entry.childIndices) {
-        if (entryMatchesSearch(childIdx, lowerQuery)) return true;
-    }
-    return false;
-}
-
-// ---------------------------------------------------------------------------
 // draw
 // ---------------------------------------------------------------------------
 void ofxOceanodeMiniMapController::draw()
 {
-    // 1. Rebuild scope list each frame, preserve selection by path
-    string previousPath = "";
-    if (!scopeList.empty() && selectedScopeIndex < (int)scopeList.size()) {
-        previousPath = scopeList[selectedScopeIndex].fullPath;
-    }
-
+    // Rebuild scope list to get up-to-date container/canvas pairs
     scopeList.clear();
     buildScopeList(
         rootContainer.get(), rootCanvas,
@@ -209,76 +124,31 @@ void ofxOceanodeMiniMapController::draw()
         /*depth=*/0, /*parentIndex=*/-1,
         scopeList);
 
-    // Clamp / restore selection index
-    selectedScopeIndex = ofClamp(selectedScopeIndex, 0, (int)scopeList.size() - 1);
-    if (!previousPath.empty()) {
-        for (int i = 0; i < (int)scopeList.size(); i++) {
-            if (scopeList[i].fullPath == previousPath) {
-                selectedScopeIndex = i;
-                break;
-            }
+    // Only accept the new UID if it maps to a known canvas
+    for (auto& entry : scopeList) {
+        if (entry.canvas && entry.canvas->getUniqueID() == activeCanvasUID) {
+            lastValidCanvasUID = activeCanvasUID;
+            break;
+        }
+    }
+    // Also accept the root canvas UID
+    if (rootCanvas && rootCanvas->getUniqueID() == activeCanvasUID) {
+        lastValidCanvasUID = activeCanvasUID;
+    }
+
+    // Find the canvas for the last known valid UID
+    ofxOceanodeContainer* activeContainer = rootContainer.get();
+    ofxOceanodeCanvas*    activeCanvas    = rootCanvas;
+
+    for (auto& entry : scopeList) {
+        if (entry.canvas && entry.canvas->getUniqueID() == lastValidCanvasUID) {
+            activeContainer = entry.container;
+            activeCanvas    = entry.canvas;
+            break;
         }
     }
 
-    // 2. Search field + tree scope selector with user-resizable height
-    ImGui::SetNextItemWidth(-1);
-    ImGui::InputTextWithHint("##minimapSearch", "Search...", searchBuf, sizeof(searchBuf));
-
-    if (ImGui::BeginChild("##scopeTree", ImVec2(0.0f, treeHeight), false)) {
-        renderScopeTree(0);
-    }
-    ImGui::EndChild();
-
-    // Draggable horizontal separator to resize the tree panel
-    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_Separator));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_SeparatorHovered));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_SeparatorActive));
-    ImGui::Button("##treeSeparator", ImVec2(-1, 4));
-    ImGui::PopStyleColor(3);
-
-    if (ImGui::IsItemActive()) {
-        treeHeight += ImGui::GetIO().MouseDelta.y;
-        treeHeight = std::max(40.0f, std::min(treeHeight, 600.0f));  // clamp between 40 and 600
-    }
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-    }
-
-    // 3. Locate / Focus buttons (disabled when root is selected)
-    bool isRoot = (selectedScopeIndex == 0);
-    if (isRoot) ImGui::BeginDisabled(true);
-
-    if (ImGui::Button("Locate") && !isRoot) {
-        const MiniMapScopeEntry& sel = scopeList[selectedScopeIndex];
-        if (sel.parentNode && sel.parentCanvas) {
-            glm::vec2 pos     = sel.parentNode->getNodeGui().getPosition();
-            glm::vec2 winSize = sel.parentCanvas->getContentRegionSize();
-            sel.parentCanvas->setScrolling(glm::vec2(
-                -pos.x + winSize.x * 0.5f,
-                -pos.y + winSize.y * 0.5f));
-        }
-    }
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("Scroll parent canvas to where this macro node is located");
-    }
-
-    ImGui::SameLine();
-
-    if (ImGui::Button("Focus") && !isRoot) {
-        const MiniMapScopeEntry& sel = scopeList[selectedScopeIndex];
-        if (sel.macroNode) {
-            sel.macroNode->activateWindow();
-        }
-    }
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("Open this macro's window to view its canvas");
-    }
-
-    if (isRoot) ImGui::EndDisabled();
-
-    // 4. Render the minimap for the selected scope
-    renderMinimap(scopeList[selectedScopeIndex].container,
-                  scopeList[selectedScopeIndex].canvas);
+    renderMinimap(activeContainer, activeCanvas);
 }
 
 // ---------------------------------------------------------------------------
