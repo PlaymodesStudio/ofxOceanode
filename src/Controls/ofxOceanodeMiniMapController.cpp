@@ -359,6 +359,24 @@ void ofxOceanodeMiniMapController::renderMinimap(
         return;
     }
 
+    // --- Compute viewport canvas-space bounds (needed before scale to expand bounding box) ---
+    glm::vec2 scroll   = activeCanvas->getScrolling();
+    glm::vec2 winSize  = activeCanvas->getContentRegionSize();
+
+    // Visible top-left in canvas-space: when scrolling=(sx,sy), nodes at (0,0) appear at
+    // screenPos + scrolling, so canvas origin is at screen scrolling offset.
+    // Visible canvas top-left = -scroll, bottom-right = -scroll + winSize
+    float vpLeft  = -scroll.x;
+    float vpTop   = -scroll.y;
+    float vpRight = vpLeft  + winSize.x;
+    float vpBot   = vpTop   + winSize.y;
+
+    // Expand bounding box to include viewport so scale fits the white rectangle within minimap
+    minX = min(minX, vpLeft);
+    minY = min(minY, vpTop);
+    maxX = max(maxX, vpRight);
+    maxY = max(maxY, vpBot);
+
     // --- Compute scale to fit bounding box in mmSize while preserving aspect ratio ---
     float canvasW = (maxX - minX) + 2.0f * PADDING;
     float canvasH = (maxY - minY) + 2.0f * PADDING;
