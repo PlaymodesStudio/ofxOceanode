@@ -443,17 +443,17 @@ void ofxOceanodeMiniMapController::renderMinimap(
             IM_COL32(col.r, col.g, col.b, 160), 1.0f);
     }
 
-    // --- Viewport indicator ---
-    glm::vec2 scroll   = activeCanvas->getScrolling();
-    glm::vec2 winSize  = activeCanvas->getContentRegionSize();
-
-    // Visible top-left in canvas-space: when scrolling=(sx,sy), nodes at (0,0) appear at
-    // screenPos + scrolling, so canvas origin is at screen scrolling offset.
-    // Visible canvas top-left = -scroll, bottom-right = -scroll + winSize
-    float vpLeft  = -scroll.x;
-    float vpTop   = -scroll.y;
-    float vpRight = vpLeft  + winSize.x;
-    float vpBot   = vpTop   + winSize.y;
+//    // --- Viewport indicator ---
+//    glm::vec2 scroll   = activeCanvas->getScrolling();
+//    glm::vec2 winSize  = activeCanvas->getContentRegionSize();
+//
+//    // Visible top-left in canvas-space: when scrolling=(sx,sy), nodes at (0,0) appear at
+//    // screenPos + scrolling, so canvas origin is at screen scrolling offset.
+//    // Visible canvas top-left = -scroll, bottom-right = -scroll + winSize
+//    float vpLeft  = -scroll.x;
+//    float vpTop   = -scroll.y;
+//    float vpRight = vpLeft  + winSize.x;
+//    float vpBot   = vpTop   + winSize.y;
 
     ImVec2 vp1 = toMinimap(vpLeft,  vpTop);
     ImVec2 vp2 = toMinimap(vpRight, vpBot);
