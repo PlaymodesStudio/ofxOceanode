@@ -12,6 +12,7 @@
 #include "ofxOceanodeBPMController.h"
 #include "ofxOceanodeNodesController.h"
 #include "ofxOceanodeInspectorController.h"
+#include "ofxOceanodeMiniMapController.h"
 #include "ofxOceanodeLogController.h"
 #include "ofxOceanodeGlobalVariablesController.h"
 #include "imgui.h"
@@ -35,6 +36,7 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     controllers.push_back(make_shared<ofxOceanodeBPMController>(container));
     controllers.push_back(make_shared<ofxOceanodeNodesController>(container,_canvas));
     controllers.push_back(make_shared<ofxOceanodeInspectorController>(container, _canvas));
+    controllers.push_back(make_shared<ofxOceanodeMiniMapController>(container, _canvas));
     auto logger = make_shared<ofxOceanodeLogController>();
     controllers.push_back(logger);
     controllers.push_back(make_shared<ofxOceanodeGlobalVariablesController>(container));

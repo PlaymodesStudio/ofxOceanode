@@ -278,9 +278,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(color.r/4, color.g/4, color.b/4, 200));
         
 		ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
-        ImGui::PushItemWidth(120.0f);
-        
-        ImVec2 offset = ImGui::GetCursorScreenPos() + scrolling;
+		      contentRegionSize = glm::vec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y);
+		      ImGui::PushItemWidth(120.0f);
+		      
+		      ImVec2 offset = ImGui::GetCursorScreenPos() + scrolling;
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         
 		// COMMENT CREATION WITH ALT MOUSE

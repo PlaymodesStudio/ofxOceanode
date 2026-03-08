@@ -33,6 +33,7 @@ public:
     glm::vec2 getScrollingOffset(){return scrollingOffset;};
     glm::vec2 getOffsetToCenter(){return offsetToCenter;};
     void setScrolling(glm::vec2 o){scrolling = o;}
+    glm::vec2 getContentRegionSize() const { return contentRegionSize; }
     
     void bringOnTop(){onTop = true;};
     // Request focus on this canvas window. The canvas will apply the focus
@@ -114,6 +115,7 @@ private:
     
     bool inited = false;
     
+    glm::vec2 contentRegionSize = glm::vec2(0.0f, 0.0f);
     glm::vec2 scrolling = glm::vec2(0.0f, 0.0f);
     glm::vec2 scrollBeforeHover = glm::vec2(0.0f, 0.0f);
     bool returnToOldScrolling=false;

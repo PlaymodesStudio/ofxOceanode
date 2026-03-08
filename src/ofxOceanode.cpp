@@ -152,6 +152,20 @@ void ofxOceanode::update(){
 
 void ofxOceanode::draw(){
     gui.begin();
+    // Track active canvas for minimap
+    {
+        ImGuiContext* ctx = ImGui::GetCurrentContext();
+        if(ctx && ctx->NavWindow) {
+            ImGuiWindow* root = ctx->NavWindow->RootWindow;
+            std::string name = root->Name;
+            if(!name.empty() && name[0] == '(') {
+                size_t closeParen = name.find(") ");
+                if(closeParen != std::string::npos)
+                    name = name.substr(closeParen + 2);
+            }
+            ofxOceanodeShared::setActiveCanvasUniqueID(name);
+        }
+    }
     bool showDocker = true;
     ShowExampleAppDockSpace(&showDocker);
     if(showMode){
