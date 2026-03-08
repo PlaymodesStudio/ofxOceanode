@@ -1602,13 +1602,10 @@ void ofxOceanodeNodeMacro::saveSnapshots() {
 		if(presetPath != "") {
 			localPath = presetPath;
 		}
-		// If no existing path, construct it from the canvas ID
+		// If no existing path, use a temp folder to avoid creating a stray folder
+		// (e.g. Presets/Canvas/) that would confuse the presets controller on next launch.
 		else {
-			if(canvasParentID.empty()) {
-				localPath = "Presets/" + nodeName() + "_" + ofToString(getNumIdentifier());
-			} else {
-				localPath = "Presets/" + canvasParentID + "/" + nodeName() + "_" + ofToString(getNumIdentifier());
-			}
+			localPath = "temp/" + nodeName() + "_" + ofToString(getNumIdentifier());
 		}
 		
 		string snapshotsFilePath = localPath + "/snapshots.json";
@@ -1624,6 +1621,7 @@ void ofxOceanodeNodeMacro::saveSnapshots() {
 			}
 		} else {
 			// Create JSON with snapshots and save
+			ofDirectory::createDirectory(localPath, true, true);
 			ofJson snapshotsJson;
 			for(const auto& pair : snapshots) {
 				ofJson slotJson;
@@ -1631,7 +1629,7 @@ void ofxOceanodeNodeMacro::saveSnapshots() {
 				slotJson["routerValues"] = routerValuesToJson(pair.second.routerValues);
 				snapshotsJson[ofToString(pair.first)] = slotJson;
 			}
-			
+
 			ofSavePrettyJson(snapshotsFilePath, snapshotsJson);
 			ofLogNotice("SnapshotSync") << "Saved " << snapshots.size() << " local snapshots to: " << snapshotsFilePath;
 		}
