@@ -91,6 +91,7 @@ public:
 	
 	void activateWindow(){
 		showWindow = true;
+		canvas.requestFocus();
 	}
 	
 	string getCurrentMacroName(){

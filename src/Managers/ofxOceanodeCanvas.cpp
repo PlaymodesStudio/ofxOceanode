@@ -49,6 +49,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImGui::SetNextWindowFocus();
         onTop = false;
     }
+    // focusPending is set by requestFocus(). We defer the actual focus call
+    // until isFirstDraw is false, because the isFirstDraw path below calls
+    // ImGui::FocusWindow(parentID) which would steal focus away again.
+    if(focusPending && !isFirstDraw){
+        ImGui::SetNextWindowFocus();
+        focusPending = false;
+    }
     // Draw a list of nodes on the left side
     bool open_context_menu = false;
     string node_hovered_in_list = "";

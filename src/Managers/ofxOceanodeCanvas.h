@@ -35,6 +35,10 @@ public:
     void setScrolling(glm::vec2 o){scrolling = o;}
     
     void bringOnTop(){onTop = true;};
+    // Request focus on this canvas window. The canvas will apply the focus
+    // automatically on the next draw frame after isFirstDraw has been cleared,
+    // so callers do not need to manage any delay themselves.
+    void requestFocus(){focusPending = true;};
     
 	// node dimensions
 	int getNodeWidth(){return NODE_WIDTH_TEXT+NODE_WIDTH_WIDGET;};
@@ -133,6 +137,7 @@ private:
     string parentID;
     bool isFirstDraw = true;
     bool onTop = false;
+    bool focusPending = false;
 	
 	// node dimensions (nodeWidthTotal should be % by 4)
 	float NODE_SLOT_RADIUS = 4.0f;

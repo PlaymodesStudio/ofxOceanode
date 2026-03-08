@@ -268,7 +268,11 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			}
 		}
 		ImGui::SameLine();
+		bool prevShowWindow = showWindow;
 		ImGui::Checkbox("Show Window?", &showWindow);
+		if(showWindow && !prevShowWindow){
+			canvas.requestFocus();
+		}
 		
 		bool firstSaveAsOpen = false;
 		if (ImGui::Button("[Save]")){
