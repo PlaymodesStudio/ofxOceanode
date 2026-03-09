@@ -19,6 +19,7 @@
 #include "ofxOceanodeCanvas.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "portal.h"
+#include "router.h"
 
 ofxOceanodeNodesController::ofxOceanodeNodesController(shared_ptr<ofxOceanodeContainer> _container,
                                                         ofxOceanodeCanvas* _canvas)
@@ -26,130 +27,29 @@ ofxOceanodeNodesController::ofxOceanodeNodesController(shared_ptr<ofxOceanodeCon
                                                         canvas(_canvas),
                                                         ofxOceanodeBaseController("Nodes")
 {
-
-//     changedBpmListener = container->changedBpmEvent.newListener([this](float newBpm){
-//    }
-    
-//    //Get node registry to update newly registered nodes
-//    auto const &models = container->getRegistry()->getRegisteredModels();
-//    auto const &categories = container->getRegistry()->getCategories();
-//    auto const &categoriesModelsAssociation = container->getRegistry()->getRegisteredModelsCategoryAssociation();
-//
-//    // buil node categories vector for browsing on them
-//    categoriesVector = vector<string>(categories.begin(), categories.end());
-//
-//    options = vector<vector<string>>(categories.size());
-//    for(int i = 0; i < categories.size(); i++){
-//        options.push_back(vector<string>());
-//        for(auto &model : models){
-//            if(categoriesModelsAssociation.at(model.first) == categoriesVector[i]){
-//                options[i].push_back(model.first);
-//            }
-//        }
-//        std::sort(options[i].begin(), options[i].end());
-//    }
 }
 
 void ofxOceanodeNodesController::draw()
 {
-    // ADD NEW NODES
-    
-    //Get node registry to update newly registered nodes
-    auto const &models = container->getRegistry()->getRegisteredModels();
-    auto const &categories = container->getRegistry()->getCategories();
-    auto const &categoriesModelsAssociation = container->getRegistry()->getRegisteredModelsCategoryAssociation();
+    // Rebuild navigable node list each frame
+    navigableNodes.clear();
 
-    // build node categories vector for browsing on them
-    categoriesVector = vector<string>(categories.begin(), categories.end());
-    
-    options = vector<vector<string>>(categories.size());
-    for(int i = 0; i < categories.size(); i++){
-        options.push_back(vector<string>());
-        for(auto &model : models){
-			if(categoriesModelsAssociation.at(model.first) == categoriesVector[i]){
-                options[i].push_back(model.first);
-            }
-        }
-        std::sort(options[i].begin(), options[i].end());
+    // Apply deferred scroll from previous frame
+    if(scrollPending && pendingScrollNode != nullptr && pendingScrollCanvas != nullptr) {
+        glm::vec2 nodeSize = glm::vec2(pendingScrollNode->getNodeGui().getRectangle().getWidth(),
+                                       pendingScrollNode->getNodeGui().getRectangle().getHeight());
+        glm::vec2 nodePos  = pendingScrollNode->getNodeGui().getPosition();
+        glm::vec2 center   = pendingScrollCanvas->getContentRegionSize() / 2.0f;
+        pendingScrollCanvas->setScrolling(-nodePos - nodeSize / 2.0f + center);
+        scrollPending       = false;
+        pendingScrollNode   = nullptr;
+        pendingScrollCanvas = nullptr;
     }
-    
-    if(ImGui::TreeNode("+ Nodes"))
-    {
-        ImGui::Separator();
-        char * cString = new char[256];
-        strcpy(cString, searchField.c_str());
-        ImVec2 offset = ImGui::GetCursorScreenPos() + canvas->getScrolling();
-
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x-40);
-        if(ImGui::InputText("New?", cString,256)){
-            searchField = cString;
-        }
-        ImGui::Separator();
-        bool isEnterPressed = ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)); //Select first option if enter is pressed
-        bool isEnterReleased = ImGui::IsKeyReleased(ImGui::GetKeyIndex(ImGuiKey_Enter));
-
-        for(int i = 0; i < categoriesVector.size(); i++)
-        {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f,0.45f,0.0f,0.5f));
-            ImGui::Button("##colorTree",ImVec2(5,0));
-            ImGui::PopStyleColor();
-            ImGui::SameLine();
-            
-            if(searchField != "") ImGui::SetNextItemOpen(true);
-            if(ImGui::TreeNode(categoriesVector[i].c_str()))
-            {
-                for(auto &op : options[i])
-                {
-                    bool showThis = false;
-                    if(searchField != ""){
-                        string lowercaseName = op;
-                        std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
-                        if(ofStringTimesInString(op, searchField) || ofStringTimesInString(lowercaseName, searchField)){
-                            showThis = true;
-                        }
-                    }else{
-                        showThis = true;
-                    }
-                    if(showThis)
-                    {
-                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f,0.45f,0.0f,0.5f));
-                        ImGui::Button("##colorBand",ImVec2(5,0));
-                        ImGui::SameLine();
-                        ImGui::PopStyleColor();
-                        
-                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
-                        
-                        if( ImGui::Selectable(op.c_str()) || ( searchField!="" && isEnterReleased) )
-                        {
-                            if(true)
-                            {
-                                unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
-                                if (type)
-                                {
-                                    auto &node = container->createNode(std::move(type));
-                                    node.getNodeGui().setPosition(-canvas->getOffsetToCenter());
-                                }
-                                ImGui::PopStyleColor();
-                                ImGui::CloseCurrentPopup();
-                                isEnterPressed = false; //Next options we dont want to create them;
-                                searchField="";
-                                
-                                break;
-                            }
-                        }
-                        ImGui::PopStyleColor();
-                    }
-                }
-                ImGui::TreePop();
-            }
-        }//for
-        ImGui::TreePop();
-    }// "+" Nodes
-    ImGui::Separator();
 
     // MY NODES LIST
     
-    if(ImGui::TreeNode("My Nodes"))
+    ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+    if(ImGui::TreeNode("Project Nodes"))
     {
         ImGui::Separator();
         
@@ -157,11 +57,30 @@ void ofxOceanodeNodesController::draw()
         char * cString = new char[256];
         strcpy(cString, searchFieldMyNodes.c_str());
         
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x-40);
-        if(ImGui::InputText("?", cString, 256)){
+        if(ImGui::Button("x##clearSearch")) {
+            searchFieldMyNodes = "";
+            selectedNode = nullptr;
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 60);
+        if(ImGui::InputText("?##searchMyNodes", cString, 256)){
             searchFieldMyNodes = cString;
         }
-
+        ImGui::SameLine();
+        if(ImGui::Button("<##collapseAll")) {
+            forceExpandAll = false;
+            ImGui::GetStateStorage()->Clear();
+        }
+        ImGui::SameLine();
+        if(ImGui::Button(">##expandAll")) {
+            forceExpandAll = true;
+        }
+        ImGui::Text("Filter:");
+        ImGui::SameLine();
+        ImGui::RadioButton("All",     &nodeTypeFilter, 0); ImGui::SameLine();
+        ImGui::RadioButton("Macros",  &nodeTypeFilter, 1); ImGui::SameLine();
+        ImGui::RadioButton("Portals", &nodeTypeFilter, 2); ImGui::SameLine();
+        ImGui::RadioButton("Routers", &nodeTypeFilter, 3);
         ImGui::Separator();
         
         std::function<int(vector<ofxOceanodeNode*>)> countNodes = [this, &countNodes](vector<ofxOceanodeNode*> nodes) -> int{
@@ -170,19 +89,37 @@ void ofxOceanodeNodesController::draw()
                 string nodeName = nodes[i]->getParameters().getName();
                 if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&nodes[i]->getNodeModel())) {
                     if(m->isLocal()){
-                        nodeName = (nodes[i]->getParameters().getName() + " // " + m->getInspectorParameter<string>("Local Name").get());
+                        nodeName = (nodes[i]->getParameters().getName()
+									+ " [" + m->getInspectorParameter<string>("Local Name").get()
+									+ "]" );
                     }else{
-                        nodeName = (nodes[i]->getParameters().getName() + " // " + m->getCurrentMacroName());
+                        nodeName = (nodes[i]->getParameters().getName()
+									+ " [" + m->getCurrentMacroName()
+									+ "]");
                     }
                     count += countNodes(m->getContainer()->getAllModules());
-                }else if(abstractPortal* m = dynamic_cast<abstractPortal*>(&nodes[i]->getNodeModel())) {
-                    nodeName = (nodes[i]->getNodeModel().nodeName() + " // " + m->getParameter<string>("Name").get() + " // " + ofToString(nodes[i]->getNodeModel().getNumIdentifier()));
                 }
+				else if(abstractPortal* m = dynamic_cast<abstractPortal*>(&nodes[i]->getNodeModel()))
+				{
+                    nodeName = (nodes[i]->getNodeModel().nodeName()
+								+ " " + ofToString(nodes[i]->getNodeModel().getNumIdentifier())
+								+ "<" + m->getParameter<string>("Name").get()
+								+ ">" );
+				}
+				else if(abstractRouter* m = dynamic_cast<abstractRouter*>(&nodes[i]->getNodeModel()))
+				{
+                    nodeName = (nodes[i]->getNodeModel().nodeName()
+								+ " " + ofToString(nodes[i]->getNodeModel().getNumIdentifier())
+								+ "<" + m->getNameParam().get()
+								+ ">" );
+				}
                 
                 if(searchFieldMyNodes != ""){
                     string lowercaseName = nodeName;
                     std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
-                    if(ofStringTimesInString(nodeName, searchFieldMyNodes) || ofStringTimesInString(lowercaseName, searchFieldMyNodes)){
+                    string lowercaseSearch = searchFieldMyNodes;
+                    std::transform(lowercaseSearch.begin(), lowercaseSearch.end(), lowercaseSearch.begin(), ::tolower);
+                    if(ofStringTimesInString(nodeName, searchFieldMyNodes) || ofStringTimesInString(lowercaseName, lowercaseSearch)){
                         count++;
                     }
                 }else{
@@ -193,7 +130,7 @@ void ofxOceanodeNodesController::draw()
         };
         
         
-        std::function<void(vector<ofxOceanodeNode*>, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*)> listNodes = [this, &listNodes, countNodes](vector<ofxOceanodeNode*> nodes, ofxOceanodeCanvas* _canvas = nullptr, ofxOceanodeNodeMacro* _macro = nullptr){
+        std::function<void(vector<ofxOceanodeNode*>, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*, int)> listNodes = [this, &listNodes, countNodes](vector<ofxOceanodeNode*> nodes, ofxOceanodeCanvas* _canvas, ofxOceanodeNodeMacro* _macro, int depth){
             vector<int> order(nodes.size());
             vector<string> displayNames(nodes.size());
             std::iota(order.begin(), order.end(), 0);
@@ -201,68 +138,371 @@ void ofxOceanodeNodesController::draw()
                 string nodeName = nodes[i]->getParameters().getName();
                 if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&nodes[i]->getNodeModel())) {
                     if(m->isLocal()){
-                        nodeName = (nodes[i]->getParameters().getName() + " // " + m->getInspectorParameter<string>("Local Name").get());
+                        nodeName = (nodes[i]->getParameters().getName()
+									+ " [" + m->getInspectorParameter<string>("Local Name").get()
+									+ "]");
                     }else{
-                        nodeName = (nodes[i]->getParameters().getName() + " // " + m->getCurrentMacroName());
+                        nodeName = (nodes[i]->getParameters().getName()
+									+ " [" + m->getCurrentMacroName()
+									+"]");
                     }
 
-                }else if(abstractPortal* m = dynamic_cast<abstractPortal*>(&nodes[i]->getNodeModel())) {
-                    nodeName = (nodes[i]->getNodeModel().nodeName() + " // " + m->getParameter<string>("Name").get() + " // " + ofToString(nodes[i]->getNodeModel().getNumIdentifier()));
+                }
+				else if(abstractPortal* m = dynamic_cast<abstractPortal*>(&nodes[i]->getNodeModel()))
+				{
+                    nodeName = (nodes[i]->getNodeModel().nodeName()
+								+ " "
+								+ ofToString(nodes[i]->getNodeModel().getNumIdentifier())
+								+ " [" + m->getParameter<string>("Name").get()
+								+ "]" );
+                }
+				else if(abstractRouter* m = dynamic_cast<abstractRouter*>(&nodes[i]->getNodeModel()))
+				{
+                    nodeName = (nodes[i]->getNodeModel().nodeName()
+								+ " "
+								+ ofToString(nodes[i]->getNodeModel().getNumIdentifier())
+								+ " [" + m->getNameParam().get()
+								+ "]" );
                 }
                 displayNames[i] = nodeName;
             }
+
+            // Build sort keys: portals sort by Name param + numeric ID; others use display name
+            vector<string> sortKeys(nodes.size());
+            for(int i = 0; i < (int)nodes.size(); i++) {
+                if(abstractPortal* m = dynamic_cast<abstractPortal*>(&nodes[i]->getNodeModel())) {
+                    sortKeys[i] = m->getParameter<string>("Name").get() + " " + ofToString(nodes[i]->getNodeModel().getNumIdentifier());
+                } else {
+                    sortKeys[i] = displayNames[i];
+                }
+            }
             
-            std::sort(order.begin(), order.end(), [displayNames](const int & a, const int & b) -> bool
-                {
-                    return displayNames[a] < displayNames[b];
-                });
-            
-            for(auto currentIdx : order)
+            // Natural sort comparator for group-3 (other) nodes
+            auto naturalCompare = [](const std::string& a, const std::string& b) -> bool {
+                size_t i = 0, j = 0;
+                while(i < a.size() && j < b.size()) {
+                    if(std::isdigit((unsigned char)a[i]) && std::isdigit((unsigned char)b[j])) {
+                        size_t ni = i, nj = j;
+                        while(ni < a.size() && std::isdigit((unsigned char)a[ni])) ni++;
+                        while(nj < b.size() && std::isdigit((unsigned char)b[nj])) nj++;
+                        int numA = std::stoi(a.substr(i, ni - i));
+                        int numB = std::stoi(b.substr(j, nj - j));
+                        if(numA != numB) return numA < numB;
+                        i = ni; j = nj;
+                    } else {
+                        if(std::tolower((unsigned char)a[i]) != std::tolower((unsigned char)b[j]))
+                            return std::tolower((unsigned char)a[i]) < std::tolower((unsigned char)b[j]);
+                        i++; j++;
+                    }
+                }
+                return a.size() < b.size();
+            };
+
+            // Group: 0=macro, 1=portal, 2=router, 3=other
+            auto groupOf = [&nodes](int idx) -> int {
+                if(dynamic_cast<ofxOceanodeNodeMacro*>(&nodes[idx]->getNodeModel()) != nullptr) return 0;
+                if(dynamic_cast<abstractPortal*>(&nodes[idx]->getNodeModel()) != nullptr) return 1;
+                if(dynamic_cast<abstractRouter*>(&nodes[idx]->getNodeModel()) != nullptr) return 2;
+                return 3;
+            };
+
+            std::sort(order.begin(), order.end(), [&](const int & a, const int & b) -> bool {
+                int ga = groupOf(a), gb = groupOf(b);
+                if(ga != gb) return ga < gb;
+                if(ga == 1) return naturalCompare(sortKeys[a], sortKeys[b]);  // portals: sort by Name param
+                if(ga == 3) return naturalCompare(displayNames[a], displayNames[b]);  // others: natural sort
+                return displayNames[a] < displayNames[b];  // macros, routers: alphabetical
+            });
+
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 16.0f);
+
+            constexpr float depthIndent = 12.0f;
+            if(depth > 0) ImGui::Indent(depthIndent * depth);
+
+            int rowIndex = 0;
+            bool didBreak = false;
+            for(int orderPos = 0; orderPos < (int)order.size(); orderPos++)
             {
+                int currentIdx = order[orderPos];
                 bool showThis = false;
+                bool nameMatches = false;
 
                 string nodeName = displayNames[currentIdx];
                 ofxOceanodeNode* node = nodes[currentIdx];
-                
-                if(searchFieldMyNodes != ""){
+
+                // --- Name/search condition ---
+                bool passesNameFilter = true;  // default: passes if no search active
+                if(searchFieldMyNodes != "") {
                     string lowercaseName = nodeName;
                     std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
-                    if(ofStringTimesInString(nodeName, searchFieldMyNodes) || ofStringTimesInString(lowercaseName, searchFieldMyNodes)){
-                        showThis = true;
+                    string lowercaseSearch = searchFieldMyNodes;
+                    std::transform(lowercaseSearch.begin(), lowercaseSearch.end(), lowercaseSearch.begin(), ::tolower);
+
+                    passesNameFilter = ofStringTimesInString(nodeName, searchFieldMyNodes)
+                                    || ofStringTimesInString(lowercaseName, lowercaseSearch);
+
+                    // Also passes if it's a macro with matching children
+                    if(!passesNameFilter) {
+                        if(ofxOceanodeNodeMacro* mCheck = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
+                            passesNameFilter = countNodes(mCheck->getContainer()->getAllModules()) > 0;
+                        }
                     }
-                }else{
-                    showThis = true;
+                }
+
+                // --- Type condition ---
+                bool passesTypeFilter = true;  // default: passes if filter=All
+                if(this->nodeTypeFilter != 0) {
+                    bool isMacro  = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel()) != nullptr;
+                    bool isPortal = dynamic_cast<abstractPortal*>(&node->getNodeModel()) != nullptr;
+                    bool isRouter = dynamic_cast<abstractRouter*>(&node->getNodeModel()) != nullptr;
+
+                    switch(this->nodeTypeFilter) {
+                        case 1: passesTypeFilter = isMacro;   break;
+                        case 2: passesTypeFilter = isPortal;  break;
+                        case 3: passesTypeFilter = isRouter;  break;
+                    }
+
+                    // Also passes if it's a macro with children matching the type filter
+                    if(!passesTypeFilter) {
+                        if(ofxOceanodeNodeMacro* mCheck = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
+                            auto children = mCheck->getContainer()->getAllModules();
+                            for(auto* child : children) {
+                                bool childIsMacro  = dynamic_cast<ofxOceanodeNodeMacro*>(&child->getNodeModel()) != nullptr;
+                                bool childIsPortal = dynamic_cast<abstractPortal*>(&child->getNodeModel()) != nullptr;
+                                bool childIsRouter = dynamic_cast<abstractRouter*>(&child->getNodeModel()) != nullptr;
+                                if((nodeTypeFilter==1 && childIsMacro) ||
+                                   (nodeTypeFilter==2 && childIsPortal) ||
+                                   (nodeTypeFilter==3 && childIsRouter)) {
+                                    passesTypeFilter = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Both conditions must be true (AND logic)
+                showThis = passesNameFilter && passesTypeFilter;
+
+                // nameMatches is true only when the node's own name directly matches the search
+                if(searchFieldMyNodes != "" && showThis) {
+                    string lowercaseName = nodeName;
+                    std::transform(lowercaseName.begin(), lowercaseName.end(), lowercaseName.begin(), ::tolower);
+                    string lowercaseSearch = searchFieldMyNodes;
+                    std::transform(lowercaseSearch.begin(), lowercaseSearch.end(), lowercaseSearch.begin(), ::tolower);
+                    nameMatches = ofStringTimesInString(nodeName, searchFieldMyNodes)
+                               || ofStringTimesInString(lowercaseName, lowercaseSearch);
                 }
                 
                 if(showThis)
                 {
-                    if(ImGui::Selectable(nodeName.c_str()))
-                    {
-                        // get the size of the node to be able to center properly
-                        glm::vec2 nodeSize = glm::vec2(node->getNodeGui().getRectangle().getWidth(),node->getNodeGui().getRectangle().getHeight());
-                        
-                        if(_macro != nullptr){
-                            _macro->activateWindow();
+                    if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
+                            // Record in navigable list (parent canvas, not macro interior)
+                            this->navigableNodes.push_back({node, _canvas, _macro, nameMatches});
+    
+                            // Single tree node for macro: arrow toggles expand/collapse, label click navigates
+                            ImGuiTreeNodeFlags macroFlags = ImGuiTreeNodeFlags_OpenOnArrow
+                                                          | ImGuiTreeNodeFlags_SpanAvailWidth;
+                            ImVec2 swatchPos = ImGui::GetCursorScreenPos();
+                        ImGui::Dummy(ImVec2(9.0f, ImGui::GetTextLineHeight()));
+                        ImGui::SameLine(0, 0);
+                        // When search is active and children match, auto-expand this macro
+                        if(searchFieldMyNodes != "" && countNodes(m->getContainer()->getAllModules()) > 0) {
+                            ImGui::SetNextItemOpen(true);
                         }
-                        _canvas->bringOnTop();
-                        _canvas->setScrolling(-(_canvas->getOffsetToCenter()-_canvas->getScrolling())-node->getNodeGui().getPosition()-nodeSize/2.0f);
-                        break;
-                    }
-                }
-                if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
-                    if(countNodes(m->getContainer()->getAllModules()) > 0){
-                        if(ImGui::TreeNode((nodeName + "_").c_str())){
-                            listNodes(m->getContainer()->getAllModules(), m->getCanvas(), m);
+                        if(forceExpandAll) {
+                            ImGui::SetNextItemOpen(true);
+                        }
+                        bool isSelectedMacro = (node == this->selectedNode);
+                        if(isSelectedMacro) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.55f, 0.0f, 1.0f));
+                        bool nodeOpen = ImGui::TreeNodeEx(nodeName.c_str(), macroFlags);
+                        if(isSelectedMacro) ImGui::PopStyleColor();
+        
+                        // Zebra stripe background
+                        {
+                            ImVec2 rowMin = ImVec2(ImGui::GetWindowPos().x, ImGui::GetItemRectMin().y);
+                            ImVec2 rowMax = ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth(), ImGui::GetItemRectMax().y);
+                            ImU32 rowBg = (rowIndex % 2 == 0)
+                                ? IM_COL32(255, 255, 255, 8)
+                                : IM_COL32(0, 0, 0, 8);
+                            drawList->AddRectFilled(rowMin, rowMax, rowBg);
+                        }
+        
+                        // Yellow search match highlight
+                        if(nameMatches) {
+                            ImVec2 matchMin = ImVec2(ImGui::GetWindowPos().x, ImGui::GetItemRectMin().y);
+                            ImVec2 matchMax = ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth(), ImGui::GetItemRectMax().y);
+                            drawList->AddRectFilled(matchMin, matchMax, IM_COL32(255, 220, 0, 45));
+                        }
+
+                        // Color swatch for macro node
+                        {
+                            ofColor c = node->getNodeGui().getColor();
+                            ImVec4 nodeCol = ImVec4(c.r/255.0f, c.g/255.0f, c.b/255.0f, 1.0f);
+                            ImU32 nodeColorU32 = ImGui::ColorConvertFloat4ToU32(nodeCol);
+                            drawList->AddRectFilled(
+                                swatchPos,
+                                ImVec2(swatchPos.x + 4.0f, swatchPos.y + ImGui::GetTextLineHeight()),
+                                nodeColorU32);
+                        }
+                        rowIndex++;
+
+                        // If label was clicked (not the arrow), navigate to the PARENT canvas containing this macro node
+                        if(ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+                            this->selectedNode = node;
+                            // CRITICAL: TreeNodeEx returned true (tree was open), so we must call
+                            // TreePop before breaking out of the loop to keep the ID stack balanced.
+                            if(nodeOpen) ImGui::TreePop();
+                            _canvas->requestFocus();
+                            _canvas->bringOnTop();
+                            // Store for deferred application next frame (canvas may not have correct size yet)
+                            this->pendingScrollNode   = node;
+                            this->pendingScrollCanvas = _canvas;
+                            this->scrollPending       = true;
+                            didBreak = true;
+                            break;
+                        }
+
+                        if(nodeOpen) {
+                            if(countNodes(m->getContainer()->getAllModules()) > 0){
+                                listNodes(m->getContainer()->getAllModules(), m->getCanvas(), m, depth + 1);
+                            }
                             ImGui::TreePop();
                         }
+                    } else {
+                        // Record in navigable list
+                        this->navigableNodes.push_back({node, _canvas, _macro, nameMatches});
+
+                        // Text color: orange if selected, dim otherwise
+                        bool isSelectedLeaf = (node == this->selectedNode);
+                        ImVec4 leafTextColor;
+                        if(isSelectedLeaf) {
+                            leafTextColor = ImVec4(1.0f, 0.55f, 0.0f, 1.0f);
+                        } else {
+                            leafTextColor = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+                            leafTextColor.x *= 0.75f;
+                            leafTextColor.y *= 0.75f;
+                            leafTextColor.z *= 0.75f;
+                        }
+                        ImGui::PushStyleColor(ImGuiCol_Text, leafTextColor);
+
+                        ImVec2 swatchPos = ImGui::GetCursorScreenPos();
+                        ImGui::Dummy(ImVec2(9.0f, ImGui::GetTextLineHeight()));
+                        ImGui::SameLine(0, 0);
+
+                        bool selected = ImGui::Selectable(nodeName.c_str(), false, ImGuiSelectableFlags_SpanAvailWidth);
+
+                        ImGui::PopStyleColor();
+
+                        // Zebra stripe background
+                        {
+                            ImVec2 rowMin = ImVec2(ImGui::GetWindowPos().x, ImGui::GetItemRectMin().y);
+                            ImVec2 rowMax = ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth(), ImGui::GetItemRectMax().y);
+                            ImU32 rowBg = (rowIndex % 2 == 0)
+                                ? IM_COL32(255, 255, 255, 8)
+                                : IM_COL32(0, 0, 0, 8);
+                            drawList->AddRectFilled(rowMin, rowMax, rowBg);
+                        }
+
+                        // Yellow search match highlight
+                        if(nameMatches) {
+                            ImVec2 matchMin = ImVec2(ImGui::GetWindowPos().x, ImGui::GetItemRectMin().y);
+                            ImVec2 matchMax = ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth(), ImGui::GetItemRectMax().y);
+                            drawList->AddRectFilled(matchMin, matchMax, IM_COL32(255, 220, 0, 45));
+                        }
+
+                        // Color swatch for leaf node
+                        {
+                            ofColor c = node->getNodeGui().getColor();
+                            ImVec4 nodeCol = ImVec4(c.r/255.0f, c.g/255.0f, c.b/255.0f, 1.0f);
+                            ImU32 nodeColorU32 = ImGui::ColorConvertFloat4ToU32(nodeCol);
+                            drawList->AddRectFilled(
+                                swatchPos,
+                                ImVec2(swatchPos.x + 4.0f, swatchPos.y + ImGui::GetTextLineHeight()),
+                                nodeColorU32);
+                        }
+                        rowIndex++;
+
+                        if(selected)
+                        {
+                            this->selectedNode = node;
+
+                            if(_macro != nullptr){
+                                _macro->activateWindow(); // sets showWindow=true and calls canvas.requestFocus()
+                            } else {
+                                _canvas->requestFocus();
+                                _canvas->bringOnTop();
+                            }
+                            // Store for deferred application next frame (canvas may not have correct size yet)
+                            this->pendingScrollNode   = node;
+                            this->pendingScrollCanvas = _canvas;
+                            this->scrollPending       = true;
+                            didBreak = true;
+                            break;
+                        }
                     }
                 }
+                if(didBreak) break;
             }
+            if(depth > 0) ImGui::Unindent(depthIndent * depth);
+            ImGui::PopStyleVar(); // IndentSpacing — always called exactly once
         };
         
-        listNodes(allNodes, canvas, nullptr);
+        listNodes(allNodes, canvas, nullptr, 0);
+
+        // Arrow key navigation
+        bool upPressed   = ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow),   true);
+        bool downPressed = ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow), true);
+
+        if((upPressed || downPressed) && !navigableNodes.empty()) {
+            // Determine the candidate pool
+            // If search is active AND there are matching nodes, iterate only matches
+            // Otherwise iterate all visible nodes
+            vector<NavigableNode*> pool;
+            if(searchFieldMyNodes != "") {
+                for(auto& n : navigableNodes) {
+                    if(n.matchesSearch) pool.push_back(&n);
+                }
+            }
+            if(pool.empty()) {
+                // No search filter active, or search produced no matches — iterate all
+                for(auto& n : navigableNodes) pool.push_back(&n);
+            }
+
+            if(!pool.empty()) {
+                // Find current selectedNode in pool
+                int currentIdx = -1;
+                for(int i = 0; i < (int)pool.size(); i++) {
+                    if(pool[i]->node == selectedNode) { currentIdx = i; break; }
+                }
+
+                int nextIdx = currentIdx;
+                if(currentIdx != -1) {
+                    if(downPressed) nextIdx = (currentIdx + 1) % (int)pool.size();
+                    if(upPressed)   nextIdx = (currentIdx - 1 + (int)pool.size()) % (int)pool.size();
+                }
+
+                if(nextIdx != -1 && nextIdx != currentIdx && currentIdx != -1) {
+                    NavigableNode& target = *pool[nextIdx];
+                    selectedNode = target.node;
+
+                    // Trigger focus + deferred scroll (same as click)
+                    if(target.macro != nullptr) {
+                        target.macro->activateWindow();
+                    } else {
+                        target.canvas->requestFocus();
+                        target.canvas->bringOnTop();
+                    }
+                    pendingScrollNode   = target.node;
+                    pendingScrollCanvas = target.canvas;
+                    scrollPending       = true;
+                }
+            }
+        }
 
         ImGui::TreePop();
     }
+    forceExpandAll = false;
 }
 #endif

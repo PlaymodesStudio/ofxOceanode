@@ -10,6 +10,9 @@
 
 #include "ofxOceanodeBaseController.h"
 
+class ofxOceanodeNode;
+class ofxOceanodeCanvas;
+class ofxOceanodeNodeMacro;
 
 class ofxOceanodeNodesController: public ofxOceanodeBaseController{
 public:
@@ -26,12 +29,24 @@ private:
 //    ofParameter<float> phase;
 //    ofEventListener phaseListener;
     
-    string searchField = "";
-    string searchFieldMyNodes = "";
-    vector<string> categoriesVector;
-    vector<vector<string>> options;
-    glm::vec2 newNodeClickPos;
+    struct NavigableNode {
+        ofxOceanodeNode*      node;
+        ofxOceanodeCanvas*    canvas;        // the canvas containing this node
+        ofxOceanodeNodeMacro* macro;         // nullptr if root canvas
+        bool                  matchesSearch; // true if name matches searchFieldMyNodes
+    };
 
+    vector<NavigableNode> navigableNodes;   // rebuilt each frame
+
+    string searchFieldMyNodes = "";
+    int nodeTypeFilter = 0; // 0=All, 1=Macros, 2=Portals, 3=Routers
+    ofxOceanodeNode* selectedNode = nullptr;
+
+    // Deferred scroll state (applied one frame after focus/visibility request)
+    ofxOceanodeNode*   pendingScrollNode   = nullptr;
+    ofxOceanodeCanvas* pendingScrollCanvas = nullptr;
+    bool               scrollPending       = false;
+    bool               forceExpandAll      = false;
 
     shared_ptr<ofxOceanodeContainer> container;
     ofxOceanodeCanvas* canvas;
