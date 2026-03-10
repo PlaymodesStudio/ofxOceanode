@@ -27,10 +27,30 @@ ofxOceanodeNodesController::ofxOceanodeNodesController(shared_ptr<ofxOceanodeCon
                                                         canvas(_canvas),
                                                         ofxOceanodeBaseController("Nodes")
 {
+    // Whenever a single node is clicked/selected in any canvas, sync the tree
+    // view so that node becomes the selected (orange) item and scrolls into view.
+    nodeSelectedListener = ofxOceanodeShared::getNodeSelectedInCanvasEvent().newListener(
+        [this](ofxOceanodeNode* node){
+            if(node != nullptr){
+                selectedNode = node;
+                scrollTreeToSelected = true;
+                forceExpandAll = true;   // ensure parent macros are expanded
+            }
+        });
 }
 
 void ofxOceanodeNodesController::draw()
 {
+    // If a canvas was focused last frame (deferred via focusPending/onTop flags),
+    // it may have stolen ImGui keyboard focus. Count down and then re-focus
+    // the Nodes window so arrow-key navigation keeps working.
+    if(refocusNodesDelay > 0) {
+        refocusNodesDelay--;
+        if(refocusNodesDelay == 0) {
+            ImGui::SetWindowFocus("Nodes");
+        }
+    }
+
     // Rebuild navigable node list each frame
     navigableNodes.clear();
 
@@ -44,6 +64,12 @@ void ofxOceanodeNodesController::draw()
         scrollPending       = false;
         pendingScrollNode   = nullptr;
         pendingScrollCanvas = nullptr;
+        // Re-activate macro canvas now that it has been drawn/docked at least once,
+        // ensuring its tab becomes the visible/focused one on first visit.
+        if(pendingScrollMacro != nullptr) {
+            pendingScrollMacro->activateWindow();
+            pendingScrollMacro = nullptr;
+        }
     }
 
     // MY NODES LIST
@@ -221,7 +247,6 @@ void ofxOceanodeNodesController::draw()
             if(depth > 0) ImGui::Indent(depthIndent * depth);
 
             int rowIndex = 0;
-            bool didBreak = false;
             for(int orderPos = 0; orderPos < (int)order.size(); orderPos++)
             {
                 int currentIdx = order[orderPos];
@@ -316,8 +341,14 @@ void ofxOceanodeNodesController::draw()
                         }
                         bool isSelectedMacro = (node == this->selectedNode);
                         if(isSelectedMacro) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.55f, 0.0f, 1.0f));
+                        ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);
                         bool nodeOpen = ImGui::TreeNodeEx(nodeName.c_str(), macroFlags);
+                        ImGui::PopItemFlag();
                         if(isSelectedMacro) ImGui::PopStyleColor();
+                        if(this->scrollTreeToSelected && node == this->selectedNode) {
+                            ImGui::SetScrollHereY(0.5f);
+                            this->scrollTreeToSelected = false;
+                        }
         
                         // Zebra stripe background
                         {
@@ -351,17 +382,26 @@ void ofxOceanodeNodesController::draw()
                         // If label was clicked (not the arrow), navigate to the PARENT canvas containing this macro node
                         if(ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
                             this->selectedNode = node;
-                            // CRITICAL: TreeNodeEx returned true (tree was open), so we must call
-                            // TreePop before breaking out of the loop to keep the ID stack balanced.
-                            if(nodeOpen) ImGui::TreePop();
+
+                            // Select this node in its host canvas (deselect all others first)
+                            {
+                                auto hostContainer = (_macro != nullptr) ? _macro->getContainer() : this->container;
+                                for(auto& pair : hostContainer->getParameterGroupNodesMap())
+                                    pair.second->getNodeGui().setSelected(false);
+                                node->getNodeGui().setSelected(true);
+                            }
+
                             _canvas->requestFocus();
                             _canvas->bringOnTop();
                             // Store for deferred application next frame (canvas may not have correct size yet)
                             this->pendingScrollNode   = node;
                             this->pendingScrollCanvas = _canvas;
+                            this->pendingScrollMacro  = _macro;
                             this->scrollPending       = true;
-                            didBreak = true;
-                            break;
+
+                            // Re-focus Nodes window after the canvas has consumed its
+                            // deferred SetNextWindowFocus (takes 2 frames).
+                            refocusNodesDelay = 2;
                         }
 
                         if(nodeOpen) {
@@ -391,7 +431,13 @@ void ofxOceanodeNodesController::draw()
                         ImGui::Dummy(ImVec2(9.0f, ImGui::GetTextLineHeight()));
                         ImGui::SameLine(0, 0);
 
+                        ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);
                         bool selected = ImGui::Selectable(nodeName.c_str(), false, ImGuiSelectableFlags_SpanAvailWidth);
+                        ImGui::PopItemFlag();
+                        if(this->scrollTreeToSelected && node == this->selectedNode) {
+                            ImGui::SetScrollHereY(0.5f);
+                            this->scrollTreeToSelected = false;
+                        }
 
                         ImGui::PopStyleColor();
 
@@ -428,32 +474,48 @@ void ofxOceanodeNodesController::draw()
                         {
                             this->selectedNode = node;
 
+                            // Select this node in its host canvas (deselect all others first)
+                            {
+                                auto hostContainer = (_macro != nullptr) ? _macro->getContainer() : this->container;
+                                for(auto& pair : hostContainer->getParameterGroupNodesMap())
+                                    pair.second->getNodeGui().setSelected(false);
+                                node->getNodeGui().setSelected(true);
+                            }
+
                             if(_macro != nullptr){
                                 _macro->activateWindow(); // sets showWindow=true and calls canvas.requestFocus()
+                                // Macro windows may have an extra isFirstDraw frame before
+                                // focusPending fires, so give an extra frame of margin.
+                                refocusNodesDelay = 4;
                             } else {
                                 _canvas->requestFocus();
                                 _canvas->bringOnTop();
+                                refocusNodesDelay = 2;
                             }
                             // Store for deferred application next frame (canvas may not have correct size yet)
                             this->pendingScrollNode   = node;
                             this->pendingScrollCanvas = _canvas;
+                            this->pendingScrollMacro  = _macro;
                             this->scrollPending       = true;
-                            didBreak = true;
-                            break;
                         }
                     }
                 }
-                if(didBreak) break;
             }
             if(depth > 0) ImGui::Unindent(depthIndent * depth);
             ImGui::PopStyleVar(); // IndentSpacing — always called exactly once
         };
         
+        // Items use ImGuiItemFlags_NoNav so clicks never assign NavId and therefore
+        // never enqueue ScrollToBringRectVisibleInWindow.  Arrow-key nav is handled
+        // manually via scrollTreeToSelected + SetScrollHereY(0.5f) inside listNodes.
+        ImGui::BeginChild("##nodesListChild", ImVec2(0, 0), false, ImGuiWindowFlags_NoNav);
         listNodes(allNodes, canvas, nullptr, 0);
+        ImGui::EndChild();
 
-        // Arrow key navigation
-        bool upPressed   = ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow),   true);
-        bool downPressed = ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow), true);
+        // Arrow key navigation — only when this window (or its child) has focus
+        bool windowFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+        bool upPressed   = windowFocused && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow),   true);
+        bool downPressed = windowFocused && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow), true);
 
         if((upPressed || downPressed) && !navigableNodes.empty()) {
             // Determine the candidate pool
@@ -496,10 +558,22 @@ void ofxOceanodeNodesController::draw()
                     }
                     pendingScrollNode   = target.node;
                     pendingScrollCanvas = target.canvas;
+                    pendingScrollMacro  = target.macro;
                     scrollPending       = true;
+                    this->scrollTreeToSelected = true;
+
+                    // Re-focus Nodes window after the canvas has consumed its
+                    // deferred SetNextWindowFocus (takes 2 frames).
+                    refocusNodesDelay = 2;
                 }
             }
         }
+
+        // Note: scrollTreeToSelected is NOT reset here so it can survive to the next
+        // frame where listNodes will read it and call SetScrollHereY(0.5f).
+        // listNodes itself clears the flag once it has scrolled to the selected item.
+        // If the selected node is filtered out and listNodes never sees it, the flag
+        // remains true and the restore is suppressed (neutral scroll — acceptable).
 
         ImGui::TreePop();
     }

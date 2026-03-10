@@ -9,6 +9,7 @@
 #define ofxOceanodeNodesController_h
 
 #include "ofxOceanodeBaseController.h"
+#include "ofEvents.h"
 
 class ofxOceanodeNode;
 class ofxOceanodeCanvas;
@@ -23,6 +24,7 @@ public:
     void draw();
     
 private:
+    ofEventListener nodeSelectedListener; // syncs canvas click → tree selection
     
 //    float bpm;
 //    ofEventListener bpmListener;
@@ -43,10 +45,13 @@ private:
     ofxOceanodeNode* selectedNode = nullptr;
 
     // Deferred scroll state (applied one frame after focus/visibility request)
-    ofxOceanodeNode*   pendingScrollNode   = nullptr;
-    ofxOceanodeCanvas* pendingScrollCanvas = nullptr;
-    bool               scrollPending       = false;
+    ofxOceanodeNode*      pendingScrollNode   = nullptr;
+    ofxOceanodeCanvas*    pendingScrollCanvas = nullptr;
+    ofxOceanodeNodeMacro* pendingScrollMacro  = nullptr;  // re-activates macro canvas after scroll
+    bool                  scrollPending       = false;
     bool               forceExpandAll      = false;
+    bool               scrollTreeToSelected = false;  // set by arrow-key nav, consumed by listNodes
+    int                refocusNodesDelay    = 0;       // counts down frames before re-focusing the Nodes window
 
     shared_ptr<ofxOceanodeContainer> container;
     ofxOceanodeCanvas* canvas;
