@@ -11,6 +11,7 @@
 #include "ofxOceanodeCanvas.h"
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeContainer.h"
+#include "ofxOceanodeNode.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 #include <unordered_set>
@@ -475,8 +476,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         if(!ImGui::GetIO().KeyShift){
                             deselectAllNodes();
                             nodeGui.setSelected(true);
-							
-							//We reorder the list do that this selected node goes to the top layer;
+                            ofxOceanodeShared::nodeSelectedInCanvas(node);
+
+       //We reorder the list do that this selected node goes to the top layer;
 							int rearangeFrom = nodesDrawingOrder[nodeId];
 							nodesDrawingOrder[nodeId] = nodesDrawingOrder.size();
 							for_each(nodesDrawingOrder.begin(), nodesDrawingOrder.end(), [rearangeFrom](std::pair<const string, int> &orderPair){

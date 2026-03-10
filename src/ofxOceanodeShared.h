@@ -11,6 +11,8 @@
 #include "portal.h"
 #include <unordered_map>
 
+class ofxOceanodeNode;
+
 typedef int ofxOceanodeConfigurationFlags;
 
 enum ofxOceanodeConfigurationFlags_
@@ -271,6 +273,19 @@ public:
 	}
 
 	inline static ofEvent<string> activeCanvasUniqueIDChangedEvent;
+
+	// Node selected in canvas — fired whenever a single node is clicked/selected
+	// in any canvas (main or macro). Subscribers receive the pointer to the node
+	// that became selected (nullptr means deselect-all with no new selection).
+	inline static ofEvent<ofxOceanodeNode*> nodeSelectedInCanvasEvent;
+
+	static void nodeSelectedInCanvas(ofxOceanodeNode* node){
+		ofNotifyEvent(nodeSelectedInCanvasEvent, node);
+	}
+
+	static ofEvent<ofxOceanodeNode*>& getNodeSelectedInCanvasEvent(){
+		return nodeSelectedInCanvasEvent;
+	}
 
 private:
     ofxOceanodeShared(){};
