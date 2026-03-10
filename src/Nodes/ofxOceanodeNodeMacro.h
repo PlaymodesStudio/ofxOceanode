@@ -101,6 +101,10 @@ public:
 	bool isLocal(){
 		return localPreset;
 	}
+
+	bool isActive() const {
+		return active.get();
+	}
 	
 private:
 	// Node Management
