@@ -549,6 +549,15 @@ void ofxOceanodeNodesController::draw()
                     NavigableNode& target = *pool[nextIdx];
                     selectedNode = target.node;
 
+                    // Select this node in its host canvas (deselect all others first),
+                    // mirroring the mouse-click behaviour.
+                    {
+                        auto hostContainer = (target.macro != nullptr) ? target.macro->getContainer() : this->container;
+                        for(auto& pair : hostContainer->getParameterGroupNodesMap())
+                            pair.second->getNodeGui().setSelected(false);
+                        target.node->getNodeGui().setSelected(true);
+                    }
+
                     // Trigger focus + deferred scroll (same as click)
                     if(target.macro != nullptr) {
                         target.macro->activateWindow();
