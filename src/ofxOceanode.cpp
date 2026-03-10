@@ -466,6 +466,20 @@ void ofxOceanode::receiveOsc(){
 #endif
 
 void ofxOceanode::loadPreset(std::string presetPathRelativeToData){ //call preset via path
+    // Parse "Presets/BANK/INDEX--NAME" and route through the event system so
+    // the preset controller updates its internal state (highlight, save path, etc.)
+    auto parts = ofSplitString(presetPathRelativeToData, "/");
+    if(parts.size() >= 3){
+        std::string bank = parts[parts.size() - 2];
+        std::string filename = parts[parts.size() - 1];
+        auto dashPos = filename.find("--");
+        if(dashPos != std::string::npos){
+            std::string name = filename.substr(dashPos + 2);
+            loadPreset(bank, name);
+            return;
+        }
+    }
+    // Fallback for non-standard paths: load directly without controller awareness
     ofxOceanodeShared::startedLoadingPreset();
     container->loadPreset(presetPathRelativeToData);
     ofxOceanodeShared::finishedLoadingPreset();
