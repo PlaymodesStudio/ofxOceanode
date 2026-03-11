@@ -385,6 +385,7 @@ void ofxOceanodeNodesController::draw()
                         if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0) && !ImGui::IsItemToggledOpen()) {
                             this->selectedNode = node;
                             m->activateWindow();  // opens & focuses the macro's interior canvas
+                            ofxOceanodeShared::setActiveCanvasUniqueID(m->getCanvas()->getUniqueID());
                             refocusNodesDelay = 4;
                             // Cancel any pending scroll that the first click of the double-click may have queued
                             this->pendingScrollNode   = nullptr;
@@ -412,6 +413,7 @@ void ofxOceanodeNodesController::draw()
                                 _canvas->bringOnTop();
                                 refocusNodesDelay = 2;
                             }
+                            ofxOceanodeShared::setActiveCanvasUniqueID(_canvas->getUniqueID());
                             // Store for deferred application; macro canvases need 2 frames to initialise
                             this->pendingScrollNode   = node;
                             this->pendingScrollCanvas = _canvas;
@@ -507,6 +509,7 @@ void ofxOceanodeNodesController::draw()
                                 _canvas->bringOnTop();
                                 refocusNodesDelay = 2;
                             }
+                            ofxOceanodeShared::setActiveCanvasUniqueID(_canvas->getUniqueID());
                             // Store for deferred application; macro canvases need 2 frames to initialise
                             this->pendingScrollNode   = node;
                             this->pendingScrollCanvas = _canvas;
@@ -583,6 +586,7 @@ void ofxOceanodeNodesController::draw()
                         target.canvas->requestFocus();
                         target.canvas->bringOnTop();
                     }
+                    ofxOceanodeShared::setActiveCanvasUniqueID(target.canvas->getUniqueID());
                     pendingScrollNode   = target.node;
                     pendingScrollCanvas = target.canvas;
                     pendingScrollMacro  = target.macro;

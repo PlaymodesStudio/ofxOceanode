@@ -9,6 +9,8 @@
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeNodeModel.h"
+#include "ofxOceanodeShared.h"
+#include "ofxOceanodeCanvas.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include <algorithm>
@@ -24,6 +26,21 @@ ofxOceanodeHierarchyController::ofxOceanodeHierarchyController(
     , rootContainer(_container)
     , rootCanvas(_canvas)
 {
+    // When active canvas changes, highlight the corresponding entry
+    activeCanvasListener = ofxOceanodeShared::activeCanvasUniqueIDChangedEvent.newListener(
+        [this](string& uid){
+            activeCanvasUID = uid;
+        });
+    activeCanvasUID = ofxOceanodeShared::getActiveCanvasUniqueID();
+    
+    // When a node is selected in a canvas, highlight the canvas containing that node
+    nodeSelectedListener = ofxOceanodeShared::getNodeSelectedInCanvasEvent().newListener(
+        [this](ofxOceanodeNode* node){
+            // We don't need to do anything specific here — the activeCanvasUID
+            // will be set by the canvas itself. But we mark scrollToSelected
+            // to center the hierarchy on the active entry next frame.
+            scrollToSelected = true;
+        });
 }
 
 // ---------------------------------------------------------------------------
@@ -158,6 +175,25 @@ void ofxOceanodeHierarchyController::draw()
         entries);
 
     // -----------------------------------------------------------------------
+    // Determine which entry to highlight based on activeCanvasUID
+    // -----------------------------------------------------------------------
+    // Match activeCanvasUID to an entry
+    int activeIdx = -1;
+    for (int i = 0; i < (int)entries.size(); i++) {
+        if (entries[i].canvas && entries[i].canvas->getUniqueID() == activeCanvasUID) {
+            activeIdx = i;
+            break;
+        }
+    }
+    // If we found a match via active canvas, use it
+    if (activeIdx >= 0) {
+        if (selectedEntryIndex != activeIdx) {
+            selectedEntryIndex = activeIdx;
+            scrollToSelected = true;
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Layout constants
     // -----------------------------------------------------------------------
     const float NODE_W     = 150.0f;
@@ -166,11 +202,6 @@ void ofxOceanodeHierarchyController::draw()
     const float VGAP       = 8.0f;
     const float INDENT_W   = NODE_W + HGAP;
     const float TEXT_PAD_X = 8.0f;
-
-    ImDrawList* dl = ImGui::GetWindowDrawList();
-    ImVec2 origin  = ImGui::GetCursorScreenPos();
-    origin.x += 4.0f;
-    origin.y += 4.0f;
 
     // -----------------------------------------------------------------------
     // Layout pass: assign row indices, centre parents over children
@@ -191,6 +222,18 @@ void ofxOceanodeHierarchyController::draw()
     if (!entries.empty()) assignRows(0);
 
     int totalRows = rowCounter > 0 ? rowCounter : 1;
+    float totalH = totalRows * (NODE_H + VGAP) + 8.0f;
+    float totalW = INDENT_W * 8.0f;
+
+    // -----------------------------------------------------------------------
+    // Begin scrollable child region
+    // -----------------------------------------------------------------------
+    ImGui::BeginChild("##hierarchyScroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+    
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImVec2 origin  = ImGui::GetCursorScreenPos();
+    origin.x += 4.0f;
+    origin.y += 4.0f;
 
     // Compute screen positions
     vector<ImVec2> pos(entries.size());
@@ -199,10 +242,8 @@ void ofxOceanodeHierarchyController::draw()
         pos[i].y = origin.y + rowY[i] * (NODE_H + VGAP);
     }
 
-    float totalH = totalRows * (NODE_H + VGAP) + 8.0f;
-
     // Reserve layout space
-    ImGui::Dummy(ImVec2(INDENT_W * 8.0f, totalH));
+    ImGui::Dummy(ImVec2(totalW, totalH));
 
     // -----------------------------------------------------------------------
     // Determine effective-active state per entry (DFS order, root is always active)
@@ -239,7 +280,7 @@ void ofxOceanodeHierarchyController::draw()
     }
 
     // -----------------------------------------------------------------------
-    // Draw boxes
+    // Draw boxes with interaction
     // -----------------------------------------------------------------------
     for (int i = 0; i < (int)entries.size(); i++) {
         ImVec2 p1 = pos[i];
@@ -265,7 +306,7 @@ void ofxOceanodeHierarchyController::draw()
                     (int)ofClamp(nodeColor.b * 1.3f, 0, 255),
                     255);
             } else {
-                // Half intensity: divide RGB by 2, keep alpha full
+                // Half intensity: divide RGB by 4, keep alpha full
                 fillCol   = IM_COL32(nodeColor.r / 4, nodeColor.g / 4, nodeColor.b / 4, 255);
                 borderCol = IM_COL32(
                     (int)ofClamp(nodeColor.r * 1.3f * 0.5f, 0, 255),
@@ -278,6 +319,11 @@ void ofxOceanodeHierarchyController::draw()
         // --- Box ---
         dl->AddRectFilled(p1, p2, fillCol,   4.0f);
         dl->AddRect      (p1, p2, borderCol, 4.0f, 0, 1.5f);
+
+        // --- Selection highlight (orange border) ---
+        if (i == selectedEntryIndex) {
+            dl->AddRect(p1, p2, IM_COL32(255, 140, 0, 255), 4.0f, 0, 2.5f);
+        }
 
         // --- Text color (luminance-adaptive; half RGB intensity when effectively inactive) ---
         float lum = (nodeColor.r * 0.299f + nodeColor.g * 0.587f + nodeColor.b * 0.114f) / 255.0f;
@@ -297,7 +343,80 @@ void ofxOceanodeHierarchyController::draw()
         float textY = p1.y + (NODE_H - ImGui::GetTextLineHeight()) * 0.5f;
         dl->AddText(ImVec2(p1.x + TEXT_PAD_X, textY), textCol, entries[i].label.c_str());
         ImGui::PopClipRect();
+
+        // --- Invisible button for click interaction ---
+        ImGui::SetCursorScreenPos(p1);
+        string btnId = "##hier_" + ofToString(i);
+        ImGui::InvisibleButton(btnId.c_str(), ImVec2(NODE_W, NODE_H));
+
+        // --- Scroll-to-selected ---
+        if (scrollToSelected && i == selectedEntryIndex) {
+            ImGui::SetScrollHereY(0.5f);
+            scrollToSelected = false;
+        }
+
+        // --- Double-click: open macro's OWN canvas (Scenario 5) ---
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
+            selectedEntryIndex = i;
+            
+            if (entries[i].macroNode != nullptr) {
+                // Open the macro's own interior canvas
+                entries[i].macroNode->activateWindow();
+                ofxOceanodeShared::setActiveCanvasUniqueID(entries[i].canvas->getUniqueID());
+            } else {
+                // Root canvas: just focus it
+                entries[i].canvas->requestFocus();
+                entries[i].canvas->bringOnTop();
+                ofxOceanodeShared::setActiveCanvasUniqueID(entries[i].canvas->getUniqueID());
+            }
+
+            // Select the macro node in the Nodes tree
+            if (entries[i].nodeWrapper != nullptr) {
+                ofxOceanodeShared::nodeSelectedInCanvas(entries[i].nodeWrapper);
+            }
+        }
+        // --- Single-click: navigate to PARENT canvas, center on macro node (Scenario 4) ---
+        else if (ImGui::IsItemClicked(0)) {
+            selectedEntryIndex = i;
+
+            if (entries[i].macroNode != nullptr && entries[i].hostCanvas != nullptr) {
+                // Navigate to the parent canvas where this macro node lives
+                if (entries[i].hostMacro != nullptr) {
+                    entries[i].hostMacro->activateWindow();
+                } else {
+                    entries[i].hostCanvas->requestFocus();
+                    entries[i].hostCanvas->bringOnTop();
+                }
+                ofxOceanodeShared::setActiveCanvasUniqueID(entries[i].hostCanvas->getUniqueID());
+
+                // Select the macro node in the host canvas (deselect all others)
+                if (entries[i].nodeWrapper != nullptr) {
+                    for (auto& pair : entries[i].hostContainer->getParameterGroupNodesMap()) {
+                        pair.second->getNodeGui().setSelected(false);
+                    }
+                    entries[i].nodeWrapper->getNodeGui().setSelected(true);
+
+                    // Notify shared system so NodesController/Inspector can react
+                    ofxOceanodeShared::nodeSelectedInCanvas(entries[i].nodeWrapper);
+
+                    // Center the host canvas on this macro node
+                    glm::vec2 nodeSize = glm::vec2(
+                        entries[i].nodeWrapper->getNodeGui().getRectangle().getWidth(),
+                        entries[i].nodeWrapper->getNodeGui().getRectangle().getHeight());
+                    glm::vec2 nodePos = entries[i].nodeWrapper->getNodeGui().getPosition();
+                    glm::vec2 center = entries[i].hostCanvas->getContentRegionSize() / 2.0f;
+                    entries[i].hostCanvas->setScrolling(-nodePos - nodeSize / 2.0f + center);
+                }
+            } else {
+                // Root canvas: just focus it
+                entries[i].canvas->requestFocus();
+                entries[i].canvas->bringOnTop();
+                ofxOceanodeShared::setActiveCanvasUniqueID(entries[i].canvas->getUniqueID());
+            }
+        }
     }
+
+    ImGui::EndChild();
 }
 
 #endif // OFXOCEANODE_HEADLESS

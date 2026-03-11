@@ -11,6 +11,7 @@
 #include "ofxOceanodeBaseController.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeCanvas.h"
+#include "ofxOceanodeShared.h"
 
 // Forward declarations
 class ofxOceanodeNodeMacro;
@@ -61,6 +62,15 @@ private:
     shared_ptr<ofxOceanodeContainer> rootContainer;
     ofxOceanodeCanvas*               rootCanvas;
     vector<HierarchyEntry>           entries;
+
+    // Interaction state
+    int selectedEntryIndex = -1;       // Currently highlighted entry (-1 = none)
+    bool scrollToSelected = false;      // Flag to scroll hierarchy view to selected entry
+    string activeCanvasUID;             // Last known active canvas UID
+    
+    // Event listeners
+    ofEventListener activeCanvasListener;
+    ofEventListener nodeSelectedListener;
 
 };
 

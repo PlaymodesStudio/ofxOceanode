@@ -69,6 +69,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     string windowName = uniqueID;
     if(title != "") windowName = "(" + title + ") " + windowName;
     if(ImGui::Begin(windowName.c_str(), open)){
+        // Track which canvas is active for MiniMap/Hierarchy coordination
+        if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)){
+            ofxOceanodeShared::setActiveCanvasUniqueID(uniqueID);
+        }
         ImGui::SameLine();
         ImGui::BeginGroup();
                 
