@@ -62,12 +62,6 @@ private:
     ofxOceanodeCanvas*               rootCanvas;
     vector<HierarchyEntry>           entries;
 
-    // Deferred scroll (applied the frame after focus request, same as NodesController)
-    ofxOceanodeNode*      pendingScrollNode   = nullptr;
-    ofxOceanodeCanvas*    pendingScrollCanvas = nullptr;
-    ofxOceanodeNodeMacro* pendingScrollMacro  = nullptr;
-    bool                  scrollPending       = false;
-    int                   refocusDelay        = 0;
 };
 
 #endif // OFXOCEANODE_HEADLESS

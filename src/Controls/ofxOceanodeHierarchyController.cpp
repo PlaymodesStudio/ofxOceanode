@@ -146,31 +146,6 @@ void ofxOceanodeHierarchyController::buildHierarchy(
 void ofxOceanodeHierarchyController::draw()
 {
     // -----------------------------------------------------------------------
-    // Apply deferred scroll from previous frame (same pattern as NodesController)
-    // -----------------------------------------------------------------------
-    if (scrollPending && pendingScrollNode && pendingScrollCanvas) {
-        glm::vec2 nodeSize = glm::vec2(
-            pendingScrollNode->getNodeGui().getRectangle().getWidth(),
-            pendingScrollNode->getNodeGui().getRectangle().getHeight());
-        glm::vec2 nodePos = pendingScrollNode->getNodeGui().getPosition();
-        glm::vec2 center  = pendingScrollCanvas->getContentRegionSize() / 2.0f;
-        pendingScrollCanvas->setScrolling(-nodePos - nodeSize / 2.0f + center);
-        scrollPending       = false;
-        pendingScrollNode   = nullptr;
-        pendingScrollCanvas = nullptr;
-        if (pendingScrollMacro) {
-            pendingScrollMacro->activateWindow();
-            pendingScrollMacro = nullptr;
-        }
-    }
-
-    if (refocusDelay > 0) {
-        refocusDelay--;
-        if (refocusDelay == 0)
-            ImGui::SetWindowFocus("Hierarchy");
-    }
-
-    // -----------------------------------------------------------------------
     // Rebuild hierarchy each frame
     // -----------------------------------------------------------------------
     entries.clear();
@@ -245,31 +220,7 @@ void ofxOceanodeHierarchyController::draw()
     }
 
     // -----------------------------------------------------------------------
-    // Helper: draw a dashed line segment
-    // -----------------------------------------------------------------------
-    auto drawDashedLine = [&](ImVec2 a, ImVec2 b, ImU32 col, float thickness,
-                              float dashLen = 4.0f, float gapLen = 4.0f) {
-        float dx = b.x - a.x, dy = b.y - a.y;
-        float len = std::sqrt(dx*dx + dy*dy);
-        if (len < 0.001f) return;
-        float nx = dx / len, ny = dy / len;
-        float t = 0.0f;
-        bool drawing = true;
-        while (t < len) {
-            float segLen = drawing ? dashLen : gapLen;
-            float t2 = std::min(t + segLen, len);
-            if (drawing) {
-                dl->AddLine(ImVec2(a.x + nx*t, a.y + ny*t),
-                            ImVec2(a.x + nx*t2, a.y + ny*t2),
-                            col, thickness);
-            }
-            t = t2;
-            drawing = !drawing;
-        }
-    };
-
-    // -----------------------------------------------------------------------
-    // Draw connectors (elbow lines; dotted when parent is inactive)
+    // Draw connectors (elbow lines; half intensity when parent is inactive)
     // -----------------------------------------------------------------------
     for (int i = 1; i < (int)entries.size(); i++) {
         int pi = entries[i].parentIndex;
@@ -280,25 +231,16 @@ void ofxOceanodeHierarchyController::draw()
         float midX = parentMid.x + HGAP * 0.5f;
 
         bool parentInactive = !effectiveActive[pi];
-        ImU32 lineCol = parentInactive ? IM_COL32(120,120,120,100) : IM_COL32(120,120,120,200);
+        ImU32 lineCol = parentInactive ? IM_COL32(0, 0, 0, 255) : IM_COL32(220, 220, 220, 255);
 
-        if (parentInactive) {
-            drawDashedLine(parentMid,               ImVec2(midX, parentMid.y), lineCol, 1.5f);
-            drawDashedLine(ImVec2(midX, parentMid.y), ImVec2(midX, childMid.y), lineCol, 1.5f);
-            drawDashedLine(ImVec2(midX, childMid.y),  childMid,                 lineCol, 1.5f);
-        } else {
-            dl->AddLine(parentMid,                 ImVec2(midX, parentMid.y), lineCol, 1.5f);
-            dl->AddLine(ImVec2(midX, parentMid.y), ImVec2(midX, childMid.y),  lineCol, 1.5f);
-            dl->AddLine(ImVec2(midX, childMid.y),  childMid,                  lineCol, 1.5f);
-        }
+        dl->AddLine(parentMid,                 ImVec2(midX, parentMid.y), lineCol, 1.5f);
+        dl->AddLine(ImVec2(midX, parentMid.y), ImVec2(midX, childMid.y),  lineCol, 1.5f);
+        dl->AddLine(ImVec2(midX, childMid.y),  childMid,                  lineCol, 1.5f);
     }
 
     // -----------------------------------------------------------------------
-    // Draw boxes and handle clicks
+    // Draw boxes
     // -----------------------------------------------------------------------
-    ImVec2 mousePos = ImGui::GetMousePos();
-    bool   mouseClicked = ImGui::IsMouseClicked(0);
-
     for (int i = 0; i < (int)entries.size(); i++) {
         ImVec2 p1 = pos[i];
         ImVec2 p2 = ImVec2(p1.x + NODE_W, p1.y + NODE_H);
@@ -306,72 +248,55 @@ void ofxOceanodeHierarchyController::draw()
         // --- Color ---
         ImU32 fillCol, borderCol;
         ofColor nodeColor;
+        bool active = effectiveActive[i];
+
         if (entries[i].macroNode == nullptr) {
-            // Root canvas: white/light
-            nodeColor  = ofColor(220, 220, 220);
-            fillCol    = IM_COL32(210, 210, 210, 230);
-            borderCol  = IM_COL32(255, 255, 255, 255);
+            // Root canvas: white/light (root is always active)
+            nodeColor = ofColor(220, 220, 220);
+            fillCol   = IM_COL32(210, 210, 210, 255);
+            borderCol = IM_COL32(255, 255, 255, 255);
         } else {
-            nodeColor  = entries[i].nodeWrapper->getColor();
-            fillCol    = IM_COL32(nodeColor.r, nodeColor.g, nodeColor.b, 210);
-            borderCol  = IM_COL32(
-                (int)ofClamp(nodeColor.r * 1.3f, 0, 255),
-                (int)ofClamp(nodeColor.g * 1.3f, 0, 255),
-                (int)ofClamp(nodeColor.b * 1.3f, 0, 255),
-                255);
+            nodeColor = entries[i].nodeWrapper->getColor();
+            if (active) {
+                fillCol   = IM_COL32(nodeColor.r, nodeColor.g, nodeColor.b, 255);
+                borderCol = IM_COL32(
+                    (int)ofClamp(nodeColor.r * 1.3f, 0, 255),
+                    (int)ofClamp(nodeColor.g * 1.3f, 0, 255),
+                    (int)ofClamp(nodeColor.b * 1.3f, 0, 255),
+                    255);
+            } else {
+                // Half intensity: divide RGB by 2, keep alpha full
+                fillCol   = IM_COL32(nodeColor.r / 4, nodeColor.g / 4, nodeColor.b / 4, 255);
+                borderCol = IM_COL32(
+                    (int)ofClamp(nodeColor.r * 1.3f * 0.5f, 0, 255),
+                    (int)ofClamp(nodeColor.g * 1.3f * 0.5f, 0, 255),
+                    (int)ofClamp(nodeColor.b * 1.3f * 0.5f, 0, 255),
+                    255);
+            }
         }
 
         // --- Box ---
         dl->AddRectFilled(p1, p2, fillCol,   4.0f);
         dl->AddRect      (p1, p2, borderCol, 4.0f, 0, 1.5f);
 
-        // --- Text color (luminance-adaptive; 50% alpha when effectively inactive) ---
+        // --- Text color (luminance-adaptive; half RGB intensity when effectively inactive) ---
         float lum = (nodeColor.r * 0.299f + nodeColor.g * 0.587f + nodeColor.b * 0.114f) / 255.0f;
-        int textAlpha = effectiveActive[i] ? 255 : 128;
-        ImU32 textCol = (lum > 0.55f)
-            ? IM_COL32(30,  30,  30,  textAlpha)
-            : IM_COL32(240, 240, 240, textAlpha);
+        ImU32 textCol;
+        if (active) {
+            textCol = (lum > 0.55f)
+                ? IM_COL32(30,  30,  30,  255)
+                : IM_COL32(240, 240, 240, 255);
+        } else {
+            textCol = (lum > 0.55f)
+                ? IM_COL32(15,  15,  15,  255)
+                : IM_COL32(120, 120, 120, 255);
+        }
 
         // --- Label (clipped) ---
         ImGui::PushClipRect(p1, p2, true);
         float textY = p1.y + (NODE_H - ImGui::GetTextLineHeight()) * 0.5f;
         dl->AddText(ImVec2(p1.x + TEXT_PAD_X, textY), textCol, entries[i].label.c_str());
         ImGui::PopClipRect();
-
-        // --- Click detection ---
-        if (mouseClicked && entries[i].macroNode != nullptr) {
-            if (mousePos.x >= p1.x && mousePos.x <= p2.x &&
-                mousePos.y >= p1.y && mousePos.y <= p2.y)
-            {
-                ofxOceanodeNode*      targetNode      = entries[i].nodeWrapper;
-                ofxOceanodeCanvas*    targetCanvas    = entries[i].hostCanvas;
-                ofxOceanodeContainer* targetContainer = entries[i].hostContainer;
-                ofxOceanodeNodeMacro* targetMacro     = entries[i].hostMacro;
-
-                // Deselect all nodes in host container, then select this one
-                if (targetContainer) {
-                    for (auto& pair : targetContainer->getParameterGroupNodesMap())
-                        pair.second->getNodeGui().setSelected(false);
-                }
-                if (targetNode) targetNode->getNodeGui().setSelected(true);
-
-                // Navigate to host canvas
-                if (targetMacro != nullptr) {
-                    targetMacro->activateWindow();
-                    refocusDelay = 4;
-                } else if (targetCanvas != nullptr) {
-                    targetCanvas->requestFocus();
-                    targetCanvas->bringOnTop();
-                    refocusDelay = 2;
-                }
-
-                // Deferred scroll to centre node on screen
-                pendingScrollNode   = targetNode;
-                pendingScrollCanvas = targetCanvas;
-                pendingScrollMacro  = targetMacro;
-                scrollPending       = true;
-            }
-        }
     }
 }
 
