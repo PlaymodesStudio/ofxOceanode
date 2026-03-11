@@ -54,21 +54,23 @@ void ofxOceanodeNodesController::draw()
     // Rebuild navigable node list each frame
     navigableNodes.clear();
 
-    // Apply deferred scroll from previous frame
-    if(scrollPending && pendingScrollNode != nullptr && pendingScrollCanvas != nullptr) {
-        glm::vec2 nodeSize = glm::vec2(pendingScrollNode->getNodeGui().getRectangle().getWidth(),
-                                       pendingScrollNode->getNodeGui().getRectangle().getHeight());
-        glm::vec2 nodePos  = pendingScrollNode->getNodeGui().getPosition();
-        glm::vec2 center   = pendingScrollCanvas->getContentRegionSize() / 2.0f;
-        pendingScrollCanvas->setScrolling(-nodePos - nodeSize / 2.0f + center);
-        scrollPending       = false;
-        pendingScrollNode   = nullptr;
-        pendingScrollCanvas = nullptr;
-        // Re-activate macro canvas now that it has been drawn/docked at least once,
-        // ensuring its tab becomes the visible/focused one on first visit.
-        if(pendingScrollMacro != nullptr) {
-            pendingScrollMacro->activateWindow();
-            pendingScrollMacro = nullptr;
+    // Apply deferred scroll — countdown so macro canvases get 2 frames to initialise
+    if(scrollPendingFrames > 0) {
+        scrollPendingFrames--;
+        if(scrollPendingFrames == 0 && pendingScrollNode != nullptr && pendingScrollCanvas != nullptr) {
+            glm::vec2 nodeSize = glm::vec2(pendingScrollNode->getNodeGui().getRectangle().getWidth(),
+                                           pendingScrollNode->getNodeGui().getRectangle().getHeight());
+            glm::vec2 nodePos  = pendingScrollNode->getNodeGui().getPosition();
+            glm::vec2 center   = pendingScrollCanvas->getContentRegionSize() / 2.0f;
+            pendingScrollCanvas->setScrolling(-nodePos - nodeSize / 2.0f + center);
+            pendingScrollNode   = nullptr;
+            pendingScrollCanvas = nullptr;
+            // Re-activate macro canvas now that it has been drawn/docked at least once,
+            // ensuring its tab becomes the visible/focused one on first visit.
+            if(pendingScrollMacro != nullptr) {
+                pendingScrollMacro->activateWindow();
+                pendingScrollMacro = nullptr;
+            }
         }
     }
 
@@ -379,8 +381,19 @@ void ofxOceanodeNodesController::draw()
                         }
                         rowIndex++;
 
-                        // If label was clicked (not the arrow), navigate to the PARENT canvas containing this macro node
-                        if(ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+                        // Double-click on a macro label → open the macro's OWN canvas (enter the macro)
+                        if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0) && !ImGui::IsItemToggledOpen()) {
+                            this->selectedNode = node;
+                            m->activateWindow();  // opens & focuses the macro's interior canvas
+                            refocusNodesDelay = 4;
+                            // Cancel any pending scroll that the first click of the double-click may have queued
+                            this->pendingScrollNode   = nullptr;
+                            this->pendingScrollCanvas = nullptr;
+                            this->pendingScrollMacro  = nullptr;
+                            this->scrollPendingFrames = 0;
+                        }
+                        // Single click on macro label (not the arrow, and not part of a double-click) → show parent canvas centered on this macro
+                        else if(ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
                             this->selectedNode = node;
 
                             // Select this node in its host canvas (deselect all others first)
@@ -391,17 +404,19 @@ void ofxOceanodeNodesController::draw()
                                 node->getNodeGui().setSelected(true);
                             }
 
-                            _canvas->requestFocus();
-                            _canvas->bringOnTop();
-                            // Store for deferred application next frame (canvas may not have correct size yet)
+                            if(_macro != nullptr){
+                                _macro->activateWindow(); // sets showWindow=true and calls canvas.requestFocus()
+                                refocusNodesDelay = 4;
+                            } else {
+                                _canvas->requestFocus();
+                                _canvas->bringOnTop();
+                                refocusNodesDelay = 2;
+                            }
+                            // Store for deferred application; macro canvases need 2 frames to initialise
                             this->pendingScrollNode   = node;
                             this->pendingScrollCanvas = _canvas;
                             this->pendingScrollMacro  = _macro;
-                            this->scrollPending       = true;
-
-                            // Re-focus Nodes window after the canvas has consumed its
-                            // deferred SetNextWindowFocus (takes 2 frames).
-                            refocusNodesDelay = 2;
+                            this->scrollPendingFrames = (_macro != nullptr) ? 2 : 1;
                         }
 
                         if(nodeOpen) {
@@ -492,11 +507,11 @@ void ofxOceanodeNodesController::draw()
                                 _canvas->bringOnTop();
                                 refocusNodesDelay = 2;
                             }
-                            // Store for deferred application next frame (canvas may not have correct size yet)
+                            // Store for deferred application; macro canvases need 2 frames to initialise
                             this->pendingScrollNode   = node;
                             this->pendingScrollCanvas = _canvas;
                             this->pendingScrollMacro  = _macro;
-                            this->scrollPending       = true;
+                            this->scrollPendingFrames = (_macro != nullptr) ? 2 : 1;
                         }
                     }
                 }
@@ -571,12 +586,12 @@ void ofxOceanodeNodesController::draw()
                     pendingScrollNode   = target.node;
                     pendingScrollCanvas = target.canvas;
                     pendingScrollMacro  = target.macro;
-                    scrollPending       = true;
+                    scrollPendingFrames = (target.macro != nullptr) ? 2 : 1;
                     this->scrollTreeToSelected = true;
 
                     // Re-focus Nodes window after the canvas has consumed its
                     // deferred SetNextWindowFocus (takes 2 frames).
-                    refocusNodesDelay = 2;
+                    refocusNodesDelay = (target.macro != nullptr) ? 4 : 2;
                 }
             }
         }

@@ -44,11 +44,11 @@ private:
     int nodeTypeFilter = 0; // 0=All, 1=Macros, 2=Portals, 3=Routers
     ofxOceanodeNode* selectedNode = nullptr;
 
-    // Deferred scroll state (applied one frame after focus/visibility request)
+    // Deferred scroll state (countdown; fires when scrollPendingFrames reaches 0, >0 means pending)
     ofxOceanodeNode*      pendingScrollNode   = nullptr;
     ofxOceanodeCanvas*    pendingScrollCanvas = nullptr;
     ofxOceanodeNodeMacro* pendingScrollMacro  = nullptr;  // re-activates macro canvas after scroll
-    bool                  scrollPending       = false;
+    int                   scrollPendingFrames = 0;
     bool               forceExpandAll      = false;
     bool               forceCollapseAll    = false;
     bool               scrollTreeToSelected = false;  // set by arrow-key nav, consumed by listNodes
