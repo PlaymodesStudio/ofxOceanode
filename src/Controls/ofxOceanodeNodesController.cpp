@@ -94,8 +94,8 @@ void ofxOceanodeNodesController::draw()
         }
         ImGui::SameLine();
         if(ImGui::Button("<##collapseAll")) {
-            forceExpandAll = false;
-            ImGui::GetStateStorage()->Clear();
+            forceExpandAll  = false;
+            forceCollapseAll = true;
         }
         ImGui::SameLine();
         if(ImGui::Button(">##expandAll")) {
@@ -509,6 +509,9 @@ void ofxOceanodeNodesController::draw()
         // never enqueue ScrollToBringRectVisibleInWindow.  Arrow-key nav is handled
         // manually via scrollTreeToSelected + SetScrollHereY(0.5f) inside listNodes.
         ImGui::BeginChild("##nodesListChild", ImVec2(0, 0), false, ImGuiWindowFlags_NoNav);
+        if(forceCollapseAll) {
+            ImGui::GetStateStorage()->Clear();
+        }
         listNodes(allNodes, canvas, nullptr, 0);
         ImGui::EndChild();
 
@@ -586,6 +589,7 @@ void ofxOceanodeNodesController::draw()
 
         ImGui::TreePop();
     }
-    forceExpandAll = false;
+    forceExpandAll   = false;
+    forceCollapseAll = false;
 }
 #endif

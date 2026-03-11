@@ -50,6 +50,7 @@ private:
     ofxOceanodeNodeMacro* pendingScrollMacro  = nullptr;  // re-activates macro canvas after scroll
     bool                  scrollPending       = false;
     bool               forceExpandAll      = false;
+    bool               forceCollapseAll    = false;
     bool               scrollTreeToSelected = false;  // set by arrow-key nav, consumed by listNodes
     int                refocusNodesDelay    = 0;       // counts down frames before re-focusing the Nodes window
 
