@@ -2137,6 +2137,92 @@ void ofxOceanodeNodeMacro::syncParameterGroupToSortOrder() {
 	parameterGroupChanged.notify(this);
 }
 
+void ofxOceanodeNodeMacro::changeRouterType(const std::string& routerName, const std::string& newTypeName) {
+	auto it = routerNodes.find(routerName);
+	if(it == routerNodes.end()) return;
+	auto* routerNode = it->second.node;
+
+#ifndef OFXOCEANODE_HEADLESS
+	glm::vec2 oldPos = routerNode->getNodeGui().getPosition();
+#endif
+
+	// 1. Find where this router sits in the sort order so we can restore it later.
+	int sortIdx = -1;
+	for(int i = 0; i < (int)routerSortOrder.size(); ++i){
+		if(!isSortSeparatorEntry(routerSortOrder[i]) && routerSortOrder[i] == routerName){
+			sortIdx = i; break;
+		}
+	}
+
+#ifndef OFXOCEANODE_HEADLESS
+	// 2. Capture inner-container connection info as plain strings before the node
+	//    is deleted (pointers become invalid after deleteSelf()).
+	string oldGroupEscaped = routerNode->getParameters().getEscapedName();
+	struct ConnInfo { string srcGroup, srcParam, sinkGroup, sinkParam; };
+	vector<ConnInfo> savedConns;
+	for(auto& conn : container->getAllConnections()){
+		string srcG = conn->getSourceParameter().getGroupHierarchyNames()[0];
+		string snkG = conn->getSinkParameter().getGroupHierarchyNames()[0];
+		if(srcG == oldGroupEscaped || snkG == oldGroupEscaped){
+			savedConns.push_back({srcG, conn->getSourceParameter().getName(),
+			                      snkG, conn->getSinkParameter().getName()});
+		}
+	}
+#endif
+
+	// 3. Delete the old router.
+	//    Fires deleteModule listeners: removes the published param from
+	//    getParameterGroup(), removes routerName from routerSortOrder,
+	//    and removes the node from the container's dynamicNodes map.
+	routerNode->deleteSelf();
+	routerNode = nullptr;
+
+	// 4. Create the new router.
+	//    Because isLoadingPreset == false, the newNodeCreated event listener
+	//    calls processRouterNode() immediately, which adds a new published
+	//    parameter and pushes the default type-label name onto routerSortOrder.
+	auto* newNode = container->createNodeFromName(newTypeName);
+	if(!newNode) return;
+
+#ifndef OFXOCEANODE_HEADLESS
+	newNode->getNodeGui().setPosition(oldPos);
+#endif
+
+	// 5. Rename the new router back to the original name.
+	//    The rename listener installed by processRouterNode() will synchronise
+	//    routerSortOrder (default label → routerName) and routerNodes.
+	static_cast<abstractRouter*>(&newNode->getNodeModel())->getNameParam().set(routerName);
+
+	// 6. Restore sort-order position.
+	//    After steps 4+5 routerName sits at the end of routerSortOrder.
+	//    Move it back to the saved index.
+	if(sortIdx >= 0){
+		auto entryIt = std::find(routerSortOrder.begin(), routerSortOrder.end(), routerName);
+		if(entryIt != routerSortOrder.end()){
+			routerSortOrder.erase(entryIt);
+			int insertAt = std::min(sortIdx, (int)routerSortOrder.size());
+			routerSortOrder.insert(routerSortOrder.begin() + insertAt, routerName);
+		}
+	}
+
+#ifndef OFXOCEANODE_HEADLESS
+	// 7. Reconnect inner-container connections (best-effort).
+	//    Incompatible type pairs will silently fail — that is expected when
+	//    switching between fundamentally different types.
+	string newGroupEscaped = newNode->getParameters().getEscapedName();
+	for(auto& ci : savedConns){
+		string srcG = (ci.srcGroup == oldGroupEscaped) ? newGroupEscaped : ci.srcGroup;
+		string snkG = (ci.sinkGroup == oldGroupEscaped) ? newGroupEscaped : ci.sinkGroup;
+		container->createConnectionFromInfo(srcG, ci.srcParam, snkG, ci.sinkParam);
+	}
+#endif
+
+	// 8. Sync the macro's parameter-group order to the (restored) sort order
+	//    and broadcast the structural change to the outer container.
+	syncParameterGroupToSortOrder();
+	parameterGroupChanged.notify(this);
+}
+
 void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 #ifndef OFXOCEANODE_HEADLESS
 	ImGui::SeparatorText("Router Management");
@@ -2151,6 +2237,10 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 	// Track whether we need to early-return because a separator was deleted
 	// (erasing from routerSortOrder mid-loop requires us to stop iterating).
 	bool separatorDeleted = false;
+
+	// Deferred type-change: set from the context menu, executed after PopID so
+	// the ImGui ID stack is clean before we rebuild routerSortOrder.
+	string typeChangeFrom, typeChangeTo;
 
 	for(int i = 0; i < (int)routerSortOrder.size(); i++){
 		ImGui::PushID(i);
@@ -2261,6 +2351,67 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 				routerSortEditBuf[sizeof(routerSortEditBuf) - 1] = '\0';
 			}
 
+			// ── Right-click context menu (only for known router rows) ─────────
+			if(!isSep && !isUnknown && ImGui::BeginPopupContextItem("##routerCtx")){
+				// ── Range editing ────────────────────────────────────────────
+				auto& innerParams = routerNodes[routerSortOrder[i]].node->getParameters();
+				if(innerParams.contains("Min") && innerParams.contains("Max")){
+					auto* minP = dynamic_cast<ofxOceanodeAbstractParameter*>(&innerParams.get("Min"));
+					auto* maxP = dynamic_cast<ofxOceanodeAbstractParameter*>(&innerParams.get("Max"));
+					if(minP && maxP){
+						ImGui::SeparatorText("Range");
+						bool rangeChanged = false;
+						string vt = minP->valueType();
+						if(vt == typeid(float).name()){
+							float mn = minP->cast<float>().getParameter().get();
+							float mx = maxP->cast<float>().getParameter().get();
+							ImGui::SetNextItemWidth(120.f);
+							rangeChanged |= ImGui::DragFloat("Min##mnf", &mn, 0.01f);
+							ImGui::SetNextItemWidth(120.f);
+							rangeChanged |= ImGui::DragFloat("Max##mxf", &mx, 0.01f);
+							if(rangeChanged){
+								minP->cast<float>().getParameter().set(mn);
+								maxP->cast<float>().getParameter().set(mx);
+							}
+						} else if(vt == typeid(int).name()){
+							int mn = minP->cast<int>().getParameter().get();
+							int mx = maxP->cast<int>().getParameter().get();
+							ImGui::SetNextItemWidth(120.f);
+							rangeChanged |= ImGui::DragInt("Min##mni", &mn);
+							ImGui::SetNextItemWidth(120.f);
+							rangeChanged |= ImGui::DragInt("Max##mxi", &mx);
+							if(rangeChanged){
+								minP->cast<int>().getParameter().set(mn);
+								maxP->cast<int>().getParameter().set(mx);
+							}
+						} else {
+							ImGui::TextDisabled("No range for this type");
+						}
+					}
+					ImGui::Separator();
+				}
+
+				// ── Change Type submenu ──────────────────────────────────────
+				string curNodeType = routerNodes[routerSortOrder[i]].node->getNodeModel().nodeName();
+				if(ImGui::BeginMenu("Change Type")){
+					for(auto& mPair : registry->getRegisteredModels()){
+						const string& mName = mPair.first;
+						// Show all "Router X" entries; highlight the current type
+						// with a checkmark and gray it out (non-clickable).
+						if(mName.size() > 7 && mName.substr(0, 7) == "Router "){
+							bool isCurrent = (mName == curNodeType);
+							if(ImGui::MenuItem(mName.c_str() + 7, nullptr, isCurrent, !isCurrent)){
+								typeChangeFrom = routerSortOrder[i];
+								typeChangeTo   = mName;
+								ImGui::CloseCurrentPopup();
+							}
+						}
+					}
+					ImGui::EndMenu();
+				}
+				ImGui::EndPopup();
+			}
+
 			// Drag-drop (disabled while any rename is in progress)
 			if(!anyEditing){
 				if(ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)){
@@ -2292,6 +2443,14 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 		}
 
 		ImGui::PopID();
+
+		// Execute a type change requested from the context menu this iteration.
+		// Placed after PopID so the ImGui ID stack is clean before we mutate
+		// routerSortOrder; we return immediately and let ImGui re-render next frame.
+		if(!typeChangeFrom.empty()){
+			changeRouterType(typeChangeFrom, typeChangeTo);
+			return;
+		}
 	}
 
 	// Apply deferred drag-drop move (only if no separator was deleted this frame).
