@@ -288,7 +288,6 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 				{
 					string sortOrderFile = currentMacroPath + "/router_sort_order.json";
 					ofJson sortJson;
-					sortJson["LiveNodeOrder"] = liveRouterSort;
 					if(!routerSortOrder.empty()) {
 						ofJson sortArr = ofJson::array();
 						for(const auto& e : routerSortOrder) sortArr.push_back(e);
@@ -350,7 +349,6 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 						{
 							string sortOrderFile = currentMacroPath + "/router_sort_order.json";
 							ofJson sortJson;
-							sortJson["LiveNodeOrder"] = liveRouterSort;
 							if(!routerSortOrder.empty()) {
 								ofJson sortArr = ofJson::array();
 								for(const auto& e : routerSortOrder) sortArr.push_back(e);
@@ -790,6 +788,28 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 		return;
 	}
 
+	// ── Collect pre-existing router nodes ────────────────────────────────────
+	// Routers that were already in the inner container (from a previous load
+	// pass) are merely repositioned by loadPreset_loadNodes() — they do NOT
+	// fire newNodeCreated() and therefore are NOT in toCreateRouters.  Without
+	// this extra step, routerSortOrder.clear() below would lose those routers
+	// from the inspector list even though their parameters are still alive.
+	// We must re-add their names to routerSortOrder WITHOUT calling
+	// processRouterNode() again (which would create duplicate parameters and
+	// duplicate listeners).
+	set<ofxOceanodeNode*> toCreateSet(toCreateRouters.begin(), toCreateRouters.end());
+	vector<ofxOceanodeNode*> preExistingRouters;
+	for(auto& typeMap : container->getDynamicNodes()){
+		if(!typeMap.first.empty() && ofSplitString(typeMap.first, " ")[0] == "Router"){
+			for(auto& nodePair : typeMap.second){
+				auto* node = nodePair.second.get();
+				if(toCreateSet.find(node) == toCreateSet.end()){
+					preExistingRouters.push_back(node);
+				}
+			}
+		}
+	}
+
 	// Remove any separator parameters left over from a previous load.
 	// Router parameters clean themselves up via their deleteModule listeners;
 	// separators have no such listener so we remove them manually here.
@@ -804,18 +824,25 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 	}
 
 	// Rebuild routerSortOrder from scratch.
-	// The tracking blocks inside processRouterNode() will push each router
-	// name as it is processed; separators are pushed inline below.
+	// processRouterNode() pushes each NEW router name; pre-existing routers are
+	// pushed inline below; separators are pushed inline in the sorted path.
 	routerSortOrder.clear();
 
 	if(!pendingRouterSortOrder.empty()){
 		// ── Sorted path ─────────────────────────────────────────────────────
+		// Build name→node maps for both new routers (need processRouterNode)
+		// and pre-existing ones (already fully set up, just need sort-order entry).
 		// Router nameParams have been pre-loaded by newNodeCreated(), so the
 		// map keys are the correct saved names, not the default type labels.
-		map<string, ofxOceanodeNode*> routerByName;
+		map<string, ofxOceanodeNode*> newRouterByName;
 		for(auto* node : toCreateRouters){
 			string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
-			routerByName[name] = node;
+			newRouterByName[name] = node;
+		}
+		map<string, ofxOceanodeNode*> preExistingByName;
+		for(auto* node : preExistingRouters){
+			string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+			preExistingByName[name] = node;
 		}
 
 		set<ofxOceanodeNode*> processed;
@@ -826,40 +853,71 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 				addSeparator(getSortSeparatorLabel(entry), getSortSeparatorColor(entry));
 				routerSortOrder.push_back(entry);
 			} else {
-				auto it = routerByName.find(entry);
-				if(it != routerByName.end()){
+				// New router: needs full processRouterNode() setup.
+				auto it = newRouterByName.find(entry);
+				if(it != newRouterByName.end()){
 					processRouterNode(it->second);   // pushes entry to routerSortOrder
 					ofEventArgs args;
 					it->second->update(args);
 					processed.insert(it->second);
+				} else {
+					// Pre-existing router: already set up, just restore sort-order entry.
+					auto it2 = preExistingByName.find(entry);
+					if(it2 != preExistingByName.end()){
+						if(!isRouterInSortOrder(entry))
+							routerSortOrder.push_back(entry);
+						processed.insert(it2->second);
+					}
+					// Entries not found in either map (router was deleted): silently dropped.
 				}
-				// Entries not found (router was deleted) are silently dropped.
 			}
 		}
 
-		// Routers not listed in the sort order: append in Y-position order
+		// New routers not listed in the sort order: append in Y-position order
 		// (backward compatibility — new routers added to the inner macro).
-		vector<ofxOceanodeNode*> remaining;
+		vector<ofxOceanodeNode*> remainingNew;
 		for(auto* node : toCreateRouters)
-			if(processed.find(node) == processed.end()) remaining.push_back(node);
-		sort(remaining.begin(), remaining.end(), [](ofxOceanodeNode* a, ofxOceanodeNode* b){
+			if(processed.find(node) == processed.end()) remainingNew.push_back(node);
+		sort(remainingNew.begin(), remainingNew.end(), [](ofxOceanodeNode* a, ofxOceanodeNode* b){
 			return a->getNodeGui().getPosition().y < b->getNodeGui().getPosition().y;
 		});
-		for(auto* node : remaining){
+		for(auto* node : remainingNew){
 			processRouterNode(node);
 			ofEventArgs args;
 			node->update(args);
 		}
+
+		// Pre-existing routers not listed in the sort order: append at the end.
+		for(auto* node : preExistingRouters){
+			if(processed.find(node) == processed.end()){
+				string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+				if(!isRouterInSortOrder(name))
+					routerSortOrder.push_back(name);
+			}
+		}
 	} else {
 		// ── Unsorted path (no saved order) ──────────────────────────────────
-		// Original Y-position sort; routerSortOrder is rebuilt in Y-order.
-		sort(toCreateRouters.begin(), toCreateRouters.end(), [](ofxOceanodeNode* a, ofxOceanodeNode* b){
-			return a->getNodeGui().getPosition().y < b->getNodeGui().getPosition().y;
+		// Combine all routers (new + pre-existing) and sort by Y-position.
+		// Call processRouterNode() only for truly new ones.
+		vector<pair<ofxOceanodeNode*, bool>> allRoutersTagged; // {node, isNew}
+		for(auto* n : toCreateRouters)    allRoutersTagged.push_back({n, true});
+		for(auto* n : preExistingRouters) allRoutersTagged.push_back({n, false});
+		sort(allRoutersTagged.begin(), allRoutersTagged.end(),
+		     [](const pair<ofxOceanodeNode*, bool>& a, const pair<ofxOceanodeNode*, bool>& b){
+			return a.first->getNodeGui().getPosition().y < b.first->getNodeGui().getPosition().y;
 		});
-		for(auto* node : toCreateRouters){
-			processRouterNode(node);
-			ofEventArgs args;
-			node->update(args);
+		for(auto& tagged : allRoutersTagged){
+			ofxOceanodeNode* node = tagged.first;
+			bool isNew            = tagged.second;
+			if(isNew){
+				processRouterNode(node);
+				ofEventArgs args;
+				node->update(args);
+			} else {
+				string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+				if(!isRouterInSortOrder(name))
+					routerSortOrder.push_back(name);
+			}
 		}
 	}
 
@@ -907,7 +965,6 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 		if(!currentMacroPath.empty()) {
 			string sortOrderFile = currentMacroPath + "/router_sort_order.json";
 			ofJson sortJson;
-			sortJson["LiveNodeOrder"] = liveRouterSort;
 			if(!routerSortOrder.empty()) {
 				ofJson sortArr = ofJson::array();
 				for(const auto& e : routerSortOrder) sortArr.push_back(e);
@@ -922,7 +979,6 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 	// Save router sort order for local macros (stored in the preset json).
 	// Global macro sort order is saved to the macro folder above.
 	if(localPreset) {
-		json["LiveNodeOrder"] = liveRouterSort;
 		if(!routerSortOrder.empty()) {
 			ofJson sortArr = ofJson::array();
 			for(const auto& e : routerSortOrder) sortArr.push_back(e);
@@ -2032,8 +2088,6 @@ void ofxOceanodeNodeMacro::loadRouterSortFromJson(const ofJson& json) {
 		for(const auto& item : json["RouterSortOrder"])
 			pendingRouterSortOrder.push_back(item.get<string>());
 	}
-	if(json.contains("LiveNodeOrder"))
-		liveRouterSort = json["LiveNodeOrder"].get<bool>();
 }
 
 void ofxOceanodeNodeMacro::syncParameterGroupToSortOrder() {
@@ -2086,7 +2140,6 @@ void ofxOceanodeNodeMacro::syncParameterGroupToSortOrder() {
 void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 #ifndef OFXOCEANODE_HEADLESS
 	ImGui::SeparatorText("Router Management");
-	ImGui::Checkbox("Live Node Order", &liveRouterSort);
 	ImGui::TextDisabled("Drag to reorder, double-click to rename.");
 	ImGui::Spacing();
 
@@ -2248,7 +2301,7 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 		int insertAt = (moveFrom < moveTo) ? moveTo - 1 : moveTo;
 		routerSortOrder.insert(routerSortOrder.begin() + insertAt, item);
 
-		if(liveRouterSort) syncParameterGroupToSortOrder();
+		syncParameterGroupToSortOrder();
 	}
 
 	// "Add separator" row

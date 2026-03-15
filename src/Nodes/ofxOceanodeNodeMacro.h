@@ -268,7 +268,6 @@ private:
 	std::vector<std::string> pendingRouterSortOrder;  // loaded from JSON, consumed by allNodesCreated()
 	std::string innerPresetLoadingPath;               // set before container->loadPreset(), used by newNodeCreated()
 	ofParameter<std::function<void()>> routerSortInspector;
-	bool liveRouterSort = false;                      // when true, reorder immediately updates the node GUI
 	char routerSortSepNameBuf[128];
 
 	// Inline-rename state (router sort inspector)

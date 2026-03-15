@@ -174,6 +174,10 @@ public:
     
     void setCanvasID(string s){canvasID = s;};
     string getCanvasID(){return canvasID;};
+
+    /// Read-only access to the dynamic node map, keyed by node-type name.
+    /// Each value is a map from integer identifier to the shared_ptr<ofxOceanodeNode>.
+    const std::unordered_map<string, nodeContainerWithId>& getDynamicNodes() const { return dynamicNodes; }
     
 private:
     
