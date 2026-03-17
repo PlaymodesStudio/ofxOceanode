@@ -311,17 +311,48 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         }
 		
 		if(ImGui::BeginMenu("Config"))
-        {
-            float f = ofGetFrameRate();
-            if(ImGui::SliderFloat("FPS", &f, 1, 10000)){ofSetFrameRate(f);}
-            bool b = false;
-            if(ImGui::Checkbox("V Sync", &b)){ofSetVerticalSync(b);};
-            ofxOceanodeConfigurationFlags configurationFlags = ofxOceanodeShared::getConfigurationFlags();
-            ImGui::CheckboxFlags("Disable Full Render", &configurationFlags, ofxOceanodeConfigurationFlags_DisableRenderAll);
-            ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
-            ImGui::Checkbox("Show Mode", &showMode);
-            ofxOceanodeShared::setConfigurationFlags(configurationFlags);
-		    bool snap = canvas.getSnapToGrid();
+		{
+			// Show actual running FPS (read-only) with color feedback
+			int currentFPS = (int)ofGetFrameRate();
+			
+			// Calculate percentage difference from desired FPS
+			float fpsDiff = abs(currentFPS - desiredFPS) / (float)desiredFPS * 100.0f;
+			
+			// Set colors based on difference
+			ImVec4 sliderColor;
+			if(fpsDiff <= 5.0f) {
+				sliderColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); // Green
+			} else if(fpsDiff <= 15.0f) {
+				sliderColor = ImVec4(1.0f, 0.6f, 0.0f, 1.0f); // Orange
+			} else {
+				sliderColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); // Red
+			}
+			
+			// Push the color styles for the slider
+			ImGui::PushStyleColor(ImGuiCol_SliderGrab, sliderColor);
+			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(sliderColor.x*0.3f, sliderColor.y*0.3f, sliderColor.z*0.3f, 1.0f));
+			
+			// Draw the disabled FPS slider
+			ImGui::BeginDisabled();
+			ImGui::SliderInt("FPS", &currentFPS, 0, 240);
+			ImGui::EndDisabled();
+			
+			// Pop the color styles
+			ImGui::PopStyleColor(2);
+			
+			// Editable Desired FPS slider
+			if(ImGui::SliderInt("Desired FPS", &desiredFPS, 1, 240)){
+				ofSetFrameRate(desiredFPS);
+			}
+			
+			bool b = false;
+			if(ImGui::Checkbox("V Sync", &b)){ofSetVerticalSync(b);};
+			ofxOceanodeConfigurationFlags configurationFlags = ofxOceanodeShared::getConfigurationFlags();
+			ImGui::CheckboxFlags("Disable Full Render", &configurationFlags, ofxOceanodeConfigurationFlags_DisableRenderAll);
+			ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
+			ImGui::Checkbox("Show Mode", &showMode);
+			ofxOceanodeShared::setConfigurationFlags(configurationFlags);
+			bool snap = canvas.getSnapToGrid();
 			if(ImGui::Checkbox("Snap To Grid",&snap))
 			{
 				canvas.setSnapToGrid(snap);
@@ -343,9 +374,19 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			canvas.setNodeWidthText(tw);
 			canvas.setNodeWidthWidget(ww);
 			
-            ImGui::EndMenu();
-        }
-		
+			ImGui::Separator();
+			
+			if(ImGui::Button("Save Config")){
+				saveConfig();
+			}
+			ImGui::SameLine();
+			if(ImGui::Button("Load Config")){
+				loadConfig();
+			}
+			
+			ImGui::EndMenu();
+		}
+
         if(ImGui::BeginMenu("Help"))
         {
             ImGui::MenuItem("Show User Manual", "CMD+L", &showManual);
