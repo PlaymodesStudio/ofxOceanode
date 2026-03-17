@@ -129,6 +129,7 @@ private:
 	void renderInspectorInterface();
 	void renderSnapshotListItem(int slot, SnapshotData& snapshot);
 	void renderRouterSortInterface();
+	void syncParameterGroupToSortOrder();
 
 	// Router Sort Order Helpers
 	bool isSortSeparatorEntry(const std::string& entry) const;
@@ -140,6 +141,10 @@ private:
 
 	// Router & Snapshot Management
 	void processRouterNode(ofxOceanodeNode* node);
+	/// Replace the router named \p routerName with a new router of type \p newTypeName.
+	/// Saves inner-container connections, deletes the old node, creates the new one,
+	/// restores sort-order position, and attempts to reconnect compatible connections.
+	void changeRouterType(const std::string& routerName, const std::string& newTypeName);
 	void updateRouterConnections();
 	void updateRouterInfo(ofxOceanodeNode* node);
 	bool checkIsInputRouter(ofxOceanodeNode* node);

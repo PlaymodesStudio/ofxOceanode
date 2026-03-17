@@ -287,15 +287,13 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 				// Save router sort order to the macro folder
 				{
 					string sortOrderFile = currentMacroPath + "/router_sort_order.json";
+					ofJson sortJson;
 					if(!routerSortOrder.empty()) {
-						ofJson sortJson;
 						ofJson sortArr = ofJson::array();
 						for(const auto& e : routerSortOrder) sortArr.push_back(e);
 						sortJson["RouterSortOrder"] = sortArr;
-						ofSavePrettyJson(sortOrderFile, sortJson);
-					} else if(ofFile::doesFileExist(sortOrderFile)) {
-						ofFile::removeFile(sortOrderFile);
 					}
+					ofSavePrettyJson(sortOrderFile, sortJson);
 				}
 				ofxOceanodeShared::macroUpdated(currentMacroPath);
 			}
@@ -350,13 +348,13 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 						// Save router sort order to the macro folder
 						{
 							string sortOrderFile = currentMacroPath + "/router_sort_order.json";
+							ofJson sortJson;
 							if(!routerSortOrder.empty()) {
-								ofJson sortJson;
 								ofJson sortArr = ofJson::array();
 								for(const auto& e : routerSortOrder) sortArr.push_back(e);
 								sortJson["RouterSortOrder"] = sortArr;
-								ofSavePrettyJson(sortOrderFile, sortJson);
 							}
+							ofSavePrettyJson(sortOrderFile, sortJson);
 						}
 						saveSnapshots();
 						ofxOceanodeShared::updateMacrosStructure();
@@ -770,26 +768,10 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 			toCreateRouters.push_back(node);
 			return;
 		}
-		auto newCreatedParam = typesRegistry->createRouterFromType(node);
-		if(newCreatedParam != nullptr){
-			string paramName = newCreatedParam->getName();
-			while (getParameterGroup().contains(paramName)) {
-				paramName = "_" + paramName;
-			}
-			newCreatedParam->setName(paramName);
-			addParameter(*newCreatedParam.get());
-
-			ofParameter<string> nameParamFromRouter = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
-			nameParamFromRouter = paramName;
-
-			parameterGroupChanged.notify(this);
-			deleteListeners.push(node->deleteModule.newListener([this, nameParamFromRouter](){
-				getParameterGroup().remove(nameParamFromRouter);
-			}, 0));
-		}
-
-		// Update router info (also handles void routers)
-		updateRouterInfo(node);
+		// Interactive creation (not during preset load): use processRouterNode()
+		// so the router is immediately added to routerSortOrder and tracked for
+		// renaming/deletion — making it appear in the inspector reorder list right away.
+		processRouterNode(node);
 	}
 	ofEventArgs args;
     node->setActive(active);
@@ -806,6 +788,28 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 		return;
 	}
 
+	// ── Collect pre-existing router nodes ────────────────────────────────────
+	// Routers that were already in the inner container (from a previous load
+	// pass) are merely repositioned by loadPreset_loadNodes() — they do NOT
+	// fire newNodeCreated() and therefore are NOT in toCreateRouters.  Without
+	// this extra step, routerSortOrder.clear() below would lose those routers
+	// from the inspector list even though their parameters are still alive.
+	// We must re-add their names to routerSortOrder WITHOUT calling
+	// processRouterNode() again (which would create duplicate parameters and
+	// duplicate listeners).
+	set<ofxOceanodeNode*> toCreateSet(toCreateRouters.begin(), toCreateRouters.end());
+	vector<ofxOceanodeNode*> preExistingRouters;
+	for(auto& typeMap : container->getDynamicNodes()){
+		if(!typeMap.first.empty() && ofSplitString(typeMap.first, " ")[0] == "Router"){
+			for(auto& nodePair : typeMap.second){
+				auto* node = nodePair.second.get();
+				if(toCreateSet.find(node) == toCreateSet.end()){
+					preExistingRouters.push_back(node);
+				}
+			}
+		}
+	}
+
 	// Remove any separator parameters left over from a previous load.
 	// Router parameters clean themselves up via their deleteModule listeners;
 	// separators have no such listener so we remove them manually here.
@@ -820,18 +824,25 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 	}
 
 	// Rebuild routerSortOrder from scratch.
-	// The tracking blocks inside processRouterNode() will push each router
-	// name as it is processed; separators are pushed inline below.
+	// processRouterNode() pushes each NEW router name; pre-existing routers are
+	// pushed inline below; separators are pushed inline in the sorted path.
 	routerSortOrder.clear();
 
 	if(!pendingRouterSortOrder.empty()){
 		// ── Sorted path ─────────────────────────────────────────────────────
+		// Build name→node maps for both new routers (need processRouterNode)
+		// and pre-existing ones (already fully set up, just need sort-order entry).
 		// Router nameParams have been pre-loaded by newNodeCreated(), so the
 		// map keys are the correct saved names, not the default type labels.
-		map<string, ofxOceanodeNode*> routerByName;
+		map<string, ofxOceanodeNode*> newRouterByName;
 		for(auto* node : toCreateRouters){
 			string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
-			routerByName[name] = node;
+			newRouterByName[name] = node;
+		}
+		map<string, ofxOceanodeNode*> preExistingByName;
+		for(auto* node : preExistingRouters){
+			string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+			preExistingByName[name] = node;
 		}
 
 		set<ofxOceanodeNode*> processed;
@@ -842,40 +853,71 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 				addSeparator(getSortSeparatorLabel(entry), getSortSeparatorColor(entry));
 				routerSortOrder.push_back(entry);
 			} else {
-				auto it = routerByName.find(entry);
-				if(it != routerByName.end()){
+				// New router: needs full processRouterNode() setup.
+				auto it = newRouterByName.find(entry);
+				if(it != newRouterByName.end()){
 					processRouterNode(it->second);   // pushes entry to routerSortOrder
 					ofEventArgs args;
 					it->second->update(args);
 					processed.insert(it->second);
+				} else {
+					// Pre-existing router: already set up, just restore sort-order entry.
+					auto it2 = preExistingByName.find(entry);
+					if(it2 != preExistingByName.end()){
+						if(!isRouterInSortOrder(entry))
+							routerSortOrder.push_back(entry);
+						processed.insert(it2->second);
+					}
+					// Entries not found in either map (router was deleted): silently dropped.
 				}
-				// Entries not found (router was deleted) are silently dropped.
 			}
 		}
 
-		// Routers not listed in the sort order: append in Y-position order
+		// New routers not listed in the sort order: append in Y-position order
 		// (backward compatibility — new routers added to the inner macro).
-		vector<ofxOceanodeNode*> remaining;
+		vector<ofxOceanodeNode*> remainingNew;
 		for(auto* node : toCreateRouters)
-			if(processed.find(node) == processed.end()) remaining.push_back(node);
-		sort(remaining.begin(), remaining.end(), [](ofxOceanodeNode* a, ofxOceanodeNode* b){
+			if(processed.find(node) == processed.end()) remainingNew.push_back(node);
+		sort(remainingNew.begin(), remainingNew.end(), [](ofxOceanodeNode* a, ofxOceanodeNode* b){
 			return a->getNodeGui().getPosition().y < b->getNodeGui().getPosition().y;
 		});
-		for(auto* node : remaining){
+		for(auto* node : remainingNew){
 			processRouterNode(node);
 			ofEventArgs args;
 			node->update(args);
 		}
+
+		// Pre-existing routers not listed in the sort order: append at the end.
+		for(auto* node : preExistingRouters){
+			if(processed.find(node) == processed.end()){
+				string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+				if(!isRouterInSortOrder(name))
+					routerSortOrder.push_back(name);
+			}
+		}
 	} else {
 		// ── Unsorted path (no saved order) ──────────────────────────────────
-		// Original Y-position sort; routerSortOrder is rebuilt in Y-order.
-		sort(toCreateRouters.begin(), toCreateRouters.end(), [](ofxOceanodeNode* a, ofxOceanodeNode* b){
-			return a->getNodeGui().getPosition().y < b->getNodeGui().getPosition().y;
+		// Combine all routers (new + pre-existing) and sort by Y-position.
+		// Call processRouterNode() only for truly new ones.
+		vector<pair<ofxOceanodeNode*, bool>> allRoutersTagged; // {node, isNew}
+		for(auto* n : toCreateRouters)    allRoutersTagged.push_back({n, true});
+		for(auto* n : preExistingRouters) allRoutersTagged.push_back({n, false});
+		sort(allRoutersTagged.begin(), allRoutersTagged.end(),
+		     [](const pair<ofxOceanodeNode*, bool>& a, const pair<ofxOceanodeNode*, bool>& b){
+			return a.first->getNodeGui().getPosition().y < b.first->getNodeGui().getPosition().y;
 		});
-		for(auto* node : toCreateRouters){
-			processRouterNode(node);
-			ofEventArgs args;
-			node->update(args);
+		for(auto& tagged : allRoutersTagged){
+			ofxOceanodeNode* node = tagged.first;
+			bool isNew            = tagged.second;
+			if(isNew){
+				processRouterNode(node);
+				ofEventArgs args;
+				node->update(args);
+			} else {
+				string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+				if(!isRouterInSortOrder(name))
+					routerSortOrder.push_back(name);
+			}
 		}
 	}
 
@@ -922,17 +964,13 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 		// "reload macro" from the popup also picks it up).
 		if(!currentMacroPath.empty()) {
 			string sortOrderFile = currentMacroPath + "/router_sort_order.json";
+			ofJson sortJson;
 			if(!routerSortOrder.empty()) {
-				ofJson sortJson;
 				ofJson sortArr = ofJson::array();
 				for(const auto& e : routerSortOrder) sortArr.push_back(e);
 				sortJson["RouterSortOrder"] = sortArr;
-				ofSavePrettyJson(sortOrderFile, sortJson);
-			} else {
-				if(ofFile::doesFileExist(sortOrderFile)) {
-					ofFile::removeFile(sortOrderFile);
-				}
 			}
+			ofSavePrettyJson(sortOrderFile, sortJson);
 		}
 	}
 
@@ -940,10 +978,12 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 
 	// Save router sort order for local macros (stored in the preset json).
 	// Global macro sort order is saved to the macro folder above.
-	if(localPreset && !routerSortOrder.empty()) {
-		ofJson sortArr = ofJson::array();
-		for(const auto& e : routerSortOrder) sortArr.push_back(e);
-		json["RouterSortOrder"] = sortArr;
+	if(localPreset) {
+		if(!routerSortOrder.empty()) {
+			ofJson sortArr = ofJson::array();
+			for(const auto& e : routerSortOrder) sortArr.push_back(e);
+			json["RouterSortOrder"] = sortArr;
+		}
 	}
 }
 
@@ -2050,10 +2090,143 @@ void ofxOceanodeNodeMacro::loadRouterSortFromJson(const ofJson& json) {
 	}
 }
 
+void ofxOceanodeNodeMacro::syncParameterGroupToSortOrder() {
+	// Build the full desired parameter order: non-managed params stay in their
+	// original positions; router/separator slots are replaced by the new order.
+	// Uses ofParameterGroup::reorder() which sorts in-place without removing or
+	// re-creating any parameter objects, so connections are never broken.
+
+	// Collect current names.
+	vector<string> originalNames;
+	for(int i = 0; i < (int)getParameterGroup().size(); i++)
+		originalNames.push_back(getParameterGroup().get(i).getName());
+
+	auto isManaged = [&](const string& name) -> bool {
+		if(name.size() > 11 && name.substr(0, 11) == "SEPARATOR:|") return true;
+		return isRouterInSortOrder(name);
+	};
+
+	// Build the new order for managed slots from routerSortOrder.
+	vector<string> managedNew;
+	for(const auto& entry : routerSortOrder) {
+		string paramName = entry;
+		if(isSortSeparatorEntry(entry)) {
+			ofColor c = getSortSeparatorColor(entry);
+			paramName = "SEPARATOR:|" + getSortSeparatorLabel(entry) + "|" +
+				ofToString((int)c.r) + "," + ofToString((int)c.g) + "," +
+				ofToString((int)c.b) + "," + ofToString((int)c.a);
+		}
+		if(getParameterGroup().contains(paramName)) managedNew.push_back(paramName);
+	}
+
+	// Merge: non-managed params keep original positions; managed slots get new order.
+	int mi = 0;
+	vector<string> newOrder;
+	for(const auto& name : originalNames) {
+		if(isManaged(name)) {
+			if(mi < (int)managedNew.size()) newOrder.push_back(managedNew[mi++]);
+		} else {
+			newOrder.push_back(name);
+		}
+	}
+	while(mi < (int)managedNew.size()) newOrder.push_back(managedNew[mi++]);
+
+	// Reorder in-place — no parameters are removed or re-created.
+	getParameterGroup().reorder(newOrder);
+
+	parameterGroupChanged.notify(this);
+}
+
+void ofxOceanodeNodeMacro::changeRouterType(const std::string& routerName, const std::string& newTypeName) {
+	auto it = routerNodes.find(routerName);
+	if(it == routerNodes.end()) return;
+	auto* routerNode = it->second.node;
+
+#ifndef OFXOCEANODE_HEADLESS
+	glm::vec2 oldPos = routerNode->getNodeGui().getPosition();
+#endif
+
+	// 1. Find where this router sits in the sort order so we can restore it later.
+	int sortIdx = -1;
+	for(int i = 0; i < (int)routerSortOrder.size(); ++i){
+		if(!isSortSeparatorEntry(routerSortOrder[i]) && routerSortOrder[i] == routerName){
+			sortIdx = i; break;
+		}
+	}
+
+#ifndef OFXOCEANODE_HEADLESS
+	// 2. Capture inner-container connection info as plain strings before the node
+	//    is deleted (pointers become invalid after deleteSelf()).
+	string oldGroupEscaped = routerNode->getParameters().getEscapedName();
+	struct ConnInfo { string srcGroup, srcParam, sinkGroup, sinkParam; };
+	vector<ConnInfo> savedConns;
+	for(auto& conn : container->getAllConnections()){
+		string srcG = conn->getSourceParameter().getGroupHierarchyNames()[0];
+		string snkG = conn->getSinkParameter().getGroupHierarchyNames()[0];
+		if(srcG == oldGroupEscaped || snkG == oldGroupEscaped){
+			savedConns.push_back({srcG, conn->getSourceParameter().getName(),
+			                      snkG, conn->getSinkParameter().getName()});
+		}
+	}
+#endif
+
+	// 3. Delete the old router.
+	//    Fires deleteModule listeners: removes the published param from
+	//    getParameterGroup(), removes routerName from routerSortOrder,
+	//    and removes the node from the container's dynamicNodes map.
+	routerNode->deleteSelf();
+	routerNode = nullptr;
+
+	// 4. Create the new router.
+	//    Because isLoadingPreset == false, the newNodeCreated event listener
+	//    calls processRouterNode() immediately, which adds a new published
+	//    parameter and pushes the default type-label name onto routerSortOrder.
+	auto* newNode = container->createNodeFromName(newTypeName);
+	if(!newNode) return;
+
+#ifndef OFXOCEANODE_HEADLESS
+	newNode->getNodeGui().setPosition(oldPos);
+#endif
+
+	// 5. Rename the new router back to the original name.
+	//    The rename listener installed by processRouterNode() will synchronise
+	//    routerSortOrder (default label → routerName) and routerNodes.
+	static_cast<abstractRouter*>(&newNode->getNodeModel())->getNameParam().set(routerName);
+
+	// 6. Restore sort-order position.
+	//    After steps 4+5 routerName sits at the end of routerSortOrder.
+	//    Move it back to the saved index.
+	if(sortIdx >= 0){
+		auto entryIt = std::find(routerSortOrder.begin(), routerSortOrder.end(), routerName);
+		if(entryIt != routerSortOrder.end()){
+			routerSortOrder.erase(entryIt);
+			int insertAt = std::min(sortIdx, (int)routerSortOrder.size());
+			routerSortOrder.insert(routerSortOrder.begin() + insertAt, routerName);
+		}
+	}
+
+#ifndef OFXOCEANODE_HEADLESS
+	// 7. Reconnect inner-container connections (best-effort).
+	//    Incompatible type pairs will silently fail — that is expected when
+	//    switching between fundamentally different types.
+	string newGroupEscaped = newNode->getParameters().getEscapedName();
+	for(auto& ci : savedConns){
+		string srcG = (ci.srcGroup == oldGroupEscaped) ? newGroupEscaped : ci.srcGroup;
+		string snkG = (ci.sinkGroup == oldGroupEscaped) ? newGroupEscaped : ci.sinkGroup;
+		container->createConnectionFromInfo(srcG, ci.srcParam, snkG, ci.sinkParam);
+	}
+#endif
+
+	// 8. Sync the macro's parameter-group order to the (restored) sort order
+	//    and broadcast the structural change to the outer container.
+	syncParameterGroupToSortOrder();
+	parameterGroupChanged.notify(this);
+}
+
 void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 #ifndef OFXOCEANODE_HEADLESS
+	ImGui::SeparatorText("Router Management");
 	ImGui::TextDisabled("Drag to reorder, double-click to rename.");
-	ImGui::TextDisabled("Changes apply on next preset load.");
 	ImGui::Spacing();
 
 	int moveFrom = -1, moveTo = -1;
@@ -2064,6 +2237,10 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 	// Track whether we need to early-return because a separator was deleted
 	// (erasing from routerSortOrder mid-loop requires us to stop iterating).
 	bool separatorDeleted = false;
+
+	// Deferred type-change: set from the context menu, executed after PopID so
+	// the ImGui ID stack is clean before we rebuild routerSortOrder.
+	string typeChangeFrom, typeChangeTo;
 
 	for(int i = 0; i < (int)routerSortOrder.size(); i++){
 		ImGui::PushID(i);
@@ -2174,6 +2351,67 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 				routerSortEditBuf[sizeof(routerSortEditBuf) - 1] = '\0';
 			}
 
+			// ── Right-click context menu (only for known router rows) ─────────
+			if(!isSep && !isUnknown && ImGui::BeginPopupContextItem("##routerCtx")){
+				// ── Range editing ────────────────────────────────────────────
+				auto& innerParams = routerNodes[routerSortOrder[i]].node->getParameters();
+				if(innerParams.contains("Min") && innerParams.contains("Max")){
+					auto* minP = dynamic_cast<ofxOceanodeAbstractParameter*>(&innerParams.get("Min"));
+					auto* maxP = dynamic_cast<ofxOceanodeAbstractParameter*>(&innerParams.get("Max"));
+					if(minP && maxP){
+						ImGui::SeparatorText("Range");
+						bool rangeChanged = false;
+						string vt = minP->valueType();
+						if(vt == typeid(float).name()){
+							float mn = minP->cast<float>().getParameter().get();
+							float mx = maxP->cast<float>().getParameter().get();
+							ImGui::SetNextItemWidth(120.f);
+							rangeChanged |= ImGui::DragFloat("Min##mnf", &mn, 0.01f);
+							ImGui::SetNextItemWidth(120.f);
+							rangeChanged |= ImGui::DragFloat("Max##mxf", &mx, 0.01f);
+							if(rangeChanged){
+								minP->cast<float>().getParameter().set(mn);
+								maxP->cast<float>().getParameter().set(mx);
+							}
+						} else if(vt == typeid(int).name()){
+							int mn = minP->cast<int>().getParameter().get();
+							int mx = maxP->cast<int>().getParameter().get();
+							ImGui::SetNextItemWidth(120.f);
+							rangeChanged |= ImGui::DragInt("Min##mni", &mn);
+							ImGui::SetNextItemWidth(120.f);
+							rangeChanged |= ImGui::DragInt("Max##mxi", &mx);
+							if(rangeChanged){
+								minP->cast<int>().getParameter().set(mn);
+								maxP->cast<int>().getParameter().set(mx);
+							}
+						} else {
+							ImGui::TextDisabled("No range for this type");
+						}
+					}
+					ImGui::Separator();
+				}
+
+				// ── Change Type submenu ──────────────────────────────────────
+				string curNodeType = routerNodes[routerSortOrder[i]].node->getNodeModel().nodeName();
+				if(ImGui::BeginMenu("Change Type")){
+					for(auto& mPair : registry->getRegisteredModels()){
+						const string& mName = mPair.first;
+						// Show all "Router X" entries; highlight the current type
+						// with a checkmark and gray it out (non-clickable).
+						if(mName.size() > 7 && mName.substr(0, 7) == "Router "){
+							bool isCurrent = (mName == curNodeType);
+							if(ImGui::MenuItem(mName.c_str() + 7, nullptr, isCurrent, !isCurrent)){
+								typeChangeFrom = routerSortOrder[i];
+								typeChangeTo   = mName;
+								ImGui::CloseCurrentPopup();
+							}
+						}
+					}
+					ImGui::EndMenu();
+				}
+				ImGui::EndPopup();
+			}
+
 			// Drag-drop (disabled while any rename is in progress)
 			if(!anyEditing){
 				if(ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)){
@@ -2205,6 +2443,14 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 		}
 
 		ImGui::PopID();
+
+		// Execute a type change requested from the context menu this iteration.
+		// Placed after PopID so the ImGui ID stack is clean before we mutate
+		// routerSortOrder; we return immediately and let ImGui re-render next frame.
+		if(!typeChangeFrom.empty()){
+			changeRouterType(typeChangeFrom, typeChangeTo);
+			return;
+		}
 	}
 
 	// Apply deferred drag-drop move (only if no separator was deleted this frame).
@@ -2213,6 +2459,8 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 		routerSortOrder.erase(routerSortOrder.begin() + moveFrom);
 		int insertAt = (moveFrom < moveTo) ? moveTo - 1 : moveTo;
 		routerSortOrder.insert(routerSortOrder.begin() + insertAt, item);
+
+		syncParameterGroupToSortOrder();
 	}
 
 	// "Add separator" row
