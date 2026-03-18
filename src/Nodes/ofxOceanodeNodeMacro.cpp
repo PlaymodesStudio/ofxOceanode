@@ -23,7 +23,8 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
 	currentSnapshotSlot = -1;
 	isInterpolating = false;
 	interpolationStartTime = 0;
-	interpolationBiPowCapture = 2.f;
+	interpolationBiPowCapture = 0.f;
+	currentMorphProgress = 0.f;
 
 	// Initialize inline-rename state
 	routerSortEditingIndex   = -1;
@@ -119,17 +120,17 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 		if(isInterpolating) {
 			float elapsed = (float)(ofGetElapsedTimeMillis() - interpolationStartTime);
 			float t = ofClamp(elapsed / interpolationMs.get(), 0.f, 1.f);
-			float mappedT;
-			if(interpolationBiPowCapture <= 0.f) {
-				mappedT = t;
-			} else if(t < 0.5f) {
-				mappedT = customPow(t * 2.f, interpolationBiPowCapture) * 0.5f;
-			} else {
-				mappedT = 1.f - customPow((1.f - t) * 2.f, interpolationBiPowCapture) * 0.5f;
+			float mappedT = t;
+			if(interpolationBiPowCapture != 0.f) {
+				mappedT = mappedT * 2.f - 1.f;       // [0,1] → [-1,1]
+				customPow(mappedT, interpolationBiPowCapture);
+				mappedT = (mappedT + 1.f) * 0.5f;    // [-1,1] → [0,1]
 			}
+			currentMorphProgress = mappedT;
 			applyInterpolatedValues(mappedT);
 			if(t >= 1.f) {
 				isInterpolating = false;
+				currentMorphProgress = 1.f;
 			}
 		}
 	}
@@ -460,8 +461,8 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	addInspectorParameter(showSnapshotNames.set("Show Names", true));
 	addInspectorParameter(addSnapshotButton.set("Add Snapshot"));
 	addInspectorParameter(retriggerSnapshotOnActive.set("Retrigger Snapshot on Active", false));
-	addInspectorParameter(interpolationMs.set("Interpolation Ms", 0.f, 0.f, 10000.f));
-	addInspectorParameter(interpolationBiPow.set("Interpolation BiPow", 2.f, 0.f, 6.f));
+	interpolationMs.set("Interpolation Ms", 0.f, 0.f, 10000.f);
+	interpolationBiPow.set("Interpolation BiPow", 0.f, -1.f, 1.f);
 
 
 	// Add snapshot inspector
@@ -487,13 +488,33 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	
 	// Setup preset control
 	auto presetNamingRef = addParameter(presetNaming.set("Preset Naming Gui", [this](){
-		
+
 		//		ImGui::SameLine();
 		// Render snapshot matrix
 		if(showSnapshotMatrix) {
 			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
 			renderSnapshotMatrix();
 			ImGui::PopStyleVar();
+
+			// Morph time controls
+			float nodeW = (float)(ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget());
+			float morphMs = interpolationMs.get();
+			ImGui::SetNextItemWidth(nodeW);
+			if(ImGui::SliderFloat("##morphMs", &morphMs, 0.f, 10000.f, "Morph: %.0f ms")) {
+				interpolationMs = morphMs;
+			}
+			float biPow = interpolationBiPow.get();
+			ImGui::SetNextItemWidth(nodeW);
+			if(ImGui::SliderFloat("##morphBiPow", &biPow, -1.f, 1.f, "BiPow: %.2f")) {
+				interpolationBiPow = biPow;
+			}
+
+			// Morphing progress bar (bipow-mapped)
+			float progress = isInterpolating ? currentMorphProgress : (currentSnapshotSlot >= 0 ? 1.f : 0.f);
+			ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.8f, 0.4f, 0.1f, 1.0f));
+			ImGui::ProgressBar(progress, ImVec2(nodeW, 6.f), "");
+			ImGui::PopStyleColor();
+
 			ImGui::Text(". . . . . . . . . . . . . . . . .");
 		}
 	}));
@@ -1257,6 +1278,10 @@ void ofxOceanodeNodeMacro::loadRouterSnapshot(int slot) {
 		}
 	});
 
+	// Use the destination snapshot's morph time (and update the displayed sliders)
+	interpolationMs = it->second.morphTimeMs;
+	interpolationBiPow = it->second.morphBiPow;
+
 	if(interpolationMs.get() > 0.f) {
 		// Stop any ongoing interpolation
 		isInterpolating = false;
@@ -1347,6 +1372,7 @@ void ofxOceanodeNodeMacro::loadRouterSnapshot(int slot) {
 	} else {
 		// Immediate apply
 		isInterpolating = false;
+		currentMorphProgress = 1.f;
 
 		for(auto& routerPair : routerNodes) {
 			if(!routerPair.second.isInput) continue;
@@ -1587,10 +1613,12 @@ void ofxOceanodeNodeMacro::saveSnapshots() {
 			for(const auto& pair : snapshots) {
 				ofJson slotJson;
 				slotJson["name"] = pair.second.name;
+				slotJson["morphTimeMs"] = pair.second.morphTimeMs;
+				slotJson["morphBiPow"] = pair.second.morphBiPow;
 				slotJson["routerValues"] = routerValuesToJson(pair.second.routerValues);
 				snapshotsJson[ofToString(pair.first)] = slotJson;
 			}
-			
+
 			ofSavePrettyJson(filename, snapshotsJson);
 			ofLogNotice("SnapshotSync") << "Saved " << snapshots.size() << " snapshots to: " << filename;
 		}
@@ -1630,6 +1658,8 @@ void ofxOceanodeNodeMacro::saveSnapshots() {
 			for(const auto& pair : snapshots) {
 				ofJson slotJson;
 				slotJson["name"] = pair.second.name;
+				slotJson["morphTimeMs"] = pair.second.morphTimeMs;
+				slotJson["morphBiPow"] = pair.second.morphBiPow;
 				slotJson["routerValues"] = routerValuesToJson(pair.second.routerValues);
 				snapshotsJson[ofToString(pair.first)] = slotJson;
 			}
@@ -1713,7 +1743,19 @@ void ofxOceanodeNodeMacro::loadSnapshotFromJson(SnapshotData& snapshot, const of
 		} else {
 			snapshot.name = "Snapshot";
 		}
-		
+
+		if(json.contains("morphTimeMs") && json["morphTimeMs"].is_number()) {
+			snapshot.morphTimeMs = json["morphTimeMs"].get<float>();
+		} else {
+			snapshot.morphTimeMs = 0.f;
+		}
+
+		if(json.contains("morphBiPow") && json["morphBiPow"].is_number()) {
+			snapshot.morphBiPow = json["morphBiPow"].get<float>();
+		} else {
+			snapshot.morphBiPow = 0.f;
+		}
+
 		if(json.contains("routerValues") && !json["routerValues"].is_null()) {
 			snapshot.routerValues = jsonToRouterValues(json["routerValues"]);
 		}
@@ -1881,6 +1923,8 @@ void ofxOceanodeNodeMacro::storeRouterSnapshot(int slot) {
 			ofLogError("Snapshot") << "Error storing value: " << e.what();
 		}
 	}
+	snapshotData.morphTimeMs = interpolationMs.get();
+	snapshotData.morphBiPow = interpolationBiPow.get();
 	snapshots[slot] = snapshotData;
 	currentSnapshotSlot = slot;
 
@@ -1892,9 +1936,11 @@ void ofxOceanodeNodeMacro::storeRouterSnapshot(int slot) {
 // Interpolation helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-float ofxOceanodeNodeMacro::customPow(float base, float exponent) {
-	if(base < 0.f) return -std::pow(-base, exponent);
-	return std::pow(base, exponent);
+void ofxOceanodeNodeMacro::customPow(float& value, float pow) {
+	float k1 = 2.f * pow * 0.99999f;
+	float k2 = k1 / ((-pow * 0.999999f) + 1.f);
+	float k3 = k2 * std::abs(value) + 1.f;
+	value = value * (k2 + 1.f) / k3;
 }
 
 bool ofxOceanodeNodeMacro::shouldInterpolateType(const std::string& type) const {
