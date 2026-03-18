@@ -37,7 +37,6 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
 	showSnapshotMatrix = false;
 	retriggerSnapshotOnActive.set("Retrigger Snapshot on Active", false);
 	
-	
 	// Add minimized view update callback
 	minimizedViewCallback = [this](ImVec2 size) {
 		// Only show output router values in minimized view
@@ -911,6 +910,8 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 			for(const auto& pair : snapshots) {
 				ofJson slotJson;
 				slotJson["name"] = pair.second.name;
+				slotJson["morphTimeMs"] = pair.second.morphTimeMs;
+				slotJson["morphBiPow"] = pair.second.morphBiPow;
 				slotJson["routerValues"] = routerValuesToJson(pair.second.routerValues);
 				snapshotsJson[ofToString(pair.first)] = slotJson;
 			}
@@ -921,12 +922,16 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 			for(const auto& pair : snapshots) {
 				ofJson slotJson;
 				slotJson["name"] = pair.second.name;
+				slotJson["morphTimeMs"] = pair.second.morphTimeMs;
+				slotJson["morphBiPow"] = pair.second.morphBiPow;
 				slotJson["routerValues"] = routerValuesToJson(pair.second.routerValues);
 				jsonSnapshots[ofToString(pair.first)] = slotJson;
 			}
 			json["Snapshots"] = jsonSnapshots;
 		}
-	}else{
+	}
+	else
+	{
 		json["LocalPreset"] = false;
 		json["CategoryStruct"] = currentCategory;
 		json["Macro"] = currentMacro;
