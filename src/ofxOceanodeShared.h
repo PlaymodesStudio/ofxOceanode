@@ -257,6 +257,12 @@ public:
 		return getInstance().snapGridDiv;
 	}
 
+	// Node dimensions (mirrors ofxOceanodeCanvas values, updated by the canvas)
+	static int getNodeWidthWidget(){ return getInstance().nodeWidthWidget; }
+	static int getNodeWidthText()  { return getInstance().nodeWidthText; }
+	static void setNodeWidthWidget(int w){ getInstance().nodeWidthWidget = w; }
+	static void setNodeWidthText(int t)  { getInstance().nodeWidthText = t; }
+
 	// Active canvas tracking
 	static void setActiveCanvasUniqueID(const string& uid){
 		auto& inst = getInstance();
@@ -312,6 +318,10 @@ private:
     
     ofxOceanodeConfigurationFlags configurationFlags;
 	
+	// Node dimensions
+	int nodeWidthWidget = 150;
+	int nodeWidthText   = 90;
+
 	// Snap to Grid
 	bool snapToGrid = false;
 	int snapGridDiv = 4;
