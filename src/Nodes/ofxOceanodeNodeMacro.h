@@ -255,9 +255,9 @@ private:
 	std::map<int, SnapshotData> snapshots;
 	std::unordered_map<std::string, ofEventListener> dropdownRouterListeners;
 
-	// Interpolation
-	ofParameter<float> interpolationMs;
-	ofParameter<float> interpolationBiPow;
+	// Interpolation (plain floats - not registered as preset params; live in snapshot data only)
+	float interpolationMs;
+	float interpolationBiPow;
 	bool isInterpolating;
 	uint64_t interpolationStartTime;
 	float interpolationBiPowCapture;

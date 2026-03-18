@@ -119,7 +119,7 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 
 		if(isInterpolating) {
 			float elapsed = (float)(ofGetElapsedTimeMillis() - interpolationStartTime);
-			float t = ofClamp(elapsed / interpolationMs.get(), 0.f, 1.f);
+			float t = ofClamp(elapsed / std::max(interpolationMs, 1.f), 0.f, 1.f);
 			float mappedT = t;
 			if(interpolationBiPowCapture != 0.f) {
 				mappedT = mappedT * 2.f - 1.f;       // [0,1] → [-1,1]
@@ -461,8 +461,8 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	addInspectorParameter(showSnapshotNames.set("Show Names", true));
 	addInspectorParameter(addSnapshotButton.set("Add Snapshot"));
 	addInspectorParameter(retriggerSnapshotOnActive.set("Retrigger Snapshot on Active", false));
-	interpolationMs.set("Interpolation Ms", 0.f, 0.f, 10000.f);
-	interpolationBiPow.set("Interpolation BiPow", 0.f, -1.f, 1.f);
+	interpolationMs = 0.f;
+	interpolationBiPow = 0.f;
 
 
 	// Add snapshot inspector
@@ -498,16 +498,10 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 
 			// Morph time controls
 			float nodeW = (float)(ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget());
-			float morphMs = interpolationMs.get();
 			ImGui::SetNextItemWidth(nodeW);
-			if(ImGui::SliderFloat("##morphMs", &morphMs, 0.f, 10000.f, "Morph: %.0f ms")) {
-				interpolationMs = morphMs;
-			}
-			float biPow = interpolationBiPow.get();
+			ImGui::SliderFloat("##morphMs", &interpolationMs, 0.f, 10000.f, "Morph: %.0f ms");
 			ImGui::SetNextItemWidth(nodeW);
-			if(ImGui::SliderFloat("##morphBiPow", &biPow, -1.f, 1.f, "BiPow: %.2f")) {
-				interpolationBiPow = biPow;
-			}
+			ImGui::SliderFloat("##morphBiPow", &interpolationBiPow, -1.f, 1.f, "BiPow: %.2f");
 
 			// Morphing progress bar (bipow-mapped)
 			float progress = isInterpolating ? currentMorphProgress : (currentSnapshotSlot >= 0 ? 1.f : 0.f);
@@ -1282,7 +1276,7 @@ void ofxOceanodeNodeMacro::loadRouterSnapshot(int slot) {
 	interpolationMs = it->second.morphTimeMs;
 	interpolationBiPow = it->second.morphBiPow;
 
-	if(interpolationMs.get() > 0.f) {
+	if(interpolationMs > 0.f) {
 		// Stop any ongoing interpolation
 		isInterpolating = false;
 
@@ -1365,7 +1359,7 @@ void ofxOceanodeNodeMacro::loadRouterSnapshot(int slot) {
 		}
 
 		// Start interpolation
-		interpolationBiPowCapture = interpolationBiPow.get();
+		interpolationBiPowCapture = interpolationBiPow;
 		interpolationStartTime = ofGetElapsedTimeMillis();
 		isInterpolating = true;
 
@@ -1923,8 +1917,8 @@ void ofxOceanodeNodeMacro::storeRouterSnapshot(int slot) {
 			ofLogError("Snapshot") << "Error storing value: " << e.what();
 		}
 	}
-	snapshotData.morphTimeMs = interpolationMs.get();
-	snapshotData.morphBiPow = interpolationBiPow.get();
+	snapshotData.morphTimeMs = interpolationMs;
+	snapshotData.morphBiPow = interpolationBiPow;
 	snapshots[slot] = snapshotData;
 	currentSnapshotSlot = slot;
 
