@@ -357,6 +357,7 @@ void ofxOceanodeHierarchyController::draw()
 
         // --- Double-click: open macro's OWN canvas (Scenario 5) ---
         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
+            pendingClickIndex = -1; // Cancel any pending single-click
             selectedEntryIndex = i;
             
             if (entries[i].macroNode != nullptr) {
@@ -375,10 +376,22 @@ void ofxOceanodeHierarchyController::draw()
                 ofxOceanodeShared::nodeSelectedInCanvas(entries[i].nodeWrapper);
             }
         }
-        // --- Single-click: navigate to PARENT canvas, center on macro node (Scenario 4) ---
+        // --- Single-click: defer navigation to PARENT canvas (Scenario 4) ---
         else if (ImGui::IsItemClicked(0)) {
             selectedEntryIndex = i;
+            pendingClickIndex = i;
+            pendingClickTime = ImGui::GetTime();
+        }
+    }
 
+    // --- Deferred single-click execution ---
+    if (pendingClickIndex >= 0) {
+        float elapsed = ImGui::GetTime() - pendingClickTime;
+        if (elapsed > ImGui::GetIO().MouseDoubleClickTime) {
+            int i = pendingClickIndex;
+            pendingClickIndex = -1;
+
+            // Execute the original single-click logic
             if (entries[i].macroNode != nullptr && entries[i].hostCanvas != nullptr) {
                 // Navigate to the parent canvas where this macro node lives
                 if (entries[i].hostMacro != nullptr) {
