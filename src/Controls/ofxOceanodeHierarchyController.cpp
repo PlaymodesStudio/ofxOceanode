@@ -311,7 +311,7 @@ void ofxOceanodeHierarchyController::draw()
                     255);
             } else {
                 // Half intensity: divide RGB by 4, keep alpha full
-                fillCol   = IM_COL32(nodeColor.r / 4, nodeColor.g / 4, nodeColor.b / 4, 255);
+                fillCol   = IM_COL32(nodeColor.r / 4, nodeColor.g / 4, nodeColor.b / 4, 128);
                 borderCol = IM_COL32(
                     (int)ofClamp(nodeColor.r * 1.3f * 0.5f, 0, 255),
                     (int)ofClamp(nodeColor.g * 1.3f * 0.5f, 0, 255),

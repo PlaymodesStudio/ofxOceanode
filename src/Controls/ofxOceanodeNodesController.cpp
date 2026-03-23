@@ -158,7 +158,7 @@ void ofxOceanodeNodesController::draw()
         };
         
         
-        std::function<void(vector<ofxOceanodeNode*>, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*, int)> listNodes = [this, &listNodes, countNodes](vector<ofxOceanodeNode*> nodes, ofxOceanodeCanvas* _canvas, ofxOceanodeNodeMacro* _macro, int depth){
+        std::function<void(vector<ofxOceanodeNode*>, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*, int, bool)> listNodes = [this, &listNodes, countNodes](vector<ofxOceanodeNode*> nodes, ofxOceanodeCanvas* _canvas, ofxOceanodeNodeMacro* _macro, int depth, bool parentActive){
             vector<int> order(nodes.size());
             vector<string> displayNames(nodes.size());
             std::iota(order.begin(), order.end(), 0);
@@ -328,6 +328,11 @@ void ofxOceanodeNodesController::draw()
                             // Record in navigable list (parent canvas, not macro interior)
                             this->navigableNodes.push_back({node, _canvas, _macro, nameMatches});
     
+                            bool effectiveActive = parentActive && m->isActive();
+                            if(!effectiveActive) {
+                                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
+                            }
+
                             // Single tree node for macro: arrow toggles expand/collapse, label click navigates
                             ImGuiTreeNodeFlags macroFlags = ImGuiTreeNodeFlags_OpenOnArrow
                                                           | ImGuiTreeNodeFlags_SpanAvailWidth;
@@ -423,13 +428,20 @@ void ofxOceanodeNodesController::draw()
 
                         if(nodeOpen) {
                             if(countNodes(m->getContainer()->getAllModules()) > 0){
-                                listNodes(m->getContainer()->getAllModules(), m->getCanvas(), m, depth + 1);
+                                listNodes(m->getContainer()->getAllModules(), m->getCanvas(), m, depth + 1, effectiveActive);
                             }
                             ImGui::TreePop();
+                        }
+                        if(!effectiveActive) {
+                            ImGui::PopStyleVar();
                         }
                     } else {
                         // Record in navigable list
                         this->navigableNodes.push_back({node, _canvas, _macro, nameMatches});
+
+                        if(!parentActive) {
+                            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
+                        }
 
                         // Text color: orange if selected, dim otherwise
                         bool isSelectedLeaf = (node == this->selectedNode);
@@ -457,6 +469,10 @@ void ofxOceanodeNodesController::draw()
                         }
 
                         ImGui::PopStyleColor();
+
+                        if(!parentActive) {
+                            ImGui::PopStyleVar();
+                        }
 
                         // Zebra stripe background
                         {
@@ -530,7 +546,7 @@ void ofxOceanodeNodesController::draw()
         if(forceCollapseAll) {
             ImGui::GetStateStorage()->Clear();
         }
-        listNodes(allNodes, canvas, nullptr, 0);
+        listNodes(allNodes, canvas, nullptr, 0, true);
         ImGui::EndChild();
 
         // Arrow key navigation — only when this window (or its child) has focus
