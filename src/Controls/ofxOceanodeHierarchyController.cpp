@@ -189,9 +189,13 @@ void ofxOceanodeHierarchyController::draw()
     if (activeIdx >= 0) {
         if (selectedEntryIndex != activeIdx) {
             selectedEntryIndex = activeIdx;
-            scrollToSelected = true;
+            if (!clickOriginIsHierarchy) {
+                scrollToSelected = true;
+            }
         }
     }
+    // Reset the suppression flag after it has been checked
+    clickOriginIsHierarchy = false;
 
     // -----------------------------------------------------------------------
     // Layout constants
@@ -375,6 +379,9 @@ void ofxOceanodeHierarchyController::draw()
             if (entries[i].nodeWrapper != nullptr) {
                 ofxOceanodeShared::nodeSelectedInCanvas(entries[i].nodeWrapper);
             }
+
+            scrollToSelected = false;
+            clickOriginIsHierarchy = true;
         }
         // --- Single-click: defer navigation to PARENT canvas (Scenario 4) ---
         else if (ImGui::IsItemClicked(0)) {
@@ -426,6 +433,9 @@ void ofxOceanodeHierarchyController::draw()
                 entries[i].canvas->bringOnTop();
                 ofxOceanodeShared::setActiveCanvasUniqueID(entries[i].canvas->getUniqueID());
             }
+
+            scrollToSelected = false;
+            clickOriginIsHierarchy = true;
         }
     }
 

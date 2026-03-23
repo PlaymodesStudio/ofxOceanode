@@ -66,6 +66,7 @@ private:
     // Interaction state
     int selectedEntryIndex = -1;       // Currently highlighted entry (-1 = none)
     bool scrollToSelected = false;      // Flag to scroll hierarchy view to selected entry
+    bool clickOriginIsHierarchy = false; // Suppresses scroll when click came from this panel
     string activeCanvasUID;             // Last known active canvas UID
     int pendingClickIndex = -1;        // Index of entry with a pending single-click
     float pendingClickTime = -1.0f;    // Time when the click was registered
