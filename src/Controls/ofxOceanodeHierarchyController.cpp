@@ -36,9 +36,7 @@ ofxOceanodeHierarchyController::ofxOceanodeHierarchyController(
     // When a node is selected in a canvas, highlight the canvas containing that node
     nodeSelectedListener = ofxOceanodeShared::getNodeSelectedInCanvasEvent().newListener(
         [this](ofxOceanodeNode* node){
-            // We don't need to do anything specific here — the activeCanvasUID
-            // will be set by the canvas itself. But we mark scrollToSelected
-            // to center the hierarchy on the active entry next frame.
+            selectedNodePtr = node;  // may be nullptr for deselect-all
             scrollToSelected = true;
         });
 }
@@ -212,6 +210,17 @@ void ofxOceanodeHierarchyController::draw()
     // Reset the suppression flag after it has been checked
     clickOriginIsHierarchy = false;
 
+    // Find orange-highlighted entry (matches selectedNodePtr)
+    int selectedNodeEntryIndex = -1;
+    if (selectedNodePtr != nullptr) {
+        for (int i = 0; i < (int)entries.size(); i++) {
+            if (entries[i].nodeWrapper == selectedNodePtr) {
+                selectedNodeEntryIndex = i;
+                break;
+            }
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Layout constants
     // -----------------------------------------------------------------------
@@ -339,8 +348,12 @@ void ofxOceanodeHierarchyController::draw()
         dl->AddRectFilled(p1, p2, fillCol,   4.0f);
         dl->AddRect      (p1, p2, borderCol, 4.0f, 0, 1.5f);
 
-        // --- Selection highlight (orange border) ---
+        // --- Active canvas highlight (cyan border) ---
         if (i == selectedEntryIndex) {
+            dl->AddRect(p1, p2, IM_COL32(0, 210, 210, 255), 4.0f, 0, 2.5f);
+        }
+        // --- Selected node highlight (orange border) ---
+        if (i == selectedNodeEntryIndex) {
             dl->AddRect(p1, p2, IM_COL32(255, 140, 0, 255), 4.0f, 0, 2.5f);
         }
 
@@ -369,7 +382,7 @@ void ofxOceanodeHierarchyController::draw()
         ImGui::InvisibleButton(btnId.c_str(), ImVec2(NODE_W, NODE_H));
 
         // --- Scroll-to-selected ---
-        if (scrollToSelected && i == selectedEntryIndex) {
+        if (scrollToSelected && (i == selectedEntryIndex || i == selectedNodeEntryIndex)) {
             ImGui::SetScrollHereY(0.5f);
             scrollToSelected = false;
         }
@@ -377,6 +390,7 @@ void ofxOceanodeHierarchyController::draw()
         // --- Double-click: open macro's OWN canvas (Scenario 5) ---
         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
             pendingClickIndex = -1; // Cancel any pending single-click
+            selectedNodePtr = nullptr;  // Clear orange highlight when entering a canvas
             selectedEntryIndex = i;
             
             if (entries[i].macroNode != nullptr) {
@@ -390,10 +404,9 @@ void ofxOceanodeHierarchyController::draw()
                 ofxOceanodeShared::setActiveCanvasUniqueID(entries[i].canvas->getUniqueID());
             }
 
-            // Select the macro node in the Nodes tree
-            if (entries[i].nodeWrapper != nullptr) {
-                ofxOceanodeShared::nodeSelectedInCanvas(entries[i].nodeWrapper);
-            }
+            // Notify shared system — passing nullptr because we're entering the macro's
+            // interior canvas, not selecting a specific node within a parent canvas.
+            ofxOceanodeShared::nodeSelectedInCanvas(nullptr);
 
             scrollToSelected = false;
             clickOriginIsHierarchy = true;
@@ -403,6 +416,7 @@ void ofxOceanodeHierarchyController::draw()
             selectedEntryIndex = i;
             pendingClickIndex = i;
             pendingClickTime = ImGui::GetTime();
+            selectedNodePtr = entries[i].nodeWrapper;  // Orange-highlight the clicked node
         }
     }
 
@@ -412,6 +426,7 @@ void ofxOceanodeHierarchyController::draw()
         if (elapsed > ImGui::GetIO().MouseDoubleClickTime) {
             int i = pendingClickIndex;
             pendingClickIndex = -1;
+            selectedNodePtr = entries[i].nodeWrapper;
 
             // Execute the original single-click logic
             if (entries[i].macroNode != nullptr && entries[i].hostCanvas != nullptr) {
@@ -444,6 +459,7 @@ void ofxOceanodeHierarchyController::draw()
                 entries[i].canvas->requestFocus();
                 entries[i].canvas->bringOnTop();
                 ofxOceanodeShared::setActiveCanvasUniqueID(entries[i].canvas->getUniqueID());
+                selectedNodePtr = nullptr;  // No node selected when clicking root canvas
             }
 
             scrollToSelected = false;

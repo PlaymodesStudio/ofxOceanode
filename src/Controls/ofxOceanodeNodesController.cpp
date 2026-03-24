@@ -391,6 +391,7 @@ void ofxOceanodeNodesController::draw()
                             this->selectedNode = node;
                             m->activateWindow();  // opens & focuses the macro's interior canvas
                             ofxOceanodeShared::setActiveCanvasUniqueID(m->getCanvas()->getUniqueID());
+                            ofxOceanodeShared::nodeSelectedInCanvas(nullptr);  // entering macro interior, no specific node selected
                             refocusNodesDelay = 4;
                             // Cancel any pending scroll that the first click of the double-click may have queued
                             this->pendingScrollNode   = nullptr;
@@ -419,6 +420,7 @@ void ofxOceanodeNodesController::draw()
                                 refocusNodesDelay = 2;
                             }
                             ofxOceanodeShared::setActiveCanvasUniqueID(_canvas->getUniqueID());
+                            ofxOceanodeShared::nodeSelectedInCanvas(node);
                             // Store for deferred application; macro canvases need 2 frames to initialise
                             this->pendingScrollNode   = node;
                             this->pendingScrollCanvas = _canvas;
@@ -526,6 +528,7 @@ void ofxOceanodeNodesController::draw()
                                 refocusNodesDelay = 2;
                             }
                             ofxOceanodeShared::setActiveCanvasUniqueID(_canvas->getUniqueID());
+                            ofxOceanodeShared::nodeSelectedInCanvas(node);
                             // Store for deferred application; macro canvases need 2 frames to initialise
                             this->pendingScrollNode   = node;
                             this->pendingScrollCanvas = _canvas;
@@ -603,6 +606,7 @@ void ofxOceanodeNodesController::draw()
                         target.canvas->bringOnTop();
                     }
                     ofxOceanodeShared::setActiveCanvasUniqueID(target.canvas->getUniqueID());
+                    ofxOceanodeShared::nodeSelectedInCanvas(target.node);
                     pendingScrollNode   = target.node;
                     pendingScrollCanvas = target.canvas;
                     pendingScrollMacro  = target.macro;

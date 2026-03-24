@@ -64,8 +64,9 @@ private:
     vector<HierarchyEntry>           entries;
 
     // Interaction state
-    int selectedEntryIndex = -1;       // Currently highlighted entry (-1 = none)
+    int selectedEntryIndex = -1;       // Currently cyan-highlighted entry (active canvas, -1 = none)
     bool scrollToSelected = false;      // Flag to scroll hierarchy view to selected entry
+    ofxOceanodeNode* selectedNodePtr = nullptr;  // Node highlighted in orange (nullptr = none)
     bool clickOriginIsHierarchy = false; // Suppresses scroll when click came from this panel
     string activeCanvasUID;             // Last known active canvas UID
     int pendingClickIndex = -1;        // Index of entry with a pending single-click
