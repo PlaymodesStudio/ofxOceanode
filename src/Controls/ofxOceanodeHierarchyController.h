@@ -75,6 +75,11 @@ private:
     ofEventListener activeCanvasListener;
     ofEventListener nodeSelectedListener;
 
+    // Pending centering (deferred to next frame so canvas layout is valid)
+    bool pendingCenter = false;
+    ofxOceanodeNode* pendingCenterNode = nullptr;
+    ofxOceanodeCanvas* pendingCenterCanvas = nullptr;
+
 };
 
 #endif // OFXOCEANODE_HEADLESS

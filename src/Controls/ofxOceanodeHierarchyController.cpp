@@ -175,6 +175,21 @@ void ofxOceanodeHierarchyController::draw()
         entries);
 
     // -----------------------------------------------------------------------
+    // Execute deferred centering from previous frame
+    // -----------------------------------------------------------------------
+    if (pendingCenter && pendingCenterNode != nullptr && pendingCenterCanvas != nullptr) {
+        glm::vec2 nodeSize = glm::vec2(
+            pendingCenterNode->getNodeGui().getRectangle().getWidth(),
+            pendingCenterNode->getNodeGui().getRectangle().getHeight());
+        glm::vec2 nodePos = pendingCenterNode->getNodeGui().getPosition();
+        glm::vec2 center = pendingCenterCanvas->getContentRegionSize() / 2.0f;
+        pendingCenterCanvas->setScrolling(-nodePos - nodeSize / 2.0f + center);
+        pendingCenter = false;
+        pendingCenterNode = nullptr;
+        pendingCenterCanvas = nullptr;
+    }
+
+    // -----------------------------------------------------------------------
     // Determine which entry to highlight based on activeCanvasUID
     // -----------------------------------------------------------------------
     // Match activeCanvasUID to an entry
@@ -419,13 +434,10 @@ void ofxOceanodeHierarchyController::draw()
                     // Notify shared system so NodesController/Inspector can react
                     ofxOceanodeShared::nodeSelectedInCanvas(entries[i].nodeWrapper);
 
-                    // Center the host canvas on this macro node
-                    glm::vec2 nodeSize = glm::vec2(
-                        entries[i].nodeWrapper->getNodeGui().getRectangle().getWidth(),
-                        entries[i].nodeWrapper->getNodeGui().getRectangle().getHeight());
-                    glm::vec2 nodePos = entries[i].nodeWrapper->getNodeGui().getPosition();
-                    glm::vec2 center = entries[i].hostCanvas->getContentRegionSize() / 2.0f;
-                    entries[i].hostCanvas->setScrolling(-nodePos - nodeSize / 2.0f + center);
+                    // Defer centering to next frame so canvas layout is valid
+                    pendingCenter = true;
+                    pendingCenterNode = entries[i].nodeWrapper;
+                    pendingCenterCanvas = entries[i].hostCanvas;
                 }
             } else {
                 // Root canvas: just focus it
