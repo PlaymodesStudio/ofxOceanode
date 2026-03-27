@@ -793,15 +793,6 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 }
 
 void ofxOceanodeNodeMacro::allNodesCreated(){
-	// Nothing queued → no router nodes were (re)created in this load pass.
-	// This happens when all routers are merely repositioned (not newly created),
-	// i.e. the container already held them from a previous load in the same session.
-	// Leave routerSortOrder unchanged and discard the pending buffer.
-	if(toCreateRouters.empty()){
-		pendingRouterSortOrder.clear();
-		return;
-	}
-
 	// ── Collect pre-existing router nodes ────────────────────────────────────
 	// Routers that were already in the inner container (from a previous load
 	// pass) are merely repositioned by loadPreset_loadNodes() — they do NOT
@@ -822,6 +813,31 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 				}
 			}
 		}
+	}
+
+	// Nothing newly created → decide whether we still need to do separator work.
+	// If no router was newly created AND neither the parameter group nor the
+	// pending sort order contains any separator entries, there is truly nothing
+	// to rebuild — preserve the existing routerSortOrder and bail out early.
+	// We must NOT bail when separators are involved: old ones may need to be
+	// removed (they have no deleteModule listener) and/or the new preset may
+	// bring a different separator layout via pendingRouterSortOrder.
+	if(toCreateRouters.empty()){
+		bool separatorWorkNeeded = false;
+		for(int i = 0; i < getParameterGroup().size() && !separatorWorkNeeded; i++){
+			const string& pn = getParameterGroup().get(i).getName();
+			if(pn.size() > 11 && pn.substr(0, 11) == "SEPARATOR:|") separatorWorkNeeded = true;
+		}
+		for(const auto& e : pendingRouterSortOrder){
+			if(isSortSeparatorEntry(e)){ separatorWorkNeeded = true; break; }
+		}
+		if(!separatorWorkNeeded){
+			pendingRouterSortOrder.clear();
+			return;
+		}
+		// Separator state differs between presets: fall through to the full
+		// cleanup + rebuild below so old separators are removed and the new
+		// preset's separator layout is applied correctly.
 	}
 
 	// Remove any separator parameters left over from a previous load.
