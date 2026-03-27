@@ -11,6 +11,7 @@
 
 #ifndef OFXOCEANODE_HEADLESS
 #include "ofMain.h"
+#include "ofxOceanodeShared.h"
 
 class ofxOceanodeContainer;
 class ofxOceanodeNodeGui;
@@ -45,10 +46,10 @@ public:
 	int getNodeWidth(){return NODE_WIDTH_TEXT+NODE_WIDTH_WIDGET;};
 	void setNodeWidth(int ww, int tw){NODE_WIDTH_WIDGET=ww;NODE_WIDTH_TEXT=tw;};
 		
-	void setNodeWidthText(int n){NODE_WIDTH_TEXT = n;};
+	void setNodeWidthText(int n){NODE_WIDTH_TEXT = n; ofxOceanodeShared::setNodeWidthText(n);};
 	int getNodeWidthText(){return NODE_WIDTH_TEXT;};
-	
-	void setNodeWidthWidget(int n){NODE_WIDTH_WIDGET = n;};
+
+	void setNodeWidthWidget(int n){NODE_WIDTH_WIDGET = n; ofxOceanodeShared::setNodeWidthWidget(n);};
 	int getNodeWidthWidget(){return NODE_WIDTH_WIDGET;};
 	
 	void setGridDivisions(int n){gridDivisions= n;};

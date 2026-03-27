@@ -32,6 +32,8 @@ struct RouterSnapshot {
 struct SnapshotData {
 	std::string name;
 	std::map<string, RouterSnapshot> routerValues;
+	float morphTimeMs = 0.f;
+	float morphBiPow = 0.f;
 };
 
 class ofxOceanodeNodeMacro : public ofxOceanodeNodeModel{
@@ -173,7 +175,7 @@ private:
 	// Interpolation helpers
 	bool shouldInterpolateType(const std::string& type) const;
 	void applyInterpolatedValues(float t);
-	static float customPow(float base, float exponent);
+	static void customPow(float& value, float pow);
 
 	// Event Handlers
 	void onMatrixSizeChanged(int& value);
@@ -258,14 +260,15 @@ private:
 	std::map<int, SnapshotData> snapshots;
 	std::unordered_map<std::string, ofEventListener> dropdownRouterListeners;
 
-	// Interpolation
-	ofParameter<float> interpolationMs;
-	ofParameter<float> interpolationBiPow;
+	// Interpolation (plain floats - not registered as preset params; live in snapshot data only)
+	float interpolationMs;
+	float interpolationBiPow;
 	bool isInterpolating;
 	uint64_t interpolationStartTime;
 	float interpolationBiPowCapture;
 	std::map<std::string, RouterSnapshot> interpolationStartValues;
 	std::map<std::string, RouterSnapshot> interpolationTargetValues;
+	float currentMorphProgress;
 
 	// Router Sort Order
 	std::vector<std::string> routerSortOrder;         // active order, rebuilt each load
