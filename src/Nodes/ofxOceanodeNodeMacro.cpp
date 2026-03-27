@@ -2236,7 +2236,15 @@ void ofxOceanodeNodeMacro::changeRouterType(const std::string& routerName, const
 	// 5. Rename the new router back to the original name.
 	//    The rename listener installed by processRouterNode() will synchronise
 	//    routerSortOrder (default label → routerName) and routerNodes.
+	//    It does NOT rename the published macro parameter for generic (non-dropdown)
+	//    routers, so we do that manually afterwards.
+	string newNodeDefaultParamName = static_cast<abstractRouter*>(&newNode->getNodeModel())->getNameParam().get();
 	static_cast<abstractRouter*>(&newNode->getNodeModel())->getNameParam().set(routerName);
+	// Rename the published macro parameter to match (generic routers only – dropdown
+	// installs its own listener that already does this).
+	if(!routerName.empty() && getParameterGroup().contains(newNodeDefaultParamName)){
+		getParameterGroup().get(newNodeDefaultParamName).setName(routerName);
+	}
 
 	// 6. Restore sort-order position.
 	//    After steps 4+5 routerName sits at the end of routerSortOrder.
@@ -2292,9 +2300,9 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 		bool isSep     = isSortSeparatorEntry(routerSortOrder[i]);
 		bool isEditing = (routerSortEditingIndex == i); // both routers and separators can edit
 
-		// Display label: separators get decorative line characters; routers show their name.
+		// Display label: separators get decorative dashes; routers show their name.
 		string displayLabel = isSep
-			? ("\xe2\x94\x80\xe2\x94\x80  " + getSortSeparatorLabel(routerSortOrder[i]) + "  \xe2\x94\x80\xe2\x94\x80")
+			? ("--  " + getSortSeparatorLabel(routerSortOrder[i]) + "  --")
 			: routerSortOrder[i];
 
 		// A router is "unknown" if it is not (yet) registered in routerNodes,
@@ -2436,6 +2444,16 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 					ImGui::Separator();
 				}
 
+				// ── Snapshot exclusion ───────────────────────────────────────
+				{
+					auto* absRouter = static_cast<abstractRouter*>(
+						&routerNodes[routerSortOrder[i]].node->getNodeModel());
+					bool excl = absRouter->isExcludeFromSnapshot();
+					if(ImGui::Checkbox("Exclude from Snapshots##excl", &excl))
+						absRouter->getSnapshotExcludeParam().set(excl);
+				}
+				ImGui::Separator();
+
 				// ── Change Type submenu ──────────────────────────────────────
 				string curNodeType = routerNodes[routerSortOrder[i]].node->getNodeModel().nodeName();
 				if(ImGui::BeginMenu("Change Type")){
@@ -2516,9 +2534,12 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 	ImGui::SameLine();
 	if(ImGui::SmallButton("+ Sep")){
 		if(routerSortSepNameBuf[0] != '\0'){
-			routerSortOrder.push_back(makeSortSeparatorEntry(
-				string(routerSortSepNameBuf), ofColor(200, 200, 200, 255)));
+			string sepLabel(routerSortSepNameBuf);
+			ofColor sepColor(200, 200, 200, 255);
+			addSeparator(sepLabel, sepColor);
+			routerSortOrder.push_back(makeSortSeparatorEntry(sepLabel, sepColor));
 			routerSortSepNameBuf[0] = '\0';
+			parameterGroupChanged.notify(this);
 		}
 	}
 #endif
