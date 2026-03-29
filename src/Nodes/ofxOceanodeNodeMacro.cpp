@@ -972,10 +972,6 @@ void ofxOceanodeNodeMacro::changeRouterType(const std::string& routerName, const
 	glm::vec2 oldPos = routerNode->getNodeGui().getPosition();
 #endif
 
-std::map<string, RouterSnapshot> ofxOceanodeNodeMacro::jsonToRouterValues(const ofJson& json) {
-	std::map<string, RouterSnapshot> values;
-	for(auto it = json.begin(); it != json.end(); ++it) {
-		values[it.key()] = jsonToRouterSnapshot(it.value());
 	// 1. Find where this router sits in the sort order so we can restore it later.
 	int sortIdx = -1;
 	for(int i = 0; i < (int)sortOrder.getOrder().size(); ++i){
@@ -983,8 +979,6 @@ std::map<string, RouterSnapshot> ofxOceanodeNodeMacro::jsonToRouterValues(const 
 			sortIdx = i; break;
 		}
 	}
-	return values;
-}
 
 #ifndef OFXOCEANODE_HEADLESS
 	// 2. Capture inner-container connection info as plain strings before the node
