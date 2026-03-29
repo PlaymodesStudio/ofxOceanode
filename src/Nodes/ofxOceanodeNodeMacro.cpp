@@ -5,31 +5,21 @@
 //  Created by Eduard Frigola Bagué on 20/06/2019.
 //  Snapshot management added by Santi Vilanova on January 2025
 //
+//  Main implementation file.  GUI rendering lives in ofxOceanodeNodeMacroGui.cpp.
+//
 
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeShared.h"
 
+// ─── Constructor ─────────────────────────────────────────────────────────────
+
 ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
 	color = ofColor::black;
 	description = "Encapsulation of a graph";
-	presetPath = "";
-	currentPreset = -1;
 	showWindow = false;
-	localPreset = true;
 	lastActiveState = true;
 	isLoadingPreset = false;
-	
-	// Initialize snapshot system members
-	currentSnapshotSlot = -1;
-	isInterpolating = false;
-	interpolationStartTime = 0;
-	interpolationBiPowCapture = 0.f;
-	currentMorphProgress = 0.f;
 
-	// Initialize inline-rename state
-	routerSortEditingIndex   = -1;
-	routerSortEditNeedsFocus = false;
-	memset(routerSortEditBuf, 0, sizeof(routerSortEditBuf));
 	matrixRows.set("Snapshot Matrix Rows", 2, 1, 8);
 	matrixCols.set("Snapshot Matrix Cols", 8, 1, 8);
 	showSnapshotNames.set("Show Names", true);
@@ -37,64 +27,24 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
 	showSnapshotMatrix = false;
 	retriggerSnapshotOnActive.set("Retrigger Snapshot on Active", false);
 	
-	// Add minimized view update callback
-	minimizedViewCallback = [this](ImVec2 size) {
-		// Only show output router values in minimized view
-		for(auto& routerPair : routerNodes) {
-			if(!routerPair.second.isInput) {
-				auto& router = routerPair.second;
-				auto& params = router.node->getParameters();
-				if(!params.contains("Value")) continue; // skip void routers
-				auto valueParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get("Value"));
-				
-				if(valueParam) {
-					string valueStr;
-					
-					if(valueParam->valueType() == typeid(float).name()) {
-						valueStr = ofToString(valueParam->cast<float>().getParameter().get(), 2);
-					}
-					else if(valueParam->valueType() == typeid(vector<float>).name()) {
-						auto vec = valueParam->cast<vector<float>>().getParameter().get();
-						valueStr = "[";
-						for(size_t i = 0; i < vec.size(); i++) {
-							valueStr += ofToString(vec[i], 2);
-							if(i < vec.size() - 1) valueStr += ", ";
-						}
-						valueStr += "]";
-					}
-					else if(valueParam->valueType() == typeid(int).name()) {
-						valueStr = ofToString(valueParam->cast<int>().getParameter().get());
-					}
-					else if(valueParam->valueType() == typeid(vector<int>).name()) {
-						auto vec = valueParam->cast<vector<int>>().getParameter().get();
-						valueStr = "[";
-						for(size_t i = 0; i < vec.size(); i++) {
-							valueStr += ofToString(vec[i]);
-							if(i < vec.size() - 1) valueStr += ", ";
-						}
-						valueStr += "]";
-					}
-					
-					ImGui::Text("%s: %s", router.routerName.c_str(), valueStr.c_str());
-				}
-			}
-		}
-	};
+	// Add minimized view update callback (body in ofxOceanodeNodeMacroGui.cpp)
+	minimizedViewCallback = [this](ImVec2 size) { renderMinimizedView(size); };
 }
 
+// ─── Lifecycle ───────────────────────────────────────────────────────────────
+
 void ofxOceanodeNodeMacro::update(ofEventArgs &a){
-	if(nextPresetPath != ""){
+	if(presetManager.getNextPresetPath() != ""){
 		// Clear snapshots when changing presets to avoid data persistence
-		snapshots.clear();
-		currentSnapshotSlot = -1;
+		snapshotSystem.clearAll();
 		
-		localPreset = false;
+		presetManager.setLocal(false);
 		isLoadingPreset = true;
 
 		// Load router sort order from the macro folder BEFORE loadPreset() so
 		// allNodesCreated() can apply it (same logic as macroLoad global branch).
 		{
-			string sortOrderFile = nextPresetPath + "/router_sort_order.json";
+			string sortOrderFile = presetManager.getNextPresetPath() + "/router_sort_order.json";
 			ofJson sortJson;
 			if(ofFile::doesFileExist(sortOrderFile)) {
 				sortJson = ofLoadJson(sortOrderFile);
@@ -103,41 +53,29 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 		}
 
 		if(clearContainerOnLoad) container->clearContainer();
-		innerPresetLoadingPath = nextPresetPath;
-		container->loadPreset(nextPresetPath);
-		innerPresetLoadingPath = "";
+		presetManager.setInnerPresetLoadingPath(presetManager.getNextPresetPath());
+		container->loadPreset(presetManager.getNextPresetPath());
+		presetManager.setInnerPresetLoadingPath("");
 
 		// Explicitly load snapshots from the global macro path
-		loadSnapshotsFromPath(nextPresetPath);
+		snapshotSystem.loadFromPath(presetManager.getNextPresetPath());
+		if(!snapshotSystem.isEmpty()) {
+			showSnapshotMatrix = true;
+		}
 
 		isLoadingPreset = false;
-		nextPresetPath = "";
+		presetManager.clearNextPresetPath();
 	}
 	if(active){
 		container->update();
 
-		if(isInterpolating) {
-			float elapsed = (float)(ofGetElapsedTimeMillis() - interpolationStartTime);
-			float t = ofClamp(elapsed / std::max(interpolationMs, 1.f), 0.f, 1.f);
-			float mappedT = t;
-			if(interpolationBiPowCapture != 0.f) {
-				mappedT = mappedT * 2.f - 1.f;       // [0,1] → [-1,1]
-				customPow(mappedT, interpolationBiPowCapture);
-				mappedT = (mappedT + 1.f) * 0.5f;    // [-1,1] → [0,1]
-			}
-			currentMorphProgress = mappedT;
-			applyInterpolatedValues(mappedT);
-			if(t >= 1.f) {
-				isInterpolating = false;
-				currentMorphProgress = 1.f;
-			}
-		}
+		morphEngine.update(routerManager.getRouterNodes());
 	}
 }
 
 void ofxOceanodeNodeMacro::draw(ofEventArgs &a){
 	if(showWindow){
-		canvas.draw(&showWindow, color, localPreset ? localName.get() : currentMacro);
+		canvas.draw(&showWindow, color, presetManager.isLocal() ? localName.get() : presetManager.getCurrentMacro());
 	}
 	if(active){
 		container->draw();
@@ -150,8 +88,9 @@ void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
 	canvasParentID = container->getCanvasID();
 }
 
+// ─── Setup ───────────────────────────────────────────────────────────────────
+
 void ofxOceanodeNodeMacro::setup(string additionalInfo){
-	
 	// Core parameters
 	addParameter(active.set("Active", true));
 	activeListener = active.newListener([this](bool &b){
@@ -159,9 +98,9 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			if(b){
 				container->activate();
 				if(resetPhaseOnActive) container->resetPhase();
-				if(retriggerSnapshotOnActive && currentSnapshotSlot >= 0) {
+				if(retriggerSnapshotOnActive && snapshotSystem.getCurrentSlot() >= 0) {
 					// Retrigger the current snapshot to fire its parameters again
-					loadRouterSnapshot(currentSnapshotSlot);
+					loadRouterSnapshot(snapshotSystem.getCurrentSlot());
 				}
 			}else{
 				container->deactivate();
@@ -171,276 +110,12 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	});
 	
 	auto presetControlRef = addParameter(presetControl.set("Preset Control Gui", [this](){
-		
-		bool addBank = false;
-		
-		if(localPreset){
-			ImGui::Text(localName->c_str());
-		}else{
-			ImGui::Text("%s", currentMacro.c_str());
-		}
-		if(ImGui::IsItemClicked(1)){
-			ImGui::OpenPopup("Macro");
-		}
-		
-		ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));  // Dark background
-		ImGui::PushStyleColor(ImGuiCol_Text,     ImVec4(0.7f, 0.7f, 0.7f, 0.7f));  // White text
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 1.0f)); // Hovered button
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
-		if(ImGui::BeginPopup("Macro")){
-			auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
-			
-			std::function<bool(shared_ptr<macroCategory>)> drawCategory =
-			[this, &addBank, &drawCategory](shared_ptr<macroCategory> category) -> bool{
-				for(auto d : category->categories){
-					if(ImGui::BeginMenu(d->name.c_str())){
-						if(drawCategory(d)){
-							if(currentCategory.size() == 0){
-								currentCategoryMacro = d;
-							}
-							currentCategory.push_front(d->name);
-							ImGui::EndMenu();
-							return true;
-						}
-						ImGui::EndMenu();
-					}
-				}
-				if(category->categories.size() != 0){
-					//TOD
-					if(ImGui::MenuItem("Add Bank")){
-						// TODO: Where? CurrentCategory?
-						addBank = true;
-					}
-				}
-				for(auto m : category->macros){
-					if(ImGui::MenuItem(m.first.c_str())){
-						nextPresetPath = m.second;
-						currentMacroPath = m.second;
-						currentMacro = m.first;
-						currentCategory.clear();
-						return true;
-					}
-				}
-				return false;
-			};
-			
-			drawCategory(macroDirectoryStructure);
-			
-			ImGui::EndPopup();
-		}
-		ImGui::PopStyleColor(3);
-		ImGui::PopStyleVar();
-		
-		if(addBank){
-			ImGui::OpenPopup("Add New Macro Bank");
-		}
-		
-		if(ImGui::BeginPopupModal("Add New Macro Bank", NULL, ImGuiWindowFlags_AlwaysAutoResize)){
-			static char cString[256];
-			if (ImGui::InputText("Bank Name", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
-			{
-				//                string proposedNewName(cString);
-				//                ofStringReplace(proposedNewName, " ", "_");
-				//                if(find(banks.begin(), banks.end(), proposedNewName) == banks.end()){
-				//                    if(proposedNewName != ""){
-				//                        banks.push_back(proposedNewName);
-				//                        currentBank = banks.size()-1;
-				//                        currentPreset[banks[currentBank]] = "";
-				//                    }
-				ImGui::CloseCurrentPopup();
-				//TODO: New Bank
-				//                }
-				//                strcpy(cString, "");
-			}
-			if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsItemActive()){
-				strcpy(cString, "");
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::EndPopup();
-		}
-		
-		if(ImGui::Checkbox("Is Local?", &localPreset)){
-			if(currentMacro == ""){
-				localPreset = true;
-			}
-			if(!localPreset){
-				container->loadPreset(currentMacroPath);
-			}
-		}
-		ImGui::SameLine();
-		bool prevShowWindow = showWindow;
-		ImGui::Checkbox("Show Window?", &showWindow);
-		if(showWindow && !prevShowWindow){
-			canvas.requestFocus();
-		}
-		
-		bool firstSaveAsOpen = false;
-		if (ImGui::Button("[Save]")){
-			//ofLog() << "Save current preset and notify other macros";
-			// If we try to save a new macro or a local preset, the save macro as window apears
-			if(currentMacroPath == "" || localPreset){
-				ImGui::OpenPopup("Save Macro As :");
-				firstSaveAsOpen = true;
-			}else{
-				container->savePreset(currentMacroPath);
-				saveSnapshots();
-				// Save router sort order to the macro folder
-				{
-					string sortOrderFile = currentMacroPath + "/router_sort_order.json";
-					if(!routerSortOrder.empty()) {
-						ofJson sortJson;
-						ofJson sortArr = ofJson::array();
-						for(const auto& e : routerSortOrder) sortArr.push_back(e);
-						sortJson["RouterSortOrder"] = sortArr;
-						ofSavePrettyJson(sortOrderFile, sortJson);
-					} else if(ofFile::doesFileExist(sortOrderFile)) {
-						ofFile::removeFile(sortOrderFile);
-					}
-				}
-				ofxOceanodeShared::macroUpdated(currentMacroPath);
-			}
-		}
-		
-		ImGui::SameLine();
-		
-		if (ImGui::Button("[Save As]")){
-			ImGui::OpenPopup("Save Macro As :");
-			firstSaveAsOpen = true;
-		}
-		
-		//ImGui::SetNextWindowSize(ImVec2(200,100));
-		if(ImGui::BeginPopupModal("Save Macro As :", NULL, ImGuiWindowFlags_AlwaysAutoResize)){
-			static char cString[256];
-			
-			if(firstSaveAsOpen){
-				saveAsTempCategory = currentCategory;
-				ImGui::SetKeyboardFocusHere(0);
-			}
-			
-			bool openNameAlreadyExistsPopup = false;
-			if (ImGui::InputText("##Preset Name : ", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
-			{
-				string proposedNewName(cString);
-				ofStringReplace(proposedNewName, " ", "_");
-				
-				
-				bool nameExists = false;
-				auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
-				for(int i = 0 ; i < saveAsTempCategory.size(); i++){
-					string categoryNameToCompare = saveAsTempCategory[i];
-					macroDirectoryStructure = *std::find_if(macroDirectoryStructure->categories.begin(), macroDirectoryStructure->categories.end(),
-															[categoryNameToCompare](shared_ptr<macroCategory> &mc){return mc->name == categoryNameToCompare;});
-				}
-				// TODO: Check if name exists with find_if
-				//				if(macroDirectoryStructure->macros.count(proposedNewName) != 0){
-				//					nameExists = true;
-				//				}
-				
-				if(!nameExists)
-				{
-					if(strcmp(proposedNewName.c_str(), "") != 0){
-						string saveAsCategoryWithSlash = ofToDataPath("Macros/", true);
-						for(auto s : saveAsTempCategory) saveAsCategoryWithSlash = saveAsCategoryWithSlash + s + "/";
-						container->savePreset(saveAsCategoryWithSlash + string(proposedNewName));
-						localPreset = false;
-						currentMacro = string(proposedNewName);
-						currentMacroPath = saveAsCategoryWithSlash + string(proposedNewName);
-						currentCategory = saveAsTempCategory;
-						currentCategoryMacro = macroDirectoryStructure;
-						// Save router sort order to the macro folder
-						{
-							string sortOrderFile = currentMacroPath + "/router_sort_order.json";
-							if(!routerSortOrder.empty()) {
-								ofJson sortJson;
-								ofJson sortArr = ofJson::array();
-								for(const auto& e : routerSortOrder) sortArr.push_back(e);
-								sortJson["RouterSortOrder"] = sortArr;
-								ofSavePrettyJson(sortOrderFile, sortJson);
-							}
-						}
-						saveSnapshots();
-						ofxOceanodeShared::updateMacrosStructure();
-					}
-					strcpy(cString, "");
-					ImGui::CloseCurrentPopup();
-					saveAsTempCategory.clear();
-				}
-				else
-				{
-					cout << "Preset name already existing : " << proposedNewName << endl;
-					strcpy(cString, "");
-					
-					openNameAlreadyExistsPopup = true;
-				}
-			}
-			if(openNameAlreadyExistsPopup){
-				ImGui::OpenPopup("Preset name already exists");
-			}
-			
-			if(ImGui::BeginPopupModal("Preset name already exists", NULL))
-			{
-				if (ImGui::Button("OK", ImVec2(220,0)) || (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)) && !openNameAlreadyExistsPopup)) {
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::EndPopup();
-				openNameAlreadyExistsPopup = false;
-			}
-			
-			if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsItemActive()){
-				strcpy(cString, "");
-			}
-			string saveAsCategoryWithSlash;
-			for(auto s : saveAsTempCategory) saveAsCategoryWithSlash = saveAsCategoryWithSlash + s + "/";
-			if(saveAsCategoryWithSlash == "") saveAsCategoryWithSlash = "None";
-			if (ImGui::Button(saveAsCategoryWithSlash.c_str())){
-				ImGui::OpenPopup("Choose Category");
-			}
-			
-			if(ImGui::BeginPopup("Choose Category")){
-				auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
-				
-				std::function<bool(shared_ptr<macroCategory>)> drawCategory =
-				[this, &drawCategory](shared_ptr<macroCategory> category) -> bool{
-					for(auto d : category->categories){
-						if(d->categories.size() == 0){
-							if(ImGui::MenuItem(d->name.c_str())){
-								saveAsTempCategory.clear();
-								saveAsTempCategory.push_front(d->name);
-								return true;
-							}
-						}else if(ImGui::BeginMenu(d->name.c_str())){
-							if(drawCategory(d)){
-								saveAsTempCategory.push_front(d->name);
-								ImGui::EndMenu();
-								return true;
-							}
-							ImGui::EndMenu();
-						}
-					}
-					return false;
-				};
-				
-				drawCategory(macroDirectoryStructure);
-				
-				ImGui::EndPopup();
-			}
-			if (ImGui::Button("Cancel"))
-			{
-				strcpy(cString, "");
-				ImGui::CloseCurrentPopup();
-				saveAsTempCategory.clear();
-			}
-			ImGui::EndPopup();
-		}
-		
-		
-		ImGui::Text(". . . . . . . . . . . . . . . . .");
-		
+		renderPresetControlGui();
 	}));
 	
 	
 	
-	// Add snapshot parameters
+	// Snapshot parameters
 	activeSnapshotSlotParam = addParameter(activeSnapshotSlot.set("Snapshot", -1, -1, 64));
 	activeSnapshotSlotParam->setFlags(activeSnapshotSlotParam->getFlags() | ofxOceanodeParameterFlags_NoGuiWidget);
 
@@ -460,8 +135,8 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	addInspectorParameter(showSnapshotNames.set("Show Names", true));
 	addInspectorParameter(addSnapshotButton.set("Add Snapshot"));
 	addInspectorParameter(retriggerSnapshotOnActive.set("Retrigger Snapshot on Active", false));
-	interpolationMs = 0.f;
-	interpolationBiPow = 0.f;
+	morphEngine.getMorphMs() = 0.f;
+	morphEngine.getMorphBiPow() = 0.f;
 
 
 	// Add snapshot inspector
@@ -471,7 +146,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	
 	// Setup snapshot event listeners
 	addSnapshotListener = addSnapshotButton.newListener([this](){
-		int newSlot = snapshots.size();
+		int newSlot = snapshotSystem.count();
 		storeRouterSnapshot(newSlot);
 	});
 	
@@ -487,45 +162,23 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	
 	// Setup preset control
 	auto presetNamingRef = addParameter(presetNaming.set("Preset Naming Gui", [this](){
-
-		//		ImGui::SameLine();
-		// Render snapshot matrix
-		if(showSnapshotMatrix) {
-			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
-			renderSnapshotMatrix();
-			ImGui::PopStyleVar();
-
-			// Morph time controls
-			float nodeW = (float)(ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget());
-			ImGui::SetNextItemWidth(nodeW);
-			ImGui::SliderFloat("##morphMs", &interpolationMs, 0.f, 10000.f, "Morph: %.0f ms");
-			ImGui::SetNextItemWidth(nodeW);
-			ImGui::SliderFloat("##morphBiPow", &interpolationBiPow, -1.f, 1.f, "BiPow: %.2f");
-
-			// Morphing progress bar (bipow-mapped)
-			float progress = isInterpolating ? currentMorphProgress : (currentSnapshotSlot >= 0 ? 1.f : 0.f);
-			ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.8f, 0.4f, 0.1f, 1.0f));
-			ImGui::ProgressBar(progress, ImVec2(nodeW, 6.f), "");
-			ImGui::PopStyleColor();
-
-			ImGui::Text(". . . . . . . . . . . . . . . . .");
-		}
+		renderPresetNamingGui();
 	}));
 	
 	presetControlRef->addReceiveFunc<int>([this](const int &i){
-		loadMacroInsideCategory(i);
+		presetManager.loadMacroInsideCategory(i);
 	});
 	
 	presetControlRef->addReceiveFunc<float>([this](const float &f){
-		loadMacroInsideCategory(floor(f));
+		presetManager.loadMacroInsideCategory(floor(f));
 	});
 	
 	presetControlRef->addReceiveFunc<vector<int>>([this](const vector<int> &vi){
-		loadMacroInsideCategory(vi[0]);
+		presetManager.loadMacroInsideCategory(vi[0]);
 	});
 	
 	presetControlRef->addReceiveFunc<vector<float>>([this](const vector<float> &vf){
-		loadMacroInsideCategory(floor(vf[0]));
+		presetManager.loadMacroInsideCategory(floor(vf[0]));
 	});
 	
 	// Initialize container
@@ -544,7 +197,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	canvas.updateGridSize();
 	
 	if(additionalInfo != ""){
-		localPreset = false;
+		presetManager.setLocal(false);
 		isLoadingPreset = true;
 		// Load router sort order from macro folder before loadPreset()
 		{
@@ -553,35 +206,41 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			if(ofFile::doesFileExist(sortOrderFile)) sortJson = ofLoadJson(sortOrderFile);
 			loadRouterSortFromJson(sortJson);
 		}
-		innerPresetLoadingPath = additionalInfo;
+		presetManager.setInnerPresetLoadingPath(additionalInfo);
 		container->loadPreset(additionalInfo);
-		innerPresetLoadingPath = "";
+		presetManager.setInnerPresetLoadingPath("");
 		isLoadingPreset = false;
-		updateCurrentCategoryFromPath(additionalInfo);
-		currentMacroPath = additionalInfo;
+		presetManager.updateCategoryFromPath(additionalInfo);
+		presetManager.setCurrentMacroPath(additionalInfo);
 		
 		// Load snapshots if they exist
-		loadSnapshotsFromPath(additionalInfo);
+		snapshotSystem.loadFromPath(additionalInfo);
+		if(!snapshotSystem.isEmpty()) {
+			showSnapshotMatrix = true;
+		}
 	}
 	
 	snapshotUpdatedListener = ofxOceanodeShared::getSnapshotUpdatedEvent().newListener([this](string &path){
 		
-		if(!localPreset && path == currentMacroPath) {
-			loadSnapshotsFromPath(currentMacroPath);
+		if(!presetManager.isLocal() && path == presetManager.getCurrentMacroPath()) {
+			snapshotSystem.loadFromPath(presetManager.getCurrentMacroPath());
+			if(!snapshotSystem.isEmpty()) {
+				showSnapshotMatrix = true;
+			}
 		}
 	});
 	
 	macroUpdatedListener = ofxOceanodeShared::getMacroUpdatedEvent().newListener([this](string &s){
-		if(s == currentMacroPath && !localPreset){
+		if(s == presetManager.getCurrentMacroPath() && !presetManager.isLocal()){
 			// Load router sort order from macro folder before reloading
 			{
-				string sortOrderFile = currentMacroPath + "/router_sort_order.json";
+				string sortOrderFile = presetManager.getCurrentMacroPath() + "/router_sort_order.json";
 				ofJson sortJson;
 				if(ofFile::doesFileExist(sortOrderFile)) sortJson = ofLoadJson(sortOrderFile);
 				loadRouterSortFromJson(sortJson);
 			}
 			if(clearContainerOnLoad) container->clearContainer();
-			container->loadPreset(currentMacroPath);
+			container->loadPreset(presetManager.getCurrentMacroPath());
 		}
 	});
 	
@@ -594,11 +253,13 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	addInspectorParameter(clearContainerOnLoad.set("Clear Container on Load Preset", false));
 
 	// Router sort order inspector region
-	memset(routerSortSepNameBuf, 0, sizeof(routerSortSepNameBuf));
+	memset(guiState.routerSortSepNameBuf, 0, sizeof(guiState.routerSortSepNameBuf));
 	addInspectorParameter(routerSortInspector.set("Router Order", [this]() {
 		renderRouterSortInterface();
 	}));
 }
+
+// ─── Router node processing ──────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 	shared_ptr<ofAbstractParameter> newCreatedParam;
@@ -639,7 +300,7 @@ void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 			auto* optionsOceaParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&optionsAbstract);
 			if(optionsOceaParam && optionsOceaParam->valueType() == typeid(vector<string>).name()){
 				// Capture shared_ptr to keep addedAbstract alive in lambda
-				dropdownRouterListeners[paramName + "_opts"] =
+				routerManager.getDropdownListeners()[paramName + "_opts"] =
 					optionsOceaParam->cast<vector<string>>().getParameter().newListener(
 						[addedAbstract, param](vector<string> &newOpts){
 							addedAbstract->cast<int>().setDropdownOptions(newOpts);
@@ -656,11 +317,11 @@ void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 		parameterGroupChanged.notify(this);
 		deleteListeners.push(node->deleteModule.newListener([this, nameParamFromRouter, paramName](){
 			getParameterGroup().remove(nameParamFromRouter);
-			dropdownRouterListeners.erase(paramName);
-			dropdownRouterListeners.erase(paramName + "_opts");
+			routerManager.getDropdownListeners().erase(paramName);
+			routerManager.getDropdownListeners().erase(paramName + "_opts");
 		}, 0));
 
-		updateRouterInfo(node);
+		routerManager.updateInfo(node);
 
 		// Auto-register in sort order and set up rename/delete tracking.
 		// shared_ptr<string> currentName is shared between the rename listener
@@ -668,31 +329,25 @@ void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 		{
 			string rName = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
 			if(!isRouterInSortOrder(rName))
-				routerSortOrder.push_back(rName);
+				sortOrder.getOrder().push_back(rName);
 
 			auto currentName = make_shared<string>(rName);
 			auto& nameRef = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
 
 			deleteListeners.push(nameRef.newListener([this, currentName](string& newName) mutable {
 				// Update sort order entry
-				for(auto& e : routerSortOrder)
+				for(auto& e : sortOrder.getOrder())
 					if(!isSortSeparatorEntry(e) && e == *currentName){ e = newName; break; }
-				// Keep routerNodes map in sync so the inspector "isUnknown" check
+				// Keep routerManager's map in sync so the inspector "isUnknown" check
 				// reflects the new name immediately after a runtime rename.
-				auto nodeIt = routerNodes.find(*currentName);
-				if(nodeIt != routerNodes.end()){
-					RouterInfo info = nodeIt->second;
-					info.routerName = newName;
-					routerNodes.erase(nodeIt);
-					routerNodes[newName] = info;
-				}
+				routerManager.renameRouter(*currentName, newName);
 				*currentName = newName;
 			}));
 
 			deleteListeners.push(node->deleteModule.newListener([this, currentName](){
-				routerSortOrder.erase(
-					remove(routerSortOrder.begin(), routerSortOrder.end(), *currentName),
-					routerSortOrder.end());
+				sortOrder.getOrder().erase(
+					remove(sortOrder.getOrder().begin(), sortOrder.getOrder().end(), *currentName),
+					sortOrder.getOrder().end());
 			}));
 		}
 		return;
@@ -718,7 +373,7 @@ void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 		}, 0));
 	}
 
-	updateRouterInfo(node);
+	routerManager.updateInfo(node);
 
 	// Auto-register in sort order and set up rename/delete tracking.
 	// shared_ptr<string> currentName is shared between the rename listener
@@ -726,34 +381,30 @@ void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 	{
 		string rName = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
 		if(!isRouterInSortOrder(rName))
-			routerSortOrder.push_back(rName);
+			sortOrder.getOrder().push_back(rName);
 
 		auto currentName = make_shared<string>(rName);
 		auto& nameRef = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
 
 		deleteListeners.push(nameRef.newListener([this, currentName](string& newName) mutable {
 			// Update sort order entry
-			for(auto& e : routerSortOrder)
+			for(auto& e : sortOrder.getOrder())
 				if(!isSortSeparatorEntry(e) && e == *currentName){ e = newName; break; }
-			// Keep routerNodes map in sync so the inspector "isUnknown" check
+			// Keep routerManager's map in sync so the inspector "isUnknown" check
 			// reflects the new name immediately after a runtime rename.
-			auto nodeIt = routerNodes.find(*currentName);
-			if(nodeIt != routerNodes.end()){
-				RouterInfo info = nodeIt->second;
-				info.routerName = newName;
-				routerNodes.erase(nodeIt);
-				routerNodes[newName] = info;
-			}
+			routerManager.renameRouter(*currentName, newName);
 			*currentName = newName;
 		}));
 
 		deleteListeners.push(node->deleteModule.newListener([this, currentName](){
-			routerSortOrder.erase(
-				remove(routerSortOrder.begin(), routerSortOrder.end(), *currentName),
-				routerSortOrder.end());
+			sortOrder.getOrder().erase(
+				remove(sortOrder.getOrder().begin(), sortOrder.getOrder().end(), *currentName),
+				sortOrder.getOrder().end());
 		}));
 	}
 }
+
+// ─── Node lifecycle callbacks ────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 	string nodeName = node->getParameters().getName();
@@ -765,10 +416,10 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 			// This mirrors what loadPresetBeforeConnections does (step 3), but
 			// we need the name to be correct already at allNodesCreated() time
 			// (step 2) so our sort-order lookup works.
-			if(!innerPresetLoadingPath.empty()){
+			if(!presetManager.getInnerPresetLoadingPath().empty()){
 				string escapedName = node->getNodeModel().nodeName();
 				ofStringReplace(escapedName, " ", "_");
-				string filePath = innerPresetLoadingPath + "/" + escapedName
+				string filePath = presetManager.getInnerPresetLoadingPath() + "/" + escapedName
 				    + "_" + ofToString(node->getNodeModel().getNumIdentifier()) + ".json";
 				if(ofFile::doesFileExist(filePath)){
 					ofJson routerJson = ofLoadJson(filePath);
@@ -784,26 +435,10 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 			toCreateRouters.push_back(node);
 			return;
 		}
-		auto newCreatedParam = typesRegistry->createRouterFromType(node);
-		if(newCreatedParam != nullptr){
-			string paramName = newCreatedParam->getName();
-			while (getParameterGroup().contains(paramName)) {
-				paramName = "_" + paramName;
-			}
-			newCreatedParam->setName(paramName);
-			addParameter(*newCreatedParam.get());
-
-			ofParameter<string> nameParamFromRouter = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
-			nameParamFromRouter = paramName;
-
-			parameterGroupChanged.notify(this);
-			deleteListeners.push(node->deleteModule.newListener([this, nameParamFromRouter](){
-				getParameterGroup().remove(nameParamFromRouter);
-			}, 0));
-		}
-
-		// Update router info (also handles void routers)
-		updateRouterInfo(node);
+		// Interactive creation (not during preset load): use processRouterNode()
+		// so the router is immediately added to sortOrder.getOrder() and tracked for
+		// renaming/deletion — making it appear in the inspector reorder list right away.
+		processRouterNode(node);
 	}
 	ofEventArgs args;
     node->setActive(active);
@@ -811,13 +446,51 @@ void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
 }
 
 void ofxOceanodeNodeMacro::allNodesCreated(){
-	// Nothing queued → no router nodes were (re)created in this load pass.
-	// This happens when all routers are merely repositioned (not newly created),
-	// i.e. the container already held them from a previous load in the same session.
-	// Leave routerSortOrder unchanged and discard the pending buffer.
+	// ── Collect pre-existing router nodes ────────────────────────────────────
+	// Routers that were already in the inner container (from a previous load
+	// pass) are merely repositioned by loadPreset_loadNodes() — they do NOT
+	// fire newNodeCreated() and therefore are NOT in toCreateRouters.  Without
+	// this extra step, sortOrder.getOrder().clear() below would lose those routers
+	// from the inspector list even though their parameters are still alive.
+	// We must re-add their names to sortOrder.getOrder() WITHOUT calling
+	// processRouterNode() again (which would create duplicate parameters and
+	// duplicate listeners).
+	set<ofxOceanodeNode*> toCreateSet(toCreateRouters.begin(), toCreateRouters.end());
+	vector<ofxOceanodeNode*> preExistingRouters;
+	for(auto& typeMap : container->getDynamicNodes()){
+		if(!typeMap.first.empty() && ofSplitString(typeMap.first, " ")[0] == "Router"){
+			for(auto& nodePair : typeMap.second){
+				auto* node = nodePair.second.get();
+				if(toCreateSet.find(node) == toCreateSet.end()){
+					preExistingRouters.push_back(node);
+				}
+			}
+		}
+	}
+
+	// Nothing newly created → decide whether we still need to do separator work.
+	// If no router was newly created AND neither the parameter group nor the
+	// pending sort order contains any separator entries, there is truly nothing
+	// to rebuild — preserve the existing sortOrder.getOrder() and bail out early.
+	// We must NOT bail when separators are involved: old ones may need to be
+	// removed (they have no deleteModule listener) and/or the new preset may
+	// bring a different separator layout via sortOrder.getPendingOrder().
 	if(toCreateRouters.empty()){
-		pendingRouterSortOrder.clear();
-		return;
+		bool separatorWorkNeeded = false;
+		for(int i = 0; i < getParameterGroup().size() && !separatorWorkNeeded; i++){
+			const string& pn = getParameterGroup().get(i).getName();
+			if(pn.size() > 11 && pn.substr(0, 11) == "SEPARATOR:|") separatorWorkNeeded = true;
+		}
+		for(const auto& e : sortOrder.getPendingOrder()){
+			if(isSortSeparatorEntry(e)){ separatorWorkNeeded = true; break; }
+		}
+		if(!separatorWorkNeeded){
+			sortOrder.getPendingOrder().clear();
+			return;
+		}
+		// Separator state differs between presets: fall through to the full
+		// cleanup + rebuild below so old separators are removed and the new
+		// preset's separator layout is applied correctly.
 	}
 
 	// Remove any separator parameters left over from a previous load.
@@ -833,98 +506,138 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 		for(const auto& n : toRemove) getParameterGroup().remove(n);
 	}
 
-	// Rebuild routerSortOrder from scratch.
-	// The tracking blocks inside processRouterNode() will push each router
-	// name as it is processed; separators are pushed inline below.
-	routerSortOrder.clear();
+	// Rebuild sortOrder.getOrder() from scratch.
+	// processRouterNode() pushes each NEW router name; pre-existing routers are
+	// pushed inline below; separators are pushed inline in the sorted path.
+	sortOrder.getOrder().clear();
 
-	if(!pendingRouterSortOrder.empty()){
+	if(!sortOrder.getPendingOrder().empty()){
 		// ── Sorted path ─────────────────────────────────────────────────────
+		// Build name→node maps for both new routers (need processRouterNode)
+		// and pre-existing ones (already fully set up, just need sort-order entry).
 		// Router nameParams have been pre-loaded by newNodeCreated(), so the
 		// map keys are the correct saved names, not the default type labels.
-		map<string, ofxOceanodeNode*> routerByName;
+		map<string, ofxOceanodeNode*> newRouterByName;
 		for(auto* node : toCreateRouters){
 			string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
-			routerByName[name] = node;
+			newRouterByName[name] = node;
+		}
+		map<string, ofxOceanodeNode*> preExistingByName;
+		for(auto* node : preExistingRouters){
+			string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+			preExistingByName[name] = node;
 		}
 
 		set<ofxOceanodeNode*> processed;
 
-		for(const auto& entry : pendingRouterSortOrder){
+		for(const auto& entry : sortOrder.getPendingOrder()){
 			if(isSortSeparatorEntry(entry)){
 				// Inject separator into the parameter group AND into the active order.
 				addSeparator(getSortSeparatorLabel(entry), getSortSeparatorColor(entry));
-				routerSortOrder.push_back(entry);
+				sortOrder.getOrder().push_back(entry);
 			} else {
-				auto it = routerByName.find(entry);
-				if(it != routerByName.end()){
-					processRouterNode(it->second);   // pushes entry to routerSortOrder
+				// New router: needs full processRouterNode() setup.
+				auto it = newRouterByName.find(entry);
+				if(it != newRouterByName.end()){
+					processRouterNode(it->second);   // pushes entry to sortOrder.getOrder()
 					ofEventArgs args;
 					it->second->update(args);
 					processed.insert(it->second);
+				} else {
+					// Pre-existing router: already set up, just restore sort-order entry.
+					auto it2 = preExistingByName.find(entry);
+					if(it2 != preExistingByName.end()){
+						if(!isRouterInSortOrder(entry))
+							sortOrder.getOrder().push_back(entry);
+						processed.insert(it2->second);
+					}
+					// Entries not found in either map (router was deleted): silently dropped.
 				}
-				// Entries not found (router was deleted) are silently dropped.
 			}
 		}
 
-		// Routers not listed in the sort order: append in Y-position order
+		// New routers not listed in the sort order: append in Y-position order
 		// (backward compatibility — new routers added to the inner macro).
-		vector<ofxOceanodeNode*> remaining;
+		vector<ofxOceanodeNode*> remainingNew;
 		for(auto* node : toCreateRouters)
-			if(processed.find(node) == processed.end()) remaining.push_back(node);
-		sort(remaining.begin(), remaining.end(), [](ofxOceanodeNode* a, ofxOceanodeNode* b){
+			if(processed.find(node) == processed.end()) remainingNew.push_back(node);
+		sort(remainingNew.begin(), remainingNew.end(), [](ofxOceanodeNode* a, ofxOceanodeNode* b){
 			return a->getNodeGui().getPosition().y < b->getNodeGui().getPosition().y;
 		});
-		for(auto* node : remaining){
+		for(auto* node : remainingNew){
 			processRouterNode(node);
 			ofEventArgs args;
 			node->update(args);
+		}
+
+		// Pre-existing routers not listed in the sort order: append at the end.
+		for(auto* node : preExistingRouters){
+			if(processed.find(node) == processed.end()){
+				string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+				if(!isRouterInSortOrder(name))
+					sortOrder.getOrder().push_back(name);
+			}
 		}
 	} else {
 		// ── Unsorted path (no saved order) ──────────────────────────────────
-		// Original Y-position sort; routerSortOrder is rebuilt in Y-order.
-		sort(toCreateRouters.begin(), toCreateRouters.end(), [](ofxOceanodeNode* a, ofxOceanodeNode* b){
-			return a->getNodeGui().getPosition().y < b->getNodeGui().getPosition().y;
+		// Combine all routers (new + pre-existing) and sort by Y-position.
+		// Call processRouterNode() only for truly new ones.
+		vector<pair<ofxOceanodeNode*, bool>> allRoutersTagged; // {node, isNew}
+		for(auto* n : toCreateRouters)    allRoutersTagged.push_back({n, true});
+		for(auto* n : preExistingRouters) allRoutersTagged.push_back({n, false});
+		sort(allRoutersTagged.begin(), allRoutersTagged.end(),
+		     [](const pair<ofxOceanodeNode*, bool>& a, const pair<ofxOceanodeNode*, bool>& b){
+			return a.first->getNodeGui().getPosition().y < b.first->getNodeGui().getPosition().y;
 		});
-		for(auto* node : toCreateRouters){
-			processRouterNode(node);
-			ofEventArgs args;
-			node->update(args);
+		for(auto& tagged : allRoutersTagged){
+			ofxOceanodeNode* node = tagged.first;
+			bool isNew            = tagged.second;
+			if(isNew){
+				processRouterNode(node);
+				ofEventArgs args;
+				node->update(args);
+			} else {
+				string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+				if(!isRouterInSortOrder(name))
+					sortOrder.getOrder().push_back(name);
+			}
 		}
 	}
 
-	pendingRouterSortOrder.clear();
+	sortOrder.getPendingOrder().clear();
 	toCreateRouters.clear();
 }
 
+// ─── Macro save/load ─────────────────────────────────────────────────────────
+
 void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
-	if(localPreset){
+	if(presetManager.isLocal()){
 		string localPath = path + "/" + nodeName() + "_" + ofToString(getNumIdentifier());
 		container->savePreset(localPath);
 		json["LocalPreset"] = true;
 		
 		// Save snapshots to a separate file in the local macro folder
-		if(!snapshots.empty()) {
+		if(!snapshotSystem.isEmpty()) {
 			string snapshotsFilePath = localPath + "/snapshots.json";
 			ofJson snapshotsJson;
-			for(const auto& pair : snapshots) {
+			for(const auto& pair : snapshotSystem.getSnapshots()) {
 				ofJson slotJson;
 				slotJson["name"] = pair.second.name;
 				slotJson["morphTimeMs"] = pair.second.morphTimeMs;
 				slotJson["morphBiPow"] = pair.second.morphBiPow;
-				slotJson["routerValues"] = routerValuesToJson(pair.second.routerValues);
+				slotJson["routerValues"] = MacroSnapshotSystem::routerValuesToJson(pair.second.routerValues);
 				snapshotsJson[ofToString(pair.first)] = slotJson;
 			}
 			ofSavePrettyJson(snapshotsFilePath, snapshotsJson);
 			
 			// Keep saving to JSON for backward compatibility
 			ofJson jsonSnapshots;
-			for(const auto& pair : snapshots) {
+			for(const auto& pair : snapshotSystem.getSnapshots()) {
 				ofJson slotJson;
 				slotJson["name"] = pair.second.name;
 				slotJson["morphTimeMs"] = pair.second.morphTimeMs;
 				slotJson["morphBiPow"] = pair.second.morphBiPow;
-				slotJson["routerValues"] = routerValuesToJson(pair.second.routerValues);
+				slotJson["routerValues"] = MacroSnapshotSystem::routerValuesToJson(pair.second.routerValues);
 				jsonSnapshots[ofToString(pair.first)] = slotJson;
 			}
 			json["Snapshots"] = jsonSnapshots;
@@ -933,26 +646,22 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 	else
 	{
 		json["LocalPreset"] = false;
-		json["CategoryStruct"] = currentCategory;
-		json["Macro"] = currentMacro;
-		json["MacroPath"] = currentMacroPath;
+		json["CategoryStruct"] = presetManager.getCurrentCategory();
+		json["Macro"] = presetManager.getCurrentMacro();
+		json["MacroPath"] = presetManager.getCurrentMacroPath();
 
 		// For global macros: save router sort order to the macro folder so
 		// it persists independently of which preset loads this macro (and so
 		// "reload macro" from the popup also picks it up).
-		if(!currentMacroPath.empty()) {
-			string sortOrderFile = currentMacroPath + "/router_sort_order.json";
-			if(!routerSortOrder.empty()) {
-				ofJson sortJson;
+		if(!presetManager.getCurrentMacroPath().empty()) {
+			string sortOrderFile = presetManager.getCurrentMacroPath() + "/router_sort_order.json";
+			ofJson sortJson;
+			if(!sortOrder.getOrder().empty()) {
 				ofJson sortArr = ofJson::array();
-				for(const auto& e : routerSortOrder) sortArr.push_back(e);
+				for(const auto& e : sortOrder.getOrder()) sortArr.push_back(e);
 				sortJson["RouterSortOrder"] = sortArr;
-				ofSavePrettyJson(sortOrderFile, sortJson);
-			} else {
-				if(ofFile::doesFileExist(sortOrderFile)) {
-					ofFile::removeFile(sortOrderFile);
-				}
 			}
+			ofSavePrettyJson(sortOrderFile, sortJson);
 		}
 	}
 
@@ -960,49 +669,15 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 
 	// Save router sort order for local macros (stored in the preset json).
 	// Global macro sort order is saved to the macro folder above.
-	if(localPreset && !routerSortOrder.empty()) {
-		ofJson sortArr = ofJson::array();
-		for(const auto& e : routerSortOrder) sortArr.push_back(e);
-		json["RouterSortOrder"] = sortArr;
+	if(presetManager.isLocal()) {
+		if(!sortOrder.getOrder().empty()) {
+			ofJson sortArr = ofJson::array();
+			for(const auto& e : sortOrder.getOrder()) sortArr.push_back(e);
+			json["RouterSortOrder"] = sortArr;
+		}
 	}
 }
 
-/**
- * macroLoad - Loads macro configuration from JSON
- *
- * CHANGES FROM ORIGINAL VERSION:
- * 1. Improved error handling:
- *    - Replaced try-catch with json.value() to provide default values
- *    - Reduces exception overhead and improves readability
- *
- * 2. Better code organization:
- *    - Added localPath variable for clarity
- *    - Improves maintainability and reduces potential for path construction errors
- *
- * 3. Added snapshot functionality:
- *    - Now loads snapshot data from JSON when available
- *    - Enables state preservation and recall within macro nodes
- *    - Supports multiple snapshots indexed by slot number
- *
- * These changes make the code more robust (better error handling),
- * more maintainable (clearer variable naming), and more powerful
- * (snapshot functionality) while maintaining backward compatibility
- * with existing presets.
- */
-
-/* Original implementation:
- void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
- try {
- localPreset = json["LocalPreset"];
- } catch (ofJson::exception) {
- ofLog() << "Cannot get local preset";
- localPreset = true;
- }
- if(localPreset){
- container->loadPreset(path + "/" + nodeName() + "_" + ofToString(getNumIdentifier()));
- }
- }
- */
 void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 	if(json.count(clearContainerOnLoad.getEscapedName()) == 0){
 		clearContainerOnLoad = false;
@@ -1020,74 +695,60 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 	isLoadingPreset = true;
 
 	// Clear existing snapshots to prevent old data persisting
-	snapshots.clear();
-	currentSnapshotSlot = -1;
+	snapshotSystem.clearAll();
 
 	try {
-		localPreset = json.value("LocalPreset", true);
+		presetManager.setLocal(json.value("LocalPreset", true));
 
-		if(localPreset){
+		if(presetManager.isLocal()){
 			// For local macros: router sort order is stored in the preset json.
 			// Load it before container->loadPreset() so allNodesCreated() can use it.
 			loadRouterSortFromJson(json);
 
 			string localPath = path + "/" + nodeName() + "_" + ofToString(getNumIdentifier());
-			innerPresetLoadingPath = localPath;
+			presetManager.setInnerPresetLoadingPath(localPath);
 			container->loadPreset(localPath);
-			innerPresetLoadingPath = "";
+			presetManager.setInnerPresetLoadingPath("");
 			
 			// Store the local path for future snapshot saving
-			presetPath = localPath;
+			presetManager.setPresetPath(localPath);
 			
 			// First check for snapshots.json file in the local macro folder
 			string snapshotsFilePath = localPath + "/snapshots.json";
 			if(ofFile::doesFileExist(snapshotsFilePath)) {
-				//ofLog() << "Loading snapshots from file: " << snapshotsFilePath;
-				loadSnapshotsFromPath(localPath);
+				snapshotSystem.loadFromPath(localPath);
+				if(!snapshotSystem.isEmpty()) {
+					showSnapshotMatrix = true;
+				}
 			}
 			// If no separate file, check for embedded snapshots (backward compatibility)
 			else if(json.contains("Snapshots") && !json["Snapshots"].is_null()) {
-				//ofLog() << "Loading snapshots from embedded JSON";
-				for(const auto& item : json["Snapshots"].items()) {
-					int slot = ofToInt(item.key());
-					SnapshotData snapshot;
-					loadSnapshotFromJson(snapshot, item.value());
-					snapshots[slot] = snapshot;
-				}
-				if(!snapshots.empty()) {
+				snapshotSystem.loadFromJson(json["Snapshots"]);
+				if(!snapshotSystem.isEmpty()) {
 					showSnapshotMatrix = true;
 				}
 			}
 		}else{
 			// Reset local path since we're now using a global macro
-			presetPath = "";
+			presetManager.setPresetPath("");
 			
-			// TODO: Load preset from the
 			auto currentCategoryVec = json["CategoryStruct"].get<deque<string>>();
-			currentCategory = currentCategoryVec;
-			currentMacro = json["Macro"];
-			currentMacroPath = "";
+			presetManager.getCurrentCategory() = currentCategoryVec;
+			presetManager.setCurrentMacro(json["Macro"]);
+			presetManager.setCurrentMacroPath("");
 			
-			if(currentMacroPath.empty()) {
+			if(presetManager.getCurrentMacroPath().empty()) {
 				auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
-				for(int i = 0 ; i < currentCategory.size(); i++){
-					string categoryNameToCompare = currentCategory[i];
+				for(int i = 0 ; i < presetManager.getCurrentCategory().size(); i++){
+					string categoryNameToCompare = presetManager.getCurrentCategory()[i];
 					macroDirectoryStructure = *std::find_if(macroDirectoryStructure->categories.begin(), macroDirectoryStructure->categories.end(),
 															[categoryNameToCompare](shared_ptr<macroCategory> &mc){return mc->name == categoryNameToCompare;});
-					//            auto result = std::find_if(macroDirectoryStructure->categories.begin(), macroDirectoryStructure->categories.end(),
-					//                                                    [categoryNameToCompare](macroCategory &mc){return mc.name == categoryNameToCompare;});
-					//            macroDirectoryStructure->name = (*result).name;
-					//            macroDirectoryStructure->macros = (*result).macros;
-					//            macroDirectoryStructure->categories.clear();
-					//            for(auto c : (*result).categories){
-					//                macroDirectoryStructure->categories.push_back(c);
-					//            }
 				}
-				currentCategoryMacro = macroDirectoryStructure;
-				auto iter = std::find_if(currentCategoryMacro->macros.begin(), currentCategoryMacro->macros.end(), [this](const std::pair<string, string> &pair){
-					return pair.first == currentMacro;
+				presetManager.setCurrentCategoryMacro(macroDirectoryStructure);
+				auto iter = std::find_if(presetManager.getCurrentCategoryMacro()->macros.begin(), presetManager.getCurrentCategoryMacro()->macros.end(), [this](const std::pair<string, string> &pair){
+					return pair.first == presetManager.getCurrentMacro();
 				});
-				if(iter != currentCategoryMacro->macros.end()){
+				if(iter != presetManager.getCurrentCategoryMacro()->macros.end()){
 					// For global macros: router sort order is stored in the macro
 					// folder (not the preset json). Load it before loadPreset() so
 					// allNodesCreated() can apply it. Fall back to the preset json
@@ -1105,169 +766,73 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 							loadRouterSortFromJson(json);
 						}
 					}
-					innerPresetLoadingPath = iter->second;
+					presetManager.setInnerPresetLoadingPath(iter->second);
 					container->loadPreset(iter->second);
-					innerPresetLoadingPath = "";
-					currentMacroPath = iter->second;
+					presetManager.setInnerPresetLoadingPath("");
+					presetManager.setCurrentMacroPath(iter->second);
 				}
 			} else {
-				innerPresetLoadingPath = currentMacroPath;
-				container->loadPreset(currentMacroPath);
-				innerPresetLoadingPath = "";
+				presetManager.setInnerPresetLoadingPath(presetManager.getCurrentMacroPath());
+				container->loadPreset(presetManager.getCurrentMacroPath());
+				presetManager.setInnerPresetLoadingPath("");
 			}
 			
 			// Load snapshots if they exist
-			if(!currentMacroPath.empty()) {
-				loadSnapshotsFromPath(currentMacroPath);
+			if(!presetManager.getCurrentMacroPath().empty()) {
+				snapshotSystem.loadFromPath(presetManager.getCurrentMacroPath());
+				if(!snapshotSystem.isEmpty()) {
+					showSnapshotMatrix = true;
+				}
 			}
 		}
 	} catch (ofJson::exception) {
 		ofLog() << "Cannot get local preset";
-		localPreset = true;
+		presetManager.setLocal(true);
 
 		string localPath = path + "/" + nodeName() + "_" + ofToString(getNumIdentifier());
-		innerPresetLoadingPath = localPath;
+		presetManager.setInnerPresetLoadingPath(localPath);
 		container->loadPreset(localPath);
-		innerPresetLoadingPath = "";
+		presetManager.setInnerPresetLoadingPath("");
 
 		// Store the local path for future snapshot saving
-		presetPath = localPath;
+		presetManager.setPresetPath(localPath);
 	}
 	isLoadingPreset = false;
 }
 
-void ofxOceanodeNodeMacro::loadMacroInsideCategory(int newPresetIndex){
-	if(newPresetIndex < currentCategoryMacro->macros.size() && currentCategoryMacro->macros[newPresetIndex].first != currentMacro){
-		nextPresetPath = currentCategoryMacro->macros[newPresetIndex].second;
-		currentMacroPath = nextPresetPath;
-		currentMacro = currentCategoryMacro->macros[newPresetIndex].first;
-	}
-}
-
-void ofxOceanodeNodeMacro::updateCurrentCategoryFromPath(string path){
-#ifdef TARGET_WIN32
-	vector<string> splittedInfo = ofSplitString(path, "\\");
-#else
-	vector<string> splittedInfo = ofSplitString(path, "/");
-#endif
-	currentCategory.clear();
-	currentMacro = splittedInfo.back();
-	for(int i = splittedInfo.size() - 2; i >= 0; i--){
-		if(splittedInfo[i] != "Macros" && splittedInfo[i] != "data") {
-			currentCategory.push_front(splittedInfo[i]);
-		}else{
-			break;
-		}
-	}
-	
-	auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
-	for(int i = 0 ; i < currentCategory.size(); i++){
-		string categoryNameToCompare = currentCategory[i];
-		macroDirectoryStructure = *std::find_if(macroDirectoryStructure->categories.begin(), macroDirectoryStructure->categories.end(),
-												[categoryNameToCompare](shared_ptr<macroCategory> &mc){return mc->name == categoryNameToCompare;});
-	}
-	currentCategoryMacro = macroDirectoryStructure;
-}
+// ─── Preset lifecycle overrides ──────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::loadBeforeConnections(ofJson &json){
-	//    container->loadPreset_loadNodes(currentMacroPath);
-	//    container->loadPreset_deactivateConnections();
-	//    container->loadPreset_loadBeforeConnections(currentMacroPath);
 }
 
 void ofxOceanodeNodeMacro::presetRecallBeforeSettingParameters(ofJson &json){
-	//    container->loadPreset_loadNodePreset(currentMacroPath);
-	//    container->loadPreset_loadConnections(currentMacroPath);
 }
 
 void ofxOceanodeNodeMacro::presetRecallAfterSettingParameters(ofJson &json){
-	//    container->loadPreset_midiBindings(currentMacroPath);
-	//    container->loadPreset_loadNodePreset(currentMacroPath);
-	//    container->loadPreset_loadComments(currentMacroPath);
 }
 
-/**
- * Activated presetWillBeLoaded method to support enhanced preset loading
- * and snapshot functionality. This provides proper container preparation
- * before loading presets.
- */
 void ofxOceanodeNodeMacro::presetWillBeLoaded(){
 	container->loadPreset_presetWillBeLoaded();
-	
-	// Clear snapshots when a new preset is about to be loaded
-	// This ensures old snapshot data doesn't persist between presets
-	snapshots.clear();
-	currentSnapshotSlot = -1;
+	snapshotSystem.clearAll();
 }
 
 void ofxOceanodeNodeMacro::presetHasLoaded(){
-	//    container->loadPreset_presetHasLoaded();
 }
 
 void ofxOceanodeNodeMacro::activateConnections(){
-	//    container->loadPreset_activateConnections();
 }
 
 void ofxOceanodeNodeMacro::deactivateConnections(){
-	//    container->loadPreset_deactivateConnections();
 }
 
-// Snapshot-specific methods
-
-void ofxOceanodeNodeMacro::updateRouterConnections() {
-	routerNodes.clear();
-	
-	auto nodes = container->getAllModules();
-	if(nodes.empty()) return;
-	
-	for(auto* node : nodes) {
-		if(!node) continue;
-		
-		if(dynamic_cast<abstractRouter*>(&node->getNodeModel()) != nullptr) {
-			updateRouterInfo(node);
-		}
-	}
-}
-
-void ofxOceanodeNodeMacro::updateRouterInfo(ofxOceanodeNode* node) {
-	auto& params = node->getParameters();
-
-	// Typed routers expose "Value"; void routers expose "Val".
-	// Both should be registered in routerNodes so rename/sort works for all.
-	string valueParamName = "";
-	if(params.contains("Value"))     valueParamName = "Value";
-	else if(params.contains("Val"))  valueParamName = "Val";
-
-	RouterInfo info;
-	info.node       = node;
-	info.routerName = static_cast<abstractRouter&>(node->getNodeModel()).getNameParam().get();
-	info.isInput    = checkIsInputRouter(node);
-
-	if(!valueParamName.empty()){
-		auto valueParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get(valueParamName));
-		if(valueParam) info.parameterType = valueParam->valueType();
-	}
-
-	routerNodes[info.routerName] = info;
-}
-
-bool ofxOceanodeNodeMacro::checkIsInputRouter(ofxOceanodeNode* node) {
-	auto& params = node->getParameters();
-	// Typed routers use "Value"; void routers use "Val".
-	string valName = params.contains("Value") ? "Value" :
-	                 (params.contains("Val")   ? "Val"   : "");
-	if(valName.empty()) return false;
-	auto valueParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get(valName));
-	if(!valueParam) return false;
-	return !valueParam->hasInConnection();
-}
+// ─── Snapshot store/load ─────────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::loadRouterSnapshot(int slot) {
-	auto it = snapshots.find(slot);
-	if(it == snapshots.end()) return;
+	const SnapshotData* snapData = snapshotSystem.getSnapshot(slot);
+	if(snapData == nullptr) return;
 
-	updateRouterConnections();
-	const auto& values = it->second.routerValues;
+	routerManager.updateAllConnections(container.get());
+	const auto& values = snapData->routerValues;
 
 	activeSnapshotSlotListener.unsubscribe();
 	activeSnapshotSlot = slot;
@@ -1278,16 +843,16 @@ void ofxOceanodeNodeMacro::loadRouterSnapshot(int slot) {
 	});
 
 	// Use the destination snapshot's morph time (and update the displayed sliders)
-	interpolationMs = it->second.morphTimeMs;
-	interpolationBiPow = it->second.morphBiPow;
+	morphEngine.getMorphMs() = snapData->morphTimeMs;
+	morphEngine.getMorphBiPow() = snapData->morphBiPow;
 
-	if(interpolationMs > 0.f) {
+	if(morphEngine.getMorphMs() > 0.f) {
 		// Stop any ongoing interpolation
-		isInterpolating = false;
+		morphEngine.stop();
 
 		// Capture current router values as interpolation start
-		interpolationStartValues.clear();
-		for(auto& routerPair : routerNodes) {
+		std::map<std::string, RouterSnapshot> startValues;
+		for(auto& routerPair : routerManager.getRouterNodes()) {
 			if(!routerPair.second.isInput) continue;
 			auto& router = routerPair.second;
 			auto& params = router.node->getParameters();
@@ -1298,41 +863,22 @@ void ofxOceanodeNodeMacro::loadRouterSnapshot(int slot) {
 			if(absRouter == nullptr || absRouter->isExcludeFromSnapshot()) continue;
 			if(!shouldInterpolateType(valueParam->valueType())) continue;
 
-			RouterSnapshot startSnap;
-			startSnap.type = valueParam->valueType();
 			try {
-				if(startSnap.type == typeid(float).name()) {
-					startSnap.value = valueParam->cast<float>().getParameter().get();
-				} else if(startSnap.type == typeid(int).name()) {
-					startSnap.value = static_cast<float>(valueParam->cast<int>().getParameter().get());
-				} else if(startSnap.type == typeid(vector<float>).name()) {
-					startSnap.value = valueParam->cast<vector<float>>().getParameter().get();
-				} else if(startSnap.type == typeid(vector<int>).name()) {
-					auto vec = valueParam->cast<vector<int>>().getParameter().get();
-					vector<float> fv;
-					for(auto v : vec) fv.push_back(static_cast<float>(v));
-					startSnap.value = fv;
-				} else if(startSnap.type == typeid(ofColor).name()) {
-					auto c = valueParam->cast<ofColor>().getParameter().get();
-					startSnap.value = {{"r", (int)c.r}, {"g", (int)c.g}, {"b", (int)c.b}, {"a", (int)c.a}};
-				} else if(startSnap.type == typeid(ofFloatColor).name()) {
-					auto c = valueParam->cast<ofFloatColor>().getParameter().get();
-					startSnap.value = {{"r", c.r}, {"g", c.g}, {"b", c.b}, {"a", c.a}};
-				}
-				interpolationStartValues[router.routerName] = startSnap;
+				RouterSnapshot startSnap = MacroRouterValueDispatch::captureForInterpolation(valueParam);
+				startValues[router.routerName] = startSnap;
 			} catch(const std::exception& e) {
 				ofLogError("Snapshot") << "Error capturing start value: " << e.what();
 			}
 		}
 
 		// Set target values
-		interpolationTargetValues.clear();
+		std::map<std::string, RouterSnapshot> targetValues;
 		for(const auto& pair : values) {
-			interpolationTargetValues[pair.first] = pair.second;
+			targetValues[pair.first] = pair.second;
 		}
 
 		// Apply non-interpolatable types immediately (bool, string, void)
-		for(auto& routerPair : routerNodes) {
+		for(auto& routerPair : routerManager.getRouterNodes()) {
 			if(!routerPair.second.isInput) continue;
 			auto valueIt = values.find(routerPair.second.routerName);
 			if(valueIt == values.end()) continue;
@@ -1347,33 +893,21 @@ void ofxOceanodeNodeMacro::loadRouterSnapshot(int slot) {
 			if(absRouter == nullptr || absRouter->isExcludeFromSnapshot()) continue;
 
 			try {
-				if(valueParam->valueType() == typeid(bool).name()) {
-					valueParam->cast<bool>().getParameter() = valueIt->second.value.get<bool>();
-				} else if(valueParam->valueType() == typeid(vector<bool>).name()) {
-					valueParam->cast<vector<bool>>().getParameter() = valueIt->second.value.get<vector<bool>>();
-				} else if(valueParam->valueType() == typeid(string).name()) {
-					valueParam->cast<string>().getParameter() = valueIt->second.value.get<string>();
-				} else if(valueParam->valueType() == typeid(vector<string>).name()) {
-					valueParam->cast<vector<string>>().getParameter() = valueIt->second.value.get<vector<string>>();
-				} else if(valueParam->valueType() == typeid(void).name()) {
-					valueParam->cast<void>().getParameter().trigger();
-				}
+				MacroRouterValueDispatch::applyValue(valueParam, valueIt->second);
 			} catch(const std::exception& e) {
 				ofLogError("Snapshot") << "Error applying immediate value: " << e.what();
 			}
 		}
 
 		// Start interpolation
-		interpolationBiPowCapture = interpolationBiPow;
-		interpolationStartTime = ofGetElapsedTimeMillis();
-		isInterpolating = true;
+		morphEngine.startMorph(morphEngine.getMorphMs(), morphEngine.getMorphBiPow(),
+		                       startValues, targetValues);
 
 	} else {
 		// Immediate apply
-		isInterpolating = false;
-		currentMorphProgress = 1.f;
+		morphEngine.setComplete();
 
-		for(auto& routerPair : routerNodes) {
+		for(auto& routerPair : routerManager.getRouterNodes()) {
 			if(!routerPair.second.isInput) continue;
 
 			auto valueIt = values.find(routerPair.second.routerName);
@@ -1389,414 +923,37 @@ void ofxOceanodeNodeMacro::loadRouterSnapshot(int slot) {
 			if(absRouter->isExcludeFromSnapshot()) continue;
 
 			try {
-				if(valueParam->valueType() == typeid(float).name()) {
-					valueParam->cast<float>().getParameter() = valueIt->second.value.get<float>();
-				}
-				else if(valueParam->valueType() == typeid(vector<float>).name()) {
-					valueParam->cast<vector<float>>().getParameter() = valueIt->second.value.get<vector<float>>();
-				}
-				else if(valueParam->valueType() == typeid(int).name()) {
-					valueParam->cast<int>().getParameter() = static_cast<int>(round(valueIt->second.value.get<float>()));
-				}
-				else if(valueParam->valueType() == typeid(vector<int>).name()) {
-					auto floatVec = valueIt->second.value.get<vector<float>>();
-					vector<int> intVec;
-					for(auto val : floatVec) {
-						intVec.push_back(static_cast<int>(round(val)));
-					}
-					valueParam->cast<vector<int>>().getParameter() = intVec;
-				}
-				else if(valueParam->valueType() == typeid(bool).name()) {
-					valueParam->cast<bool>().getParameter() = valueIt->second.value.get<bool>();
-				}
-				else if(valueParam->valueType() == typeid(vector<bool>).name()) {
-					valueParam->cast<vector<bool>>().getParameter() = valueIt->second.value.get<vector<bool>>();
-				}
-				else if(valueParam->valueType() == typeid(string).name()) {
-					valueParam->cast<string>().getParameter() = valueIt->second.value.get<string>();
-				}
-				else if(valueParam->valueType() == typeid(vector<string>).name()) {
-					valueParam->cast<vector<string>>().getParameter() = valueIt->second.value.get<vector<string>>();
-				}
-				else if(valueParam->valueType() == typeid(ofColor).name()) {
-					ofColor color;
-					auto& colorJson = valueIt->second.value;
-					color.r = colorJson["r"].get<int>();
-					color.g = colorJson["g"].get<int>();
-					color.b = colorJson["b"].get<int>();
-					color.a = colorJson["a"].get<int>();
-					valueParam->cast<ofColor>().getParameter() = color;
-				}
-				else if(valueParam->valueType() == typeid(ofFloatColor).name()) {
-					ofFloatColor color;
-					auto& colorJson = valueIt->second.value;
-					color.r = colorJson["r"].get<float>();
-					color.g = colorJson["g"].get<float>();
-					color.b = colorJson["b"].get<float>();
-					color.a = colorJson["a"].get<float>();
-					valueParam->cast<ofFloatColor>().getParameter() = color;
-				}
-				else if(valueParam->valueType() == typeid(void).name()) {
-					valueParam->cast<void>().getParameter().trigger();
-				}
+				MacroRouterValueDispatch::applyValue(valueParam, valueIt->second);
 			} catch(const std::exception& e) {
 				ofLogError("Snapshot") << "Error loading value: " << e.what();
 			}
 		}
 	}
 
-	currentSnapshotSlot = slot;
+	snapshotSystem.setCurrentSlot(slot);
 }
 
-void ofxOceanodeNodeMacro::renderSnapshotMatrix() {
-	ImGui::PushID("Matrix");
-	
-	const int numRows = matrixRows;
-	const int numCols = matrixCols;
-	
-	for(int i = 0; i < numRows; i++) {
-		for(int j = 0; j < numCols; j++) {
-			if(j > 0) ImGui::SameLine();
-			
-			int slot = i * numCols + j;
-			ImGui::PushID(slot);
-			
-			bool hasData = snapshots.count(slot) > 0;
-			bool isActive = (slot == currentSnapshotSlot);
-			
-			// Set button colors based on state
-			if(isActive) {
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.0f, 0.0f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.7f, 0.0f, 0.0f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
-			}
-			else if(hasData) {
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.4f, 0.0f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.5f, 0.0f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.6f, 0.0f, 1.0f));
-			}
-			else {
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
-			}
-			
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
-			
-			string label = (hasData && showSnapshotNames) ? snapshots[slot].name : ofToString(slot);
-			
-			if(ImGui::Button(label.c_str(), ImVec2(buttonSize, buttonSize/1.5))) {
-				if(ImGui::GetIO().KeyShift) {
-					storeRouterSnapshot(slot);
-				} else {
-					currentSnapshotSlot = slot;
-					loadRouterSnapshot(slot);
-				}
-			}
-			
-			ImGui::PopStyleColor(4);
-			ImGui::PopID();
-		}
-	}
-	
-	ImGui::PopID();
-}
 
-void ofxOceanodeNodeMacro::renderInspectorInterface() {
-	// Global clear button in the inspector
-	if(ImGui::Button("Clear All Snapshots", ImVec2(130, 0))) {
-		ImGui::OpenPopup("Clear All Snapshots?");
-	}
-	
-	// Handle clear all confirmation popup
-	if(ImGui::BeginPopupModal("Clear All Snapshots?", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-		ImGui::Text("Are you sure you want to clear all snapshots?\nThis action cannot be undone.");
-		ImGui::Separator();
-		
-		if(ImGui::Button("Yes", ImVec2(120, 0))) {
-			clearAllSnapshots();
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::SameLine();
-		if(ImGui::Button("Cancel", ImVec2(120, 0))) {
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::EndPopup();
-	}
-	
-	if(snapshots.empty()) {
-		ImGui::Text("No snapshots stored");
-		return;
-	}
-	
-	for(auto it = snapshots.begin(); it != snapshots.end();) {
-		ImGui::PushID(it->first);
-		
-		bool shouldDelete = false;
-		char nameBuf[256];
-		strcpy(nameBuf, it->second.name.c_str());
-		
-		// Slot number
-		ImGui::Text("Slot %d", it->first);
-		
-		// Name input
-		ImGui::SetNextItemWidth(150);
-		if(ImGui::InputText("##name", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue)) {
-			it->second.name = nameBuf;
-			saveSnapshots(); // Save immediately when a snapshot name is changed
-		}
-		
-		// Load button
-		ImGui::SameLine();
-		if(ImGui::Button("Load")) {
-			loadRouterSnapshot(it->first);
-		}
-		
-		// Clear button with confirmation
-		ImGui::SameLine();
-		if(ImGui::Button("Clear")) {
-			ImGui::OpenPopup("Clear Snapshot?");
-		}
-		
-		// Confirmation popup for individual clear
-		if(ImGui::BeginPopup("Clear Snapshot?")) {
-			ImGui::Text("Clear snapshot %d (%s)?", it->first, it->second.name.c_str());
-			ImGui::Separator();
-			
-			if(ImGui::Button("Yes", ImVec2(120, 0))) {
-				shouldDelete = true;
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::SameLine();
-			if(ImGui::Button("Cancel", ImVec2(120, 0))) {
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::EndPopup();
-		}
-		
-		ImGui::PopID();
-		ImGui::Separator();
-		
-		// Handle deletion if confirmed
-		if(shouldDelete) {
-			if(currentSnapshotSlot == it->first) {
-				currentSnapshotSlot = -1;
-			}
-			it = snapshots.erase(it);
-			saveSnapshots(); // Save the updated state
-		} else {
-			++it;
-		}
-	}
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Snapshot methods — delegated to snapshotSystem
+// ─────────────────────────────────────────────────────────────────────────────
 
-void ofxOceanodeNodeMacro::saveSnapshots() {
-	ofLogNotice("SnapshotSync") << "saveSnapshots called, snapshot count: " << snapshots.size();
-	
-	// For global macros
-	if(!localPreset && !currentMacroPath.empty()) {
-		string filename = ofFilePath::removeTrailingSlash(currentMacroPath) + "/snapshots.json";
-		ofLogNotice("SnapshotSync") << "Global macro snapshot file: " << filename;
-		
-		if(snapshots.empty()) {
-			// Delete the snapshots file if no snapshots exist
-			if(ofFile::doesFileExist(filename)) {
-				ofFile::removeFile(filename);
-				ofLogNotice("SnapshotSync") << "Deleted empty snapshots file: " << filename;
-			} else {
-				ofLogNotice("SnapshotSync") << "No snapshots file to delete";
-			}
-		} else {
-			// Create JSON with snapshots and save
-			ofJson snapshotsJson;
-			for(const auto& pair : snapshots) {
-				ofJson slotJson;
-				slotJson["name"] = pair.second.name;
-				slotJson["morphTimeMs"] = pair.second.morphTimeMs;
-				slotJson["morphBiPow"] = pair.second.morphBiPow;
-				slotJson["routerValues"] = routerValuesToJson(pair.second.routerValues);
-				snapshotsJson[ofToString(pair.first)] = slotJson;
-			}
+void ofxOceanodeNodeMacro::storeRouterSnapshot(int slot) {
+	routerManager.updateAllConnections(container.get());
+	snapshotSystem.storeSnapshot(slot, routerManager.getRouterNodes(), morphEngine.getMorphMs(), morphEngine.getMorphBiPow());
 
-			ofSavePrettyJson(filename, snapshotsJson);
-			ofLogNotice("SnapshotSync") << "Saved " << snapshots.size() << " snapshots to: " << filename;
-		}
-		
-		// Broadcast update regardless of whether we saved or deleted
-		ofxOceanodeShared::snapshotUpdated(currentMacroPath);
-	}
-	// For local macros
-	else if(localPreset) {
-		string localPath;
-		
-		// Try to use the same path that was used to load the preset
-		if(presetPath != "") {
-			localPath = presetPath;
-		}
-		// If no existing path, use a temp folder to avoid creating a stray folder
-		// (e.g. Presets/Canvas/) that would confuse the presets controller on next launch.
-		else {
-			localPath = "temp/" + nodeName() + "_" + ofToString(getNumIdentifier());
-		}
-		
-		string snapshotsFilePath = localPath + "/snapshots.json";
-		ofLogNotice("SnapshotSync") << "Local macro snapshot file: " << snapshotsFilePath;
-		
-		if(snapshots.empty()) {
-			// Delete the snapshots file if no snapshots exist
-			if(ofFile::doesFileExist(snapshotsFilePath)) {
-				ofFile::removeFile(snapshotsFilePath);
-				ofLogNotice("SnapshotSync") << "Deleted empty local snapshots file: " << snapshotsFilePath;
-			} else {
-				ofLogNotice("SnapshotSync") << "No local snapshots file to delete";
-			}
-		} else {
-			// Create JSON with snapshots and save
-			ofDirectory::createDirectory(localPath, true, true);
-			ofJson snapshotsJson;
-			for(const auto& pair : snapshots) {
-				ofJson slotJson;
-				slotJson["name"] = pair.second.name;
-				slotJson["morphTimeMs"] = pair.second.morphTimeMs;
-				slotJson["morphBiPow"] = pair.second.morphBiPow;
-				slotJson["routerValues"] = routerValuesToJson(pair.second.routerValues);
-				snapshotsJson[ofToString(pair.first)] = slotJson;
-			}
-
-			ofSavePrettyJson(snapshotsFilePath, snapshotsJson);
-			ofLogNotice("SnapshotSync") << "Saved " << snapshots.size() << " local snapshots to: " << snapshotsFilePath;
-		}
-	}
-}
-
-string ofxOceanodeNodeMacro::calculateSnapshotHash() {
-	if(snapshots.empty()) return "";
-	
-	string hashInput;
-	for(const auto& pair : snapshots) {
-		hashInput += ofToString(pair.first) + pair.second.name;
-		// Add some representation of the router values
-		for(const auto& routerPair : pair.second.routerValues) {
-			hashInput += routerPair.first + routerPair.second.type;
-		}
-	}
-	
-	// Simple hash - you could use a proper hash function here
-	return ofToString(std::hash<string>{}(hashInput));
-}
-
-void ofxOceanodeNodeMacro::loadSnapshotsFromPath(const string& path) {
-	// Check if the path already ends with snapshots.json
-	string snapshotsFile;
-	if(ofFilePath::getFileName(path) == "snapshots.json") {
-		snapshotsFile = path;
-	} else {
-		snapshotsFile = ofFilePath::removeTrailingSlash(path) + "/snapshots.json";
-	}
-	
-	ofLogNotice("SnapshotSync") << "Loading snapshots from: " << snapshotsFile;
-	
-	if(ofFile::doesFileExist(snapshotsFile)) {
-		//ofLog() << "Found snapshots file, loading...";
-		try {
-			ofJson snapshotsJson = ofLoadJson(snapshotsFile);
-			snapshots.clear();
-			for(const auto& item : snapshotsJson.items()) {
-				int slot = ofToInt(item.key());
-				SnapshotData snapshot;
-				loadSnapshotFromJson(snapshot, item.value());
-				snapshots[slot] = snapshot;
-				//ofLog() << "Loaded snapshot for slot " << slot << " with name " << snapshot.name;
-			}
-			//ofLog() << "Loaded " << snapshots.size() << " snapshots from " << snapshotsFile;
-			ofLogNotice("SnapshotSync") << "Loaded " << snapshots.size() << " snapshots";
-			
-			lastSnapshotHash = calculateSnapshotHash();
-
-			if(!snapshots.empty()) {
-				showSnapshotMatrix = true;
-			}
-
-		} catch(const std::exception& e) {
-			ofLogError("Macro") << "Error loading snapshots: " << e.what();
-		}
-	} else {
-		//ofLogWarning("Macro") << "Snapshots file does not exist: " << snapshotsFile;
-		ofLogWarning("SnapshotSync") << "Snapshots file does not exist: " << snapshotsFile;
-		
-	}
+	// Save snapshots to disk immediately for both local and global presets
+	snapshotSystem.save(presetManager.isLocal(), presetManager.getCurrentMacroPath(), presetManager.getPresetPath(), nodeName(), getNumIdentifier());
 }
 
 void ofxOceanodeNodeMacro::syncSnapshotsFromDisk() {
-	if(!localPreset && !currentMacroPath.empty()) {
-		ofLogNotice("SnapshotSync") << "Manual sync requested for: " << currentMacroPath;
-		
-		loadSnapshotsFromPath(currentMacroPath);
+	if(!presetManager.isLocal() && !presetManager.getCurrentMacroPath().empty()) {
+		ofLogNotice("SnapshotSync") << "Manual sync requested for: " << presetManager.getCurrentMacroPath();
+		snapshotSystem.syncFromDisk(presetManager.getCurrentMacroPath());
+		if(!snapshotSystem.isEmpty()) {
+			showSnapshotMatrix = true;
+		}
 	}
-}
-
-void ofxOceanodeNodeMacro::loadSnapshotFromJson(SnapshotData& snapshot, const ofJson& json) {
-	try {
-		if(json.contains("name") && !json["name"].is_null()) {
-			snapshot.name = json["name"].get<string>();
-		} else {
-			snapshot.name = "Snapshot";
-		}
-
-		if(json.contains("morphTimeMs") && json["morphTimeMs"].is_number()) {
-			snapshot.morphTimeMs = json["morphTimeMs"].get<float>();
-		} else {
-			snapshot.morphTimeMs = 0.f;
-		}
-
-		if(json.contains("morphBiPow") && json["morphBiPow"].is_number()) {
-			snapshot.morphBiPow = json["morphBiPow"].get<float>();
-		} else {
-			snapshot.morphBiPow = 0.f;
-		}
-
-		if(json.contains("routerValues") && !json["routerValues"].is_null()) {
-			snapshot.routerValues = jsonToRouterValues(json["routerValues"]);
-		}
-	} catch(const std::exception& e) {
-		ofLogError("Snapshot") << "Error parsing snapshot: " << e.what();
-		throw;
-	}
-}
-
-void ofxOceanodeNodeMacro::clearSnapshot(int slot) {
-	auto it = snapshots.find(slot);
-	if(it != snapshots.end()) {
-		ofLogNotice("SnapshotSync") << "Clearing snapshot slot: " << slot;
-		snapshots.erase(it);
-		if(currentSnapshotSlot == slot) {
-			currentSnapshotSlot = -1;
-		}
-		
-		// Save immediately when a snapshot is cleared
-		saveSnapshots();
-		
-		ofLogNotice("SnapshotSync") << "Snapshot " << slot << " cleared and saved";
-	}
-}
-
-void ofxOceanodeNodeMacro::renameSnapshot(int slot, const string& newName) {
-	auto it = snapshots.find(slot);
-	if(it != snapshots.end()) {
-		it->second.name = newName;
-		saveSnapshots(); // Save immediately when a snapshot is renamed
-	}
-}
-
-void ofxOceanodeNodeMacro::clearAllSnapshots() {
-	ofLogNotice("SnapshotSync") << "Clearing all snapshots";
-	snapshots.clear();
-	currentSnapshotSlot = -1;
-	
-	// Important: Call saveSnapshots to delete the file
-	saveSnapshots();
-	
-	ofLogNotice("SnapshotSync") << "All snapshots cleared and saved";
 }
 
 void ofxOceanodeNodeMacro::onMatrixSizeChanged(int& value) {
@@ -1804,474 +961,98 @@ void ofxOceanodeNodeMacro::onMatrixSizeChanged(int& value) {
 	matrixCols.set(ofClamp(matrixCols.get(), 1, 8));
 }
 
-ofJson ofxOceanodeNodeMacro::routerValuesToJson(const std::map<string, RouterSnapshot>& values) {
-	ofJson json;
-	for(const auto& pair : values) {
-		json[pair.first] = routerSnapshotToJson(pair.second);
-	}
-	return json;
-}
+// ─── changeRouterType ────────────────────────────────────────────────────────
 
-std::map<string, RouterSnapshot> ofxOceanodeNodeMacro::jsonToRouterValues(const ofJson& json) {
-	std::map<string, RouterSnapshot> values;
-	for(auto it = json.begin(); it != json.end(); ++it) {
-		values[it.key()] = jsonToRouterSnapshot(it.value());
-	}
-	return values;
-}
+void ofxOceanodeNodeMacro::changeRouterType(const std::string& routerName, const std::string& newTypeName) {
+	auto it = routerManager.getRouterNodes().find(routerName);
+	if(it == routerManager.getRouterNodes().end()) return;
+	auto* routerNode = it->second.node;
 
-ofJson ofxOceanodeNodeMacro::routerSnapshotToJson(const RouterSnapshot& snapshot) {
-	ofJson json;
-	json["type"] = snapshot.type;
-	json["value"] = snapshot.value;
-	return json;
-}
-
-RouterSnapshot ofxOceanodeNodeMacro::jsonToRouterSnapshot(const ofJson& json) {
-	RouterSnapshot snapshot;
-	snapshot.type = json["type"].get<string>();
-	snapshot.value = json["value"];
-	return snapshot;
-}
-
-void ofxOceanodeNodeMacro::storeRouterSnapshot(int slot) {
-	updateRouterConnections();
-	
-	SnapshotData snapshotData;
-	
-	// Preserve existing name if the slot already exists
-	auto existingSnapshot = snapshots.find(slot);
-	if(existingSnapshot != snapshots.end()) {
-		snapshotData.name = existingSnapshot->second.name;
-	} else {
-		snapshotData.name = ofToString(slot);
-	}
-	
-	for(auto& routerPair : routerNodes) {
-		auto& router = routerPair.second;
-		if(!router.isInput) continue;
-
-		auto& params = router.node->getParameters();
-		if(!params.contains("Value")) continue; // void routers have no capturable value
-		auto valueParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get("Value"));
-		if(!valueParam) continue;
-		abstractRouter* absRouter = dynamic_cast<abstractRouter*>(&router.node->getNodeModel());
-		if(absRouter == nullptr) continue;
-		if(absRouter->isExcludeFromSnapshot()) continue;
-
-		RouterSnapshot snapshot;
-		snapshot.type = valueParam->valueType();
-		
-		try {
-			if(snapshot.type == typeid(float).name()) {
-				snapshot.value = valueParam->cast<float>().getParameter().get();
-			}
-			else if(snapshot.type == typeid(vector<float>).name()) {
-				snapshot.value = valueParam->cast<vector<float>>().getParameter().get();
-			}
-			else if(snapshot.type == typeid(int).name()) {
-				int val = valueParam->cast<int>().getParameter().get();
-				snapshot.value = static_cast<float>(val);
-			}
-			else if(snapshot.type == typeid(vector<int>).name()) {
-				auto vec = valueParam->cast<vector<int>>().getParameter().get();
-				vector<float> floatVec;
-				for(auto val : vec) {
-					floatVec.push_back(static_cast<float>(val));
-				}
-				snapshot.value = floatVec;
-			}
-			else if(snapshot.type == typeid(bool).name()) {
-				snapshot.value = valueParam->cast<bool>().getParameter().get();
-			}
-			else if(snapshot.type == typeid(vector<bool>).name()) {
-				auto vec = valueParam->cast<vector<bool>>().getParameter().get();
-				vector<bool> boolVec(vec.begin(), vec.end());
-				snapshot.value = boolVec;
-			}
-			else if(snapshot.type == typeid(string).name()) {
-				snapshot.value = valueParam->cast<string>().getParameter().get();
-			}
-			else if(snapshot.type == typeid(vector<string>).name()) {
-				snapshot.value = valueParam->cast<vector<string>>().getParameter().get();
-			}
-			else if(snapshot.type == typeid(ofColor).name()) {
-				auto color = valueParam->cast<ofColor>().getParameter().get();
-				snapshot.value = {
-					{"r", color.r},
-					{"g", color.g},
-					{"b", color.b},
-					{"a", color.a}
-				};
-			}
-			else if(snapshot.type == typeid(ofFloatColor).name()) {
-				auto color = valueParam->cast<ofFloatColor>().getParameter().get();
-				snapshot.value = {
-					{"r", color.r},
-					{"g", color.g},
-					{"b", color.b},
-					{"a", color.a}
-				};
-			}
-			else if(snapshot.type == typeid(void).name()) {
-				snapshot.value = nullptr;  // Just store the trigger state
-			}
-			
-			snapshotData.routerValues[router.routerName] = snapshot;
-		} catch(const std::exception& e) {
-			ofLogError("Snapshot") << "Error storing value: " << e.what();
-		}
-	}
-	snapshotData.morphTimeMs = interpolationMs;
-	snapshotData.morphBiPow = interpolationBiPow;
-	snapshots[slot] = snapshotData;
-	currentSnapshotSlot = slot;
-
-	// Save snapshots to disk immediately for both local and global presets
-	saveSnapshots();
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Interpolation helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-void ofxOceanodeNodeMacro::customPow(float& value, float pow) {
-	float k1 = 2.f * pow * 0.99999f;
-	float k2 = k1 / ((-pow * 0.999999f) + 1.f);
-	float k3 = k2 * std::abs(value) + 1.f;
-	value = value * (k2 + 1.f) / k3;
-}
-
-bool ofxOceanodeNodeMacro::shouldInterpolateType(const std::string& type) const {
-	return type == typeid(float).name()
-		|| type == typeid(int).name()
-		|| type == typeid(vector<float>).name()
-		|| type == typeid(vector<int>).name()
-		|| type == typeid(ofColor).name()
-		|| type == typeid(ofFloatColor).name();
-}
-
-void ofxOceanodeNodeMacro::applyInterpolatedValues(float t) {
-	for(auto& routerPair : routerNodes) {
-		if(!routerPair.second.isInput) continue;
-
-		auto targetIt = interpolationTargetValues.find(routerPair.second.routerName);
-		if(targetIt == interpolationTargetValues.end()) continue;
-		if(!shouldInterpolateType(targetIt->second.type)) continue;
-
-		auto startIt = interpolationStartValues.find(routerPair.second.routerName);
-
-		auto& router = routerPair.second;
-		auto& params = router.node->getParameters();
-		if(!params.contains("Value")) continue;
-		auto valueParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get("Value"));
-		if(!valueParam) continue;
-		abstractRouter* absRouter = dynamic_cast<abstractRouter*>(&router.node->getNodeModel());
-		if(absRouter == nullptr || absRouter->isExcludeFromSnapshot()) continue;
-
-		try {
-			if(valueParam->valueType() == typeid(float).name()) {
-				float sv = (startIt != interpolationStartValues.end())
-					? startIt->second.value.get<float>()
-					: targetIt->second.value.get<float>();
-				float tv = targetIt->second.value.get<float>();
-				valueParam->cast<float>().getParameter() = sv + (tv - sv) * t;
-			}
-			else if(valueParam->valueType() == typeid(int).name()) {
-				float sv = (startIt != interpolationStartValues.end())
-					? startIt->second.value.get<float>()
-					: targetIt->second.value.get<float>();
-				float tv = targetIt->second.value.get<float>();
-				valueParam->cast<int>().getParameter() = static_cast<int>(round(sv + (tv - sv) * t));
-			}
-			else if(valueParam->valueType() == typeid(vector<float>).name()) {
-				auto tv = targetIt->second.value.get<vector<float>>();
-				vector<float> sv = (startIt != interpolationStartValues.end())
-					? startIt->second.value.get<vector<float>>()
-					: tv;
-				vector<float> result;
-				for(size_t i = 0; i < tv.size(); i++) {
-					float s = (i < sv.size()) ? sv[i] : tv[i];
-					result.push_back(s + (tv[i] - s) * t);
-				}
-				valueParam->cast<vector<float>>().getParameter() = result;
-			}
-			else if(valueParam->valueType() == typeid(vector<int>).name()) {
-				auto tv = targetIt->second.value.get<vector<float>>();
-				vector<float> sv = (startIt != interpolationStartValues.end())
-					? startIt->second.value.get<vector<float>>()
-					: tv;
-				vector<int> result;
-				for(size_t i = 0; i < tv.size(); i++) {
-					float s = (i < sv.size()) ? sv[i] : tv[i];
-					result.push_back(static_cast<int>(round(s + (tv[i] - s) * t)));
-				}
-				valueParam->cast<vector<int>>().getParameter() = result;
-			}
-			else if(valueParam->valueType() == typeid(ofColor).name()) {
-				auto& tcj = targetIt->second.value;
-				ofColor tc; tc.r = tcj["r"].get<int>(); tc.g = tcj["g"].get<int>(); tc.b = tcj["b"].get<int>(); tc.a = tcj["a"].get<int>();
-				ofColor sc = tc;
-				if(startIt != interpolationStartValues.end()) {
-					auto& scj = startIt->second.value;
-					sc.r = scj["r"].get<int>(); sc.g = scj["g"].get<int>(); sc.b = scj["b"].get<int>(); sc.a = scj["a"].get<int>();
-				}
-				ofColor result;
-				result.r = (int)(sc.r + (tc.r - sc.r) * t);
-				result.g = (int)(sc.g + (tc.g - sc.g) * t);
-				result.b = (int)(sc.b + (tc.b - sc.b) * t);
-				result.a = (int)(sc.a + (tc.a - sc.a) * t);
-				valueParam->cast<ofColor>().getParameter() = result;
-			}
-			else if(valueParam->valueType() == typeid(ofFloatColor).name()) {
-				auto& tcj = targetIt->second.value;
-				ofFloatColor tc; tc.r = tcj["r"].get<float>(); tc.g = tcj["g"].get<float>(); tc.b = tcj["b"].get<float>(); tc.a = tcj["a"].get<float>();
-				ofFloatColor sc = tc;
-				if(startIt != interpolationStartValues.end()) {
-					auto& scj = startIt->second.value;
-					sc.r = scj["r"].get<float>(); sc.g = scj["g"].get<float>(); sc.b = scj["b"].get<float>(); sc.a = scj["a"].get<float>();
-				}
-				ofFloatColor result;
-				result.r = sc.r + (tc.r - sc.r) * t;
-				result.g = sc.g + (tc.g - sc.g) * t;
-				result.b = sc.b + (tc.b - sc.b) * t;
-				result.a = sc.a + (tc.a - sc.a) * t;
-				valueParam->cast<ofFloatColor>().getParameter() = result;
-			}
-		} catch(const std::exception& e) {
-			ofLogError("Snapshot") << "Error interpolating value: " << e.what();
-		}
-	}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Router Sort Order
-// ─────────────────────────────────────────────────────────────────────────────
-
-bool ofxOceanodeNodeMacro::isSortSeparatorEntry(const string& e) const {
-	return e.size() > 7 && e.substr(0, 7) == "__SEP__";
-}
-
-string ofxOceanodeNodeMacro::getSortSeparatorLabel(const string& e) const {
-	// format: "__SEP__:label"  or  "__SEP__:label:r,g,b,a"
-	size_t first = e.find(':');
-	if(first == string::npos) return "";
-	size_t second = e.find(':', first + 1);
-	return (second == string::npos)
-		? e.substr(first + 1)
-		: e.substr(first + 1, second - first - 1);
-}
-
-ofColor ofxOceanodeNodeMacro::getSortSeparatorColor(const string& e) const {
-	size_t first = e.find(':');
-	if(first == string::npos) return ofColor(200, 200, 200, 255);
-	size_t second = e.find(':', first + 1);
-	if(second == string::npos) return ofColor(200, 200, 200, 255);
-	auto parts = ofSplitString(e.substr(second + 1), ",");
-	if(parts.size() < 4) return ofColor(200, 200, 200, 255);
-	return ofColor(ofToInt(parts[0]), ofToInt(parts[1]), ofToInt(parts[2]), ofToInt(parts[3]));
-}
-
-string ofxOceanodeNodeMacro::makeSortSeparatorEntry(const string& label, const ofColor& c) const {
-	return "__SEP__:" + label + ":" +
-		ofToString((int)c.r) + "," + ofToString((int)c.g) + "," +
-		ofToString((int)c.b) + "," + ofToString((int)c.a);
-}
-
-bool ofxOceanodeNodeMacro::isRouterInSortOrder(const string& name) const {
-	for(const auto& e : routerSortOrder)
-		if(!isSortSeparatorEntry(e) && e == name) return true;
-	return false;
-}
-
-void ofxOceanodeNodeMacro::loadRouterSortFromJson(const ofJson& json) {
-	// Load into the PENDING buffer, not into the active routerSortOrder.
-	// The active routerSortOrder is cleared and rebuilt by allNodesCreated() once
-	// all router nodes have been created and their nameParams pre-loaded.
-	pendingRouterSortOrder.clear();
-	if(json.contains("RouterSortOrder") && json["RouterSortOrder"].is_array()){
-		for(const auto& item : json["RouterSortOrder"])
-			pendingRouterSortOrder.push_back(item.get<string>());
-	}
-}
-
-void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 #ifndef OFXOCEANODE_HEADLESS
-	ImGui::TextDisabled("Drag to reorder, double-click to rename.");
-	ImGui::TextDisabled("Changes apply on next preset load.");
-	ImGui::Spacing();
+	glm::vec2 oldPos = routerNode->getNodeGui().getPosition();
+#endif
 
-	int moveFrom = -1, moveTo = -1;
-	// Disable drag-and-drop while a rename is in progress so the InputText
-	// doesn't accidentally get cancelled by an unintended drag gesture.
-	bool anyEditing = (routerSortEditingIndex >= 0);
-
-	// Track whether we need to early-return because a separator was deleted
-	// (erasing from routerSortOrder mid-loop requires us to stop iterating).
-	bool separatorDeleted = false;
-
-	for(int i = 0; i < (int)routerSortOrder.size(); i++){
-		ImGui::PushID(i);
-		bool isSep     = isSortSeparatorEntry(routerSortOrder[i]);
-		bool isEditing = (routerSortEditingIndex == i); // both routers and separators can edit
-
-		// Display label: separators get decorative line characters; routers show their name.
-		string displayLabel = isSep
-			? ("\xe2\x94\x80\xe2\x94\x80  " + getSortSeparatorLabel(routerSortOrder[i]) + "  \xe2\x94\x80\xe2\x94\x80")
-			: routerSortOrder[i];
-
-		// A router is "unknown" if it is not (yet) registered in routerNodes,
-		// e.g. an entry left over from a deleted router.  Separators are never unknown.
-		bool isUnknown = !isSep && (routerNodes.find(routerSortOrder[i]) == routerNodes.end());
-
-		if(isEditing){
-			// ── Inline rename InputText (routers and separators) ─────────────
-			if(routerSortEditNeedsFocus){
-				ImGui::SetKeyboardFocusHere();
-				routerSortEditNeedsFocus = false;
-			}
-			ImGui::SetNextItemWidth(isSep ? -40.0f : -1.0f); // leave room for x button on seps
-			bool confirmed = ImGui::InputText("##rename", routerSortEditBuf, sizeof(routerSortEditBuf),
-				ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
-
-			if(confirmed){
-				string newName(routerSortEditBuf);
-				if(isSep){
-					// Separator rename: update the parameter name in the group and
-					// replace the sort-order entry with the new label.
-					if(!newName.empty()){
-						string oldLabel  = getSortSeparatorLabel(routerSortOrder[i]);
-						ofColor sepColor = getSortSeparatorColor(routerSortOrder[i]);
-						if(newName != oldLabel){
-							string oldParamName = "SEPARATOR:|" + oldLabel + "|" +
-								ofToString((int)sepColor.r) + "," + ofToString((int)sepColor.g) + "," +
-								ofToString((int)sepColor.b) + "," + ofToString((int)sepColor.a);
-							string newParamName = "SEPARATOR:|" + newName + "|" +
-								ofToString((int)sepColor.r) + "," + ofToString((int)sepColor.g) + "," +
-								ofToString((int)sepColor.b) + "," + ofToString((int)sepColor.a);
-							// Update the parameter name in-place so the visual divider
-							// reflects the new label immediately (no need to reload).
-							for(int j = 0; j < getParameterGroup().size(); j++){
-								if(getParameterGroup().get(j).getName() == oldParamName){
-									getParameterGroup().get(j).setName(newParamName);
-									break;
-								}
-							}
-							routerSortOrder[i] = makeSortSeparatorEntry(newName, sepColor);
-						}
-					}
-				} else {
-					// Router rename: set the abstractRouter's nameParam; the existing
-					// rename listener cascades the update to routerSortOrder, routerNodes,
-					// and the macro's published parameter name.
-					if(!newName.empty() && newName != routerSortOrder[i]){
-						auto it = routerNodes.find(routerSortOrder[i]);
-						if(it != routerNodes.end()){
-							static_cast<abstractRouter*>(&it->second.node->getNodeModel())
-								->getNameParam().set(newName);
-						}
-					}
-				}
-				routerSortEditingIndex = -1;
-			} else if(ImGui::IsItemDeactivated()){
-				// Lost focus (Escape or click elsewhere) → cancel silently
-				routerSortEditingIndex = -1;
-			}
-
-			// Delete button shown inline even while editing a separator
-			if(isSep){
-				ImGui::SameLine();
-				if(ImGui::SmallButton("x")){
-					string sepLabel = getSortSeparatorLabel(routerSortOrder[i]);
-					removeSeparator(sepLabel);
-					routerSortOrder.erase(routerSortOrder.begin() + i);
-					routerSortEditingIndex = -1;
-					separatorDeleted = true;
-					ImGui::PopID();
-					break; // stop iterating — routerSortOrder just changed size
-				}
-			}
-		} else {
-			// ── Normal display ───────────────────────────────────────────────
-			if(isUnknown) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-			if(isSep)     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.85f, 1.0f, 1.0f));
-
-			// For separators, constrain the selectable to leave 40 px for the
-			// delete ("x") button (same margin as the InputText in edit mode).
-			// ImVec2(0,0) would fill the entire available width, pushing the
-			// SameLine button outside the clip rect and making it unclickable.
-			float selWidth = isSep
-				? max(0.0f, ImGui::GetContentRegionAvail().x - 40.0f)
-				: 0.0f;
-			ImGui::Selectable(displayLabel.c_str(), false, ImGuiSelectableFlags_None, ImVec2(selWidth, 0));
-
-			if(isUnknown || isSep) ImGui::PopStyleColor();
-
-			// Double-click enters rename mode for any known entry (routers AND separators).
-			if(!isUnknown
-				&& ImGui::IsItemHovered()
-				&& ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)){
-				routerSortEditingIndex   = i;
-				routerSortEditNeedsFocus = true;
-				// Pre-fill with just the label (not the full __SEP__:... prefix for seps).
-				string currentLabel = isSep ? getSortSeparatorLabel(routerSortOrder[i]) : routerSortOrder[i];
-				strncpy(routerSortEditBuf, currentLabel.c_str(), sizeof(routerSortEditBuf) - 1);
-				routerSortEditBuf[sizeof(routerSortEditBuf) - 1] = '\0';
-			}
-
-			// Drag-drop (disabled while any rename is in progress)
-			if(!anyEditing){
-				if(ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)){
-					ImGui::SetDragDropPayload("ROUTER_SORT_ITEM", &i, sizeof(int));
-					ImGui::Text("%s", displayLabel.c_str());
-					ImGui::EndDragDropSource();
-				}
-				if(ImGui::BeginDragDropTarget()){
-					if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ROUTER_SORT_ITEM")){
-						moveFrom = *(const int*)payload->Data;
-						moveTo   = i;
-					}
-					ImGui::EndDragDropTarget();
-				}
-			}
-
-			// Delete button for separators (shown in normal display mode too)
-			if(isSep){
-				ImGui::SameLine();
-				if(ImGui::SmallButton("x")){
-					string sepLabel = getSortSeparatorLabel(routerSortOrder[i]);
-					removeSeparator(sepLabel);
-					routerSortOrder.erase(routerSortOrder.begin() + i);
-					separatorDeleted = true;
-					ImGui::PopID();
-					break; // stop iterating — routerSortOrder just changed size
-				}
-			}
+	// 1. Find where this router sits in the sort order so we can restore it later.
+	int sortIdx = -1;
+	for(int i = 0; i < (int)sortOrder.getOrder().size(); ++i){
+		if(!isSortSeparatorEntry(sortOrder.getOrder()[i]) && sortOrder.getOrder()[i] == routerName){
+			sortIdx = i; break;
 		}
-
-		ImGui::PopID();
 	}
 
-	// Apply deferred drag-drop move (only if no separator was deleted this frame).
-	if(!separatorDeleted && moveFrom >= 0 && moveTo >= 0 && moveFrom != moveTo){
-		string item = routerSortOrder[moveFrom];
-		routerSortOrder.erase(routerSortOrder.begin() + moveFrom);
-		int insertAt = (moveFrom < moveTo) ? moveTo - 1 : moveTo;
-		routerSortOrder.insert(routerSortOrder.begin() + insertAt, item);
-	}
-
-	// "Add separator" row
-	ImGui::Spacing();
-	ImGui::Separator();
-	ImGui::SetNextItemWidth(120);
-	ImGui::InputText("##sep_name", routerSortSepNameBuf, sizeof(routerSortSepNameBuf));
-	ImGui::SameLine();
-	if(ImGui::SmallButton("+ Sep")){
-		if(routerSortSepNameBuf[0] != '\0'){
-			routerSortOrder.push_back(makeSortSeparatorEntry(
-				string(routerSortSepNameBuf), ofColor(200, 200, 200, 255)));
-			routerSortSepNameBuf[0] = '\0';
+#ifndef OFXOCEANODE_HEADLESS
+	// 2. Capture inner-container connection info as plain strings before the node
+	//    is deleted (pointers become invalid after deleteSelf()).
+	string oldGroupEscaped = routerNode->getParameters().getEscapedName();
+	struct ConnInfo { string srcGroup, srcParam, sinkGroup, sinkParam; };
+	vector<ConnInfo> savedConns;
+	for(auto& conn : container->getAllConnections()){
+		string srcG = conn->getSourceParameter().getGroupHierarchyNames()[0];
+		string snkG = conn->getSinkParameter().getGroupHierarchyNames()[0];
+		if(srcG == oldGroupEscaped || snkG == oldGroupEscaped){
+			savedConns.push_back({srcG, conn->getSourceParameter().getName(),
+			                      snkG, conn->getSinkParameter().getName()});
 		}
 	}
 #endif
+
+	// 3. Delete the old router.
+	//    Fires deleteModule listeners: removes the published param from
+	//    getParameterGroup(), removes routerName from sortOrder.getOrder(),
+	//    and removes the node from the container's dynamicNodes map.
+	routerNode->deleteSelf();
+	routerNode = nullptr;
+
+	// 4. Create the new router.
+	//    Because isLoadingPreset == false, the newNodeCreated event listener
+	//    calls processRouterNode() immediately, which adds a new published
+	//    parameter and pushes the default type-label name onto sortOrder.getOrder().
+	auto* newNode = container->createNodeFromName(newTypeName);
+	if(!newNode) return;
+
+#ifndef OFXOCEANODE_HEADLESS
+	newNode->getNodeGui().setPosition(oldPos);
+#endif
+
+	// 5. Rename the new router back to the original name.
+	//    The rename listener installed by processRouterNode() will synchronise
+	//    sortOrder.getOrder() (default label → routerName) and routerManager's map.
+	//    It does NOT rename the published macro parameter for generic (non-dropdown)
+	//    routers, so we do that manually afterwards.
+	string newNodeDefaultParamName = static_cast<abstractRouter*>(&newNode->getNodeModel())->getNameParam().get();
+	static_cast<abstractRouter*>(&newNode->getNodeModel())->getNameParam().set(routerName);
+	// Rename the published macro parameter to match (generic routers only – dropdown
+	// installs its own listener that already does this).
+	if(!routerName.empty() && getParameterGroup().contains(newNodeDefaultParamName)){
+		getParameterGroup().get(newNodeDefaultParamName).setName(routerName);
+	}
+
+	// 6. Restore sort-order position.
+	//    After steps 4+5 routerName sits at the end of sortOrder.getOrder().
+	//    Move it back to the saved index.
+	if(sortIdx >= 0){
+		auto entryIt = std::find(sortOrder.getOrder().begin(), sortOrder.getOrder().end(), routerName);
+		if(entryIt != sortOrder.getOrder().end()){
+			sortOrder.getOrder().erase(entryIt);
+			int insertAt = std::min(sortIdx, (int)sortOrder.getOrder().size());
+			sortOrder.getOrder().insert(sortOrder.getOrder().begin() + insertAt, routerName);
+		}
+	}
+
+#ifndef OFXOCEANODE_HEADLESS
+	// 7. Reconnect inner-container connections (best-effort).
+	//    Incompatible type pairs will silently fail — that is expected when
+	//    switching between fundamentally different types.
+	string newGroupEscaped = newNode->getParameters().getEscapedName();
+	for(auto& ci : savedConns){
+		string srcG = (ci.srcGroup == oldGroupEscaped) ? newGroupEscaped : ci.srcGroup;
+		string snkG = (ci.sinkGroup == oldGroupEscaped) ? newGroupEscaped : ci.sinkGroup;
+		container->createConnectionFromInfo(srcG, ci.srcParam, snkG, ci.sinkParam);
+	}
+#endif
+
+	// 8. Sync the macro's parameter-group order to the (restored) sort order
+	//    and broadcast the structural change to the outer container.
+	syncParameterGroupToSortOrder();
+	parameterGroupChanged.notify(this);
 }

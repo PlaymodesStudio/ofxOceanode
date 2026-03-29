@@ -3,7 +3,12 @@
 //  example-basic
 //
 //  Created by Eduard Frigola Bagué on 20/06/2019.
-//	Snapshot management added by Santi Vilanova on January 2025
+//  Snapshot management added by Santi Vilanova on January 2025
+//
+//  Refactored in phases 1-8 (March 2025): extracted helper classes for
+//  router management, snapshot system, morph engine, preset management,
+//  router sort-order, and value dispatch.  GUI rendering lives in
+//  ofxOceanodeNodeMacroGui.cpp.
 
 #ifndef ofxOceanodeNodeMacro_h
 #define ofxOceanodeNodeMacro_h
@@ -12,11 +17,21 @@
 #include "ofxOceanodeShared.h"
 #include "router.h"
 
+#include "MacroRouterSortOrder.h"
+#include "MacroRouterValueDispatch.h"
+#include "MacroSnapshotSystem.h"
+#include "MacroMorphEngine.h"
+#include "MacroRouterManager.h"
+#include "MacroPresetManager.h"
+
 #ifdef OFXOCEANODE_USE_OSC
 class ofxOscMessage;
 #endif
 
-// Data Structures for Snapshots
+// ─── Shared data types ────────────────────────────────────────────────────────
+// RouterInfo is used by both the router manager and the snapshot system.
+// RouterSnapshot and SnapshotData are defined in MacroSnapshotSystem.h.
+
 struct RouterInfo {
 	bool isInput;
 	std::string routerName;
@@ -24,23 +39,26 @@ struct RouterInfo {
 	ofxOceanodeNode* node;
 };
 
-struct RouterSnapshot {
-	std::string type;
-	ofJson value;
+// ─── GUI scratch state ────────────────────────────────────────────────────────
+// Mutable buffers used by the router-sort inspector (renderRouterSortInterface).
+
+struct MacroGuiState {
+	char routerSortSepNameBuf[128] = {};
+	int  routerSortEditingIndex = -1;
+	bool routerSortEditNeedsFocus = false;
+	char routerSortEditBuf[256] = {};
 };
 
-struct SnapshotData {
-	std::string name;
-	std::map<string, RouterSnapshot> routerValues;
-	float morphTimeMs = 0.f;
-	float morphBiPow = 0.f;
-};
+// ═══════════════════════════════════════════════════════════════════════════════
+// ofxOceanodeNodeMacro — encapsulates a sub-graph (a "macro")
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class ofxOceanodeNodeMacro : public ofxOceanodeNodeModel{
 public:
 	ofxOceanodeNodeMacro();
 	~ofxOceanodeNodeMacro(){};
 	
+	// ─── Lifecycle ────────────────────────────────────────────────────────
 	void setup(){setup("");};
 	void setup(string additionalInfo);
 	void update(ofEventArgs &a);
@@ -48,6 +66,7 @@ public:
 	
 	void setContainer(ofxOceanodeContainer* container);
 	
+	// ─── Preset save/load ─────────────────────────────────────────────────
 	void macroSave(ofJson &json, string path);
 	void macroLoad(ofJson &json, string path);
 	
@@ -60,9 +79,11 @@ public:
 	void activateConnections() override;
 	void deactivateConnections() override;
 	
+	// ─── BPM / Phase ──────────────────────────────────────────────────────
 	void setBpm(float bpm){container->setBpm(bpm);};
 	void resetPhase(){container->resetPhase();};
 	
+	// ─── Snapshot sync ────────────────────────────────────────────────────
 	void syncSnapshotsFromDisk();
 
 #ifdef OFXOCEANODE_USE_OSC
@@ -71,24 +92,37 @@ public:
 		return true;};
 #endif
 	
+	// ─── Accessors ────────────────────────────────────────────────────────
 	shared_ptr<ofxOceanodeContainer> getContainer() {return container;};
 	ofxOceanodeCanvas* getCanvas() {return &canvas;};
 	
+	string getCurrentMacroName(){
+		return presetManager.getCurrentMacro();
+	}
+	
+	bool isLocal(){
+		return presetManager.isLocal();
+	}
+
+	bool isActive() const {
+		return active.get();
+	}
+	
+	// ─── Activation ───────────────────────────────────────────────────────
 	void activate(){
-        if(active){
-            container->activate();
-            if(resetPhaseOnActive) container->resetPhase();
-            if(retriggerSnapshotOnActive && currentSnapshotSlot >= 0) {
-                // Retrigger the current snapshot to fire its parameters again
-                loadRouterSnapshot(currentSnapshotSlot);
-            }
-        }
+		if(active){
+			container->activate();
+			if(resetPhaseOnActive) container->resetPhase();
+			if(retriggerSnapshotOnActive && snapshotSystem.getCurrentSlot() >= 0) {
+				loadRouterSnapshot(snapshotSystem.getCurrentSlot());
+			}
+		}
 	}
 	
 	void deactivate(){
-        if(active){
-            container->deactivate();
-        }
+		if(active){
+			container->deactivate();
+		}
 	}
 	
 	void activateWindow(){
@@ -96,85 +130,64 @@ public:
 		canvas.requestFocus();
 	}
 	
-	string getCurrentMacroName(){
-		return currentMacro;
-	}
-	
-	bool isLocal(){
-		return localPreset;
-	}
-	
 private:
-	// Node Management
+	// ─── Node management ──────────────────────────────────────────────────
 	void newNodeCreated(ofxOceanodeNode* &node);
-    void allNodesCreated();
-	void loadMacroInsideCategory(int newPresetIndex);
-	void updateCurrentCategoryFromPath(string path);
+	void allNodesCreated();
 	
-	// Initialization Methods
+	// ─── Router & snapshot logic ──────────────────────────────────────────
+	void processRouterNode(ofxOceanodeNode* node);
+	void changeRouterType(const std::string& routerName, const std::string& newTypeName);
+	void storeRouterSnapshot(int slot);
+	void loadRouterSnapshot(int slot);
+	void updateMacroDirectoryStructure();
+	
+	// ─── Initialization helpers (called from setup) ───────────────────────
 	void initializeContainer(const string& additionalInfo);
 	void initializeParameters();
 	void initializeEventListeners();
 	void setupPresetControl();
 	void initializeSnapshotSystem();
 
-	// GUI Rendering Methods
-	void renderMacroControls();
-	void renderSnapshotsSection();
-	void renderMacroSelection(bool& addBank);
-	void renderBankCreationModal();
-	void renderSaveControls(bool& firstSaveAsOpen);
-	void renderSaveAsModal(bool firstSaveAsOpen);
-	void renderSaveAsPopups(bool openNameAlreadyExistsPopup, char* cString);
-	void renderChooseCategoryPopup();
+	// ─── GUI rendering (implemented in ofxOceanodeNodeMacroGui.cpp) ──────
+	void renderPresetControlGui();
+	void renderPresetNamingGui();
+	void renderMinimizedView(ImVec2 size);
 	void renderSnapshotMatrix();
 	void renderInspectorInterface();
-	void renderSnapshotListItem(int slot, SnapshotData& snapshot);
 	void renderRouterSortInterface();
+	void syncParameterGroupToSortOrder();
 
-	// Router Sort Order Helpers
-	bool isSortSeparatorEntry(const std::string& entry) const;
-	std::string getSortSeparatorLabel(const std::string& entry) const;
-	ofColor getSortSeparatorColor(const std::string& entry) const;
-	std::string makeSortSeparatorEntry(const std::string& label, const ofColor& color) const;
-	bool isRouterInSortOrder(const std::string& routerName) const;
-	void loadRouterSortFromJson(const ofJson& json);
+	// ─── Router sort-order inline helpers (delegate to sortOrder) ─────────
+	bool isSortSeparatorEntry(const std::string& entry) const { return sortOrder.isSortSeparatorEntry(entry); }
+	std::string getSortSeparatorLabel(const std::string& entry) const { return sortOrder.getSortSeparatorLabel(entry); }
+	ofColor getSortSeparatorColor(const std::string& entry) const { return sortOrder.getSortSeparatorColor(entry); }
+	std::string makeSortSeparatorEntry(const std::string& label, const ofColor& color) const { return sortOrder.makeSortSeparatorEntry(label, color); }
+	bool isRouterInSortOrder(const std::string& routerName) const { return sortOrder.isRouterInSortOrder(routerName); }
+	void loadRouterSortFromJson(const ofJson& json) { sortOrder.loadRouterSortFromJson(json); }
 
-	// Router & Snapshot Management
-	void processRouterNode(ofxOceanodeNode* node);
-	void updateRouterConnections();
-	void updateRouterInfo(ofxOceanodeNode* node);
-	bool checkIsInputRouter(ofxOceanodeNode* node);
-	void storeRouterSnapshot(int slot);
-	void loadRouterSnapshot(int slot);
-	void clearSnapshot(int slot);
-	void renameSnapshot(int slot, const string& newName);
-	void saveSnapshots();
-	void loadSnapshotsFromPath(const string& path);
-	void loadSnapshotFromJson(SnapshotData& snapshot, const ofJson& json);
-	void updateMacroDirectoryStructure();
-	void clearAllSnapshots();
-	void setupSnapshotInspectorParameters();
-	string calculateSnapshotHash();
+	// ─── Interpolation inline helper ──────────────────────────────────────
+	bool shouldInterpolateType(const std::string& type) const { return MacroRouterValueDispatch::shouldInterpolate(type); }
 
-	
-
-	// Router Value Management
-	std::map<string, RouterSnapshot> captureRouterValues();
-	void applyRouterValues(const std::map<string, RouterSnapshot>& values);
-	ofJson routerValuesToJson(const std::map<string, RouterSnapshot>& values);
-	std::map<string, RouterSnapshot> jsonToRouterValues(const ofJson& json);
-	ofJson routerSnapshotToJson(const RouterSnapshot& snapshot);
-	RouterSnapshot jsonToRouterSnapshot(const ofJson& json);
-
-	// Interpolation helpers
-	bool shouldInterpolateType(const std::string& type) const;
-	void applyInterpolatedValues(float t);
-	static void customPow(float& value, float pow);
-
-	// Event Handlers
+	// ─── Event handlers ───────────────────────────────────────────────────
 	void onMatrixSizeChanged(int& value);
 
+	// ═════════════════════════════════════════════════════════════════════
+	// Member variables
+	// ═════════════════════════════════════════════════════════════════════
+
+	// ─── Sub-systems ──────────────────────────────────────────────────────
+	MacroRouterSortOrder sortOrder;
+	MacroSnapshotSystem  snapshotSystem;
+	MacroMorphEngine     morphEngine;
+	MacroRouterManager   routerManager;
+	MacroPresetManager   presetManager;
+
+	// ─── GUI state ────────────────────────────────────────────────────────
+	MacroGuiState guiState;
+	std::function<void(ImVec2)> minimizedViewCallback;
+
+	// ─── Core containers ──────────────────────────────────────────────────
 #ifndef OFXOCEANODE_HEADLESS
 	ofxOceanodeCanvas canvas;
 #endif
@@ -182,61 +195,39 @@ private:
 	shared_ptr<ofxOceanodeNodeRegistry> registry;
 	shared_ptr<ofxOceanodeTypesRegistry> typesRegistry;
 	
-	// Event Listeners
+	// ─── Event listeners ──────────────────────────────────────────────────
 	ofEventListener newNodeListener;
 	ofEventListener macroUpdatedListener;
 	ofEventListener activeListener;
 	ofEventListener colorListener;
 	ofEventListener addSnapshotListener;
 	ofEventListener matrixSizeListener;
-	ofEventListeners deleteListeners;
-	ofEventListeners presetActionsListeners;
 	ofEventListener activeSnapshotSlotListener;
 	ofEventListener snapshotUpdatedListener;
 	ofEventListener showSnapshotMatrixListener;
-		
+	ofEventListener allNodesCreatedListener;
+	ofEventListeners deleteListeners;
+	ofEventListeners presetActionsListeners;
 	std::unordered_map<string, ofEventListeners> inoutListeners;
 	
-	// Basic Parameters
+	// ─── Basic state ──────────────────────────────────────────────────────
 	bool showWindow;
-	string presetPath;
-	ofParameter<int> bank;
-	int previousBank;
-	shared_ptr<ofxOceanodeParameter<int>> bankDropdown;
-	vector<string> bankNames;
-	ofParameter<int> preset;
-	shared_ptr<ofxOceanodeParameter<int>> presetDropdown;
-	int currentPreset;
-	ofParameter<string> savePresetField;
-	vector<string> presetsInBank;
-	ofParameter<string> presetName;
-	ofParameter<bool> savePreset;
-	
+	bool lastActiveState;
+	bool isLoadingPreset;
+	string canvasParentID;
+	std::vector<ofxOceanodeNode*> toCreateRouters;
+
+	// ─── Parameters ───────────────────────────────────────────────────────
+	ofParameter<bool> active;
 	ofParameter<ofColor> colorParam;
 	ofParameter<bool> resetPhaseOnActive;
-    
-    ofParameter<bool> clearContainerOnLoad;
-	
-	bool localPreset;
-	bool lastActiveState;
-	string nextPresetPath;
-	string currentMacro;
-	string currentMacroPath;
-	string canvasParentID;
-	deque<string> currentCategory;
-	shared_ptr<macroCategory> currentCategoryMacro;
-	deque<string> saveAsTempCategory;
+	ofParameter<bool> clearContainerOnLoad;
 	ofParameter<string> localName;
-    
-    ofEventListener allNodesCreatedListener;
-    bool isLoadingPreset;
-    std::vector<ofxOceanodeNode*> toCreateRouters;
 	
-	ofParameter<bool> active;
 	ofParameter<std::function<void()>> presetControl;
 	ofParameter<std::function<void()>> presetNaming;
-
-	// Snapshot-related Parameters
+	
+	// ─── Snapshot parameters ──────────────────────────────────────────────
 	ofParameter<std::function<void()>> snapshotInspector;
 	ofParameter<int> matrixRows;
 	ofParameter<int> matrixCols;
@@ -245,40 +236,11 @@ private:
 	ofParameter<int> activeSnapshotSlot;
 	shared_ptr<ofxOceanodeAbstractParameter> activeSnapshotSlotParam;
 	ofParameter<float> buttonSize;
-	ofParameter<bool> retriggerSnapshotOnActive; 
+	ofParameter<bool> retriggerSnapshotOnActive;
 	ofParameter<bool> showSnapshotMatrix;
-	int currentSnapshotSlot;
-	string lastSnapshotHash;
-	
-	// Collections
-	std::map<std::string, RouterInfo> routerNodes;
-	std::map<int, SnapshotData> snapshots;
-	std::unordered_map<std::string, ofEventListener> dropdownRouterListeners;
 
-	// Interpolation (plain floats - not registered as preset params; live in snapshot data only)
-	float interpolationMs;
-	float interpolationBiPow;
-	bool isInterpolating;
-	uint64_t interpolationStartTime;
-	float interpolationBiPowCapture;
-	std::map<std::string, RouterSnapshot> interpolationStartValues;
-	std::map<std::string, RouterSnapshot> interpolationTargetValues;
-	float currentMorphProgress;
-
-	// Router Sort Order
-	std::vector<std::string> routerSortOrder;         // active order, rebuilt each load
-	std::vector<std::string> pendingRouterSortOrder;  // loaded from JSON, consumed by allNodesCreated()
-	std::string innerPresetLoadingPath;               // set before container->loadPreset(), used by newNodeCreated()
+	// ─── Router sort-order inspector ──────────────────────────────────────
 	ofParameter<std::function<void()>> routerSortInspector;
-	char routerSortSepNameBuf[128];
-
-	// Inline-rename state (router sort inspector)
-	int  routerSortEditingIndex;    // index into routerSortOrder being renamed, -1 = none
-	bool routerSortEditNeedsFocus;  // focus the InputText on the first edit frame
-	char routerSortEditBuf[256];    // scratch buffer for the rename InputText
-
-	// Additional Components
-	std::function<void(ImVec2)> minimizedViewCallback;
 };
 
 #endif /* ofxOceanodeNodeMacro_h */
