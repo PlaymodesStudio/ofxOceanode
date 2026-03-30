@@ -70,7 +70,7 @@ void ofxOceanodeInspectorController::draw(){
 		ImGui::GetWindowDrawList()->AddRectFilled(
 			cursorPos,
 			ImVec2(cursorPos.x + availWidth, cursorPos.y + textSize.y + padding * 2),
-			ImGui::ColorConvertFloat4ToU32(node->getColor()*.25)
+			ImGui::ColorConvertFloat4ToU32(node->getColor()*.5)
 		);
 		
 		// Draw white text on top
@@ -90,15 +90,59 @@ void ofxOceanodeInspectorController::draw(){
             ImGui::PushID(uniqueId.c_str());
 
             if(absParam.valueType() == typeid(std::function<void()>).name()){
-                absParam.cast<std::function<void()>>().get()();
+                // Check if this is a separator by looking at the parameter name
+                if(uniqueId.find("SEPARATOR:|") == 0){
+                    // Parse separator data: "SEPARATOR:|label|r,g,b,a"
+                    vector<string> parts = ofSplitString(uniqueId, "|");
+                    string label = parts.size() > 1 ? parts[1] : "";
+                    ofColor color(200, 200, 200, 255); // default
+                    
+                    if(parts.size() > 2){
+                        vector<string> colorParts = ofSplitString(parts[2], ",");
+                        if(colorParts.size() >= 4){
+                            color.r = ofToInt(colorParts[0]);
+                            color.g = ofToInt(colorParts[1]);
+                            color.b = ofToInt(colorParts[2]);
+                            color.a = ofToInt(colorParts[3]);
+                        }
+                    }
+                    
+                    // Render separator with label and background highlight
+                    if(!label.empty()){
+                        ImVec2 p = ImGui::GetCursorScreenPos();
+                        float w = ImGui::GetContentRegionAvail().x;
+                        
+                        // Draw the text
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(color.r/255.0f, color.g/255.0f, color.b/255.0f, color.a/255.0f));
+                        ImGui::TextUnformatted(label.c_str());
+                        ImGui::PopStyleColor();
+                        
+                        // Get the size of the rendered text
+                        ImVec2 textSize = ImGui::CalcTextSize(label.c_str());
+                        
+                        // Draw a semi-transparent rectangle behind/below the text (15% opacity to match node gui)
+                        ImU32 bgCol = IM_COL32(color.r, color.g, color.b, color.a * 0.15f);
+                        ImGui::GetWindowDrawList()->AddRectFilled(
+                            ImVec2(p.x, p.y),
+                            ImVec2(p.x + w, p.y + textSize.y),
+                            bgCol
+                        );
+                        
+                        ImGui::Dummy(ImVec2(0, 2));
+                    }
+                } else {
+                    // Regular custom region function
+                    absParam.cast<std::function<void()>>().get()();
+                }
             } else {
-                ImGui::Text("%s", uniqueId.c_str());
-                ImGui::SameLine();
-                string hiddenUniqueId = "##" + uniqueId;
-                bool isItemEditableByText = false;
+				string hiddenUniqueId = "##" + uniqueId;
+				bool isItemEditableByText = false;
 
                 // PARAM FLOAT
                 if(absParam.valueType() == typeid(float).name()){
+					ImGui::Text("%s", uniqueId.c_str());
+					ImGui::SameLine();
+
                     auto tempCast = absParam.cast<float>();
                     auto temp = tempCast.get();
                     if(tempCast.getMin() == std::numeric_limits<float>::lowest() || tempCast.getMax() == std::numeric_limits<float>::max()){
@@ -113,6 +157,9 @@ void ofxOceanodeInspectorController::draw(){
                 }
                 // PARAM INT
                 else if(absParam.valueType() == typeid(int).name()){
+					ImGui::Text("%s", uniqueId.c_str());
+					ImGui::SameLine();
+
                     auto tempCast = absParam.cast<int>();
                     std::string nodeTypeName = node->getNodeModel().nodeName();
                     std::vector<std::string> dropdownOptions = getInspectorDropdownOptions(nodeTypeName, absParam.getName());
@@ -149,6 +196,9 @@ void ofxOceanodeInspectorController::draw(){
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast = !tempCast;
                     }
+					ImGui::SameLine();
+					ImGui::Text("%s", uniqueId.c_str());
+
                 }
                 // PARAM VOID
                 else if(absParam.valueType() == typeid(void).name()){
@@ -163,6 +213,9 @@ void ofxOceanodeInspectorController::draw(){
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
                         tempCast.trigger();
                     }
+					ImGui::SameLine();
+					ImGui::Text("%s", uniqueId.c_str());
+
                 }
                 // PARAM STRING
                 else if(absParam.valueType() == typeid(string).name()){
@@ -223,7 +276,7 @@ void ofxOceanodeInspectorController::draw(){
         vector<int> scopeIndices;
         for(int i = 0; i < nodeGui.getParameters().size(); i++){
             ofxOceanodeAbstractParameter &p = static_cast<ofxOceanodeAbstractParameter&>(nodeGui.getParameters().get(i));
-            if(p.getFlags() & ofxOceanodeParameterFlags_DisableInConnection){
+            if(p.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized){
                 scopeIndices.push_back(i);
             }
         }
