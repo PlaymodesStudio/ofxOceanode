@@ -241,6 +241,11 @@ void ofxOceanodeMiniMapController::renderMinimap(
     float vpRight = vpLeft  + winSize.x;
     float vpBot   = vpTop   + winSize.y;
 
+    // Save raw content bounding box (nodes + comments only) BEFORE expanding with viewport.
+    // This is used later to clamp navigation so the user can't pan far outside the node area.
+    float contentMinX = minX, contentMinY = minY;
+    float contentMaxX = maxX, contentMaxY = maxY;
+
     // Expand bounding box to include viewport so scale fits the white rectangle within minimap
     minX = min(minX, vpLeft);
     minY = min(minY, vpTop);
@@ -341,7 +346,12 @@ void ofxOceanodeMiniMapController::renderMinimap(
         float cx = (mousePos.x - offsetX) / scale + minX - PADDING;
         float cy = (mousePos.y - offsetY) / scale + minY - PADDING;
 
-        // Center view on the clicked canvas point
+        // Clamp target canvas point to the node/content bounding box (+ PADDING margin)
+        // so the user cannot pan the view far away from where the nodes actually live.
+        cx = ofClamp(cx, contentMinX - PADDING, contentMaxX + PADDING);
+        cy = ofClamp(cy, contentMinY - PADDING, contentMaxY + PADDING);
+
+        // Center view on the clicked (clamped) canvas point
         activeCanvas->setScrolling(glm::vec2(
             winSize.x * 0.5f - cx,
             winSize.y * 0.5f - cy));
