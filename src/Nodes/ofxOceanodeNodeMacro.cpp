@@ -91,7 +91,8 @@ void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::setup(string additionalInfo){
-	// Core parameters
+	// node parameter : "Active"
+	//--------------------------
 	addParameter(active.set("Active", true));
 	activeListener = active.newListener([this](bool &b){
 		if(lastActiveState != b){
@@ -109,17 +110,43 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 		lastActiveState = b;
 	});
 	
+	// node parameter : "Macro Preset"
+	//--------------------------------
 	auto presetControlRef = addParameter(presetControl.set("Preset Control Gui", [this](){
 		renderPresetControlGui();
 	}));
+		
+
 	
-	
-	
-	// Snapshot parameters
+	// Inspector parameters : "Local name"
+	//-------------------------------------
+	addInspectorSeparator("Macro Info",ofColor(250,250,250,128));
+	addInspectorParameter(localName.set("Local Name", "Local"));
+	// Inspector parameters : "Color"
+	//-------------------------------------
+	addInspectorParameter(colorParam.set("Color", color));
+	colorListener = colorParam.newListener([this](ofColor &c){
+		color = c;
+	});
+	// Inspector parameters : "Reset Ph. on Active"
+	//---------------------------------------------
+	addInspectorParameter(resetPhaseOnActive.set("Reset Ph on Active", false));
+	//addInspectorParameter(clearContainerOnLoad.set("Clear Container on Load Preset", false));
+
+	// node parameter : "Snapshot"
+	//--------------------------------
 	activeSnapshotSlotParam = addParameter(activeSnapshotSlot.set("Snapshot", -1, -1, 64));
 	activeSnapshotSlotParam->setFlags(activeSnapshotSlotParam->getFlags() | ofxOceanodeParameterFlags_NoGuiWidget);
 
-	addInspectorParameter(showSnapshotMatrix.set("Show Snapshot Buttons", false));
+	// Inspector parameters : "Show Snapshots, Show Names, Retrigger On Active"
+	//-------------------------------------------------------------------------
+	addInspectorSeparator("Snapshots",ofColor(0,200,0,128));
+	addInspectorParameter(showSnapshotMatrix.set("Show Snapshot?", false));
+	addInspectorParameter(showSnapshotNames.set("Show Names", true));
+	addInspectorParameter(retriggerSnapshotOnActive.set("Retrigger Snapshot on Active", false));
+
+	// Listener "Show Snapshot?"
+	//--------------------------
 	showSnapshotMatrixListener = showSnapshotMatrix.newListener([this](bool &show){
 		if(activeSnapshotSlotParam) {
 			if(show) {
@@ -129,15 +156,15 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			}
 		}
 	});
+	
 	addInspectorParameter(matrixRows.set("Snapshot Rows", 2, 1, 8));
 	addInspectorParameter(matrixCols.set("Snapshot Cols", 8, 1, 8));
 	addInspectorParameter(buttonSize.set("Button Size", 28.0f, 15.0f, 60.0f));
-	addInspectorParameter(showSnapshotNames.set("Show Names", true));
 	addInspectorParameter(addSnapshotButton.set("Add Snapshot"));
-	addInspectorParameter(retriggerSnapshotOnActive.set("Retrigger Snapshot on Active", false));
+	addInspectorParameter(clearSnapshotsButton.set("Clear All Snapshots"));
+	
 	morphEngine.getMorphMs() = 0.f;
 	morphEngine.getMorphBiPow() = 0.f;
-
 
 	// Add snapshot inspector
 	addInspectorParameter(snapshotInspector.set("Snapshot Names", [this]() {
@@ -148,6 +175,10 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	addSnapshotListener = addSnapshotButton.newListener([this](){
 		int newSlot = snapshotSystem.count();
 		storeRouterSnapshot(newSlot);
+	});
+	
+	clearSnapshotsListener = clearSnapshotsButton.newListener([this](){
+		guiState.showClearAllSnapshotsPopup = true;
 	});
 	
 	matrixSizeListener = matrixRows.newListener([this](int& value){
@@ -244,15 +275,9 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 		}
 	});
 	
-	addInspectorParameter(colorParam.set("Color", color));
-	colorListener = colorParam.newListener([this](ofColor &c){
-		color = c;
-	});
-	addInspectorParameter(localName.set("Local Name", "Local"));
-	addInspectorParameter(resetPhaseOnActive.set("Reset Ph on Active", false));
-	addInspectorParameter(clearContainerOnLoad.set("Clear Container on Load Preset", false));
-
 	// Router sort order inspector region
+	addInspectorSeparator("Router Management",ofColor(255,128,0,128));
+
 	memset(guiState.routerSortSepNameBuf, 0, sizeof(guiState.routerSortSepNameBuf));
 	addInspectorParameter(routerSortInspector.set("Router Order", [this]() {
 		renderRouterSortInterface();

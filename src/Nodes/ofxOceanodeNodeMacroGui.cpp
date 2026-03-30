@@ -346,7 +346,7 @@ void ofxOceanodeNodeMacro::renderPresetNamingGui() {
 
 void ofxOceanodeNodeMacro::renderSnapshotMatrix() {
 	ImGui::PushID("Matrix");
-	
+
 	const int numRows = matrixRows;
 	const int numCols = matrixCols;
 	
@@ -403,11 +403,16 @@ void ofxOceanodeNodeMacro::renderSnapshotMatrix() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::renderInspectorInterface() {
-	// Global clear button in the inspector
-	if(ImGui::Button("Clear All Snapshots", ImVec2(130, 0))) {
-		ImGui::OpenPopup("Clear All Snapshots?");
+	if(snapshotSystem.isEmpty()) {
+		ImGui::Text("No snapshots stored");
+		return;
 	}
 	
+	if(guiState.showClearAllSnapshotsPopup) {
+		ImGui::OpenPopup("Clear All Snapshots?");
+		guiState.showClearAllSnapshotsPopup = false;
+	}
+
 	// Handle clear all confirmation popup
 	if(ImGui::BeginPopupModal("Clear All Snapshots?", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
 		ImGui::Text("Are you sure you want to clear all snapshots?\nThis action cannot be undone.");
@@ -424,12 +429,7 @@ void ofxOceanodeNodeMacro::renderInspectorInterface() {
 		}
 		ImGui::EndPopup();
 	}
-	
-	if(snapshotSystem.isEmpty()) {
-		ImGui::Text("No snapshots stored");
-		return;
-	}
-	
+
 	for(auto it = snapshotSystem.getSnapshots().begin(); it != snapshotSystem.getSnapshots().end();) {
 		ImGui::PushID(it->first);
 		
@@ -550,10 +550,10 @@ void ofxOceanodeNodeMacro::syncParameterGroupToSortOrder() {
 
 void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 #ifndef OFXOCEANODE_HEADLESS
-	ImGui::SeparatorText("Router Management");
+//	ImGui::SeparatorText("Router Management");
 	ImGui::TextDisabled("Drag to reorder, double-click to rename.");
 	ImGui::Spacing();
-
+	
 	int moveFrom = -1, moveTo = -1;
 	// Disable drag-and-drop while a rename is in progress so the InputText
 	// doesn't accidentally get cancelled by an unintended drag gesture.
