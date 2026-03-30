@@ -47,6 +47,7 @@ struct MacroGuiState {
 	int  routerSortEditingIndex = -1;
 	bool routerSortEditNeedsFocus = false;
 	char routerSortEditBuf[256] = {};
+	bool showClearAllSnapshotsPopup = false;
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -201,6 +202,7 @@ private:
 	ofEventListener activeListener;
 	ofEventListener colorListener;
 	ofEventListener addSnapshotListener;
+	ofEventListener clearSnapshotsListener;
 	ofEventListener matrixSizeListener;
 	ofEventListener activeSnapshotSlotListener;
 	ofEventListener snapshotUpdatedListener;
@@ -221,7 +223,7 @@ private:
 	ofParameter<bool> active;
 	ofParameter<ofColor> colorParam;
 	ofParameter<bool> resetPhaseOnActive;
-	ofParameter<bool> clearContainerOnLoad;
+//	ofParameter<bool> clearContainerOnLoad;
 	ofParameter<string> localName;
 	
 	ofParameter<std::function<void()>> presetControl;
@@ -233,6 +235,7 @@ private:
 	ofParameter<int> matrixCols;
 	ofParameter<bool> showSnapshotNames;
 	ofParameter<void> addSnapshotButton;
+	ofParameter<void> clearSnapshotsButton;
 	ofParameter<int> activeSnapshotSlot;
 	shared_ptr<ofxOceanodeAbstractParameter> activeSnapshotSlotParam;
 	ofParameter<float> buttonSize;

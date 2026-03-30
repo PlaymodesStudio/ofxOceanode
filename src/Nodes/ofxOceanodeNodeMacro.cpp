@@ -52,7 +52,7 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 			loadRouterSortFromJson(sortJson);
 		}
 
-		if(clearContainerOnLoad) container->clearContainer();
+		//if(clearContainerOnLoad) container->clearContainer();
 		presetManager.setInnerPresetLoadingPath(presetManager.getNextPresetPath());
 		container->loadPreset(presetManager.getNextPresetPath());
 		presetManager.setInnerPresetLoadingPath("");
@@ -239,7 +239,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 				if(ofFile::doesFileExist(sortOrderFile)) sortJson = ofLoadJson(sortOrderFile);
 				loadRouterSortFromJson(sortJson);
 			}
-			if(clearContainerOnLoad) container->clearContainer();
+//			if(clearContainerOnLoad) container->clearContainer();
 			container->loadPreset(presetManager.getCurrentMacroPath());
 		}
 	});
@@ -679,19 +679,20 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 }
 
 void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
-	if(json.count(clearContainerOnLoad.getEscapedName()) == 0){
-		clearContainerOnLoad = false;
-	}else{
-		deserializeParameter(json, clearContainerOnLoad);
-	}
-	
+//	if(json.count(clearContainerOnLoad.getEscapedName()) == 0){
+//		clearContainerOnLoad = false;
+//	}else{
+//		deserializeParameter(json, clearContainerOnLoad);
+//	}
+//	deserializeParameter(json, clearContainerOnLoad);
+
 	if(json.count("RetriggerSnapshotOnActive") == 0){
 		retriggerSnapshotOnActive = false;
 	}else{
 		retriggerSnapshotOnActive = json["RetriggerSnapshotOnActive"].get<bool>();
 	}
 	
-	if(clearContainerOnLoad) container->clearContainer();
+//	if(clearContainerOnLoad) container->clearContainer();
 	isLoadingPreset = true;
 
 	// Clear existing snapshots to prevent old data persisting
