@@ -376,7 +376,7 @@ void ofxOceanodeNodesController::draw()
 
                         // Color swatch for macro node
                         {
-                            ofColor c = node->getNodeGui().getColor();
+                            ofColor c = node->getColor();
                             ImVec4 nodeCol = ImVec4(c.r/255.0f, c.g/255.0f, c.b/255.0f, 1.0f);
                             ImU32 nodeColorU32 = ImGui::ColorConvertFloat4ToU32(nodeCol);
                             drawList->AddRectFilled(
@@ -495,7 +495,7 @@ void ofxOceanodeNodesController::draw()
 
                         // Color swatch for leaf node
                         {
-                            ofColor c = node->getNodeGui().getColor();
+                            ofColor c = node->getColor();
                             ImVec4 nodeCol = ImVec4(c.r/255.0f, c.g/255.0f, c.b/255.0f, 1.0f);
                             ImU32 nodeColorU32 = ImGui::ColorConvertFloat4ToU32(nodeCol);
                             drawList->AddRectFilled(
