@@ -42,10 +42,19 @@ public:
         return dynamic_pointer_cast<T>(controllers.back());
     }
     
+    vector<shared_ptr<ofxOceanodeBaseController>>& getControllers(){
+        return controllers;
+    }
+    
+    std::map<std::string, bool>& getControllersVisibility(){
+        return controllerVisible;
+    }
+    
 private:
     std::shared_ptr<ofxOceanodeContainer> container;
     ofEventListeners listeners;
     vector<shared_ptr<ofxOceanodeBaseController>> controllers;
+    std::map<std::string, bool> controllerVisible;
 };
 
 #endif

@@ -265,6 +265,8 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     if (show_app_metrics){ImGui::ShowMetricsWindow(&show_app_metrics);}
     if (showManual) showManualWindow(&showManual);
 
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 6.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12.0f, 6.0f));
     if (ImGui::BeginMenuBar())
     {
         if (ImGui::BeginMenu("File"))
@@ -276,40 +278,46 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
                 if(ImGui::MenuItem("Recent2.oceanode")){}
                 ImGui::EndMenu();
             }
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("Edit"))
-        {
-            if (ImGui::MenuItem("Undo", "CTRL+Z")) {}
-            if (ImGui::MenuItem("Redo", "CTRL+Y", false, false)) {}  // Disabled item
-            ImGui::Separator();
-            if (ImGui::MenuItem("Cut", "CTRL+X")) {}
-            if (ImGui::MenuItem("Copy", "CTRL+C")) {}
-            if (ImGui::MenuItem("Paste", "CTRL+V")) {}
-            ImGui::EndMenu();
-        }
-        if(ImGui::BeginMenu("Windows"))
-        {
-            ImGui::MenuItem("Metrics", NULL, &show_app_metrics);
-            if (ImGui::MenuItem("Show Presets", "CMD+P")) {}
-            if (ImGui::MenuItem("Show BPM", "CMD+B")) {}
-            if (ImGui::MenuItem("Show Timeline", "CMD+T")) {}
-            //Maybe better to use a modal? Need to open windows in layout?
-            if (ImGui::BeginMenu("Saved Layouts")){
-                //                    ofDirectory dir("Layouts");
-                //                    for(auto layout : dir.get)
-                //TODO: Get layouts from disk
-                //for layout in layouts
-                //  if(ImGui::MenuItem(layout)){
-                //      LoadIniSettingsFromDisk(layout);
-                //  }
-                if(ImGui::MenuItem("Dummy Layout 1")){}
-                if(ImGui::MenuItem("Dummy Layout 2")){}
-                ImGui::EndMenu();
-            }
+			ImGui::MenuItem("Metrics", NULL, &show_app_metrics);
             ImGui::EndMenu();
         }
 		
+		if(ImGui::BeginMenu("View"))
+		{
+		    auto& controllers = controls->getControllers();
+		    auto& visibility = controls->getControllersVisibility();
+		    
+		    // Build pending state on first open (static local map)
+		    static std::map<std::string, bool> pendingVisibility;
+		    static bool pendingInitialized = false;
+		    if(!pendingInitialized){
+		        pendingVisibility = visibility;
+		        pendingInitialized = true;
+		    }
+		    // Sync any new controllers added after init
+		    for(auto &c : controllers){
+		        const std::string& name = c->getControllerName();
+		        if(pendingVisibility.find(name) == pendingVisibility.end()){
+		            pendingVisibility[name] = visibility.count(name) ? visibility.at(name) : true;
+		        }
+		    }
+		    
+		    for(auto &c : controllers){
+		        const std::string& name = c->getControllerName();
+		        ImGui::Checkbox(name.c_str(), &pendingVisibility[name]);
+		    }
+		    
+		    ImGui::Separator();
+		    if(ImGui::Button("Apply")){
+		        visibility = pendingVisibility;
+		    }
+		    ImGui::SameLine();
+		    if(ImGui::Button("Reset")){
+		        pendingVisibility = visibility;
+		    }
+		    ImGui::EndMenu();
+		}
+
 		if(ImGui::BeginMenu("Config"))
 		{
 			// Show actual running FPS (read-only) with color feedback
@@ -397,6 +405,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         }
         ImGui::EndMenuBar();
     }
+    ImGui::PopStyleVar(2);
     ImGui::End();
     
     if(showHelp){

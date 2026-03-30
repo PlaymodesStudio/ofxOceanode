@@ -53,11 +53,21 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
 #ifdef OFXOCEANODE_USE_MIDI
     controllers.push_back(make_shared<ofxOceanodeMidiController>(get<ofxOceanodePresetsController>(), container));
 #endif
+    
+    // Initialize all controllers as visible
+    for(auto &c : controllers){
+        controllerVisible[c->getControllerName()] = true;
+    }
 }
 
 
 void ofxOceanodeControls::draw(){
     for(auto &c : controllers){
+        // Skip drawing if controller is hidden
+        auto it = controllerVisible.find(c->getControllerName());
+        if(it != controllerVisible.end() && !it->second){
+            continue;
+        }
         ImGui::SetNextWindowDockID(ofxOceanodeShared::getLeftNodeID(), ImGuiCond_FirstUseEver);
 		if(ImGui::Begin(c->getControllerName().c_str())){
 			c->draw();
