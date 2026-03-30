@@ -32,6 +32,7 @@ public:
     }
     
     bool isExcludeFromSnapshot(){return snapshotExclude;}
+    ofParameter<bool>& getSnapshotExcludeParam(){ return snapshotExclude; }
 protected:
     ofParameter<string> nameParam;
     ofParameter<bool> snapshotExclude;
