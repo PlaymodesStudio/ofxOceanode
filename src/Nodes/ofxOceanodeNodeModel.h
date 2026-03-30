@@ -151,6 +151,9 @@ public:
 	// SEPARATORS FOR THE NODE GUI
     void addSeparator(string name = "", ofColor color = ofColor(200, 200, 200, 255));
 	void removeSeparator(string name);
+
+	// SEPARATORS FOR THE INSPECTOR GUI
+	void addInspectorSeparator(string name = "", ofColor color = ofColor(200, 200, 200, 255));
 	
     template<typename ParameterType>
     ofParameter<ParameterType>& getParameter(string name){
