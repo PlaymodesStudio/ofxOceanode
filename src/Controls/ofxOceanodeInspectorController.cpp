@@ -59,12 +59,29 @@ void ofxOceanodeInspectorController::draw(){
 
     ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 0.0f);
 
-    // Node name and description
-    ImGui::PushStyleColor(ImGuiCol_Text, node->getColor());
-    ImGui::Text(selectedNodes[0].first.c_str(), "%s");
-    ImGui::PopStyleColor();
+	// Node name with colored background
+	{
+		ImVec2 textSize = ImGui::CalcTextSize(selectedNodes[0].first.c_str());
+		float padding = ImGui::GetStyle().FramePadding.y;
+		ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+		float availWidth = ImGui::GetContentRegionAvail().x;
+		
+		// Draw colored background rectangle
+		ImGui::GetWindowDrawList()->AddRectFilled(
+			cursorPos,
+			ImVec2(cursorPos.x + availWidth, cursorPos.y + textSize.y + padding * 2),
+			ImGui::ColorConvertFloat4ToU32(node->getColor()*.25)
+		);
+		
+		// Draw white text on top
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + padding);
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+		ImGui::Text("%s", selectedNodes[0].first.c_str());
+		ImGui::PopStyleColor();
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + padding);
+	}
 
-    // Inspector Parameters
+	// Inspector Parameters
     ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
     if(ImGui::TreeNode("Inspector Parameters")){
         for(int i = 0; i < node->getInspectorParameters().size(); i++){
