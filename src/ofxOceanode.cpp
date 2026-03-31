@@ -264,8 +264,12 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     static bool show_app_metrics = false;
     if (show_app_metrics){ImGui::ShowMetricsWindow(&show_app_metrics);}
     if (showManual) showManualWindow(&showManual);
+	
+	// make the bacground of the menus 25% darker to get better contrast with the main GUI,
+	ImVec4 popupBg = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
+	ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(popupBg.x * 0.75f, popupBg.y * 0.75f, popupBg.z * 0.75f, popupBg.w));
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 6.0f));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 6.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12.0f, 6.0f));
     if (ImGui::BeginMenuBar())
     {
@@ -406,6 +410,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         ImGui::EndMenuBar();
     }
     ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(1); // matches PushStyleColor(ImGuiCol_PopupBg)
     ImGui::End();
     
     if(showHelp){
