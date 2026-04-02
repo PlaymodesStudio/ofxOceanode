@@ -125,6 +125,8 @@ public:
 	
 	void saveConfig();
 	void loadConfig();
+	void saveViewConfig(const std::map<std::string, bool>& visibilityMap);
+	void loadViewConfig();
 
 private:
     ofxOceanodeCanvas canvas;
@@ -149,6 +151,7 @@ private:
     bool settingsLoaded;
     bool showMode;
 	bool snapToGrid;
+    std::map<std::string, bool> savedViewConfig;
 
     void drawShowModeWindow();
     

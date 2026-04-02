@@ -137,6 +137,15 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Mapper_1/Min_Input");
     gui.setup(nullptr);
 	ofxOceanodeShared::readMacros();
+    // Load and apply saved view preferences now that controls is initialized
+    // and openFrameworks data path is fully set up
+    loadViewConfig();
+    if(!savedViewConfig.empty()){
+        auto& visibility = controls->getControllersVisibility();
+        for(auto& kv : savedViewConfig){
+            visibility[kv.first] = kv.second;
+        }
+    }
     oceanodeTime->setup(container, controls->get<ofxOceanodeBPMController>());
     StyleColorsOceanode();
 }
@@ -317,7 +326,14 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 		    }
 		    ImGui::SameLine();
 		    if(ImGui::Button("Reset")){
-		        pendingVisibility = visibility;
+		        for(auto& kv : pendingVisibility){
+		            pendingVisibility[kv.first] = true;
+		        }
+		    }
+		    ImGui::SameLine();
+		    if(ImGui::Button("Save")){
+		        visibility = pendingVisibility;
+		        saveViewConfig(pendingVisibility);
 		    }
 		    ImGui::EndMenu();
 		}
@@ -629,4 +645,36 @@ void ofxOceanode::loadConfig(){
 		canvas.updateGridSize();
 		ofxOceanodeShared::setSnapGridDiv(i);
 	}
+}
+
+void ofxOceanode::saveViewConfig(const std::map<std::string, bool>& visibilityMap){
+    ofJson viewConfig;
+    for(auto& kv : visibilityMap){
+        viewConfig[kv.first] = kv.second;
+    }
+    
+    // Create config directory if it doesn't exist
+    string configDir = ofToDataPath("config", true);
+    ofDirectory dir(configDir);
+    if(!dir.exists()){
+        dir.create(true);
+    }
+    
+    string viewConfigPath = ofToDataPath("config/view.json", true);
+    ofSavePrettyJson(viewConfigPath, viewConfig);
+}
+
+void ofxOceanode::loadViewConfig(){
+    string viewConfigPath = ofToDataPath("config/view.json", true);
+    
+    ofFile viewConfigFile(viewConfigPath);
+    if(!viewConfigFile.exists()){
+        return; // No saved view config, use defaults
+    }
+    
+    ofJson viewConfig = ofLoadJson(viewConfigPath);
+    savedViewConfig.clear();
+    for(auto it = viewConfig.begin(); it != viewConfig.end(); ++it){
+        savedViewConfig[it.key()] = it.value().get<bool>();
+    }
 }
