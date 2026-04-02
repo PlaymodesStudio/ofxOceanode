@@ -62,6 +62,12 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
 
 
 void ofxOceanodeControls::draw(){
+    // Sync Inspector visibility with node selection state
+    auto inspector = get<ofxOceanodeInspectorController>();
+    if(inspector){
+        controllerVisible[inspector->getControllerName()] = inspector->hasAnySelectedNode();
+    }
+    
     for(auto &c : controllers){
         // Skip drawing if controller is hidden
         auto it = controllerVisible.find(c->getControllerName());

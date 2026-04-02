@@ -18,6 +18,7 @@ public:
     ~ofxOceanodeInspectorController(){};
     
     void draw();
+    bool hasAnySelectedNode();
 	
 	static void registerInspectorDropdown(const std::string& nodeTypeName, const std::string& paramName, const std::vector<std::string>& options);
 	

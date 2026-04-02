@@ -26,6 +26,24 @@ std::vector<std::string> ofxOceanodeInspectorController::getInspectorDropdownOpt
 	return (it != inspectorDropdownOptions.end()) ? it->second : std::vector<std::string>();
 }
 
+bool ofxOceanodeInspectorController::hasAnySelectedNode(){
+    vector<pair<string, ofxOceanodeNode*>> nodes(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
+    std::function<bool(vector<pair<string, ofxOceanodeNode*>>)> checkSelected = [&checkSelected](vector<pair<string, ofxOceanodeNode*>> nodes) -> bool {
+        for(auto &nodePair : nodes){
+            if(nodePair.second->getNodeGui().getSelected()){
+                return true;
+            }
+            if(ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&nodePair.second->getNodeModel())){
+                if(checkSelected(vector<pair<string, ofxOceanodeNode*>>(m->getContainer()->getParameterGroupNodesMap().begin(), m->getContainer()->getParameterGroupNodesMap().end()))){
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+    return checkSelected(nodes);
+}
+
 void ofxOceanodeInspectorController::draw(){
     vector<pair<string, ofxOceanodeNode*>> nodesInThisFrame = vector<pair<string, ofxOceanodeNode*>>(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
     
