@@ -306,6 +306,7 @@ void ofxOceanodeContainer::loadScope(const std::string& presetPath) {
     ofFile file(filepath);
     if(!file.exists()) {
         ofLogNotice("ofxOceanodeContainer") << "No scope config file found at: " << filepath;
+        ofxOceanodeScope::getInstance()->clearScopedParameters();
         return;
     }
     
