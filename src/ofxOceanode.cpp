@@ -315,9 +315,9 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 		        }
 		    }
 		    
-		    for(auto &c : controllers){
-		        const std::string& name = c->getControllerName();
-		        ImGui::Checkbox(name.c_str(), &pendingVisibility[name]);
+		    // Iterate the sorted map so checkboxes appear alphabetically
+		    for(auto& kv : pendingVisibility){
+		        ImGui::Checkbox(kv.first.c_str(), &pendingVisibility[kv.first]);
 		    }
 		    
 		    ImGui::Separator();
