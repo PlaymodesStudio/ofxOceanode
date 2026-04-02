@@ -71,6 +71,9 @@ private:
     string activeCanvasUID;             // Last known active canvas UID
     int pendingClickIndex = -1;        // Index of entry with a pending single-click
     float pendingClickTime = -1.0f;    // Time when the click was registered
+
+    // Zoom / scale
+    float hierarchyScale = 1.0f;       // Zoom factor (0.4 – 2.0); controlled by slider
     
     // Event listeners
     ofEventListener activeCanvasListener;

@@ -222,14 +222,20 @@ void ofxOceanodeHierarchyController::draw()
     }
 
     // -----------------------------------------------------------------------
-    // Layout constants
+    // Zoom slider (compact, above the scrollable region)
     // -----------------------------------------------------------------------
-    const float NODE_W     = 150.0f;
-    const float NODE_H     = 26.0f;
-    const float HGAP       = 20.0f;
-    const float VGAP       = 8.0f;
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::SliderFloat("##hierZoom", &hierarchyScale, 0.4f, 2.0f, "Zoom %.2f×");
+
+    // -----------------------------------------------------------------------
+    // Layout constants (all scaled by hierarchyScale)
+    // -----------------------------------------------------------------------
+    const float NODE_W     = 150.0f * hierarchyScale;
+    const float NODE_H     = 26.0f  * hierarchyScale;
+    const float HGAP       = 20.0f  * hierarchyScale;
+    const float VGAP       = 8.0f   * hierarchyScale;
     const float INDENT_W   = NODE_W + HGAP;
-    const float TEXT_PAD_X = 8.0f;
+    const float TEXT_PAD_X = 8.0f   * hierarchyScale;
 
     // -----------------------------------------------------------------------
     // Layout pass: assign row indices, centre parents over children
@@ -370,10 +376,11 @@ void ofxOceanodeHierarchyController::draw()
                 : IM_COL32(120, 120, 120, 255);
         }
 
-        // --- Label (clipped) ---
+        // --- Label (clipped, font scaled by hierarchyScale) ---
+        float scaledFontSize = ImGui::GetFontSize() * hierarchyScale;
         ImGui::PushClipRect(p1, p2, true);
-        float textY = p1.y + (NODE_H - ImGui::GetTextLineHeight()) * 0.5f;
-        dl->AddText(ImVec2(p1.x + TEXT_PAD_X, textY), textCol, entries[i].label.c_str());
+        float textY = p1.y + (NODE_H - scaledFontSize) * 0.5f;
+        dl->AddText(ImGui::GetFont(), scaledFontSize, ImVec2(p1.x + TEXT_PAD_X, textY), textCol, entries[i].label.c_str());
         ImGui::PopClipRect();
 
         // --- Invisible button for click interaction ---
