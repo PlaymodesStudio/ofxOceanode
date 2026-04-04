@@ -259,6 +259,15 @@ public:
 		return getInstance().snapGridDiv;
 	}
 
+	// Auto Inspector show/hide
+	static void setAutoInspectorShowHide(bool b){
+		getInstance().autoInspectorShowHide = b;
+	}
+
+	static bool getAutoInspectorShowHide(){
+		return getInstance().autoInspectorShowHide;
+	}
+
 	// Node dimensions (mirrors ofxOceanodeCanvas values, updated by the canvas)
 	static int getNodeWidthWidget(){ return getInstance().nodeWidthWidget; }
 	static int getNodeWidthText()  { return getInstance().nodeWidthText; }
@@ -340,6 +349,9 @@ private:
 	// Snap to Grid
 	bool snapToGrid = false;
 	int snapGridDiv = 4;
+
+	// Auto Inspector show/hide
+	bool autoInspectorShowHide = true;
 
 	// Active canvas tracking
 	string activeCanvasUniqueID = "";

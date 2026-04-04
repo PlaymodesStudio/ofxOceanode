@@ -379,6 +379,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			ImGui::CheckboxFlags("Disable Full Render", &configurationFlags, ofxOceanodeConfigurationFlags_DisableRenderAll);
 			ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
 			ImGui::Checkbox("Show Mode", &showMode);
+			bool autoInspector = ofxOceanodeShared::getAutoInspectorShowHide();
+			if(ImGui::Checkbox("Auto Inspector show/hide", &autoInspector)){
+				ofxOceanodeShared::setAutoInspectorShowHide(autoInspector);
+			}
 			ofxOceanodeShared::setConfigurationFlags(configurationFlags);
 			bool snap = canvas.getSnapToGrid();
 			if(ImGui::Checkbox("Snap To Grid",&snap))
@@ -575,8 +579,9 @@ void ofxOceanode::saveConfig(){
     config["nodeWidgetWidth"] = canvas.getNodeWidthWidget();
     config["gridDivisions"] = canvas.getGridDivisions();
 	config["snapToGrid"] = canvas.getSnapToGrid();
+	config["autoInspectorShowHide"] = ofxOceanodeShared::getAutoInspectorShowHide();
 	
-    // Create config directory if it doesn't exist
+	   // Create config directory if it doesn't exist
     string configDir = ofToDataPath("config", true);
     ofDirectory dir(configDir);
     if(!dir.exists()){
@@ -644,6 +649,9 @@ void ofxOceanode::loadConfig(){
 		canvas.setGridDivisions(i);
 		canvas.updateGridSize();
 		ofxOceanodeShared::setSnapGridDiv(i);
+	}
+	if(config.contains("autoInspectorShowHide")){
+		ofxOceanodeShared::setAutoInspectorShowHide(config["autoInspectorShowHide"].get<bool>());
 	}
 }
 
