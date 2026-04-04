@@ -62,22 +62,34 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
 
 
 void ofxOceanodeControls::draw(){
-    // Sync Inspector visibility with node selection state
+    // Sync Inspector visibility with node selection state (only when auto show/hide is enabled)
     auto inspector = get<ofxOceanodeInspectorController>();
+    std::string inspectorName;
     if(inspector){
-        controllerVisible[inspector->getControllerName()] = inspector->hasAnySelectedNode();
+        inspectorName = inspector->getControllerName();
+        if(ofxOceanodeShared::getAutoInspectorShowHide()){
+            controllerVisible[inspectorName] = inspector->hasAnySelectedNode();
+        } else {
+            controllerVisible[inspectorName] = true;
+        }
     }
     
     for(auto &c : controllers){
-        // Skip drawing if controller is hidden
+        // Determine visibility
         auto it = controllerVisible.find(c->getControllerName());
-        if(it != controllerVisible.end() && !it->second){
-            continue;
-        }
+        bool isVisible = (it == controllerVisible.end()) || it->second;
+
+        // When a controller is hidden, skip Begin/End entirely so the window
+        // truly disappears from the tab bar.
+        if(!isVisible) continue;
+
+        // Use NoFocusOnAppearing so that when the Inspector reappears after a
+        // node is first selected it does NOT steal focus away from the canvas
+        // (which was the root cause of needing to click twice to move/delete).
         ImGui::SetNextWindowDockID(ofxOceanodeShared::getLeftNodeID(), ImGuiCond_FirstUseEver);
-		if(ImGui::Begin(c->getControllerName().c_str())){
-			c->draw();
-		}
+        if(ImGui::Begin(c->getControllerName().c_str(), nullptr, ImGuiWindowFlags_NoFocusOnAppearing)){
+            c->draw();
+        }
         ImGui::End();
     }
 }
