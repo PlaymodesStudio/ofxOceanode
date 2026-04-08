@@ -725,10 +725,10 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
 			}
 		}
 		
-		// Add an invisible item to ensure the group has the correct size
-		if(totalHeight > 0) {
-			ImGui::InvisibleButton("##nodesize", ImVec2(nodeWidthText+nodeWidthWidget, 0.1f));
-		}
+		// Always add an invisible item to enforce the node's full width when collapsed.
+		// This prevents the node from shrinking when there are no DisplayMinimized params,
+		// and eliminates the animated resize effect by keeping the width stable every frame.
+		ImGui::InvisibleButton("##nodesize", ImVec2(nodeWidthText+nodeWidthWidget, 0.1f));
 	}
 				
 				ImGui::EndGroup();
