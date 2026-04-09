@@ -600,11 +600,12 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 		}
 
 		// Pre-existing routers not listed in the sort order: append at the end.
+		// Their params were removed above (pendingOrder was non-empty), so re-add them.
 		for(auto* node : preExistingRouters){
 			if(processed.find(node) == processed.end()){
-				string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
-				if(!isRouterInSortOrder(name))
-					sortOrder.getOrder().push_back(name);
+				processRouterNode(node);
+				ofEventArgs args;
+				node->update(args);
 			}
 		}
 	} else {
@@ -626,9 +627,16 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 				ofEventArgs args;
 				node->update(args);
 			} else {
-				string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
-				if(!isRouterInSortOrder(name))
-					sortOrder.getOrder().push_back(name);
+				if(!toCreateRouters.empty()){
+					// Params were removed above (toCreateRouters non-empty), so re-add.
+					processRouterNode(node);
+					ofEventArgs args;
+					node->update(args);
+				} else {
+					string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+					if(!isRouterInSortOrder(name))
+						sortOrder.getOrder().push_back(name);
+				}
 			}
 		}
 	}
