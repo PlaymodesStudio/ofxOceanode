@@ -513,20 +513,24 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 			sortOrder.getPendingOrder().clear();
 			return;
 		}
-		// Separator state differs between presets: fall through to the full
-		// cleanup + rebuild below so old separators are removed and the new
-		// preset's separator layout is applied correctly.
 	}
 
-	// Remove any separator parameters left over from a previous load.
-	// Router parameters clean themselves up via their deleteModule listeners;
-	// separators have no such listener so we remove them manually here.
+	// Remove separator and router parameters to rebuild in correct order
 	{
 		vector<string> toRemove;
 		for(int i = 0; i < getParameterGroup().size(); i++){
 			const string& pName = getParameterGroup().get(i).getName();
-			if(pName.size() > 11 && pName.substr(0, 11) == "SEPARATOR:|")
+			if(pName.size() > 11 && pName.substr(0, 11) == "SEPARATOR:|") {
 				toRemove.push_back(getParameterGroup().get(i).getEscapedName());
+			}
+			else if(!toCreateRouters.empty() || !sortOrder.getPendingOrder().empty()) {
+				for(const auto& pair : routerManager.getRouterNodes()) {
+					if(pair.second.routerName == pName) {
+						toRemove.push_back(getParameterGroup().get(i).getEscapedName());
+						break;
+					}
+				}
+			}
 		}
 		for(const auto& n : toRemove) getParameterGroup().remove(n);
 	}
@@ -569,14 +573,14 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 					it->second->update(args);
 					processed.insert(it->second);
 				} else {
-					// Pre-existing router: already set up, just restore sort-order entry.
+					// Pre-existing router: recreate parameter in correct position
 					auto it2 = preExistingByName.find(entry);
 					if(it2 != preExistingByName.end()){
-						if(!isRouterInSortOrder(entry))
-							sortOrder.getOrder().push_back(entry);
+						processRouterNode(it2->second);
+						ofEventArgs args;
+						it2->second->update(args);
 						processed.insert(it2->second);
 					}
-					// Entries not found in either map (router was deleted): silently dropped.
 				}
 			}
 		}
