@@ -37,8 +37,9 @@ ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
     
 }
 
-bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
+bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget, float zoomLevel){
     string moduleName = getParameters().getName();
+    const bool renderWidgets = (zoomLevel > 0.5f);
 	
 	bool isTransparent = (node.getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
 
@@ -60,7 +61,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
 		
 		// Position the delete button at the right edge using the screen-space node width
 		// (nodeWidthText + nodeWidthWidget is already zoom-scaled by the caller)
-		ImGui::SameLine(nodeWidthText + nodeWidthWidget - ImGui::GetFrameHeight());
+		ImGui::SameLine(nodeWidthText + nodeWidthWidget - ofxOceanodeShared::getBaseFrameHeight() * zoomLevel);
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(220,220,220,255)));
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(ImColor(0, 0, 0,0)));
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
@@ -130,20 +131,17 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                         }
                     }
                     
-                    // At zoom ≤ 50% the canvas makes ImGuiCol_Text fully transparent.
-                    // Skip the separator entirely (zero height) so it contributes no
-                    // visual element and no extra vertical space at low zoom levels.
-                    const bool hideSeparator = (ImGui::GetStyleColorVec4(ImGuiCol_Text).w < 0.01f);
+                    // At zoom ≤ 50% skip the separator entirely (zero height) so it
+                    // contributes no visual element and no extra vertical space.
+                    const bool hideSeparator = !renderWidgets;
                     
                     // Render separator with label and background highlight
                     if(!label.empty() && !hideSeparator){
                         ImVec2 p = ImGui::GetCursorScreenPos();
                         // Use the already zoom-scaled screen-space widths passed by the canvas,
                         // not guiRect.width which is in world-space coordinates.
-                        float w = (float)(nodeWidthText + nodeWidthWidget);
-                        // Scale hard-coded constants proportionally to zoom.
-                        float baseW = (float)(ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget());
-                        float scale = (baseW > 0.0f) ? (w / baseW) : 1.0f;
+                        float w = nodeWidthText + nodeWidthWidget;
+                        float scale = zoomLevel;
                         
                         // Draw the text
                         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(color.r/255.0f, color.g/255.0f, color.b/255.0f, color.a/255.0f));
@@ -169,7 +167,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                 }
             }else{
                 
-                bool textIsHidden = (ImGui::GetStyleColorVec4(ImGuiCol_Text).w < 0.01f);
+                bool textIsHidden = !renderWidgets;
                 if (!textIsHidden) {
                     ImGui::Text("%s", uniqueId.c_str());
                     ImGui::SetItemAllowOverlap();
@@ -178,13 +176,10 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                 } else {
                     // Low-zoom: skip all widgets and replace the entire row with a correctly-sized
                     // Dummy so the node height stays identical to the fully-rendered version.
-                    float baseTextWidth = (float)ofxOceanodeShared::getNodeWidthText();
-                    float zoom = (baseTextWidth > 0.0f) ? ((float)nodeWidthText / baseTextWidth) : 1.0f;
-                    static constexpr float BASE_FRAME_HEIGHT = 16.0f; // ZOOM_FONT_SIZES[2] + 2*BASE_FRAME_PADDING_Y
-                    float targetH = BASE_FRAME_HEIGHT * zoom;
+                    float targetH = ofxOceanodeShared::getBaseFrameHeight() * zoomLevel;
                     // Full-width Dummy keeps the row at the correct height; connection-point
                     // positions are still recorded below from this item's rect.
-                    ImGui::Dummy(ImVec2((float)(nodeWidthText + nodeWidthWidget), targetH));
+                    ImGui::Dummy(ImVec2(nodeWidthText + nodeWidthWidget, targetH));
                 }
                 
                 if(!textIsHidden) {

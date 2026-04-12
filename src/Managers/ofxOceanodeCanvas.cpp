@@ -36,6 +36,16 @@ int ofxOceanodeCanvas::getCurrentFontIndex() const {
     return bestIdx;
 }
 
+int ofxOceanodeCanvas::getCeilingFontIndex() const {
+    float targetSize = ZOOM_FONT_SIZES[2] * zoomLevel; // 14 * zoom
+    // Find smallest loaded font whose nominal size >= targetSize (scale-down only)
+    for(int i = 0; i < 5; i++){
+        if(ZOOM_FONT_SIZES[i] >= targetSize)
+            return i;
+    }
+    return 4; // fallback: largest font
+}
+
 bool ofxOceanodeCanvas::shouldRenderText() const {
     // Hide text exactly when the smallest pre-cached font (8pt) would exceed
     // the zoom-scaled target frame height (BASE_FRAME_HEIGHT = 14.0 + 2*1.0 = 16.0).
@@ -120,6 +130,14 @@ void ofxOceanodeCanvas::setupFonts() {
     // ImGui::GetFontSize() / ofxOceanodeShared::getZoomBaseFontSize() without
     // hard-coding the canvas-internal ZOOM_FONT_SIZES constant.
     ofxOceanodeShared::setZoomBaseFontSize(ZOOM_FONT_SIZES[2]);
+
+    // Publish the base frame height so NodeGui and other classes can derive the
+    // correct row height without duplicating this formula.
+    {
+        static constexpr float BASE_FRAME_PADDING_Y = 1.0f;
+        static constexpr float BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[2] + 2.0f * BASE_FRAME_PADDING_Y;
+        ofxOceanodeShared::setBaseFrameHeight(BASE_FRAME_HEIGHT);
+    }
 
     // Compensate for the physical-pixel oversize: render at logical size.
     // e.g. on Retina: atlas built at 2× → FontGlobalScale = 0.5 → displayed at 1× logical.
@@ -615,8 +633,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             {
                 static constexpr float BASE_FRAME_PADDING_Y = 1.0f;
                 static constexpr float BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[2] + 2.0f * BASE_FRAME_PADDING_Y;
-                float currentFontSize = ZOOM_FONT_SIZES[getCurrentFontIndex()];
-                float targetPaddingY = (BASE_FRAME_HEIGHT * zoomLevel - currentFontSize) / 2.0f;
+                float targetSize = ZOOM_FONT_SIZES[2] * zoomLevel;  // exact continuous size
+                float targetPaddingY = (BASE_FRAME_HEIGHT * zoomLevel - targetSize) / 2.0f;
+                // = (16.0f * zoomLevel - 14.0f * zoomLevel) / 2.0f = zoomLevel (always >= 0)
                 if(targetPaddingY < 0.0f) targetPaddingY = 0.0f;
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(BASE_FRAME_PADDING_Y * zoomLevel, targetPaddingY));
                 }
@@ -625,25 +644,28 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize,   12.0f * zoomLevel);
                 ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 14.0f * zoomLevel);
 
-            ImFont* zoomFont = getZoomFont();
-
-            bool renderParameters = shouldRenderText();
-            if(!renderParameters) {
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.f, 0.f, 0.f, 0.f)); // fully transparent text — signals constructGui() to use Dummies
-            }
-
+            int ceilFontIdx = getCeilingFontIndex();
+            ImFont* zoomFont = zoomFonts[ceilFontIdx];
             if(zoomFont) ImGui::PushFont(zoomFont);
+
+            // Compute scale-down factor (always <= 1.0 when ceiling font found; clamp at 1.0 to avoid blur)
+            float targetSize = ZOOM_FONT_SIZES[2] * zoomLevel;
+            float baseFontNominalSize = ZOOM_FONT_SIZES[ceilFontIdx];
+            float fontWindowScale = (baseFontNominalSize > 0.0f) ? (targetSize / baseFontNominalSize) : 1.0f;
+            if(fontWindowScale > 1.0f) fontWindowScale = 1.0f; // never scale up (clamp to avoid blurriness)
+            ImGui::SetWindowFontScale(fontWindowScale);
 
             ImGui::SetCursorScreenPos(ImVec2(node_rect_min.x + NODE_WINDOW_PADDING.x * zoomLevel,
                                              node_rect_min.y + NODE_WINDOW_PADDING.y * zoomLevel));
 
             //Draw Parameters
-            if(nodeGui.constructGui((int)(NODE_WIDTH_TEXT * zoomLevel),(int)(NODE_WIDTH_WIDGET * zoomLevel))){
+            if(nodeGui.constructGui(
+                NODE_WIDTH_TEXT   * zoomLevel,
+                NODE_WIDTH_WIDGET * zoomLevel,
+                zoomLevel)){
 
+                ImGui::SetWindowFontScale(1.0f);
                 if(zoomFont) ImGui::PopFont();
-                if(!renderParameters) {
-                    ImGui::PopStyleColor(); // restore text color
-                }
                 ImGui::PopStyleVar(5);
                 
                 // Save the size of what we have emitted and whether any of the widgets are being used
@@ -846,10 +868,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }
             }
             else{
+                ImGui::SetWindowFontScale(1.0f);
                 if(zoomFont) ImGui::PopFont();
-                if(!renderParameters) {
-                    ImGui::PopStyleColor(); // restore text color
-                }
                 ImGui::PopStyleVar(5);
                 deletedIds.insert(nodeId);
             }
