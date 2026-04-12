@@ -55,6 +55,7 @@ public:
 
     // Font management helpers
     int getCurrentFontIndex() const;
+    int getCeilingFontIndex() const;
     bool shouldRenderText() const;
 
     void setupFonts();  // Must be called BEFORE gui.setup() / ImGui font atlas is built
@@ -167,7 +168,7 @@ private:
 	
 	// Pre-cached fonts for zoom levels
 	ImFont* zoomFonts[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
-	static constexpr float ZOOM_FONT_SIZES[5] = {8.0f, 10.0f, 14.0f, 22.0f, 32.0f};
+	static constexpr float ZOOM_FONT_SIZES[5] = {8.0f, 10.0f, 14.0f, 28.0f, 48.0f};
 
 	// Get the appropriate font for current zoom level
 	ImFont* getZoomFont() const;

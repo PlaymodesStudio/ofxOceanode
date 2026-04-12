@@ -274,6 +274,11 @@ public:
 	static void setNodeWidthWidget(int w){ getInstance().nodeWidthWidget = w; }
 	static void setNodeWidthText(int t)  { getInstance().nodeWidthText = t; }
 
+	// Base frame height at zoom=1.0 (ZOOM_FONT_SIZES[2] + 2*BASE_FRAME_PADDING_Y).
+	// Set by the canvas setupFonts(); default matches current canvas constants.
+	static float getBaseFrameHeight(){ return getInstance().baseFrameHeight; }
+	static void  setBaseFrameHeight(float h){ getInstance().baseFrameHeight = h; }
+
 	// Base font size at zoom 1.0 — set by ofxOceanodeCanvas::setupFonts() and used
 	// by any GUI code that needs to derive the current zoom factor at render time via
 	// ImGui::GetFontSize() / ofxOceanodeShared::getZoomBaseFontSize().
@@ -357,6 +362,10 @@ private:
 	// Node dimensions
 	int nodeWidthWidget = 150;
 	int nodeWidthText   = 90;
+
+	// Base frame height at zoom=1.0 (ZOOM_FONT_SIZES[2] + 2*BASE_FRAME_PADDING_Y).
+	// Default of 16.0f matches current canvas constants; overwritten by setupFonts().
+	float baseFrameHeight = 16.0f;
 
 	// Base (zoom=1.0) font size.  Initialised to 0 (unset); the canvas writes the
 	// real value from ZOOM_FONT_SIZES[2] via setZoomBaseFontSize() in setupFonts(),
