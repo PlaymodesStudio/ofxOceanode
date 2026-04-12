@@ -515,22 +515,17 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 		}
 	}
 
-	// Remove separator and router parameters to rebuild in correct order
+	// Remove any separator parameters left over from a previous load.
+	// Router parameters must NOT be removed here — their ofxOceanodeAbstractParameter
+	// objects are referenced by existing outer connections and by the type-registry
+	// listeners. Recreating them would break those connections. Separator ordering
+	// is corrected at the end via syncParameterGroupToSortOrder().
 	{
 		vector<string> toRemove;
 		for(int i = 0; i < getParameterGroup().size(); i++){
 			const string& pName = getParameterGroup().get(i).getName();
-			if(pName.size() > 11 && pName.substr(0, 11) == "SEPARATOR:|") {
+			if(pName.size() > 11 && pName.substr(0, 11) == "SEPARATOR:|")
 				toRemove.push_back(getParameterGroup().get(i).getEscapedName());
-			}
-			else if(!toCreateRouters.empty() || !sortOrder.getPendingOrder().empty()) {
-				for(const auto& pair : routerManager.getRouterNodes()) {
-					if(pair.second.routerName == pName) {
-						toRemove.push_back(getParameterGroup().get(i).getEscapedName());
-						break;
-					}
-				}
-			}
 		}
 		for(const auto& n : toRemove) getParameterGroup().remove(n);
 	}
@@ -573,14 +568,16 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 					it->second->update(args);
 					processed.insert(it->second);
 				} else {
-					// Pre-existing router: recreate parameter in correct position
+					// Pre-existing router: parameter already exists in the group.
+					// Just restore the sort-order entry; syncParameterGroupToSortOrder()
+					// at the end will reorder the group correctly (including separators).
 					auto it2 = preExistingByName.find(entry);
 					if(it2 != preExistingByName.end()){
-						processRouterNode(it2->second);
-						ofEventArgs args;
-						it2->second->update(args);
+						if(!isRouterInSortOrder(entry))
+							sortOrder.getOrder().push_back(entry);
 						processed.insert(it2->second);
 					}
+					// Entries not found in either map (router was deleted): silently dropped.
 				}
 			}
 		}
@@ -600,12 +597,11 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 		}
 
 		// Pre-existing routers not listed in the sort order: append at the end.
-		// Their params were removed above (pendingOrder was non-empty), so re-add them.
 		for(auto* node : preExistingRouters){
 			if(processed.find(node) == processed.end()){
-				processRouterNode(node);
-				ofEventArgs args;
-				node->update(args);
+				string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+				if(!isRouterInSortOrder(name))
+					sortOrder.getOrder().push_back(name);
 			}
 		}
 	} else {
@@ -627,22 +623,21 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 				ofEventArgs args;
 				node->update(args);
 			} else {
-				if(!toCreateRouters.empty()){
-					// Params were removed above (toCreateRouters non-empty), so re-add.
-					processRouterNode(node);
-					ofEventArgs args;
-					node->update(args);
-				} else {
-					string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
-					if(!isRouterInSortOrder(name))
-						sortOrder.getOrder().push_back(name);
-				}
+				string name = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam().get();
+				if(!isRouterInSortOrder(name))
+					sortOrder.getOrder().push_back(name);
 			}
 		}
 	}
 
 	sortOrder.getPendingOrder().clear();
 	toCreateRouters.clear();
+
+	// Reorder the parameter group in-place to match sortOrder.getOrder().
+	// This places separators at the correct positions relative to router parameters
+	// without removing or recreating any parameter objects, so outer connections
+	// (which reference specific ofxOceanodeAbstractParameter objects) remain valid.
+	syncParameterGroupToSortOrder();
 }
 
 // ─── Macro save/load ─────────────────────────────────────────────────────────
