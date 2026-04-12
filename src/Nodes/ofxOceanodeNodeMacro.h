@@ -238,7 +238,6 @@ private:
 	ofParameter<void> clearSnapshotsButton;
 	ofParameter<int> activeSnapshotSlot;
 	shared_ptr<ofxOceanodeAbstractParameter> activeSnapshotSlotParam;
-	ofParameter<float> buttonSize;
 	ofParameter<bool> retriggerSnapshotOnActive;
 	ofParameter<bool> showSnapshotMatrix;
 

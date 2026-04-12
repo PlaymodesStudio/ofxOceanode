@@ -274,6 +274,18 @@ public:
 	static void setNodeWidthWidget(int w){ getInstance().nodeWidthWidget = w; }
 	static void setNodeWidthText(int t)  { getInstance().nodeWidthText = t; }
 
+	// Base font size at zoom 1.0 — set by ofxOceanodeCanvas::setupFonts() and used
+	// by any GUI code that needs to derive the current zoom factor at render time via
+	// ImGui::GetFontSize() / ofxOceanodeShared::getZoomBaseFontSize().
+	static float getZoomBaseFontSize(){ return getInstance().zoomBaseFontSize; }
+	static void  setZoomBaseFontSize(float s){ getInstance().zoomBaseFontSize = s; }
+
+	// Continuous zoom level — set by the active ofxOceanodeCanvas each frame before
+	// rendering node GUIs, so any code that needs a smooth zoom factor can read it
+	// instead of deriving a stepped value from the discrete font size.
+	static float getZoomLevel(){ return getInstance().zoomLevel; }
+	static void  setZoomLevel(float z){ getInstance().zoomLevel = z; }
+
 	// Active canvas tracking
 	static void setActiveCanvasUniqueID(const string& uid){
 		auto& inst = getInstance();
@@ -345,6 +357,14 @@ private:
 	// Node dimensions
 	int nodeWidthWidget = 150;
 	int nodeWidthText   = 90;
+
+	// Base (zoom=1.0) font size.  Initialised to 0 (unset); the canvas writes the
+	// real value from ZOOM_FONT_SIZES[2] via setZoomBaseFontSize() in setupFonts(),
+	// which runs before any node GUI is rendered.
+	float zoomBaseFontSize = 0.0f;
+
+	// Continuous zoom level (set by the active canvas each frame).
+	float zoomLevel = 1.0f;
 
 	// Snap to Grid
 	bool snapToGrid = false;

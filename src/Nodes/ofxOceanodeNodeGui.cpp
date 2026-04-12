@@ -14,6 +14,7 @@
 #include "ofxImGuiSimple.h"
 #include "imgui.h"
 #include "ofxOceanodeParameter.h"
+#include "ofxOceanodeShared.h"
 #include "ofxOceanodeScope.h"
 #include "ofxOceanodeTime.h"
 
@@ -57,7 +58,9 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
 		ImGui::SameLine();
 		ImGui::Text("%s", moduleName.c_str());
 		
-		ImGui::SameLine(guiRect.width - 30);
+		// Position the delete button at the right edge using the screen-space node width
+		// (nodeWidthText + nodeWidthWidget is already zoom-scaled by the caller)
+		ImGui::SameLine(nodeWidthText + nodeWidthWidget - ImGui::GetFrameHeight());
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(220,220,220,255)));
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(ImColor(0, 0, 0,0)));
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
@@ -127,10 +130,20 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                         }
                     }
                     
+                    // At zoom ≤ 50% the canvas makes ImGuiCol_Text fully transparent.
+                    // Skip the separator entirely (zero height) so it contributes no
+                    // visual element and no extra vertical space at low zoom levels.
+                    const bool hideSeparator = (ImGui::GetStyleColorVec4(ImGuiCol_Text).w < 0.01f);
+                    
                     // Render separator with label and background highlight
-                    if(!label.empty()){
+                    if(!label.empty() && !hideSeparator){
                         ImVec2 p = ImGui::GetCursorScreenPos();
-                        float w = guiRect.width;
+                        // Use the already zoom-scaled screen-space widths passed by the canvas,
+                        // not guiRect.width which is in world-space coordinates.
+                        float w = (float)(nodeWidthText + nodeWidthWidget);
+                        // Scale hard-coded constants proportionally to zoom.
+                        float baseW = (float)(ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget());
+                        float scale = (baseW > 0.0f) ? (w / baseW) : 1.0f;
                         
                         // Draw the text
                         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(color.r/255.0f, color.g/255.0f, color.b/255.0f, color.a/255.0f));
@@ -144,11 +157,11 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                         ImU32 bgCol = IM_COL32(color.r, color.g, color.b, color.a * 0.15f);
                         ImGui::GetWindowDrawList()->AddRectFilled(
                             ImVec2(p.x, p.y),
-                            ImVec2(p.x + w - 16 , p.y + textSize.y),
+                            ImVec2(p.x + w - 16.0f * scale, p.y + textSize.y),
                             bgCol
                         );
                         
-                        ImGui::Dummy(ImVec2(0, 2));
+                        ImGui::Dummy(ImVec2(0, 2.0f * scale));
                     }
                 }else{
                     // Regular custom region function
@@ -156,12 +169,25 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                 }
             }else{
                 
-                ImGui::Text("%s", uniqueId.c_str());
+                bool textIsHidden = (ImGui::GetStyleColorVec4(ImGuiCol_Text).w < 0.01f);
+                if (!textIsHidden) {
+                    ImGui::Text("%s", uniqueId.c_str());
+                    ImGui::SetItemAllowOverlap();
+                    ImGui::SameLine(-1);
+                    ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
+                } else {
+                    // Low-zoom: skip all widgets and replace the entire row with a correctly-sized
+                    // Dummy so the node height stays identical to the fully-rendered version.
+                    float baseTextWidth = (float)ofxOceanodeShared::getNodeWidthText();
+                    float zoom = (baseTextWidth > 0.0f) ? ((float)nodeWidthText / baseTextWidth) : 1.0f;
+                    static constexpr float BASE_FRAME_HEIGHT = 16.0f; // ZOOM_FONT_SIZES[2] + 2*BASE_FRAME_PADDING_Y
+                    float targetH = BASE_FRAME_HEIGHT * zoom;
+                    // Full-width Dummy keeps the row at the correct height; connection-point
+                    // positions are still recorded below from this item's rect.
+                    ImGui::Dummy(ImVec2((float)(nodeWidthText + nodeWidthWidget), targetH));
+                }
                 
-                ImGui::SetItemAllowOverlap();
-                ImGui::SameLine(-1);
-				ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
-                
+                if(!textIsHidden) {
                 int drag = 0;
                 bool resetValue = false;
                 if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)){
@@ -406,7 +432,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                                 return true;
                             };
                             
-                            vector<string> options = absParam.cast<int>().getDropdownOptions();
+                            vector<string> options = absParam.cast<vector<int>>().getDropdownOptions();
                             if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.get()[0], vector_getter, static_cast<void*>(&options), options.size()))
                                 tempCast = vector<int>(1, ofClamp(tempCast.get()[0], tempCast.getMin()[0], tempCast.getMax()[0]));
                             
@@ -602,11 +628,12 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                     ImGui::Separator();
                     ImGui::EndPopup();
                 }
-				// Always pop the same number you pushed
-				ImGui::PopStyleColor(3);
-				ImGui::PopStyleVar();
+    // Always pop the same number you pushed
+    ImGui::PopStyleColor(3);
+    ImGui::PopStyleVar();
 
                 ImGui::PopStyleColor(6);
+                } // end if(!textIsHidden)
             }
             inputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
             outputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
