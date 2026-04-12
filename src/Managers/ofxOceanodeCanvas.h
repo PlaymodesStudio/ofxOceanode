@@ -40,7 +40,7 @@ public:
     glm::vec2 getContentRegionSize() const { return contentRegionSize; }
 
     float getZoomLevel() const { return zoomLevel; }
-    void setZoomLevel(float z) { zoomLevel = ofClamp(z, ZOOM_MIN, ZOOM_MAX); }
+    void setZoomLevel(float z) { rawZoomLevel = ofClamp(z, ZOOM_MIN, ZOOM_MAX); zoomLevel = std::round(rawZoomLevel / 0.05f) * 0.05f; }
     glm::vec2 getContentRegionSizeInWorld() const { return contentRegionSize / zoomLevel; }
 
     // Convert world/canvas coordinates to screen coordinates
@@ -175,6 +175,7 @@ private:
 
 	// Zoom state
 	float zoomLevel = 1.0f;
+	float rawZoomLevel = 1.0f; // continuous accumulator; zoomLevel is quantised from this
 	static constexpr float ZOOM_MIN = 0.25f;
 	static constexpr float ZOOM_MAX = 4.0f;
 	static constexpr float ZOOM_DEFAULT = 1.0f;

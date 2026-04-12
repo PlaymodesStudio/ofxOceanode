@@ -9,6 +9,7 @@
 #ifndef OFXOCEANODE_HEADLESS
 
 #include "ofxOceanodeCanvas.h"
+#include <cmath>
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeNode.h"
@@ -266,12 +267,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		if(ImGui::SliderFloat("##zoom", &zoomPercent, ZOOM_MIN * 100.0f, ZOOM_MAX * 100.0f, "%.0f%%")) {
 			glm::vec2 canvasCenter = glm::vec2(ImGui::GetContentRegionAvail()) * 0.5f;
 			glm::vec2 worldCenterBefore = screenToWorld(canvasOrigin + canvasCenter);
-			zoomLevel = ofClamp(zoomPercent / 100.0f, ZOOM_MIN, ZOOM_MAX);
+			rawZoomLevel = ofClamp(zoomPercent / 100.0f, ZOOM_MIN, ZOOM_MAX);
+			zoomLevel = std::round(rawZoomLevel / 0.05f) * 0.05f;
 			glm::vec2 worldCenterAfter = screenToWorld(canvasOrigin + canvasCenter);
 			scrolling += glm::vec2(worldCenterAfter - worldCenterBefore);
 		}
 		ImGui::SameLine();
 		if(ImGui::SmallButton("1:1")) {
+			rawZoomLevel = 1.0f;
 			zoomLevel = 1.0f;
 		}
 
@@ -1624,7 +1627,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     // Zoom centered on mouse position
                     glm::vec2 mouseScreen = glm::vec2(ImGui::GetMousePos());
                     glm::vec2 worldBeforeZoom = screenToWorld(mouseScreen);
-                    zoomLevel = ofClamp(zoomLevel * (1.0f + wheel * 0.1f), ZOOM_MIN, ZOOM_MAX);
+                    rawZoomLevel = ofClamp(rawZoomLevel * (1.0f + wheel * 0.1f), ZOOM_MIN, ZOOM_MAX);
+                    zoomLevel = std::round(rawZoomLevel / 0.05f) * 0.05f;
                     glm::vec2 worldAfterZoom = screenToWorld(mouseScreen);
                     scrolling += (worldAfterZoom - worldBeforeZoom);
                 } else {
