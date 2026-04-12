@@ -64,7 +64,29 @@ void ofxOceanodeNodeMacro::renderMinimizedView(ImVec2 size) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::renderPresetControlGui() {
-	
+
+	// Zoom suppression: when the canvas pushes transparent ImGuiCol_Text (zoom ≤ 50%),
+	// replace all widget rows with correctly-sized Dummies so the node height stays
+	// identical to the fully-rendered version.
+	// Rows rendered by this function (always shown, never inside a collapsible):
+	//   1. Macro name text
+	//   2. "Is Local?" checkbox + "Show Window?" checkbox  (SameLine → one row)
+	//   3. "[Save]" button  + "[Save As]" button           (SameLine → one row)
+	// Total = 3 rows × frameH + 2 × spacingY (between rows).
+	{
+		const bool hideContent = (ImGui::GetStyleColorVec4(ImGuiCol_Text).w < 0.01f);
+		if(hideContent) {
+			const float zoomLevel  = ofxOceanodeShared::getZoomLevel();
+			static constexpr float BASE_FRAME_HEIGHT = 16.0f;
+			const float frameH   = BASE_FRAME_HEIGHT * zoomLevel;
+			const float spacingY = 4.0f * zoomLevel;
+			const float totalW   = (float)(ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget())
+				* zoomLevel;
+			ImGui::Dummy(ImVec2(totalW, 3.0f * frameH + 2.0f * spacingY));
+			return;
+		}
+	}
+
 	bool addBank = false;
 	
 	if(presetManager.isLocal()){
@@ -307,7 +329,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 	}
 	
 	
-	ImGui::Text(". . . . . . . . . . . . . . . . .");
+//	ImGui::Text(". . . . . . . . . . . . . . . . .");
 	
 }
 
@@ -319,24 +341,54 @@ void ofxOceanodeNodeMacro::renderPresetNamingGui() {
 
 	// Render snapshot matrix
 	if(showSnapshotMatrix) {
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
+		// Scale inter-button spacing with zoom so gaps don't dominate at high zoom.
+		// Use the continuous zoomLevel published by the canvas rather than deriving
+		// a stepped factor from the discrete pre-cached font size.
+		const float zoomFactor = ofxOceanodeShared::getZoomLevel();
+		// Stable node width derived from configured dimensions × zoom factor.
+		// Do NOT use GetContentRegionAvail().x here — it causes an infinite expansion
+		// feedback loop when the snapshot matrix is visible.
+		const float scaledTotalW = (float)(ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget()) * zoomFactor;
+
+		// Zoom suppression: when the canvas pushes transparent ImGuiCol_Text (zoom ≤ 50%),
+		// replace the entire showSnapshotMatrix block (matrix + 2 sliders + progress bar)
+		// with a single correctly-sized Dummy so the node height stays identical.
+		const bool hideContent = (ImGui::GetStyleColorVec4(ImGuiCol_Text).w < 0.01f);
+		if(hideContent) {
+			const float zoomLevel  = ofxOceanodeShared::getZoomLevel();
+			static constexpr float BASE_FRAME_HEIGHT = 16.0f;
+			const float frameH   = BASE_FRAME_HEIGHT * zoomLevel;
+			const float spacingY = 4.0f * zoomLevel;
+			// Matrix height: numRows buttons with 2.0f gaps (the ItemSpacing.y used inside renderSnapshotMatrix).
+			const float matrixSpacingY = 2.0f * zoomLevel;
+			const int   nRows    = matrixRows;
+			const float matrixH  = (nRows > 0) ? (nRows * frameH + (nRows - 1) * matrixSpacingY) : 0.0f;
+			// Two SliderFloat rows + one ProgressBar row, each separated by normal spacingY.
+			const float totalH = matrixH
+				+ spacingY + frameH              // SliderFloat ##morphMs
+				+ spacingY + frameH              // SliderFloat ##morphBiPow
+				+ spacingY + 6.0f * zoomLevel;  // ProgressBar (6px base height, scaled)
+			ImGui::Dummy(ImVec2(scaledTotalW, totalH));
+			return;
+		}
+
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.0f, 2.0f));
 		renderSnapshotMatrix();
 		ImGui::PopStyleVar();
 
-		// Morph time controls
-		float nodeW = (float)(ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget());
-		ImGui::SetNextItemWidth(nodeW);
+		// Morph time controls — use the stable node width (not GetContentRegionAvail).
+		ImGui::SetNextItemWidth(scaledTotalW);
 		ImGui::SliderFloat("##morphMs", &morphEngine.getMorphMs(), 0.f, 10000.f, "Morph: %.0f ms");
-		ImGui::SetNextItemWidth(nodeW);
+		ImGui::SetNextItemWidth(scaledTotalW);
 		ImGui::SliderFloat("##morphBiPow", &morphEngine.getMorphBiPow(), -1.f, 1.f, "BiPow: %.2f");
 
-		// Morphing progress bar (bipow-mapped)
+		// Morphing progress bar — use explicit stable width (not -FLT_MIN sentinel).
 		float progress = morphEngine.isMorphing() ? morphEngine.getProgress() : (snapshotSystem.getCurrentSlot() >= 0 ? 1.f : 0.f);
 		ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.8f, 0.4f, 0.1f, 1.0f));
-		ImGui::ProgressBar(progress, ImVec2(nodeW, 6.f), "");
+		ImGui::ProgressBar(progress, ImVec2(scaledTotalW, 6.f), "");
 		ImGui::PopStyleColor();
 
-		ImGui::Text(". . . . . . . . . . . . . . . . .");
+//		ImGui::Text(". . . . . . . . . . . . . . . . .");
 	}
 }
 
@@ -349,7 +401,36 @@ void ofxOceanodeNodeMacro::renderSnapshotMatrix() {
 
 	const int numRows = matrixRows;
 	const int numCols = matrixCols;
-	
+
+	// Compute per-button width from the configured node dimensions (zoom-scaled) so
+	// the result is a stable fixed value that does not feed back into the ImGui
+	// layout loop.  GetContentRegionAvail().x must NOT be used here — calling it
+	// inside the parameter callback that has no explicit width constraint makes the
+	// node window expand each frame, which in turn grows GetContentRegionAvail(),
+	// which grows the buttons, producing unbounded width growth.
+	const float zoomFactor_sm = ofxOceanodeShared::getZoomLevel();
+	const float scaledTotalW_sm = (float)(ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget()) * zoomFactor_sm;
+	const float spacing = ImGui::GetStyle().ItemSpacing.x;
+	const float btnW    = (scaledTotalW_sm - spacing * (numCols - 1)) / numCols;
+	// Height: standard ImGui item height (same as a slider/text input).
+	// GetFrameHeight() is already zoom-correct — no zoomFactor multiplication needed.
+	const float btnH    = ImGui::GetFrameHeight();
+
+	// Zoom suppression: when the canvas pushes transparent ImGuiCol_Text (zoom ≤ 50%),
+	// replace the entire button grid with a single correctly-sized Dummy so the node
+	// height stays identical to the fully-rendered version.
+	const bool hideContent = (ImGui::GetStyleColorVec4(ImGuiCol_Text).w < 0.01f);
+	if(hideContent) {
+		// ItemSpacing.y is 2.0f here (pushed by renderPresetNamingGui before calling us).
+		const float spacingY = ImGui::GetStyle().ItemSpacing.y;
+		const float totalH   = (numRows > 0)
+			? (numRows * btnH + (numRows - 1) * spacingY)
+			: 0.0f;
+		ImGui::Dummy(ImVec2(scaledTotalW_sm, totalH));
+		ImGui::PopID();
+		return;
+	}
+
 	for(int i = 0; i < numRows; i++) {
 		for(int j = 0; j < numCols; j++) {
 			if(j > 0) ImGui::SameLine();
@@ -377,11 +458,17 @@ void ofxOceanodeNodeMacro::renderSnapshotMatrix() {
 				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
 			}
 			
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
+			// Respect the canvas zoom-based text suppression: when the canvas pushes a
+			// fully-transparent ImGuiCol_Text (zoom ≤ 50%), preserve that transparency
+			// instead of overriding it with the normal button-label colour.
+			const bool hideLabel = (ImGui::GetStyleColorVec4(ImGuiCol_Text).w < 0.01f);
+			ImGui::PushStyleColor(ImGuiCol_Text, hideLabel
+				? ImVec4(0.0f, 0.0f, 0.0f, 0.0f)
+				: ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
 			
 			string label = (hasData && showSnapshotNames) ? snapshotSystem.getSnapshots().at(slot).name : ofToString(slot);
 			
-			if(ImGui::Button(label.c_str(), ImVec2(buttonSize, buttonSize/1.5))) {
+			if(ImGui::Button(label.c_str(), ImVec2(btnW, btnH))) {
 				if(ImGui::GetIO().KeyShift) {
 					storeRouterSnapshot(slot);
 				} else {
@@ -553,6 +640,11 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 //	ImGui::SeparatorText("Router Management");
 	ImGui::TextDisabled("Drag to reorder, double-click to rename.");
 	ImGui::Spacing();
+
+	// The delete-button reservation margin is a raw pixel value.
+	// ImGui style (FramePadding, ItemSpacing) is already scaled by the canvas before
+	// constructGui() runs, so no additional zoomFactor multiplication is needed here.
+	const float sepDeleteMargin = 40.0f;
 	
 	int moveFrom = -1, moveTo = -1;
 	// Disable drag-and-drop while a rename is in progress so the InputText
@@ -587,7 +679,7 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 				ImGui::SetKeyboardFocusHere();
 				guiState.routerSortEditNeedsFocus = false;
 			}
-			ImGui::SetNextItemWidth(isSep ? -40.0f : -1.0f); // leave room for x button on seps
+			ImGui::SetNextItemWidth(isSep ? -sepDeleteMargin : -1.0f); // leave room for x button on seps
 			bool confirmed = ImGui::InputText("##rename", guiState.routerSortEditBuf, sizeof(guiState.routerSortEditBuf),
 				ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
 
@@ -658,7 +750,7 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 			// ImVec2(0,0) would fill the entire available width, pushing the
 			// SameLine button outside the clip rect and making it unclickable.
 			float selWidth = isSep
-				? max(0.0f, ImGui::GetContentRegionAvail().x - 40.0f)
+				? max(0.0f, ImGui::GetContentRegionAvail().x - sepDeleteMargin)
 				: 0.0f;
 			ImGui::Selectable(displayLabel.c_str(), false, ImGuiSelectableFlags_None, ImVec2(selWidth, 0));
 

@@ -23,7 +23,6 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
 	matrixRows.set("Snapshot Matrix Rows", 2, 1, 8);
 	matrixCols.set("Snapshot Matrix Cols", 8, 1, 8);
 	showSnapshotNames.set("Show Names", true);
-	buttonSize.set("Button Size", 28.0f, 15.0f, 60.0f);
 	showSnapshotMatrix = false;
 	retriggerSnapshotOnActive.set("Retrigger Snapshot on Active", false);
 	
@@ -159,7 +158,6 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	
 	addInspectorParameter(matrixRows.set("Snapshot Rows", 2, 1, 8));
 	addInspectorParameter(matrixCols.set("Snapshot Cols", 8, 1, 8));
-	addInspectorParameter(buttonSize.set("Button Size", 28.0f, 15.0f, 60.0f));
 	addInspectorParameter(addSnapshotButton.set("Add Snapshot"));
 	addInspectorParameter(clearSnapshotsButton.set("Clear All Snapshots"));
 	

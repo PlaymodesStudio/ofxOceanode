@@ -176,11 +176,12 @@ void ofxOceanodeHierarchyController::draw()
     // Execute deferred centering from previous frame
     // -----------------------------------------------------------------------
     if (pendingCenter && pendingCenterNode != nullptr && pendingCenterCanvas != nullptr) {
+        float zoom = pendingCenterCanvas->getZoomLevel();
         glm::vec2 nodeSize = glm::vec2(
             pendingCenterNode->getNodeGui().getRectangle().getWidth(),
             pendingCenterNode->getNodeGui().getRectangle().getHeight());
         glm::vec2 nodePos = pendingCenterNode->getNodeGui().getPosition();
-        glm::vec2 center = pendingCenterCanvas->getContentRegionSize() / 2.0f;
+        glm::vec2 center = pendingCenterCanvas->getContentRegionSize() / (2.0f * zoom);
         pendingCenterCanvas->setScrolling(-nodePos - nodeSize / 2.0f + center);
         pendingCenter = false;
         pendingCenterNode = nullptr;

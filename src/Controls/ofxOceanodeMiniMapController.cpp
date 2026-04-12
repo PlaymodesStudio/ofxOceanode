@@ -232,14 +232,16 @@ void ofxOceanodeMiniMapController::renderMinimap(
     // --- Compute viewport canvas-space bounds (needed before scale to expand bounding box) ---
     glm::vec2 scroll   = activeCanvas->getScrolling();
     glm::vec2 winSize  = activeCanvas->getContentRegionSize();
+    float zoom         = activeCanvas->getZoomLevel();
 
     // Visible top-left in canvas-space: when scrolling=(sx,sy), nodes at (0,0) appear at
     // screenPos + scrolling, so canvas origin is at screen scrolling offset.
-    // Visible canvas top-left = -scroll, bottom-right = -scroll + winSize
+    // Visible canvas top-left = -scroll, bottom-right = -scroll + winSize/zoom
+    // (the visible world area shrinks when zoomed in)
     float vpLeft  = -scroll.x;
     float vpTop   = -scroll.y;
-    float vpRight = vpLeft  + winSize.x;
-    float vpBot   = vpTop   + winSize.y;
+    float vpRight = vpLeft  + winSize.x / zoom;
+    float vpBot   = vpTop   + winSize.y / zoom;
 
     // Save raw content bounding box (nodes + comments only) BEFORE expanding with viewport.
     // This is used later to clamp navigation so the user can't pan far outside the node area.
@@ -352,9 +354,10 @@ void ofxOceanodeMiniMapController::renderMinimap(
         cy = ofClamp(cy, contentMinY - PADDING, contentMaxY + PADDING);
 
         // Center view on the clicked (clamped) canvas point
+        // Use world-space half-width = screen / zoom so centering is correct at any zoom level
         activeCanvas->setScrolling(glm::vec2(
-            winSize.x * 0.5f - cx,
-            winSize.y * 0.5f - cy));
+            winSize.x / (2.0f * zoom) - cx,
+            winSize.y / (2.0f * zoom) - cy));
     }
 }
 

@@ -135,7 +135,8 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Oscillator_1/Pow");
     //        timelines.emplace_back("Indexer_1/NumWaves");
     //        timelines.emplace_back("Mapper_1/Min_Input");
-    gui.setup(nullptr);
+    gui.setup(nullptr);     // First: creates ImGui context
+    canvas.setupFonts();    // Then: adds fonts to the now-existing context and rebuilds atlas
 	ofxOceanodeShared::readMacros();
     // Load and apply saved view preferences now that controls is initialized
     // and openFrameworks data path is fully set up
@@ -389,6 +390,16 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			{
 				canvas.setSnapToGrid(snap);
 				ofxOceanodeShared::setSnapToGrid(snap);
+			}
+			
+			// Canvas zoom control
+			float zoomLevel = canvas.getZoomLevel() * 100.0f;
+			if(ImGui::SliderFloat("Canvas Zoom", &zoomLevel, 25.0f, 400.0f, "%.0f%%")) {
+				canvas.setZoomLevel(zoomLevel / 100.0f);
+			}
+			ImGui::SameLine();
+			if(ImGui::Button("Reset##zoom")) {
+				canvas.setZoomLevel(1.0f);
 			}
 			
 			int tw = canvas.getNodeWidthText();
