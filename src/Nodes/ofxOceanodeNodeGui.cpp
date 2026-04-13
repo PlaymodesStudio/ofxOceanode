@@ -61,7 +61,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 		
 		// Position the delete button at the right edge using the screen-space node width
 		// (nodeWidthText + nodeWidthWidget is already zoom-scaled by the caller)
-		ImGui::SameLine(nodeWidthText + nodeWidthWidget - ofxOceanodeShared::getBaseFrameHeight() * zoomLevel);
+		ImGui::SameLine(nodeWidthText + nodeWidthWidget - ofxOceanodeShared::getBaseFrameHeight() * zoomLevel, 0.0f);
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(220,220,220,255)));
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(ImColor(0, 0, 0,0)));
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
@@ -171,7 +171,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                 if (!textIsHidden) {
                     ImGui::Text("%s", uniqueId.c_str());
                     ImGui::SetItemAllowOverlap();
-                    ImGui::SameLine(-1);
+                    ImGui::SameLine(0.0f, 0.0f);
                     ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
                 } else {
                     // Low-zoom: skip all widgets and replace the entire row with a correctly-sized
@@ -200,7 +200,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                 }
                 
 				// [ node width ] : this was 90 pixels for the name and 150 for the "widget"
-				ImGui::SameLine(nodeWidthText);
+				ImGui::SameLine(nodeWidthText, 0.0f);
 				ImGui::SetNextItemWidth(nodeWidthWidget);
                 
                 string hiddenUniqueId = "##" + uniqueId;
@@ -464,7 +464,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                         tempCast = !tempCast;
                     }
 					ImGui::SameLine();
-					ImGui::Dummy(ImVec2(nodeWidthWidget-sizeCB.x-8,ImGui::GetFrameHeight()));
+					ImGui::Dummy(ImVec2(nodeWidthWidget-sizeCB.x-ImGui::GetStyle().ItemSpacing.x,ImGui::GetFrameHeight()));
 					
                     // PARAM VOID
                     /////////////
@@ -479,7 +479,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                         tempCast.trigger();
                     }
 					ImGui::SameLine();
-					ImGui::Dummy(ImVec2(nodeWidthWidget-sizeCB.x-8,ImGui::GetFrameHeight()));
+					ImGui::Dummy(ImVec2(nodeWidthWidget-sizeCB.x-ImGui::GetStyle().ItemSpacing.x,ImGui::GetFrameHeight()));
 				// PARAM STRING
 				///////////////
                 }else if(absParam.valueType() == typeid(string).name()){
@@ -643,7 +643,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 		
 		// First pass: calculate total height needed for all minimized parameters
 		float totalHeight = 0;
-		float spacing = 2; // Spacing between parameters
+		float spacing = 2.0f * zoomLevel; // Spacing between parameters
 		std::vector<ImVec2> paramSizes;
 		
 		for(int i=0 ; i<getParameters().size(); i++)
@@ -666,7 +666,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 						size = ImVec2(nodeWidthText+nodeWidthWidget, nodeWidthText+nodeWidthWidget);
 					}
 				}
-				else size = ImVec2(nodeWidthText+nodeWidthWidget,30);
+				else size = ImVec2(nodeWidthText+nodeWidthWidget, 30.0f * zoomLevel);
 				
 				paramSizes.push_back(size);
 				totalHeight += size.y + spacing;

@@ -633,30 +633,32 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             // Compensate FramePadding.y so that GetFrameHeight() (= FontSize + FramePadding.y*2) scales
             // smoothly with zoomLevel even when the discrete font index flips.
             // BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[2] + 2 * 1.0f  (default font + base padding)
-            {
-                static constexpr float BASE_FRAME_PADDING_Y = 1.0f;
-                static constexpr float BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[2] + 2.0f * BASE_FRAME_PADDING_Y;
-                float targetSize = ZOOM_FONT_SIZES[2] * zoomLevel;  // exact continuous size
-                float targetPaddingY = (BASE_FRAME_HEIGHT * zoomLevel - targetSize) / 2.0f;
-                // = (16.0f * zoomLevel - 14.0f * zoomLevel) / 2.0f = zoomLevel (always >= 0)
-                if(targetPaddingY < 0.0f) targetPaddingY = 0.0f;
-                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(BASE_FRAME_PADDING_Y * zoomLevel, targetPaddingY));
-                }
-                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f * zoomLevel, 4.0f * zoomLevel));
-                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f * zoomLevel, 8.0f * zoomLevel));
-                ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize,   12.0f * zoomLevel);
-                ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 14.0f * zoomLevel);
+            // Use the actual effective font size (after fontWindowScale clamping) so that when the ceiling
+            // font is larger than targetSize and fwScale is clamped to 1.0, targetPaddingY still produces
+            // GetFrameHeight() == BASE_FRAME_HEIGHT * zoomLevel exactly.
+            static constexpr float BASE_FRAME_PADDING_Y = 1.0f;
+            static constexpr float BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[2] + 2.0f * BASE_FRAME_PADDING_Y;
+            int   ceilIdx          = getCeilingFontIndex();
+            float ceilFontSize     = ZOOM_FONT_SIZES[ceilIdx];
+            float targetSize       = ZOOM_FONT_SIZES[2] * zoomLevel;
+            float fwScale          = (ceilFontSize > 0.0f) ? (targetSize / ceilFontSize) : 1.0f;
+            if(fwScale > 1.0f) fwScale = 1.0f;          // never scale up (clamp to avoid blurriness)
+            float effectiveFontSize = ceilFontSize * fwScale;  // actual rendered font size after clamping
+            float targetPaddingY    = (BASE_FRAME_HEIGHT * zoomLevel - effectiveFontSize) / 2.0f;
+            if(targetPaddingY < 0.0f) targetPaddingY = 0.0f;
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(BASE_FRAME_PADDING_Y * zoomLevel, targetPaddingY));
 
-            int ceilFontIdx = getCeilingFontIndex();
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f * zoomLevel, 4.0f * zoomLevel));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f * zoomLevel, 8.0f * zoomLevel));
+            ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize,   12.0f * zoomLevel);
+            ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 14.0f * zoomLevel);
+
+            int ceilFontIdx = ceilIdx;
             ImFont* zoomFont = zoomFonts[ceilFontIdx];
             if(zoomFont) ImGui::PushFont(zoomFont);
 
-            // Compute scale-down factor (always <= 1.0 when ceiling font found; clamp at 1.0 to avoid blur)
-            float targetSize = ZOOM_FONT_SIZES[2] * zoomLevel;
-            float baseFontNominalSize = ZOOM_FONT_SIZES[ceilFontIdx];
-            float fontWindowScale = (baseFontNominalSize > 0.0f) ? (targetSize / baseFontNominalSize) : 1.0f;
-            if(fontWindowScale > 1.0f) fontWindowScale = 1.0f; // never scale up (clamp to avoid blurriness)
-            ImGui::SetWindowFontScale(fontWindowScale);
+            // fwScale already computed above (clamped fontWindowScale); reuse it here.
+            ImGui::SetWindowFontScale(fwScale);
 
             ImGui::SetCursorScreenPos(ImVec2(node_rect_min.x + NODE_WINDOW_PADDING.x * zoomLevel,
                                              node_rect_min.y + NODE_WINDOW_PADDING.y * zoomLevel));
