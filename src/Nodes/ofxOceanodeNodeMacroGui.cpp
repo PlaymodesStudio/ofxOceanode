@@ -17,6 +17,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::renderMinimizedView(ImVec2 size) {
+	const float zoomLevel = ofxOceanodeShared::getZoomLevel();
+	const bool renderWidgets = (zoomLevel > 0.5f);
+	if(!renderWidgets) {
+		const float rowH = ofxOceanodeShared::getBaseFrameHeight() * zoomLevel;
+		int outputCount = 0;
+		for(auto& rPair : routerManager.getRouterNodes())
+			if(!rPair.second.isInput) outputCount++;
+		if(outputCount > 0)
+			ImGui::Dummy(ImVec2(size.x, outputCount * rowH));
+		return;
+	}
+
 	// Only show output router values in minimized view
 	for(auto& routerPair : routerManager.getRouterNodes()) {
 		if(!routerPair.second.isInput) {
@@ -77,7 +89,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 		const bool hideContent = (ImGui::GetStyleColorVec4(ImGuiCol_Text).w < 0.01f);
 		if(hideContent) {
 			const float zoomLevel  = ofxOceanodeShared::getZoomLevel();
-			static constexpr float BASE_FRAME_HEIGHT = 16.0f;
+			const float BASE_FRAME_HEIGHT = ofxOceanodeShared::getBaseFrameHeight();
 			const float frameH   = BASE_FRAME_HEIGHT * zoomLevel;
 			const float spacingY = 4.0f * zoomLevel;
 			const float totalW   = (float)(ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget())
@@ -356,7 +368,7 @@ void ofxOceanodeNodeMacro::renderPresetNamingGui() {
 		const bool hideContent = (ImGui::GetStyleColorVec4(ImGuiCol_Text).w < 0.01f);
 		if(hideContent) {
 			const float zoomLevel  = ofxOceanodeShared::getZoomLevel();
-			static constexpr float BASE_FRAME_HEIGHT = 16.0f;
+			const float BASE_FRAME_HEIGHT = ofxOceanodeShared::getBaseFrameHeight();
 			const float frameH   = BASE_FRAME_HEIGHT * zoomLevel;
 			const float spacingY = 4.0f * zoomLevel;
 			// Matrix height: numRows buttons with 2.0f gaps (the ItemSpacing.y used inside renderSnapshotMatrix).
@@ -385,7 +397,7 @@ void ofxOceanodeNodeMacro::renderPresetNamingGui() {
 		// Morphing progress bar — use explicit stable width (not -FLT_MIN sentinel).
 		float progress = morphEngine.isMorphing() ? morphEngine.getProgress() : (snapshotSystem.getCurrentSlot() >= 0 ? 1.f : 0.f);
 		ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.8f, 0.4f, 0.1f, 1.0f));
-		ImGui::ProgressBar(progress, ImVec2(scaledTotalW, 6.f), "");
+		ImGui::ProgressBar(progress, ImVec2(scaledTotalW, 6.0f * zoomFactor), "");
 		ImGui::PopStyleColor();
 
 //		ImGui::Text(". . . . . . . . . . . . . . . . .");
@@ -637,14 +649,20 @@ void ofxOceanodeNodeMacro::syncParameterGroupToSortOrder() {
 
 void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 #ifndef OFXOCEANODE_HEADLESS
+	const float zoomLevel = ofxOceanodeShared::getZoomLevel();
+	const bool renderWidgets = (zoomLevel > 0.5f);
+	if(!renderWidgets) {
+		const float rowH = ofxOceanodeShared::getBaseFrameHeight() * zoomLevel;
+		const int numEntries = (int)sortOrder.getOrder().size();
+		float totalH = numEntries * rowH + rowH; // entries + footer row
+		ImGui::Dummy(ImVec2(0, totalH));
+		return;
+	}
 //	ImGui::SeparatorText("Router Management");
 	ImGui::TextDisabled("Drag to reorder, double-click to rename.");
 	ImGui::Spacing();
 
-	// The delete-button reservation margin is a raw pixel value.
-	// ImGui style (FramePadding, ItemSpacing) is already scaled by the canvas before
-	// constructGui() runs, so no additional zoomFactor multiplication is needed here.
-	const float sepDeleteMargin = 40.0f;
+	const float sepDeleteMargin = 40.0f * zoomLevel;
 	
 	int moveFrom = -1, moveTo = -1;
 	// Disable drag-and-drop while a rename is in progress so the InputText
@@ -782,9 +800,9 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 						if(vt == typeid(float).name()){
 							float mn = minP->cast<float>().getParameter().get();
 							float mx = maxP->cast<float>().getParameter().get();
-							ImGui::SetNextItemWidth(120.f);
+							ImGui::SetNextItemWidth(120.0f * zoomLevel);
 							rangeChanged |= ImGui::DragFloat("Min##mnf", &mn, 0.01f);
-							ImGui::SetNextItemWidth(120.f);
+							ImGui::SetNextItemWidth(120.0f * zoomLevel);
 							rangeChanged |= ImGui::DragFloat("Max##mxf", &mx, 0.01f);
 							if(rangeChanged){
 								minP->cast<float>().getParameter().set(mn);
@@ -793,9 +811,9 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 						} else if(vt == typeid(int).name()){
 							int mn = minP->cast<int>().getParameter().get();
 							int mx = maxP->cast<int>().getParameter().get();
-							ImGui::SetNextItemWidth(120.f);
+							ImGui::SetNextItemWidth(120.0f * zoomLevel);
 							rangeChanged |= ImGui::DragInt("Min##mni", &mn);
-							ImGui::SetNextItemWidth(120.f);
+							ImGui::SetNextItemWidth(120.0f * zoomLevel);
 							rangeChanged |= ImGui::DragInt("Max##mxi", &mx);
 							if(rangeChanged){
 								minP->cast<int>().getParameter().set(mn);
