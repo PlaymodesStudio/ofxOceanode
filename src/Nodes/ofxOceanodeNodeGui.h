@@ -83,6 +83,8 @@ private:
     
     bool valueHasBeenReseted = false;
     
+    float cachedContentHeight = 0.0f;  // Last measured full-zoom content height
+    
 #ifdef OFXOCEANODE_USE_MIDI
     bool isListeningMidi;
 #endif

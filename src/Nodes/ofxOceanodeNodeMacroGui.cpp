@@ -17,18 +17,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::renderMinimizedView(ImVec2 size) {
-	const float zoomLevel = ofxOceanodeShared::getZoomLevel();
-	const bool renderWidgets = (zoomLevel > 0.5f);
-	if(!renderWidgets) {
-		const float rowH = ofxOceanodeShared::getBaseFrameHeight() * zoomLevel;
-		int outputCount = 0;
-		for(auto& rPair : routerManager.getRouterNodes())
-			if(!rPair.second.isInput) outputCount++;
-		if(outputCount > 0)
-			ImGui::Dummy(ImVec2(size.x, outputCount * rowH));
-		return;
-	}
-
 	// Only show output router values in minimized view
 	for(auto& routerPair : routerManager.getRouterNodes()) {
 		if(!routerPair.second.isInput) {
@@ -76,28 +64,6 @@ void ofxOceanodeNodeMacro::renderMinimizedView(ImVec2 size) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::renderPresetControlGui() {
-
-	// Zoom suppression: when zoom ≤ 50%, replace all widget rows with correctly-sized
-	// Dummies so the node height stays identical to the fully-rendered version.
-	// Rows rendered by this function (always shown, never inside a collapsible):
-	//   1. Macro name text
-	//   2. "Is Local?" checkbox + "Show Window?" checkbox  (SameLine → one row)
-	//   3. "[Save]" button  + "[Save As]" button           (SameLine → one row)
-	// Total = 3 rows × frameH + 2 × spacingY (between rows).
-	{
-		const float zoomLevel    = ofxOceanodeShared::getZoomLevel();
-		const bool renderWidgets = (zoomLevel > 0.5f);
-		if(!renderWidgets) {
-			const float BASE_FRAME_HEIGHT = ofxOceanodeShared::getBaseFrameHeight();
-			const float frameH   = BASE_FRAME_HEIGHT * zoomLevel;
-			const float spacingY = ImGui::GetStyle().ItemSpacing.y;
-			const float totalW   = (float)(ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget())
-				* zoomLevel;
-			ImGui::Dummy(ImVec2(totalW, 3.0f * frameH + 2.0f * spacingY));
-			return;
-		}
-	}
-
 	bool addBank = false;
 	
 	if(presetManager.isLocal()){
@@ -361,27 +327,6 @@ void ofxOceanodeNodeMacro::renderPresetNamingGui() {
 		// feedback loop when the snapshot matrix is visible.
 		const float scaledTotalW = (float)(ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget()) * zoomFactor;
 
-		// Zoom suppression: when zoom ≤ 50%, replace the entire showSnapshotMatrix block
-		// (matrix + 2 sliders + progress bar) with a single correctly-sized Dummy so the
-		// node height stays identical.
-		const bool renderWidgets = (zoomFactor > 0.5f);
-		if(!renderWidgets) {
-			const float BASE_FRAME_HEIGHT = ofxOceanodeShared::getBaseFrameHeight();
-			const float frameH   = BASE_FRAME_HEIGHT * zoomFactor;
-			const float spacingY = 4.0f * zoomFactor;
-			// Matrix height: numRows buttons with 2.0f gaps (the ItemSpacing.y used inside renderSnapshotMatrix).
-			const float matrixSpacingY = 2.0f * zoomFactor;
-			const int   nRows    = matrixRows;
-			const float matrixH  = (nRows > 0) ? (nRows * frameH + (nRows - 1) * matrixSpacingY) : 0.0f;
-			// Two SliderFloat rows + one ProgressBar row, each separated by normal spacingY.
-			const float totalH = matrixH
-				+ spacingY + frameH              // SliderFloat ##morphMs
-				+ spacingY + frameH              // SliderFloat ##morphBiPow
-				+ spacingY + 6.0f * zoomFactor;  // ProgressBar (6px base height, scaled)
-			ImGui::Dummy(ImVec2(scaledTotalW, totalH));
-			return;
-		}
-
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.0f, 2.0f));
 		renderSnapshotMatrix();
 		ImGui::PopStyleVar();
@@ -425,20 +370,6 @@ void ofxOceanodeNodeMacro::renderSnapshotMatrix() {
 	// Height: standard ImGui item height (same as a slider/text input).
 	// GetFrameHeight() is already zoom-correct — no zoomFactor multiplication needed.
 	const float btnH    = ImGui::GetFrameHeight();
-
-	// Zoom suppression: when zoom ≤ 50%, replace the entire button grid with a single
-	// correctly-sized Dummy so the node height stays identical to the fully-rendered version.
-	const bool renderWidgets_sm = (zoomFactor_sm > 0.5f);
-	if(!renderWidgets_sm) {
-		// ItemSpacing.y is 2.0f here (pushed by renderPresetNamingGui before calling us).
-		const float spacingY = ImGui::GetStyle().ItemSpacing.y;
-		const float totalH   = (numRows > 0)
-			? (numRows * btnH + (numRows - 1) * spacingY)
-			: 0.0f;
-		ImGui::Dummy(ImVec2(scaledTotalW_sm, totalH));
-		ImGui::PopID();
-		return;
-	}
 
 	for(int i = 0; i < numRows; i++) {
 		for(int j = 0; j < numCols; j++) {
@@ -642,18 +573,6 @@ void ofxOceanodeNodeMacro::syncParameterGroupToSortOrder() {
 void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 #ifndef OFXOCEANODE_HEADLESS
 	const float zoomLevel = ofxOceanodeShared::getZoomLevel();
-	const bool renderWidgets = (zoomLevel > 0.5f);
-	if(!renderWidgets) {
-		const float rowH = ofxOceanodeShared::getBaseFrameHeight() * zoomLevel;
-		const int numEntries = (int)sortOrder.getOrder().size();
-		// header row (TextDisabled) + entries + footer row (InputText + SmallButton)
-		const float spacingY  = ImGui::GetStyle().ItemSpacing.y;
-		const float separatorH = spacingY * 2.0f + 1.0f;  // ImGui Separator height
-		float totalH = (numEntries + 2) * rowH + spacingY + separatorH;
-		const float totalW = (float)(ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget()) * zoomLevel;
-		ImGui::Dummy(ImVec2(totalW, totalH));
-		return;
-	}
 //	ImGui::SeparatorText("Router Management");
 	ImGui::TextDisabled("Drag to reorder, double-click to rename.");
 	ImGui::Spacing();

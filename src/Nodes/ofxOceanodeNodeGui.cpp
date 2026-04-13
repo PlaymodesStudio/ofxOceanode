@@ -99,6 +99,9 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         ImGui::Spacing();
         
         auto startPos = ImGui::GetCursorScreenPos();
+        float cursorYBefore = ImGui::GetCursorPosY();
+        
+        if(renderWidgets){
         
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
@@ -131,12 +134,8 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                         }
                     }
                     
-                    // At zoom ≤ 50% skip the separator entirely (zero height) so it
-                    // contributes no visual element and no extra vertical space.
-                    const bool hideSeparator = !renderWidgets;
-                    
                     // Render separator with label and background highlight
-                    if(!label.empty() && !hideSeparator){
+                    if(!label.empty()){
                         ImVec2 p = ImGui::GetCursorScreenPos();
                         // Use the already zoom-scaled screen-space widths passed by the canvas,
                         // not guiRect.width which is in world-space coordinates.
@@ -167,22 +166,11 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                 }
             }else{
                 
-                bool textIsHidden = !renderWidgets;
-                if (!textIsHidden) {
-                    ImGui::Text("%s", uniqueId.c_str());
-                    ImGui::SetItemAllowOverlap();
-                    ImGui::SameLine(0.0f, 0.0f);
-                    ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
-                } else {
-                    // Low-zoom: skip all widgets and replace the entire row with a correctly-sized
-                    // Dummy so the node height stays identical to the fully-rendered version.
-                    float targetH = ofxOceanodeShared::getBaseFrameHeight() * zoomLevel;
-                    // Full-width Dummy keeps the row at the correct height; connection-point
-                    // positions are still recorded below from this item's rect.
-                    ImGui::Dummy(ImVec2(nodeWidthText + nodeWidthWidget, targetH));
-                }
-                
-                if(!textIsHidden) {
+                ImGui::Text("%s", uniqueId.c_str());
+                ImGui::SetItemAllowOverlap();
+                ImGui::SameLine(0.0f, 0.0f);
+                ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
+                {
                 int drag = 0;
                 bool resetValue = false;
                 if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)){
@@ -628,7 +616,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
     ImGui::PopStyleVar();
 
                 ImGui::PopStyleColor(6);
-                } // end if(!textIsHidden)
+                } // end widget rendering block
             }
             inputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
             outputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
@@ -636,6 +624,27 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
             ImGui::PopID();
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::EndDisabled();
         } //endFor
+        
+        float cursorYAfter = ImGui::GetCursorPosY();
+        if(cursorYAfter > cursorYBefore){
+            cachedContentHeight = (cursorYAfter - cursorYBefore) / zoomLevel;
+        }
+        
+        } else {
+            // zoom ≤ 0.5f: skip all parameter widgets, render single Dummy to preserve node size
+            if(cachedContentHeight > 0.0f){
+                ImGui::Dummy(ImVec2(nodeWidthText + nodeWidthWidget, cachedContentHeight * zoomLevel));
+                // Distribute pin Y positions evenly across the dummy area so connections
+                // remain anchored at sensible positions even when widgets are not rendered.
+                auto numParams = getParameters().size();
+                for(int i = 0; i < (int)numParams; i++){
+                    float yPos = numParams == 1 ? (cachedContentHeight * zoomLevel) / 2.0f
+                                                : (cachedContentHeight * zoomLevel) * ((float)i / (numParams - 1));
+                    inputPositions[i]  = glm::vec2(0, ImGui::GetItemRectMin().y + yPos);
+                    outputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + yPos);
+                }
+            }
+        } // end if(renderWidgets)
     }
 	else
 	{

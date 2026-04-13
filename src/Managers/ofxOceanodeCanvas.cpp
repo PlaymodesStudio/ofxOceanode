@@ -756,9 +756,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 //draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(0, 0, 0, 255), 4.0f);
                 
                 if(nodeGui.getExpanded()){
-                    int NODE_BULLET_MIN_SIZE = 3;
-                    int NODE_BULLET_MAX_SIZE = 10;
-                    int NODE_BULLET_GROW_DIST = 10;
+                    float NODE_BULLET_MIN_SIZE = 3.0f * zoomLevel;
+                    float NODE_BULLET_MAX_SIZE = 10.0f * zoomLevel;
+                    float NODE_BULLET_GROW_DIST = 10.0f * zoomLevel;
                     
                     for (auto &absParam : node->getParameters()){
                         auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
@@ -938,7 +938,17 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             glm::vec2 screenSize = c.size * zoomLevel;
             float headerH = 15.0f * zoomLevel;
             draw_list->AddRectFilled(currentPosition, currentPosition + glm::vec2(screenSize.x, headerH), IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 255));
-            draw_list->AddText(currentPosition, IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255), c.text.c_str());
+            ImFont* commentFont = zoomFonts[getCeilingFontIndex()];
+            float commentFontSize = ZOOM_FONT_SIZES[2] * zoomLevel;  // base font size scaled by zoom
+            if(commentFont) {
+                draw_list->AddText(commentFont, commentFontSize, currentPosition,
+                                   IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255),
+                                   c.text.c_str());
+            } else {
+                draw_list->AddText(currentPosition,
+                                   IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255),
+                                   c.text.c_str());
+            }
             draw_list->AddRectFilled(currentPosition + glm::vec2(0, headerH), currentPosition + screenSize, IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 100));
             
             // Draw selection border if selected
