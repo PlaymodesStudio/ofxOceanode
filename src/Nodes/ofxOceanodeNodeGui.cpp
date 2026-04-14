@@ -59,7 +59,10 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 		ImGui::SameLine();
 		// Don't draw node name text below 50% zoom
 		if(zoomLevel > 0.5f){
+			ImFont* boldFont = ofxOceanodeShared::getCurrentBoldFont();
+			if(boldFont) ImGui::PushFont(boldFont);
 			ImGui::Text("%s", moduleName.c_str());
+			if(boldFont) ImGui::PopFont();
 		}
 		
 		// Position the delete button at the right edge using the screen-space node width

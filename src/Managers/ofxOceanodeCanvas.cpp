@@ -28,6 +28,7 @@
 
 // Static member definition – shared across all canvas instances (ImGui uses a single font atlas)
 ImFont* ofxOceanodeCanvas::zoomFonts[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+ImFont* ofxOceanodeCanvas::zoomFontsBold[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
 
 int ofxOceanodeCanvas::getCurrentFontIndex() const {
     float desiredScreenSize = ZOOM_FONT_SIZES[2] * zoomLevel;  // index 2 = default (18px)
@@ -122,6 +123,29 @@ void ofxOceanodeCanvas::setupFonts() {
             if(!zoomFonts[i]) {
                 ofLogWarning("ofxOceanodeCanvas") << "Failed to load font size " << ZOOM_FONT_SIZES[i];
                 zoomFonts[i] = io.Fonts->AddFontDefault();
+            }
+        }
+    }
+
+    // ── Bold fonts (ExtraBold) for node titles ──────────────────────────
+    std::string boldFontPath = ofToDataPath("config/font/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ExtraBold.ttf", true);
+    ofFile boldFontFile(boldFontPath);
+    if(!boldFontFile.exists()) {
+        ofLogWarning("ofxOceanodeCanvas") << "JetBrainsMono ExtraBold font not found at: " << boldFontPath;
+        ofLogWarning("ofxOceanodeCanvas") << "Bold node titles will fall back to regular font";
+        for(int i = 0; i < 5; i++) {
+            zoomFontsBold[i] = nullptr; // nullptr signals "no bold available"
+        }
+    } else {
+        ImFontConfig boldCfg;
+        boldCfg.OversampleH = 2;
+        boldCfg.OversampleV = 2;
+        boldCfg.MergeMode   = false;
+
+        for(int i = 0; i < 5; i++) {
+            zoomFontsBold[i] = io.Fonts->AddFontFromFileTTF(boldFontPath.c_str(), ZOOM_FONT_SIZES[i] * scale, &boldCfg);
+            if(!zoomFontsBold[i]) {
+                ofLogWarning("ofxOceanodeCanvas") << "Failed to load bold font size " << ZOOM_FONT_SIZES[i];
             }
         }
     }
@@ -662,6 +686,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 
             int ceilFontIdx = ceilIdx;
             ImFont* zoomFont = zoomFonts[ceilFontIdx];
+            ofxOceanodeShared::setCurrentBoldFont(zoomFontsBold[ceilFontIdx]);
             if(zoomFont) ImGui::PushFont(zoomFont);
 
             // fwScale already computed above (clamped fontWindowScale); reuse it here.
