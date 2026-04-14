@@ -26,6 +26,9 @@
 #include "ofxOceanodeParameter.h"
 #include "ofAppGLFWWindow.h"
 
+// Static member definition – shared across all canvas instances (ImGui uses a single font atlas)
+ImFont* ofxOceanodeCanvas::zoomFonts[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+
 int ofxOceanodeCanvas::getCurrentFontIndex() const {
     float desiredScreenSize = ZOOM_FONT_SIZES[2] * zoomLevel;  // index 2 = default (18px)
     int bestIdx = 2;
@@ -179,6 +182,10 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
 }
 
 void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
+    // Save the previous shared zoom level so nested canvas draws (e.g. macros)
+    // restore the parent's value when they finish.
+    float previousSharedZoom = ofxOceanodeShared::getZoomLevel();
+
     //Draw Guis
     if(onTop){
         ImGui::SetNextWindowFocus();
@@ -1757,6 +1764,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     ofPushMatrix();
     ofMultMatrix(glm::inverse(transformationMatrix->get()));
     ofPopMatrix();
+
+    // Restore the previous shared zoom level (stack-like save/restore for nested canvases)
+    ofxOceanodeShared::setZoomLevel(previousSharedZoom);
 }
 
 //void ofxOceanodeCanvas::mouseScrolled(ofMouseEventArgs &e){
