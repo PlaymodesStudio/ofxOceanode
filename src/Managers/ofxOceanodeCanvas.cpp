@@ -938,16 +938,19 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             glm::vec2 screenSize = c.size * zoomLevel;
             float headerH = 15.0f * zoomLevel;
             draw_list->AddRectFilled(currentPosition, currentPosition + glm::vec2(screenSize.x, headerH), IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 255));
-            ImFont* commentFont = zoomFonts[getCeilingFontIndex()];
-            float commentFontSize = ZOOM_FONT_SIZES[2] * zoomLevel;  // base font size scaled by zoom
-            if(commentFont) {
-                draw_list->AddText(commentFont, commentFontSize, currentPosition,
-                                   IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255),
-                                   c.text.c_str());
-            } else {
-                draw_list->AddText(currentPosition,
-                                   IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255),
-                                   c.text.c_str());
+            // Don't draw comment text below 50% zoom
+            if(zoomLevel > 0.5f){
+                ImFont* commentFont = zoomFonts[getCeilingFontIndex()];
+                float commentFontSize = ZOOM_FONT_SIZES[2] * zoomLevel;  // base font size scaled by zoom
+                if(commentFont) {
+                    draw_list->AddText(commentFont, commentFontSize, currentPosition,
+                                       IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255),
+                                       c.text.c_str());
+                } else {
+                    draw_list->AddText(currentPosition,
+                                       IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255),
+                                       c.text.c_str());
+                }
             }
             draw_list->AddRectFilled(currentPosition + glm::vec2(0, headerH), currentPosition + screenSize, IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 100));
             
@@ -1715,6 +1718,15 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
             else if(ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace)) && !ImGui::IsAnyItemActive()){
                 container->deleteSelectedModules();
+            }
+            
+            // Alt+Z: reset zoom to 100%, preserving the visible world center
+            if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && ImGui::GetIO().KeyAlt && ImGui::IsKeyPressed((ImGuiKey)'Z')){
+                glm::vec2 canvasCenter = contentRegionSize * 0.5f;
+                glm::vec2 worldCenterBefore = screenToWorld(canvasOrigin + canvasCenter);
+                setZoomLevel(ZOOM_DEFAULT);
+                glm::vec2 worldCenterAfter = screenToWorld(canvasOrigin + canvasCenter);
+                scrolling += (worldCenterAfter - worldCenterBefore);
             }
             
             if (isCreatingConnection && !ImGui::IsMouseDown(0)){

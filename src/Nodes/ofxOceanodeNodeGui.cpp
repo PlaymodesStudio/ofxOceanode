@@ -57,7 +57,10 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 		ImGui::PopStyleColor();
 		
 		ImGui::SameLine();
-		ImGui::Text("%s", moduleName.c_str());
+		// Don't draw node name text below 50% zoom
+		if(zoomLevel > 0.5f){
+			ImGui::Text("%s", moduleName.c_str());
+		}
 		
 		// Position the delete button at the right edge using the screen-space node width
 		// (nodeWidthText + nodeWidthWidget is already zoom-scaled by the caller)
@@ -168,7 +171,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                 
                 ImGui::Text("%s", uniqueId.c_str());
                 ImGui::SetItemAllowOverlap();
-                ImGui::SameLine(0.0f, 0.0f);
+                ImGui::SameLine(-1);
                 ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
                 {
                 int drag = 0;
