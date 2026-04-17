@@ -1417,7 +1417,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     glm::vec2 pastePosition = ImGui::GetMousePos() - offset;
                     if(snap_to_grid) pastePosition = snapToGrid(pastePosition);
                     container->pasteModulesAndConnectionsInPosition(pastePosition, ImGui::GetIO().KeyShift);
-                }else if(ImGui::IsKeyPressed((ImGuiKey)'X')){
+                }else if(ImGui::IsKeyPressed(ImGuiKey_X)){
                     container->cutSelectedModulesWithConnections();
                 }else if(ImGui::IsKeyPressed(ImGuiKey_D)){
                     container->copySelectedModulesWithConnections();
@@ -1425,9 +1425,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     glm::vec2 pastePosition = ImGui::GetMousePos() - offset;
                     if(snap_to_grid) pastePosition = snapToGrid(pastePosition);
                     container->pasteModulesAndConnectionsInPosition(pastePosition, ImGui::GetIO().KeyShift);
-                }else if(ImGui::IsKeyPressed((ImGuiKey)'A')){
+                }else if(ImGui::IsKeyPressed(ImGuiKey_A)){
                     selectAllNodes();
-				}else if(ImGui::IsKeyPressed((ImGuiKey)'E')){
+				}else if(ImGui::IsKeyPressed(ImGuiKey_E)){
 					container->encapsulateSelectedNodes();
 				}
             }
