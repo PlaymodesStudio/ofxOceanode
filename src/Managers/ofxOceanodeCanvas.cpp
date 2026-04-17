@@ -291,9 +291,18 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		ImGui::PopStyleColor();
 		ImGui::PopStyleVar();
 
-		// ZOOM SLIDER
+		// [Z]OOM SLIDER
+		ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.4,0.4,0.4,1.0));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
+
+		ImGui::SameLine();
+		if(ImGui::SmallButton("[Z]")) {
+			rawZoomLevel = 1.0f;
+			zoomLevel = 1.0f;
+		}
 		ImGui::SameLine();
 		ImGui::SetNextItemWidth(80);
+
 		float zoomPercent = zoomLevel * 100.0f;
 		if(ImGui::SliderFloat("##zoom", &zoomPercent, ZOOM_MIN * 100.0f, ZOOM_MAX * 100.0f, "%.0f%%")) {
 			glm::vec2 canvasCenter = glm::vec2(ImGui::GetContentRegionAvail()) * 0.5f;
@@ -303,11 +312,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 			glm::vec2 worldCenterAfter = screenToWorld(canvasOrigin + canvasCenter);
 			scrolling += glm::vec2(worldCenterAfter - worldCenterBefore);
 		}
-		ImGui::SameLine();
-		if(ImGui::SmallButton("1:1")) {
-			rawZoomLevel = 1.0f;
-			zoomLevel = 1.0f;
-		}
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
+
 
 		// COMMENTS
 		
