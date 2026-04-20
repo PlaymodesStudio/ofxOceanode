@@ -170,12 +170,16 @@ public:
 		});
 	}
 	
+	void trigger() {
+		value.trigger();
+	}
+
 	void resendValue() override {
 		if(!getOceanodeParameter(value).hasOutConnections()) {
 			value.trigger();
 		}
 	}
-	
+
 	bool match(abstractPortal* p){
 		// getName() == p->getName() is guaranteed by the map-based registry in ofxOceanodeShared
 		if(type() == p->type() && checkLocal(p) && p != this){

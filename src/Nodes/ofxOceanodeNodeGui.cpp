@@ -548,7 +548,16 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                     ImGui::Separator();
                     if(!absParam.isScoped()){ //Param is not scoped
                         if(ImGui::Selectable("Add to Scope")){
-                            ofxOceanodeScope::getInstance()->addParameter(&absParam,node.getColor());
+                            // Extract full path information
+                            std::string canvasID = absParam.getNodeModel()->getParents();
+                            std::string nodeName = absParam.getGroupHierarchyNames().front();
+                            
+                            ofxOceanodeScope::getInstance()->addParameter(
+                                &absParam,
+                                node.getColor(),
+                                canvasID,
+                                nodeName
+                            );
                         }
                     }else{
                         if(ImGui::Selectable("Remove from Scope")){
@@ -715,10 +724,10 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
 			}
 		}
 		
-		// Add an invisible item to ensure the group has the correct size
-		if(totalHeight > 0) {
-			ImGui::InvisibleButton("##nodesize", ImVec2(nodeWidthText+nodeWidthWidget, 0.1f));
-		}
+		// Always add an invisible item to enforce the node's full width when collapsed.
+		// This prevents the node from shrinking when there are no DisplayMinimized params,
+		// and eliminates the animated resize effect by keeping the width stable every frame.
+		ImGui::InvisibleButton("##nodesize", ImVec2(nodeWidthText+nodeWidthWidget, 0.1f));
 	}
 				
 				ImGui::EndGroup();

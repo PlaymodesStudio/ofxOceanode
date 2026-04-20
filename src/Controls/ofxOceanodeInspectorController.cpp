@@ -26,11 +26,28 @@ std::vector<std::string> ofxOceanodeInspectorController::getInspectorDropdownOpt
 	return (it != inspectorDropdownOptions.end()) ? it->second : std::vector<std::string>();
 }
 
+bool ofxOceanodeInspectorController::hasAnySelectedNode(){
+    vector<pair<string, ofxOceanodeNode*>> nodes(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
+    std::function<bool(vector<pair<string, ofxOceanodeNode*>>)> checkSelected = [&checkSelected](vector<pair<string, ofxOceanodeNode*>> nodes) -> bool {
+        for(auto &nodePair : nodes){
+            if(nodePair.second->getNodeGui().getSelected()){
+                return true;
+            }
+            if(ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&nodePair.second->getNodeModel())){
+                if(checkSelected(vector<pair<string, ofxOceanodeNode*>>(m->getContainer()->getParameterGroupNodesMap().begin(), m->getContainer()->getParameterGroupNodesMap().end()))){
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+    return checkSelected(nodes);
+}
+
 void ofxOceanodeInspectorController::draw(){
     vector<pair<string, ofxOceanodeNode*>> nodesInThisFrame = vector<pair<string, ofxOceanodeNode*>>(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
     
     vector<pair<string, ofxOceanodeNode*>> selectedNodes;
-	
 	
 	std::function<void(vector<pair<string, ofxOceanodeNode*>>)> getSelectedModules = [&selectedNodes, &getSelectedModules](vector<pair<string, ofxOceanodeNode*>> nodes){
 		for(auto nodePair : nodes)
@@ -46,814 +63,343 @@ void ofxOceanodeInspectorController::draw(){
 	};
 	
 	getSelectedModules(nodesInThisFrame);
-    
-    if(selectedNodes.size() > 0){
-        //Order nodes by name
-        std::sort(selectedNodes.begin(), selectedNodes.end(), [this](std::pair<std::string, ofxOceanodeNode*> a, std::pair<std::string, ofxOceanodeNode*> b){
-            string aName = a.first;
-            string bName = b.first;
-            string aNum = a.first;
-            string bNum = b.first;
-            aNum = aNum.substr(aNum.find_last_of("_") + 1);
-            bNum = bNum.substr(bNum.find_last_of("_") + 1);
-            aName.erase(aName.rfind(aNum)-1);
-            bName.erase(bName.rfind(bNum)-1);
-            if(aName == bName) return ofToInt(aNum) < ofToInt(bNum);
-            else{
-                return aName < bName;
-            }
-        });
-        
-        vector<pair<string, ofxOceanodeNode*>> selectedNodesWithoutFirst = vector<pair<string, ofxOceanodeNode*>>(selectedNodes.begin() + 1, selectedNodes.end());
-        
-        ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 0.0f);
-        
-        //Draw Selected Names
-        ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
-        if(ImGui::TreeNode("Selected Nodes")){
-            for(auto nodePair : selectedNodes)
-            {
-                auto node = nodePair.second;
-                auto &nodeGui = node->getNodeGui();
-                ImGui::PushStyleColor(ImGuiCol_Text, node->getColor());
-                string nodeId = nodePair.first;
-                ImGui::Text(nodeId.c_str(), "%s");
-                ImGui::PopStyleColor();
-            }
-			if(ImGui::Button("[Clear Selection]")){
-				for(auto nodePair : selectedNodes)
-				{
-					nodePair.second->getNodeGui().setSelected(false);
-				}
-			}
-            bool sameDescription = true;
-            for(auto nodePair : selectedNodesWithoutFirst){
-                if(selectedNodes[0].second->getNodeModel().getDescription() != nodePair.second->getNodeModel().getDescription()){
-                    sameDescription = false;
-                }
-            }
-            if(sameDescription){
-                if(selectedNodes[0].second->getNodeModel().getDescription() != ""){
-                    ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 21.0f);
-                    ImGui::SetNextItemOpen(false, ImGuiCond_Appearing);
-                    if(ImGui::TreeNode("Description")){
-                        ImGui::TextWrapped(selectedNodes[0].second->getNodeModel().getDescription().c_str(), "%s");
-                        ImGui::TreePop();
-                    }
-                    ImGui::PopStyleVar();
-                }
-            }
-            ImGui::TreePop();
-        }
-        
-        ImGui::Separator();
-        ImGui::Separator();
-    
-    //Draw common Inspector Parameters
-        ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
-        if(ImGui::TreeNode("Inspector Parameters")){
-            auto &node = selectedNodes[0].second;
-            for(int i=0 ; i < node->getInspectorParameters().size(); i++){
-                ofAbstractParameter &absParam = node->getInspectorParameters().get(i);
-                bool isShared = true;
-                bool sameValue = true;
-                for(auto nodePair : selectedNodesWithoutFirst){
-                    if(!nodePair.second->getInspectorParameters().contains(absParam.getName())) isShared = false;
-                    else{
-                        ofAbstractParameter &_absParam = (nodePair.second->getInspectorParameters().get(absParam.getName()));
-                        if(_absParam.valueType() != absParam.valueType()) isShared = false;
-                        else if(absParam.valueType() == typeid(float).name() &&
-                                absParam.valueType() == typeid(int).name()){
-                            bool sameRange = false;
-                            if(checkSameRange<float>(absParam, _absParam)) sameRange = true;
-                            if(checkSameRange<int>(absParam, _absParam)) sameRange = true;
-                            
-                            if(!sameRange) isShared = false;
-                        }
-                        
-                        bool sameValueWithThis = false;
-                        if(checkSameValue<float>(absParam, _absParam)) sameValueWithThis = true;
-                        if(checkSameValue<int>(absParam, _absParam)) sameValueWithThis = true;
-                        if(checkSameValue<bool>(absParam, _absParam)) sameValueWithThis = true;
-                        if(checkSameValue<string>(absParam, _absParam)) sameValueWithThis = true;
-                        if(checkSameValue<ofColor>(absParam, _absParam)) sameValueWithThis = true;
-                        if(checkSameValue<ofFloatColor>(absParam, _absParam)) sameValueWithThis = true;
-                        
-                        if(!sameValueWithThis) sameValue = false;
-                    }
-                }
-                if (isShared) {
-                    string uniqueId = absParam.getName();
-                    ImGui::PushID(uniqueId.c_str());
-                    if(absParam.valueType() == typeid(std::function<void()>).name()){
-                        absParam.cast<std::function<void()>>().get()();
-                    }else{
-                        ImGui::Text("%s", uniqueId.c_str());
-                        
-//                        ImGui::SetItemAllowOverlap();
-//                        ImGui::SameLine(-1);
-//                        ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(51, ImGui::GetFrameHeight())); //Used to check later behaviours
 
-                        ImGui::SameLine();
-                        //ImGui::SetNextItemWidth(150);
-                        
-                        string hiddenUniqueId = "##" + uniqueId;
-                        //TODO: CAMBIAR ESTIL
-                        if(!sameValue) ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.2, 0.2, 0.2, 1));
-                        //            ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()*0.5f));
-                        //            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()*0.5f));
-                        //            ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()*0.5f));
-                        //            ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(node.getColor()*.25f));
-                        //            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
-                        //            ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
-                        
-                        bool isItemEditableByText = false; //Used for set focus via mouse or key
-                        
-                        // PARAM FLOAT
-                        ///////////////
-                        if(absParam.valueType() == typeid(float).name())
-                        {
-                            auto tempCast = absParam.cast<float>();
-                            
-                            auto temp = tempCast.get();
-                            if(tempCast.getMin() == std::numeric_limits<float>::lowest() || tempCast.getMax() == std::numeric_limits<float>::max()){
-                                ImGui::DragFloat(hiddenUniqueId.c_str(), &temp, 0.001, tempCast.getMin(), tempCast.getMax());
-                            }else{
-                                ImGui::SliderFloat(hiddenUniqueId.c_str(), &temp, tempCast.getMin(), tempCast.getMax(), "%.4f");
-                            }
-                            
-                            //TODO: Implement better this hack
-                            // Maybe discard and reset value when not presed enter??
-                            if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()) ){
-                                tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
-                                for(auto nodePair : selectedNodesWithoutFirst){
-                                    nodePair.second->getInspectorParameters().getFloat(absParam.getName()) = tempCast;
-                                }
-                            }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-                                tempCast = tempCast;
-                                for(auto nodePair : selectedNodesWithoutFirst){
-                                    nodePair.second->getInspectorParameters().getFloat(absParam.getName()) = tempCast;
-                                }
-                            }
-                            isItemEditableByText = true;
+    // Only show inspector when exactly one node is selected
+    if(selectedNodes.size() != 1){
+        if(selectedNodes.size() == 0)
+            ImGui::Text("No Nodes Selected", "%s");
+        else
+            ImGui::Text("Multiple Nodes Selected", "%s");
+        return;
+    }
+
+    auto &node = selectedNodes[0].second;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 0.0f);
+
+	// Node name with colored background
+	{
+		ImVec2 textSize = ImGui::CalcTextSize(selectedNodes[0].first.c_str());
+		float padding = ImGui::GetStyle().FramePadding.y;
+		ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+		float availWidth = ImGui::GetContentRegionAvail().x;
+		
+		// Draw colored background rectangle
+		ImGui::GetWindowDrawList()->AddRectFilled(
+			cursorPos,
+			ImVec2(cursorPos.x + availWidth, cursorPos.y + textSize.y + padding * 2),
+			ImGui::ColorConvertFloat4ToU32(node->getColor()*.5)
+		);
+		
+		// Draw white text on top
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + padding);
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+		ImGui::Text("%s", selectedNodes[0].first.c_str());
+		ImGui::PopStyleColor();
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + padding);
+	}
+
+	// Inspector Parameters
+    ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
+    if(ImGui::TreeNode("Inspector Parameters")){
+        for(int i = 0; i < node->getInspectorParameters().size(); i++){
+            ofAbstractParameter &absParam = node->getInspectorParameters().get(i);
+            string uniqueId = absParam.getName();
+            ImGui::PushID(uniqueId.c_str());
+
+            if(absParam.valueType() == typeid(std::function<void()>).name()){
+                // Check if this is a separator by looking at the parameter name
+                if(uniqueId.find("SEPARATOR:|") == 0){
+                    // Parse separator data: "SEPARATOR:|label|r,g,b,a"
+                    vector<string> parts = ofSplitString(uniqueId, "|");
+                    string label = parts.size() > 1 ? parts[1] : "";
+                    ofColor color(200, 200, 200, 255); // default
+                    
+                    if(parts.size() > 2){
+                        vector<string> colorParts = ofSplitString(parts[2], ",");
+                        if(colorParts.size() >= 4){
+                            color.r = ofToInt(colorParts[0]);
+                            color.g = ofToInt(colorParts[1]);
+                            color.b = ofToInt(colorParts[2]);
+                            color.a = ofToInt(colorParts[3]);
                         }
-						// PARAM INT
-						/////////////
-						else if(absParam.valueType() == typeid(int).name())
-						{
-							auto tempCast = absParam.cast<int>();
-							
-							// Check for dropdown options using the new system
-							std::string nodeTypeName = selectedNodes[0].second->getNodeModel().nodeName();
-							std::vector<std::string> dropdownOptions = getInspectorDropdownOptions(nodeTypeName, absParam.getName());
-							
-							if(dropdownOptions.empty()) // Regular int parameter
-							{
-								auto temp = tempCast.get();
-								if(tempCast.getMin() == std::numeric_limits<int>::lowest() || tempCast.getMax() == std::numeric_limits<int>::max()){
-									ImGui::DragInt(hiddenUniqueId.c_str(), &temp, 1, tempCast.getMin(), tempCast.getMax());
-								}else{
-									ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin(),tempCast.getMax());
-								}
-								
-								if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-									tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
-									for(auto nodePair : selectedNodesWithoutFirst){
-										nodePair.second->getInspectorParameters().getInt(absParam.getName()) = tempCast;
-									}
-								}
-								
-								if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-									tempCast = tempCast;
-									for(auto nodePair : selectedNodesWithoutFirst){
-										nodePair.second->getInspectorParameters().getInt(absParam.getName()) = tempCast;
-									}
-								}
-								
-								isItemEditableByText = true;
-							}
-							else // Dropdown parameter
-							{
-								auto vector_getter = [](void* vec, int idx, const char** out_text)
-								{
-									auto& vector = *static_cast<std::vector<std::string>*>(vec);
-									if (idx < 0 || idx >= static_cast<int>(vector.size())) { return false; }
-									*out_text = vector.at(idx).c_str();
-									return true;
-								};
-								
-								if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.get(), vector_getter, static_cast<void*>(&dropdownOptions), dropdownOptions.size())){
-									tempCast = ofClamp(tempCast, tempCast.getMin(), tempCast.getMax());
-									for(auto nodePair : selectedNodesWithoutFirst){
-										nodePair.second->getInspectorParameters().getInt(absParam.getName()) = tempCast;
-									}
-								}
-								
-								if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-									tempCast = tempCast;
-									for(auto nodePair : selectedNodesWithoutFirst){
-										nodePair.second->getInspectorParameters().getInt(absParam.getName()) = tempCast;
-									}
-								}
-							}
-						}
-                        // PARAM BOOL
-                        /////////////
-                        else if(absParam.valueType() == typeid(bool).name()){
-                            auto tempCast = absParam.cast<bool>();
-                            
-                            if (ImGui::Checkbox(hiddenUniqueId.c_str(), (bool *)&tempCast.get()))
-                            {
-                                tempCast = tempCast;
-                                for(auto nodePair : selectedNodesWithoutFirst){
-                                    nodePair.second->getInspectorParameters().getBool(absParam.getName()) = tempCast;
-                                }
-                            }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-                                tempCast = !tempCast;
-                                for(auto nodePair : selectedNodesWithoutFirst){
-                                    nodePair.second->getInspectorParameters().getBool(absParam.getName()) = tempCast;
-                                }
-                            }
-                        // PARAM VOID
-                        /////////////
-						}else if(absParam.valueType() == typeid(void).name()){
-							auto tempCast = absParam.cast<void>();
-							
-							// Add styling to make the button visible
-							ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
-							ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
-							ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
-							
-							if (ImGui::Button(hiddenUniqueId.c_str(), ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight())))
-							{
-								tempCast.trigger();
-								for(auto nodePair : selectedNodesWithoutFirst){
-									nodePair.second->getInspectorParameters().getVoid(absParam.getName()) = tempCast;
-								}
-							}
-							
-							ImGui::PopStyleColor(3);
-							
-							if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-								tempCast.trigger();
-								for(auto nodePair : selectedNodesWithoutFirst){
-									nodePair.second->getInspectorParameters().getVoid(absParam.getName()) = tempCast;
-								}
-							}
-                        // PARAM STRING
-                        //////////////
-                        }else if(absParam.valueType() == typeid(string).name()){
-                            auto tempCast = absParam.cast<string>();
-                            string currentText = tempCast.get();
-                            size_t bufferSize = max(static_cast<size_t>(1024), currentText.length() + 256);
-                            char * cString = new char[bufferSize];
-                            strncpy(cString, currentText.c_str(), bufferSize - 1);
-                            cString[bufferSize - 1] = '\0';
-                            auto result = false;
-                            if (ImGui::InputText(hiddenUniqueId.c_str(), cString, bufferSize, ImGuiInputTextFlags_EnterReturnsTrue))
-                            {
-                                tempCast = cString;
-                                for(auto nodePair : selectedNodesWithoutFirst){
-                                    nodePair.second->getInspectorParameters().getString(absParam.getName()) = tempCast;
-                                }
-                            }
-                            delete[] cString;
-                            isItemEditableByText = true;
-                        // PARAM CHAR
-                        /////////////
-                        }else if(absParam.valueType() == typeid(char).name()){
-                            ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
-                        // PARAM COLOR
-                        //////////////
-                        }else if(absParam.valueType() == typeid(ofColor).name()){
-                            auto tempCast = absParam.cast<ofColor>();
-                            
-                            ofFloatColor floatColor(tempCast.get());
-                            
-                            if (ImGui::ColorEdit3(hiddenUniqueId.c_str(), &floatColor.r))
-                            {
-                                tempCast = ofColor(floatColor);
-                                for(auto nodePair : selectedNodesWithoutFirst){
-                                    nodePair.second->getInspectorParameters().getColor(absParam.getName()) = tempCast;
-                                }
-                            }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-                                tempCast = tempCast;
-                                for(auto nodePair : selectedNodesWithoutFirst){
-                                    nodePair.second->getInspectorParameters().getColor(absParam.getName()) = tempCast;
-                                }
-                            }
-                            //PARAM FLOAT COLOR
-                            ///////////////////
-                        }else if(absParam.valueType() == typeid(ofFloatColor).name()){
-                            auto tempCast = absParam.cast<ofFloatColor>();
-                            
-                            if (ImGui::ColorEdit3(hiddenUniqueId.c_str(), (float*)&tempCast.get().r))
-                            {
-                                tempCast = tempCast;
-                                for(auto nodePair : selectedNodesWithoutFirst){
-                                    nodePair.second->getInspectorParameters().getFloatColor(absParam.getName()) = tempCast;
-                                }
-                            }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-                                tempCast = tempCast;
-                                for(auto nodePair : selectedNodesWithoutFirst){
-                                    nodePair.second->getInspectorParameters().getFloatColor(absParam.getName()) = tempCast;
-                                }
-                            }
-                        }
-                        // UNKNOWN PARAM
-                        ////////////////
-                        else
-                        {
-                            ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
-                        }
-                        
-                        if (isItemEditableByText){
-                            if ((ImGui::IsItemHovered() && !ImGui::IsItemEdited() && ImGui::IsKeyPressed((ImGuiKey_Enter))) || ImGui::IsItemClicked(1)){
-                                ImGui::SetKeyboardFocusHere(-1);
-                            }
-                        }
-                        
-                        if(!sameValue)
-                            ImGui::PopStyleColor(1);
                     }
-                    ImGui::PopID();
+                    
+                    // Render separator with label and background highlight
+                    if(!label.empty()){
+                        ImVec2 p = ImGui::GetCursorScreenPos();
+                        float w = ImGui::GetContentRegionAvail().x;
+                        
+                        // Draw the text
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(color.r/255.0f, color.g/255.0f, color.b/255.0f, color.a/255.0f));
+                        ImGui::TextUnformatted(label.c_str());
+                        ImGui::PopStyleColor();
+                        
+                        // Get the size of the rendered text
+                        ImVec2 textSize = ImGui::CalcTextSize(label.c_str());
+                        
+                        // Draw a semi-transparent rectangle behind/below the text (15% opacity to match node gui)
+                        ImU32 bgCol = IM_COL32(color.r, color.g, color.b, color.a * 0.15f);
+                        ImGui::GetWindowDrawList()->AddRectFilled(
+                            ImVec2(p.x, p.y),
+                            ImVec2(p.x + w, p.y + textSize.y),
+                            bgCol
+                        );
+                        
+                        ImGui::Dummy(ImVec2(0, 2));
+                    }
+                } else {
+                    // Regular custom region function
+                    absParam.cast<std::function<void()>>().get()();
                 }
-            } //endFor
-            ImGui::TreePop();
-        }
-        
-        ImGui::Separator();
-        ImGui::Separator();
-    
-    //Draw common Parameters
-        ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
-        if(ImGui::TreeNode("Shared Parameters")){
-            auto &node = selectedNodes[0].second;
-            for(int i=0 ; i < node->getParameters().size(); i++){
-                ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(node->getParameters().get(i));
-                bool isOutput = (absParam.getFlags() & ofxOceanodeParameterFlags_DisableInConnection);
-                bool hasInConnection = absParam.hasInConnection();
-                bool isShared = true;
-                bool sameValue = true;
-                for(auto nodePair : selectedNodesWithoutFirst){
-                    if(!nodePair.second->getParameters().contains(absParam.getName())) isShared = false;
-                    else{
-                        ofxOceanodeAbstractParameter &_absParam = static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName()));
-                        if(_absParam.valueType() != absParam.valueType()) isShared = false;
-                        else if(_absParam.hasInConnection()) isShared = false;
-                        else if(_absParam.getFlags() & ofxOceanodeParameterFlags_DisableInConnection) isShared = false;
-                        else if(absParam.valueType() == typeid(float).name() &&
-                                absParam.valueType() == typeid(int).name() &&
-                                absParam.valueType() == typeid(vector<float>).name() &&
-                                absParam.valueType() == typeid(vector<int>).name()){
-                            bool sameRange = false;
-                            if(checkSameRange<float>(absParam, _absParam)) sameRange = true;
-                            if(checkSameRange<int>(absParam, _absParam)) sameRange = true;
-                            if(checkSameRange<vector<float>>(absParam, _absParam)) sameRange = true;
-                            if(checkSameRange<vector<int>>(absParam, _absParam)) sameRange = true;
-                            
-                            if(!sameRange) isShared = false;
+            } else {
+				string hiddenUniqueId = "##" + uniqueId;
+				bool isItemEditableByText = false;
+
+                // PARAM FLOAT
+                if(absParam.valueType() == typeid(float).name()){
+					ImGui::Text("%s", uniqueId.c_str());
+					ImGui::SameLine();
+
+                    auto tempCast = absParam.cast<float>();
+                    auto temp = tempCast.get();
+                    if(tempCast.getMin() == std::numeric_limits<float>::lowest() || tempCast.getMax() == std::numeric_limits<float>::max()){
+                        ImGui::DragFloat(hiddenUniqueId.c_str(), &temp, 0.001, tempCast.getMin(), tempCast.getMax());
+                    } else {
+                        ImGui::SliderFloat(hiddenUniqueId.c_str(), &temp, tempCast.getMin(), tempCast.getMax(), "%.4f");
+                    }
+                    if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
+                        tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
+                    }
+                    isItemEditableByText = true;
+                }
+                // PARAM INT
+                else if(absParam.valueType() == typeid(int).name()){
+					ImGui::Text("%s", uniqueId.c_str());
+					ImGui::SameLine();
+
+                    auto tempCast = absParam.cast<int>();
+                    std::string nodeTypeName = node->getNodeModel().nodeName();
+                    std::vector<std::string> dropdownOptions = getInspectorDropdownOptions(nodeTypeName, absParam.getName());
+
+                    if(dropdownOptions.empty()){
+                        auto temp = tempCast.get();
+                        if(tempCast.getMin() == std::numeric_limits<int>::lowest() || tempCast.getMax() == std::numeric_limits<int>::max()){
+                            ImGui::DragInt(hiddenUniqueId.c_str(), &temp, 1, tempCast.getMin(), tempCast.getMax());
+                        } else {
+                            ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin(), tempCast.getMax());
                         }
-                        
-                        bool sameValueWithThis = false;
-                        if(checkSameValue<float>(absParam, _absParam)) sameValueWithThis = true;
-                        if(checkSameValue<int>(absParam, _absParam)) sameValueWithThis = true;
-                        if(checkSameValue<vector<float>>(absParam, _absParam)) sameValueWithThis = true;
-                        if(checkSameValue<vector<int>>(absParam, _absParam)) sameValueWithThis = true;
-                        if(checkSameValue<bool>(absParam, _absParam)) sameValueWithThis = true;
-                        if(checkSameValue<string>(absParam, _absParam)) sameValueWithThis = true;
-                        if(checkSameValue<ofColor>(absParam, _absParam)) sameValueWithThis = true;
-                        if(checkSameValue<ofFloatColor>(absParam, _absParam)) sameValueWithThis = true;
-                        
-                        if(!sameValueWithThis) sameValue = false;
+                        if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
+                            tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
+                        }
+                        isItemEditableByText = true;
+                    } else {
+                        auto vector_getter = [](void* vec, int idx, const char** out_text){
+                            auto& vector = *static_cast<std::vector<std::string>*>(vec);
+                            if (idx < 0 || idx >= static_cast<int>(vector.size())) return false;
+                            *out_text = vector.at(idx).c_str();
+                            return true;
+                        };
+                        if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.get(), vector_getter, static_cast<void*>(&dropdownOptions), dropdownOptions.size())){
+                            tempCast = ofClamp(tempCast, tempCast.getMin(), tempCast.getMax());
+                        }
                     }
                 }
-                if (isShared && !isOutput && !hasInConnection) {
-                    string uniqueId = absParam.getName();
-                    ImGui::PushID(uniqueId.c_str());
-                    if(absParam.valueType() == typeid(std::function<void()>).name()){
-                        absParam.cast<std::function<void()>>().getParameter().get()();
-                    }else{
-                        
-                        ImGui::SetNextItemAllowOverlap();
-                        ImGui::Text("%s", uniqueId.c_str());
-                        
-                        ImGui::SameLine(-1);
-                        ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(51, ImGui::GetFrameHeight())); //Used to check later behaviours
-                        
-                        int drag = 0;
-                        bool resetValue = false;
-                        if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)){
-                            resetValue = true;
-                            valueHasBeenReseted = true;
-                        }
-                        else if(ImGui::IsItemActive() && ImGui::IsMouseDragging(0, 0.1f) && !valueHasBeenReseted){
-                            drag = ImGui::GetIO().MouseDelta.x;
-                        }
-                        else if(ImGui::IsItemClicked(1)){
-                            ImGui::OpenPopup("Param Popup");
-                        }
-                        else if(valueHasBeenReseted && ImGui::IsMouseReleased(0)){
-                            valueHasBeenReseted = false;
-                        }
-                        
-                        
-                        ImGui::SameLine(60);
-                        //ImGui::SetNextItemWidth(150);
-                        
-                        string hiddenUniqueId = "##" + uniqueId;
-                        //TODO: CAMBIAR ESTIL
-                        if(!sameValue) ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.2, 0.2, 0.2, 1));
-                        //            ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()*0.5f));
-                        //            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(node.getColor()*0.5f));
-                        //            ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(node.getColor()*0.5f));
-                        //            ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(node.getColor()*.25f));
-                        //            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(node.getColor()*.50f));
-                        //            ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(node.getColor()*.75f));
-                        
-                        bool isItemEditableByText = false; //Used for set focus via mouse or key
-                        
-                        // PARAM FLOAT
-                        ///////////////
-                        if(absParam.valueType() == typeid(float).name())
-                        {
-                            auto tempCast = absParam.cast<float>().getParameter();
-                            
-                            if(drag != 0){
-                                if(ImGui::GetIO().KeyShift) absParam.cast<float>().applyPrecisionDrag(drag);
-                                else if(ImGui::GetIO().KeyAlt) absParam.cast<float>().applySpeedDrag(drag);
-                                else absParam.cast<float>().applyNormalDrag(drag);
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<float>().getParameter() = tempCast;
-                                }
-                            }
-                            
-                            if(resetValue){
-                                tempCast = absParam.cast<float>().getDefaultValue();
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<float>().getParameter() = tempCast;
-                                }
-                            }
-                            
-                            auto temp = tempCast.get();
-                            if(tempCast.getMin() == std::numeric_limits<float>::lowest() || tempCast.getMax() == std::numeric_limits<float>::max()){
-                                ImGui::DragFloat(hiddenUniqueId.c_str(), &temp, 0.001, tempCast.getMin(), tempCast.getMax());
-                            }else{
-                                ImGui::SliderFloat(hiddenUniqueId.c_str(), &temp, tempCast.getMin(), tempCast.getMax(), "%.4f");
-                            }
-                            
-                            //TODO: Implement better this hack
-                            // Maybe discard and reset value when not presed enter??
-                            if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()) ){
-                                tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<float>().getParameter() = tempCast;
-                                }
-                            }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-                                tempCast = tempCast;
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<float>().getParameter() = tempCast;
-                                }
-                            }
-                            isItemEditableByText = true;
-                        }
-                        // PARAM VECTOR < FLOAT >
-                        /////////////////////////
-                        else if(absParam.valueType() == typeid(vector<float>).name())
-                        {
-                            auto tempCast = absParam.cast<vector<float>>().getParameter();
-                            if(tempCast->size() == 1)
-                            {
-                                if(drag != 0){
-                                    if(ImGui::GetIO().KeyShift) absParam.cast<vector<float>>().applyPrecisionDrag(drag);
-                                    else if(ImGui::GetIO().KeyAlt) absParam.cast<vector<float>>().applySpeedDrag(drag);
-                                    else absParam.cast<vector<float>>().applyNormalDrag(drag);
-                                    for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<vector<float>>().getParameter() = tempCast;
-                                    }
-                                }
-                                
-                                if(resetValue){
-                                    tempCast = absParam.cast<vector<float>>().getDefaultValue();
-                                    for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<vector<float>>().getParameter() = tempCast;
-                                    }
-                                }
-                                
-                                auto temp = tempCast.get()[0];
-								if(tempCast.getMin()[0] == std::numeric_limits<float>::lowest() || tempCast.getMax()[0] == std::numeric_limits<float>::max()){
-									ImGui::DragFloat(hiddenUniqueId.c_str(), &temp, 0.001, tempCast.getMin()[0], tempCast.getMax()[0]);
-								}else{
-									ImGui::SliderFloat(hiddenUniqueId.c_str(), &temp, tempCast.getMin()[0], tempCast.getMax()[0], "%.4f");
-								}
-                                
-                                if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-                                    tempCast = vector<float>(1, ofClamp(temp, tempCast.getMin()[0], tempCast.getMax()[0]));
-                                    for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<vector<float>>().getParameter() = tempCast;
-                                    }
-                                }
-                                isItemEditableByText = true;
-                            }else{
-                                //ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
-                            }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-                                tempCast = tempCast;
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<vector<float>>().getParameter() = tempCast;
-                                }
-                            }
-                        }
-                        // PARAM INT
-                        /////////////
-                        else if(absParam.valueType() == typeid(int).name())
-                        {
-                            auto tempCast = absParam.cast<int>().getParameter();
-                            if(absParam.cast<int>().getDropdownOptions().size() == 0)
-                            {
-                                if(drag != 0){
-                                    if(ImGui::GetIO().KeyShift) absParam.cast<int>().applyPrecisionDrag(drag);
-                                    else if(ImGui::GetIO().KeyAlt) absParam.cast<int>().applySpeedDrag(drag);
-                                    else absParam.cast<int>().applyNormalDrag(drag);
-                                    for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<int>().getParameter() = tempCast;
-                                    }
-                                }
-                                
-                                if(resetValue){
-                                    tempCast = absParam.cast<int>().getDefaultValue();
-                                    for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<int>().getParameter() = tempCast;
-                                    }
-                                }
-                                
-                                auto temp = tempCast.get();
-                                if(tempCast.getMin() == std::numeric_limits<int>::lowest() || tempCast.getMax() == std::numeric_limits<int>::max()){
-                                    ImGui::DragInt(hiddenUniqueId.c_str(), &temp, 1, tempCast.getMin(), tempCast.getMax());
-                                }else{
-                                    ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin(),tempCast.getMax());
-                                }
-                                
-                                if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-                                    tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
-                                    for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<int>().getParameter() = tempCast;
-                                    }
-                                }
-                                
-                                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-                                    tempCast = tempCast;
-                                    for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<int>().getParameter() = tempCast;
-                                    }
-                                }
-                                
-                                isItemEditableByText = true;
-                            }else{
-                                auto vector_getter = [](void* vec, int idx, const char** out_text)
-                                {
-                                    auto& vector = *static_cast<std::vector<std::string>*>(vec);
-                                    if (idx < 0 || idx >= static_cast<int>(vector.size())) { return false; }
-                                    *out_text = vector.at(idx).c_str();
-                                    return true;
-                                };
-                                
-                                vector<string> options = absParam.cast<int>().getDropdownOptions();
-                                if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.get(), vector_getter, static_cast<void*>(&options), options.size())){
-                                    tempCast = ofClamp(tempCast, tempCast.getMin(), tempCast.getMax());
-                                    for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<int>().getParameter() = tempCast;
-                                    }
-                                }
-                                
-                                if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-                                    tempCast = tempCast;
-                                    for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<int>().getParameter() = tempCast;
-                                    }
-                                }
-                            }
-                        }
-                        // PARAM VECTOR < INT >
-                        /////////////////////////
-                        else if(absParam.valueType() == typeid(vector<int>).name())
-                        {
-                            auto tempCast = absParam.cast<vector<int>>().getParameter();
-                            if(tempCast->size() == 1)
-                            {
-                                if(drag != 0){
-                                    if(ImGui::GetIO().KeyShift) absParam.cast<vector<int>>().applyPrecisionDrag(drag);
-                                    else if(ImGui::GetIO().KeyAlt) absParam.cast<vector<int>>().applySpeedDrag(drag);
-                                    else absParam.cast<vector<int>>().applyNormalDrag(drag);
-                                    for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<vector<int>>().getParameter() = tempCast;
-                                    }
-                                }
-                                
-                                if(resetValue){
-                                    tempCast = absParam.cast<vector<int>>().getDefaultValue();
-                                    for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<vector<int>>().getParameter() = tempCast;
-                                    }
-                                }
-                                
-                                auto temp = tempCast.get()[0];
-                                if(tempCast.getMin()[0] == std::numeric_limits<int>::lowest() || tempCast.getMax()[0] == std::numeric_limits<int>::max()){
-									ImGui::DragInt(hiddenUniqueId.c_str(), &temp, 1, tempCast.getMin()[0], tempCast.getMax()[0]);
-								}else{
-									ImGui::SliderInt(hiddenUniqueId.c_str(), &temp, tempCast.getMin()[0], tempCast.getMax()[0]);
-								}
-                                
-                                if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited())){
-                                    tempCast = vector<int>(1, ofClamp(temp, tempCast.getMin()[0], tempCast.getMax()[0]));
-                                    for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<vector<int>>().getParameter() = tempCast;
-                                    }
-                                }
-                                isItemEditableByText = true;
-                            }
-                            else{
-//                                std::vector<float> floatVec(tempCast.get().begin(), tempCast.get().end());
-//                                ImGui::PlotHistogram(hiddenUniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
-                            }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-                                tempCast = tempCast;
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<vector<int>>().getParameter() = tempCast;
-                                }
-                            }
-                        }
-                        // PARAM BOOL
-                        /////////////
-                        else if(absParam.valueType() == typeid(bool).name()){
-                            auto tempCast = absParam.cast<bool>().getParameter();
-                            
-                            if(drag != 0){
-                                absParam.cast<bool>().applyNormalDrag(drag);
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<bool>().getParameter() = tempCast;
-                                }
-                            }
-                            
-                            if (ImGui::Checkbox(hiddenUniqueId.c_str(), (bool *)&tempCast.get()))
-                            {
-                                tempCast = tempCast;
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<bool>().getParameter() = tempCast;
-                                }
-                            }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-                                tempCast = !tempCast;
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<bool>().getParameter() = tempCast;
-                                }
-                            }
-                            // PARAM VOID
-                            /////////////
-						}else if(absParam.valueType() == typeid(void).name()){
-							auto tempCast = absParam.cast<void>().getParameter();
-							
-							// Add styling to make the button visible
-							ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
-							ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
-							ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
-							
-							if (ImGui::Button(hiddenUniqueId.c_str(), ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight())))
-							{
-								tempCast.trigger();
-								for(auto nodePair : selectedNodesWithoutFirst){
-									static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<void>().getParameter().trigger();
-								}
-							}
-							
-							ImGui::PopStyleColor(3);
-							
-							if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-								tempCast.trigger();
-								for(auto nodePair : selectedNodesWithoutFirst){
-									static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<void>().getParameter().trigger();
-								}
-							}
-                            // PARAM STRING
-                            ///////////////
-                        }else if(absParam.valueType() == typeid(string).name()){
-                            auto tempCast = absParam.cast<string>().getParameter();
-                            string currentText = tempCast.get();
-                            size_t bufferSize = max(static_cast<size_t>(1024), currentText.length() + 256);
-                            char * cString = new char[bufferSize];
-                            strncpy(cString, currentText.c_str(), bufferSize - 1);
-                            cString[bufferSize - 1] = '\0';
-                            auto result = false;
-                            if (ImGui::InputText(hiddenUniqueId.c_str(), cString, bufferSize, ImGuiInputTextFlags_EnterReturnsTrue))
-                            {
-                                tempCast = cString;
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<string>().getParameter() = tempCast;
-                                }
-                            }
-                            delete[] cString;
-                            isItemEditableByText = true;
-                            // PARAM CHAR
-                            /////////////
-                        }else if(absParam.valueType() == typeid(char).name()){
-                            ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
-                            // PARAM COLOR
-                            //////////////
-                        }else if(absParam.valueType() == typeid(ofColor).name()){
-                            auto tempCast = absParam.cast<ofColor>().getParameter();
-                            if(drag != 0){
-                                if(ImGui::GetIO().KeyShift) absParam.cast<ofColor>().applyPrecisionDrag(drag);
-                                else if(ImGui::GetIO().KeyAlt) absParam.cast<ofColor>().applySpeedDrag(drag);
-                                else absParam.cast<ofColor>().applyNormalDrag(drag);
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<ofColor>().getParameter() = tempCast;
-                                }
-                            }
-                            
-                            ofFloatColor floatColor(tempCast.get());
-                            
-                            if (ImGui::ColorEdit3(hiddenUniqueId.c_str(), &floatColor.r))
-                            {
-                                tempCast = ofColor(floatColor);
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<ofColor>().getParameter() = tempCast;
-                                }
-                            }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-                                tempCast = tempCast;
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<ofColor>().getParameter() = tempCast;
-                                }
-                            }
-                            //PARAM FLOAT COLOR
-                            ///////////////////
-                        }else if(absParam.valueType() == typeid(ofFloatColor).name()){
-                            auto tempCast = absParam.cast<ofFloatColor>().getParameter();
-                            
-                            if(drag != 0){
-                                if(ImGui::GetIO().KeyShift) absParam.cast<ofFloatColor>().applyPrecisionDrag(drag);
-                                else if(ImGui::GetIO().KeyAlt) absParam.cast<ofFloatColor>().applySpeedDrag(drag);
-                                else absParam.cast<ofFloatColor>().applyNormalDrag(drag);
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<ofFloatColor>().getParameter() = tempCast;
-                                }
-                            }
-                            
-                            if (ImGui::ColorEdit3(hiddenUniqueId.c_str(), (float*)&tempCast.get().r))
-                            {
-                                tempCast = tempCast;
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<ofFloatColor>().getParameter() = tempCast;
-                                }
-                            }
-                            if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
-                                tempCast = tempCast;
-                                for(auto nodePair : selectedNodesWithoutFirst){ static_cast<ofxOceanodeAbstractParameter&>(nodePair.second->getParameters().get(absParam.getName())).cast<ofFloatColor>().getParameter() = tempCast;
-                                }
-                            }
-                        }
-                        // UNKNOWN PARAM
-                        ////////////////
-                        else
-                        {
-                            ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
-                        }
-                        
-                        if (isItemEditableByText){
-                            if ((ImGui::IsItemHovered() && !ImGui::IsItemEdited() && ImGui::IsKeyPressed((ImGuiKey_Enter))) || ImGui::IsItemClicked(1)){
-                                ImGui::SetKeyboardFocusHere(-1);
-                            }
-                        }
-                        
-                        if(!sameValue)
-                            ImGui::PopStyleColor(1);
+                // PARAM BOOL
+                else if(absParam.valueType() == typeid(bool).name()){
+                    auto tempCast = absParam.cast<bool>();
+                    if(ImGui::Checkbox(hiddenUniqueId.c_str(), (bool *)&tempCast.get())){
+                        tempCast = tempCast;
                     }
-                    ImGui::PopID();
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                        tempCast = !tempCast;
+                    }
+					ImGui::SameLine();
+					ImGui::Text("%s", uniqueId.c_str());
+
                 }
-            } //endFor
-            ImGui::TreePop();
-        }
-        
-        ImGui::Separator();
-        ImGui::Separator();
-    
-        ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
-        if(ImGui::TreeNode("Scope")){
-            for(auto nodePair : selectedNodes){
-                auto &nodeGui = nodePair.second->getNodeGui();
-                for(int i=0 ; i<nodeGui.getParameters().size(); i++){
-                    ofxOceanodeAbstractParameter &p = static_cast<ofxOceanodeAbstractParameter&>(nodeGui.getParameters().get(i));
-                    if((p.getFlags() & ofxOceanodeParameterFlags_DisableInConnection)){
-                        auto size = ImVec2(ImGui::GetContentRegionAvail().x, 100);
-                        
-                        ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(nodeGui.getColor()*0.75f));
-                        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(nodeGui.getColor()*0.75f));
-                        ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(nodeGui.getColor()*0.75f));
-                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
-                        ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(0.0,0.0,0.0,0.0));
-                        
-                        ImGui::BeginChild(("Child_" + p.getGroupHierarchyNames().front() + "/" + p.getName()).c_str(), size, true);
-                        //ImGui::SameLine();
-                        ImGui::Text((p.getGroupHierarchyNames().front() + "/" + p.getName()).c_str());
-                        
-                        // f() function to properly draw each scope item
-                        for(auto f : ofxOceanodeScope::getInstance()->getScopedTypes())
-                        {
-                            if(f(&p, size)) break;
-                        }
-                        
-                        ImGui::PopStyleColor(5);
-                        ImGui::EndChild();
+                // PARAM VOID
+                else if(absParam.valueType() == typeid(void).name()){
+                    auto tempCast = absParam.cast<void>();
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
+                    if(ImGui::Button(hiddenUniqueId.c_str(), ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()))){
+                        tempCast.trigger();
+                    }
+                    ImGui::PopStyleColor(3);
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                        tempCast.trigger();
+                    }
+					ImGui::SameLine();
+					ImGui::Text("%s", uniqueId.c_str());
+
+                }
+                // PARAM STRING
+                else if(absParam.valueType() == typeid(string).name()){
+                    auto tempCast = absParam.cast<string>();
+                    string currentText = tempCast.get();
+                    size_t bufferSize = max(static_cast<size_t>(1024), currentText.length() + 256);
+                    char* cString = new char[bufferSize];
+                    strncpy(cString, currentText.c_str(), bufferSize - 1);
+                    cString[bufferSize - 1] = '\0';
+                    if(ImGui::InputText(hiddenUniqueId.c_str(), cString, bufferSize, ImGuiInputTextFlags_EnterReturnsTrue)){
+                        tempCast = cString;
+                    }
+                    delete[] cString;
+                    isItemEditableByText = true;
+                }
+                // PARAM CHAR
+                else if(absParam.valueType() == typeid(char).name()){
+                    ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
+                }
+                // PARAM COLOR
+                else if(absParam.valueType() == typeid(ofColor).name()){
+                    auto tempCast = absParam.cast<ofColor>();
+                    ofFloatColor floatColor(tempCast.get());
+                    if(ImGui::ColorEdit3(hiddenUniqueId.c_str(), &floatColor.r)){
+                        tempCast = ofColor(floatColor);
+                    }
+                }
+                // PARAM FLOAT COLOR
+                else if(absParam.valueType() == typeid(ofFloatColor).name()){
+                    auto tempCast = absParam.cast<ofFloatColor>();
+                    if(ImGui::ColorEdit3(hiddenUniqueId.c_str(), (float*)&tempCast.get().r)){
+                        tempCast = tempCast;
+                    }
+                }
+                // UNKNOWN PARAM
+                else {
+                    ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
+                }
+
+                if(isItemEditableByText){
+                    if((ImGui::IsItemHovered() && !ImGui::IsItemEdited() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter))) || ImGui::IsItemClicked(1)){
+                        ImGui::SetKeyboardFocusHere(-1);
                     }
                 }
             }
-            ImGui::TreePop();
+            ImGui::PopID();
         }
-        ImGui::PopStyleVar();
+        ImGui::TreePop();
+    }
 
+    ImGui::Separator();
+
+    // Scope - full available space with draggable separators
+    {
+        auto &nodeGui = node->getNodeGui();
+
+        // Collect scope parameter indices
+        vector<int> scopeIndices;
+        for(int i = 0; i < nodeGui.getParameters().size(); i++){
+            ofxOceanodeAbstractParameter &p = static_cast<ofxOceanodeAbstractParameter&>(nodeGui.getParameters().get(i));
+            if(p.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized){
+                scopeIndices.push_back(i);
+            }
+        }
+
+        int scopeCount = (int)scopeIndices.size();
+        if(scopeCount > 0){
+            const float splitterThickness = 6.0f;
+            const float minPaneHeight = 30.0f;
+            float itemSpacing = ImGui::GetStyle().ItemSpacing.y;
+            float availableHeight = ImGui::GetContentRegionAvail().y;
+            // Each panel-splitter-panel sequence adds 2 ItemSpacing gaps per splitter
+            float totalSplitterHeight = (scopeCount - 1) * (splitterThickness + 2.0f * itemSpacing);
+            float totalContentHeight = availableHeight - totalSplitterHeight;
+
+            // Persistent heights keyed by node name, with resize tracking
+            static std::map<string, vector<float>> scopeHeights;
+            static std::map<string, float> scopePrevAvailHeight;
+            string nodeKey = selectedNodes[0].first;
+            auto &heights = scopeHeights[nodeKey];
+            float &prevAvailHeight = scopePrevAvailHeight[nodeKey];
+
+            if((int)heights.size() != scopeCount){
+                // First time or scope count changed: distribute evenly
+                heights.assign(scopeCount, totalContentHeight / scopeCount);
+                prevAvailHeight = availableHeight;
+            } else if(prevAvailHeight > 0.0f && prevAvailHeight != availableHeight){
+                // Window resized: scale all heights proportionally
+                float prevTotalContent = prevAvailHeight - totalSplitterHeight;
+                if(prevTotalContent > 0.0f){
+                    float scale = totalContentHeight / prevTotalContent;
+                    for(auto &h : heights){
+                        h *= scale;
+                        h = max(h, minPaneHeight);
+                    }
+                }
+                prevAvailHeight = availableHeight;
+            }
+
+            for(int si = 0; si < scopeCount; si++){
+                int i = scopeIndices[si];
+                ofxOceanodeAbstractParameter &p = static_cast<ofxOceanodeAbstractParameter&>(nodeGui.getParameters().get(i));
+
+                float childHeight = max(heights[si], minPaneHeight);
+                auto size = ImVec2(ImGui::GetContentRegionAvail().x, childHeight);
+
+                ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(nodeGui.getColor()*0.75f));
+                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(nodeGui.getColor()*0.75f));
+                ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(nodeGui.getColor()*0.75f));
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55, 0.55, 0.55, 1.0));
+                ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0, 0.0, 0.0, 0.0));
+
+                ImGui::BeginChild(("Child_" + p.getGroupHierarchyNames().front() + "/" + p.getName()).c_str(), size, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+                ImGui::Text("%s", (p.getGroupHierarchyNames().front() + "/" + p.getName()).c_str());
+
+                for(auto f : ofxOceanodeScope::getInstance()->getScopedTypes()){
+                    if(f(&p, size)) break;
+                }
+
+                ImGui::PopStyleColor(5);
+                ImGui::EndChild();
+
+                // Draggable splitter between panes
+                if(si < scopeCount - 1){
+                    string splitterId = "##scopesplitter_" + to_string(si);
+
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.28f, 0.28f, 0.28f, 0.6f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.50f, 0.50f, 0.50f, 0.8f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.65f, 0.65f, 0.65f, 1.0f));
+
+                    ImGui::Button(splitterId.c_str(), ImVec2(-1.0f, splitterThickness));
+
+                    if(ImGui::IsItemActive()){
+                        float delta = ImGui::GetIO().MouseDelta.y;
+                        heights[si]   += delta;
+                        heights[si+1] -= delta;
+                        heights[si]   = max(heights[si],   minPaneHeight);
+                        heights[si+1] = max(heights[si+1], minPaneHeight);
+                    }
+                    if(ImGui::IsItemHovered() || ImGui::IsItemActive()){
+                        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+                    }
+
+                    ImGui::PopStyleColor(3);
+                }
+            }
+        }
     }
-    else{
-        ImGui::Text("No Nodes Selected", "%s");
-    }
+	ImGui::Separator();
+
+	if(node->getNodeModel().getDescription() != ""){
+		ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 21.0f);
+		ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.75,0.75,.75,1.0));
+		bool descOpen = ImGui::TreeNode("Description");
+		ImGui::PopStyleColor(); // always pop header colour right after TreeNode
+		if(descOpen){
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.6,0.6,.6,1.0));
+			ImGui::TextWrapped(node->getNodeModel().getDescription().c_str(), "%s");
+			ImGui::PopStyleColor();
+			ImGui::TreePop();
+		}
+		ImGui::PopStyleVar();
+	}
+
+
+
+    ImGui::PopStyleVar();
 }
-
-   
-

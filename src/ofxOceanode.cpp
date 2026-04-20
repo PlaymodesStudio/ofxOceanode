@@ -138,6 +138,15 @@ void ofxOceanode::setup(){
     OceanodeTheme* oceanodeTheme = new OceanodeTheme();
     gui.setup(oceanodeTheme, false, ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable, false);
 	ofxOceanodeShared::readMacros();
+    // Load and apply saved view preferences now that controls is initialized
+    // and openFrameworks data path is fully set up
+    loadViewConfig();
+    if(!savedViewConfig.empty()){
+        auto& visibility = controls->getControllersVisibility();
+        for(auto& kv : savedViewConfig){
+            visibility[kv.first] = kv.second;
+        }
+    }
     oceanodeTime->setup(container, controls->get<ofxOceanodeBPMController>());
 }
 
@@ -264,7 +273,13 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     static bool show_app_metrics = false;
     if (show_app_metrics){ImGui::ShowMetricsWindow(&show_app_metrics);}
     if (showManual) showManualWindow(&showManual);
+	
+	// make the bacground of the menus 25% darker to get better contrast with the main GUI,
+	ImVec4 popupBg = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
+	ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(popupBg.x * 0.75f, popupBg.y * 0.75f, popupBg.z * 0.75f, popupBg.w));
 
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 6.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12.0f, 6.0f));
     if (ImGui::BeginMenuBar())
     {
         if (ImGui::BeginMenu("File"))
@@ -276,40 +291,53 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
                 if(ImGui::MenuItem("Recent2.oceanode")){}
                 ImGui::EndMenu();
             }
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("Edit"))
-        {
-            if (ImGui::MenuItem("Undo", "CTRL+Z")) {}
-            if (ImGui::MenuItem("Redo", "CTRL+Y", false, false)) {}  // Disabled item
-            ImGui::Separator();
-            if (ImGui::MenuItem("Cut", "CTRL+X")) {}
-            if (ImGui::MenuItem("Copy", "CTRL+C")) {}
-            if (ImGui::MenuItem("Paste", "CTRL+V")) {}
-            ImGui::EndMenu();
-        }
-        if(ImGui::BeginMenu("Windows"))
-        {
-            ImGui::MenuItem("Metrics", NULL, &show_app_metrics);
-            if (ImGui::MenuItem("Show Presets", "CMD+P")) {}
-            if (ImGui::MenuItem("Show BPM", "CMD+B")) {}
-            if (ImGui::MenuItem("Show Timeline", "CMD+T")) {}
-            //Maybe better to use a modal? Need to open windows in layout?
-            if (ImGui::BeginMenu("Saved Layouts")){
-                //                    ofDirectory dir("Layouts");
-                //                    for(auto layout : dir.get)
-                //TODO: Get layouts from disk
-                //for layout in layouts
-                //  if(ImGui::MenuItem(layout)){
-                //      LoadIniSettingsFromDisk(layout);
-                //  }
-                if(ImGui::MenuItem("Dummy Layout 1")){}
-                if(ImGui::MenuItem("Dummy Layout 2")){}
-                ImGui::EndMenu();
-            }
+			ImGui::MenuItem("Metrics", NULL, &show_app_metrics);
             ImGui::EndMenu();
         }
 		
+		if(ImGui::BeginMenu("View"))
+		{
+		    auto& controllers = controls->getControllers();
+		    auto& visibility = controls->getControllersVisibility();
+		    
+		    // Build pending state on first open (static local map)
+		    static std::map<std::string, bool> pendingVisibility;
+		    static bool pendingInitialized = false;
+		    if(!pendingInitialized){
+		        pendingVisibility = visibility;
+		        pendingInitialized = true;
+		    }
+		    // Sync any new controllers added after init
+		    for(auto &c : controllers){
+		        const std::string& name = c->getControllerName();
+		        if(pendingVisibility.find(name) == pendingVisibility.end()){
+		            pendingVisibility[name] = visibility.count(name) ? visibility.at(name) : true;
+		        }
+		    }
+		    
+		    // Iterate the sorted map so checkboxes appear alphabetically
+		    for(auto& kv : pendingVisibility){
+		        ImGui::Checkbox(kv.first.c_str(), &pendingVisibility[kv.first]);
+		    }
+		    
+		    ImGui::Separator();
+		    if(ImGui::Button("Apply")){
+		        visibility = pendingVisibility;
+		    }
+		    ImGui::SameLine();
+		    if(ImGui::Button("Reset")){
+		        for(auto& kv : pendingVisibility){
+		            pendingVisibility[kv.first] = true;
+		        }
+		    }
+		    ImGui::SameLine();
+		    if(ImGui::Button("Save")){
+		        visibility = pendingVisibility;
+		        saveViewConfig(pendingVisibility);
+		    }
+		    ImGui::EndMenu();
+		}
+
 		if(ImGui::BeginMenu("Config"))
 		{
 			// Show actual running FPS (read-only) with color feedback
@@ -351,6 +379,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			ImGui::CheckboxFlags("Disable Full Render", &configurationFlags, ofxOceanodeConfigurationFlags_DisableRenderAll);
 			ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
 			ImGui::Checkbox("Show Mode", &showMode);
+			bool autoInspector = ofxOceanodeShared::getAutoInspectorShowHide();
+			if(ImGui::Checkbox("Inspector auto show/hide", &autoInspector)){
+				ofxOceanodeShared::setAutoInspectorShowHide(autoInspector);
+			}
 			ofxOceanodeShared::setConfigurationFlags(configurationFlags);
 			bool snap = canvas.getSnapToGrid();
 			if(ImGui::Checkbox("Snap To Grid",&snap))
@@ -397,6 +429,8 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         }
         ImGui::EndMenuBar();
     }
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(1); // matches PushStyleColor(ImGuiCol_PopupBg)
     ImGui::End();
     
     if(showHelp){
@@ -545,8 +579,9 @@ void ofxOceanode::saveConfig(){
     config["nodeWidgetWidth"] = canvas.getNodeWidthWidget();
     config["gridDivisions"] = canvas.getGridDivisions();
 	config["snapToGrid"] = canvas.getSnapToGrid();
+	config["autoInspectorShowHide"] = ofxOceanodeShared::getAutoInspectorShowHide();
 	
-    // Create config directory if it doesn't exist
+	   // Create config directory if it doesn't exist
     string configDir = ofToDataPath("config", true);
     ofDirectory dir(configDir);
     if(!dir.exists()){
@@ -615,4 +650,39 @@ void ofxOceanode::loadConfig(){
 		canvas.updateGridSize();
 		ofxOceanodeShared::setSnapGridDiv(i);
 	}
+	if(config.contains("autoInspectorShowHide")){
+		ofxOceanodeShared::setAutoInspectorShowHide(config["autoInspectorShowHide"].get<bool>());
+	}
+}
+
+void ofxOceanode::saveViewConfig(const std::map<std::string, bool>& visibilityMap){
+    ofJson viewConfig;
+    for(auto& kv : visibilityMap){
+        viewConfig[kv.first] = kv.second;
+    }
+    
+    // Create config directory if it doesn't exist
+    string configDir = ofToDataPath("config", true);
+    ofDirectory dir(configDir);
+    if(!dir.exists()){
+        dir.create(true);
+    }
+    
+    string viewConfigPath = ofToDataPath("config/view.json", true);
+    ofSavePrettyJson(viewConfigPath, viewConfig);
+}
+
+void ofxOceanode::loadViewConfig(){
+    string viewConfigPath = ofToDataPath("config/view.json", true);
+    
+    ofFile viewConfigFile(viewConfigPath);
+    if(!viewConfigFile.exists()){
+        return; // No saved view config, use defaults
+    }
+    
+    ofJson viewConfig = ofLoadJson(viewConfigPath);
+    savedViewConfig.clear();
+    for(auto it = viewConfig.begin(); it != viewConfig.end(); ++it){
+        savedViewConfig[it.key()] = it.value().get<bool>();
+    }
 }

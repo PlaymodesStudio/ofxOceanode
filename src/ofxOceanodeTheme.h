@@ -38,9 +38,9 @@ public:
         colors[ImGuiCol_CheckMark]              = colors[ImGuiCol_Text];
         colors[ImGuiCol_SliderGrab]             = ImVec4(0.24f, 0.52f, 0.88f, 1.00f);
         colors[ImGuiCol_SliderGrabActive]       = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
-        colors[ImGuiCol_Button]                 = ImVec4(0.26f, 0.26f, 0.26f, 0.00f);
-        colors[ImGuiCol_ButtonHovered]          = ImVec4(0.35f, 0.35f, 0.35f, 1.00f);
-        colors[ImGuiCol_ButtonActive]           = ImVec4(0.35f, 0.35f, 0.35f, 0.50f);
+        colors[ImGuiCol_Button]                 = ImVec4(0.26f, 0.26f, 0.26f, 0.50f);
+        colors[ImGuiCol_ButtonHovered]          = ImVec4(0.35f, 0.35f, 0.35f, 0.50f);
+        colors[ImGuiCol_ButtonActive]           = ImVec4(0.35f, 0.35f, 0.35f, 0.75f);
         colors[ImGuiCol_Header]                 = ImVec4(0.30f, 0.30f, 0.30f, 1.00f);
         colors[ImGuiCol_HeaderHovered]          = ImVec4(0.36f, 0.36f, 0.36f, 1.00f);
         colors[ImGuiCol_HeaderActive]           = ImVec4(0.46f, 0.46f, 0.46f, 1.00f);

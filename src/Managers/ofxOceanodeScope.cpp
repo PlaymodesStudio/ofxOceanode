@@ -9,6 +9,9 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "ofxOceanodeParameter.h"
+#include "ofxOceanodeContainer.h"
+#include "ofxOceanodeNode.h"
+#include "ofxOceanodeShared.h"
 
 // https://github.com/ocornut/imgui/issues/1720
 bool Splitter(int splitNum, bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size = -1.0f)
@@ -76,6 +79,14 @@ void ofxOceanodeScope::draw(){
 
     if(scopedParameters.size() > 0){
         ImGui::Begin("Scopes", NULL, ImGuiWindowFlags_NoScrollbar);
+        
+        // Apply saved window configuration on first frame after load
+        if(windowConfig.hasConfig){
+            ImGui::SetWindowPos(ImVec2(windowConfig.posX, windowConfig.posY), ImGuiCond_Once);
+            ImGui::SetWindowSize(ImVec2(windowConfig.width, windowConfig.height), ImGuiCond_Once);
+            windowConfig.hasConfig = false; // Only apply once
+        }
+        
         windowWidth = ImGui::GetContentRegionAvail().x;
         windowHeight = ImGui::GetContentRegionAvail().y;
         for(int i = 0; i < scopedParameters.size()-1; i++){
@@ -103,6 +114,9 @@ void ofxOceanodeScope::draw(){
                     scopedParameters[i].sizeRelative += topInc * scopedParameters.size() / windowHeight;
                     scopedParameters[i+1].sizeRelative += bottomInc * scopedParameters.size() / windowHeight;
                 }
+                
+                // Auto-save after splitter change
+                notifyScopeChanged();
             }
         }
         for(int i = 0; i < scopedParameters.size(); i++)
@@ -118,23 +132,34 @@ void ofxOceanodeScope::draw(){
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
             ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(0.0,0.0,0.0,0.0));
             
-            ImGui::BeginChild(("Child_" + p.parameter->getGroupHierarchyNames().front() + "/" + p.parameter->getName()).c_str(), size, true);
+            std::string fullPath = p.getFullPath();
+			ImGui::BeginChild(("Child_" + p.canvasID +"/" + fullPath).c_str(), size, true);
             if(ImGui::Button("x##RemoveScope"))
             {
                 ofxOceanodeScope::getInstance()->removeParameter(p.parameter);
+                // Auto-save is called inside removeParameter()
             }
             ImGui::SameLine();
-            ImGui::Text((p.parameter->getGroupHierarchyNames().front() + "/" + p.parameter->getName()).c_str());
+            if(p.canvasID=="Canvas") ImGui::Text(fullPath.c_str());
+			else ImGui::Text((p.canvasID +" / " +fullPath).c_str());
+			
             ImGui::SameLine();
             if(ImGui::Button("[^]##MoveScopeUp"))
             {
-                if(i>0) std::swap(scopedParameters[i],scopedParameters[i-1]);
+                if(i>0){
+                    std::swap(scopedParameters[i],scopedParameters[i-1]);
+                    // Auto-save after moving parameter up
+                    notifyScopeChanged();
+                }
             }
             ImGui::SameLine();
             if(ImGui::Button("[v]##MoveScopeDown"))
             {
-                if(i<scopedParameters.size()-1) std::swap(scopedParameters[i],scopedParameters[i+1]);
-                
+                if(i<scopedParameters.size()-1){
+                    std::swap(scopedParameters[i],scopedParameters[i+1]);
+                    // Auto-save after moving parameter down
+                    notifyScopeChanged();
+                }
             }
 //            ImGui::SameLine();
 //            bool keepAspectRatio = (p.parameter->getFlags() & ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
@@ -160,13 +185,59 @@ void ofxOceanodeScope::draw(){
             ImGui::PopStyleColor(5);
             ImGui::EndChild();
         }
+        
+        // Check for window position/size changes and auto-save
+        ImVec2 currentPos = ImGui::GetWindowPos();
+        ImVec2 currentSize = ImGui::GetWindowSize();
+        
+        if(lastWindowConfig.hasConfig){
+            bool posChanged = (currentPos.x != lastWindowConfig.posX || currentPos.y != lastWindowConfig.posY);
+            bool sizeChanged = (currentSize.x != lastWindowConfig.width || currentSize.y != lastWindowConfig.height);
+            
+            if(posChanged || sizeChanged){
+                // Auto-save after window position/size change
+                notifyScopeChanged();
+            }
+        }
+        
+        // Update last window config for next frame
+        lastWindowConfig.hasConfig = true;
+        lastWindowConfig.posX = currentPos.x;
+        lastWindowConfig.posY = currentPos.y;
+        lastWindowConfig.width = currentSize.x;
+        lastWindowConfig.height = currentSize.y;
+        
         ImGui::End();
     }
 }
 
-void ofxOceanodeScope::addParameter(ofxOceanodeAbstractParameter* p, ofColor _color){
+void ofxOceanodeScope::addParameter(
+    ofxOceanodeAbstractParameter* p,
+    ofColor _color,
+    const std::string& canvasID,
+    const std::string& nodeName
+){
     p->setScoped(true);
-    scopedParameters.emplace_back(p,_color);
+    
+    // If canvasID/nodeName not provided, extract from parameter
+    std::string actualCanvasID = canvasID;
+    std::string actualNodeName = nodeName;
+    
+    if(actualCanvasID.empty() || actualNodeName.empty()) {
+        if(p->getNodeModel() != nullptr) {
+            actualCanvasID = p->getNodeModel()->getParents();
+            
+            auto hierarchyNames = p->getGroupHierarchyNames();
+            if(!hierarchyNames.empty()) {
+                actualNodeName = hierarchyNames.front();
+            }
+        }
+    }
+    
+    scopedParameters.emplace_back(p, _color, 1.0f, actualCanvasID, actualNodeName);
+    
+    // Auto-save after adding parameter 
+    notifyScopeChanged();
 }
 
 void ofxOceanodeScope::removeParameter(ofxOceanodeAbstractParameter* p){
@@ -177,5 +248,197 @@ void ofxOceanodeScope::removeParameter(ofxOceanodeAbstractParameter* p){
     for (auto &sp : scopedParameters) {
         sp.sizeRelative += ((sizeBackup - 1) / scopedParameters.size());
     }
+	// Auto-save after adding parameter
+	notifyScopeChanged();
+}
+
+ofxOceanodeScopeState ofxOceanodeScope::getScopeState() const {
+    ofxOceanodeScopeState state;
+	ImGuiContext& g = *GImGui;
+	
+	// to avoid bad access when closing app, we check if there is an ImGui context window before getting scope state as it might be non existing
+	if(g.CurrentWindow!=NULL)
+	{
+		// Export window config (from ImGui if window is open)
+		if(scopedParameters.size() > 0) {
+			state.windowConfig.hasConfig = true;
+			state.windowConfig.posX = ImGui::GetWindowPos().x;
+			state.windowConfig.posY = ImGui::GetWindowPos().y;
+			state.windowConfig.width = ImGui::GetWindowSize().x;
+			state.windowConfig.height = ImGui::GetWindowSize().y;
+		} else {
+			state.windowConfig = windowConfig;
+		}
+		
+		// Export parameter data
+		for(const auto& item : scopedParameters) {
+			ofxOceanodeScopeParameterData paramData;
+			
+			// New format with full path
+			paramData.canvasID = item.canvasID;
+			paramData.nodeName = item.cachedNodeName;
+			paramData.paramName = item.parameter->getName();
+			paramData.sizeRelative = item.sizeRelative;
+			
+			// Backward compatibility: also set legacy path
+			paramData.parameterPath = item.cachedNodeName + "/" + item.parameter->getName();
+			
+			state.parameters.push_back(paramData);
+		}
+		
+	}
+	return state;
+}
+
+void ofxOceanodeScope::setScopeState(const ofxOceanodeScopeState& state) {
+    // Clear existing parameters
+    clearScopedParameters();
     
+    // Set window config for next frame
+    setWindowConfig(state.windowConfig);
+    
+    // NOTE: Parameters are NOT resolved here!
+    // Container will call addParameter() for each resolved parameter
+}
+
+void ofxOceanodeScope::clearScopedParameters() {
+    for(auto& item : scopedParameters) {
+        item.parameter->setScoped(false);
+    }
+    scopedParameters.clear();
+}
+
+ofxOceanodeScopeWindowConfig ofxOceanodeScope::getWindowConfig() const {
+    if(scopedParameters.size() > 0) {
+        // Get current window state from ImGui
+        ofxOceanodeScopeWindowConfig config;
+        config.hasConfig = true;
+        config.posX = ImGui::GetWindowPos().x;
+        config.posY = ImGui::GetWindowPos().y;
+        config.width = ImGui::GetWindowSize().x;
+        config.height = ImGui::GetWindowSize().y;
+        return config;
+    }
+    return windowConfig;
+}
+
+// Helper method implementations for full path display
+std::string ofxOceanodeScopeItem::getFullPath() const {
+    std::string fullPath;
+    
+    // Build path from canvasID hierarchy
+    if(!canvasID.empty() && canvasID != "0") {
+        // Parse canvasID to build readable macro path
+        // Example: "0.2.5" -> "Macro2 > Macro5 > "
+        vector<string> levels = ofSplitString(canvasID, ".");
+        
+        // Skip the root "0" level
+        for(size_t i = 1; i < levels.size(); i++) {
+            fullPath += "Macro" + levels[i] + " > ";
+        }
+    }
+    
+    // Append node name and parameter name
+    fullPath += cachedNodeName + " / " + parameter->getName();
+    
+    return fullPath;
+}
+
+std::string ofxOceanodeScopeParameterData::getFullPath() const {
+    std::string fullPath;
+    
+    if(!canvasID.empty() && canvasID != "0") {
+        vector<string> levels = ofSplitString(canvasID, ".");
+        for(size_t i = 1; i < levels.size(); i++) {
+            fullPath += "Macro" + levels[i] + " > ";
+        }
+    }
+    
+    fullPath += nodeName + " / " + paramName;
+    return fullPath;
+}
+
+void ofxOceanodeScope::setWindowConfig(const ofxOceanodeScopeWindowConfig& config) {
+    windowConfig = config;
+}
+
+void ofxOceanodeScope::setScopeChangedCallback(ScopeChangedCallback callback) {
+    scopeChangedCallback = callback;
+}
+
+void ofxOceanodeScope::notifyScopeChanged() {
+    if(scopeChangedCallback) {
+        scopeChangedCallback();
+    }
+}
+
+// Serialization helpers for ofxOceanodeScopeState
+ofJson ofxOceanodeScopeState::toJson() const {
+    ofJson json;
+    
+    // Window config
+    if(windowConfig.hasConfig) {
+        json["window"]["posX"] = windowConfig.posX;
+        json["window"]["posY"] = windowConfig.posY;
+        json["window"]["width"] = windowConfig.width;
+        json["window"]["height"] = windowConfig.height;
+    }
+    
+    // Parameters
+    json["parameters"] = ofJson::array();
+    for(const auto& param : parameters) {
+        ofJson paramJson;
+        
+        // New format
+        paramJson["canvasID"] = param.canvasID;
+        paramJson["nodeName"] = param.nodeName;
+        paramJson["paramName"] = param.paramName;
+        paramJson["sizeRelative"] = param.sizeRelative;
+        
+        // Backward compatibility: also save legacy path
+        paramJson["path"] = param.getLegacyPath();
+        
+        json["parameters"].push_back(paramJson);
+    }
+    
+    return json;
+}
+
+ofxOceanodeScopeState ofxOceanodeScopeState::fromJson(const ofJson& json) {
+    ofxOceanodeScopeState state;
+        
+    // Window config
+    if(json.contains("window")) {
+        state.windowConfig.hasConfig = true;
+        state.windowConfig.posX = json["window"]["posX"];
+        state.windowConfig.posY = json["window"]["posY"];
+        state.windowConfig.width = json["window"]["width"];
+        state.windowConfig.height = json["window"]["height"];
+    }
+    
+    // Parameters
+    if(json.contains("parameters") && json["parameters"].is_array()) {
+        int paramIndex = 0;
+        for(const auto& paramJson : json["parameters"]) {
+            ofxOceanodeScopeParameterData data;
+            // Try new format first
+            if(paramJson.contains("canvasID") && paramJson.contains("nodeName") && paramJson.contains("paramName")) {
+                data.canvasID = paramJson["canvasID"];
+                data.nodeName = paramJson["nodeName"];
+                data.paramName = paramJson["paramName"];
+                // Populate parameterPath for backward compatibility with resolution logic
+                data.parameterPath = data.nodeName + "/" + data.paramName;
+			}
+            
+            if(paramJson.contains("sizeRelative")) {
+                data.sizeRelative = paramJson["sizeRelative"];
+            } else {
+                data.sizeRelative = 1.0f;
+            }
+            
+            state.parameters.push_back(data);
+            paramIndex++;
+        }
+    }
+    return state;
 }

@@ -11,6 +11,8 @@
 #include "portal.h"
 #include <unordered_map>
 
+class ofxOceanodeNode;
+
 typedef int ofxOceanodeConfigurationFlags;
 
 enum ofxOceanodeConfigurationFlags_
@@ -257,6 +259,15 @@ public:
 		return getInstance().snapGridDiv;
 	}
 
+	// Auto Inspector show/hide
+	static void setAutoInspectorShowHide(bool b){
+		getInstance().autoInspectorShowHide = b;
+	}
+
+	static bool getAutoInspectorShowHide(){
+		return getInstance().autoInspectorShowHide;
+	}
+
 	// Node dimensions (mirrors ofxOceanodeCanvas values, updated by the canvas)
 	static int getNodeWidthWidget(){ return getInstance().nodeWidthWidget; }
 	static int getNodeWidthText()  { return getInstance().nodeWidthText; }
@@ -277,6 +288,19 @@ public:
 	}
 
 	inline static ofEvent<string> activeCanvasUniqueIDChangedEvent;
+
+	// Node selected in canvas — fired whenever a single node is clicked/selected
+	// in any canvas (main or macro). Subscribers receive the pointer to the node
+	// that became selected (nullptr means deselect-all with no new selection).
+	inline static ofEvent<ofxOceanodeNode*> nodeSelectedInCanvasEvent;
+
+	static void nodeSelectedInCanvas(ofxOceanodeNode* node){
+		ofNotifyEvent(nodeSelectedInCanvasEvent, node);
+	}
+
+	static ofEvent<ofxOceanodeNode*>& getNodeSelectedInCanvasEvent(){
+		return nodeSelectedInCanvasEvent;
+	}
 
 private:
     ofxOceanodeShared(){};
@@ -325,6 +349,9 @@ private:
 	// Snap to Grid
 	bool snapToGrid = false;
 	int snapGridDiv = 4;
+
+	// Auto Inspector show/hide
+	bool autoInspectorShowHide = true;
 
 	// Active canvas tracking
 	string activeCanvasUniqueID = "";
