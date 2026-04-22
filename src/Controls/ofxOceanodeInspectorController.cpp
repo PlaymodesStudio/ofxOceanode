@@ -353,8 +353,8 @@ void ofxOceanodeInspectorController::draw(){
                     if(f(&p, size)) break;
                 }
 
-                ImGui::PopStyleColor(5);
                 ImGui::EndChild();
+                ImGui::PopStyleColor(5);
 
                 // Draggable splitter between panes
                 if(si < scopeCount - 1){
