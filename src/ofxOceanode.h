@@ -162,6 +162,11 @@ private:
     
     void receiveOsc();
 #endif
+    
+    ofEventListener presetLoadedListener;
+    ofEventListener presetSavedListener;
+    bool hasActivePreset = false;
+    std::string pendingIniLoad; // empty means no pending load
 };
 
 #endif /* ofxOceanode_h */

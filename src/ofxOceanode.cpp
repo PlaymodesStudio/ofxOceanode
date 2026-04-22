@@ -137,7 +137,22 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Mapper_1/Min_Input");
     OceanodeTheme* oceanodeTheme = new OceanodeTheme();
     gui.setup(oceanodeTheme, false, ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable, false);
-	ofxOceanodeShared::readMacros();
+
+    presetLoadedListener = ofxOceanodeShared::getPresetHasLoadedEvent().newListener([this](){
+        string iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
+        if(ofFile(iniPath).exists()){
+            pendingIniLoad = iniPath;   // defer — will be applied before next NewFrame
+        }
+        hasActivePreset = true;
+    });
+
+    presetSavedListener = ofxOceanodeShared::getPresetWasSavedEvent().newListener([this](){
+        string iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
+        ImGui::SaveIniSettingsToDisk(iniPath.c_str());
+        hasActivePreset = true;
+    });
+
+ ofxOceanodeShared::readMacros();
     // Load and apply saved view preferences now that controls is initialized
     // and openFrameworks data path is fully set up
     loadViewConfig();
@@ -160,6 +175,10 @@ void ofxOceanode::update(){
 }
 
 void ofxOceanode::draw(){
+    if(!pendingIniLoad.empty()){
+        ImGui::LoadIniSettingsFromDisk(pendingIniLoad.c_str());
+        pendingIniLoad.clear();
+    }
     gui.begin();
     // Track active canvas for minimap
     {
@@ -205,6 +224,10 @@ void ofxOceanode::draw(){
 }
 
 void ofxOceanode::exit(){
+    if(hasActivePreset){
+        string iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
+        ImGui::SaveIniSettingsToDisk(iniPath.c_str());
+    }
     container->clearContainer();
 }
 
