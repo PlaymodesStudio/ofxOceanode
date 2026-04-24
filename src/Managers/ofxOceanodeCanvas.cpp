@@ -73,6 +73,39 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)){
             ofxOceanodeShared::setActiveCanvasUniqueID(uniqueID);
         }
+        
+        // Detect canvas tab activation for layout switching.
+        // Use dock tab selection instead of window focus — when canvases are
+        // docked as tabs in the same dock node, ImGuiFocusedFlags_ChildWindows
+        // causes both tabs to report as focused (they share a parent dock node),
+        // so wasFocusedLastFrame never transitions to false and the rising-edge
+        // detection fails on the first switch back.
+        bool isActiveTab = false;
+        ImGuiWindow* win = ImGui::GetCurrentWindow();
+        if(win->DockNode && win->DockNode->TabBar){
+            // Check if this window's tab is the selected one in the dock node
+            isActiveTab = (win->DockNode->TabBar->SelectedTabId == win->TabId);
+        } else {
+            // Not docked as a tab — fall back to plain window focus
+            isActiveTab = ImGui::IsWindowFocused(ImGuiFocusedFlags_None);
+        }
+        
+        if(isActiveTab && !wasFocusedLastFrame && !layoutIniPath.empty()){
+            if(ofxOceanodeShared::getGuiLayoutChangesWithCanvas()){
+                string newIniPath = ofToDataPath(layoutIniPath);
+                string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
+                
+                // Only switch if we're actually changing to a different layout
+                if(newIniPath != activeLayoutPath){
+                    // Queue: save current layout to previous canvas, load this canvas's layout
+                    ofxOceanodeShared::getPendingLayoutSavePath() = activeLayoutPath;
+                    ofxOceanodeShared::getPendingLayoutLoadPath() = newIniPath;
+                    // Update active path immediately so subsequent focus changes in the same frame don't re-trigger
+                    activeLayoutPath = newIniPath;
+                }
+            }
+        }
+        wasFocusedLastFrame = isActiveTab;
         ImGui::SameLine();
         ImGui::BeginGroup();
                 
