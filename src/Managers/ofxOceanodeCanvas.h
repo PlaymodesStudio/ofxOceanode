@@ -42,6 +42,10 @@ public:
     // so callers do not need to manage any delay themselves.
     void requestFocus(){focusPending = true;};
     
+    // Per-canvas ImGui layout path (for layout switching on tab activation)
+    void setLayoutIniPath(const string& path){ layoutIniPath = path; }
+    const string& getLayoutIniPath() const { return layoutIniPath; }
+    
 	// node dimensions
 	int getNodeWidth(){return NODE_WIDTH_TEXT+NODE_WIDTH_WIDGET;};
 	void setNodeWidth(int ww, int tw){NODE_WIDTH_WIDGET=ww;NODE_WIDTH_TEXT=tw;};
@@ -141,6 +145,10 @@ private:
     bool isFirstDraw = true;
     bool onTop = false;
     bool focusPending = false;
+    
+    // Per-canvas layout switching
+    string layoutIniPath;
+    bool wasFocusedLastFrame = false;
 	
 	// node dimensions (nodeWidthTotal should be % by 4)
 	float NODE_SLOT_RADIUS = 4.0f;

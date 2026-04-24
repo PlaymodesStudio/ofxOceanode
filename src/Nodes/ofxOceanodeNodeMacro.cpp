@@ -10,6 +10,7 @@
 
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeShared.h"
+#include <sstream>
 
 // ─── Constructor ─────────────────────────────────────────────────────────────
 
@@ -62,6 +63,9 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 		if(!snapshotSystem.isEmpty()) {
 			showSnapshotMatrix = true;
 		}
+
+		// Set macro layout path for the newly selected global path
+		loadMacroLayout(presetManager.getNextPresetPath());
 
 		isLoadingPreset = false;
 		presetManager.clearNextPresetPath();
@@ -244,6 +248,9 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 		presetManager.updateCategoryFromPath(additionalInfo);
 		presetManager.setCurrentMacroPath(additionalInfo);
 		
+		// Set macro layout path
+		loadMacroLayout(additionalInfo);
+		
 		// Load snapshots if they exist
 		snapshotSystem.loadFromPath(additionalInfo);
 		if(!snapshotSystem.isEmpty()) {
@@ -272,6 +279,9 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			}
 //			if(clearContainerOnLoad) container->clearContainer();
 			container->loadPreset(presetManager.getCurrentMacroPath());
+			
+			// Set macro layout path for reload
+			loadMacroLayout(presetManager.getCurrentMacroPath());
 		}
 	});
 	
@@ -645,7 +655,33 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 	if(presetManager.isLocal()){
 		string localPath = path + "/" + nodeName() + "_" + ofToString(getNumIdentifier());
+		
+#ifndef OFXOCEANODE_HEADLESS
+		// Cache existing macro layout before container->savePreset() recreates the folder
+		string cachedLayout;
+		{
+			string existingIniPath = ofToDataPath(canvas.getLayoutIniPath());
+			if(!existingIniPath.empty() && ofFile(existingIniPath).exists()){
+				ofBuffer buf = ofBufferFromFile(existingIniPath);
+				cachedLayout = buf.getText();
+			}
+		}
+#endif
+		
 		container->savePreset(localPath);
+		
+#ifndef OFXOCEANODE_HEADLESS
+		// Restore cached layout (savePreset recreated the folder, deleting ImGuiLayout.ini)
+		if(!cachedLayout.empty()){
+			string newIniPath = ofToDataPath(localPath + "/ImGuiLayout.ini");
+			ofBuffer buf;
+			buf.set(cachedLayout.c_str(), cachedLayout.size());
+			ofBufferToFile(newIniPath, buf);
+			ofLogNotice("ofxOceanodeNodeMacro") << "Restored cached macro layout to " << newIniPath;
+		}
+		
+		canvas.setLayoutIniPath(localPath + "/ImGuiLayout.ini");
+#endif
 		json["LocalPreset"] = true;
 		
 		// Save snapshots to a separate file in the local macro folder
@@ -694,6 +730,12 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 				sortJson["RouterSortOrder"] = sortArr;
 			}
 			ofSavePrettyJson(sortOrderFile, sortJson);
+			
+			// Save macro layout to global macro folder
+			saveMacroLayout(presetManager.getCurrentMacroPath());
+#ifndef OFXOCEANODE_HEADLESS
+			canvas.setLayoutIniPath(presetManager.getCurrentMacroPath() + "/ImGuiLayout.ini");
+#endif
 		}
 	}
 
@@ -745,6 +787,9 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 			
 			// Store the local path for future snapshot saving
 			presetManager.setPresetPath(localPath);
+			
+			// Set macro layout path
+			loadMacroLayout(localPath);
 			
 			// First check for snapshots.json file in the local macro folder
 			string snapshotsFilePath = localPath + "/snapshots.json";
@@ -803,11 +848,17 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 					container->loadPreset(iter->second);
 					presetManager.setInnerPresetLoadingPath("");
 					presetManager.setCurrentMacroPath(iter->second);
+					
+					// Set macro layout path from global folder
+					loadMacroLayout(iter->second);
 				}
 			} else {
 				presetManager.setInnerPresetLoadingPath(presetManager.getCurrentMacroPath());
 				container->loadPreset(presetManager.getCurrentMacroPath());
 				presetManager.setInnerPresetLoadingPath("");
+				
+				// Set macro layout path from global folder
+				loadMacroLayout(presetManager.getCurrentMacroPath());
 			}
 			
 			// Load snapshots if they exist
@@ -1089,3 +1140,46 @@ void ofxOceanodeNodeMacro::changeRouterType(const std::string& routerName, const
 	syncParameterGroupToSortOrder();
 	parameterGroupChanged.notify(this);
 }
+
+// ─── ImGui layout persistence (per-macro) ────────────────────────────────────
+
+#ifndef OFXOCEANODE_HEADLESS
+
+void ofxOceanodeNodeMacro::saveMacroLayout(const string& folderPath) {
+	string newIniPath = ofToDataPath(folderPath + "/ImGuiLayout.ini");
+	string currentLayoutPath = canvas.getLayoutIniPath();
+	string activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
+	string currentIniFullPath = ofToDataPath(currentLayoutPath);
+	
+	if(!activeLayoutPath.empty() && currentIniFullPath == activeLayoutPath){
+		// This macro's canvas is currently active — save from ImGui state
+		ImGui::SaveIniSettingsToDisk(newIniPath.c_str());
+		ofLogNotice("ofxOceanodeNodeMacro") << "Saved active macro layout to " << newIniPath;
+	} else if(!currentLayoutPath.empty() && ofFile(currentIniFullPath).exists()){
+		if(currentIniFullPath == newIniPath){
+			// Source and destination are the same file — layout is already in place,
+			// no copy needed. Copying a file onto itself with overwrite would delete it.
+			ofLogNotice("ofxOceanodeNodeMacro") << "Macro layout already at " << newIniPath;
+		} else {
+			// This macro is not active — copy existing layout file to new location
+			ofFile src(currentIniFullPath);
+			src.copyTo(newIniPath, true, true);
+			ofLogNotice("ofxOceanodeNodeMacro") << "Copied macro layout to " << newIniPath;
+		}
+	}
+	// else: no layout exists yet, nothing to save
+}
+
+void ofxOceanodeNodeMacro::loadMacroLayout(const string& folderPath) {
+	string iniPath = folderPath + "/ImGuiLayout.ini";
+	canvas.setLayoutIniPath(iniPath);
+	ofLogNotice("ofxOceanodeNodeMacro") << "Set macro layout path to " << iniPath;
+}
+
+#else
+
+// Headless stubs
+void ofxOceanodeNodeMacro::saveMacroLayout(const string& folderPath) {}
+void ofxOceanodeNodeMacro::loadMacroLayout(const string& folderPath) {}
+
+#endif

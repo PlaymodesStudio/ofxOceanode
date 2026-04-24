@@ -135,8 +135,70 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Oscillator_1/Pow");
     //        timelines.emplace_back("Indexer_1/NumWaves");
     //        timelines.emplace_back("Mapper_1/Min_Input");
-    gui.setup(nullptr);
-	ofxOceanodeShared::readMacros();
+    OceanodeTheme* oceanodeTheme = new OceanodeTheme();
+    gui.setup(oceanodeTheme, false, ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable, false);
+
+    presetLoadedListener = ofxOceanodeShared::getPresetHasLoadedEvent().newListener([this](){
+        string iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
+        if(ofFile(iniPath).exists()){
+            pendingIniLoad = iniPath;   // defer — will be applied before next NewFrame
+            // Cache the content for preservation during future saves
+            ofBuffer buf = ofBufferFromFile(iniPath);
+            ofxOceanodeShared::getLayoutContentCache()[iniPath] = buf.getText();
+        }
+        // Set main canvas layout path
+        canvas.setLayoutIniPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
+        ofxOceanodeShared::getActiveCanvasLayoutPath() = iniPath;
+        hasActivePreset = true;
+    });
+
+    presetSavedListener = ofxOceanodeShared::getPresetWasSavedEvent().newListener([this](){
+        string iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
+        string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
+        
+        // Only save from ImGui state if the root canvas is active
+        // (activeLayoutPath matches the preset's layout path).
+        if(activeLayoutPath == iniPath){
+            ImGui::SaveIniSettingsToDisk(iniPath.c_str());
+            // Update cache
+            size_t sz = 0;
+            const char* d = ImGui::SaveIniSettingsToMemory(&sz);
+            if(d && sz > 0) ofxOceanodeShared::getLayoutContentCache()[iniPath] = string(d, sz);
+        }
+        // If a macro is active, save ImGui state to the macro's active path instead.
+        // IMPORTANT: Read the root layout from disk FIRST — ImGui's in-memory state
+        // currently holds the macro layout (loaded when the user focused the macro canvas),
+        // and SaveIniSettingsToDisk writes that macro layout wherever we tell it.
+        // The root layout file on disk is still correct (container->savePreset() never
+        // touches ImGuiLayout.ini), so we snapshot it before any ImGui write, then
+        // put it back afterwards to guarantee it isn't lost.
+        else if(!activeLayoutPath.empty()){
+            // Snapshot the root layout file from disk before any ImGui write
+            string rootLayoutContent;
+            if(ofFile(iniPath).exists()){
+                ofBuffer buf = ofBufferFromFile(iniPath);
+                rootLayoutContent = buf.getText();
+            }
+            
+            // Save ImGui state (which is the macro's layout) to the macro's path
+            ImGui::SaveIniSettingsToDisk(activeLayoutPath.c_str());
+            
+            // Restore the root layout from the disk snapshot we took above
+            if(!rootLayoutContent.empty()){
+                ofBuffer buf;
+                buf.set(rootLayoutContent.c_str(), rootLayoutContent.size());
+                ofBufferToFile(iniPath, buf);
+                // Also update the in-memory cache to keep it in sync
+                ofxOceanodeShared::getLayoutContentCache()[iniPath] = rootLayoutContent;
+                ofLogNotice("ofxOceanode") << "Preserved root layout at " << iniPath;
+            }
+        }
+        
+        canvas.setLayoutIniPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
+        hasActivePreset = true;
+    });
+
+ ofxOceanodeShared::readMacros();
     // Load and apply saved view preferences now that controls is initialized
     // and openFrameworks data path is fully set up
     loadViewConfig();
@@ -147,7 +209,6 @@ void ofxOceanode::setup(){
         }
     }
     oceanodeTime->setup(container, controls->get<ofxOceanodeBPMController>());
-    StyleColorsOceanode();
 }
 
 void ofxOceanode::update(){
@@ -160,6 +221,35 @@ void ofxOceanode::update(){
 }
 
 void ofxOceanode::draw(){
+    if(!pendingIniLoad.empty()){
+        ImGui::LoadIniSettingsFromDisk(pendingIniLoad.c_str());
+        pendingIniLoad.clear();
+    }
+    // Deferred canvas layout switching (save previous, load new)
+    {
+        string& pendingSave = ofxOceanodeShared::getPendingLayoutSavePath();
+        string& pendingLoad = ofxOceanodeShared::getPendingLayoutLoadPath();
+        
+        if(!pendingLoad.empty()){
+            // Save current ImGui state to the previous canvas's file
+            if(!pendingSave.empty()){
+                ImGui::SaveIniSettingsToDisk(pendingSave.c_str());
+                // Cache the saved content in memory for preservation during preset save
+                size_t iniSize = 0;
+                const char* iniData = ImGui::SaveIniSettingsToMemory(&iniSize);
+                if(iniData && iniSize > 0){
+                    ofxOceanodeShared::getLayoutContentCache()[pendingSave] = string(iniData, iniSize);
+                }
+                pendingSave.clear();
+            }
+            
+            // Load the new canvas's layout
+            if(ofFile(pendingLoad).exists()){
+                ImGui::LoadIniSettingsFromDisk(pendingLoad.c_str());
+            }
+            pendingLoad.clear();
+        }
+    }
     gui.begin();
     // Track active canvas for minimap
     {
@@ -205,6 +295,21 @@ void ofxOceanode::draw(){
 }
 
 void ofxOceanode::exit(){
+    if(hasActivePreset){
+        string iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
+        string& activeLayout = ofxOceanodeShared::getActiveCanvasLayoutPath();
+        
+        // Save ImGui state to the currently active canvas layout path.
+        // If root is active, activeLayout == iniPath so root gets saved.
+        // If a macro is active, save to the macro's path — the root layout
+        // on disk is already correct from the last focus-change save.
+        if(!activeLayout.empty()){
+            ImGui::SaveIniSettingsToDisk(activeLayout.c_str());
+        } else {
+            // Fallback: no active layout tracked, save to root preset path
+            ImGui::SaveIniSettingsToDisk(iniPath.c_str());
+        }
+    }
     container->clearContainer();
 }
 
@@ -382,6 +487,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			bool autoInspector = ofxOceanodeShared::getAutoInspectorShowHide();
 			if(ImGui::Checkbox("Inspector auto show/hide", &autoInspector)){
 				ofxOceanodeShared::setAutoInspectorShowHide(autoInspector);
+			}
+			bool layoutWithCanvas = ofxOceanodeShared::getGuiLayoutChangesWithCanvas();
+			if(ImGui::Checkbox("GUI layout changes with canvas", &layoutWithCanvas)){
+				ofxOceanodeShared::getGuiLayoutChangesWithCanvas() = layoutWithCanvas;
 			}
 			ofxOceanodeShared::setConfigurationFlags(configurationFlags);
 			bool snap = canvas.getSnapToGrid();
@@ -580,6 +689,7 @@ void ofxOceanode::saveConfig(){
     config["gridDivisions"] = canvas.getGridDivisions();
 	config["snapToGrid"] = canvas.getSnapToGrid();
 	config["autoInspectorShowHide"] = ofxOceanodeShared::getAutoInspectorShowHide();
+	config["guiLayoutChangesWithCanvas"] = ofxOceanodeShared::getGuiLayoutChangesWithCanvas();
 	
 	   // Create config directory if it doesn't exist
     string configDir = ofToDataPath("config", true);
@@ -652,6 +762,9 @@ void ofxOceanode::loadConfig(){
 	}
 	if(config.contains("autoInspectorShowHide")){
 		ofxOceanodeShared::setAutoInspectorShowHide(config["autoInspectorShowHide"].get<bool>());
+	}
+	if(config.contains("guiLayoutChangesWithCanvas")){
+		ofxOceanodeShared::getGuiLayoutChangesWithCanvas() = config["guiLayoutChangesWithCanvas"].get<bool>();
 	}
 }
 
