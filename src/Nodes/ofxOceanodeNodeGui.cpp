@@ -172,7 +172,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
             }else{
                 
                 ImGui::Text("%s", uniqueId.c_str());
-                ImGui::SetItemAllowOverlap();
+				ImGui::SetNextItemAllowOverlap();
                 ImGui::SameLine(-1);
                 ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
                 {

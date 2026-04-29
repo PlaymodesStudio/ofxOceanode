@@ -93,9 +93,12 @@ void ofxOceanodeCanvas::setupFonts() {
     ofLogNotice("ofxOceanodeCanvas") << "Font pixel scale: " << scale
                                      << " (fbWidth=" << fbWidth << ", winWidth=" << winWidth << ")";
 
-    // Load fonts at PHYSICAL pixel size (logical size × screen scale) so the
-    // atlas is rasterised at full native resolution.  FontGlobalScale is then
-    // set to 1/scale so that ImGui renders them back at the correct logical size.
+    // Load fonts at LOGICAL pixel size — do NOT multiply by scale and do NOT set
+    // FontGlobalScale.  Loading at physical size (×scale) then compensating with
+    // FontGlobalScale=1/scale caused ImFont::FontSize (stored at atlas size) to
+    // diverge from g.FontSize (layout size after the global scale multiplier).
+    // That divergence trips an assertion inside InputTextEx at line 4785 when
+    // ImGui does cursor/click-position math on a multiline text widget.
     ImFontConfig fontCfg;
     fontCfg.OversampleH = 2;   // 2 is sufficient at 2× physical — saves atlas memory
     fontCfg.OversampleV = 2;   // increase from default 1 for vertical sharpness
@@ -110,13 +113,13 @@ void ofxOceanodeCanvas::setupFonts() {
     } else {
         // Add default (index 2) FIRST — ImGui uses the first added font as default
         // This ensures the main UI font is 18px, not 10px
-        zoomFonts[2] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[2] * scale, &fontCfg);
+        zoomFonts[2] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[2], &fontCfg);
 
         // Add the remaining fonts
-        zoomFonts[0] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[0] * scale, &fontCfg);
-        zoomFonts[1] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[1] * scale, &fontCfg);
-        zoomFonts[3] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[3] * scale, &fontCfg);
-        zoomFonts[4] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[4] * scale, &fontCfg);
+        zoomFonts[0] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[0], &fontCfg);
+        zoomFonts[1] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[1], &fontCfg);
+        zoomFonts[3] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[3], &fontCfg);
+        zoomFonts[4] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[4], &fontCfg);
 
         // Validate and fall back any that failed
         for(int i = 0; i < 5; i++) {
@@ -143,7 +146,7 @@ void ofxOceanodeCanvas::setupFonts() {
         boldCfg.MergeMode   = false;
 
         for(int i = 0; i < 5; i++) {
-            zoomFontsBold[i] = io.Fonts->AddFontFromFileTTF(boldFontPath.c_str(), ZOOM_FONT_SIZES[i] * scale, &boldCfg);
+            zoomFontsBold[i] = io.Fonts->AddFontFromFileTTF(boldFontPath.c_str(), ZOOM_FONT_SIZES[i], &boldCfg);
             if(!zoomFontsBold[i]) {
                 ofLogWarning("ofxOceanodeCanvas") << "Failed to load bold font size " << ZOOM_FONT_SIZES[i];
             }
@@ -152,6 +155,39 @@ void ofxOceanodeCanvas::setupFonts() {
 
     // Rebuild the font atlas after adding fonts (called after gui.setup() created the context)
     io.Fonts->Build();
+
+    // ── DIAGNOSTIC: Font atlas state after build ───────────────────────────
+    ofLogNotice("ofxOceanodeCanvas::setupFonts") << "--- Font Atlas Diagnostic ---";
+    ofLogNotice("ofxOceanodeCanvas::setupFonts") << "Total fonts in atlas: " << io.Fonts->Fonts.Size;
+    for(int _di = 0; _di < io.Fonts->Fonts.Size; _di++) {
+        ImFont* _f = io.Fonts->Fonts[_di];
+        bool isZoom2 = (_f == zoomFonts[2]);
+        ofLogNotice("ofxOceanodeCanvas::setupFonts")
+            << "  Fonts[" << _di << "] @ " << (void*)_f
+            << (isZoom2 ? "  <-- zoomFonts[2] (JetBrainsMono 18px)" : "");
+    }
+    ofLogNotice("ofxOceanodeCanvas::setupFonts")
+        << "io.FontDefault (before fix) = " << (void*)io.FontDefault
+        << (io.FontDefault == nullptr ? "  (NULL => was using Fonts[0])" : "");
+    ofLogNotice("ofxOceanodeCanvas::setupFonts")
+        << "zoomFonts[2]   = " << (void*)zoomFonts[2];
+    if(io.Fonts->Fonts.Size > 0) {
+        bool defaultIsZoom2 = (io.Fonts->Fonts[0] == zoomFonts[2]);
+        ofLogNotice("ofxOceanodeCanvas::setupFonts")
+            << "Fonts[0] == zoomFonts[2]: " << (defaultIsZoom2 ? "YES (atlas order correct)" : "NO  (built-in font is Fonts[0]; io.FontDefault fix is required)");
+    }
+    // ── END DIAGNOSTIC ─────────────────────────────────────────────────────
+
+    // ── FIX: Explicitly set the global default font to JetBrainsMono-Medium 18px.
+    // Without this, ImGui falls back to Fonts->Fonts[0].  Because ofxImGui's
+    // gui.setup() calls AddFontDefault() before setupFonts() runs, Fonts[0] is
+    // the built-in ImGui font — not JetBrainsMono — so every window/menu/widget
+    // that does NOT call PushFont() renders with the wrong font.
+    if(zoomFonts[2]) {
+        io.FontDefault = zoomFonts[2];
+        ofLogNotice("ofxOceanodeCanvas::setupFonts")
+            << "io.FontDefault set to zoomFonts[2] (JetBrainsMono-Medium 18px)";
+    }
 
     // Publish the base (zoom=1.0) font size so that render-time code in other
     // translation units (e.g. macro GUI) can compute the current zoom factor via
@@ -167,18 +203,19 @@ void ofxOceanodeCanvas::setupFonts() {
         ofxOceanodeShared::setBaseFrameHeight(BASE_FRAME_HEIGHT);
     }
 
-    // Compensate for the physical-pixel oversize: render at logical size.
-    // e.g. on Retina: atlas built at 2× → FontGlobalScale = 0.5 → displayed at 1× logical.
-    // This does NOT require a rebuild — it is a render-time multiplier.
-    io.FontGlobalScale = 1.0f / scale;
+    // FontGlobalScale is intentionally left at its default (1.0).  Fonts are now
+    // loaded at logical pixel size so no global scaling compensation is needed.
+    // Setting FontGlobalScale < 1 caused ImFont::FontSize (atlas size) to diverge
+    // from g.FontSize (layout size), which triggered an assertion in InputTextEx.
+    io.FontGlobalScale = 1.0f;
 
     // Recreate the GPU font texture for whichever renderer is active
     if(ofIsGLProgrammableRenderer()) {
-        ImGui_ImplOpenGL3_DestroyFontsTexture();
-        ImGui_ImplOpenGL3_CreateFontsTexture();
+        ImGui_ImplOpenGL3_DestroyDeviceObjects();
+        ImGui_ImplOpenGL3_CreateDeviceObjects();
     } else {
-        ImGui_ImplOpenGL2_DestroyFontsTexture();
-        ImGui_ImplOpenGL2_CreateFontsTexture();
+        ImGui_ImplOpenGL2_DestroyDeviceObjects();
+        ImGui_ImplOpenGL2_CreateDeviceObjects();
     }
 }
 
@@ -1037,7 +1074,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 			// IM_ASSERT(size_arg.x != 0.0f && size_arg.y != 0.0f);
 			// if size of x or y is 0 -> crash !
 			// This could happen if accidentally creating a "comment" with click+option without dragging = size = 0
-			if(c.size.x==0 || c.size.y==0)
+			         if(c.size.x==0 || c.size.y==0)
 			{
 				c.size.x = 256;
 				c.size.y = 15;
@@ -1671,11 +1708,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         entireSelect =  selectInitialPoint.y < selectEndPoint.y;
                         canvasHasScolled = true; //HACK to not remove selection on mouse release
                     }
-                    if((!isSelecting && !isCreatingConnection && someSelectedModuleMove == "") || (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space)))){
+                    if((!isSelecting && !isCreatingConnection && someSelectedModuleMove == "") || (ImGui::IsKeyDown(ImGuiKey_Space))){
                         scrolling = scrolling + glm::vec2(ImGui::GetIO().MouseDelta) / zoomLevel;
                         if(glm::vec2(ImGui::GetIO().MouseDelta) != glm::vec2(0,0)) canvasHasScolled = true;
                         if(isSelecting && !ImGui::GetIO().KeyCtrl){
-#endif
                             selectInitialPoint += glm::vec2(ImGui::GetIO().MouseDelta) / zoomLevel;
                             selectEndPoint += glm::vec2(ImGui::GetIO().MouseDelta) / zoomLevel;
                             selectedRect = ofRectangle(selectInitialPoint, selectEndPoint);
@@ -1683,7 +1719,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         }
                     }
 				}else if(ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)){
-					if(ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space))){
+					if(ImGui::IsKeyDown(ImGuiKey_Space)){
 						scrolling = scrolling + glm::vec2(ImGui::GetIO().MouseDelta) / zoomLevel;
                         if(glm::vec2(ImGui::GetIO().MouseDelta) != glm::vec2(0,0)) canvasHasScolled = true;
 					}
@@ -1701,9 +1737,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 float wheelH = ImGui::GetIO().MouseWheelH;
 
                 bool zoomModifier = ImGui::GetIO().KeyCtrl;
-#ifdef TARGET_OSX
-                zoomModifier = ImGui::GetIO().KeySuper; // Cmd key on Mac
-#endif
 
                 if(zoomModifier && wheel != 0.0f) {
                     // Zoom centered on mouse position
@@ -1784,7 +1817,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
             
             // Alt+Z: reset zoom to 100%, preserving the visible world center
-            if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && ImGui::GetIO().KeyAlt && ImGui::IsKeyPressed((ImGuiKey)'Z')){
+            if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && ImGui::GetIO().KeyAlt && ImGui::IsKeyPressed(ImGuiKey_Z)){
                 glm::vec2 canvasCenter = contentRegionSize * 0.5f;
                 glm::vec2 worldCenterBefore = screenToWorld(canvasOrigin + canvasCenter);
                 setZoomLevel(ZOOM_DEFAULT);

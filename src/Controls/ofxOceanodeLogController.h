@@ -38,7 +38,7 @@ public:
             combinedMessages += s + "\n";
         }
         
-        ImGui::InputTextMultiline("##LogText", (char *)combinedMessages.c_str(), combinedMessages.size(), ImGui::GetContentRegionAvail(), ImGuiInputTextFlags_ReadOnly);
+        ImGui::InputTextMultiline("##LogText", (char *)combinedMessages.c_str(), combinedMessages.size() + 1, ImGui::GetContentRegionAvail(), ImGuiInputTextFlags_ReadOnly);
         
         if(hasToScroll){
             //https://github.com/ocornut/imgui/issues/5484

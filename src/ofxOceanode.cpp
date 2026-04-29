@@ -137,6 +137,7 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Mapper_1/Min_Input");
     OceanodeTheme* oceanodeTheme = new OceanodeTheme();
     gui.setup(oceanodeTheme, false, ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable, false);
+	canvas.setupFonts();
     loadDefaultGUILayout();
     // Auto-load default theme if pointer file exists
     {
