@@ -11,7 +11,6 @@
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeContainer.h"
-#include "ofxImGuiSimple.h"
 #include "imgui.h"
 #include "ofxOceanodeParameter.h"
 #include "ofxOceanodeScope.h"
@@ -74,7 +73,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
 			ImGui::Text("%s", (moduleName + "\n").c_str());
 			ImGui::Separator();
 			
-			if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
+			if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown((ImGuiKey_Enter))) {
 				ImGui::CloseCurrentPopup();
 				deleteModule = true;
 			}
@@ -156,9 +155,9 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                 }
             }else{
                 
+                ImGui::SetNextItemAllowOverlap();
                 ImGui::Text("%s", uniqueId.c_str());
                 
-                ImGui::SetItemAllowOverlap();
                 ImGui::SameLine(-1);
 				ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
                 
@@ -314,7 +313,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                             ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
                         }
                     }
-                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                         tempCast = tempCast;
                     }
                 }
@@ -344,7 +343,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                         
                         if(ImGui::IsItemDeactivated() || (ImGui::IsMouseDown(0) && ImGui::IsItemEdited()))
                             tempCast = ofClamp(temp, tempCast.getMin(), tempCast.getMax());
-                        if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space)))
+                        if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space)))
                             tempCast = tempCast;
                         
                         isItemEditableByText = true;
@@ -361,7 +360,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                         if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.get(), vector_getter, static_cast<void*>(&options), options.size()))
                             tempCast = ofClamp(tempCast, tempCast.getMin(), tempCast.getMax());
                         
-                        if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space)))
+                        if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space)))
                             tempCast = tempCast;
                         
                     }
@@ -422,7 +421,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                             ImGui::PlotHistogram(hiddenUniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
                         }
                     }
-                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space)))
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space)))
                         tempCast = tempCast;
                 }
                 // PARAM BOOL
@@ -439,7 +438,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                         tempCast = tempCast;
                     }
 					ImVec2 sizeCB = ImGui::GetItemRectSize();
-                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                         tempCast = !tempCast;
                     }
 					ImGui::SameLine();
@@ -454,7 +453,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                         tempCast.trigger();
                     }
 					ImVec2 sizeCB = ImGui::GetItemRectSize();
-                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                         tempCast.trigger();
                     }
 					ImGui::SameLine();
@@ -494,7 +493,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                     {
                         tempCast = ofColor(floatColor);
                     }
-                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                         tempCast = tempCast;
                     }
                     //PARAM FLOAT COLOR
@@ -512,7 +511,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                     {
                         tempCast = tempCast;
                     }
-                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                         tempCast = tempCast;
                     }
                 }else if(absParam.valueType() == typeid(time_t).name()){
@@ -534,7 +533,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                 }
                 
                 if (isItemEditableByText){
-                    if ((ImGui::IsItemHovered() && !ImGui::IsItemEdited() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter))) || ImGui::IsItemClicked(1)){
+                    if ((ImGui::IsItemHovered() && !ImGui::IsItemEdited() && ImGui::IsKeyPressed((ImGuiKey_Enter))) || ImGui::IsItemClicked(1)){
                         ImGui::SetKeyboardFocusHere(-1);
                     }
                 }

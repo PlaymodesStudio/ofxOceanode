@@ -211,7 +211,7 @@ void ofxOceanodeInspectorController::draw(){
                     if(ImGui::Checkbox(hiddenUniqueId.c_str(), (bool *)&tempCast.get())){
                         tempCast = tempCast;
                     }
-                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                         tempCast = !tempCast;
                     }
 					ImGui::SameLine();
@@ -228,7 +228,7 @@ void ofxOceanodeInspectorController::draw(){
                         tempCast.trigger();
                     }
                     ImGui::PopStyleColor(3);
-                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space))){
+                    if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                         tempCast.trigger();
                     }
 					ImGui::SameLine();
@@ -274,7 +274,7 @@ void ofxOceanodeInspectorController::draw(){
                 }
 
                 if(isItemEditableByText){
-                    if((ImGui::IsItemHovered() && !ImGui::IsItemEdited() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter))) || ImGui::IsItemClicked(1)){
+                    if((ImGui::IsItemHovered() && !ImGui::IsItemEdited() && ImGui::IsKeyPressed((ImGuiKey_Enter))) || ImGui::IsItemClicked(1)){
                         ImGui::SetKeyboardFocusHere(-1);
                     }
                 }

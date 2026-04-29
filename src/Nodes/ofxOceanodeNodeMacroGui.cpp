@@ -254,7 +254,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 		
 		if(ImGui::BeginPopupModal("Preset name already exists", NULL))
 		{
-			if (ImGui::Button("OK", ImVec2(220,0)) || (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)) && !openNameAlreadyExistsPopup)) {
+			if (ImGui::Button("OK", ImVec2(220,0)) || (ImGui::IsKeyDown((ImGuiKey_Enter)) && !openNameAlreadyExistsPopup)) {
 				ImGui::CloseCurrentPopup();
 			}
 			ImGui::EndPopup();

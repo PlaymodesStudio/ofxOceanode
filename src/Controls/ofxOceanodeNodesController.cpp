@@ -554,8 +554,8 @@ void ofxOceanodeNodesController::draw()
 
         // Arrow key navigation — only when this window (or its child) has focus
         bool windowFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-        bool upPressed   = windowFocused && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow),   true);
-        bool downPressed = windowFocused && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow), true);
+        bool upPressed   = windowFocused && ImGui::IsKeyPressed((ImGuiKey_UpArrow),   true);
+        bool downPressed = windowFocused && ImGui::IsKeyPressed((ImGuiKey_DownArrow), true);
 
         if((upPressed || downPressed) && !navigableNodes.empty()) {
             // Determine the candidate pool
