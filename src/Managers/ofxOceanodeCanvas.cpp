@@ -9,6 +9,7 @@
 #ifndef OFXOCEANODE_HEADLESS
 
 #include "ofxOceanodeCanvas.h"
+#include <cmath>
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeNode.h"
@@ -18,8 +19,168 @@
 
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "imgui_impl_opengl3.h"
+#include "imgui_impl_opengl2.h"
+#include "ofGLUtils.h"
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeParameter.h"
+#include "ofAppGLFWWindow.h"
+
+// Static member definition – shared across all canvas instances (ImGui uses a single font atlas)
+ImFont* ofxOceanodeCanvas::zoomFonts[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+ImFont* ofxOceanodeCanvas::zoomFontsBold[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+
+int ofxOceanodeCanvas::getCurrentFontIndex() const {
+    float desiredScreenSize = ZOOM_FONT_SIZES[2] * zoomLevel;  // index 2 = default (18px)
+    int bestIdx = 2;
+    float bestDist = FLT_MAX;
+    for(int i = 0; i < 5; i++) {
+        float dist = fabsf(ZOOM_FONT_SIZES[i] - desiredScreenSize);
+        if(dist < bestDist) { bestDist = dist; bestIdx = i; }
+    }
+    return bestIdx;
+}
+
+int ofxOceanodeCanvas::getCeilingFontIndex() const {
+    float targetSize = ZOOM_FONT_SIZES[2] * zoomLevel; // 14 * zoom
+    // Find smallest loaded font whose nominal size >= targetSize (scale-down only)
+    for(int i = 0; i < 5; i++){
+        if(ZOOM_FONT_SIZES[i] >= targetSize)
+            return i;
+    }
+    return 4; // fallback: largest font
+}
+
+bool ofxOceanodeCanvas::shouldRenderText() const {
+    // Hide text exactly when the smallest pre-cached font (8pt) would exceed
+    // the zoom-scaled target frame height (BASE_FRAME_HEIGHT = 14.0 + 2*1.0 = 16.0).
+    // This matches the FramePadding compensation logic: below this zoom level,
+    // targetPaddingY goes negative and row heights can no longer be maintained proportionally.
+    static constexpr float BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[2] + 2.0f; // 16.0f
+    return ZOOM_FONT_SIZES[0] < BASE_FRAME_HEIGHT * zoomLevel;
+}
+
+ImFont* ofxOceanodeCanvas::getZoomFont() const {
+    int idx = getCurrentFontIndex();
+    if(zoomFonts[idx] != nullptr) return zoomFonts[idx];
+    return nullptr; // fallback to current font
+}
+
+void ofxOceanodeCanvas::setupFonts() {
+    ImGuiIO& io = ImGui::GetIO();
+    std::string fontPath = ofToDataPath("config/font/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Medium.ttf", true);
+
+    // Detect Retina / HiDPI pixel density.
+    // Strategy 1: ask OpenGL for the actual framebuffer width and compare to the
+    // logical window width.  This is reliable at any point after window creation
+    // because it queries the real framebuffer rather than a cached OF value.
+    // Strategy 2: fall back to ofAppGLFWWindow::getPixelScreenCoordScale().
+    float scale = 1.0f;
+
+    GLint viewport[4];
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    float fbWidth = (float)viewport[2];
+    float winWidth = (float)ofGetWindowWidth();
+    if(winWidth > 0.0f && fbWidth > winWidth) {
+        scale = fbWidth / winWidth;
+    } else {
+        // Fallback: ask GLFW window directly
+        ofAppGLFWWindow* glfwWindow = dynamic_cast<ofAppGLFWWindow*>(ofGetWindowPtr());
+        if(glfwWindow) {
+            scale = (float)glfwWindow->getPixelScreenCoordScale();
+        }
+    }
+    ofLogNotice("ofxOceanodeCanvas") << "Font pixel scale: " << scale
+                                     << " (fbWidth=" << fbWidth << ", winWidth=" << winWidth << ")";
+
+    // Load fonts at PHYSICAL pixel size (logical size × screen scale) so the
+    // atlas is rasterised at full native resolution.  FontGlobalScale is then
+    // set to 1/scale so that ImGui renders them back at the correct logical size.
+    ImFontConfig fontCfg;
+    fontCfg.OversampleH = 2;   // 2 is sufficient at 2× physical — saves atlas memory
+    fontCfg.OversampleV = 2;   // increase from default 1 for vertical sharpness
+
+    ofFile fontFile(fontPath);
+    if(!fontFile.exists()) {
+        ofLogWarning("ofxOceanodeCanvas") << "JetBrainsMono font not found at: " << fontPath;
+        ofLogWarning("ofxOceanodeCanvas") << "Using default ImGui font for zoom system";
+        for(int i = 0; i < 5; i++) {
+            zoomFonts[i] = io.Fonts->AddFontDefault();
+        }
+    } else {
+        // Add default (index 2) FIRST — ImGui uses the first added font as default
+        // This ensures the main UI font is 18px, not 10px
+        zoomFonts[2] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[2] * scale, &fontCfg);
+
+        // Add the remaining fonts
+        zoomFonts[0] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[0] * scale, &fontCfg);
+        zoomFonts[1] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[1] * scale, &fontCfg);
+        zoomFonts[3] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[3] * scale, &fontCfg);
+        zoomFonts[4] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[4] * scale, &fontCfg);
+
+        // Validate and fall back any that failed
+        for(int i = 0; i < 5; i++) {
+            if(!zoomFonts[i]) {
+                ofLogWarning("ofxOceanodeCanvas") << "Failed to load font size " << ZOOM_FONT_SIZES[i];
+                zoomFonts[i] = io.Fonts->AddFontDefault();
+            }
+        }
+    }
+
+    // ── Bold fonts (ExtraBold) for node titles ──────────────────────────
+    std::string boldFontPath = ofToDataPath("config/font/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ExtraBold.ttf", true);
+    ofFile boldFontFile(boldFontPath);
+    if(!boldFontFile.exists()) {
+        ofLogWarning("ofxOceanodeCanvas") << "JetBrainsMono ExtraBold font not found at: " << boldFontPath;
+        ofLogWarning("ofxOceanodeCanvas") << "Bold node titles will fall back to regular font";
+        for(int i = 0; i < 5; i++) {
+            zoomFontsBold[i] = nullptr; // nullptr signals "no bold available"
+        }
+    } else {
+        ImFontConfig boldCfg;
+        boldCfg.OversampleH = 2;
+        boldCfg.OversampleV = 2;
+        boldCfg.MergeMode   = false;
+
+        for(int i = 0; i < 5; i++) {
+            zoomFontsBold[i] = io.Fonts->AddFontFromFileTTF(boldFontPath.c_str(), ZOOM_FONT_SIZES[i] * scale, &boldCfg);
+            if(!zoomFontsBold[i]) {
+                ofLogWarning("ofxOceanodeCanvas") << "Failed to load bold font size " << ZOOM_FONT_SIZES[i];
+            }
+        }
+    }
+
+    // Rebuild the font atlas after adding fonts (called after gui.setup() created the context)
+    io.Fonts->Build();
+
+    // Publish the base (zoom=1.0) font size so that render-time code in other
+    // translation units (e.g. macro GUI) can compute the current zoom factor via
+    // ImGui::GetFontSize() / ofxOceanodeShared::getZoomBaseFontSize() without
+    // hard-coding the canvas-internal ZOOM_FONT_SIZES constant.
+    ofxOceanodeShared::setZoomBaseFontSize(ZOOM_FONT_SIZES[2]);
+
+    // Publish the base frame height so NodeGui and other classes can derive the
+    // correct row height without duplicating this formula.
+    {
+        static constexpr float BASE_FRAME_PADDING_Y = 1.0f;
+        static constexpr float BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[2] + 2.0f * BASE_FRAME_PADDING_Y;
+        ofxOceanodeShared::setBaseFrameHeight(BASE_FRAME_HEIGHT);
+    }
+
+    // Compensate for the physical-pixel oversize: render at logical size.
+    // e.g. on Retina: atlas built at 2× → FontGlobalScale = 0.5 → displayed at 1× logical.
+    // This does NOT require a rebuild — it is a render-time multiplier.
+    io.FontGlobalScale = 1.0f / scale;
+
+    // Recreate the GPU font texture for whichever renderer is active
+    if(ofIsGLProgrammableRenderer()) {
+        ImGui_ImplOpenGL3_DestroyFontsTexture();
+        ImGui_ImplOpenGL3_CreateFontsTexture();
+    } else {
+        ImGui_ImplOpenGL2_DestroyFontsTexture();
+        ImGui_ImplOpenGL2_CreateFontsTexture();
+    }
+}
 
 void ofxOceanodeCanvas::setup(string _uid, string _pid){
     transformationMatrix = &container->getTransformationMatrix();
@@ -45,6 +206,10 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
 }
 
 void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
+    // Save the previous shared zoom level so nested canvas draws (e.g. macros)
+    // restore the parent's value when they finish.
+    float previousSharedZoom = ofxOceanodeShared::getZoomLevel();
+
     //Draw Guis
     if(onTop){
         ImGui::SetNextWindowFocus();
@@ -112,11 +277,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImGui::BeginGroup();
                 
         // Create our child canvas
-		offsetToCenter = glm::vec2(int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
-		
-		// CANVAS POSITION
-		ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1.0,1.0,1.0,0.5));
-		ImGui::Text("[%d,%d]",int(scrolling.x - (ImGui::GetContentRegionAvail().x/2.0f)), int( scrolling.y - (ImGui::GetContentRegionAvail().y/2.0f))+8);
+        offsetToCenter = glm::vec2(
+        	int(scrolling.x - (ImGui::GetContentRegionAvail().x / (2.0f * zoomLevel))),
+        	int(scrolling.y - (ImGui::GetContentRegionAvail().y / (2.0f * zoomLevel))) + 8);
+        
+        // CANVAS POSITION
+        ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1.0,1.0,1.0,0.5));
+        ImGui::Text("[%d,%d]",int(scrolling.x - (ImGui::GetContentRegionAvail().x / (2.0f * zoomLevel))), int( scrolling.y - (ImGui::GetContentRegionAvail().y / (2.0f * zoomLevel)))+8);
         ImGui::SameLine();
 		ImGui::PopStyleColor();
 		
@@ -158,6 +325,31 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		}
 		ImGui::PopStyleColor();
 		ImGui::PopStyleVar();
+
+		// [Z]OOM SLIDER
+		ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.4,0.4,0.4,1.0));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
+
+		ImGui::SameLine();
+		if(ImGui::SmallButton("[Z]")) {
+			rawZoomLevel = 1.0f;
+			zoomLevel = 1.0f;
+		}
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(80);
+
+		float zoomPercent = zoomLevel * 100.0f;
+		if(ImGui::SliderFloat("##zoom", &zoomPercent, ZOOM_MIN * 100.0f, ZOOM_MAX * 100.0f, "%.0f%%")) {
+			glm::vec2 canvasCenter = glm::vec2(ImGui::GetContentRegionAvail()) * 0.5f;
+			glm::vec2 worldCenterBefore = screenToWorld(canvasOrigin + canvasCenter);
+			rawZoomLevel = ofClamp(zoomPercent / 100.0f, ZOOM_MIN, ZOOM_MAX);
+			zoomLevel = std::round(rawZoomLevel / 0.05f) * 0.05f;
+			glm::vec2 worldCenterAfter = screenToWorld(canvasOrigin + canvasCenter);
+			scrolling += glm::vec2(worldCenterAfter - worldCenterBefore);
+		}
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
+
 
 		// COMMENTS
 		
@@ -321,7 +513,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		      contentRegionSize = glm::vec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y);
 		      ImGui::PushItemWidth(120.0f);
 		      
-		      ImVec2 offset = ImGui::GetCursorScreenPos() + scrolling;
+		      canvasOrigin = glm::vec2(ImGui::GetCursorScreenPos());
+		      ImVec2 offset = ImVec2(canvasOrigin.x + scrolling.x * zoomLevel,
+		                             canvasOrigin.y + scrolling.y * zoomLevel);
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         
 		// COMMENT CREATION WITH ALT MOUSE
@@ -359,8 +553,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             {
                 if(!ImGui::GetIO().KeyShift)
                 {
-                    scrolling.x = ImGui::GetContentRegionAvail().x/2.0f;
-                    scrolling.y = ImGui::GetContentRegionAvail().y/2.0f;
+                    scrolling.x = ImGui::GetContentRegionAvail().x / (2.0f * zoomLevel);
+                    scrolling.y = ImGui::GetContentRegionAvail().y / (2.0f * zoomLevel);
                 }
                 else
                 {
@@ -374,19 +568,35 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         currentNodeCenter = allNodes[i]->getNodeGui().getPosition() + currentNodeRectangle/2.0f  ;
                         centerOfMass = centerOfMass + currentNodeCenter;
                     }
-                    scrolling.x = (ImGui::GetContentRegionAvail().x/2.0f) - (centerOfMass.x/allNodes.size());
-                    scrolling.y = (ImGui::GetContentRegionAvail().y/2.0f) - (centerOfMass.y/allNodes.size());
+                    scrolling.x = (ImGui::GetContentRegionAvail().x / (2.0f * zoomLevel)) - (centerOfMass.x/allNodes.size());
+                    scrolling.y = (ImGui::GetContentRegionAvail().y / (2.0f * zoomLevel)) - (centerOfMass.y/allNodes.size());
                 }
             }
 
-            for (float x = fmodf(scrolling.x, GRID_SIZE); x < canvas_sz.x; x += GRID_SIZE)
-                draw_list->AddLine(ImVec2(x, 0.0f) + win_pos, ImVec2(x, canvas_sz.y) + win_pos, GRID_COLOR);
-            for (float y = fmodf(scrolling.y, GRID_SIZE); y < canvas_sz.y; y += GRID_SIZE)
-                draw_list->AddLine(ImVec2(0.0f, y) + win_pos, ImVec2(canvas_sz.x, y) + win_pos, GRID_COLOR);
-            
-            ImVec2 origin = ImVec2(win_pos.x + scrolling.x, win_pos.y + scrolling.y );
-            draw_list->AddLine(ImVec2(origin.x,0),ImVec2(origin.x,origin.x +  canvas_sz.y/2),GRID_COLOR_CENTER,2);
-            draw_list->AddLine(ImVec2(0,origin.y),ImVec2(origin.x +  canvas_sz.x,origin.y),GRID_COLOR_CENTER,2);
+            // Scaled grid spacing
+            float scaledGridSize = GRID_SIZE * zoomLevel;
+
+            // Compute fade opacity
+            float gridOpacity = 1.0f;
+            if(scaledGridSize < 40.0f) {
+                gridOpacity = (scaledGridSize <= 10.0f) ? 0.0f : (scaledGridSize - 10.0f) / 30.0f;
+            }
+
+            if(gridOpacity > 0.01f) {
+                int alpha = (int)(40 * gridOpacity);
+                ImU32 gridCol = IM_COL32(90, 90, 90, alpha);
+                float startX = fmodf(scrolling.x * zoomLevel, scaledGridSize);
+                float startY = fmodf(scrolling.y * zoomLevel, scaledGridSize);
+                for(float x = startX; x < canvas_sz.x; x += scaledGridSize)
+                    draw_list->AddLine(ImVec2(x, 0.0f) + win_pos, ImVec2(x, canvas_sz.y) + win_pos, gridCol);
+                for(float y = startY; y < canvas_sz.y; y += scaledGridSize)
+                    draw_list->AddLine(ImVec2(0.0f, y) + win_pos, ImVec2(canvas_sz.x, y) + win_pos, gridCol);
+            }
+
+            // Always draw origin cross
+            ImVec2 origin = ImVec2(win_pos.x + scrolling.x * zoomLevel, win_pos.y + scrolling.y * zoomLevel);
+            draw_list->AddLine(ImVec2(origin.x, win_pos.y), ImVec2(origin.x, win_pos.y + canvas_sz.y), GRID_COLOR_CENTER, 2.0f);
+            draw_list->AddLine(ImVec2(win_pos.x, origin.y), ImVec2(win_pos.x + canvas_sz.x, origin.y), GRID_COLOR_CENTER, 2.0f);
         }
 		
 		vector<pair<string, ofxOceanodeNode*>> nodesInThisFrame = vector<pair<string, ofxOceanodeNode*>>(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
@@ -436,7 +646,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             
             bool visibleNode = true;
             if(ofxOceanodeShared::getConfigurationFlags() & ofxOceanodeConfigurationFlags_DisableRenderAll){
-                if(!ofRectangle(ImGui::GetWindowPos() - offset, ImGui::GetWindowWidth(), ImGui::GetWindowHeight()).intersects(nodeGui.getRectangle()) && nodeGui.getRectangle().getWidth() > 0){
+                glm::vec2 screenNodePos = worldToScreen(nodeGui.getPosition());
+                glm::vec2 screenNodeSize = glm::vec2(nodeGui.getRectangle().getWidth() * zoomLevel,
+                                                     nodeGui.getRectangle().getHeight() * zoomLevel);
+                ofRectangle screenRect(screenNodePos.x, screenNodePos.y, screenNodeSize.x, screenNodeSize.y);
+                ofRectangle windowRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y,
+                                       ImGui::GetWindowWidth(), ImGui::GetWindowHeight());
+                if(!windowRect.intersects(screenRect) && screenRect.getWidth() > 0){
                     if(!nodeGui.getSelected())
                         visibleNode = false;
                 }
@@ -447,6 +663,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }else{
                 nodeGui.setVisibility(false);
             }
+            // TODO: At zoom < 0.3, consider rendering nodes as simplified colored rectangles
+            // for performance with large patches
         }
         
         //reorder nodesInThisFrame, so they are in correct drawing order, for the interaction to work properly
@@ -474,30 +692,80 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 				nodesDrawingOrder[nodeId] = nodesDrawingOrder.size();
 			}
             
-            glm::vec2 node_rect_min = offset + nodeGui.getPosition();
+            glm::vec2 node_rect_min = worldToScreen(nodeGui.getPosition());
             // Display node contents first
             draw_list->ChannelsSetCurrent(nodeDrawChannel+1); // Foreground
             bool old_any_active = ImGui::IsAnyItemActive();
-            ImGui::SetCursorScreenPos(node_rect_min + NODE_WINDOW_PADDING);
-            
-            
+
+            // Publish the continuous zoom level so node GUI code (e.g. macro snapshot
+            // matrix) can derive a smooth zoom factor without relying on the discrete font.
+            ofxOceanodeShared::setZoomLevel(zoomLevel);
+
+            // Apply zoom scaling for node rendering via style vars (avoids FontGlobalScale feedback loop)
+            // FramePadding inside scrolling_region is (1,1); ItemSpacing defaults are (8,4)
+            // Compensate FramePadding.y so that GetFrameHeight() (= FontSize + FramePadding.y*2) scales
+            // smoothly with zoomLevel even when the discrete font index flips.
+            // BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[2] + 2 * 1.0f  (default font + base padding)
+            // Use the actual effective font size (after fontWindowScale clamping) so that when the ceiling
+            // font is larger than targetSize and fwScale is clamped to 1.0, targetPaddingY still produces
+            // GetFrameHeight() == BASE_FRAME_HEIGHT * zoomLevel exactly.
+            static constexpr float BASE_FRAME_PADDING_Y = 1.0f;
+            static constexpr float BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[2] + 2.0f * BASE_FRAME_PADDING_Y;
+            int   ceilIdx          = getCeilingFontIndex();
+            float ceilFontSize     = ZOOM_FONT_SIZES[ceilIdx];
+            float targetSize       = ZOOM_FONT_SIZES[2] * zoomLevel;
+            float fwScale          = (ceilFontSize > 0.0f) ? (targetSize / ceilFontSize) : 1.0f;
+            if(fwScale > 1.0f) fwScale = 1.0f;          // never scale up (clamp to avoid blurriness)
+            float effectiveFontSize = ceilFontSize * fwScale;  // actual rendered font size after clamping
+            float targetPaddingY    = (BASE_FRAME_HEIGHT * zoomLevel - effectiveFontSize) / 2.0f;
+            if(targetPaddingY < 0.0f) targetPaddingY = 0.0f;
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(BASE_FRAME_PADDING_Y * zoomLevel, targetPaddingY));
+
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f * zoomLevel, 4.0f * zoomLevel));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f * zoomLevel, 8.0f * zoomLevel));
+            ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize,   12.0f * zoomLevel);
+            ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 14.0f * zoomLevel);
+
+            int ceilFontIdx = ceilIdx;
+            ImFont* zoomFont = zoomFonts[ceilFontIdx];
+            ofxOceanodeShared::setCurrentBoldFont(zoomFontsBold[ceilFontIdx]);
+            if(zoomFont) ImGui::PushFont(zoomFont);
+
+            // fwScale already computed above (clamped fontWindowScale); reuse it here.
+            ImGui::SetWindowFontScale(fwScale);
+
+            ImGui::SetCursorScreenPos(ImVec2(node_rect_min.x + NODE_WINDOW_PADDING.x * zoomLevel,
+                                             node_rect_min.y + NODE_WINDOW_PADDING.y * zoomLevel));
+
             //Draw Parameters
-			if(nodeGui.constructGui(NODE_WIDTH_TEXT,NODE_WIDTH_WIDGET)){
+            if(nodeGui.constructGui(
+                NODE_WIDTH_TEXT   * zoomLevel,
+                NODE_WIDTH_WIDGET * zoomLevel,
+                zoomLevel)){
+
+                ImGui::SetWindowFontScale(1.0f);
+                if(zoomFont) ImGui::PopFont();
+                ImGui::PopStyleVar(5);
                 
                 // Save the size of what we have emitted and whether any of the widgets are being used
                 bool node_widgets_active = (!old_any_active && ImGui::IsAnyItemActive());
-                glm::vec2 size = ImGui::GetItemRectSize() + NODE_WINDOW_PADDING + NODE_WINDOW_PADDING;
-                ImVec2 node_rect_max = node_rect_min + size;
-                ImVec2 node_rect_header = node_rect_min + ImVec2(size.x,29);
-                
-                nodeGui.setSize(size);
+                glm::vec2 screenSize = glm::vec2(ImGui::GetItemRectSize())
+                                       + glm::vec2(NODE_WINDOW_PADDING) * zoomLevel
+                                       + glm::vec2(NODE_WINDOW_PADDING) * zoomLevel;
+                glm::vec2 worldSize = screenSize / zoomLevel;
+                nodeGui.setSize(worldSize);
+
+                ImVec2 node_rect_max = ImVec2(node_rect_min.x + screenSize.x, node_rect_min.y + screenSize.y);
+                ImVec2 node_rect_header = ImVec2(node_rect_min.x + screenSize.x, node_rect_min.y + 29.0f * zoomLevel);
+                // Keep a local alias for backward compatibility in this scope
+                glm::vec2 size = screenSize;
                 
                 // Display node box
                 draw_list->ChannelsSetCurrent(nodeDrawChannel); // Background
                 ImGui::SetCursorScreenPos(node_rect_min);
                 bool interacting_node = ImGui::IsItemActive();
                 bool connectionCanBeInteracted = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
-                ImGui::InvisibleButton("node", size);
+                ImGui::InvisibleButton("node", ImVec2(screenSize.x, screenSize.y));
                 
                 if (ImGui::IsItemHovered())
                 {
@@ -562,14 +830,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 //draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(0, 0, 0, 255), 4.0f);
                 
                 if(nodeGui.getExpanded()){
-                    int NODE_BULLET_MIN_SIZE = 3;
-                    int NODE_BULLET_MAX_SIZE = 10;
-                    int NODE_BULLET_GROW_DIST = 10;
+                    float NODE_BULLET_MIN_SIZE = 3.0f * zoomLevel;
+                    float NODE_BULLET_MAX_SIZE = 10.0f * zoomLevel;
+                    float NODE_BULLET_GROW_DIST = 10.0f * zoomLevel;
                     
                     for (auto &absParam : node->getParameters()){
                         auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
                         if(!(param->getFlags() & ofxOceanodeParameterFlags_DisableInConnection)){
-                            auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
+                            auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                             auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
                             auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
                             draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
@@ -627,7 +895,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     for (auto &absParam : node->getParameters()){
                         auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
                         if(!(param->getFlags() & ofxOceanodeParameterFlags_DisableOutConnection)){
-                            auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
+                            auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                             auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
                             auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
                             draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
@@ -679,6 +947,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }
             }
             else{
+                ImGui::SetWindowFontScale(1.0f);
+                if(zoomFont) ImGui::PopFont();
+                ImGui::PopStyleVar(5);
                 deletedIds.insert(nodeId);
             }
             ImGui::PopID();
@@ -695,6 +966,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         
         if(newComment){
             // Snap comment corners to grid if snap_to_grid is enabled
+            // selectedRect is in world coordinates (Phase 6 changes), no extra conversion needed
             glm::vec2 commentPosition = selectedRect.position;
             glm::vec2 commentSize = glm::vec2(selectedRect.width, selectedRect.height);
             
@@ -736,14 +1008,29 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             
             bool isSelectedOrSelecting = c.selected;
             
-            glm::vec2 currentPosition = c.position + offset;
-            draw_list->AddRectFilled(currentPosition, currentPosition + glm::vec2(c.size.x, 15), IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 255));
-            draw_list->AddText(currentPosition, IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255), c.text.c_str());
-            draw_list->AddRectFilled(currentPosition + glm::vec2(0, 15), currentPosition + c.size, IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 100));
+            glm::vec2 currentPosition = worldToScreen(c.position);
+            glm::vec2 screenSize = c.size * zoomLevel;
+            float headerH = 15.0f * zoomLevel;
+            draw_list->AddRectFilled(currentPosition, currentPosition + glm::vec2(screenSize.x, headerH), IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 255));
+            // Don't draw comment text below 50% zoom
+            if(zoomLevel > 0.5f){
+                ImFont* commentFont = zoomFonts[getCeilingFontIndex()];
+                float commentFontSize = ZOOM_FONT_SIZES[2] * zoomLevel;  // base font size scaled by zoom
+                if(commentFont) {
+                    draw_list->AddText(commentFont, commentFontSize, currentPosition,
+                                       IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255),
+                                       c.text.c_str());
+                } else {
+                    draw_list->AddText(currentPosition,
+                                       IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255),
+                                       c.text.c_str());
+                }
+            }
+            draw_list->AddRectFilled(currentPosition + glm::vec2(0, headerH), currentPosition + screenSize, IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 100));
             
             // Draw selection border if selected
             if(isSelectedOrSelecting){
-                draw_list->AddRect(currentPosition, currentPosition + c.size, IM_COL32(255, 127, 0, 255), 0.0f, 0, 2.0f);
+                draw_list->AddRect(currentPosition, currentPosition + screenSize, IM_COL32(255, 127, 0, 255), 0.0f, 0, 2.0f);
             }
             ImGui::SetCursorScreenPos(currentPosition);
 			// trying to avoid a crash on ImGui::InvisibleButton
@@ -755,11 +1042,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 				c.size.x = 256;
 				c.size.y = 15;
 			}
-            ImGui::InvisibleButton("Inv Button", ImVec2(c.size.x, 15));
+            ImGui::InvisibleButton("Inv Button", ImVec2(c.size.x * zoomLevel, 15.0f * zoomLevel));
             
             if(ImGui::IsItemActive()){
                 ofRectangle rect(c.position, c.size.x, c.size.y);
-                glm::vec2 dragDelta = ImGui::GetIO().MouseDelta;
+                glm::vec2 dragDelta = glm::vec2(ImGui::GetIO().MouseDelta) / zoomLevel;
                 
                 // If this comment is selected, move all selected items (nodes + comments)
                 if(c.selected && dragDelta != glm::vec2(0,0)){
@@ -940,7 +1227,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 			newNodeClickPos = ImGui::GetMousePos();
 			bool commentClicked = false;
 			for(auto &c : container->getComments()){
-				if(ofRectangle(c.position.x, c.position.y, c.size.x, 15).inside(newNodeClickPos-offset)){
+				if(ofRectangle(c.position.x, c.position.y, c.size.x, 15.0f / zoomLevel).inside(screenToWorld(glm::vec2(newNodeClickPos)))){
 					c.openPopupInNext = true;
 					commentClicked = true;
 				}
@@ -1128,7 +1415,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(result.name);
                             if (type) {
                                 auto &node = container->createNode(std::move(type));
-                                glm::vec2 nodePosition = newNodeClickPos - offset;
+                                glm::vec2 nodePosition = screenToWorld(glm::vec2(newNodeClickPos));
                                 if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
                                 node.getNodeGui().setPosition(nodePosition);
                             }
@@ -1136,7 +1423,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
                             if (type) {
                                 auto &node = container->createNode(std::move(type), result.macroPath);
-                                glm::vec2 nodePosition = newNodeClickPos - offset;
+                                glm::vec2 nodePosition = screenToWorld(glm::vec2(newNodeClickPos));
                                 if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
                                 node.getNodeGui().setPosition(nodePosition);
                             }
@@ -1163,7 +1450,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(firstResult.name);
                         if (type) {
                             auto &node = container->createNode(std::move(type));
-                            glm::vec2 nodePosition = newNodeClickPos - offset;
+                            glm::vec2 nodePosition = screenToWorld(glm::vec2(newNodeClickPos));
                             if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
                             node.getNodeGui().setPosition(nodePosition);
                         }
@@ -1171,7 +1458,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
                         if (type) {
                             auto &node = container->createNode(std::move(type), firstResult.macroPath);
-                            glm::vec2 nodePosition = newNodeClickPos - offset;
+                            glm::vec2 nodePosition = screenToWorld(glm::vec2(newNodeClickPos));
                             if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
                             node.getNodeGui().setPosition(nodePosition);
                         }
@@ -1207,7 +1494,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                 if (type)
                                 {
                                     auto &node = container->createNode(std::move(type));
-                                    glm::vec2 nodePosition = newNodeClickPos - offset;
+                                    glm::vec2 nodePosition = screenToWorld(glm::vec2(newNodeClickPos));
                                     if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
                                     node.getNodeGui().setPosition(nodePosition);
                                 }
@@ -1238,7 +1525,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 				auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
 				
 				std::function<void(shared_ptr<macroCategory>)> drawCategory =
-				[this, offset, &drawCategory](shared_ptr<macroCategory> category){
+				[this, &drawCategory](shared_ptr<macroCategory> category){
 					for(auto d : category->categories){
 						if(ImGui::BeginMenu(d->name.c_str())){
 							drawCategory(d);
@@ -1251,9 +1538,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 							if (type)
 							{
 								auto &node = container->createNode(std::move(type), m.second);
-								glm::vec2 nodePosition = newNodeClickPos - offset;
-								if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
-								node.getNodeGui().setPosition(nodePosition);
+									glm::vec2 nodePosition = screenToWorld(glm::vec2(newNodeClickPos));
+									if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
+									node.getNodeGui().setPosition(nodePosition);
 							}
 						}
 					}
@@ -1273,7 +1560,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
 			
 			if(ImGui::Selectable("Comment")){
-				glm::vec2 commentPosition = newNodeClickPos - offset;
+				glm::vec2 commentPosition = screenToWorld(glm::vec2(newNodeClickPos));
 				glm::vec2 commentSize;
 				
 				// Snap comment position and size to grid if snap_to_grid is enabled
@@ -1295,25 +1582,25 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImGui::PopStyleVar();
         //ImGui::PopStyleColor();
         
-        auto getSourceConnectionPositionFromParameter = [this, offset](ofxOceanodeAbstractParameter& param) -> glm::vec2{
+        auto getSourceConnectionPositionFromParameter = [this](ofxOceanodeAbstractParameter& param) -> glm::vec2{
             auto gui = container->getGuiFromModel(param.getNodeModel());
             if(gui != nullptr){
                 if(gui->getVisibility()){
                     return gui->getSourceConnectionPositionFromParameter(param);
                 }else{
-                    return gui->getPosition() + offset + glm::vec2(gui->getRectangle().getWidth(), gui->getRectangle().getHeight()/2);
+                    return worldToScreen(gui->getPosition()) + glm::vec2(gui->getRectangle().getWidth() * zoomLevel, gui->getRectangle().getHeight() * zoomLevel / 2.0f);
                 }
             }
             return glm::vec2();
             //TODO: Throw exception
         };
-        auto getSinkConnectionPositionFromParameter = [this, offset](ofxOceanodeAbstractParameter& param) -> glm::vec2{
+        auto getSinkConnectionPositionFromParameter = [this](ofxOceanodeAbstractParameter& param) -> glm::vec2{
             auto gui = container->getGuiFromModel(param.getNodeModel());
             if(gui != nullptr){
                 if(gui->getVisibility()){
                     return gui->getSinkConnectionPositionFromParameter(param);
                 }else{
-                    return gui->getPosition() + offset + glm::vec2(0, gui->getRectangle().getHeight()/2);
+                    return worldToScreen(gui->getPosition()) + glm::vec2(0, gui->getRectangle().getHeight() * zoomLevel / 2.0f);
                 }
             }
             return glm::vec2();
@@ -1334,10 +1621,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 if(param->getInConnection() != nullptr) connections.push_back(param->getInConnection());
                 for(auto connection : connections){
                     if(std::find(drawnConnections.begin(), drawnConnections.end(), connection) == drawnConnections.end()){
-                        glm::vec2 p1 = getSourceConnectionPositionFromParameter(connection->getSourceParameter()) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
-                        glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter()) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
+                        glm::vec2 p1 = getSourceConnectionPositionFromParameter(connection->getSourceParameter()) + glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
+                        glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter()) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                         glm::vec2  controlPoint(0,0);
-                        controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
+                        controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);
                         draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 200, 128), 2.0f);
                         drawnConnections.push_back(connection);
                     }
@@ -1348,14 +1635,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         if(tempSourceParameter != nullptr || tempSinkParameter != nullptr){
             glm::vec2 p1, p2;
             if(tempSourceParameter != nullptr){
-                p1 = getSourceConnectionPositionFromParameter(*tempSourceParameter) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
+                p1 = getSourceConnectionPositionFromParameter(*tempSourceParameter) + glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                 p2 = ImGui::GetMousePos();
             }else{
                 p1 = ImGui::GetMousePos();
-                p2 = getSinkConnectionPositionFromParameter(*tempSinkParameter) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
+                p2 = getSinkConnectionPositionFromParameter(*tempSinkParameter) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
             }
             glm::vec2  controlPoint(0,0);
-            controlPoint.x = ofMap(glm::distance(p1,p2),0,1500,25,400);
+            controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);
             float linkWidth = 2.0f;
             ImColor c;
             if(connectionIsDoable){
@@ -1376,31 +1663,32 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 if (ImGui::IsWindowHovered()){
                     if(ImGui::GetIO().KeyCtrl && !isCreatingConnection){
                         if(!isSelecting){
-                            selectInitialPoint = ImGui::GetMousePos() - ImGui::GetIO().MouseDelta - offset;
+                            selectInitialPoint = screenToWorld(glm::vec2(ImGui::GetMousePos()) - glm::vec2(ImGui::GetIO().MouseDelta));
                             isSelecting  = true;
                         }
-                        selectEndPoint = ImGui::GetMousePos() - offset;
+                        selectEndPoint = screenToWorld(glm::vec2(ImGui::GetMousePos()));
                         selectedRect = ofRectangle(selectInitialPoint, selectEndPoint);
                         entireSelect =  selectInitialPoint.y < selectEndPoint.y;
                         canvasHasScolled = true; //HACK to not remove selection on mouse release
                     }
-                    if((!isSelecting && !isCreatingConnection && someSelectedModuleMove == "") || (ImGui::IsKeyDown((ImGuiKey_Space)))){
-                        scrolling = scrolling + ImGui::GetIO().MouseDelta;
+                    if((!isSelecting && !isCreatingConnection && someSelectedModuleMove == "") || (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space)))){
+                        scrolling = scrolling + glm::vec2(ImGui::GetIO().MouseDelta) / zoomLevel;
                         if(glm::vec2(ImGui::GetIO().MouseDelta) != glm::vec2(0,0)) canvasHasScolled = true;
                         if(isSelecting && !ImGui::GetIO().KeyCtrl){
-                            selectInitialPoint = selectInitialPoint +  ImGui::GetIO().MouseDelta;
-                            selectEndPoint = selectEndPoint + ImGui::GetIO().MouseDelta;
+#endif
+                            selectInitialPoint += glm::vec2(ImGui::GetIO().MouseDelta) / zoomLevel;
+                            selectEndPoint += glm::vec2(ImGui::GetIO().MouseDelta) / zoomLevel;
                             selectedRect = ofRectangle(selectInitialPoint, selectEndPoint);
                             entireSelect = glm::vec2(selectedRect.getTopLeft()) == selectInitialPoint;
                         }
                     }
 				}else if(ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)){
-					if(ImGui::IsKeyDown((ImGuiKey_Space))){
-						scrolling = scrolling + ImGui::GetIO().MouseDelta;
+					if(ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space))){
+						scrolling = scrolling + glm::vec2(ImGui::GetIO().MouseDelta) / zoomLevel;
                         if(glm::vec2(ImGui::GetIO().MouseDelta) != glm::vec2(0,0)) canvasHasScolled = true;
 					}
 					else if(someSelectedModuleMove != ""){
-						moveSelectedModulesWithDrag = ImGui::GetIO().MouseDelta;
+						moveSelectedModulesWithDrag = glm::vec2(ImGui::GetIO().MouseDelta) / zoomLevel;
 						if(moveSelectedModulesWithDrag != glm::vec2(0,0))
 							someDragAppliedToSelection = true;
 					}
@@ -1409,15 +1697,34 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             
             //TODO: Scroll amount in config
             if(ImGui::IsWindowHovered()){
-                scrolling = scrolling + glm::vec2(ImGui::GetIO().MouseWheelH * 10, ImGui::GetIO().MouseWheel * 10);
+                float wheel = ImGui::GetIO().MouseWheel;
+                float wheelH = ImGui::GetIO().MouseWheelH;
+
+                bool zoomModifier = ImGui::GetIO().KeyCtrl;
+#ifdef TARGET_OSX
+                zoomModifier = ImGui::GetIO().KeySuper; // Cmd key on Mac
+#endif
+
+                if(zoomModifier && wheel != 0.0f) {
+                    // Zoom centered on mouse position
+                    glm::vec2 mouseScreen = glm::vec2(ImGui::GetMousePos());
+                    glm::vec2 worldBeforeZoom = screenToWorld(mouseScreen);
+                    rawZoomLevel = ofClamp(rawZoomLevel * (1.0f + wheel * 0.1f), ZOOM_MIN, ZOOM_MAX);
+                    zoomLevel = std::round(rawZoomLevel / 0.05f) * 0.05f;
+                    glm::vec2 worldAfterZoom = screenToWorld(mouseScreen);
+                    scrolling += (worldAfterZoom - worldBeforeZoom);
+                } else {
+                    // Normal panning — convert screen delta to world delta
+                    scrolling += glm::vec2(wheelH * 10.0f, wheel * 10.0f) / zoomLevel;
+                }
             }
             
             if(isSelecting){
                 //TODO: Change colors
                 if(selectInitialPoint.y < selectEndPoint.y){ //From top to bottom;
-                    draw_list->AddRectFilled(selectInitialPoint + offset, selectEndPoint + offset, IM_COL32(255,127,0,30));
+                    draw_list->AddRectFilled(worldToScreen(selectInitialPoint), worldToScreen(selectEndPoint), IM_COL32(255,127,0,30));
                 }else{
-                    draw_list->AddRectFilled(selectInitialPoint + offset, selectEndPoint + offset, IM_COL32(0,125,255,30));
+                    draw_list->AddRectFilled(worldToScreen(selectInitialPoint), worldToScreen(selectEndPoint), IM_COL32(0,125,255,30));
                 }
             }
             
@@ -1455,7 +1762,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     deselectAllNodes();
                 }else if(ImGui::IsKeyPressed(ImGuiKey_V) && !ImGui::IsAnyItemActive()){
                     deselectAllNodes();
-                    glm::vec2 pastePosition = ImGui::GetMousePos() - offset;
+                    glm::vec2 pastePosition = screenToWorld(glm::vec2(ImGui::GetMousePos()));
                     if(snap_to_grid) pastePosition = snapToGrid(pastePosition);
                     container->pasteModulesAndConnectionsInPosition(pastePosition, ImGui::GetIO().KeyShift);
                 }else if(ImGui::IsKeyPressed(ImGuiKey_X)){
@@ -1463,7 +1770,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }else if(ImGui::IsKeyPressed(ImGuiKey_D)){
                     container->copySelectedModulesWithConnections();
                     deselectAllNodes();
-                    glm::vec2 pastePosition = ImGui::GetMousePos() - offset;
+                    glm::vec2 pastePosition = screenToWorld(glm::vec2(ImGui::GetMousePos()));
                     if(snap_to_grid) pastePosition = snapToGrid(pastePosition);
                     container->pasteModulesAndConnectionsInPosition(pastePosition, ImGui::GetIO().KeyShift);
                 }else if(ImGui::IsKeyPressed(ImGuiKey_A)){
@@ -1474,6 +1781,15 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
             else if(ImGui::IsKeyPressed((ImGuiKey_Backspace)) && !ImGui::IsAnyItemActive()){
                 container->deleteSelectedModules();
+            }
+            
+            // Alt+Z: reset zoom to 100%, preserving the visible world center
+            if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && ImGui::GetIO().KeyAlt && ImGui::IsKeyPressed((ImGuiKey)'Z')){
+                glm::vec2 canvasCenter = contentRegionSize * 0.5f;
+                glm::vec2 worldCenterBefore = screenToWorld(canvasOrigin + canvasCenter);
+                setZoomLevel(ZOOM_DEFAULT);
+                glm::vec2 worldCenterAfter = screenToWorld(canvasOrigin + canvasCenter);
+                scrolling += (worldCenterAfter - worldCenterBefore);
             }
             
             if (isCreatingConnection && !ImGui::IsMouseDown(0)){
@@ -1505,6 +1821,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     ofPushMatrix();
     ofMultMatrix(glm::inverse(transformationMatrix->get()));
     ofPopMatrix();
+
+    // Restore the previous shared zoom level (stack-like save/restore for nested canvases)
+    ofxOceanodeShared::setZoomLevel(previousSharedZoom);
 }
 
 //void ofxOceanodeCanvas::mouseScrolled(ofMouseEventArgs &e){

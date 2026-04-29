@@ -531,6 +531,16 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 				ofxOceanodeShared::setSnapToGrid(snap);
 			}
 			
+			// Canvas zoom control
+			float zoomLevel = canvas.getZoomLevel() * 100.0f;
+			if(ImGui::SliderFloat("Canvas Zoom", &zoomLevel, 25.0f, 400.0f, "%.0f%%")) {
+				canvas.setZoomLevel(zoomLevel / 100.0f);
+			}
+			ImGui::SameLine();
+			if(ImGui::Button("Reset##zoom")) {
+				canvas.setZoomLevel(1.0f);
+			}
+			
 			int tw = canvas.getNodeWidthText();
 			int ww = canvas.getNodeWidthWidget();
 			int gd = canvas.getGridDivisions();

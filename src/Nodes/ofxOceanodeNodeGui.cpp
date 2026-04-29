@@ -13,6 +13,7 @@
 #include "ofxOceanodeContainer.h"
 #include "imgui.h"
 #include "ofxOceanodeParameter.h"
+#include "ofxOceanodeShared.h"
 #include "ofxOceanodeScope.h"
 #include "ofxOceanodeTime.h"
 
@@ -35,8 +36,9 @@ ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
     
 }
 
-bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
+bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget, float zoomLevel){
     string moduleName = getParameters().getName();
+    const bool renderWidgets = (zoomLevel > 0.5f);
 	
 	bool isTransparent = (node.getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
 
@@ -54,9 +56,17 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
 		ImGui::PopStyleColor();
 		
 		ImGui::SameLine();
-		ImGui::Text("%s", moduleName.c_str());
+		// Don't draw node name text below 50% zoom
+		if(zoomLevel > 0.5f){
+			ImFont* boldFont = ofxOceanodeShared::getCurrentBoldFont();
+			if(boldFont) ImGui::PushFont(boldFont);
+			ImGui::Text("%s", moduleName.c_str());
+			if(boldFont) ImGui::PopFont();
+		}
 		
-		ImGui::SameLine(guiRect.width - 30);
+		// Position the delete button at the right edge using the screen-space node width
+		// (nodeWidthText + nodeWidthWidget is already zoom-scaled by the caller)
+		ImGui::SameLine(nodeWidthText + nodeWidthWidget - ofxOceanodeShared::getBaseFrameHeight() * zoomLevel, 0.0f);
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(220,220,220,255)));
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(ImColor(0, 0, 0,0)));
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
@@ -94,6 +104,9 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
         ImGui::Spacing();
         
         auto startPos = ImGui::GetCursorScreenPos();
+        float cursorYBefore = ImGui::GetCursorPosY();
+        
+        if(renderWidgets){
         
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
@@ -129,7 +142,10 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                     // Render separator with label and background highlight
                     if(!label.empty()){
                         ImVec2 p = ImGui::GetCursorScreenPos();
-                        float w = guiRect.width;
+                        // Use the already zoom-scaled screen-space widths passed by the canvas,
+                        // not guiRect.width which is in world-space coordinates.
+                        float w = nodeWidthText + nodeWidthWidget;
+                        float scale = zoomLevel;
                         
                         // Draw the text
                         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(color.r/255.0f, color.g/255.0f, color.b/255.0f, color.a/255.0f));
@@ -143,11 +159,11 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                         ImU32 bgCol = IM_COL32(color.r, color.g, color.b, color.a * 0.15f);
                         ImGui::GetWindowDrawList()->AddRectFilled(
                             ImVec2(p.x, p.y),
-                            ImVec2(p.x + w - 16 , p.y + textSize.y),
+                            ImVec2(p.x + w - 16.0f * scale, p.y + textSize.y),
                             bgCol
                         );
                         
-                        ImGui::Dummy(ImVec2(0, 2));
+                        ImGui::Dummy(ImVec2(0, 2.0f * scale));
                     }
                 }else{
                     // Regular custom region function
@@ -155,12 +171,11 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                 }
             }else{
                 
-                ImGui::SetNextItemAllowOverlap();
                 ImGui::Text("%s", uniqueId.c_str());
-                
+                ImGui::SetItemAllowOverlap();
                 ImGui::SameLine(-1);
-				ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
-                
+                ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
+                {
                 int drag = 0;
                 bool resetValue = false;
                 if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)){
@@ -178,7 +193,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                 }
                 
 				// [ node width ] : this was 90 pixels for the name and 150 for the "widget"
-				ImGui::SameLine(nodeWidthText);
+				ImGui::SameLine(nodeWidthText, 0.0f);
 				ImGui::SetNextItemWidth(nodeWidthWidget);
                 
                 string hiddenUniqueId = "##" + uniqueId;
@@ -405,7 +420,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                                 return true;
                             };
                             
-                            vector<string> options = absParam.cast<int>().getDropdownOptions();
+                            vector<string> options = absParam.cast<vector<int>>().getDropdownOptions();
                             if(ImGui::Combo(hiddenUniqueId.c_str(), (int*)&tempCast.get()[0], vector_getter, static_cast<void*>(&options), options.size()))
                                 tempCast = vector<int>(1, ofClamp(tempCast.get()[0], tempCast.getMin()[0], tempCast.getMax()[0]));
                             
@@ -442,7 +457,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                         tempCast = !tempCast;
                     }
 					ImGui::SameLine();
-					ImGui::Dummy(ImVec2(nodeWidthWidget-sizeCB.x-8,ImGui::GetFrameHeight()));
+					ImGui::Dummy(ImVec2(nodeWidthWidget-sizeCB.x-ImGui::GetStyle().ItemSpacing.x,ImGui::GetFrameHeight()));
 					
                     // PARAM VOID
                     /////////////
@@ -457,7 +472,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                         tempCast.trigger();
                     }
 					ImGui::SameLine();
-					ImGui::Dummy(ImVec2(nodeWidthWidget-sizeCB.x-8,ImGui::GetFrameHeight()));
+					ImGui::Dummy(ImVec2(nodeWidthWidget-sizeCB.x-ImGui::GetStyle().ItemSpacing.x,ImGui::GetFrameHeight()));
 				// PARAM STRING
 				///////////////
                 }else if(absParam.valueType() == typeid(string).name()){
@@ -601,11 +616,12 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
                     ImGui::Separator();
                     ImGui::EndPopup();
                 }
-				// Always pop the same number you pushed
-				ImGui::PopStyleColor(3);
-				ImGui::PopStyleVar();
+    // Always pop the same number you pushed
+    ImGui::PopStyleColor(3);
+    ImGui::PopStyleVar();
 
                 ImGui::PopStyleColor(6);
+                } // end widget rendering block
             }
             inputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
             outputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
@@ -613,6 +629,27 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
             ImGui::PopID();
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::EndDisabled();
         } //endFor
+        
+        float cursorYAfter = ImGui::GetCursorPosY();
+        if(cursorYAfter > cursorYBefore){
+            cachedContentHeight = (cursorYAfter - cursorYBefore) / zoomLevel;
+        }
+        
+        } else {
+            // zoom ≤ 0.5f: skip all parameter widgets, render single Dummy to preserve node size
+            if(cachedContentHeight > 0.0f){
+                ImGui::Dummy(ImVec2(nodeWidthText + nodeWidthWidget, cachedContentHeight * zoomLevel));
+                // Distribute pin Y positions evenly across the dummy area so connections
+                // remain anchored at sensible positions even when widgets are not rendered.
+                auto numParams = getParameters().size();
+                for(int i = 0; i < (int)numParams; i++){
+                    float yPos = numParams == 1 ? (cachedContentHeight * zoomLevel) / 2.0f
+                                                : (cachedContentHeight * zoomLevel) * ((float)i / (numParams - 1));
+                    inputPositions[i]  = glm::vec2(0, ImGui::GetItemRectMin().y + yPos);
+                    outputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + yPos);
+                }
+            }
+        } // end if(renderWidgets)
     }
 	else
 	{
@@ -620,7 +657,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
 		
 		// First pass: calculate total height needed for all minimized parameters
 		float totalHeight = 0;
-		float spacing = 2; // Spacing between parameters
+		float spacing = 2.0f * zoomLevel; // Spacing between parameters
 		std::vector<ImVec2> paramSizes;
 		
 		for(int i=0 ; i<getParameters().size(); i++)
@@ -643,7 +680,7 @@ bool ofxOceanodeNodeGui::constructGui(int nodeWidthText, int nodeWidthWidget){
 						size = ImVec2(nodeWidthText+nodeWidthWidget, nodeWidthText+nodeWidthWidget);
 					}
 				}
-				else size = ImVec2(nodeWidthText+nodeWidthWidget,30);
+				else size = ImVec2(nodeWidthText+nodeWidthWidget, 30.0f * zoomLevel);
 				
 				paramSizes.push_back(size);
 				totalHeight += size.y + spacing;

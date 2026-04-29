@@ -63,10 +63,11 @@ void ofxOceanodeNodesController::draw()
     if(scrollPendingFrames > 0) {
         scrollPendingFrames--;
         if(scrollPendingFrames == 0 && pendingScrollNode != nullptr && pendingScrollCanvas != nullptr) {
+            float zoom = pendingScrollCanvas->getZoomLevel();
             glm::vec2 nodeSize = glm::vec2(pendingScrollNode->getNodeGui().getRectangle().getWidth(),
                                            pendingScrollNode->getNodeGui().getRectangle().getHeight());
             glm::vec2 nodePos  = pendingScrollNode->getNodeGui().getPosition();
-            glm::vec2 center   = pendingScrollCanvas->getContentRegionSize() / 2.0f;
+            glm::vec2 center   = pendingScrollCanvas->getContentRegionSize() / (2.0f * zoom);
             pendingScrollCanvas->setScrolling(-nodePos - nodeSize / 2.0f + center);
             pendingScrollNode   = nullptr;
             pendingScrollCanvas = nullptr;

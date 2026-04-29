@@ -17,6 +17,9 @@ class ofxOceanodeContainer;
 class ofxOceanodeNodeGui;
 class ofxOceanodeAbstractParameter;
 
+// Forward declarations
+struct ImFont;
+
 class ofxOceanodeCanvas{
 public:
     //ofxOceanodeCanvas(){};
@@ -35,7 +38,28 @@ public:
     glm::vec2 getOffsetToCenter(){return offsetToCenter;};
     void setScrolling(glm::vec2 o){scrolling = o;}
     glm::vec2 getContentRegionSize() const { return contentRegionSize; }
-    
+
+    float getZoomLevel() const { return zoomLevel; }
+    void setZoomLevel(float z) { rawZoomLevel = ofClamp(z, ZOOM_MIN, ZOOM_MAX); zoomLevel = std::round(rawZoomLevel / 0.05f) * 0.05f; }
+    glm::vec2 getContentRegionSizeInWorld() const { return contentRegionSize / zoomLevel; }
+
+    // Convert world/canvas coordinates to screen coordinates
+    glm::vec2 worldToScreen(glm::vec2 worldPos) const {
+        return canvasOrigin + (worldPos + glm::vec2(scrolling)) * zoomLevel;
+    }
+
+    // Convert screen coordinates to world/canvas coordinates
+    glm::vec2 screenToWorld(glm::vec2 screenPos) const {
+        return (screenPos - canvasOrigin) / zoomLevel - glm::vec2(scrolling);
+    }
+
+    // Font management helpers
+    int getCurrentFontIndex() const;
+    int getCeilingFontIndex() const;
+    bool shouldRenderText() const;
+
+    void setupFonts();  // Must be called BEFORE gui.setup() / ImGui font atlas is built
+
     void bringOnTop(){onTop = true;};
     // Request focus on this canvas window. The canvas will apply the focus
     // automatically on the next draw frame after isFirstDraw has been cleared,
@@ -150,6 +174,25 @@ private:
     string layoutIniPath;
     bool wasFocusedLastFrame = false;
 	
+	// Pre-cached fonts for zoom levels (static: shared across all canvas instances via ImGui's single font atlas)
+	static ImFont* zoomFonts[5];
+	static ImFont* zoomFontsBold[5];
+	static constexpr float ZOOM_FONT_SIZES[5] = {8.0f, 10.0f, 14.0f, 28.0f, 48.0f};
+
+	// Get the appropriate font for current zoom level
+	ImFont* getZoomFont() const;
+
+	// Zoom state
+	float zoomLevel = 1.0f;
+	float rawZoomLevel = 1.0f; // continuous accumulator; zoomLevel is quantised from this
+	static constexpr float ZOOM_MIN = 0.25f;
+	static constexpr float ZOOM_MAX = 4.0f;
+	static constexpr float ZOOM_DEFAULT = 1.0f;
+	static constexpr float ZOOM_STEP = 0.1f;
+
+	// Canvas origin (screen space), set each frame
+	glm::vec2 canvasOrigin;
+
 	// node dimensions (nodeWidthTotal should be % by 4)
 	float NODE_SLOT_RADIUS = 4.0f;
 	int NODE_WIDTH_TEXT = 90;
