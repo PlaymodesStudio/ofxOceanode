@@ -137,24 +137,11 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Mapper_1/Min_Input");
     OceanodeTheme* oceanodeTheme = new OceanodeTheme();
     gui.setup(oceanodeTheme, false, ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable, false);
-    loadDefaultGUILayout();
-    // Auto-load default theme if pointer file exists
-    {
-        std::string defaultThemeFile = ofToDataPath("config/themes/defaultTheme", true);
-        if(ofFile(defaultThemeFile).exists()){
-            ofJson defaultJson = ofLoadJson(defaultThemeFile);
-            std::string themeName = defaultJson.value("theme", "");
-            if(!themeName.empty()){
-                loadTheme(themeName);
-            }
-        }
-    }
 
     presetLoadedListener = ofxOceanodeShared::getPresetHasLoadedEvent().newListener([this](){
         string iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
         if(ofFile(iniPath).exists()){
             pendingIniLoad = iniPath;   // defer — will be applied before next NewFrame
-            pendingPresetsTabActivation = true; // force Presets tab active after layout restore
             // Cache the content for preservation during future saves
             ofBuffer buf = ofBufferFromFile(iniPath);
             ofxOceanodeShared::getLayoutContentCache()[iniPath] = buf.getText();
@@ -238,13 +225,6 @@ void ofxOceanode::draw(){
         ImGui::LoadIniSettingsFromDisk(pendingIniLoad.c_str());
         pendingIniLoad.clear();
     }
-    if(pendingPresetsTabActivation){
-        ImGuiWindow* presetsWin = ImGui::FindWindowByName("Presets");
-        if(presetsWin && presetsWin->DockNode && presetsWin->DockNode->TabBar){
-            presetsWin->DockNode->TabBar->NextSelectedTabId = presetsWin->ID;
-        }
-        pendingPresetsTabActivation = false;
-    }
     // Deferred canvas layout switching (save previous, load new)
     {
         string& pendingSave = ofxOceanodeShared::getPendingLayoutSavePath();
@@ -300,26 +280,13 @@ void ofxOceanode::draw(){
     //            t.draw();
     //        }
     
-    // Draw theme editor window if open
-    if(showThemeEditor){
-        drawThemeEditorWindow();
-    }
-
     //Make Presets the current active tab on the first frame
     if(firstDraw){
         if(settingsLoaded){
-            ImGuiWindow* canvasWin = ImGui::FindWindowByName("Canvas");
-            ImGuiWindow* presetsWin = ImGui::FindWindowByName("Presets");
-            if(canvasWin && canvasWin->DockNode && presetsWin && presetsWin->DockNode){
-                ofxOceanodeShared::setCentralNodeID(canvasWin->DockNode->ID);
-                ofxOceanodeShared::setLeftNodeID(presetsWin->DockNode->ID);
-            }
+            ofxOceanodeShared::setCentralNodeID(ImGui::FindWindowByName("Canvas")->DockNode->ID);
+            ofxOceanodeShared::setLeftNodeID(ImGui::FindWindowByName("Presets")->DockNode->ID);
         }
-        ImGuiDockNode* leftNode = ImGui::DockBuilderGetNode(ofxOceanodeShared::getLeftNodeID());
-        ImGuiWindow* presetsWin = ImGui::FindWindowByName("Presets");
-        if(leftNode && leftNode->TabBar && presetsWin){
-            leftNode->TabBar->NextSelectedTabId = presetsWin->ID;
-        }
+        ImGui::DockBuilderGetNode(ofxOceanodeShared::getLeftNodeID())->TabBar->NextSelectedTabId = ImGui::FindWindowByName("Presets")->ID;
         firstDraw = false;
     }
     
@@ -517,13 +484,15 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			ImGui::CheckboxFlags("Disable Full Render", &configurationFlags, ofxOceanodeConfigurationFlags_DisableRenderAll);
 			ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
 			ImGui::Checkbox("Show Mode", &showMode);
-			ofxOceanodeShared::setConfigurationFlags(configurationFlags);
-			
-			ImGui::SeparatorText("GUI");
 			bool autoInspector = ofxOceanodeShared::getAutoInspectorShowHide();
 			if(ImGui::Checkbox("Inspector auto show/hide", &autoInspector)){
 				ofxOceanodeShared::setAutoInspectorShowHide(autoInspector);
 			}
+			bool layoutWithCanvas = ofxOceanodeShared::getGuiLayoutChangesWithCanvas();
+			if(ImGui::Checkbox("GUI layout changes with canvas", &layoutWithCanvas)){
+				ofxOceanodeShared::getGuiLayoutChangesWithCanvas() = layoutWithCanvas;
+			}
+			ofxOceanodeShared::setConfigurationFlags(configurationFlags);
 			bool snap = canvas.getSnapToGrid();
 			if(ImGui::Checkbox("Snap To Grid",&snap))
 			{
@@ -546,42 +515,6 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			canvas.setNodeWidthText(tw);
 			canvas.setNodeWidthWidget(ww);
 			
-			ImGui::SeparatorText("LAYOUT");
-			bool layoutWithCanvas = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
-			if(ImGui::Checkbox("GUI layout changes with macros", &layoutWithCanvas)){
-				ofxOceanodeShared::getGuiLayoutChangesWithMacros() = layoutWithCanvas;
-			}
-			
-			if(ImGui::BeginMenu("Load GUI layout")){
-				string layoutsDir = ofToDataPath("config/guiLayouts/", true);
-				ofDirectory dir(layoutsDir);
-				dir.allowExt("ini");
-				dir.listDir();
-				if(dir.size() == 0){
-					ImGui::BeginDisabled();
-					ImGui::MenuItem("(no layouts saved)");
-					ImGui::EndDisabled();
-				} else {
-					for(int i = 0; i < (int)dir.size(); i++){
-						string name = dir.getName(i);
-						if(ImGui::MenuItem(name.c_str())){
-							pendingIniLoad = dir.getPath(i);
-						}
-					}
-				}
-				ImGui::EndMenu();
-			}
-			
-			if(ImGui::MenuItem("Save current GUI layout")){
-				memset(saveLayoutNameBuf, 0, sizeof(saveLayoutNameBuf));
-				openSaveLayoutPopup = true;
-			}
-			
-			if(ImGui::MenuItem("Set current GUI layout as default")){
-				setDefaultLayoutSelected = "";
-				openSetDefaultLayoutPopup = true;
-			}
-			
 			ImGui::Separator();
 			
 			if(ImGui::Button("Save Config")){
@@ -595,74 +528,6 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			ImGui::EndMenu();
 		}
 
-        if(ImGui::BeginMenu("Theme"))
-        {
-            if(ImGui::MenuItem("Edit Theme", nullptr, &showThemeEditor)){}
-            ImGui::Separator();
-            if(!currentThemeName.empty()){
-                ImGui::TextDisabled("Current: %s", currentThemeName.c_str());
-                ImGui::Separator();
-            }
-            if(ImGui::MenuItem("Save Theme...")){
-                memset(themeNameBuf, 0, sizeof(themeNameBuf));
-                if(!currentThemeName.empty()){
-                    strncpy(themeNameBuf, currentThemeName.c_str(), sizeof(themeNameBuf) - 1);
-                }
-                openSaveThemePopup = true;
-            }
-            if(ImGui::BeginMenu("Load Theme...")){
-                ofDirectory themeDir(ofToDataPath("config/themes", true));
-                themeDir.allowExt("json");
-                themeDir.listDir();
-                if(themeDir.size() == 0){
-                    ImGui::BeginDisabled();
-                    ImGui::MenuItem("(no themes saved)");
-                    ImGui::EndDisabled();
-                } else {
-                    for(int i = 0; i < (int)themeDir.size(); i++){
-                        std::string name = themeDir.getFile(i).getBaseName();
-                        bool isCurrent = (name == currentThemeName);
-                        if(isCurrent) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.9f, 0.4f, 1.0f));
-                        if(ImGui::MenuItem(name.c_str())){
-                            loadTheme(name);
-                        }
-                        if(isCurrent) ImGui::PopStyleColor();
-                    }
-                }
-                ImGui::EndMenu();
-            }
-            if(ImGui::BeginMenu("Set as Default")){
-                ofDirectory dir(ofToDataPath("config/themes", true));
-                dir.allowExt("json");
-                dir.listDir();
-
-                std::string currentDefault = "";
-                ofFile defaultFile(ofToDataPath("config/themes/defaultTheme", true));
-                if(defaultFile.exists()){
-                    ofJson dj = ofLoadJson(ofToDataPath("config/themes/defaultTheme", true));
-                    currentDefault = dj.value("theme", "");
-                }
-
-                if(dir.size() == 0){
-                    ImGui::TextDisabled("No themes saved yet");
-                }
-                for(int i = 0; i < (int)dir.size(); i++){
-                    std::string name = dir.getFile(i).getBaseName();
-                    bool isDefault = (name == currentDefault);
-                    if(isDefault) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.3f, 1.0f, 0.3f, 1.0f));
-                    if(ImGui::MenuItem(name.c_str())){
-                        ofDirectory::createDirectory(ofToDataPath("config/themes", true), true, true);
-                        ofJson defaultJson;
-                        defaultJson["theme"] = name;
-                        ofSaveJson(ofToDataPath("config/themes/defaultTheme", true), defaultJson);
-                    }
-                    if(isDefault) ImGui::PopStyleColor();
-                }
-                ImGui::EndMenu();
-            }
-            ImGui::EndMenu();
-        }
-
         if(ImGui::BeginMenu("Help"))
         {
             ImGui::MenuItem("Show User Manual", "CMD+L", &showManual);
@@ -675,112 +540,12 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     }
     ImGui::PopStyleVar(2);
     ImGui::PopStyleColor(1); // matches PushStyleColor(ImGuiCol_PopupBg)
-    // NOTE: ImGui::End() is intentionally deferred until AFTER all popup
-    // OpenPopup/BeginPopupModal calls below, so the DockSpace window is still
-    // the active window context when the popups are registered.
-
+    ImGui::End();
+    
     if(showHelp){
         ImGui::OpenPopup("Here are some tips:");
     }
     showHelpPopUp();
-
-    // --- Save GUI Layout Modal ---
-    // --- Save Theme Modal ---
-    if(openSaveThemePopup){
-        ImGui::OpenPopup("Save Theme##modal");
-        openSaveThemePopup = false;
-    }
-    if(ImGui::BeginPopupModal("Save Theme##modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
-        ImGui::Text("Enter a name for the theme:");
-        ImGui::SetNextItemWidth(260);
-        ImGui::InputText("##themename", themeNameBuf, sizeof(themeNameBuf));
-        ImGui::Spacing();
-        bool canSave = (strlen(themeNameBuf) > 0);
-        if(!canSave) ImGui::BeginDisabled();
-        if(ImGui::Button("Save", ImVec2(120, 0))){
-            saveTheme(std::string(themeNameBuf));
-            ImGui::CloseCurrentPopup();
-        }
-        if(!canSave) ImGui::EndDisabled();
-        ImGui::SameLine();
-        if(ImGui::Button("Cancel", ImVec2(120, 0))){
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-
-    if(openSaveLayoutPopup){
-        ImGui::OpenPopup("Save GUI Layout");
-        openSaveLayoutPopup = false;
-    }
-    if(ImGui::BeginPopupModal("Save GUI Layout", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
-        ImGui::Text("Enter a name for the layout:");
-        ImGui::InputText("##layoutname", saveLayoutNameBuf, sizeof(saveLayoutNameBuf));
-        ImGui::Spacing();
-        if(ImGui::Button("Save", ImVec2(120, 0))){
-            if(strlen(saveLayoutNameBuf) > 0){
-                string dirPath = ofToDataPath("config/guiLayouts/", true);
-                ofDirectory d(dirPath);
-                if(!d.exists()) d.create(true);
-                string fullPath = dirPath + string(saveLayoutNameBuf) + ".ini";
-                ImGui::SaveIniSettingsToDisk(fullPath.c_str());
-            }
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        if(ImGui::Button("Cancel", ImVec2(120, 0))){
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-
-    // --- Set Default GUI Layout Modal ---
-    if(openSetDefaultLayoutPopup){
-        ImGui::OpenPopup("Set Default GUI Layout");
-        openSetDefaultLayoutPopup = false;
-    }
-    if(ImGui::BeginPopupModal("Set Default GUI Layout", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
-        ImGui::Text("Choose a layout to use as default at startup:");
-        ImGui::Spacing();
-        string layoutsDir = ofToDataPath("config/guiLayouts/", true);
-        ofDirectory dir(layoutsDir);
-        dir.allowExt("ini");
-        dir.listDir();
-        if(dir.size() == 0){
-            ImGui::TextDisabled("(no layouts saved)");
-        } else {
-            for(int i = 0; i < (int)dir.size(); i++){
-                string name = dir.getName(i);
-                bool selected = (setDefaultLayoutSelected == name);
-                if(ImGui::Selectable(name.c_str(), selected, ImGuiSelectableFlags_DontClosePopups)){
-                    setDefaultLayoutSelected = name;
-                }
-            }
-        }
-        ImGui::Spacing();
-        bool canConfirm = !setDefaultLayoutSelected.empty();
-        if(!canConfirm) ImGui::BeginDisabled();
-        if(ImGui::Button("Set as Default", ImVec2(140, 0))){
-            string configPath = ofToDataPath("config/config.json", true);
-            ofJson j;
-            ofFile existingCfg(configPath);
-            if(existingCfg.exists()) j = ofLoadJson(configPath);
-            j["defaultLayout"] = setDefaultLayoutSelected;
-            string cfgDir = ofToDataPath("config/", true);
-            ofDirectory cfgD(cfgDir);
-            if(!cfgD.exists()) cfgD.create(true);
-            ofSavePrettyJson(configPath, j);
-            ImGui::CloseCurrentPopup();
-        }
-        if(!canConfirm) ImGui::EndDisabled();
-        ImGui::SameLine();
-        if(ImGui::Button("Cancel", ImVec2(120, 0))){
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-
-    ImGui::End(); // End DockSpace window — must come after all popup code above
 }
 
 void ofxOceanode::showManualWindow(bool *b)
@@ -924,27 +689,18 @@ void ofxOceanode::saveConfig(){
     config["gridDivisions"] = canvas.getGridDivisions();
 	config["snapToGrid"] = canvas.getSnapToGrid();
 	config["autoInspectorShowHide"] = ofxOceanodeShared::getAutoInspectorShowHide();
-	config["guiLayoutChangesWithCanvas"] = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
+	config["guiLayoutChangesWithCanvas"] = ofxOceanodeShared::getGuiLayoutChangesWithCanvas();
 	
 	   // Create config directory if it doesn't exist
-	   string configDir = ofToDataPath("config", true);
-	   ofDirectory dir(configDir);
-	   if(!dir.exists()){
-	       dir.create(true);
-	   }
-	   
-	   // Preserve defaultLayout if already set in the existing config
-	   string configPath = ofToDataPath("config/config.json", true);
-	   ofFile existingFile(configPath);
-	   if(existingFile.exists()){
-	       ofJson existing = ofLoadJson(configPath);
-	       if(existing.contains("defaultLayout")){
-	           config["defaultLayout"] = existing["defaultLayout"];
-	       }
-	   }
-	   
-	   // Save to file
-	   ofSavePrettyJson(configPath, config);
+    string configDir = ofToDataPath("config", true);
+    ofDirectory dir(configDir);
+    if(!dir.exists()){
+        dir.create(true);
+    }
+    
+    // Save to file
+    string configPath = ofToDataPath("config/config.json", true);
+    ofSavePrettyJson(configPath, config);
 }
 
 void ofxOceanode::loadConfig(){
@@ -1007,8 +763,8 @@ void ofxOceanode::loadConfig(){
 	if(config.contains("autoInspectorShowHide")){
 		ofxOceanodeShared::setAutoInspectorShowHide(config["autoInspectorShowHide"].get<bool>());
 	}
-	if(config.contains("guiLayoutChangesWithMacros")){
-		ofxOceanodeShared::getGuiLayoutChangesWithMacros() = config["guiLayoutChangesWithMacros"].get<bool>();
+	if(config.contains("guiLayoutChangesWithCanvas")){
+		ofxOceanodeShared::getGuiLayoutChangesWithCanvas() = config["guiLayoutChangesWithCanvas"].get<bool>();
 	}
 }
 
@@ -1042,102 +798,4 @@ void ofxOceanode::loadViewConfig(){
     for(auto it = viewConfig.begin(); it != viewConfig.end(); ++it){
         savedViewConfig[it.key()] = it.value().get<bool>();
     }
-}
-
-void ofxOceanode::loadDefaultGUILayout(){
-    string configPath = ofToDataPath("config/config.json", true);
-    ofFile f(configPath);
-    if(!f.exists()) return;
-
-    ofJson j = ofLoadJson(configPath);
-    if(!j.contains("defaultLayout")) return;
-
-    string filename = j["defaultLayout"].get<std::string>();
-    if(filename.empty()) return;
-
-    string fullPath = ofToDataPath("config/guiLayouts/" + filename, true);
-    ofFile iniFile(fullPath);
-    if(!iniFile.exists()) return;
-
-    // Defer to draw() so ImGui context is fully active
-    pendingIniLoad = fullPath;
-}
-
-void ofxOceanode::saveTheme(const std::string& name){
-    ofDirectory::createDirectory(ofToDataPath("config/themes", true), true, true);
-    ofJson j;
-    ImVec4* colors = ImGui::GetStyle().Colors;
-    for(int i = 0; i < ImGuiCol_COUNT; i++){
-        string colorName = ImGui::GetStyleColorName(i);
-        j["colors"][colorName] = { colors[i].x, colors[i].y, colors[i].z, colors[i].w };
-    }
-    string path = ofToDataPath("config/themes/" + name + ".json", true);
-    ofSavePrettyJson(path, j);
-    currentThemeName = name;
-    ofLogNotice("ofxOceanode") << "Theme saved to " << path;
-}
-
-void ofxOceanode::loadTheme(const std::string& name){
-    string path = ofToDataPath("config/themes/" + name + ".json", true);
-    ofFile f(path);
-    if(!f.exists()){
-        ofLogWarning("ofxOceanode") << "Theme file not found: " << path;
-        return;
-    }
-    ofJson j = ofLoadJson(path);
-    if(!j.contains("colors")) return;
-
-    ImVec4* colors = ImGui::GetStyle().Colors;
-    for(int i = 0; i < ImGuiCol_COUNT; i++){
-        string colorName = ImGui::GetStyleColorName(i);
-        if(j["colors"].contains(colorName)){
-            auto& arr = j["colors"][colorName];
-            if(arr.is_array() && arr.size() == 4){
-                colors[i] = ImVec4(arr[0].get<float>(), arr[1].get<float>(),
-                                   arr[2].get<float>(), arr[3].get<float>());
-            }
-        }
-    }
-    currentThemeName = name;
-    ofLogNotice("ofxOceanode") << "Theme loaded from " << path;
-}
-
-void ofxOceanode::drawThemeEditorWindow(){
-    std::string editorTitle = "Theme Editor";
-    if(!currentThemeName.empty()) editorTitle += " — " + currentThemeName;
-    editorTitle += "###ThemeEditorWindow";
-
-    ImGui::SetNextWindowSize(ImVec2(480, 620), ImGuiCond_FirstUseEver);
-    if(ImGui::Begin(editorTitle.c_str(), &showThemeEditor)){
-        ImGuiStyle& style = ImGui::GetStyle();
-        ImVec4* colors = style.Colors;
-
-        if(currentThemeName.empty()){
-            ImGui::TextDisabled("No theme loaded");
-        } else {
-            ImGui::TextDisabled("Current theme: %s", currentThemeName.c_str());
-        }
-        ImGui::Spacing();
-
-        if(ImGui::Button("Reset to Default")){
-            OceanodeTheme defaultTheme;
-            defaultTheme.setup();
-            currentThemeName = "";
-        }
-
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        ImGui::BeginChild("##colorscroll", ImVec2(0, 0), false);
-        for(int i = 0; i < ImGuiCol_COUNT; i++){
-            const char* name = ImGui::GetStyleColorName(i);
-            ImGui::PushID(i);
-            ImGui::ColorEdit4(name, (float*)&colors[i],
-                              ImGuiColorEditFlags_AlphaBar |
-                              ImGuiColorEditFlags_AlphaPreviewHalf);
-            ImGui::PopID();
-        }
-        ImGui::EndChild();
-    }
-    ImGui::End();
 }
