@@ -27,14 +27,14 @@
 #include "ofAppGLFWWindow.h"
 
 // Static member definition – shared across all canvas instances (ImGui uses a single font atlas)
-ImFont* ofxOceanodeCanvas::zoomFonts[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
-ImFont* ofxOceanodeCanvas::zoomFontsBold[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+ImFont* ofxOceanodeCanvas::zoomFonts[9] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+ImFont* ofxOceanodeCanvas::zoomFontsBold[9] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 
 int ofxOceanodeCanvas::getCurrentFontIndex() const {
-    float desiredScreenSize = ZOOM_FONT_SIZES[2] * zoomLevel;  // index 2 = default (18px)
-    int bestIdx = 2;
+    float desiredScreenSize = ZOOM_FONT_SIZES[3] * zoomLevel;  // index 3 = default (14px)
+    int bestIdx = 3;
     float bestDist = FLT_MAX;
-    for(int i = 0; i < 5; i++) {
+    for(int i = 0; i < 9; i++) {
         float dist = fabsf(ZOOM_FONT_SIZES[i] - desiredScreenSize);
         if(dist < bestDist) { bestDist = dist; bestIdx = i; }
     }
@@ -42,13 +42,13 @@ int ofxOceanodeCanvas::getCurrentFontIndex() const {
 }
 
 int ofxOceanodeCanvas::getCeilingFontIndex() const {
-    float targetSize = ZOOM_FONT_SIZES[2] * zoomLevel; // 14 * zoom
+    float targetSize = ZOOM_FONT_SIZES[3] * zoomLevel; // 14 * zoom
     // Find smallest loaded font whose nominal size >= targetSize (scale-down only)
-    for(int i = 0; i < 5; i++){
+    for(int i = 0; i < 9; i++){
         if(ZOOM_FONT_SIZES[i] >= targetSize)
             return i;
     }
-    return 4; // fallback: largest font
+    return 8; // fallback: largest font
 }
 
 bool ofxOceanodeCanvas::shouldRenderText() const {
@@ -56,7 +56,7 @@ bool ofxOceanodeCanvas::shouldRenderText() const {
     // the zoom-scaled target frame height (BASE_FRAME_HEIGHT = 14.0 + 2*1.0 = 16.0).
     // This matches the FramePadding compensation logic: below this zoom level,
     // targetPaddingY goes negative and row heights can no longer be maintained proportionally.
-    static constexpr float BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[2] + 2.0f; // 16.0f
+    static constexpr float BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[3] + 2.0f; // 16.0f
     return ZOOM_FONT_SIZES[0] < BASE_FRAME_HEIGHT * zoomLevel;
 }
 
@@ -107,22 +107,26 @@ void ofxOceanodeCanvas::setupFonts() {
     if(!fontFile.exists()) {
         ofLogWarning("ofxOceanodeCanvas") << "JetBrainsMono font not found at: " << fontPath;
         ofLogWarning("ofxOceanodeCanvas") << "Using default ImGui font for zoom system";
-        for(int i = 0; i < 5; i++) {
+        for(int i = 0; i < 9; i++) {
             zoomFonts[i] = io.Fonts->AddFontDefault();
         }
     } else {
-        // Add default (index 2) FIRST — ImGui uses the first added font as default
-        // This ensures the main UI font is 18px, not 10px
-        zoomFonts[2] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[2], &fontCfg);
+        // Add default (index 3) FIRST — ImGui uses the first added font as default
+        // This ensures the main UI font is 14px, not 8px
+        zoomFonts[3] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[3], &fontCfg);
 
         // Add the remaining fonts
         zoomFonts[0] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[0], &fontCfg);
         zoomFonts[1] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[1], &fontCfg);
-        zoomFonts[3] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[3], &fontCfg);
+        zoomFonts[2] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[2], &fontCfg);
         zoomFonts[4] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[4], &fontCfg);
+        zoomFonts[5] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[5], &fontCfg);
+        zoomFonts[6] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[6], &fontCfg);
+        zoomFonts[7] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[7], &fontCfg);
+        zoomFonts[8] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[8], &fontCfg);
 
         // Validate and fall back any that failed
-        for(int i = 0; i < 5; i++) {
+        for(int i = 0; i < 9; i++) {
             if(!zoomFonts[i]) {
                 ofLogWarning("ofxOceanodeCanvas") << "Failed to load font size " << ZOOM_FONT_SIZES[i];
                 zoomFonts[i] = io.Fonts->AddFontDefault();
@@ -136,7 +140,7 @@ void ofxOceanodeCanvas::setupFonts() {
     if(!boldFontFile.exists()) {
         ofLogWarning("ofxOceanodeCanvas") << "JetBrainsMono ExtraBold font not found at: " << boldFontPath;
         ofLogWarning("ofxOceanodeCanvas") << "Bold node titles will fall back to regular font";
-        for(int i = 0; i < 5; i++) {
+        for(int i = 0; i < 9; i++) {
             zoomFontsBold[i] = nullptr; // nullptr signals "no bold available"
         }
     } else {
@@ -145,7 +149,7 @@ void ofxOceanodeCanvas::setupFonts() {
         boldCfg.OversampleV = 2;
         boldCfg.MergeMode   = false;
 
-        for(int i = 0; i < 5; i++) {
+        for(int i = 0; i < 9; i++) {
             zoomFontsBold[i] = io.Fonts->AddFontFromFileTTF(boldFontPath.c_str(), ZOOM_FONT_SIZES[i], &boldCfg);
             if(!zoomFontsBold[i]) {
                 ofLogWarning("ofxOceanodeCanvas") << "Failed to load bold font size " << ZOOM_FONT_SIZES[i];
@@ -161,45 +165,45 @@ void ofxOceanodeCanvas::setupFonts() {
     ofLogNotice("ofxOceanodeCanvas::setupFonts") << "Total fonts in atlas: " << io.Fonts->Fonts.Size;
     for(int _di = 0; _di < io.Fonts->Fonts.Size; _di++) {
         ImFont* _f = io.Fonts->Fonts[_di];
-        bool isZoom2 = (_f == zoomFonts[2]);
+        bool isZoom3 = (_f == zoomFonts[3]);
         ofLogNotice("ofxOceanodeCanvas::setupFonts")
             << "  Fonts[" << _di << "] @ " << (void*)_f
-            << (isZoom2 ? "  <-- zoomFonts[2] (JetBrainsMono 18px)" : "");
+            << (isZoom3 ? "  <-- zoomFonts[3] (JetBrainsMono 14px)" : "");
     }
     ofLogNotice("ofxOceanodeCanvas::setupFonts")
         << "io.FontDefault (before fix) = " << (void*)io.FontDefault
         << (io.FontDefault == nullptr ? "  (NULL => was using Fonts[0])" : "");
     ofLogNotice("ofxOceanodeCanvas::setupFonts")
-        << "zoomFonts[2]   = " << (void*)zoomFonts[2];
+        << "zoomFonts[3]   = " << (void*)zoomFonts[3];
     if(io.Fonts->Fonts.Size > 0) {
-        bool defaultIsZoom2 = (io.Fonts->Fonts[0] == zoomFonts[2]);
+        bool defaultIsZoom3 = (io.Fonts->Fonts[0] == zoomFonts[3]);
         ofLogNotice("ofxOceanodeCanvas::setupFonts")
-            << "Fonts[0] == zoomFonts[2]: " << (defaultIsZoom2 ? "YES (atlas order correct)" : "NO  (built-in font is Fonts[0]; io.FontDefault fix is required)");
+            << "Fonts[0] == zoomFonts[3]: " << (defaultIsZoom3 ? "YES (atlas order correct)" : "NO  (built-in font is Fonts[0]; io.FontDefault fix is required)");
     }
     // ── END DIAGNOSTIC ─────────────────────────────────────────────────────
 
-    // ── FIX: Explicitly set the global default font to JetBrainsMono-Medium 18px.
+    // ── FIX: Explicitly set the global default font to JetBrainsMono-Medium 14px.
     // Without this, ImGui falls back to Fonts->Fonts[0].  Because ofxImGui's
     // gui.setup() calls AddFontDefault() before setupFonts() runs, Fonts[0] is
     // the built-in ImGui font — not JetBrainsMono — so every window/menu/widget
     // that does NOT call PushFont() renders with the wrong font.
-    if(zoomFonts[2]) {
-        io.FontDefault = zoomFonts[2];
+    if(zoomFonts[3]) {
+        io.FontDefault = zoomFonts[3];
         ofLogNotice("ofxOceanodeCanvas::setupFonts")
-            << "io.FontDefault set to zoomFonts[2] (JetBrainsMono-Medium 18px)";
+            << "io.FontDefault set to zoomFonts[3] (JetBrainsMono-Medium 14px)";
     }
 
     // Publish the base (zoom=1.0) font size so that render-time code in other
     // translation units (e.g. macro GUI) can compute the current zoom factor via
     // ImGui::GetFontSize() / ofxOceanodeShared::getZoomBaseFontSize() without
     // hard-coding the canvas-internal ZOOM_FONT_SIZES constant.
-    ofxOceanodeShared::setZoomBaseFontSize(ZOOM_FONT_SIZES[2]);
+    ofxOceanodeShared::setZoomBaseFontSize(ZOOM_FONT_SIZES[3]);
 
     // Publish the base frame height so NodeGui and other classes can derive the
     // correct row height without duplicating this formula.
     {
         static constexpr float BASE_FRAME_PADDING_Y = 1.0f;
-        static constexpr float BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[2] + 2.0f * BASE_FRAME_PADDING_Y;
+        static constexpr float BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[3] + 2.0f * BASE_FRAME_PADDING_Y;
         ofxOceanodeShared::setBaseFrameHeight(BASE_FRAME_HEIGHT);
     }
 
@@ -742,34 +746,41 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             // FramePadding inside scrolling_region is (1,1); ItemSpacing defaults are (8,4)
             // Compensate FramePadding.y so that GetFrameHeight() (= FontSize + FramePadding.y*2) scales
             // smoothly with zoomLevel even when the discrete font index flips.
-            // BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[2] + 2 * 1.0f  (default font + base padding)
-            // Use the actual effective font size (after fontWindowScale clamping) so that when the ceiling
-            // font is larger than targetSize and fwScale is clamped to 1.0, targetPaddingY still produces
-            // GetFrameHeight() == BASE_FRAME_HEIGHT * zoomLevel exactly.
+            // BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[3] + 2 * 1.0f  (default font + base padding)
+            // Push font FIRST, then read the actual effective font size via ImGui::GetFontSize()
+            // so that targetPaddingY is computed from the real post-scale value rather than a prediction.
             static constexpr float BASE_FRAME_PADDING_Y = 1.0f;
-            static constexpr float BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[2] + 2.0f * BASE_FRAME_PADDING_Y;
+            static constexpr float BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[3] + 2.0f * BASE_FRAME_PADDING_Y;
             int   ceilIdx          = getCeilingFontIndex();
             float ceilFontSize     = ZOOM_FONT_SIZES[ceilIdx];
-            float targetSize       = ZOOM_FONT_SIZES[2] * zoomLevel;
+            float targetSize       = ZOOM_FONT_SIZES[3] * zoomLevel;
             float fwScale          = (ceilFontSize > 0.0f) ? (targetSize / ceilFontSize) : 1.0f;
             if(fwScale > 1.0f) fwScale = 1.0f;          // never scale up (clamp to avoid blurriness)
-            float effectiveFontSize = ceilFontSize * fwScale;  // actual rendered font size after clamping
-            float targetPaddingY    = (BASE_FRAME_HEIGHT * zoomLevel - effectiveFontSize) / 2.0f;
-            if(targetPaddingY < 0.0f) targetPaddingY = 0.0f;
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(BASE_FRAME_PADDING_Y * zoomLevel, targetPaddingY));
 
+            // Push the other style vars before the font (order among these doesn't matter for Fix A)
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f * zoomLevel, 4.0f * zoomLevel));
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f * zoomLevel, 8.0f * zoomLevel));
             ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize,   12.0f * zoomLevel);
             ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 14.0f * zoomLevel);
 
+            // 1. Set font first
             int ceilFontIdx = ceilIdx;
             ImFont* zoomFont = zoomFonts[ceilFontIdx];
             ofxOceanodeShared::setCurrentBoldFont(zoomFontsBold[ceilFontIdx]);
             if(zoomFont) ImGui::PushFont(zoomFont);
 
-            // fwScale already computed above (clamped fontWindowScale); reuse it here.
+            // 2. Apply window font scale
             ImGui::SetWindowFontScale(fwScale);
+
+            // 3. Read ACTUAL font size now that PushFont+SetWindowFontScale are active
+            float actualFontSize = ImGui::GetFontSize();
+
+            // 4. Compute targetPaddingY from the actual (not predicted) font size
+            float targetPaddingY = (BASE_FRAME_HEIGHT * zoomLevel - actualFontSize) / 2.0f;
+            if(targetPaddingY < 0.0f) targetPaddingY = 0.0f;
+
+            // 5. Push FramePadding AFTER font is set (so GetFrameHeight() will be exact)
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(BASE_FRAME_PADDING_Y * zoomLevel, targetPaddingY));
 
             ImGui::SetCursorScreenPos(ImVec2(node_rect_min.x + NODE_WINDOW_PADDING.x * zoomLevel,
                                              node_rect_min.y + NODE_WINDOW_PADDING.y * zoomLevel));
@@ -780,9 +791,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 NODE_WIDTH_WIDGET * zoomLevel,
                 zoomLevel)){
 
+                ImGui::PopStyleVar();          // FramePadding (pushed last, popped first)
                 ImGui::SetWindowFontScale(1.0f);
                 if(zoomFont) ImGui::PopFont();
-                ImGui::PopStyleVar(5);
+                ImGui::PopStyleVar(4);         // ScrollbarSize, GrabMinSize, WindowPadding, ItemSpacing
                 
                 // Save the size of what we have emitted and whether any of the widgets are being used
                 bool node_widgets_active = (!old_any_active && ImGui::IsAnyItemActive());
@@ -984,9 +996,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }
             }
             else{
+                ImGui::PopStyleVar();          // FramePadding (pushed last, popped first)
                 ImGui::SetWindowFontScale(1.0f);
                 if(zoomFont) ImGui::PopFont();
-                ImGui::PopStyleVar(5);
+                ImGui::PopStyleVar(4);         // ScrollbarSize, GrabMinSize, WindowPadding, ItemSpacing
                 deletedIds.insert(nodeId);
             }
             ImGui::PopID();
@@ -1052,7 +1065,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             // Don't draw comment text below 50% zoom
             if(zoomLevel > 0.5f){
                 ImFont* commentFont = zoomFonts[getCeilingFontIndex()];
-                float commentFontSize = ZOOM_FONT_SIZES[2] * zoomLevel;  // base font size scaled by zoom
+                float commentFontSize = ZOOM_FONT_SIZES[3] * zoomLevel;  // base font size scaled by zoom
                 if(commentFont) {
                     draw_list->AddText(commentFont, commentFontSize, currentPosition,
                                        IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255),

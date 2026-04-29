@@ -175,9 +175,9 @@ private:
     bool wasFocusedLastFrame = false;
 	
 	// Pre-cached fonts for zoom levels (static: shared across all canvas instances via ImGui's single font atlas)
-	static ImFont* zoomFonts[5];
-	static ImFont* zoomFontsBold[5];
-	static constexpr float ZOOM_FONT_SIZES[5] = {8.0f, 10.0f, 14.0f, 28.0f, 48.0f};
+	static ImFont* zoomFonts[9];
+	static ImFont* zoomFontsBold[9];
+	static constexpr float ZOOM_FONT_SIZES[9] = {8.0f, 10.0f, 12.0f, 14.0f, 18.0f, 22.0f, 28.0f, 36.0f, 48.0f};
 
 	// Get the appropriate font for current zoom level
 	ImFont* getZoomFont() const;
