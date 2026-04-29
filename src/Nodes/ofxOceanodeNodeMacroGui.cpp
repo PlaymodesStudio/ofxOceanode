@@ -163,7 +163,8 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 			firstSaveAsOpen = true;
 		}else{
 			container->savePreset(presetManager.getCurrentMacroPath());
-				snapshotSystem.save(presetManager.isLocal(), presetManager.getCurrentMacroPath(), presetManager.getPresetPath(), nodeName(), getNumIdentifier());
+				saveMacroLayout(presetManager.getCurrentMacroPath());
+					snapshotSystem.save(presetManager.isLocal(), presetManager.getCurrentMacroPath(), presetManager.getPresetPath(), nodeName(), getNumIdentifier());
 			// Save router sort order to the macro folder
 			{
 				string sortOrderFile = presetManager.getCurrentMacroPath() + "/router_sort_order.json";
@@ -220,7 +221,8 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 					presetManager.setCurrentMacroPath(saveAsCategoryWithSlash + string(proposedNewName));
 					presetManager.getCurrentCategory() = presetManager.getSaveAsTempCategory();
 					presetManager.setCurrentCategoryMacro(macroDirectoryStructure);
-					// Save router sort order to the macro folder
+						saveMacroLayout(presetManager.getCurrentMacroPath());
+						// Save router sort order to the macro folder
 					{
 						string sortOrderFile = presetManager.getCurrentMacroPath() + "/router_sort_order.json";
 						ofJson sortJson;

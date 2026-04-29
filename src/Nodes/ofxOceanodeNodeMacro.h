@@ -150,6 +150,10 @@ private:
 	void setupPresetControl();
 	void initializeSnapshotSystem();
 
+	// ─── ImGui layout persistence (per-macro) ────────────────────────────
+	void saveMacroLayout(const string& folderPath);
+	void loadMacroLayout(const string& folderPath);
+
 	// ─── GUI rendering (implemented in ofxOceanodeNodeMacroGui.cpp) ──────
 	void renderPresetControlGui();
 	void renderPresetNamingGui();
