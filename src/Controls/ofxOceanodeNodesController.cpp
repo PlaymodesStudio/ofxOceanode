@@ -51,6 +51,11 @@ void ofxOceanodeNodesController::draw()
         }
     }
 
+    // Decrement layout-switch suppression countdown (once per frame, not per canvas)
+    if(ofxOceanodeShared::getLayoutSwitchSuppressFrames() > 0){
+        ofxOceanodeShared::getLayoutSwitchSuppressFrames()--;
+    }
+
     // Rebuild navigable node list each frame
     navigableNodes.clear();
 
@@ -393,6 +398,17 @@ void ofxOceanodeNodesController::draw()
                             ofxOceanodeShared::setActiveCanvasUniqueID(m->getCanvas()->getUniqueID());
                             ofxOceanodeShared::nodeSelectedInCanvas(nullptr);  // entering macro interior, no specific node selected
                             refocusNodesDelay = 4;
+                            ofxOceanodeShared::getLayoutSwitchSuppressFrames() = 4;
+                            // Active layout switch — queue save/load so GUI layout follows the canvas switch
+                            if(ofxOceanodeShared::getGuiLayoutChangesWithMacros()){
+                                string newIniPath = ofToDataPath(m->getCanvas()->getLayoutIniPath());
+                                string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
+                                if(!newIniPath.empty() && newIniPath != activeLayoutPath){
+                                    ofxOceanodeShared::getPendingLayoutSavePath() = activeLayoutPath;
+                                    ofxOceanodeShared::getPendingLayoutLoadPath() = newIniPath;
+                                    activeLayoutPath = newIniPath;
+                                }
+                            }
                             // Cancel any pending scroll that the first click of the double-click may have queued
                             this->pendingScrollNode   = nullptr;
                             this->pendingScrollCanvas = nullptr;
@@ -426,6 +442,17 @@ void ofxOceanodeNodesController::draw()
                             this->pendingScrollCanvas = _canvas;
                             this->pendingScrollMacro  = _macro;
                             this->scrollPendingFrames = (_macro != nullptr) ? 2 : 1;
+                            ofxOceanodeShared::getLayoutSwitchSuppressFrames() = 4;
+                            // Active layout switch — queue save/load so GUI layout follows the canvas switch
+                            if(ofxOceanodeShared::getGuiLayoutChangesWithMacros()){
+                                string newIniPath = ofToDataPath(_canvas->getLayoutIniPath());
+                                string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
+                                if(!newIniPath.empty() && newIniPath != activeLayoutPath){
+                                    ofxOceanodeShared::getPendingLayoutSavePath() = activeLayoutPath;
+                                    ofxOceanodeShared::getPendingLayoutLoadPath() = newIniPath;
+                                    activeLayoutPath = newIniPath;
+                                }
+                            }
                         }
 
                         if(nodeOpen) {
@@ -534,6 +561,17 @@ void ofxOceanodeNodesController::draw()
                             this->pendingScrollCanvas = _canvas;
                             this->pendingScrollMacro  = _macro;
                             this->scrollPendingFrames = (_macro != nullptr) ? 2 : 1;
+                            ofxOceanodeShared::getLayoutSwitchSuppressFrames() = 4;
+                            // Active layout switch — queue save/load so GUI layout follows the canvas switch
+                            if(ofxOceanodeShared::getGuiLayoutChangesWithMacros()){
+                                string newIniPath = ofToDataPath(_canvas->getLayoutIniPath());
+                                string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
+                                if(!newIniPath.empty() && newIniPath != activeLayoutPath){
+                                    ofxOceanodeShared::getPendingLayoutSavePath() = activeLayoutPath;
+                                    ofxOceanodeShared::getPendingLayoutLoadPath() = newIniPath;
+                                    activeLayoutPath = newIniPath;
+                                }
+                            }
                         }
                     }
                 }
@@ -616,6 +654,17 @@ void ofxOceanodeNodesController::draw()
                     // Re-focus Nodes window after the canvas has consumed its
                     // deferred SetNextWindowFocus (takes 2 frames).
                     refocusNodesDelay = (target.macro != nullptr) ? 4 : 2;
+                    ofxOceanodeShared::getLayoutSwitchSuppressFrames() = 4;
+                    // Active layout switch — queue save/load so GUI layout follows the canvas switch
+                    if(ofxOceanodeShared::getGuiLayoutChangesWithMacros()){
+                        string newIniPath = ofToDataPath(target.canvas->getLayoutIniPath());
+                        string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
+                        if(!newIniPath.empty() && newIniPath != activeLayoutPath){
+                            ofxOceanodeShared::getPendingLayoutSavePath() = activeLayoutPath;
+                            ofxOceanodeShared::getPendingLayoutLoadPath() = newIniPath;
+                            activeLayoutPath = newIniPath;
+                        }
+                    }
                 }
             }
         }

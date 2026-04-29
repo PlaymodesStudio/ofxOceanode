@@ -66,20 +66,16 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     bool connectionIsDoable = false;
     
     ImGui::SetNextWindowDockID(ofxOceanodeShared::getDockspaceID(), ImGuiCond_FirstUseEver);
-    string windowName = uniqueID;
-    if(title != "") windowName = "(" + title + ") " + windowName;
+    string windowName;
+    if(title != "") {
+        windowName = "(" + title + ") " + uniqueID + "###" + uniqueID;
+    } else {
+        windowName = uniqueID + "###" + uniqueID;
+    }
     if(ImGui::Begin(windowName.c_str(), open)){
-        // Track which canvas is active for MiniMap/Hierarchy coordination
-        if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)){
-            ofxOceanodeShared::setActiveCanvasUniqueID(uniqueID);
-        }
-        
-        // Detect canvas tab activation for layout switching.
-        // Use dock tab selection instead of window focus — when canvases are
-        // docked as tabs in the same dock node, ImGuiFocusedFlags_ChildWindows
-        // causes both tabs to report as focused (they share a parent dock node),
-        // so wasFocusedLastFrame never transitions to false and the rising-edge
-        // detection fails on the first switch back.
+        // Detect canvas tab activation — consistent check for both active-canvas-ID
+        // and layout switching. Uses dock tab selection when available to avoid
+        // the RootAndChildWindows false-positive with shared dock hosts.
         bool isActiveTab = false;
         ImGuiWindow* win = ImGui::GetCurrentWindow();
         if(win->DockNode && win->DockNode->TabBar){
@@ -90,8 +86,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             isActiveTab = ImGui::IsWindowFocused(ImGuiFocusedFlags_None);
         }
         
+        // Track which canvas is active for MiniMap/Hierarchy coordination
+        if(isActiveTab){
+            ofxOceanodeShared::setActiveCanvasUniqueID(uniqueID);
+        }
+        
         if(isActiveTab && !wasFocusedLastFrame && !layoutIniPath.empty()){
-            if(ofxOceanodeShared::getGuiLayoutChangesWithCanvas()){
+            if(ofxOceanodeShared::getGuiLayoutChangesWithMacros()
+               && ofxOceanodeShared::getLayoutSwitchSuppressFrames() <= 0){
                 string newIniPath = ofToDataPath(layoutIniPath);
                 string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
                 
@@ -1495,8 +1497,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     
     //TODO: Find better way to to this, when macro created, recoverr focus on canvas, should be its parent. something like. container->getParentCanvas? Or set a id in canvas as "Parent Canvas".
     if(isFirstDraw && parentID != ""){
-        ImGui::FocusWindow(ImGui::FindWindowByName(parentID.c_str()));
-        
+        ImGuiID parentWinID = ImHashStr(parentID.c_str(), 0, 0);
+        ImGuiWindow* parentWin = ImGui::FindWindowByID(parentWinID);
+        if(parentWin) ImGui::FocusWindow(parentWin);
     }
     isFirstDraw = false;
     ofPushMatrix();

@@ -127,6 +127,9 @@ public:
 	void loadConfig();
 	void saveViewConfig(const std::map<std::string, bool>& visibilityMap);
 	void loadViewConfig();
+	void loadDefaultGUILayout();
+	void saveTheme(const std::string& name);
+	void loadTheme(const std::string& name);
 
 private:
     ofxOceanodeCanvas canvas;
@@ -162,6 +165,27 @@ private:
     
     void receiveOsc();
 #endif
+    
+    ofEventListener presetLoadedListener;
+    ofEventListener presetSavedListener;
+    bool hasActivePreset = false;
+    std::string pendingIniLoad; // empty means no pending load
+    bool pendingPresetsTabActivation = false; // force Presets tab active after preset load
+
+    // GUI layout management state
+    bool openSaveLayoutPopup = false;
+    bool openSetDefaultLayoutPopup = false;
+    std::string setDefaultLayoutSelected;
+    char saveLayoutNameBuf[256] = {};
+
+    // Theme editor state
+    bool showThemeEditor = false;
+    void drawThemeEditorWindow();
+
+    // Theme save/load state
+    std::string currentThemeName;
+    bool openSaveThemePopup = false;
+    char themeNameBuf[128] = {};
 };
 
 #endif /* ofxOceanode_h */

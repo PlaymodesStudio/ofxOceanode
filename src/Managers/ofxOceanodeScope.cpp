@@ -45,9 +45,9 @@ void ofxOceanodeScope::setup(){
                 }
             }else if(param->size()>0){
                 if(param.getMin()[0] == std::numeric_limits<float>::lowest() || param.getMax()[0] == std::numeric_limits<float>::max()){
-                    ImGui::PlotHistogram("", &param.get()[0], param->size(), 0, NULL, *std::min_element(param->begin(), param->end()), *std::max_element(param->begin(), param->end()), size);
+                    ImGui::PlotHistogram("##histplot", &param.get()[0], param->size(), 0, NULL, *std::min_element(param->begin(), param->end()), *std::max_element(param->begin(), param->end()), size);
                 }else{
-                    ImGui::PlotHistogram("", &param.get()[0], param->size(), 0, NULL, param.getMin()[0], param.getMax()[0], size);
+                    ImGui::PlotHistogram("##histplot", &param.get()[0], param->size(), 0, NULL, param.getMin()[0], param.getMax()[0], size);
                 }
             }
             return true;
