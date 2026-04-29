@@ -317,9 +317,17 @@ public:
 	}
 
 	// GUI layout changes with canvas — when true, switching canvas tabs triggers layout switching
-	static bool& getGuiLayoutChangesWithCanvas(){
+	static bool& getGuiLayoutChangesWithMacros(){
 		static bool enabled = true;
 		return enabled;
+	}
+
+	// Suppress automatic layout switching for N frames (used by NodesController
+	// when programmatically switching canvases to prevent the rising-edge
+	// detection from undoing the switch via LoadIniSettingsFromDisk)
+	static int& getLayoutSwitchSuppressFrames(){
+		static int frames = 0;
+		return frames;
 	}
 
 	// Cache for layout contents — used to preserve layouts across folder recreations
