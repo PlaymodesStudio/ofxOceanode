@@ -100,18 +100,15 @@ void ofxOceanodePresetsController::draw(){
     ImGui::Text("%s",banks[currentBank].c_str());
     ImGui::PopStyleColor();
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
-
-    ImGui::Separator();
 	
+	if(ImGui::Button("[+]")){
+		ImGui::OpenPopup("Add New Bank");
+	}
+	ImGui::SameLine();
 	if(ImGui::Button("Reload Macros")){
 		ofxOceanodeShared::updateMacrosStructure();
 	}
 	
-	ImGui::Separator();
-
-    if(ImGui::Button("[+]")){
-        ImGui::OpenPopup("Add New Bank");
-    }
     ImGui::PopStyleColor();
     
     if(ImGui::BeginPopupModal("Add New Bank", NULL, ImGuiWindowFlags_AlwaysAutoResize)){
@@ -136,8 +133,6 @@ void ofxOceanodePresetsController::draw(){
         }
         ImGui::EndPopup();
     }
-
-    ImGui::Separator();
     
     // Preset related
 
@@ -156,7 +151,6 @@ void ofxOceanodePresetsController::draw(){
 
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
 
-    ImGui::Separator();
     if(ImGui::Button("[+]")){}
     ImGui::SameLine();
     if(ImGui::Button("[-]")){

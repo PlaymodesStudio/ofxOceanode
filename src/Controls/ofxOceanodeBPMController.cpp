@@ -64,6 +64,7 @@ void ofxOceanodeBPMController::draw(){
     if (ImGui::Button("Reset Phase")){
         container->resetPhase();
     }
+	ImGui::SameLine();
     if (ImGui::Button("Tap Tempo")){
         if(lastButtonPressTime == -1){
             lastButtonPressTime = ofGetElapsedTimef();
@@ -92,50 +93,49 @@ void ofxOceanodeBPMController::draw(){
         }
     }
     #ifdef OFXOCEANODE_USE_BPM_DETECTION
-    ImGui::Separator();
-    ImGui::Separator();
     ImGui::Checkbox("Auto BPM", &useDetection);
     #endif
     
     if(timeParameters != nullptr){
-        ImGui::Separator();
-        ImGui::Separator();
-        ImGui::Text("TIME");
-        ImGui::Text("----- %f -----", timeParameters->getFloat("Time").get());
+        ImGui::Text("Time :");
+		ImGui::SameLine();
+        ImGui::Text("- %f -", timeParameters->getFloat("Time").get());
         
-        ImGui::Separator();
         auto fm = timeParameters->getBool("Frame Mode");
         if(ImGui::Checkbox("Frame Mode", (bool*)&fm.get())){
             fm = fm;
         }
+		ImGui::SameLine();
         auto fi = timeParameters->getInt("Frame Interval");
         if(ImGui::SliderInt("Frame Interval", (int*)&fi.get(), 1, 600)){
             fi = fi;
         }
-        ImGui::Separator();
+		ImGui::DragFloat("Scrub", &scrub, 0.001, -100, 100);
+		if(ImGui::IsMouseReleased(0)){
+			scrub = 0;
+		}else if(scrub != 0){
+			timeParameters->getFloat("Scrub") = scrub;
+		}
         auto p = timeParameters->getBool("Is Playing");
         if(ImGui::Checkbox("Playing", (bool*)&p.get())){
             p = p;
         }
-        
+		ImGui::SameLine();
         if(ImGui::Button("Play")){
             p = true;
         }
+		ImGui::SameLine();
         if(ImGui::Button("Pause")){
             p = false;
         }
+		ImGui::SameLine();
         if(ImGui::Button("Reset")){
             timeParameters->getVoid("Stop").trigger();
             p = true;
         }
+		ImGui::SameLine();
         if(ImGui::Button("Stop")){
             timeParameters->getVoid("Stop").trigger();
-        }
-        ImGui::DragFloat("Scrub", &scrub, 0.001, -100, 100);
-        if(ImGui::IsMouseReleased(0)){
-            scrub = 0;
-        }else if(scrub != 0){
-            timeParameters->getFloat("Scrub") = scrub;
         }
     }
 }

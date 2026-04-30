@@ -84,9 +84,7 @@ void ofxOceanodeNodesController::draw()
     
     ImGui::SetNextItemOpen(true, ImGuiCond_Once);
     if(ImGui::TreeNode("Project Nodes"))
-    {
-        ImGui::Separator();
-        
+    {        
         vector<ofxOceanodeNode*> allNodes = container->getAllModules();
         char * cString = new char[256];
         strcpy(cString, searchFieldMyNodes.c_str());
