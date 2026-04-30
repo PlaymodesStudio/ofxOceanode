@@ -15,6 +15,7 @@
 #include "imgui_internal.h"
 #include <algorithm>
 #include <functional>
+#include "ofxOceanodeColors.h"
 
 // ---------------------------------------------------------------------------
 // Constructor
@@ -307,7 +308,7 @@ void ofxOceanodeHierarchyController::draw()
         float midX = parentMid.x + HGAP * 0.5f;
 
         bool parentInactive = !effectiveActive[pi];
-        ImU32 lineCol = parentInactive ? IM_COL32(0, 0, 0, 255) : IM_COL32(220, 220, 220, 255);
+        ImU32 lineCol = parentInactive ? OceanodeColors::U32(OceanodeColors::HierarchyLineInactive) : OceanodeColors::U32(OceanodeColors::HierarchyLineActive);
 
         dl->AddLine(parentMid,                 ImVec2(midX, parentMid.y), lineCol, 1.5f);
         dl->AddLine(ImVec2(midX, parentMid.y), ImVec2(midX, childMid.y),  lineCol, 1.5f);
@@ -329,8 +330,8 @@ void ofxOceanodeHierarchyController::draw()
         if (entries[i].macroNode == nullptr) {
             // Root canvas: white/light (root is always active)
             nodeColor = ofColor(220, 220, 220);
-            fillCol   = IM_COL32(210, 210, 210, 255);
-            borderCol = IM_COL32(255, 255, 255, 255);
+            fillCol   = OceanodeColors::U32(OceanodeColors::HierarchyRootFill);
+            borderCol = OceanodeColors::U32(OceanodeColors::HierarchyRootBorder);
         } else {
             nodeColor = entries[i].nodeWrapper->getColor();
             if (active) {
@@ -357,11 +358,11 @@ void ofxOceanodeHierarchyController::draw()
 
         // --- Active canvas highlight (cyan border) ---
         if (i == selectedEntryIndex) {
-            dl->AddRect(p1, p2, IM_COL32(0, 210, 210, 255), 4.0f, 0, 2.5f);
+            dl->AddRect(p1, p2, OceanodeColors::U32(OceanodeColors::HierarchyActiveBorder), 4.0f, 0, 2.5f);
         }
         // --- Selected node highlight (orange border) ---
         if (i == selectedNodeEntryIndex) {
-            dl->AddRect(p1, p2, IM_COL32(255, 140, 0, 255), 4.0f, 0, 2.5f);
+            dl->AddRect(p1, p2, OceanodeColors::U32(OceanodeColors::HierarchySelectedBorder), 4.0f, 0, 2.5f);
         }
 
         // --- Text color (luminance-adaptive; half RGB intensity when effectively inactive) ---
@@ -369,12 +370,12 @@ void ofxOceanodeHierarchyController::draw()
         ImU32 textCol;
         if (active) {
             textCol = (lum > 0.55f)
-                ? IM_COL32(30,  30,  30,  255)
-                : IM_COL32(240, 240, 240, 255);
+                ? OceanodeColors::U32(OceanodeColors::HierarchyLineInactive)   // dark text on bright bg
+                : OceanodeColors::U32(OceanodeColors::HierarchyLineActive);    // light text on dark bg
         } else {
             textCol = (lum > 0.55f)
-                ? IM_COL32(15,  15,  15,  255)
-                : IM_COL32(120, 120, 120, 255);
+                ? IM_COL32(15, 15, 15, 255)               // very dark, dimmed
+                : ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
         }
 
         // --- Label (clipped, font scaled by hierarchyScale) ---

@@ -12,6 +12,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include <algorithm>
+#include "ofxOceanodeColors.h"
 
 ofxOceanodeMiniMapController::ofxOceanodeMiniMapController(
     shared_ptr<ofxOceanodeContainer> _container,
@@ -215,7 +216,7 @@ void ofxOceanodeMiniMapController::renderMinimap(
     draw_list->AddRectFilled(
         mmPos,
         ImVec2(mmPos.x + mmSize.x, mmPos.y + mmSize.y),
-        IM_COL32(30, 30, 30, 220));
+        OceanodeColors::U32(OceanodeColors::MiniMapBg));
 
     // --- Handle empty patch ---
     bool hasContent = (minX != FLT_MAX && maxX != -FLT_MAX);
@@ -224,7 +225,7 @@ void ofxOceanodeMiniMapController::renderMinimap(
         draw_list->AddText(
             ImVec2(mmPos.x + mmSize.x * 0.5f - 18.0f,
                    mmPos.y + mmSize.y * 0.5f - 6.0f),
-            IM_COL32(128, 128, 128, 200),
+            ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled)),
             emptyMsg);
         return;
     }
@@ -310,7 +311,7 @@ void ofxOceanodeMiniMapController::renderMinimap(
         ImVec2 p2 = toMinimap((float)(r.x + r.width), (float)(r.y + r.height));
 
         // Dark body
-        draw_list->AddRectFilled(p1, p2, IM_COL32(40, 40, 40, 200), 1.0f);
+        draw_list->AddRectFilled(p1, p2, OceanodeColors::U32(OceanodeColors::NodeBg), 1.0f);
 
         // Colored header strip (top ~29 canvas-space px, scaled)
         float headerH = 29.0f * scale;
@@ -335,8 +336,8 @@ void ofxOceanodeMiniMapController::renderMinimap(
     ImVec2 vp1 = toMinimap(vpLeft,  vpTop);
     ImVec2 vp2 = toMinimap(vpRight, vpBot);
 
-    draw_list->AddRectFilled(vp1, vp2, IM_COL32(255, 255, 255, 20));
-    draw_list->AddRect(vp1, vp2, IM_COL32(255, 255, 255, 160), 0.0f, 0, 1.5f);
+    draw_list->AddRectFilled(vp1, vp2, OceanodeColors::U32(OceanodeColors::MiniMapViewportFill));
+    draw_list->AddRect(vp1, vp2, OceanodeColors::U32(OceanodeColors::MiniMapViewportBorder), 0.0f, 0, 1.5f);
 
     // --- Click-to-navigate ---
     bool itemHovered = ImGui::IsItemHovered();

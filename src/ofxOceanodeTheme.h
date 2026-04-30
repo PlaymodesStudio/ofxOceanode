@@ -9,6 +9,7 @@
 #define ofxOceanodeTheme_h
 
 #include "BaseTheme.h"
+#include "ofxOceanodeColors.h"
 
 class OceanodeTheme: public ofxImGui::BaseTheme
 {
@@ -69,6 +70,9 @@ public:
         colors[ImGuiCol_NavWindowingHighlight]  = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
         colors[ImGuiCol_NavWindowingDimBg]      = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
         colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
+
+        // Reset all custom Oceanode semantic colours to their built-in defaults
+        OceanodeColors::reset();
     }
 };
 

@@ -24,6 +24,7 @@
 #include "ofGLUtils.h"
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeParameter.h"
+#include "ofxOceanodeColors.h"
 #include "ofAppGLFWWindow.h"
 
 // Static member definition – shared across all canvas instances (ImGui uses a single font atlas)
@@ -323,16 +324,16 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         	int(scrolling.y - (ImGui::GetContentRegionAvail().y / (2.0f * zoomLevel))) + 8);
         
         // CANVAS POSITION
-        ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1.0,1.0,1.0,0.5));
+        ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::CanvasInfoText);
         ImGui::Text("[%d,%d]",int(scrolling.x - (ImGui::GetContentRegionAvail().x / (2.0f * zoomLevel))), int( scrolling.y - (ImGui::GetContentRegionAvail().y / (2.0f * zoomLevel)))+8);
         ImGui::SameLine();
 		ImGui::PopStyleColor();
 		
 		// FPS
         float fps = ofGetFrameRate();
-        if(fps>=60.0) ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.0,1.0,0.0,0.5));
-        else if(fps>30.0) ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1.0,0.5,0.0,0.5));
-        else ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(1.0,0.0,0.0,0.5));
+        if(fps>=60.0) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::FpsGood);
+        else if(fps>30.0) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::FpsWarning);
+        else ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::FpsBad);
         ImGui::Text("%d fps",int(fps));
         ImGui::PopStyleColor();
         
@@ -341,9 +342,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		
 		ImGui::SameLine();
 		if(snap_to_grid) {
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.86f, 0.38f, 0.0f, 1.0f)); // Orange when enabled
+			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TabHovered)); // Orange when enabled
 		}
-		else ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.4,0.4,0.4,1.0));
+		else ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
 
 		if(ImGui::Button("[S]"))
@@ -355,7 +356,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 
 		// [C]ENTER
 		
-		ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.4,0.4,0.4,1.0));
+		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
 
 		ImGui::SameLine();
@@ -368,7 +369,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		ImGui::PopStyleVar();
 
 		// [Z]OOM SLIDER
-		ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.4,0.4,0.4,1.0));
+		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
 
 		ImGui::SameLine();
@@ -395,7 +396,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		// COMMENTS
 		
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 		ImGui::SetNextItemWidth(90);
 		
         int numComments = container->getComments().size();
@@ -593,8 +594,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         // Display grid
         if (show_grid)
         {
-            ImU32 GRID_COLOR = IM_COL32(90, 90, 90, 40);
-            ImU32 GRID_COLOR_CENTER = IM_COL32(30, 30, 30, 80);
+            ImU32 GRID_COLOR = OceanodeColors::U32(OceanodeColors::GridLine);
+            ImU32 GRID_COLOR_CENTER = OceanodeColors::U32(OceanodeColors::GridCenter);
             ImVec2 win_pos = ImGui::GetCursorScreenPos();
             ImVec2 canvas_sz = ImGui::GetContentRegionAvail();
             
@@ -633,13 +634,12 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 
             if(gridOpacity > 0.01f) {
                 int alpha = (int)(40 * gridOpacity);
-                ImU32 gridCol = IM_COL32(90, 90, 90, alpha);
                 float startX = fmodf(scrolling.x * zoomLevel, scaledGridSize);
                 float startY = fmodf(scrolling.y * zoomLevel, scaledGridSize);
                 for(float x = startX; x < canvas_sz.x; x += scaledGridSize)
-                    draw_list->AddLine(ImVec2(x, 0.0f) + win_pos, ImVec2(x, canvas_sz.y) + win_pos, gridCol);
+                    draw_list->AddLine(ImVec2(x, 0.0f) + win_pos, ImVec2(x, canvas_sz.y) + win_pos, GRID_COLOR);
                 for(float y = startY; y < canvas_sz.y; y += scaledGridSize)
-                    draw_list->AddLine(ImVec2(0.0f, y) + win_pos, ImVec2(canvas_sz.x, y) + win_pos, gridCol);
+                    draw_list->AddLine(ImVec2(0.0f, y) + win_pos, ImVec2(canvas_sz.x, y) + win_pos, GRID_COLOR);
             }
 
             // Always draw origin cross
@@ -870,7 +870,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 bool isSelectedOrSelecting = nodeGui.getSelected() || (isSelecting && getIsSelectedByRect(nodeGui.getRectangle()));
                 
                 //            ImU32 node_bg_color = /*(node_hovered_in_list == node->ID || node_hovered_in_scene == node->ID || (node_hovered_in_list == -1 && node_selected == node->ID)) ? IM_COL32(75, 75, 75, 255) :*/ IM_COL32(40, 40, 40, 255);
-                ImU32 node_bg_color = IM_COL32(40, 40, 40, 255);
+                ImU32 node_bg_color = OceanodeColors::U32(OceanodeColors::NodeBg);
                 
                 ImU32 node_hd_color = (isSelectedOrSelecting) ? IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,160) : IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,64);
                 
@@ -897,7 +897,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                             auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
                             auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
-                            draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
+                            draw_list->AddCircleFilled(bulletPosition, bulletSize, OceanodeColors::U32(OceanodeColors::ConnectionBullet));
                             if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
                                 connectionIsDoable = true;
                                 if(ImGui::IsMouseClicked(0)){
@@ -955,7 +955,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                             auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
                             auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
-                            draw_list->AddCircleFilled(bulletPosition, bulletSize, IM_COL32(0, 0, 0, 255));
+                            draw_list->AddCircleFilled(bulletPosition, bulletSize, OceanodeColors::U32(OceanodeColors::ConnectionBullet));
                             if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
                                 if(ImGui::IsMouseClicked(0)){
                                     nodeGui.setSelected(false); //Deselect node if we are making connections
@@ -1088,7 +1088,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             
             // Draw selection border if selected
             if(isSelectedOrSelecting){
-                draw_list->AddRect(currentPosition, currentPosition + screenSize, IM_COL32(255, 127, 0, 255), 0.0f, 0, 2.0f);
+                draw_list->AddRect(currentPosition, currentPosition + screenSize, OceanodeColors::U32(OceanodeColors::SelectedBorder), 0.0f, 0, 2.0f);
             }
             ImGui::SetCursorScreenPos(currentPosition);
 			// trying to avoid a crash on ImGui::InvisibleButton
@@ -1207,9 +1207,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ImGui::OpenPopup("Comment");
                 c.openPopupInNext = false;
             }
-			ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));  // Dark background
-			ImGui::PushStyleColor(ImGuiCol_Text,     ImVec4(0.7f, 0.7f, 0.7f, 0.7f));  // White text
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 1.0f)); // Hovered button
+			ImGui::PushStyleColor(ImGuiCol_PopupBg, OceanodeColors::PopupBg);
+			ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
 
             if(ImGui::BeginPopup("Comment")){
@@ -1454,12 +1454,12 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     
                     // Highlight selected item
                     if(isSelected) {
-                        ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.43f, 0.19f, 0.0f, 0.8f));
-                        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.86f,0.38f, 0.0f, 0.6f));
-                        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.8f, 0.3f, 0.0f, 0.6f));
+                        ImGui::PushStyleColor(ImGuiCol_Header, OceanodeColors::SearchSelectedHeader);
+                        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, OceanodeColors::SearchSelectedHovered);
+                        ImGui::PushStyleColor(ImGuiCol_HeaderActive, OceanodeColors::SearchSelectedActive);
                     }
                     
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.6f, 0.6f, 0.6f,1.0f)));
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
                     
                     bool itemClicked = ImGui::Selectable(result.name.c_str(), isSelected);
                     bool itemActivated = itemClicked || (isSelected && isEnterPressed);
@@ -1545,7 +1545,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     {
                         for(auto &op : options[i])
                         {
-                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(0.65f, 0.65f, 0.65f,1.0f)));
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
                             if( ImGui::MenuItem(op.c_str()) || (ImGui::IsItemFocused() && isEnterPressed))
                             {
                                 unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
@@ -1683,7 +1683,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter()) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                         glm::vec2  controlPoint(0,0);
                         controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);
-                        draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, IM_COL32(200, 200, 200, 128), 2.0f);
+                        draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, OceanodeColors::U32(OceanodeColors::ConnectionLine), 2.0f);
                         drawnConnections.push_back(connection);
                     }
                 }
@@ -1705,9 +1705,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             ImColor c;
             if(connectionIsDoable){
                 linkWidth = 3.0f;
-                c = IM_COL32(255, 255, 255, 128);
+                c = OceanodeColors::ConnectionDraggingReachable;
             }else{
-                c = IM_COL32(255, 255, 255, 64);
+                c = OceanodeColors::ConnectionDragging;
             }
             draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, c, linkWidth);
         }
@@ -1776,9 +1776,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             if(isSelecting){
                 //TODO: Change colors
                 if(selectInitialPoint.y < selectEndPoint.y){ //From top to bottom;
-                    draw_list->AddRectFilled(worldToScreen(selectInitialPoint), worldToScreen(selectEndPoint), IM_COL32(255,127,0,30));
+                    draw_list->AddRectFilled(worldToScreen(selectInitialPoint), worldToScreen(selectEndPoint), OceanodeColors::U32(OceanodeColors::SelectionRectEntire));
                 }else{
-                    draw_list->AddRectFilled(worldToScreen(selectInitialPoint), worldToScreen(selectEndPoint), IM_COL32(0,125,255,30));
+                    draw_list->AddRectFilled(worldToScreen(selectInitialPoint), worldToScreen(selectEndPoint), OceanodeColors::U32(OceanodeColors::SelectionRectIntersect));
                 }
             }
             

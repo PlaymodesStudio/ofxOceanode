@@ -633,7 +633,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
                     for(int i = 0; i < (int)themeDir.size(); i++){
                         std::string name = themeDir.getFile(i).getBaseName();
                         bool isCurrent = (name == currentThemeName);
-                        if(isCurrent) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.9f, 0.4f, 1.0f));
+                        if(isCurrent) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::ActiveItemHighlight);
                         if(ImGui::MenuItem(name.c_str())){
                             loadTheme(name);
                         }
@@ -660,7 +660,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
                 for(int i = 0; i < (int)dir.size(); i++){
                     std::string name = dir.getFile(i).getBaseName();
                     bool isDefault = (name == currentDefault);
-                    if(isDefault) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.3f, 1.0f, 0.3f, 1.0f));
+                    if(isDefault) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::ActiveItemHighlight);
                     if(ImGui::MenuItem(name.c_str())){
                         ofDirectory::createDirectory(ofToDataPath("config/themes", true), true, true);
                         ofJson defaultJson;
@@ -1088,6 +1088,10 @@ void ofxOceanode::saveTheme(const std::string& name){
         string colorName = ImGui::GetStyleColorName(i);
         j["colors"][colorName] = { colors[i].x, colors[i].y, colors[i].z, colors[i].w };
     }
+    // Save custom Oceanode semantic colours
+    for(auto& f : OceanodeColors::getFields()){
+        j["oceanodeColors"][f.name] = { f.ptr->x, f.ptr->y, f.ptr->z, f.ptr->w };
+    }
     string path = ofToDataPath("config/themes/" + name + ".json", true);
     ofSavePrettyJson(path, j);
     currentThemeName = name;
@@ -1116,6 +1120,18 @@ void ofxOceanode::loadTheme(const std::string& name){
             if(arr.is_array() && arr.size() == 4){
                 colors[i] = ImVec4(arr[0].get<float>(), arr[1].get<float>(),
                                    arr[2].get<float>(), arr[3].get<float>());
+            }
+        }
+    }
+    // Load custom Oceanode semantic colours (optional: gracefully absent in old theme files)
+    if(j.contains("oceanodeColors")){
+        for(auto& field : OceanodeColors::getFields()){
+            if(j["oceanodeColors"].contains(field.name)){
+                auto& arr = j["oceanodeColors"][field.name];
+                if(arr.is_array() && arr.size() == 4){
+                    *field.ptr = ImVec4(arr[0].get<float>(), arr[1].get<float>(),
+                                       arr[2].get<float>(), arr[3].get<float>());
+                }
             }
         }
     }
@@ -1149,22 +1165,44 @@ void ofxOceanode::drawThemeEditorWindow(){
         ImGui::Separator();
         ImGui::Spacing();
 
-        std::vector<int> colorIndices(ImGuiCol_COUNT);
-        for(int i = 0; i < ImGuiCol_COUNT; i++) colorIndices[i] = i;
-        std::sort(colorIndices.begin(), colorIndices.end(), [](int a, int b){
-            return strcmp(ImGui::GetStyleColorName(a), ImGui::GetStyleColorName(b)) < 0;
-        });
+        if(ImGui::BeginTabBar("##themeditor_tabs")){
 
-        ImGui::BeginChild("##colorscroll", ImVec2(0, 0), false);
-        for(int idx : colorIndices){
-            const char* name = ImGui::GetStyleColorName(idx);
-            ImGui::PushID(idx);
-            ImGui::ColorEdit4(name, (float*)&colors[idx],
-                              ImGuiColorEditFlags_AlphaBar |
-                              ImGuiColorEditFlags_AlphaPreviewHalf);
-            ImGui::PopID();
+            if(ImGui::BeginTabItem("ImGui Colors")){
+                std::vector<int> colorIndices(ImGuiCol_COUNT);
+                for(int i = 0; i < ImGuiCol_COUNT; i++) colorIndices[i] = i;
+                std::sort(colorIndices.begin(), colorIndices.end(), [](int a, int b){
+                    return strcmp(ImGui::GetStyleColorName(a), ImGui::GetStyleColorName(b)) < 0;
+                });
+
+                ImGui::BeginChild("##colorscroll_imgui", ImVec2(0, 0), false);
+                for(int idx : colorIndices){
+                    const char* colorName = ImGui::GetStyleColorName(idx);
+                    ImGui::PushID(idx);
+                    ImGui::ColorEdit4(colorName, (float*)&colors[idx],
+                                      ImGuiColorEditFlags_AlphaBar |
+                                      ImGuiColorEditFlags_AlphaPreviewHalf);
+                    ImGui::PopID();
+                }
+                ImGui::EndChild();
+                ImGui::EndTabItem();
+            }
+
+            if(ImGui::BeginTabItem("Oceanode Colors")){
+                ImGui::BeginChild("##colorscroll_oc", ImVec2(0, 0), false);
+                auto fields = OceanodeColors::getFields();
+                for(int i = 0; i < (int)fields.size(); i++){
+                    ImGui::PushID(i + ImGuiCol_COUNT);
+                    ImGui::ColorEdit4(fields[i].name, (float*)fields[i].ptr,
+                                      ImGuiColorEditFlags_AlphaBar |
+                                      ImGuiColorEditFlags_AlphaPreviewHalf);
+                    ImGui::PopID();
+                }
+                ImGui::EndChild();
+                ImGui::EndTabItem();
+            }
+
+            ImGui::EndTabBar();
         }
-        ImGui::EndChild();
     }
     ImGui::End();
 }

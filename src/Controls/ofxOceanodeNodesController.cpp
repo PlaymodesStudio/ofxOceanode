@@ -20,6 +20,7 @@
 #include "ofxOceanodeNodeMacro.h"
 #include "portal.h"
 #include "router.h"
+#include "ofxOceanodeColors.h"
 
 ofxOceanodeNodesController::ofxOceanodeNodesController(shared_ptr<ofxOceanodeContainer> _container,
                                                         ofxOceanodeCanvas* _canvas)
@@ -351,7 +352,7 @@ void ofxOceanodeNodesController::draw()
                             ImGui::SetNextItemOpen(true);
                         }
                         bool isSelectedMacro = (node == this->selectedNode);
-                        if(isSelectedMacro) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.55f, 0.0f, 1.0f));
+                        if(isSelectedMacro) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::SelectedNodeText);
                         ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);
                         bool nodeOpen = ImGui::TreeNodeEx(nodeName.c_str(), macroFlags);
                         ImGui::PopItemFlag();
@@ -366,8 +367,8 @@ void ofxOceanodeNodesController::draw()
                             ImVec2 rowMin = ImVec2(ImGui::GetWindowPos().x, ImGui::GetItemRectMin().y);
                             ImVec2 rowMax = ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth(), ImGui::GetItemRectMax().y);
                             ImU32 rowBg = (rowIndex % 2 == 0)
-                                ? IM_COL32(255, 255, 255, 8)
-                                : IM_COL32(0, 0, 0, 8);
+                                ? OceanodeColors::U32(OceanodeColors::ZebraEven)
+                                : OceanodeColors::U32(OceanodeColors::ZebraOdd);
                             drawList->AddRectFilled(rowMin, rowMax, rowBg);
                         }
         
@@ -375,7 +376,7 @@ void ofxOceanodeNodesController::draw()
                         if(nameMatches) {
                             ImVec2 matchMin = ImVec2(ImGui::GetWindowPos().x, ImGui::GetItemRectMin().y);
                             ImVec2 matchMax = ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth(), ImGui::GetItemRectMax().y);
-                            drawList->AddRectFilled(matchMin, matchMax, IM_COL32(255, 220, 0, 45));
+                            drawList->AddRectFilled(matchMin, matchMax, OceanodeColors::U32(OceanodeColors::SearchMatchHighlight));
                         }
 
                         // Color swatch for macro node
@@ -475,7 +476,7 @@ void ofxOceanodeNodesController::draw()
                         bool isSelectedLeaf = (node == this->selectedNode);
                         ImVec4 leafTextColor;
                         if(isSelectedLeaf) {
-                            leafTextColor = ImVec4(1.0f, 0.55f, 0.0f, 1.0f);
+                            leafTextColor = OceanodeColors::SelectedNodeText;
                         } else {
                             leafTextColor = ImGui::GetStyleColorVec4(ImGuiCol_Text);
                             leafTextColor.x *= 0.75f;
@@ -507,8 +508,8 @@ void ofxOceanodeNodesController::draw()
                             ImVec2 rowMin = ImVec2(ImGui::GetWindowPos().x, ImGui::GetItemRectMin().y);
                             ImVec2 rowMax = ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth(), ImGui::GetItemRectMax().y);
                             ImU32 rowBg = (rowIndex % 2 == 0)
-                                ? IM_COL32(255, 255, 255, 8)
-                                : IM_COL32(0, 0, 0, 8);
+                                ? OceanodeColors::U32(OceanodeColors::ZebraEven)
+                                : OceanodeColors::U32(OceanodeColors::ZebraOdd);
                             drawList->AddRectFilled(rowMin, rowMax, rowBg);
                         }
 
@@ -516,7 +517,7 @@ void ofxOceanodeNodesController::draw()
                         if(nameMatches) {
                             ImVec2 matchMin = ImVec2(ImGui::GetWindowPos().x, ImGui::GetItemRectMin().y);
                             ImVec2 matchMax = ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth(), ImGui::GetItemRectMax().y);
-                            drawList->AddRectFilled(matchMin, matchMax, IM_COL32(255, 220, 0, 45));
+                            drawList->AddRectFilled(matchMin, matchMax, OceanodeColors::U32(OceanodeColors::SearchMatchHighlight));
                         }
 
                         // Color swatch for leaf node

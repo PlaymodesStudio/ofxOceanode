@@ -9,6 +9,7 @@
 #include "ofxOceanodeContainer.h"
 #include "phasor.h"
 #include "ofxOceanodeNodeMacro.h"
+#include "ofxOceanodeColors.h"
 
 void ofxOceanodeTime::setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOceanodeBPMController> contr){
     container = c;
@@ -298,8 +299,8 @@ void ofxOceanodeTime::draw(){
                 ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(p.color*0.75f));
                 ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(p.color*0.75f));
                 ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(p.color*0.75f));
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
-                ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(0.0,0.0,0.0,0.0));
+                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+                ImGui::PushStyleColor(ImGuiCol_Border, OceanodeColors::TransparentButton);
 //
                 ImGui::SetCursorPosY(accumPos);
                 if(ImGui::TreeNode(p.parameter->getName().c_str())){

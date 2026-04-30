@@ -11,6 +11,7 @@
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeShared.h"
 #include "imgui.h"
+#include "ofxOceanodeColors.h"
 
 int mouseAction=0;
 
@@ -96,10 +97,10 @@ void ofxOceanodePresetsController::draw(){
     // Bank related
     ImGui::Text("%s","Bank:");
     ImGui::SameLine();
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     ImGui::Text("%s",banks[currentBank].c_str());
     ImGui::PopStyleColor();
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 	
 	if(ImGui::Button("[+]")){
 		ImGui::OpenPopup("Add New Bank");
@@ -145,11 +146,11 @@ void ofxOceanodePresetsController::draw(){
     else presetName = currentPreset[banks[currentBank]];
     ImGui::Text("Preset: ");
     ImGui::SameLine();
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6,0.6,0.6,1.0));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     ImGui::Text("%s",presetName.c_str());
     ImGui::PopStyleColor(1);
 
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 
     if(ImGui::Button("[+]")){}
     ImGui::SameLine();
@@ -261,13 +262,13 @@ void ofxOceanodePresetsController::draw(){
     {
         if(b==currentBank)
         {
-            ImGui::PushStyleColor(ImGuiCol_Text,style.Colors[ImGuiCol_TabHovered]);
-            ImGui::PushStyleColor(ImGuiCol_WindowBg,ImVec4(1.0f,1.0f,0.0f,1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TabHovered]);
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, style.Colors[ImGuiCol_WindowBg]);
         }
         else
         {
-            ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.55f,0.55f,0.55f,1.00f));
-            ImGui::PushStyleColor(ImGuiCol_WindowBg,ImVec4(1.0f,0.0f,0.0f,1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, style.Colors[ImGuiCol_WindowBg]);
         }
         
         //ImGui::SetNextItemOpen(true);

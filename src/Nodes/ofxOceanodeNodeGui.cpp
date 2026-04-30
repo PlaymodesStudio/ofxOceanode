@@ -16,6 +16,7 @@
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeScope.h"
 #include "ofxOceanodeTime.h"
+#include "ofxOceanodeColors.h"
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node) : container(_container), node(_node){
     color = node.getColor();
@@ -48,7 +49,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
     
 	if (!isTransparent) {
 		
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, OceanodeColors::TransparentButton);
 		
 		if(ImGui::ArrowButton("expand", expanded ? ImGuiDir_Down : ImGuiDir_Right)){
 			expanded = !expanded;
@@ -67,10 +68,10 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 		// Position the delete button at the right edge using the screen-space node width
 		// (nodeWidthText + nodeWidthWidget is already zoom-scaled by the caller)
 		ImGui::SameLine(nodeWidthText + nodeWidthWidget - ofxOceanodeShared::getBaseFrameHeight() * zoomLevel, 0.0f);
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ImColor(220,220,220,255)));
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(ImColor(0, 0, 0,0)));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(ImColor(0, 0, 0,0)));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(ImColor(0, 0, 0,0)));
+		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+		ImGui::PushStyleColor(ImGuiCol_Button, OceanodeColors::TransparentButton);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, OceanodeColors::TransparentButton);
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, OceanodeColors::TransparentButton);
 		
 		if (ImGui::Button("x"))
 		{
@@ -554,9 +555,9 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                 }
                 
 				// Push custom style colors
-				ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));  // Dark background
-				ImGui::PushStyleColor(ImGuiCol_Text,     ImVec4(0.7f, 0.7f, 0.7f, 0.7f));  // White text
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 1.0f)); // Hovered button
+				ImGui::PushStyleColor(ImGuiCol_PopupBg, OceanodeColors::PopupBg);
+				ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
 				ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
 				
                 if(ImGui::BeginPopup("Param Popup")){
@@ -600,8 +601,8 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 #endif
 #ifdef OFXOCEANODE_USE_OSC
                     ImGui::Separator();
-					ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.08f, 0.08f, 0.08f, 1.0f));  // Dark background
-					ImGui::PushStyleColor(ImGuiCol_Text,     ImVec4(0.7f, 0.7f, 0.7f, 0.7f));  // White text
+					ImGui::PushStyleColor(ImGuiCol_PopupBg, OceanodeColors::PopupBg);
+					ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
 
                     //ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
 					ImGui::Text("OSC Address");

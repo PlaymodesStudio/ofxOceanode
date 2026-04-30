@@ -8,6 +8,7 @@
 
 #include "curve2.h"
 #include "glm/gtx/closest_point.hpp"
+#include "ofxOceanodeColors.h"
 
 //---------------------------------------------------------------
 // StandardCoordinateTransformer Implementation
@@ -124,7 +125,7 @@ void StandardCanvasLayout::calculateLayout(const ImVec2& availableSize, ImVec2& 
 
 void StandardCanvasLayout::renderGrid(ImDrawList* drawList, const ImVec2& visualPos, const ImVec2& visualSize,
                                     int horizontalDivs, int verticalDivs) {
-    ImU32 GRID_COLOR = IM_COL32(120, 120, 120, 60);
+    ImU32 GRID_COLOR = OceanodeColors::U32(OceanodeColors::CurveGridLine);
     ImVec2 cell_sz = ImVec2(visualSize.x / horizontalDivs, visualSize.y / verticalDivs);
     
     // Draw vertical lines (skip first and last by starting at cell_sz.x and stopping before visualSize.x)
@@ -200,7 +201,7 @@ void ShowAllCurveManager::renderInterface() {
     if (!curves || !activeCurve || !numCurves || !outputs) return;
     
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     
     handleAddCurve();
     ImGui::SameLine();
@@ -209,7 +210,7 @@ void ShowAllCurveManager::renderInterface() {
     handleResetCurve();
     ImGui::SameLine();
     
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0,1.0,1.0,1.0));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
     renderCurveSelector();
     ImGui::PopStyleColor();
     
@@ -622,7 +623,7 @@ void curve2::draw(ofEventArgs &args){
 			// Create our child canvas with calculated height
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(25, 25, 25, 200));
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, OceanodeColors::CurveEditorBg);
 			ImGui::BeginChild("scrolling_region", ImVec2(0, curveEditorHeight), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
 			ImGui::PushItemWidth(120.0f);
 			
@@ -828,7 +829,7 @@ void curve2::draw(ofEventArgs &args){
 			// Re-push style vars for drawing operations
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(50, 50, 50, 200));
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, OceanodeColors::CurveEditorBg);
 			
 			// ========================================================================
 			// PHASE 4: Multi-curve rendering system
@@ -910,7 +911,7 @@ void curve2::draw(ofEventArgs &args){
 						
 						// Draw small, non-interactive vertices with curve color
 						draw_list->AddCircleFilled(pointPos, 3, IM_COL32(curveColor.r, curveColor.g, curveColor.b, 180));
-						draw_list->AddCircle(pointPos, 3, IM_COL32(255, 255, 255, 100), 0, 1); // Light outline
+						draw_list->AddCircle(pointPos, 3, OceanodeColors::U32(OceanodeColors::MiniMapViewportFill), 0, 1); // Light outline
 					}
 				}
 			}
@@ -926,9 +927,9 @@ void curve2::draw(ofEventArgs &args){
 					
 					if(i == hoveredPointIndex){
 						// Draw highlighted point with larger radius and different color
-						draw_list->AddCircleFilled(pointPos, 8, IM_COL32(255, 255, 255, 255)); // White highlight
+						draw_list->AddCircleFilled(pointPos, 8, OceanodeColors::U32(OceanodeColors::CurvePointHoverHighlight)); // White highlight
 						draw_list->AddCircle(pointPos, 8, IM_COL32(activeCurveColor.r, activeCurveColor.g, activeCurveColor.b, 255), 0, 2); // Active curve colored outline
-						draw_list->AddCircleFilled(pointPos, 5, IM_COL32(0, 0, 0, 255)); // Original black center
+						draw_list->AddCircleFilled(pointPos, 5, OceanodeColors::U32(OceanodeColors::CurvePointDot)); // Black center
 					} else {
 						// Draw normal point for active curve
 						draw_list->AddCircleFilled(pointPos, 5, IM_COL32(activeCurveColor.r, activeCurveColor.g, activeCurveColor.b,255));
@@ -938,7 +939,7 @@ void curve2::draw(ofEventArgs &args){
 			
 			for(auto &v : input.get()){
 				auto mv = ofMap(v, minX, maxX, 0, 1);
-				draw_list->AddLine(coordinateTransformer->denormalizePoint(glm::vec2(mv, 0)), coordinateTransformer->denormalizePoint(glm::vec2(mv, 1)), IM_COL32(127, 127, 127, 127));
+				draw_list->AddLine(coordinateTransformer->denormalizePoint(glm::vec2(mv, 0)), coordinateTransformer->denormalizePoint(glm::vec2(mv, 1)), OceanodeColors::U32(OceanodeColors::CurveInputIndicator));
 			}
 			
 			// Pop the style vars that were re-pushed for drawing operations
@@ -1667,7 +1668,7 @@ void StandardVisualFeedback::renderInflectionLines(ImDrawList* drawList, const s
             glm::vec2 lineBottomPoint = coordinateTransformer->denormalizePoint(glm::vec2(lineX, 1.0f));
             
             // Draw dotted vertical line with semi-transparent yellow color
-            drawDottedLine(drawList, lineTopPoint, lineBottomPoint, IM_COL32(255, 255, 0, 64));
+            drawDottedLine(drawList, lineTopPoint, lineBottomPoint, OceanodeColors::U32(OceanodeColors::CurveInflectionGuide));
         }
     }
 }
@@ -1725,7 +1726,7 @@ void StandardVisualFeedback::renderAsymmetryLines(ImDrawList* drawList, const st
             glm::vec2 lineRightPoint = coordinateTransformer->denormalizePoint(glm::vec2(1.0f, lineY));
             
             // Draw dotted horizontal line with semi-transparent cyan color
-            drawDottedLine(drawList, lineLeftPoint, lineRightPoint, IM_COL32(0, 255, 255, 64));
+            drawDottedLine(drawList, lineLeftPoint, lineRightPoint, OceanodeColors::U32(OceanodeColors::CurveAsymmetryGuide));
         }
     }
 }
@@ -1780,7 +1781,7 @@ void StandardVisualFeedback::renderBParameterLines(ImDrawList* drawList, const s
             glm::vec2 lineBottomPoint = coordinateTransformer->denormalizePoint(glm::vec2(lineX, 1.0f));
             
             // Draw dotted vertical line with semi-transparent red color
-            drawDottedLine(drawList, lineTopPoint, lineBottomPoint, IM_COL32(255, 0, 0, 64));
+            drawDottedLine(drawList, lineTopPoint, lineBottomPoint, OceanodeColors::U32(OceanodeColors::CurveBParameterGuide));
         }
     }
 }
@@ -1832,7 +1833,7 @@ void StandardVisualFeedback::renderCurveLabels(ImDrawList* drawList, const std::
         drawList->AddRectFilled(
                                 ImVec2(labelPos.x - 2, labelPos.y - 2),
                                 ImVec2(labelPos.x + textSize.x + 2, labelPos.y + textSize.y + 2),
-                                IM_COL32(0, 0, 0, 120) // Semi-transparent black background
+                                OceanodeColors::U32(OceanodeColors::CurveLabelBg)
                                 );
         
         // Draw the label text
@@ -2706,14 +2707,14 @@ void MultiCurveRenderer::renderExtensionLines(ImDrawList* drawList, const std::v
     if(isActive){
         // Draw active curve extension lines in black
         // Start extension line
-        drawList->AddLine(coordinateTransformer->denormalizePoint(glm::vec2(0, points[0].point.y)), 
-                         coordinateTransformer->denormalizePoint(points[0].point), 
-                         IM_COL32(10, 10, 10, 255));
+        drawList->AddLine(coordinateTransformer->denormalizePoint(glm::vec2(0, points[0].point.y)),
+                         coordinateTransformer->denormalizePoint(points[0].point),
+                         OceanodeColors::U32(OceanodeColors::CurveExtensionLine));
         
         // End extension line
-        drawList->AddLine(coordinateTransformer->denormalizePoint(points.back().point), 
-                         coordinateTransformer->denormalizePoint(glm::vec2(1, points.back().point.y)), 
-                         IM_COL32(10, 10, 10, 255));
+        drawList->AddLine(coordinateTransformer->denormalizePoint(points.back().point),
+                         coordinateTransformer->denormalizePoint(glm::vec2(1, points.back().point.y)),
+                         OceanodeColors::U32(OceanodeColors::CurveExtensionLine));
     } else {
         // Draw inactive curve extension lines with reduced opacity
         const float inactiveOpacity = MultiCurveRenderer::INACTIVE_OPACITY;
@@ -2741,7 +2742,7 @@ int MultiCurveRenderer::calculateAdaptiveSegments(float segmentB, bool isActive)
 ImU32 MultiCurveRenderer::calculateSegmentColor(const ofColor& curveColor, bool isActive, 
                                                bool whiteHighlight, bool activeHighlight) const {
     if(whiteHighlight){
-        return IM_COL32(255, 255, 255, 255); // White for shift/ctrl drag
+        return OceanodeColors::U32(OceanodeColors::CurvePointHoverHighlight); // White for shift/ctrl drag
     } else if(activeHighlight || isActive){
         return IM_COL32(curveColor.r, curveColor.g, curveColor.b, 255); // Full opacity
     } else {

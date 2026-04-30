@@ -9,6 +9,7 @@
 #include "curve.h"
 #include "imgui.h"
 #include "glm/gtx/closest_point.hpp"
+#include "ofxOceanodeColors.h"
 
 void curve::setup() {
     color = ofColor(255,128,0,255);
@@ -75,11 +76,11 @@ void curve::draw(ofEventArgs &args){
 			const ImVec2 NODE_WINDOW_PADDING(8.0f, 7.0f);
 			
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0,1.0,1.0,1.0));
-            ImGui::Text(ofToString(curveName).c_str());
-            ImGui::PopStyleColor();
-            ImGui::SameLine();
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
+			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+			         ImGui::Text(ofToString(curveName).c_str());
+			         ImGui::PopStyleColor();
+			         ImGui::SameLine();
+			         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 			if(ImGui::Button("[Clear]"))
 			{
 				points.clear();
@@ -98,7 +99,7 @@ void curve::draw(ofEventArgs &args){
 			// Create our child canvas
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(50, 50, 50, 200));
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, OceanodeColors::CurveEditorBg);
 			ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
 			ImGui::PushItemWidth(120.0f);
 			
@@ -109,7 +110,7 @@ void curve::draw(ofEventArgs &args){
 			ImVec2 canvas_sz = ImGui::GetContentRegionAvail();
 			if (true)
 			{
-				ImU32 GRID_COLOR = IM_COL32(80, 80, 90, 40);
+				ImU32 GRID_COLOR = OceanodeColors::U32(OceanodeColors::CurveGridLine);
 				ImVec2 cell_sz = canvas_sz / ImVec2(numHorizontalDivisions, numVerticalDivisions);
 
 				for (float x = cell_sz.x; x < canvas_sz.x; x += cell_sz.x)
@@ -298,7 +299,7 @@ void curve::draw(ofEventArgs &args){
 				createPoint = true;
 			}
 			
-			draw_list->AddLine(denormalizePoint(glm::vec2(0, points[0].point.y)), denormalizePoint(points[0].point), IM_COL32(10, 10, 10, 255));
+			draw_list->AddLine(denormalizePoint(glm::vec2(0, points[0].point.y)), denormalizePoint(points[0].point), OceanodeColors::U32(OceanodeColors::CurveExtensionLine));
 			for(int i = 0; i < points.size()-1; i++){
 				if(lines[i].type == LINE_BEZIER){
                     draw_list->AddBezierCubic(denormalizePoint(points[i].point),
@@ -323,26 +324,26 @@ void curve::draw(ofEventArgs &args){
 			for(int i = 0; i < points.size(); i++){
 				auto &p = points[i];
 				if((i > 0) && lines[i-1].type == LINE_BEZIER){
-					draw_list->AddLine(denormalizePoint(p.cp1), denormalizePoint(p.point), IM_COL32(15, 15, 15, 255));
+					draw_list->AddLine(denormalizePoint(p.cp1), denormalizePoint(p.point), OceanodeColors::U32(OceanodeColors::CurveControlPointLine));
 				}
 				if((i < points.size()-1) && lines[i].type == LINE_BEZIER){
-					draw_list->AddLine(denormalizePoint(p.cp2), denormalizePoint(p.point), IM_COL32(15, 15, 15, 255));
+					draw_list->AddLine(denormalizePoint(p.cp2), denormalizePoint(p.point), OceanodeColors::U32(OceanodeColors::CurveControlPointLine));
 				}
 				
-				draw_list->AddCircleFilled(denormalizePoint(p.point), 5, IM_COL32(0, 0, 0, 255));
+				draw_list->AddCircleFilled(denormalizePoint(p.point), 5, OceanodeColors::U32(OceanodeColors::CurvePointDot));
 				if((i > 0) && lines[i-1].type == LINE_BEZIER){
-					draw_list->AddCircleFilled(denormalizePoint(p.cp1), 5, IM_COL32(0, 255, 255, 127));
+					draw_list->AddCircleFilled(denormalizePoint(p.cp1), 5, OceanodeColors::U32(OceanodeColors::CurveCP1));
 				}
 				if((i < points.size()-1) && lines[i].type == LINE_BEZIER){
-					draw_list->AddCircleFilled(denormalizePoint(p.cp2), 5, IM_COL32(255, 0, 255, 127));
+					draw_list->AddCircleFilled(denormalizePoint(p.cp2), 5, OceanodeColors::U32(OceanodeColors::CurveCP2));
 				}
 			}
 			
-			draw_list->AddLine(denormalizePoint(points.back().point), denormalizePoint(glm::vec2(1, points.back().point.y)), IM_COL32(10, 10, 10, 255));
+			draw_list->AddLine(denormalizePoint(points.back().point), denormalizePoint(glm::vec2(1, points.back().point.y)), OceanodeColors::U32(OceanodeColors::CurveExtensionLine));
 			
 			for(auto &v : input.get()){
 				auto mv = ofMap(v, minX, maxX, 0, 1);
-				draw_list->AddLine(denormalizePoint(glm::vec2(mv, 0)), denormalizePoint(glm::vec2(mv, 1)), IM_COL32(127, 127, 127, 127));
+				draw_list->AddLine(denormalizePoint(glm::vec2(mv, 0)), denormalizePoint(glm::vec2(mv, 1)), OceanodeColors::U32(OceanodeColors::CurveInputIndicator));
 			}
 			
 			for(auto &p : debugPoints){

@@ -12,6 +12,7 @@
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeShared.h"
+#include "ofxOceanodeColors.h"
 
 // https://github.com/ocornut/imgui/issues/1720
 bool Splitter(int splitNum, bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size = -1.0f)
@@ -129,8 +130,8 @@ void ofxOceanodeScope::draw(){
             ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(p.color*0.75f));
             ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(p.color*0.75f));
             ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(p.color*0.75f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
-            ImGui::PushStyleColor(ImGuiCol_Border,ImVec4(0.0,0.0,0.0,0.0));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            ImGui::PushStyleColor(ImGuiCol_Border, OceanodeColors::TransparentButton);
             
             std::string fullPath = p.getFullPath();
 			ImGui::BeginChild(("Child_" + p.canvasID +"/" + fullPath).c_str(), size, true);

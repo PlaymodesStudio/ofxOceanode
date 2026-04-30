@@ -11,6 +11,7 @@
 
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeShared.h"
+#include "ofxOceanodeColors.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // renderMinimizedView — extracted from the minimizedViewCallback lambda
@@ -75,9 +76,9 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 		ImGui::OpenPopup("Macro");
 	}
 	
-	ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));  // Dark background
-	ImGui::PushStyleColor(ImGuiCol_Text,     ImVec4(0.7f, 0.7f, 0.7f, 0.7f));  // White text
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 1.0f)); // Hovered button
+	ImGui::PushStyleColor(ImGuiCol_PopupBg, OceanodeColors::PopupBg);
+	ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
 	if(ImGui::BeginPopup("Macro")){
 		auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
@@ -341,7 +342,7 @@ void ofxOceanodeNodeMacro::renderPresetNamingGui() {
 
 		// Morphing progress bar — use explicit stable width (not -FLT_MIN sentinel).
 		float progress = morphEngine.isMorphing() ? morphEngine.getProgress() : (snapshotSystem.getCurrentSlot() >= 0 ? 1.f : 0.f);
-		ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.8f, 0.4f, 0.1f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_PlotHistogram, OceanodeColors::MorphProgressBar);
 		ImGui::ProgressBar(progress, ImVec2(scaledTotalW, 6.0f * zoomFactor), "");
 		ImGui::PopStyleColor();
 
@@ -385,23 +386,23 @@ void ofxOceanodeNodeMacro::renderSnapshotMatrix() {
 			
 			// Set button colors based on state
 			if(isActive) {
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.0f, 0.0f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.7f, 0.0f, 0.0f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_Button, OceanodeColors::SnapshotActive);
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, OceanodeColors::SnapshotActiveHovered);
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, OceanodeColors::SnapshotActivePressed);
 			}
 			else if(hasData) {
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.4f, 0.0f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.5f, 0.0f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.6f, 0.0f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_Button, OceanodeColors::SnapshotFilled);
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, OceanodeColors::SnapshotFilledHovered);
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, OceanodeColors::SnapshotFilledPressed);
 			}
 			else {
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_Button));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
 			}
 			
 			// Text is always visible here — we already early-returned when !renderWidgets_sm.
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
 			
 			string label = (hasData && showSnapshotNames) ? snapshotSystem.getSnapshots().at(slot).name : ofToString(slot);
 			
@@ -678,7 +679,7 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 		} else {
 			// ── Normal display ───────────────────────────────────────────────
 			if(isUnknown) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-			if(isSep)     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.85f, 1.0f, 1.0f));
+			if(isSep)     ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::SelectedNodeText);
 
 			// For separators, constrain the selectable to leave 40 px for the
 			// delete ("x") button (same margin as the InputText in edit mode).

@@ -12,6 +12,7 @@
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "imgui.h"
+#include "ofxOceanodeColors.h"
 
 std::map<std::string, std::vector<std::string>> ofxOceanodeInspectorController::inspectorDropdownOptions;
 
@@ -93,7 +94,7 @@ void ofxOceanodeInspectorController::draw(){
 		
 		// Draw white text on top
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + padding);
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
 		ImGui::Text("%s", selectedNodes[0].first.c_str());
 		ImGui::PopStyleColor();
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + padding);
@@ -221,9 +222,9 @@ void ofxOceanodeInspectorController::draw(){
                 // PARAM VOID
                 else if(absParam.valueType() == typeid(void).name()){
                     auto tempCast = absParam.cast<void>();
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_Button));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
                     if(ImGui::Button(hiddenUniqueId.c_str(), ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()))){
                         tempCast.trigger();
                     }
@@ -343,8 +344,8 @@ void ofxOceanodeInspectorController::draw(){
                 ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(nodeGui.getColor()*0.75f));
                 ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(nodeGui.getColor()*0.75f));
                 ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(nodeGui.getColor()*0.75f));
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55, 0.55, 0.55, 1.0));
-                ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0, 0.0, 0.0, 0.0));
+                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+                ImGui::PushStyleColor(ImGuiCol_Border, OceanodeColors::TransparentButton);
 
                 ImGui::BeginChild(("Child_" + p.getGroupHierarchyNames().front() + "/" + p.getName()).c_str(), size, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
                 ImGui::Text("%s", (p.getGroupHierarchyNames().front() + "/" + p.getName()).c_str());
@@ -360,9 +361,9 @@ void ofxOceanodeInspectorController::draw(){
                 if(si < scopeCount - 1){
                     string splitterId = "##scopesplitter_" + to_string(si);
 
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.28f, 0.28f, 0.28f, 0.6f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.50f, 0.50f, 0.50f, 0.8f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.65f, 0.65f, 0.65f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_Button));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
 
                     ImGui::Button(splitterId.c_str(), ImVec2(-1.0f, splitterThickness));
 
@@ -387,11 +388,11 @@ void ofxOceanodeInspectorController::draw(){
 	if(node->getNodeModel().getDescription() != ""){
 		ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 21.0f);
 		ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.75,0.75,.75,1.0));
+		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
 		bool descOpen = ImGui::TreeNode("Description");
 		ImGui::PopStyleColor(); // always pop header colour right after TreeNode
 		if(descOpen){
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.6,0.6,.6,1.0));
+			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 			ImGui::TextWrapped(node->getNodeModel().getDescription().c_str(), "%s");
 			ImGui::PopStyleColor();
 			ImGui::TreePop();
