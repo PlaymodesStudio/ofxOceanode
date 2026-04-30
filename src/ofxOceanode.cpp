@@ -671,6 +671,12 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
                 }
                 ImGui::EndMenu();
             }
+            ImGui::Separator();
+            if(ImGui::MenuItem("Reset to Built-in Theme")){
+                OceanodeTheme base;
+                base.setup();
+                currentThemeName = "OceanodeTheme (built-in)";
+            }
             ImGui::EndMenu();
         }
 
@@ -1098,6 +1104,10 @@ void ofxOceanode::loadTheme(const std::string& name){
     ofJson j = ofLoadJson(path);
     if(!j.contains("colors")) return;
 
+    // Reset to OceanodeTheme baseline before applying JSON overrides
+    OceanodeTheme base;
+    base.setup();
+
     ImVec4* colors = ImGui::GetStyle().Colors;
     for(int i = 0; i < ImGuiCol_COUNT; i++){
         string colorName = ImGui::GetStyleColorName(i);
@@ -1124,7 +1134,7 @@ void ofxOceanode::drawThemeEditorWindow(){
         ImVec4* colors = style.Colors;
 
         if(currentThemeName.empty()){
-            ImGui::TextDisabled("No theme loaded");
+            ImGui::TextDisabled("OceanodeTheme (built-in)");
         } else {
             ImGui::TextDisabled("Current theme: %s", currentThemeName.c_str());
         }
@@ -1133,17 +1143,23 @@ void ofxOceanode::drawThemeEditorWindow(){
         if(ImGui::Button("Reset to Default")){
             OceanodeTheme defaultTheme;
             defaultTheme.setup();
-            currentThemeName = "";
+            currentThemeName = "OceanodeTheme (built-in)";
         }
 
         ImGui::Separator();
         ImGui::Spacing();
 
+        std::vector<int> colorIndices(ImGuiCol_COUNT);
+        for(int i = 0; i < ImGuiCol_COUNT; i++) colorIndices[i] = i;
+        std::sort(colorIndices.begin(), colorIndices.end(), [](int a, int b){
+            return strcmp(ImGui::GetStyleColorName(a), ImGui::GetStyleColorName(b)) < 0;
+        });
+
         ImGui::BeginChild("##colorscroll", ImVec2(0, 0), false);
-        for(int i = 0; i < ImGuiCol_COUNT; i++){
-            const char* name = ImGui::GetStyleColorName(i);
-            ImGui::PushID(i);
-            ImGui::ColorEdit4(name, (float*)&colors[i],
+        for(int idx : colorIndices){
+            const char* name = ImGui::GetStyleColorName(idx);
+            ImGui::PushID(idx);
+            ImGui::ColorEdit4(name, (float*)&colors[idx],
                               ImGuiColorEditFlags_AlphaBar |
                               ImGuiColorEditFlags_AlphaPreviewHalf);
             ImGui::PopID();
