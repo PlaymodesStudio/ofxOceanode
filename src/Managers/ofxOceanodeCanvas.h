@@ -206,6 +206,8 @@ private:
 	vector<int> keyboardSlots;           // Maps keyboard slots (0-9) to comment indices (-1 = empty)
 	vector<int> commentToSlot;           // Maps comment indices to keyboard slots (-1 = not assigned)
 	static const int MAX_KEYBOARD_SLOTS = 10;
+	
+	const float connectionWidth = 3.0;
 };
 
 #endif

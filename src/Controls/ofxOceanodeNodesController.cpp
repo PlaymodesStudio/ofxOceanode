@@ -83,9 +83,9 @@ void ofxOceanodeNodesController::draw()
 
     // MY NODES LIST
     
-    ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-    if(ImGui::TreeNode("Project Nodes"))
-    {        
+//    ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+//    if(ImGui::TreeNode("Project Nodes"))
+//    {        
         vector<ofxOceanodeNode*> allNodes = container->getAllModules();
         char * cString = new char[256];
         strcpy(cString, searchFieldMyNodes.c_str());
@@ -161,9 +161,13 @@ void ofxOceanodeNodesController::draw()
             }
             return count;
         };
+
+        // Shared zebra counter — declared outside the lambda so all recursion levels
+        // (including macro children) share a single monotonically-increasing index.
+        // This guarantees the even/odd alternation is never broken by expand/collapse.
+        int zebraRowIndex = 0;
         
-        
-        std::function<void(vector<ofxOceanodeNode*>, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*, int, bool)> listNodes = [this, &listNodes, countNodes](vector<ofxOceanodeNode*> nodes, ofxOceanodeCanvas* _canvas, ofxOceanodeNodeMacro* _macro, int depth, bool parentActive){
+        std::function<void(vector<ofxOceanodeNode*>, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*, int, bool)> listNodes = [this, &listNodes, countNodes, &zebraRowIndex](vector<ofxOceanodeNode*> nodes, ofxOceanodeCanvas* _canvas, ofxOceanodeNodeMacro* _macro, int depth, bool parentActive){
             vector<int> order(nodes.size());
             vector<string> displayNames(nodes.size());
             std::iota(order.begin(), order.end(), 0);
@@ -253,7 +257,6 @@ void ofxOceanodeNodesController::draw()
             constexpr float depthIndent = 12.0f;
             if(depth > 0) ImGui::Indent(depthIndent * depth);
 
-            int rowIndex = 0;
             for(int orderPos = 0; orderPos < (int)order.size(); orderPos++)
             {
                 int currentIdx = order[orderPos];
@@ -366,7 +369,7 @@ void ofxOceanodeNodesController::draw()
                         {
                             ImVec2 rowMin = ImVec2(ImGui::GetWindowPos().x, ImGui::GetItemRectMin().y);
                             ImVec2 rowMax = ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth(), ImGui::GetItemRectMax().y);
-                            ImU32 rowBg = (rowIndex % 2 == 0)
+                            ImU32 rowBg = (zebraRowIndex % 2 == 0)
                                 ? OceanodeColors::U32(OceanodeColors::ZebraEven)
                                 : OceanodeColors::U32(OceanodeColors::ZebraOdd);
                             drawList->AddRectFilled(rowMin, rowMax, rowBg);
@@ -389,7 +392,7 @@ void ofxOceanodeNodesController::draw()
                                 ImVec2(swatchPos.x + 4.0f, swatchPos.y + ImGui::GetTextLineHeight()),
                                 nodeColorU32);
                         }
-                        rowIndex++;
+                        zebraRowIndex++;
 
                         // Double-click on a macro label → open the macro's OWN canvas (enter the macro)
                         if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0) && !ImGui::IsItemToggledOpen()) {
@@ -507,7 +510,7 @@ void ofxOceanodeNodesController::draw()
                         {
                             ImVec2 rowMin = ImVec2(ImGui::GetWindowPos().x, ImGui::GetItemRectMin().y);
                             ImVec2 rowMax = ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth(), ImGui::GetItemRectMax().y);
-                            ImU32 rowBg = (rowIndex % 2 == 0)
+                            ImU32 rowBg = (zebraRowIndex % 2 == 0)
                                 ? OceanodeColors::U32(OceanodeColors::ZebraEven)
                                 : OceanodeColors::U32(OceanodeColors::ZebraOdd);
                             drawList->AddRectFilled(rowMin, rowMax, rowBg);
@@ -530,7 +533,7 @@ void ofxOceanodeNodesController::draw()
                                 ImVec2(swatchPos.x + 4.0f, swatchPos.y + ImGui::GetTextLineHeight()),
                                 nodeColorU32);
                         }
-                        rowIndex++;
+                        zebraRowIndex++;
 
                         if(selected)
                         {
@@ -675,8 +678,8 @@ void ofxOceanodeNodesController::draw()
         // If the selected node is filtered out and listNodes never sees it, the flag
         // remains true and the restore is suppressed (neutral scroll — acceptable).
 
-        ImGui::TreePop();
-    }
+//        ImGui::TreePop();
+//    }
     forceExpandAll   = false;
     forceCollapseAll = false;
 }

@@ -105,8 +105,7 @@ void ofxOceanodeBPMController::draw(){
         if(ImGui::Checkbox("Frame Mode", (bool*)&fm.get())){
             fm = fm;
         }
-		ImGui::SameLine();
-        auto fi = timeParameters->getInt("Frame Interval");
+		auto fi = timeParameters->getInt("Frame Interval");
         if(ImGui::SliderInt("Frame Interval", (int*)&fi.get(), 1, 600)){
             fi = fi;
         }

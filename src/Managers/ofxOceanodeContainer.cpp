@@ -56,6 +56,10 @@ ofxOceanodeContainer::~ofxOceanodeContainer(){
 }
 
 void ofxOceanodeContainer::clearContainer(){
+    // Clear scope callback first to prevent auto-saves triggered by parameter
+    // destructors during teardown (app exit or preset switching)
+    ofxOceanodeScope::getInstance()->setScopeChangedCallback(nullptr);
+    
     connections.clear();
     
     std::vector<shared_ptr<ofxOceanodeNode>> toDelete;
@@ -259,27 +263,15 @@ void ofxOceanodeContainer::saveScope(const std::string& presetPath)
 	// Get scope state from scope
 	auto scopeState = ofxOceanodeScope::getInstance()->getScopeState();
 	
-	// when closing app, we're removing parameters, so we're trying to save the scope, so avoid saving the JSON if scopeState is not valid
-	if(scopeState.windowConfig.hasConfig != false)
-	{
-		// Convert to JSON
-		ofJson json = scopeState.toJson();
-		
-		// Save to file
-		std::string filepath = presetPath + "/scope_config.json";
-		ofSavePrettyJson(filepath, json);
-		
-		//ofLogNotice("ofxOceanodeContainer") << "Saved scope configuration to: " << filepath;
-		for (const auto& data : scopeState.parameters) {
-			std::string fullPath = data.canvasID;
-			if (!fullPath.empty() && fullPath != "Canvas" && fullPath != "0") {
-				fullPath += " > ";
-			} else {
-				fullPath = "";
-			}
-			fullPath += data.nodeName + " / " + data.paramName;
-		}
-	}
+	// Always save – even an empty scope (no parameters) must overwrite the file
+	// so that removing all scoped parameters and hitting Save Preset correctly
+	// reflects zero scopes.  The callback is cleared in clearContainer() to
+	// prevent spurious saves during app exit or preset switching.
+	ofJson json = scopeState.toJson();
+	
+	// Save to file
+	std::string filepath = presetPath + "/scope_config.json";
+	ofSavePrettyJson(filepath, json);
 }
 
 void ofxOceanodeContainer::loadScope(const std::string& presetPath) {

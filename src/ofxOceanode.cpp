@@ -278,11 +278,18 @@ void ofxOceanode::draw(){
         if(ctx && ctx->NavWindow) {
             ImGuiWindow* root = ctx->NavWindow->RootWindow;
             std::string name = root->Name;
+            // Strip optional "(title) " prefix used by macro canvas windows
             if(!name.empty() && name[0] == '(') {
                 size_t closeParen = name.find(") ");
                 if(closeParen != std::string::npos)
                     name = name.substr(closeParen + 2);
             }
+            // Strip ImGui "###stableID" suffix — Begin() stores the full string in Name,
+            // but canvas uniqueIDs never include "###". Without this, the root canvas window
+            // ("Canvas###Canvas") maps to "Canvas###Canvas" which never matches uniqueID "Canvas".
+            size_t hashHash = name.find("###");
+            if(hashHash != std::string::npos)
+                name = name.substr(0, hashHash);
             ofxOceanodeShared::setActiveCanvasUniqueID(name);
         }
     }

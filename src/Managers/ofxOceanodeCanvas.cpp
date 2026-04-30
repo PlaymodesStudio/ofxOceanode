@@ -1683,7 +1683,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter()) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                         glm::vec2  controlPoint(0,0);
                         controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);
-                        draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, OceanodeColors::U32(OceanodeColors::ConnectionLine), 2.0f);
+                        draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, OceanodeColors::U32(OceanodeColors::ConnectionLine), connectionWidth);
                         drawnConnections.push_back(connection);
                     }
                 }
@@ -1701,15 +1701,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
             glm::vec2  controlPoint(0,0);
             controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);
-            float linkWidth = 2.0f;
             ImColor c;
             if(connectionIsDoable){
-                linkWidth = 3.0f;
                 c = OceanodeColors::ConnectionDraggingReachable;
             }else{
                 c = OceanodeColors::ConnectionDragging;
             }
-            draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, c, linkWidth);
+            draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, c, connectionWidth);
         }
         
         draw_list->ChannelsMerge();

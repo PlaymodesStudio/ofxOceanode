@@ -172,8 +172,8 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                 }
             }else{
                 
+                ImGui::SetNextItemAllowOverlap();
                 ImGui::Text("%s", uniqueId.c_str());
-				ImGui::SetNextItemAllowOverlap();
                 ImGui::SameLine(-1);
                 ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
                 {
@@ -561,7 +561,6 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 				ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
 				
                 if(ImGui::BeginPopup("Param Popup")){
-                    ImGui::Separator();
                     if(!absParam.isScoped()){ //Param is not scoped
                         if(ImGui::Selectable("Add to Scope")){
                             // Extract full path information
@@ -580,7 +579,6 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                             ofxOceanodeScope::getInstance()->removeParameter(&absParam);
                         }
                     }
-                    ImGui::Separator();
                     if(!absParam.isTimelined()){ //Param is not timelined
                         if(ImGui::Selectable("Add to Timeline")){
                             ofxOceanodeTime::getInstance()->addParameter(&absParam,node.getColor());

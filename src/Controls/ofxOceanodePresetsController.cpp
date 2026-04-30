@@ -102,7 +102,7 @@ void ofxOceanodePresetsController::draw(){
     ImGui::PopStyleColor();
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 	
-	if(ImGui::Button("[+]")){
+	if(ImGui::Button("[+]##newBank")){
 		ImGui::OpenPopup("Add New Bank");
 	}
 	ImGui::SameLine();
@@ -152,7 +152,7 @@ void ofxOceanodePresetsController::draw(){
 
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 
-    if(ImGui::Button("[+]")){}
+    if(ImGui::Button("[+]##newPreset")){}
     ImGui::SameLine();
     if(ImGui::Button("[-]")){
         ImGui::OpenPopup("Delete Preset?");
@@ -262,7 +262,7 @@ void ofxOceanodePresetsController::draw(){
     {
         if(b==currentBank)
         {
-            ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TabHovered]);
+            ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::SelectedNodeText);
             ImGui::PushStyleColor(ImGuiCol_WindowBg, style.Colors[ImGuiCol_WindowBg]);
         }
         else
@@ -286,7 +286,7 @@ void ofxOceanodePresetsController::draw(){
                 presetName = bankPresets[banks[b]][n];
                 
                 bool isCurrentPreset = (presetName == currentPreset[banks[currentBank]]);
-                if((isCurrentPreset)&&(b==currentBank)) ImGui::PushStyleColor(ImGuiCol_Text,style.Colors[ImGuiCol_TabHovered]);
+                if((isCurrentPreset)&&(b==currentBank)) ImGui::PushStyleColor(ImGuiCol_Text,OceanodeColors::SelectedNodeText);
                 
                 ImGui::Text((ofToString(n+1)+"|").c_str());
                 ImGui::SameLine();

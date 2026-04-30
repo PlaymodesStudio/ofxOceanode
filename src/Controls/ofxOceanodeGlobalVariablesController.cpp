@@ -190,7 +190,6 @@ void ofxOceanodeGlobalVariablesController::draw(){
             ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
             if(ImGui::BeginPopupModal("New Variable", NULL, ImGuiWindowFlags_AlwaysAutoResize)){
                 ImGui::Text("%s %s %s", "New variable for", group->name.c_str(), "group");
-                ImGui::Separator();
                 enum Types { Type_Float, Type_Int, Type_Bool, Type_String, Type_OfColor, Type_OfFloatColor, Type_COUNT };
                 static int type = Type_Float;
                 const char* types_names[Type_COUNT] = { "Float", "Int", "Bool", "String", "ofColor", "ofFloatColor" };
