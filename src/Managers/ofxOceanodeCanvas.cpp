@@ -498,7 +498,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     string displayText;
                     if(commentCheckboxStates[i] && commentToSlot[i] != -1)
                     {
-                        int keyNum = (commentToSlot[i] + 1) % 10; // 0 becomes 10, others stay 1-9
+                        int keyNum = (commentToSlot[i] + 1) % 10;
                         if(keyNum == 0) keyNum = 10;
                         displayText = "[" + ofToString(keyNum == 10 ? 0 : keyNum) + "] " + c.text;
                     }
@@ -507,17 +507,25 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         displayText = c.text;
                     }
                     
-                    // Apply comment color to the item
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(c.color.r, c.color.g, c.color.b, 1.0));
-					string sName = displayText + "##" + ofToString(i);
-					if(ImGui::Selectable(sName.c_str() ))
+                    // Draw a small color swatch (same technique as NodesController):
+                    // record position, reserve space with Dummy, then draw the colored rect
+                    ImDrawList* comboDrawList = ImGui::GetWindowDrawList();
+                    ImVec2 swatchPos = ImGui::GetCursorScreenPos();
+                    ImGui::Dummy(ImVec2(9.0f, ImGui::GetTextLineHeight()));
+                    ImGui::SameLine(0, 4);
+                    comboDrawList->AddRectFilled(
+                        swatchPos,
+                        ImVec2(swatchPos.x + 6.0f, swatchPos.y + ImGui::GetTextLineHeight()),
+                        IM_COL32((int)(c.color.r * 255), (int)(c.color.g * 255), (int)(c.color.b * 255), 255));
+                    
+                    // Normal text color — no PushStyleColor tint
+                    string sName = displayText + "##" + ofToString(i);
+                    if(ImGui::Selectable(sName.c_str()))
                     {
                         // Navigate to comment position
                         scrolling.x = -c.position.x;
                         scrolling.y = -c.position.y;
                     }
-                    
-                    ImGui::PopStyleColor();
                 }
                 ImGui::EndCombo();
             }
