@@ -577,6 +577,69 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                             ofxOceanodeScope::getInstance()->removeParameter(&absParam);
                         }
                     }
+                    ImGui::Separator();
+                    auto customTypes = container.getCompatibleCustomGuiWidgetTypes(absParam);
+                    bool anyRemoval = false;
+                    for(const auto& panel : container.getCustomGuiPanelsData()){
+                        if(container.customGuiContainsParameter(panel.id, absParam)){
+                            anyRemoval = true;
+                            break;
+                        }
+                    }
+
+                    if(!customTypes.empty() && ImGui::BeginMenu("Add to Custom GUI")){
+                        CustomGuiWidgetType defaultType = container.getDefaultCustomGuiWidgetType(absParam);
+
+                        if(container.getCustomGuiPanelsData().empty()){
+                            if(ImGui::Selectable("New Custom GUI")){
+                                container.requestCreateCustomGui(container.getCustomGuiParameterPath(absParam), defaultType, true);
+                            }
+                        }else{
+                            if(ImGui::BeginMenu("New Custom GUI")){
+                                for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
+                                    CustomGuiWidgetType widgetType = customTypes[widgetIndex];
+                                    std::string label = customGuiWidgetTypeToString(widgetType);
+                                    if(widgetType == defaultType) label += " (default)";
+                                    if(ImGui::Selectable(label.c_str())){
+                                        container.requestCreateCustomGui(container.getCustomGuiParameterPath(absParam), widgetType, true);
+                                    }
+                                }
+                                ImGui::EndMenu();
+                            }
+
+                            ImGui::Separator();
+                            for(const auto& panel : container.getCustomGuiPanelsData()){
+                                if(ImGui::BeginMenu(panel.name.c_str())){
+                                    bool alreadyAdded = container.customGuiContainsParameter(panel.id, absParam);
+                                    if(alreadyAdded){
+                                        ImGui::TextDisabled("Already added");
+                                        ImGui::Separator();
+                                    }
+                                    for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
+                                        CustomGuiWidgetType widgetType = customTypes[widgetIndex];
+                                        std::string label = customGuiWidgetTypeToString(widgetType);
+                                        if(widgetType == defaultType) label += " (default)";
+                                        if(ImGui::Selectable(label.c_str(), false, alreadyAdded ? ImGuiSelectableFlags_Disabled : 0)){
+                                            container.addParameterToCustomGui(panel.id, absParam, widgetType);
+                                            container.openCustomGuiPanel(panel.id, false);
+                                        }
+                                    }
+                                    ImGui::EndMenu();
+                                }
+                            }
+
+                        }
+                        ImGui::EndMenu();
+                    }
+                    if(anyRemoval && ImGui::BeginMenu("Remove from Custom GUI")){
+                        for(const auto& panel : container.getCustomGuiPanelsData()){
+                            if(ImGui::Selectable(panel.name.c_str(), false, container.customGuiContainsParameter(panel.id, absParam) ? 0 : ImGuiSelectableFlags_Disabled)){
+                                container.removeParameterFromCustomGui(panel.id, absParam);
+                            }
+                        }
+                        ImGui::EndMenu();
+                    }
+                    ImGui::Separator();
                     if(!absParam.isTimelined()){ //Param is not timelined
                         if(ImGui::Selectable("Add to Timeline")){
                             ofxOceanodeTime::getInstance()->addParameter(&absParam,node.getColor());
