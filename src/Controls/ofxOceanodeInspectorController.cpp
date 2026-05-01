@@ -11,6 +11,7 @@
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeNodeMacro.h"
+#include "CustomGui/ofxOceanodeCustomGuiPanel.h"
 #include "imgui.h"
 #include "ofxOceanodeColors.h"
 
@@ -282,6 +283,40 @@ void ofxOceanodeInspectorController::draw(){
             }
             ImGui::PopID();
         }
+        ImGui::TreePop();
+    }
+
+    ImGui::Separator();
+
+    if(ImGui::TreeNode("Custom GUI")){
+        if(ImGui::Button("Create Custom GUI")){
+            auto& panel = container->createCustomGuiPanel();
+            container->openCustomGuiPanel(panel.id, true);
+        }
+        ImGui::Separator();
+
+        bool anyMembership = false;
+        for(const auto& panel : container->getCustomGuiPanelsData()){
+            bool panelHasNodeParams = false;
+            for(int i = 0; i < node->getParameters().size() && !panelHasNodeParams; i++){
+                auto& absParam = static_cast<ofxOceanodeAbstractParameter&>(node->getParameters().get(i));
+                panelHasNodeParams = container->customGuiContainsParameter(panel.id, absParam);
+            }
+
+            if(panelHasNodeParams){
+                anyMembership = true;
+                ImGui::Text("%s", panel.name.c_str());
+                ImGui::SameLine(220);
+                if(ImGui::SmallButton(("Open##" + panel.id).c_str())){
+                    container->openCustomGuiPanel(panel.id, false);
+                }
+                ImGui::SameLine();
+                if(ImGui::SmallButton(("Edit##" + panel.id).c_str())){
+                    container->openCustomGuiPanel(panel.id, true);
+                }
+            }
+        }
+        if(!anyMembership) ImGui::TextDisabled("No parameters from this node are in a custom GUI yet.");
         ImGui::TreePop();
     }
 

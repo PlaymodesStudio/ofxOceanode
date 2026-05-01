@@ -467,6 +467,35 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 		    }
 		    
 		    ImGui::Separator();
+		    if(ImGui::BeginMenu("Custom GUIs")){
+		        const std::string activeCanvasId = ofxOceanodeShared::getActiveCanvasUniqueID();
+		        ofxOceanodeContainer* activeContainer = container->getContainerForCanvasID(activeCanvasId);
+		        if(activeContainer == nullptr) activeContainer = container.get();
+		        const auto& panels = activeContainer->getCustomGuiPanelsData();
+		        if(panels.empty()){
+		            ImGui::TextDisabled("No Custom GUIs");
+		        }else{
+		            for(const auto& panel : panels){
+		                if(ImGui::BeginMenu(panel.name.c_str())){
+		                    if(ImGui::MenuItem("Open", nullptr, panel.windowState.isOpen)){
+		                        activeContainer->openCustomGuiPanel(panel.id, false);
+		                    }
+		                    if(ImGui::MenuItem("Edit")){
+		                        activeContainer->openCustomGuiPanel(panel.id, true);
+		                    }
+		                    if(ImGui::MenuItem("Close", nullptr, false, panel.windowState.isOpen)){
+		                        if(CustomGuiPanelData* panelData = activeContainer->getCustomGuiPanelData(panel.id)){
+		                            panelData->windowState.isOpen = false;
+		                            activeContainer->saveCustomGuis();
+		                        }
+		                    }
+		                    ImGui::EndMenu();
+		                }
+		            }
+		        }
+		        ImGui::EndMenu();
+		    }
+		    ImGui::Separator();
 		    if(ImGui::Button("Apply")){
 		        visibility = pendingVisibility;
 		    }
