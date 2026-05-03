@@ -142,6 +142,7 @@ public:
     void saveCustomGuis(const std::string& presetPath);
     void loadCustomGuis(const std::string& presetPath);
     void saveCustomGuis();
+    void markCustomGuisDirty();
     
     void setBpm(float _bpm);
     void resetPhase();
@@ -251,6 +252,7 @@ private:
     std::vector<CustomGuiPanelData> customGuiPanelsData;
     std::vector<std::unique_ptr<ofxOceanodeCustomGuiPanel>> customGuiPanels;
     std::string customGuiStoragePath;
+    bool customGuisDirty = false;
     bool customGuiCreateModalOpen = false;
     std::string pendingCustomGuiName = "Custom GUI";
     std::string pendingCustomGuiParameterPath;

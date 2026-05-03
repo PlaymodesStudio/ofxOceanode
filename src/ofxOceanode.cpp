@@ -272,27 +272,6 @@ void ofxOceanode::draw(){
         }
     }
     gui.begin();
-    // Track active canvas for minimap
-    {
-        ImGuiContext* ctx = ImGui::GetCurrentContext();
-        if(ctx && ctx->NavWindow) {
-            ImGuiWindow* root = ctx->NavWindow->RootWindow;
-            std::string name = root->Name;
-            // Strip optional "(title) " prefix used by macro canvas windows
-            if(!name.empty() && name[0] == '(') {
-                size_t closeParen = name.find(") ");
-                if(closeParen != std::string::npos)
-                    name = name.substr(closeParen + 2);
-            }
-            // Strip ImGui "###stableID" suffix — Begin() stores the full string in Name,
-            // but canvas uniqueIDs never include "###". Without this, the root canvas window
-            // ("Canvas###Canvas") maps to "Canvas###Canvas" which never matches uniqueID "Canvas".
-            size_t hashHash = name.find("###");
-            if(hashHash != std::string::npos)
-                name = name.substr(0, hashHash);
-            ofxOceanodeShared::setActiveCanvasUniqueID(name);
-        }
-    }
     bool showDocker = true;
     ShowExampleAppDockSpace(&showDocker);
     if(showMode){
@@ -468,25 +447,57 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 		    
 		    ImGui::Separator();
 		    if(ImGui::BeginMenu("Custom GUIs")){
-		        const std::string activeCanvasId = ofxOceanodeShared::getActiveCanvasUniqueID();
+		        struct PanelEntry {
+		            ofxOceanodeContainer* owner = nullptr;
+		            const CustomGuiPanelData* panel = nullptr;
+		            std::string canvasId;
+		        };
+
+		        const std::string activeCanvasId = ofxOceanodeShared::getActiveCanvasUniqueID().empty() ? "Canvas" : ofxOceanodeShared::getActiveCanvasUniqueID();
 		        ofxOceanodeContainer* activeContainer = container->getContainerForCanvasID(activeCanvasId);
 		        if(activeContainer == nullptr) activeContainer = container.get();
-		        const auto& panels = activeContainer->getCustomGuiPanelsData();
-		        if(panels.empty()){
+
+		        std::vector<PanelEntry> panelEntries;
+		        std::function<void(ofxOceanodeContainer*, const std::string&)> collectPanels =
+		        [&](ofxOceanodeContainer* currentContainer, const std::string& currentCanvasId){
+		            if(currentContainer == nullptr) return;
+
+		            for(const auto& panel : currentContainer->getCustomGuiPanelsData()){
+		                panelEntries.push_back({currentContainer, &panel, currentCanvasId});
+		            }
+
+		            for(auto* node : currentContainer->getAllModules()){
+		                if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
+		                    auto macroContainer = macro->getContainer();
+		                    if(macroContainer != nullptr){
+		                        collectPanels(macroContainer.get(), macroContainer->getCanvasID());
+		                    }
+		                }
+		            }
+		        };
+
+		        collectPanels(activeContainer, activeContainer->getCanvasID());
+
+		        if(panelEntries.empty()){
 		            ImGui::TextDisabled("No Custom GUIs");
 		        }else{
-		            for(const auto& panel : panels){
-		                if(ImGui::BeginMenu(panel.name.c_str())){
-		                    if(ImGui::MenuItem("Open", nullptr, panel.windowState.isOpen)){
-		                        activeContainer->openCustomGuiPanel(panel.id, false);
+		            for(const auto& entry : panelEntries){
+		                std::string menuLabel = entry.panel->name;
+		                if(!entry.canvasId.empty() && entry.canvasId != "Canvas"){
+		                    menuLabel += " [" + entry.canvasId + "]";
+		                }
+
+		                if(ImGui::BeginMenu(menuLabel.c_str())){
+		                    if(ImGui::MenuItem("Open", nullptr, entry.panel->windowState.isOpen)){
+		                        entry.owner->openCustomGuiPanel(entry.panel->id, false);
 		                    }
 		                    if(ImGui::MenuItem("Edit")){
-		                        activeContainer->openCustomGuiPanel(panel.id, true);
+		                        entry.owner->openCustomGuiPanel(entry.panel->id, true);
 		                    }
-		                    if(ImGui::MenuItem("Close", nullptr, false, panel.windowState.isOpen)){
-		                        if(CustomGuiPanelData* panelData = activeContainer->getCustomGuiPanelData(panel.id)){
+		                    if(ImGui::MenuItem("Close", nullptr, false, entry.panel->windowState.isOpen)){
+		                        if(CustomGuiPanelData* panelData = entry.owner->getCustomGuiPanelData(entry.panel->id)){
 		                            panelData->windowState.isOpen = false;
-		                            activeContainer->saveCustomGuis();
+		                            entry.owner->markCustomGuisDirty();
 		                        }
 		                    }
 		                    ImGui::EndMenu();

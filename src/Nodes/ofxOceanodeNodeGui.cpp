@@ -621,7 +621,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                                         if(widgetType == defaultType) label += " (default)";
                                         if(ImGui::Selectable(label.c_str(), false, alreadyAdded ? ImGuiSelectableFlags_Disabled : 0)){
                                             container.addParameterToCustomGui(panel.id, absParam, widgetType);
-                                            container.openCustomGuiPanel(panel.id, false);
+                                            container.openCustomGuiPanel(panel.id, true);
                                         }
                                     }
                                     ImGui::EndMenu();
