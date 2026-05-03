@@ -1,2 +1,2 @@
-ofxImGui
+ofxImGuiSimple
 ofxOceanode

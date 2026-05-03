@@ -1,4 +1,4 @@
-ofxImGui
+ofxImGuiSimple
 ofxOceanode
 ofxMidi
 ofxOceanodeMidi
