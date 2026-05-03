@@ -55,6 +55,12 @@ private:
     std::string setValueLabel;
     double setValueScalar = 0.0;
     std::vector<double> setValueVectorValues;
+    bool requestOpenRenameSnapshotPopup = false;
+    bool requestOpenDeleteSnapshotPopup = false;
+    bool createSnapshotFromPopup = false;
+    std::string snapshotRenameId;
+    std::string snapshotRenameValue;
+    std::string snapshotDeleteId;
 };
 
 #endif

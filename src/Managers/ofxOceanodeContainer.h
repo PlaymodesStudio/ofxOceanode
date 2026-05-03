@@ -143,6 +143,10 @@ public:
     void loadCustomGuis(const std::string& presetPath);
     void saveCustomGuis();
     void markCustomGuisDirty();
+    void saveCustomGuiSnapshots(const std::string& presetPath);
+    void loadCustomGuiSnapshots(const std::string& presetPath);
+    void saveCustomGuiSnapshots();
+    void markCustomGuiSnapshotsDirty();
     
     void setBpm(float _bpm);
     void resetPhase();
@@ -187,6 +191,7 @@ public:
     bool deleteCustomGuiPanel(const std::string& panelId);
     void openCustomGuiPanel(const std::string& panelId, bool designMode = false);
     bool renameCustomGuiPanel(const std::string& panelId, const std::string& requestedName);
+    bool customGuiPanelHasSnapshotEligibleParameters(const std::string& panelId) const;
     bool addParameterToCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter, CustomGuiWidgetType type);
     bool removeParameterFromCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter);
     bool customGuiContainsParameter(const std::string& panelId, ofxOceanodeAbstractParameter& parameter) const;
@@ -197,6 +202,17 @@ public:
     ofxOceanodeNode* getNodeFromParameter(ofxOceanodeAbstractParameter& param);
     ofxOceanodeContainer* getContainerForCanvasID(const std::string& canvasID);
     const ofxOceanodeContainer* getContainerForCanvasID(const std::string& canvasID) const;
+    CustomGuiSnapshotBank* getCustomGuiSnapshotBank(const std::string& panelId);
+    const CustomGuiSnapshotBank* getCustomGuiSnapshotBank(const std::string& panelId) const;
+    std::string createCustomGuiSnapshot(const std::string& panelId, const std::string& requestedName = "");
+    bool updateCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId);
+    bool recallCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId);
+    bool renameCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId, const std::string& requestedName);
+    bool deleteCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId);
+    CustomGuiSnapshotData* getCustomGuiSnapshotBySlot(const std::string& panelId, int slot);
+    const CustomGuiSnapshotData* getCustomGuiSnapshotBySlot(const std::string& panelId, int slot) const;
+    std::string storeCustomGuiSnapshotToSlot(const std::string& panelId, int slot, const std::string& requestedName = "");
+    bool recallCustomGuiSnapshotSlot(const std::string& panelId, int slot);
     void requestCreateCustomGui(const std::string& parameterPath = "", CustomGuiWidgetType type = CustomGuiWidgetType::Slider, bool openInEdit = true);
     void drawCustomGuiCreationModal();
     
@@ -239,8 +255,13 @@ private:
     ParsedParameterPath parseParameterPath(const std::string& path);
     void rebuildCustomGuiPanels();
     std::string getCustomGuiFilePath(const std::string& presetPath) const;
+    std::string getCustomGuiSnapshotsFilePath(const std::string& presetPath) const;
     std::string makeUniqueCustomGuiName(const std::string& baseName = "Custom GUI") const;
     std::string makeCustomGuiId() const;
+    std::string makeCustomGuiSnapshotId() const;
+    std::string makeUniqueCustomGuiSnapshotName(const CustomGuiSnapshotBank& bank, const std::string& baseName = "Snapshot") const;
+    CustomGuiSnapshotBank* getOrCreateCustomGuiSnapshotBank(const std::string& panelId);
+    int getNextAvailableCustomGuiSnapshotSlot(const CustomGuiSnapshotBank& bank) const;
     
     //NodeModel;
     std::unordered_map<string, nodeContainerWithId> dynamicNodes;
@@ -251,8 +272,10 @@ private:
 #ifndef OFXOCEANODE_HEADLESS
     std::vector<CustomGuiPanelData> customGuiPanelsData;
     std::vector<std::unique_ptr<ofxOceanodeCustomGuiPanel>> customGuiPanels;
+    std::vector<CustomGuiSnapshotBank> customGuiSnapshotBanks;
     std::string customGuiStoragePath;
     bool customGuisDirty = false;
+    bool customGuiSnapshotsDirty = false;
     bool customGuiCreateModalOpen = false;
     std::string pendingCustomGuiName = "Custom GUI";
     std::string pendingCustomGuiParameterPath;

@@ -4,6 +4,7 @@
 #include "ofColor.h"
 #include "ofJson.h"
 #include "ofMain.h"
+#include <map>
 
 enum class CustomGuiWidgetType {
     Slider,
@@ -71,6 +72,25 @@ struct CustomGuiPanelData {
     bool designMode = false;
     CustomGuiLayout layout;
     CustomGuiWindowState windowState;
+};
+
+struct CustomGuiSnapshotValue {
+    std::string type;
+    ofJson value;
+};
+
+struct CustomGuiSnapshotData {
+    std::string id;
+    std::string name;
+    int slot = -1;
+    std::map<std::string, CustomGuiSnapshotValue> parameterValues;
+};
+
+struct CustomGuiSnapshotBank {
+    std::string customGuiId;
+    std::string customGuiName;
+    std::string currentSnapshotId;
+    std::vector<CustomGuiSnapshotData> snapshots;
 };
 
 inline std::string customGuiWidgetTypeToString(CustomGuiWidgetType type)
@@ -291,6 +311,97 @@ inline std::vector<CustomGuiPanelData> customGuiPanelsFromJson(const ofJson& jso
         panels.push_back(panel);
     }
     return panels;
+}
+
+inline ofJson customGuiSnapshotValueToJson(const CustomGuiSnapshotValue& snapshotValue)
+{
+    ofJson json;
+    json["type"] = snapshotValue.type;
+    json["value"] = snapshotValue.value;
+    return json;
+}
+
+inline CustomGuiSnapshotValue customGuiSnapshotValueFromJson(const ofJson& json)
+{
+    CustomGuiSnapshotValue snapshotValue;
+    if(json.contains("type")) snapshotValue.type = json["type"].get<std::string>();
+    if(json.contains("value")) snapshotValue.value = json["value"];
+    return snapshotValue;
+}
+
+inline ofJson customGuiSnapshotDataToJson(const CustomGuiSnapshotData& snapshot)
+{
+    ofJson json;
+    json["id"] = snapshot.id;
+    json["name"] = snapshot.name;
+    json["slot"] = snapshot.slot;
+    json["parameterValues"] = ofJson::object();
+    for(const auto& pair : snapshot.parameterValues){
+        json["parameterValues"][pair.first] = customGuiSnapshotValueToJson(pair.second);
+    }
+    return json;
+}
+
+inline CustomGuiSnapshotData customGuiSnapshotDataFromJson(const ofJson& json)
+{
+    CustomGuiSnapshotData snapshot;
+    if(json.contains("id")) snapshot.id = json["id"].get<std::string>();
+    if(json.contains("name")) snapshot.name = json["name"].get<std::string>();
+    if(json.contains("slot")) snapshot.slot = json["slot"].get<int>();
+    if(json.contains("parameterValues") && json["parameterValues"].is_object()){
+        for(auto it = json["parameterValues"].begin(); it != json["parameterValues"].end(); ++it){
+            snapshot.parameterValues[it.key()] = customGuiSnapshotValueFromJson(it.value());
+        }
+    }
+    return snapshot;
+}
+
+inline ofJson customGuiSnapshotBankToJson(const CustomGuiSnapshotBank& bank)
+{
+    ofJson json;
+    json["customGuiId"] = bank.customGuiId;
+    json["customGuiName"] = bank.customGuiName;
+    json["currentSnapshotId"] = bank.currentSnapshotId;
+    json["snapshots"] = ofJson::array();
+    for(const auto& snapshot : bank.snapshots){
+        json["snapshots"].push_back(customGuiSnapshotDataToJson(snapshot));
+    }
+    return json;
+}
+
+inline CustomGuiSnapshotBank customGuiSnapshotBankFromJson(const ofJson& json)
+{
+    CustomGuiSnapshotBank bank;
+    if(json.contains("customGuiId")) bank.customGuiId = json["customGuiId"].get<std::string>();
+    if(json.contains("customGuiName")) bank.customGuiName = json["customGuiName"].get<std::string>();
+    if(json.contains("currentSnapshotId")) bank.currentSnapshotId = json["currentSnapshotId"].get<std::string>();
+    if(json.contains("snapshots") && json["snapshots"].is_array()){
+        for(const auto& snapshotJson : json["snapshots"]){
+            bank.snapshots.push_back(customGuiSnapshotDataFromJson(snapshotJson));
+        }
+    }
+    return bank;
+}
+
+inline ofJson customGuiSnapshotBanksToJson(const std::vector<CustomGuiSnapshotBank>& banks)
+{
+    ofJson json;
+    json["banks"] = ofJson::array();
+    for(const auto& bank : banks){
+        json["banks"].push_back(customGuiSnapshotBankToJson(bank));
+    }
+    return json;
+}
+
+inline std::vector<CustomGuiSnapshotBank> customGuiSnapshotBanksFromJson(const ofJson& json)
+{
+    std::vector<CustomGuiSnapshotBank> banks;
+    if(json.contains("banks") && json["banks"].is_array()){
+        for(const auto& bankJson : json["banks"]){
+            banks.push_back(customGuiSnapshotBankFromJson(bankJson));
+        }
+    }
+    return banks;
 }
 
 #endif
