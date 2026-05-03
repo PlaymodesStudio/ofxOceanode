@@ -2,12 +2,15 @@
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "CustomGui/ofxOceanodeCustomGuiPanel.h"
+#include "CustomGui/ofxOceanodeCustomGuiWidgetRegistry.h"
 #include "CustomGui/ofxOceanodeCustomGuiWidgets.h"
+#include "CustomGui/Widgets/ofxOceanodeCustomGuiWidgetHelpers.h"
 
 #include "Managers/ofxOceanodeContainer.h"
 #include "Nodes/ofxOceanodeNode.h"
 #include "Nodes/ofxOceanodeNodeModel.h"
 #include "ofxOceanodeParameter.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include "imgui.h"
@@ -68,12 +71,12 @@ void ofxOceanodeCustomGuiPanel::draw()
         panel->layout.widgets.push_back(widget);
         panel->layout.columns = std::max(panel->layout.columns, widget.gridX + widget.spanW);
         panel->layout.rows = std::max(panel->layout.rows, widget.gridY + widget.spanH);
-        container.saveCustomGuis();
+        container.markCustomGuisDirty();
     };
 
     if(panel->windowState.hasConfig && !appliedWindowState){
-        ImGui::SetNextWindowPos(ImVec2(panel->windowState.posX, panel->windowState.posY), ImGuiCond_Once);
-        ImGui::SetNextWindowSize(ImVec2(panel->windowState.width, panel->windowState.height), ImGuiCond_Once);
+        ImGui::SetNextWindowPos(ImVec2(panel->windowState.posX, panel->windowState.posY), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(panel->windowState.width, panel->windowState.height), ImGuiCond_FirstUseEver);
         appliedWindowState = true;
     }
 
@@ -81,22 +84,22 @@ void ofxOceanodeCustomGuiPanel::draw()
     if(ImGui::Begin(title.c_str(), &openState, ImGuiWindowFlags_NoCollapse)){
         if(openState != panel->windowState.isOpen){
             panel->windowState.isOpen = openState;
-            container.saveCustomGuis();
+            container.markCustomGuisDirty();
         }
 
         if(ImGui::SmallButton(panel->designMode ? "Run" : "Edit")){
             panel->designMode = !panel->designMode;
-            container.saveCustomGuis();
+            container.markCustomGuisDirty();
         }
         ImGui::SameLine();
         if(ImGui::SmallButton("-")){
             panel->layout.zoom = ofClamp(panel->layout.zoom - 0.1f, 0.25f, 4.0f);
-            container.saveCustomGuis();
+            container.markCustomGuisDirty();
         }
         ImGui::SameLine();
         if(ImGui::SmallButton("+")){
             panel->layout.zoom = ofClamp(panel->layout.zoom + 0.1f, 0.25f, 4.0f);
-            container.saveCustomGuis();
+            container.markCustomGuisDirty();
         }
         ImGui::SameLine();
         ImGui::Text("Zoom %.2fx", panel->layout.zoom);
@@ -108,43 +111,94 @@ void ofxOceanodeCustomGuiPanel::draw()
             if(ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer))){
                 container.renameCustomGuiPanel(panel->id, nameBuffer);
             }
-            ImGui::SameLine();
+
+            ImGui::SameLine(0, 18.0f);
             ImGui::SetNextItemWidth(70);
             if(ImGui::InputInt("Cols", &panel->layout.columns)){
                 panel->layout.columns = std::max(1, panel->layout.columns);
                 ensureLayoutFitsWidgets(panel->layout);
-                container.saveCustomGuis();
+                container.markCustomGuisDirty();
             }
-            ImGui::SameLine();
+
+            ImGui::SameLine(0, 10.0f);
             ImGui::SetNextItemWidth(70);
             if(ImGui::InputInt("Rows", &panel->layout.rows)){
                 panel->layout.rows = std::max(1, panel->layout.rows);
                 ensureLayoutFitsWidgets(panel->layout);
-                container.saveCustomGuis();
+                container.markCustomGuisDirty();
             }
-            ImGui::SameLine();
+
+            ImGui::SameLine(0, 18.0f);
             ImGui::SetNextItemWidth(70);
             if(ImGui::InputFloat("Cell W", &panel->layout.cellWidth, 1.0f, 10.0f, "%.0f")){
                 panel->layout.cellWidth = std::max(20.0f, panel->layout.cellWidth);
-                container.saveCustomGuis();
+                container.markCustomGuisDirty();
             }
-            ImGui::SameLine();
+
+            ImGui::SameLine(0, 10.0f);
             ImGui::SetNextItemWidth(70);
             if(ImGui::InputFloat("Cell H", &panel->layout.cellHeight, 1.0f, 10.0f, "%.0f")){
                 panel->layout.cellHeight = std::max(20.0f, panel->layout.cellHeight);
-                container.saveCustomGuis();
+                container.markCustomGuisDirty();
             }
-            ImGui::SameLine();
+
+            ImGui::SameLine(0, 18.0f);
             if(ImGui::SmallButton("Add Panel")){
                 createStaticWidget(CustomGuiWidgetType::BackgroundPanel, "", 3, 2, ofColor(40, 40, 40, 180));
             }
-            ImGui::SameLine();
+            ImGui::SameLine(0, 8.0f);
             if(ImGui::SmallButton("Add Text")){
                 createStaticWidget(CustomGuiWidgetType::Text, "Text", 2, 1, ofColor::white);
             }
-            ImGui::SameLine();
+            ImGui::SameLine(0, 8.0f);
             if(ImGui::SmallButton("Add Image")){
                 createStaticWidget(CustomGuiWidgetType::Image, "", 3, 2, ofColor::white);
+            }
+            ImGui::SameLine(0, 14.0f);
+            if(ImGui::BeginMenu("Custom Regions")){
+                struct AvailableCustomRegion {
+                    ofxOceanodeAbstractParameter* parameter = nullptr;
+                    std::string label;
+                };
+
+                std::vector<AvailableCustomRegion> availableRegions;
+                for(auto* node : container.getAllModules()){
+                    if(node == nullptr) continue;
+                    for(int paramIndex = 0; paramIndex < node->getParameters().size(); paramIndex++){
+                        auto& absParam = static_cast<ofxOceanodeAbstractParameter&>(node->getParameters().get(paramIndex));
+                        if(absParam.valueType() != typeid(std::function<void()>).name()) continue;
+                        if(absParam.getName().find("SEPARATOR:|") == 0) continue;
+                        if(!ofxOceanodeCustomGuiWidgetHelpers::isRegisteredCustomRegionParameter(absParam)) continue;
+
+                        auto customTypes = container.getCompatibleCustomGuiWidgetTypes(absParam);
+                        if(std::find(customTypes.begin(), customTypes.end(), CustomGuiWidgetType::CustomRegion) == customTypes.end()) continue;
+
+                        availableRegions.push_back({&absParam, node->getParameters().getName() + " / " + absParam.getName()});
+                    }
+                }
+
+                std::sort(availableRegions.begin(), availableRegions.end(), [](const AvailableCustomRegion& a, const AvailableCustomRegion& b){
+                    return a.label < b.label;
+                });
+
+                if(availableRegions.empty()){
+                    ImGui::TextDisabled("No custom regions");
+                }else{
+                    for(const auto& region : availableRegions){
+                        if(region.parameter == nullptr) continue;
+                        const bool alreadyAdded = containsParameter(*region.parameter);
+                        const std::string parameterPath = container.getCustomGuiParameterPath(*region.parameter);
+                        ImGui::PushID(parameterPath.c_str());
+                        if(ImGui::MenuItem(region.label.c_str(), nullptr, false, !alreadyAdded)){
+                            if(addParameter(*region.parameter, CustomGuiWidgetType::CustomRegion)){
+                                ImGui::CloseCurrentPopup();
+                            }
+                        }
+                        ImGui::PopID();
+                    }
+                }
+
+                ImGui::EndMenu();
             }
         }
 
@@ -154,7 +208,7 @@ void ofxOceanodeCustomGuiPanel::draw()
 
         if(panel->designMode){
             ImGui::InvisibleButton("##CustomGuiGridSpace", ImVec2(panelWidth, panelHeight));
-            ImGui::SetItemAllowOverlap();
+            ImGui::SetNextItemAllowOverlap();
         }else{
             ImGui::Dummy(ImVec2(panelWidth, panelHeight));
         }
@@ -222,7 +276,7 @@ void ofxOceanodeCustomGuiPanel::draw()
                 if(draggedWidgetIndex == (int)i && ImGui::IsMouseReleased(ImGuiMouseButton_Left)){
                     ensureLayoutFitsWidgets(panel->layout);
                     draggedWidgetIndex = -1;
-                    container.saveCustomGuis();
+                    container.markCustomGuisDirty();
                 }
                 if(resizedWidgetIndex == (int)i && ImGui::IsMouseDown(ImGuiMouseButton_Left)){
                     ImVec2 delta = ImGui::GetIO().MousePos - resizeAnchorMouse;
@@ -236,7 +290,7 @@ void ofxOceanodeCustomGuiPanel::draw()
                 if(resizedWidgetIndex == (int)i && ImGui::IsMouseReleased(ImGuiMouseButton_Left)){
                     ensureLayoutFitsWidgets(panel->layout);
                     resizedWidgetIndex = -1;
-                    container.saveCustomGuis();
+                    container.markCustomGuisDirty();
                 }
 
                 if(hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)){
@@ -250,6 +304,26 @@ void ofxOceanodeCustomGuiPanel::draw()
                     ImGui::OpenPopup("Widget Context");
                 }
                 if(ImGui::BeginPopup("Widget Context")){
+                    const std::string parameterType = parameter->valueType();
+                    const bool canSetValue =
+                        parameterType == typeid(float).name() ||
+                        parameterType == typeid(int).name() ||
+                        parameterType == typeid(std::vector<float>).name() ||
+                        parameterType == typeid(std::vector<int>).name();
+#ifdef OFXOCEANODE_USE_MIDI
+                    if(canSetValue){
+                        if(ImGui::Selectable("Set Value")){
+                            openSetValuePopup(*parameter, getFallbackLabel(widget));
+                            ImGui::CloseCurrentPopup();
+                        }
+                        ImGui::Separator();
+                    }
+#else
+                    if(canSetValue && ImGui::Selectable("Set Value")){
+                        openSetValuePopup(*parameter, getFallbackLabel(widget));
+                        ImGui::CloseCurrentPopup();
+                    }
+#endif
 #ifdef OFXOCEANODE_USE_MIDI
                     if(ImGui::Selectable("Bind MIDI")){
                         container.createMidiBinding(*parameter);
@@ -274,10 +348,15 @@ void ofxOceanodeCustomGuiPanel::draw()
         }
 
         if(widgetToRemove >= 0 && widgetToRemove < (int)panel->layout.widgets.size()){
+            if(const CustomGuiWidgetDefinition* definition = ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(panel->layout.widgets[widgetToRemove].type)){
+                if(definition->cleanup) definition->cleanup(panel->id, panel->layout.widgets[widgetToRemove].parameterRef.parameterPath);
+            }
             panel->layout.widgets.erase(panel->layout.widgets.begin() + widgetToRemove);
             ensureLayoutFitsWidgets(panel->layout);
-            container.saveCustomGuis();
+            container.markCustomGuisDirty();
         }
+
+        drawSetValuePopup();
 
         ImVec2 currentPos = ImGui::GetWindowPos();
         ImVec2 currentSize = ImGui::GetWindowSize();
@@ -288,7 +367,7 @@ void ofxOceanodeCustomGuiPanel::draw()
             panel->windowState.posY = currentPos.y;
             panel->windowState.width = currentSize.x;
             panel->windowState.height = currentSize.y;
-            container.saveCustomGuis();
+            container.markCustomGuisDirty();
         }
     }
     ImGui::End();
@@ -306,272 +385,161 @@ std::string ofxOceanodeCustomGuiPanel::getFallbackLabel(const CustomGuiWidget& w
     return widget.parameterRef.parameterPath;
 }
 
+void ofxOceanodeCustomGuiPanel::openSetValuePopup(ofxOceanodeAbstractParameter& parameter, const std::string& label)
+{
+    setValueParameterPath = container.getCustomGuiParameterPath(parameter);
+    setValueLabel = label;
+    setValueVectorValues.clear();
+
+    const std::string type = parameter.valueType();
+    if(type == typeid(float).name()){
+        setValueScalar = parameter.cast<float>().getParameter().get();
+    }else if(type == typeid(int).name()){
+        setValueScalar = parameter.cast<int>().getParameter().get();
+    }else if(type == typeid(std::vector<float>).name()){
+        auto values = parameter.cast<std::vector<float>>().getParameter().get();
+        setValueVectorValues.reserve(values.size());
+        for(float value : values) setValueVectorValues.push_back(value);
+    }else if(type == typeid(std::vector<int>).name()){
+        auto values = parameter.cast<std::vector<int>>().getParameter().get();
+        setValueVectorValues.reserve(values.size());
+        for(int value : values) setValueVectorValues.push_back(value);
+    }
+
+    requestOpenSetValuePopup = true;
+}
+
+void ofxOceanodeCustomGuiPanel::drawSetValuePopup()
+{
+    if(requestOpenSetValuePopup){
+        ImGui::OpenPopup("Set Value");
+        requestOpenSetValuePopup = false;
+    }
+
+    if(!ImGui::BeginPopupModal("Set Value", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+
+    ofxOceanodeAbstractParameter* parameter = setValueParameterPath.empty() ? nullptr : container.findCustomGuiParameter(setValueParameterPath);
+    if(parameter == nullptr){
+        ImGui::TextDisabled("Parameter unavailable");
+        if(ImGui::Button("Close")) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+        return;
+    }
+
+    ImGui::TextWrapped("%s", setValueLabel.c_str());
+    ImGui::Spacing();
+
+    const std::string type = parameter->valueType();
+    bool valueEdited = false;
+
+    if(type == typeid(float).name()){
+        float value = (float)setValueScalar;
+        if(ImGui::InputFloat("Value", &value)){
+            setValueScalar = value;
+        }
+        if(ImGui::Button("Apply")){
+            parameter->cast<float>().getParameter().set((float)setValueScalar);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if(ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+    }else if(type == typeid(int).name()){
+        int value = (int)std::round(setValueScalar);
+        if(ImGui::InputInt("Value", &value)){
+            setValueScalar = value;
+        }
+        if(ImGui::Button("Apply")){
+            parameter->cast<int>().getParameter().set((int)std::round(setValueScalar));
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if(ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+    }else if(type == typeid(std::vector<float>).name()){
+        auto currentValues = parameter->cast<std::vector<float>>().getParameter().get();
+        if(setValueVectorValues.size() != currentValues.size()){
+            setValueVectorValues.assign(currentValues.begin(), currentValues.end());
+        }
+        for(size_t i = 0; i < setValueVectorValues.size(); i++){
+            float value = (float)setValueVectorValues[i];
+            ImGui::PushID((int)i);
+            if(ImGui::InputFloat("##value", &value)){
+                setValueVectorValues[i] = value;
+                valueEdited = true;
+            }
+            ImGui::SameLine();
+            ImGui::Text("Value %zu", i + 1);
+            ImGui::PopID();
+        }
+        if(ImGui::Button("Apply")){
+            std::vector<float> values(setValueVectorValues.size(), 0.0f);
+            for(size_t i = 0; i < setValueVectorValues.size(); i++) values[i] = (float)setValueVectorValues[i];
+            parameter->cast<std::vector<float>>().getParameter().set(values);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if(ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+    }else if(type == typeid(std::vector<int>).name()){
+        auto currentValues = parameter->cast<std::vector<int>>().getParameter().get();
+        if(setValueVectorValues.size() != currentValues.size()){
+            setValueVectorValues.resize(currentValues.size(), 0.0);
+            for(size_t i = 0; i < currentValues.size(); i++) setValueVectorValues[i] = currentValues[i];
+        }
+        for(size_t i = 0; i < setValueVectorValues.size(); i++){
+            int value = (int)std::round(setValueVectorValues[i]);
+            ImGui::PushID((int)i);
+            if(ImGui::InputInt("##value", &value)){
+                setValueVectorValues[i] = value;
+                valueEdited = true;
+            }
+            ImGui::SameLine();
+            ImGui::Text("Value %zu", i + 1);
+            ImGui::PopID();
+        }
+        if(ImGui::Button("Apply")){
+            std::vector<int> values(setValueVectorValues.size(), 0);
+            for(size_t i = 0; i < setValueVectorValues.size(); i++) values[i] = (int)std::round(setValueVectorValues[i]);
+            parameter->cast<std::vector<int>>().getParameter().set(values);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if(ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+    }else{
+        ImGui::TextDisabled("This widget does not support manual value entry");
+        if(ImGui::Button("Close")) ImGui::CloseCurrentPopup();
+    }
+
+    if(valueEdited) ImGui::Spacing();
+    ImGui::EndPopup();
+}
+
 bool ofxOceanodeCustomGuiPanel::renderWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter, const ImVec2& size)
 {
-    const std::string label = getFallbackLabel(widget);
-    const bool showValue = shouldShowNumericValue(widget);
-    const bool designMode = getPanelData() != nullptr ? getPanelData()->designMode : false;
-    const bool isStaticWidget = widget.type == CustomGuiWidgetType::BackgroundPanel ||
-                                widget.type == CustomGuiWidgetType::Text ||
-                                widget.type == CustomGuiWidgetType::Image ||
-                                widget.type == CustomGuiWidgetType::Label;
-    ImGui::BeginGroup();
-    if(widget.type != CustomGuiWidgetType::BackgroundPanel && widget.type != CustomGuiWidgetType::Text && widget.type != CustomGuiWidgetType::Image){
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(widget.color.r / 255.0f, widget.color.g / 255.0f, widget.color.b / 255.0f, widget.color.a / 255.0f));
-        if(widget.type != CustomGuiWidgetType::Button) ImGui::TextWrapped("%s", label.c_str());
-        ImGui::PopStyleColor();
-    }
-
-    const ImVec2 itemSize(size.x, std::max(1.0f, size.y - ImGui::GetFrameHeightWithSpacing()));
-    if(widget.type == CustomGuiWidgetType::Label){
-        ImGui::TextWrapped("%s", label.c_str());
-        ImGui::EndGroup();
-        return true;
-    }
-
-    if(widget.type == CustomGuiWidgetType::BackgroundPanel){
-        if(designMode){
-            ImGui::InvisibleButton("##background", size);
-            ImGui::SetItemAllowOverlap();
-        }else{
-            ImGui::Dummy(size);
-        }
-        ImDrawList* drawList = ImGui::GetWindowDrawList();
-        ImVec2 min = ImGui::GetItemRectMin();
-        ImVec2 max = ImGui::GetItemRectMax();
-        drawList->AddRectFilled(min, max, IM_COL32(widget.color.r, widget.color.g, widget.color.b, widget.color.a), 4.0f);
-        ImGui::EndGroup();
-        return true;
-    }
-
-    if(widget.type == CustomGuiWidgetType::Text){
-        const float fontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
-        ImGui::InvisibleButton("##text", size);
-        ImDrawList* drawList = ImGui::GetWindowDrawList();
-        ImVec2 min = ImGui::GetItemRectMin();
-        float fontSize = ImGui::GetFontSize() * fontScale;
-        drawList->AddText(ImGui::GetFont(), fontSize, min, IM_COL32(widget.color.r, widget.color.g, widget.color.b, widget.color.a), label.c_str(), nullptr, size.x);
-        ImGui::EndGroup();
-        return true;
-    }
-
-    if(widget.type == CustomGuiWidgetType::Image){
-        ImGui::InvisibleButton("##image", size);
-        ImDrawList* drawList = ImGui::GetWindowDrawList();
-        ImVec2 min = ImGui::GetItemRectMin();
-        ImVec2 max = ImGui::GetItemRectMax();
-        std::string imagePath = widget.config.value("imagePath", std::string());
-        auto image = loadWidgetImage(imagePath);
-        if(image != nullptr && image->isAllocated()){
-            ImTextureID textureID = (ImTextureID)(uintptr_t)image->getTexture().texData.textureID;
-            drawList->AddImage(textureID, min, max, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, widget.color.a));
-        }else{
-            drawList->AddRect(min, max, IM_COL32(160, 160, 160, 180), 2.0f);
-            drawList->AddText(ImVec2(min.x + 6.0f, min.y + 6.0f), IM_COL32(200, 200, 200, 220), imagePath.empty() ? "Image path..." : "Image not found");
-        }
-        ImGui::EndGroup();
-        return true;
-    }
-
-    if(parameter == nullptr && !isStaticWidget){
-        ImGui::TextDisabled("Missing: %s", label.c_str());
-        ImGui::EndGroup();
+    const CustomGuiWidgetDefinition* definition = ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(widget.type);
+    if(definition == nullptr || !definition->render){
+        ImGui::TextDisabled("Unsupported widget");
         return false;
     }
 
-    const std::string type = parameter->valueType();
-    const float itemWidth = std::max(40.0f, itemSize.x);
-    ImGui::SetNextItemWidth(itemWidth);
-    bool interactive = ofxOceanodeCustomGuiWidgets::isInteractive(widget, parameter);
-    bool verticalSlider = itemSize.y > itemSize.x;
-    bool useCustomRange = widget.config.value("useCustomRange", false);
-
-    auto floatRangeMin = [&](float fallbackMin){
-        return useCustomRange ? widget.config.value("rangeMin", fallbackMin) : fallbackMin;
-    };
-    auto floatRangeMax = [&](float fallbackMax){
-        return useCustomRange ? widget.config.value("rangeMax", fallbackMax) : fallbackMax;
-    };
-    auto intRangeMin = [&](int fallbackMin){
-        return useCustomRange ? (int)std::round(widget.config.value("rangeMin", (float)fallbackMin)) : fallbackMin;
-    };
-    auto intRangeMax = [&](int fallbackMax){
-        return useCustomRange ? (int)std::round(widget.config.value("rangeMax", (float)fallbackMax)) : fallbackMax;
-    };
-
-    if(type == typeid(float).name()){
-        auto& param = parameter->cast<float>().getParameter();
-        float value = param.get();
-        bool changed = false;
-        float sliderMin = floatRangeMin(param.getMin());
-        float sliderMax = floatRangeMax(param.getMax());
-        if(!interactive){
-            float fraction = sliderMax != sliderMin ? (value - sliderMin) / (sliderMax - sliderMin) : 0.0f;
-            ImGui::ProgressBar(ofClamp(fraction, 0.0f, 1.0f), itemSize, showValue ? ofToString(value, 3).c_str() : "");
-        } else if(widget.type == CustomGuiWidgetType::DragNumber){
-            changed = ImGui::DragFloat("##value", &value, 0.01f, sliderMin, sliderMax);
-        } else if(widget.type == CustomGuiWidgetType::Waveform){
-            float fraction = sliderMax != sliderMin ? (value - sliderMin) / (sliderMax - sliderMin) : 0.0f;
-            ImGui::ProgressBar(ofClamp(fraction, 0.0f, 1.0f), itemSize, showValue ? ofToString(value, 3).c_str() : "");
-        } else if(verticalSlider) {
-            changed = ImGui::VSliderFloat("##value", itemSize, &value, sliderMin, sliderMax, showValue ? "%.3f" : "");
-        } else {
-            changed = ImGui::SliderFloat("##value", &value, sliderMin, sliderMax, showValue ? "%.3f" : "");
+    CustomGuiWidgetRenderContext context {
+        container,
+        panelId,
+        getPanelData() != nullptr ? getPanelData()->designMode : false,
+        size,
+        getFallbackLabel(widget),
+        shouldShowNumericValue(widget),
+        ofxOceanodeCustomGuiWidgets::isInteractive(widget, parameter),
+        [this](CustomGuiWidget& widgetRef, ofxOceanodeAbstractParameter* parameterRef, std::vector<float>& valueRef, const ImVec2& sizeRef, bool interactiveRef){
+            return drawMultiSliderWidget(widgetRef, parameterRef, valueRef, sizeRef, interactiveRef);
+        },
+        [this](const ImVec2& sizeRef, float normalizedRef, const ImU32& colorRef){
+            drawVerticalMeter(sizeRef, normalizedRef, colorRef);
+        },
+        [this](const std::string& imagePath){
+            return loadWidgetImage(imagePath);
         }
-        if(changed) param.set(value);
-    } else if(type == typeid(int).name()){
-        auto& param = parameter->cast<int>().getParameter();
-        int value = param.get();
-        bool changed = false;
-        int sliderMin = intRangeMin(param.getMin());
-        int sliderMax = intRangeMax(param.getMax());
-        auto options = parameter->cast<int>().getDropdownOptions();
-        if(!interactive){
-            ImGui::TextWrapped("%d", value);
-        } else if(widget.type == CustomGuiWidgetType::Dropdown && !options.empty()){
-            const char* preview = options[ofClamp(value, 0, (int)options.size() - 1)].c_str();
-            if(ImGui::BeginCombo("##value", preview)){
-                for(int i = 0; i < (int)options.size(); i++){
-                    if(ImGui::Selectable(options[i].c_str(), value == i)){
-                        value = i;
-                        changed = true;
-                    }
-                }
-                ImGui::EndCombo();
-            }
-        } else if(widget.type == CustomGuiWidgetType::DragNumber){
-            changed = ImGui::DragInt("##value", &value, 1.0f, sliderMin, sliderMax);
-        } else if(verticalSlider) {
-            changed = ImGui::VSliderInt("##value", itemSize, &value, sliderMin, sliderMax, showValue ? "%d" : "");
-        } else {
-            changed = ImGui::SliderInt("##value", &value, sliderMin, sliderMax, showValue ? "%d" : "");
-        }
-        if(changed) param.set(value);
-    } else if(type == typeid(bool).name()){
-        auto& param = parameter->cast<bool>().getParameter();
-        bool value = param.get();
-        if(!interactive){
-            ImGui::TextWrapped("%s", value ? "On" : "Off");
-        } else if(ImGui::Checkbox("##value", &value)) param.set(value);
-    } else if(type == typeid(void).name()){
-        if(interactive && ImGui::Button(label.c_str(), itemSize)) parameter->cast<void>().getParameter().trigger();
-    } else if(type == typeid(std::string).name()){
-        auto& param = parameter->cast<std::string>().getParameter();
-        ImGui::TextWrapped("%s", param.get().c_str());
-    } else if(type == typeid(std::vector<float>).name()){
-        auto& param = parameter->cast<std::vector<float>>().getParameter();
-        auto value = param.get();
-        if(widget.type == CustomGuiWidgetType::Waveform){
-            if(!value.empty()) ImGui::PlotLines("##value", value.data(), (int)value.size(), 0, nullptr, FLT_MAX, FLT_MAX, itemSize);
-        } else if(widget.type == CustomGuiWidgetType::XYPad && value.size() >= 2){
-            ImGui::Button("##xypad", itemSize);
-            ImDrawList* drawList = ImGui::GetWindowDrawList();
-            ImVec2 min = ImGui::GetItemRectMin();
-            ImVec2 max = ImGui::GetItemRectMax();
-            drawList->AddRect(min, max, IM_COL32(180, 180, 180, 180));
-            float x = ofMap(value[0], param.getMin()[0], param.getMax()[0], min.x, max.x, true);
-            float y = ofMap(value[1], param.getMin()[1], param.getMax()[1], max.y, min.y, true);
-            drawList->AddCircleFilled(ImVec2(x, y), 5.0f, IM_COL32(widget.color.r, widget.color.g, widget.color.b, 255));
-            if(ImGui::IsItemActive() && ImGui::IsMouseDragging(0)){
-                ImVec2 mouse = ImGui::GetIO().MousePos;
-                value[0] = ofMap(mouse.x, min.x, max.x, param.getMin()[0], param.getMax()[0], true);
-                value[1] = ofMap(mouse.y, max.y, min.y, param.getMin()[1], param.getMax()[1], true);
-                param.set(value);
-            }
-        } else if(!value.empty()){
-            if(widget.type == CustomGuiWidgetType::MultiSlider){
-                bool changed = drawMultiSliderWidget(widget, parameter, value, itemSize, interactive);
-                if(changed) param.set(value);
-                ImGui::EndGroup();
-                return true;
-            }
-            bool changed = false;
-            int visibleCount = widget.config.value("visibleCount", (int)value.size());
-            visibleCount = ofClamp(visibleCount, 1, (int)value.size());
-            bool vertical = widget.type == CustomGuiWidgetType::MultiSlider ? true : verticalSlider;
-            bool useCustomRange = widget.config.value("useCustomRange", false);
-            float rowHeight = std::max(16.0f, itemSize.y / std::max(1, visibleCount));
-            if(vertical){
-                const float baseCursorX = ImGui::GetCursorPosX();
-                const float baseCursorY = ImGui::GetCursorPosY();
-                const float spacing = visibleCount > 1 ? std::min(2.0f, itemSize.x / std::max(8.0f, (float)visibleCount * 2.0f)) : 0.0f;
-                const float totalSpacing = spacing * std::max(0, visibleCount - 1);
-                const float barWidth = std::max(1.0f, (itemSize.x - totalSpacing) / (float)visibleCount);
-                const ImVec2 barSize(barWidth, itemSize.y);
+    };
 
-                for(int i = 0; i < visibleCount; i++){
-                    ImGui::PushID((int)i);
-                    float min = i < param.getMin().size() ? param.getMin()[i] : 0.0f;
-                    float max = i < param.getMax().size() ? param.getMax()[i] : 1.0f;
-                    if(useCustomRange){
-                        min = widget.config.value("rangeMin", min);
-                        max = widget.config.value("rangeMax", max);
-                    }
-                    ImGui::SetCursorPos(ImVec2(baseCursorX + i * (barWidth + spacing), baseCursorY));
-                    if(interactive){
-                        changed |= ImGui::VSliderFloat("##bar", barSize, &value[i], min, max);
-                    } else {
-                        float fraction = max != min ? (value[i] - min) / (max - min) : 0.0f;
-                        drawVerticalMeter(barSize, ofClamp(fraction, 0.0f, 1.0f), IM_COL32(widget.color.r, widget.color.g, widget.color.b, 220));
-                    }
-                    ImGui::PopID();
-                }
-                ImGui::SetCursorPos(ImVec2(baseCursorX, baseCursorY + itemSize.y));
-            } else {
-                for(int i = 0; i < visibleCount; i++){
-                    ImGui::PushID((int)i);
-                    float min = i < param.getMin().size() ? param.getMin()[i] : 0.0f;
-                    float max = i < param.getMax().size() ? param.getMax()[i] : 1.0f;
-                    if(useCustomRange){
-                        min = widget.config.value("rangeMin", min);
-                        max = widget.config.value("rangeMax", max);
-                    }
-                    if(interactive){
-                        ImGui::SetNextItemWidth(itemWidth);
-                        changed |= ImGui::SliderFloat("##bar", &value[i], min, max);
-                    } else {
-                        float fraction = max != min ? (value[i] - min) / (max - min) : 0.0f;
-                        ImGui::ProgressBar(ofClamp(fraction, 0.0f, 1.0f), ImVec2(itemWidth, 0), "");
-                    }
-                    ImGui::PopID();
-                    if((i + 1) * rowHeight >= itemSize.y) break;
-                }
-            }
-            if(changed) param.set(value);
-        }
-    } else if(type == typeid(std::vector<int>).name()){
-        auto& param = parameter->cast<std::vector<int>>().getParameter();
-        auto value = param.get();
-        int rows = widget.config.value("rows", 1);
-        int cols = widget.config.value("cols", std::max(1, (int)value.size()));
-        bool changed = false;
-        ImVec2 buttonSize(std::max(12.0f, itemSize.x / cols - 3.0f), std::max(12.0f, itemSize.y / rows - 3.0f));
-        for(int r = 0; r < rows; r++){
-            for(int c = 0; c < cols; c++){
-                int index = r * cols + c;
-                if(index >= (int)value.size()) continue;
-                ImGui::PushID(index);
-                if(interactive){
-                    if(value[index] > 0) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(widget.color.r / 255.0f, widget.color.g / 255.0f, widget.color.b / 255.0f, 0.8f));
-                    if(ImGui::Button("##cell", buttonSize)){
-                        value[index] = value[index] > 0 ? 0 : 1;
-                        changed = true;
-                    }
-                    if(value[index] > 0) ImGui::PopStyleColor();
-                } else {
-                    ImGui::ProgressBar(value[index] > 0 ? 1.0f : 0.0f, buttonSize, "");
-                }
-                ImGui::PopID();
-                if(c < cols - 1) ImGui::SameLine();
-            }
-        }
-        if(changed) param.set(value);
-    } else {
-        ImGui::TextDisabled("Unsupported type");
-    }
-
-    ImGui::EndGroup();
-    return true;
+    return definition->render(context, widget, parameter);
 }
 
 bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, size_t widgetIndex, ofxOceanodeAbstractParameter* parameter)
@@ -583,7 +551,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
         std::snprintf(labelBuffer, sizeof(labelBuffer), "%s", widget.label.c_str());
         if(ImGui::InputText("Label", labelBuffer, sizeof(labelBuffer))){
             widget.label = labelBuffer;
-            container.saveCustomGuis();
+            container.markCustomGuisDirty();
         }
 
         int spanW = widget.spanW;
@@ -594,7 +562,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                 panel->layout.columns = std::max(panel->layout.columns, widget.gridX + widget.spanW);
                 panel->layout.rows = std::max(panel->layout.rows, widget.gridY + widget.spanH);
             }
-            container.saveCustomGuis();
+            container.markCustomGuisDirty();
         }
         if(ImGui::InputInt("Height", &spanH)){
             widget.spanH = std::max(1, spanH);
@@ -602,7 +570,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                 panel->layout.columns = std::max(panel->layout.columns, widget.gridX + widget.spanW);
                 panel->layout.rows = std::max(panel->layout.rows, widget.gridY + widget.spanH);
             }
-            container.saveCustomGuis();
+            container.markCustomGuisDirty();
         }
 
         float color[4] = {
@@ -613,36 +581,37 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
         };
         if(ImGui::ColorEdit4("Color", color)){
             widget.color = ofColor(color[0] * 255.0f, color[1] * 255.0f, color[2] * 255.0f, color[3] * 255.0f);
-            container.saveCustomGuis();
+            container.markCustomGuisDirty();
         }
 
         bool interactive = ofxOceanodeCustomGuiWidgets::isInteractive(widget, parameter);
         if(parameter != nullptr && parameter->valueType() != typeid(std::string).name()){
             if(ImGui::Checkbox("Interactive", &interactive)){
                 widget.config["interactive"] = interactive;
-                container.saveCustomGuis();
+                container.markCustomGuisDirty();
             }
         }
 
         bool showValue = shouldShowNumericValue(widget);
-        if(parameter != nullptr &&
-           (parameter->valueType() == typeid(float).name() ||
-            parameter->valueType() == typeid(int).name() ||
-            parameter->valueType() == typeid(std::vector<float>).name())){
-            if(ImGui::Checkbox("Show Value", &showValue)){
-                widget.config["showValue"] = showValue;
-                container.saveCustomGuis();
+	        if(parameter != nullptr &&
+		   (parameter->valueType() == typeid(float).name() ||
+		    parameter->valueType() == typeid(int).name() ||
+		    parameter->valueType() == typeid(std::vector<float>).name() ||
+		    parameter->valueType() == typeid(std::vector<int>).name())){
+	            if(ImGui::Checkbox("Show Value", &showValue)){
+	                widget.config["showValue"] = showValue;
+	                container.markCustomGuisDirty();
             }
         }
 
-        if(parameter != nullptr &&
-           (parameter->valueType() == typeid(float).name() ||
-            parameter->valueType() == typeid(int).name() ||
-            parameter->valueType() == typeid(std::vector<float>).name())){
-            bool useCustomRange = widget.config.value("useCustomRange", false);
-            if(ImGui::Checkbox("Custom Range", &useCustomRange)){
-                widget.config["useCustomRange"] = useCustomRange;
-                container.saveCustomGuis();
+	        if(parameter != nullptr &&
+		   (parameter->valueType() == typeid(float).name() ||
+		    parameter->valueType() == typeid(int).name() ||
+		    parameter->valueType() == typeid(std::vector<float>).name())){
+	            bool useCustomRange = widget.config.value("useCustomRange", false);
+	            if(ImGui::Checkbox("Custom Range", &useCustomRange)){
+	                widget.config["useCustomRange"] = useCustomRange;
+                container.markCustomGuisDirty();
             }
             if(useCustomRange){
                 if(parameter->valueType() == typeid(int).name()){
@@ -651,11 +620,11 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                     if(ImGui::InputInt("Range Min", &rangeMin)){
                         widget.config["rangeMin"] = rangeMin;
                         if(rangeMax < rangeMin) widget.config["rangeMax"] = rangeMin;
-                        container.saveCustomGuis();
+                        container.markCustomGuisDirty();
                     }
                     if(ImGui::InputInt("Range Max", &rangeMax)){
                         widget.config["rangeMax"] = std::max(rangeMin, rangeMax);
-                        container.saveCustomGuis();
+                        container.markCustomGuisDirty();
                     }
                 }else{
                     float defaultMin = parameter->valueType() == typeid(float).name() ? parameter->cast<float>().getParameter().getMin() : 0.0f;
@@ -671,69 +640,36 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                     if(ImGui::InputFloat("Range Min", &rangeMin)){
                         widget.config["rangeMin"] = rangeMin;
                         if(rangeMax < rangeMin) widget.config["rangeMax"] = rangeMin;
-                        container.saveCustomGuis();
+                        container.markCustomGuisDirty();
                     }
                     if(ImGui::InputFloat("Range Max", &rangeMax)){
                         widget.config["rangeMax"] = std::max(rangeMin, rangeMax);
-                        container.saveCustomGuis();
+                        container.markCustomGuisDirty();
                     }
                 }
-            }
-        }
+	            }
+	        }
 
-        if(widget.type == CustomGuiWidgetType::Text){
-            float fontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
-            if(ImGui::InputFloat("Font Scale", &fontScale, 0.05f, 0.2f, "%.2f")){
-                widget.config["fontScale"] = std::max(0.2f, fontScale);
-                container.saveCustomGuis();
-            }
-        }
+	        if(parameter != nullptr &&
+	           (parameter->valueType() == typeid(float).name() ||
+	            parameter->valueType() == typeid(std::vector<float>).name()) &&
+	           widget.type != CustomGuiWidgetType::Waveform &&
+	           widget.type != CustomGuiWidgetType::XYPad &&
+	           widget.type != CustomGuiWidgetType::MultiToggle){
+	            int quantization = std::max(0, widget.config.value("quantization", 0));
+	            if(ImGui::InputInt("Quantization", &quantization)){
+	                widget.config["quantization"] = std::max(0, quantization);
+	                container.markCustomGuisDirty();
+	            }
+	        }
 
-        if(widget.type == CustomGuiWidgetType::Image){
-            char pathBuffer[512];
-            std::snprintf(pathBuffer, sizeof(pathBuffer), "%s", widget.config.value("imagePath", std::string()).c_str());
-            if(ImGui::InputText("Image Path", pathBuffer, sizeof(pathBuffer))){
-                widget.config["imagePath"] = std::string(pathBuffer);
-                imageCache.erase(std::string(pathBuffer));
-                container.saveCustomGuis();
-            }
-        }
-
-        if(parameter != nullptr && parameter->valueType() == typeid(std::vector<float>).name() && widget.type == CustomGuiWidgetType::MultiSlider){
-            int maxCount = (int)parameter->cast<std::vector<float>>().getParameter().get().size();
-            int visibleCount = widget.config.value("visibleCount", maxCount);
-            if(ImGui::SliderInt("Num Sliders", &visibleCount, 1, std::max(1, maxCount))){
-                widget.config["visibleCount"] = visibleCount;
-                container.saveCustomGuis();
-            }
-
-            bool vertical = widget.config.value("vertical", true);
-            if(ImGui::Checkbox("Vertical", &vertical)){
-                widget.config["vertical"] = vertical;
-                container.saveCustomGuis();
-            }
-
-            bool canResizeVector = interactive && !parameter->hasInConnection() && !(parameter->getFlags() & ofxOceanodeParameterFlags_DisableInConnection);
-            if(canResizeVector){
-                int vectorSize = (int)parameter->cast<std::vector<float>>().getParameter().get().size();
-                if(ImGui::SliderInt("Vector Size", &vectorSize, 1, 64)){
-                    auto& param = parameter->cast<std::vector<float>>().getParameter();
-                    auto values = param.get();
-                    auto mins = param.getMin();
-                    auto maxs = param.getMax();
-                    float fillValue = values.empty() ? 0.0f : values.back();
-                    float fillMin = mins.empty() ? 0.0f : mins.back();
-                    float fillMax = maxs.empty() ? 1.0f : maxs.back();
-                    values.resize(vectorSize, fillValue);
-                    mins.resize(vectorSize, fillMin);
-                    maxs.resize(vectorSize, fillMax);
-                    param.setMin(mins);
-                    param.setMax(maxs);
-                    param.set(values);
-                    widget.config["visibleCount"] = vectorSize;
-                    container.saveCustomGuis();
-                }
-            }
+        const CustomGuiWidgetDefinition* definition = ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(widget.type);
+        if(definition != nullptr && definition->drawProperties){
+            CustomGuiWidgetPropertiesContext context {
+                container,
+                [this](){ return getPanelData(); }
+            };
+            definition->drawProperties(context, widget, parameter);
         }
 
         if(ImGui::Button("Remove from GUI")){
@@ -756,10 +692,11 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
     auto& param = parameter->cast<std::vector<float>>().getParameter();
     const auto& mins = param.getMin();
     const auto& maxs = param.getMax();
-    const int visibleCount = ofClamp(widget.config.value("visibleCount", (int)value.size()), 1, (int)value.size());
-    const bool vertical = widget.config.value("vertical", true);
-    const bool showValue = shouldShowNumericValue(widget);
-    const bool useCustomRange = widget.config.value("useCustomRange", false);
+	    const int visibleCount = ofClamp(widget.config.value("visibleCount", (int)value.size()), 1, (int)value.size());
+	    const bool vertical = widget.config.value("vertical", true);
+	    const bool showValue = shouldShowNumericValue(widget);
+	    const bool useCustomRange = widget.config.value("useCustomRange", false);
+	    const int quantization = std::max(0, widget.config.value("quantization", 0));
 
     ImGui::InvisibleButton("##multislider", size);
     const bool isHovered = ImGui::IsItemHovered();
@@ -784,11 +721,11 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
 
         float minValue = index < mins.size() ? mins[index] : 0.0f;
         float maxValue = index < maxs.size() ? maxs[index] : 1.0f;
-        if(useCustomRange){
-            minValue = widget.config.value("rangeMin", minValue);
-            maxValue = widget.config.value("rangeMax", maxValue);
-        }
-        if(minValue >= maxValue) maxValue = minValue + 1.0f;
+	        if(useCustomRange){
+	            minValue = widget.config.value("rangeMin", minValue);
+	            maxValue = widget.config.value("rangeMax", maxValue);
+	        }
+	        if(minValue >= maxValue) maxValue = minValue + 1.0f;
 
         float normalized = 0.0f;
         if(vertical){
@@ -796,8 +733,15 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
         }else{
             normalized = ofClamp((mousePos.x - min.x) / std::max(1.0f, size.x), 0.0f, 1.0f);
         }
-        const float newValue = minValue + normalized * (maxValue - minValue);
-        if(index < (int)value.size() && value[index] != newValue){
+	        float newValue = minValue + normalized * (maxValue - minValue);
+	        if(quantization >= 2){
+	            const float step = (maxValue - minValue) / (float)(quantization - 1);
+	            if(step > 0.0f){
+	                newValue = minValue + std::round((newValue - minValue) / step) * step;
+	                newValue = ofClamp(newValue, minValue, maxValue);
+	            }
+	        }
+	        if(index < (int)value.size() && value[index] != newValue){
             value[index] = newValue;
             changed = true;
         }
@@ -890,30 +834,12 @@ void ofxOceanodeCustomGuiPanel::drawGridOverlay(const CustomGuiLayout& layout, c
 
 std::vector<CustomGuiWidgetType> ofxOceanodeCustomGuiPanel::getCompatibleWidgetTypes(ofxOceanodeAbstractParameter& parameter) const
 {
-    const std::string type = parameter.valueType();
-    if(type == typeid(float).name()) return {CustomGuiWidgetType::Slider, CustomGuiWidgetType::Knob, CustomGuiWidgetType::DragNumber, CustomGuiWidgetType::Waveform};
-    if(type == typeid(int).name()){
-        auto options = parameter.cast<int>().getDropdownOptions();
-        if(options.empty()) return {CustomGuiWidgetType::Slider, CustomGuiWidgetType::DragNumber};
-        return {CustomGuiWidgetType::Slider, CustomGuiWidgetType::DragNumber, CustomGuiWidgetType::Dropdown};
-    }
-    if(type == typeid(bool).name()) return {CustomGuiWidgetType::Toggle};
-    if(type == typeid(void).name()) return {CustomGuiWidgetType::Button};
-    if(type == typeid(std::string).name()) return {CustomGuiWidgetType::TextDisplay};
-    if(type == typeid(std::vector<float>).name()){
-        auto value = parameter.cast<std::vector<float>>().getParameter().get();
-        if(value.size() == 2) return {CustomGuiWidgetType::MultiSlider, CustomGuiWidgetType::Waveform, CustomGuiWidgetType::XYPad};
-        return {CustomGuiWidgetType::MultiSlider, CustomGuiWidgetType::Waveform};
-    }
-    if(type == typeid(std::vector<int>).name()) return {CustomGuiWidgetType::ToggleGrid, CustomGuiWidgetType::MultiSlider};
-    return {};
+    return ofxOceanodeCustomGuiWidgetRegistry::instance().getCompatibleWidgets(parameter);
 }
 
 CustomGuiWidgetType ofxOceanodeCustomGuiPanel::getDefaultWidgetType(ofxOceanodeAbstractParameter& parameter) const
 {
-    auto types = getCompatibleWidgetTypes(parameter);
-    if(types.empty()) return CustomGuiWidgetType::Label;
-    return types.front();
+    return ofxOceanodeCustomGuiWidgetRegistry::instance().getDefaultWidgetType(parameter);
 }
 
 bool ofxOceanodeCustomGuiPanel::containsParameter(ofxOceanodeAbstractParameter& parameter) const
@@ -933,13 +859,19 @@ bool ofxOceanodeCustomGuiPanel::removeParameter(const std::string& parameterPath
     if(panel == nullptr) return false;
 
     auto& widgets = panel->layout.widgets;
+    for(const auto& widget : widgets){
+        if(widget.parameterRef.parameterPath != parameterPath) continue;
+        if(const CustomGuiWidgetDefinition* definition = ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(widget.type)){
+            if(definition->cleanup) definition->cleanup(panel->id, parameterPath);
+        }
+    }
+
     auto it = std::remove_if(widgets.begin(), widgets.end(), [&](const CustomGuiWidget& widget){
         return widget.parameterRef.parameterPath == parameterPath;
     });
     if(it == widgets.end()) return false;
-
     widgets.erase(it, widgets.end());
-    container.saveCustomGuis();
+    container.markCustomGuisDirty();
     return true;
 }
 
@@ -965,27 +897,11 @@ bool ofxOceanodeCustomGuiPanel::addParameter(ofxOceanodeAbstractParameter& param
     }
     widget.type = type;
     widget.label = parameter.getName();
-    widget.spanW = type == CustomGuiWidgetType::Slider || type == CustomGuiWidgetType::MultiSlider || type == CustomGuiWidgetType::ToggleGrid ? 2 : 1;
-    widget.spanH = type == CustomGuiWidgetType::ToggleGrid || type == CustomGuiWidgetType::XYPad ? 2 : 1;
     widget.config["interactive"] = ofxOceanodeCustomGuiWidgets::defaultInteractiveState(parameter);
     widget.config["showValue"] = true;
 
-    if(type == CustomGuiWidgetType::ToggleGrid){
-        int size = 1;
-        if(parameter.valueType() == typeid(std::vector<int>).name()){
-            size = std::max(1, (int)parameter.cast<std::vector<int>>().getParameter().get().size());
-        }
-        widget.config["rows"] = 1;
-        widget.config["cols"] = size;
-    }
-    if(type == CustomGuiWidgetType::MultiSlider){
-        if(parameter.valueType() == typeid(std::vector<float>).name()){
-            int size = std::max(1, (int)parameter.cast<std::vector<float>>().getParameter().get().size());
-            widget.config["visibleCount"] = size;
-            widget.config["vertical"] = true;
-            widget.spanW = 3;
-            widget.spanH = 3;
-        }
+    if(const CustomGuiWidgetDefinition* definition = ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(type)){
+        if(definition->initializeWidget) definition->initializeWidget(widget, parameter);
     }
 
     auto cell = findNextAvailableCell(panel->layout, widget.spanW, widget.spanH);
@@ -995,7 +911,7 @@ bool ofxOceanodeCustomGuiPanel::addParameter(ofxOceanodeAbstractParameter& param
     panel->layout.columns = std::max(panel->layout.columns, widget.gridX + widget.spanW);
     panel->layout.rows = std::max(panel->layout.rows, widget.gridY + widget.spanH);
     panel->windowState.isOpen = true;
-    container.saveCustomGuis();
+    container.markCustomGuisDirty();
     return true;
 }
 

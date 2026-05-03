@@ -37,6 +37,8 @@ private:
                                std::vector<float>& value,
                                const ImVec2& size,
                                bool interactive) const;
+    void openSetValuePopup(ofxOceanodeAbstractParameter& parameter, const std::string& label);
+    void drawSetValuePopup();
     void drawVerticalMeter(const ImVec2& size, float normalized, const ImU32& color) const;
     void drawGridOverlay(const CustomGuiLayout& layout, const ImVec2& origin) const;
     std::pair<int, int> findNextAvailableCell(const CustomGuiLayout& layout, int spanW, int spanH) const;
@@ -48,6 +50,11 @@ private:
     std::string panelId;
     mutable bool appliedWindowState = false;
     mutable std::map<std::string, std::shared_ptr<ofImage>> imageCache;
+    bool requestOpenSetValuePopup = false;
+    std::string setValueParameterPath;
+    std::string setValueLabel;
+    double setValueScalar = 0.0;
+    std::vector<double> setValueVectorValues;
 };
 
 #endif

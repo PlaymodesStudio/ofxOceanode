@@ -9,18 +9,24 @@ enum class CustomGuiWidgetType {
     Slider,
     Knob,
     DragNumber,
-    Toggle,
-    Button,
-    MultiSlider,
-    ToggleGrid,
-    XYPad,
+	Toggle,
+	Button,
+	MultiSlider,
+	MultiToggle,
+    PianoKeyboard,
+	XYPad,
     Waveform,
+    VUMeter,
+    FFT,
     TextDisplay,
+    FileBrowser,
     Label,
-    Dropdown,
-    BackgroundPanel,
-    Text,
-    Image
+	Dropdown,
+	BackgroundPanel,
+	Text,
+	Texture,
+	Image,
+    CustomRegion
 };
 
 struct CustomGuiParameterReference {
@@ -44,8 +50,8 @@ struct CustomGuiWidget {
 struct CustomGuiLayout {
     int columns = 4;
     int rows = 3;
-    float cellWidth = 80.0f;
-    float cellHeight = 60.0f;
+    float cellWidth = 20.0f;
+    float cellHeight = 20.0f;
     float zoom = 1.0f;
     std::vector<CustomGuiWidget> widgets;
 };
@@ -76,15 +82,21 @@ inline std::string customGuiWidgetTypeToString(CustomGuiWidgetType type)
         case CustomGuiWidgetType::Toggle: return "Toggle";
         case CustomGuiWidgetType::Button: return "Button";
         case CustomGuiWidgetType::MultiSlider: return "MultiSlider";
-        case CustomGuiWidgetType::ToggleGrid: return "ToggleGrid";
+		case CustomGuiWidgetType::MultiToggle: return "MultiToggle";
+        case CustomGuiWidgetType::PianoKeyboard: return "PianoKeyboard";
         case CustomGuiWidgetType::XYPad: return "XYPad";
         case CustomGuiWidgetType::Waveform: return "Waveform";
+        case CustomGuiWidgetType::VUMeter: return "VUMeter";
+        case CustomGuiWidgetType::FFT: return "FFT";
         case CustomGuiWidgetType::TextDisplay: return "TextDisplay";
+        case CustomGuiWidgetType::FileBrowser: return "FileBrowser";
         case CustomGuiWidgetType::Label: return "Label";
         case CustomGuiWidgetType::Dropdown: return "Dropdown";
-        case CustomGuiWidgetType::BackgroundPanel: return "BackgroundPanel";
-        case CustomGuiWidgetType::Text: return "Text";
-        case CustomGuiWidgetType::Image: return "Image";
+	        case CustomGuiWidgetType::BackgroundPanel: return "BackgroundPanel";
+	        case CustomGuiWidgetType::Text: return "Text";
+	        case CustomGuiWidgetType::Texture: return "Texture";
+	        case CustomGuiWidgetType::Image: return "Image";
+            case CustomGuiWidgetType::CustomRegion: return "CustomRegion";
     }
     return "Slider";
 }
@@ -94,17 +106,23 @@ inline CustomGuiWidgetType customGuiWidgetTypeFromString(const std::string& type
     if(type == "Knob") return CustomGuiWidgetType::Knob;
     if(type == "DragNumber") return CustomGuiWidgetType::DragNumber;
     if(type == "Toggle") return CustomGuiWidgetType::Toggle;
-    if(type == "Button") return CustomGuiWidgetType::Button;
-    if(type == "MultiSlider") return CustomGuiWidgetType::MultiSlider;
-    if(type == "ToggleGrid") return CustomGuiWidgetType::ToggleGrid;
+	if(type == "Button") return CustomGuiWidgetType::Button;
+	if(type == "MultiSlider") return CustomGuiWidgetType::MultiSlider;
+	if(type == "MultiToggle" || type == "ToggleGrid") return CustomGuiWidgetType::MultiToggle;
+    if(type == "PianoKeyboard") return CustomGuiWidgetType::PianoKeyboard;
     if(type == "XYPad") return CustomGuiWidgetType::XYPad;
     if(type == "Waveform") return CustomGuiWidgetType::Waveform;
+    if(type == "VUMeter") return CustomGuiWidgetType::VUMeter;
+    if(type == "FFT") return CustomGuiWidgetType::FFT;
     if(type == "TextDisplay") return CustomGuiWidgetType::TextDisplay;
+    if(type == "FileBrowser") return CustomGuiWidgetType::FileBrowser;
     if(type == "Label") return CustomGuiWidgetType::Label;
     if(type == "Dropdown") return CustomGuiWidgetType::Dropdown;
-    if(type == "BackgroundPanel") return CustomGuiWidgetType::BackgroundPanel;
-    if(type == "Text") return CustomGuiWidgetType::Text;
-    if(type == "Image") return CustomGuiWidgetType::Image;
+	    if(type == "BackgroundPanel") return CustomGuiWidgetType::BackgroundPanel;
+	    if(type == "Text") return CustomGuiWidgetType::Text;
+	    if(type == "Texture") return CustomGuiWidgetType::Texture;
+	    if(type == "Image") return CustomGuiWidgetType::Image;
+    if(type == "CustomRegion") return CustomGuiWidgetType::CustomRegion;
     return CustomGuiWidgetType::Slider;
 }
 
