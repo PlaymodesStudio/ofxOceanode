@@ -186,17 +186,21 @@ ofJson ofxOceanodeNode::saveParametersToJson(bool persistentPreset){
     for(int i = 0; i < getParameters().size(); i++){
         ofxOceanodeAbstractParameter& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
         if((!persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) || (persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject))){
-            if(p.valueType() == typeid(vector<float>).name()){
-                auto vecF = p.cast<vector<float>>().getParameter().get();
-                if(vecF.size() == 1){
-                    json[p.getEscapedName()] = vecF[0];
-                }
-            }
-            else if(p.valueType() == typeid(vector<int>).name()){
-                auto vecI = p.cast<vector<int>>().getParameter().get();
-                if(vecI.size() == 1){
-                    json[p.getEscapedName()] = vecI[0];
-                }
+			if(p.valueType() == typeid(vector<float>).name()){
+				auto vecF = p.cast<vector<float>>().getParameter().get();
+				if(vecF.size() == 1){
+					json[p.getEscapedName()] = vecF[0];
+				}else{
+					json[p.getEscapedName()] = vecF;
+				}
+			}
+			else if(p.valueType() == typeid(vector<int>).name()){
+				auto vecI = p.cast<vector<int>>().getParameter().get();
+				if(vecI.size() == 1){
+					json[p.getEscapedName()] = vecI[0];
+				}else{
+					json[p.getEscapedName()] = vecI;
+				}
 			}else{
 				 ofSerialize(json, p);
 			}
@@ -229,24 +233,53 @@ void ofxOceanodeNode::loadInspectorParametersFromJson(ofJson json){
 }
 
 void ofxOceanodeNode::deserializeParameter(ofJson &json, ofxOceanodeAbstractParameter &p, bool persistentPreset){
-    if((((!persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) || (persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject)))) && json.count(p.getEscapedName()) && !p.hasInConnection()){
-        if(p.valueType() == typeid(vector<float>).name()){
-            float value = 0;
-            if(json[p.getEscapedName()].is_string()){
-				p.cast<vector<float>>().getParameter() = vector<float>(1, ofToFloat(json[p.getEscapedName()]));
-            }else{
-                p.cast<vector<float>>().getParameter() = vector<float>(1, float(json[p.getEscapedName()]));
-            }
-        }
-        else if(p.valueType() == typeid(vector<int>).name()){
-            if(json[p.getEscapedName()].is_string()){
-                p.cast<vector<int>>().getParameter() = vector<int>(1, ofToInt(json[p.getEscapedName()]));
-            }else{
-                p.cast<vector<int>>().getParameter() = vector<int>(1, int(json[p.getEscapedName()]));
-            }
+	if((((!persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) || (persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject)))) && json.count(p.getEscapedName()) && !p.hasInConnection()){
+		if(p.valueType() == typeid(vector<float>).name()){
+			auto& param = p.cast<vector<float>>().getParameter();
+			vector<float> values;
+			if(json[p.getEscapedName()].is_array()){
+				values = json[p.getEscapedName()].get<vector<float>>();
+			}else if(json[p.getEscapedName()].is_string()){
+				values = vector<float>(1, ofToFloat(json[p.getEscapedName()]));
+			}else{
+				values = vector<float>(1, float(json[p.getEscapedName()]));
+			}
+			if(!values.empty()){
+				auto mins = param.getMin();
+				auto maxs = param.getMax();
+				float fillMin = mins.empty() ? 0.0f : mins.back();
+				float fillMax = maxs.empty() ? 1.0f : maxs.back();
+				mins.resize(values.size(), fillMin);
+				maxs.resize(values.size(), fillMax);
+				param.setMin(mins);
+				param.setMax(maxs);
+			}
+			param = values;
+		}
+		else if(p.valueType() == typeid(vector<int>).name()){
+			auto& param = p.cast<vector<int>>().getParameter();
+			vector<int> values;
+			if(json[p.getEscapedName()].is_array()){
+				values = json[p.getEscapedName()].get<vector<int>>();
+			}else if(json[p.getEscapedName()].is_string()){
+				values = vector<int>(1, ofToInt(json[p.getEscapedName()]));
+			}else{
+				values = vector<int>(1, int(json[p.getEscapedName()]));
+			}
+			if(!values.empty()){
+				auto mins = param.getMin();
+				auto maxs = param.getMax();
+				int fillMin = mins.empty() ? 0 : mins.back();
+				int fillMax = maxs.empty() ? 1 : maxs.back();
+				mins.resize(values.size(), fillMin);
+				maxs.resize(values.size(), fillMax);
+				param.setMin(mins);
+				param.setMax(maxs);
+			}
+			param = values;
 		}else if(p.valueType() == typeid(std::string).name()){
-            p.cast<std::string>().getParameter() = json[p.getEscapedName()].get<std::string>();
-        }else{
+			p.cast<std::string>().getParameter() = json[p.getEscapedName()].get<std::string>();
+		}else{
 			ofDeserialize(json, p);
 		}
     }

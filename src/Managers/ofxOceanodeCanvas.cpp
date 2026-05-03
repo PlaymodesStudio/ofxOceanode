@@ -279,6 +279,55 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         windowName = uniqueID + "###" + uniqueID;
     }
     if(ImGui::Begin(windowName.c_str(), open)){
+        auto prepareNewNodeModal = [&](){
+            searchField = "";
+            lastSearchField = "";
+            numTimesPopup = 0;
+            selectedSearchResultIndex = -1;
+            filteredSearchResults.clear();
+
+            auto const &models = container->getRegistry()->getRegisteredModels();
+            auto const &categories = container->getRegistry()->getCategories();
+            auto const &categoriesModelsAssociation = container->getRegistry()->getRegisteredModelsCategoryAssociation();
+
+            categoriesVector = vector<string>(categories.begin(), categories.end());
+
+            options = vector<vector<string>>(categories.size());
+            for(int i = 0; i < categories.size(); i++){
+                options.push_back(vector<string>());
+                for(auto &model : models){
+                    if(categoriesModelsAssociation.at(model.first) == categoriesVector[i]){
+                        options[i].push_back(model.first);
+                    }
+                }
+                std::sort(options[i].begin(), options[i].end());
+            }
+        };
+
+        auto drawCustomGuiManagementMenu = [&](){
+            if(ImGui::Selectable("Create Custom GUI...")){
+                container->requestCreateCustomGui("", CustomGuiWidgetType::Slider, true);
+            }
+            if(!container->getCustomGuiPanelsData().empty()){
+                ImGui::Separator();
+                for(const auto& panel : container->getCustomGuiPanelsData()){
+                    if(ImGui::BeginMenu(panel.name.c_str())){
+                        if(ImGui::Selectable("Open")){
+                            container->openCustomGuiPanel(panel.id, false);
+                        }
+                        if(ImGui::Selectable("Edit")){
+                            container->openCustomGuiPanel(panel.id, true);
+                        }
+                        ImGui::Separator();
+                        if(ImGui::Selectable("Delete")){
+                            container->deleteCustomGuiPanel(panel.id);
+                        }
+                        ImGui::EndMenu();
+                    }
+                }
+            }
+        };
+
         // Detect canvas tab activation — consistent check for both active-canvas-ID
         // and layout switching. Uses dock tab selection when available to avoid
         // the RootAndChildWindows false-positive with shared dock hosts.
@@ -1291,27 +1340,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
         if(ImGui::BeginPopup("Canvas Custom GUIs")){
             if(customGuiContextNode != nullptr){
-                if(ImGui::Selectable("Create Custom GUI...")){
-                    container->requestCreateCustomGui("", CustomGuiWidgetType::Slider, true);
-                }
-                if(!container->getCustomGuiPanelsData().empty()){
-                    ImGui::Separator();
-                    for(const auto& panel : container->getCustomGuiPanelsData()){
-                        if(ImGui::BeginMenu(panel.name.c_str())){
-                            if(ImGui::Selectable("Open")){
-                                container->openCustomGuiPanel(panel.id, false);
-                            }
-                            if(ImGui::Selectable("Edit")){
-                                container->openCustomGuiPanel(panel.id, true);
-                            }
-                            ImGui::Separator();
-                            if(ImGui::Selectable("Delete")){
-                                container->deleteCustomGuiPanel(panel.id);
-                            }
-                            ImGui::EndMenu();
-                        }
-                    }
-                }
+                drawCustomGuiManagementMenu();
             }
             ImGui::EndPopup();
         }
@@ -1332,33 +1361,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 				if(commentClicked) break;
 			}
 			if(!commentClicked){
+				prepareNewNodeModal();
 				ImGui::OpenPopup("New Node");
-				searchField = "";
-				lastSearchField = "";
-				numTimesPopup = 0;
-				selectedSearchResultIndex = -1;
-				filteredSearchResults.clear();
-				
-				//Get node registry to update newly registered nodes
-				auto const &models = container->getRegistry()->getRegisteredModels();
-				auto const &categories = container->getRegistry()->getCategories();
-				auto const &categoriesModelsAssociation = container->getRegistry()->getRegisteredModelsCategoryAssociation();
-				
-				categoriesVector = vector<string>(categories.begin(), categories.end());
-				
-				options = vector<vector<string>>(categories.size());
-				for(int i = 0; i < categories.size(); i++){
-					options.push_back(vector<string>());
-					for(auto &model : models){
-						if(categoriesModelsAssociation.at(model.first) == categoriesVector[i]){
-							options[i].push_back(model.first);
-						}
-					}
-					std::sort(options[i].begin(), options[i].end());
-				}
 			}
         }
-        
+
         // Draw New Node menu
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
@@ -1674,6 +1681,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 				
 				container->getComments().emplace_back(commentPosition, commentSize);
 			}
+            
+            ImGui::Separator();
+            if(ImGui::Selectable("Add Custom GUI")){
+                container->requestCreateCustomGui("", CustomGuiWidgetType::Slider, true);
+            }
             
             ImGui::EndPopup();
         }
