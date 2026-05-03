@@ -87,17 +87,78 @@ void ofxOceanodeCustomGuiPanel::draw()
             container.markCustomGuisDirty();
         }
 
+        auto* snapshotBank = container.getCustomGuiSnapshotBank(panel->id);
+        const bool canSnapshot = container.customGuiPanelHasSnapshotEligibleParameters(panel->id);
+        auto getSelectedSnapshot = [&]() -> CustomGuiSnapshotData* {
+            if(snapshotBank == nullptr) return nullptr;
+            for(auto& snapshot : snapshotBank->snapshots){
+                if(snapshot.id == snapshotBank->currentSnapshotId) return &snapshot;
+            }
+            if(!snapshotBank->snapshots.empty()){
+                snapshotBank->currentSnapshotId = snapshotBank->snapshots.front().id;
+                return &snapshotBank->snapshots.front();
+            }
+            return nullptr;
+        };
+        auto* selectedSnapshot = getSelectedSnapshot();
+
         if(ImGui::SmallButton(panel->designMode ? "Run" : "Edit")){
             panel->designMode = !panel->designMode;
             container.markCustomGuisDirty();
         }
         ImGui::SameLine();
-        if(ImGui::SmallButton("-")){
+        ImGui::SetNextItemWidth(180.0f);
+        const char* snapshotPreview = selectedSnapshot != nullptr ? selectedSnapshot->name.c_str() : "Snapshots";
+        if(ImGui::BeginCombo("##CustomGuiSnapshots", snapshotPreview)){
+            if(snapshotBank == nullptr || snapshotBank->snapshots.empty()){
+                ImGui::TextDisabled("No snapshots");
+            }else{
+                for(const auto& snapshot : snapshotBank->snapshots){
+                    const bool isSelected = snapshot.id == snapshotBank->currentSnapshotId;
+                    if(ImGui::Selectable(snapshot.name.c_str(), isSelected)){
+                        container.recallCustomGuiSnapshot(panel->id, snapshot.id);
+                        selectedSnapshot = getSelectedSnapshot();
+                    }
+                    if(isSelected) ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine(0, 6.0f);
+        if(!canSnapshot) ImGui::BeginDisabled();
+        if(ImGui::SmallButton("+##CreateSnapshot") && canSnapshot){
+            createSnapshotFromPopup = true;
+            snapshotRenameId.clear();
+            snapshotRenameValue = "Snapshot";
+            requestOpenRenameSnapshotPopup = true;
+        }
+        if(!canSnapshot) ImGui::EndDisabled();
+        ImGui::SameLine(0, 6.0f);
+        if(selectedSnapshot == nullptr) ImGui::BeginDisabled();
+        if(ImGui::SmallButton("Save") && selectedSnapshot != nullptr){
+            container.updateCustomGuiSnapshot(panel->id, selectedSnapshot->id);
+            snapshotBank = container.getCustomGuiSnapshotBank(panel->id);
+            selectedSnapshot = getSelectedSnapshot();
+        }
+        ImGui::SameLine(0, 6.0f);
+        if(ImGui::SmallButton("Rename") && selectedSnapshot != nullptr){
+            snapshotRenameId = selectedSnapshot->id;
+            snapshotRenameValue = selectedSnapshot->name;
+            requestOpenRenameSnapshotPopup = true;
+        }
+        ImGui::SameLine(0, 6.0f);
+        if(ImGui::SmallButton("-##DeleteSnapshot") && selectedSnapshot != nullptr){
+            snapshotDeleteId = selectedSnapshot->id;
+            requestOpenDeleteSnapshotPopup = true;
+        }
+        if(selectedSnapshot == nullptr) ImGui::EndDisabled();
+        ImGui::SameLine(0, 12.0f);
+        if(ImGui::SmallButton("-##ZoomOut")){
             panel->layout.zoom = ofClamp(panel->layout.zoom - 0.1f, 0.25f, 4.0f);
             container.markCustomGuisDirty();
         }
         ImGui::SameLine();
-        if(ImGui::SmallButton("+")){
+        if(ImGui::SmallButton("+##ZoomIn")){
             panel->layout.zoom = ofClamp(panel->layout.zoom + 0.1f, 0.25f, 4.0f);
             container.markCustomGuisDirty();
         }
@@ -357,6 +418,83 @@ void ofxOceanodeCustomGuiPanel::draw()
         }
 
         drawSetValuePopup();
+
+        if(requestOpenRenameSnapshotPopup){
+            ImGui::OpenPopup(createSnapshotFromPopup ? "New Snapshot" : "Rename Snapshot");
+            requestOpenRenameSnapshotPopup = false;
+        }
+        if(ImGui::BeginPopupModal("New Snapshot", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+            char snapshotNameBuffer[256];
+            std::snprintf(snapshotNameBuffer, sizeof(snapshotNameBuffer), "%s", snapshotRenameValue.c_str());
+            ImGui::SetNextItemWidth(240.0f);
+            if(ImGui::InputText("Name", snapshotNameBuffer, sizeof(snapshotNameBuffer))){
+                snapshotRenameValue = snapshotNameBuffer;
+            }
+            if(ImGui::Button("Create")){
+                const std::string createdSnapshotId = container.createCustomGuiSnapshot(panel->id, snapshotRenameValue);
+                if(!createdSnapshotId.empty()){
+                    container.recallCustomGuiSnapshot(panel->id, createdSnapshotId);
+                    snapshotBank = container.getCustomGuiSnapshotBank(panel->id);
+                    selectedSnapshot = getSelectedSnapshot();
+                }
+                createSnapshotFromPopup = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if(ImGui::Button("Cancel")){
+                createSnapshotFromPopup = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+        if(ImGui::BeginPopupModal("Rename Snapshot", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+            char snapshotNameBuffer[256];
+            std::snprintf(snapshotNameBuffer, sizeof(snapshotNameBuffer), "%s", snapshotRenameValue.c_str());
+            ImGui::SetNextItemWidth(240.0f);
+            if(ImGui::InputText("Name", snapshotNameBuffer, sizeof(snapshotNameBuffer))){
+                snapshotRenameValue = snapshotNameBuffer;
+            }
+            if(ImGui::Button("Apply")){
+                container.renameCustomGuiSnapshot(panel->id, snapshotRenameId, snapshotRenameValue);
+                snapshotBank = container.getCustomGuiSnapshotBank(panel->id);
+                selectedSnapshot = getSelectedSnapshot();
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if(ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
+
+        if(requestOpenDeleteSnapshotPopup){
+            ImGui::OpenPopup("Delete Snapshot?");
+            requestOpenDeleteSnapshotPopup = false;
+        }
+        if(ImGui::BeginPopupModal("Delete Snapshot?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+            const CustomGuiSnapshotData* snapshotToDelete = nullptr;
+            if(snapshotBank != nullptr){
+                for(const auto& snapshot : snapshotBank->snapshots){
+                    if(snapshot.id == snapshotDeleteId){
+                        snapshotToDelete = &snapshot;
+                        break;
+                    }
+                }
+            }
+            if(snapshotToDelete != nullptr){
+                ImGui::TextWrapped("Delete snapshot \"%s\"?", snapshotToDelete->name.c_str());
+            }else{
+                ImGui::TextDisabled("Snapshot unavailable");
+            }
+
+            if(ImGui::Button("Delete")){
+                container.deleteCustomGuiSnapshot(panel->id, snapshotDeleteId);
+                snapshotBank = container.getCustomGuiSnapshotBank(panel->id);
+                selectedSnapshot = getSelectedSnapshot();
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if(ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
 
         ImVec2 currentPos = ImGui::GetWindowPos();
         ImVec2 currentSize = ImGui::GetWindowSize();

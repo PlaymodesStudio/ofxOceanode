@@ -23,5 +23,6 @@
 #include "noise.h"
 #include "randomGenerator.h"
 #include "portal.h"
+#include "customGuiSnapshots.h"
 
 #endif /* defaultNodes_h */
