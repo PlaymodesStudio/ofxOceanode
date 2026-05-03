@@ -222,6 +222,12 @@ private:
             return;
         }
 
+        outputBus = std::make_unique<ofxSCBus>(RATE_AUDIO, numChannels, server);
+        if(outputBus == nullptr){
+            clear();
+            return;
+        }
+
         int lowestBusIndex = buses.front()->index;
         for(const auto& bus : buses){
             if(bus == nullptr){
@@ -233,6 +239,7 @@ private:
 
         synth = std::make_unique<ofxSCSynth>("vumeter" + ofToString(numChannels), server);
         synth->set("in", inputBus);
+        synth->set("out", outputBus->index);
         synth->set("vubus", lowestBusIndex);
         synth->set("vuattacktime", 10.0f);
         synth->set("vureleasetime", 300.0f);
@@ -267,6 +274,10 @@ private:
             synth->free();
             synth.reset();
         }
+        if(outputBus != nullptr){
+            outputBus->free();
+            outputBus.reset();
+        }
         for(auto& bus : buses){
             if(bus != nullptr) bus->free();
         }
@@ -281,6 +292,7 @@ private:
     int inputBus = -1;
     int numChannels = 0;
     std::unique_ptr<ofxSCSynth> synth;
+    std::unique_ptr<ofxSCBus> outputBus;
     std::vector<std::unique_ptr<ofxSCBus>> buses;
     std::vector<float> levels;
 };

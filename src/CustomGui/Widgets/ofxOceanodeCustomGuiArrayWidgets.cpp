@@ -32,7 +32,7 @@ bool supportsXYPadWidget(ofxOceanodeAbstractParameter& parameter)
 
 bool supportsPianoKeyboardWidget(ofxOceanodeAbstractParameter& parameter)
 {
-    return isIntVectorParameter(parameter);
+    return isIntVectorParameter(parameter) || isFloatVectorParameter(parameter);
 }
 
 void initializeMultiSliderWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
@@ -154,10 +154,34 @@ int pianoNoteFromPosition(const std::vector<PianoKeyGeometry>& geometry, int sta
 
 bool renderPianoKeyboardWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
 {
-    if(parameter == nullptr || !isIntVectorParameter(*parameter)) return false;
+    if(parameter == nullptr) return false;
 
-    auto& param = parameter->cast<std::vector<int>>().getParameter();
-    auto value = param.get();
+    std::set<int> selectedNotes;
+    std::function<void(const std::set<int>&)> applySelection;
+
+    if(isIntVectorParameter(*parameter)){
+        auto& param = parameter->cast<std::vector<int>>().getParameter();
+        auto value = param.get();
+        selectedNotes = std::set<int>(value.begin(), value.end());
+        applySelection = [&](const std::set<int>& notes){
+            param.set(std::vector<int>(notes.begin(), notes.end()));
+        };
+    }else if(isFloatVectorParameter(*parameter)){
+        auto& param = parameter->cast<std::vector<float>>().getParameter();
+        auto value = param.get();
+        for(float note : value){
+            selectedNotes.insert((int)std::round(note));
+        }
+        applySelection = [&](const std::set<int>& notes){
+            std::vector<float> floatNotes;
+            floatNotes.reserve(notes.size());
+            for(int note : notes) floatNotes.push_back((float)note);
+            param.set(floatNotes);
+        };
+    }else{
+        return false;
+    }
+
     const bool interactive = context.interactive && !context.designMode;
     const int startNote = ofClamp(widget.config.value("loNote", 48), 0, 127);
     const int endNote = ofClamp(widget.config.value("hiNote", 72), 0, 127);
@@ -168,8 +192,6 @@ bool renderPianoKeyboardWidget(CustomGuiWidgetRenderContext& context, CustomGuiW
     const float keyboardHeight = std::max(24.0f, itemSize.y);
     const float keyboardWidth = std::max(1.0f, itemSize.x);
     const auto geometry = buildPianoGeometry(lo, hi, keyboardWidth);
-
-    std::set<int> selectedNotes(value.begin(), value.end());
 
     ImGui::BeginGroup();
     drawWidgetLabel(widget, context.label);
@@ -184,9 +206,7 @@ bool renderPianoKeyboardWidget(CustomGuiWidgetRenderContext& context, CustomGuiW
         if(clickedNote >= 0){
             if(selectedNotes.count(clickedNote)) selectedNotes.erase(clickedNote);
             else selectedNotes.insert(clickedNote);
-            param.set(std::vector<int>(selectedNotes.begin(), selectedNotes.end()));
-            value = param.get();
-            selectedNotes = std::set<int>(value.begin(), value.end());
+            applySelection(selectedNotes);
         }
     }
 
