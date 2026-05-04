@@ -5,6 +5,7 @@
 #include "Managers/ofxOceanodeContainer.h"
 #include <algorithm>
 #include <cfloat>
+#include <cstdint>
 #include <cmath>
 #include <cstring>
 #include <memory>
@@ -53,12 +54,14 @@ public:
             return false;
         }
 
-        if(server != targetServer || inputBus != sourceBus || numChannels != channels){
+        ensureServerListeners(targetServer);
+        if(needsServerRecreate || server != targetServer || inputBus != sourceBus || numChannels != channels){
             recreate(targetServer, sourceBus, channels);
         }
 
-        updateFrame();
+        bool receivedFrame = updateFrame();
         requestedTimeWindow = std::max(0.001f, timeWindow);
+        handleStaleData(receivedFrame, targetServer, sourceBus, channels);
         return synth != nullptr && !frameData.empty() && !slidingBuffer.empty();
     }
 
@@ -68,11 +71,48 @@ public:
     float getRequestedTimeWindow() const { return requestedTimeWindow; }
 
 private:
+    void ensureServerListeners(ofxSCServer* targetServer){
+        if(listeningServer == targetServer) return;
+
+        serverBootedListener.unsubscribe();
+        serverInitializedListener.unsubscribe();
+        listeningServer = targetServer;
+
+        if(listeningServer != nullptr){
+            serverBootedListener = listeningServer->serverBootedEvent.newListener([this](){
+                invalidateForServerRestart();
+            });
+            serverInitializedListener = listeningServer->serverInitializedEvent.newListener([this](){
+                invalidateForServerRestart();
+            });
+        }
+    }
+
+    void invalidateForServerRestart(){
+        needsServerRecreate = true;
+        staleFrameCount = 0;
+        for(auto& bus : controlBuses){
+            if(bus != nullptr && listeningServer != nullptr && bus->index >= 0 && bus->index < (int)listeningServer->controlBusses.size()){
+                listeningServer->controlBusses[bus->index] = nullptr;
+            }
+        }
+        server = nullptr;
+        inputBus = -1;
+        numChannels = 0;
+        synth.reset();
+        controlBuses.clear();
+        frameData.clear();
+        slidingBuffer.clear();
+        maxBufferSize = 0;
+    }
+
     void recreate(ofxSCServer* targetServer, int sourceBus, int channels){
         clear();
         server = targetServer;
         inputBus = sourceBus;
         numChannels = channels;
+        lastRecreateAttemptMs = ofGetElapsedTimeMillis();
+        needsServerRecreate = false;
 
         const int totalBuses = kScBusWaveformSamplesPerFrame * numChannels;
         controlBuses.reserve(totalBuses);
@@ -104,8 +144,8 @@ private:
         slidingBuffer.assign(maxBufferSize * numChannels, 0.0f);
     }
 
-    void updateFrame(){
-        if(synth == nullptr || controlBuses.empty()) return;
+    bool updateFrame(){
+        if(synth == nullptr || controlBuses.empty()) return false;
 
         for(const auto& bus : controlBuses){
             if(bus != nullptr) bus->requestValues();
@@ -117,15 +157,17 @@ private:
         }
 
         std::fill(frameData.begin(), frameData.end(), 0.0f);
+        bool receivedAnyValue = false;
         for(const auto& bus : controlBuses){
             if(bus == nullptr || bus->readValues.empty()) continue;
+            receivedAnyValue = true;
             const int position = bus->index - lowestBusIndex;
             if(position >= 0 && position < (int)frameData.size()){
                 frameData[position] = bus->readValues[0];
             }
         }
 
-        if(maxBufferSize <= 0 || slidingBuffer.empty()) return;
+        if(maxBufferSize <= 0 || slidingBuffer.empty()) return receivedAnyValue;
         for(int ch = 0; ch < numChannels; ch++){
             const int channelOffset = ch * maxBufferSize;
             std::memmove(&slidingBuffer[channelOffset],
@@ -136,6 +178,20 @@ private:
                 if(frameIndex >= (int)frameData.size()) break;
                 slidingBuffer[channelOffset + maxBufferSize - kScBusWaveformSamplesPerFrame + i] = frameData[frameIndex];
             }
+        }
+        return receivedAnyValue;
+    }
+
+    void handleStaleData(bool receivedFrame, ofxSCServer* targetServer, int sourceBus, int channels){
+        if(receivedFrame){
+            staleFrameCount = 0;
+            return;
+        }
+
+        staleFrameCount++;
+        const uint64_t nowMs = ofGetElapsedTimeMillis();
+        if(staleFrameCount >= kStaleFrameThreshold && nowMs - lastRecreateAttemptMs >= kRecreateRetryIntervalMs){
+            recreate(targetServer, sourceBus, channels);
         }
     }
 
@@ -154,7 +210,12 @@ private:
         inputBus = -1;
         numChannels = 0;
         maxBufferSize = 0;
+        staleFrameCount = 0;
+        needsServerRecreate = false;
     }
+
+    static constexpr int kStaleFrameThreshold = 8;
+    static constexpr uint64_t kRecreateRetryIntervalMs = 300;
 
     ofxSCServer* server = nullptr;
     int inputBus = -1;
@@ -167,6 +228,12 @@ private:
     float sampleRate = 44100.0f;
     float maxBufferTime = 10.0f;
     float requestedTimeWindow = 0.02f;
+    int staleFrameCount = 0;
+    uint64_t lastRecreateAttemptMs = 0;
+    bool needsServerRecreate = false;
+    ofxSCServer* listeningServer = nullptr;
+    ofEventListener serverBootedListener;
+    ofEventListener serverInitializedListener;
 };
 
 std::unordered_map<std::string, std::unique_ptr<CustomGuiScBusWaveformScope>>& getScBusWaveformScopes(){
@@ -196,22 +263,63 @@ public:
             return false;
         }
 
-        if(server != targetServer || inputBus != sourceBus || numChannels != channels){
+        ensureServerListeners(targetServer);
+        if(needsServerRecreate || server != targetServer || inputBus != sourceBus || numChannels != channels){
             recreate(targetServer, sourceBus, channels);
         }
 
-        update();
+        bool receivedLevels = update();
+        handleStaleData(receivedLevels, targetServer, sourceBus, channels);
         return synth != nullptr && !levels.empty();
     }
 
     const std::vector<float>& getLevels() const { return levels; }
 
 private:
+    void ensureServerListeners(ofxSCServer* targetServer){
+        if(listeningServer == targetServer) return;
+
+        serverBootedListener.unsubscribe();
+        serverInitializedListener.unsubscribe();
+        listeningServer = targetServer;
+
+        if(listeningServer != nullptr){
+            serverBootedListener = listeningServer->serverBootedEvent.newListener([this](){
+                invalidateForServerRestart();
+            });
+            serverInitializedListener = listeningServer->serverInitializedEvent.newListener([this](){
+                invalidateForServerRestart();
+            });
+        }
+    }
+
+    void invalidateForServerRestart(){
+        needsServerRecreate = true;
+        staleFrameCount = 0;
+        for(auto& bus : buses){
+            if(bus != nullptr && listeningServer != nullptr && bus->index >= 0 && bus->index < (int)listeningServer->controlBusses.size()){
+                listeningServer->controlBusses[bus->index] = nullptr;
+            }
+        }
+        if(outputBus != nullptr && listeningServer != nullptr && outputBus->index >= 0 && outputBus->index < (int)listeningServer->audioBusses.size()){
+            listeningServer->audioBusses[outputBus->index] = nullptr;
+        }
+        server = nullptr;
+        inputBus = -1;
+        numChannels = 0;
+        synth.reset();
+        outputBus.reset();
+        buses.clear();
+        levels.clear();
+    }
+
     void recreate(ofxSCServer* targetServer, int sourceBus, int channels){
         clear();
         server = targetServer;
         inputBus = sourceBus;
         numChannels = channels;
+        lastRecreateAttemptMs = ofGetElapsedTimeMillis();
+        needsServerRecreate = false;
 
         buses.reserve(numChannels);
         for(int i = 0; i < numChannels; i++){
@@ -248,8 +356,8 @@ private:
         levels.assign(numChannels, 0.0f);
     }
 
-    void update(){
-        if(synth == nullptr) return;
+    bool update(){
+        if(synth == nullptr) return false;
         for(const auto& bus : buses){
             if(bus != nullptr) bus->requestValues();
         }
@@ -260,12 +368,28 @@ private:
         }
 
         std::fill(levels.begin(), levels.end(), 0.0f);
+        bool receivedAnyValue = false;
         for(const auto& bus : buses){
             if(bus == nullptr || bus->readValues.empty()) continue;
+            receivedAnyValue = true;
             const int position = bus->index - lowestBusIndex;
             if(position >= 0 && position < (int)levels.size()){
                 levels[position] = bus->readValues[0];
             }
+        }
+        return receivedAnyValue;
+    }
+
+    void handleStaleData(bool receivedLevels, ofxSCServer* targetServer, int sourceBus, int channels){
+        if(receivedLevels){
+            staleFrameCount = 0;
+            return;
+        }
+
+        staleFrameCount++;
+        const uint64_t nowMs = ofGetElapsedTimeMillis();
+        if(staleFrameCount >= kStaleFrameThreshold && nowMs - lastRecreateAttemptMs >= kRecreateRetryIntervalMs){
+            recreate(targetServer, sourceBus, channels);
         }
     }
 
@@ -286,7 +410,12 @@ private:
         server = nullptr;
         inputBus = -1;
         numChannels = 0;
+        staleFrameCount = 0;
+        needsServerRecreate = false;
     }
+
+    static constexpr int kStaleFrameThreshold = 8;
+    static constexpr uint64_t kRecreateRetryIntervalMs = 300;
 
     ofxSCServer* server = nullptr;
     int inputBus = -1;
@@ -295,6 +424,12 @@ private:
     std::unique_ptr<ofxSCBus> outputBus;
     std::vector<std::unique_ptr<ofxSCBus>> buses;
     std::vector<float> levels;
+    int staleFrameCount = 0;
+    uint64_t lastRecreateAttemptMs = 0;
+    bool needsServerRecreate = false;
+    ofxSCServer* listeningServer = nullptr;
+    ofEventListener serverBootedListener;
+    ofEventListener serverInitializedListener;
 };
 
 std::unordered_map<std::string, std::unique_ptr<CustomGuiScBusVUMeterScope>>& getScBusVUMeterScopes(){
@@ -324,22 +459,57 @@ public:
             return false;
         }
 
-        if(server != targetServer || inputBus != sourceBus || numChannels != channels){
+        ensureServerListeners(targetServer);
+        if(needsServerRecreate || server != targetServer || inputBus != sourceBus || numChannels != channels){
             recreate(targetServer, sourceBus, channels);
         }
 
-        update(std::clamp(smoothing, 0.0f, 0.99f));
+        bool receivedSpectrum = update(std::clamp(smoothing, 0.0f, 0.99f));
+        handleStaleData(receivedSpectrum, targetServer, sourceBus, channels);
         return synth != nullptr && !displayMagnitudes.empty();
     }
 
     const std::vector<float>& getMagnitudes() const { return displayMagnitudes; }
 
 private:
+    void ensureServerListeners(ofxSCServer* targetServer){
+        if(listeningServer == targetServer) return;
+
+        serverBootedListener.unsubscribe();
+        serverInitializedListener.unsubscribe();
+        listeningServer = targetServer;
+
+        if(listeningServer != nullptr){
+            serverBootedListener = listeningServer->serverBootedEvent.newListener([this](){
+                invalidateForServerRestart();
+            });
+            serverInitializedListener = listeningServer->serverInitializedEvent.newListener([this](){
+                invalidateForServerRestart();
+            });
+        }
+    }
+
+    void invalidateForServerRestart(){
+        needsServerRecreate = true;
+        staleFrameCount = 0;
+        if(fftBus != nullptr && listeningServer != nullptr && fftBus->index >= 0 && fftBus->index < (int)listeningServer->controlBusses.size()){
+            listeningServer->controlBusses[fftBus->index] = nullptr;
+        }
+        server = nullptr;
+        inputBus = -1;
+        numChannels = 0;
+        synth.reset();
+        fftBus.reset();
+        displayMagnitudes.clear();
+    }
+
     void recreate(ofxSCServer* targetServer, int sourceBus, int channels){
         clear();
         server = targetServer;
         inputBus = sourceBus;
         numChannels = channels;
+        lastRecreateAttemptMs = ofGetElapsedTimeMillis();
+        needsServerRecreate = false;
 
         fftBus = std::make_unique<ofxSCBus>(RATE_CONTROL, kScBusFftBins, server);
         if(fftBus == nullptr || fftBus->index < 0){
@@ -355,14 +525,28 @@ private:
         displayMagnitudes.assign(kScBusFftBins, 0.0f);
     }
 
-    void update(float smoothing){
-        if(synth == nullptr || fftBus == nullptr) return;
+    bool update(float smoothing){
+        if(synth == nullptr || fftBus == nullptr) return false;
         fftBus->requestValues();
         const auto& raw = fftBus->readValues;
-        if((int)raw.size() != kScBusFftBins) return;
+        if((int)raw.size() != kScBusFftBins) return false;
 
         for(int i = 0; i < kScBusFftBins; i++){
             displayMagnitudes[i] = displayMagnitudes[i] * smoothing + raw[i] * (1.0f - smoothing);
+        }
+        return true;
+    }
+
+    void handleStaleData(bool receivedSpectrum, ofxSCServer* targetServer, int sourceBus, int channels){
+        if(receivedSpectrum){
+            staleFrameCount = 0;
+            return;
+        }
+
+        staleFrameCount++;
+        const uint64_t nowMs = ofGetElapsedTimeMillis();
+        if(staleFrameCount >= kStaleFrameThreshold && nowMs - lastRecreateAttemptMs >= kRecreateRetryIntervalMs){
+            recreate(targetServer, sourceBus, channels);
         }
     }
 
@@ -379,7 +563,12 @@ private:
         server = nullptr;
         inputBus = -1;
         numChannels = 0;
+        staleFrameCount = 0;
+        needsServerRecreate = false;
     }
+
+    static constexpr int kStaleFrameThreshold = 8;
+    static constexpr uint64_t kRecreateRetryIntervalMs = 300;
 
     ofxSCServer* server = nullptr;
     int inputBus = -1;
@@ -387,6 +576,12 @@ private:
     std::unique_ptr<ofxSCSynth> synth;
     std::unique_ptr<ofxSCBus> fftBus;
     std::vector<float> displayMagnitudes;
+    int staleFrameCount = 0;
+    uint64_t lastRecreateAttemptMs = 0;
+    bool needsServerRecreate = false;
+    ofxSCServer* listeningServer = nullptr;
+    ofEventListener serverBootedListener;
+    ofEventListener serverInitializedListener;
 };
 
 std::unordered_map<std::string, std::unique_ptr<CustomGuiScBusFftScope>>& getScBusFftScopes(){
