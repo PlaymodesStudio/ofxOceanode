@@ -110,6 +110,12 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
             string uniqueId = absParam.getName();
+            const bool publishedInCustomGui = [&](){
+                for(const auto& panel : container.getCustomGuiPanelsData()){
+                    if(container.customGuiContainsParameter(panel.id, absParam)) return true;
+                }
+                return false;
+            }();
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::BeginDisabled();
             ImGui::PushID(uniqueId.c_str());
             if(absParam.getFlags() & ofxOceanodeParameterFlags_NoGuiWidget){
@@ -171,7 +177,22 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
             }else{
                 
                 ImGui::SetNextItemAllowOverlap();
-                ImGui::Text("%s", uniqueId.c_str());
+                if(publishedInCustomGui){
+                    ImGui::Text("%s", uniqueId.c_str());
+
+                    ImDrawList* drawList = ImGui::GetWindowDrawList();
+                    ImVec2 labelMin = ImGui::GetItemRectMin();
+                    ImVec2 labelMax = ImGui::GetItemRectMax();
+                    float underlineY = labelMax.y - 1.0f;
+                    drawList->AddLine(
+                        ImVec2(labelMin.x, underlineY),
+                        ImVec2(labelMax.x, underlineY),
+                        ImGui::GetColorU32(ImGuiCol_Text),
+                        1.0f
+                    );
+                }else{
+                    ImGui::Text("%s", uniqueId.c_str());
+                }
                 ImGui::SameLine(-1);
                 ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
                 {
