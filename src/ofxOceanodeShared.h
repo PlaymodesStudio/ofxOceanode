@@ -33,6 +33,12 @@ struct macroCategory{
 
 class ofxOceanodeShared{
 public:
+    struct CustomRegionRenderContext {
+        bool active = false;
+        float width = 0.0f;
+        float height = 0.0f;
+    };
+
     static unsigned int getDockspaceID(){
         return getInstance().getDockspaceIDFromInstance();
     }
@@ -306,6 +312,24 @@ public:
 	static float getZoomLevel(){ return getInstance().zoomLevel; }
 	static void  setZoomLevel(float z){ getInstance().zoomLevel = z; }
 
+    // Active custom-region render context — set while a custom region is being
+    // rendered inside a Custom GUI widget, so region implementations can opt
+    // into using the widget's size without affecting their node-local drawing.
+    static const CustomRegionRenderContext& getCustomRegionRenderContext(){
+        return getInstance().customRegionRenderContext;
+    }
+
+    static void pushCustomRegionRenderContext(float width, float height){
+        auto& context = getInstance().customRegionRenderContext;
+        context.active = true;
+        context.width = width;
+        context.height = height;
+    }
+
+    static void popCustomRegionRenderContext(){
+        getInstance().customRegionRenderContext = CustomRegionRenderContext{};
+    }
+
 	// Active canvas tracking
 	static void setActiveCanvasUniqueID(const string& uid){
 		auto& inst = getInstance();
@@ -428,6 +452,10 @@ private:
 
 	// Continuous zoom level (set by the active canvas each frame).
 	float zoomLevel = 1.0f;
+
+    // Custom-region widget size context (active only while rendering inside a
+    // Custom GUI widget).
+    CustomRegionRenderContext customRegionRenderContext;
 
 	// Bold font for the current render context (set by the active canvas each frame).
 	ImFont* currentBoldFont = nullptr;

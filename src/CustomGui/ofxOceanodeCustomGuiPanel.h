@@ -57,6 +57,7 @@ private:
     std::vector<double> setValueVectorValues;
     bool requestOpenRenameSnapshotPopup = false;
     bool requestOpenDeleteSnapshotPopup = false;
+    bool requestOpenDeletePanelPopup = false;
     bool createSnapshotFromPopup = false;
     std::string snapshotRenameId;
     std::string snapshotRenameValue;

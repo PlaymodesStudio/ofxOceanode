@@ -189,6 +189,7 @@ public:
     const CustomGuiPanelData* getCustomGuiPanelData(const std::string& panelId) const;
     CustomGuiPanelData& createCustomGuiPanel(const std::string& requestedName = "");
     bool deleteCustomGuiPanel(const std::string& panelId);
+    void requestDeleteCustomGuiPanel(const std::string& panelId);
     void openCustomGuiPanel(const std::string& panelId, bool designMode = false);
     bool renameCustomGuiPanel(const std::string& panelId, const std::string& requestedName);
     bool customGuiPanelHasSnapshotEligibleParameters(const std::string& panelId) const;
@@ -278,6 +279,7 @@ private:
     bool customGuiSnapshotsDirty = false;
     bool customGuiCreateModalOpen = false;
     std::string pendingCustomGuiName = "Custom GUI";
+    std::string pendingDeletedCustomGuiPanelId;
     std::string pendingCustomGuiParameterPath;
     CustomGuiWidgetType pendingCustomGuiWidgetType = CustomGuiWidgetType::Slider;
     bool pendingCustomGuiOpenInEdit = true;

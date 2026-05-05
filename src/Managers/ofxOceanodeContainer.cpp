@@ -134,6 +134,11 @@ void ofxOceanodeContainer::draw(){
     for(auto& panel : customGuiPanels){
         if(panel) panel->draw();
     }
+    if(!pendingDeletedCustomGuiPanelId.empty()){
+        std::string panelId = pendingDeletedCustomGuiPanelId;
+        pendingDeletedCustomGuiPanelId.clear();
+        deleteCustomGuiPanel(panelId);
+    }
 #endif
 }
 
@@ -1966,6 +1971,11 @@ bool ofxOceanodeContainer::deleteCustomGuiPanel(const std::string& panelId)
     markCustomGuisDirty();
     markCustomGuiSnapshotsDirty();
     return true;
+}
+
+void ofxOceanodeContainer::requestDeleteCustomGuiPanel(const std::string& panelId)
+{
+    pendingDeletedCustomGuiPanelId = panelId;
 }
 
 void ofxOceanodeContainer::openCustomGuiPanel(const std::string& panelId, bool designMode)
