@@ -503,6 +503,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 		                            entry.owner->markCustomGuisDirty();
 		                        }
 		                    }
+		                    ImGui::Separator();
+		                    if(ImGui::MenuItem("Delete")){
+		                        entry.owner->requestDeleteCustomGuiPanel(entry.panel->id);
+		                    }
 		                    ImGui::EndMenu();
 		                }
 		            }

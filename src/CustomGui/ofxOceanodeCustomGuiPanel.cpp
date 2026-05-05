@@ -37,6 +37,17 @@ void ofxOceanodeCustomGuiPanel::draw()
     CustomGuiPanelData* panel = getPanelData();
     if(panel == nullptr || !panel->windowState.isOpen) return;
 
+    static int draggedWidgetIndex = -1;
+    static ImVec2 dragAnchorMouse = ImVec2(0, 0);
+    static int dragAnchorX = 0;
+    static int dragAnchorY = 0;
+    static std::string draggedWidgetPanelId;
+    static int resizedWidgetIndex = -1;
+    static ImVec2 resizeAnchorMouse = ImVec2(0, 0);
+    static int resizeAnchorW = 1;
+    static int resizeAnchorH = 1;
+    static std::string resizedWidgetPanelId;
+
     auto ensureLayoutFitsWidgets = [&](CustomGuiLayout& layout){
         int requiredColumns = std::max(1, layout.columns);
         int requiredRows = std::max(1, layout.rows);
@@ -81,11 +92,38 @@ void ofxOceanodeCustomGuiPanel::draw()
     }
 
     bool openState = panel->windowState.isOpen;
-    if(ImGui::Begin(title.c_str(), &openState, ImGuiWindowFlags_NoCollapse)){
-        if(openState != panel->windowState.isOpen){
-            panel->windowState.isOpen = openState;
-            container.markCustomGuisDirty();
+    const bool beginVisible = ImGui::Begin(title.c_str(), &openState, ImGuiWindowFlags_NoCollapse);
+    if(openState != panel->windowState.isOpen){
+        panel->windowState.isOpen = openState;
+        container.markCustomGuisDirty();
+    }
+
+    if(!openState){
+        if(draggedWidgetPanelId == panel->id){
+            draggedWidgetIndex = -1;
+            draggedWidgetPanelId.clear();
         }
+        if(resizedWidgetPanelId == panel->id){
+            resizedWidgetIndex = -1;
+            resizedWidgetPanelId.clear();
+        }
+        requestOpenSetValuePopup = false;
+        requestOpenRenameSnapshotPopup = false;
+        requestOpenDeleteSnapshotPopup = false;
+        requestOpenDeletePanelPopup = false;
+        createSnapshotFromPopup = false;
+        setValueParameterPath.clear();
+        setValueLabel.clear();
+        setValueVectorValues.clear();
+        snapshotRenameId.clear();
+        snapshotRenameValue.clear();
+        snapshotDeleteId.clear();
+        ImGui::ClosePopupsOverWindow(ImGui::GetCurrentWindow(), false);
+        ImGui::End();
+        return;
+    }
+
+    if(beginVisible){
 
         auto* snapshotBank = container.getCustomGuiSnapshotBank(panel->id);
         const bool canSnapshot = container.customGuiPanelHasSnapshotEligibleParameters(panel->id);
@@ -171,6 +209,11 @@ void ofxOceanodeCustomGuiPanel::draw()
             ImGui::SetNextItemWidth(220);
             if(ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer))){
                 container.renameCustomGuiPanel(panel->id, nameBuffer);
+            }
+
+            ImGui::SameLine(0, 12.0f);
+            if(ImGui::SmallButton("Delete GUI")){
+                requestOpenDeletePanelPopup = true;
             }
 
             ImGui::SameLine(0, 18.0f);
@@ -277,15 +320,6 @@ void ofxOceanodeCustomGuiPanel::draw()
         if(panel->designMode) drawGridOverlay(panel->layout, origin);
 
         int widgetToRemove = -1;
-        static int draggedWidgetIndex = -1;
-        static ImVec2 dragAnchorMouse = ImVec2(0, 0);
-        static int dragAnchorX = 0;
-        static int dragAnchorY = 0;
-        static int resizedWidgetIndex = -1;
-        static ImVec2 resizeAnchorMouse = ImVec2(0, 0);
-        static int resizeAnchorW = 1;
-        static int resizeAnchorH = 1;
-
         auto drawWidgetAtIndex = [&](size_t i){
             auto& widget = panel->layout.widgets[i];
             const float x = origin.x + widget.gridX * panel->layout.cellWidth * panel->layout.zoom;
@@ -315,17 +349,19 @@ void ofxOceanodeCustomGuiPanel::draw()
                 if(hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
                     if(resizeHovered){
                         resizedWidgetIndex = (int)i;
+                        resizedWidgetPanelId = panel->id;
                         resizeAnchorMouse = ImGui::GetIO().MousePos;
                         resizeAnchorW = widget.spanW;
                         resizeAnchorH = widget.spanH;
                     }else{
                         draggedWidgetIndex = (int)i;
+                        draggedWidgetPanelId = panel->id;
                         dragAnchorMouse = ImGui::GetIO().MousePos;
                         dragAnchorX = widget.gridX;
                         dragAnchorY = widget.gridY;
                     }
                 }
-                if(draggedWidgetIndex == (int)i && ImGui::IsMouseDown(ImGuiMouseButton_Left)){
+                if(draggedWidgetPanelId == panel->id && draggedWidgetIndex == (int)i && ImGui::IsMouseDown(ImGuiMouseButton_Left)){
                     ImVec2 delta = ImGui::GetIO().MousePos - dragAnchorMouse;
                     int offsetX = (int)std::round(delta.x / (panel->layout.cellWidth * panel->layout.zoom));
                     int offsetY = (int)std::round(delta.y / (panel->layout.cellHeight * panel->layout.zoom));
@@ -334,12 +370,13 @@ void ofxOceanodeCustomGuiPanel::draw()
                     panel->layout.columns = std::max(panel->layout.columns, widget.gridX + widget.spanW);
                     panel->layout.rows = std::max(panel->layout.rows, widget.gridY + widget.spanH);
                 }
-                if(draggedWidgetIndex == (int)i && ImGui::IsMouseReleased(ImGuiMouseButton_Left)){
+                if(draggedWidgetPanelId == panel->id && draggedWidgetIndex == (int)i && ImGui::IsMouseReleased(ImGuiMouseButton_Left)){
                     ensureLayoutFitsWidgets(panel->layout);
                     draggedWidgetIndex = -1;
+                    draggedWidgetPanelId.clear();
                     container.markCustomGuisDirty();
                 }
-                if(resizedWidgetIndex == (int)i && ImGui::IsMouseDown(ImGuiMouseButton_Left)){
+                if(resizedWidgetPanelId == panel->id && resizedWidgetIndex == (int)i && ImGui::IsMouseDown(ImGuiMouseButton_Left)){
                     ImVec2 delta = ImGui::GetIO().MousePos - resizeAnchorMouse;
                     int offsetW = (int)std::round(delta.x / (panel->layout.cellWidth * panel->layout.zoom));
                     int offsetH = (int)std::round(delta.y / (panel->layout.cellHeight * panel->layout.zoom));
@@ -348,9 +385,10 @@ void ofxOceanodeCustomGuiPanel::draw()
                     panel->layout.columns = std::max(panel->layout.columns, widget.gridX + widget.spanW);
                     panel->layout.rows = std::max(panel->layout.rows, widget.gridY + widget.spanH);
                 }
-                if(resizedWidgetIndex == (int)i && ImGui::IsMouseReleased(ImGuiMouseButton_Left)){
+                if(resizedWidgetPanelId == panel->id && resizedWidgetIndex == (int)i && ImGui::IsMouseReleased(ImGuiMouseButton_Left)){
                     ensureLayoutFitsWidgets(panel->layout);
                     resizedWidgetIndex = -1;
+                    resizedWidgetPanelId.clear();
                     container.markCustomGuisDirty();
                 }
 
@@ -493,6 +531,24 @@ void ofxOceanodeCustomGuiPanel::draw()
             }
             ImGui::SameLine();
             if(ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
+
+        if(requestOpenDeletePanelPopup){
+            ImGui::OpenPopup("Delete Custom GUI?");
+            requestOpenDeletePanelPopup = false;
+        }
+        if(ImGui::BeginPopupModal("Delete Custom GUI?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+            ImGui::TextWrapped("Delete custom GUI \"%s\"?", panel->name.c_str());
+            ImGui::TextDisabled("This removes the GUI layout and its snapshots from this canvas.");
+            if(ImGui::Button("Delete", ImVec2(120, 0))){
+                container.requestDeleteCustomGuiPanel(panel->id);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if(ImGui::Button("Cancel", ImVec2(120, 0))){
+                ImGui::CloseCurrentPopup();
+            }
             ImGui::EndPopup();
         }
 

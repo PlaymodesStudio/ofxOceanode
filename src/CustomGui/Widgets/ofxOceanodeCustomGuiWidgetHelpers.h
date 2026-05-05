@@ -36,18 +36,21 @@ inline void drawWidgetLabel(const CustomGuiWidget& widget, const std::string& la
 {
     if(widget.type == CustomGuiWidgetType::BackgroundPanel ||
        widget.type == CustomGuiWidgetType::Text ||
-       widget.type == CustomGuiWidgetType::Image){
+       widget.type == CustomGuiWidgetType::Image ||
+       widget.type == CustomGuiWidgetType::Button){
         return;
     }
 
     ImGui::PushStyleColor(ImGuiCol_Text, colorToImVec4(widget.color));
-    if(widget.type != CustomGuiWidgetType::Button) ImGui::TextWrapped("%s", label.c_str());
+    ImGui::TextWrapped("%s", label.c_str());
     ImGui::PopStyleColor();
 }
 
 inline ImVec2 widgetItemSize(const CustomGuiWidgetRenderContext& context)
 {
-    return ImVec2(context.size.x, std::max(1.0f, context.size.y - ImGui::GetFrameHeightWithSpacing()));
+    const bool reserveLabelSpace = !context.label.empty();
+    const float labelHeight = reserveLabelSpace ? ImGui::GetFrameHeightWithSpacing() : 0.0f;
+    return ImVec2(context.size.x, std::max(1.0f, context.size.y - labelHeight));
 }
 
 inline float widgetItemWidth(const ImVec2& itemSize)
@@ -141,6 +144,9 @@ inline bool isFunctionParameter(ofxOceanodeAbstractParameter& parameter)
 inline bool isRegisteredCustomRegionParameter(ofxOceanodeAbstractParameter& parameter)
 {
     if(!isFunctionParameter(parameter)) return false;
+    if(parameter.getName().empty()) return false;
+    if(parameter.getName().find("SEPARATOR:|") == 0) return false;
+    if(parameter.getName().find("Separator") != std::string::npos) return false;
 
     constexpr int requiredFlags =
         ofxOceanodeParameterFlags_DisableSavePreset |

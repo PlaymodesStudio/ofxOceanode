@@ -610,10 +610,19 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 
                     if(!customTypes.empty() && ImGui::BeginMenu("Add to Custom GUI")){
                         CustomGuiWidgetType defaultType = container.getDefaultCustomGuiWidgetType(absParam);
+                        const std::string parameterPath = container.getCustomGuiParameterPath(absParam);
 
                         if(container.getCustomGuiPanelsData().empty()){
-                            if(ImGui::Selectable("New Custom GUI")){
-                                container.requestCreateCustomGui(container.getCustomGuiParameterPath(absParam), defaultType, true);
+                            if(ImGui::BeginMenu("New Custom GUI")){
+                                for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
+                                    CustomGuiWidgetType widgetType = customTypes[widgetIndex];
+                                    std::string label = customGuiWidgetTypeToString(widgetType);
+                                    if(widgetType == defaultType) label += " (default)";
+                                    if(ImGui::Selectable(label.c_str())){
+                                        container.requestCreateCustomGui(parameterPath, widgetType, true);
+                                    }
+                                }
+                                ImGui::EndMenu();
                             }
                         }else{
                             if(ImGui::BeginMenu("New Custom GUI")){
@@ -622,7 +631,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                                     std::string label = customGuiWidgetTypeToString(widgetType);
                                     if(widgetType == defaultType) label += " (default)";
                                     if(ImGui::Selectable(label.c_str())){
-                                        container.requestCreateCustomGui(container.getCustomGuiParameterPath(absParam), widgetType, true);
+                                        container.requestCreateCustomGui(parameterPath, widgetType, true);
                                     }
                                 }
                                 ImGui::EndMenu();

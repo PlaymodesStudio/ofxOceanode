@@ -4,6 +4,7 @@
 #include "CustomGui/Widgets/ofxOceanodeCustomGuiWidgetHelpers.h"
 #include "CustomGui/ofxOceanodeCustomGuiWidgets.h"
 #include "Managers/ofxOceanodeContainer.h"
+#include "ofxOceanodeShared.h"
 #include "ofMain.h"
 #include <algorithm>
 
@@ -60,6 +61,12 @@ void initializeWideWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&
 {
     widget.spanW = 2;
     widget.spanH = 1;
+}
+
+void initializeButtonWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
+{
+    widget.spanW = 2;
+    widget.spanH = 2;
 }
 
 bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
@@ -288,7 +295,10 @@ bool renderCustomRegionWidget(CustomGuiWidgetRenderContext& context, CustomGuiWi
     ImGui::BeginGroup();
     drawWidgetLabel(widget, context.label);
     ImGui::BeginChild("##customregion", widgetItemSize(context), true, childFlags);
+    ImVec2 available = ImGui::GetContentRegionAvail();
+    ofxOceanodeShared::pushCustomRegionRenderContext(std::max(1.0f, available.x), std::max(1.0f, available.y));
     parameter->cast<std::function<void()>>().getParameter().get()();
+    ofxOceanodeShared::popCustomRegionRenderContext();
     ImGui::EndChild();
     ImGui::EndGroup();
     return true;
@@ -328,7 +338,7 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 
     registerWidget(registry, CustomGuiWidgetType::Button,
                    supportsButtonWidget,
-                   [](CustomGuiWidget&, ofxOceanodeAbstractParameter&){},
+                   initializeButtonWidget,
                    renderButtonWidget);
 
     registerWidget(registry, CustomGuiWidgetType::TextDisplay,
