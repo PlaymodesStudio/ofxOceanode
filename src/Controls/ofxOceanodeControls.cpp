@@ -19,7 +19,7 @@
 
 #ifdef OFXOCEANODE_USE_OSC
     #include "ofxOceanodeOSCVariablesController.h"
-#include "ofxOceanodeOSCVariablesController.h"
+#endif
 
 #ifdef OFXOCEANODE_USE_MIDI
     #include "ofxOceanodeMidiController.h"
