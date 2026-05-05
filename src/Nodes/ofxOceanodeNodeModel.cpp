@@ -97,7 +97,6 @@ string ofxOceanodeNodeModel::getParents(){
 void ofxOceanodeNodeModel::addSeparator(string name, ofColor color){
     ofParameter<std::function<void()>> separator;
     
-#ifndef OFXOCEANODE_HEADLESS
     // Store the label and color as a string that will be parsed in the GUI
     // Format: "SEPARATOR:|label|r,g,b,a"
     string separatorData = "SEPARATOR:|" + name + "|" +
@@ -107,16 +106,11 @@ void ofxOceanodeNodeModel::addSeparator(string name, ofColor color){
                           ofToString((int)color.a);
     separator.setName(separatorData);
     addCustomRegion(separator, [](){});  // Empty function, rendering will be handled by GUI
-#else
-    // In headless mode, just add an empty function
-    addCustomRegion(separator, [](){});
-#endif
 }
 
 void ofxOceanodeNodeModel::addInspectorSeparator(string name, ofColor color){
     ofParameter<std::function<void()>> separator;
     
-#ifndef OFXOCEANODE_HEADLESS
     // Store the label and color as a string that will be parsed in the GUI
     // Format: "SEPARATOR:|label|r,g,b,a"
     string separatorData = "SEPARATOR:|" + name + "|" +
@@ -127,12 +121,6 @@ void ofxOceanodeNodeModel::addInspectorSeparator(string name, ofColor color){
     separator.setName(separatorData);
     separator.set([](){}); // Empty function, rendering will be handled by GUI
     inspectorParameters.add(separator);
-#else
-    // In headless mode, just add an empty function
-    separator.setName("SEPARATOR:|" + name);
-    separator.set([](){});
-    inspectorParameters.add(separator);
-#endif
 }
 
 void ofxOceanodeNodeModel::removeSeparator(string _name)

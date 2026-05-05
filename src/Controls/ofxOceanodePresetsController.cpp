@@ -5,8 +5,6 @@
 //  Created by Eduard Frigola Bagué on 12/03/2018.
 //
 
-#ifndef OFXOCEANODE_HEADLESS
-
 #include "ofxOceanodePresetsController.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeShared.h"
@@ -468,4 +466,3 @@ void ofxOceanodePresetsController::deletePreset(string presetName, string bankNa
     
     
 }
-#endif

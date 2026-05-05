@@ -172,13 +172,11 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     nodeModel->setContainer(this);
     auto node = make_shared<ofxOceanodeNode>(move(nodeModel));
 	node->setup(additionalInfo);
-#ifndef OFXOCEANODE_HEADLESS
-        auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);
+	auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);
 #ifdef OFXOCEANODE_USE_MIDI
         nodeGui->setIsListeningMidi(isListeningMidi);
 #endif
-        node->setGui(std::move(nodeGui));
-#endif
+	node->setGui(std::move(nodeGui));
     node->setBpm(bpm);
     node->setIsPersistent(isPersistent);
     
@@ -520,10 +518,8 @@ void ofxOceanodeContainer::loadPreset_loadNodes(string presetFolderPath){
                 string stringIdentifier = ofToString(identifier, 2, '0');
                 if(json.find(moduleName) != json.end() && json[moduleName].find(stringIdentifier) != json[moduleName].end()){
                     vector<float> readArray = json[moduleName][stringIdentifier];
-#ifndef OFXOCEANODE_HEADLESS
                     glm::vec2 position(readArray[0], readArray[1]);
                     dynamicNodes[moduleName][identifier]->getNodeGui().setPosition(position);
-#endif
                     json[moduleName].erase(stringIdentifier);
                 }else{
                     for(int i = 0; i < connections.size();){
@@ -549,10 +545,8 @@ void ofxOceanodeContainer::loadPreset_loadNodes(string presetFolderPath){
                 string stringIdentifier = ofToString(identifier);
                 if(json.find(moduleName) != json.end() && json[moduleName].find(stringIdentifier) != json[moduleName].end()){
                     vector<float> readArray = json[moduleName][stringIdentifier];
-#ifndef OFXOCEANODE_HEADLESS
                     glm::vec2 position(readArray[0], readArray[1]);
                     persistentNodes[moduleName][identifier]->getNodeGui().setPosition(position);
-#endif
                     json[moduleName].erase(stringIdentifier);
                 }
             }
@@ -564,9 +558,7 @@ void ofxOceanodeContainer::loadPreset_loadNodes(string presetFolderPath){
                     vector<float> readArray = it.value();
                     if(readArray.size() == 2){ //Size 3 means it is only saved as persistent, we only want to move it, if it does not exist we don't create it
                         auto node = createNodeFromName(moduleName, identifier);
-#ifndef OFXOCEANODE_HEADLESS
                         node->getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
-#endif
                     }
                 }
             }
@@ -823,18 +815,14 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             glm::vec2 pos(0,0);
-#ifndef OFXOCEANODE_HEADLESS
-                pos = node.second->getNodeGui().getPosition();
-#endif
+			pos = node.second->getNodeGui().getPosition();
             json[nodeTypeMap.first][ofToString(node.first, 2, '0')] = {pos.x, pos.y};
         }
     }
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             glm::vec2 pos(0,0);
-#ifndef OFXOCEANODE_HEADLESS
             pos = node.second->getNodeGui().getPosition();
-#endif
             json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y, 0}; //We add an element to know is persistent
         }
     }
@@ -912,10 +900,8 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
         for(ofJson::iterator nodeId = nodeType.value().begin(); nodeId != nodeType.value().end(); ++nodeId){
             ofLog() << nodeType.key() << " " << nodeId.key();
             auto node = createNodeFromName(nodeType.key());
-#ifndef OFXOCEANODE_HEADLESS
             node->getNodeGui().setPosition(glm::vec2(nodeId.value()[0], nodeId.value()[1]) + referencePosition);
             node->getNodeGui().setSelected(true);
-#endif
             newCreatedNodes.push_back(node);
             int newNodeId = node->getNodeModel().getNumIdentifier();
             string escapedNodeName = nodeType.key();
@@ -978,7 +964,6 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
     }
     
     // Load comments
-#ifndef OFXOCEANODE_HEADLESS
     if(of::filesystem::exists(presetFolderPath / "comments.json")){
         json.clear();
         json = ofLoadJson(presetFolderPath / "comments.json");
@@ -995,7 +980,6 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
             comments.push_back(comment);
         }
     }
-#endif
     
     ofDirectory::removeDirectory(tempLoadFolderPath, true);
 	
@@ -1013,9 +997,7 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
     for(auto &node : nodes){
         nodeAsParentNames.push_back(node->getParameters().getEscapedName());
         glm::vec2 pos(0,0);
-#ifndef OFXOCEANODE_HEADLESS
         pos = node->getNodeGui().getPosition();
-#endif
         json[node->getNodeModel().nodeName()][ofToString(node->getNodeModel().getNumIdentifier(), 2, '0')] = {pos.x - referencePosition.x, pos.y - referencePosition.y};
     }
     ofSavePrettyJson(presetFolderPath / "modules.json", json);
@@ -1043,7 +1025,6 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
     }
     
     // Save selected comments
-#ifndef OFXOCEANODE_HEADLESS
     json.clear();
     json["NumComments"] = 0;
     int commentIndex = 0;
@@ -1060,7 +1041,6 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
     }
     json["NumComments"] = commentIndex;
     ofSavePrettyJson(presetFolderPath / "comments.json", json);
-#endif
 }
 
 void ofxOceanodeContainer::savePersistent(){
@@ -1071,18 +1051,14 @@ void ofxOceanodeContainer::savePersistent(){
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             glm::vec2 pos(0,0);
-#ifndef OFXOCEANODE_HEADLESS
-                pos = node.second->getNodeGui().getPosition();
-#endif
+			pos = node.second->getNodeGui().getPosition();
             json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y};
         }
     }
     for(auto &nodeTypeMap : persistentNodes){
         for(auto &node : nodeTypeMap.second){
             glm::vec2 pos(0,0);
-#ifndef OFXOCEANODE_HEADLESS
-                pos = node.second->getNodeGui().getPosition();
-#endif
+			pos = node.second->getNodeGui().getPosition();
             json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y};
         }
     }
@@ -1150,10 +1126,8 @@ void ofxOceanodeContainer::loadPersistent(){
                 string stringIdentifier = ofToString(identifier);
                 if(json.find(moduleName) != json.end() && json[moduleName].find(stringIdentifier) != json[moduleName].end()){
                     vector<float> readArray = json[moduleName][stringIdentifier];
-#ifndef OFXOCEANODE_HEADLESS
-                        glm::vec2 position(readArray[0], readArray[1]);
-                        persistentNodes[moduleName][identifier]->getNodeGui().setPosition(position);
-#endif
+					glm::vec2 position(readArray[0], readArray[1]);
+					persistentNodes[moduleName][identifier]->getNodeGui().setPosition(position);
                     json[moduleName].erase(stringIdentifier);
                 }else{
                     persistentNodes[moduleName][identifier]->deleteSelf();
@@ -1163,9 +1137,7 @@ void ofxOceanodeContainer::loadPersistent(){
                 int identifier = ofToInt(it.key());
                 if(persistentNodes[moduleName].count(identifier) == 0){
                     auto node = createNodeFromName(moduleName, identifier, true);
-#ifndef OFXOCEANODE_HEADLESS
-                        node->getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
-#endif
+					node->getNodeGui().setPosition(glm::vec2(it.value()[0], it.value()[1]));
                 }
             }
         }
@@ -1424,53 +1396,12 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
         }
     }else if(splitAddress.size() == 2){ //Load preset by name
         if(splitAddress[0] == "presetLoad"){
-#ifndef OFXOCEANODE_HEADLESS
             auto toSendPair = make_pair(splitAddress[1], m.getArgAsString(0));
             loadPresetEvent.notify(toSendPair);
-#else
-            string bankName = splitAddress[1];
-            
-            ofDirectory dir;
-            map<int, string> presets;
-            dir.open("Presets/" + bankName);
-            if(!dir.exists())
-                return;
-            dir.sort();
-            int numPresets = dir.listDir();
-            for ( int i = 0 ; i < numPresets; i++){
-                if(ofSplitString(dir.getName(i), "--")[1] == m.getArgAsString(0)){
-                    string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
-                    ofxOceanodeShared::startedLoadingPreset();
-                    loadPreset("Presets/" + bankAndPreset);
-                    ofxOceanodeShared::finishedLoadingPreset();
-                    break;
-                }
-            }
-#endif
         }else if(splitAddress[0] == "presetLoadi"){ //Load preset by number
 			if(m.getArgAsInt(0) != 0){
-#ifndef OFXOCEANODE_HEADLESS
 				auto toSendPair = make_pair(splitAddress[1], m.getArgAsInt(0));
 				loadPresetNumEvent.notify(toSendPair);
-#else
-				string bankName = splitAddress[1];
-				ofDirectory dir;
-				map<int, string> presets;
-				dir.open("Presets/" + bankName);
-				if(!dir.exists())
-					return;
-				dir.sort();
-				int numPresets = dir.listDir();
-				for ( int i = 0 ; i < numPresets; i++){
-					if(ofToInt(ofSplitString(dir.getName(i), "--")[0]) == m.getArgAsInt(0)){
-						string bankAndPreset = bankName + "/" + ofSplitString(dir.getName(i), ".")[0];
-                        ofxOceanodeShared::startedLoadingPreset();
-						loadPreset("Presets/" + bankAndPreset);
-                        ofxOceanodeShared::finishedLoadingPreset();
-						break;
-					}
-				}
-#endif
 			}
 //        }else if(splitAddress[0] == "presetSave"){
 //            savePreset("Presets/" + splitAddress[1] + "/" + m.getArgAsString(0));
@@ -1541,14 +1472,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
         }
     }
     else if(splitAddress.size() == 3){
-//        if(splitAddress[0] == "presetLoad"){
-//            string bankAndPreset = splitAddress[1] + "/" + splitAddress[2];
-//#ifdef OFXOCEANODE_HEADLESS
-//            loadPreset("Presets/" + bankAndPreset);
-//#else
-//            ofNotifyEvent(loadPresetEvent, bankAndPreset);
-//#endif
-        /*}else*/ if(splitAddress[0] == "relative"){
+		if(splitAddress[0] == "relative"){
             if(splitAddress[1] == "Global"){
                 for(auto &nodeType  : dynamicNodes){
                     for(auto &node : nodeType.second){
@@ -1613,7 +1537,6 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
 
 #endif
 
-#ifndef OFXOCEANODE_HEADLESS
 
 vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules(){
     vector<ofxOceanodeNode*> modulesToCopy;
@@ -1688,28 +1611,23 @@ bool ofxOceanodeContainer::cutSelectedModulesWithConnections(){
         minPosition = glm::vec2(min(node->getNodeGui().getPosition().x, minPosition.x), min(node->getNodeGui().getPosition().y, minPosition.y));
     }
     
-#ifndef OFXOCEANODE_HEADLESS
     // Also consider selected comments for minimum position
     for(auto &c : comments){
         if(c.selected){
             minPosition = glm::vec2(min(c.position.x, minPosition.x), min(c.position.y, minPosition.y));
         }
     }
-#endif
     
     if(modulesToCut.size() == 0 && getSelectedCommentIndices().size() == 0) return false;
     saveClipboardModulesAndConnections(modulesToCut, minPosition);
     for(auto &m : modulesToCut) m->deleteSelf();
     
-#ifndef OFXOCEANODE_HEADLESS
     // Also delete selected comments
     auto selectedCommentIndices = getSelectedCommentIndices();
     // Delete in reverse order to maintain correct indices
     for(int i = selectedCommentIndices.size() - 1; i >= 0; i--){
         comments.erase(comments.begin() + selectedCommentIndices[i]);
     }
-#endif
-    
     return true;
 }
 
@@ -1723,14 +1641,12 @@ bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 positi
 bool ofxOceanodeContainer::deleteSelectedModules(){
     for(auto &m : getSelectedModules()) m->deleteSelf();
     
-#ifndef OFXOCEANODE_HEADLESS
     // Also delete selected comments
     auto selectedCommentIndices = getSelectedCommentIndices();
     // Delete in reverse order to maintain correct indices
     for(int i = selectedCommentIndices.size() - 1; i >= 0; i--){
         comments.erase(comments.begin() + selectedCommentIndices[i]);
     }
-#endif
     
     if(getSelectedModules().size() > 0 || selectedCommentIndices.size() > 0) return true;
     return false;
@@ -1751,9 +1667,6 @@ void ofxOceanodeContainer::deselectAllComments(){
         c.selected = false;
     }
 }
-
-
-#endif
 
 #ifdef OFXOCEANODE_USE_MIDI
 //TODO: Review for ofxOceanodeParameter
@@ -1996,9 +1909,7 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 	// 2. Calculate center position for macro placement
 	glm::vec2 centerPos(0, 0);
 	for(auto node : selectedNodes) {
-#ifndef OFXOCEANODE_HEADLESS
 		centerPos += node->getNodeGui().getPosition();
-#endif
 	}
 	if(!selectedNodes.empty()) {
 		centerPos /= selectedNodes.size();
@@ -2017,9 +1928,7 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 		NodeInfo info;
 		info.originalName = node->getParameters().getName();
 		info.nodeType = node->getNodeModel().nodeName();
-#ifndef OFXOCEANODE_HEADLESS
 		info.position = node->getNodeGui().getPosition();
-#endif
 		originalNodeInfo.push_back(info);
 	}
 	
@@ -2040,11 +1949,9 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 		return;
 	}
 	
-#ifndef OFXOCEANODE_HEADLESS
 	macroNode->getNodeGui().setPosition(centerPos);
 	macroNode->getNodeGui().setSelected(true);
-#endif
-	
+
 	// 7. Get macro internals
 	auto macroModel = dynamic_cast<ofxOceanodeNodeMacro*>(&macroNode->getNodeModel());
 	if(!macroModel) {
@@ -2215,12 +2122,10 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 		
 		// Compute minPosition (same logic as cutSelectedModulesWithConnections) for router positioning
 		glm::vec2 minPos(FLT_MAX, FLT_MAX);
-#ifndef OFXOCEANODE_HEADLESS
 		for(const auto& info : originalNodeInfo) {
 			minPos.x = std::min(minPos.x, info.position.x);
 			minPos.y = std::min(minPos.y, info.position.y);
 		}
-#endif
 		if(minPos.x == FLT_MAX) minPos = glm::vec2(0, 0);
 
 		// 10. Create routers and reconnect
@@ -2450,7 +2355,6 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 				ofLogNotice("Encapsulation") << "Set router name to: " << extConn.routerName;
 			}
 			
-			#ifndef OFXOCEANODE_HEADLESS
 						glm::vec2 routerPos(0, 0);
 						bool posFound = false;
 
@@ -2496,7 +2400,6 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 
 						ofLogNotice("Encapsulation") << "Positioned " << (extConn.isIncoming ? "input" : "output")
 							<< " router '" << extConn.routerName << "' at (" << routerPos.x << ", " << routerPos.y << ")";
-			#endif
 
 			// Get router's Value/Val parameter (void routers use "Val", typed routers use "Value")
 			auto& routerParams = routerNode->getParameters();

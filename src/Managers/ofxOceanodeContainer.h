@@ -11,9 +11,7 @@
 
 #include "ofxOceanodeConnection.h"
 #include "ofxOceanodeNode.h"
-#ifndef OFXOCEANODE_HEADLESS
 #include "ofxOceanodeNodeGui.h"
-#endif
 
 class ofxOceanodeNodeModel;
 class ofxOceanodeNodeRegistry;
@@ -172,7 +170,6 @@ public:
     
     ofParameter<glm::mat4> &getTransformationMatrix(){return transformationMatrix;};
     
-#ifndef OFXOCEANODE_HEADLESS
     vector<ofxOceanodeNode*> getSelectedModules();
     vector<ofxOceanodeNode*> getAllModules();
     ofxOceanodeNodeGui* getGuiFromModel(ofxOceanodeNodeModel* model);
@@ -188,7 +185,6 @@ public:
 	vector<ofxOceanodeComment> &getComments(){return comments;};
 	vector<int> getSelectedCommentIndices();
 	void deselectAllComments();
-#endif
     
     void setCanvasID(string s){canvasID = s;};
     string getCanvasID(){return canvasID;};

@@ -3,8 +3,6 @@
 //  ofxOceanode
 //
 
-#ifndef OFXOCEANODE_HEADLESS
-
 #include "ofxOceanodeHierarchyController.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeNode.h"
@@ -478,5 +476,3 @@ void ofxOceanodeHierarchyController::draw()
 
     ImGui::EndChild();
 }
-
-#endif // OFXOCEANODE_HEADLESS

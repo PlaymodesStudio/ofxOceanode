@@ -5,8 +5,6 @@
 //  Created by Eduard Frigola Bagué on 12/03/2018.
 //
 
-#ifndef OFXOCEANODE_HEADLESS
-
 #include "ofxOceanodeControls.h"
 #include "ofxOceanodePresetsController.h"
 #include "ofxOceanodeBPMController.h"
@@ -20,10 +18,8 @@
 #include "ofxOceanodeShared.h"
 
 #ifdef OFXOCEANODE_USE_OSC
-    #include "ofxOceanodeOSCController.h"
     #include "ofxOceanodeOSCVariablesController.h"
-
-#endif
+#include "ofxOceanodeOSCVariablesController.h"
 
 #ifdef OFXOCEANODE_USE_MIDI
     #include "ofxOceanodeMidiController.h"
@@ -46,7 +42,6 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     ofSetLoggerChannel(logger);
 
 #ifdef OFXOCEANODE_USE_OSC
-    controllers.push_back(make_shared<ofxOceanodeOSCController>(_receiverPort));
     controllers.push_back(make_shared<ofxOceanodeOSCVariablesController>(container));
 #endif
     
@@ -99,5 +94,3 @@ void ofxOceanodeControls::update(){
         c->update();
     }
 }
-
-#endif

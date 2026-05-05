@@ -25,11 +25,8 @@ public:
     void update(ofEventArgs &e);
     void draw(ofEventArgs &e);
     
-#ifndef OFXOCEANODE_HEADLESS
     void setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui);
     ofxOceanodeNodeGui& getNodeGui();
-#endif
-    
     ofxOceanodeNodeModel& getNodeModel();
     
     ofColor getColor();
@@ -73,12 +70,11 @@ public:
     
     ofParameterGroup& getParameters();
     ofParameterGroup& getInspectorParameters();
+
 private:
     std::unique_ptr<ofxOceanodeNodeModel> nodeModel;
-#ifndef OFXOCEANODE_HEADLESS
     std::unique_ptr<ofxOceanodeNodeGui> nodeGui;
-#endif
-    
+	
     ofEventListeners nodeModelListeners;
     
     bool isPersistent;

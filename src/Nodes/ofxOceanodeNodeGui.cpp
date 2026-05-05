@@ -5,8 +5,6 @@
 //  Created by Eduard Frigola Bagué on 22/02/2018.
 //
 
-#ifndef OFXOCEANODE_HEADLESS
-
 #include "ofxOceanodeNodeGui.h"
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeNodeModel.h"
@@ -826,5 +824,3 @@ glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofxOceano
 glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter){
     return inputPositions[getParameters().getPosition(parameter.getName())];
 }
-
-#endif

@@ -8,8 +8,6 @@
 #ifndef ofxOceanodeControls_h
 #define ofxOceanodeControls_h
 
-#ifndef OFXOCEANODE_HEADLESS
-
 #include "ofMain.h"
 #include "ofxOceanodeBaseController.h"
 
@@ -56,7 +54,5 @@ private:
     vector<shared_ptr<ofxOceanodeBaseController>> controllers;
     std::map<std::string, bool> controllerVisible;
 };
-
-#endif
 
 #endif /* ofxOceanodeControls_h */

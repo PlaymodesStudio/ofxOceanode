@@ -6,8 +6,6 @@
 //
 //
 
-#ifndef OFXOCEANODE_HEADLESS
-
 #include "ofxOceanodeCanvas.h"
 #include <cmath>
 #include "ofxOceanodeNodeRegistry.h"
@@ -1943,5 +1941,3 @@ void ofxOceanodeCanvas::selectAllNodes(){
         c.selected = true;
     }
 }
-
-#endif

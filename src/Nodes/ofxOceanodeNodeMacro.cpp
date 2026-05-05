@@ -654,7 +654,6 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 	if(presetManager.isLocal()){
 		string localPath = path + "/" + nodeName() + "_" + ofToString(getNumIdentifier());
 		
-#ifndef OFXOCEANODE_HEADLESS
 		// Cache existing macro layout before container->savePreset() recreates the folder
 		string cachedLayout;
 		{
@@ -664,11 +663,8 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 				cachedLayout = buf.getText();
 			}
 		}
-#endif
-		
 		container->savePreset(localPath);
 		
-#ifndef OFXOCEANODE_HEADLESS
 		// Restore cached layout (savePreset recreated the folder, deleting ImGuiLayout.ini)
 		if(!cachedLayout.empty()){
 			string newIniPath = ofToDataPath(localPath + "/ImGuiLayout.ini");
@@ -679,7 +675,6 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 		}
 		
 		canvas.setLayoutIniPath(localPath + "/ImGuiLayout.ini");
-#endif
 		json["LocalPreset"] = true;
 		
 		// Save snapshots to a separate file in the local macro folder
@@ -731,9 +726,7 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 			
 			// Save macro layout to global macro folder
 			saveMacroLayout(presetManager.getCurrentMacroPath());
-#ifndef OFXOCEANODE_HEADLESS
 			canvas.setLayoutIniPath(presetManager.getCurrentMacroPath() + "/ImGuiLayout.ini");
-#endif
 		}
 	}
 
@@ -1049,10 +1042,7 @@ void ofxOceanodeNodeMacro::changeRouterType(const std::string& routerName, const
 	auto it = routerManager.getRouterNodes().find(routerName);
 	if(it == routerManager.getRouterNodes().end()) return;
 	auto* routerNode = it->second.node;
-
-#ifndef OFXOCEANODE_HEADLESS
 	glm::vec2 oldPos = routerNode->getNodeGui().getPosition();
-#endif
 
 	// 1. Find where this router sits in the sort order so we can restore it later.
 	int sortIdx = -1;
@@ -1062,7 +1052,6 @@ void ofxOceanodeNodeMacro::changeRouterType(const std::string& routerName, const
 		}
 	}
 
-#ifndef OFXOCEANODE_HEADLESS
 	// 2. Capture inner-container connection info as plain strings before the node
 	//    is deleted (pointers become invalid after deleteSelf()).
 	string oldGroupEscaped = routerNode->getParameters().getEscapedName();
@@ -1076,7 +1065,6 @@ void ofxOceanodeNodeMacro::changeRouterType(const std::string& routerName, const
 			                      snkG, conn->getSinkParameter().getName()});
 		}
 	}
-#endif
 
 	// 3. Delete the old router.
 	//    Fires deleteModule listeners: removes the published param from
@@ -1092,9 +1080,7 @@ void ofxOceanodeNodeMacro::changeRouterType(const std::string& routerName, const
 	auto* newNode = container->createNodeFromName(newTypeName);
 	if(!newNode) return;
 
-#ifndef OFXOCEANODE_HEADLESS
 	newNode->getNodeGui().setPosition(oldPos);
-#endif
 
 	// 5. Rename the new router back to the original name.
 	//    The rename listener installed by processRouterNode() will synchronise
@@ -1121,7 +1107,6 @@ void ofxOceanodeNodeMacro::changeRouterType(const std::string& routerName, const
 		}
 	}
 
-#ifndef OFXOCEANODE_HEADLESS
 	// 7. Reconnect inner-container connections (best-effort).
 	//    Incompatible type pairs will silently fail — that is expected when
 	//    switching between fundamentally different types.
@@ -1131,7 +1116,6 @@ void ofxOceanodeNodeMacro::changeRouterType(const std::string& routerName, const
 		string snkG = (ci.sinkGroup == oldGroupEscaped) ? newGroupEscaped : ci.sinkGroup;
 		container->createConnectionFromInfo(srcG, ci.srcParam, snkG, ci.sinkParam);
 	}
-#endif
 
 	// 8. Sync the macro's parameter-group order to the (restored) sort order
 	//    and broadcast the structural change to the outer container.
@@ -1141,7 +1125,6 @@ void ofxOceanodeNodeMacro::changeRouterType(const std::string& routerName, const
 
 // ─── ImGui layout persistence (per-macro) ────────────────────────────────────
 
-#ifndef OFXOCEANODE_HEADLESS
 
 void ofxOceanodeNodeMacro::saveMacroLayout(const string& folderPath) {
 	string newIniPath = ofToDataPath(folderPath + "/ImGuiLayout.ini");
@@ -1173,11 +1156,3 @@ void ofxOceanodeNodeMacro::loadMacroLayout(const string& folderPath) {
 	canvas.setLayoutIniPath(iniPath);
 	ofLogNotice("ofxOceanodeNodeMacro") << "Set macro layout path to " << iniPath;
 }
-
-#else
-
-// Headless stubs
-void ofxOceanodeNodeMacro::saveMacroLayout(const string& folderPath) {}
-void ofxOceanodeNodeMacro::loadMacroLayout(const string& folderPath) {}
-
-#endif

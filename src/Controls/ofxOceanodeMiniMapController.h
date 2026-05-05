@@ -6,8 +6,6 @@
 #ifndef ofxOceanodeMiniMapController_h
 #define ofxOceanodeMiniMapController_h
 
-#ifndef OFXOCEANODE_HEADLESS
-
 #include "ofxOceanodeBaseController.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeCanvas.h"
@@ -62,7 +60,4 @@ private:
     string               lastValidCanvasUID;
     ofEventListener      activeCanvasListener;
 };
-
-#endif // OFXOCEANODE_HEADLESS
-
 #endif /* ofxOceanodeMiniMapController_h */

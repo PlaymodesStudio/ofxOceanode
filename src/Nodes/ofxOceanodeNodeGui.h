@@ -8,8 +8,6 @@
 #ifndef ofxOceanodeNodeGui_h
 #define ofxOceanodeNodeGui_h
 
-#ifndef OFXOCEANODE_HEADLESS
-
 class ofxOceanodeContainer;
 class ofxOceanodeNode;
 class ofxOceanodeAbstractParameter;
@@ -89,7 +87,5 @@ private:
     bool isListeningMidi;
 #endif
 };
-
-#endif
 
 #endif /* ofxOceanodeNodeGui_h */

@@ -574,7 +574,6 @@ void ofxOceanodeNodeMacro::syncParameterGroupToSortOrder() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::renderRouterSortInterface() {
-#ifndef OFXOCEANODE_HEADLESS
 	const float zoomLevel = ofxOceanodeShared::getZoomLevel();
 //	ImGui::SeparatorText("Router Management");
 	ImGui::TextDisabled("Drag to reorder, double-click to rename.");
@@ -842,5 +841,4 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 			parameterGroupChanged.notify(this);
 		}
 	}
-#endif
 }

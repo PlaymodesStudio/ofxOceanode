@@ -10,9 +10,7 @@
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeConnection.h"
-#ifndef OFXOCEANODE_HEADLESS
 #include "ofxOceanodeNodeGui.h"
-#endif
 
 ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){
     nodeModelListeners.push(nodeModel->deleteModule.newListener([this](){
@@ -44,7 +42,6 @@ void ofxOceanodeNode::draw(ofEventArgs &e){
     nodeGui->draw(e);
 }
 
-#ifndef OFXOCEANODE_HEADLESS
 void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
     nodeGui = std::move(gui);
 }
@@ -52,7 +49,6 @@ void ofxOceanodeNode::setGui(std::unique_ptr<ofxOceanodeNodeGui>&& gui){
 ofxOceanodeNodeGui& ofxOceanodeNode::getNodeGui(){
     return *nodeGui.get();
 }
-#endif
 
 ofxOceanodeNodeModel& ofxOceanodeNode::getNodeModel(){
     return *nodeModel.get();
@@ -278,11 +274,9 @@ void ofxOceanodeNode::setActive(bool act){
     nodeModel->setActive(active);
     if(active) nodeModel->activate();
     else nodeModel->deactivate();
-#ifndef OFXOCEANODE_HEADLESS
     if(active){
         nodeGui->enable();
     }else{
         nodeGui->disable();
     }
-#endif
 }

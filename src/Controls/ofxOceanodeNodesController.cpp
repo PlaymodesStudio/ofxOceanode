@@ -5,8 +5,6 @@
 //  Created by Eduard Frigola Bagué on 13/03/2018.
 //
 
-#ifndef OFXOCEANODE_HEADLESS
-
 #include "ofxOceanodeNodesController.h"
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeContainer.h"
@@ -683,4 +681,3 @@ void ofxOceanodeNodesController::draw()
     forceExpandAll   = false;
     forceCollapseAll = false;
 }
-#endif

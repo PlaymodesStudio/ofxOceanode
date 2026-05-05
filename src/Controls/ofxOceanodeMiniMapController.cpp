@@ -3,8 +3,6 @@
 //  ofxOceanode
 //
 
-#ifndef OFXOCEANODE_HEADLESS
-
 #include "ofxOceanodeMiniMapController.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeNode.h"
@@ -361,5 +359,3 @@ void ofxOceanodeMiniMapController::renderMinimap(
             winSize.y / (2.0f * zoom) - cy));
     }
 }
-
-#endif // OFXOCEANODE_HEADLESS

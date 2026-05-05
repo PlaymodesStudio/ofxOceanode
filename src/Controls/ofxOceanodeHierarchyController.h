@@ -6,8 +6,6 @@
 #ifndef ofxOceanodeHierarchyController_h
 #define ofxOceanodeHierarchyController_h
 
-#ifndef OFXOCEANODE_HEADLESS
-
 #include "ofxOceanodeBaseController.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeCanvas.h"
@@ -85,6 +83,4 @@ private:
     ofxOceanodeCanvas* pendingCenterCanvas = nullptr;
 
 };
-
-#endif // OFXOCEANODE_HEADLESS
 #endif /* ofxOceanodeHierarchyController_h */

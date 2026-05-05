@@ -193,9 +193,7 @@ private:
 	std::function<void(ImVec2)> minimizedViewCallback;
 
 	// ─── Core containers ──────────────────────────────────────────────────
-#ifndef OFXOCEANODE_HEADLESS
 	ofxOceanodeCanvas canvas;
-#endif
 	shared_ptr<ofxOceanodeContainer> container;
 	shared_ptr<ofxOceanodeNodeRegistry> registry;
 	shared_ptr<ofxOceanodeTypesRegistry> typesRegistry;

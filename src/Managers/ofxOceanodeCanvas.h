@@ -9,7 +9,6 @@
 #ifndef ofxOceanodeCanvas_h
 #define ofxOceanodeCanvas_h
 
-#ifndef OFXOCEANODE_HEADLESS
 #include "ofMain.h"
 #include "ofxOceanodeShared.h"
 
@@ -209,7 +208,5 @@ private:
 	
 	const float connectionWidth = 3.0;
 };
-
-#endif
 
 #endif /* ofxOceanodeCanvas_h */
