@@ -270,7 +270,6 @@ private:
     
     std::unordered_map<string, ofxOceanodeNode*> parameterGroupNodesMap; //Maps nodes to parameterGroup.getName() reference, used in canvas
 
-#ifndef OFXOCEANODE_HEADLESS
     std::vector<CustomGuiPanelData> customGuiPanelsData;
     std::vector<std::unique_ptr<ofxOceanodeCustomGuiPanel>> customGuiPanels;
     std::vector<CustomGuiSnapshotBank> customGuiSnapshotBanks;
@@ -283,7 +282,6 @@ private:
     std::string pendingCustomGuiParameterPath;
     CustomGuiWidgetType pendingCustomGuiWidgetType = CustomGuiWidgetType::Slider;
     bool pendingCustomGuiOpenInEdit = true;
-#endif
 
     vector<unique_ptr<ofxOceanodeAbstractConnection>> connections;
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;

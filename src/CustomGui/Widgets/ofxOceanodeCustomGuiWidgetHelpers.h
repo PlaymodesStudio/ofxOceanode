@@ -1,7 +1,6 @@
 #ifndef ofxOceanodeCustomGuiWidgetHelpers_h
 #define ofxOceanodeCustomGuiWidgetHelpers_h
 
-#ifndef OFXOCEANODE_HEADLESS
 
 #include "CustomGui/ofxOceanodeCustomGuiWidgetRegistry.h"
 #include "ofxOceanodeParameter.h"
@@ -174,6 +173,5 @@ inline bool isTextureParameter(ofxOceanodeAbstractParameter& parameter)
 
 } // namespace ofxOceanodeCustomGuiWidgetHelpers
 
-#endif
 
 #endif

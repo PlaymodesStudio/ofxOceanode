@@ -1,4 +1,3 @@
-#ifndef OFXOCEANODE_HEADLESS
 
 #include "CustomGui/Widgets/ofxOceanodeCustomGuiSignalWidgets.h"
 #include "CustomGui/Widgets/ofxOceanodeCustomGuiWidgetHelpers.h"
@@ -1171,4 +1170,3 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 
 } // namespace ofxOceanodeCustomGuiSignalWidgets
 
-#endif

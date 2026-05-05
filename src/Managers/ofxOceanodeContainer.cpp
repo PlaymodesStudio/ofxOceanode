@@ -14,12 +14,10 @@
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeScope.h"
-#ifndef OFXOCEANODE_HEADLESS
 #include "CustomGui/ofxOceanodeCustomGuiPanel.h"
 #include "Nodes/MacroSnapshotSystem.h"
 #include "Nodes/MacroRouterValueDispatch.h"
 #include "imgui.h"
-#endif
 
 #ifdef OFXOCEANODE_USE_MIDI
 #include "ofxOceanodeMidiBinding.h"
@@ -67,11 +65,9 @@ void ofxOceanodeContainer::clearContainer(){
     ofxOceanodeScope::getInstance()->setScopeChangedCallback(nullptr);
     
     connections.clear();
-#ifndef OFXOCEANODE_HEADLESS
     customGuiPanels.clear();
     customGuiPanelsData.clear();
     customGuiSnapshotBanks.clear();
-#endif
     
     std::vector<shared_ptr<ofxOceanodeNode>> toDelete;
     for(auto &nodeTypeMap : dynamicNodes){
@@ -130,7 +126,6 @@ void ofxOceanodeContainer::draw(){
         }
     }
 
-#ifndef OFXOCEANODE_HEADLESS
     for(auto& panel : customGuiPanels){
         if(panel) panel->draw();
     }
@@ -139,7 +134,6 @@ void ofxOceanodeContainer::draw(){
         pendingDeletedCustomGuiPanelId.clear();
         deleteCustomGuiPanel(panelId);
     }
-#endif
 }
 
 void ofxOceanodeContainer::activate(){
@@ -235,9 +229,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
 
 bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     ofLog()<<"Load Preset " << presetFolderPath;
-#ifndef OFXOCEANODE_HEADLESS
     customGuiStoragePath = presetFolderPath;
-#endif
     
     // Disable scope auto-save during preset loading to prevent saving empty scope
     // when nodes are deleted
@@ -264,10 +256,8 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     loadPreset_presetHasLoaded();
     
 	loadScope(presetFolderPath);
-#ifndef OFXOCEANODE_HEADLESS
 	loadCustomGuis(presetFolderPath);
     loadCustomGuiSnapshots(presetFolderPath);
-#endif
 	
 	resetPhase();
 	
@@ -285,7 +275,6 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     return true;
 }
 
-#ifndef OFXOCEANODE_HEADLESS
 void ofxOceanodeContainer::saveCustomGuis(const std::string& presetPath)
 {
     customGuiStoragePath = presetPath;
@@ -506,7 +495,6 @@ void ofxOceanodeContainer::loadCustomGuiSnapshots(const std::string& presetPath)
     customGuiSnapshotBanks = std::move(sanitizedBanks);
     customGuiSnapshotsDirty = false;
 }
-#endif
 
 void ofxOceanodeContainer::saveScope(const std::string& presetPath)
 {
@@ -1115,10 +1103,8 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 	ofSavePrettyJson(presetFolderPath + "/comments.json", json);
 	
 	saveScope(presetFolderPath);
-#ifndef OFXOCEANODE_HEADLESS
 	saveCustomGuis(presetFolderPath);
     saveCustomGuiSnapshots(presetFolderPath);
-#endif
 	
 }
 
@@ -2875,7 +2861,6 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 			}
 		}
 
-#ifndef OFXOCEANODE_HEADLESS
 		{
 			auto remapParameterPath = [&](const string& parameterPath) -> string {
 				size_t separatorPos = parameterPath.find('/');
@@ -2986,7 +2971,6 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 				ofLogNotice("Encapsulation") << "Migrated " << migratedPanelIds.size() << " Custom GUI panel(s) into new macro";
 			}
 		}
-#endif
 	}
 
 	if(!externalConnections.empty()) {

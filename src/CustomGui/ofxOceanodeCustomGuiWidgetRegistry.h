@@ -1,7 +1,6 @@
 #ifndef ofxOceanodeCustomGuiWidgetRegistry_h
 #define ofxOceanodeCustomGuiWidgetRegistry_h
 
-#ifndef OFXOCEANODE_HEADLESS
 
 #include "CustomGui/ofxOceanodeCustomGuiLayout.h"
 #include "ofGraphicsBaseTypes.h"
@@ -57,6 +56,5 @@ private:
     std::unordered_map<int, CustomGuiWidgetDefinition> definitions;
 };
 
-#endif
 
 #endif

@@ -3,7 +3,6 @@
 
 #include "ofxOceanodeNodeModel.h"
 
-#ifndef OFXOCEANODE_HEADLESS
 class ofxOceanodeContainer;
 class ofxOceanodeNodeMacro;
 
@@ -59,6 +58,5 @@ private:
     bool suppressSnapshotListener = false;
     ofEventListeners listeners;
 };
-#endif
 
 #endif /* customGuiSnapshots_h */
