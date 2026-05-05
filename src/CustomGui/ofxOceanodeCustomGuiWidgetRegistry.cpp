@@ -1,4 +1,3 @@
-#ifndef OFXOCEANODE_HEADLESS
 
 #include "CustomGui/ofxOceanodeCustomGuiWidgetRegistry.h"
 #include "CustomGui/ofxOceanodeCustomGuiBuiltinWidgets.h"
@@ -47,4 +46,3 @@ CustomGuiWidgetType ofxOceanodeCustomGuiWidgetRegistry::getDefaultWidgetType(ofx
     return compatible.front();
 }
 
-#endif

@@ -1,4 +1,3 @@
-#ifndef OFXOCEANODE_HEADLESS
 
 #include "CustomGui/ofxOceanodeCustomGuiBuiltinWidgets.h"
 #include "CustomGui/Widgets/ofxOceanodeCustomGuiArrayWidgets.h"
@@ -19,4 +18,3 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 
 }
 
-#endif

@@ -1,6 +1,5 @@
 #include "customGuiSnapshots.h"
 
-#ifndef OFXOCEANODE_HEADLESS
 
 #include "Managers/ofxOceanodeContainer.h"
 #include "Nodes/ofxOceanodeNodeMacro.h"
@@ -420,4 +419,3 @@ void customGuiSnapshots::collectTargets(ofxOceanodeContainer* root, std::vector<
     }
 }
 
-#endif

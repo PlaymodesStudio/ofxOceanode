@@ -1,7 +1,6 @@
 #ifndef ofxOceanodeCustomGuiPanel_h
 #define ofxOceanodeCustomGuiPanel_h
 
-#ifndef OFXOCEANODE_HEADLESS
 
 #include "CustomGui/ofxOceanodeCustomGuiLayout.h"
 #include <map>
@@ -64,6 +63,5 @@ private:
     std::string snapshotDeleteId;
 };
 
-#endif
 
 #endif /* ofxOceanodeCustomGuiPanel_h */

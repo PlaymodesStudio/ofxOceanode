@@ -1,4 +1,3 @@
-#ifndef OFXOCEANODE_HEADLESS
 
 #include "CustomGui/Widgets/ofxOceanodeCustomGuiValueWidgets.h"
 #include "CustomGui/Widgets/ofxOceanodeCustomGuiWidgetHelpers.h"
@@ -365,4 +364,3 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 
 } // namespace ofxOceanodeCustomGuiValueWidgets
 
-#endif

@@ -18,6 +18,7 @@
 #include "ofxOceanodeShared.h"
 
 #ifdef OFXOCEANODE_USE_OSC
+    #include "ofxOceanodeOSCController.h"
     #include "ofxOceanodeOSCVariablesController.h"
 #endif
 
@@ -42,6 +43,7 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     ofSetLoggerChannel(logger);
 
 #ifdef OFXOCEANODE_USE_OSC
+    controllers.push_back(make_shared<ofxOceanodeOSCController>(_receiverPort));
     controllers.push_back(make_shared<ofxOceanodeOSCVariablesController>(container));
 #endif
     

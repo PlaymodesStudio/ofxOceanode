@@ -1,4 +1,3 @@
-#ifndef OFXOCEANODE_HEADLESS
 
 #include "CustomGui/ofxOceanodeCustomGuiWidgets.h"
 #include "ofxOceanodeParameter.h"
@@ -21,4 +20,3 @@ bool isInteractive(const CustomGuiWidget& widget, ofxOceanodeAbstractParameter* 
 
 }
 
-#endif

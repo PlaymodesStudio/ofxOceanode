@@ -59,9 +59,7 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<ofxOceanodeNodeMacro>("MACRO");
     nodeRegistry->registerModel<noise>("Generators");
     nodeRegistry->registerModel<randomGenerator>("Generators");
-#ifndef OFXOCEANODE_HEADLESS
     nodeRegistry->registerModel<customGuiSnapshots>("Custom GUI");
-#endif
 
     //Register default Routers
     nodeRegistry->registerModel<router<vector<float>>>("Router", "v_f", 0, 0, 1);

@@ -1,4 +1,3 @@
-#ifndef OFXOCEANODE_HEADLESS
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "CustomGui/ofxOceanodeCustomGuiPanel.h"
@@ -1159,4 +1158,3 @@ std::shared_ptr<ofImage> ofxOceanodeCustomGuiPanel::loadWidgetImage(const std::s
     return image;
 }
 
-#endif
