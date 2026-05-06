@@ -18,6 +18,7 @@ struct CustomGuiWidgetRenderContext {
     ofxOceanodeContainer& container;
     std::string panelId;
     bool designMode = false;
+    float zoom = 1.0f;
     ImVec2 size = ImVec2(0, 0);
     std::string label;
     bool showValue = true;

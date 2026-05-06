@@ -132,7 +132,6 @@ void ofxOceanodeCustomGuiPanel::draw()
     }
 
     if(beginVisible){
-
         auto* snapshotBank = container.getCustomGuiSnapshotBank(panel->id);
         const bool canSnapshot = container.customGuiPanelHasSnapshotEligibleParameters(panel->id);
         auto getSelectedSnapshot = [&]() -> CustomGuiSnapshotData* {
@@ -203,15 +202,15 @@ void ofxOceanodeCustomGuiPanel::draw()
             panel->layout.zoom = ofClamp(panel->layout.zoom - 0.1f, 0.25f, 4.0f);
             container.markCustomGuisDirty();
         }
-        ImGui::SameLine();
+        ImGui::SameLine(0, 6.0f);
         if(ImGui::SmallButton("+##ZoomIn")){
             panel->layout.zoom = ofClamp(panel->layout.zoom + 0.1f, 0.25f, 4.0f);
             container.markCustomGuisDirty();
         }
-        ImGui::SameLine();
+        ImGui::SameLine(0, 6.0f);
         ImGui::Text("Zoom %.2fx", panel->layout.zoom);
         if(panel->designMode){
-            ImGui::SameLine();
+            ImGui::NewLine();
             char nameBuffer[256];
             std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", panel->name.c_str());
             ImGui::SetNextItemWidth(220);
@@ -254,7 +253,7 @@ void ofxOceanodeCustomGuiPanel::draw()
                 container.markCustomGuisDirty();
             }
 
-            ImGui::SameLine(0, 18.0f);
+            ImGui::NewLine();
             if(ImGui::SmallButton("Add Panel")){
                 createStaticWidget(CustomGuiWidgetType::BackgroundPanel, "", 3, 2, ofColor(40, 40, 40, 180));
             }
@@ -267,7 +266,10 @@ void ofxOceanodeCustomGuiPanel::draw()
                 createStaticWidget(CustomGuiWidgetType::Image, "", 3, 2, ofColor::white);
             }
             ImGui::SameLine(0, 14.0f);
-            if(ImGui::BeginMenu("Custom Regions")){
+            if(ImGui::SmallButton("Custom Regions")){
+                ImGui::OpenPopup("Custom Regions Popup");
+            }
+            if(ImGui::BeginPopup("Custom Regions Popup")){
                 struct AvailableCustomRegion {
                     ofxOceanodeAbstractParameter* parameter = nullptr;
                     std::string label;
@@ -310,7 +312,7 @@ void ofxOceanodeCustomGuiPanel::draw()
                     }
                 }
 
-                ImGui::EndMenu();
+                ImGui::EndPopup();
             }
         }
 
@@ -724,6 +726,7 @@ bool ofxOceanodeCustomGuiPanel::renderWidget(CustomGuiWidget& widget, ofxOceanod
         container,
         panelId,
         getPanelData() != nullptr ? getPanelData()->designMode : false,
+        getPanelData() != nullptr ? getPanelData()->layout.zoom : 1.0f,
         size,
         getFallbackLabel(widget),
         shouldShowNumericValue(widget),
@@ -739,7 +742,10 @@ bool ofxOceanodeCustomGuiPanel::renderWidget(CustomGuiWidget& widget, ofxOceanod
         }
     };
 
-    return definition->render(context, widget, parameter);
+    ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
+    const bool rendered = definition->render(context, widget, parameter);
+    ImGui::SetWindowFontScale(1.0f);
+    return rendered;
 }
 
 bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, size_t widgetIndex, ofxOceanodeAbstractParameter* parameter)
