@@ -59,8 +59,13 @@ void ofxOceanodeCustomGuiPanel::draw()
     };
 
     std::string title = panel->name.empty() ? "Custom GUI" : panel->name;
+    std::string canvasLabel = container.getCanvasID();
+    if(!canvasLabel.empty() && canvasLabel != "Canvas"){
+        ofStringReplace(canvasLabel, "_", " ");
+        title += " (" + canvasLabel + ")";
+    }
     if(panel->designMode) title += " [DESIGN]";
-    title += "###CustomGui_" + panel->id;
+    title += "###CustomGui_" + container.getCanvasID() + "_" + panel->id;
 
     auto createStaticWidget = [&](CustomGuiWidgetType type, const std::string& label, int spanW, int spanH, const ofColor& color){
         CustomGuiWidget widget;
@@ -90,8 +95,12 @@ void ofxOceanodeCustomGuiPanel::draw()
         appliedWindowState = true;
     }
 
+    const float panelWidth = panel->layout.columns * panel->layout.cellWidth * panel->layout.zoom;
+    const float panelHeight = panel->layout.rows * panel->layout.cellHeight * panel->layout.zoom;
+    ImGui::SetNextWindowContentSize(ImVec2(panelWidth, panelHeight));
+
     bool openState = panel->windowState.isOpen;
-    const bool beginVisible = ImGui::Begin(title.c_str(), &openState, ImGuiWindowFlags_NoCollapse);
+    const bool beginVisible = ImGui::Begin(title.c_str(), &openState, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_HorizontalScrollbar);
     if(openState != panel->windowState.isOpen){
         panel->windowState.isOpen = openState;
         container.markCustomGuisDirty();
@@ -306,8 +315,6 @@ void ofxOceanodeCustomGuiPanel::draw()
         }
 
         const ImVec2 origin = ImGui::GetCursorPos();
-        const float panelWidth = panel->layout.columns * panel->layout.cellWidth * panel->layout.zoom;
-        const float panelHeight = panel->layout.rows * panel->layout.cellHeight * panel->layout.zoom;
 
         if(panel->designMode){
             ImGui::InvisibleButton("##CustomGuiGridSpace", ImVec2(panelWidth, panelHeight));
@@ -1157,4 +1164,3 @@ std::shared_ptr<ofImage> ofxOceanodeCustomGuiPanel::loadWidgetImage(const std::s
     imageCache[imagePath] = image;
     return image;
 }
-
