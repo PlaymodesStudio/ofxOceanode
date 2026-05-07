@@ -23,13 +23,14 @@ namespace {
 
 using namespace ofxOceanodeCustomGuiWidgetHelpers;
 
+constexpr float kScBusFftSampleRate = 44100.0f;
+constexpr float kScBusFftFreqMin = 20.0f;
+constexpr float kScBusFftFreqMax = 22050.0f;
+
 #ifdef OFXOCEANODE_CUSTOMGUI_HAS_SCBUS
 constexpr int kScBusWaveformSamplesPerFrame = 64;
 constexpr int kScBusWaveformMaxChannels = 128;
 constexpr int kScBusFftBins = 128;
-constexpr float kScBusFftSampleRate = 44100.0f;
-constexpr float kScBusFftFreqMin = 20.0f;
-constexpr float kScBusFftFreqMax = 22050.0f;
 
 bool isScBusParameterType(const std::string& type){
     return type == typeid(nodePort).name();
@@ -1169,4 +1170,3 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 }
 
 } // namespace ofxOceanodeCustomGuiSignalWidgets
-
