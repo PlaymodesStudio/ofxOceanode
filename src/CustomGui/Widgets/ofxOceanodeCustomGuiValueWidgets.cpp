@@ -18,12 +18,15 @@ bool supportsSliderWidget(ofxOceanodeAbstractParameter& parameter)
 
 bool supportsKnobWidget(ofxOceanodeAbstractParameter& parameter)
 {
-    return isFloatParameter(parameter);
+    return isFloatParameter(parameter) || isIntParameter(parameter);
 }
 
 bool supportsDragNumberWidget(ofxOceanodeAbstractParameter& parameter)
 {
-    return isFloatParameter(parameter) || isIntParameter(parameter);
+    return isFloatParameter(parameter) ||
+           isIntParameter(parameter) ||
+           isFloatVectorParameter(parameter) ||
+           isIntVectorParameter(parameter);
 }
 
 bool supportsToggleWidget(ofxOceanodeAbstractParameter& parameter)
@@ -60,12 +63,100 @@ void initializeWideWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&
 {
     widget.spanW = 2;
     widget.spanH = 1;
+    ensureWidgetBodyColor(widget);
+    ensureWidgetLabelColor(widget);
+}
+
+void initializeFontScaledWideWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
+{
+    initializeWideWidget(widget, parameter);
+    widget.config["fontScale"] = 1.0f;
 }
 
 void initializeButtonWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
 {
     widget.spanW = 2;
     widget.spanH = 2;
+    ensureWidgetBodyColor(widget);
+    ensureWidgetLabelColor(widget);
+}
+
+bool renderKnobWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
+{
+    if(parameter == nullptr) return false;
+
+    const bool interactive = context.interactive;
+    const bool showValue = context.showValue;
+    const ImVec2 itemSize = widgetItemSize(context);
+    const float size = std::max(24.0f, std::min(itemSize.x, itemSize.y));
+    const ofColor bodyColor = widgetBodyColor(widget);
+    float value = 0.0f;
+    float sliderMin = 0.0f;
+    float sliderMax = 1.0f;
+    bool changed = false;
+
+    if(isFloatParameter(*parameter)){
+        auto& param = parameter->cast<float>().getParameter();
+        value = param.get();
+        sliderMin = floatRangeMin(widget, param.getMin());
+        sliderMax = floatRangeMax(widget, param.getMax());
+    }else if(isIntParameter(*parameter)){
+        auto& param = parameter->cast<int>().getParameter();
+        value = (float)param.get();
+        sliderMin = (float)intRangeMin(widget, param.getMin());
+        sliderMax = (float)intRangeMax(widget, param.getMax());
+    }else{
+        return false;
+    }
+
+    ImGui::BeginGroup();
+    drawWidgetLabel(widget, context.label);
+    ImGui::InvisibleButton("##knob", ImVec2(size, size));
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    const ImVec2 center((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
+    const float radius = size * 0.42f;
+    const float normalized = sliderMax > sliderMin ? ofClamp((value - sliderMin) / (sliderMax - sliderMin), 0.0f, 1.0f) : 0.0f;
+    constexpr float kPi = 3.14159265358979323846f;
+    const float startAngle = kPi * 0.75f;
+    const float endAngle = kPi * 2.25f;
+    const float angle = startAngle + (endAngle - startAngle) * normalized;
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    const ImU32 body = IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a);
+    drawList->AddCircleFilled(center, radius, body, 32);
+    drawList->AddCircle(center, radius, IM_COL32(210, 210, 210, 180), 32, 1.5f);
+    drawList->PathArcTo(center, radius - 3.0f, startAngle, endAngle, 32);
+    drawList->PathStroke(IM_COL32(70, 70, 70, 220), false, 3.0f);
+    drawList->PathArcTo(center, radius - 3.0f, startAngle, angle, 32);
+    drawList->PathStroke(IM_COL32(widget.color.r, widget.color.g, widget.color.b, 255), false, 3.5f);
+    drawList->AddLine(center,
+                      ImVec2(center.x + std::cos(angle) * (radius - 8.0f), center.y + std::sin(angle) * (radius - 8.0f)),
+                      IM_COL32(255, 255, 255, 230), 2.0f);
+
+    if(interactive && ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)){
+        value -= ImGui::GetIO().MouseDelta.y * (sliderMax - sliderMin) * 0.005f;
+        value = ofClamp(value, sliderMin, sliderMax);
+        value = quantizeFloatValue(widget, value, sliderMin, sliderMax);
+        changed = true;
+    }
+
+    if(showValue){
+        const std::string text = isIntParameter(*parameter) ? ofToString((int)std::round(value)) : ofToString(value, 3);
+        ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
+        drawList->AddText(ImVec2(center.x - textSize.x * 0.5f, center.y - textSize.y * 0.5f),
+                          IM_COL32(245, 245, 245, 220), text.c_str());
+    }
+
+    if(changed){
+        if(isFloatParameter(*parameter)){
+            value = quantizeFloatValue(widget, value, sliderMin, sliderMax);
+            parameter->cast<float>().getParameter().set(value);
+        }else{
+            parameter->cast<int>().getParameter().set((int)std::round(ofClamp(value, sliderMin, sliderMax)));
+        }
+    }
+    ImGui::EndGroup();
+    return true;
 }
 
 bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
@@ -81,10 +172,16 @@ bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& w
     const float sliderMin = floatRangeMin(widget, param.getMin());
     const float sliderMax = floatRangeMax(widget, param.getMax());
     bool changed = false;
+    const bool customFontScale = widget.type == CustomGuiWidgetType::DragNumber;
+    const float fontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
+    const ofColor bodyColor = widgetBodyColor(widget);
+    const ofColor accentColor = widget.color;
 
     ImGui::BeginGroup();
     drawWidgetLabel(widget, context.label);
+    if(customFontScale) ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * fontScale));
     ImGui::SetNextItemWidth(widgetItemWidth(itemSize));
+    pushWidgetFrameColors(bodyColor, accentColor);
 
     if(!interactive){
         const float fraction = sliderMax != sliderMin ? (value - sliderMin) / (sliderMax - sliderMin) : 0.0f;
@@ -110,6 +207,8 @@ bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& w
         param.set(value);
     }
 
+    ImGui::PopStyleColor(8);
+    if(customFontScale) ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
     ImGui::EndGroup();
     return true;
 }
@@ -128,10 +227,16 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
     const int sliderMax = intRangeMax(widget, param.getMax());
     const auto options = parameter->cast<int>().getDropdownOptions();
     bool changed = false;
+    const bool customFontScale = widget.type == CustomGuiWidgetType::DragNumber;
+    const float fontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
+    const ofColor bodyColor = widgetBodyColor(widget);
+    const ofColor accentColor = widget.color;
 
     ImGui::BeginGroup();
     drawWidgetLabel(widget, context.label);
+    if(customFontScale) ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * fontScale));
     ImGui::SetNextItemWidth(widgetItemWidth(itemSize));
+    pushWidgetFrameColors(bodyColor, accentColor);
 
     if(!interactive){
         ImGui::TextWrapped("%d", value);
@@ -164,8 +269,95 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
 
     if(changed) param.set(value);
 
+    ImGui::PopStyleColor(8);
+    if(customFontScale) ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
     ImGui::EndGroup();
     return true;
+}
+
+bool renderVectorDragNumberWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
+{
+    if(parameter == nullptr) return false;
+
+    const ImVec2 itemSize = widgetItemSize(context);
+    const bool interactive = context.interactive;
+    const float fontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
+    const ofColor bodyColor = widgetBodyColor(widget);
+    const ofColor accentColor = widget.color;
+
+    ImGui::BeginGroup();
+    drawWidgetLabel(widget, context.label);
+    ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * fontScale));
+    ImGui::SetNextItemWidth(widgetItemWidth(itemSize));
+    pushWidgetFrameColors(bodyColor, accentColor);
+
+    if(isFloatVectorParameter(*parameter)){
+        auto& param = parameter->cast<std::vector<float>>().getParameter();
+        auto value = param.get();
+        if(value.empty()){
+            ImGui::TextDisabled("Empty vector");
+            ImGui::EndGroup();
+            return true;
+        }
+
+        float sliderMin = !param.getMin().empty() ? param.getMin()[0] : 0.0f;
+        float sliderMax = !param.getMax().empty() ? param.getMax()[0] : 1.0f;
+        sliderMin = floatRangeMin(widget, sliderMin);
+        sliderMax = floatRangeMax(widget, sliderMax);
+
+        float scalarValue = value[0];
+        bool changed = false;
+        if(!interactive){
+            ImGui::TextWrapped("%.3f", scalarValue);
+        }else{
+            changed = ImGui::DragFloat("##value", &scalarValue, 0.01f, sliderMin, sliderMax);
+        }
+
+        if(changed){
+            value[0] = quantizeFloatValue(widget, scalarValue, sliderMin, sliderMax);
+            param.set(value);
+        }
+    }else if(isIntVectorParameter(*parameter)){
+        auto& param = parameter->cast<std::vector<int>>().getParameter();
+        auto value = param.get();
+        if(value.empty()){
+            ImGui::TextDisabled("Empty vector");
+            ImGui::EndGroup();
+            return true;
+        }
+
+        int sliderMin = !param.getMin().empty() ? param.getMin()[0] : 0;
+        int sliderMax = !param.getMax().empty() ? param.getMax()[0] : 1;
+        sliderMin = intRangeMin(widget, sliderMin);
+        sliderMax = intRangeMax(widget, sliderMax);
+
+        int scalarValue = value[0];
+        bool changed = false;
+        if(!interactive){
+            ImGui::TextWrapped("%d", scalarValue);
+        }else{
+            changed = ImGui::DragInt("##value", &scalarValue, 1.0f, sliderMin, sliderMax);
+        }
+
+        if(changed){
+            value[0] = scalarValue;
+            param.set(value);
+        }
+    }
+
+    ImGui::PopStyleColor(8);
+    ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
+    ImGui::EndGroup();
+    return true;
+}
+
+void drawFontScaleProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter*)
+{
+    float fontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
+    if(ImGui::InputFloat("Font Scale", &fontScale, 0.05f, 0.2f, "%.2f")){
+        widget.config["fontScale"] = std::max(0.2f, fontScale);
+        context.container.markCustomGuisDirty();
+    }
 }
 
 bool renderToggleWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
@@ -204,7 +396,10 @@ bool renderTextDisplayWidget(CustomGuiWidgetRenderContext& context, CustomGuiWid
 
     ImGui::BeginGroup();
     drawWidgetLabel(widget, context.label);
+    const float fontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
+    ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * fontScale));
     ImGui::TextWrapped("%s", parameter->cast<std::string>().getParameter().get().c_str());
+    ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
     ImGui::EndGroup();
     return true;
 }
@@ -320,15 +515,18 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
     registerWidget(registry, CustomGuiWidgetType::Knob,
                    supportsKnobWidget,
                    initializeWideWidget,
-                   renderFloatWidget);
+                   renderKnobWidget);
 
     registerWidget(registry, CustomGuiWidgetType::DragNumber,
                    supportsDragNumberWidget,
-                   initializeWideWidget,
+                   initializeFontScaledWideWidget,
                    [](CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter){
                        if(parameter == nullptr) return false;
-                       return isFloatParameter(*parameter) ? renderFloatWidget(context, widget, parameter) : renderIntWidget(context, widget, parameter);
-                   });
+                       if(isFloatParameter(*parameter)) return renderFloatWidget(context, widget, parameter);
+                       if(isIntParameter(*parameter)) return renderIntWidget(context, widget, parameter);
+                       return renderVectorDragNumberWidget(context, widget, parameter);
+                   },
+                   drawFontScaleProperties);
 
     registerWidget(registry, CustomGuiWidgetType::Toggle,
                    supportsToggleWidget,
@@ -342,8 +540,9 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 
     registerWidget(registry, CustomGuiWidgetType::TextDisplay,
                    supportsTextDisplayWidget,
-                   [](CustomGuiWidget&, ofxOceanodeAbstractParameter&){},
-                   renderTextDisplayWidget);
+                   [](CustomGuiWidget& widget, ofxOceanodeAbstractParameter&){ widget.config["fontScale"] = 1.0f; },
+                   renderTextDisplayWidget,
+                   drawFontScaleProperties);
 
     registerWidget(registry, CustomGuiWidgetType::FileBrowser,
                    supportsFileBrowserWidget,
@@ -363,4 +562,3 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 }
 
 } // namespace ofxOceanodeCustomGuiValueWidgets
-

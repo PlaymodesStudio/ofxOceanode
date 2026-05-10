@@ -54,6 +54,7 @@ struct CustomGuiLayout {
     float cellWidth = 20.0f;
     float cellHeight = 20.0f;
     float zoom = 1.0f;
+    ofColor backgroundColor = ofColor(24, 24, 24, 255);
     std::vector<CustomGuiWidget> widgets;
 };
 
@@ -218,6 +219,7 @@ inline ofJson customGuiLayoutToJson(const CustomGuiLayout& layout)
     json["cellWidth"] = layout.cellWidth;
     json["cellHeight"] = layout.cellHeight;
     json["zoom"] = layout.zoom;
+    json["backgroundColor"] = customGuiColorToJson(layout.backgroundColor);
     json["widgets"] = ofJson::array();
     for(const auto& widget : layout.widgets){
         json["widgets"].push_back(customGuiWidgetToJson(widget));
@@ -233,6 +235,7 @@ inline CustomGuiLayout customGuiLayoutFromJson(const ofJson& json)
     if(json.contains("cellWidth")) layout.cellWidth = std::max(20.0f, json["cellWidth"].get<float>());
     if(json.contains("cellHeight")) layout.cellHeight = std::max(20.0f, json["cellHeight"].get<float>());
     if(json.contains("zoom")) layout.zoom = ofClamp(json["zoom"].get<float>(), 0.25f, 4.0f);
+    if(json.contains("backgroundColor")) layout.backgroundColor = customGuiColorFromJson(json["backgroundColor"], ofColor(24, 24, 24, 255));
     if(json.contains("widgets") && json["widgets"].is_array()){
         for(const auto& widgetJson : json["widgets"]){
             layout.widgets.push_back(customGuiWidgetFromJson(widgetJson));

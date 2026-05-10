@@ -12,7 +12,7 @@ using namespace ofxOceanodeCustomGuiWidgetHelpers;
 
 bool supportsMultiSliderWidget(ofxOceanodeAbstractParameter& parameter)
 {
-    return isFloatVectorParameter(parameter);
+    return isFloatVectorParameter(parameter) || isIntVectorParameter(parameter);
 }
 
 bool supportsMultiToggleWidget(ofxOceanodeAbstractParameter& parameter)
@@ -38,7 +38,14 @@ void initializeMultiSliderWidget(CustomGuiWidget& widget, ofxOceanodeAbstractPar
 {
     widget.spanW = 3;
     widget.spanH = 3;
-    int size = std::max(1, (int)parameter.cast<std::vector<float>>().getParameter().get().size());
+    ensureWidgetBodyColor(widget);
+    ensureWidgetLabelColor(widget);
+    int size = 1;
+    if(isFloatVectorParameter(parameter)){
+        size = std::max(1, (int)parameter.cast<std::vector<float>>().getParameter().get().size());
+    }else if(isIntVectorParameter(parameter)){
+        size = std::max(1, (int)parameter.cast<std::vector<int>>().getParameter().get().size());
+    }
     widget.config["visibleCount"] = size;
     widget.config["vertical"] = true;
 }
@@ -47,6 +54,8 @@ void initializeMultiToggleWidget(CustomGuiWidget& widget, ofxOceanodeAbstractPar
 {
     widget.spanW = 2;
     widget.spanH = isFloatVectorParameter(parameter) || isIntVectorParameter(parameter) ? 2 : 1;
+    ensureWidgetBodyColor(widget);
+    ensureWidgetLabelColor(widget);
 
     int size = 1;
     if(isFloatVectorParameter(parameter)){
@@ -63,6 +72,8 @@ void initializeXYPadWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter
 {
     widget.spanW = 2;
     widget.spanH = 2;
+    ensureWidgetBodyColor(widget);
+    ensureWidgetLabelColor(widget);
 }
 
 void initializePianoKeyboardWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
@@ -72,6 +83,8 @@ void initializePianoKeyboardWidget(CustomGuiWidget& widget, ofxOceanodeAbstractP
     widget.config["loNote"] = 48;
     widget.config["hiNote"] = 72;
     widget.config["dimOutsidePianoRange"] = false;
+    ensureWidgetBodyColor(widget, ofColor(120, 120, 120, 220));
+    ensureWidgetLabelColor(widget);
 }
 
 struct PianoKeyGeometry {
@@ -187,6 +200,7 @@ bool renderPianoKeyboardWidget(CustomGuiWidgetRenderContext& context, CustomGuiW
     const int lo = std::min(startNote, endNote);
     const int hi = std::max(startNote, endNote);
     const bool dimOutsidePianoRange = widget.config.value("dimOutsidePianoRange", false);
+    const ofColor bodyColor = widgetBodyColor(widget, ofColor(120, 120, 120, 220));
     const ImVec2 itemSize = widgetItemSize(context);
     const float keyboardHeight = std::max(24.0f, itemSize.y);
     const float keyboardWidth = std::max(1.0f, itemSize.x);
@@ -223,7 +237,7 @@ bool renderPianoKeyboardWidget(CustomGuiWidgetRenderContext& context, CustomGuiW
                                     ? IM_COL32(240, 240, 240, 120)
                                     : IM_COL32(255, 255, 255, 255));
         if(selectedNotes.count(note)){
-            drawList->AddRectFilled(keyMin, keyMax, IM_COL32(widget.color.r, widget.color.g, widget.color.b, 120));
+            drawList->AddRectFilled(keyMin, keyMax, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a));
         }
         drawList->AddRect(keyMin, keyMax, IM_COL32(100, 100, 100, 255));
     }
@@ -240,7 +254,7 @@ bool renderPianoKeyboardWidget(CustomGuiWidgetRenderContext& context, CustomGuiW
                                     ? IM_COL32(80, 80, 80, 120)
                                     : IM_COL32(0, 0, 0, 255));
         if(selectedNotes.count(note)){
-            drawList->AddRectFilled(keyMin, keyMax, IM_COL32(widget.color.r, widget.color.g, widget.color.b, 160));
+            drawList->AddRectFilled(keyMin, keyMax, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a));
         }
         drawList->AddRect(keyMin, keyMax, IM_COL32(100, 100, 100, 255));
     }
@@ -261,6 +275,7 @@ bool drawMultiToggleGrid(const CustomGuiWidgetRenderContext& context, CustomGuiW
     const float cellWidth = std::max(12.0f, (itemSize.x - totalWidthSpacing) / cols);
     const float cellHeight = std::max(12.0f, (itemSize.y - totalHeightSpacing) / rows);
     const ImVec2 gridSize(cellWidth * cols + totalWidthSpacing, cellHeight * rows + totalHeightSpacing);
+    const ofColor bodyColor = widgetBodyColor(widget);
     ImGui::InvisibleButton("##multitogglegrid", gridSize);
 
     const bool hovered = ImGui::IsItemHovered();
@@ -268,7 +283,7 @@ bool drawMultiToggleGrid(const CustomGuiWidgetRenderContext& context, CustomGuiW
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const ImVec2 min = ImGui::GetItemRectMin();
     const ImVec2 max = ImGui::GetItemRectMax();
-    drawList->AddRectFilled(min, max, IM_COL32(45, 45, 45, 255), 2.0f);
+    drawList->AddRectFilled(min, max, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 2.0f);
     drawList->AddRect(min, max, IM_COL32(90, 90, 90, 255), 2.0f);
 
     static ImGuiID activePaintWidget = 0;
@@ -454,6 +469,15 @@ bool renderIntVectorWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidge
                             [&](int cellValue){ return cellValue > 0; },
                             [&](int& cellValue, bool state){ cellValue = state ? 1 : 0; });
         if(value != previousValue) param.set(value);
+    }else if(widget.type == CustomGuiWidgetType::MultiSlider && !value.empty()){
+        std::vector<float> sliderValue(value.begin(), value.end());
+        bool changed = context.drawMultiSliderWidget(widget, parameter, sliderValue, widgetItemSize(context), context.interactive);
+        if(changed){
+            for(size_t i = 0; i < value.size() && i < sliderValue.size(); i++){
+                value[i] = (int)std::round(sliderValue[i]);
+            }
+            param.set(value);
+        }
     }else{
         ImGui::TextDisabled("Unsupported type");
     }
@@ -544,9 +568,14 @@ void drawMultiToggleProperties(CustomGuiWidgetPropertiesContext& context, Custom
 
 void drawMultiSliderProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
 {
-    if(parameter == nullptr || !isFloatVectorParameter(*parameter)) return;
+    if(parameter == nullptr || (!isFloatVectorParameter(*parameter) && !isIntVectorParameter(*parameter))) return;
 
-    int maxCount = (int)parameter->cast<std::vector<float>>().getParameter().get().size();
+    int maxCount = 1;
+    if(isFloatVectorParameter(*parameter)){
+        maxCount = (int)parameter->cast<std::vector<float>>().getParameter().get().size();
+    }else if(isIntVectorParameter(*parameter)){
+        maxCount = (int)parameter->cast<std::vector<int>>().getParameter().get().size();
+    }
     int visibleCount = widget.config.value("visibleCount", maxCount);
     if(ImGui::SliderInt("Num Sliders", &visibleCount, 1, std::max(1, maxCount))){
         widget.config["visibleCount"] = visibleCount;
@@ -562,23 +591,44 @@ void drawMultiSliderProperties(CustomGuiWidgetPropertiesContext& context, Custom
     bool interactive = ofxOceanodeCustomGuiWidgets::isInteractive(widget, parameter);
     bool canResizeVector = interactive && !parameter->hasInConnection() && !(parameter->getFlags() & ofxOceanodeParameterFlags_DisableInConnection);
     if(canResizeVector){
-        int vectorSize = (int)parameter->cast<std::vector<float>>().getParameter().get().size();
-        if(ImGui::SliderInt("Vector Size", &vectorSize, 1, 64)){
-            auto& param = parameter->cast<std::vector<float>>().getParameter();
-            auto values = param.get();
-            auto mins = param.getMin();
-            auto maxs = param.getMax();
-            float fillValue = values.empty() ? 0.0f : values.back();
-            float fillMin = mins.empty() ? 0.0f : mins.back();
-            float fillMax = maxs.empty() ? 1.0f : maxs.back();
-            values.resize(vectorSize, fillValue);
-            mins.resize(vectorSize, fillMin);
-            maxs.resize(vectorSize, fillMax);
-            param.setMin(mins);
-            param.setMax(maxs);
-            param.set(values);
-            widget.config["visibleCount"] = vectorSize;
-            context.container.markCustomGuisDirty();
+        if(isFloatVectorParameter(*parameter)){
+            int vectorSize = (int)parameter->cast<std::vector<float>>().getParameter().get().size();
+            if(ImGui::SliderInt("Vector Size", &vectorSize, 1, 64)){
+                auto& param = parameter->cast<std::vector<float>>().getParameter();
+                auto values = param.get();
+                auto mins = param.getMin();
+                auto maxs = param.getMax();
+                float fillValue = values.empty() ? 0.0f : values.back();
+                float fillMin = mins.empty() ? 0.0f : mins.back();
+                float fillMax = maxs.empty() ? 1.0f : maxs.back();
+                values.resize(vectorSize, fillValue);
+                mins.resize(vectorSize, fillMin);
+                maxs.resize(vectorSize, fillMax);
+                param.setMin(mins);
+                param.setMax(maxs);
+                param.set(values);
+                widget.config["visibleCount"] = vectorSize;
+                context.container.markCustomGuisDirty();
+            }
+        }else if(isIntVectorParameter(*parameter)){
+            int vectorSize = (int)parameter->cast<std::vector<int>>().getParameter().get().size();
+            if(ImGui::SliderInt("Vector Size", &vectorSize, 1, 64)){
+                auto& param = parameter->cast<std::vector<int>>().getParameter();
+                auto values = param.get();
+                auto mins = param.getMin();
+                auto maxs = param.getMax();
+                int fillValue = values.empty() ? 0 : values.back();
+                int fillMin = mins.empty() ? 0 : mins.back();
+                int fillMax = maxs.empty() ? 1 : maxs.back();
+                values.resize(vectorSize, fillValue);
+                mins.resize(vectorSize, fillMin);
+                maxs.resize(vectorSize, fillMax);
+                param.setMin(mins);
+                param.setMax(maxs);
+                param.set(values);
+                widget.config["visibleCount"] = vectorSize;
+                context.container.markCustomGuisDirty();
+            }
         }
     }
 }
@@ -612,7 +662,12 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
     registerWidget(registry, CustomGuiWidgetType::MultiSlider,
                    supportsMultiSliderWidget,
                    initializeMultiSliderWidget,
-                   renderFloatVectorWidget,
+                   [](CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter){
+                       if(parameter == nullptr) return false;
+                       return isFloatVectorParameter(*parameter)
+                           ? renderFloatVectorWidget(context, widget, parameter)
+                           : renderIntVectorWidget(context, widget, parameter);
+                   },
                    drawMultiSliderProperties);
 
     registerWidget(registry, CustomGuiWidgetType::MultiToggle,
@@ -638,4 +693,3 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 }
 
 } // namespace ofxOceanodeCustomGuiArrayWidgets
-

@@ -5,6 +5,7 @@
 #include "CustomGui/ofxOceanodeCustomGuiLayout.h"
 #include <map>
 #include <memory>
+#include <vector>
 
 class ofxOceanodeContainer;
 class ofxOceanodeAbstractParameter;
@@ -61,6 +62,7 @@ private:
     std::string snapshotRenameId;
     std::string snapshotRenameValue;
     std::string snapshotDeleteId;
+    std::vector<int> selectedWidgetIndices;
 };
 
 

@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <utility>
 #include "imgui.h"
 #include "imgui_internal.h"
 
@@ -38,8 +39,8 @@ void ofxOceanodeCustomGuiPanel::draw()
 
     static int draggedWidgetIndex = -1;
     static ImVec2 dragAnchorMouse = ImVec2(0, 0);
-    static int dragAnchorX = 0;
-    static int dragAnchorY = 0;
+    static std::vector<int> draggedWidgetIndices;
+    static std::vector<std::pair<int, int>> dragAnchorPositions;
     static std::string draggedWidgetPanelId;
     static int resizedWidgetIndex = -1;
     static ImVec2 resizeAnchorMouse = ImVec2(0, 0);
@@ -57,6 +58,19 @@ void ofxOceanodeCustomGuiPanel::draw()
         layout.columns = requiredColumns;
         layout.rows = requiredRows;
     };
+
+    auto isWidgetSelected = [&](int index){
+        return std::find(selectedWidgetIndices.begin(), selectedWidgetIndices.end(), index) != selectedWidgetIndices.end();
+    };
+
+    auto sanitizeSelectedIndices = [&](){
+        selectedWidgetIndices.erase(std::remove_if(selectedWidgetIndices.begin(), selectedWidgetIndices.end(),
+                                                   [&](int index){
+                                                       return index < 0 || index >= (int)panel->layout.widgets.size();
+                                                   }),
+                                    selectedWidgetIndices.end());
+    };
+    sanitizeSelectedIndices();
 
     std::string title = panel->name.empty() ? "Custom GUI" : panel->name;
     std::string canvasLabel = container.getCanvasID();
@@ -109,6 +123,8 @@ void ofxOceanodeCustomGuiPanel::draw()
     if(!openState){
         if(draggedWidgetPanelId == panel->id){
             draggedWidgetIndex = -1;
+            draggedWidgetIndices.clear();
+            dragAnchorPositions.clear();
             draggedWidgetPanelId.clear();
         }
         if(resizedWidgetPanelId == panel->id){
@@ -253,6 +269,21 @@ void ofxOceanodeCustomGuiPanel::draw()
                 container.markCustomGuisDirty();
             }
 
+            ImGui::SameLine(0, 18.0f);
+            float backgroundColor[4] = {
+                panel->layout.backgroundColor.r / 255.0f,
+                panel->layout.backgroundColor.g / 255.0f,
+                panel->layout.backgroundColor.b / 255.0f,
+                panel->layout.backgroundColor.a / 255.0f
+            };
+            if(ImGui::ColorEdit4("BG", backgroundColor, ImGuiColorEditFlags_NoInputs)){
+                panel->layout.backgroundColor = ofColor(backgroundColor[0] * 255.0f,
+                                                        backgroundColor[1] * 255.0f,
+                                                        backgroundColor[2] * 255.0f,
+                                                        backgroundColor[3] * 255.0f);
+                container.markCustomGuisDirty();
+            }
+
             ImGui::NewLine();
             if(ImGui::SmallButton("Add Panel")){
                 createStaticWidget(CustomGuiWidgetType::BackgroundPanel, "", 3, 2, ofColor(40, 40, 40, 180));
@@ -317,6 +348,15 @@ void ofxOceanodeCustomGuiPanel::draw()
         }
 
         const ImVec2 origin = ImGui::GetCursorPos();
+        const ImVec2 originScreen = ImGui::GetCursorScreenPos();
+
+        ImDrawList* panelDrawList = ImGui::GetWindowDrawList();
+        panelDrawList->AddRectFilled(originScreen,
+                                     ImVec2(originScreen.x + panelWidth, originScreen.y + panelHeight),
+                                     IM_COL32(panel->layout.backgroundColor.r,
+                                              panel->layout.backgroundColor.g,
+                                              panel->layout.backgroundColor.b,
+                                              panel->layout.backgroundColor.a));
 
         if(panel->designMode){
             ImGui::InvisibleButton("##CustomGuiGridSpace", ImVec2(panelWidth, panelHeight));
@@ -344,47 +384,91 @@ void ofxOceanodeCustomGuiPanel::draw()
             ofxOceanodeAbstractParameter* parameter = hasParameter ? findParameter(widget) : nullptr;
             renderWidget(widget, parameter, ImVec2(w, h));
 
+            if(!panel->designMode){
+                const std::string hint = widget.config.value("hint", std::string());
+                if(!hint.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)){
+                    ImGui::SetTooltip("%s", hint.c_str());
+                }
+            }
+
             if(panel->designMode){
+                const bool propertiesPopupOpen = ImGui::IsPopupOpen("Widget Properties");
                 ImDrawList* drawList = ImGui::GetWindowDrawList();
                 const ImVec2 min = ImGui::GetItemRectMin();
                 const ImVec2 max = ImGui::GetItemRectMax();
-                drawList->AddRect(min, max, IM_COL32(255, 180, 40, 180), 2.0f, 0, 1.5f);
+                const bool selected = isWidgetSelected((int)i);
+                const bool locked = widget.config.value("locked", false);
+                drawList->AddRect(min, max,
+                                  locked ? IM_COL32(120, 180, 255, 220) :
+                                  (selected ? IM_COL32(255, 255, 255, 220) : IM_COL32(255, 180, 40, 180)),
+                                  2.0f, 0, selected ? 2.0f : 1.5f);
 
                 bool hovered = ImGui::IsMouseHoveringRect(min, max);
                 ImVec2 handleMin(max.x - 12.0f, max.y - 12.0f);
-                bool resizeHovered = ImGui::IsMouseHoveringRect(handleMin, max);
-                drawList->AddRectFilled(handleMin, max, IM_COL32(255, 180, 40, 220), 1.0f);
-                if(hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
-                    if(resizeHovered){
+                bool resizeHovered = !locked && ImGui::IsMouseHoveringRect(handleMin, max);
+                if(!locked) drawList->AddRectFilled(handleMin, max, IM_COL32(255, 180, 40, 220), 1.0f);
+                if(!propertiesPopupOpen && hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
+                    const bool shiftPressed = ImGui::GetIO().KeyShift;
+                    if(shiftPressed){
+                        auto selectedIt = std::find(selectedWidgetIndices.begin(), selectedWidgetIndices.end(), (int)i);
+                        if(selectedIt == selectedWidgetIndices.end()) selectedWidgetIndices.push_back((int)i);
+                        else selectedWidgetIndices.erase(selectedIt);
+                    }else if(!selected){
+                        selectedWidgetIndices = {(int)i};
+                    }
+
+                    if(!shiftPressed && resizeHovered){
                         resizedWidgetIndex = (int)i;
                         resizedWidgetPanelId = panel->id;
                         resizeAnchorMouse = ImGui::GetIO().MousePos;
                         resizeAnchorW = widget.spanW;
                         resizeAnchorH = widget.spanH;
-                    }else{
+                    }else if(!shiftPressed && !locked){
                         draggedWidgetIndex = (int)i;
                         draggedWidgetPanelId = panel->id;
                         dragAnchorMouse = ImGui::GetIO().MousePos;
-                        dragAnchorX = widget.gridX;
-                        dragAnchorY = widget.gridY;
+                        draggedWidgetIndices = selectedWidgetIndices;
+                        if(draggedWidgetIndices.empty()) draggedWidgetIndices.push_back((int)i);
+                        draggedWidgetIndices.erase(std::remove_if(draggedWidgetIndices.begin(), draggedWidgetIndices.end(),
+                                                                  [&](int selectedIndex){
+                                                                      return selectedIndex < 0 ||
+                                                                             selectedIndex >= (int)panel->layout.widgets.size() ||
+                                                                             panel->layout.widgets[selectedIndex].config.value("locked", false);
+                                                                  }),
+                                                 draggedWidgetIndices.end());
+                        if(draggedWidgetIndices.empty()) draggedWidgetIndices.push_back((int)i);
+                        dragAnchorPositions.clear();
+                        dragAnchorPositions.reserve(draggedWidgetIndices.size());
+                        for(int selectedIndex : draggedWidgetIndices){
+                            const auto& selectedWidget = panel->layout.widgets[selectedIndex];
+                            dragAnchorPositions.emplace_back(selectedWidget.gridX, selectedWidget.gridY);
+                        }
                     }
                 }
-                if(draggedWidgetPanelId == panel->id && draggedWidgetIndex == (int)i && ImGui::IsMouseDown(ImGuiMouseButton_Left)){
+                if(!propertiesPopupOpen && draggedWidgetPanelId == panel->id && ImGui::IsMouseDown(ImGuiMouseButton_Left)){
                     ImVec2 delta = ImGui::GetIO().MousePos - dragAnchorMouse;
                     int offsetX = (int)std::round(delta.x / (panel->layout.cellWidth * panel->layout.zoom));
                     int offsetY = (int)std::round(delta.y / (panel->layout.cellHeight * panel->layout.zoom));
-                    widget.gridX = std::max(0, dragAnchorX + offsetX);
-                    widget.gridY = std::max(0, dragAnchorY + offsetY);
-                    panel->layout.columns = std::max(panel->layout.columns, widget.gridX + widget.spanW);
-                    panel->layout.rows = std::max(panel->layout.rows, widget.gridY + widget.spanH);
+                    auto draggedIt = std::find(draggedWidgetIndices.begin(), draggedWidgetIndices.end(), (int)i);
+                    if(draggedIt != draggedWidgetIndices.end()){
+                        const size_t draggedOffset = std::distance(draggedWidgetIndices.begin(), draggedIt);
+                        if(draggedOffset < dragAnchorPositions.size()){
+                            widget.gridX = std::max(0, dragAnchorPositions[draggedOffset].first + offsetX);
+                            widget.gridY = std::max(0, dragAnchorPositions[draggedOffset].second + offsetY);
+                            panel->layout.columns = std::max(panel->layout.columns, widget.gridX + widget.spanW);
+                            panel->layout.rows = std::max(panel->layout.rows, widget.gridY + widget.spanH);
+                        }
+                    }
                 }
-                if(draggedWidgetPanelId == panel->id && draggedWidgetIndex == (int)i && ImGui::IsMouseReleased(ImGuiMouseButton_Left)){
+                if(draggedWidgetPanelId == panel->id && ImGui::IsMouseReleased(ImGuiMouseButton_Left)){
                     ensureLayoutFitsWidgets(panel->layout);
                     draggedWidgetIndex = -1;
+                    draggedWidgetIndices.clear();
+                    dragAnchorPositions.clear();
                     draggedWidgetPanelId.clear();
                     container.markCustomGuisDirty();
                 }
-                if(resizedWidgetPanelId == panel->id && resizedWidgetIndex == (int)i && ImGui::IsMouseDown(ImGuiMouseButton_Left)){
+                if(!propertiesPopupOpen && resizedWidgetPanelId == panel->id && resizedWidgetIndex == (int)i && ImGui::IsMouseDown(ImGuiMouseButton_Left)){
                     ImVec2 delta = ImGui::GetIO().MousePos - resizeAnchorMouse;
                     int offsetW = (int)std::round(delta.x / (panel->layout.cellWidth * panel->layout.zoom));
                     int offsetH = (int)std::round(delta.y / (panel->layout.cellHeight * panel->layout.zoom));
@@ -448,10 +532,18 @@ void ofxOceanodeCustomGuiPanel::draw()
         };
 
         for(size_t i = 0; i < panel->layout.widgets.size(); i++){
-            if(panel->layout.widgets[i].type == CustomGuiWidgetType::BackgroundPanel) drawWidgetAtIndex(i);
+            const auto& widget = panel->layout.widgets[i];
+            if(widget.type == CustomGuiWidgetType::BackgroundPanel ||
+               (widget.type == CustomGuiWidgetType::Image && widget.config.value("sendToBack", false))){
+                drawWidgetAtIndex(i);
+            }
         }
         for(size_t i = 0; i < panel->layout.widgets.size(); i++){
-            if(panel->layout.widgets[i].type != CustomGuiWidgetType::BackgroundPanel) drawWidgetAtIndex(i);
+            const auto& widget = panel->layout.widgets[i];
+            if(widget.type != CustomGuiWidgetType::BackgroundPanel &&
+               !(widget.type == CustomGuiWidgetType::Image && widget.config.value("sendToBack", false))){
+                drawWidgetAtIndex(i);
+            }
         }
 
         if(widgetToRemove >= 0 && widgetToRemove < (int)panel->layout.widgets.size()){
@@ -459,6 +551,10 @@ void ofxOceanodeCustomGuiPanel::draw()
                 if(definition->cleanup) definition->cleanup(panel->id, panel->layout.widgets[widgetToRemove].parameterRef.parameterPath);
             }
             panel->layout.widgets.erase(panel->layout.widgets.begin() + widgetToRemove);
+            selectedWidgetIndices.erase(std::remove(selectedWidgetIndices.begin(), selectedWidgetIndices.end(), widgetToRemove), selectedWidgetIndices.end());
+            for(int& selectedIndex : selectedWidgetIndices){
+                if(selectedIndex > widgetToRemove) selectedIndex--;
+            }
             ensureLayoutFitsWidgets(panel->layout);
             container.markCustomGuisDirty();
         }
@@ -759,6 +855,157 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
             widget.label = labelBuffer;
             container.markCustomGuisDirty();
         }
+        char hintBuffer[512];
+        const std::string currentHint = widget.config.value("hint", std::string());
+        std::snprintf(hintBuffer, sizeof(hintBuffer), "%s", currentHint.c_str());
+        if(ImGui::InputText("Hint", hintBuffer, sizeof(hintBuffer))){
+            widget.config["hint"] = std::string(hintBuffer);
+            container.markCustomGuisDirty();
+        }
+        bool locked = widget.config.value("locked", false);
+        if(ImGui::Checkbox("Locked", &locked)){
+            widget.config["locked"] = locked;
+            container.markCustomGuisDirty();
+        }
+        if(widget.type != CustomGuiWidgetType::Label &&
+           widget.type != CustomGuiWidgetType::Text &&
+           widget.type != CustomGuiWidgetType::BackgroundPanel){
+            ofColor labelColor = ofxOceanodeCustomGuiWidgetHelpers::widgetLabelColor(widget, ofColor::black);
+            float labelColorFloat[4] = {
+                labelColor.r / 255.0f,
+                labelColor.g / 255.0f,
+                labelColor.b / 255.0f,
+                labelColor.a / 255.0f
+            };
+            if(ImGui::ColorEdit4("Label Color", labelColorFloat)){
+                widget.config["labelColor"] = customGuiColorToJson(ofColor(labelColorFloat[0] * 255.0f,
+                                                                           labelColorFloat[1] * 255.0f,
+                                                                           labelColorFloat[2] * 255.0f,
+                                                                           labelColorFloat[3] * 255.0f));
+                container.markCustomGuisDirty();
+            }
+            ofColor bodyColor = ofxOceanodeCustomGuiWidgetHelpers::widgetBodyColor(widget);
+            float bodyColorFloat[4] = {
+                bodyColor.r / 255.0f,
+                bodyColor.g / 255.0f,
+                bodyColor.b / 255.0f,
+                bodyColor.a / 255.0f
+            };
+            if(ImGui::ColorEdit4("Body Color", bodyColorFloat)){
+                widget.config["bodyColor"] = customGuiColorToJson(ofColor(bodyColorFloat[0] * 255.0f,
+                                                                          bodyColorFloat[1] * 255.0f,
+                                                                          bodyColorFloat[2] * 255.0f,
+                                                                          bodyColorFloat[3] * 255.0f));
+                container.markCustomGuisDirty();
+            }
+
+            float accentColor[4] = {
+                widget.color.r / 255.0f,
+                widget.color.g / 255.0f,
+                widget.color.b / 255.0f,
+                widget.color.a / 255.0f
+            };
+            if(ImGui::ColorEdit4("Accent Color", accentColor)){
+                widget.color = ofColor(accentColor[0] * 255.0f,
+                                       accentColor[1] * 255.0f,
+                                       accentColor[2] * 255.0f,
+                                       accentColor[3] * 255.0f);
+                container.markCustomGuisDirty();
+            }
+        }
+
+        if(parameter != nullptr){
+            auto compatibleTypes = getCompatibleWidgetTypes(*parameter);
+            auto addCompatibleType = [&](CustomGuiWidgetType type){
+                if(std::find(compatibleTypes.begin(), compatibleTypes.end(), type) == compatibleTypes.end()){
+                    compatibleTypes.push_back(type);
+                }
+            };
+
+            if(ofxOceanodeCustomGuiWidgetHelpers::isFloatVectorParameter(*parameter)){
+                addCompatibleType(CustomGuiWidgetType::DragNumber);
+                addCompatibleType(CustomGuiWidgetType::MultiSlider);
+                addCompatibleType(CustomGuiWidgetType::MultiToggle);
+                addCompatibleType(CustomGuiWidgetType::PianoKeyboard);
+                addCompatibleType(CustomGuiWidgetType::Waveform);
+                addCompatibleType(CustomGuiWidgetType::VUMeter);
+                addCompatibleType(CustomGuiWidgetType::FFT);
+                if(parameter->cast<std::vector<float>>().getParameter().get().size() == 2){
+                    addCompatibleType(CustomGuiWidgetType::XYPad);
+                }
+            }else if(ofxOceanodeCustomGuiWidgetHelpers::isIntVectorParameter(*parameter)){
+                addCompatibleType(CustomGuiWidgetType::DragNumber);
+                addCompatibleType(CustomGuiWidgetType::MultiSlider);
+                addCompatibleType(CustomGuiWidgetType::MultiToggle);
+                addCompatibleType(CustomGuiWidgetType::PianoKeyboard);
+            }else if(ofxOceanodeCustomGuiWidgetHelpers::isFloatParameter(*parameter)){
+                addCompatibleType(CustomGuiWidgetType::Slider);
+                addCompatibleType(CustomGuiWidgetType::Knob);
+                addCompatibleType(CustomGuiWidgetType::DragNumber);
+                addCompatibleType(CustomGuiWidgetType::MultiToggle);
+            }else if(ofxOceanodeCustomGuiWidgetHelpers::isIntParameter(*parameter)){
+                addCompatibleType(CustomGuiWidgetType::Slider);
+                addCompatibleType(CustomGuiWidgetType::DragNumber);
+                addCompatibleType(CustomGuiWidgetType::MultiToggle);
+                if(!parameter->cast<int>().getDropdownOptions().empty()){
+                    addCompatibleType(CustomGuiWidgetType::Dropdown);
+                }
+            }else if(ofxOceanodeCustomGuiWidgetHelpers::isBoolParameter(*parameter)){
+                addCompatibleType(CustomGuiWidgetType::Toggle);
+            }else if(ofxOceanodeCustomGuiWidgetHelpers::isTriggerParameter(*parameter)){
+                addCompatibleType(CustomGuiWidgetType::Button);
+            }else if(ofxOceanodeCustomGuiWidgetHelpers::isStringParameter(*parameter)){
+                addCompatibleType(CustomGuiWidgetType::TextDisplay);
+                addCompatibleType(CustomGuiWidgetType::FileBrowser);
+            }else if(ofxOceanodeCustomGuiWidgetHelpers::isTextureParameter(*parameter)){
+                addCompatibleType(CustomGuiWidgetType::Texture);
+                addCompatibleType(CustomGuiWidgetType::Waveform);
+            }else if(ofxOceanodeCustomGuiWidgetHelpers::isRegisteredCustomRegionParameter(*parameter)){
+                addCompatibleType(CustomGuiWidgetType::CustomRegion);
+            }
+
+            if(std::find(compatibleTypes.begin(), compatibleTypes.end(), widget.type) == compatibleTypes.end()){
+                compatibleTypes.insert(compatibleTypes.begin(), widget.type);
+            }
+            if(!compatibleTypes.empty()){
+                const std::string currentTypeLabel = customGuiWidgetTypeToString(widget.type);
+                if(ImGui::BeginCombo("Widget Type", currentTypeLabel.c_str())){
+                    for(CustomGuiWidgetType compatibleType : compatibleTypes){
+                        const std::string compatibleTypeLabel = customGuiWidgetTypeToString(compatibleType);
+                        const bool selected = compatibleType == widget.type;
+                        if(ImGui::Selectable(compatibleTypeLabel.c_str(), selected) && !selected){
+                            const int gridX = widget.gridX;
+                            const int gridY = widget.gridY;
+                            const CustomGuiParameterReference parameterRef = widget.parameterRef;
+                            const std::string label = widget.label;
+                            const ofColor color = widget.color;
+
+                            widget.type = compatibleType;
+                            widget.gridX = gridX;
+                            widget.gridY = gridY;
+                            widget.parameterRef = parameterRef;
+                            widget.label = label;
+                            widget.color = color;
+                            widget.config = ofJson::object();
+
+                            const CustomGuiWidgetDefinition* newDefinition =
+                                ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(compatibleType);
+                            if(newDefinition != nullptr && newDefinition->initializeWidget){
+                                newDefinition->initializeWidget(widget, *parameter);
+                            }
+
+                            if(CustomGuiPanelData* panel = getPanelData()){
+                                panel->layout.columns = std::max(panel->layout.columns, widget.gridX + widget.spanW);
+                                panel->layout.rows = std::max(panel->layout.rows, widget.gridY + widget.spanH);
+                            }
+                            container.markCustomGuisDirty();
+                        }
+                        if(selected) ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+            }
+        }
 
         int spanW = widget.spanW;
         int spanH = widget.spanH;
@@ -776,17 +1023,6 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                 panel->layout.columns = std::max(panel->layout.columns, widget.gridX + widget.spanW);
                 panel->layout.rows = std::max(panel->layout.rows, widget.gridY + widget.spanH);
             }
-            container.markCustomGuisDirty();
-        }
-
-        float color[4] = {
-            widget.color.r / 255.0f,
-            widget.color.g / 255.0f,
-            widget.color.b / 255.0f,
-            widget.color.a / 255.0f
-        };
-        if(ImGui::ColorEdit4("Color", color)){
-            widget.color = ofColor(color[0] * 255.0f, color[1] * 255.0f, color[2] * 255.0f, color[3] * 255.0f);
             container.markCustomGuisDirty();
         }
 
@@ -895,14 +1131,25 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
 {
     if(parameter == nullptr) return false;
 
-    auto& param = parameter->cast<std::vector<float>>().getParameter();
-    const auto& mins = param.getMin();
-    const auto& maxs = param.getMax();
-	    const int visibleCount = ofClamp(widget.config.value("visibleCount", (int)value.size()), 1, (int)value.size());
-	    const bool vertical = widget.config.value("vertical", true);
-	    const bool showValue = shouldShowNumericValue(widget);
-	    const bool useCustomRange = widget.config.value("useCustomRange", false);
-	    const int quantization = std::max(0, widget.config.value("quantization", 0));
+    std::vector<float> mins;
+    std::vector<float> maxs;
+    const bool integerVector = parameter->valueType() == typeid(std::vector<int>).name();
+    if(integerVector){
+        const auto& intParam = parameter->cast<std::vector<int>>().getParameter();
+        const auto& intMins = intParam.getMin();
+        const auto& intMaxs = intParam.getMax();
+        mins.assign(intMins.begin(), intMins.end());
+        maxs.assign(intMaxs.begin(), intMaxs.end());
+    }else{
+        const auto& floatParam = parameter->cast<std::vector<float>>().getParameter();
+        mins = floatParam.getMin();
+        maxs = floatParam.getMax();
+    }
+    const int visibleCount = ofClamp(widget.config.value("visibleCount", (int)value.size()), 1, (int)value.size());
+    const bool vertical = widget.config.value("vertical", true);
+    const bool showValue = shouldShowNumericValue(widget);
+    const bool useCustomRange = widget.config.value("useCustomRange", false);
+    const int quantization = std::max(0, widget.config.value("quantization", 0));
 
     ImGui::InvisibleButton("##multislider", size);
     const bool isHovered = ImGui::IsItemHovered();
@@ -911,7 +1158,8 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
     const ImVec2 min = ImGui::GetItemRectMin();
     const ImVec2 max = ImGui::GetItemRectMax();
 
-    drawList->AddRectFilled(min, max, IM_COL32(50, 50, 50, 255), 2.0f);
+    const ofColor bodyColor = ofxOceanodeCustomGuiWidgetHelpers::widgetBodyColor(widget);
+    drawList->AddRectFilled(min, max, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 2.0f);
     drawList->AddRect(min, max, IM_COL32(100, 100, 100, 255), 2.0f);
 
     const float majorSize = vertical ? size.x : size.y;
@@ -976,7 +1224,7 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
             const float fillTop = max.y - size.y * normalized;
             drawList->AddRectFilled(ImVec2(x0, fillTop), ImVec2(x1, max.y), IM_COL32(widget.color.r, widget.color.g, widget.color.b, 235));
             if(showValue && slotSize > 16.0f){
-                std::string text = ofToString(value[i], 2);
+                std::string text = integerVector ? ofToString((int)std::round(value[i])) : ofToString(value[i], 2);
                 ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
                 if(textSize.x < slotSize - 2.0f){
                     drawList->AddText(ImVec2(x0 + (slotSize - textSize.x) * 0.5f, min.y + 2.0f), IM_COL32(235, 235, 235, 220), text.c_str());
@@ -991,7 +1239,7 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
             const float fillRight = min.x + size.x * normalized;
             drawList->AddRectFilled(ImVec2(min.x, y0), ImVec2(fillRight, y1), IM_COL32(widget.color.r, widget.color.g, widget.color.b, 235));
             if(showValue && slotSize > 14.0f){
-                std::string text = ofToString(value[i], 2);
+                std::string text = integerVector ? ofToString((int)std::round(value[i])) : ofToString(value[i], 2);
                 ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
                 if(textSize.y < slotSize - 2.0f){
                     drawList->AddText(ImVec2(min.x + 4.0f, y0 + (slotSize - textSize.y) * 0.5f), IM_COL32(235, 235, 235, 220), text.c_str());
@@ -1005,7 +1253,8 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
         const float majorPos = vertical ? (mousePos.x - min.x) : (mousePos.y - min.y);
         int hoveredIndex = (int)std::floor(majorPos / std::max(1.0f, slotSize + spacing));
         hoveredIndex = ofClamp(hoveredIndex, 0, visibleCount - 1);
-        ImGui::SetTooltip("Slider %d: %s", hoveredIndex, ofToString(value[hoveredIndex], 3).c_str());
+        const std::string tooltipValue = integerVector ? ofToString((int)std::round(value[hoveredIndex])) : ofToString(value[hoveredIndex], 3);
+        ImGui::SetTooltip("Slider %d: %s", hoveredIndex, tooltipValue.c_str());
     }
 
     return changed;
