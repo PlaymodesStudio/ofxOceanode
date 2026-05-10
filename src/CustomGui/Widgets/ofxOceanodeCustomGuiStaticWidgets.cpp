@@ -109,6 +109,12 @@ void drawImageProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWid
         widget.config["imagePath"] = "";
         context.container.markCustomGuisDirty();
     }
+
+    bool sendToBack = widget.config.value("sendToBack", false);
+    if(ImGui::Checkbox("Send To Back", &sendToBack)){
+        widget.config["sendToBack"] = sendToBack;
+        context.container.markCustomGuisDirty();
+    }
 }
 
 void initializeTextWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
@@ -119,6 +125,7 @@ void initializeTextWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&
 void initializeImageWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
 {
     widget.config["imagePath"] = "";
+    widget.config["sendToBack"] = false;
 }
 
 } // namespace
@@ -151,4 +158,3 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 }
 
 } // namespace ofxOceanodeCustomGuiStaticWidgets
-

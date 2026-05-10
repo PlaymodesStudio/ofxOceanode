@@ -31,6 +31,62 @@ inline ImVec4 colorToImVec4(const ofColor& color, float alphaScale = 1.0f)
     return ImVec4(color.r / 255.0f, color.g / 255.0f, color.b / 255.0f, (color.a / 255.0f) * alphaScale);
 }
 
+inline ofColor widgetBodyColor(const CustomGuiWidget& widget, const ofColor& fallback = ofColor(90, 90, 90, 220))
+{
+    if(widget.config.contains("bodyColor") && widget.config["bodyColor"].is_array()){
+        return customGuiColorFromJson(widget.config["bodyColor"], fallback);
+    }
+    return fallback;
+}
+
+inline void ensureWidgetBodyColor(CustomGuiWidget& widget, const ofColor& fallback = ofColor(90, 90, 90, 220))
+{
+    if(!widget.config.contains("bodyColor")){
+        widget.config["bodyColor"] = customGuiColorToJson(fallback);
+    }
+}
+
+inline ofColor widgetLabelColor(const CustomGuiWidget& widget, const ofColor& fallback = ofColor::black)
+{
+    if(widget.config.contains("labelColor") && widget.config["labelColor"].is_array()){
+        return customGuiColorFromJson(widget.config["labelColor"], fallback);
+    }
+    return fallback;
+}
+
+inline void ensureWidgetLabelColor(CustomGuiWidget& widget, const ofColor& fallback = ofColor::black)
+{
+    if(!widget.config.contains("labelColor")){
+        widget.config["labelColor"] = customGuiColorToJson(fallback);
+    }
+}
+
+inline void pushWidgetFrameColors(const ofColor& bodyColor, const ofColor& accentColor)
+{
+    const ImVec4 base = colorToImVec4(bodyColor);
+    const ImVec4 accent = colorToImVec4(accentColor);
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, base);
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(std::min(1.0f, base.x + 0.08f),
+                                                          std::min(1.0f, base.y + 0.08f),
+                                                          std::min(1.0f, base.z + 0.08f),
+                                                          std::min(1.0f, base.w + 0.08f)));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(std::min(1.0f, base.x + 0.12f),
+                                                         std::min(1.0f, base.y + 0.12f),
+                                                         std::min(1.0f, base.z + 0.12f),
+                                                         std::min(1.0f, base.w + 0.12f)));
+    ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(accent.x, accent.y, accent.z, std::max(0.6f, accent.w)));
+    ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(std::min(1.0f, accent.x + 0.12f),
+                                                            std::min(1.0f, accent.y + 0.12f),
+                                                            std::min(1.0f, accent.z + 0.12f),
+                                                            std::max(0.8f, accent.w)));
+    ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(accent.x, accent.y, accent.z, std::max(0.8f, accent.w)));
+    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(accent.x, accent.y, accent.z, std::max(0.8f, accent.w)));
+    ImGui::PushStyleColor(ImGuiCol_PlotHistogramHovered, ImVec4(std::min(1.0f, accent.x + 0.12f),
+                                                                std::min(1.0f, accent.y + 0.12f),
+                                                                std::min(1.0f, accent.z + 0.12f),
+                                                                std::max(0.9f, accent.w)));
+}
+
 inline void drawWidgetLabel(const CustomGuiWidget& widget, const std::string& label)
 {
     if(widget.type == CustomGuiWidgetType::BackgroundPanel ||
@@ -40,7 +96,8 @@ inline void drawWidgetLabel(const CustomGuiWidget& widget, const std::string& la
         return;
     }
 
-    ImGui::PushStyleColor(ImGuiCol_Text, colorToImVec4(widget.color));
+    const ofColor labelColor = widgetLabelColor(widget, ofColor::black);
+    ImGui::PushStyleColor(ImGuiCol_Text, colorToImVec4(labelColor));
     ImGui::TextWrapped("%s", label.c_str());
     ImGui::PopStyleColor();
 }
@@ -112,32 +169,38 @@ inline void pushToggleOnColors(const ofColor& color)
 
 inline bool isFloatParameter(ofxOceanodeAbstractParameter& parameter)
 {
-    return parameter.valueType() == typeid(float).name();
+    return dynamic_cast<ofxOceanodeParameter<float>*>(&parameter) != nullptr ||
+           parameter.valueType() == typeid(float).name();
 }
 
 inline bool isIntParameter(ofxOceanodeAbstractParameter& parameter)
 {
-    return parameter.valueType() == typeid(int).name();
+    return dynamic_cast<ofxOceanodeParameter<int>*>(&parameter) != nullptr ||
+           parameter.valueType() == typeid(int).name();
 }
 
 inline bool isBoolParameter(ofxOceanodeAbstractParameter& parameter)
 {
-    return parameter.valueType() == typeid(bool).name();
+    return dynamic_cast<ofxOceanodeParameter<bool>*>(&parameter) != nullptr ||
+           parameter.valueType() == typeid(bool).name();
 }
 
 inline bool isTriggerParameter(ofxOceanodeAbstractParameter& parameter)
 {
-    return parameter.valueType() == typeid(void).name();
+    return dynamic_cast<ofxOceanodeParameter<void>*>(&parameter) != nullptr ||
+           parameter.valueType() == typeid(void).name();
 }
 
 inline bool isStringParameter(ofxOceanodeAbstractParameter& parameter)
 {
-    return parameter.valueType() == typeid(std::string).name();
+    return dynamic_cast<ofxOceanodeParameter<std::string>*>(&parameter) != nullptr ||
+           parameter.valueType() == typeid(std::string).name();
 }
 
 inline bool isFunctionParameter(ofxOceanodeAbstractParameter& parameter)
 {
-    return parameter.valueType() == typeid(std::function<void()>).name();
+    return dynamic_cast<ofxOceanodeParameter<std::function<void()>>*>(&parameter) != nullptr ||
+           parameter.valueType() == typeid(std::function<void()>).name();
 }
 
 inline bool isRegisteredCustomRegionParameter(ofxOceanodeAbstractParameter& parameter)
@@ -158,17 +221,20 @@ inline bool isRegisteredCustomRegionParameter(ofxOceanodeAbstractParameter& para
 
 inline bool isFloatVectorParameter(ofxOceanodeAbstractParameter& parameter)
 {
-    return parameter.valueType() == typeid(std::vector<float>).name();
+    return dynamic_cast<ofxOceanodeParameter<std::vector<float>>*>(&parameter) != nullptr ||
+           parameter.valueType() == typeid(std::vector<float>).name();
 }
 
 inline bool isIntVectorParameter(ofxOceanodeAbstractParameter& parameter)
 {
-    return parameter.valueType() == typeid(std::vector<int>).name();
+    return dynamic_cast<ofxOceanodeParameter<std::vector<int>>*>(&parameter) != nullptr ||
+           parameter.valueType() == typeid(std::vector<int>).name();
 }
 
 inline bool isTextureParameter(ofxOceanodeAbstractParameter& parameter)
 {
-    return parameter.valueType() == typeid(ofTexture*).name();
+    return dynamic_cast<ofxOceanodeParameter<ofTexture*>*>(&parameter) != nullptr ||
+           parameter.valueType() == typeid(ofTexture*).name();
 }
 
 } // namespace ofxOceanodeCustomGuiWidgetHelpers
