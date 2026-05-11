@@ -17,6 +17,7 @@ class ofxOceanodeContainer;
 struct CustomGuiWidgetRenderContext {
     ofxOceanodeContainer& container;
     std::string panelId;
+    const CustomGuiWidget* widget = nullptr;
     bool designMode = false;
     float zoom = 1.0f;
     ImVec2 size = ImVec2(0, 0);

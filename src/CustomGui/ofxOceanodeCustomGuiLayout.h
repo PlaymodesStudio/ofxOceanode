@@ -22,9 +22,11 @@ enum class CustomGuiWidgetType {
     TextDisplay,
     FileBrowser,
     Label,
-	Dropdown,
+    Dropdown,
+    CustomDropdown,
 	BackgroundPanel,
 	Text,
+    Line,
 	Texture,
 	Image,
     CustomRegion
@@ -113,8 +115,10 @@ inline std::string customGuiWidgetTypeToString(CustomGuiWidgetType type)
         case CustomGuiWidgetType::FileBrowser: return "FileBrowser";
         case CustomGuiWidgetType::Label: return "Label";
         case CustomGuiWidgetType::Dropdown: return "Dropdown";
+        case CustomGuiWidgetType::CustomDropdown: return "CustomDropdown";
 	        case CustomGuiWidgetType::BackgroundPanel: return "BackgroundPanel";
 	        case CustomGuiWidgetType::Text: return "Text";
+            case CustomGuiWidgetType::Line: return "Line";
 	        case CustomGuiWidgetType::Texture: return "Texture";
 	        case CustomGuiWidgetType::Image: return "Image";
             case CustomGuiWidgetType::CustomRegion: return "CustomRegion";
@@ -139,8 +143,10 @@ inline CustomGuiWidgetType customGuiWidgetTypeFromString(const std::string& type
     if(type == "FileBrowser") return CustomGuiWidgetType::FileBrowser;
     if(type == "Label") return CustomGuiWidgetType::Label;
     if(type == "Dropdown") return CustomGuiWidgetType::Dropdown;
+    if(type == "CustomDropdown") return CustomGuiWidgetType::CustomDropdown;
 	    if(type == "BackgroundPanel") return CustomGuiWidgetType::BackgroundPanel;
 	    if(type == "Text") return CustomGuiWidgetType::Text;
+        if(type == "Line") return CustomGuiWidgetType::Line;
 	    if(type == "Texture") return CustomGuiWidgetType::Texture;
 	    if(type == "Image") return CustomGuiWidgetType::Image;
     if(type == "CustomRegion") return CustomGuiWidgetType::CustomRegion;
