@@ -87,12 +87,23 @@ inline void pushWidgetFrameColors(const ofColor& bodyColor, const ofColor& accen
                                                                 std::max(0.9f, accent.w)));
 }
 
+inline bool widgetSupportsLabel(const CustomGuiWidget& widget)
+{
+    return widget.type != CustomGuiWidgetType::BackgroundPanel &&
+           widget.type != CustomGuiWidgetType::Text &&
+           widget.type != CustomGuiWidgetType::Line &&
+           widget.type != CustomGuiWidgetType::Image &&
+           widget.type != CustomGuiWidgetType::Button;
+}
+
+inline bool shouldShowWidgetLabel(const CustomGuiWidget& widget)
+{
+    return widgetSupportsLabel(widget) && widget.config.value("showLabel", true);
+}
+
 inline void drawWidgetLabel(const CustomGuiWidget& widget, const std::string& label)
 {
-    if(widget.type == CustomGuiWidgetType::BackgroundPanel ||
-       widget.type == CustomGuiWidgetType::Text ||
-       widget.type == CustomGuiWidgetType::Image ||
-       widget.type == CustomGuiWidgetType::Button){
+    if(!shouldShowWidgetLabel(widget)){
         return;
     }
 
@@ -104,7 +115,7 @@ inline void drawWidgetLabel(const CustomGuiWidget& widget, const std::string& la
 
 inline ImVec2 widgetItemSize(const CustomGuiWidgetRenderContext& context)
 {
-    const bool reserveLabelSpace = !context.label.empty();
+    const bool reserveLabelSpace = shouldShowWidgetLabel(*context.widget) && !context.label.empty();
     const float labelHeight = reserveLabelSpace ? ImGui::GetFrameHeightWithSpacing() : 0.0f;
     return ImVec2(context.size.x, std::max(1.0f, context.size.y - labelHeight));
 }

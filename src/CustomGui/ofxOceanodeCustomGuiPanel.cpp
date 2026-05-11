@@ -91,6 +91,13 @@ void ofxOceanodeCustomGuiPanel::draw()
         widget.config["showValue"] = true;
         if(type == CustomGuiWidgetType::Text){
             widget.config["fontScale"] = 1.0f;
+        }else if(type == CustomGuiWidgetType::BackgroundPanel){
+            widget.config["showLabel"] = true;
+            widget.config["labelFontScale"] = 1.0f;
+            widget.config["labelColor"] = customGuiColorToJson(ofColor::black);
+        }else if(type == CustomGuiWidgetType::Line){
+            widget.config["horizontal"] = true;
+            widget.config["lineWeight"] = 2.0f;
         }else if(type == CustomGuiWidgetType::Image){
             widget.config["imagePath"] = "";
         }
@@ -293,6 +300,10 @@ void ofxOceanodeCustomGuiPanel::draw()
                 createStaticWidget(CustomGuiWidgetType::Text, "Text", 2, 1, ofColor::white);
             }
             ImGui::SameLine(0, 8.0f);
+            if(ImGui::SmallButton("Add Line")){
+                createStaticWidget(CustomGuiWidgetType::Line, "", 2, 1, ofColor(180, 180, 180, 255));
+            }
+            ImGui::SameLine(0, 8.0f);
             if(ImGui::SmallButton("Add Image")){
                 createStaticWidget(CustomGuiWidgetType::Image, "", 3, 2, ofColor::white);
             }
@@ -380,6 +391,7 @@ void ofxOceanodeCustomGuiPanel::draw()
             bool hasParameter = !(widget.type == CustomGuiWidgetType::Label ||
                                   widget.type == CustomGuiWidgetType::BackgroundPanel ||
                                   widget.type == CustomGuiWidgetType::Text ||
+                                  widget.type == CustomGuiWidgetType::Line ||
                                   widget.type == CustomGuiWidgetType::Image);
             ofxOceanodeAbstractParameter* parameter = hasParameter ? findParameter(widget) : nullptr;
             renderWidget(widget, parameter, ImVec2(w, h));
@@ -821,6 +833,7 @@ bool ofxOceanodeCustomGuiPanel::renderWidget(CustomGuiWidget& widget, ofxOceanod
     CustomGuiWidgetRenderContext context {
         container,
         panelId,
+        &widget,
         getPanelData() != nullptr ? getPanelData()->designMode : false,
         getPanelData() != nullptr ? getPanelData()->layout.zoom : 1.0f,
         size,
@@ -867,9 +880,66 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
             widget.config["locked"] = locked;
             container.markCustomGuisDirty();
         }
-        if(widget.type != CustomGuiWidgetType::Label &&
-           widget.type != CustomGuiWidgetType::Text &&
-           widget.type != CustomGuiWidgetType::BackgroundPanel){
+        if(ofxOceanodeCustomGuiWidgetHelpers::widgetSupportsLabel(widget) ||
+           widget.type == CustomGuiWidgetType::BackgroundPanel){
+            bool showLabel = widget.config.value("showLabel", true);
+            if(ImGui::Checkbox("Show Label", &showLabel)){
+                widget.config["showLabel"] = showLabel;
+                container.markCustomGuisDirty();
+            }
+        }
+        if(widget.type != CustomGuiWidgetType::Label){
+            if(widget.type == CustomGuiWidgetType::BackgroundPanel){
+                float panelColor[4] = {
+                    widget.color.r / 255.0f,
+                    widget.color.g / 255.0f,
+                    widget.color.b / 255.0f,
+                    widget.color.a / 255.0f
+                };
+                if(ImGui::ColorEdit4("Panel Color", panelColor)){
+                    widget.color = ofColor(panelColor[0] * 255.0f,
+                                           panelColor[1] * 255.0f,
+                                           panelColor[2] * 255.0f,
+                                           panelColor[3] * 255.0f);
+                    container.markCustomGuisDirty();
+                }
+
+                ofColor labelColor = ofxOceanodeCustomGuiWidgetHelpers::widgetLabelColor(widget, ofColor::black);
+                float labelColorFloat[4] = {
+                    labelColor.r / 255.0f,
+                    labelColor.g / 255.0f,
+                    labelColor.b / 255.0f,
+                    labelColor.a / 255.0f
+                };
+                if(ImGui::ColorEdit4("Label Color", labelColorFloat)){
+                    widget.config["labelColor"] = customGuiColorToJson(ofColor(labelColorFloat[0] * 255.0f,
+                                                                               labelColorFloat[1] * 255.0f,
+                                                                               labelColorFloat[2] * 255.0f,
+                                                                               labelColorFloat[3] * 255.0f));
+                    container.markCustomGuisDirty();
+                }
+
+                float labelFontScale = std::max(0.2f, widget.config.value("labelFontScale", 1.0f));
+                if(ImGui::InputFloat("Label Font Scale", &labelFontScale, 0.05f, 0.2f, "%.2f")){
+                    widget.config["labelFontScale"] = std::max(0.2f, labelFontScale);
+                    container.markCustomGuisDirty();
+                }
+            }else if(widget.type == CustomGuiWidgetType::Text){
+                float textColor[4] = {
+                    widget.color.r / 255.0f,
+                    widget.color.g / 255.0f,
+                    widget.color.b / 255.0f,
+                    widget.color.a / 255.0f
+                };
+                if(ImGui::ColorEdit4("Text Color", textColor)){
+                    widget.color = ofColor(textColor[0] * 255.0f,
+                                           textColor[1] * 255.0f,
+                                           textColor[2] * 255.0f,
+                                           textColor[3] * 255.0f);
+                    container.markCustomGuisDirty();
+                }
+            }else if(widget.type == CustomGuiWidgetType::Line){
+            }else{
             ofColor labelColor = ofxOceanodeCustomGuiWidgetHelpers::widgetLabelColor(widget, ofColor::black);
             float labelColorFloat[4] = {
                 labelColor.r / 255.0f,
@@ -912,6 +982,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                                        accentColor[3] * 255.0f);
                 container.markCustomGuisDirty();
             }
+            }
         }
 
         if(parameter != nullptr){
@@ -923,6 +994,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
             };
 
             if(ofxOceanodeCustomGuiWidgetHelpers::isFloatVectorParameter(*parameter)){
+                addCompatibleType(CustomGuiWidgetType::Knob);
                 addCompatibleType(CustomGuiWidgetType::DragNumber);
                 addCompatibleType(CustomGuiWidgetType::MultiSlider);
                 addCompatibleType(CustomGuiWidgetType::MultiToggle);
@@ -947,6 +1019,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                 addCompatibleType(CustomGuiWidgetType::Slider);
                 addCompatibleType(CustomGuiWidgetType::DragNumber);
                 addCompatibleType(CustomGuiWidgetType::MultiToggle);
+                addCompatibleType(CustomGuiWidgetType::CustomDropdown);
                 if(!parameter->cast<int>().getDropdownOptions().empty()){
                     addCompatibleType(CustomGuiWidgetType::Dropdown);
                 }

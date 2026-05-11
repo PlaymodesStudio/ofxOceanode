@@ -6,6 +6,7 @@
 #include "ofxOceanodeShared.h"
 #include "ofMain.h"
 #include <algorithm>
+#include <cstdio>
 
 namespace {
 
@@ -18,7 +19,9 @@ bool supportsSliderWidget(ofxOceanodeAbstractParameter& parameter)
 
 bool supportsKnobWidget(ofxOceanodeAbstractParameter& parameter)
 {
-    return isFloatParameter(parameter) || isIntParameter(parameter);
+    return isFloatParameter(parameter) ||
+           isIntParameter(parameter) ||
+           isFloatVectorParameter(parameter);
 }
 
 bool supportsDragNumberWidget(ofxOceanodeAbstractParameter& parameter)
@@ -59,6 +62,70 @@ bool supportsDropdownWidget(ofxOceanodeAbstractParameter& parameter)
     return isIntParameter(parameter) && !parameter.cast<int>().getDropdownOptions().empty();
 }
 
+bool supportsCustomDropdownWidget(ofxOceanodeAbstractParameter& parameter)
+{
+    return isIntParameter(parameter);
+}
+
+std::vector<std::string> getCustomDropdownOptions(const CustomGuiWidget& widget)
+{
+    std::vector<std::string> options;
+    if(!widget.config.contains("customOptions") || !widget.config["customOptions"].is_array()) return options;
+
+    for(const auto& item : widget.config["customOptions"]){
+        options.push_back(item.is_string() ? item.get<std::string>() : std::string());
+    }
+    return options;
+}
+
+ofJson customDropdownOptionsToJson(const std::vector<std::string>& options)
+{
+    ofJson json = ofJson::array();
+    for(const auto& option : options) json.push_back(option);
+    return json;
+}
+
+void drawCustomDropdownProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
+{
+    std::vector<std::string> options = getCustomDropdownOptions(widget);
+    int baseValue = 0;
+
+    if(parameter != nullptr && isIntParameter(*parameter)){
+        auto& intParam = parameter->cast<int>().getParameter();
+        baseValue = intParam.getMin();
+        ImGui::TextDisabled("Mapped from parameter min: %d", baseValue);
+    }
+
+    for(size_t i = 0; i < options.size(); i++){
+        char buffer[256];
+        std::snprintf(buffer, sizeof(buffer), "%s", options[i].c_str());
+        ImGui::PushID((int)i);
+        const std::string label = "##customOption";
+        if(ImGui::InputText(label.c_str(), buffer, sizeof(buffer))){
+            options[i] = buffer;
+            widget.config["customOptions"] = customDropdownOptionsToJson(options);
+            context.container.markCustomGuisDirty();
+        }
+        ImGui::SameLine();
+        ImGui::Text("Value %d", baseValue + (int)i);
+        ImGui::SameLine();
+        if(ImGui::SmallButton("-")){
+            options.erase(options.begin() + i);
+            widget.config["customOptions"] = customDropdownOptionsToJson(options);
+            context.container.markCustomGuisDirty();
+            ImGui::PopID();
+            break;
+        }
+        ImGui::PopID();
+    }
+
+    if(ImGui::Button("Add Option")){
+        options.push_back("");
+        widget.config["customOptions"] = customDropdownOptionsToJson(options);
+        context.container.markCustomGuisDirty();
+    }
+}
+
 void initializeWideWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
 {
     widget.spanW = 2;
@@ -71,6 +138,26 @@ void initializeFontScaledWideWidget(CustomGuiWidget& widget, ofxOceanodeAbstract
 {
     initializeWideWidget(widget, parameter);
     widget.config["fontScale"] = 1.0f;
+}
+
+void initializeCustomDropdownWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
+{
+    initializeWideWidget(widget, parameter);
+
+    std::vector<std::string> options = parameter.cast<int>().getDropdownOptions();
+    if(options.empty()){
+        auto& intParam = parameter.cast<int>().getParameter();
+        const int minValue = intParam.getMin();
+        const int maxValue = intParam.getMax();
+        const int range = maxValue - minValue;
+        if(range >= 0 && range <= 32){
+            options.reserve(range + 1);
+            for(int value = minValue; value <= maxValue; value++){
+                options.push_back(ofToString(value));
+            }
+        }
+    }
+    widget.config["customOptions"] = customDropdownOptionsToJson(options);
 }
 
 void initializeButtonWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
@@ -94,12 +181,25 @@ bool renderKnobWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wi
     float sliderMin = 0.0f;
     float sliderMax = 1.0f;
     bool changed = false;
+    bool floatVectorParameter = false;
+    std::vector<float> floatVectorValue;
 
     if(isFloatParameter(*parameter)){
         auto& param = parameter->cast<float>().getParameter();
         value = param.get();
         sliderMin = floatRangeMin(widget, param.getMin());
         sliderMax = floatRangeMax(widget, param.getMax());
+    }else if(isFloatVectorParameter(*parameter)){
+        auto& param = parameter->cast<std::vector<float>>().getParameter();
+        floatVectorValue = param.get();
+        if(floatVectorValue.empty()) return false;
+
+        value = floatVectorValue[0];
+        float minValue = !param.getMin().empty() ? param.getMin()[0] : 0.0f;
+        float maxValue = !param.getMax().empty() ? param.getMax()[0] : 1.0f;
+        sliderMin = floatRangeMin(widget, minValue);
+        sliderMax = floatRangeMax(widget, maxValue);
+        floatVectorParameter = true;
     }else if(isIntParameter(*parameter)){
         auto& param = parameter->cast<int>().getParameter();
         value = (float)param.get();
@@ -151,6 +251,10 @@ bool renderKnobWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wi
         if(isFloatParameter(*parameter)){
             value = quantizeFloatValue(widget, value, sliderMin, sliderMax);
             parameter->cast<float>().getParameter().set(value);
+        }else if(floatVectorParameter){
+            value = quantizeFloatValue(widget, value, sliderMin, sliderMax);
+            floatVectorValue[0] = value;
+            parameter->cast<std::vector<float>>().getParameter().set(floatVectorValue);
         }else{
             parameter->cast<int>().getParameter().set((int)std::round(ofClamp(value, sliderMin, sliderMax)));
         }
@@ -226,6 +330,7 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
     const int sliderMin = intRangeMin(widget, param.getMin());
     const int sliderMax = intRangeMax(widget, param.getMax());
     const auto options = parameter->cast<int>().getDropdownOptions();
+    const auto customOptions = getCustomDropdownOptions(widget);
     bool changed = false;
     const bool customFontScale = widget.type == CustomGuiWidgetType::DragNumber;
     const float fontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
@@ -239,7 +344,19 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
     pushWidgetFrameColors(bodyColor, accentColor);
 
     if(!interactive){
-        ImGui::TextWrapped("%d", value);
+        if(widget.type == CustomGuiWidgetType::Dropdown && !options.empty()){
+            const int index = ofClamp(value, 0, (int)options.size() - 1);
+            ImGui::TextWrapped("%s", options[index].c_str());
+        }else if(widget.type == CustomGuiWidgetType::CustomDropdown && !customOptions.empty()){
+            const int optionIndex = value - sliderMin;
+            if(optionIndex >= 0 && optionIndex < (int)customOptions.size()){
+                ImGui::TextWrapped("%s", customOptions[optionIndex].c_str());
+            }else{
+                ImGui::TextWrapped("%d", value);
+            }
+        }else{
+            ImGui::TextWrapped("%d", value);
+        }
     }else if(widget.type == CustomGuiWidgetType::MultiToggle){
         const bool active = value > 0;
         if(active) pushToggleOnColors(widget.color);
@@ -254,6 +371,19 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
             for(int i = 0; i < (int)options.size(); i++){
                 if(ImGui::Selectable(options[i].c_str(), value == i)){
                     value = i;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+    }else if(widget.type == CustomGuiWidgetType::CustomDropdown && !customOptions.empty()){
+        int optionIndex = value - sliderMin;
+        optionIndex = ofClamp(optionIndex, 0, (int)customOptions.size() - 1);
+        const char* preview = customOptions[optionIndex].c_str();
+        if(ImGui::BeginCombo("##value", preview)){
+            for(int i = 0; i < (int)customOptions.size(); i++){
+                if(ImGui::Selectable(customOptions[i].c_str(), optionIndex == i)){
+                    value = sliderMin + i;
                     changed = true;
                 }
             }
@@ -554,6 +684,12 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
                    supportsDropdownWidget,
                    initializeWideWidget,
                    renderIntWidget);
+
+    registerWidget(registry, CustomGuiWidgetType::CustomDropdown,
+                   supportsCustomDropdownWidget,
+                   initializeCustomDropdownWidget,
+                   renderIntWidget,
+                   drawCustomDropdownProperties);
 
     registerWidget(registry, CustomGuiWidgetType::CustomRegion,
                    supportsCustomRegionWidget,
