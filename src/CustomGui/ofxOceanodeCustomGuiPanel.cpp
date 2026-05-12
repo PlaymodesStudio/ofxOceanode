@@ -47,6 +47,10 @@ void ofxOceanodeCustomGuiPanel::draw()
     static int resizeAnchorW = 1;
     static int resizeAnchorH = 1;
     static std::string resizedWidgetPanelId;
+    static bool marqueeSelectionActive = false;
+    static ImVec2 marqueeAnchorMouse = ImVec2(0, 0);
+    static ImVec2 marqueeCurrentMouse = ImVec2(0, 0);
+    static std::string marqueePanelId;
 
     auto ensureLayoutFitsWidgets = [&](CustomGuiLayout& layout){
         int requiredColumns = std::max(1, layout.columns);
@@ -361,6 +365,81 @@ void ofxOceanodeCustomGuiPanel::draw()
         const ImVec2 origin = ImGui::GetCursorPos();
         const ImVec2 originScreen = ImGui::GetCursorScreenPos();
 
+        auto getWidgetRect = [&](const CustomGuiWidget& widget){
+            const float x = widget.gridX * panel->layout.cellWidth * panel->layout.zoom;
+            const float y = widget.gridY * panel->layout.cellHeight * panel->layout.zoom;
+            const float w = widget.spanW * panel->layout.cellWidth * panel->layout.zoom;
+            const float h = widget.spanH * panel->layout.cellHeight * panel->layout.zoom;
+            return std::pair<ImVec2, ImVec2>(ImVec2(originScreen.x + x, originScreen.y + y),
+                                             ImVec2(originScreen.x + x + w, originScreen.y + y + h));
+        };
+
+        auto widgetDrawsBehind = [&](const CustomGuiWidget& widget){
+            return widget.type == CustomGuiWidgetType::BackgroundPanel ||
+                   (widget.type == CustomGuiWidgetType::Image && widget.config.value("sendToBack", false));
+        };
+
+        auto rectsIntersect = [&](const ImVec2& minA, const ImVec2& maxA, const ImVec2& minB, const ImVec2& maxB){
+            return minA.x < maxB.x && maxA.x > minB.x &&
+                   minA.y < maxB.y && maxA.y > minB.y;
+        };
+
+        auto rectContainsRect = [&](const ImVec2& outerMin, const ImVec2& outerMax, const ImVec2& innerMin, const ImVec2& innerMax){
+            return innerMin.x >= outerMin.x && innerMax.x <= outerMax.x &&
+                   innerMin.y >= outerMin.y && innerMax.y <= outerMax.y;
+        };
+
+        auto findTopmostWidgetAt = [&](const ImVec2& mousePos){
+            (void)mousePos;
+            int topIndex = -1;
+            auto considerPass = [&](bool backPass){
+                for(size_t index = 0; index < panel->layout.widgets.size(); index++){
+                    const auto& widget = panel->layout.widgets[index];
+                    if(widgetDrawsBehind(widget) != backPass) continue;
+                    const auto rect = getWidgetRect(widget);
+                    if(ImGui::IsMouseHoveringRect(rect.first, rect.second)){
+                        topIndex = (int)index;
+                    }
+                }
+            };
+            considerPass(true);
+            considerPass(false);
+            return topIndex;
+        };
+
+        auto findTopmostResizeHandleAt = [&](const ImVec2& mousePos){
+            (void)mousePos;
+            int topIndex = -1;
+            auto considerPass = [&](bool backPass){
+                for(size_t index = 0; index < panel->layout.widgets.size(); index++){
+                    const auto& widget = panel->layout.widgets[index];
+                    if(widgetDrawsBehind(widget) != backPass) continue;
+                    if(widget.config.value("locked", false)) continue;
+                    const auto rect = getWidgetRect(widget);
+                    const ImVec2 handleMin(rect.second.x - 12.0f, rect.second.y - 12.0f);
+                    if(ImGui::IsMouseHoveringRect(handleMin, rect.second)){
+                        topIndex = (int)index;
+                    }
+                }
+            };
+            considerPass(true);
+            considerPass(false);
+            return topIndex;
+        };
+
+        auto findBackgroundPanelAt = [&](const ImVec2& mousePos){
+            int panelIndex = -1;
+            for(size_t index = 0; index < panel->layout.widgets.size(); index++){
+                const auto& widget = panel->layout.widgets[index];
+                if(widget.type != CustomGuiWidgetType::BackgroundPanel) continue;
+                const auto rect = getWidgetRect(widget);
+                if(ImGui::IsMouseHoveringRect(rect.first, rect.second)){
+                    panelIndex = (int)index;
+                }
+            }
+            return panelIndex;
+        };
+
         ImDrawList* panelDrawList = ImGui::GetWindowDrawList();
         panelDrawList->AddRectFilled(originScreen,
                                      ImVec2(originScreen.x + panelWidth, originScreen.y + panelHeight),
@@ -376,6 +455,35 @@ void ofxOceanodeCustomGuiPanel::draw()
             ImGui::Dummy(ImVec2(panelWidth, panelHeight));
         }
 
+        const int topmostHoveredWidgetIndex = panel->designMode ? findTopmostWidgetAt(ImGui::GetIO().MousePos) : -1;
+        const int topmostResizeHandleIndex = panel->designMode ? findTopmostResizeHandleAt(ImGui::GetIO().MousePos) : -1;
+        const int hoveredBackgroundPanelIndex = panel->designMode ? findBackgroundPanelAt(ImGui::GetIO().MousePos) : -1;
+        const bool gridHovered = panel->designMode && ImGui::IsItemHovered();
+        const bool foregroundWidgetHovered =
+            topmostHoveredWidgetIndex >= 0 &&
+            panel->layout.widgets[topmostHoveredWidgetIndex].type != CustomGuiWidgetType::BackgroundPanel;
+        const bool propertiesPopupOpen = panel->designMode && ImGui::IsPopupOpen("Widget Properties");
+        const bool ctrlPressed = ImGui::GetIO().KeyCtrl;
+
+        if(panel->designMode && !propertiesPopupOpen && ctrlPressed &&
+           !marqueeSelectionActive && gridHovered && !foregroundWidgetHovered &&
+           ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
+            marqueeSelectionActive = true;
+            marqueePanelId = panel->id;
+            marqueeAnchorMouse = ImGui::GetIO().MousePos;
+            marqueeCurrentMouse = marqueeAnchorMouse;
+            draggedWidgetIndex = -1;
+            draggedWidgetIndices.clear();
+            dragAnchorPositions.clear();
+            draggedWidgetPanelId.clear();
+            resizedWidgetIndex = -1;
+            resizedWidgetPanelId.clear();
+        }else if(panel->designMode && !propertiesPopupOpen && !ctrlPressed &&
+                 !marqueeSelectionActive && gridHovered &&
+                 topmostHoveredWidgetIndex < 0 &&
+                 ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
+            selectedWidgetIndices.clear();
+        }
         if(panel->designMode) drawGridOverlay(panel->layout, origin);
 
         int widgetToRemove = -1;
@@ -404,7 +512,6 @@ void ofxOceanodeCustomGuiPanel::draw()
             }
 
             if(panel->designMode){
-                const bool propertiesPopupOpen = ImGui::IsPopupOpen("Widget Properties");
                 ImDrawList* drawList = ImGui::GetWindowDrawList();
                 const ImVec2 min = ImGui::GetItemRectMin();
                 const ImVec2 max = ImGui::GetItemRectMax();
@@ -415,13 +522,34 @@ void ofxOceanodeCustomGuiPanel::draw()
                                   (selected ? IM_COL32(255, 255, 255, 220) : IM_COL32(255, 180, 40, 180)),
                                   2.0f, 0, selected ? 2.0f : 1.5f);
 
-                bool hovered = ImGui::IsMouseHoveringRect(min, max);
+                bool hovered = topmostHoveredWidgetIndex == (int)i && ImGui::IsMouseHoveringRect(min, max);
                 ImVec2 handleMin(max.x - 12.0f, max.y - 12.0f);
-                bool resizeHovered = !locked && ImGui::IsMouseHoveringRect(handleMin, max);
+                bool resizeHovered = !locked &&
+                                     topmostResizeHandleIndex == (int)i &&
+                                     ImGui::IsMouseHoveringRect(handleMin, max);
                 if(!locked) drawList->AddRectFilled(handleMin, max, IM_COL32(255, 180, 40, 220), 1.0f);
                 if(!propertiesPopupOpen && hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
                     const bool shiftPressed = ImGui::GetIO().KeyShift;
-                    if(shiftPressed){
+                    if(ctrlPressed){
+                        marqueeSelectionActive = true;
+                        marqueePanelId = panel->id;
+                        marqueeAnchorMouse = ImGui::GetIO().MousePos;
+                        marqueeCurrentMouse = marqueeAnchorMouse;
+                    }else if(!shiftPressed && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+                             hoveredBackgroundPanelIndex >= 0){
+                        const auto panelRect = getWidgetRect(panel->layout.widgets[hoveredBackgroundPanelIndex]);
+                        selectedWidgetIndices.clear();
+                        selectedWidgetIndices.push_back(hoveredBackgroundPanelIndex);
+                        for(size_t otherIndex = 0; otherIndex < panel->layout.widgets.size(); otherIndex++){
+                            if((int)otherIndex == hoveredBackgroundPanelIndex) continue;
+                            const auto& otherWidget = panel->layout.widgets[otherIndex];
+                            if(otherWidget.type == CustomGuiWidgetType::BackgroundPanel) continue;
+                            const auto otherRect = getWidgetRect(otherWidget);
+                            if(rectsIntersect(panelRect.first, panelRect.second, otherRect.first, otherRect.second)){
+                                selectedWidgetIndices.push_back((int)otherIndex);
+                            }
+                        }
+                    }else if(shiftPressed){
                         auto selectedIt = std::find(selectedWidgetIndices.begin(), selectedWidgetIndices.end(), (int)i);
                         if(selectedIt == selectedWidgetIndices.end()) selectedWidgetIndices.push_back((int)i);
                         else selectedWidgetIndices.erase(selectedIt);
@@ -429,7 +557,8 @@ void ofxOceanodeCustomGuiPanel::draw()
                         selectedWidgetIndices = {(int)i};
                     }
 
-                    if(!shiftPressed && resizeHovered){
+                    if(ctrlPressed){
+                    }else if(!shiftPressed && resizeHovered){
                         resizedWidgetIndex = (int)i;
                         resizedWidgetPanelId = panel->id;
                         resizeAnchorMouse = ImGui::GetIO().MousePos;
@@ -555,6 +684,28 @@ void ofxOceanodeCustomGuiPanel::draw()
             if(widget.type != CustomGuiWidgetType::BackgroundPanel &&
                !(widget.type == CustomGuiWidgetType::Image && widget.config.value("sendToBack", false))){
                 drawWidgetAtIndex(i);
+            }
+        }
+
+        if(panel->designMode && marqueeSelectionActive && marqueePanelId == panel->id){
+            marqueeCurrentMouse = ImGui::GetIO().MousePos;
+            const ImVec2 selectionMin(std::min(marqueeAnchorMouse.x, marqueeCurrentMouse.x),
+                                      std::min(marqueeAnchorMouse.y, marqueeCurrentMouse.y));
+            const ImVec2 selectionMax(std::max(marqueeAnchorMouse.x, marqueeCurrentMouse.x),
+                                      std::max(marqueeAnchorMouse.y, marqueeCurrentMouse.y));
+            panelDrawList->AddRectFilled(selectionMin, selectionMax, IM_COL32(90, 150, 255, 35));
+            panelDrawList->AddRect(selectionMin, selectionMax, IM_COL32(90, 150, 255, 220), 0.0f, 0, 1.5f);
+
+            if(ImGui::IsMouseReleased(ImGuiMouseButton_Left)){
+                selectedWidgetIndices.clear();
+                for(size_t i = 0; i < panel->layout.widgets.size(); i++){
+                    const auto rect = getWidgetRect(panel->layout.widgets[i]);
+                    if(rectContainsRect(selectionMin, selectionMax, rect.first, rect.second)){
+                        selectedWidgetIndices.push_back((int)i);
+                    }
+                }
+                marqueeSelectionActive = false;
+                marqueePanelId.clear();
             }
         }
 
