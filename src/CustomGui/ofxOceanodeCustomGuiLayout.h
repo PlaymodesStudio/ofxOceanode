@@ -24,11 +24,13 @@ enum class CustomGuiWidgetType {
     Label,
     Dropdown,
     CustomDropdown,
+    ButtonMatrix,
 	BackgroundPanel,
 	Text,
     Line,
 	Texture,
 	Image,
+    SnapshotMatrix,
     CustomRegion
 };
 
@@ -116,11 +118,13 @@ inline std::string customGuiWidgetTypeToString(CustomGuiWidgetType type)
         case CustomGuiWidgetType::Label: return "Label";
         case CustomGuiWidgetType::Dropdown: return "Dropdown";
         case CustomGuiWidgetType::CustomDropdown: return "CustomDropdown";
+        case CustomGuiWidgetType::ButtonMatrix: return "ButtonMatrix";
 	        case CustomGuiWidgetType::BackgroundPanel: return "BackgroundPanel";
 	        case CustomGuiWidgetType::Text: return "Text";
             case CustomGuiWidgetType::Line: return "Line";
 	        case CustomGuiWidgetType::Texture: return "Texture";
 	        case CustomGuiWidgetType::Image: return "Image";
+            case CustomGuiWidgetType::SnapshotMatrix: return "SnapshotMatrix";
             case CustomGuiWidgetType::CustomRegion: return "CustomRegion";
     }
     return "Slider";
@@ -144,11 +148,13 @@ inline CustomGuiWidgetType customGuiWidgetTypeFromString(const std::string& type
     if(type == "Label") return CustomGuiWidgetType::Label;
     if(type == "Dropdown") return CustomGuiWidgetType::Dropdown;
     if(type == "CustomDropdown") return CustomGuiWidgetType::CustomDropdown;
+    if(type == "ButtonMatrix") return CustomGuiWidgetType::ButtonMatrix;
 	    if(type == "BackgroundPanel") return CustomGuiWidgetType::BackgroundPanel;
 	    if(type == "Text") return CustomGuiWidgetType::Text;
         if(type == "Line") return CustomGuiWidgetType::Line;
 	    if(type == "Texture") return CustomGuiWidgetType::Texture;
 	    if(type == "Image") return CustomGuiWidgetType::Image;
+    if(type == "SnapshotMatrix") return CustomGuiWidgetType::SnapshotMatrix;
     if(type == "CustomRegion") return CustomGuiWidgetType::CustomRegion;
     return CustomGuiWidgetType::Slider;
 }

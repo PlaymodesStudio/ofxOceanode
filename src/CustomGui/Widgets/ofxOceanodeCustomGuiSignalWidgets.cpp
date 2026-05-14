@@ -652,6 +652,7 @@ void initializeVUMeterWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParamet
 {
     widget.spanW = 3;
     widget.spanH = 2;
+    widget.config["vertical"] = true;
     if(isScBusParameterType(parameter.valueType())){
         widget.config["channels"] = 2;
     }
@@ -710,43 +711,79 @@ ImU32 getVUMeterColorDB(float dbLevel)
     }
 }
 
-void drawVUMeterDisplay(const std::vector<float>& levels, const ImVec2& itemSize, ImDrawList* drawList, const ImVec2& min, const ImVec2& max)
+void drawVUMeterDisplay(const std::vector<float>& levels, const ImVec2& itemSize, ImDrawList* drawList, const ImVec2& min, const ImVec2& max, bool vertical)
 {
     const int numChans = std::max(1, (int)levels.size());
-    const float leftMargin = std::min(20.0f, itemSize.x * 0.12f);
-    const float meterWidth = std::max(1.0f, itemSize.x - leftMargin);
-    const float separatorHeight = 1.0f;
-    const float totalSeparatorHeight = std::max(0, numChans - 1) * separatorHeight;
-    const float channelH = std::max(8.0f, (itemSize.y - totalSeparatorHeight) / numChans);
-
     drawList->AddRectFilled(min, max, IM_COL32(15, 15, 15, 255), 2.0f);
     drawList->AddRect(min, max, IM_COL32(100, 100, 100, 255), 2.0f);
 
-    float currentY = min.y;
-    for(int ch = 0; ch < numChans; ch++){
-        const float dbLevel = ampToDb(ofClamp(levels[ch], 0.0f, 2.0f));
-        const ImVec2 channelStart(min.x + leftMargin, currentY);
-        const ImVec2 channelEnd(max.x, currentY + channelH);
-        drawList->AddRectFilled(channelStart, channelEnd, IM_COL32(25, 25, 25, 255));
+    if(vertical){
+        const float leftMargin = std::min(20.0f, itemSize.x * 0.12f);
+        const float meterWidth = std::max(1.0f, itemSize.x - leftMargin);
+        const float separatorHeight = 1.0f;
+        const float totalSeparatorHeight = std::max(0, numChans - 1) * separatorHeight;
+        const float channelH = std::max(8.0f, (itemSize.y - totalSeparatorHeight) / numChans);
 
-        if(dbLevel > -60.0f){
-            const float meterPosition = dbToVUPosition(dbLevel, -60.0f, 6.0f);
-            const float meterW = meterWidth * meterPosition;
-            drawList->AddRectFilled(channelStart, ImVec2(channelStart.x + meterW, channelEnd.y), getVUMeterColorDB(dbLevel));
+        float currentY = min.y;
+        for(int ch = 0; ch < numChans; ch++){
+            const float dbLevel = ampToDb(ofClamp(levels[ch], 0.0f, 2.0f));
+            const ImVec2 channelStart(min.x + leftMargin, currentY);
+            const ImVec2 channelEnd(max.x, currentY + channelH);
+            drawList->AddRectFilled(channelStart, channelEnd, IM_COL32(25, 25, 25, 255));
+
+            if(dbLevel > -60.0f){
+                const float meterPosition = dbToVUPosition(dbLevel, -60.0f, 6.0f);
+                const float meterW = meterWidth * meterPosition;
+                drawList->AddRectFilled(channelStart, ImVec2(channelStart.x + meterW, channelEnd.y), getVUMeterColorDB(dbLevel));
+            }
+
+            const float zeroDbPosition = dbToVUPosition(0.0f, -60.0f, 6.0f);
+            if(zeroDbPosition > 0.01f && zeroDbPosition < 0.99f){
+                const float zeroDbX = channelStart.x + meterWidth * zeroDbPosition;
+                drawList->AddLine(ImVec2(zeroDbX, channelStart.y), ImVec2(zeroDbX, channelEnd.y), IM_COL32(255, 255, 255, 220), 1.0f);
+            }
+
+            const char* channelLabel = ch == 0 ? "L" : (ch == 1 ? "R" : nullptr);
+            const std::string label = channelLabel != nullptr ? channelLabel : ofToString(ch + 1);
+            drawList->AddText(ImVec2(min.x + 3.0f, currentY + 2.0f), IM_COL32(180, 180, 180, 255), label.c_str());
+
+            currentY += channelH;
+            if(ch < numChans - 1) currentY += separatorHeight;
         }
+    }else{
+        const float topMargin = std::min(16.0f, itemSize.y * 0.2f);
+        const float meterHeight = std::max(1.0f, itemSize.y - topMargin);
+        const float separatorWidth = 1.0f;
+        const float totalSeparatorWidth = std::max(0, numChans - 1) * separatorWidth;
+        const float channelW = std::max(8.0f, (itemSize.x - totalSeparatorWidth) / numChans);
 
-        const float zeroDbPosition = dbToVUPosition(0.0f, -60.0f, 6.0f);
-        if(zeroDbPosition > 0.01f && zeroDbPosition < 0.99f){
-            const float zeroDbX = channelStart.x + meterWidth * zeroDbPosition;
-            drawList->AddLine(ImVec2(zeroDbX, channelStart.y), ImVec2(zeroDbX, channelEnd.y), IM_COL32(255, 255, 255, 220), 1.0f);
+        float currentX = min.x;
+        for(int ch = 0; ch < numChans; ch++){
+            const float dbLevel = ampToDb(ofClamp(levels[ch], 0.0f, 2.0f));
+            const ImVec2 channelStart(currentX, min.y + topMargin);
+            const ImVec2 channelEnd(currentX + channelW, max.y);
+            drawList->AddRectFilled(channelStart, channelEnd, IM_COL32(25, 25, 25, 255));
+
+            if(dbLevel > -60.0f){
+                const float meterPosition = dbToVUPosition(dbLevel, -60.0f, 6.0f);
+                const float meterH = meterHeight * meterPosition;
+                drawList->AddRectFilled(ImVec2(channelStart.x, channelEnd.y - meterH), channelEnd, getVUMeterColorDB(dbLevel));
+            }
+
+            const float zeroDbPosition = dbToVUPosition(0.0f, -60.0f, 6.0f);
+            if(zeroDbPosition > 0.01f && zeroDbPosition < 0.99f){
+                const float zeroDbY = channelEnd.y - meterHeight * zeroDbPosition;
+                drawList->AddLine(ImVec2(channelStart.x, zeroDbY), ImVec2(channelEnd.x, zeroDbY), IM_COL32(255, 255, 255, 220), 1.0f);
+            }
+
+            const char* channelLabel = ch == 0 ? "L" : (ch == 1 ? "R" : nullptr);
+            const std::string label = channelLabel != nullptr ? channelLabel : ofToString(ch + 1);
+            ImVec2 textSize = ImGui::CalcTextSize(label.c_str());
+            drawList->AddText(ImVec2(currentX + (channelW - textSize.x) * 0.5f, min.y + 1.0f), IM_COL32(180, 180, 180, 255), label.c_str());
+
+            currentX += channelW;
+            if(ch < numChans - 1) currentX += separatorWidth;
         }
-
-        const char* channelLabel = ch == 0 ? "L" : (ch == 1 ? "R" : nullptr);
-        const std::string label = channelLabel != nullptr ? channelLabel : ofToString(ch + 1);
-        drawList->AddText(ImVec2(min.x + 3.0f, currentY + 2.0f), IM_COL32(180, 180, 180, 255), label.c_str());
-
-        currentY += channelH;
-        if(ch < numChans - 1) currentY += separatorHeight;
     }
 }
 
@@ -1000,7 +1037,8 @@ bool renderVUMeterWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget&
     drawWidgetLabel(widget, context.label);
     const ImVec2 itemSize = widgetItemSize(context);
     ImGui::InvisibleButton("##vumeter", itemSize);
-    drawVUMeterDisplay(levels, itemSize, ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    drawVUMeterDisplay(levels, itemSize, ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+                       widget.config.value("vertical", true));
     ImGui::EndGroup();
     return true;
 }
@@ -1083,6 +1121,12 @@ void drawWaveformProperties(CustomGuiWidgetPropertiesContext& context, CustomGui
 
 void drawVUMeterProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
 {
+    bool vertical = widget.config.value("vertical", true);
+    if(ImGui::Checkbox("Vertical", &vertical)){
+        widget.config["vertical"] = vertical;
+        context.container.markCustomGuisDirty();
+    }
+
     if(parameter == nullptr || !isScBusParameterType(parameter->valueType())) return;
 #ifdef OFXOCEANODE_CUSTOMGUI_HAS_SCBUS
     int channels = ofClamp(widget.config.value("channels", 2), 1, kScBusWaveformMaxChannels);

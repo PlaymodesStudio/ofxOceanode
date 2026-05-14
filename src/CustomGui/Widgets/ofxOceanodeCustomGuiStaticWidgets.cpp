@@ -9,6 +9,32 @@ namespace {
 
 using namespace ofxOceanodeCustomGuiWidgetHelpers;
 
+ofColor matrixColorFromConfig(const CustomGuiWidget& widget, const char* key, const ofColor& fallback)
+{
+    if(widget.config.contains(key) && widget.config[key].is_array()){
+        return customGuiColorFromJson(widget.config[key], fallback);
+    }
+    return fallback;
+}
+
+void drawMatrixColorProperty(CustomGuiWidgetPropertiesContext& context, CustomGuiWidget& widget, const char* key, const char* label, const ofColor& fallback)
+{
+    ofColor color = matrixColorFromConfig(widget, key, fallback);
+    float colorFloat[4] = {
+        color.r / 255.0f,
+        color.g / 255.0f,
+        color.b / 255.0f,
+        color.a / 255.0f
+    };
+    if(ImGui::ColorEdit4(label, colorFloat)){
+        widget.config[key] = customGuiColorToJson(ofColor(colorFloat[0] * 255.0f,
+                                                          colorFloat[1] * 255.0f,
+                                                          colorFloat[2] * 255.0f,
+                                                          colorFloat[3] * 255.0f));
+        context.container.markCustomGuisDirty();
+    }
+}
+
 bool renderLabelWidget(CustomGuiWidgetRenderContext&, CustomGuiWidget& widget, ofxOceanodeAbstractParameter*)
 {
     ImGui::BeginGroup();
@@ -108,6 +134,50 @@ bool renderLineWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wi
     return true;
 }
 
+bool renderSnapshotMatrixWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter*)
+{
+    const CustomGuiSnapshotBank* bank = context.container.getCustomGuiSnapshotBank(context.panelId);
+    const int rows = std::max(1, widget.config.value("rows", 2));
+    const int cols = std::max(1, widget.config.value("cols", 4));
+    const bool showNames = widget.config.value("showSnapshotNames", true);
+    const float spacingX = ImGui::GetStyle().ItemSpacing.x;
+    const float spacingY = ImGui::GetStyle().ItemSpacing.y;
+    const ImVec2 itemSize = widgetItemSize(context);
+    const float btnW = std::max(18.0f, (itemSize.x - spacingX * (cols - 1)) / cols);
+    const float btnH = std::max(18.0f, (itemSize.y - spacingY * (rows - 1)) / rows);
+    const ofColor activeColor = matrixColorFromConfig(widget, "activeColor", ofColor(102, 0, 0, 255));
+    const ofColor filledColor = matrixColorFromConfig(widget, "filledColor", ofColor(51, 102, 0, 255));
+    const ofColor emptyColor = matrixColorFromConfig(widget, "emptyColor", ofColor(70, 70, 70, 255));
+
+    ImGui::BeginGroup();
+    drawWidgetLabel(widget, context.label);
+    for(int row = 0; row < rows; row++){
+        for(int col = 0; col < cols; col++){
+            if(col > 0) ImGui::SameLine();
+            const int slot = row * cols + col;
+            const CustomGuiSnapshotData* snapshot = context.container.getCustomGuiSnapshotBySlot(context.panelId, slot);
+            const bool hasData = snapshot != nullptr;
+            const bool isActive = bank != nullptr && snapshot != nullptr && bank->currentSnapshotId == snapshot->id;
+            const ofColor buttonColor = isActive ? activeColor : (hasData ? filledColor : emptyColor);
+
+            ImGui::PushID(slot);
+            ImGui::PushStyleColor(ImGuiCol_Button, colorToImVec4(buttonColor));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colorToImVec4(buttonColor, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, colorToImVec4(buttonColor, 1.0f));
+
+            std::string label = (hasData && showNames) ? snapshot->name : ofToString(slot + 1);
+            if(ImGui::Button(label.c_str(), ImVec2(btnW, btnH)) && !context.designMode){
+                context.container.recallCustomGuiSnapshotSlot(context.panelId, slot);
+            }
+
+            ImGui::PopStyleColor(3);
+            ImGui::PopID();
+        }
+    }
+    ImGui::EndGroup();
+    return true;
+}
+
 void drawTextProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter*)
 {
     float fontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
@@ -189,6 +259,30 @@ void drawLineProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidg
     }
 }
 
+void drawSnapshotMatrixProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter*)
+{
+    int rows = std::max(1, widget.config.value("rows", 2));
+    int cols = std::max(1, widget.config.value("cols", 4));
+    if(ImGui::InputInt("Rows", &rows)){
+        widget.config["rows"] = std::max(1, rows);
+        context.container.markCustomGuisDirty();
+    }
+    if(ImGui::InputInt("Cols", &cols)){
+        widget.config["cols"] = std::max(1, cols);
+        context.container.markCustomGuisDirty();
+    }
+
+    bool showNames = widget.config.value("showSnapshotNames", true);
+    if(ImGui::Checkbox("Show Names", &showNames)){
+        widget.config["showSnapshotNames"] = showNames;
+        context.container.markCustomGuisDirty();
+    }
+
+    drawMatrixColorProperty(context, widget, "activeColor", "Active Color", ofColor(102, 0, 0, 255));
+    drawMatrixColorProperty(context, widget, "filledColor", "Filled Color", ofColor(51, 102, 0, 255));
+    drawMatrixColorProperty(context, widget, "emptyColor", "Empty Color", ofColor(70, 70, 70, 255));
+}
+
 void initializeTextWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
 {
     widget.config["fontScale"] = 1.0f;
@@ -213,6 +307,19 @@ void initializeLineWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&
     widget.spanH = 1;
     widget.config["horizontal"] = true;
     widget.config["lineWeight"] = 2.0f;
+}
+
+void initializeSnapshotMatrixWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
+{
+    widget.spanW = 4;
+    widget.spanH = 2;
+    widget.config["rows"] = 2;
+    widget.config["cols"] = 4;
+    widget.config["showSnapshotNames"] = true;
+    widget.config["activeColor"] = customGuiColorToJson(ofColor(102, 0, 0, 255));
+    widget.config["filledColor"] = customGuiColorToJson(ofColor(51, 102, 0, 255));
+    widget.config["emptyColor"] = customGuiColorToJson(ofColor(70, 70, 70, 255));
+    ensureWidgetLabelColor(widget);
 }
 
 } // namespace
@@ -248,6 +355,12 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
                    initializeImageWidget,
                    renderImageWidget,
                    drawImageProperties);
+
+    registerWidget(registry, CustomGuiWidgetType::SnapshotMatrix,
+                   [](ofxOceanodeAbstractParameter&){ return false; },
+                   initializeSnapshotMatrixWidget,
+                   renderSnapshotMatrixWidget,
+                   drawSnapshotMatrixProperties);
 }
 
 } // namespace ofxOceanodeCustomGuiStaticWidgets

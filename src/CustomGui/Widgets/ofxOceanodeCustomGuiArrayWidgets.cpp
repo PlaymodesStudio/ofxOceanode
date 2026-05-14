@@ -588,6 +588,14 @@ void drawMultiSliderProperties(CustomGuiWidgetPropertiesContext& context, Custom
         context.container.markCustomGuisDirty();
     }
 
+    if(isFloatVectorParameter(*parameter)){
+        int quantization = std::max(0, widget.config.value("quantization", 0));
+        if(ImGui::InputInt("Quantization", &quantization)){
+            widget.config["quantization"] = std::max(0, quantization);
+            context.container.markCustomGuisDirty();
+        }
+    }
+
     bool interactive = ofxOceanodeCustomGuiWidgets::isInteractive(widget, parameter);
     bool canResizeVector = interactive && !parameter->hasInConnection() && !(parameter->getFlags() & ofxOceanodeParameterFlags_DisableInConnection);
     if(canResizeVector){

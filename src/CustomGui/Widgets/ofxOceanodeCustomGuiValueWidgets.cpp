@@ -67,6 +67,11 @@ bool supportsCustomDropdownWidget(ofxOceanodeAbstractParameter& parameter)
     return isIntParameter(parameter);
 }
 
+bool supportsButtonMatrixWidget(ofxOceanodeAbstractParameter& parameter)
+{
+    return isIntParameter(parameter);
+}
+
 std::vector<std::string> getCustomDropdownOptions(const CustomGuiWidget& widget)
 {
     std::vector<std::string> options;
@@ -160,6 +165,16 @@ void initializeCustomDropdownWidget(CustomGuiWidget& widget, ofxOceanodeAbstract
     widget.config["customOptions"] = customDropdownOptionsToJson(options);
 }
 
+void initializeButtonMatrixWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
+{
+    widget.spanW = 4;
+    widget.spanH = 2;
+    widget.config["rows"] = 2;
+    widget.config["cols"] = 4;
+    ensureWidgetBodyColor(widget, ofColor(70, 70, 70, 220));
+    ensureWidgetLabelColor(widget);
+}
+
 void initializeButtonWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
 {
     widget.spanW = 2;
@@ -175,7 +190,9 @@ bool renderKnobWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wi
     const bool interactive = context.interactive;
     const bool showValue = context.showValue;
     const ImVec2 itemSize = widgetItemSize(context);
-    const float size = std::max(24.0f, std::min(itemSize.x, itemSize.y));
+    const float valueAreaHeight = showValue ? ImGui::GetTextLineHeightWithSpacing() : 0.0f;
+    const float knobAreaHeight = std::max(1.0f, itemSize.y - valueAreaHeight);
+    const float size = std::max(24.0f, std::min(itemSize.x, knobAreaHeight));
     const ofColor bodyColor = widgetBodyColor(widget);
     float value = 0.0f;
     float sliderMin = 0.0f;
@@ -212,9 +229,9 @@ bool renderKnobWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wi
     ImGui::BeginGroup();
     drawWidgetLabel(widget, context.label);
     ImGui::InvisibleButton("##knob", ImVec2(size, size));
-    const ImVec2 min = ImGui::GetItemRectMin();
-    const ImVec2 max = ImGui::GetItemRectMax();
-    const ImVec2 center((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
+    const ImVec2 knobMin = ImGui::GetItemRectMin();
+    const ImVec2 knobMax = ImGui::GetItemRectMax();
+    const ImVec2 center((knobMin.x + knobMax.x) * 0.5f, (knobMin.y + knobMax.y) * 0.5f);
     const float radius = size * 0.42f;
     const float normalized = sliderMax > sliderMin ? ofClamp((value - sliderMin) / (sliderMax - sliderMin), 0.0f, 1.0f) : 0.0f;
     constexpr float kPi = 3.14159265358979323846f;
@@ -242,8 +259,13 @@ bool renderKnobWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wi
 
     if(showValue){
         const std::string text = isIntParameter(*parameter) ? ofToString((int)std::round(value)) : ofToString(value, 3);
+        ImGui::Dummy(ImVec2(size, valueAreaHeight));
+        const ImVec2 valueMin = ImGui::GetItemRectMin();
+        const ImVec2 valueMax = ImGui::GetItemRectMax();
         ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
-        drawList->AddText(ImVec2(center.x - textSize.x * 0.5f, center.y - textSize.y * 0.5f),
+        const float textX = valueMin.x + ((valueMax.x - valueMin.x) - textSize.x) * 0.5f;
+        const float textY = valueMin.y + ((valueMax.y - valueMin.y) - textSize.y) * 0.5f;
+        drawList->AddText(ImVec2(textX, textY),
                           IM_COL32(245, 245, 245, 220), text.c_str());
     }
 
@@ -357,6 +379,36 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
         }else{
             ImGui::TextWrapped("%d", value);
         }
+    }else if(widget.type == CustomGuiWidgetType::ButtonMatrix){
+        const int rows = std::max(1, widget.config.value("rows", 2));
+        const int cols = std::max(1, widget.config.value("cols", 4));
+        const float spacingX = ImGui::GetStyle().ItemSpacing.x;
+        const float spacingY = ImGui::GetStyle().ItemSpacing.y;
+        const float btnW = std::max(18.0f, (itemSize.x - spacingX * (cols - 1)) / cols);
+        const float btnH = std::max(18.0f, (itemSize.y - spacingY * (rows - 1)) / rows);
+        const ofColor inactiveColor = widgetBodyColor(widget, ofColor(70, 70, 70, 220));
+        const ofColor activeColor = widget.color;
+        const int baseValue = sliderMin;
+
+        for(int row = 0; row < rows; row++){
+            for(int col = 0; col < cols; col++){
+                if(col > 0) ImGui::SameLine();
+                const int slot = row * cols + col;
+                const int buttonValue = baseValue + slot;
+                const bool active = value == buttonValue;
+                const ofColor buttonColor = active ? activeColor : inactiveColor;
+                ImGui::PushID(slot);
+                ImGui::PushStyleColor(ImGuiCol_Button, colorToImVec4(buttonColor));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colorToImVec4(buttonColor));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, colorToImVec4(buttonColor));
+                if(ImGui::Button(ofToString(buttonValue).c_str(), ImVec2(btnW, btnH))){
+                    value = buttonValue;
+                    changed = true;
+                }
+                ImGui::PopStyleColor(3);
+                ImGui::PopID();
+            }
+        }
     }else if(widget.type == CustomGuiWidgetType::MultiToggle){
         const bool active = value > 0;
         if(active) pushToggleOnColors(widget.color);
@@ -403,6 +455,20 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
     if(customFontScale) ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
     ImGui::EndGroup();
     return true;
+}
+
+void drawButtonMatrixProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter*)
+{
+    int rows = std::max(1, widget.config.value("rows", 2));
+    int cols = std::max(1, widget.config.value("cols", 4));
+    if(ImGui::InputInt("Rows", &rows)){
+        widget.config["rows"] = std::max(1, rows);
+        context.container.markCustomGuisDirty();
+    }
+    if(ImGui::InputInt("Cols", &cols)){
+        widget.config["cols"] = std::max(1, cols);
+        context.container.markCustomGuisDirty();
+    }
 }
 
 bool renderVectorDragNumberWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
@@ -690,6 +756,12 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
                    initializeCustomDropdownWidget,
                    renderIntWidget,
                    drawCustomDropdownProperties);
+
+    registerWidget(registry, CustomGuiWidgetType::ButtonMatrix,
+                   supportsButtonMatrixWidget,
+                   initializeButtonMatrixWidget,
+                   renderIntWidget,
+                   drawButtonMatrixProperties);
 
     registerWidget(registry, CustomGuiWidgetType::CustomRegion,
                    supportsCustomRegionWidget,
