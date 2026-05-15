@@ -341,8 +341,10 @@ public:
 
 	// GUI layout changes with canvas — when true, switching canvas tabs triggers layout switching
 	static bool& getGuiLayoutChangesWithMacros(){
-		static bool enabled = true;
-		return enabled;
+		return getInstance().changeLayoutOnMacros;
+	}
+	static void setGuiLayoutChangesWithMacros(bool b){
+		getInstance().changeLayoutOnMacros = b;
 	}
 
 	// Suppress automatic layout switching for N frames (used by NodesController
@@ -441,6 +443,9 @@ private:
 
 	// Active canvas tracking
 	string activeCanvasUniqueID = "";
+	
+	// Change layout on macros
+	bool changeLayoutOnMacros = false;
 };
 
 #endif /* ofxOceanodeShared_h */

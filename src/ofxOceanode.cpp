@@ -565,9 +565,9 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			canvas.setNodeWidthWidget(ww);
 			
 			ImGui::SeparatorText("LAYOUT");
-			bool layoutWithCanvas = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
-			if(ImGui::Checkbox("GUI layout changes with macros", &layoutWithCanvas)){
-				ofxOceanodeShared::getGuiLayoutChangesWithMacros() = layoutWithCanvas;
+			bool layoutWithMacros = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
+			if(ImGui::Checkbox("GUI layout changes with macros", &layoutWithMacros)){
+				ofxOceanodeShared::setGuiLayoutChangesWithMacros(layoutWithMacros);
 			}
 			
 			if(ImGui::BeginMenu("Load GUI layout")){
@@ -948,7 +948,7 @@ void ofxOceanode::saveConfig(){
     config["gridDivisions"] = canvas.getGridDivisions();
 	config["snapToGrid"] = canvas.getSnapToGrid();
 	config["autoInspectorShowHide"] = ofxOceanodeShared::getAutoInspectorShowHide();
-	config["guiLayoutChangesWithCanvas"] = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
+	config["guiLayoutChangesWithMacros"] = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
 	
 	   // Create config directory if it doesn't exist
 	   string configDir = ofToDataPath("config", true);
@@ -1032,7 +1032,7 @@ void ofxOceanode::loadConfig(){
 		ofxOceanodeShared::setAutoInspectorShowHide(config["autoInspectorShowHide"].get<bool>());
 	}
 	if(config.contains("guiLayoutChangesWithMacros")){
-		ofxOceanodeShared::getGuiLayoutChangesWithMacros() = config["guiLayoutChangesWithMacros"].get<bool>();
+		ofxOceanodeShared::setGuiLayoutChangesWithMacros(config["guiLayoutChangesWithMacros"].get<bool>());
 	}
 }
 
