@@ -158,7 +158,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                         ImU32 bgCol = IM_COL32(color.r, color.g, color.b, color.a * 0.15f);
                         ImGui::GetWindowDrawList()->AddRectFilled(
                             ImVec2(p.x, p.y),
-                            ImVec2(p.x + w - 16.0f * scale, p.y + textSize.y),
+                            ImVec2(p.x + w, p.y + textSize.y),
                             bgCol
                         );
                         

@@ -831,14 +831,22 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 	ImGui::SetNextItemWidth(120.0f * zoomLevel);
 	ImGui::InputText("##sep_name", guiState.routerSortSepNameBuf, sizeof(guiState.routerSortSepNameBuf));
 	ImGui::SameLine();
-	if(ImGui::SmallButton("+ Sep")){
+	ImGui::ColorEdit4("##sep_color", guiState.routerSortSepColor, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
+	ImGui::SameLine();
+	if(ImGui::SmallButton("[+ Separator]")){
 		if(guiState.routerSortSepNameBuf[0] != '\0'){
 			string sepLabel(guiState.routerSortSepNameBuf);
-			ofColor sepColor(200, 200, 200, 255);
+			ofColor sepColor(
+				guiState.routerSortSepColor[0] * 255.0f,
+				guiState.routerSortSepColor[1] * 255.0f,
+				guiState.routerSortSepColor[2] * 255.0f,
+				guiState.routerSortSepColor[3] * 255.0f
+			);
 			addSeparator(sepLabel, sepColor);
 			sortOrder.getOrder().push_back(makeSortSeparatorEntry(sepLabel, sepColor));
 			guiState.routerSortSepNameBuf[0] = '\0';
 			parameterGroupChanged.notify(this);
 		}
 	}
+
 }

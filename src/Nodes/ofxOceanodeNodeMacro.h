@@ -44,6 +44,7 @@ struct RouterInfo {
 
 struct MacroGuiState {
 	char routerSortSepNameBuf[128] = {};
+	float routerSortSepColor[4] = {0.78f, 0.78f, 0.78f, 1.0f}; // Default 200,200,200,255
 	int  routerSortEditingIndex = -1;
 	bool routerSortEditNeedsFocus = false;
 	char routerSortEditBuf[256] = {};

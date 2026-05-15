@@ -123,7 +123,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	
 	// Inspector parameters : "Local name"
 	//-------------------------------------
-	addInspectorSeparator("Macro Info",ofColor(250,250,250,128));
+	addInspectorSeparator("Macro Info",ofColor(250,250,250,255));
 	addInspectorParameter(localName.set("Local Name", "Local"));
 	// Inspector parameters : "Color"
 	//-------------------------------------
@@ -284,7 +284,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	});
 	
 	// Router sort order inspector region
-	addInspectorSeparator("Router Management",ofColor(255,128,0,128));
+	addInspectorSeparator("Router Management",ofColor(255,128,0,255));
 
 	memset(guiState.routerSortSepNameBuf, 0, sizeof(guiState.routerSortSepNameBuf));
 	addInspectorParameter(routerSortInspector.set("Router Order", [this]() {
