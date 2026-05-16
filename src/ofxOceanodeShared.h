@@ -24,6 +24,11 @@ enum ofxOceanodeConfigurationFlags_
     ofxOceanodeConfigurationFlags_DisableHistograms = 2 << 1    // Do not display histograms in vectors
 };
 
+enum ofxOceanodePresetLoadType {
+    ofxOceanodePresetLoadType_FullPreset = 0,
+    ofxOceanodePresetLoadType_ClipboardPaste
+};
+
 struct macroCategory{
 	macroCategory(std::string _name = "Parent") : name(_name){};
 	std::string name;
@@ -190,7 +195,8 @@ public:
         return getInstance().presetWasSavedEvent;
     }
     
-    static void startedLoadingPreset(){
+    static void startedLoadingPreset(ofxOceanodePresetLoadType loadType = ofxOceanodePresetLoadType_FullPreset){
+        getInstance().presetLoadType = loadType;
         getInstance().presetWillBeLoadedEvent.notify();
         getInstance().presetLoading = true;
     }
@@ -198,6 +204,7 @@ public:
     static void finishedLoadingPreset(){
         getInstance().presetLoading = false;
         getInstance().presetHasLoadedEvent.notify();
+        getInstance().presetLoadType = ofxOceanodePresetLoadType_FullPreset;
     }
     
     static void presetWasSaved(){
@@ -206,6 +213,10 @@ public:
     
     static bool isPresetLoading(){
         return getInstance().presetLoading;
+    }
+
+    static ofxOceanodePresetLoadType getPresetLoadType(){
+        return getInstance().presetLoadType;
     }
     
     static int getConfigurationFlags(){
@@ -426,6 +437,7 @@ private:
 	ofEvent<string> macroUpdatedEvent;
     
 	bool presetLoading;
+        ofxOceanodePresetLoadType presetLoadType = ofxOceanodePresetLoadType_FullPreset;
 	   ofEvent<void> presetWillBeLoadedEvent;
 	   ofEvent<void> presetHasLoadedEvent;
 	   ofEvent<void> presetWasSavedEvent;

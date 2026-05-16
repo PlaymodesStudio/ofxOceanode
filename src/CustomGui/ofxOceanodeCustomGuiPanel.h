@@ -39,6 +39,9 @@ private:
                                bool interactive) const;
     void openSetValuePopup(ofxOceanodeAbstractParameter& parameter, const std::string& label);
     void drawSetValuePopup();
+    void openSetVectorSizePopup(ofxOceanodeAbstractParameter& parameter, const std::string& label);
+    void drawSetVectorSizePopup();
+    bool resetParameterToDefaultValue(ofxOceanodeAbstractParameter& parameter) const;
     void drawVerticalMeter(const ImVec2& size, float normalized, const ImU32& color) const;
     void drawGridOverlay(const CustomGuiLayout& layout, const ImVec2& origin) const;
     std::pair<int, int> findNextAvailableCell(const CustomGuiLayout& layout, int spanW, int spanH) const;
@@ -55,6 +58,10 @@ private:
     std::string setValueLabel;
     double setValueScalar = 0.0;
     std::vector<double> setValueVectorValues;
+    bool requestOpenSetVectorSizePopup = false;
+    std::string setVectorSizeParameterPath;
+    std::string setVectorSizeLabel;
+    int setVectorSizeValue = 1;
     bool requestOpenRenameSnapshotPopup = false;
     bool requestOpenDeleteSnapshotPopup = false;
     bool requestOpenDeletePanelPopup = false;

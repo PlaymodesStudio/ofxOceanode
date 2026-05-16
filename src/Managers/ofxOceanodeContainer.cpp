@@ -2395,7 +2395,7 @@ bool ofxOceanodeContainer::cutSelectedModulesWithConnections(){
 }
 
 bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 position, bool allowOutsideInputs){
-    ofxOceanodeShared::startedLoadingPreset();
+    ofxOceanodeShared::startedLoadingPreset(ofxOceanodePresetLoadType_ClipboardPaste);
     bool b_sucess = loadClipboardModulesAndConnections(position, allowOutsideInputs);
     ofxOceanodeShared::finishedLoadingPreset();
     return b_sucess;

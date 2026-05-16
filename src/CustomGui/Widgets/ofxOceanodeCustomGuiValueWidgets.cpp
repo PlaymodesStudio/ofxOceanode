@@ -72,6 +72,15 @@ bool supportsButtonMatrixWidget(ofxOceanodeAbstractParameter& parameter)
     return isIntParameter(parameter);
 }
 
+float sliderValueFontScale(const ImVec2& itemSize, bool verticalSlider)
+{
+    const float widthReference = verticalSlider ? 42.0f : 120.0f;
+    const float heightReference = verticalSlider ? 100.0f : 24.0f;
+    const float widthScale = itemSize.x / widthReference;
+    const float heightScale = itemSize.y / heightReference;
+    return ofClamp(std::min(widthScale, heightScale), 0.35f, 1.0f);
+}
+
 std::vector<std::string> getCustomDropdownOptions(const CustomGuiWidget& widget)
 {
     std::vector<std::string> options;
@@ -299,13 +308,21 @@ bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& w
     const float sliderMax = floatRangeMax(widget, param.getMax());
     bool changed = false;
     const bool customFontScale = widget.type == CustomGuiWidgetType::DragNumber;
-    const float fontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
+    const float configuredFontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
+    const bool adaptiveSliderValueScale =
+        showValue &&
+        (widget.type == CustomGuiWidgetType::Slider || widget.type == CustomGuiWidgetType::Knob);
+    const float activeFontScale = customFontScale
+        ? configuredFontScale
+        : (adaptiveSliderValueScale ? sliderValueFontScale(itemSize, verticalSlider) : 1.0f);
     const ofColor bodyColor = widgetBodyColor(widget);
     const ofColor accentColor = widget.color;
 
     ImGui::BeginGroup();
     drawWidgetLabel(widget, context.label);
-    if(customFontScale) ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * fontScale));
+    if(customFontScale || adaptiveSliderValueScale){
+        ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * activeFontScale));
+    }
     ImGui::SetNextItemWidth(widgetItemWidth(itemSize));
     pushWidgetFrameColors(bodyColor, accentColor);
 
@@ -334,7 +351,7 @@ bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& w
     }
 
     ImGui::PopStyleColor(8);
-    if(customFontScale) ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
+    if(customFontScale || adaptiveSliderValueScale) ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
     ImGui::EndGroup();
     return true;
 }
@@ -355,13 +372,19 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
     const auto customOptions = getCustomDropdownOptions(widget);
     bool changed = false;
     const bool customFontScale = widget.type == CustomGuiWidgetType::DragNumber;
-    const float fontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
+    const float configuredFontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
+    const bool adaptiveSliderValueScale = showValue && widget.type == CustomGuiWidgetType::Slider;
+    const float activeFontScale = customFontScale
+        ? configuredFontScale
+        : (adaptiveSliderValueScale ? sliderValueFontScale(itemSize, verticalSlider) : 1.0f);
     const ofColor bodyColor = widgetBodyColor(widget);
     const ofColor accentColor = widget.color;
 
     ImGui::BeginGroup();
     drawWidgetLabel(widget, context.label);
-    if(customFontScale) ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * fontScale));
+    if(customFontScale || adaptiveSliderValueScale){
+        ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * activeFontScale));
+    }
     ImGui::SetNextItemWidth(widgetItemWidth(itemSize));
     pushWidgetFrameColors(bodyColor, accentColor);
 
@@ -452,7 +475,7 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
     if(changed) param.set(value);
 
     ImGui::PopStyleColor(8);
-    if(customFontScale) ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
+    if(customFontScale || adaptiveSliderValueScale) ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
     ImGui::EndGroup();
     return true;
 }
