@@ -34,6 +34,15 @@ bool supportsPianoKeyboardWidget(ofxOceanodeAbstractParameter& parameter)
     return isIntVectorParameter(parameter) || isFloatVectorParameter(parameter);
 }
 
+float sliderValueFontScale(const ImVec2& itemSize, bool verticalSlider)
+{
+    const float widthReference = verticalSlider ? 42.0f : 120.0f;
+    const float heightReference = verticalSlider ? 100.0f : 24.0f;
+    const float widthScale = itemSize.x / widthReference;
+    const float heightScale = itemSize.y / heightReference;
+    return ofClamp(std::min(widthScale, heightScale), 0.35f, 1.0f);
+}
+
 void initializeMultiSliderWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
 {
     widget.spanW = 3;
@@ -402,6 +411,7 @@ bool renderFloatVectorWidget(CustomGuiWidgetRenderContext& context, CustomGuiWid
         const float totalSpacing = spacing * std::max(0, visibleCount - 1);
         const float barWidth = std::max(1.0f, (itemSize.x - totalSpacing) / (float)visibleCount);
         const ImVec2 barSize(barWidth, itemSize.y);
+        const float valueFontScale = sliderValueFontScale(barSize, true);
 
         for(int i = 0; i < visibleCount; i++){
             ImGui::PushID(i);
@@ -413,7 +423,9 @@ bool renderFloatVectorWidget(CustomGuiWidgetRenderContext& context, CustomGuiWid
             }
             ImGui::SetCursorPos(ImVec2(baseCursorX + i * (barWidth + spacing), baseCursorY));
             if(interactive){
-                bool itemChanged = ImGui::VSliderFloat("##bar", barSize, &value[i], min, max);
+                ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * valueFontScale));
+                bool itemChanged = ImGui::VSliderFloat("##bar", barSize, &value[i], min, max, "%.3f");
+                ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
                 if(itemChanged){
                     value[i] = quantizeFloatValue(widget, value[i], min, max);
                     changed = true;
@@ -436,7 +448,9 @@ bool renderFloatVectorWidget(CustomGuiWidgetRenderContext& context, CustomGuiWid
             }
             if(interactive){
                 ImGui::SetNextItemWidth(itemWidth);
-                bool itemChanged = ImGui::SliderFloat("##bar", &value[i], min, max);
+                ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * sliderValueFontScale(ImVec2(itemWidth, rowHeight), false)));
+                bool itemChanged = ImGui::SliderFloat("##bar", &value[i], min, max, "%.3f");
+                ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
                 if(itemChanged){
                     value[i] = quantizeFloatValue(widget, value[i], min, max);
                     changed = true;
