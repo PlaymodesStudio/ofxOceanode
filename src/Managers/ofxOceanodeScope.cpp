@@ -14,18 +14,6 @@
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeColors.h"
 
-// https://github.com/ocornut/imgui/issues/1720
-bool Splitter(int splitNum, bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size = -1.0f)
-{
-    using namespace ImGui;
-    ImGuiContext& g = *GImGui;
-    ImGuiWindow* window = g.CurrentWindow;
-    ImGuiID id = window->GetID(("##Splitter" + ofToString(splitNum)).c_str());
-    ImRect bb;
-    bb.Min = window->DC.CursorPos + (split_vertically ? ImVec2(*size1, 0.0f) : ImVec2(0.0f, *size1));
-    bb.Max = bb.Min + CalcItemSize(split_vertically ? ImVec2(thickness, splitter_long_axis_size) : ImVec2(splitter_long_axis_size, thickness), 0.0f, 0.0f);
-    return SplitterBehavior(bb, id, split_vertically ? ImGuiAxis_X : ImGuiAxis_Y, size1, size2, min_size1, min_size2, 4.0f, 0.04f);
-}
 
 void ofxOceanodeScope::setup(){
     scopeTypes.push_back([](ofxOceanodeAbstractParameter *p, ImVec2 size) -> bool{
@@ -79,6 +67,12 @@ void ofxOceanodeScope::setup(){
 void ofxOceanodeScope::draw(){
 
     if(scopedParameters.size() > 0){
+        ImGuiWindowClass window_class;
+        window_class.ClassId = ImGui::GetID("ScopesClass");
+        window_class.DockingAllowUnclassed = false;
+
+        // Do NOT set the window class for the main "Scopes" window
+        // so it can be docked anywhere in the main application
         ImGui::Begin("Scopes", NULL, ImGuiWindowFlags_NoScrollbar);
         
         // Apply saved window configuration on first frame after load
@@ -88,105 +82,9 @@ void ofxOceanodeScope::draw(){
             windowConfig.hasConfig = false; // Only apply once
         }
         
-        windowWidth = ImGui::GetContentRegionAvail().x;
-        windowHeight = ImGui::GetContentRegionAvail().y;
-        for(int i = 0; i < scopedParameters.size()-1; i++){
-            float topHeight = 0;
-            float bottomHeight = 0;
-                for(int j = 0; j < i+1; j++) topHeight += (scopedParameters[j].sizeRelative / scopedParameters.size() * windowHeight);
-                for(int j = i+1; j < scopedParameters.size(); j++) bottomHeight += (scopedParameters[j].sizeRelative / scopedParameters.size() * windowHeight);
-            float oldTopHeight = topHeight;
-            float oldBottomHeight = bottomHeight;
-            
-            bool isShiftPresed = ImGui::GetIO().KeyShift;
-            
-            float minTop = isShiftPresed ? 10 * (i+1) : 10 + topHeight - scopedParameters[i].sizeRelative / scopedParameters.size() * windowHeight;
-            float minBottom = isShiftPresed ? 10 * (scopedParameters.size() - (i+1)) : 10 + bottomHeight - scopedParameters[i+1].sizeRelative / scopedParameters.size() * windowHeight;
-            
-            if(Splitter(i, false, 1, &topHeight, &bottomHeight, minTop, minBottom)){
-                if(isShiftPresed){
-                    float topScale = topHeight / oldTopHeight;
-                    float bottomScale = bottomHeight / oldBottomHeight;
-                    for(int j = 0; j < i+1; j++) scopedParameters[j].sizeRelative *= topScale;
-                    for(int j = i+1; j < scopedParameters.size(); j++) scopedParameters[j].sizeRelative *= bottomScale;
-                }else{
-                    float topInc = topHeight - oldTopHeight;
-                    float bottomInc = bottomHeight - oldBottomHeight;
-                    scopedParameters[i].sizeRelative += topInc * scopedParameters.size() / windowHeight;
-                    scopedParameters[i+1].sizeRelative += bottomInc * scopedParameters.size() / windowHeight;
-                }
-                
-                // Auto-save after splitter change
-                notifyScopeChanged();
-            }
-        }
-        for(int i = 0; i < scopedParameters.size(); i++)
-        {
-            auto &p = scopedParameters[i];
-            auto itemHeight = (p.sizeRelative / scopedParameters.size() * windowHeight) - 2.5;
+        ImGuiID dockspace_id = ImGui::GetID("ScopesDockSpace");
+        ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None, &window_class);
 
-            auto size = ImVec2(ImGui::GetContentRegionAvail().x, itemHeight);
-            
-            ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(p.color*0.75f));
-            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(p.color*0.75f));
-            ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(p.color*0.75f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-            ImGui::PushStyleColor(ImGuiCol_Border, OceanodeColors::TransparentButton);
-            
-            std::string fullPath = p.getFullPath();
-			ImGui::BeginChild(("Child_" + p.canvasID +"/" + fullPath).c_str(), size, true);
-            if(ImGui::Button("x##RemoveScope"))
-            {
-                ofxOceanodeScope::getInstance()->removeParameter(p.parameter);
-                // Auto-save is called inside removeParameter()
-            }
-            ImGui::SameLine();
-            if(p.canvasID=="Canvas") ImGui::Text(fullPath.c_str());
-			else ImGui::Text((p.canvasID +" / " +fullPath).c_str());
-			
-            ImGui::SameLine();
-            if(ImGui::Button("[^]##MoveScopeUp"))
-            {
-                if(i>0){
-                    std::swap(scopedParameters[i],scopedParameters[i-1]);
-                    // Auto-save after moving parameter up
-                    notifyScopeChanged();
-                }
-            }
-            ImGui::SameLine();
-            if(ImGui::Button("[v]##MoveScopeDown"))
-            {
-                if(i<scopedParameters.size()-1){
-                    std::swap(scopedParameters[i],scopedParameters[i+1]);
-                    // Auto-save after moving parameter down
-                    notifyScopeChanged();
-                }
-            }
-//            ImGui::SameLine();
-//            bool keepAspectRatio = (p.parameter->getFlags() & ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
-//            if(keepAspectRatio)ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0,0.5,0.0,1.0));
-//            else ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55,0.55,0.55,1.0));
-//            if(ImGui::Button("[AR]##KeepAspectRatio"))
-//            {
-//                
-//                if(keepAspectRatio){
-//                    p.parameter->setFlags(p.parameter->getFlags()&~ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
-//                }
-//                else p.parameter->setFlags(p.parameter->getFlags()|ofxOceanodeParameterFlags_ScopeKeepAspectRatio);
-//            }
-//            ImGui::PopStyleColor();
-
-
-            // f() function to properly draw each scope item
-            for(auto f : scopeTypes)
-            {
-                if(f(p.parameter, ImVec2(ImGui::GetContentRegionAvail().x, itemHeight-(ImGui::GetFrameHeight()*2.1)))) break;
-            }
-            
-            ImGui::PopStyleColor(5);
-            ImGui::EndChild();
-        }
-        
         // Check for window position/size changes and auto-save
         ImVec2 currentPos = ImGui::GetWindowPos();
         ImVec2 currentSize = ImGui::GetWindowSize();
@@ -209,6 +107,56 @@ void ofxOceanodeScope::draw(){
         lastWindowConfig.height = currentSize.y;
         
         ImGui::End();
+
+        for(int i = 0; i < scopedParameters.size(); i++)
+        {
+            auto &p = scopedParameters[i];
+            
+            std::string fullPath = p.getFullPath();
+            std::string windowName = p.canvasID == "Canvas" ? fullPath : (p.canvasID + " / " + fullPath);
+            windowName += "###Scope_" + p.canvasID + "_" + fullPath;
+
+            bool open = true;
+            
+            // We want them to be dockable within the class, but not become floating windows outside the main app.
+            // ImGuiDockNodeFlags_NoUndocking prevents them from being moved AT ALL once docked.
+            // Instead, we rely on DockingAlwaysTabBar and DockingAllowUnclassed=false to keep them contained.
+            // To prevent floating, we can use ImGuiWindowFlags_NoMove on the window itself, but that might prevent dragging tabs.
+            // Actually, ImGui handles this: if DockingAllowUnclassed is false, it can only dock into nodes of the same class.
+            // If we want to prevent it from being dragged outside to become a floating window, we can set DockingAlwaysTabBar.
+            window_class.DockingAlwaysTabBar = false;
+            window_class.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_None; // Remove NoUndocking so they can be rearranged
+            
+            ImGui::SetNextWindowClass(&window_class);
+            
+            // We also need to ensure it docks into the dockspace initially if it's not already docked
+            ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
+
+            if(ImGui::Begin(windowName.c_str(), &open))
+            {
+                ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(p.color*0.75f));
+                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(p.color*0.75f));
+                ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(p.color*0.75f));
+                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+                ImGui::PushStyleColor(ImGuiCol_Border, OceanodeColors::TransparentButton);
+                
+                // f() function to properly draw each scope item
+                for(auto f : scopeTypes)
+                {
+                    if(f(p.parameter, ImGui::GetContentRegionAvail())) break;
+                }
+                
+                ImGui::PopStyleColor(5);
+            }
+            ImGui::End();
+
+            if(!open)
+            {
+                ofxOceanodeScope::getInstance()->removeParameter(p.parameter);
+                // Auto-save is called inside removeParameter()
+                i--; // Adjust index since we removed an element
+            }
+        }
     }
 }
 
@@ -237,7 +185,29 @@ void ofxOceanodeScope::addParameter(
     
     scopedParameters.emplace_back(p, _color, 1.0f, actualCanvasID, actualNodeName);
     
-    // Auto-save after adding parameter 
+    // When adding a new scope, we want to split the dockspace vertically
+    // so it appears below the existing ones instead of as a tab.
+    if(scopedParameters.size() > 1) {
+        ImGuiID dockspace_id = ImGui::GetID("ScopesDockSpace");
+        
+        // Get the full path of the newly added parameter to construct its window name
+        std::string fullPath = scopedParameters.back().getFullPath();
+        std::string windowName = actualCanvasID == "Canvas" ? fullPath : (actualCanvasID + " / " + fullPath);
+        windowName += "###Scope_" + actualCanvasID + "_" + fullPath;
+        
+        // Only split if the dockspace node actually exists (it might not exist yet if the window hasn't been drawn)
+        if(ImGui::DockBuilderGetNode(dockspace_id) != NULL) {
+            // Split the dockspace node downwards
+            ImGuiID dock_main_id = dockspace_id;
+            ImGuiID dock_id_bottom;
+            ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.5f, &dock_id_bottom, &dock_main_id);
+            
+            // Dock the new window into the bottom split
+            ImGui::DockBuilderDockWindow(windowName.c_str(), dock_id_bottom);
+        }
+    }
+    
+    // Auto-save after adding parameter
     notifyScopeChanged();
 }
 
