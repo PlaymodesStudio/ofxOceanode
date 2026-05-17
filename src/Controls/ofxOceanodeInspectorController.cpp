@@ -305,7 +305,7 @@ void ofxOceanodeInspectorController::draw(){
             const float splitterThickness = 6.0f;
             const float minPaneHeight = 30.0f;
             float itemSpacing = ImGui::GetStyle().ItemSpacing.y;
-            float availableHeight = ImGui::GetContentRegionAvail().y;
+            float availableHeight = ImGui::GetContentRegionAvail().y-ofxOceanodeShared::getBaseFrameHeight();
             // Each panel-splitter-panel sequence adds 2 ItemSpacing gaps per splitter
             float totalSplitterHeight = (scopeCount - 1) * (splitterThickness + 2.0f * itemSpacing);
             float totalContentHeight = availableHeight - totalSplitterHeight;
