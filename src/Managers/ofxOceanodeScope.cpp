@@ -14,6 +14,16 @@
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeColors.h"
 
+// Helper to recursively scale SizeRef of all dock nodes in a tree.
+// This ensures docked scope windows maintain their relative proportions
+// when the parent "Scopes" window is resized.
+static void ScaleDockNodeSizeRef(ImGuiDockNode* node, float scaleX, float scaleY) {
+    if (!node) return;
+    node->SizeRef.x *= scaleX;
+    node->SizeRef.y *= scaleY;
+    if (node->ChildNodes[0]) ScaleDockNodeSizeRef(node->ChildNodes[0], scaleX, scaleY);
+    if (node->ChildNodes[1]) ScaleDockNodeSizeRef(node->ChildNodes[1], scaleX, scaleY);
+}
 
 void ofxOceanodeScope::setup(){
     scopeTypes.push_back([](ofxOceanodeAbstractParameter *p, ImVec2 size) -> bool{
@@ -82,6 +92,20 @@ void ofxOceanodeScope::draw(){
             windowConfig.hasConfig = false; // Only apply once
         }
         
+        // Proportional scaling: when the Scopes window is resized, scale all dock nodes'
+        // SizeRef so that the internal layout maintains its relative proportions.
+        ImVec2 currentWindowSize = ImGui::GetWindowSize();
+        if (lastDockspaceWidth > 0.0f && lastDockspaceHeight > 0.0f) {
+            float scaleX = currentWindowSize.x / lastDockspaceWidth;
+            float scaleY = currentWindowSize.y / lastDockspaceHeight;
+            if (scaleX != 1.0f || scaleY != 1.0f) {
+                ImGuiID dockspace_id = ImGui::GetID("ScopesDockSpace");
+                if (ImGuiDockNode* rootNode = ImGui::DockBuilderGetNode(dockspace_id)) {
+                    ScaleDockNodeSizeRef(rootNode, scaleX, scaleY);
+                }
+            }
+        }
+        
         ImGuiID dockspace_id = ImGui::GetID("ScopesDockSpace");
         ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None, &window_class);
 
@@ -105,6 +129,10 @@ void ofxOceanodeScope::draw(){
         lastWindowConfig.posY = currentPos.y;
         lastWindowConfig.width = currentSize.x;
         lastWindowConfig.height = currentSize.y;
+        
+        // Update last dockspace size for proportional scaling on next resize
+        lastDockspaceWidth = currentWindowSize.x;
+        lastDockspaceHeight = currentWindowSize.y;
         
         ImGui::End();
 

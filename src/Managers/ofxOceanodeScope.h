@@ -127,6 +127,9 @@ private:
     ofxOceanodeScopeWindowConfig windowConfig;
     std::vector<ofxOceanodeScopeParameterData> loadedParameterData;
     
+    float lastDockspaceWidth = 0;
+    float lastDockspaceHeight = 0;
+    
     // // load / save scopes : Auto-save functionality
     std::string saveFilePath = "scope_config.json";
     ofxOceanodeScopeWindowConfig lastWindowConfig;
