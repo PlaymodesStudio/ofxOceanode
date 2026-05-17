@@ -63,9 +63,13 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 			if(boldFont) ImGui::PopFont();
 		}
 		
-		// Position the delete button at the right edge using the screen-space node width
-		// (nodeWidthText + nodeWidthWidget is already zoom-scaled by the caller)
-		ImGui::SameLine(nodeWidthText + nodeWidthWidget - ofxOceanodeShared::getBaseFrameHeight() * zoomLevel, 0.0f);
+		// Keep the delete button aligned with the actual node width. Some nodes render
+		// custom regions wider than the default 240px body, so we fall back to the
+		// last measured node content width when it is wider than the base layout.
+		const float defaultContentWidth = nodeWidthText + nodeWidthWidget;
+		const float cachedContentWidth = std::max(0.0f, guiRect.getWidth() * zoomLevel - 2.0f * ImGui::GetStyle().WindowPadding.x);
+		const float headerContentWidth = std::max(defaultContentWidth, cachedContentWidth);
+		ImGui::SameLine(headerContentWidth - ImGui::GetFrameHeight(), 0.0f);
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
 		ImGui::PushStyleColor(ImGuiCol_Button, OceanodeColors::TransparentButton);
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, OceanodeColors::TransparentButton);
