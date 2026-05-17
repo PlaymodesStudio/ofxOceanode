@@ -716,7 +716,13 @@ void ofxOceanodeContainer::loadPreset_presetWillBeLoaded(){
 }
 
 void ofxOceanodeContainer::loadPreset_loadNodes(string presetFolderPath){
-    ofJson json = ofLoadJson(presetFolderPath + "/modules.json");
+    const std::string modulesPath = presetFolderPath + "/modules.json";
+    if(!ofFile::doesFileExist(modulesPath)){
+        ofLogWarning("ofxOceanodeContainer") << "Preset modules file not found: " << modulesPath;
+        return;
+    }
+
+    ofJson json = ofLoadJson(modulesPath);
     if(!json.empty()){;
         for(auto &models : registry->getRegisteredModels()){
             string moduleName = models.first;
