@@ -100,6 +100,13 @@ void ofxOceanodeInspectorController::draw(){
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + padding);
 	}
 
+    if(node->getNodeModel().getDescription() != ""){
+        ImGui::Separator();
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        ImGui::TextWrapped("%s", node->getNodeModel().getDescription().c_str());
+        ImGui::PopStyleColor();
+    }
+
 	// Inspector Parameters
     ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
     if(ImGui::TreeNode("Inspector Parameters")){
@@ -383,24 +390,5 @@ void ofxOceanodeInspectorController::draw(){
             }
         }
     }
-	ImGui::Separator();
-
-	if(node->getNodeModel().getDescription() != ""){
-		ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 21.0f);
-		ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
-		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
-		bool descOpen = ImGui::TreeNode("Description");
-		ImGui::PopStyleColor(); // always pop header colour right after TreeNode
-		if(descOpen){
-			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-			ImGui::TextWrapped(node->getNodeModel().getDescription().c_str(), "%s");
-			ImGui::PopStyleColor();
-			ImGui::TreePop();
-		}
-		ImGui::PopStyleVar();
-	}
-
-
-
     ImGui::PopStyleVar();
 }
