@@ -152,6 +152,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 	bool prevShowWindow = showWindow;
 	ImGui::Checkbox("Show Window?", &showWindow);
 	if(showWindow && !prevShowWindow){
+		canvas.forceDockWindow();
 		canvas.requestFocus();
 	}
 	

@@ -270,7 +270,12 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     bool isAnyNodeHovered = false;
     bool connectionIsDoable = false;
     
-    ImGui::SetNextWindowDockID(ofxOceanodeShared::getDockspaceID(), ImGuiCond_FirstUseEver);
+    if(forceDockOnNextShow){
+        ImGui::SetNextWindowDockID(ofxOceanodeShared::getDockspaceID(), ImGuiCond_Always);
+        forceDockOnNextShow = false;
+    }else{
+        ImGui::SetNextWindowDockID(ofxOceanodeShared::getDockspaceID(), ImGuiCond_FirstUseEver);
+    }
     string windowName;
     if(title != "") {
         windowName = "(" + title + ") " + uniqueID + "###" + uniqueID;

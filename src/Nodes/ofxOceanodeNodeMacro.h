@@ -129,6 +129,7 @@ public:
 	
 	void activateWindow(){
 		showWindow = true;
+		canvas.forceDockWindow();
 		canvas.requestFocus();
 	}
 	

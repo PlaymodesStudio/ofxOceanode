@@ -65,6 +65,11 @@ public:
     // so callers do not need to manage any delay themselves.
     void requestFocus(){focusPending = true;};
     
+    // Force this canvas to dock into the main dock space on its next draw.
+    // Used when a macro canvas transitions from hidden to visible so it always
+    // appears as a tab rather than a floating window.
+    void forceDockWindow(){ forceDockOnNextShow = true; };
+    
     // Per-canvas ImGui layout path (for layout switching on tab activation)
     void setLayoutIniPath(const string& path){ layoutIniPath = path; }
     const string& getLayoutIniPath() const { return layoutIniPath; }
@@ -168,6 +173,7 @@ private:
     bool isFirstDraw = true;
     bool onTop = false;
     bool focusPending = false;
+    bool forceDockOnNextShow = false;
     
     // Per-canvas layout switching
     string layoutIniPath;
