@@ -100,6 +100,13 @@ void ofxOceanodeInspectorController::draw(){
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + padding);
 	}
 
+//    if(node->getNodeModel().getDescription() != ""){
+//        ImGui::Separator();
+//        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+//        ImGui::TextWrapped("%s", node->getNodeModel().getDescription().c_str());
+//        ImGui::PopStyleColor();
+//    }
+
 	// Inspector Parameters
     ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
     if(ImGui::TreeNode("Inspector Parameters")){
@@ -287,7 +294,7 @@ void ofxOceanodeInspectorController::draw(){
 
     ImGui::Separator();
 
-    // Scope - full available space with draggable separators
+    // Scope - fixed height per output parameter
     {
         auto &nodeGui = node->getNodeGui();
 
@@ -302,44 +309,13 @@ void ofxOceanodeInspectorController::draw(){
 
         int scopeCount = (int)scopeIndices.size();
         if(scopeCount > 0){
-            const float splitterThickness = 6.0f;
-            const float minPaneHeight = 30.0f;
-            float itemSpacing = ImGui::GetStyle().ItemSpacing.y;
-            float availableHeight = ImGui::GetContentRegionAvail().y-ofxOceanodeShared::getBaseFrameHeight();
-            // Each panel-splitter-panel sequence adds 2 ItemSpacing gaps per splitter
-            float totalSplitterHeight = (scopeCount - 1) * (splitterThickness + 2.0f * itemSpacing);
-            float totalContentHeight = availableHeight - totalSplitterHeight;
-
-            // Persistent heights keyed by node name, with resize tracking
-            static std::map<string, vector<float>> scopeHeights;
-            static std::map<string, float> scopePrevAvailHeight;
-            string nodeKey = selectedNodes[0].first;
-            auto &heights = scopeHeights[nodeKey];
-            float &prevAvailHeight = scopePrevAvailHeight[nodeKey];
-
-            if((int)heights.size() != scopeCount){
-                // First time or scope count changed: distribute evenly
-                heights.assign(scopeCount, totalContentHeight / scopeCount);
-                prevAvailHeight = availableHeight;
-            } else if(prevAvailHeight > 0.0f && prevAvailHeight != availableHeight){
-                // Window resized: scale all heights proportionally
-                float prevTotalContent = prevAvailHeight - totalSplitterHeight;
-                if(prevTotalContent > 0.0f){
-                    float scale = totalContentHeight / prevTotalContent;
-                    for(auto &h : heights){
-                        h *= scale;
-                        h = max(h, minPaneHeight);
-                    }
-                }
-                prevAvailHeight = availableHeight;
-            }
+            float scopeHeight = 2.0f * ofxOceanodeShared::getBaseFrameHeight();
 
             for(int si = 0; si < scopeCount; si++){
                 int i = scopeIndices[si];
                 ofxOceanodeAbstractParameter &p = static_cast<ofxOceanodeAbstractParameter&>(nodeGui.getParameters().get(i));
 
-                float childHeight = max(heights[si], minPaneHeight);
-                auto size = ImVec2(ImGui::GetContentRegionAvail().x, childHeight);
+                auto size = ImVec2(ImGui::GetContentRegionAvail().x, scopeHeight);
 
                 ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(nodeGui.getColor()*0.75f));
                 ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(nodeGui.getColor()*0.75f));
@@ -347,47 +323,30 @@ void ofxOceanodeInspectorController::draw(){
                 ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
                 ImGui::PushStyleColor(ImGuiCol_Border, OceanodeColors::TransparentButton);
 
-                ImGui::BeginChild(("Child_" + p.getGroupHierarchyNames().front() + "/" + p.getName()).c_str(), size, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+                // Draw parameter label outside the scope child so the child
+                // is filled entirely by the scope visualization.
                 ImGui::Text("%s", (p.getGroupHierarchyNames().front() + "/" + p.getName()).c_str());
+
+                // Remove window padding so the scope fills the full 2x height.
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+                ImGui::BeginChild(("Child_" + p.getGroupHierarchyNames().front() + "/" + p.getName()).c_str(), size, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
                 for(auto f : ofxOceanodeScope::getInstance()->getScopedTypes()){
                     if(f(&p, size)) break;
                 }
 
                 ImGui::EndChild();
+                ImGui::PopStyleVar();
                 ImGui::PopStyleColor(5);
-
-                // Draggable splitter between panes
-                if(si < scopeCount - 1){
-                    string splitterId = "##scopesplitter_" + to_string(si);
-
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_Button));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-
-                    ImGui::Button(splitterId.c_str(), ImVec2(-1.0f, splitterThickness));
-
-                    if(ImGui::IsItemActive()){
-                        float delta = ImGui::GetIO().MouseDelta.y;
-                        heights[si]   += delta;
-                        heights[si+1] -= delta;
-                        heights[si]   = max(heights[si],   minPaneHeight);
-                        heights[si+1] = max(heights[si+1], minPaneHeight);
-                    }
-                    if(ImGui::IsItemHovered() || ImGui::IsItemActive()){
-                        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-                    }
-
-                    ImGui::PopStyleColor(3);
-                }
             }
         }
     }
+	
 	ImGui::Separator();
 
 	if(node->getNodeModel().getDescription() != ""){
 		ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 21.0f);
-		ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
+		ImGui::SetNextItemOpen(false, ImGuiCond_Appearing);
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
 		bool descOpen = ImGui::TreeNode("Description");
 		ImGui::PopStyleColor(); // always pop header colour right after TreeNode
@@ -399,8 +358,6 @@ void ofxOceanodeInspectorController::draw(){
 		}
 		ImGui::PopStyleVar();
 	}
-
-
 
     ImGui::PopStyleVar();
 }
