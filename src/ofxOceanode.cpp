@@ -152,6 +152,9 @@ void ofxOceanode::setup(){
     }
 
     presetLoadedListener = ofxOceanodeShared::getPresetHasLoadedEvent().newListener([this](){
+        if(ofxOceanodeShared::getPresetLoadType() != ofxOceanodePresetLoadType_FullPreset){
+            return; // Don't reload layout for clipboard paste / duplicate
+        }
         string iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
         if(ofFile(iniPath).exists()){
             pendingIniLoad = iniPath;   // defer — will be applied before next NewFrame
