@@ -585,24 +585,64 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 				} else {
 					for(int i = 0; i < (int)dir.size(); i++){
 						string name = dir.getName(i);
+						bool isCurrent = (name == currentLayoutName);
+						if(isCurrent) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::ActiveItemHighlight);
 						if(ImGui::MenuItem(name.c_str())){
 							pendingIniLoad = dir.getPath(i);
+							currentLayoutName = name;
 						}
+						if(isCurrent) ImGui::PopStyleColor();
 					}
 				}
 				ImGui::EndMenu();
 			}
-			
+
 			if(ImGui::MenuItem("Save current GUI layout")){
 				memset(saveLayoutNameBuf, 0, sizeof(saveLayoutNameBuf));
 				openSaveLayoutPopup = true;
 			}
-			
-			if(ImGui::MenuItem("Set current GUI layout as default")){
-				setDefaultLayoutSelected = "";
-				openSetDefaultLayoutPopup = true;
+
+			if(ImGui::BeginMenu("Set default layout")){
+				string layoutsDir = ofToDataPath("config/guiLayouts/", true);
+				ofDirectory dir(layoutsDir);
+				dir.allowExt("ini");
+				dir.listDir();
+				
+				std::string currentDefault = "";
+				ofFile defaultConfig(ofToDataPath("config/config.json", true));
+				if(defaultConfig.exists()){
+					ofJson j = ofLoadJson(defaultConfig.path());
+					if(j.contains("defaultLayout")){
+						currentDefault = j["defaultLayout"].get<std::string>();
+					}
+				}
+				
+				if(dir.size() == 0){
+					ImGui::BeginDisabled();
+					ImGui::MenuItem("(no layouts saved)");
+					ImGui::EndDisabled();
+				} else {
+					for(int i = 0; i < (int)dir.size(); i++){
+						string name = dir.getName(i);
+						bool isDefault = (name == currentDefault);
+						if(isDefault) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::ActiveItemHighlight);
+						if(ImGui::MenuItem(name.c_str())){
+							string configPath = ofToDataPath("config/config.json", true);
+							ofJson j;
+							ofFile existingCfg(configPath);
+							if(existingCfg.exists()) j = ofLoadJson(configPath);
+							j["defaultLayout"] = name;
+							string cfgDir = ofToDataPath("config/", true);
+							ofDirectory cfgD(cfgDir);
+							if(!cfgD.exists()) cfgD.create(true);
+							ofSavePrettyJson(configPath, j);
+						}
+						if(isDefault) ImGui::PopStyleColor();
+					}
+				}
+				ImGui::EndMenu();
 			}
-			
+
 			ImGui::Separator();
 			
 			if(ImGui::Button("Save Config")){
@@ -754,52 +794,6 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             }
             ImGui::CloseCurrentPopup();
         }
-        ImGui::SameLine();
-        if(ImGui::Button("Cancel", ImVec2(120, 0))){
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-
-    // --- Set Default GUI Layout Modal ---
-    if(openSetDefaultLayoutPopup){
-        ImGui::OpenPopup("Set Default GUI Layout");
-        openSetDefaultLayoutPopup = false;
-    }
-    if(ImGui::BeginPopupModal("Set Default GUI Layout", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
-        ImGui::Text("Choose a layout to use as default at startup:");
-        ImGui::Spacing();
-        string layoutsDir = ofToDataPath("config/guiLayouts/", true);
-        ofDirectory dir(layoutsDir);
-        dir.allowExt("ini");
-        dir.listDir();
-        if(dir.size() == 0){
-            ImGui::TextDisabled("(no layouts saved)");
-        } else {
-            for(int i = 0; i < (int)dir.size(); i++){
-                string name = dir.getName(i);
-                bool selected = (setDefaultLayoutSelected == name);
-                if(ImGui::Selectable(name.c_str(), selected, ImGuiSelectableFlags_DontClosePopups)){
-                    setDefaultLayoutSelected = name;
-                }
-            }
-        }
-        ImGui::Spacing();
-        bool canConfirm = !setDefaultLayoutSelected.empty();
-        if(!canConfirm) ImGui::BeginDisabled();
-        if(ImGui::Button("Set as Default", ImVec2(140, 0))){
-            string configPath = ofToDataPath("config/config.json", true);
-            ofJson j;
-            ofFile existingCfg(configPath);
-            if(existingCfg.exists()) j = ofLoadJson(configPath);
-            j["defaultLayout"] = setDefaultLayoutSelected;
-            string cfgDir = ofToDataPath("config/", true);
-            ofDirectory cfgD(cfgDir);
-            if(!cfgD.exists()) cfgD.create(true);
-            ofSavePrettyJson(configPath, j);
-            ImGui::CloseCurrentPopup();
-        }
-        if(!canConfirm) ImGui::EndDisabled();
         ImGui::SameLine();
         if(ImGui::Button("Cancel", ImVec2(120, 0))){
             ImGui::CloseCurrentPopup();
@@ -1088,6 +1082,7 @@ void ofxOceanode::loadDefaultGUILayout(){
 
     // Defer to draw() so ImGui context is fully active
     pendingIniLoad = fullPath;
+    currentLayoutName = filename;
 }
 
 void ofxOceanode::saveTheme(const std::string& name){

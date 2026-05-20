@@ -172,8 +172,7 @@ private:
 
     // GUI layout management state
     bool openSaveLayoutPopup = false;
-    bool openSetDefaultLayoutPopup = false;
-    std::string setDefaultLayoutSelected;
+    std::string currentLayoutName;
     char saveLayoutNameBuf[256] = {};
 
     // Theme editor state
