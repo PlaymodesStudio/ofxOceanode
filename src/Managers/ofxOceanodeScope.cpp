@@ -157,7 +157,7 @@ void ofxOceanodeScope::draw(){
             
             ImGui::SetNextWindowClass(&window_class);
             
-            // We also need to ensure it docks into the dockspace initially if it's not already docked
+            // Guide first-time windows into the dockspace initially.
             ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
 
             if(ImGui::Begin(windowName.c_str(), &open))
@@ -183,6 +183,36 @@ void ofxOceanodeScope::draw(){
                 ofxOceanodeScope::getInstance()->removeParameter(p.parameter);
                 // Auto-save is called inside removeParameter()
                 i--; // Adjust index since we removed an element
+            }
+            else
+            {
+                // After the window has been drawn, check if it ended up floating outside
+                // the Scopes dockspace. If so (and the user is not actively dragging it),
+                // force it back into the Scopes dockspace for the next frame.
+                // We use the internal SetWindowDock() directly rather than SetNextWindowDockID()
+                // to avoid racing with ImGui's own drag-and-drop docking requests.
+                ImGuiWindow* scopeWindow = ImGui::FindWindowByName(windowName.c_str());
+                if (scopeWindow && !ImGui::IsMouseDown(0))
+                {
+                    bool isFloatingOutsideScopes = false;
+                    if (scopeWindow->DockNode == NULL)
+                    {
+                        isFloatingOutsideScopes = true;
+                    }
+                    else
+                    {
+                        ImGuiDockNode* rootNode = ImGui::DockNodeGetRootNode(scopeWindow->DockNode);
+                        if (rootNode->ID != dockspace_id)
+                        {
+                            isFloatingOutsideScopes = true;
+                        }
+                    }
+                    
+                    if (isFloatingOutsideScopes)
+                    {
+                        ImGui::SetWindowDock(scopeWindow, dockspace_id, ImGuiCond_Always);
+                    }
+                }
             }
         }
     }
