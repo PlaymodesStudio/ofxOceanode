@@ -1204,8 +1204,48 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 c.nodes.clear();
             }
             
+            // Right-click on header opens popup
             if(ImGui::IsItemClicked(1)){
                 c.openPopupInNext = true;
+            }
+            
+            // --- Resize handle at bottom-right corner ---
+            float resizeHandleSize = 10.0f * zoomLevel;
+            glm::vec2 handleScreenPos = currentPosition + screenSize - glm::vec2(resizeHandleSize, resizeHandleSize);
+            ImGui::SetCursorScreenPos(ImVec2(handleScreenPos.x, handleScreenPos.y));
+            ImGui::InvisibleButton("ResizeHandle", ImVec2(resizeHandleSize, resizeHandleSize));
+            
+            // Visual indicator for resize handle (uses comment color)
+            ImU32 handleColor = (ImGui::IsItemHovered() || ImGui::IsItemActive())
+                ? IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 255)
+                : IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 150);
+            draw_list->AddRectFilled(handleScreenPos, handleScreenPos + glm::vec2(resizeHandleSize, resizeHandleSize), handleColor);
+            
+            if(ImGui::IsItemHovered() || ImGui::IsItemActive()){
+                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNWSE);
+            }
+            
+            if(ImGui::IsItemActive()){
+                glm::vec2 dragDelta = glm::vec2(ImGui::GetIO().MouseDelta) / zoomLevel;
+                c.size += dragDelta;
+                // Enforce minimum size
+                float minWidth = 32.0f;
+                float minHeight = 15.0f;
+                if(c.size.x < minWidth) c.size.x = minWidth;
+                if(c.size.y < minHeight) c.size.y = minHeight;
+            }
+            
+            if(ImGui::IsItemDeactivated()){
+                if(snap_to_grid){
+                    glm::vec2 bottomRight = c.position + c.size;
+                    glm::vec2 snappedBottomRight = snapToGrid(bottomRight);
+                    c.size = snappedBottomRight - c.position;
+                    // Ensure minimum size after snapping
+                    float minWidth = 32.0f;
+                    float minHeight = 15.0f;
+                    if(c.size.x < minWidth) c.size.x = minWidth;
+                    if(c.size.y < minHeight) c.size.y = minHeight;
+                }
             }
             
             if(c.openPopupInNext){
@@ -1225,8 +1265,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     c.text = cString;
                 }
                 delete[] cString;
-                ImGui::DragFloat2("Position", &c.position.x);
-                ImGui::DragFloat2("Size", &c.size.x);
                 ImGui::ColorEdit3("Color", &c.color.r);
                 ImGui::ColorEdit3("TextColor", &c.textColor.r);
                 if(ImGui::Button("[Remove]")){
