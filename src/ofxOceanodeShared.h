@@ -14,6 +14,7 @@
 
 struct ImFont;
 class ofxOceanodeNode;
+class ofxOceanodeCanvas;
 
 typedef int ofxOceanodeConfigurationFlags;
 
@@ -374,6 +375,15 @@ public:
 		return nodeSelectedInCanvasEvent;
 	}
 
+	// Root container / canvas — used for whole-patch operations such as
+	// Alt+Arrow portal navigation that need to traverse all nodes across
+	// the main graph and every macro.
+	static void setRootContainer(ofxOceanodeContainer* c){ getInstance().rootContainer = c; }
+	static ofxOceanodeContainer* getRootContainer(){ return getInstance().rootContainer; }
+
+	static void setRootCanvas(ofxOceanodeCanvas* c){ getInstance().rootCanvas = c; }
+	static ofxOceanodeCanvas* getRootCanvas(){ return getInstance().rootCanvas; }
+
 private:
     ofxOceanodeShared(){};
     
@@ -446,6 +456,10 @@ private:
 	
 	// Change layout on macros
 	bool changeLayoutOnMacros = false;
+
+	// Root references for whole-patch traversal
+	ofxOceanodeContainer* rootContainer = nullptr;
+	ofxOceanodeCanvas* rootCanvas = nullptr;
 };
 
 #endif /* ofxOceanodeShared_h */

@@ -128,6 +128,8 @@ void ofxOceanode::setup(){
     container = make_shared<ofxOceanodeContainer>(nodeRegistry, typesRegistry);
     canvas.setContainer(container);
     canvas.setup();
+    ofxOceanodeShared::setRootContainer(container.get());
+    ofxOceanodeShared::setRootCanvas(&canvas);
     scope->setup();
     //controls = make_unique<ofxOceanodeControls>(container);
     controls = make_unique<ofxOceanodeControls>(container,&canvas, oscReceiverPort);

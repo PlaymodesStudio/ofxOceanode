@@ -30,8 +30,8 @@ ofxOceanodeNodesController::ofxOceanodeNodesController(shared_ptr<ofxOceanodeCon
     // view so that node becomes the selected (orange) item and scrolls into view.
     nodeSelectedListener = ofxOceanodeShared::getNodeSelectedInCanvasEvent().newListener(
         [this](ofxOceanodeNode* node){
+            selectedNode = node;
             if(node != nullptr){
-                selectedNode = node;
                 scrollTreeToSelected = true;
                 forceExpandAll = true;   // ensure parent macros are expanded
             }
