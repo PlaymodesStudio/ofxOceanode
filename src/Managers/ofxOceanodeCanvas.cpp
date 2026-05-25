@@ -1076,8 +1076,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             float headerH = 15.0f * zoomLevel;
             draw_list->AddRectFilled(currentPosition, currentPosition + glm::vec2(screenSize.x, headerH), IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 255));
             // Don't draw comment text below 50% zoom
+			// Don't draw node name text below 50% zoom
+
             if(zoomLevel > 0.5f){
-                ImFont* commentFont = zoomFonts[getCeilingFontIndex()];
+                ImFont* commentFont = zoomFontsBold[getCeilingFontIndex()];
                 float commentFontSize = ZOOM_FONT_SIZES[3] * zoomLevel;  // base font size scaled by zoom
                 if(commentFont) {
                     draw_list->AddText(commentFont, commentFontSize, currentPosition,
