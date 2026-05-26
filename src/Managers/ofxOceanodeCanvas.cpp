@@ -252,6 +252,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     // restore the parent's value when they finish.
     float previousSharedZoom = ofxOceanodeShared::getZoomLevel();
 
+    if(parentID == ""){
+        ofxOceanodeShared::tickPendingCanvasNavigation();
+    }
+
     //Draw Guis
     if(onTop){
         ImGui::SetNextWindowFocus();
@@ -619,6 +623,22 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		      ImGui::PushItemWidth(120.0f);
 		      
 		      canvasOrigin = glm::vec2(ImGui::GetCursorScreenPos());
+              auto& pendingNavigation = ofxOceanodeShared::getPendingCanvasNavigation();
+              if(pendingNavigation.active &&
+                 pendingNavigation.canvas == this &&
+                 pendingNavigation.node != nullptr &&
+                 pendingNavigation.framesRemaining <= 0 &&
+                 !isFirstDraw &&
+                 contentRegionSize.x > 0.0f &&
+                 contentRegionSize.y > 0.0f){
+                  float zoom = getZoomLevel();
+                  glm::vec2 nodeSize = glm::vec2(pendingNavigation.node->getNodeGui().getRectangle().getWidth(),
+                                                 pendingNavigation.node->getNodeGui().getRectangle().getHeight());
+                  glm::vec2 nodePos = pendingNavigation.node->getNodeGui().getPosition();
+                  glm::vec2 center = getContentRegionSize() / (2.0f * zoom);
+                  setScrolling(-nodePos - nodeSize / 2.0f + center);
+                  ofxOceanodeShared::clearPendingCanvasNavigation();
+              }
 		      ImVec2 offset = ImVec2(canvasOrigin.x + scrolling.x * zoomLevel,
 		                             canvasOrigin.y + scrolling.y * zoomLevel);
         ImDrawList* draw_list = ImGui::GetWindowDrawList();

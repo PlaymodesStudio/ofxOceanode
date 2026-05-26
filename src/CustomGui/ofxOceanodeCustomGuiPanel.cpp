@@ -668,6 +668,11 @@ void ofxOceanodeCustomGuiPanel::draw()
                     ImGui::OpenPopup("Widget Edit Context");
                 }
                 if(ImGui::BeginPopup("Widget Edit Context")){
+                    if(parameter != nullptr && ImGui::Selectable("Show in Canvas")){
+                        container.showParameterInCanvas(*parameter);
+                        ImGui::CloseCurrentPopup();
+                    }
+                    if(parameter != nullptr) ImGui::Separator();
                     if(ImGui::Selectable("Properties")){
                         propertiesWidgetIndex = (int)i;
                         requestOpenWidgetPropertiesPopup = true;
@@ -704,6 +709,11 @@ void ofxOceanodeCustomGuiPanel::draw()
                          widget.type == CustomGuiWidgetType::MultiToggle) &&
                         (parameterType == typeid(std::vector<float>).name() ||
                          parameterType == typeid(std::vector<int>).name());
+                    if(ImGui::Selectable("Show in Canvas")){
+                        container.showParameterInCanvas(*parameter);
+                        ImGui::CloseCurrentPopup();
+                    }
+                    ImGui::Separator();
 #ifdef OFXOCEANODE_USE_MIDI
                     if(canSetValue){
                         if(ImGui::Selectable("Set Value")){

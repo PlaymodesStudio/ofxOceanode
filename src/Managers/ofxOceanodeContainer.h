@@ -201,6 +201,8 @@ public:
     std::string getCustomGuiParameterPath(ofxOceanodeAbstractParameter& parameter) const;
     ofxOceanodeAbstractParameter* findCustomGuiParameter(const std::string& parameterPath) const;
     ofxOceanodeNode* getNodeFromParameter(ofxOceanodeAbstractParameter& param);
+    bool showNodeInCanvas(ofxOceanodeNode& node);
+    bool showParameterInCanvas(ofxOceanodeAbstractParameter& parameter);
     ofxOceanodeContainer* getContainerForCanvasID(const std::string& canvasID);
     const ofxOceanodeContainer* getContainerForCanvasID(const std::string& canvasID) const;
     CustomGuiSnapshotBank* getCustomGuiSnapshotBank(const std::string& panelId);

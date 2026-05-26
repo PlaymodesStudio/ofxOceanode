@@ -2045,6 +2045,85 @@ ofxOceanodeAbstractParameter* ofxOceanodeContainer::findCustomGuiParameter(const
     return resolved.parameter;
 }
 
+bool ofxOceanodeContainer::showParameterInCanvas(ofxOceanodeAbstractParameter& parameter)
+{
+    auto* node = getNodeFromParameter(parameter);
+    if(node == nullptr) return false;
+    return showNodeInCanvas(*node);
+}
+
+bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode)
+{
+    auto* rootContainer = ofxOceanodeShared::getRootContainer();
+    auto* rootCanvas = ofxOceanodeShared::getRootCanvas();
+    if(rootContainer == nullptr || rootCanvas == nullptr) return false;
+
+    struct NodeLocation {
+        ofxOceanodeNode* node = nullptr;
+        ofxOceanodeCanvas* canvas = nullptr;
+        ofxOceanodeNodeMacro* macro = nullptr;
+        ofxOceanodeContainer* container = nullptr;
+    };
+
+    NodeLocation location;
+    std::function<void(ofxOceanodeContainer*, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*)> findNode =
+        [&](ofxOceanodeContainer* currentContainer, ofxOceanodeCanvas* currentCanvas, ofxOceanodeNodeMacro* currentMacro){
+            if(currentContainer == nullptr || currentCanvas == nullptr || location.node != nullptr) return;
+
+            for(auto* node : currentContainer->getAllModules()){
+                if(node == nullptr || location.node != nullptr) continue;
+
+                if(node == &targetNode){
+                    location.node = node;
+                    location.canvas = currentCanvas;
+                    location.macro = currentMacro;
+                    location.container = currentContainer;
+                    return;
+                }
+
+                if(auto* nestedMacro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
+                    findNode(nestedMacro->getContainer().get(), nestedMacro->getCanvas(), nestedMacro);
+                }
+            }
+        };
+
+    findNode(rootContainer, rootCanvas, nullptr);
+    if(location.node == nullptr || location.canvas == nullptr || location.container == nullptr) return false;
+
+    for(auto& pair : location.container->getParameterGroupNodesMap()){
+        pair.second->getNodeGui().setSelected(false);
+    }
+    location.container->deselectAllComments();
+    location.node->getNodeGui().setSelected(true);
+
+    if(location.macro != nullptr){
+        location.macro->activateWindow();
+        location.canvas = location.macro->getCanvas();
+    }else{
+        location.canvas->requestFocus();
+    }
+
+    location.canvas->bringOnTop();
+    ofxOceanodeShared::setActiveCanvasUniqueID(location.canvas->getUniqueID());
+    ofxOceanodeShared::nodeSelectedInCanvas(location.node);
+    ofxOceanodeShared::getLayoutSwitchSuppressFrames() = 4;
+
+    if(ofxOceanodeShared::getGuiLayoutChangesWithMacros()){
+        string newIniPath = ofToDataPath(location.canvas->getLayoutIniPath());
+        string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
+        if(!newIniPath.empty() && newIniPath != activeLayoutPath){
+            ofxOceanodeShared::getPendingLayoutSavePath() = activeLayoutPath;
+            ofxOceanodeShared::getPendingLayoutLoadPath() = newIniPath;
+            activeLayoutPath = newIniPath;
+        }
+    }
+
+    ofxOceanodeShared::requestCanvasNavigation(location.node,
+                                               location.canvas,
+                                               location.macro != nullptr ? 2 : 1);
+    return true;
+}
+
 bool ofxOceanodeContainer::addParameterToCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter, CustomGuiWidgetType type)
 {
     ofxOceanodeCustomGuiPanel tempPanel(*this, panelId);
