@@ -52,17 +52,6 @@ void ofxOceanodeCustomGuiPanel::draw()
     static ImVec2 marqueeCurrentMouse = ImVec2(0, 0);
     static std::string marqueePanelId;
 
-    auto ensureLayoutFitsWidgets = [&](CustomGuiLayout& layout){
-        int requiredColumns = std::max(1, layout.columns);
-        int requiredRows = std::max(1, layout.rows);
-        for(const auto& widget : layout.widgets){
-            requiredColumns = std::max(requiredColumns, widget.gridX + widget.spanW);
-            requiredRows = std::max(requiredRows, widget.gridY + widget.spanH);
-        }
-        layout.columns = requiredColumns;
-        layout.rows = requiredRows;
-    };
-
     auto isWidgetSelected = [&](int index){
         return std::find(selectedWidgetIndices.begin(), selectedWidgetIndices.end(), index) != selectedWidgetIndices.end();
     };
@@ -170,6 +159,7 @@ void ofxOceanodeCustomGuiPanel::draw()
     if(beginVisible){
         auto* snapshotBank = container.getCustomGuiSnapshotBank(panel->id);
         const bool canSnapshot = container.customGuiPanelHasSnapshotEligibleParameters(panel->id);
+        bool requestRemoveSelectedWidgets = false;
         auto getSelectedSnapshot = [&]() -> CustomGuiSnapshotData* {
             if(snapshotBank == nullptr) return nullptr;
             for(auto& snapshot : snapshotBank->snapshots){
@@ -258,6 +248,12 @@ void ofxOceanodeCustomGuiPanel::draw()
             if(ImGui::SmallButton("Delete GUI")){
                 requestOpenDeletePanelPopup = true;
             }
+            ImGui::SameLine(0, 8.0f);
+            if(selectedWidgetIndices.empty()) ImGui::BeginDisabled();
+            if(ImGui::SmallButton(selectedWidgetIndices.size() > 1 ? "Remove Widgets" : "Remove Widget")){
+                requestRemoveSelectedWidgets = true;
+            }
+            if(selectedWidgetIndices.empty()) ImGui::EndDisabled();
 
             ImGui::SameLine(0, 18.0f);
             ImGui::SetNextItemWidth(70);
@@ -476,7 +472,20 @@ void ofxOceanodeCustomGuiPanel::draw()
             topmostHoveredWidgetIndex >= 0 &&
             panel->layout.widgets[topmostHoveredWidgetIndex].type != CustomGuiWidgetType::BackgroundPanel;
         const bool propertiesPopupOpen = panel->designMode && ImGui::IsPopupOpen("Widget Properties");
+        const bool widgetContextPopupOpen = panel->designMode && ImGui::IsPopupOpen("Widget Edit Context");
         const bool ctrlPressed = ImGui::GetIO().KeyCtrl;
+        const bool deleteShortcutPressed =
+            panel->designMode &&
+            ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+            !selectedWidgetIndices.empty() &&
+            !propertiesPopupOpen &&
+            !widgetContextPopupOpen &&
+            !ImGui::IsAnyItemActive() &&
+            (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace));
+
+        if(deleteShortcutPressed){
+            requestRemoveSelectedWidgets = true;
+        }
 
         if(propertiesPopupOpen){
             if(draggedWidgetPanelId == panel->id){
@@ -774,6 +783,10 @@ void ofxOceanodeCustomGuiPanel::draw()
             }
         }
 
+        if(requestRemoveSelectedWidgets){
+            removeSelectedWidgets();
+        }
+
         if(requestOpenWidgetPropertiesPopup && propertiesWidgetIndex >= 0 &&
            propertiesWidgetIndex < (int)panel->layout.widgets.size()){
             ImGui::OpenPopup("Widget Properties");
@@ -800,22 +813,7 @@ void ofxOceanodeCustomGuiPanel::draw()
         }
 
         if(widgetToRemove >= 0 && widgetToRemove < (int)panel->layout.widgets.size()){
-            if(propertiesWidgetIndex == widgetToRemove){
-                propertiesWidgetIndex = -1;
-                requestOpenWidgetPropertiesPopup = false;
-            }else if(propertiesWidgetIndex > widgetToRemove){
-                propertiesWidgetIndex--;
-            }
-            if(const CustomGuiWidgetDefinition* definition = ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(panel->layout.widgets[widgetToRemove].type)){
-                if(definition->cleanup) definition->cleanup(panel->id, panel->layout.widgets[widgetToRemove].parameterRef.parameterPath);
-            }
-            panel->layout.widgets.erase(panel->layout.widgets.begin() + widgetToRemove);
-            selectedWidgetIndices.erase(std::remove(selectedWidgetIndices.begin(), selectedWidgetIndices.end(), widgetToRemove), selectedWidgetIndices.end());
-            for(int& selectedIndex : selectedWidgetIndices){
-                if(selectedIndex > widgetToRemove) selectedIndex--;
-            }
-            ensureLayoutFitsWidgets(panel->layout);
-            container.markCustomGuisDirty();
+            removeWidgetsByIndices({widgetToRemove});
         }
 
         drawSetValuePopup();
@@ -1522,7 +1520,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
             definition->drawProperties(context, widget, parameter);
         }
 
-        if(ImGui::Button("Remove from GUI")){
+        if(ImGui::Button("Remove Widget")){
             removeWidget = true;
             ImGui::CloseCurrentPopup();
         }
@@ -1695,6 +1693,67 @@ void ofxOceanodeCustomGuiPanel::drawGridOverlay(const CustomGuiLayout& layout, c
     }
 }
 
+void ofxOceanodeCustomGuiPanel::ensureLayoutFitsWidgets(CustomGuiLayout& layout) const
+{
+    int requiredColumns = std::max(1, layout.columns);
+    int requiredRows = std::max(1, layout.rows);
+    for(const auto& widget : layout.widgets){
+        requiredColumns = std::max(requiredColumns, widget.gridX + widget.spanW);
+        requiredRows = std::max(requiredRows, widget.gridY + widget.spanH);
+    }
+    layout.columns = requiredColumns;
+    layout.rows = requiredRows;
+}
+
+bool ofxOceanodeCustomGuiPanel::removeWidgetsByIndices(const std::vector<int>& widgetIndices)
+{
+    CustomGuiPanelData* panel = getPanelData();
+    if(panel == nullptr || widgetIndices.empty()) return false;
+
+    std::vector<int> indices = widgetIndices;
+    indices.erase(std::remove_if(indices.begin(), indices.end(), [&](int index){
+                      return index < 0 || index >= (int)panel->layout.widgets.size();
+                  }),
+                  indices.end());
+    if(indices.empty()) return false;
+
+    std::sort(indices.begin(), indices.end());
+    indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
+    std::sort(indices.rbegin(), indices.rend());
+
+    bool removed = false;
+    for(int index : indices){
+        if(index < 0 || index >= (int)panel->layout.widgets.size()) continue;
+
+        if(propertiesWidgetIndex == index){
+            propertiesWidgetIndex = -1;
+            requestOpenWidgetPropertiesPopup = false;
+        }else if(propertiesWidgetIndex > index){
+            propertiesWidgetIndex--;
+        }
+
+        const auto& widget = panel->layout.widgets[index];
+        if(const CustomGuiWidgetDefinition* definition = ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(widget.type)){
+            if(definition->cleanup) definition->cleanup(panel->id, widget.parameterRef.parameterPath);
+        }
+        panel->layout.widgets.erase(panel->layout.widgets.begin() + index);
+        removed = true;
+    }
+
+    if(!removed) return false;
+
+    selectedWidgetIndices.clear();
+    ensureLayoutFitsWidgets(panel->layout);
+    container.markCustomGuisDirty();
+    if(ImGui::IsPopupOpen("Widget Properties")) ImGui::ClosePopupToLevel(0, true);
+    return true;
+}
+
+bool ofxOceanodeCustomGuiPanel::removeSelectedWidgets()
+{
+    return removeWidgetsByIndices(selectedWidgetIndices);
+}
+
 std::vector<CustomGuiWidgetType> ofxOceanodeCustomGuiPanel::getCompatibleWidgetTypes(ofxOceanodeAbstractParameter& parameter) const
 {
     return ofxOceanodeCustomGuiWidgetRegistry::instance().getCompatibleWidgets(parameter);
@@ -1721,21 +1780,15 @@ bool ofxOceanodeCustomGuiPanel::removeParameter(const std::string& parameterPath
     CustomGuiPanelData* panel = getPanelData();
     if(panel == nullptr) return false;
 
-    auto& widgets = panel->layout.widgets;
-    for(const auto& widget : widgets){
-        if(widget.parameterRef.parameterPath != parameterPath) continue;
-        if(const CustomGuiWidgetDefinition* definition = ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(widget.type)){
-            if(definition->cleanup) definition->cleanup(panel->id, parameterPath);
+    std::vector<int> widgetIndices;
+    widgetIndices.reserve(panel->layout.widgets.size());
+    for(size_t i = 0; i < panel->layout.widgets.size(); i++){
+        if(panel->layout.widgets[i].parameterRef.parameterPath == parameterPath){
+            widgetIndices.push_back((int)i);
         }
     }
 
-    auto it = std::remove_if(widgets.begin(), widgets.end(), [&](const CustomGuiWidget& widget){
-        return widget.parameterRef.parameterPath == parameterPath;
-    });
-    if(it == widgets.end()) return false;
-    widgets.erase(it, widgets.end());
-    container.markCustomGuisDirty();
-    return true;
+    return removeWidgetsByIndices(widgetIndices);
 }
 
 bool ofxOceanodeCustomGuiPanel::addParameter(ofxOceanodeAbstractParameter& parameter, CustomGuiWidgetType type)

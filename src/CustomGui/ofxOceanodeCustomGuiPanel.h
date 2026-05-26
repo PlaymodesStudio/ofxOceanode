@@ -44,10 +44,13 @@ private:
     bool resetParameterToDefaultValue(ofxOceanodeAbstractParameter& parameter) const;
     void drawVerticalMeter(const ImVec2& size, float normalized, const ImU32& color) const;
     void drawGridOverlay(const CustomGuiLayout& layout, const ImVec2& origin) const;
+    void ensureLayoutFitsWidgets(CustomGuiLayout& layout) const;
     std::pair<int, int> findNextAvailableCell(const CustomGuiLayout& layout, int spanW, int spanH) const;
     std::string getFallbackLabel(const CustomGuiWidget& widget) const;
     bool shouldShowNumericValue(const CustomGuiWidget& widget) const;
     std::shared_ptr<ofImage> loadWidgetImage(const std::string& imagePath) const;
+    bool removeWidgetsByIndices(const std::vector<int>& widgetIndices);
+    bool removeSelectedWidgets();
 
     ofxOceanodeContainer& container;
     std::string panelId;
