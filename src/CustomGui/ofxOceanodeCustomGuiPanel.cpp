@@ -150,6 +150,8 @@ void ofxOceanodeCustomGuiPanel::draw()
             resizedWidgetPanelId.clear();
         }
         requestOpenSetValuePopup = false;
+        requestOpenWidgetPropertiesPopup = false;
+        propertiesWidgetIndex = -1;
         requestOpenRenameSnapshotPopup = false;
         requestOpenDeleteSnapshotPopup = false;
         requestOpenDeletePanelPopup = false;
@@ -660,8 +662,9 @@ void ofxOceanodeCustomGuiPanel::draw()
                 }
                 if(ImGui::BeginPopup("Widget Edit Context")){
                     if(ImGui::Selectable("Properties")){
+                        propertiesWidgetIndex = (int)i;
+                        requestOpenWidgetPropertiesPopup = true;
                         ImGui::CloseCurrentPopup();
-                        ImGui::OpenPopup("Widget Properties");
                     }
                     const bool canSetVectorSize =
                         parameter != nullptr &&
@@ -674,9 +677,6 @@ void ofxOceanodeCustomGuiPanel::draw()
                         ImGui::CloseCurrentPopup();
                     }
                     ImGui::EndPopup();
-                }
-                if(drawWidgetProperties(widget, i, parameter)){
-                    widgetToRemove = (int)i;
                 }
             }else if(parameter != nullptr){
                 if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)){
@@ -774,7 +774,38 @@ void ofxOceanodeCustomGuiPanel::draw()
             }
         }
 
+        if(requestOpenWidgetPropertiesPopup && propertiesWidgetIndex >= 0 &&
+           propertiesWidgetIndex < (int)panel->layout.widgets.size()){
+            ImGui::OpenPopup("Widget Properties");
+            requestOpenWidgetPropertiesPopup = false;
+        }else if(requestOpenWidgetPropertiesPopup){
+            requestOpenWidgetPropertiesPopup = false;
+            propertiesWidgetIndex = -1;
+        }
+
+        if(propertiesWidgetIndex >= 0 && propertiesWidgetIndex < (int)panel->layout.widgets.size()){
+            auto& widget = panel->layout.widgets[propertiesWidgetIndex];
+            const bool hasParameter = !(widget.type == CustomGuiWidgetType::Label ||
+                                        widget.type == CustomGuiWidgetType::BackgroundPanel ||
+                                        widget.type == CustomGuiWidgetType::Text ||
+                                        widget.type == CustomGuiWidgetType::Line ||
+                                        widget.type == CustomGuiWidgetType::Image ||
+                                        widget.type == CustomGuiWidgetType::SnapshotMatrix);
+            ofxOceanodeAbstractParameter* parameter = hasParameter ? findParameter(widget) : nullptr;
+            if(drawWidgetProperties(widget, propertiesWidgetIndex, parameter)){
+                widgetToRemove = propertiesWidgetIndex;
+            }
+        }else{
+            propertiesWidgetIndex = -1;
+        }
+
         if(widgetToRemove >= 0 && widgetToRemove < (int)panel->layout.widgets.size()){
+            if(propertiesWidgetIndex == widgetToRemove){
+                propertiesWidgetIndex = -1;
+                requestOpenWidgetPropertiesPopup = false;
+            }else if(propertiesWidgetIndex > widgetToRemove){
+                propertiesWidgetIndex--;
+            }
             if(const CustomGuiWidgetDefinition* definition = ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(panel->layout.widgets[widgetToRemove].type)){
                 if(definition->cleanup) definition->cleanup(panel->id, panel->layout.widgets[widgetToRemove].parameterRef.parameterPath);
             }

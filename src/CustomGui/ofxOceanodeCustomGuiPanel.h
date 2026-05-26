@@ -62,6 +62,8 @@ private:
     std::string setVectorSizeParameterPath;
     std::string setVectorSizeLabel;
     int setVectorSizeValue = 1;
+    bool requestOpenWidgetPropertiesPopup = false;
+    int propertiesWidgetIndex = -1;
     bool requestOpenRenameSnapshotPopup = false;
     bool requestOpenDeleteSnapshotPopup = false;
     bool requestOpenDeletePanelPopup = false;
