@@ -5,6 +5,7 @@
 #include "CustomGui/ofxOceanodeCustomGuiWidgetRegistry.h"
 #include "ofxOceanodeParameter.h"
 #include <cmath>
+#include "imgui_internal.h"
 
 namespace ofxOceanodeCustomGuiWidgetHelpers {
 
@@ -101,28 +102,59 @@ inline bool shouldShowWidgetLabel(const CustomGuiWidget& widget)
     return widgetSupportsLabel(widget) && widget.config.value("showLabel", true);
 }
 
-inline void drawWidgetLabel(const CustomGuiWidget& widget, const std::string& label)
+inline float widgetLabelRowHeight(const CustomGuiWidgetRenderContext& context)
 {
-    if(!shouldShowWidgetLabel(widget)){
+    const bool showLabel = shouldShowWidgetLabel(*context.widget) && !context.label.empty();
+    if(!showLabel) return 0.0f;
+    return std::max(1.0f, context.cellSize.y > 0.0f ? context.cellSize.y : ImGui::GetFrameHeightWithSpacing());
+}
+
+inline void drawWidgetLabel(const CustomGuiWidgetRenderContext& context, const CustomGuiWidget& widget, const std::string& label)
+{
+    if(label.empty() || !shouldShowWidgetLabel(widget)){
         return;
     }
 
+    const float labelHeight = widgetLabelRowHeight(context);
+    const ImVec2 startPos = ImGui::GetCursorPos();
+    ImGui::Dummy(ImVec2(context.size.x, labelHeight));
+
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    const float padX = std::max(2.0f, std::min(8.0f, (context.cellSize.x > 0.0f ? context.cellSize.x : context.size.x) * 0.08f));
     const ofColor labelColor = widgetLabelColor(widget, ofColor::black);
     ImGui::PushStyleColor(ImGuiCol_Text, colorToImVec4(labelColor));
-    ImGui::TextWrapped("%s", label.c_str());
+    ImGui::PushClipRect(min, max, true);
+    ImGui::RenderTextClipped(ImVec2(min.x + padX, min.y),
+                             ImVec2(max.x - padX, max.y),
+                             label.c_str(), nullptr, nullptr,
+                             ImVec2(0.0f, 0.5f), nullptr);
+    ImGui::PopClipRect();
     ImGui::PopStyleColor();
+    ImGui::SetCursorPos(ImVec2(startPos.x, startPos.y + labelHeight));
 }
 
 inline ImVec2 widgetItemSize(const CustomGuiWidgetRenderContext& context)
 {
-    const bool reserveLabelSpace = shouldShowWidgetLabel(*context.widget) && !context.label.empty();
-    const float labelHeight = reserveLabelSpace ? ImGui::GetFrameHeightWithSpacing() : 0.0f;
+    const float labelHeight = widgetLabelRowHeight(context);
     return ImVec2(context.size.x, std::max(1.0f, context.size.y - labelHeight));
 }
 
 inline float widgetItemWidth(const ImVec2& itemSize)
 {
     return std::max(40.0f, itemSize.x);
+}
+
+inline void pushAlignedFrameStyle(const CustomGuiWidgetRenderContext& context, const ImVec2& itemSize)
+{
+    const float framePadX = std::max(0.0f, std::min(4.0f, (context.cellSize.x > 0.0f ? context.cellSize.x : itemSize.x) * 0.04f));
+    const float framePadY = std::max(0.0f, (itemSize.y - ImGui::GetFontSize()) * 0.5f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(framePadX, framePadY));
+}
+
+inline void popAlignedFrameStyle()
+{
+    ImGui::PopStyleVar();
 }
 
 inline bool useCustomRange(const CustomGuiWidget& widget)
@@ -194,6 +226,18 @@ inline bool isBoolParameter(ofxOceanodeAbstractParameter& parameter)
 {
     return dynamic_cast<ofxOceanodeParameter<bool>*>(&parameter) != nullptr ||
            parameter.valueType() == typeid(bool).name();
+}
+
+inline bool isColorParameter(ofxOceanodeAbstractParameter& parameter)
+{
+    return dynamic_cast<ofxOceanodeParameter<ofColor>*>(&parameter) != nullptr ||
+           parameter.valueType() == typeid(ofColor).name();
+}
+
+inline bool isFloatColorParameter(ofxOceanodeAbstractParameter& parameter)
+{
+    return dynamic_cast<ofxOceanodeParameter<ofFloatColor>*>(&parameter) != nullptr ||
+           parameter.valueType() == typeid(ofFloatColor).name();
 }
 
 inline bool isTriggerParameter(ofxOceanodeAbstractParameter& parameter)

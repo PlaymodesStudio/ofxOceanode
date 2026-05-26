@@ -12,6 +12,7 @@ enum class CustomGuiWidgetType {
     DragNumber,
 	Toggle,
 	Button,
+    ColorSwatch,
 	MultiSlider,
 	MultiToggle,
     PianoKeyboard,
@@ -106,6 +107,7 @@ inline std::string customGuiWidgetTypeToString(CustomGuiWidgetType type)
         case CustomGuiWidgetType::DragNumber: return "DragNumber";
         case CustomGuiWidgetType::Toggle: return "Toggle";
         case CustomGuiWidgetType::Button: return "Button";
+        case CustomGuiWidgetType::ColorSwatch: return "ColorSwatch";
         case CustomGuiWidgetType::MultiSlider: return "MultiSlider";
 		case CustomGuiWidgetType::MultiToggle: return "MultiToggle";
         case CustomGuiWidgetType::PianoKeyboard: return "PianoKeyboard";
@@ -136,6 +138,7 @@ inline CustomGuiWidgetType customGuiWidgetTypeFromString(const std::string& type
     if(type == "DragNumber") return CustomGuiWidgetType::DragNumber;
     if(type == "Toggle") return CustomGuiWidgetType::Toggle;
 	if(type == "Button") return CustomGuiWidgetType::Button;
+    if(type == "ColorSwatch") return CustomGuiWidgetType::ColorSwatch;
 	if(type == "MultiSlider") return CustomGuiWidgetType::MultiSlider;
 	if(type == "MultiToggle" || type == "ToggleGrid") return CustomGuiWidgetType::MultiToggle;
     if(type == "PianoKeyboard") return CustomGuiWidgetType::PianoKeyboard;

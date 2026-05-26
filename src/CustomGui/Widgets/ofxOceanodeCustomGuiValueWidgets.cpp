@@ -42,6 +42,11 @@ bool supportsButtonWidget(ofxOceanodeAbstractParameter& parameter)
     return isTriggerParameter(parameter);
 }
 
+bool supportsColorSwatchWidget(ofxOceanodeAbstractParameter& parameter)
+{
+    return isColorParameter(parameter) || isFloatColorParameter(parameter);
+}
+
 bool supportsTextDisplayWidget(ofxOceanodeAbstractParameter& parameter)
 {
     return isStringParameter(parameter);
@@ -143,7 +148,7 @@ void drawCustomDropdownProperties(CustomGuiWidgetPropertiesContext& context, Cus
 void initializeWideWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
 {
     widget.spanW = 2;
-    widget.spanH = 1;
+    widget.spanH = 2;
     ensureWidgetBodyColor(widget);
     ensureWidgetLabelColor(widget);
 }
@@ -192,6 +197,15 @@ void initializeButtonWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParamete
     ensureWidgetLabelColor(widget);
 }
 
+void initializeColorSwatchWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
+{
+    widget.spanW = 2;
+    widget.spanH = 2;
+    ensureWidgetBodyColor(widget, ofColor(60, 60, 60, 255));
+    ensureWidgetLabelColor(widget);
+    widget.config["showValue"] = false;
+}
+
 bool renderKnobWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
 {
     if(parameter == nullptr) return false;
@@ -236,7 +250,7 @@ bool renderKnobWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wi
     }
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
     ImGui::InvisibleButton("##knob", ImVec2(size, size));
     const ImVec2 knobMin = ImGui::GetItemRectMin();
     const ImVec2 knobMax = ImGui::GetItemRectMax();
@@ -319,10 +333,11 @@ bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& w
     const ofColor accentColor = widget.color;
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
     if(customFontScale || adaptiveSliderValueScale){
         ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * activeFontScale));
     }
+    pushAlignedFrameStyle(context, itemSize);
     ImGui::SetNextItemWidth(widgetItemWidth(itemSize));
     pushWidgetFrameColors(bodyColor, accentColor);
 
@@ -351,6 +366,7 @@ bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& w
     }
 
     ImGui::PopStyleColor(8);
+    popAlignedFrameStyle();
     if(customFontScale || adaptiveSliderValueScale) ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
     ImGui::EndGroup();
     return true;
@@ -381,10 +397,11 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
     const ofColor accentColor = widget.color;
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
     if(customFontScale || adaptiveSliderValueScale){
         ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * activeFontScale));
     }
+    pushAlignedFrameStyle(context, itemSize);
     ImGui::SetNextItemWidth(widgetItemWidth(itemSize));
     pushWidgetFrameColors(bodyColor, accentColor);
 
@@ -475,6 +492,7 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
     if(changed) param.set(value);
 
     ImGui::PopStyleColor(8);
+    popAlignedFrameStyle();
     if(customFontScale || adaptiveSliderValueScale) ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
     ImGui::EndGroup();
     return true;
@@ -505,8 +523,9 @@ bool renderVectorDragNumberWidget(CustomGuiWidgetRenderContext& context, CustomG
     const ofColor accentColor = widget.color;
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
     ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * fontScale));
+    pushAlignedFrameStyle(context, itemSize);
     ImGui::SetNextItemWidth(widgetItemWidth(itemSize));
     pushWidgetFrameColors(bodyColor, accentColor);
 
@@ -515,6 +534,7 @@ bool renderVectorDragNumberWidget(CustomGuiWidgetRenderContext& context, CustomG
         auto value = param.get();
         if(value.empty()){
             ImGui::TextDisabled("Empty vector");
+            popAlignedFrameStyle();
             ImGui::EndGroup();
             return true;
         }
@@ -541,6 +561,7 @@ bool renderVectorDragNumberWidget(CustomGuiWidgetRenderContext& context, CustomG
         auto value = param.get();
         if(value.empty()){
             ImGui::TextDisabled("Empty vector");
+            popAlignedFrameStyle();
             ImGui::EndGroup();
             return true;
         }
@@ -565,6 +586,7 @@ bool renderVectorDragNumberWidget(CustomGuiWidgetRenderContext& context, CustomG
     }
 
     ImGui::PopStyleColor(8);
+    popAlignedFrameStyle();
     ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
     ImGui::EndGroup();
     return true;
@@ -587,12 +609,18 @@ bool renderToggleWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& 
     bool value = param.get();
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
-    if(!context.interactive){
-        ImGui::TextWrapped("%s", value ? "On" : "Off");
-    }else if(ImGui::Checkbox("##value", &value)){
-        param.set(value);
+    drawWidgetLabel(context, widget, context.label);
+    const ImVec2 itemSize = widgetItemSize(context);
+    const ofColor bodyColor = widgetBodyColor(widget, ofColor(70, 70, 70, 220));
+    const ofColor activeColor = widget.color;
+    const ofColor buttonColor = value ? activeColor : bodyColor;
+    ImGui::PushStyleColor(ImGuiCol_Button, colorToImVec4(buttonColor));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colorToImVec4(buttonColor, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, colorToImVec4(buttonColor, 1.0f));
+    if(ImGui::Button(value ? "On" : "Off", itemSize) && context.interactive){
+        param.set(!value);
     }
+    ImGui::PopStyleColor(3);
     ImGui::EndGroup();
     return true;
 }
@@ -609,12 +637,95 @@ bool renderButtonWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget&,
     return true;
 }
 
+bool renderColorSwatchWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
+{
+    if(parameter == nullptr) return false;
+
+    const bool floatColorParameter = isFloatColorParameter(*parameter);
+    const bool byteColorParameter = isColorParameter(*parameter);
+    if(!floatColorParameter && !byteColorParameter) return false;
+
+    float color[4];
+    if(floatColorParameter){
+        auto value = parameter->cast<ofFloatColor>().getParameter().get();
+        color[0] = value.r;
+        color[1] = value.g;
+        color[2] = value.b;
+        color[3] = value.a;
+    }else{
+        auto value = parameter->cast<ofColor>().getParameter().get();
+        color[0] = value.r / 255.0f;
+        color[1] = value.g / 255.0f;
+        color[2] = value.b / 255.0f;
+        color[3] = value.a / 255.0f;
+    }
+
+    ImGui::BeginGroup();
+    drawWidgetLabel(context, widget, context.label);
+    const ImVec2 itemSize = widgetItemSize(context);
+    ImGui::InvisibleButton("##colorswatch", itemSize);
+    const bool hovered = ImGui::IsItemHovered();
+    if(context.interactive && ImGui::IsItemClicked(ImGuiMouseButton_Left)){
+        ImGui::OpenPopup("Color Swatch Picker");
+    }
+
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    const ofColor bodyColor = widgetBodyColor(widget, ofColor(60, 60, 60, 255));
+
+    const float checker = std::max(6.0f, std::min(14.0f, std::min(itemSize.x, itemSize.y) * 0.15f));
+    drawList->AddRectFilled(min, max, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 4.0f);
+    for(float y = min.y; y < max.y; y += checker){
+        for(float x = min.x; x < max.x; x += checker){
+            const bool dark = (((int)((x - min.x) / checker) + (int)((y - min.y) / checker)) % 2) == 0;
+            const ImU32 cellColor = dark ? IM_COL32(90, 90, 90, 255) : IM_COL32(130, 130, 130, 255);
+            drawList->AddRectFilled(ImVec2(x, y),
+                                    ImVec2(std::min(x + checker, max.x), std::min(y + checker, max.y)),
+                                    cellColor);
+        }
+    }
+    drawList->AddRectFilled(min,
+                            max,
+                            IM_COL32((int)std::round(color[0] * 255.0f),
+                                     (int)std::round(color[1] * 255.0f),
+                                     (int)std::round(color[2] * 255.0f),
+                                     (int)std::round(color[3] * 255.0f)),
+                            4.0f);
+    drawList->AddRect(min,
+                      max,
+                      hovered ? IM_COL32(255, 255, 255, 220) : IM_COL32(100, 100, 100, 255),
+                      4.0f, 0, hovered ? 2.0f : 1.0f);
+
+    bool changed = false;
+    if(ImGui::BeginPopup("Color Swatch Picker")){
+        ImGuiColorEditFlags flags = ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_AlphaBar;
+        if(floatColorParameter) flags |= ImGuiColorEditFlags_Float;
+        changed = ImGui::ColorPicker4("##picker", color, flags);
+        ImGui::EndPopup();
+    }
+
+    if(changed){
+        if(floatColorParameter){
+            parameter->cast<ofFloatColor>().getParameter().set(ofFloatColor(color[0], color[1], color[2], color[3]));
+        }else{
+            parameter->cast<ofColor>().getParameter().set(ofColor((int)std::round(ofClamp(color[0], 0.0f, 1.0f) * 255.0f),
+                                                                  (int)std::round(ofClamp(color[1], 0.0f, 1.0f) * 255.0f),
+                                                                  (int)std::round(ofClamp(color[2], 0.0f, 1.0f) * 255.0f),
+                                                                  (int)std::round(ofClamp(color[3], 0.0f, 1.0f) * 255.0f)));
+        }
+    }
+
+    ImGui::EndGroup();
+    return true;
+}
+
 bool renderTextDisplayWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
 {
     if(parameter == nullptr) return false;
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
     const float fontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
     ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * fontScale));
     ImGui::TextWrapped("%s", parameter->cast<std::string>().getParameter().get().c_str());
@@ -652,7 +763,7 @@ bool renderFileBrowserWidget(CustomGuiWidgetRenderContext& context, CustomGuiWid
     const std::string currentValue = param.get();
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
 
     if(interactive){
         if(ImGui::Button(selectFolders ? "Folder..." : "Browse...", ImVec2(buttonWidth, buttonHeight))){
@@ -706,13 +817,27 @@ bool renderCustomRegionWidget(CustomGuiWidgetRenderContext& context, CustomGuiWi
     }
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
-    ImGui::BeginChild("##customregion", widgetItemSize(context), true, childFlags);
-    ImVec2 available = ImGui::GetContentRegionAvail();
-    ofxOceanodeShared::pushCustomRegionRenderContext(std::max(1.0f, available.x), std::max(1.0f, available.y));
+    drawWidgetLabel(context, widget, context.label);
+    const ImVec2 regionSize = widgetItemSize(context);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::BeginChild("##customregion", regionSize, false, childFlags);
+    const ImVec2 contentMin = ImGui::GetCursorScreenPos();
+    const ImVec2 available = ImGui::GetContentRegionAvail();
+    const ImVec2 contentMax(contentMin.x + std::max(1.0f, available.x),
+                            contentMin.y + std::max(1.0f, available.y));
+    const float overflowPad = std::max(4.0f, std::min(8.0f, std::min(regionSize.x, regionSize.y) * 0.05f));
+    ImGui::PushClipRect(ImVec2(contentMin.x - overflowPad, contentMin.y - overflowPad),
+                        ImVec2(contentMax.x + overflowPad, contentMax.y + overflowPad),
+                        false);
+    ofxOceanodeShared::pushCustomRegionRenderContext(std::max(1.0f, available.x),
+                                                     std::max(1.0f, available.y),
+                                                     contentMin,
+                                                     contentMax);
     parameter->cast<std::function<void()>>().getParameter().get()();
     ofxOceanodeShared::popCustomRegionRenderContext();
+    ImGui::PopClipRect();
     ImGui::EndChild();
+    ImGui::PopStyleVar();
     ImGui::EndGroup();
     return true;
 }
@@ -749,7 +874,7 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 
     registerWidget(registry, CustomGuiWidgetType::Toggle,
                    supportsToggleWidget,
-                   [](CustomGuiWidget&, ofxOceanodeAbstractParameter&){},
+                   initializeWideWidget,
                    renderToggleWidget);
 
     registerWidget(registry, CustomGuiWidgetType::Button,
@@ -757,9 +882,14 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
                    initializeButtonWidget,
                    renderButtonWidget);
 
+    registerWidget(registry, CustomGuiWidgetType::ColorSwatch,
+                   supportsColorSwatchWidget,
+                   initializeColorSwatchWidget,
+                   renderColorSwatchWidget);
+
     registerWidget(registry, CustomGuiWidgetType::TextDisplay,
                    supportsTextDisplayWidget,
-                   [](CustomGuiWidget& widget, ofxOceanodeAbstractParameter&){ widget.config["fontScale"] = 1.0f; },
+                   initializeFontScaledWideWidget,
                    renderTextDisplayWidget,
                    drawFontScaleProperties);
 

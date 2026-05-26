@@ -471,15 +471,13 @@ void ofxOceanodeCustomGuiPanel::draw()
         const bool foregroundWidgetHovered =
             topmostHoveredWidgetIndex >= 0 &&
             panel->layout.widgets[topmostHoveredWidgetIndex].type != CustomGuiWidgetType::BackgroundPanel;
-        const bool propertiesPopupOpen = panel->designMode && ImGui::IsPopupOpen("Widget Properties");
-        const bool widgetContextPopupOpen = panel->designMode && ImGui::IsPopupOpen("Widget Edit Context");
+        const bool anyPopupOpen = panel->designMode && ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
         const bool ctrlPressed = ImGui::GetIO().KeyCtrl;
         const bool deleteShortcutPressed =
             panel->designMode &&
             ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
             !selectedWidgetIndices.empty() &&
-            !propertiesPopupOpen &&
-            !widgetContextPopupOpen &&
+            !anyPopupOpen &&
             !ImGui::IsAnyItemActive() &&
             (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace));
 
@@ -487,7 +485,7 @@ void ofxOceanodeCustomGuiPanel::draw()
             requestRemoveSelectedWidgets = true;
         }
 
-        if(propertiesPopupOpen){
+        if(anyPopupOpen){
             if(draggedWidgetPanelId == panel->id){
                 draggedWidgetIndex = -1;
                 draggedWidgetIndices.clear();
@@ -504,7 +502,7 @@ void ofxOceanodeCustomGuiPanel::draw()
             }
         }
 
-        if(panel->designMode && !propertiesPopupOpen && ctrlPressed &&
+        if(panel->designMode && !anyPopupOpen && ctrlPressed &&
            !marqueeSelectionActive && gridHovered && !foregroundWidgetHovered &&
            ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
             marqueeSelectionActive = true;
@@ -517,7 +515,7 @@ void ofxOceanodeCustomGuiPanel::draw()
             draggedWidgetPanelId.clear();
             resizedWidgetIndex = -1;
             resizedWidgetPanelId.clear();
-        }else if(panel->designMode && !propertiesPopupOpen && !ctrlPressed &&
+        }else if(panel->designMode && !anyPopupOpen && !ctrlPressed &&
                  !marqueeSelectionActive && gridHovered &&
                  topmostHoveredWidgetIndex < 0 &&
                  ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
@@ -569,7 +567,7 @@ void ofxOceanodeCustomGuiPanel::draw()
                                      topmostResizeHandleIndex == (int)i &&
                                      ImGui::IsMouseHoveringRect(handleMin, max);
                 if(!locked) drawList->AddRectFilled(handleMin, max, IM_COL32(255, 180, 40, 220), 1.0f);
-                if(!propertiesPopupOpen && (hovered || resizeHovered) && ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
+                if(!anyPopupOpen && (hovered || resizeHovered) && ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
                     const bool shiftPressed = ImGui::GetIO().KeyShift;
                     if(ctrlPressed){
                         marqueeSelectionActive = true;
@@ -627,7 +625,7 @@ void ofxOceanodeCustomGuiPanel::draw()
                         }
                     }
                 }
-                if(!propertiesPopupOpen && draggedWidgetPanelId == panel->id && ImGui::IsMouseDown(ImGuiMouseButton_Left)){
+                if(!anyPopupOpen && draggedWidgetPanelId == panel->id && ImGui::IsMouseDown(ImGuiMouseButton_Left)){
                     ImVec2 delta = ImGui::GetIO().MousePos - dragAnchorMouse;
                     int offsetX = (int)std::round(delta.x / (panel->layout.cellWidth * panel->layout.zoom));
                     int offsetY = (int)std::round(delta.y / (panel->layout.cellHeight * panel->layout.zoom));
@@ -650,7 +648,7 @@ void ofxOceanodeCustomGuiPanel::draw()
                     draggedWidgetPanelId.clear();
                     container.markCustomGuisDirty();
                 }
-                if(!propertiesPopupOpen && resizedWidgetPanelId == panel->id && resizedWidgetIndex == (int)i && ImGui::IsMouseDown(ImGuiMouseButton_Left)){
+                if(!anyPopupOpen && resizedWidgetPanelId == panel->id && resizedWidgetIndex == (int)i && ImGui::IsMouseDown(ImGuiMouseButton_Left)){
                     ImVec2 delta = ImGui::GetIO().MousePos - resizeAnchorMouse;
                     int offsetW = (int)std::round(delta.x / (panel->layout.cellWidth * panel->layout.zoom));
                     int offsetH = (int)std::round(delta.y / (panel->layout.cellHeight * panel->layout.zoom));
@@ -1192,6 +1190,10 @@ bool ofxOceanodeCustomGuiPanel::renderWidget(CustomGuiWidget& widget, ofxOceanod
         getPanelData() != nullptr ? getPanelData()->designMode : false,
         getPanelData() != nullptr ? getPanelData()->layout.zoom : 1.0f,
         size,
+        getPanelData() != nullptr
+            ? ImVec2(getPanelData()->layout.cellWidth * getPanelData()->layout.zoom,
+                     getPanelData()->layout.cellHeight * getPanelData()->layout.zoom)
+            : ImVec2(0, 0),
         getFallbackLabel(widget),
         shouldShowNumericValue(widget),
         ofxOceanodeCustomGuiWidgets::isInteractive(widget, parameter),

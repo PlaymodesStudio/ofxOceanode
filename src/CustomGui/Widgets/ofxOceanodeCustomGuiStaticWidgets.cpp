@@ -150,7 +150,7 @@ bool renderSnapshotMatrixWidget(CustomGuiWidgetRenderContext& context, CustomGui
     const ofColor emptyColor = matrixColorFromConfig(widget, "emptyColor", ofColor(70, 70, 70, 255));
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
     for(int row = 0; row < rows; row++){
         for(int col = 0; col < cols; col++){
             if(col > 0) ImGui::SameLine();

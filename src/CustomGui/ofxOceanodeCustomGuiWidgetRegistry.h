@@ -21,6 +21,7 @@ struct CustomGuiWidgetRenderContext {
     bool designMode = false;
     float zoom = 1.0f;
     ImVec2 size = ImVec2(0, 0);
+    ImVec2 cellSize = ImVec2(0, 0);
     std::string label;
     bool showValue = true;
     bool interactive = false;

@@ -870,7 +870,7 @@ void drawSpectrumDisplay(ImDrawList* drawList, const ImVec2& min, const ImVec2& 
 bool renderTextureLikeWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofTexture* texture, const char* unavailableLabel)
 {
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
     const ImVec2 itemSize = widgetItemSize(context);
     ImGui::InvisibleButton("##texture", itemSize);
     ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -898,7 +898,7 @@ bool renderWaveformWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget
         const float max = floatRangeMax(widget, param.getMax());
         const float fraction = max != min ? (value - min) / (max - min) : 0.0f;
         ImGui::BeginGroup();
-        drawWidgetLabel(widget, context.label);
+        drawWidgetLabel(context, widget, context.label);
         ImGui::ProgressBar(ofClamp(fraction, 0.0f, 1.0f), widgetItemSize(context), context.showValue ? ofToString(value, 3).c_str() : "");
         ImGui::EndGroup();
         return true;
@@ -911,7 +911,7 @@ bool renderWaveformWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget
     if(isFloatVectorParameter(*parameter)){
         auto value = parameter->cast<std::vector<float>>().getParameter().get();
         ImGui::BeginGroup();
-        drawWidgetLabel(widget, context.label);
+        drawWidgetLabel(context, widget, context.label);
         if(!value.empty()) ImGui::PlotLines("##value", value.data(), (int)value.size(), 0, nullptr, FLT_MAX, FLT_MAX, widgetItemSize(context));
         ImGui::EndGroup();
         return true;
@@ -929,7 +929,7 @@ bool renderWaveformWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget
         if(scope == nullptr) scope = std::make_unique<CustomGuiScBusWaveformScope>();
 
         ImGui::BeginGroup();
-        drawWidgetLabel(widget, context.label);
+        drawWidgetLabel(context, widget, context.label);
         const ImVec2 itemSize = widgetItemSize(context);
         ImGui::InvisibleButton("##scwaveform", itemSize);
         ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -977,7 +977,7 @@ bool renderWaveformWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget
         return true;
 #else
         ImGui::BeginGroup();
-        drawWidgetLabel(widget, context.label);
+        drawWidgetLabel(context, widget, context.label);
         ImGui::TextDisabled("SC bus support unavailable");
         ImGui::EndGroup();
         return true;
@@ -985,7 +985,7 @@ bool renderWaveformWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget
     }
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
     ImGui::TextDisabled("Unsupported type");
     ImGui::EndGroup();
     return true;
@@ -1016,7 +1016,7 @@ bool renderVUMeterWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget&
         if(scope == nullptr) scope = std::make_unique<CustomGuiScBusVUMeterScope>();
         if(!scope->sync(port, channels)){
             ImGui::BeginGroup();
-            drawWidgetLabel(widget, context.label);
+            drawWidgetLabel(context, widget, context.label);
             ImGui::TextDisabled("SC bus unavailable");
             ImGui::EndGroup();
             return true;
@@ -1024,7 +1024,7 @@ bool renderVUMeterWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget&
         levels = scope->getLevels();
 #else
         ImGui::BeginGroup();
-        drawWidgetLabel(widget, context.label);
+        drawWidgetLabel(context, widget, context.label);
         ImGui::TextDisabled("SC bus support unavailable");
         ImGui::EndGroup();
         return true;
@@ -1034,7 +1034,7 @@ bool renderVUMeterWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget&
     }
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
     const ImVec2 itemSize = widgetItemSize(context);
     ImGui::InvisibleButton("##vumeter", itemSize);
     drawVUMeterDisplay(levels, itemSize, ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
@@ -1061,7 +1061,7 @@ bool renderFFTWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
         if(scope == nullptr) scope = std::make_unique<CustomGuiScBusFftScope>();
         if(!scope->sync(port, channels, smoothing)){
             ImGui::BeginGroup();
-            drawWidgetLabel(widget, context.label);
+            drawWidgetLabel(context, widget, context.label);
             ImGui::TextDisabled("SC bus unavailable");
             ImGui::EndGroup();
             return true;
@@ -1069,7 +1069,7 @@ bool renderFFTWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
         magnitudes = scope->getMagnitudes();
 #else
         ImGui::BeginGroup();
-        drawWidgetLabel(widget, context.label);
+        drawWidgetLabel(context, widget, context.label);
         ImGui::TextDisabled("SC bus support unavailable");
         ImGui::EndGroup();
         return true;
@@ -1079,7 +1079,7 @@ bool renderFFTWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
     }
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
     const ImVec2 itemSize = widgetItemSize(context);
     ImGui::InvisibleButton("##fft", itemSize);
     drawSpectrumDisplay(ImGui::GetWindowDrawList(),

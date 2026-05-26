@@ -9,6 +9,7 @@
 #define ofxOceanodeShared_h
 
 #include "portal.h"
+#include "imgui.h"
 #include <unordered_map>
 #include <map>
 
@@ -43,6 +44,8 @@ public:
         bool active = false;
         float width = 0.0f;
         float height = 0.0f;
+        ImVec2 screenMin = ImVec2(0, 0);
+        ImVec2 screenMax = ImVec2(0, 0);
     };
 
     static unsigned int getDockspaceID(){
@@ -331,11 +334,13 @@ public:
         return getInstance().customRegionRenderContext;
     }
 
-    static void pushCustomRegionRenderContext(float width, float height){
+    static void pushCustomRegionRenderContext(float width, float height, ImVec2 screenMin = ImVec2(0, 0), ImVec2 screenMax = ImVec2(0, 0)){
         auto& context = getInstance().customRegionRenderContext;
         context.active = true;
         context.width = width;
         context.height = height;
+        context.screenMin = screenMin;
+        context.screenMax = screenMax;
     }
 
     static void popCustomRegionRenderContext(){

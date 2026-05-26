@@ -216,7 +216,7 @@ bool renderPianoKeyboardWidget(CustomGuiWidgetRenderContext& context, CustomGuiW
     const auto geometry = buildPianoGeometry(lo, hi, keyboardWidth);
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
     ImGui::InvisibleButton("##pianokeyboard", ImVec2(keyboardWidth, keyboardHeight));
 
     const ImVec2 min = ImGui::GetItemRectMin();
@@ -359,7 +359,7 @@ bool renderFloatVectorWidget(CustomGuiWidgetRenderContext& context, CustomGuiWid
     const bool useRange = useCustomRange(widget);
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
 
     if(widget.type == CustomGuiWidgetType::XYPad && value.size() >= 2){
         ImGui::Button("##xypad", itemSize);
@@ -476,7 +476,7 @@ bool renderIntVectorWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidge
     auto value = param.get();
 
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
     if(widget.type == CustomGuiWidgetType::MultiToggle && !value.empty()){
         auto previousValue = value;
         drawMultiToggleGrid(context, widget, value,
@@ -505,7 +505,7 @@ bool renderScalarMultiToggleWidget(CustomGuiWidgetRenderContext& context, Custom
 
     const ImVec2 itemSize = widgetItemSize(context);
     ImGui::BeginGroup();
-    drawWidgetLabel(widget, context.label);
+    drawWidgetLabel(context, widget, context.label);
 
     if(isFloatParameter(*parameter)){
         auto& param = parameter->cast<float>().getParameter();
