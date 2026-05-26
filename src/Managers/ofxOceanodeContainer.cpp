@@ -14,6 +14,10 @@
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeScope.h"
+#include "CustomGui/ofxOceanodeCustomGuiPanel.h"
+#include "Nodes/MacroSnapshotSystem.h"
+#include "Nodes/MacroRouterValueDispatch.h"
+#include "imgui.h"
 
 #ifdef OFXOCEANODE_USE_MIDI
 #include "ofxOceanodeMidiBinding.h"
@@ -61,6 +65,9 @@ void ofxOceanodeContainer::clearContainer(){
     ofxOceanodeScope::getInstance()->setScopeChangedCallback(nullptr);
     
     connections.clear();
+    customGuiPanels.clear();
+    customGuiPanelsData.clear();
+    customGuiSnapshotBanks.clear();
     
     std::vector<shared_ptr<ofxOceanodeNode>> toDelete;
     for(auto &nodeTypeMap : dynamicNodes){
@@ -117,6 +124,15 @@ void ofxOceanodeContainer::draw(){
             if(node.second->getActive())
                 node.second->draw(args);
         }
+    }
+
+    for(auto& panel : customGuiPanels){
+        if(panel) panel->draw();
+    }
+    if(!pendingDeletedCustomGuiPanelId.empty()){
+        std::string panelId = pendingDeletedCustomGuiPanelId;
+        pendingDeletedCustomGuiPanelId.clear();
+        deleteCustomGuiPanel(panelId);
     }
 }
 
@@ -213,6 +229,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
 
 bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     ofLog()<<"Load Preset " << presetFolderPath;
+    customGuiStoragePath = presetFolderPath;
     
     // Disable scope auto-save during preset loading to prevent saving empty scope
     // when nodes are deleted
@@ -239,6 +256,8 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     loadPreset_presetHasLoaded();
     
 	loadScope(presetFolderPath);
+	loadCustomGuis(presetFolderPath);
+    loadCustomGuiSnapshots(presetFolderPath);
 	
 	resetPhase();
 	
@@ -254,6 +273,227 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
 	});
 
     return true;
+}
+
+void ofxOceanodeContainer::saveCustomGuis(const std::string& presetPath)
+{
+    customGuiStoragePath = presetPath;
+    ofSavePrettyJson(getCustomGuiFilePath(presetPath), customGuiPanelsToJson(customGuiPanelsData));
+    customGuisDirty = false;
+}
+
+void ofxOceanodeContainer::saveCustomGuiSnapshots(const std::string& presetPath)
+{
+    customGuiStoragePath = presetPath;
+    std::string filePath = getCustomGuiSnapshotsFilePath(presetPath);
+
+    std::vector<CustomGuiSnapshotBank> sanitizedBanks;
+    sanitizedBanks.reserve(customGuiSnapshotBanks.size());
+    for(auto bank : customGuiSnapshotBanks){
+        if(bank.customGuiId.empty()) continue;
+        const CustomGuiPanelData* panel = getCustomGuiPanelData(bank.customGuiId);
+        if(panel == nullptr) continue;
+
+        bank.customGuiName = panel->name;
+        bank.snapshots.erase(std::remove_if(bank.snapshots.begin(), bank.snapshots.end(), [](const CustomGuiSnapshotData& snapshot){
+            return snapshot.id.empty() || snapshot.parameterValues.empty();
+        }), bank.snapshots.end());
+        for(size_t i = 0; i < bank.snapshots.size(); i++){
+            if(bank.snapshots[i].slot < 0) bank.snapshots[i].slot = (int)i;
+        }
+        std::sort(bank.snapshots.begin(), bank.snapshots.end(), [](const CustomGuiSnapshotData& a, const CustomGuiSnapshotData& b){
+            return a.slot < b.slot;
+        });
+
+        if(bank.snapshots.empty()) continue;
+        sanitizedBanks.push_back(std::move(bank));
+    }
+    customGuiSnapshotBanks = sanitizedBanks;
+
+    if(customGuiSnapshotBanks.empty()){
+        if(ofFile::doesFileExist(filePath)) ofFile::removeFile(filePath);
+        customGuiSnapshotsDirty = false;
+        return;
+    }
+
+    ofSavePrettyJson(filePath, customGuiSnapshotBanksToJson(customGuiSnapshotBanks));
+    customGuiSnapshotsDirty = false;
+}
+
+void ofxOceanodeContainer::saveCustomGuis()
+{
+    if(customGuiStoragePath.empty()) return;
+    saveCustomGuis(customGuiStoragePath);
+}
+
+void ofxOceanodeContainer::saveCustomGuiSnapshots()
+{
+    if(customGuiStoragePath.empty()) return;
+    saveCustomGuiSnapshots(customGuiStoragePath);
+}
+
+void ofxOceanodeContainer::markCustomGuisDirty()
+{
+    customGuisDirty = true;
+}
+
+void ofxOceanodeContainer::markCustomGuiSnapshotsDirty()
+{
+    customGuiSnapshotsDirty = true;
+}
+
+void ofxOceanodeContainer::loadCustomGuis(const std::string& presetPath)
+{
+    customGuiStoragePath = presetPath;
+    std::string filepath = getCustomGuiFilePath(presetPath);
+    ofFile file(filepath);
+    customGuiPanelsData.clear();
+    if(!file.exists()){
+        rebuildCustomGuiPanels();
+        customGuisDirty = false;
+        return;
+    }
+
+    ofJson json;
+    try {
+        json = ofLoadJson(filepath);
+    } catch(const std::exception& e) {
+        ofLogError("ofxOceanodeContainer") << "Error loading custom GUIs: " << e.what();
+        rebuildCustomGuiPanels();
+        return;
+    }
+
+    try {
+        customGuiPanelsData = customGuiPanelsFromJson(json);
+    } catch(const std::exception& e) {
+        ofLogError("ofxOceanodeContainer") << "Error parsing custom GUIs: " << e.what();
+        customGuiPanelsData.clear();
+    }
+
+    auto isStaticWidgetType = [](CustomGuiWidgetType type){
+        return type == CustomGuiWidgetType::Label ||
+               type == CustomGuiWidgetType::BackgroundPanel ||
+               type == CustomGuiWidgetType::Text ||
+               type == CustomGuiWidgetType::Image;
+    };
+
+    std::vector<CustomGuiPanelData> sanitizedPanels;
+    sanitizedPanels.reserve(customGuiPanelsData.size());
+    for(auto panel : customGuiPanelsData){
+        std::set<std::string> widgetNodeNames;
+        int parameterWidgetCount = 0;
+        int staticWidgetCount = 0;
+        std::vector<CustomGuiWidget> sanitizedWidgets;
+        sanitizedWidgets.reserve(panel.layout.widgets.size());
+
+        for(auto widget : panel.layout.widgets){
+            if(isStaticWidgetType(widget.type)){
+                staticWidgetCount++;
+                sanitizedWidgets.push_back(std::move(widget));
+                continue;
+            }
+
+            if(widget.parameterRef.parameterPath.empty()) continue;
+            ofxOceanodeAbstractParameter* parameter = findCustomGuiParameter(widget.parameterRef.parameterPath);
+            if(parameter == nullptr) continue;
+
+            parameterWidgetCount++;
+            if(!widget.parameterRef.nodeDisplayName.empty()){
+                widgetNodeNames.insert(widget.parameterRef.nodeDisplayName);
+            }else{
+                auto* node = getNodeFromParameter(*parameter);
+                if(node != nullptr){
+                    widget.parameterRef.nodeDisplayName = node->getParameters().getName();
+                    widgetNodeNames.insert(widget.parameterRef.nodeDisplayName);
+                }
+            }
+            widget.parameterRef.parameterDisplayName = parameter->getName();
+            sanitizedWidgets.push_back(std::move(widget));
+        }
+
+        panel.layout.widgets = std::move(sanitizedWidgets);
+        if(panel.layout.widgets.empty()) continue;
+
+        const bool looksLikeLegacySingleNodePanel =
+            parameterWidgetCount > 0 &&
+            staticWidgetCount == 0 &&
+            widgetNodeNames.size() == 1 &&
+            panel.name == *widgetNodeNames.begin();
+
+        if(looksLikeLegacySingleNodePanel) continue;
+
+        panel.designMode = false;
+        panel.windowState.isOpen = true;
+        sanitizedPanels.push_back(std::move(panel));
+    }
+
+    customGuiPanelsData = std::move(sanitizedPanels);
+    rebuildCustomGuiPanels();
+    customGuisDirty = false;
+}
+
+void ofxOceanodeContainer::loadCustomGuiSnapshots(const std::string& presetPath)
+{
+    customGuiStoragePath = presetPath;
+    customGuiSnapshotBanks.clear();
+
+    std::string filepath = getCustomGuiSnapshotsFilePath(presetPath);
+    ofFile file(filepath);
+    if(!file.exists()){
+        customGuiSnapshotsDirty = false;
+        return;
+    }
+
+    ofJson json;
+    try {
+        json = ofLoadJson(filepath);
+    } catch(const std::exception& e) {
+        ofLogError("ofxOceanodeContainer") << "Error loading custom GUI snapshots: " << e.what();
+        return;
+    }
+
+    try {
+        customGuiSnapshotBanks = customGuiSnapshotBanksFromJson(json);
+    } catch(const std::exception& e) {
+        ofLogError("ofxOceanodeContainer") << "Error parsing custom GUI snapshots: " << e.what();
+        customGuiSnapshotBanks.clear();
+    }
+
+    std::vector<CustomGuiSnapshotBank> sanitizedBanks;
+    sanitizedBanks.reserve(customGuiSnapshotBanks.size());
+    for(auto bank : customGuiSnapshotBanks){
+        if(bank.customGuiId.empty()) continue;
+        const CustomGuiPanelData* panel = getCustomGuiPanelData(bank.customGuiId);
+        if(panel == nullptr) continue;
+
+        bank.customGuiName = panel->name;
+        bank.snapshots.erase(std::remove_if(bank.snapshots.begin(), bank.snapshots.end(), [](const CustomGuiSnapshotData& snapshot){
+            return snapshot.id.empty() || snapshot.parameterValues.empty();
+        }), bank.snapshots.end());
+        for(size_t i = 0; i < bank.snapshots.size(); i++){
+            if(bank.snapshots[i].slot < 0) bank.snapshots[i].slot = (int)i;
+        }
+        std::sort(bank.snapshots.begin(), bank.snapshots.end(), [](const CustomGuiSnapshotData& a, const CustomGuiSnapshotData& b){
+            return a.slot < b.slot;
+        });
+        if(bank.snapshots.empty()) continue;
+
+        bool currentExists = false;
+        for(const auto& snapshot : bank.snapshots){
+            if(snapshot.id == bank.currentSnapshotId){
+                currentExists = true;
+                break;
+            }
+        }
+        if(!currentExists){
+            bank.currentSnapshotId = bank.snapshots.front().id;
+        }
+
+        sanitizedBanks.push_back(std::move(bank));
+    }
+
+    customGuiSnapshotBanks = std::move(sanitizedBanks);
+    customGuiSnapshotsDirty = false;
 }
 
 void ofxOceanodeContainer::saveScope(const std::string& presetPath)
@@ -386,74 +626,8 @@ ofxOceanodeContainer::ResolvedParameter ofxOceanodeContainer::resolveParameterFr
         return ResolvedParameter();
     }
     
-    // Determine which container to search in based on canvasID
-    ofxOceanodeContainer* targetContainer = this;
-    
-    // If canvasID is not empty and not "Canvas" or "0", we need to find the macro
-    if(!canvasID.empty() && canvasID != "Canvas" && canvasID != "0") {
-        // Split canvasID by " / " to handle nested macros
-        vector<string> canvasLevels = ofSplitString(canvasID, " / ");
-        
-        // Start from root container
-        ofxOceanodeContainer* currentContainer = this;
-        bool allLevelsFound = true;
-        bool foundMacro = false;
-        
-        // Build accumulated path as we traverse
-        string accumulatedPath = "";
-        
-        // Traverse each level of the hierarchy
-        int levelIndex = 0;
-        for(const auto& levelName : canvasLevels) {
-            levelIndex++;
-            
-            // Build the accumulated path for this level
-            if(levelIndex == 1) {
-                accumulatedPath = levelName;
-            } else {
-                accumulatedPath += " / " + levelName;
-            }
-            
-            vector<ofxOceanodeNode*> nodesAtLevel = currentContainer->getAllModules();
-            bool levelFound = false;
-            
-            // Search for macro with matching canvasID at this level
-            for(auto* node : nodesAtLevel) {
-                // Try to cast to macro node
-                if(ofxOceanodeNodeMacro* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
-                    auto macroContainer = macro->getContainer();
-                    if(macroContainer != nullptr) {
-                        string macroCanvasID = macroContainer->getCanvasID();
-                        
-                        // Compare the accumulated path against the macro's full canvasID
-                        if(macroCanvasID == accumulatedPath) {
-                            // Found the macro for this level, move into its container
-                            currentContainer = macroContainer.get();
-                            levelFound = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            if(!levelFound) {
-                allLevelsFound = false;
-                ofLogWarning("ofxOceanodeContainer") << "Could not find macro with path: " << accumulatedPath
-                                                      << " in hierarchy: " << canvasID;
-                break;
-            }
-        }
-        
-        if(allLevelsFound) {
-            targetContainer = currentContainer;
-            foundMacro = true;
-        }
-        
-        if(!foundMacro) {
-            ofLogWarning("ofxOceanodeContainer") << "Could not find macro with name: " << canvasID
-                                                  << ", falling back to root container";
-        }
-    }
+    ofxOceanodeContainer* targetContainer = getContainerForCanvasID(canvasID);
+    if(targetContainer == nullptr) targetContainer = this;
     
     // Get all nodes from the target container
     vector<ofxOceanodeNode*> allNodes = targetContainer->getAllModules();
@@ -461,6 +635,7 @@ ofxOceanodeContainer::ResolvedParameter ofxOceanodeContainer::resolveParameterFr
     // Search for matching parameter
     for(auto* node : allNodes) {
         ofParameterGroup& params = node->getParameters();
+        const std::string groupEscapedName = params.getEscapedName();
         
         // Check each parameter in the node
         for(int i = 0; i < params.size(); i++) {
@@ -469,12 +644,16 @@ ofxOceanodeContainer::ResolvedParameter ofxOceanodeContainer::resolveParameterFr
             // Try to cast to oceanode parameter
             auto* oceanodeParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&absParam);
             if(oceanodeParam != nullptr) {
-                // Check if hierarchy matches
+                const bool groupMatchesDirectly = (groupEscapedName == parsed.groupName);
+
+                bool groupMatchesHierarchy = false;
                 vector<string> hierarchyNames = oceanodeParam->getGroupHierarchyNames();
-                
                 if(!hierarchyNames.empty() && hierarchyNames.front() == parsed.groupName) {
-                    // Check if parameter name matches
-                    if(absParam.getName() == parsed.paramName) {
+                    groupMatchesHierarchy = true;
+                }
+
+                if(groupMatchesDirectly || groupMatchesHierarchy) {
+                    if(absParam.getName() == parsed.paramName || absParam.getEscapedName() == parsed.paramName) {
                         return ResolvedParameter(oceanodeParam, node);
                     }
                 }
@@ -483,6 +662,46 @@ ofxOceanodeContainer::ResolvedParameter ofxOceanodeContainer::resolveParameterFr
     }
     
     return ResolvedParameter();
+}
+
+ofxOceanodeContainer* ofxOceanodeContainer::getContainerForCanvasID(const std::string& canvasID)
+{
+    return const_cast<ofxOceanodeContainer*>(static_cast<const ofxOceanodeContainer*>(this)->getContainerForCanvasID(canvasID));
+}
+
+const ofxOceanodeContainer* ofxOceanodeContainer::getContainerForCanvasID(const std::string& canvasID) const
+{
+    if(canvasID.empty() || canvasID == "Canvas" || canvasID == "0") return this;
+
+    vector<string> canvasLevels = ofSplitString(canvasID, " / ");
+    const ofxOceanodeContainer* currentContainer = this;
+    string accumulatedPath;
+
+    for(int levelIndex = 0; levelIndex < (int)canvasLevels.size(); levelIndex++) {
+        if(levelIndex == 0) accumulatedPath = canvasLevels[levelIndex];
+        else accumulatedPath += " / " + canvasLevels[levelIndex];
+
+        vector<ofxOceanodeNode*> nodesAtLevel = const_cast<ofxOceanodeContainer*>(currentContainer)->getAllModules();
+        bool levelFound = false;
+        for(auto* node : nodesAtLevel) {
+            if(ofxOceanodeNodeMacro* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
+                auto macroContainer = macro->getContainer();
+                if(macroContainer != nullptr && macroContainer->getCanvasID() == accumulatedPath) {
+                    currentContainer = macroContainer.get();
+                    levelFound = true;
+                    break;
+                }
+            }
+        }
+
+        if(!levelFound) {
+            ofLogWarning("ofxOceanodeContainer") << "Could not find macro with path: " << accumulatedPath
+                                                 << " in hierarchy: " << canvasID;
+            return this;
+        }
+    }
+
+    return currentContainer;
 }
 
 
@@ -502,7 +721,13 @@ void ofxOceanodeContainer::loadPreset_presetWillBeLoaded(){
 }
 
 void ofxOceanodeContainer::loadPreset_loadNodes(string presetFolderPath){
-    ofJson json = ofLoadJson(presetFolderPath + "/modules.json");
+    const std::string modulesPath = presetFolderPath + "/modules.json";
+    if(!ofFile::doesFileExist(modulesPath)){
+        ofLogWarning("ofxOceanodeContainer") << "Preset modules file not found: " << modulesPath;
+        return;
+    }
+
+    ofJson json = ofLoadJson(modulesPath);
     if(!json.empty()){;
         for(auto &models : registry->getRegisteredModels()){
             string moduleName = models.first;
@@ -889,6 +1114,8 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 	ofSavePrettyJson(presetFolderPath + "/comments.json", json);
 	
 	saveScope(presetFolderPath);
+	saveCustomGuis(presetFolderPath);
+    saveCustomGuiSnapshots(presetFolderPath);
 	
 }
 
@@ -1543,6 +1770,548 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
 #endif
 
 
+namespace {
+    bool isCustomGuiSnapshotSupportedType(const std::string& type)
+    {
+        return type == typeid(float).name() ||
+               type == typeid(std::vector<float>).name() ||
+               type == typeid(int).name() ||
+               type == typeid(std::vector<int>).name() ||
+               type == typeid(bool).name() ||
+               type == typeid(std::vector<bool>).name() ||
+               type == typeid(std::string).name() ||
+               type == typeid(std::vector<std::string>).name() ||
+               type == typeid(ofColor).name() ||
+               type == typeid(ofFloatColor).name();
+    }
+
+    std::string trimCustomGuiSnapshotName(const std::string& name, const std::string& fallback)
+    {
+        std::string trimmed = name;
+        auto begin = trimmed.find_first_not_of(" \t\n\r");
+        auto end = trimmed.find_last_not_of(" \t\n\r");
+        if(begin == std::string::npos) trimmed.clear();
+        else trimmed = trimmed.substr(begin, end - begin + 1);
+        return trimmed.empty() ? fallback : trimmed;
+    }
+}
+
+std::string ofxOceanodeContainer::getCustomGuiFilePath(const std::string& presetPath) const
+{
+    return presetPath + "/custom_guis.json";
+}
+
+std::string ofxOceanodeContainer::getCustomGuiSnapshotsFilePath(const std::string& presetPath) const
+{
+    return presetPath + "/custom_gui_snapshots.json";
+}
+
+std::string ofxOceanodeContainer::makeUniqueCustomGuiName(const std::string& baseName) const
+{
+    std::string candidate = baseName.empty() ? "Custom GUI" : baseName;
+    auto nameExists = [&](const std::string& name){
+        return std::any_of(customGuiPanelsData.begin(), customGuiPanelsData.end(), [&](const CustomGuiPanelData& panel){
+            return panel.name == name;
+        });
+    };
+
+    if(!nameExists(candidate)) return candidate;
+    for(int i = 2; ; i++){
+        std::string numbered = candidate + " " + ofToString(i);
+        if(!nameExists(numbered)) return numbered;
+    }
+}
+
+std::string ofxOceanodeContainer::makeCustomGuiId() const
+{
+    return "custom_gui_" + ofGetTimestampString("%Y%m%d%H%M%S") + "_" + ofToString(ofGetElapsedTimeMicros()) + "_" + ofToString(customGuiPanelsData.size() + 1);
+}
+
+std::string ofxOceanodeContainer::makeCustomGuiSnapshotId() const
+{
+    return "custom_gui_snapshot_" + ofGetTimestampString("%Y%m%d%H%M%S") + "_" + ofToString(ofGetElapsedTimeMicros());
+}
+
+std::string ofxOceanodeContainer::makeUniqueCustomGuiSnapshotName(const CustomGuiSnapshotBank& bank, const std::string& baseName) const
+{
+    const std::string candidateBase = baseName.empty() ? "Snapshot" : baseName;
+    auto nameExists = [&](const std::string& name){
+        return std::any_of(bank.snapshots.begin(), bank.snapshots.end(), [&](const CustomGuiSnapshotData& snapshot){
+            return snapshot.name == name;
+        });
+    };
+
+    if(!nameExists(candidateBase)) return candidateBase;
+    for(int i = 2; ; i++){
+        const std::string numbered = candidateBase + " " + ofToString(i);
+        if(!nameExists(numbered)) return numbered;
+    }
+}
+
+int ofxOceanodeContainer::getNextAvailableCustomGuiSnapshotSlot(const CustomGuiSnapshotBank& bank) const
+{
+    int slot = 0;
+    while(true){
+        bool used = false;
+        for(const auto& snapshot : bank.snapshots){
+            if(snapshot.slot == slot){
+                used = true;
+                break;
+            }
+        }
+        if(!used) return slot;
+        slot++;
+    }
+}
+
+void ofxOceanodeContainer::rebuildCustomGuiPanels()
+{
+    customGuiPanels.clear();
+    for(const auto& panelData : customGuiPanelsData){
+        customGuiPanels.push_back(std::make_unique<ofxOceanodeCustomGuiPanel>(*this, panelData.id));
+    }
+}
+
+CustomGuiPanelData* ofxOceanodeContainer::getCustomGuiPanelData(const std::string& panelId)
+{
+    for(auto& panel : customGuiPanelsData){
+        if(panel.id == panelId) return &panel;
+    }
+    return nullptr;
+}
+
+const CustomGuiPanelData* ofxOceanodeContainer::getCustomGuiPanelData(const std::string& panelId) const
+{
+    for(const auto& panel : customGuiPanelsData){
+        if(panel.id == panelId) return &panel;
+    }
+    return nullptr;
+}
+
+CustomGuiSnapshotBank* ofxOceanodeContainer::getCustomGuiSnapshotBank(const std::string& panelId)
+{
+    for(auto& bank : customGuiSnapshotBanks){
+        if(bank.customGuiId == panelId) return &bank;
+    }
+    return nullptr;
+}
+
+const CustomGuiSnapshotBank* ofxOceanodeContainer::getCustomGuiSnapshotBank(const std::string& panelId) const
+{
+    for(const auto& bank : customGuiSnapshotBanks){
+        if(bank.customGuiId == panelId) return &bank;
+    }
+    return nullptr;
+}
+
+CustomGuiSnapshotBank* ofxOceanodeContainer::getOrCreateCustomGuiSnapshotBank(const std::string& panelId)
+{
+    if(panelId.empty()) return nullptr;
+    if(auto* existing = getCustomGuiSnapshotBank(panelId)) return existing;
+
+    const CustomGuiPanelData* panel = getCustomGuiPanelData(panelId);
+    if(panel == nullptr) return nullptr;
+
+    CustomGuiSnapshotBank bank;
+    bank.customGuiId = panelId;
+    bank.customGuiName = panel->name;
+    customGuiSnapshotBanks.push_back(std::move(bank));
+    return &customGuiSnapshotBanks.back();
+}
+
+CustomGuiSnapshotData* ofxOceanodeContainer::getCustomGuiSnapshotBySlot(const std::string& panelId, int slot)
+{
+    if(slot < 0) return nullptr;
+    CustomGuiSnapshotBank* bank = getCustomGuiSnapshotBank(panelId);
+    if(bank == nullptr) return nullptr;
+    for(auto& snapshot : bank->snapshots){
+        if(snapshot.slot == slot) return &snapshot;
+    }
+    return nullptr;
+}
+
+const CustomGuiSnapshotData* ofxOceanodeContainer::getCustomGuiSnapshotBySlot(const std::string& panelId, int slot) const
+{
+    if(slot < 0) return nullptr;
+    const CustomGuiSnapshotBank* bank = getCustomGuiSnapshotBank(panelId);
+    if(bank == nullptr) return nullptr;
+    for(const auto& snapshot : bank->snapshots){
+        if(snapshot.slot == slot) return &snapshot;
+    }
+    return nullptr;
+}
+
+CustomGuiPanelData& ofxOceanodeContainer::createCustomGuiPanel(const std::string& requestedName)
+{
+    CustomGuiPanelData panel;
+    panel.id = makeCustomGuiId();
+    panel.name = makeUniqueCustomGuiName(requestedName.empty() ? "Custom GUI" : requestedName);
+    panel.windowState.isOpen = true;
+    panel.windowState.hasConfig = false;
+    customGuiPanelsData.push_back(panel);
+    rebuildCustomGuiPanels();
+    markCustomGuisDirty();
+    return customGuiPanelsData.back();
+}
+
+bool ofxOceanodeContainer::deleteCustomGuiPanel(const std::string& panelId)
+{
+    auto it = std::remove_if(customGuiPanelsData.begin(), customGuiPanelsData.end(), [&](const CustomGuiPanelData& panel){
+        return panel.id == panelId;
+    });
+    if(it == customGuiPanelsData.end()) return false;
+    customGuiPanelsData.erase(it, customGuiPanelsData.end());
+    customGuiSnapshotBanks.erase(std::remove_if(customGuiSnapshotBanks.begin(), customGuiSnapshotBanks.end(), [&](const CustomGuiSnapshotBank& bank){
+        return bank.customGuiId == panelId;
+    }), customGuiSnapshotBanks.end());
+    rebuildCustomGuiPanels();
+    markCustomGuisDirty();
+    markCustomGuiSnapshotsDirty();
+    return true;
+}
+
+void ofxOceanodeContainer::requestDeleteCustomGuiPanel(const std::string& panelId)
+{
+    pendingDeletedCustomGuiPanelId = panelId;
+}
+
+void ofxOceanodeContainer::openCustomGuiPanel(const std::string& panelId, bool designMode)
+{
+    CustomGuiPanelData* panel = getCustomGuiPanelData(panelId);
+    if(panel == nullptr) return;
+    panel->designMode = designMode;
+    panel->windowState.isOpen = true;
+    markCustomGuisDirty();
+}
+
+bool ofxOceanodeContainer::renameCustomGuiPanel(const std::string& panelId, const std::string& requestedName)
+{
+    CustomGuiPanelData* panel = getCustomGuiPanelData(panelId);
+    if(panel == nullptr) return false;
+
+    std::string trimmedName = requestedName;
+    auto begin = trimmedName.find_first_not_of(" \t\n\r");
+    auto end = trimmedName.find_last_not_of(" \t\n\r");
+    if(begin == std::string::npos) trimmedName.clear();
+    else trimmedName = trimmedName.substr(begin, end - begin + 1);
+    if(trimmedName.empty()) trimmedName = "Custom GUI";
+
+    if(panel->name == trimmedName) return true;
+    panel->name = makeUniqueCustomGuiName(trimmedName);
+    if(auto* bank = getCustomGuiSnapshotBank(panelId)){
+        bank->customGuiName = panel->name;
+        markCustomGuiSnapshotsDirty();
+    }
+    markCustomGuisDirty();
+    return true;
+}
+
+bool ofxOceanodeContainer::customGuiPanelHasSnapshotEligibleParameters(const std::string& panelId) const
+{
+    const CustomGuiPanelData* panel = getCustomGuiPanelData(panelId);
+    if(panel == nullptr) return false;
+
+    for(const auto& widget : panel->layout.widgets){
+        if(widget.parameterRef.parameterPath.empty()) continue;
+        auto* parameter = findCustomGuiParameter(widget.parameterRef.parameterPath);
+        if(parameter == nullptr) continue;
+        if(isCustomGuiSnapshotSupportedType(parameter->valueType())) return true;
+    }
+    return false;
+}
+
+std::vector<CustomGuiWidgetType> ofxOceanodeContainer::getCompatibleCustomGuiWidgetTypes(ofxOceanodeAbstractParameter& parameter) const
+{
+    ofxOceanodeCustomGuiPanel tempPanel(const_cast<ofxOceanodeContainer&>(*this), "");
+    return tempPanel.getCompatibleWidgetTypes(parameter);
+}
+
+CustomGuiWidgetType ofxOceanodeContainer::getDefaultCustomGuiWidgetType(ofxOceanodeAbstractParameter& parameter) const
+{
+    ofxOceanodeCustomGuiPanel tempPanel(const_cast<ofxOceanodeContainer&>(*this), "");
+    return tempPanel.getDefaultWidgetType(parameter);
+}
+
+std::string ofxOceanodeContainer::getCustomGuiParameterPath(ofxOceanodeAbstractParameter& parameter) const
+{
+    auto* model = parameter.getNodeModel();
+    if(model == nullptr) return parameter.getEscapedName();
+    return model->getParameterGroup().getEscapedName() + "/" + parameter.getEscapedName();
+}
+
+ofxOceanodeAbstractParameter* ofxOceanodeContainer::findCustomGuiParameter(const std::string& parameterPath) const
+{
+    auto resolved = const_cast<ofxOceanodeContainer*>(this)->resolveParameterFromPath(parameterPath, "");
+    return resolved.parameter;
+}
+
+bool ofxOceanodeContainer::addParameterToCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter, CustomGuiWidgetType type)
+{
+    ofxOceanodeCustomGuiPanel tempPanel(*this, panelId);
+    return tempPanel.addParameter(parameter, type);
+}
+
+bool ofxOceanodeContainer::removeParameterFromCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter)
+{
+    ofxOceanodeCustomGuiPanel tempPanel(*this, panelId);
+    return tempPanel.removeParameter(getCustomGuiParameterPath(parameter));
+}
+
+bool ofxOceanodeContainer::customGuiContainsParameter(const std::string& panelId, ofxOceanodeAbstractParameter& parameter) const
+{
+    ofxOceanodeCustomGuiPanel tempPanel(const_cast<ofxOceanodeContainer&>(*this), panelId);
+    return tempPanel.containsParameter(parameter);
+}
+
+std::string ofxOceanodeContainer::createCustomGuiSnapshot(const std::string& panelId, const std::string& requestedName)
+{
+    CustomGuiSnapshotBank* bank = getOrCreateCustomGuiSnapshotBank(panelId);
+    const CustomGuiPanelData* panel = getCustomGuiPanelData(panelId);
+    if(bank == nullptr || panel == nullptr) return "";
+
+    CustomGuiSnapshotData snapshot;
+    snapshot.id = makeCustomGuiSnapshotId();
+    snapshot.name = makeUniqueCustomGuiSnapshotName(*bank, trimCustomGuiSnapshotName(requestedName, "Snapshot"));
+    snapshot.slot = getNextAvailableCustomGuiSnapshotSlot(*bank);
+
+    for(const auto& widget : panel->layout.widgets){
+        if(widget.parameterRef.parameterPath.empty()) continue;
+        ofxOceanodeAbstractParameter* parameter = findCustomGuiParameter(widget.parameterRef.parameterPath);
+        if(parameter == nullptr) continue;
+        if(!isCustomGuiSnapshotSupportedType(parameter->valueType())) continue;
+
+        CustomGuiSnapshotValue snapshotValue;
+        RouterSnapshot routerSnapshot = MacroRouterValueDispatch::captureValue(parameter);
+        snapshotValue.type = routerSnapshot.type;
+        snapshotValue.value = routerSnapshot.value;
+        snapshot.parameterValues[widget.parameterRef.parameterPath] = std::move(snapshotValue);
+    }
+
+    if(snapshot.parameterValues.empty()) return "";
+
+    bank->customGuiName = panel->name;
+    bank->snapshots.push_back(std::move(snapshot));
+    std::sort(bank->snapshots.begin(), bank->snapshots.end(), [](const CustomGuiSnapshotData& a, const CustomGuiSnapshotData& b){
+        return a.slot < b.slot;
+    });
+    bank->currentSnapshotId = bank->snapshots.back().id;
+    markCustomGuiSnapshotsDirty();
+    return bank->currentSnapshotId;
+}
+
+bool ofxOceanodeContainer::updateCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId)
+{
+    if(snapshotId.empty()) return false;
+    CustomGuiSnapshotBank* bank = getCustomGuiSnapshotBank(panelId);
+    const CustomGuiPanelData* panel = getCustomGuiPanelData(panelId);
+    if(bank == nullptr || panel == nullptr) return false;
+
+    auto it = std::find_if(bank->snapshots.begin(), bank->snapshots.end(), [&](const CustomGuiSnapshotData& snapshot){
+        return snapshot.id == snapshotId;
+    });
+    if(it == bank->snapshots.end()) return false;
+
+    std::map<std::string, CustomGuiSnapshotValue> capturedValues;
+    for(const auto& widget : panel->layout.widgets){
+        if(widget.parameterRef.parameterPath.empty()) continue;
+        ofxOceanodeAbstractParameter* parameter = findCustomGuiParameter(widget.parameterRef.parameterPath);
+        if(parameter == nullptr) continue;
+        if(!isCustomGuiSnapshotSupportedType(parameter->valueType())) continue;
+
+        RouterSnapshot routerSnapshot = MacroRouterValueDispatch::captureValue(parameter);
+        capturedValues[widget.parameterRef.parameterPath] = {routerSnapshot.type, routerSnapshot.value};
+    }
+
+    if(capturedValues.empty()) return false;
+    it->parameterValues = std::move(capturedValues);
+    bank->customGuiName = panel->name;
+    bank->currentSnapshotId = snapshotId;
+    markCustomGuiSnapshotsDirty();
+    return true;
+}
+
+std::string ofxOceanodeContainer::storeCustomGuiSnapshotToSlot(const std::string& panelId, int slot, const std::string& requestedName)
+{
+    if(slot < 0) return "";
+
+    if(CustomGuiSnapshotData* existing = getCustomGuiSnapshotBySlot(panelId, slot)){
+        std::string snapshotId = existing->id;
+        if(!requestedName.empty()) renameCustomGuiSnapshot(panelId, snapshotId, requestedName);
+        if(updateCustomGuiSnapshot(panelId, snapshotId)){
+            return snapshotId;
+        }
+        return "";
+    }
+
+    std::string createdSnapshotId = createCustomGuiSnapshot(panelId, requestedName.empty() ? ("Snapshot " + ofToString(slot + 1)) : requestedName);
+    if(createdSnapshotId.empty()) return "";
+
+    CustomGuiSnapshotBank* bank = getCustomGuiSnapshotBank(panelId);
+    if(bank == nullptr) return createdSnapshotId;
+    auto it = std::find_if(bank->snapshots.begin(), bank->snapshots.end(), [&](const CustomGuiSnapshotData& snapshot){
+        return snapshot.id == createdSnapshotId;
+    });
+    if(it == bank->snapshots.end()) return createdSnapshotId;
+
+    it->slot = slot;
+    std::sort(bank->snapshots.begin(), bank->snapshots.end(), [](const CustomGuiSnapshotData& a, const CustomGuiSnapshotData& b){
+        return a.slot < b.slot;
+    });
+    bank->currentSnapshotId = createdSnapshotId;
+    markCustomGuiSnapshotsDirty();
+    return createdSnapshotId;
+}
+
+bool ofxOceanodeContainer::recallCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId)
+{
+    if(snapshotId.empty()) return false;
+    CustomGuiSnapshotBank* bank = getCustomGuiSnapshotBank(panelId);
+    if(bank == nullptr) return false;
+
+    auto it = std::find_if(bank->snapshots.begin(), bank->snapshots.end(), [&](const CustomGuiSnapshotData& snapshot){
+        return snapshot.id == snapshotId;
+    });
+    if(it == bank->snapshots.end()) return false;
+
+    bool appliedAny = false;
+    for(const auto& pair : it->parameterValues){
+        ofxOceanodeAbstractParameter* parameter = findCustomGuiParameter(pair.first);
+        if(parameter == nullptr) continue;
+        if(!isCustomGuiSnapshotSupportedType(parameter->valueType())) continue;
+
+        RouterSnapshot routerSnapshot;
+        routerSnapshot.type = pair.second.type;
+        routerSnapshot.value = pair.second.value;
+
+        try {
+            MacroRouterValueDispatch::applyValue(parameter, routerSnapshot);
+            appliedAny = true;
+        } catch(const std::exception& e) {
+            ofLogWarning("ofxOceanodeContainer") << "Error recalling custom GUI snapshot parameter " << pair.first << ": " << e.what();
+        }
+    }
+
+    if(appliedAny){
+        bank->currentSnapshotId = snapshotId;
+        markCustomGuiSnapshotsDirty();
+    }
+    return appliedAny;
+}
+
+bool ofxOceanodeContainer::renameCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId, const std::string& requestedName)
+{
+    if(snapshotId.empty()) return false;
+    CustomGuiSnapshotBank* bank = getCustomGuiSnapshotBank(panelId);
+    if(bank == nullptr) return false;
+
+    auto it = std::find_if(bank->snapshots.begin(), bank->snapshots.end(), [&](const CustomGuiSnapshotData& snapshot){
+        return snapshot.id == snapshotId;
+    });
+    if(it == bank->snapshots.end()) return false;
+
+    const std::string fallbackName = it->name.empty() ? "Snapshot" : it->name;
+    std::string trimmedName = trimCustomGuiSnapshotName(requestedName, fallbackName);
+    if(trimmedName == it->name) return true;
+
+    auto baseName = trimmedName;
+    auto nameExists = [&](const std::string& name){
+        return std::any_of(bank->snapshots.begin(), bank->snapshots.end(), [&](const CustomGuiSnapshotData& snapshot){
+            return snapshot.id != snapshotId && snapshot.name == name;
+        });
+    };
+
+    if(nameExists(trimmedName)){
+        for(int i = 2; ; i++){
+            const std::string numbered = baseName + " " + ofToString(i);
+            if(!nameExists(numbered)){
+                trimmedName = numbered;
+                break;
+            }
+        }
+    }
+
+    it->name = trimmedName;
+    markCustomGuiSnapshotsDirty();
+    return true;
+}
+
+bool ofxOceanodeContainer::deleteCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId)
+{
+    if(snapshotId.empty()) return false;
+    CustomGuiSnapshotBank* bank = getCustomGuiSnapshotBank(panelId);
+    if(bank == nullptr) return false;
+
+    auto it = std::remove_if(bank->snapshots.begin(), bank->snapshots.end(), [&](const CustomGuiSnapshotData& snapshot){
+        return snapshot.id == snapshotId;
+    });
+    if(it == bank->snapshots.end()) return false;
+
+    const bool wasCurrent = bank->currentSnapshotId == snapshotId;
+    bank->snapshots.erase(it, bank->snapshots.end());
+    if(bank->snapshots.empty()){
+        customGuiSnapshotBanks.erase(std::remove_if(customGuiSnapshotBanks.begin(), customGuiSnapshotBanks.end(), [&](const CustomGuiSnapshotBank& candidate){
+            return candidate.customGuiId == panelId;
+        }), customGuiSnapshotBanks.end());
+    }else if(wasCurrent){
+        bank->currentSnapshotId = bank->snapshots.front().id;
+    }
+
+    markCustomGuiSnapshotsDirty();
+    return true;
+}
+
+bool ofxOceanodeContainer::recallCustomGuiSnapshotSlot(const std::string& panelId, int slot)
+{
+    const CustomGuiSnapshotData* snapshot = getCustomGuiSnapshotBySlot(panelId, slot);
+    if(snapshot == nullptr) return false;
+    return recallCustomGuiSnapshot(panelId, snapshot->id);
+}
+
+void ofxOceanodeContainer::requestCreateCustomGui(const std::string& parameterPath, CustomGuiWidgetType type, bool openInEdit)
+{
+    pendingCustomGuiName = makeUniqueCustomGuiName("Custom GUI");
+    pendingCustomGuiParameterPath = parameterPath;
+    pendingCustomGuiWidgetType = type;
+    pendingCustomGuiOpenInEdit = openInEdit;
+    customGuiCreateModalOpen = true;
+}
+
+void ofxOceanodeContainer::drawCustomGuiCreationModal()
+{
+    if(customGuiCreateModalOpen){
+        ImGui::OpenPopup("Create Custom GUI");
+        customGuiCreateModalOpen = false;
+    }
+
+    bool keepOpen = true;
+    if(ImGui::BeginPopupModal("Create Custom GUI", &keepOpen, ImGuiWindowFlags_AlwaysAutoResize)){
+        char nameBuffer[256];
+        std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", pendingCustomGuiName.c_str());
+        if(ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer))){
+            pendingCustomGuiName = nameBuffer;
+        }
+
+        if(ImGui::Button("Create")){
+            auto& panel = createCustomGuiPanel(pendingCustomGuiName);
+            if(!pendingCustomGuiParameterPath.empty()){
+                ofxOceanodeAbstractParameter* parameter = findCustomGuiParameter(pendingCustomGuiParameterPath);
+                if(parameter != nullptr){
+                    addParameterToCustomGui(panel.id, *parameter, pendingCustomGuiWidgetType);
+                }
+            }
+            openCustomGuiPanel(panel.id, pendingCustomGuiOpenInEdit);
+            pendingCustomGuiParameterPath.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if(ImGui::Button("Cancel")){
+            pendingCustomGuiParameterPath.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
 vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules(){
     vector<ofxOceanodeNode*> modulesToCopy;
     for(auto &nodeTypeMap : dynamicNodes){
@@ -1637,7 +2406,7 @@ bool ofxOceanodeContainer::cutSelectedModulesWithConnections(){
 }
 
 bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 position, bool allowOutsideInputs){
-    ofxOceanodeShared::startedLoadingPreset();
+    ofxOceanodeShared::startedLoadingPreset(ofxOceanodePresetLoadType_ClipboardPaste);
     bool b_sucess = loadClipboardModulesAndConnections(position, allowOutsideInputs);
     ofxOceanodeShared::finishedLoadingPreset();
     return b_sucess;
@@ -1924,6 +2693,7 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 	// We need to preserve the node info before the nodes are deleted
 	struct NodeInfo {
 		string originalName;
+		string originalEscapedName;
 		string nodeType;
 		glm::vec2 position;
 	};
@@ -1932,6 +2702,7 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 	for(auto node : selectedNodes) {
 		NodeInfo info;
 		info.originalName = node->getParameters().getName();
+		info.originalEscapedName = node->getParameters().getEscapedName();
 		info.nodeType = node->getNodeModel().nodeName();
 		info.position = node->getNodeGui().getPosition();
 		originalNodeInfo.push_back(info);
@@ -1981,15 +2752,17 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 	// The issue is that the mapping logic doesn't work correctly with macros
 
 	// 9. FIXED: Update external connections using stored node info
-	if(!externalConnections.empty()) {
-		auto macroNodes = macroContainer->getAllModules();
+	auto macroNodes = macroContainer->getAllModules();
+	
+	// MACRO-AWARE FIX: Ensure any macro nodes have their parameters properly exposed
+	ensureMacroParametersExposed(macroNodes);
+	
+	// Create a mapping from original node names to new node names
+	// CRITICAL FIX: Use a smarter mapping strategy for macros
+	map<string, string> nodeNameMapping;
+	map<string, string> escapedNodeNameMapping;
 		
-		// MACRO-AWARE FIX: Ensure any macro nodes have their parameters properly exposed
-		ensureMacroParametersExposed(macroNodes);
-		
-		// Create a mapping from original node names to new node names
-		// CRITICAL FIX: Use a smarter mapping strategy for macros
-		map<string, string> nodeNameMapping;
+	if(!macroNodes.empty()) {
 		
 		ofLogNotice("Encapsulation") << "Creating node name mapping from stored info...";
 		
@@ -2067,6 +2840,7 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 				if(bestMatch) {
 					string newName = bestMatch->getParameters().getName();
 					nodeNameMapping[originalName] = newName;
+					escapedNodeNameMapping[origInfo.originalEscapedName] = bestMatch->getParameters().getEscapedName();
 					// Mark this pasted node as used by adding reverse mapping
 					nodeNameMapping[newName] = originalName;
 					
@@ -2087,15 +2861,130 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 					}
 					
 					if(typeIndex < pastedNodesByType[nodeType].size()) {
-						string newName = pastedNodesByType[nodeType][typeIndex]->getParameters().getName();
+						auto* mappedNode = pastedNodesByType[nodeType][typeIndex];
+						string newName = mappedNode->getParameters().getName();
 						nodeNameMapping[originalName] = newName;
+						escapedNodeNameMapping[origInfo.originalEscapedName] = mappedNode->getParameters().getEscapedName();
 						
 						ofLogNotice("Encapsulation") << "REGULAR MATCH: " << originalName << " → " << newName;
 					}
 				}
 			}
 		}
-		
+
+		{
+			auto remapParameterPath = [&](const string& parameterPath) -> string {
+				size_t separatorPos = parameterPath.find('/');
+				if(separatorPos == string::npos) return "";
+				string originalGroupName = parameterPath.substr(0, separatorPos);
+				auto mappingIt = escapedNodeNameMapping.find(originalGroupName);
+				if(mappingIt == escapedNodeNameMapping.end()) return "";
+				return mappingIt->second + parameterPath.substr(separatorPos);
+			};
+
+			set<string> selectedEscapedNodeNames;
+			for(const auto& info : originalNodeInfo) {
+				selectedEscapedNodeNames.insert(info.originalEscapedName);
+			}
+
+			vector<CustomGuiPanelData> migratedPanels;
+			set<string> migratedPanelIds;
+            map<string, pair<string, string>> migratedPanelIdMapping;
+			for(const auto& panel : customGuiPanelsData) {
+				bool hasParameterWidgets = false;
+				bool fullyContained = true;
+				bool fullyRemappable = true;
+				CustomGuiPanelData migratedPanel = panel;
+
+				for(auto& widget : migratedPanel.layout.widgets) {
+					if(widget.parameterRef.parameterPath.empty()) continue;
+
+					hasParameterWidgets = true;
+					size_t separatorPos = widget.parameterRef.parameterPath.find('/');
+					if(separatorPos == string::npos) {
+						fullyContained = false;
+						break;
+					}
+
+					string originalGroupName = widget.parameterRef.parameterPath.substr(0, separatorPos);
+					if(selectedEscapedNodeNames.find(originalGroupName) == selectedEscapedNodeNames.end()) {
+						fullyContained = false;
+						break;
+					}
+
+					string remappedPath = remapParameterPath(widget.parameterRef.parameterPath);
+					if(remappedPath.empty()) {
+						fullyRemappable = false;
+						break;
+					}
+
+					ofxOceanodeAbstractParameter* remappedParameter = macroContainer->findCustomGuiParameter(remappedPath);
+					if(remappedParameter == nullptr) {
+						fullyRemappable = false;
+						break;
+					}
+
+					widget.parameterRef.parameterPath = remappedPath;
+					widget.parameterRef.parameterDisplayName = remappedParameter->getName();
+					if(auto* remappedNode = macroContainer->getNodeFromParameter(*remappedParameter)) {
+						widget.parameterRef.nodeDisplayName = remappedNode->getParameters().getName();
+					}
+				}
+
+				if(hasParameterWidgets && fullyContained && fullyRemappable) {
+                    const string originalPanelId = migratedPanel.id;
+					migratedPanel.id = macroContainer->makeCustomGuiId();
+					migratedPanel.name = macroContainer->makeUniqueCustomGuiName(panel.name);
+                    migratedPanelIdMapping[originalPanelId] = {migratedPanel.id, migratedPanel.name};
+					migratedPanels.push_back(std::move(migratedPanel));
+					migratedPanelIds.insert(panel.id);
+				}
+			}
+
+			if(!migratedPanels.empty()) {
+				customGuiPanelsData.erase(
+					std::remove_if(customGuiPanelsData.begin(), customGuiPanelsData.end(), [&](const CustomGuiPanelData& panel){
+						return migratedPanelIds.find(panel.id) != migratedPanelIds.end();
+					}),
+					customGuiPanelsData.end()
+				);
+
+				for(auto& panel : migratedPanels) {
+					macroContainer->customGuiPanelsData.push_back(std::move(panel));
+				}
+
+                for(const auto& pair : migratedPanelIdMapping) {
+                    auto bankIt = std::find_if(customGuiSnapshotBanks.begin(), customGuiSnapshotBanks.end(), [&](const CustomGuiSnapshotBank& bank){
+                        return bank.customGuiId == pair.first;
+                    });
+                    if(bankIt == customGuiSnapshotBanks.end()) continue;
+
+                    CustomGuiSnapshotBank migratedBank = *bankIt;
+                    migratedBank.customGuiId = pair.second.first;
+                    migratedBank.customGuiName = pair.second.second;
+                    macroContainer->customGuiSnapshotBanks.push_back(std::move(migratedBank));
+                }
+
+                customGuiSnapshotBanks.erase(
+                    std::remove_if(customGuiSnapshotBanks.begin(), customGuiSnapshotBanks.end(), [&](const CustomGuiSnapshotBank& bank){
+                        return migratedPanelIds.find(bank.customGuiId) != migratedPanelIds.end();
+                    }),
+                    customGuiSnapshotBanks.end()
+                );
+
+				rebuildCustomGuiPanels();
+				macroContainer->rebuildCustomGuiPanels();
+				markCustomGuisDirty();
+				macroContainer->markCustomGuisDirty();
+                markCustomGuiSnapshotsDirty();
+                macroContainer->markCustomGuiSnapshotsDirty();
+
+				ofLogNotice("Encapsulation") << "Migrated " << migratedPanelIds.size() << " Custom GUI panel(s) into new macro";
+			}
+		}
+	}
+
+	if(!externalConnections.empty()) {
 		// Update external connections using the mapping
 		for(auto& extConn : externalConnections) {
 			if(extConn.isIncoming) {

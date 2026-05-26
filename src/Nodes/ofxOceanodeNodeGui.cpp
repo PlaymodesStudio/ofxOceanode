@@ -63,9 +63,13 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 			if(boldFont) ImGui::PopFont();
 		}
 		
-		// Position the delete button at the right edge using the screen-space node width
-		// (nodeWidthText + nodeWidthWidget is already zoom-scaled by the caller)
-		ImGui::SameLine(nodeWidthText + nodeWidthWidget - ofxOceanodeShared::getBaseFrameHeight() * zoomLevel, 0.0f);
+		// Keep the delete button aligned with the actual node width. Some nodes render
+		// custom regions wider than the default 240px body, so we fall back to the
+		// last measured node content width when it is wider than the base layout.
+		const float defaultContentWidth = nodeWidthText + nodeWidthWidget;
+		const float cachedContentWidth = std::max(0.0f, guiRect.getWidth() * zoomLevel - 2.0f * ImGui::GetStyle().WindowPadding.x);
+		const float headerContentWidth = std::max(defaultContentWidth, cachedContentWidth);
+		ImGui::SameLine(headerContentWidth - ImGui::GetFrameHeight(), 0.0f);
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
 		ImGui::PushStyleColor(ImGuiCol_Button, OceanodeColors::TransparentButton);
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, OceanodeColors::TransparentButton);
@@ -110,6 +114,12 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
             string uniqueId = absParam.getName();
+            const bool publishedInCustomGui = [&](){
+                for(const auto& panel : container.getCustomGuiPanelsData()){
+                    if(container.customGuiContainsParameter(panel.id, absParam)) return true;
+                }
+                return false;
+            }();
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::BeginDisabled();
             ImGui::PushID(uniqueId.c_str());
             if(absParam.getFlags() & ofxOceanodeParameterFlags_NoGuiWidget){
@@ -171,7 +181,22 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
             }else{
                 
                 ImGui::SetNextItemAllowOverlap();
-                ImGui::Text("%s", uniqueId.c_str());
+                if(publishedInCustomGui){
+                    ImGui::Text("%s", uniqueId.c_str());
+
+                    ImDrawList* drawList = ImGui::GetWindowDrawList();
+                    ImVec2 labelMin = ImGui::GetItemRectMin();
+                    ImVec2 labelMax = ImGui::GetItemRectMax();
+                    float underlineY = labelMax.y - 1.0f;
+                    drawList->AddLine(
+                        ImVec2(labelMin.x, underlineY),
+                        ImVec2(labelMax.x, underlineY),
+                        ImGui::GetColorU32(ImGuiCol_Text),
+                        1.0f
+                    );
+                }else{
+                    ImGui::Text("%s", uniqueId.c_str());
+                }
                 ImGui::SameLine(-1);
                 ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
                 {
@@ -577,6 +602,78 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                             ofxOceanodeScope::getInstance()->removeParameter(&absParam);
                         }
                     }
+                    ImGui::Separator();
+                    auto customTypes = container.getCompatibleCustomGuiWidgetTypes(absParam);
+                    bool anyRemoval = false;
+                    for(const auto& panel : container.getCustomGuiPanelsData()){
+                        if(container.customGuiContainsParameter(panel.id, absParam)){
+                            anyRemoval = true;
+                            break;
+                        }
+                    }
+
+                    if(!customTypes.empty() && ImGui::BeginMenu("Add to Custom GUI")){
+                        CustomGuiWidgetType defaultType = container.getDefaultCustomGuiWidgetType(absParam);
+                        const std::string parameterPath = container.getCustomGuiParameterPath(absParam);
+
+                        if(container.getCustomGuiPanelsData().empty()){
+                            if(ImGui::BeginMenu("New Custom GUI")){
+                                for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
+                                    CustomGuiWidgetType widgetType = customTypes[widgetIndex];
+                                    std::string label = customGuiWidgetTypeToString(widgetType);
+                                    if(widgetType == defaultType) label += " (default)";
+                                    if(ImGui::Selectable(label.c_str())){
+                                        container.requestCreateCustomGui(parameterPath, widgetType, true);
+                                    }
+                                }
+                                ImGui::EndMenu();
+                            }
+                        }else{
+                            if(ImGui::BeginMenu("New Custom GUI")){
+                                for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
+                                    CustomGuiWidgetType widgetType = customTypes[widgetIndex];
+                                    std::string label = customGuiWidgetTypeToString(widgetType);
+                                    if(widgetType == defaultType) label += " (default)";
+                                    if(ImGui::Selectable(label.c_str())){
+                                        container.requestCreateCustomGui(parameterPath, widgetType, true);
+                                    }
+                                }
+                                ImGui::EndMenu();
+                            }
+
+                            ImGui::Separator();
+                            for(const auto& panel : container.getCustomGuiPanelsData()){
+                                if(ImGui::BeginMenu(panel.name.c_str())){
+                                    bool alreadyAdded = container.customGuiContainsParameter(panel.id, absParam);
+                                    if(alreadyAdded){
+                                        ImGui::TextDisabled("Already added");
+                                        ImGui::Separator();
+                                    }
+                                    for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
+                                        CustomGuiWidgetType widgetType = customTypes[widgetIndex];
+                                        std::string label = customGuiWidgetTypeToString(widgetType);
+                                        if(widgetType == defaultType) label += " (default)";
+                                        if(ImGui::Selectable(label.c_str(), false, alreadyAdded ? ImGuiSelectableFlags_Disabled : 0)){
+                                            container.addParameterToCustomGui(panel.id, absParam, widgetType);
+                                            container.openCustomGuiPanel(panel.id, true);
+                                        }
+                                    }
+                                    ImGui::EndMenu();
+                                }
+                            }
+
+                        }
+                        ImGui::EndMenu();
+                    }
+                    if(anyRemoval && ImGui::BeginMenu("Remove from Custom GUI")){
+                        for(const auto& panel : container.getCustomGuiPanelsData()){
+                            if(ImGui::Selectable(panel.name.c_str(), false, container.customGuiContainsParameter(panel.id, absParam) ? 0 : ImGuiSelectableFlags_Disabled)){
+                                container.removeParameterFromCustomGui(panel.id, absParam);
+                            }
+                        }
+                        ImGui::EndMenu();
+                    }
+                    ImGui::Separator();
                     if(!absParam.isTimelined()){ //Param is not timelined
                         if(ImGui::Selectable("Add to Timeline")){
                             ofxOceanodeTime::getInstance()->addParameter(&absParam,node.getColor());

@@ -11,12 +11,14 @@
 
 #include "ofxOceanodeConnection.h"
 #include "ofxOceanodeNode.h"
+#include "CustomGui/ofxOceanodeCustomGuiLayout.h"
 #include "ofxOceanodeNodeGui.h"
 
 class ofxOceanodeNodeModel;
 class ofxOceanodeNodeRegistry;
 class ofxOceanodeTypesRegistry;
 class ofxOceanodeNodeMacro;
+class ofxOceanodeCustomGuiPanel;
 
 
 #ifdef OFXOCEANODE_USE_OSC
@@ -137,6 +139,14 @@ public:
     
     void saveScope(const std::string& presetPath);
     void loadScope(const std::string& presetPath);
+    void saveCustomGuis(const std::string& presetPath);
+    void loadCustomGuis(const std::string& presetPath);
+    void saveCustomGuis();
+    void markCustomGuisDirty();
+    void saveCustomGuiSnapshots(const std::string& presetPath);
+    void loadCustomGuiSnapshots(const std::string& presetPath);
+    void saveCustomGuiSnapshots();
+    void markCustomGuiSnapshotsDirty();
     
     void setBpm(float _bpm);
     void resetPhase();
@@ -173,6 +183,39 @@ public:
     vector<ofxOceanodeNode*> getSelectedModules();
     vector<ofxOceanodeNode*> getAllModules();
     ofxOceanodeNodeGui* getGuiFromModel(ofxOceanodeNodeModel* model);
+
+    const std::vector<CustomGuiPanelData>& getCustomGuiPanelsData() const { return customGuiPanelsData; }
+    CustomGuiPanelData* getCustomGuiPanelData(const std::string& panelId);
+    const CustomGuiPanelData* getCustomGuiPanelData(const std::string& panelId) const;
+    CustomGuiPanelData& createCustomGuiPanel(const std::string& requestedName = "");
+    bool deleteCustomGuiPanel(const std::string& panelId);
+    void requestDeleteCustomGuiPanel(const std::string& panelId);
+    void openCustomGuiPanel(const std::string& panelId, bool designMode = false);
+    bool renameCustomGuiPanel(const std::string& panelId, const std::string& requestedName);
+    bool customGuiPanelHasSnapshotEligibleParameters(const std::string& panelId) const;
+    bool addParameterToCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter, CustomGuiWidgetType type);
+    bool removeParameterFromCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter);
+    bool customGuiContainsParameter(const std::string& panelId, ofxOceanodeAbstractParameter& parameter) const;
+    std::vector<CustomGuiWidgetType> getCompatibleCustomGuiWidgetTypes(ofxOceanodeAbstractParameter& parameter) const;
+    CustomGuiWidgetType getDefaultCustomGuiWidgetType(ofxOceanodeAbstractParameter& parameter) const;
+    std::string getCustomGuiParameterPath(ofxOceanodeAbstractParameter& parameter) const;
+    ofxOceanodeAbstractParameter* findCustomGuiParameter(const std::string& parameterPath) const;
+    ofxOceanodeNode* getNodeFromParameter(ofxOceanodeAbstractParameter& param);
+    ofxOceanodeContainer* getContainerForCanvasID(const std::string& canvasID);
+    const ofxOceanodeContainer* getContainerForCanvasID(const std::string& canvasID) const;
+    CustomGuiSnapshotBank* getCustomGuiSnapshotBank(const std::string& panelId);
+    const CustomGuiSnapshotBank* getCustomGuiSnapshotBank(const std::string& panelId) const;
+    std::string createCustomGuiSnapshot(const std::string& panelId, const std::string& requestedName = "");
+    bool updateCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId);
+    bool recallCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId);
+    bool renameCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId, const std::string& requestedName);
+    bool deleteCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId);
+    CustomGuiSnapshotData* getCustomGuiSnapshotBySlot(const std::string& panelId, int slot);
+    const CustomGuiSnapshotData* getCustomGuiSnapshotBySlot(const std::string& panelId, int slot) const;
+    std::string storeCustomGuiSnapshotToSlot(const std::string& panelId, int slot, const std::string& requestedName = "");
+    bool recallCustomGuiSnapshotSlot(const std::string& panelId, int slot);
+    void requestCreateCustomGui(const std::string& parameterPath = "", CustomGuiWidgetType type = CustomGuiWidgetType::Slider, bool openInEdit = true);
+    void drawCustomGuiCreationModal();
     
     bool copySelectedModulesWithConnections();
     bool cutSelectedModulesWithConnections();
@@ -182,7 +225,7 @@ public:
     const vector<unique_ptr<ofxOceanodeAbstractConnection>>& getAllConnections(){return connections;};
     const std::unordered_map<string, ofxOceanodeNode*> & getParameterGroupNodesMap(){return parameterGroupNodesMap;};
 	
-	vector<ofxOceanodeComment> &getComments(){return comments;};
+    vector<ofxOceanodeComment> &getComments(){return comments;};
 	vector<int> getSelectedCommentIndices();
 	void deselectAllComments();
     
@@ -211,12 +254,34 @@ private:
     };
 	
     ParsedParameterPath parseParameterPath(const std::string& path);
+    void rebuildCustomGuiPanels();
+    std::string getCustomGuiFilePath(const std::string& presetPath) const;
+    std::string getCustomGuiSnapshotsFilePath(const std::string& presetPath) const;
+    std::string makeUniqueCustomGuiName(const std::string& baseName = "Custom GUI") const;
+    std::string makeCustomGuiId() const;
+    std::string makeCustomGuiSnapshotId() const;
+    std::string makeUniqueCustomGuiSnapshotName(const CustomGuiSnapshotBank& bank, const std::string& baseName = "Snapshot") const;
+    CustomGuiSnapshotBank* getOrCreateCustomGuiSnapshotBank(const std::string& panelId);
+    int getNextAvailableCustomGuiSnapshotSlot(const CustomGuiSnapshotBank& bank) const;
     
     //NodeModel;
     std::unordered_map<string, nodeContainerWithId> dynamicNodes;
     std::unordered_map<string, nodeContainerWithId> persistentNodes;
     
     std::unordered_map<string, ofxOceanodeNode*> parameterGroupNodesMap; //Maps nodes to parameterGroup.getName() reference, used in canvas
+
+    std::vector<CustomGuiPanelData> customGuiPanelsData;
+    std::vector<std::unique_ptr<ofxOceanodeCustomGuiPanel>> customGuiPanels;
+    std::vector<CustomGuiSnapshotBank> customGuiSnapshotBanks;
+    std::string customGuiStoragePath;
+    bool customGuisDirty = false;
+    bool customGuiSnapshotsDirty = false;
+    bool customGuiCreateModalOpen = false;
+    std::string pendingCustomGuiName = "Custom GUI";
+    std::string pendingDeletedCustomGuiPanelId;
+    std::string pendingCustomGuiParameterPath;
+    CustomGuiWidgetType pendingCustomGuiWidgetType = CustomGuiWidgetType::Slider;
+    bool pendingCustomGuiOpenInEdit = true;
 
     vector<unique_ptr<ofxOceanodeAbstractConnection>> connections;
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;
@@ -272,7 +337,6 @@ private:
 	void ensureMacroParametersExposed(const vector<ofxOceanodeNode*>& macroNodes);
 
 		string mapParameterTypeToRouterName(const string& paramType);
-		ofxOceanodeNode* getNodeFromParameter(ofxOceanodeAbstractParameter& param);
 		bool isNodeInList(ofxOceanodeNode* node, vector<ofxOceanodeNode*>& nodeList);
 		string getParameterTypeName(ofxOceanodeAbstractParameter& param);
 		ofxOceanodeAbstractParameter* findInternalParameter(const vector<ofxOceanodeNode*>& macroNodes, const InternalConnection& internalConn);

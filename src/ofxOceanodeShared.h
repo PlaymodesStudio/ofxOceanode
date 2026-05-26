@@ -25,6 +25,11 @@ enum ofxOceanodeConfigurationFlags_
     ofxOceanodeConfigurationFlags_DisableHistograms = 2 << 1    // Do not display histograms in vectors
 };
 
+enum ofxOceanodePresetLoadType {
+    ofxOceanodePresetLoadType_FullPreset = 0,
+    ofxOceanodePresetLoadType_ClipboardPaste
+};
+
 struct macroCategory{
 	macroCategory(std::string _name = "Parent") : name(_name){};
 	std::string name;
@@ -34,6 +39,12 @@ struct macroCategory{
 
 class ofxOceanodeShared{
 public:
+    struct CustomRegionRenderContext {
+        bool active = false;
+        float width = 0.0f;
+        float height = 0.0f;
+    };
+
     static unsigned int getDockspaceID(){
         return getInstance().getDockspaceIDFromInstance();
     }
@@ -185,7 +196,8 @@ public:
         return getInstance().presetWasSavedEvent;
     }
     
-    static void startedLoadingPreset(){
+    static void startedLoadingPreset(ofxOceanodePresetLoadType loadType = ofxOceanodePresetLoadType_FullPreset){
+        getInstance().presetLoadType = loadType;
         getInstance().presetWillBeLoadedEvent.notify();
         getInstance().presetLoading = true;
     }
@@ -193,6 +205,7 @@ public:
     static void finishedLoadingPreset(){
         getInstance().presetLoading = false;
         getInstance().presetHasLoadedEvent.notify();
+        getInstance().presetLoadType = ofxOceanodePresetLoadType_FullPreset;
     }
     
     static void presetWasSaved(){
@@ -201,6 +214,10 @@ public:
     
     static bool isPresetLoading(){
         return getInstance().presetLoading;
+    }
+
+    static ofxOceanodePresetLoadType getPresetLoadType(){
+        return getInstance().presetLoadType;
     }
     
     static int getConfigurationFlags(){
@@ -306,6 +323,24 @@ public:
 	// instead of deriving a stepped value from the discrete font size.
 	static float getZoomLevel(){ return getInstance().zoomLevel; }
 	static void  setZoomLevel(float z){ getInstance().zoomLevel = z; }
+
+    // Active custom-region render context — set while a custom region is being
+    // rendered inside a Custom GUI widget, so region implementations can opt
+    // into using the widget's size without affecting their node-local drawing.
+    static const CustomRegionRenderContext& getCustomRegionRenderContext(){
+        return getInstance().customRegionRenderContext;
+    }
+
+    static void pushCustomRegionRenderContext(float width, float height){
+        auto& context = getInstance().customRegionRenderContext;
+        context.active = true;
+        context.width = width;
+        context.height = height;
+    }
+
+    static void popCustomRegionRenderContext(){
+        getInstance().customRegionRenderContext = CustomRegionRenderContext{};
+    }
 
 	// Active canvas tracking
 	static void setActiveCanvasUniqueID(const string& uid){
@@ -414,6 +449,7 @@ private:
 	ofEvent<string> macroUpdatedEvent;
     
 	bool presetLoading;
+        ofxOceanodePresetLoadType presetLoadType = ofxOceanodePresetLoadType_FullPreset;
 	   ofEvent<void> presetWillBeLoadedEvent;
 	   ofEvent<void> presetHasLoadedEvent;
 	   ofEvent<void> presetWasSavedEvent;
@@ -440,6 +476,10 @@ private:
 
 	// Continuous zoom level (set by the active canvas each frame).
 	float zoomLevel = 1.0f;
+
+    // Custom-region widget size context (active only while rendering inside a
+    // Custom GUI widget).
+    CustomRegionRenderContext customRegionRenderContext;
 
 	// Bold font for the current render context (set by the active canvas each frame).
 	ImFont* currentBoldFont = nullptr;

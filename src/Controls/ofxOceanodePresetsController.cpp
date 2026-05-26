@@ -390,14 +390,27 @@ void ofxOceanodePresetsController::loadPresetFromNumber(int num){
 }
 
 void ofxOceanodePresetsController::loadPreset(string name, string bank){
-    
-    int presetIndex = distance(bankPresets[banks[currentBank]].begin(),
-                               find(bankPresets[banks[currentBank]].begin(),
-                                    bankPresets[banks[currentBank]].end(),
-                                    name)
-                               );
-    
-    string myPath = "./Presets/" + banks[currentBank] +"/" + ofToString(presetIndex+1) +  "--" + name;
+    auto bankIt = bankPresets.find(bank);
+    if(bankIt == bankPresets.end()){
+        ofLogWarning("ofxOceanodePresetsController") << "Cannot load preset from unknown bank: " << bank;
+        return;
+    }
+
+    const auto &presets = bankIt->second;
+    auto presetIt = find(presets.begin(), presets.end(), name);
+    if(presetIt == presets.end()){
+        ofLogWarning("ofxOceanodePresetsController") << "Cannot load unknown preset '" << name
+                                                     << "' from bank '" << bank << "'";
+        return;
+    }
+
+    int presetIndex = distance(presets.begin(), presetIt);
+    string myPath = "./Presets/" + bank + "/" + ofToString(presetIndex+1) +  "--" + name;
+    if(!ofDirectory::doesDirectoryExist(myPath)){
+        ofLogWarning("ofxOceanodePresetsController") << "Preset folder does not exist: " << myPath;
+        return;
+    }
+
     ofxOceanodeShared::startedLoadingPreset();
 	ofxOceanodeShared::setCurrentPresetPath(myPath);
 	ofxOceanodeShared::setCurrentBankName(bank);
@@ -411,12 +424,22 @@ void ofxOceanodePresetsController::loadPreset(string name, string bank){
 
 void ofxOceanodePresetsController::savePreset(string name, string bank)
 {
-    int presetIndex = distance(bankPresets[banks[currentBank]].begin(),
-                     find(bankPresets[banks[currentBank]].begin(),
-                          bankPresets[banks[currentBank]].end(),
-                          name)
-                     );
-    string myPath = "./Presets/" + banks[currentBank] +"/" + ofToString(presetIndex+1) +  "--" + name;
+    auto bankIt = bankPresets.find(bank);
+    if(bankIt == bankPresets.end()){
+        ofLogWarning("ofxOceanodePresetsController") << "Cannot save preset to unknown bank: " << bank;
+        return;
+    }
+
+    const auto &presets = bankIt->second;
+    auto presetIt = find(presets.begin(), presets.end(), name);
+    if(presetIt == presets.end()){
+        ofLogWarning("ofxOceanodePresetsController") << "Cannot save unknown preset '" << name
+                                                     << "' in bank '" << bank << "'";
+        return;
+    }
+
+    int presetIndex = distance(presets.begin(), presetIt);
+    string myPath = "./Presets/" + bank + "/" + ofToString(presetIndex+1) +  "--" + name;
 	
 	ofxOceanodeShared::setCurrentPresetPath(myPath);
 	ofxOceanodeShared::setCurrentBankName(bank);
