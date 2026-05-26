@@ -312,6 +312,9 @@ void ofxOceanodeContainer::loadScope(const std::string& presetPath) {
     int successCount = 0;
     int failureCount = 0;
     
+    // Tell the scope we're loading from preset so it doesn't rebuild the dock tree
+    ofxOceanodeScope::getInstance()->setLoadingFromPreset(true);
+    
     for(const auto& paramData : scopeState.parameters) {
         // Resolve parameter with canvasID awareness
         auto resolved = resolveParameterFromPath(paramData.parameterPath, paramData.canvasID);
@@ -339,6 +342,8 @@ void ofxOceanodeContainer::loadScope(const std::string& presetPath) {
             failureCount++;
         }
     }
+    
+    ofxOceanodeScope::getInstance()->setLoadingFromPreset(false);
         
     if (successCount > 0) {
         for (const auto& data : scopeState.parameters) {

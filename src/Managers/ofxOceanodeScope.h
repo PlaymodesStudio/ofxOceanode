@@ -116,6 +116,8 @@ public:
     void setScopeChangedCallback(ScopeChangedCallback callback);
     // Accessor for container to get scoped parameters (for setting sizeRelative)
     std::vector<ofxOceanodeScopeItem>& getScopedParameters() { return scopedParameters; }
+    // Flag to suppress dock-tree rebuilds while loading a preset
+    void setLoadingFromPreset(bool loading) { isLoadingFromPreset = loading; }
 
 private:
     std::vector<scopeFunc> scopeTypes;
@@ -127,14 +129,13 @@ private:
     ofxOceanodeScopeWindowConfig windowConfig;
     std::vector<ofxOceanodeScopeParameterData> loadedParameterData;
     
-    float lastDockspaceWidth = 0;
-    float lastDockspaceHeight = 0;
-    
     // // load / save scopes : Auto-save functionality
     std::string saveFilePath = "scope_config.json";
     ofxOceanodeScopeWindowConfig lastWindowConfig;
     ScopeChangedCallback scopeChangedCallback;
     void notifyScopeChanged();
+    
+    bool isLoadingFromPreset = false;
 };
 
 #endif /* ofxOceanodeScope_h */
