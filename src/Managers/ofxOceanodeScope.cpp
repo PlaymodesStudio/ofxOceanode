@@ -14,6 +14,84 @@
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeColors.h"
 
+// ---------------------------------------------------------------------------
+// Proportional dock-node resizing helpers
+//
+// ImGui's default behavior when a docked parent window is resized is to keep
+// the absolute pixel size (SizeRef) of one split child and give all the
+// remaining space to the other child. This makes scope windows feel "sticky":
+// one keeps its size and the other one collapses/expands.
+//
+// To get a proportional resize (every child keeps its share of the parent),
+// we walk the dock node tree under ScopesDockSpace each frame the parent
+// changes size, and rewrite each split node's children SizeRef so the ratio
+// of (child0 / child1) along the split axis is preserved at the new parent
+// size. ImGui will then re-run layout with those new SizeRefs.
+// ---------------------------------------------------------------------------
+static void RescaleDockNodeProportional(ImGuiDockNode* node, ImVec2 oldSize, ImVec2 newSize)
+{
+    if(node == NULL) return;
+
+    // For each split node, rescale the two children along the split axis so
+    // their ratio is preserved, then recurse into them.
+    if(node->ChildNodes[0] != NULL && node->ChildNodes[1] != NULL)
+    {
+        ImGuiDockNode* c0 = node->ChildNodes[0];
+        ImGuiDockNode* c1 = node->ChildNodes[1];
+
+        // SplitAxis: X = horizontal split (children side-by-side, scaled in X),
+        //            Y = vertical split (children stacked, scaled in Y).
+        if(node->SplitAxis == ImGuiAxis_X)
+        {
+            float oldParent = oldSize.x;
+            float newParent = newSize.x;
+            if(oldParent > 0.0f && newParent > 0.0f)
+            {
+                // Use current SizeRef.x as the source of truth for the ratio.
+                // (Fall back to Size.x if SizeRef is zero, which happens just
+                //  after a fresh split.)
+                float s0 = c0->SizeRef.x > 0.0f ? c0->SizeRef.x : c0->Size.x;
+                float s1 = c1->SizeRef.x > 0.0f ? c1->SizeRef.x : c1->Size.x;
+                float total = s0 + s1;
+                if(total > 0.0f)
+                {
+                    float ratio0 = s0 / total;
+                    c0->SizeRef.x = newParent * ratio0;
+                    c1->SizeRef.x = newParent * (1.0f - ratio0);
+                    // Keep the orthogonal axis snapped to the parent.
+                    c0->SizeRef.y = newSize.y;
+                    c1->SizeRef.y = newSize.y;
+                }
+            }
+        }
+        else if(node->SplitAxis == ImGuiAxis_Y)
+        {
+            float oldParent = oldSize.y;
+            float newParent = newSize.y;
+            if(oldParent > 0.0f && newParent > 0.0f)
+            {
+                float s0 = c0->SizeRef.y > 0.0f ? c0->SizeRef.y : c0->Size.y;
+                float s1 = c1->SizeRef.y > 0.0f ? c1->SizeRef.y : c1->Size.y;
+                float total = s0 + s1;
+                if(total > 0.0f)
+                {
+                    float ratio0 = s0 / total;
+                    c0->SizeRef.y = newParent * ratio0;
+                    c1->SizeRef.y = newParent * (1.0f - ratio0);
+                    c0->SizeRef.x = newSize.x;
+                    c1->SizeRef.x = newSize.x;
+                }
+            }
+        }
+
+        // Recurse with each child's *current* size as the "old" size and the
+        // freshly-written SizeRef as the "new" size, so deeper splits also
+        // scale proportionally.
+        RescaleDockNodeProportional(c0, c0->Size, c0->SizeRef);
+        RescaleDockNodeProportional(c1, c1->Size, c1->SizeRef);
+    }
+}
+
 void ofxOceanodeScope::setup(){
     scopeTypes.push_back([](ofxOceanodeAbstractParameter *p, ImVec2 size) -> bool{
         // VECTOR FLOAT PARAM
@@ -91,6 +169,20 @@ void ofxOceanodeScope::draw(){
         if(lastWindowConfig.hasConfig){
             bool posChanged = (currentPos.x != lastWindowConfig.posX || currentPos.y != lastWindowConfig.posY);
             bool sizeChanged = (currentSize.x != lastWindowConfig.width || currentSize.y != lastWindowConfig.height);
+            
+            // Proportional dock layout rescaling.
+            // When the Scopes window is resized, walk the dock-tree and rewrite
+            // each split node's SizeRef so the children keep their share of the
+            // parent. Without this, ImGui keeps one child at its absolute pixel
+            // size and dumps all extra/missing space onto the other child.
+            if(sizeChanged){
+                ImGuiDockNode* rootNode = ImGui::DockBuilderGetNode(dockspace_id);
+                if(rootNode != NULL){
+                    ImVec2 oldSize(lastWindowConfig.width, lastWindowConfig.height);
+                    ImVec2 newSize = currentSize;
+                    RescaleDockNodeProportional(rootNode, oldSize, newSize);
+                }
+            }
             
             if(posChanged || sizeChanged){
                 // Auto-save after window position/size change
