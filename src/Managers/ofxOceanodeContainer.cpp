@@ -2118,9 +2118,8 @@ bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode)
         }
     }
 
-    ofxOceanodeShared::requestCanvasNavigation(location.node,
-                                               location.canvas,
-                                               location.macro != nullptr ? 2 : 1);
+    location.canvas->requestCenterOnNode(location.node,
+                                         location.macro != nullptr ? 2 : 1);
     return true;
 }
 

@@ -17,7 +17,6 @@ struct ImFont;
 class ofxOceanodeNode;
 class ofxOceanodeCanvas;
 class ofxOceanodeContainer;
-class ofxOceanodeNodeMacro;
 
 typedef int ofxOceanodeConfigurationFlags;
 
@@ -48,13 +47,6 @@ public:
         float height = 0.0f;
         ImVec2 screenMin = ImVec2(0, 0);
         ImVec2 screenMax = ImVec2(0, 0);
-    };
-
-    struct PendingCanvasNavigation {
-        ofxOceanodeNode* node = nullptr;
-        ofxOceanodeCanvas* canvas = nullptr;
-        int framesRemaining = 0;
-        bool active = false;
     };
 
     static unsigned int getDockspaceID(){
@@ -433,29 +425,6 @@ public:
 	static void setRootCanvas(ofxOceanodeCanvas* c){ getInstance().rootCanvas = c; }
 	static ofxOceanodeCanvas* getRootCanvas(){ return getInstance().rootCanvas; }
 
-    static void requestCanvasNavigation(ofxOceanodeNode* node, ofxOceanodeCanvas* canvas, int delayFrames = 1){
-        auto& pending = getInstance().pendingCanvasNavigation;
-        pending.node = node;
-        pending.canvas = canvas;
-        pending.framesRemaining = std::max(0, delayFrames);
-        pending.active = (node != nullptr && canvas != nullptr);
-    }
-
-    static PendingCanvasNavigation& getPendingCanvasNavigation(){
-        return getInstance().pendingCanvasNavigation;
-    }
-
-    static void tickPendingCanvasNavigation(){
-        auto& pending = getInstance().pendingCanvasNavigation;
-        if(pending.active && pending.framesRemaining > 0){
-            pending.framesRemaining--;
-        }
-    }
-
-    static void clearPendingCanvasNavigation(){
-        getInstance().pendingCanvasNavigation = PendingCanvasNavigation{};
-    }
-
 private:
     ofxOceanodeShared(){};
     
@@ -537,10 +506,6 @@ private:
 	// Root references for whole-patch traversal
 	ofxOceanodeContainer* rootContainer = nullptr;
 	ofxOceanodeCanvas* rootCanvas = nullptr;
-
-    // Deferred node centering request — used when navigation targets canvases
-    // that may need one or more frames to become visible/measure themselves.
-    PendingCanvasNavigation pendingCanvasNavigation;
 };
 
 #endif /* ofxOceanodeShared_h */

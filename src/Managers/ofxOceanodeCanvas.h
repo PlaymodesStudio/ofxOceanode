@@ -64,6 +64,10 @@ public:
     // automatically on the next draw frame after isFirstDraw has been cleared,
     // so callers do not need to manage any delay themselves.
     void requestFocus(){focusPending = true;};
+    void requestCenterOnNode(ofxOceanodeNode* node, int delayFrames = 0){
+        pendingCenterNode = node;
+        pendingCenterFrames = std::max(0, delayFrames);
+    }
     
     // Force this canvas to dock into the main dock space on its next draw.
     // Used when a macro canvas transitions from hidden to visible so it always
@@ -174,6 +178,8 @@ private:
     bool onTop = false;
     bool focusPending = false;
     bool forceDockOnNextShow = false;
+    ofxOceanodeNode* pendingCenterNode = nullptr;
+    int pendingCenterFrames = 0;
     
     // Per-canvas layout switching
     string layoutIniPath;
