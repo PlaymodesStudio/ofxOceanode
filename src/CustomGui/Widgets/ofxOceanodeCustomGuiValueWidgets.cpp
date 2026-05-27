@@ -828,7 +828,7 @@ bool renderCustomRegionWidget(CustomGuiWidgetRenderContext& context, CustomGuiWi
     const float overflowPad = std::max(4.0f, std::min(8.0f, std::min(regionSize.x, regionSize.y) * 0.05f));
     ImGui::PushClipRect(ImVec2(contentMin.x - overflowPad, contentMin.y - overflowPad),
                         ImVec2(contentMax.x + overflowPad, contentMax.y + overflowPad),
-                        false);
+                        true);
     ofxOceanodeShared::pushCustomRegionRenderContext(std::max(1.0f, available.x),
                                                      std::max(1.0f, available.y),
                                                      contentMin,
