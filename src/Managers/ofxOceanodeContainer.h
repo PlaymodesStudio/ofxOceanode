@@ -259,6 +259,7 @@ private:
 	
     ParsedParameterPath parseParameterPath(const std::string& path);
     void invalidateCustomGuiMembershipIndex();
+    void invalidateCustomGuiParameterPathCache();
     void rebuildCustomGuiMembershipIndexIfNeeded() const;
     void rebuildCustomGuiPanels();
     std::string getCustomGuiFilePath(const std::string& presetPath) const;
@@ -279,6 +280,7 @@ private:
     std::vector<CustomGuiPanelData> customGuiPanelsData;
     std::vector<std::unique_ptr<ofxOceanodeCustomGuiPanel>> customGuiPanels;
     std::vector<CustomGuiSnapshotBank> customGuiSnapshotBanks;
+    mutable std::unordered_map<const ofxOceanodeAbstractParameter*, std::string> customGuiParameterPathCache;
     mutable std::unordered_map<std::string, std::unordered_set<std::string>> customGuiPanelParameterIndex;
     mutable std::unordered_set<std::string> customGuiPublishedParameterIndex;
     mutable bool customGuiMembershipIndexDirty = true;
