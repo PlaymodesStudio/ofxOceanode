@@ -184,6 +184,14 @@ public:
     
     ofxOceanodeNodeModelFlags getFlags(){return flags;};
     void setFlags(ofxOceanodeNodeModelFlags f){flags = f;};
+
+    // Transparent nodes may override this to supply a fill colour for the minimap.
+    // The default returns hasHint=false, which means "skip me on the minimap".
+    struct MiniMapHint {
+        bool    hasHint   = false;
+        ofColor fillColor;
+    };
+    virtual MiniMapHint getMiniMapHint() const { return {}; }
     
     string getParents();
     
