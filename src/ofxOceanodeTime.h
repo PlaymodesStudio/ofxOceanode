@@ -9,25 +9,13 @@
 #define ofxOceanodeTime_h
 
 #include "ofThread.h"
+#include "ofxOceanodeTransport.h"
 #include "phasor.h"
-#include "ofxOceanodeBPMController.h"
+#include "ofxOceanodeTransportController.h"
 #include <chrono>
 
 class ofxOceanodeContainer;
 class ofxOceanodeNode;
-
-class ofxOceanodeTimelinedItem {
-public:
-    ofxOceanodeTimelinedItem(ofxOceanodeAbstractParameter* p, ofColor c = ofColor::white, float h = 10) : parameter(p), color(c), height(h){
-        open = false;
-    };
-    ~ofxOceanodeTimelinedItem(){};
-    
-    ofxOceanodeAbstractParameter* parameter;
-    ofColor color;
-    float height;
-    bool open;
-};
 
 class ofxOceanodeTime : public ofThread{
 public:
@@ -42,9 +30,7 @@ public:
            return &instance;
        }
     
-    void setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOceanodeBPMController> contr);
-    
-    void draw();
+    void setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOceanodeTransportController> contr);
     
     void togglePlay(){
         isPlaying = !isPlaying;
@@ -58,11 +44,10 @@ public:
     void audioIn(ofSoundBuffer & input);
     void audioOut(ofSoundBuffer & output);
     
-    void addParameter(ofxOceanodeAbstractParameter* p, ofColor _color);
-    void removeParameter(ofxOceanodeAbstractParameter* p);
-    
 private:
     void threadedFunction() override;
+    void updateLegacyTimeFromTransport();
+    TransportDriverMode getDesiredDriverMode(bool forceFrameMode) const;
     
     ofParameterGroup parameters;
     ofEventListeners listeners;
@@ -88,13 +73,11 @@ private:
     ofThreadChannel<vector<shared_ptr<basePhasor>>> phasorChannel2;
     
     shared_ptr<ofxOceanodeContainer> container;
-    shared_ptr<ofxOceanodeBPMController> controller;
+    shared_ptr<ofxOceanodeTransportController> controller;
+    std::shared_ptr<ofxOceanodeTransport> transport;
     
     ofSoundStream soundStream;
     std::chrono::time_point<std::chrono::steady_clock> lastAudioCallbackTime;
-
-    std::vector<ofxOceanodeTimelinedItem> timlinedParameters;
-    float windowHeight;
     
     std::function<void(ofxOceanodeNode*)> checkNodeModel;
 };

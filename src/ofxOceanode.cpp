@@ -228,7 +228,7 @@ void ofxOceanode::setup(){
             visibility[kv.first] = kv.second;
         }
     }
-    oceanodeTime->setup(container, controls->get<ofxOceanodeBPMController>());
+    oceanodeTime->setup(container, controls->get<ofxOceanodeTransportController>());
 }
 
 void ofxOceanode::update(){

@@ -1,18 +1,18 @@
 //
-//  ofxOceanodeBPMController.cpp
+//  ofxOceanodeTransportController.cpp
 //  example-basic
 //
 //  Created by Eduard Frigola Bagué on 13/03/2018.
 //
 
-#include "ofxOceanodeBPMController.h"
+#include "ofxOceanodeTransportController.h"
 #include "ofxOceanodeContainer.h"
 #include <numeric>
 #include "imgui.h"
 
 //DatGui
 
-ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("BPM"){
+ofxOceanodeTransportController::ofxOceanodeTransportController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("Transport"){
     bpm = 120;
     container->setBpm(bpm);
     lastButtonPressTime = -1;
@@ -52,7 +52,7 @@ ofxOceanodeBPMController::ofxOceanodeBPMController(shared_ptr<ofxOceanodeContain
     scrub = 0;
 }
 
-void ofxOceanodeBPMController::draw(){
+void ofxOceanodeTransportController::draw(){
     ImGui::DragFloat("BPM", &bpm, 0.005);
     //TODO: Implement better this hack
     // Maybe discard and reset value when not presed enter??
@@ -137,7 +137,7 @@ void ofxOceanodeBPMController::draw(){
     }
 }
 
-void ofxOceanodeBPMController::audioIn(ofSoundBuffer &input){
+void ofxOceanodeTransportController::audioIn(ofSoundBuffer &input){
 #ifdef OFXOCEANODE_USE_BPM_DETECTION
     bpmDetection.audioIn(input.getBuffer().data(), input.size()/2, input.getNumChannels());
     if(oldBpm != bpmDetection.bpm){
@@ -150,7 +150,7 @@ void ofxOceanodeBPMController::audioIn(ofSoundBuffer &input){
 #endif
 }
 
-void ofxOceanodeBPMController::setBPM(float _bpm){
+void ofxOceanodeTransportController::setBPM(float _bpm){
     oldBpm = bpm;
     bpm = _bpm;
     container->setBpm(bpm);

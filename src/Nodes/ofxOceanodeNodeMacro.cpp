@@ -86,6 +86,7 @@ void ofxOceanodeNodeMacro::draw(ofEventArgs &a){
 }
 
 void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
+	ofxOceanodeNodeModel::setContainer(container);
 	registry = container->getRegistry();
 	typesRegistry = container->getTypesRegistry();
 	canvasParentID = container->getCanvasID();
@@ -215,7 +216,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	});
 	
 	// Initialize container
-	container = make_shared<ofxOceanodeContainer>(registry, typesRegistry);
+	container = make_shared<ofxOceanodeContainer>(registry, typesRegistry, hostContainer != nullptr ? hostContainer->getTransport() : nullptr);
 	newNodeListener = container->newNodeCreated.newListener(this, &ofxOceanodeNodeMacro::newNodeCreated);
 	allNodesCreatedListener = container->allNodesCreated.newListener(this, &ofxOceanodeNodeMacro::allNodesCreated);
 	

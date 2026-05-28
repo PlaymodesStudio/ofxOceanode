@@ -673,16 +673,6 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                         }
                         ImGui::EndMenu();
                     }
-                    ImGui::Separator();
-                    if(!absParam.isTimelined()){ //Param is not timelined
-                        if(ImGui::Selectable("Add to Timeline")){
-                            ofxOceanodeTime::getInstance()->addParameter(&absParam,node.getColor());
-                        }
-                    }else{
-                        if(ImGui::Selectable("Remove from Timeline")){
-                            ofxOceanodeTime::getInstance()->removeParameter(&absParam);
-                        }
-                    }
 #ifdef OFXOCEANODE_USE_MIDI
                     ImGui::Separator();
                     if(ImGui::Selectable("Bind MIDI")){

@@ -26,12 +26,14 @@
 #endif
 
 
-ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry, shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry) : registry(_registry), typesRegistry(_typesRegistry){
+ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry, shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry, shared_ptr<ofxOceanodeTransport> _transport) : registry(_registry), typesRegistry(_typesRegistry), transport(_transport){
     if(registry == nullptr) registry = make_shared<ofxOceanodeNodeRegistry>();
     if(typesRegistry == nullptr) typesRegistry = make_shared<ofxOceanodeTypesRegistry>();
+    if(transport == nullptr) transport = make_shared<ofxOceanodeTransport>();
     transformationMatrix = glm::mat4(1.0);
     bpm = 120;
     phase = 0;
+    transport->setBpm(bpm);
     
 #ifdef OFXOCEANODE_USE_MIDI
     ofxMidiIn* midiIn = new ofxMidiIn();
@@ -1464,6 +1466,9 @@ void ofxOceanodeContainer::saveCurrentPreset(){
 
 void ofxOceanodeContainer::setBpm(float _bpm){
     bpm = _bpm;
+    if(transport != nullptr){
+        transport->setBpm(bpm);
+    }
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->setBpm(bpm);
@@ -1476,7 +1481,10 @@ void ofxOceanodeContainer::setBpm(float _bpm){
     }
 }
 
-void ofxOceanodeContainer::resetPhase(){
+void ofxOceanodeContainer::resetPhase(bool notifyTransport){
+    if(notifyTransport && transport != nullptr){
+        transport->notifyReset();
+    }
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->resetPhase();
@@ -1487,6 +1495,20 @@ void ofxOceanodeContainer::resetPhase(){
             node.second->resetPhase();
         }
     }
+}
+
+ofxOceanodeTransportState ofxOceanodeContainer::getTransportState() const{
+    if(transport == nullptr){
+        return {};
+    }
+    return transport->getState();
+}
+
+ofxOceanodeFrameTransportState ofxOceanodeContainer::getFrameTransportState() const{
+    if(transport == nullptr){
+        return {};
+    }
+    return transport->getFrameState();
 }
 
 #ifdef OFXOCEANODE_USE_OSC

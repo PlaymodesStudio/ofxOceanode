@@ -10,6 +10,8 @@
 #define ofxOceanodeNodeModel_h
 
 #include "ofMain.h"
+#include "ofxOceanodeTransport.h"
+#include "ofxOceanodeTransportUtils.h"
 #include "ofxOceanodeParameter.h"
 
 class ofxOceanodeContainer;
@@ -81,6 +83,10 @@ public:
     //For Macro
     virtual bool receiveOscMessage(ofxOscMessage &m){return false;};
 	virtual void setContainer(ofxOceanodeContainer* container);
+    ofxOceanodeContainer* getHostContainer() const { return hostContainer; }
+    std::shared_ptr<ofxOceanodeTransport> getTransport() const;
+    ofxOceanodeTransportState getTransportState() const;
+    ofxOceanodeFrameTransportState getFrameTransportState() const;
     
     void addInspectorParameter(ofAbstractParameter& p){
         inspectorParameters.add(p);
@@ -201,6 +207,7 @@ protected:
     ofColor color;
 	string canvasID;
     string description;
+    ofxOceanodeContainer* hostContainer = nullptr;
     
 private:
     string nameIdentifier;

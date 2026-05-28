@@ -9,11 +9,12 @@
 #include "ofxOceanodeContainer.h"
 #include "phasor.h"
 #include "ofxOceanodeNodeMacro.h"
-#include "ofxOceanodeColors.h"
+#include <algorithm>
 
-void ofxOceanodeTime::setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOceanodeBPMController> contr){
+void ofxOceanodeTime::setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOceanodeTransportController> contr){
     container = c;
     controller = contr;
+    transport = container->getTransport();
     startTime = ofGetCurrentTime();
     
     parameters.add(isPlaying.set("Is Playing", true));
@@ -23,18 +24,35 @@ void ofxOceanodeTime::setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOc
     parameters.add(time.set("Time", 0));
     parameters.add(scrub.set("Scrub", 0));
     listeners.push(isPlaying.newListener([this](bool &b){
+        if(transport != nullptr){
+            transport->setIsPlaying(b);
+        }
         if(b){
             startTime = ofGetCurrentTime() + std::chrono::duration<double>(-time);
         }
     }));
     
     listeners.push(stop.newListener([this](){
+        if(transport != nullptr){
+            transport->stop();
+        }
         isPlaying = false;
         time = 0;
-        container->resetPhase();
+        container->resetPhase(false);
     }));
     
     listeners.push(scrub.newListener([this](float &f){
+        if(transport != nullptr){
+            const auto state = transport->getState();
+            const double beatsPerSecond = std::max(0.0f, state.bpm) / 60.0;
+            const double currentTime = beatsPerSecond > 0.0 ? state.beatPosition / beatsPerSecond : 0.0;
+            const double newTime = std::max(0.0, currentTime + static_cast<double>(f));
+            const double newBeat = newTime * beatsPerSecond;
+            transport->seekToBeat(newBeat);
+            time = newTime;
+            startTime = ofGetCurrentTime() + std::chrono::duration<double>(-time.get());
+            return;
+        }
         startTime = startTime + std::chrono::duration<double>(-f);
         if(!isPlaying){
             time += f;
@@ -102,9 +120,9 @@ void ofxOceanodeTime::update(){
     std::function<void(shared_ptr<ofxOceanodeContainer>)> getPhasorsFromContainer = [this, &phasors, &getPhasorsFromContainer, &timeGenerators, &forceFrameMode](shared_ptr<ofxOceanodeContainer> c){
         for(auto &n : c->getAllModules()){
             ofxOceanodeNodeModel *model = &n->getNodeModel();
-//            if(model->getFlags() & ofxOceanodeNodeModelFlags_ForceFrameMode){
-//                forceFrameMode = true;
-//            }
+            if(model->getFlags() & ofxOceanodeNodeModelFlags_ForceFrameMode){
+                forceFrameMode = true;
+            }
             if(dynamic_cast<phasor*>(model) != nullptr){
                 phasors.push_back(dynamic_cast<phasor*>(model)->getBasePhasor());
             }
@@ -125,23 +143,39 @@ void ofxOceanodeTime::update(){
     while(phasorChannel2.tryReceive(oldPhasors));
     phasorChannel2.send(phasors);
     
-    for(auto c : timeGenerators){
-        c->setTime(time);
+    const TransportDriverMode desiredDriverMode = getDesiredDriverMode(forceFrameMode);
+    if(transport != nullptr){
+        transport->setDriverMode(desiredDriverMode);
     }
-    
+
     if(isPlaying){
-        if(frameMode || forceFrameMode){
+        if(desiredDriverMode == TransportDriverMode::FrameStep){
             if(ofGetFrameNum() % frameInterval == 0 || forceFrameMode){
                 float targetFR = ofGetTargetFrameRate();
                 if(targetFR == 0) targetFR = 60;
-                time += (1.0f/targetFR);
+                if(transport != nullptr){
+                    transport->advanceFrameStep(1.0f / targetFR);
+                }else{
+                    time += (1.0f/targetFR);
+                }
                 for(auto p : phasors){
                     p->advanceForFrameRate(targetFR);
                 }
             }
+        }else if(transport != nullptr){
+            transport->syncRealTime();
         }else{
             time = std::chrono::duration<double>(ofGetCurrentTime() - startTime).count();
         }
+    }
+
+    if(transport != nullptr){
+        transport->latchFrameState();
+        updateLegacyTimeFromTransport();
+    }
+
+    for(auto c : timeGenerators){
+        c->setTime(time);
     }
 }
 
@@ -159,8 +193,14 @@ void ofxOceanodeTime::threadedFunction(){
 }
 
 void ofxOceanodeTime::audioIn(ofSoundBuffer & input){
+    if(transport != nullptr && transport->getState().driverMode != TransportDriverMode::RealTime){
+        return;
+    }
     if(!frameMode){
         float nominalRate = (float)input.getSampleRate() / (float)input.getNumFrames();
+        if(transport != nullptr){
+            transport->syncRealTime();
+        }
         phasorChannel2.tryReceive(phasorsInThread2);
         for(auto p : phasorsInThread2){
             if(p->isAudio())
@@ -172,6 +212,9 @@ void ofxOceanodeTime::audioIn(ofSoundBuffer & input){
 }
 
 void ofxOceanodeTime::audioOut(ofSoundBuffer & input){
+    if(transport != nullptr && transport->getState().driverMode != TransportDriverMode::RealTime){
+        return;
+    }
     if(!frameMode){
         // Measure actual elapsed time between callbacks to get true callback rate.
         // This is immune to hardware/software sample rate mismatches (e.g. built-in
@@ -188,6 +231,9 @@ void ofxOceanodeTime::audioOut(ofSoundBuffer & input){
         }
         lastAudioCallbackTime = now;
         float effectiveRate = 1.0f / elapsed;
+        if(transport != nullptr){
+            transport->syncRealTime();
+        }
 
         phasorChannel2.tryReceive(phasorsInThread2);
         for(auto p : phasorsInThread2){
@@ -199,159 +245,24 @@ void ofxOceanodeTime::audioOut(ofSoundBuffer & input){
     }
 }
 
-#include "imgui_internal.h"
-// https://github.com/ocornut/imgui/issues/1720
-bool Splitter2(int splitNum, bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size = -1.0f)
-{
-    using namespace ImGui;
-    ImGuiContext& g = *GImGui;
-    ImGuiWindow* window = g.CurrentWindow;
-    ImGuiID id = window->GetID(("##Splitter" + ofToString(splitNum)).c_str());
-    ImRect bb;
-    bb.Min = window->DC.CursorPos + (split_vertically ? ImVec2(*size1, 0.0f) : ImVec2(0.0f, *size1));
-    bb.Max = bb.Min + CalcItemSize(split_vertically ? ImVec2(thickness, splitter_long_axis_size) : ImVec2(splitter_long_axis_size, thickness), 0.0f, 0.0f);
-    return SplitterBehavior(bb, id, split_vertically ? ImGuiAxis_X : ImGuiAxis_Y, size1, size2, min_size1, min_size2, 4.0f, 0.04f);
-}
-
-void ofxOceanodeTime::draw(){
-    ImGui::SetNextWindowSize(ImVec2(0, 30));
-    if(ImGui::Begin("Timeline")){
-        //Width Tables
-//        ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable;
-//        if(ImGui::BeginTable("Table", 2, flags)){
-//            ImGui::TableSetupColumn("Esquerra");
-//            ImGui::TableSetupColumn("Dreta");
-//
-//            ImGui::TableNextRow();
-//            ImGui::TableSetColumnIndex(0);
-//            ImGui::Button("Propietats timelin");
-//
-//            ImGui::TableSetColumnIndex(1);
-//
-//            float availWidth = ImGui::GetContentRegionAvail().x;
-//            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-//            draw_list->AddRectFilled(ImGui::GetCursorScreenPos(), ImGui::GetCursorScreenPos() + ImVec2(availWidth, 10), IM_COL32(255, 255, 0, 50));
-//
-//            ImGui::TableNextRow();
-//            ImGui::TableSetColumnIndex(0);
-//            ImGui::Button("Parameter");
-//            ImGui::TableSetColumnIndex(1);
-//            ImGui::Button("Currva");
-//
-//            ImGui::EndTable();
-//        }
-        //Like scope
-        float availWidth = ImGui::GetContentRegionAvail().x;
-        
-        float rulerHeight = 10;
-        float left = 100;
-        float right = availWidth-left;
-        Splitter2(0, true, 2, &left, &right, 10, 10);
-        
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        draw_list->AddRectFilled(ImGui::GetCursorScreenPos() + ImVec2(left, 0), ImGui::GetCursorScreenPos() + ImVec2(availWidth, rulerHeight), IM_COL32(255, 255, 0, 50));
-        
-        //TODO: Add timelines
-        /*
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + rulerHeight + ImGui::GetFrameHeightWithSpacing() - ImGui::GetFrameHeight());
-        ImGui::Spacing();
-        ImGui::Separator();
-        float topPos = ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y;
-        
-        if(timlinedParameters.size() > 0){
-            //ImGui::Begin("Scopes", NULL, ImGuiWindowFlags_NoScrollbar);
-            windowHeight = ImGui::GetContentRegionAvail().y;
-            for(int i = 0; i < timlinedParameters.size(); i++){
-                float topHeight = 0;
-                float bottomHeight = 0;
-                    for(int j = 0; j < i+1; j++) topHeight += timlinedParameters[j].open ? timlinedParameters[j].height : ImGui::GetFrameHeight();
-                    for(int j = i+1; j < timlinedParameters.size(); j++) bottomHeight += timlinedParameters[j].open ? timlinedParameters[j].height : ImGui::GetFrameHeight();
-                float oldTopHeight = topHeight;
-                float oldBottomHeight = bottomHeight;
-                
-                
-//                float minTop = 10;
-//                float minBottom = 10;
-                float minTop = topHeight - timlinedParameters[i].height;
-                float minBottom = 0;
-                
-                //TODO: remove hack
-//                if(timlinedParameters[i].open){
-                    if(Splitter2(i+1, false, 1, &topHeight, &bottomHeight, minTop, minBottom) && timlinedParameters[i].open){
-                        float topInc = topHeight - oldTopHeight;
-                        timlinedParameters[i].height += topInc;
-                    }
-//                }
-//                else{
-                    // Draw division no interaction
-//                }
-                    
-            }
-            
-            float accumPos = topPos;
-            for(int i = 0; i < timlinedParameters.size(); i++)
-            {
-                auto &p = timlinedParameters[i];
-                auto itemHeight = (p.height);
-//
-                auto size = ImVec2(ImGui::GetContentRegionAvail().x, itemHeight);
-//                
-                ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(p.color*0.75f));
-                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(p.color*0.75f));
-                ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(p.color*0.75f));
-                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-                ImGui::PushStyleColor(ImGuiCol_Border, OceanodeColors::TransparentButton);
-//
-                ImGui::SetCursorPosY(accumPos);
-                if(ImGui::TreeNode(p.parameter->getName().c_str())){
-                    p.open = true;
-                    //Draw Slider / Control
-                    ImGui::Button(p.parameter->getName().c_str());
-                    
-                    //Draw Curve
-                    ImGui::SameLine(left + 20);
-                    ImGui::BeginGroup();
-                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
-                    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-                    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(50, 50, 50, 200));
-                    ImGui::BeginChild("scrolling_region", ImVec2(right - 10, p.height - ImGui::GetFrameHeightWithSpacing()), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
-                    
-                    ImGui::EndChild();
-                    ImGui::PopStyleColor();
-                    ImGui::PopStyleVar(2);
-                    ImGui::EndGroup();
-                    
-                    accumPos += p.height;
-                    ImGui::TreePop();
-                }else{
-                    p.open = false;
-                    accumPos += ImGui::GetFrameHeight();// + (ImGui::GetStyle().ItemSpacing.y*4);
-                }
-                ImGui::PopStyleColor(5);
-                ImGui::Spacing();
-            }
-            //ImGui::End();
-        }
-         */
-        
+void ofxOceanodeTime::updateLegacyTimeFromTransport(){
+    if(transport == nullptr){
+        return;
     }
-    ImGui::End();
+    const auto state = transport->getState();
+    const double beatsPerSecond = std::max(0.0f, state.bpm) / 60.0;
+    time = beatsPerSecond > 0.0 ? state.beatPosition / beatsPerSecond : 0.0;
+    if(isPlaying.get() != state.isPlaying){
+        isPlaying = state.isPlaying;
+    }
+    startTime = ofGetCurrentTime() + std::chrono::duration<double>(-time.get());
 }
 
-void ofxOceanodeTime::addParameter(ofxOceanodeAbstractParameter* p, ofColor _color){
-    p->setTimelined(true);
-    timlinedParameters.emplace_back(p,_color, 100);
-}
-
-void ofxOceanodeTime::removeParameter(ofxOceanodeAbstractParameter* p){
-    p->setTimelined(false);
-    auto timelineToRemove = std::find_if(timlinedParameters.begin(), timlinedParameters.end(), [p](const ofxOceanodeTimelinedItem& i){return i.parameter == p;});
-//    float sizeBackup = timelineToRemove->sizeRelative;
-    timlinedParameters.erase(timelineToRemove);
-//    for (auto &sp : timlinedParameters) {
-//        sp.sizeRelative += ((sizeBackup - 1) / timlinedParameters.size());
-//    }
-    
+TransportDriverMode ofxOceanodeTime::getDesiredDriverMode(bool forceFrameMode) const{
+    if(frameMode || forceFrameMode){
+        return TransportDriverMode::FrameStep;
+    }
+    return TransportDriverMode::RealTime;
 }
 
 Timestamp::Timestamp() : currentTime(std::chrono::system_clock::now()) {

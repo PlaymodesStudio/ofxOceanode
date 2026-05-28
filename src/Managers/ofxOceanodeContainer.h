@@ -9,6 +9,7 @@
 #ifndef ofxOceanodeContainer_h
 #define ofxOceanodeContainer_h
 
+#include "ofxOceanodeTransport.h"
 #include "ofxOceanodeConnection.h"
 #include "ofxOceanodeNode.h"
 #include "CustomGui/ofxOceanodeCustomGuiLayout.h"
@@ -61,7 +62,7 @@ class ofxOceanodeContainer {
 public:
     using nodeContainerWithId = std::unordered_map<int, shared_ptr<ofxOceanodeNode>>;
     
-    ofxOceanodeContainer(std::shared_ptr<ofxOceanodeNodeRegistry> _registry = nullptr, std::shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry = nullptr);
+    ofxOceanodeContainer(std::shared_ptr<ofxOceanodeNodeRegistry> _registry = nullptr, std::shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry = nullptr, std::shared_ptr<ofxOceanodeTransport> _transport = nullptr);
     ~ofxOceanodeContainer();
     
     void clearContainer();
@@ -149,7 +150,10 @@ public:
     void markCustomGuiSnapshotsDirty();
     
     void setBpm(float _bpm);
-    void resetPhase();
+    void resetPhase(bool notifyTransport = true);
+    std::shared_ptr<ofxOceanodeTransport> getTransport() const { return transport; }
+    ofxOceanodeTransportState getTransportState() const;
+    ofxOceanodeFrameTransportState getFrameTransportState() const;
 	
 	// Node encapsulation functionality
 	void encapsulateSelectedNodes(const string& macroName = "Encapsulated");
@@ -295,6 +299,7 @@ private:
     ofParameter<glm::mat4> transformationMatrix;
     float bpm;
     float phase;
+    std::shared_ptr<ofxOceanodeTransport> transport;
     
 #ifdef OFXOCEANODE_USE_MIDI
     bool isListeningMidi;
