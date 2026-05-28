@@ -2137,8 +2137,15 @@ bool ofxOceanodeContainer::removeParameterFromCustomGui(const std::string& panel
 
 bool ofxOceanodeContainer::customGuiContainsParameter(const std::string& panelId, ofxOceanodeAbstractParameter& parameter) const
 {
-    ofxOceanodeCustomGuiPanel tempPanel(const_cast<ofxOceanodeContainer&>(*this), panelId);
-    return tempPanel.containsParameter(parameter);
+    const CustomGuiPanelData* panel = getCustomGuiPanelData(panelId);
+    if(panel == nullptr) return false;
+
+    const std::string parameterPath = getCustomGuiParameterPath(parameter);
+    for(const auto& widget : panel->layout.widgets){
+        if(widget.parameterRef.parameterPath == parameterPath) return true;
+    }
+
+    return false;
 }
 
 std::string ofxOceanodeContainer::createCustomGuiSnapshot(const std::string& panelId, const std::string& requestedName)

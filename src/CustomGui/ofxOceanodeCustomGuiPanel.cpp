@@ -1780,10 +1780,12 @@ bool ofxOceanodeCustomGuiPanel::containsParameter(ofxOceanodeAbstractParameter& 
 {
     const CustomGuiPanelData* panel = getPanelData();
     if(panel == nullptr) return false;
+
     const std::string parameterPath = container.getCustomGuiParameterPath(parameter);
     for(const auto& widget : panel->layout.widgets){
         if(widget.parameterRef.parameterPath == parameterPath) return true;
     }
+
     return false;
 }
 
@@ -1808,10 +1810,9 @@ bool ofxOceanodeCustomGuiPanel::addParameter(ofxOceanodeAbstractParameter& param
     CustomGuiPanelData* panel = getPanelData();
     if(panel == nullptr) return false;
 
+    if(containsParameter(parameter)) return false;
+
     const std::string parameterPath = container.getCustomGuiParameterPath(parameter);
-    for(const auto& widget : panel->layout.widgets){
-        if(widget.parameterRef.parameterPath == parameterPath) return false;
-    }
 
     CustomGuiWidget widget;
     widget.parameterRef.parameterPath = parameterPath;
