@@ -14,7 +14,9 @@ phasor::phasor() : ofxOceanodeNodeModel("Phasor")
     selfTrigger = false;
     basePh = make_shared<basePhasor>();
     parameterAutoSettersListeners.push(basePh->audioUpdate.newListener([this](vector<float> &vf){
-        phasorMonitor = vf;
+        if(!syncToTransport_Param) {
+            phasorMonitor = vf;
+        }
     }));
 }
 
@@ -39,7 +41,14 @@ void phasor::setup(){
            basePh->setMultiTrigger(val);
     }));
     parameterAutoSettersListeners.push(audioRate_Param.newListener([&](bool &val){
-           basePh->setAudioRate(val);
+        if(syncToTransport_Param && val){
+            audioRate_Param = false;
+            return;
+        }
+        basePh->setAudioRate(val);
+    }));
+    parameterAutoSettersListeners.push(syncToTransport_Param.newListener([this](bool &val){
+        handleSyncToTransportChanged(val);
     }));
 
     addParameter(bpm_Param.set("BPM", 120, 0, 999), ofxOceanodeParameterFlags_DisableSavePreset);
@@ -52,13 +61,17 @@ void phasor::setup(){
     
     addInspectorParameter(multiTrigger_Param.set("Multi Trigger", false));
     addInspectorParameter(audioRate_Param.set("Audio Rate", false));
+    addInspectorParameter(syncToTransport_Param.set("Sync To Transport", false));
     
     resetPhaseListener = resetPhase_Param.newListener([&](){
-        if(!selfTrigger)
+        if(!selfTrigger && !syncToTransport_Param)
             basePh->resetPhasor();
     });
     
     cycleListener = basePh->phasorCycle.newListener([this](){
+        if(syncToTransport_Param) {
+            return;
+        }
         selfTrigger = true;
         resetPhase_Param.trigger();
         selfTrigger = false;
@@ -67,15 +80,82 @@ void phasor::setup(){
 
 void phasor::update(ofEventArgs &e)
 {
-    if(!basePh->isAudio())
+    if(syncToTransport_Param){
+        phasorMonitor = calculateTransportLockedPhasors(getFrameTransportState().current.beatPosition);
+    }else if(!basePh->isAudio()){
         phasorMonitor = basePh->getPhasors();
+    }
 }
 
 void phasor::resetPhase(){
-    basePh->resetPhasor(true);
+    if(!syncToTransport_Param) {
+        basePh->resetPhasor(true);
+    }
 }
 
 void phasor::setBpm(float bpm){
     //TODO: Check if BPM is being modulated. Maybe info in parametersInfo?
     bpm_Param = bpm;
+}
+
+void phasor::handleSyncToTransportChanged(bool syncEnabled){
+    if(syncEnabled){
+        if(audioRate_Param) {
+            audioRate_Param = false;
+        }else{
+            basePh->setAudioRate(false);
+        }
+        basePh->setPaused(true);
+        phasorMonitor = calculateTransportLockedPhasors(getFrameTransportState().current.beatPosition);
+    }else{
+        basePh->setPhasor(calculateTransportLockedRawPhasors(getFrameTransportState().current.beatPosition));
+        basePh->setPaused(false);
+    }
+}
+
+vector<float> phasor::calculateTransportLockedRawPhasors(double beatPosition) const{
+    const size_t numPhasors = getTransportLockedPhasorCount();
+    vector<float> rawPhases(numPhasors, 0.0f);
+    const auto &beatDivs = beatsDiv_Param.get();
+    const auto &beatMults = beatsMult_Param.get();
+
+    for(size_t i = 0; i < numPhasors; i++){
+        const double beatDiv = std::max(static_cast<double>(getValueForIndex(beatDivs, i)), ofxOceanodeTimeUtils::StepEpsilon);
+        const double beatMult = static_cast<double>(getValueForIndex(beatMults, i));
+        const double rawCycles = beatPosition * beatMult / beatDiv;
+
+        if(!loop_Param && rawCycles >= 1.0){
+            rawPhases[i] = 0.0f;
+        }else{
+            rawPhases[i] = static_cast<float>(ofxOceanodeTimeUtils::wrapPhase(rawCycles, 1.0));
+        }
+    }
+
+    return rawPhases;
+}
+
+vector<float> phasor::calculateTransportLockedPhasors(double beatPosition) const{
+    vector<float> phases = calculateTransportLockedRawPhasors(beatPosition);
+    const auto &initPhases = initPhase_Param.get();
+
+    for(size_t i = 0; i < phases.size(); i++){
+        const double phase = static_cast<double>(phases[i]) + static_cast<double>(getValueForIndex(initPhases, i));
+        phases[i] = static_cast<float>(ofxOceanodeTimeUtils::wrapPhase(phase, 1.0));
+    }
+
+    return phases;
+}
+
+size_t phasor::getTransportLockedPhasorCount() const{
+    size_t count = beatsDiv_Param.get().size();
+    count = std::max(count, beatsMult_Param.get().size());
+    count = std::max(count, initPhase_Param.get().size());
+    return std::max<size_t>(1, count);
+}
+
+float phasor::getValueForIndex(const vector<float> &values, size_t index) const{
+    if(values.empty()) {
+        return 0.0f;
+    }
+    return index < values.size() ? values[index] : values[0];
 }

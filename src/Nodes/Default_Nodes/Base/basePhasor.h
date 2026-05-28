@@ -71,6 +71,11 @@ public:
         return getPhasors()[0];
     }
     void  resetPhasor(bool global = false);
+    void setPaused(bool shouldPause){
+        paused = shouldPause;
+        paused_channel.send(paused);
+    }
+    void setPhasor(const vector<float> &phaseValues);
     
     ofEvent<void> phasorCycle;
     ofEvent<int> phasorCycleIndex;
@@ -134,6 +139,7 @@ private:
     ofThreadChannel<bool>   loop_Param_channel;
     ofThreadChannel<bool>   multiTrigger_channel;
 	ofThreadChannel<bool>	reset_channel;
+    ofThreadChannel<bool> paused_channel;
     
     float    bpm_Param_inThread;
     vector<float>    beatsMult_Param_inThread;
@@ -142,6 +148,8 @@ private:
     bool   loop_Param_inThread;
     bool    multiTrigger_inThread;
 	bool reset_inThread;
+    bool paused;
+    bool paused_inThread;
 
 	int resize;
 };

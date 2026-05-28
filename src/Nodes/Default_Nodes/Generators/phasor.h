@@ -241,6 +241,12 @@ public:
     
     shared_ptr<basePhasor> getBasePhasor(){return basePh;};
 private:
+    void handleSyncToTransportChanged(bool syncEnabled);
+    vector<float> calculateTransportLockedRawPhasors(double beatPosition) const;
+    vector<float> calculateTransportLockedPhasors(double beatPosition) const;
+    size_t getTransportLockedPhasorCount() const;
+    float getValueForIndex(const vector<float> &values, size_t index) const;
+
     shared_ptr<basePhasor> basePh;
 
 
@@ -253,6 +259,7 @@ private:
     ofParameter<bool>   multiTrigger_Param;
     ofParameter<void>   resetPhase_Param;
     ofParameter<bool>   audioRate_Param;
+    ofParameter<bool>   syncToTransport_Param;
     float phaseOffset;
     
     ofEventListeners parameterAutoSettersListeners;

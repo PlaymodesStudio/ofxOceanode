@@ -8,6 +8,14 @@
 
 #include "basePhasor.h"
 
+namespace {
+double wrapUnitPhase(double value){
+    if(value < 0) value += 1.0;
+    value -= static_cast<int>(value);
+    return value;
+}
+}
+
 
 void basePhasor::setup(){
     phasor = vector<double>(1, 0);
@@ -25,8 +33,10 @@ void basePhasor::setup(){
     beatsDiv_Param_inThread = vector<float>(1, 1);
     initPhase_Param_inThread = vector<float>(1, 0);;
     loop_Param_inThread = true;
-    multiTrigger_inThread = false;
+	multiTrigger_inThread = false;
 	reset_inThread = false;
+    paused = false;
+    paused_inThread = false;
     numPhasors = 1;
 	resize = -1;
     stopPhasor = vector<bool>(1, true);
@@ -58,6 +68,18 @@ void basePhasor::resetPhasor(bool global){
     momentaryPhasor = phasor;
 }
 
+void basePhasor::setPhasor(const vector<float> &phaseValues){
+    for(int i = 0; i < numPhasors; i++){
+        double phase = 0.0;
+        if(!phaseValues.empty()){
+            phase = i < phaseValues.size() ? phaseValues[i] : phaseValues[0];
+        }
+        phasor[i] = wrapUnitPhase(phase);
+        phasorMod[i] = wrapUnitPhase(phasor[i] + getValueForIndex(initPhase_Param, i));
+    }
+    momentaryPhasor = phasorMod;
+}
+
 void basePhasor::threadedFunction(double microseconds){
 		if (resize > 0) {
 			numPhasors = resize;
@@ -74,11 +96,12 @@ void basePhasor::threadedFunction(double microseconds){
         while(loop_Param_channel.tryReceive(loop_Param_inThread));
         while(multiTrigger_channel.tryReceive(multiTrigger_inThread));
 		while(reset_channel.tryReceive(reset_inThread));
+        while(paused_channel.tryReceive(paused_inThread));
         vector<float> removePhasors;
         for(int i = 0; i < numPhasors; i++){
             if(reset_inThread){
                 phasor[i] = 0;
-            }else{
+            }else if(!paused_inThread){
                 //tue phasor that goes from 0 to 1 at desired frequency
                 double freq = (double)bpm_Param_inThread/(double)60;
                 freq = freq * (double)getValueForIndex(beatsMult_Param_inThread, i);
@@ -106,8 +129,7 @@ void basePhasor::threadedFunction(double microseconds){
                 
                 if(stopPhasor[i]) phasor[i] = 0;
                 
-                if(phasor[i] < 0) phasor[i] += 1.0f;
-                phasor[i] -= (int)phasor[i];
+                phasor[i] = wrapUnitPhase(phasor[i]);
                 
             }
             
@@ -116,7 +138,7 @@ void basePhasor::threadedFunction(double microseconds){
             
             //take the initPhase_Param as a phase offset param
             phasorMod[i] += getValueForIndex(initPhase_Param_inThread, i);
-            phasorMod[i] -= (int)phasorMod[i];
+            phasorMod[i] = wrapUnitPhase(phasorMod[i]);
         }
         
         for(int i = removePhasors.size()-1; i >= 0; i--){
@@ -143,9 +165,7 @@ void basePhasor::advanceForFrameRate(float framerate){
     }
     vector<float> removePhasors;
     for(int i = 0; i < numPhasors; i++){
-        if(false){
-//            phasor[i] = 0;
-        }else{
+        if(!paused){
             //tue phasor that goes from 0 to 1 at desired frequency
             double freq = (double)bpm_Param/(double)60;
             freq = freq * (double)getValueForIndex(beatsMult_Param, i);
@@ -173,8 +193,7 @@ void basePhasor::advanceForFrameRate(float framerate){
             
             if(stopPhasor[i]) phasor[i] = 0;
             
-            if(phasor[i] < 0) phasor[i] += 1.0f;
-            phasor[i] -= (int)phasor[i];
+            phasor[i] = wrapUnitPhase(phasor[i]);
             
         }
         
@@ -183,7 +202,7 @@ void basePhasor::advanceForFrameRate(float framerate){
         
         //take the initPhase_Param as a phase offset param
         phasorMod[i] += getValueForIndex(initPhase_Param, i);
-        phasorMod[i] -= (int)phasorMod[i];
+        phasorMod[i] = wrapUnitPhase(phasorMod[i]);
     }
     
     for(int i = removePhasors.size()-1; i >= 0; i--){
