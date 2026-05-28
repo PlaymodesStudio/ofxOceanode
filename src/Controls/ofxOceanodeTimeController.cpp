@@ -1,18 +1,18 @@
 //
-//  ofxOceanodeTransportController.cpp
+//  ofxOceanodeTimeController.cpp
 //  example-basic
 //
 //  Created by Eduard Frigola Bagué on 13/03/2018.
 //
 
-#include "ofxOceanodeTransportController.h"
+#include "ofxOceanodeTimeController.h"
 #include "ofxOceanodeContainer.h"
 #include <numeric>
 #include "imgui.h"
 
 //DatGui
 
-ofxOceanodeTransportController::ofxOceanodeTransportController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("Transport"){
+ofxOceanodeTimeController::ofxOceanodeTimeController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("Time"){
     bpm = 120;
     container->setBpm(bpm);
     lastButtonPressTime = -1;
@@ -52,7 +52,7 @@ ofxOceanodeTransportController::ofxOceanodeTransportController(shared_ptr<ofxOce
     scrub = 0;
 }
 
-void ofxOceanodeTransportController::draw(){
+void ofxOceanodeTimeController::draw(){
     ImGui::DragFloat("BPM", &bpm, 0.005);
     //TODO: Implement better this hack
     // Maybe discard and reset value when not presed enter??
@@ -95,9 +95,12 @@ void ofxOceanodeTransportController::draw(){
     #endif
     
     if(timeParameters != nullptr){
-        ImGui::Text("Time :");
+        ImGui::Text("Transport :");
 		ImGui::SameLine();
         ImGui::Text("- %f -", timeParameters->getFloat("Time").get());
+        ImGui::Text("Counter :");
+        ImGui::SameLine();
+        ImGui::Text("- %f -", timeParameters->getFloat("Global Time").get());
         
         auto fm = timeParameters->getBool("Frame Mode");
         if(ImGui::Checkbox("Frame Mode", (bool*)&fm.get())){
@@ -134,10 +137,14 @@ void ofxOceanodeTransportController::draw(){
         if(ImGui::Button("Stop")){
             timeParameters->getVoid("Stop").trigger();
         }
+		ImGui::SameLine();
+        if(ImGui::Button("Reset Counter")){
+            timeParameters->getVoid("Reset Global Time").trigger();
+        }
     }
 }
 
-void ofxOceanodeTransportController::audioIn(ofSoundBuffer &input){
+void ofxOceanodeTimeController::audioIn(ofSoundBuffer &input){
 #ifdef OFXOCEANODE_USE_BPM_DETECTION
     bpmDetection.audioIn(input.getBuffer().data(), input.size()/2, input.getNumChannels());
     if(oldBpm != bpmDetection.bpm){
@@ -150,7 +157,7 @@ void ofxOceanodeTransportController::audioIn(ofSoundBuffer &input){
 #endif
 }
 
-void ofxOceanodeTransportController::setBPM(float _bpm){
+void ofxOceanodeTimeController::setBPM(float _bpm){
     oldBpm = bpm;
     bpm = _bpm;
     container->setBpm(bpm);

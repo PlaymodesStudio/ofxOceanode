@@ -94,6 +94,14 @@ ofxOceanodeFrameTransportState ofxOceanodeNodeModel::getFrameTransportState() co
     return hostContainer->getFrameTransportState();
 }
 
+ofxOceanodeTimeState ofxOceanodeNodeModel::getGlobalTimeState() const{
+    return ofxOceanodeTime::getInstance()->getGlobalTimeState();
+}
+
+ofxOceanodeFrameTimeState ofxOceanodeNodeModel::getFrameGlobalTimeState() const{
+    return ofxOceanodeTime::getInstance()->getFrameGlobalTimeState();
+}
+
 //parameterInfo& ofxOceanodeNodeModel::addParameterToGroupAndInfo(ofAbstractParameter& p){
 //    addParameter(p);
 //    if(parametersInfo.count(p.getName()) == 0) parametersInfo[p.getName()] = parameterInfo();

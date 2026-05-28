@@ -1,12 +1,12 @@
 //
-//  ofxOceanodeTransportController.h
+//  ofxOceanodeTimeController.h
 //  example-basic
 //
 //  Created by Eduard Frigola Bagué on 13/03/2018.
 //
 
-#ifndef ofxOceanodeTransportController_h
-#define ofxOceanodeTransportController_h
+#ifndef ofxOceanodeTimeController_h
+#define ofxOceanodeTimeController_h
 
 #include "ofxOceanodeBaseController.h"
 
@@ -14,10 +14,10 @@
     #include "ofxAubio.h"
 #endif
 
-class ofxOceanodeTransportController: public ofxOceanodeBaseController{
+class ofxOceanodeTimeController: public ofxOceanodeBaseController{
 public:
-    ofxOceanodeTransportController(shared_ptr<ofxOceanodeContainer> _container);
-    ~ofxOceanodeTransportController(){};
+    ofxOceanodeTimeController(shared_ptr<ofxOceanodeContainer> _container);
+    ~ofxOceanodeTimeController(){};
     
     void draw();
     
@@ -56,4 +56,4 @@ private:
 };
 
 
-#endif /* ofxOceanodeTransportController_h */
+#endif /* ofxOceanodeTimeController_h */

@@ -7,7 +7,7 @@
 
 #include "ofxOceanodeControls.h"
 #include "ofxOceanodePresetsController.h"
-#include "ofxOceanodeTransportController.h"
+#include "ofxOceanodeTimeController.h"
 #include "ofxOceanodeNodesController.h"
 #include "ofxOceanodeInspectorController.h"
 #include "ofxOceanodeMiniMapController.h"
@@ -31,7 +31,7 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
 {
     container = _container;
     controllers.push_back(make_shared<ofxOceanodePresetsController>(container));
-    controllers.push_back(make_shared<ofxOceanodeTransportController>(container));
+    controllers.push_back(make_shared<ofxOceanodeTimeController>(container));
     controllers.push_back(make_shared<ofxOceanodeNodesController>(container,_canvas));
     controllers.push_back(make_shared<ofxOceanodeInspectorController>(container, _canvas));
     controllers.push_back(make_shared<ofxOceanodeMiniMapController>(container, _canvas));

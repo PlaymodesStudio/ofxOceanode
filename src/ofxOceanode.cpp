@@ -8,6 +8,7 @@
 #include "ofxOceanode.h"
 #include "ofxOceanodeTheme.h"
 #include "ofxOceanodeShared.h"
+#include "ofxOceanodeTimeController.h"
 #include "imgui_internal.h"
 #include "defaultNodes.h"
 
@@ -228,7 +229,7 @@ void ofxOceanode::setup(){
             visibility[kv.first] = kv.second;
         }
     }
-    oceanodeTime->setup(container, controls->get<ofxOceanodeTransportController>());
+    oceanodeTime->setup(container, controls->get<ofxOceanodeTimeController>());
 }
 
 void ofxOceanode::update(){

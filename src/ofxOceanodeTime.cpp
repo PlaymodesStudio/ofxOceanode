@@ -8,20 +8,27 @@
 #include "ofxOceanodeTime.h"
 #include "ofxOceanodeContainer.h"
 #include "phasor.h"
+#include "ofxOceanodeTimeController.h"
 #include "ofxOceanodeNodeMacro.h"
 #include <algorithm>
 
-void ofxOceanodeTime::setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOceanodeTransportController> contr){
+void ofxOceanodeTime::setup(std::shared_ptr<ofxOceanodeContainer> c, std::shared_ptr<ofxOceanodeTimeController> contr){
     container = c;
     controller = contr;
     transport = container->getTransport();
     startTime = ofGetCurrentTime();
+    const uint64_t nowUs = getSteadyNowUs();
+    globalTimeState.steadyTimeUs = nowUs;
+    frameGlobalTimeState.previous = globalTimeState;
+    frameGlobalTimeState.current = globalTimeState;
     
     parameters.add(isPlaying.set("Is Playing", true));
     parameters.add(frameMode.set("Frame Mode", false));
     parameters.add(frameInterval.set("Frame Interval", 1));
     parameters.add(stop.set("Stop"));
     parameters.add(time.set("Time", 0));
+    parameters.add(globalTime.set("Global Time", 0));
+    parameters.add(resetGlobalTimeCounter.set("Reset Global Time"));
     parameters.add(scrub.set("Scrub", 0));
     listeners.push(isPlaying.newListener([this](bool &b){
         if(transport != nullptr){
@@ -39,6 +46,11 @@ void ofxOceanodeTime::setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOc
         isPlaying = false;
         time = 0;
         container->resetPhase(false);
+    }));
+
+    listeners.push(resetGlobalTimeCounter.newListener([this](){
+        resetGlobalTime();
+        globalTime = 0;
     }));
     
     listeners.push(scrub.newListener([this](float &f){
@@ -147,32 +159,48 @@ void ofxOceanodeTime::update(){
     if(transport != nullptr){
         transport->setDriverMode(desiredDriverMode);
     }
+    {
+        std::lock_guard<std::mutex> lock(globalTimeMutex);
+        globalTimeState.driverMode = desiredDriverMode;
+    }
 
-    if(isPlaying){
-        if(desiredDriverMode == TransportDriverMode::FrameStep){
-            if(ofGetFrameNum() % frameInterval == 0 || forceFrameMode){
-                float targetFR = ofGetTargetFrameRate();
-                if(targetFR == 0) targetFR = 60;
+    const bool shouldAdvanceFrameStep = desiredDriverMode == TransportDriverMode::FrameStep &&
+                                        (ofGetFrameNum() % frameInterval == 0 || forceFrameMode);
+
+    if(desiredDriverMode == TransportDriverMode::FrameStep){
+        if(shouldAdvanceFrameStep){
+            float targetFR = ofGetTargetFrameRate();
+            if(targetFR == 0) targetFR = 60;
+            const double deltaSeconds = 1.0 / targetFR;
+            advanceGlobalTimeFrameStep(deltaSeconds);
+            if(isPlaying){
                 if(transport != nullptr){
-                    transport->advanceFrameStep(1.0f / targetFR);
+                    transport->advanceFrameStep(deltaSeconds);
                 }else{
-                    time += (1.0f/targetFR);
+                    time += deltaSeconds;
                 }
                 for(auto p : phasors){
                     p->advanceForFrameRate(targetFR);
                 }
             }
-        }else if(transport != nullptr){
-            transport->syncRealTime();
-        }else{
-            time = std::chrono::duration<double>(ofGetCurrentTime() - startTime).count();
+        }
+    }else{
+        syncGlobalTimeRealTime();
+        if(isPlaying){
+            if(transport != nullptr){
+                transport->syncRealTime();
+            }else{
+                time = std::chrono::duration<double>(ofGetCurrentTime() - startTime).count();
+            }
         }
     }
 
+    latchGlobalTimeState();
     if(transport != nullptr){
         transport->latchFrameState();
         updateLegacyTimeFromTransport();
     }
+    globalTime = frameGlobalTimeState.current.time;
 
     for(auto c : timeGenerators){
         c->setTime(time);
@@ -197,6 +225,7 @@ void ofxOceanodeTime::audioIn(ofSoundBuffer & input){
         return;
     }
     if(!frameMode){
+        syncGlobalTimeRealTime();
         float nominalRate = (float)input.getSampleRate() / (float)input.getNumFrames();
         if(transport != nullptr){
             transport->syncRealTime();
@@ -216,6 +245,7 @@ void ofxOceanodeTime::audioOut(ofSoundBuffer & input){
         return;
     }
     if(!frameMode){
+        syncGlobalTimeRealTime();
         // Measure actual elapsed time between callbacks to get true callback rate.
         // This is immune to hardware/software sample rate mismatches (e.g. built-in
         // speakers running at 48kHz while 44100 was requested).
@@ -263,6 +293,73 @@ TransportDriverMode ofxOceanodeTime::getDesiredDriverMode(bool forceFrameMode) c
         return TransportDriverMode::FrameStep;
     }
     return TransportDriverMode::RealTime;
+}
+
+ofxOceanodeTimeState ofxOceanodeTime::getGlobalTimeState() const{
+    std::lock_guard<std::mutex> lock(globalTimeMutex);
+    return globalTimeState;
+}
+
+ofxOceanodeFrameTimeState ofxOceanodeTime::getFrameGlobalTimeState() const{
+    std::lock_guard<std::mutex> lock(globalTimeMutex);
+    return frameGlobalTimeState;
+}
+
+void ofxOceanodeTime::syncGlobalTimeRealTime(){
+    std::lock_guard<std::mutex> lock(globalTimeMutex);
+    globalTimeState.driverMode = TransportDriverMode::RealTime;
+    advanceGlobalTimeToNowLocked(getSteadyNowUs());
+}
+
+void ofxOceanodeTime::advanceGlobalTimeFrameStep(double deltaSeconds){
+    std::lock_guard<std::mutex> lock(globalTimeMutex);
+    globalTimeState.driverMode = TransportDriverMode::FrameStep;
+    const uint64_t nowUs = getSteadyNowUs();
+    advanceGlobalTimeToNowLocked(nowUs);
+    if(globalTimeState.driverMode == TransportDriverMode::FrameStep){
+        globalTimeState.time += std::max(0.0, deltaSeconds);
+    }
+    globalTimeState.steadyTimeUs = nowUs;
+}
+
+void ofxOceanodeTime::resetGlobalTime(){
+    std::lock_guard<std::mutex> lock(globalTimeMutex);
+    const uint64_t nowUs = getSteadyNowUs();
+    advanceGlobalTimeToNowLocked(nowUs);
+    globalTimeState.time = 0.0;
+    globalTimeState.generation++;
+    globalTimeState.steadyTimeUs = nowUs;
+}
+
+void ofxOceanodeTime::latchGlobalTimeState(){
+    std::lock_guard<std::mutex> lock(globalTimeMutex);
+    frameGlobalTimeState.previous = frameGlobalTimeState.current;
+    frameGlobalTimeState.current = globalTimeState;
+}
+
+uint64_t ofxOceanodeTime::getSteadyNowUs(){
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()
+    ).count();
+}
+
+void ofxOceanodeTime::advanceGlobalTimeToNowLocked(uint64_t nowUs){
+    if(globalTimeState.driverMode != TransportDriverMode::RealTime){
+        globalTimeState.steadyTimeUs = nowUs;
+        return;
+    }
+
+    if(globalTimeState.steadyTimeUs == 0){
+        globalTimeState.steadyTimeUs = nowUs;
+        return;
+    }
+
+    if(nowUs > globalTimeState.steadyTimeUs){
+        const double deltaSeconds = static_cast<double>(nowUs - globalTimeState.steadyTimeUs) / 1000000.0;
+        globalTimeState.time += deltaSeconds;
+    }
+
+    globalTimeState.steadyTimeUs = nowUs;
 }
 
 Timestamp::Timestamp() : currentTime(std::chrono::system_clock::now()) {
