@@ -1778,15 +1778,8 @@ CustomGuiWidgetType ofxOceanodeCustomGuiPanel::getDefaultWidgetType(ofxOceanodeA
 
 bool ofxOceanodeCustomGuiPanel::containsParameter(ofxOceanodeAbstractParameter& parameter) const
 {
-    const CustomGuiPanelData* panel = getPanelData();
-    if(panel == nullptr) return false;
-
-    const std::string parameterPath = container.getCustomGuiParameterPath(parameter);
-    for(const auto& widget : panel->layout.widgets){
-        if(widget.parameterRef.parameterPath == parameterPath) return true;
-    }
-
-    return false;
+    if(panelId.empty()) return false;
+    return container.customGuiContainsParameter(panelId, parameter);
 }
 
 bool ofxOceanodeCustomGuiPanel::removeParameter(const std::string& parameterPath)

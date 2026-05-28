@@ -59,6 +59,11 @@ ofxOceanodeContainer::~ofxOceanodeContainer(){
     clearContainer();
 }
 
+void ofxOceanodeContainer::invalidateCustomGuiMembershipIndex()
+{
+    customGuiMembershipIndexDirty = true;
+}
+
 void ofxOceanodeContainer::clearContainer(){
     // Clear scope callback first to prevent auto-saves triggered by parameter
     // destructors during teardown (app exit or preset switching)
@@ -68,6 +73,9 @@ void ofxOceanodeContainer::clearContainer(){
     customGuiPanels.clear();
     customGuiPanelsData.clear();
     customGuiSnapshotBanks.clear();
+    customGuiPanelParameterIndex.clear();
+    customGuiPublishedParameterIndex.clear();
+    invalidateCustomGuiMembershipIndex();
     
     std::vector<shared_ptr<ofxOceanodeNode>> toDelete;
     for(auto &nodeTypeMap : dynamicNodes){
@@ -335,6 +343,7 @@ void ofxOceanodeContainer::saveCustomGuiSnapshots()
 void ofxOceanodeContainer::markCustomGuisDirty()
 {
     customGuisDirty = true;
+    invalidateCustomGuiMembershipIndex();
 }
 
 void ofxOceanodeContainer::markCustomGuiSnapshotsDirty()
@@ -348,6 +357,7 @@ void ofxOceanodeContainer::loadCustomGuis(const std::string& presetPath)
     std::string filepath = getCustomGuiFilePath(presetPath);
     ofFile file(filepath);
     customGuiPanelsData.clear();
+    invalidateCustomGuiMembershipIndex();
     if(!file.exists()){
         rebuildCustomGuiPanels();
         customGuisDirty = false;
@@ -2137,15 +2147,41 @@ bool ofxOceanodeContainer::removeParameterFromCustomGui(const std::string& panel
 
 bool ofxOceanodeContainer::customGuiContainsParameter(const std::string& panelId, ofxOceanodeAbstractParameter& parameter) const
 {
-    const CustomGuiPanelData* panel = getCustomGuiPanelData(panelId);
-    if(panel == nullptr) return false;
+    if(panelId.empty()) return false;
+
+    rebuildCustomGuiMembershipIndexIfNeeded();
+    auto panelIt = customGuiPanelParameterIndex.find(panelId);
+    if(panelIt == customGuiPanelParameterIndex.end()) return false;
 
     const std::string parameterPath = getCustomGuiParameterPath(parameter);
-    for(const auto& widget : panel->layout.widgets){
-        if(widget.parameterRef.parameterPath == parameterPath) return true;
+    return panelIt->second.find(parameterPath) != panelIt->second.end();
+}
+
+bool ofxOceanodeContainer::customGuiContainsParameterAnywhere(ofxOceanodeAbstractParameter& parameter) const
+{
+    rebuildCustomGuiMembershipIndexIfNeeded();
+    const std::string parameterPath = getCustomGuiParameterPath(parameter);
+    return customGuiPublishedParameterIndex.find(parameterPath) != customGuiPublishedParameterIndex.end();
+}
+
+void ofxOceanodeContainer::rebuildCustomGuiMembershipIndexIfNeeded() const
+{
+    if(!customGuiMembershipIndexDirty) return;
+
+    customGuiPanelParameterIndex.clear();
+    customGuiPublishedParameterIndex.clear();
+    customGuiPanelParameterIndex.reserve(customGuiPanelsData.size());
+
+    for(const auto& panel : customGuiPanelsData){
+        auto& indexedParameters = customGuiPanelParameterIndex[panel.id];
+        for(const auto& widget : panel.layout.widgets){
+            if(widget.parameterRef.parameterPath.empty()) continue;
+            indexedParameters.insert(widget.parameterRef.parameterPath);
+            customGuiPublishedParameterIndex.insert(widget.parameterRef.parameterPath);
+        }
     }
 
-    return false;
+    customGuiMembershipIndexDirty = false;
 }
 
 std::string ofxOceanodeContainer::createCustomGuiSnapshot(const std::string& panelId, const std::string& requestedName)
