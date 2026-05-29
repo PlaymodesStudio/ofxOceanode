@@ -4,6 +4,7 @@
 
 #include "CustomGui/ofxOceanodeCustomGuiWidgetRegistry.h"
 #include "ofxOceanodeParameter.h"
+#include <cfloat>
 #include <cmath>
 #include "imgui_internal.h"
 
@@ -60,6 +61,22 @@ inline void ensureWidgetLabelColor(CustomGuiWidget& widget, const ofColor& fallb
     if(!widget.config.contains("labelColor")){
         widget.config["labelColor"] = customGuiColorToJson(fallback);
     }
+}
+
+inline float widgetLabelFontScale(const CustomGuiWidget& widget, float fallback = 1.0f)
+{
+    return std::max(0.2f, widget.config.value("labelFontScale", fallback));
+}
+
+inline float widgetValueFontScale(const CustomGuiWidget& widget, float fallback = 1.0f)
+{
+    if(widget.config.contains("valueFontScale")){
+        return std::max(0.2f, widget.config.value("valueFontScale", fallback));
+    }
+    if(widget.config.contains("fontScale")){
+        return std::max(0.2f, widget.config.value("fontScale", fallback));
+    }
+    return std::max(0.2f, fallback);
 }
 
 inline void pushWidgetFrameColors(const ofColor& bodyColor, const ofColor& accentColor)
@@ -123,14 +140,17 @@ inline void drawWidgetLabel(const CustomGuiWidgetRenderContext& context, const C
     const ImVec2 max = ImGui::GetItemRectMax();
     const float padX = std::max(2.0f, std::min(8.0f, (context.cellSize.x > 0.0f ? context.cellSize.x : context.size.x) * 0.08f));
     const ofColor labelColor = widgetLabelColor(widget, ofColor::black);
-    ImGui::PushStyleColor(ImGuiCol_Text, colorToImVec4(labelColor));
+    const float fontSize = std::max(1.0f, ImGui::GetFontSize() * widgetLabelFontScale(widget));
+    const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, label.c_str());
+    const float textY = min.y + std::max(0.0f, (labelHeight - textSize.y) * 0.5f);
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
     ImGui::PushClipRect(min, max, true);
-    ImGui::RenderTextClipped(ImVec2(min.x + padX, min.y),
-                             ImVec2(max.x - padX, max.y),
-                             label.c_str(), nullptr, nullptr,
-                             ImVec2(0.0f, 0.5f), nullptr);
+    drawList->AddText(ImGui::GetFont(),
+                      fontSize,
+                      ImVec2(min.x + padX, textY),
+                      IM_COL32(labelColor.r, labelColor.g, labelColor.b, labelColor.a),
+                      label.c_str());
     ImGui::PopClipRect();
-    ImGui::PopStyleColor();
     ImGui::SetCursorPos(ImVec2(startPos.x, startPos.y + labelHeight));
 }
 

@@ -247,8 +247,8 @@ inline CustomGuiLayout customGuiLayoutFromJson(const ofJson& json)
     CustomGuiLayout layout;
     if(json.contains("columns")) layout.columns = std::max(1, json["columns"].get<int>());
     if(json.contains("rows")) layout.rows = std::max(1, json["rows"].get<int>());
-    if(json.contains("cellWidth")) layout.cellWidth = std::max(20.0f, json["cellWidth"].get<float>());
-    if(json.contains("cellHeight")) layout.cellHeight = std::max(20.0f, json["cellHeight"].get<float>());
+    if(json.contains("cellWidth")) layout.cellWidth = std::max(10.0f, json["cellWidth"].get<float>());
+    if(json.contains("cellHeight")) layout.cellHeight = std::max(10.0f, json["cellHeight"].get<float>());
     if(json.contains("zoom")) layout.zoom = ofClamp(json["zoom"].get<float>(), 0.25f, 4.0f);
     if(json.contains("backgroundColor")) layout.backgroundColor = customGuiColorFromJson(json["backgroundColor"], ofColor(24, 24, 24, 255));
     if(json.contains("widgets") && json["widgets"].is_array()){
