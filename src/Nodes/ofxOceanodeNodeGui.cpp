@@ -114,12 +114,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
             string uniqueId = absParam.getName();
-            const bool publishedInCustomGui = [&](){
-                for(const auto& panel : container.getCustomGuiPanelsData()){
-                    if(container.customGuiContainsParameter(panel.id, absParam)) return true;
-                }
-                return false;
-            }();
+            const bool publishedInCustomGui = container.customGuiContainsParameterAnywhere(absParam);
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::BeginDisabled();
             ImGui::PushID(uniqueId.c_str());
             if(absParam.getFlags() & ofxOceanodeParameterFlags_NoGuiWidget){

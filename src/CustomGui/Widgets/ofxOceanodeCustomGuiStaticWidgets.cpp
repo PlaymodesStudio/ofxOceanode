@@ -26,7 +26,7 @@ void drawMatrixColorProperty(CustomGuiWidgetPropertiesContext& context, CustomGu
         color.b / 255.0f,
         color.a / 255.0f
     };
-    if(ImGui::ColorEdit4(label, colorFloat)){
+    if(ImGui::ColorEdit4(label, colorFloat, ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_AlphaBar)){
         widget.config[key] = customGuiColorToJson(ofColor(colorFloat[0] * 255.0f,
                                                           colorFloat[1] * 255.0f,
                                                           colorFloat[2] * 255.0f,
@@ -35,10 +35,13 @@ void drawMatrixColorProperty(CustomGuiWidgetPropertiesContext& context, CustomGu
     }
 }
 
-bool renderLabelWidget(CustomGuiWidgetRenderContext&, CustomGuiWidget& widget, ofxOceanodeAbstractParameter*)
+bool renderLabelWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter*)
 {
     ImGui::BeginGroup();
+    const float fontScale = widgetValueFontScale(widget);
+    ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * fontScale));
     ImGui::TextWrapped("%s", widget.label.c_str());
+    ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
     ImGui::EndGroup();
     return true;
 }
@@ -60,7 +63,7 @@ bool renderBackgroundPanelWidget(CustomGuiWidgetRenderContext& context, CustomGu
     const bool showLabel = widget.config.value("showLabel", true);
     if(showLabel && !widget.label.empty()){
         const ofColor labelColor = widgetLabelColor(widget, ofColor::black);
-        const float labelFontScale = std::max(0.2f, widget.config.value("labelFontScale", 1.0f));
+        const float labelFontScale = widgetLabelFontScale(widget);
         const float labelFontSize = ImGui::GetFontSize() * labelFontScale;
         const ImVec2 textPos(min.x + 8.0f, min.y + 6.0f);
         const float wrapWidth = std::max(1.0f, context.size.x - 16.0f);
@@ -76,7 +79,7 @@ bool renderBackgroundPanelWidget(CustomGuiWidgetRenderContext& context, CustomGu
 bool renderTextWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter*)
 {
     ImGui::BeginGroup();
-    const float fontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
+    const float fontScale = widgetValueFontScale(widget);
     ImGui::InvisibleButton("##text", context.size);
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const ImVec2 min = ImGui::GetItemRectMin();
@@ -151,6 +154,7 @@ bool renderSnapshotMatrixWidget(CustomGuiWidgetRenderContext& context, CustomGui
 
     ImGui::BeginGroup();
     drawWidgetLabel(context, widget, context.label);
+    ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * widgetValueFontScale(widget)));
     for(int row = 0; row < rows; row++){
         for(int col = 0; col < cols; col++){
             if(col > 0) ImGui::SameLine();
@@ -174,17 +178,15 @@ bool renderSnapshotMatrixWidget(CustomGuiWidgetRenderContext& context, CustomGui
             ImGui::PopID();
         }
     }
+    ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
     ImGui::EndGroup();
     return true;
 }
 
 void drawTextProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter*)
 {
-    float fontScale = std::max(0.2f, widget.config.value("fontScale", 1.0f));
-    if(ImGui::InputFloat("Font Scale", &fontScale, 0.05f, 0.2f, "%.2f")){
-        widget.config["fontScale"] = std::max(0.2f, fontScale);
-        context.container.markCustomGuisDirty();
-    }
+    (void)context;
+    (void)widget;
 }
 
 void drawImageProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter*)
@@ -250,7 +252,7 @@ void drawLineProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidg
         widget.color.b / 255.0f,
         widget.color.a / 255.0f
     };
-    if(ImGui::ColorEdit4("Line Color", lineColor)){
+    if(ImGui::ColorEdit4("Line Color", lineColor, ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_AlphaBar)){
         widget.color = ofColor(lineColor[0] * 255.0f,
                                lineColor[1] * 255.0f,
                                lineColor[2] * 255.0f,
@@ -285,7 +287,7 @@ void drawSnapshotMatrixProperties(CustomGuiWidgetPropertiesContext& context, Cus
 
 void initializeTextWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
 {
-    widget.config["fontScale"] = 1.0f;
+    widget.config["valueFontScale"] = 1.0f;
 }
 
 void initializeImageWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
@@ -298,6 +300,7 @@ void initializeBackgroundPanelWidget(CustomGuiWidget& widget, ofxOceanodeAbstrac
 {
     widget.config["showLabel"] = true;
     widget.config["labelFontScale"] = 1.0f;
+    widget.config["valueFontScale"] = 1.0f;
     ensureWidgetLabelColor(widget);
 }
 

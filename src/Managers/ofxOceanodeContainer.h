@@ -14,6 +14,7 @@
 #include "ofxOceanodeNode.h"
 #include "CustomGui/ofxOceanodeCustomGuiLayout.h"
 #include "ofxOceanodeNodeGui.h"
+#include <unordered_set>
 
 class ofxOceanodeNodeModel;
 class ofxOceanodeNodeRegistry;
@@ -200,6 +201,7 @@ public:
     bool addParameterToCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter, CustomGuiWidgetType type);
     bool removeParameterFromCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter);
     bool customGuiContainsParameter(const std::string& panelId, ofxOceanodeAbstractParameter& parameter) const;
+    bool customGuiContainsParameterAnywhere(ofxOceanodeAbstractParameter& parameter) const;
     std::vector<CustomGuiWidgetType> getCompatibleCustomGuiWidgetTypes(ofxOceanodeAbstractParameter& parameter) const;
     CustomGuiWidgetType getDefaultCustomGuiWidgetType(ofxOceanodeAbstractParameter& parameter) const;
     std::string getCustomGuiParameterPath(ofxOceanodeAbstractParameter& parameter) const;
@@ -260,6 +262,9 @@ private:
     };
 	
     ParsedParameterPath parseParameterPath(const std::string& path);
+    void invalidateCustomGuiMembershipIndex();
+    void invalidateCustomGuiParameterPathCache();
+    void rebuildCustomGuiMembershipIndexIfNeeded() const;
     void rebuildCustomGuiPanels();
     std::string getCustomGuiFilePath(const std::string& presetPath) const;
     std::string getCustomGuiSnapshotsFilePath(const std::string& presetPath) const;
@@ -279,6 +284,10 @@ private:
     std::vector<CustomGuiPanelData> customGuiPanelsData;
     std::vector<std::unique_ptr<ofxOceanodeCustomGuiPanel>> customGuiPanels;
     std::vector<CustomGuiSnapshotBank> customGuiSnapshotBanks;
+    mutable std::unordered_map<const ofxOceanodeAbstractParameter*, std::string> customGuiParameterPathCache;
+    mutable std::unordered_map<std::string, std::unordered_set<std::string>> customGuiPanelParameterIndex;
+    mutable std::unordered_set<std::string> customGuiPublishedParameterIndex;
+    mutable bool customGuiMembershipIndexDirty = true;
     std::string customGuiStoragePath;
     bool customGuisDirty = false;
     bool customGuiSnapshotsDirty = false;

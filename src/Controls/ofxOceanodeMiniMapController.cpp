@@ -300,9 +300,20 @@ void ofxOceanodeMiniMapController::renderMinimap(
     for (auto& [id, node] : activeContainer->getParameterGroupNodesMap()) {
         ofRectangle r = effectiveRect(node);
 
-        // Skip transparent nodes
         bool isTransparent = (node->getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
-        if (isTransparent) continue;
+
+        if (isTransparent) {
+            // Ask the node model if it wants a simplified minimap rectangle.
+            // Nodes that don't override getMiniMapHint() return hasHint=false and are skipped.
+            auto hint = node->getNodeModel().getMiniMapHint();
+            if (!hint.hasHint) continue;
+
+            ImVec2 p1 = toMinimap((float)r.x, (float)r.y);
+            ImVec2 p2 = toMinimap((float)(r.x + r.width), (float)(r.y + r.height));
+            const ofColor& c = hint.fillColor;
+            draw_list->AddRectFilled(p1, p2, IM_COL32(c.r, c.g, c.b, c.a));
+            continue;
+        }
 
         ofColor col = node->getColor();
         ImVec2 p1 = toMinimap((float)r.x, (float)r.y);

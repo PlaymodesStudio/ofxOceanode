@@ -10,6 +10,7 @@
 #include "Nodes/ofxOceanodeNodeModel.h"
 #include "ofxOceanodeParameter.h"
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <cstdio>
 #include <utility>
@@ -83,7 +84,7 @@ void ofxOceanodeCustomGuiPanel::draw()
         widget.spanH = spanH;
         widget.config["showValue"] = true;
         if(type == CustomGuiWidgetType::Text){
-            widget.config["fontScale"] = 1.0f;
+            widget.config["valueFontScale"] = 1.0f;
         }else if(type == CustomGuiWidgetType::BackgroundPanel){
             widget.config["showLabel"] = true;
             widget.config["labelFontScale"] = 1.0f;
@@ -115,10 +116,6 @@ void ofxOceanodeCustomGuiPanel::draw()
         ImGui::SetNextWindowSize(ImVec2(panel->windowState.width, panel->windowState.height), ImGuiCond_FirstUseEver);
         appliedWindowState = true;
     }
-
-    const float panelWidth = panel->layout.columns * panel->layout.cellWidth * panel->layout.zoom;
-    const float panelHeight = panel->layout.rows * panel->layout.cellHeight * panel->layout.zoom;
-    ImGui::SetNextWindowContentSize(ImVec2(panelWidth, panelHeight));
 
     bool openState = panel->windowState.isOpen;
     const bool beginVisible = ImGui::Begin(title.c_str(), &openState, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_HorizontalScrollbar);
@@ -257,31 +254,15 @@ void ofxOceanodeCustomGuiPanel::draw()
 
             ImGui::SameLine(0, 18.0f);
             ImGui::SetNextItemWidth(70);
-            if(ImGui::InputInt("Cols", &panel->layout.columns)){
-                panel->layout.columns = std::max(1, panel->layout.columns);
-                ensureLayoutFitsWidgets(panel->layout);
-                container.markCustomGuisDirty();
-            }
-
-            ImGui::SameLine(0, 10.0f);
-            ImGui::SetNextItemWidth(70);
-            if(ImGui::InputInt("Rows", &panel->layout.rows)){
-                panel->layout.rows = std::max(1, panel->layout.rows);
-                ensureLayoutFitsWidgets(panel->layout);
-                container.markCustomGuisDirty();
-            }
-
-            ImGui::SameLine(0, 18.0f);
-            ImGui::SetNextItemWidth(70);
             if(ImGui::InputFloat("Cell W", &panel->layout.cellWidth, 1.0f, 10.0f, "%.0f")){
-                panel->layout.cellWidth = std::max(20.0f, panel->layout.cellWidth);
+                panel->layout.cellWidth = std::max(10.0f, panel->layout.cellWidth);
                 container.markCustomGuisDirty();
             }
 
             ImGui::SameLine(0, 10.0f);
             ImGui::SetNextItemWidth(70);
             if(ImGui::InputFloat("Cell H", &panel->layout.cellHeight, 1.0f, 10.0f, "%.0f")){
-                panel->layout.cellHeight = std::max(20.0f, panel->layout.cellHeight);
+                panel->layout.cellHeight = std::max(10.0f, panel->layout.cellHeight);
                 container.markCustomGuisDirty();
             }
 
@@ -292,7 +273,7 @@ void ofxOceanodeCustomGuiPanel::draw()
                 panel->layout.backgroundColor.b / 255.0f,
                 panel->layout.backgroundColor.a / 255.0f
             };
-            if(ImGui::ColorEdit4("BG", backgroundColor, ImGuiColorEditFlags_NoInputs)){
+            if(ImGui::ColorEdit4("BG", backgroundColor, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar)){
                 panel->layout.backgroundColor = ofColor(backgroundColor[0] * 255.0f,
                                                         backgroundColor[1] * 255.0f,
                                                         backgroundColor[2] * 255.0f,
@@ -371,6 +352,12 @@ void ofxOceanodeCustomGuiPanel::draw()
             }
         }
 
+        ensureLayoutFitsWidgets(panel->layout);
+        const ImVec2 canvasAvail = ImGui::GetContentRegionAvail();
+        const float widgetExtentWidth = panel->layout.columns * panel->layout.cellWidth * panel->layout.zoom;
+        const float widgetExtentHeight = panel->layout.rows * panel->layout.cellHeight * panel->layout.zoom;
+        const float panelWidth = std::max(widgetExtentWidth, std::max(1.0f, canvasAvail.x));
+        const float panelHeight = std::max(widgetExtentHeight, std::max(1.0f, canvasAvail.y));
         const ImVec2 origin = ImGui::GetCursorPos();
         const ImVec2 originScreen = ImGui::GetCursorScreenPos();
 
@@ -521,7 +508,14 @@ void ofxOceanodeCustomGuiPanel::draw()
                  ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
             selectedWidgetIndices.clear();
         }
-        if(panel->designMode) drawGridOverlay(panel->layout, origin);
+        if(panel->designMode){
+            CustomGuiLayout overlayLayout = panel->layout;
+            const float gridCellWidth = std::max(1.0f, panel->layout.cellWidth * panel->layout.zoom);
+            const float gridCellHeight = std::max(1.0f, panel->layout.cellHeight * panel->layout.zoom);
+            overlayLayout.columns = std::max(overlayLayout.columns, (int)std::ceil(panelWidth / gridCellWidth));
+            overlayLayout.rows = std::max(overlayLayout.rows, (int)std::ceil(panelHeight / gridCellHeight));
+            drawGridOverlay(overlayLayout, origin);
+        }
 
         int widgetToRemove = -1;
         auto drawWidgetAtIndex = [&](size_t i){
@@ -1274,6 +1268,20 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                 container.markCustomGuisDirty();
             }
         }
+        const ImGuiColorEditFlags colorEditFlags = ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_AlphaBar;
+        if(widget.type != CustomGuiWidgetType::Line && widget.type != CustomGuiWidgetType::Image){
+            float labelFontScale = std::max(0.2f, widget.config.value("labelFontScale", 1.0f));
+            if(ImGui::InputFloat("Label Font Size", &labelFontScale, 0.05f, 0.2f, "%.2f")){
+                widget.config["labelFontScale"] = std::max(0.2f, labelFontScale);
+                container.markCustomGuisDirty();
+            }
+
+            float valueFontScale = std::max(0.2f, widget.config.value("valueFontScale", widget.config.value("fontScale", 1.0f)));
+            if(ImGui::InputFloat("Value Font Size", &valueFontScale, 0.05f, 0.2f, "%.2f")){
+                widget.config["valueFontScale"] = std::max(0.2f, valueFontScale);
+                container.markCustomGuisDirty();
+            }
+        }
         if(widget.type != CustomGuiWidgetType::Label){
             if(widget.type == CustomGuiWidgetType::BackgroundPanel){
                 float panelColor[4] = {
@@ -1282,7 +1290,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                     widget.color.b / 255.0f,
                     widget.color.a / 255.0f
                 };
-                if(ImGui::ColorEdit4("Panel Color", panelColor)){
+                if(ImGui::ColorEdit4("Panel Color", panelColor, colorEditFlags)){
                     widget.color = ofColor(panelColor[0] * 255.0f,
                                            panelColor[1] * 255.0f,
                                            panelColor[2] * 255.0f,
@@ -1297,17 +1305,11 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                     labelColor.b / 255.0f,
                     labelColor.a / 255.0f
                 };
-                if(ImGui::ColorEdit4("Label Color", labelColorFloat)){
+                if(ImGui::ColorEdit4("Label Color", labelColorFloat, colorEditFlags)){
                     widget.config["labelColor"] = customGuiColorToJson(ofColor(labelColorFloat[0] * 255.0f,
                                                                                labelColorFloat[1] * 255.0f,
                                                                                labelColorFloat[2] * 255.0f,
                                                                                labelColorFloat[3] * 255.0f));
-                    container.markCustomGuisDirty();
-                }
-
-                float labelFontScale = std::max(0.2f, widget.config.value("labelFontScale", 1.0f));
-                if(ImGui::InputFloat("Label Font Scale", &labelFontScale, 0.05f, 0.2f, "%.2f")){
-                    widget.config["labelFontScale"] = std::max(0.2f, labelFontScale);
                     container.markCustomGuisDirty();
                 }
             }else if(widget.type == CustomGuiWidgetType::Text){
@@ -1317,13 +1319,77 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                     widget.color.b / 255.0f,
                     widget.color.a / 255.0f
                 };
-                if(ImGui::ColorEdit4("Text Color", textColor)){
+                if(ImGui::ColorEdit4("Text Color", textColor, colorEditFlags)){
                     widget.color = ofColor(textColor[0] * 255.0f,
                                            textColor[1] * 255.0f,
                                            textColor[2] * 255.0f,
                                            textColor[3] * 255.0f);
                     container.markCustomGuisDirty();
                 }
+            }else if(widget.type == CustomGuiWidgetType::Button){
+            ofColor textColor = ofxOceanodeCustomGuiWidgetHelpers::widgetLabelColor(widget, ofColor::white);
+            float textColorFloat[4] = {
+                textColor.r / 255.0f,
+                textColor.g / 255.0f,
+                textColor.b / 255.0f,
+                textColor.a / 255.0f
+            };
+            if(ImGui::ColorEdit4("Text Color", textColorFloat, colorEditFlags)){
+                widget.config["labelColor"] = customGuiColorToJson(ofColor(textColorFloat[0] * 255.0f,
+                                                                           textColorFloat[1] * 255.0f,
+                                                                           textColorFloat[2] * 255.0f,
+                                                                           textColorFloat[3] * 255.0f));
+                container.markCustomGuisDirty();
+            }
+
+            ofColor buttonColor = ofxOceanodeCustomGuiWidgetHelpers::widgetBodyColor(widget);
+            float buttonColorFloat[4] = {
+                buttonColor.r / 255.0f,
+                buttonColor.g / 255.0f,
+                buttonColor.b / 255.0f,
+                buttonColor.a / 255.0f
+            };
+            if(ImGui::ColorEdit4("Button Color", buttonColorFloat, colorEditFlags)){
+                widget.config["bodyColor"] = customGuiColorToJson(ofColor(buttonColorFloat[0] * 255.0f,
+                                                                          buttonColorFloat[1] * 255.0f,
+                                                                          buttonColorFloat[2] * 255.0f,
+                                                                          buttonColorFloat[3] * 255.0f));
+                container.markCustomGuisDirty();
+            }
+
+            ofColor hoverColor = widget.config.contains("buttonHoverColor")
+                ? customGuiColorFromJson(widget.config["buttonHoverColor"], widget.color)
+                : widget.color;
+            float hoverColorFloat[4] = {
+                hoverColor.r / 255.0f,
+                hoverColor.g / 255.0f,
+                hoverColor.b / 255.0f,
+                hoverColor.a / 255.0f
+            };
+            if(ImGui::ColorEdit4("Hover Color", hoverColorFloat, colorEditFlags)){
+                widget.config["buttonHoverColor"] = customGuiColorToJson(ofColor(hoverColorFloat[0] * 255.0f,
+                                                                                 hoverColorFloat[1] * 255.0f,
+                                                                                 hoverColorFloat[2] * 255.0f,
+                                                                                 hoverColorFloat[3] * 255.0f));
+                container.markCustomGuisDirty();
+            }
+
+            ofColor pressedColor = widget.config.contains("buttonPressedColor")
+                ? customGuiColorFromJson(widget.config["buttonPressedColor"], hoverColor)
+                : hoverColor;
+            float pressedColorFloat[4] = {
+                pressedColor.r / 255.0f,
+                pressedColor.g / 255.0f,
+                pressedColor.b / 255.0f,
+                pressedColor.a / 255.0f
+            };
+            if(ImGui::ColorEdit4("Pressed Color", pressedColorFloat, colorEditFlags)){
+                widget.config["buttonPressedColor"] = customGuiColorToJson(ofColor(pressedColorFloat[0] * 255.0f,
+                                                                                   pressedColorFloat[1] * 255.0f,
+                                                                                   pressedColorFloat[2] * 255.0f,
+                                                                                   pressedColorFloat[3] * 255.0f));
+                container.markCustomGuisDirty();
+            }
             }else if(widget.type == CustomGuiWidgetType::Line){
             }else{
             ofColor labelColor = ofxOceanodeCustomGuiWidgetHelpers::widgetLabelColor(widget, ofColor::black);
@@ -1333,7 +1399,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                 labelColor.b / 255.0f,
                 labelColor.a / 255.0f
             };
-            if(ImGui::ColorEdit4("Label Color", labelColorFloat)){
+            if(ImGui::ColorEdit4("Label Color", labelColorFloat, colorEditFlags)){
                 widget.config["labelColor"] = customGuiColorToJson(ofColor(labelColorFloat[0] * 255.0f,
                                                                            labelColorFloat[1] * 255.0f,
                                                                            labelColorFloat[2] * 255.0f,
@@ -1347,7 +1413,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                 bodyColor.b / 255.0f,
                 bodyColor.a / 255.0f
             };
-            if(ImGui::ColorEdit4("Body Color", bodyColorFloat)){
+            if(ImGui::ColorEdit4("Body Color", bodyColorFloat, colorEditFlags)){
                 widget.config["bodyColor"] = customGuiColorToJson(ofColor(bodyColorFloat[0] * 255.0f,
                                                                           bodyColorFloat[1] * 255.0f,
                                                                           bodyColorFloat[2] * 255.0f,
@@ -1361,7 +1427,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                 widget.color.b / 255.0f,
                 widget.color.a / 255.0f
             };
-            if(ImGui::ColorEdit4("Accent Color", accentColor)){
+            if(ImGui::ColorEdit4("Accent Color", accentColor, colorEditFlags)){
                 widget.color = ofColor(accentColor[0] * 255.0f,
                                        accentColor[1] * 255.0f,
                                        accentColor[2] * 255.0f,
@@ -1523,6 +1589,17 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
 	            }
 	        }
 
+        if(parameter != nullptr &&
+           widget.type == CustomGuiWidgetType::Slider &&
+           (parameter->valueType() == typeid(float).name() ||
+            parameter->valueType() == typeid(int).name())){
+            bool centeredBar = widget.config.value("centeredBar", true);
+            if(ImGui::Checkbox("Centered Bar", &centeredBar)){
+                widget.config["centeredBar"] = centeredBar;
+                container.markCustomGuisDirty();
+            }
+        }
+
         const CustomGuiWidgetDefinition* definition = ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(widget.type);
         if(definition != nullptr && definition->drawProperties){
             CustomGuiWidgetPropertiesContext context {
@@ -1551,23 +1628,78 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
 
     std::vector<float> mins;
     std::vector<float> maxs;
-    const bool integerVector = parameter->valueType() == typeid(std::vector<int>).name();
+    const std::string parameterType = parameter->valueType();
+    const bool integerScalar = parameterType == typeid(int).name();
+    const bool integerVector = parameterType == typeid(std::vector<int>).name();
+    const bool floatScalar = parameterType == typeid(float).name();
     if(integerVector){
         const auto& intParam = parameter->cast<std::vector<int>>().getParameter();
         const auto& intMins = intParam.getMin();
         const auto& intMaxs = intParam.getMax();
         mins.assign(intMins.begin(), intMins.end());
         maxs.assign(intMaxs.begin(), intMaxs.end());
-    }else{
+    }else if(parameterType == typeid(std::vector<float>).name()){
         const auto& floatParam = parameter->cast<std::vector<float>>().getParameter();
         mins = floatParam.getMin();
         maxs = floatParam.getMax();
+    }else if(integerScalar){
+        const auto& intParam = parameter->cast<int>().getParameter();
+        mins.push_back((float)intParam.getMin());
+        maxs.push_back((float)intParam.getMax());
+    }else if(floatScalar){
+        const auto& floatParam = parameter->cast<float>().getParameter();
+        mins.push_back(floatParam.getMin());
+        maxs.push_back(floatParam.getMax());
+    }else{
+        return false;
     }
-    const int visibleCount = ofClamp(widget.config.value("visibleCount", (int)value.size()), 1, (int)value.size());
+    const int visibleCount = std::max(1, (int)value.size());
     const bool vertical = widget.config.value("vertical", true);
     const bool showValue = shouldShowNumericValue(widget);
     const bool useCustomRange = widget.config.value("useCustomRange", false);
     const int quantization = std::max(0, widget.config.value("quantization", 0));
+    const float valueFontSize = std::max(1.0f, ImGui::GetFontSize() * ofxOceanodeCustomGuiWidgetHelpers::widgetValueFontScale(widget));
+    const float barSpacing = std::max(0.0f, widget.config.value("barSpacingPx", 1.0f));
+    const float edgePadding = std::max(1.0f, barSpacing * 0.5f + 0.5f);
+    float fallbackMinValue = 0.0f;
+    float fallbackMaxValue = 1.0f;
+    if(useCustomRange){
+        fallbackMinValue = widget.config.value("rangeMin", fallbackMinValue);
+        fallbackMaxValue = widget.config.value("rangeMax", fallbackMaxValue);
+    }else{
+        bool foundValidRange = false;
+        for(size_t rangeIndex = 0; rangeIndex < mins.size() && rangeIndex < maxs.size(); rangeIndex++){
+            if(maxs[rangeIndex] > mins[rangeIndex]){
+                if(!foundValidRange){
+                    fallbackMinValue = mins[rangeIndex];
+                    fallbackMaxValue = maxs[rangeIndex];
+                    foundValidRange = true;
+                }else{
+                    fallbackMinValue = std::min(fallbackMinValue, mins[rangeIndex]);
+                    fallbackMaxValue = std::max(fallbackMaxValue, maxs[rangeIndex]);
+                }
+            }
+        }
+    }
+    if(fallbackMaxValue <= fallbackMinValue){
+        fallbackMaxValue = fallbackMinValue + 1.0f;
+    }
+
+    auto resolvedRangeForIndex = [&](int index){
+        float minValue = index < mins.size() ? mins[index] : fallbackMinValue;
+        float maxValue = index < maxs.size() ? maxs[index] : fallbackMaxValue;
+        if(useCustomRange){
+            minValue = widget.config.value("rangeMin", minValue);
+            maxValue = widget.config.value("rangeMax", maxValue);
+        }else if(maxValue <= minValue){
+            minValue = fallbackMinValue;
+            maxValue = fallbackMaxValue;
+        }
+        if(maxValue <= minValue){
+            maxValue = minValue + 1.0f;
+        }
+        return std::pair<float, float>(minValue, maxValue);
+    };
 
     ImGui::InvisibleButton("##multislider", size);
     const bool isHovered = ImGui::IsItemHovered();
@@ -1575,35 +1707,33 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const ImVec2 min = ImGui::GetItemRectMin();
     const ImVec2 max = ImGui::GetItemRectMax();
+    const ImVec2 contentMin(min.x + edgePadding, min.y + edgePadding);
+    const ImVec2 contentMax(max.x - edgePadding, max.y - edgePadding);
+    const ImVec2 contentSize(std::max(1.0f, contentMax.x - contentMin.x),
+                             std::max(1.0f, contentMax.y - contentMin.y));
 
     const ofColor bodyColor = ofxOceanodeCustomGuiWidgetHelpers::widgetBodyColor(widget);
     drawList->AddRectFilled(min, max, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 2.0f);
-    drawList->AddRect(min, max, IM_COL32(100, 100, 100, 255), 2.0f);
 
-    const float majorSize = vertical ? size.x : size.y;
-    const float spacing = std::max(0.0f, std::min(1.0f, 1.8f - 0.12f * (float)visibleCount));
-    const float totalSpacing = spacing * std::max(0, visibleCount - 1);
+    const float majorSize = vertical ? contentSize.x : contentSize.y;
+    const float totalSpacing = barSpacing * std::max(0, visibleCount - 1);
     const float slotSize = std::max(1.0f, (majorSize - totalSpacing) / (float)visibleCount);
     bool changed = false;
 
     auto setValueFromMouse = [&](const ImVec2& mousePos){
-        const float majorPos = vertical ? (mousePos.x - min.x) : (mousePos.y - min.y);
-        int index = (int)std::floor(majorPos / std::max(1.0f, slotSize + spacing));
+        const float majorPos = vertical ? (mousePos.x - contentMin.x) : (mousePos.y - contentMin.y);
+        int index = (int)std::floor(majorPos / std::max(1.0f, slotSize + barSpacing));
         index = ofClamp(index, 0, visibleCount - 1);
 
-        float minValue = index < mins.size() ? mins[index] : 0.0f;
-        float maxValue = index < maxs.size() ? maxs[index] : 1.0f;
-	        if(useCustomRange){
-	            minValue = widget.config.value("rangeMin", minValue);
-	            maxValue = widget.config.value("rangeMax", maxValue);
-	        }
-	        if(minValue >= maxValue) maxValue = minValue + 1.0f;
+        const auto range = resolvedRangeForIndex(index);
+        const float minValue = range.first;
+        const float maxValue = range.second;
 
         float normalized = 0.0f;
         if(vertical){
-            normalized = 1.0f - ofClamp((mousePos.y - min.y) / std::max(1.0f, size.y), 0.0f, 1.0f);
+            normalized = 1.0f - ofClamp((mousePos.y - contentMin.y) / std::max(1.0f, contentSize.y), 0.0f, 1.0f);
         }else{
-            normalized = ofClamp((mousePos.x - min.x) / std::max(1.0f, size.x), 0.0f, 1.0f);
+            normalized = ofClamp((mousePos.x - contentMin.x) / std::max(1.0f, contentSize.x), 0.0f, 1.0f);
         }
 	        float newValue = minValue + normalized * (maxValue - minValue);
 	        if(quantization >= 2){
@@ -1624,43 +1754,65 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
     }
 
     for(int i = 0; i < visibleCount; i++){
-        float minValue = i < mins.size() ? mins[i] : 0.0f;
-        float maxValue = i < maxs.size() ? maxs[i] : 1.0f;
-        if(useCustomRange){
-            minValue = widget.config.value("rangeMin", minValue);
-            maxValue = widget.config.value("rangeMax", maxValue);
-        }
-        if(minValue >= maxValue) maxValue = minValue + 1.0f;
+        const auto range = resolvedRangeForIndex(i);
+        const float minValue = range.first;
+        const float maxValue = range.second;
         const float normalized = ofClamp((value[i] - minValue) / (maxValue - minValue), 0.0f, 1.0f);
 
         if(vertical){
-            const float x0 = min.x + i * (slotSize + spacing);
+            const float x0 = contentMin.x + i * (slotSize + barSpacing);
             const float x1 = x0 + slotSize;
-            if(i > 0 && spacing > 0.0f){
-                drawList->AddLine(ImVec2(x0 - spacing * 0.5f, min.y), ImVec2(x0 - spacing * 0.5f, max.y), IM_COL32(80, 80, 80, 255));
+            const float trackInset = std::min(1.0f, std::max(0.0f, slotSize * 0.08f));
+            const float trackLeft = x0 + trackInset;
+            const float trackRight = x1 - trackInset;
+            if(i > 0 && barSpacing > 0.0f){
+                drawList->AddLine(ImVec2(x0 - barSpacing * 0.5f, contentMin.y), ImVec2(x0 - barSpacing * 0.5f, contentMax.y), IM_COL32(80, 80, 80, 255));
             }
-            const float fillTop = max.y - size.y * normalized;
-            drawList->AddRectFilled(ImVec2(x0, fillTop), ImVec2(x1, max.y), IM_COL32(widget.color.r, widget.color.g, widget.color.b, 235));
+            drawList->AddRectFilled(ImVec2(trackLeft, contentMin.y),
+                                    ImVec2(trackRight, contentMax.y),
+                                    IM_COL32(50, 50, 50, 110));
+            float fillTop = contentMax.y - contentSize.y * normalized;
+            if(normalized > 0.0f){
+                fillTop = std::min(fillTop, contentMax.y - 1.0f);
+            }
+            drawList->AddRectFilled(ImVec2(trackLeft, fillTop), ImVec2(trackRight, contentMax.y), IM_COL32(widget.color.r, widget.color.g, widget.color.b, 235));
             if(showValue && slotSize > 16.0f){
-                std::string text = integerVector ? ofToString((int)std::round(value[i])) : ofToString(value[i], 2);
-                ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
+                std::string text = (integerVector || integerScalar) ? ofToString((int)std::round(value[i])) : ofToString(value[i], 2);
+                ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(valueFontSize, FLT_MAX, 0.0f, text.c_str());
                 if(textSize.x < slotSize - 2.0f){
-                    drawList->AddText(ImVec2(x0 + (slotSize - textSize.x) * 0.5f, min.y + 2.0f), IM_COL32(235, 235, 235, 220), text.c_str());
+                    drawList->AddText(ImGui::GetFont(),
+                                      valueFontSize,
+                                      ImVec2(x0 + (slotSize - textSize.x) * 0.5f, contentMin.y + 2.0f),
+                                      IM_COL32(235, 235, 235, 220),
+                                      text.c_str());
                 }
             }
         }else{
-            const float y0 = min.y + i * (slotSize + spacing);
+            const float y0 = contentMin.y + i * (slotSize + barSpacing);
             const float y1 = y0 + slotSize;
-            if(i > 0 && spacing > 0.0f){
-                drawList->AddLine(ImVec2(min.x, y0 - spacing * 0.5f), ImVec2(max.x, y0 - spacing * 0.5f), IM_COL32(80, 80, 80, 255));
+            const float trackInset = std::min(1.0f, std::max(0.0f, slotSize * 0.08f));
+            const float trackTop = y0 + trackInset;
+            const float trackBottom = y1 - trackInset;
+            if(i > 0 && barSpacing > 0.0f){
+                drawList->AddLine(ImVec2(contentMin.x, y0 - barSpacing * 0.5f), ImVec2(contentMax.x, y0 - barSpacing * 0.5f), IM_COL32(80, 80, 80, 255));
             }
-            const float fillRight = min.x + size.x * normalized;
-            drawList->AddRectFilled(ImVec2(min.x, y0), ImVec2(fillRight, y1), IM_COL32(widget.color.r, widget.color.g, widget.color.b, 235));
+            drawList->AddRectFilled(ImVec2(contentMin.x, trackTop),
+                                    ImVec2(contentMax.x, trackBottom),
+                                    IM_COL32(50, 50, 50, 110));
+            float fillRight = contentMin.x + contentSize.x * normalized;
+            if(normalized > 0.0f){
+                fillRight = std::max(fillRight, contentMin.x + 1.0f);
+            }
+            drawList->AddRectFilled(ImVec2(contentMin.x, trackTop), ImVec2(fillRight, trackBottom), IM_COL32(widget.color.r, widget.color.g, widget.color.b, 235));
             if(showValue && slotSize > 14.0f){
-                std::string text = integerVector ? ofToString((int)std::round(value[i])) : ofToString(value[i], 2);
-                ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
+                std::string text = (integerVector || integerScalar) ? ofToString((int)std::round(value[i])) : ofToString(value[i], 2);
+                ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(valueFontSize, FLT_MAX, 0.0f, text.c_str());
                 if(textSize.y < slotSize - 2.0f){
-                    drawList->AddText(ImVec2(min.x + 4.0f, y0 + (slotSize - textSize.y) * 0.5f), IM_COL32(235, 235, 235, 220), text.c_str());
+                    drawList->AddText(ImGui::GetFont(),
+                                      valueFontSize,
+                                      ImVec2(contentMin.x + 4.0f, y0 + (slotSize - textSize.y) * 0.5f),
+                                      IM_COL32(235, 235, 235, 220),
+                                      text.c_str());
                 }
             }
         }
@@ -1668,10 +1820,12 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
 
     if(isHovered){
         const ImVec2 mousePos = ImGui::GetIO().MousePos;
-        const float majorPos = vertical ? (mousePos.x - min.x) : (mousePos.y - min.y);
-        int hoveredIndex = (int)std::floor(majorPos / std::max(1.0f, slotSize + spacing));
+        const float majorPos = vertical ? (mousePos.x - contentMin.x) : (mousePos.y - contentMin.y);
+        int hoveredIndex = (int)std::floor(majorPos / std::max(1.0f, slotSize + barSpacing));
         hoveredIndex = ofClamp(hoveredIndex, 0, visibleCount - 1);
-        const std::string tooltipValue = integerVector ? ofToString((int)std::round(value[hoveredIndex])) : ofToString(value[hoveredIndex], 3);
+        const std::string tooltipValue = (integerVector || integerScalar)
+            ? ofToString((int)std::round(value[hoveredIndex]))
+            : ofToString(value[hoveredIndex], 3);
         ImGui::SetTooltip("Slider %d: %s", hoveredIndex, tooltipValue.c_str());
     }
 
@@ -1778,13 +1932,8 @@ CustomGuiWidgetType ofxOceanodeCustomGuiPanel::getDefaultWidgetType(ofxOceanodeA
 
 bool ofxOceanodeCustomGuiPanel::containsParameter(ofxOceanodeAbstractParameter& parameter) const
 {
-    const CustomGuiPanelData* panel = getPanelData();
-    if(panel == nullptr) return false;
-    const std::string parameterPath = container.getCustomGuiParameterPath(parameter);
-    for(const auto& widget : panel->layout.widgets){
-        if(widget.parameterRef.parameterPath == parameterPath) return true;
-    }
-    return false;
+    if(panelId.empty()) return false;
+    return container.customGuiContainsParameter(panelId, parameter);
 }
 
 bool ofxOceanodeCustomGuiPanel::removeParameter(const std::string& parameterPath)
@@ -1808,10 +1957,9 @@ bool ofxOceanodeCustomGuiPanel::addParameter(ofxOceanodeAbstractParameter& param
     CustomGuiPanelData* panel = getPanelData();
     if(panel == nullptr) return false;
 
+    if(containsParameter(parameter)) return false;
+
     const std::string parameterPath = container.getCustomGuiParameterPath(parameter);
-    for(const auto& widget : panel->layout.widgets){
-        if(widget.parameterRef.parameterPath == parameterPath) return false;
-    }
 
     CustomGuiWidget widget;
     widget.parameterRef.parameterPath = parameterPath;
