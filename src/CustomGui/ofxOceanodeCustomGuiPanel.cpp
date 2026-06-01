@@ -1593,9 +1593,31 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
            widget.type == CustomGuiWidgetType::Slider &&
            (parameter->valueType() == typeid(float).name() ||
             parameter->valueType() == typeid(int).name())){
-            bool centeredBar = widget.config.value("centeredBar", true);
-            if(ImGui::Checkbox("Centered Bar", &centeredBar)){
-                widget.config["centeredBar"] = centeredBar;
+            int sliderMode = 0;
+            if(widget.config.contains("sliderMode") && widget.config["sliderMode"].is_string()){
+                const std::string sliderModeValue = widget.config["sliderMode"].get<std::string>();
+                if(sliderModeValue == "centeredBar") sliderMode = 1;
+                else if(sliderModeValue == "bipolar") sliderMode = 2;
+            }else{
+                sliderMode = widget.config.value("centeredBar", true) ? 2 : 0;
+            }
+
+            const char* sliderModeOptions[] = {"Anchored", "Centered Bar", "Bipolar"};
+            if(ImGui::Combo("Slider Mode", &sliderMode, sliderModeOptions, IM_ARRAYSIZE(sliderModeOptions))){
+                switch(sliderMode){
+                    case 1:
+                        widget.config["sliderMode"] = "centeredBar";
+                        widget.config["centeredBar"] = false;
+                        break;
+                    case 2:
+                        widget.config["sliderMode"] = "bipolar";
+                        widget.config["centeredBar"] = true;
+                        break;
+                    default:
+                        widget.config["sliderMode"] = "anchored";
+                        widget.config["centeredBar"] = false;
+                        break;
+                }
                 container.markCustomGuisDirty();
             }
         }

@@ -78,6 +78,12 @@ bool supportsButtonMatrixWidget(ofxOceanodeAbstractParameter& parameter)
     return isIntParameter(parameter);
 }
 
+enum class SliderVisualMode {
+    Anchored,
+    CenteredBar,
+    Bipolar
+};
+
 std::vector<std::string> getCustomDropdownOptions(const CustomGuiWidget& widget)
 {
     std::vector<std::string> options;
@@ -209,6 +215,18 @@ bool sliderUsesCenteredBar(const CustomGuiWidget& widget)
     return widget.config.value("centeredBar", true);
 }
 
+SliderVisualMode sliderVisualMode(const CustomGuiWidget& widget)
+{
+    if(widget.config.contains("sliderMode") && widget.config["sliderMode"].is_string()){
+        const std::string sliderMode = widget.config["sliderMode"].get<std::string>();
+        if(sliderMode == "anchored") return SliderVisualMode::Anchored;
+        if(sliderMode == "centeredBar") return SliderVisualMode::CenteredBar;
+        if(sliderMode == "bipolar") return SliderVisualMode::Bipolar;
+    }
+
+    return sliderUsesCenteredBar(widget) ? SliderVisualMode::Bipolar : SliderVisualMode::Anchored;
+}
+
 ofColor buttonHoverColor(const CustomGuiWidget& widget, const ofColor& fallback)
 {
     if(widget.config.contains("buttonHoverColor") && widget.config["buttonHoverColor"].is_array()){
@@ -259,35 +277,59 @@ bool drawScalarSliderBar(const CustomGuiWidgetRenderContext& context,
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const ofColor bodyColor = widgetBodyColor(widget);
     const ofColor accentColor = widget.color;
-    const bool centeredBar = sliderUsesCenteredBar(widget);
+    const SliderVisualMode sliderMode = sliderVisualMode(widget);
     const float normalized = ofClamp((value - sliderMin) / (sliderMax - sliderMin), 0.0f, 1.0f);
-    const float centerNormalized = centeredBar ? 0.5f : 0.0f;
     const float fontSize = std::max(1.0f, ImGui::GetFontSize() * widgetValueFontScale(widget));
+    const float slimThickness = std::max(2.0f, std::round((verticalSlider ? itemSize.y : itemSize.x) * 0.04f));
 
     drawList->AddRectFilled(min, max, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 3.0f);
 
     if(verticalSlider){
-        const float centerY = max.y - itemSize.y * centerNormalized;
         const float valueY = max.y - itemSize.y * normalized;
-        const float fillTop = std::min(centerY, valueY);
-        const float fillBottom = std::max(centerY, valueY);
-        drawList->AddRectFilled(ImVec2(min.x, fillTop),
-                                ImVec2(max.x, fillBottom),
-                                IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a),
-                                3.0f);
-        if(centeredBar){
+        if(sliderMode == SliderVisualMode::Anchored){
+            drawList->AddRectFilled(ImVec2(min.x, valueY),
+                                    ImVec2(max.x, max.y),
+                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a),
+                                    3.0f);
+        }else if(sliderMode == SliderVisualMode::CenteredBar){
+            const float lineTop = ofClamp(valueY - slimThickness * 0.5f, min.y, max.y);
+            const float lineBottom = ofClamp(valueY + slimThickness * 0.5f, min.y, max.y);
+            drawList->AddRectFilled(ImVec2(min.x, lineTop),
+                                    ImVec2(max.x, lineBottom),
+                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a),
+                                    2.0f);
+        }else{
+            const float centerY = min.y + itemSize.y * 0.5f;
+            const float fillTop = std::min(centerY, valueY);
+            const float fillBottom = std::max(centerY, valueY);
+            drawList->AddRectFilled(ImVec2(min.x, fillTop),
+                                    ImVec2(max.x, fillBottom),
+                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a),
+                                    3.0f);
             drawList->AddLine(ImVec2(min.x, centerY), ImVec2(max.x, centerY), IM_COL32(255, 255, 255, 60), 1.0f);
         }
     }else{
-        const float centerX = min.x + itemSize.x * centerNormalized;
         const float valueX = min.x + itemSize.x * normalized;
-        const float fillLeft = std::min(centerX, valueX);
-        const float fillRight = std::max(centerX, valueX);
-        drawList->AddRectFilled(ImVec2(fillLeft, min.y),
-                                ImVec2(fillRight, max.y),
-                                IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a),
-                                3.0f);
-        if(centeredBar){
+        if(sliderMode == SliderVisualMode::Anchored){
+            drawList->AddRectFilled(ImVec2(min.x, min.y),
+                                    ImVec2(valueX, max.y),
+                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a),
+                                    3.0f);
+        }else if(sliderMode == SliderVisualMode::CenteredBar){
+            const float lineLeft = ofClamp(valueX - slimThickness * 0.5f, min.x, max.x);
+            const float lineRight = ofClamp(valueX + slimThickness * 0.5f, min.x, max.x);
+            drawList->AddRectFilled(ImVec2(lineLeft, min.y),
+                                    ImVec2(lineRight, max.y),
+                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a),
+                                    2.0f);
+        }else{
+            const float centerX = min.x + itemSize.x * 0.5f;
+            const float fillLeft = std::min(centerX, valueX);
+            const float fillRight = std::max(centerX, valueX);
+            drawList->AddRectFilled(ImVec2(fillLeft, min.y),
+                                    ImVec2(fillRight, max.y),
+                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a),
+                                    3.0f);
             drawList->AddLine(ImVec2(centerX, min.y), ImVec2(centerX, max.y), IM_COL32(255, 255, 255, 60), 1.0f);
         }
     }
