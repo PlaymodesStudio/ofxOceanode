@@ -95,6 +95,7 @@ public:
         addOutputParameter(output.set("Out", 0, 0, 1));
         addParameter(isRamping.set("IsRamping",false));
         addOutputParameter(isRampFinish.set("Finish",false));
+        addParameter(enable.set("Enable", true));
         rampStartTime = 0;
         isRamping = false;
         isRampFinish = false;
@@ -102,7 +103,7 @@ public:
         
         // Add listener for the trigger
         listeners.push(trigger.newListener([this]() {
-            startRamp();
+            if(enable) startRamp();
         }));
         // Add listener for the reset
         listeners.push(reset.newListener([this]() {
@@ -110,7 +111,7 @@ public:
         }));
         // Add listener for the trigger Float
         listeners.push(triggerFloat.newListener([this](float &f) {
-            if(triggerFloat==1.0)
+            if(enable && triggerFloat==1.0)
             {
                 startRamp();
             }
@@ -161,6 +162,7 @@ private:
     ofParameter<bool> isRamping;
     ofParameter<bool> isRampFinish;
     ofParameter<void> forceFinish;
+    ofParameter<bool> enable;
     
     float rampStartTime; // Time in seconds
     float lastTNum;
