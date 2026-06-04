@@ -54,6 +54,17 @@ void initializeMultiSliderWidget(CustomGuiWidget& widget, ofxOceanodeAbstractPar
     widget.spanW = std::max(widget.spanW, size);
     widget.config["vertical"] = true;
     widget.config["barSpacingPx"] = widget.config.value("barSpacingPx", 1.0f);
+    if(isIntParameter(parameter)){
+        const auto& param = parameter.cast<int>().getParameter();
+        widget.config["quantization"] = widget.config.value("quantization", std::max(2, param.getMax() - param.getMin() + 1));
+    }else if(isIntVectorParameter(parameter)){
+        const auto& param = parameter.cast<std::vector<int>>().getParameter();
+        int defaultSteps = 2;
+        if(!param.getMin().empty() && !param.getMax().empty()){
+            defaultSteps = std::max(2, param.getMax()[0] - param.getMin()[0] + 1);
+        }
+        widget.config["quantization"] = widget.config.value("quantization", defaultSteps);
+    }
 }
 
 void initializeMultiToggleWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
@@ -628,7 +639,10 @@ void drawMultiSliderProperties(CustomGuiWidgetPropertiesContext& context, Custom
         context.container.markCustomGuisDirty();
     }
 
-    if(isFloatParameter(*parameter) || isFloatVectorParameter(*parameter)){
+    if(isFloatParameter(*parameter) ||
+       isFloatVectorParameter(*parameter) ||
+       isIntParameter(*parameter) ||
+       isIntVectorParameter(*parameter)){
         int quantization = std::max(0, widget.config.value("quantization", 0));
         if(ImGui::InputInt("Quantization", &quantization)){
             widget.config["quantization"] = std::max(0, quantization);

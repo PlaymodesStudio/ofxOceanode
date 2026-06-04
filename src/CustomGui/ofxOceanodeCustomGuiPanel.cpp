@@ -1592,7 +1592,14 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
         if(parameter != nullptr &&
            widget.type == CustomGuiWidgetType::Slider &&
            (parameter->valueType() == typeid(float).name() ||
-            parameter->valueType() == typeid(int).name())){
+            parameter->valueType() == typeid(int).name() ||
+            parameter->valueType() == typeid(std::vector<float>).name())){
+            bool vertical = widget.config.value("vertical", widget.spanH > widget.spanW);
+            if(ImGui::Checkbox("Vertical", &vertical)){
+                widget.config["vertical"] = vertical;
+                container.markCustomGuisDirty();
+            }
+
             int sliderMode = 0;
             if(widget.config.contains("sliderMode") && widget.config["sliderMode"].is_string()){
                 const std::string sliderModeValue = widget.config["sliderMode"].get<std::string>();
@@ -1765,6 +1772,9 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
 	                newValue = ofClamp(newValue, minValue, maxValue);
 	            }
 	        }
+            if(integerScalar || integerVector){
+                newValue = std::round(ofClamp(newValue, minValue, maxValue));
+            }
 	        if(index < (int)value.size() && value[index] != newValue){
             value[index] = newValue;
             changed = true;
