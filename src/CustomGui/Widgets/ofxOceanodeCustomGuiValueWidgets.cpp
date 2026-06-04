@@ -15,7 +15,9 @@ using namespace ofxOceanodeCustomGuiWidgetHelpers;
 
 bool supportsSliderWidget(ofxOceanodeAbstractParameter& parameter)
 {
-    return isFloatParameter(parameter) || isIntParameter(parameter);
+    return isFloatParameter(parameter) ||
+           isIntParameter(parameter) ||
+           isFloatVectorParameter(parameter);
 }
 
 bool supportsKnobWidget(ofxOceanodeAbstractParameter& parameter)
@@ -225,6 +227,14 @@ SliderVisualMode sliderVisualMode(const CustomGuiWidget& widget)
     }
 
     return sliderUsesCenteredBar(widget) ? SliderVisualMode::Bipolar : SliderVisualMode::Anchored;
+}
+
+bool sliderIsVertical(const CustomGuiWidget& widget, const ImVec2& itemSize)
+{
+    if(widget.config.contains("vertical")){
+        return widget.config.value("vertical", true);
+    }
+    return itemSize.y > itemSize.x;
 }
 
 ofColor buttonHoverColor(const CustomGuiWidget& widget, const ofColor& fallback)
@@ -460,15 +470,35 @@ bool renderKnobWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wi
 bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
 {
     if(parameter == nullptr) return false;
-
-    auto& param = parameter->cast<float>().getParameter();
-    float value = param.get();
     const ImVec2 itemSize = widgetItemSize(context);
     const bool interactive = context.interactive;
     const bool showValue = context.showValue;
-    const bool verticalSlider = itemSize.y > itemSize.x;
-    const float sliderMin = floatRangeMin(widget, param.getMin());
-    const float sliderMax = floatRangeMax(widget, param.getMax());
+    const bool verticalSlider = sliderIsVertical(widget, itemSize);
+    float value = 0.0f;
+    float sliderMin = 0.0f;
+    float sliderMax = 1.0f;
+    bool floatVectorParameter = false;
+    std::vector<float> floatVectorValue;
+
+    if(isFloatParameter(*parameter)){
+        auto& param = parameter->cast<float>().getParameter();
+        value = param.get();
+        sliderMin = floatRangeMin(widget, param.getMin());
+        sliderMax = floatRangeMax(widget, param.getMax());
+    }else if(isFloatVectorParameter(*parameter)){
+        auto& param = parameter->cast<std::vector<float>>().getParameter();
+        floatVectorValue = param.get();
+        if(floatVectorValue.empty()) return false;
+        value = floatVectorValue[0];
+        const float minValue = !param.getMin().empty() ? param.getMin()[0] : 0.0f;
+        const float maxValue = !param.getMax().empty() ? param.getMax()[0] : 1.0f;
+        sliderMin = floatRangeMin(widget, minValue);
+        sliderMax = floatRangeMax(widget, maxValue);
+        floatVectorParameter = true;
+    }else{
+        return false;
+    }
+
     bool changed = false;
     const float valueScale = widgetValueFontScale(widget);
     const ofColor bodyColor = widgetBodyColor(widget);
@@ -515,7 +545,12 @@ bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& w
 
     if(changed){
         value = quantizeFloatValue(widget, value, sliderMin, sliderMax);
-        param.set(value);
+        if(floatVectorParameter){
+            floatVectorValue[0] = value;
+            parameter->cast<std::vector<float>>().getParameter().set(floatVectorValue);
+        }else{
+            parameter->cast<float>().getParameter().set(value);
+        }
     }
     ImGui::EndGroup();
     return true;
@@ -530,7 +565,7 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
     const ImVec2 itemSize = widgetItemSize(context);
     const bool interactive = context.interactive;
     const bool showValue = context.showValue;
-    const bool verticalSlider = itemSize.y > itemSize.x;
+    const bool verticalSlider = sliderIsVertical(widget, itemSize);
     const int sliderMin = intRangeMin(widget, param.getMin());
     const int sliderMax = intRangeMax(widget, param.getMax());
     const auto options = parameter->cast<int>().getDropdownOptions();
@@ -1021,7 +1056,9 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
                    initializeWideWidget,
                    [](CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter){
                        if(parameter == nullptr) return false;
-                       return isFloatParameter(*parameter) ? renderFloatWidget(context, widget, parameter) : renderIntWidget(context, widget, parameter);
+                       return (isFloatParameter(*parameter) || isFloatVectorParameter(*parameter))
+                           ? renderFloatWidget(context, widget, parameter)
+                           : renderIntWidget(context, widget, parameter);
                    });
 
     registerWidget(registry, CustomGuiWidgetType::Knob,
