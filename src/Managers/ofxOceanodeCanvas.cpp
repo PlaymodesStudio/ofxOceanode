@@ -1959,6 +1959,33 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 scrolling += (worldCenterAfter - worldCenterBefore);
             }
             
+            // Alt+C: recenter canvas scrolling (same as clicking the [C] button).
+            // With Shift held, center on the center of mass of all nodes.
+            if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && ImGui::GetIO().KeyAlt && ImGui::IsKeyPressed(ImGuiKey_C)){
+                if(!ImGui::GetIO().KeyShift)
+                {
+                    scrolling.x = contentRegionSize.x / (2.0f * zoomLevel);
+                    scrolling.y = contentRegionSize.y / (2.0f * zoomLevel);
+                }
+                else
+                {
+                    vector<ofxOceanodeNode*> allNodes = container->getAllModules();
+                    if(!allNodes.empty()){
+                        glm::vec2 centerOfMass = glm::vec2(0.0f,0.0f);
+                        glm::vec2 currentNodeCenter;
+                        glm::vec2 currentNodeRectangle;
+                        for(int i=0;i<allNodes.size();i++)
+                        {
+                            currentNodeRectangle =  glm::vec2(allNodes[i]->getNodeGui().getRectangle().width,allNodes[i]->getNodeGui().getRectangle().height);
+                            currentNodeCenter = allNodes[i]->getNodeGui().getPosition() + currentNodeRectangle/2.0f  ;
+                            centerOfMass = centerOfMass + currentNodeCenter;
+                        }
+                        scrolling.x = (contentRegionSize.x / (2.0f * zoomLevel)) - (centerOfMass.x/allNodes.size());
+                        scrolling.y = (contentRegionSize.y / (2.0f * zoomLevel)) - (centerOfMass.y/allNodes.size());
+                    }
+                }
+            }
+            
             if (isCreatingConnection && !ImGui::IsMouseDown(0)){
                 //Destroy temporal connection
                 tempSourceParameter = nullptr;
