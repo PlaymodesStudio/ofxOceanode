@@ -514,7 +514,7 @@ void ofxOceanodeCustomGuiPanel::draw()
             const float gridCellHeight = std::max(1.0f, panel->layout.cellHeight * panel->layout.zoom);
             overlayLayout.columns = std::max(overlayLayout.columns, (int)std::ceil(panelWidth / gridCellWidth));
             overlayLayout.rows = std::max(overlayLayout.rows, (int)std::ceil(panelHeight / gridCellHeight));
-            drawGridOverlay(overlayLayout, origin);
+            drawGridOverlay(overlayLayout, originScreen);
         }
 
         int widgetToRemove = -1;
@@ -1875,19 +1875,18 @@ void ofxOceanodeCustomGuiPanel::drawVerticalMeter(const ImVec2& size, float norm
     drawList->AddRectFilled(ImVec2(min.x + 1.0f, fillTop), ImVec2(max.x - 1.0f, max.y - 1.0f), color);
 }
 
-void ofxOceanodeCustomGuiPanel::drawGridOverlay(const CustomGuiLayout& layout, const ImVec2& origin) const
+void ofxOceanodeCustomGuiPanel::drawGridOverlay(const CustomGuiLayout& layout, const ImVec2& originScreen) const
 {
     ImDrawList* drawList = ImGui::GetWindowDrawList();
-    ImVec2 screenOrigin = ImGui::GetWindowPos() + origin;
     const float cellW = layout.cellWidth * layout.zoom;
     const float cellH = layout.cellHeight * layout.zoom;
     for(int x = 0; x <= layout.columns; x++){
-        float px = screenOrigin.x + x * cellW;
-        drawList->AddLine(ImVec2(px, screenOrigin.y), ImVec2(px, screenOrigin.y + layout.rows * cellH), IM_COL32(255, 255, 255, 55));
+        float px = originScreen.x + x * cellW;
+        drawList->AddLine(ImVec2(px, originScreen.y), ImVec2(px, originScreen.y + layout.rows * cellH), IM_COL32(255, 255, 255, 55));
     }
     for(int y = 0; y <= layout.rows; y++){
-        float py = screenOrigin.y + y * cellH;
-        drawList->AddLine(ImVec2(screenOrigin.x, py), ImVec2(screenOrigin.x + layout.columns * cellW, py), IM_COL32(255, 255, 255, 55));
+        float py = originScreen.y + y * cellH;
+        drawList->AddLine(ImVec2(originScreen.x, py), ImVec2(originScreen.x + layout.columns * cellW, py), IM_COL32(255, 255, 255, 55));
     }
 }
 
