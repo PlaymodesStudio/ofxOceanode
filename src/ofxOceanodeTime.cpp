@@ -83,7 +83,12 @@ void ofxOceanodeTime::setup(std::shared_ptr<ofxOceanodeContainer> c, std::shared
     {
         ofxOceanodeNodeModel *nodeModel = &node->getNodeModel();
         if(dynamic_cast<timeGenerator*>(nodeModel) != nullptr){
-            dynamic_cast<timeGenerator*>(nodeModel)->setTime(time);
+            auto *timeNode = dynamic_cast<timeGenerator*>(nodeModel);
+            if(dynamic_cast<counter*>(nodeModel) != nullptr) {
+                timeNode->setTime(globalTime);
+            } else {
+                timeNode->setTime(time);
+            }
         }
         else if(dynamic_cast<ofxOceanodeNodeMacro*>(nodeModel) != nullptr){
             newNodeInMacroListener.push(dynamic_cast<ofxOceanodeNodeMacro*>(nodeModel)->getContainer()->newNodeCreated.newListener(checkNodeModel));
@@ -203,7 +208,11 @@ void ofxOceanodeTime::update(){
     globalTime = frameGlobalTimeState.current.time;
 
     for(auto c : timeGenerators){
-        c->setTime(time);
+        if(dynamic_cast<counter*>(c) != nullptr) {
+            c->setTime(globalTime);
+        } else {
+            c->setTime(time);
+        }
     }
 }
 
