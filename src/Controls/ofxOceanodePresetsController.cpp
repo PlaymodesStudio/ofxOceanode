@@ -13,6 +13,17 @@
 
 int mouseAction=0;
 
+namespace {
+string sanitizePresetName(string name){
+    ofStringReplace(name, " ", "_");
+    return name;
+}
+
+bool presetNameExists(const vector<string>& existingPresets, const string& requestedName){
+    return find(existingPresets.begin(), existingPresets.end(), sanitizePresetName(requestedName)) != existingPresets.end();
+}
+}
+
 ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("Presets"){
     //Preset Control
     ofDirectory dir;
@@ -188,46 +199,20 @@ void ofxOceanodePresetsController::draw(){
     
     if(ImGui::BeginPopupModal("Save preset as :", NULL)){
         static char cString[256];
-        
+
 		if(firstSaveAsOpen){
 			ImGui::SetKeyboardFocusHere(0);
 		}
         
         if (ImGui::InputText("##Preset Name : ", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
         {
-            string proposedNewName(cString);
-            ofStringReplace(proposedNewName, " ", "_");
-
-            bool nameExists=false;
-            for(int i=0;i<bankPresets[banks[currentBank]].size();i++)
-            {
-                if(proposedNewName==bankPresets[banks[currentBank]][i])
-                {
-                    nameExists = true;
-                }
-            }
-            
-            if(!nameExists)
-            {
-                if(strcmp(proposedNewName.c_str(), "") != 0){
-                    createPreset(string(proposedNewName));
-                    newPresetCreated=true;
-                }
-                strcpy(cString, "");
-                ImGui::CloseCurrentPopup();
-            }
-            else
-            {
-                cout << "Preset name already existing : " << proposedNewName << endl;
-                strcpy(cString, "");
-                //ImGui::CloseCurrentPopup();
-                // TODO : why this doens't show up ?
-                ImGui::OpenPopup("Preset name already exists.");
-                if(ImGui::BeginPopupModal("Preset name already exists.", NULL,ImGuiWindowFlags_AlwaysAutoResize))
-                {
-                    if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown((ImGuiKey_Enter))) {
-                        ImGui::CloseCurrentPopup();
-                    }
+            const string requestedName = sanitizePresetName(string(cString));
+            if(!requestedName.empty()){
+                if(!presetNameExists(bankPresets[banks[currentBank]], requestedName)){
+                    createPreset(requestedName);
+                    newPresetCreated = true;
+                    strcpy(cString, "");
+                    ImGui::CloseCurrentPopup();
                 }
             }
         }
@@ -357,12 +342,13 @@ void ofxOceanodePresetsController::draw(){
 }
 
 void ofxOceanodePresetsController::createPreset(string name){
-    int newPresetNum = 1;
-    if(bankPresets[banks[currentBank]].size() != 0){
-        int lastPreset = bankPresets[banks[currentBank]].size();
-        newPresetNum = lastPreset + 1;
+    name = sanitizePresetName(name);
+    if(name.empty()) return;
+    if(presetNameExists(bankPresets[banks[currentBank]], name)){
+        ofLogWarning("ofxOceanodePresetsController")
+            << "Refusing to create duplicate preset '" << name << "' in bank '" << banks[currentBank] << "'";
+        return;
     }
-    ofStringReplace(name, " ", "_");
     bankPresets[banks[currentBank]].push_back(name);
     currentPreset[banks[currentBank]] = bankPresets[banks[currentBank]].back();
     savePreset(name, banks[currentBank]);
