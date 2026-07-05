@@ -155,10 +155,23 @@ void initializeWideWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&
     widget.config["valueFontScale"] = widget.config.value("valueFontScale", 1.0f);
 }
 
+void initializeSliderWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
+{
+    initializeWideWidget(widget, parameter);
+    widget.config["sliderMode"] = widget.config.value("sliderMode", "anchored");
+    widget.config["centeredBar"] = widget.config.value("centeredBar", false);
+}
+
 void initializeFontScaledWideWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
 {
     initializeWideWidget(widget, parameter);
     widget.config["valueFontScale"] = widget.config.value("valueFontScale", 1.0f);
+}
+
+void initializeDragNumberWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
+{
+    initializeFontScaledWideWidget(widget, parameter);
+    widget.config["integerDisplay"] = widget.config.value("integerDisplay", false);
 }
 
 void initializeCustomDropdownWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
@@ -214,7 +227,12 @@ void initializeColorSwatchWidget(CustomGuiWidget& widget, ofxOceanodeAbstractPar
 
 bool sliderUsesCenteredBar(const CustomGuiWidget& widget)
 {
-    return widget.config.value("centeredBar", true);
+    return widget.config.value("centeredBar", false);
+}
+
+bool dragNumberUsesIntegerDisplay(const CustomGuiWidget& widget)
+{
+    return widget.config.value("integerDisplay", false);
 }
 
 SliderVisualMode sliderVisualMode(const CustomGuiWidget& widget)
@@ -519,7 +537,13 @@ bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& w
         ImGui::SetNextItemWidth(widgetItemWidth(itemSize));
         pushWidgetFrameColors(bodyColor, accentColor);
 
-        if(!interactive){
+        if(!interactive && widget.type == CustomGuiWidgetType::DragNumber){
+            const bool integerDisplay = dragNumberUsesIntegerDisplay(widget);
+            ImGui::TextWrapped("%s",
+                               integerDisplay
+                                   ? ofToString((int)std::round(value)).c_str()
+                                   : ofToString(value, 3).c_str());
+        }else if(!interactive){
             const float fraction = sliderMax != sliderMin ? (value - sliderMin) / (sliderMax - sliderMin) : 0.0f;
             ImGui::ProgressBar(ofClamp(fraction, 0.0f, 1.0f), itemSize, showValue ? ofToString(value, 3).c_str() : "");
         }else if(widget.type == CustomGuiWidgetType::MultiToggle){
@@ -531,7 +555,13 @@ bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& w
             }
             if(active) ImGui::PopStyleColor(3);
         }else if(widget.type == CustomGuiWidgetType::DragNumber){
-            changed = ImGui::DragFloat("##value", &value, 0.01f, sliderMin, sliderMax);
+            const bool integerDisplay = dragNumberUsesIntegerDisplay(widget);
+            changed = ImGui::DragFloat("##value",
+                                       &value,
+                                       integerDisplay ? 1.0f : 0.01f,
+                                       sliderMin,
+                                       sliderMax,
+                                       integerDisplay ? "%.0f" : "%.3f");
         }else if(verticalSlider){
             changed = ImGui::VSliderFloat("##value", itemSize, &value, sliderMin, sliderMax, showValue ? "%.3f" : "");
         }else{
@@ -736,10 +766,17 @@ bool renderVectorDragNumberWidget(CustomGuiWidgetRenderContext& context, CustomG
 
         float scalarValue = value[0];
         bool changed = false;
+        const bool integerDisplay = dragNumberUsesIntegerDisplay(widget);
         if(!interactive){
-            ImGui::TextWrapped("%.3f", scalarValue);
+            if(integerDisplay) ImGui::TextWrapped("%d", (int)std::round(scalarValue));
+            else ImGui::TextWrapped("%.3f", scalarValue);
         }else{
-            changed = ImGui::DragFloat("##value", &scalarValue, 0.01f, sliderMin, sliderMax);
+            changed = ImGui::DragFloat("##value",
+                                       &scalarValue,
+                                       integerDisplay ? 1.0f : 0.01f,
+                                       sliderMin,
+                                       sliderMax,
+                                       integerDisplay ? "%.0f" : "%.3f");
         }
 
         if(changed){
@@ -782,10 +819,17 @@ bool renderVectorDragNumberWidget(CustomGuiWidgetRenderContext& context, CustomG
     return true;
 }
 
-void drawFontScaleProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter*)
+void drawFontScaleProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
 {
-    (void)context;
-    (void)widget;
+    if(parameter != nullptr &&
+       widget.type == CustomGuiWidgetType::DragNumber &&
+       (isFloatParameter(*parameter) || isFloatVectorParameter(*parameter))){
+        bool integerDisplay = dragNumberUsesIntegerDisplay(widget);
+        if(ImGui::Checkbox("Display as Int", &integerDisplay)){
+            widget.config["integerDisplay"] = integerDisplay;
+            context.container.markCustomGuisDirty();
+        }
+    }
 }
 
 bool renderToggleWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter)
@@ -829,7 +873,8 @@ bool renderButtonWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& 
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, colorToImVec4(pressedColor));
     ImGui::PushStyleColor(ImGuiCol_Text, colorToImVec4(labelColor));
     if(ImGui::Button(context.label.c_str(), widgetItemSize(context)) && context.interactive){
-        parameter->cast<void>().getParameter().trigger();
+        auto triggerParameter = parameter->cast<void>().getParameter();
+        triggerParameter.trigger();
     }
     ImGui::PopStyleColor(4);
     ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
@@ -1053,7 +1098,7 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 {
     registerWidget(registry, CustomGuiWidgetType::Slider,
                    supportsSliderWidget,
-                   initializeWideWidget,
+                   initializeSliderWidget,
                    [](CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter){
                        if(parameter == nullptr) return false;
                        return (isFloatParameter(*parameter) || isFloatVectorParameter(*parameter))
@@ -1068,7 +1113,7 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 
     registerWidget(registry, CustomGuiWidgetType::DragNumber,
                    supportsDragNumberWidget,
-                   initializeFontScaledWideWidget,
+                   initializeDragNumberWidget,
                    [](CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter){
                        if(parameter == nullptr) return false;
                        if(isFloatParameter(*parameter)) return renderFloatWidget(context, widget, parameter);

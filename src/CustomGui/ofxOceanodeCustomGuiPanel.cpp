@@ -686,13 +686,14 @@ void ofxOceanodeCustomGuiPanel::draw()
                 }
             }else if(parameter != nullptr){
                 if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)){
-                    resetParameterToDefaultValue(*parameter);
+                    resetParameterToDefaultValue(widget, *parameter);
                 }
                 if(ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)){
                     ImGui::OpenPopup("Widget Context");
                 }
                 if(ImGui::BeginPopup("Widget Context")){
                     const std::string parameterType = parameter->valueType();
+                    const bool canResetToDefault = widgetSupportsDefaultValue(*parameter);
                     const bool canSetValue =
                         parameterType == typeid(float).name() ||
                         parameterType == typeid(int).name() ||
@@ -708,6 +709,11 @@ void ofxOceanodeCustomGuiPanel::draw()
                         ImGui::CloseCurrentPopup();
                     }
                     ImGui::Separator();
+                    if(canResetToDefault && ImGui::Selectable("Default")){
+                        resetParameterToDefaultValue(widget, *parameter);
+                        ImGui::CloseCurrentPopup();
+                    }
+                    bool hasRunAction = canResetToDefault;
 #ifdef OFXOCEANODE_USE_MIDI
                     if(canSetValue){
                         if(ImGui::Selectable("Set Value")){
@@ -719,6 +725,7 @@ void ofxOceanodeCustomGuiPanel::draw()
                             ImGui::CloseCurrentPopup();
                         }
                         ImGui::Separator();
+                        hasRunAction = true;
                     }
 #else
                     if(canSetValue){
@@ -730,6 +737,7 @@ void ofxOceanodeCustomGuiPanel::draw()
                             openSetVectorSizePopup(*parameter, getFallbackLabel(widget));
                             ImGui::CloseCurrentPopup();
                         }
+                        hasRunAction = true;
                     }
 #endif
 #ifdef OFXOCEANODE_USE_MIDI
@@ -740,7 +748,7 @@ void ofxOceanodeCustomGuiPanel::draw()
                         container.removeLastMidiBinding(*parameter);
                     }
 #else
-                    ImGui::TextDisabled("No actions");
+                    if(!hasRunAction) ImGui::TextDisabled("No actions");
 #endif
                     ImGui::EndPopup();
                 }
@@ -1154,8 +1162,93 @@ void ofxOceanodeCustomGuiPanel::drawSetVectorSizePopup()
     ImGui::EndPopup();
 }
 
-bool ofxOceanodeCustomGuiPanel::resetParameterToDefaultValue(ofxOceanodeAbstractParameter& parameter) const
+bool ofxOceanodeCustomGuiPanel::widgetSupportsDefaultValue(ofxOceanodeAbstractParameter& parameter) const
 {
+    const std::string type = parameter.valueType();
+    return type == typeid(float).name() ||
+           type == typeid(int).name() ||
+           type == typeid(bool).name() ||
+           type == typeid(std::string).name() ||
+           type == typeid(std::vector<float>).name() ||
+           type == typeid(std::vector<int>).name();
+}
+
+ofJson ofxOceanodeCustomGuiPanel::makeParameterDefaultValueJson(ofxOceanodeAbstractParameter& parameter) const
+{
+    const std::string type = parameter.valueType();
+    if(type == typeid(float).name()){
+        return parameter.cast<float>().getDefaultValue();
+    }else if(type == typeid(int).name()){
+        return parameter.cast<int>().getDefaultValue();
+    }else if(type == typeid(bool).name()){
+        return parameter.cast<bool>().getDefaultValue();
+    }else if(type == typeid(std::string).name()){
+        return parameter.cast<std::string>().getDefaultValue();
+    }else if(type == typeid(std::vector<float>).name()){
+        ofJson json = ofJson::array();
+        for(float value : parameter.cast<std::vector<float>>().getDefaultValue()) json.push_back(value);
+        return json;
+    }else if(type == typeid(std::vector<int>).name()){
+        ofJson json = ofJson::array();
+        for(int value : parameter.cast<std::vector<int>>().getDefaultValue()) json.push_back(value);
+        return json;
+    }
+    return ofJson();
+}
+
+bool ofxOceanodeCustomGuiPanel::applyWidgetConfiguredDefaultValue(const CustomGuiWidget& widget,
+                                                                  ofxOceanodeAbstractParameter& parameter) const
+{
+    if(!widget.config.value("useCustomDefault", false)) return false;
+    if(!widget.config.contains("defaultValue")) return false;
+
+    const ofJson& defaultValue = widget.config["defaultValue"];
+    const std::string type = parameter.valueType();
+
+    try{
+        if(type == typeid(float).name() && defaultValue.is_number()){
+            parameter.cast<float>().getParameter().set(defaultValue.get<float>());
+            return true;
+        }else if(type == typeid(int).name() && defaultValue.is_number()){
+            parameter.cast<int>().getParameter().set((int)std::round(defaultValue.get<double>()));
+            return true;
+        }else if(type == typeid(bool).name() && defaultValue.is_boolean()){
+            parameter.cast<bool>().getParameter().set(defaultValue.get<bool>());
+            return true;
+        }else if(type == typeid(std::string).name() && defaultValue.is_string()){
+            parameter.cast<std::string>().getParameter().set(defaultValue.get<std::string>());
+            return true;
+        }else if(type == typeid(std::vector<float>).name() && defaultValue.is_array()){
+            std::vector<float> values;
+            values.reserve(defaultValue.size());
+            for(const auto& item : defaultValue){
+                if(!item.is_number()) return false;
+                values.push_back(item.get<float>());
+            }
+            parameter.cast<std::vector<float>>().getParameter().set(values);
+            return true;
+        }else if(type == typeid(std::vector<int>).name() && defaultValue.is_array()){
+            std::vector<int> values;
+            values.reserve(defaultValue.size());
+            for(const auto& item : defaultValue){
+                if(!item.is_number()) return false;
+                values.push_back((int)std::round(item.get<double>()));
+            }
+            parameter.cast<std::vector<int>>().getParameter().set(values);
+            return true;
+        }
+    }catch(const std::exception&){
+        return false;
+    }
+
+    return false;
+}
+
+bool ofxOceanodeCustomGuiPanel::resetParameterToDefaultValue(const CustomGuiWidget& widget,
+                                                             ofxOceanodeAbstractParameter& parameter) const
+{
+    if(applyWidgetConfiguredDefaultValue(widget, parameter)) return true;
+
     const std::string type = parameter.valueType();
     if(type == typeid(float).name()){
         parameter.cast<float>().getParameter().set(parameter.cast<float>().getDefaultValue());
@@ -1177,6 +1270,104 @@ bool ofxOceanodeCustomGuiPanel::resetParameterToDefaultValue(ofxOceanodeAbstract
         return true;
     }
     return false;
+}
+
+void ofxOceanodeCustomGuiPanel::drawWidgetDefaultValueProperties(CustomGuiWidget& widget,
+                                                                 ofxOceanodeAbstractParameter& parameter)
+{
+    if(!widgetSupportsDefaultValue(parameter)) return;
+
+    bool useCustomDefault = widget.config.value("useCustomDefault", false);
+    if(ImGui::Checkbox("Override Default", &useCustomDefault)){
+        widget.config["useCustomDefault"] = useCustomDefault;
+        if(useCustomDefault && !widget.config.contains("defaultValue")){
+            widget.config["defaultValue"] = makeParameterDefaultValueJson(parameter);
+        }
+        container.markCustomGuisDirty();
+    }
+
+    if(!useCustomDefault) return;
+
+    if(!widget.config.contains("defaultValue")){
+        widget.config["defaultValue"] = makeParameterDefaultValueJson(parameter);
+        container.markCustomGuisDirty();
+    }
+
+    const std::string type = parameter.valueType();
+    ImGui::Separator();
+    ImGui::TextUnformatted("Default");
+
+    if(type == typeid(float).name()){
+        float value = widget.config["defaultValue"].is_number()
+            ? widget.config["defaultValue"].get<float>()
+            : parameter.cast<float>().getDefaultValue();
+        if(ImGui::InputFloat("Default Value", &value)){
+            widget.config["defaultValue"] = value;
+            container.markCustomGuisDirty();
+        }
+    }else if(type == typeid(int).name()){
+        int value = widget.config["defaultValue"].is_number()
+            ? (int)std::round(widget.config["defaultValue"].get<double>())
+            : parameter.cast<int>().getDefaultValue();
+        if(ImGui::InputInt("Default Value", &value)){
+            widget.config["defaultValue"] = value;
+            container.markCustomGuisDirty();
+        }
+    }else if(type == typeid(bool).name()){
+        bool value = widget.config["defaultValue"].is_boolean()
+            ? widget.config["defaultValue"].get<bool>()
+            : parameter.cast<bool>().getDefaultValue();
+        if(ImGui::Checkbox("Default Value", &value)){
+            widget.config["defaultValue"] = value;
+            container.markCustomGuisDirty();
+        }
+    }else if(type == typeid(std::string).name()){
+        std::string value = widget.config["defaultValue"].is_string()
+            ? widget.config["defaultValue"].get<std::string>()
+            : parameter.cast<std::string>().getDefaultValue();
+        char buffer[512];
+        std::snprintf(buffer, sizeof(buffer), "%s", value.c_str());
+        if(ImGui::InputText("Default Value", buffer, sizeof(buffer))){
+            widget.config["defaultValue"] = std::string(buffer);
+            container.markCustomGuisDirty();
+        }
+    }else if(type == typeid(std::vector<float>).name()){
+        ofJson& defaultValue = widget.config["defaultValue"];
+        if(!defaultValue.is_array()){
+            defaultValue = makeParameterDefaultValueJson(parameter);
+            container.markCustomGuisDirty();
+        }
+        for(size_t i = 0; i < defaultValue.size(); i++){
+            float value = defaultValue[i].is_number() ? defaultValue[i].get<float>() : 0.0f;
+            ImGui::PushID((int)i);
+            if(ImGui::InputFloat("##defaultValue", &value)){
+                defaultValue[i] = value;
+                container.markCustomGuisDirty();
+            }
+            ImGui::SameLine();
+            ImGui::Text("Default %zu", i + 1);
+            ImGui::PopID();
+        }
+        if(defaultValue.empty()) ImGui::TextDisabled("Empty default vector");
+    }else if(type == typeid(std::vector<int>).name()){
+        ofJson& defaultValue = widget.config["defaultValue"];
+        if(!defaultValue.is_array()){
+            defaultValue = makeParameterDefaultValueJson(parameter);
+            container.markCustomGuisDirty();
+        }
+        for(size_t i = 0; i < defaultValue.size(); i++){
+            int value = defaultValue[i].is_number() ? (int)std::round(defaultValue[i].get<double>()) : 0;
+            ImGui::PushID((int)i);
+            if(ImGui::InputInt("##defaultValue", &value)){
+                defaultValue[i] = value;
+                container.markCustomGuisDirty();
+            }
+            ImGui::SameLine();
+            ImGui::Text("Default %zu", i + 1);
+            ImGui::PopID();
+        }
+        if(defaultValue.empty()) ImGui::TextDisabled("Empty default vector");
+    }
 }
 
 bool ofxOceanodeCustomGuiPanel::renderWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter, const ImVec2& size)
@@ -1606,7 +1797,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                 if(sliderModeValue == "centeredBar") sliderMode = 1;
                 else if(sliderModeValue == "bipolar") sliderMode = 2;
             }else{
-                sliderMode = widget.config.value("centeredBar", true) ? 2 : 0;
+                sliderMode = widget.config.value("centeredBar", false) ? 2 : 0;
             }
 
             const char* sliderModeOptions[] = {"Anchored", "Centered Bar", "Bipolar"};
@@ -1627,6 +1818,10 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                 }
                 container.markCustomGuisDirty();
             }
+        }
+
+        if(parameter != nullptr){
+            drawWidgetDefaultValueProperties(widget, *parameter);
         }
 
         const CustomGuiWidgetDefinition* definition = ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(widget.type);

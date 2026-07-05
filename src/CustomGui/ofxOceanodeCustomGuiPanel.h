@@ -41,7 +41,11 @@ private:
     void drawSetValuePopup();
     void openSetVectorSizePopup(ofxOceanodeAbstractParameter& parameter, const std::string& label);
     void drawSetVectorSizePopup();
-    bool resetParameterToDefaultValue(ofxOceanodeAbstractParameter& parameter) const;
+    bool resetParameterToDefaultValue(const CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter) const;
+    bool widgetSupportsDefaultValue(ofxOceanodeAbstractParameter& parameter) const;
+    bool applyWidgetConfiguredDefaultValue(const CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter) const;
+    ofJson makeParameterDefaultValueJson(ofxOceanodeAbstractParameter& parameter) const;
+    void drawWidgetDefaultValueProperties(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter);
     void drawVerticalMeter(const ImVec2& size, float normalized, const ImU32& color) const;
     void drawGridOverlay(const CustomGuiLayout& layout, const ImVec2& origin) const;
     void ensureLayoutFitsWidgets(CustomGuiLayout& layout) const;

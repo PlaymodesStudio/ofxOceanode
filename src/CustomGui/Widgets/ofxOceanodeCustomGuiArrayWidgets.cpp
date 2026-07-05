@@ -34,7 +34,10 @@ bool supportsXYPadWidget(ofxOceanodeAbstractParameter& parameter)
 
 bool supportsPianoKeyboardWidget(ofxOceanodeAbstractParameter& parameter)
 {
-    return isIntVectorParameter(parameter) || isFloatVectorParameter(parameter);
+    return isIntParameter(parameter) ||
+           isFloatParameter(parameter) ||
+           isIntVectorParameter(parameter) ||
+           isFloatVectorParameter(parameter);
 }
 
 void initializeMultiSliderWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
@@ -195,6 +198,13 @@ bool renderPianoKeyboardWidget(CustomGuiWidgetRenderContext& context, CustomGuiW
         applySelection = [&](const std::set<int>& notes){
             param.set(std::vector<int>(notes.begin(), notes.end()));
         };
+    }else if(isIntParameter(*parameter)){
+        auto& param = parameter->cast<int>().getParameter();
+        selectedNotes.insert(param.get());
+        applySelection = [&](const std::set<int>& notes){
+            if(notes.empty()) return;
+            param.set(*notes.rbegin());
+        };
     }else if(isFloatVectorParameter(*parameter)){
         auto& param = parameter->cast<std::vector<float>>().getParameter();
         auto value = param.get();
@@ -206,6 +216,13 @@ bool renderPianoKeyboardWidget(CustomGuiWidgetRenderContext& context, CustomGuiW
             floatNotes.reserve(notes.size());
             for(int note : notes) floatNotes.push_back((float)note);
             param.set(floatNotes);
+        };
+    }else if(isFloatParameter(*parameter)){
+        auto& param = parameter->cast<float>().getParameter();
+        selectedNotes.insert((int)std::round(param.get()));
+        applySelection = [&](const std::set<int>& notes){
+            if(notes.empty()) return;
+            param.set((float)*notes.rbegin());
         };
     }else{
         return false;

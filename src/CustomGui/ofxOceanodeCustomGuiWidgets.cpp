@@ -7,6 +7,7 @@ namespace ofxOceanodeCustomGuiWidgets {
 bool defaultInteractiveState(ofxOceanodeAbstractParameter& parameter)
 {
     if(parameter.getFlags() & ofxOceanodeParameterFlags_ReadOnly) return false;
+    if(parameter.valueType() == typeid(void).name()) return true;
     if(parameter.hasInConnection()) return false;
     return true;
 }
@@ -19,4 +20,3 @@ bool isInteractive(const CustomGuiWidget& widget, ofxOceanodeAbstractParameter* 
 }
 
 }
-
