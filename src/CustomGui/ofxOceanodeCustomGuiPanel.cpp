@@ -1517,6 +1517,23 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                                            textColor[3] * 255.0f);
                     container.markCustomGuisDirty();
                 }
+            }else if(widget.type == CustomGuiWidgetType::TextDisplay){
+                ofColor textColor = widget.config.contains("textColor")
+                    ? customGuiColorFromJson(widget.config["textColor"], ofColor::white)
+                    : ofColor::white;
+                float textColorFloat[4] = {
+                    textColor.r / 255.0f,
+                    textColor.g / 255.0f,
+                    textColor.b / 255.0f,
+                    textColor.a / 255.0f
+                };
+                if(ImGui::ColorEdit4("Text Color", textColorFloat, colorEditFlags)){
+                    widget.config["textColor"] = customGuiColorToJson(ofColor(textColorFloat[0] * 255.0f,
+                                                                              textColorFloat[1] * 255.0f,
+                                                                              textColorFloat[2] * 255.0f,
+                                                                              textColorFloat[3] * 255.0f));
+                    container.markCustomGuisDirty();
+                }
             }else if(widget.type == CustomGuiWidgetType::Button){
             ofColor textColor = ofxOceanodeCustomGuiWidgetHelpers::widgetLabelColor(widget, ofColor::white);
             float textColorFloat[4] = {

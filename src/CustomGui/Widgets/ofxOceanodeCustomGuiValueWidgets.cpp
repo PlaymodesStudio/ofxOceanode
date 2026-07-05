@@ -168,6 +168,12 @@ void initializeFontScaledWideWidget(CustomGuiWidget& widget, ofxOceanodeAbstract
     widget.config["valueFontScale"] = widget.config.value("valueFontScale", 1.0f);
 }
 
+void initializeTextDisplayWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
+{
+    initializeFontScaledWideWidget(widget, parameter);
+    widget.config["textColor"] = widget.config.value("textColor", customGuiColorToJson(ofColor::white));
+}
+
 void initializeDragNumberWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
 {
     initializeFontScaledWideWidget(widget, parameter);
@@ -267,6 +273,14 @@ ofColor buttonPressedColor(const CustomGuiWidget& widget, const ofColor& fallbac
 {
     if(widget.config.contains("buttonPressedColor") && widget.config["buttonPressedColor"].is_array()){
         return customGuiColorFromJson(widget.config["buttonPressedColor"], fallback);
+    }
+    return fallback;
+}
+
+ofColor textDisplayColor(const CustomGuiWidget& widget, const ofColor& fallback = ofColor::white)
+{
+    if(widget.config.contains("textColor") && widget.config["textColor"].is_array()){
+        return customGuiColorFromJson(widget.config["textColor"], fallback);
     }
     return fallback;
 }
@@ -972,8 +986,11 @@ bool renderTextDisplayWidget(CustomGuiWidgetRenderContext& context, CustomGuiWid
     ImGui::BeginGroup();
     drawWidgetLabel(context, widget, context.label);
     const float fontScale = widgetValueFontScale(widget);
+    const ofColor valueColor = textDisplayColor(widget);
     ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * fontScale));
+    ImGui::PushStyleColor(ImGuiCol_Text, colorToImVec4(valueColor));
     ImGui::TextWrapped("%s", parameter->cast<std::string>().getParameter().get().c_str());
+    ImGui::PopStyleColor();
     ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
     ImGui::EndGroup();
     return true;
@@ -1139,7 +1156,7 @@ void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 
     registerWidget(registry, CustomGuiWidgetType::TextDisplay,
                    supportsTextDisplayWidget,
-                   initializeFontScaledWideWidget,
+                   initializeTextDisplayWidget,
                    renderTextDisplayWidget,
                    drawFontScaleProperties);
 
