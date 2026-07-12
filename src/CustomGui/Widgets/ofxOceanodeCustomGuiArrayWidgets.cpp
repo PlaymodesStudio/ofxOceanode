@@ -301,14 +301,29 @@ template <typename T, typename IsActiveFn, typename SetStateFn>
 bool drawMultiToggleGrid(const CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget, std::vector<T>& values, IsActiveFn isActiveValue, SetStateFn setValueFromState)
 {
     const ImVec2 itemSize = widgetItemSize(context);
-    const int rows = std::max(1, widget.config.value("rows", 1));
-    const int cols = std::max(1, widget.config.value("cols", (int)values.size()));
-    const float cellSpacing = 1.0f;
-    const float totalWidthSpacing = cellSpacing * std::max(0, cols - 1);
-    const float totalHeightSpacing = cellSpacing * std::max(0, rows - 1);
-    const float cellWidth = std::max(12.0f, (itemSize.x - totalWidthSpacing) / cols);
-    const float cellHeight = std::max(12.0f, (itemSize.y - totalHeightSpacing) / rows);
-    const ImVec2 gridSize(cellWidth * cols + totalWidthSpacing, cellHeight * rows + totalHeightSpacing);
+    const int valueCount = std::max(1, (int)values.size());
+    int rows = std::max(1, widget.config.value("rows", 1));
+    int cols = std::max(1, widget.config.value("cols", valueCount));
+    if(rows <= 1){
+        cols = valueCount;
+    }else if(rows * cols < valueCount){
+        cols = std::max(cols, (int)std::ceil((float)valueCount / (float)rows));
+    }
+    const float minCellExtent = 1.0f;
+    const float maxCellSpacing = 1.0f;
+    const float cellSpacingX =
+        (cols > 1)
+            ? std::max(0.0f, std::min(maxCellSpacing, (itemSize.x - minCellExtent * cols) / (float)(cols - 1)))
+            : 0.0f;
+    const float cellSpacingY =
+        (rows > 1)
+            ? std::max(0.0f, std::min(maxCellSpacing, (itemSize.y - minCellExtent * rows) / (float)(rows - 1)))
+            : 0.0f;
+    const float totalWidthSpacing = cellSpacingX * std::max(0, cols - 1);
+    const float totalHeightSpacing = cellSpacingY * std::max(0, rows - 1);
+    const float cellWidth = std::max(minCellExtent, (itemSize.x - totalWidthSpacing) / cols);
+    const float cellHeight = std::max(minCellExtent, (itemSize.y - totalHeightSpacing) / rows);
+    const ImVec2 gridSize(itemSize.x, itemSize.y);
     const ofColor bodyColor = widgetBodyColor(widget);
     ImGui::InvisibleButton("##multitogglegrid", gridSize);
 
@@ -326,8 +341,8 @@ bool drawMultiToggleGrid(const CustomGuiWidgetRenderContext& context, CustomGuiW
     auto hoveredIndexFromMouse = [&](const ImVec2& mousePos){
         const float relX = mousePos.x - min.x;
         const float relY = mousePos.y - min.y;
-        const int col = ofClamp((int)std::floor(relX / std::max(1.0f, cellWidth + cellSpacing)), 0, cols - 1);
-        const int row = ofClamp((int)std::floor(relY / std::max(1.0f, cellHeight + cellSpacing)), 0, rows - 1);
+        const int col = ofClamp((int)std::floor(relX / std::max(1.0f, cellWidth + cellSpacingX)), 0, cols - 1);
+        const int row = ofClamp((int)std::floor(relY / std::max(1.0f, cellHeight + cellSpacingY)), 0, rows - 1);
         return row * cols + col;
     };
 
@@ -354,9 +369,9 @@ bool drawMultiToggleGrid(const CustomGuiWidgetRenderContext& context, CustomGuiW
     for(int r = 0; r < rows; r++){
         for(int c = 0; c < cols; c++){
             const int index = r * cols + c;
-            if(index >= (int)values.size()) continue;
-            const float x0 = min.x + c * (cellWidth + cellSpacing);
-            const float y0 = min.y + r * (cellHeight + cellSpacing);
+            if(index >= valueCount) continue;
+            const float x0 = min.x + c * (cellWidth + cellSpacingX);
+            const float y0 = min.y + r * (cellHeight + cellSpacingY);
             const float x1 = x0 + cellWidth;
             const float y1 = y0 + cellHeight;
             const bool cellOn = isActiveValue(values[index]);
