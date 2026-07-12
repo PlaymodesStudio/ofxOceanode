@@ -81,10 +81,27 @@ bool renderTextWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wi
     ImGui::BeginGroup();
     const float fontScale = widgetValueFontScale(widget);
     ImGui::InvisibleButton("##text", context.size);
+    const bool hovered = ImGui::IsItemHovered();
+    const std::string url = widget.config.value("url", std::string());
+    if(!context.designMode && !url.empty() && ImGui::IsItemClicked(ImGuiMouseButton_Left)){
+        ofLaunchBrowser(url);
+    }
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const ImVec2 min = ImGui::GetItemRectMin();
     const float fontSize = ImGui::GetFontSize() * fontScale;
-    drawList->AddText(ImGui::GetFont(), fontSize, min, IM_COL32(widget.color.r, widget.color.g, widget.color.b, widget.color.a), widget.label.c_str(), nullptr, context.size.x);
+    const ofColor textColor = (!url.empty() && hovered)
+        ? ofColor(std::min(255, widget.color.r + 30),
+                  std::min(255, widget.color.g + 30),
+                  std::min(255, widget.color.b + 30),
+                  widget.color.a)
+        : widget.color;
+    drawList->AddText(ImGui::GetFont(), fontSize, min, IM_COL32(textColor.r, textColor.g, textColor.b, textColor.a), widget.label.c_str(), nullptr, context.size.x);
+    if(!url.empty()){
+        const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(fontSize, context.size.x, 0.0f, widget.label.c_str());
+        const float underlineY = min.y + textSize.y + 1.0f;
+        drawList->AddLine(ImVec2(min.x, underlineY), ImVec2(min.x + textSize.x, underlineY),
+                          IM_COL32(textColor.r, textColor.g, textColor.b, textColor.a), 1.0f);
+    }
     ImGui::EndGroup();
     return true;
 }
@@ -185,8 +202,13 @@ bool renderSnapshotMatrixWidget(CustomGuiWidgetRenderContext& context, CustomGui
 
 void drawTextProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter*)
 {
-    (void)context;
-    (void)widget;
+    char urlBuffer[512];
+    const std::string currentUrl = widget.config.value("url", std::string());
+    std::snprintf(urlBuffer, sizeof(urlBuffer), "%s", currentUrl.c_str());
+    if(ImGui::InputText("URL", urlBuffer, sizeof(urlBuffer))){
+        widget.config["url"] = std::string(urlBuffer);
+        context.container.markCustomGuisDirty();
+    }
 }
 
 void drawImageProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidget& widget, ofxOceanodeAbstractParameter*)

@@ -301,6 +301,30 @@ void ofxOceanodeCustomGuiPanel::draw()
             if(ImGui::SmallButton("Add Snapshot Matrix")){
                 createStaticWidget(CustomGuiWidgetType::SnapshotMatrix, "Snapshots", 4, 2, ofColor::white);
             }
+            ImGui::SameLine(0, 8.0f);
+            if(ImGui::SmallButton("Add URL")){
+                ImGui::OpenPopup("Add URL");
+            }
+            if(ImGui::BeginPopupModal("Add URL", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+                static char urlBuffer[512] = "";
+                ImGui::InputText("URL", urlBuffer, sizeof(urlBuffer));
+
+                if(ImGui::Button("Create")){
+                    std::string url = urlBuffer;
+                    if(!url.empty()){
+                        createStaticWidget(CustomGuiWidgetType::Text, url, 3, 1, ofColor(110, 170, 255, 255));
+                        panel->layout.widgets.back().config["url"] = url;
+                        std::snprintf(urlBuffer, sizeof(urlBuffer), "%s", "");
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                ImGui::SameLine();
+                if(ImGui::Button("Cancel")){
+                    std::snprintf(urlBuffer, sizeof(urlBuffer), "%s", "");
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
             ImGui::SameLine(0, 14.0f);
             if(ImGui::SmallButton("Custom Regions")){
                 ImGui::OpenPopup("Custom Regions Popup");
