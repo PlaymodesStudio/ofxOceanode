@@ -63,13 +63,12 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 			if(boldFont) ImGui::PopFont();
 		}
 		
-		// Keep the delete button aligned with the actual node width. Some nodes render
-		// custom regions wider than the default 240px body, so we fall back to the
-		// last measured node content width when it is wider than the base layout.
+		// Keep the header width derived from the current frame's nominal layout instead
+		// of the previous cached guiRect width. A stale oversized guiRect can otherwise
+		// feed back into the header and make nodes animate back from a huge width after
+		// dock/preset layout changes.
 		const float defaultContentWidth = nodeWidthText + nodeWidthWidget;
-		const float cachedContentWidth = std::max(0.0f, guiRect.getWidth() * zoomLevel - 2.0f * ImGui::GetStyle().WindowPadding.x);
-		const float headerContentWidth = std::max(defaultContentWidth, cachedContentWidth);
-		ImGui::SameLine(headerContentWidth - ImGui::GetFrameHeight(), 0.0f);
+		ImGui::SameLine(defaultContentWidth - ImGui::GetFrameHeight(), 0.0f);
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
 		ImGui::PushStyleColor(ImGuiCol_Button, OceanodeColors::TransparentButton);
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, OceanodeColors::TransparentButton);
