@@ -17,6 +17,25 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
+namespace {
+bool widgetPreservesVectorSizeOnReset(const CustomGuiWidget& widget)
+{
+    return widget.type == CustomGuiWidgetType::MultiToggle ||
+           widget.type == CustomGuiWidgetType::MultiSlider;
+}
+
+template<typename T>
+std::vector<T> resizeDefaultVectorToMatchCurrentSize(const std::vector<T>& defaultValues, size_t targetSize)
+{
+    std::vector<T> resized = defaultValues;
+    if(targetSize == 0) return resized;
+
+    if(resized.empty()) resized.push_back(T{});
+    resized.resize(targetSize, resized.back());
+    return resized;
+}
+}
+
 ofxOceanodeCustomGuiPanel::ofxOceanodeCustomGuiPanel(ofxOceanodeContainer& container, const std::string& panelId)
 : container(container)
 , panelId(panelId)
@@ -1249,6 +1268,10 @@ bool ofxOceanodeCustomGuiPanel::applyWidgetConfiguredDefaultValue(const CustomGu
                 if(!item.is_number()) return false;
                 values.push_back(item.get<float>());
             }
+            if(widgetPreservesVectorSizeOnReset(widget)){
+                const auto currentValues = parameter.cast<std::vector<float>>().getParameter().get();
+                values = resizeDefaultVectorToMatchCurrentSize(values, currentValues.size());
+            }
             parameter.cast<std::vector<float>>().getParameter().set(values);
             return true;
         }else if(type == typeid(std::vector<int>).name() && defaultValue.is_array()){
@@ -1257,6 +1280,10 @@ bool ofxOceanodeCustomGuiPanel::applyWidgetConfiguredDefaultValue(const CustomGu
             for(const auto& item : defaultValue){
                 if(!item.is_number()) return false;
                 values.push_back((int)std::round(item.get<double>()));
+            }
+            if(widgetPreservesVectorSizeOnReset(widget)){
+                const auto currentValues = parameter.cast<std::vector<int>>().getParameter().get();
+                values = resizeDefaultVectorToMatchCurrentSize(values, currentValues.size());
             }
             parameter.cast<std::vector<int>>().getParameter().set(values);
             return true;
@@ -1287,10 +1314,20 @@ bool ofxOceanodeCustomGuiPanel::resetParameterToDefaultValue(const CustomGuiWidg
         parameter.cast<std::string>().getParameter().set(parameter.cast<std::string>().getDefaultValue());
         return true;
     }else if(type == typeid(std::vector<float>).name()){
-        parameter.cast<std::vector<float>>().getParameter().set(parameter.cast<std::vector<float>>().getDefaultValue());
+        auto values = parameter.cast<std::vector<float>>().getDefaultValue();
+        if(widgetPreservesVectorSizeOnReset(widget)){
+            const auto currentValues = parameter.cast<std::vector<float>>().getParameter().get();
+            values = resizeDefaultVectorToMatchCurrentSize(values, currentValues.size());
+        }
+        parameter.cast<std::vector<float>>().getParameter().set(values);
         return true;
     }else if(type == typeid(std::vector<int>).name()){
-        parameter.cast<std::vector<int>>().getParameter().set(parameter.cast<std::vector<int>>().getDefaultValue());
+        auto values = parameter.cast<std::vector<int>>().getDefaultValue();
+        if(widgetPreservesVectorSizeOnReset(widget)){
+            const auto currentValues = parameter.cast<std::vector<int>>().getParameter().get();
+            values = resizeDefaultVectorToMatchCurrentSize(values, currentValues.size());
+        }
+        parameter.cast<std::vector<int>>().getParameter().set(values);
         return true;
     }
     return false;
