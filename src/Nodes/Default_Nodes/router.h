@@ -24,7 +24,14 @@ public:
     }
     
     void loadBeforeConnections(ofJson &json){
-        ofDeserialize(json, nameParam);
+        if(!json.count(nameParam.getEscapedName())) return;
+        if(json[nameParam.getEscapedName()].is_string()){
+            nameParam = json[nameParam.getEscapedName()].get<std::string>();
+        }else if(json[nameParam.getEscapedName()].is_number_integer() || json[nameParam.getEscapedName()].is_number_unsigned() || json[nameParam.getEscapedName()].is_number_float() || json[nameParam.getEscapedName()].is_boolean()){
+            nameParam = json[nameParam.getEscapedName()].dump();
+        }else{
+            ofLogWarning("abstractRouter") << "Failed to deserialize preset value for " << nameParam.getName() << ": invalid json type for string parameter";
+        }
     }
     
     string type(){
