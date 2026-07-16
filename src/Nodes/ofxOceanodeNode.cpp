@@ -278,7 +278,13 @@ void ofxOceanodeNode::deserializeParameter(ofJson &json, ofxOceanodeAbstractPara
 			}
 			param = values;
 		}else if(p.valueType() == typeid(std::string).name()){
-			p.cast<std::string>().getParameter() = json[p.getEscapedName()].get<std::string>();
+			if(json[p.getEscapedName()].is_string()){
+				p.cast<std::string>().getParameter() = json[p.getEscapedName()].get<std::string>();
+			}else if(json[p.getEscapedName()].is_number_integer() || json[p.getEscapedName()].is_number_unsigned() || json[p.getEscapedName()].is_number_float() || json[p.getEscapedName()].is_boolean()){
+				p.cast<std::string>().getParameter() = json[p.getEscapedName()].dump();
+			}else{
+				ofLogWarning("ofxOceanodeNode") << "Failed to deserialize preset value for " << p.getName() << ": invalid json type for string parameter";
+			}
 		}else{
 			ofDeserialize(json, p);
 		}
