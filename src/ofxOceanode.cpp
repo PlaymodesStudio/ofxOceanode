@@ -485,6 +485,11 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 
 		        collectPanels(activeContainer, activeContainer->getCanvasID());
 
+		        if(ImGui::MenuItem("New Custom GUI")){
+		            activeContainer->requestCreateCustomGui("", CustomGuiWidgetType::Slider, true);
+		        }
+		        ImGui::Separator();
+
 		        if(panelEntries.empty()){
 		            ImGui::TextDisabled("No Custom GUIs");
 		        }else{
