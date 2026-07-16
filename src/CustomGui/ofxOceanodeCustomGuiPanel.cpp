@@ -603,7 +603,7 @@ void ofxOceanodeCustomGuiPanel::draw()
                 bool resizeHovered = !locked &&
                                      topmostResizeHandleIndex == (int)i &&
                                      ImGui::IsMouseHoveringRect(handleMin, max);
-                if(!locked) drawList->AddRectFilled(handleMin, max, IM_COL32(255, 180, 40, 220), 1.0f);
+                if(!locked) ImGui::GetForegroundDrawList()->AddRectFilled(handleMin, max, IM_COL32(255, 180, 40, 220), 1.0f);
                 if(!anyPopupOpen && (hovered || resizeHovered) && ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
                     const bool shiftPressed = ImGui::GetIO().KeyShift;
                     if(ctrlPressed){
