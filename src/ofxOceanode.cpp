@@ -242,7 +242,7 @@ void ofxOceanode::update(){
 
 void ofxOceanode::draw(){
     if(!pendingIniLoad.empty()){
-        ImGui::LoadIniSettingsFromDisk(pendingIniLoad.c_str());
+        loadGUILayoutFromDisk(pendingIniLoad);
         pendingIniLoad.clear();
     }
     if(pendingPresetsTabActivation){
@@ -272,12 +272,16 @@ void ofxOceanode::draw(){
             
             // Load the new canvas's layout
             if(ofFile(pendingLoad).exists()){
-                ImGui::LoadIniSettingsFromDisk(pendingLoad.c_str());
+                loadGUILayoutFromDisk(pendingLoad);
             }
             pendingLoad.clear();
         }
     }
     gui.begin();
+    // DockBuilder operations are expected before the DockSpace is submitted.
+    // This only affects registered controllers absent from the loaded file;
+    // windows with an explicit saved DockId remain untouched.
+    reconcileMissingControllerWindows();
     bool showDocker = true;
     ShowExampleAppDockSpace(&showDocker);
     if(showMode){
@@ -318,6 +322,85 @@ void ofxOceanode::draw(){
     
     gui.end();
     gui.draw();
+}
+
+void ofxOceanode::loadGUILayoutFromDisk(const std::string& path){
+    loadedGUILayoutLeftDockId = 0;
+
+    ofBuffer layoutBuffer = ofBufferFromFile(path);
+    loadedGUILayoutData = layoutBuffer.getText();
+    std::string currentWindow;
+    const std::string windowPrefix = "[Window][";
+
+    for(std::string line : ofSplitString(loadedGUILayoutData, "\n", false, false)){
+        line = ofTrim(line);
+
+        if(line.rfind(windowPrefix, 0) == 0 && line.size() > windowPrefix.size() && line.back() == ']'){
+            currentWindow = line.substr(windowPrefix.size(), line.size() - windowPrefix.size() - 1);
+            continue;
+        }
+
+        // The Presets controller is the stable semantic anchor for the LEFT
+        // controller pane. Numeric dock IDs are layout-specific and must not be
+        // hard-coded.
+        if(currentWindow == "Presets" && line.rfind("DockId=", 0) == 0){
+            std::string dockIdText = line.substr(7);
+            size_t comma = dockIdText.find(',');
+            if(comma != std::string::npos) dockIdText.erase(comma);
+
+            try{
+                loadedGUILayoutLeftDockId = static_cast<ImGuiID>(std::stoul(dockIdText, nullptr, 0));
+            }catch(const std::exception&){
+                loadedGUILayoutLeftDockId = 0;
+            }
+        }
+    }
+
+    ImGui::LoadIniSettingsFromDisk(path.c_str());
+    pendingControllerDockReconciliation = true;
+}
+
+void ofxOceanode::reconcileMissingControllerWindows(){
+    if(!pendingControllerDockReconciliation) return;
+
+    ImGuiID leftDockId = loadedGUILayoutLeftDockId;
+
+    // If the file did not contain a usable Presets DockId, retry on a later
+    // frame using the live Presets window. This also supports layouts created
+    // from the built-in DockSpace fallback.
+    if(leftDockId == 0 || ImGui::DockBuilderGetNode(leftDockId) == nullptr){
+        ImGuiWindow* presetsWindow = ImGui::FindWindowByName("Presets");
+        if(presetsWindow != nullptr && presetsWindow->DockNode != nullptr){
+            leftDockId = presetsWindow->DockNode->ID;
+        }
+    }
+
+    // The DockSpace/anchor may not exist on the first frame of a layout without
+    // docking data. Leave the request pending and retry next frame.
+    if(leftDockId == 0 || ImGui::DockBuilderGetNode(leftDockId) == nullptr) return;
+
+    auto layoutLines = ofSplitString(loadedGUILayoutData, "\n", false, false);
+    for(std::string& line : layoutLines) line = ofTrim(line);
+
+    for(const auto& controller : controls->getControllers()){
+        const std::string windowName = controller->getControllerName();
+        const std::string windowHeader = "[Window][" + windowName + "]";
+        bool windowWasSaved = false;
+        for(const std::string& line : layoutLines){
+            if(line == windowHeader){
+                windowWasSaved = true;
+                break;
+            }
+        }
+
+        if(!windowWasSaved){
+            ImGui::DockBuilderDockWindow(windowName.c_str(), leftDockId);
+        }
+    }
+
+    loadedGUILayoutLeftDockId = leftDockId;
+    loadedGUILayoutData.clear();
+    pendingControllerDockReconciliation = false;
 }
 
 void ofxOceanode::exit(){

@@ -170,6 +170,15 @@ private:
     std::string pendingIniLoad; // empty means no pending load
     bool pendingPresetsTabActivation = false; // force Presets tab active after preset load
 
+    // Metadata for the most recently loaded ImGui layout. ImGui restores only
+    // windows present in the .ini file, so controllers introduced after the
+    // layout was saved need a deterministic default docking destination.
+    std::string loadedGUILayoutData;
+    ImGuiID loadedGUILayoutLeftDockId = 0;
+    bool pendingControllerDockReconciliation = false;
+    void loadGUILayoutFromDisk(const std::string& path);
+    void reconcileMissingControllerWindows();
+
     // GUI layout management state
     bool openSaveLayoutPopup = false;
     std::string currentLayoutName;
