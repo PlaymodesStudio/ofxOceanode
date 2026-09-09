@@ -74,8 +74,20 @@ void ofxOceanodeContainer::invalidateCustomGuiParameterPathCache()
 
 void ofxOceanodeContainer::clearContainer(){
     // Clear scope callback first to prevent auto-saves triggered by parameter
-    // destructors during teardown (app exit or preset switching)
-    ofxOceanodeScope::getInstance()->setScopeChangedCallback(nullptr);
+    // destructors during teardown (app exit or preset switching). Only the
+    // canvas that owns the global scope singleton touches it here -- a
+    // secondary canvas tearing down must not flush or silence state that
+    // belongs to a different (still-active) canvas.
+    const bool ownsGlobalScope = getCanvasID().empty()
+        || getCanvasID() == "Canvas"
+        || getCanvasID() == "0";
+    if(ownsGlobalScope)
+    {
+        // Persist the last debounced change while all parameter pointers are
+        // still valid, then silence teardown notifications.
+        flushPendingScopeSave();
+        ofxOceanodeScope::getInstance()->setScopeChangedCallback(nullptr);
+    }
     if(timelineManager != nullptr) timelineManager->clear();
     
     connections.clear();
@@ -139,6 +151,11 @@ void ofxOceanodeContainer::update(){
     // re-applies the values evaluateAutomation() already computed above
     // instead of re-scanning every track/clip/lane a second time.
     if(timelineManager != nullptr) timelineManager->applyAutomation();
+
+    if(scopeSavePending && ofGetElapsedTimeMillis() >= pendingScopeSaveDeadlineMillis)
+    {
+        flushPendingScopeSave();
+    }
 }
 
 void ofxOceanodeContainer::draw(){
@@ -275,10 +292,17 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
 bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     ofLog()<<"Load Preset " << presetFolderPath;
     customGuiStoragePath = presetFolderPath;
+    const bool ownsGlobalScope = getCanvasID().empty()
+        || getCanvasID() == "Canvas"
+        || getCanvasID() == "0";
     
-    // Disable scope auto-save during preset loading to prevent saving empty scope
-    // when nodes are deleted
-    ofxOceanodeScope::getInstance()->setScopeChangedCallback(nullptr);
+    if(ownsGlobalScope)
+    {
+        // Flush the previous preset before its nodes are replaced, then disable
+        // notifications until the new scope state has finished loading.
+        flushPendingScopeSave();
+        ofxOceanodeScope::getInstance()->setScopeChangedCallback(nullptr);
+    }
     
     loadPreset_presetWillBeLoaded();
 
@@ -311,13 +335,13 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
 	// Re-enable scope auto-save callback AFTER all loading is complete
 	// This must be the LAST step to avoid saving during any deferred cleanup
 	// Capture presetFolderPath by value to ensure we save to the correct location
-	ofxOceanodeScope::getInstance()->setScopeChangedCallback([this, presetFolderPath]()
-	{
-		if (!(!getCanvasID().empty() && getCanvasID() != "Canvas" && getCanvasID() != "0"))
-		{
-			saveScope(presetFolderPath);
-		}
-	});
+    if(ownsGlobalScope)
+    {
+	    ofxOceanodeScope::getInstance()->setScopeChangedCallback([this, presetFolderPath]()
+	    {
+            scheduleScopeSave(presetFolderPath);
+	    });
+    }
 
     return true;
 }
@@ -547,6 +571,13 @@ void ofxOceanodeContainer::loadCustomGuiSnapshots(const std::string& presetPath)
 
 void ofxOceanodeContainer::saveScope(const std::string& presetPath)
 {
+	if(scopeSavePending && pendingScopeSavePath == presetPath)
+    {
+        scopeSavePending = false;
+        pendingScopeSavePath.clear();
+        pendingScopeSaveDeadlineMillis = 0;
+    }
+
 	// Get scope state from scope
 	auto scopeState = ofxOceanodeScope::getInstance()->getScopeState();
 	
@@ -559,6 +590,44 @@ void ofxOceanodeContainer::saveScope(const std::string& presetPath)
 	// Save to file
 	std::string filepath = presetPath + "/scope_config.json";
 	ofSavePrettyJson(filepath, json);
+}
+
+void ofxOceanodeContainer::scheduleScopeSave(const std::string& presetPath)
+{
+    if(presetPath.empty()) return;
+    pendingScopeSavePath = presetPath;
+    pendingScopeSaveDeadlineMillis = ofGetElapsedTimeMillis() + 450;
+    scopeSavePending = true;
+}
+
+void ofxOceanodeContainer::flushPendingScopeSave()
+{
+    if(!scopeSavePending || pendingScopeSavePath.empty()) return;
+
+    const std::string presetPath = pendingScopeSavePath;
+    scopeSavePending = false;
+    pendingScopeSavePath.clear();
+    pendingScopeSaveDeadlineMillis = 0;
+    saveScope(presetPath);
+
+    // The real divider proportions live in ImGuiLayout.ini. Save that state
+    // in the same debounced transaction, but never from Scope::draw().
+    if(ImGui::GetCurrentContext() != nullptr)
+    {
+        std::string layoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
+        if(layoutPath.empty())
+        {
+            layoutPath = ofToDataPath(presetPath + "/ImGuiLayout.ini");
+        }
+
+        ImGui::SaveIniSettingsToDisk(layoutPath.c_str());
+        size_t iniSize = 0;
+        const char* iniData = ImGui::SaveIniSettingsToMemory(&iniSize);
+        if(iniData != nullptr && iniSize > 0)
+        {
+            ofxOceanodeShared::getLayoutContentCache()[layoutPath] = std::string(iniData, iniSize);
+        }
+    }
 }
 
 void ofxOceanodeContainer::loadScope(const std::string& presetPath) {
@@ -615,16 +684,18 @@ void ofxOceanodeContainer::loadScope(const std::string& presetPath) {
                 nodeColor = resolved.node->getColor();
             }
             
-            // Add to scope
-            ofxOceanodeScope::getInstance()->addParameter(resolved.parameter, nodeColor);
-            
-            // Set size relative (access the last added item)
-            auto& scopedParams = ofxOceanodeScope::getInstance()->getScopedParameters();
-            if(!scopedParams.empty()) {
-                scopedParams.back().sizeRelative = paramData.sizeRelative;
+            if(ofxOceanodeScope::getInstance()->addParameter(
+                resolved.parameter,
+                nodeColor,
+                paramData.canvasID,
+                paramData.nodeName
+            )) {
+                successCount++;
+            } else {
+                ofLogWarning("ofxOceanodeContainer") << "No scope renderer for parameter: "
+                                                      << paramData.parameterPath;
+                failureCount++;
             }
-            
-            successCount++;
         } else {
             ofLogWarning("ofxOceanodeContainer") << "Could not resolve parameter: " 
                                                   << paramData.parameterPath;
