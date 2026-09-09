@@ -89,14 +89,11 @@ public:
     
    template<typename T>
     void registerScope(std::function<void(ofxOceanodeAbstractParameter* p, ImVec2 size)> func){
-        ofxOceanodeScope::getInstance()->addScopeFunc([func](ofxOceanodeAbstractParameter *p, ImVec2 size) -> bool{
-            if(p->valueType() == typeid(T).name())
-            {
-                func(p, size);
-                return true;
-            }
-            return false;
-        });
+        ofxOceanodeScope::getInstance()->addScopeRenderer(
+            typeid(T).name(),
+            std::move(func),
+            true
+        );
     }
     
     void togglePlay(){

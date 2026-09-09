@@ -13,6 +13,7 @@
 #include "ofxOceanodeNode.h"
 #include "CustomGui/ofxOceanodeCustomGuiLayout.h"
 #include "ofxOceanodeNodeGui.h"
+#include <cstdint>
 #include <unordered_set>
 
 class ofxOceanodeNodeModel;
@@ -260,6 +261,8 @@ private:
     ParsedParameterPath parseParameterPath(const std::string& path);
     void invalidateCustomGuiMembershipIndex();
     void invalidateCustomGuiParameterPathCache();
+    void scheduleScopeSave(const std::string& presetPath);
+    void flushPendingScopeSave();
     void rebuildCustomGuiMembershipIndexIfNeeded() const;
     void rebuildCustomGuiPanels();
     std::string getCustomGuiFilePath(const std::string& presetPath) const;
@@ -287,6 +290,9 @@ private:
     std::string customGuiStoragePath;
     bool customGuisDirty = false;
     bool customGuiSnapshotsDirty = false;
+    std::string pendingScopeSavePath;
+    std::uint64_t pendingScopeSaveDeadlineMillis = 0;
+    bool scopeSavePending = false;
     bool customGuiCreateModalOpen = false;
     std::string pendingCustomGuiName = "Custom GUI";
     std::string pendingDeletedCustomGuiPanelId;

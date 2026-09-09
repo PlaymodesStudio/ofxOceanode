@@ -578,7 +578,11 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 				ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
 				
                 if(ImGui::BeginPopup("Param Popup")){
-                    if(!absParam.isScoped()){ //Param is not scoped
+                    if(absParam.isScoped()){
+                        if(ImGui::Selectable("Remove from Scope")){
+                            ofxOceanodeScope::getInstance()->removeParameter(&absParam);
+                        }
+                    }else if(ofxOceanodeScope::getInstance()->canScope(&absParam)){
                         if(ImGui::Selectable("Add to Scope")){
                             // Extract full path information
                             std::string canvasID = absParam.getNodeModel()->getParents();
@@ -590,10 +594,6 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                                 canvasID,
                                 nodeName
                             );
-                        }
-                    }else{
-                        if(ImGui::Selectable("Remove from Scope")){
-                            ofxOceanodeScope::getInstance()->removeParameter(&absParam);
                         }
                     }
                     ImGui::Separator();
@@ -822,17 +822,9 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 				// Position cursor inside the "fake child" area for rendering
 				ImGui::SetCursorScreenPos(pos);
 				
-				// Render the content using scope functions
-				// IMPORTANT: We must break after the first scope function that handles the parameter
-				// to avoid multiple renderings. Each scope function returns true if it handled the parameter.
+				// Render through the typed scope registry.
 								
-				for(auto f : ofxOceanodeScope::getInstance()->getScopedTypes())
-				{
-					if(f(&absParam2, size))
-					{
-						break; // Stop after first successful handler
-					}
-				}
+				ofxOceanodeScope::getInstance()->drawParameter(&absParam2, size);
 								
 				// Restore clipping
 				ImGui::PopClipRect();

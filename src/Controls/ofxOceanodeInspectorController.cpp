@@ -331,9 +331,7 @@ void ofxOceanodeInspectorController::draw(){
                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
                 ImGui::BeginChild(("Child_" + p.getGroupHierarchyNames().front() + "/" + p.getName()).c_str(), size, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-                for(auto f : ofxOceanodeScope::getInstance()->getScopedTypes()){
-                    if(f(&p, size)) break;
-                }
+                ofxOceanodeScope::getInstance()->drawParameter(&p, size);
 
                 ImGui::EndChild();
                 ImGui::PopStyleVar();
