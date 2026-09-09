@@ -134,6 +134,7 @@ private:
     ofxOceanodeScopeWindowConfig lastWindowConfig;
     ScopeChangedCallback scopeChangedCallback;
     void notifyScopeChanged();
+    unsigned int lastCentralScopeWindowID = 0;
     
     bool isLoadingFromPreset = false;
 };

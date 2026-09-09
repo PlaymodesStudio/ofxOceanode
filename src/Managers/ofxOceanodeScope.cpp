@@ -92,6 +92,113 @@ static void RescaleDockNodeProportional(ImGuiDockNode* node, ImVec2 oldSize, ImV
     }
 }
 
+static std::string GetScopeWindowName(const ofxOceanodeScopeItem& item)
+{
+    const std::string fullPath = item.getFullPath();
+    std::string windowName = item.canvasID == "Canvas" ? fullPath : (item.canvasID + " / " + fullPath);
+    windowName += "###Scope_" + item.canvasID + "_" + fullPath;
+    return windowName;
+}
+
+static ImGuiWindow* FindScopeWindowToFillCentralNode(
+    const std::vector<ofxOceanodeScopeItem>& scopedParameters,
+    ImGuiDockNode* rootNode,
+    ImGuiID excludedWindowID
+)
+{
+    ImGuiWindow* bestWindow = NULL;
+    ImVec2 bestPosition(0.0f, 0.0f);
+    bool bestIsVisible = false;
+    const float sameRowTolerance = 1.0f;
+
+    for(const auto& item : scopedParameters)
+    {
+        ImGuiWindow* window = ImGui::FindWindowByName(GetScopeWindowName(item).c_str());
+        if(window == NULL || window->DockNode == NULL || window->ID == excludedWindowID) continue;
+        if(ImGui::DockNodeGetRootNode(window->DockNode) != rootNode) continue;
+
+        const ImVec2 position = window->DockNode->Pos;
+        const bool isVisible = window->DockNode->VisibleWindow == window;
+
+        bool comesFirst = bestWindow == NULL;
+        if(bestWindow != NULL)
+        {
+            const bool isHigherRow = position.y < bestPosition.y - sameRowTolerance;
+            const bool isSameRow = position.y >= bestPosition.y - sameRowTolerance
+                && position.y <= bestPosition.y + sameRowTolerance;
+            const bool isFurtherLeft = position.x < bestPosition.x;
+            const bool isSamePosition = isSameRow
+                && position.x >= bestPosition.x - sameRowTolerance
+                && position.x <= bestPosition.x + sameRowTolerance;
+
+            comesFirst = isHigherRow
+                || (isSameRow && isFurtherLeft)
+                || (isSamePosition && isVisible && !bestIsVisible);
+        }
+
+        if(comesFirst)
+        {
+            bestWindow = window;
+            bestPosition = position;
+            bestIsVisible = isVisible;
+        }
+    }
+
+    return bestWindow;
+}
+
+static bool IsScopeWindowPendingDock(
+    const std::vector<ofxOceanodeScopeItem>& scopedParameters,
+    ImGuiID dockNodeID
+)
+{
+    for(const auto& item : scopedParameters)
+    {
+        ImGuiWindow* window = ImGui::FindWindowByName(GetScopeWindowName(item).c_str());
+        if(window != NULL && window->DockNode == NULL && window->DockId == dockNodeID) return true;
+    }
+
+    return false;
+}
+
+static void ReturnScopeWindowToTop(
+    ImGuiWindow* window,
+    ImGuiID dockspaceID,
+    size_t scopeCount
+)
+{
+    if(window == NULL) return;
+
+    // With no other scopes there is no stack to split: fill the dockspace.
+    if(scopeCount <= 1)
+    {
+        ImGui::SetWindowDock(window, dockspaceID, ImGuiCond_Always);
+        return;
+    }
+
+    // Give the returned scope approximately one equal share of the total
+    // height. The exact distribution policy can be refined independently.
+    const float topRatio = 1.0f / static_cast<float>(scopeCount);
+    ImGuiID topNodeID = 0;
+    ImGuiID remainingNodeID = 0;
+    ImGui::DockBuilderSplitNode(
+        dockspaceID,
+        ImGuiDir_Up,
+        topRatio,
+        &topNodeID,
+        &remainingNodeID
+    );
+
+    if(topNodeID != 0)
+    {
+        ImGui::SetWindowDock(window, topNodeID, ImGuiCond_Always);
+    }
+    else
+    {
+        ImGui::SetWindowDock(window, dockspaceID, ImGuiCond_Always);
+    }
+}
+
 void ofxOceanodeScope::setup(){
     scopeTypes.push_back([](ofxOceanodeAbstractParameter *p, ImVec2 size) -> bool{
         // VECTOR FLOAT PARAM
@@ -203,9 +310,7 @@ void ofxOceanodeScope::draw(){
         {
             auto &p = scopedParameters[i];
             
-            std::string fullPath = p.getFullPath();
-            std::string windowName = p.canvasID == "Canvas" ? fullPath : (p.canvasID + " / " + fullPath);
-            windowName += "###Scope_" + p.canvasID + "_" + fullPath;
+            std::string windowName = GetScopeWindowName(p);
 
             bool open = true;
             
@@ -273,7 +378,74 @@ void ofxOceanodeScope::draw(){
                     
                     if (isFloatingOutsideScopes)
                     {
-                        ImGui::SetWindowDock(scopeWindow, dockspace_id, ImGuiCond_Always);
+                        ReturnScopeWindowToTop(
+                            scopeWindow,
+                            dockspace_id,
+                            scopedParameters.size()
+                        );
+                    }
+                }
+            }
+        }
+
+        // ImGui deliberately keeps the central dock node alive when its last
+        // window is dragged elsewhere. For the Scopes dockspace that leaves a
+        // permanent patch of empty background. Once the drag has finished,
+        // move the first remaining visible scope in spatial reading order into
+        // the empty central node: top to bottom, and left to right within each
+        // row. Moving a single-window non-central leaf makes ImGui merge that
+        // leaf with its sibling automatically.
+        if(!ImGui::IsMouseDown(0))
+        {
+            ImGuiDockNode* rootNode = ImGui::DockBuilderGetNode(dockspace_id);
+            ImGuiDockNode* centralNode = rootNode != NULL ? rootNode->CentralNode : NULL;
+
+            if(centralNode != NULL && centralNode->Windows.Size > 0)
+            {
+                ImGuiWindow* centralWindow = centralNode->VisibleWindow != NULL
+                    ? centralNode->VisibleWindow
+                    : centralNode->Windows[0];
+                lastCentralScopeWindowID = centralWindow->ID;
+            }
+            else if(
+                centralNode != NULL
+                && centralNode->IsLeafNode()
+                && scopedParameters.size() > 1
+                && !IsScopeWindowPendingDock(scopedParameters, centralNode->ID)
+            )
+            {
+                ImGuiWindow* donor = FindScopeWindowToFillCentralNode(
+                    scopedParameters,
+                    rootNode,
+                    lastCentralScopeWindowID
+                );
+
+                // If the remembered central window is the only available
+                // candidate, filling the hole is preferable to leaving it.
+                if(donor == NULL)
+                {
+                    donor = FindScopeWindowToFillCentralNode(
+                        scopedParameters,
+                        rootNode,
+                        0
+                    );
+                }
+
+                if(donor != NULL)
+                {
+                    const ImGuiID donorWindowID = donor->ID;
+
+                    // Removing a single-window donor may merge its old node
+                    // and invalidate the previous central-node pointer/ID.
+                    // Undock first, then reacquire the central node before
+                    // assigning the new dock destination.
+                    ImGui::DockContextProcessUndockWindow(GImGui, donor, true);
+                    rootNode = ImGui::DockBuilderGetNode(dockspace_id);
+                    centralNode = rootNode != NULL ? rootNode->CentralNode : NULL;
+                    if(centralNode != NULL)
+                    {
+                        ImGui::SetWindowDock(donor, centralNode->ID, ImGuiCond_Always);
+                        lastCentralScopeWindowID = donorWindowID;
                     }
                 }
             }
@@ -314,9 +486,7 @@ void ofxOceanodeScope::addParameter(
         ImGuiID dockspace_id = ImGui::GetID("ScopesDockSpace");
         
         // Get the full path of the newly added parameter to construct its window name
-        std::string fullPath = scopedParameters.back().getFullPath();
-        std::string windowName = actualCanvasID == "Canvas" ? fullPath : (actualCanvasID + " / " + fullPath);
-        windowName += "###Scope_" + actualCanvasID + "_" + fullPath;
+        std::string windowName = GetScopeWindowName(scopedParameters.back());
         
         // Only split if the dockspace node actually exists (it might not exist yet if the window hasn't been drawn)
         if(ImGui::DockBuilderGetNode(dockspace_id) != NULL) {
@@ -400,6 +570,7 @@ void ofxOceanodeScope::clearScopedParameters() {
         item.parameter->setScoped(false);
     }
     scopedParameters.clear();
+    lastCentralScopeWindowID = 0;
 }
 
 ofxOceanodeScopeWindowConfig ofxOceanodeScope::getWindowConfig() const {
