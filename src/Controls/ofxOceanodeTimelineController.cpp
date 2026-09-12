@@ -530,18 +530,20 @@ void ofxOceanodeTimelineController::draw() {
         };
 
         auto drawClip = [&](const ofxOceanodeTimelineClip& clip, const ofxOceanodeTimelineLane* lane,
-                            const ImVec2& min, const ImVec2& max) {
+                            const ImVec2& min, const ImVec2& max, bool drawChrome = true) {
             const float x1 = min.x + beatOffset(clip.startBeat);
             const float x2 = min.x + beatOffset(clip.startBeat + clip.durationBeats);
             const float left = std::max(min.x, x1), right = std::min(max.x, x2);
             if(right <= left) return;
-            const ImU32 fill = IM_COL32(track.color.r, track.color.g, track.color.b, lane == nullptr ? 75 : 185);
-            dl->AddRectFilled(ImVec2(left + 1, min.y + 3), ImVec2(right - 1, max.y - 3), fill, 3);
-            dl->AddRect(ImVec2(left + 1, min.y + 3), ImVec2(right - 1, max.y - 3), IM_COL32(track.color.r, track.color.g, track.color.b, 245), 3);
-            if(right - left > 45) {
-                std::string label = clip.name;
-                if(lane != nullptr) label += " [" + std::string(laneTypeName(lane->type)) + "]";
-                dl->AddText(ImVec2(left + 6, min.y + 6), IM_COL32(245, 250, 255, 255), label.c_str());
+            if(drawChrome) {
+                const ImU32 fill = IM_COL32(track.color.r, track.color.g, track.color.b, lane == nullptr ? 75 : 185);
+                dl->AddRectFilled(ImVec2(left + 1, min.y + 3), ImVec2(right - 1, max.y - 3), fill, 3);
+                dl->AddRect(ImVec2(left + 1, min.y + 3), ImVec2(right - 1, max.y - 3), IM_COL32(track.color.r, track.color.g, track.color.b, 245), 3);
+                if(right - left > 45) {
+                    std::string label = clip.name;
+                    if(lane != nullptr) label += " [" + std::string(laneTypeName(lane->type)) + "]";
+                    dl->AddText(ImVec2(left + 6, min.y + 6), IM_COL32(245, 250, 255, 255), label.c_str());
+                }
             }
             if(lane == nullptr) return;
             if(lane->type == ofxOceanodeTimelineLaneType::Curve) {
@@ -760,9 +762,15 @@ void ofxOceanodeTimelineController::draw() {
             dl->PushClipRect(ImVec2(zoneLeft, min.y), ImVec2(max.x, max.y), true);
             drawGrid(laneMin, max);
             for(const auto& clip : track.clips) {
-                const auto* lane = clip.lanes.empty() ? nullptr : &clip.lanes.front();
-                drawClip(clip, lane, laneMin, max);
-                handleClip(clip, lane, laneMin, max);
+                if(clip.lanes.empty()) {
+                    drawClip(clip, nullptr, laneMin, max);
+                } else {
+                    for(size_t laneIndex = 0; laneIndex < clip.lanes.size(); ++laneIndex) {
+                        drawClip(clip, &clip.lanes[laneIndex], laneMin, max, laneIndex == 0);
+                    }
+                }
+                const auto* frontLane = clip.lanes.empty() ? nullptr : &clip.lanes.front();
+                handleClip(clip, frontLane, laneMin, max);
                 drawClipMenu(clip);
             }
             const float px = laneMin.x + beatOffset(transportState.beatPosition);
