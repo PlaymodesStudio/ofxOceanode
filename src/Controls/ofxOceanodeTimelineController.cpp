@@ -321,7 +321,8 @@ void ofxOceanodeTimelineController::draw() {
     // only the beat-based content to its right slides. A native ScrollX
     // would shift the whole child uniformly, dragging the labels off-screen
     // together with the timeline content.
-    ImGui::BeginChild("##TimelineViewport", ImVec2(0, 0), false,
+    const float scrollbarHeight = ImGui::GetStyle().ScrollbarSize;
+    ImGui::BeginChild("##TimelineViewport", ImVec2(0, -scrollbarHeight), false,
                       ImGuiWindowFlags_NoScrollWithMouse);
     const float zoneLeft = ImGui::GetWindowPos().x + kLabelWidth;
     const float maxTimelineScrollX = std::max(0.0f, timelineWidth - (availableWidth - kLabelWidth));
@@ -860,6 +861,52 @@ void ofxOceanodeTimelineController::draw() {
     // final cursor position uncommitted.
     ImGui::Dummy(ImVec2(0.0f, 0.0f));
     ImGui::EndChild();
+
+    // Horizontal scrolling is manual (timelineScrollX) so the label column
+    // can stay pinned (see the comment above BeginChild), which meant losing
+    // ImGui's native scrollbar along with native ScrollX. This redraws an
+    // equivalent scrollbar by hand, in the strip reserved below the viewport,
+    // spanning only the content zone (the label column never scrolls).
+    {
+        const ImVec2 viewportMin = ImGui::GetItemRectMin();
+        const ImVec2 viewportMax = ImGui::GetItemRectMax();
+        const float trackLeft = viewportMin.x + kLabelWidth;
+        const float trackRight = viewportMax.x;
+        const float trackWidth = std::max(1.0f, trackRight - trackLeft);
+        ImDrawList* footerDl = ImGui::GetWindowDrawList();
+        const ImVec2 trackMin(trackLeft, viewportMax.y);
+        const ImVec2 trackMax(trackRight, viewportMax.y + scrollbarHeight);
+        footerDl->AddRectFilled(trackMin, trackMax, IM_COL32(20, 20, 20, 255));
+
+        const float thumbWidth = maxTimelineScrollX <= 0.0f ? trackWidth
+            : std::max(24.0f, trackWidth * trackWidth / (trackWidth + maxTimelineScrollX));
+        const float thumbTravel = std::max(0.0f, trackWidth - thumbWidth);
+        const float thumbX = trackLeft + (maxTimelineScrollX > 0.0f
+            ? thumbTravel * ofClamp(timelineScrollX / maxTimelineScrollX, 0.0f, 1.0f) : 0.0f);
+        const ImVec2 thumbMin(thumbX, trackMin.y + 2.0f);
+        const ImVec2 thumbMax(thumbX + thumbWidth, trackMax.y - 2.0f);
+
+        ImGui::SetCursorScreenPos(trackMin);
+        ImGui::InvisibleButton("##timelineHScrollbar", ImVec2(trackWidth, scrollbarHeight));
+        const bool thumbHovered = ImGui::IsItemHovered();
+        const bool thumbActive = ImGui::IsItemActive();
+        if(maxTimelineScrollX > 0.0f) {
+            if(ImGui::IsItemClicked() && !ImGui::IsMouseHoveringRect(thumbMin, thumbMax)) {
+                const float targetThumbX = ofClamp(ImGui::GetIO().MousePos.x - thumbWidth * 0.5f,
+                                                   trackLeft, trackLeft + thumbTravel);
+                timelineScrollX = ofClamp((targetThumbX - trackLeft) / std::max(1.0f, thumbTravel) * maxTimelineScrollX,
+                                          0.0f, maxTimelineScrollX);
+            }
+            if(thumbActive && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+                timelineScrollX = ofClamp(timelineScrollX +
+                    ImGui::GetIO().MouseDelta.x / std::max(1.0f, thumbTravel) * maxTimelineScrollX,
+                    0.0f, maxTimelineScrollX);
+            }
+        }
+        footerDl->AddRectFilled(thumbMin, thumbMax,
+                                thumbActive ? IM_COL32(150, 150, 160, 255)
+                                            : thumbHovered ? IM_COL32(120, 120, 130, 255) : IM_COL32(90, 90, 100, 255), 3.0f);
+    }
 
     if(requestRenamePopup) {
         ImGui::OpenPopup(pendingNewTrackDialog ? "New Timeline Track" : "Rename Timeline Track");
