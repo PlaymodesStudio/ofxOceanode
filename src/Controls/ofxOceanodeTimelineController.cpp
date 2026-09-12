@@ -1277,6 +1277,15 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     }
 
     if(lane->type == ofxOceanodeTimelineLaneType::PianoRoll) {
+        // The note selection is keyed by index into this lane's pianoNotes,
+        // so switching to a different lane must drop it -- otherwise stale
+        // indices could highlight (or, worse, delete) unrelated notes.
+        if(pianoSelectionLaneId != lane->id) {
+            pianoSelectionLaneId = lane->id;
+            pianoSelectedNoteIndices.clear();
+            pianoDragSnapshot.clear();
+            pianoMarqueeActive = false;
+        }
         const int lowPitch = ofClamp(lane->pianoLowPitch, 0, 127);
         const int highPitch = ofClamp(lane->pianoHighPitch, lowPitch, 127);
         const float rollTop = editorMin.y + 8.0f;
@@ -1358,7 +1367,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 const float x2 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, note.startBeat + note.durationBeats, cycle));
                 const float y2 = rollBottom - (note.pitch - lowPitch) * pitchHeight;
                 const float y1 = y2 - pitchHeight + 1.0f;
-                const bool selected = pianoDragNoteIndex == static_cast<int>(noteIndex);
+                const bool selected = pianoSelectedNoteIndices.count(static_cast<int>(noteIndex)) > 0;
                 dl->AddRectFilled(ImVec2(x1 + 1.0f, y1), ImVec2(x2 - 1.0f, y2),
                                   selected ? IM_COL32(250, 210, 90, 245) : IM_COL32(track.color.r, track.color.g, track.color.b, cycle == 0 ? 225 : 135), 2.0f);
                 dl->AddLine(ImVec2(x2 - 3.0f, y1 + 1.0f), ImVec2(x2 - 3.0f, y2 - 1.0f), IM_COL32(255, 255, 255, 180), 1.0f);
@@ -1401,29 +1410,86 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         };
 
         if(hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+            int hitIndex = -1;
             for(int i = static_cast<int>(lane->pianoNotes.size()) - 1; i >= 0; --i) {
                 const auto& note = lane->pianoNotes[i];
                 if(note.pitch == pitch && sourceBeat >= note.startBeat && sourceBeat <= note.startBeat + note.durationBeats) {
-                    lane->pianoNotes.erase(lane->pianoNotes.begin() + i);
+                    hitIndex = i;
                     break;
                 }
+            }
+            if(hitIndex >= 0) {
+                // Right-clicking a note that's part of a multi-selection
+                // deletes the whole group; right-clicking any other note
+                // (selected alone, or not selected at all) deletes just it.
+                std::set<int> toDelete;
+                if(pianoSelectedNoteIndices.count(hitIndex) > 0 && pianoSelectedNoteIndices.size() > 1) {
+                    toDelete = pianoSelectedNoteIndices;
+                } else {
+                    toDelete.insert(hitIndex);
+                }
+                for(auto it = toDelete.rbegin(); it != toDelete.rend(); ++it) {
+                    if(*it >= 0 && *it < static_cast<int>(lane->pianoNotes.size()))
+                        lane->pianoNotes.erase(lane->pianoNotes.begin() + *it);
+                }
+                pianoSelectedNoteIndices.clear();
             }
         }
         if(hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             pianoDragNoteIndex = -1;
+            int hitIndex = -1;
             for(int i = static_cast<int>(lane->pianoNotes.size()) - 1; i >= 0; --i) {
                 const auto& note = lane->pianoNotes[i];
                 if(note.pitch == pitch && sourceBeat >= note.startBeat && sourceBeat <= note.startBeat + note.durationBeats) {
-                    pianoDragNoteIndex = i;
+                    hitIndex = i;
+                    break;
+                }
+            }
+            const bool ctrlDown = ImGui::GetIO().KeyCtrl;
+            if(hitIndex >= 0) {
+                if(ctrlDown) {
+                    // Ctrl+click only toggles membership -- it never starts a
+                    // drag, so a whole selection can be built up click by
+                    // click before moving any of it.
+                    if(pianoSelectedNoteIndices.count(hitIndex) > 0) pianoSelectedNoteIndices.erase(hitIndex);
+                    else pianoSelectedNoteIndices.insert(hitIndex);
+                } else {
+                    if(pianoSelectedNoteIndices.count(hitIndex) == 0) {
+                        // Clicking a note outside the current selection
+                        // replaces it, matching the old single-note behaviour.
+                        pianoSelectedNoteIndices.clear();
+                        pianoSelectedNoteIndices.insert(hitIndex);
+                    }
+                    // Otherwise the click landed on a note that's already
+                    // part of the selection -- keep the whole group selected
+                    // and drag it together.
+                    const auto& note = lane->pianoNotes[hitIndex];
+                    pianoDragNoteIndex = hitIndex;
                     const double edgeThreshold = std::max(grid * 0.2,
                         std::abs(beatAtOffset(mouse.x - timelineMin.x + 6.0f) - timelineBeat));
                     pianoDragMode = std::abs(sourceBeat - note.startBeat - note.durationBeats) <= edgeThreshold
                         ? PianoDragMode::Resize : PianoDragMode::Move;
                     pianoDragBeatOffset = sourceBeat - note.startBeat;
-                    break;
+                    if(pianoDragMode == PianoDragMode::Move) {
+                        pianoDragSnapshot.clear();
+                        for(int index : pianoSelectedNoteIndices) {
+                            if(index >= 0 && index < static_cast<int>(lane->pianoNotes.size()))
+                                pianoDragSnapshot.push_back({index, lane->pianoNotes[index].startBeat, lane->pianoNotes[index].pitch});
+                        }
+                        pianoDragAnchorStartBeat = note.startBeat;
+                        pianoDragAnchorPitch = note.pitch;
+                    }
                 }
-            }
-            if(pianoDragNoteIndex < 0) {
+            } else if(ctrlDown) {
+                // Ctrl+drag on empty space marquee-selects instead of
+                // drawing a new note. Without Shift the previous selection
+                // is replaced once the drag resolves on release.
+                pianoMarqueeActive = true;
+                pianoMarqueeStartX = mouse.x;
+                pianoMarqueeStartY = mouse.y;
+                if(!ImGui::GetIO().KeyShift) pianoSelectedNoteIndices.clear();
+            } else {
+                pianoSelectedNoteIndices.clear();
                 const double duration = grid;
                 if(lane->pianoMonophonic) {
                     lane->pianoNotes.erase(std::remove_if(lane->pianoNotes.begin(), lane->pianoNotes.end(), [&](const auto& note) {
@@ -1432,8 +1498,48 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 }
                 lane->pianoNotes.push_back({std::max(0.0, snappedSource), duration, pitch, lane->pianoDefaultVelocity, 1.0f});
                 pianoDragNoteIndex = static_cast<int>(lane->pianoNotes.size()) - 1;
+                pianoSelectedNoteIndices.insert(pianoDragNoteIndex);
                 pianoDragMode = PianoDragMode::Resize;
             }
+        }
+        if(pianoMarqueeActive) {
+            if(ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                const ImVec2 marqueeMin(std::min(pianoMarqueeStartX, mouse.x), std::min(pianoMarqueeStartY, mouse.y));
+                const ImVec2 marqueeMax(std::max(pianoMarqueeStartX, mouse.x), std::max(pianoMarqueeStartY, mouse.y));
+                dl->PushClipRect(ImVec2(left, rollTop), ImVec2(right, rollBottom), true);
+                dl->AddRectFilled(marqueeMin, marqueeMax, IM_COL32(250, 210, 90, 40));
+                dl->AddRect(marqueeMin, marqueeMax, IM_COL32(250, 210, 90, 200));
+                dl->PopClipRect();
+            } else {
+                const float marqueeMinX = std::min(pianoMarqueeStartX, mouse.x);
+                const float marqueeMaxX = std::max(pianoMarqueeStartX, mouse.x);
+                const float marqueeMinY = std::min(pianoMarqueeStartY, mouse.y);
+                const float marqueeMaxY = std::max(pianoMarqueeStartY, mouse.y);
+                for(int cycle = 0; cycle < cycles; ++cycle) {
+                    for(size_t noteIndex = 0; noteIndex < lane->pianoNotes.size(); ++noteIndex) {
+                        const auto& note = lane->pianoNotes[noteIndex];
+                        if(note.pitch < lowPitch || note.pitch > highPitch) continue;
+                        const float x1 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, note.startBeat, cycle));
+                        const float x2 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, note.startBeat + note.durationBeats, cycle));
+                        const float y2 = rollBottom - (note.pitch - lowPitch) * pitchHeight;
+                        const float y1 = y2 - pitchHeight + 1.0f;
+                        if(x2 >= marqueeMinX && x1 <= marqueeMaxX && y2 >= marqueeMinY && y1 <= marqueeMaxY) {
+                            pianoSelectedNoteIndices.insert(static_cast<int>(noteIndex));
+                        }
+                    }
+                }
+                pianoMarqueeActive = false;
+            }
+        }
+        if(hovered && !pianoSelectedNoteIndices.empty() && !ImGui::IsAnyItemActive() &&
+           (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace))) {
+            std::vector<int> sortedSelection(pianoSelectedNoteIndices.begin(), pianoSelectedNoteIndices.end());
+            std::sort(sortedSelection.rbegin(), sortedSelection.rend());
+            for(int index : sortedSelection) {
+                if(index >= 0 && index < static_cast<int>(lane->pianoNotes.size()))
+                    lane->pianoNotes.erase(lane->pianoNotes.begin() + index);
+            }
+            pianoSelectedNoteIndices.clear();
         }
         if(velocityHovered || probabilityHovered) {
             if(ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
@@ -1459,9 +1565,21 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 const double end = lane->pianoSnapToGrid ? std::round(sourceBeat / grid) * grid : sourceBeat;
                 note.durationBeats = std::max(grid, end - note.startBeat);
             } else if(pianoDragMode == PianoDragMode::Move) {
-                const double newStart = sourceBeat - pianoDragBeatOffset;
-                note.startBeat = std::max(0.0, lane->pianoSnapToGrid ? std::round(newStart / grid) * grid : newStart);
-                note.pitch = pitch;
+                // Move every selected note by the same delta from where it
+                // started the drag, rather than snapping each one straight
+                // to the mouse -- that's what keeps a multi-note selection's
+                // shape intact while dragging it.
+                const double newAnchorStart = sourceBeat - pianoDragBeatOffset;
+                const double snappedAnchorStart = std::max(0.0, lane->pianoSnapToGrid
+                    ? std::round(newAnchorStart / grid) * grid : newAnchorStart);
+                const double deltaBeat = snappedAnchorStart - pianoDragAnchorStartBeat;
+                const int deltaPitch = pitch - pianoDragAnchorPitch;
+                for(const auto& entry : pianoDragSnapshot) {
+                    if(entry.index < 0 || entry.index >= static_cast<int>(lane->pianoNotes.size())) continue;
+                    auto& dragged = lane->pianoNotes[entry.index];
+                    dragged.startBeat = std::max(0.0, entry.startBeat + deltaBeat);
+                    dragged.pitch = ofClamp(entry.pitch + deltaPitch, lowPitch, highPitch);
+                }
             } else if(pianoDragMode == PianoDragMode::Velocity) {
                 note.velocity = ofClamp((velocityBottom - mouse.y) /
                                         std::max(1.0f, velocityBottom - velocityTop - 3.0f), 0.0f, 1.0f);
@@ -1473,6 +1591,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         if(ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
             pianoDragMode = PianoDragMode::None;
             pianoDragNoteIndex = -1;
+            pianoDragSnapshot.clear();
         }
         if(ImGui::BeginPopup("Piano note value")) {
             if(pianoNumericNoteIndex >= 0 &&

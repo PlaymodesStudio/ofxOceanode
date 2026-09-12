@@ -3,7 +3,9 @@
 
 #include "ofxOceanodeBaseController.h"
 #include <memory>
+#include <set>
 #include <string>
+#include <vector>
 
 class ofxOceanodeContainer;
 class ofxOceanodeTimelineManager;
@@ -69,6 +71,19 @@ private:
     PianoDragMode pianoDragMode = PianoDragMode::None;
     int pianoDragNoteIndex = -1;
     double pianoDragBeatOffset = 0.0;
+    // Multi-note selection: which notes (by index into the lane's
+    // pianoNotes) are selected, plus the state needed to move the whole
+    // group together by a common delta instead of snapping each note
+    // independently to the mouse.
+    std::string pianoSelectionLaneId;
+    std::set<int> pianoSelectedNoteIndices;
+    struct PianoDragSnapshotEntry { int index; double startBeat; int pitch; };
+    std::vector<PianoDragSnapshotEntry> pianoDragSnapshot;
+    double pianoDragAnchorStartBeat = 0.0;
+    int pianoDragAnchorPitch = 0;
+    bool pianoMarqueeActive = false;
+    float pianoMarqueeStartX = 0.0f;
+    float pianoMarqueeStartY = 0.0f;
     enum class PianoNumericField { None, Velocity, Probability };
     PianoNumericField pianoNumericField = PianoNumericField::None;
     int pianoNumericNoteIndex = -1;
