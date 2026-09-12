@@ -379,6 +379,7 @@ void ofxOceanodeTimelineController::draw() {
         // in this loop makes SetCursorPos extend the child and asserts in End().
         const bool trackCollapsed = track.collapsed;
         const float trackHeaderHeight = trackCollapsed ? kCollapsedHeight : kHeaderHeight;
+        bool expandTrackForEditor = false;
         ImGui::SetCursorPos(ImVec2(0, headerY));
         // Keep the header as a visual/layout item only. A full-width
         // InvisibleButton steals the overlap from the color button on some
@@ -510,6 +511,12 @@ void ofxOceanodeTimelineController::draw() {
                     }
                     ImGui::EndMenu();
                 }
+            }
+            ImGui::Separator();
+            if(ImGui::MenuItem("Remove track")) {
+                trackDeletionId = track.id;
+                requestTrackDeletion = true;
+                ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
         }
@@ -651,33 +658,32 @@ void ofxOceanodeTimelineController::draw() {
             if(!ImGui::IsMouseHoveringRect(min, max) || mouse.x < x1 || mouse.x > x2) return;
             const std::string menuId = "##clipMenu" + track.id + "_" + clip.id;
             if(ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                if(clipInteractionClaimedThisFrame) return;
+                clipInteractionClaimedThisFrame = true;
                 pendingTrackId = track.id;
                 pendingClipId = clip.id;
                 pendingLaneId = lane != nullptr ? lane->id : (clip.lanes.empty() ? "" : clip.lanes.front().id);
                 ImGui::OpenPopup(menuId.c_str());
             }
             if(ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                // Overlapping clips are independent objects. The first clip
-                // that receives the click owns the drag; do not let another
-                // overlapping lane overwrite the selected clip id in the
-                // same frame.
-                if(clipDragMode != ClipDragMode::None) return;
+                if(clipInteractionClaimedThisFrame || clipDragMode != ClipDragMode::None) return;
+                clipInteractionClaimedThisFrame = true;
                 pendingTrackId = track.id;
                 pendingClipId = clip.id;
                 pendingLaneId = lane != nullptr ? lane->id : (clip.lanes.empty() ? "" : clip.lanes.front().id);
                 const double clickedBeat = beatAtOffset(mouse.x - min.x);
-                // A collapsed track's row is drawn (see trackCollapsed
-                // branch below) purely as a compact overview -- it has no
-                // visible clip editor dock for an opened editor to sit
-                // under, so opening one here would leave it floating
-                // disconnected from the (still collapsed) clip it belongs
-                // to. Double-clicking a clip while its track is collapsed
-                // does nothing until the track is expanded first.
-                if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && lane != nullptr && !trackCollapsed) {
+                if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && lane != nullptr) {
                     editorTrackId = track.id;
                     editorClipId = clip.id;
                     editorLaneId = lane->id;
-                    stepEditorOpen = true;
+                    clipEditorOpen = true;
+                    if(trackCollapsed) {
+                        // Layout stays collapsed for the rest of this frame,
+                        // but the model expands now so the editor is docked
+                        // directly below the track on the next frame.
+                        if(auto* editTrack = timeline.getTrack(track.id)) editTrack->collapsed = false;
+                        expandTrackForEditor = true;
+                    }
                     pendingStartBeat = snapBeat(std::max(0.0, clickedBeat - clip.startBeat));
                     pendingDurationBeats = 1.0;
                 } else {
@@ -792,8 +798,14 @@ void ofxOceanodeTimelineController::draw() {
                         drawClip(clip, &clip.lanes[laneIndex], laneMin, max, laneIndex == 0);
                     }
                 }
-                const auto* frontLane = clip.lanes.empty() ? nullptr : &clip.lanes.front();
-                handleClip(clip, frontLane, laneMin, max);
+            }
+            // Later clips are drawn on top, so hit-test in reverse order and
+            // let the visually topmost overlapping clip own the gesture.
+            for(auto clipIt = track.clips.rbegin(); clipIt != track.clips.rend(); ++clipIt) {
+                const auto* frontLane = clipIt->lanes.empty() ? nullptr : &clipIt->lanes.front();
+                handleClip(*clipIt, frontLane, laneMin, max);
+            }
+            for(const auto& clip : track.clips) {
                 drawClipMenu(clip);
             }
             const float px = laneMin.x + beatOffset(transportState.beatPosition);
@@ -803,8 +815,8 @@ void ofxOceanodeTimelineController::draw() {
             // A collapsed track hides its rows entirely, so any clip editor
             // still open for it would float disconnected from what it's
             // editing -- close it rather than keep drawing it.
-            if(stepEditorOpen && editorTrackId == track.id) {
-                stepEditorOpen = false;
+            if(clipEditorOpen && editorTrackId == track.id && !expandTrackForEditor) {
+                clipEditorOpen = false;
                 editorTrackId.clear();
                 editorClipId.clear();
                 editorLaneId.clear();
@@ -839,13 +851,18 @@ void ofxOceanodeTimelineController::draw() {
 
                 const std::string bindingMenuId = "##bindingMenu" + track.id + binding.id;
                 if(ImGui::IsMouseHoveringRect(min, max) && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                    const double clickedBeat = beatAtOffset(ImGui::GetIO().MousePos.x - laneMin.x);
+                    const bool overTimelineZone = ImGui::GetIO().MousePos.x >= zoneLeft;
+                    const double clickedBeat = overTimelineZone
+                        ? beatAtOffset(ImGui::GetIO().MousePos.x - laneMin.x)
+                        : 0.0;
                     bool overClip = false;
-                    for(const auto& clip : track.clips) {
-                        if(laneForBinding(clip, binding.id) != nullptr &&
-                           clickedBeat >= clip.startBeat && clickedBeat <= clip.startBeat + clip.durationBeats) {
-                            overClip = true;
-                            break;
+                    if(overTimelineZone) {
+                        for(const auto& clip : track.clips) {
+                            if(laneForBinding(clip, binding.id) != nullptr &&
+                               clickedBeat >= clip.startBeat && clickedBeat <= clip.startBeat + clip.durationBeats) {
+                                overClip = true;
+                                break;
+                            }
                         }
                     }
                     if(!overClip) {
@@ -883,13 +900,18 @@ void ofxOceanodeTimelineController::draw() {
                     ImGui::EndPopup();
                 }
                 dl->PushClipRect(ImVec2(zoneLeft, min.y), ImVec2(max.x, max.y), true);
+                if(!track.bindings.empty() && binding.id == track.bindings.front().id) {
+                    for(const auto& clip : track.clips) drawClipMenu(clip);
+                }
                 for(const auto& clip : track.clips) {
                     const auto* lane = laneForBinding(clip, binding.id);
-                    if(!track.bindings.empty() && binding.id == track.bindings.front().id) drawClipMenu(clip);
                     if(lane == nullptr) continue;
                     drawClip(clip, lane, laneMin, max);
-                    handleClip(clip, lane, laneMin, max);
                     if(clip.lanes.size() > 1) multiLaneClipRowSpans[clip.id].push_back({min.y, max.y});
+                }
+                for(auto clipIt = track.clips.rbegin(); clipIt != track.clips.rend(); ++clipIt) {
+                    const auto* lane = laneForBinding(*clipIt, binding.id);
+                    if(lane != nullptr) handleClip(*clipIt, lane, laneMin, max);
                 }
                 const float px = laneMin.x + beatOffset(transportState.beatPosition);
                 if(px >= zoneLeft && px <= max.x) dl->AddLine(ImVec2(px, min.y), ImVec2(px, max.y), kPlayhead, 2);
@@ -921,16 +943,62 @@ void ofxOceanodeTimelineController::draw() {
                 }
             }
             ImGui::SetCursorPosY(headerY + kHeaderHeight + index * kRowHeight);
-            if(stepEditorOpen && editorTrackId == track.id) drawLaneEditor(timeline, track, contentWidth, endBeat, transportState.beatPosition);
+            if(clipEditorOpen && editorTrackId == track.id) drawLaneEditor(timeline, track, contentWidth, endBeat, transportState.beatPosition);
         }
     }
 
-    if(requestClipDeletion) {
-        if(stepEditorOpen && editorTrackId == clipDeletionTrackId && editorClipId == clipDeletionClipId) {
-            stepEditorOpen = false;
+    if(requestTrackDeletion) {
+        // Clear controller-only state before the manager destroys all of the
+        // track's bindings, clips and lanes.
+        if(const auto* deletedTrack = timeline.getTrack(trackDeletionId)) {
+            for(const auto& clip : deletedTrack->clips) {
+                for(const auto& lane : clip.lanes) {
+                    collapsedLaneIds.erase(lane.id);
+                    laneEditorHeights.erase(lane.id);
+                }
+            }
+        }
+        if(clipEditorOpen && editorTrackId == trackDeletionId) {
+            clipEditorOpen = false;
             editorTrackId.clear();
             editorClipId.clear();
             editorLaneId.clear();
+            pianoSelectedNoteIndices.clear();
+            pianoDragSnapshot.clear();
+            pianoValueDragSnapshot.clear();
+        }
+        if(draggingTrackId == trackDeletionId) {
+            clipDragMode = ClipDragMode::None;
+            draggingTrackId.clear();
+            draggingClipId.clear();
+        }
+        if(pianoKeyboardPreviewTrackId == trackDeletionId) {
+            pianoKeyboardPreviewActive = false;
+            pianoKeyboardPreviewTrackId.clear();
+            pianoKeyboardPreviewGateBindingId.clear();
+            pianoKeyboardPreviewPitchBindingId.clear();
+            pianoKeyboardPreviewPitch = -1;
+        }
+        timeline.removeTrack(trackDeletionId);
+        requestTrackDeletion = false;
+        trackDeletionId.clear();
+    }
+
+    if(requestClipDeletion) {
+        if(const auto* deletedClip = timeline.getClip(clipDeletionTrackId, clipDeletionClipId)) {
+            for(const auto& lane : deletedClip->lanes) {
+                collapsedLaneIds.erase(lane.id);
+                laneEditorHeights.erase(lane.id);
+            }
+        }
+        if(clipEditorOpen && editorTrackId == clipDeletionTrackId && editorClipId == clipDeletionClipId) {
+            clipEditorOpen = false;
+            editorTrackId.clear();
+            editorClipId.clear();
+            editorLaneId.clear();
+            pianoSelectedNoteIndices.clear();
+            pianoDragSnapshot.clear();
+            pianoValueDragSnapshot.clear();
         }
         timeline.removeClip(clipDeletionTrackId, clipDeletionClipId);
         requestClipDeletion = false;
@@ -960,12 +1028,16 @@ void ofxOceanodeTimelineController::draw() {
         requestRemoveLane = false;
         if(auto* clip = timeline.getClip(editorTrackId, editorClipId)) {
             if(clip->lanes.size() <= 1) {
+                collapsedLaneIds.erase(pendingRemoveLaneId);
+                laneEditorHeights.erase(pendingRemoveLaneId);
                 timeline.removeClip(editorTrackId, editorClipId);
-                stepEditorOpen = false;
+                clipEditorOpen = false;
                 editorTrackId.clear();
                 editorClipId.clear();
                 editorLaneId.clear();
             } else {
+                collapsedLaneIds.erase(pendingRemoveLaneId);
+                laneEditorHeights.erase(pendingRemoveLaneId);
                 timeline.removeLane(editorTrackId, editorClipId, pendingRemoveLaneId);
                 if(editorLaneId == pendingRemoveLaneId) {
                     if(auto* clip2 = timeline.getClip(editorTrackId, editorClipId)) {
@@ -989,9 +1061,16 @@ void ofxOceanodeTimelineController::draw() {
                     const double duration = std::max(1.0 / kPPQ, snapBeat(mouseBeat - clip->startBeat));
                     timeline.setClipTiming(draggingTrackId, draggingClipId, clip->startBeat, duration);
                     if(clipDragMode == ClipDragMode::Repeat) timeline.setClipContentDuration(draggingTrackId, draggingClipId, dragInitialContentDuration, true);
-                    else if(clipDragMode == ClipDragMode::Stretch) timeline.setClipContentDuration(draggingTrackId, draggingClipId, dragInitialContentDuration, false);
+                    else if(clipDragMode == ClipDragMode::Stretch) {
+                        timeline.setClipContentDuration(draggingTrackId, draggingClipId, dragInitialContentDuration, false);
+                        clip->contentStretch = duration / std::max(1.0 / kPPQ, dragInitialContentDuration);
+                    }
                     else {
-                        timeline.setClipContentDuration(draggingTrackId, draggingClipId, duration, false);
+                        // Shift-resize adds/crops source space without
+                        // changing an existing stretch ratio.
+                        clip->contentStretch = std::max(1.0 / 1024.0, dragInitialContentStretch);
+                        timeline.setClipContentDuration(draggingTrackId, draggingClipId,
+                            duration / clip->contentStretch, false);
                     }
                 }
             }
@@ -1459,7 +1538,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         if(ImGui::SmallButton("+##addLane")) ImGui::OpenPopup("##addLaneTypePopup");
         if(ImGui::IsItemHovered()) ImGui::SetTooltip("Add another lane to this clip");
         ImGui::SameLine();
-        if(ImGui::SmallButton("x")) stepEditorOpen = false;
+        if(ImGui::SmallButton("x")) clipEditorOpen = false;
         if(ImGui::BeginPopup("##addLaneTypePopup")) {
             if(ImGui::MenuItem("Step Sequencer")) { requestAddLane = true; pendingAddLaneType = 0; }
             if(ImGui::MenuItem("Curve")) { requestAddLane = true; pendingAddLaneType = 1; }
@@ -2384,7 +2463,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         } // isFocused (curve interaction)
         const float playheadX = timelineMin.x + beatOffset(beatPosition);
         if(playheadX >= zoneLeft && playheadX <= editorMax.x) dl->AddLine(ImVec2(playheadX, editorMin.y), ImVec2(playheadX, editorMax.y), kPlayhead, 2.0f);
-        if(isFocused && editorCanvasHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) stepEditorOpen = false;
+        if(isFocused && editorCanvasHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) clipEditorOpen = false;
         dl->PopClipRect();
         finishAbsoluteLayout(ImVec2(editorMin.x, editorMax.y));
         continue;
@@ -2496,7 +2575,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     }
     const float playheadX = timelineMin.x + beatOffset(beatPosition);
     if(playheadX >= zoneLeft && playheadX <= editorMax.x) dl->AddLine(ImVec2(playheadX, editorMin.y), ImVec2(playheadX, editorMax.y), kPlayhead, 2.0f);
-    if(isFocused && editorCanvasHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) stepEditorOpen = false;
+    if(isFocused && editorCanvasHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) clipEditorOpen = false;
     dl->PopClipRect();
     finishAbsoluteLayout(ImVec2(editorMin.x, editorMax.y));
     } // end for(laneIndex : clip->lanes)

@@ -117,7 +117,7 @@ private:
     int pendingAddLaneType = 0;
     bool requestRemoveLane = false;
     std::string pendingRemoveLaneId;
-    bool stepEditorOpen = false;
+    bool clipEditorOpen = false;
     enum class PianoDragMode { None, Move, Resize, Velocity, Probability };
     PianoDragMode pianoDragMode = PianoDragMode::None;
     int pianoDragNoteIndex = -1;
