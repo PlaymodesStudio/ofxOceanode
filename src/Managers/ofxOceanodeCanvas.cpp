@@ -366,6 +366,208 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             return outputs;
         };
 
+        auto autoLayoutNodes = [&](vector<ofxOceanodeNode*> nodes){
+            if(nodes.size() < 2) return;
+
+            const int nodeCount = (int)nodes.size();
+            unordered_map<ofxOceanodeNodeModel*, int> nodeIndices;
+            vector<unordered_set<int>> outgoing(nodeCount);
+            vector<unordered_set<int>> incoming(nodeCount);
+            for(int i = 0; i < nodeCount; i++){
+                nodeIndices[&nodes[i]->getNodeModel()] = i;
+            }
+
+            auto addEdge = [&](int source, int sink){
+                if(source == sink || outgoing[source].count(sink) != 0) return;
+                outgoing[source].insert(sink);
+                incoming[sink].insert(source);
+            };
+
+            for(const auto& connection : container->getAllConnections()){
+                auto sourceIt = nodeIndices.find(connection->getSourceParameter().getNodeModel());
+                auto sinkIt = nodeIndices.find(connection->getSinkParameter().getNodeModel());
+                if(sourceIt != nodeIndices.end() && sinkIt != nodeIndices.end()){
+                    addEdge(sourceIt->second, sinkIt->second);
+                }
+            }
+
+            // Treat matching portals as virtual edges so portalized graphs remain together.
+            unordered_map<string, vector<int>> portalGroups;
+            for(int i = 0; i < nodeCount; i++){
+                auto* portalModel = dynamic_cast<abstractPortal*>(&nodes[i]->getNodeModel());
+                if(portalModel != nullptr){
+                    portalGroups[nodes[i]->getNodeModel().nodeName() + "\n" + portalModel->getName()].push_back(i);
+                }
+            }
+            for(const auto& group : portalGroups){
+                vector<int> senders;
+                vector<int> receivers;
+                for(int index : group.second){
+                    if(!nodes[index]->getParameters().contains("Value")) continue;
+                    auto& value = static_cast<ofxOceanodeAbstractParameter&>(nodes[index]->getParameters().get("Value"));
+                    if(value.hasInConnection()) senders.push_back(index);
+                    if(value.hasOutConnections()) receivers.push_back(index);
+                }
+                for(int sender : senders){
+                    for(int receiver : receivers) addEdge(sender, receiver);
+                }
+            }
+
+            vector<int> indegree(nodeCount, 0);
+            vector<int> rank(nodeCount, 0);
+            vector<bool> processed(nodeCount, false);
+            vector<int> ready;
+            for(int i = 0; i < nodeCount; i++){
+                indegree[i] = (int)incoming[i].size();
+                if(indegree[i] == 0) ready.push_back(i);
+            }
+            auto originalOrder = [&](int a, int b){
+                const glm::vec2 pa = nodes[a]->getNodeGui().getPosition();
+                const glm::vec2 pb = nodes[b]->getNodeGui().getPosition();
+                return pa.x == pb.x ? pa.y < pb.y : pa.x < pb.x;
+            };
+            std::sort(ready.begin(), ready.end(), originalOrder);
+
+            size_t readyIndex = 0;
+            int processedCount = 0;
+            while(processedCount < nodeCount){
+                if(readyIndex >= ready.size()){
+                    int cycleRoot = -1;
+                    for(int i = 0; i < nodeCount; i++){
+                        if(!processed[i] && (cycleRoot == -1 || originalOrder(i, cycleRoot))) cycleRoot = i;
+                    }
+                    if(cycleRoot == -1) break;
+                    ready.push_back(cycleRoot);
+                }
+
+                const int source = ready[readyIndex++];
+                if(processed[source]) continue;
+                processed[source] = true;
+                processedCount++;
+                for(int sink : outgoing[source]){
+                    if(processed[sink]) continue; // Deterministically breaks cycles.
+                    rank[sink] = std::max(rank[sink], rank[source] + 1);
+                    if(--indegree[sink] <= 0) ready.push_back(sink);
+                }
+            }
+
+            const int maxRank = *std::max_element(rank.begin(), rank.end());
+            vector<vector<int>> layers(maxRank + 1);
+            vector<float> originalY(nodeCount);
+            for(int i = 0; i < nodeCount; i++){
+                layers[rank[i]].push_back(i);
+                originalY[i] = nodes[i]->getNodeGui().getPosition().y;
+            }
+            for(auto& layer : layers){
+                std::stable_sort(layer.begin(), layer.end(), [&](int a, int b){
+                    return originalY[a] < originalY[b];
+                });
+            }
+
+            vector<int> componentOf(nodeCount, -1);
+            vector<vector<int>> components;
+            for(int root = 0; root < nodeCount; root++){
+                if(componentOf[root] != -1) continue;
+                const int component = (int)components.size();
+                components.push_back({});
+                vector<int> stack = {root};
+                componentOf[root] = component;
+                while(!stack.empty()){
+                    const int node = stack.back();
+                    stack.pop_back();
+                    components.back().push_back(node);
+                    for(int neighbour : outgoing[node]){
+                        if(componentOf[neighbour] == -1){
+                            componentOf[neighbour] = component;
+                            stack.push_back(neighbour);
+                        }
+                    }
+                    for(int neighbour : incoming[node]){
+                        if(componentOf[neighbour] == -1){
+                            componentOf[neighbour] = component;
+                            stack.push_back(neighbour);
+                        }
+                    }
+                }
+            }
+            std::stable_sort(components.begin(), components.end(), [&](const vector<int>& a, const vector<int>& b){
+                auto top = [&](const vector<int>& component){
+                    float y = std::numeric_limits<float>::max();
+                    for(int node : component) y = std::min(y, originalY[node]);
+                    return y;
+                };
+                return top(a) < top(b);
+            });
+
+            vector<glm::vec2> sizes(nodeCount);
+            const float horizontalGap = GRID_SIZE;
+            const float verticalGap = GRID_SIZE;
+            for(int layer = 0; layer <= maxRank; layer++){
+                for(int node : layers[layer]){
+                    const ofRectangle rectangle = nodes[node]->getNodeGui().getRectangle();
+                    sizes[node] = glm::vec2(std::max(rectangle.getWidth(), (float)getTotalNodeWidth()),
+                                            std::max(rectangle.getHeight(), (float)GRID_SIZE));
+                }
+            }
+
+            vector<glm::vec2> positions(nodeCount);
+            float componentY = 0;
+            const float componentGap = GRID_SIZE * 2.0f;
+            for(const auto& component : components){
+                vector<bool> inComponent(nodeCount, false);
+                for(int node : component) inComponent[node] = true;
+                vector<float> columnWidths(maxRank + 1, 0);
+                vector<float> heights(maxRank + 1, 0);
+                float componentHeight = 0;
+                for(int layer = 0; layer <= maxRank; layer++){
+                    for(int node : layers[layer]){
+                        if(inComponent[node]){
+                            columnWidths[layer] = std::max(columnWidths[layer], sizes[node].x);
+                            heights[layer] += sizes[node].y + verticalGap;
+                        }
+                    }
+                    if(heights[layer] > 0) heights[layer] -= verticalGap;
+                    componentHeight = std::max(componentHeight, heights[layer]);
+                }
+                vector<float> columnX(maxRank + 1, 0);
+                float x = 0;
+                for(int layer = 0; layer <= maxRank; layer++){
+                    if(columnWidths[layer] == 0) continue;
+                    columnX[layer] = x;
+                    x += columnWidths[layer] + horizontalGap;
+                }
+                for(int layer = 0; layer <= maxRank; layer++){
+                    float y = componentY + (componentHeight - heights[layer]) * 0.5f;
+                    for(int node : layers[layer]){
+                        if(!inComponent[node]) continue;
+                        positions[node] = glm::vec2(columnX[layer], y);
+                        y += sizes[node].y + verticalGap;
+                    }
+                }
+                componentY += componentHeight + componentGap;
+            }
+
+            glm::vec2 oldMin(std::numeric_limits<float>::max());
+            glm::vec2 oldMax(std::numeric_limits<float>::lowest());
+            glm::vec2 newMin(std::numeric_limits<float>::max());
+            glm::vec2 newMax(std::numeric_limits<float>::lowest());
+            for(int i = 0; i < nodeCount; i++){
+                const glm::vec2 oldPosition = nodes[i]->getNodeGui().getPosition();
+                oldMin = glm::min(oldMin, oldPosition);
+                oldMax = glm::max(oldMax, oldPosition + sizes[i]);
+                newMin = glm::min(newMin, positions[i]);
+                newMax = glm::max(newMax, positions[i] + sizes[i]);
+            }
+            const glm::vec2 offset = (oldMin + oldMax - newMin - newMax) * 0.5f;
+            for(int i = 0; i < nodeCount; i++){
+                positions[i] += offset;
+                if(snap_to_grid) positions[i] = snapToGrid(positions[i]);
+            }
+            for(int i = 0; i < nodeCount; i++){
+                nodes[i]->getNodeGui().setPosition(positions[i]);
+            }
+        };
+
         auto portalizeOutput = [&](ofxOceanodeAbstractParameter* sourceParameter){
             if(sourceParameter == nullptr) return false;
 
@@ -485,6 +687,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         if(portalizeSelectionRequested){
             portalizeSelectionRequested = false;
             for(auto* output : getPortalizableOutputs(container->getSelectedModules())) portalizeOutput(output);
+        }
+        if(autoLayoutSelectionRequested){
+            autoLayoutSelectionRequested = false;
+            autoLayoutNodes(container->getSelectedModules());
+        }
+        if(autoLayoutCanvasRequested){
+            autoLayoutCanvasRequested = false;
+            autoLayoutNodes(container->getAllModules());
         }
 
         // Detect canvas tab activation — consistent check for both active-canvas-ID
@@ -1601,6 +1811,22 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             if(customGuiContextNode != nullptr){
                 auto selectedNodes = container->getSelectedModules();
                 bool contextNodeIsSelected = std::find(selectedNodes.begin(), selectedNodes.end(), customGuiContextNode) != selectedNodes.end();
+                if(contextNodeIsSelected && selectedNodes.size() > 1){
+                    if(ImGui::Selectable("Auto Layout Selection")){
+                        autoLayoutNodes(selectedNodes);
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                auto allNodes = container->getAllModules();
+                if(allNodes.size() > 1){
+                    if(ImGui::Selectable("Auto Layout Canvas")){
+                        autoLayoutNodes(allNodes);
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                if((contextNodeIsSelected && selectedNodes.size() > 1) || allNodes.size() > 1){
+                    ImGui::Separator();
+                }
                 if(contextNodeIsSelected && selectedNodes.size() > 1){
                     auto connectedOutputs = getPortalizableOutputs(selectedNodes);
                     if(!connectedOutputs.empty()){

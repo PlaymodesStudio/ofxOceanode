@@ -454,6 +454,13 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             if(ImGui::MenuItem("Portalize Selection", nullptr, false, hasSelection)){
                 activeCanvas->requestPortalizeSelection();
             }
+            ImGui::Separator();
+            if(ImGui::MenuItem("Auto Layout Selection", nullptr, false, hasSelection)){
+                activeCanvas->requestAutoLayoutSelection();
+            }
+            if(ImGui::MenuItem("Auto Layout Canvas", nullptr, false, activeContainer->getAllModules().size() > 1)){
+                activeCanvas->requestAutoLayoutCanvas();
+            }
             ImGui::EndMenu();
         }
 		

@@ -100,6 +100,8 @@ public:
 	bool getSnapToGrid(){return snap_to_grid;};
 
     void requestPortalizeSelection(){portalizeSelectionRequested = true;}
+    void requestAutoLayoutSelection(){autoLayoutSelectionRequested = true;}
+    void requestAutoLayoutCanvas(){autoLayoutCanvasRequested = true;}
 	
 	
 private:
@@ -166,6 +168,8 @@ private:
     bool show_grid = true;
     bool snap_to_grid = false;
     bool portalizeSelectionRequested = false;
+    bool autoLayoutSelectionRequested = false;
+    bool autoLayoutCanvasRequested = false;
     
     string node_selected = "";
     glm::vec2 newNodeClickPos;
