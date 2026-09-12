@@ -1960,6 +1960,31 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                         }
                         pianoDragAnchorStartBeat = note.startBeat;
                         pianoDragAnchorPitch = note.pitch;
+                        if(ImGui::GetIO().KeyAlt) {
+                            // Alt+drag duplicates the whole selection in
+                            // place and drags the copies instead, leaving
+                            // the originals untouched where they were.
+                            // "note" and hitIndex must not be dereferenced
+                            // into lane->pianoNotes again after this point --
+                            // push_back below can reallocate the vector.
+                            std::unordered_map<int, int> originalToDuplicate;
+                            for(int index : pianoSelectedNoteIndices) {
+                                if(index < 0 || index >= static_cast<int>(lane->pianoNotes.size())) continue;
+                                const auto copy = lane->pianoNotes[index];
+                                lane->pianoNotes.push_back(copy);
+                                originalToDuplicate[index] = static_cast<int>(lane->pianoNotes.size()) - 1;
+                            }
+                            pianoSelectedNoteIndices.clear();
+                            for(const auto& [originalIndex, duplicateIndex] : originalToDuplicate)
+                                pianoSelectedNoteIndices.insert(duplicateIndex);
+                            const auto foundDuplicate = originalToDuplicate.find(hitIndex);
+                            if(foundDuplicate != originalToDuplicate.end()) pianoDragNoteIndex = foundDuplicate->second;
+                            pianoDragSnapshot.clear();
+                            for(int index : pianoSelectedNoteIndices) {
+                                if(index >= 0 && index < static_cast<int>(lane->pianoNotes.size()))
+                                    pianoDragSnapshot.push_back({index, lane->pianoNotes[index].startBeat, lane->pianoNotes[index].pitch});
+                            }
+                        }
                     }
                 }
             } else if(ctrlDown) {
