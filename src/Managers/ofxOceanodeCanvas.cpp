@@ -272,6 +272,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     bool open_outlet_context_menu = false;
     static ofxOceanodeNode* customGuiContextNode = nullptr;
     static ofxOceanodeAbstractParameter* portalizeSourceParameter = nullptr;
+    static char portalizeNameBuffer[256] = "";
+    bool open_portalize_name_popup = false;
     struct PendingPortalAlignment {
         ofxOceanodeContainer* container;
         string receiverNode;
@@ -568,7 +570,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
         };
 
-        auto portalizeOutput = [&](ofxOceanodeAbstractParameter* sourceParameter){
+        // The right-click "Portalize" flow lets the user rename the portal
+        // before it's created; everything else (Portalize Selection, and the
+        // uniquification below) keeps using this same default.
+        auto computeDefaultPortalName = [](ofxOceanodeAbstractParameter* sourceParameter) -> string{
+            return sourceParameter->getGroupHierarchyNames()[0] + "." + sourceParameter->getName();
+        };
+
+        auto portalizeOutput = [&](ofxOceanodeAbstractParameter* sourceParameter, const string& desiredName = string()){
             if(sourceParameter == nullptr) return false;
 
             vector<ofxOceanodeAbstractConnection*> originalConnections;
@@ -586,7 +595,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 return false;
             }
 
-            string portalName = sourceParameter->getGroupHierarchyNames()[0] + "." + sourceParameter->getName();
+            string portalName = !desiredName.empty() ? desiredName : computeDefaultPortalName(sourceParameter);
             const string portalNameBase = portalName;
             int nameSuffix = 2;
             auto portalNameExists = [&](const string& name){
@@ -1793,7 +1802,32 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         }
         if(ImGui::BeginPopup("Outlet Connection")){
             if(hasPortalizableConnections(portalizeSourceParameter) && ImGui::Selectable("Portalize")){
-                portalizeOutput(portalizeSourceParameter);
+                // Pre-fill the default name but let the user confirm/rename it
+                // before the portal pair is actually created.
+                const string defaultPortalName = computeDefaultPortalName(portalizeSourceParameter);
+                strncpy(portalizeNameBuffer, defaultPortalName.c_str(), sizeof(portalizeNameBuffer) - 1);
+                portalizeNameBuffer[sizeof(portalizeNameBuffer) - 1] = '\0';
+                open_portalize_name_popup = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        if(open_portalize_name_popup){
+            ImGui::OpenPopup("Portalize Output");
+        }
+        if(ImGui::BeginPopupModal("Portalize Output", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+            if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+            const bool namedEntered = ImGui::InputText("Name", portalizeNameBuffer, sizeof(portalizeNameBuffer),
+                                                        ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+            const bool createPressed = ImGui::Button("Create");
+            ImGui::SameLine();
+            const bool cancelPressed = ImGui::Button("Cancel");
+            if((namedEntered || createPressed) && portalizeSourceParameter != nullptr){
+                portalizeOutput(portalizeSourceParameter, string(portalizeNameBuffer));
+                portalizeSourceParameter = nullptr;
+                ImGui::CloseCurrentPopup();
+            } else if(cancelPressed){
                 portalizeSourceParameter = nullptr;
                 ImGui::CloseCurrentPopup();
             }
