@@ -1567,7 +1567,12 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 });
             }
         }
-        if(curveHovered && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        // Once a point or a tension handle has been grabbed, keep updating
+        // it for as long as the mouse button is held, even if the cursor
+        // strays outside the curve editor's rect - a normal, fast Alt-drag
+        // easily overshoots the lane's vertical bounds. Re-requiring hover
+        // here made the drag silently stop applying the moment that happened.
+        if((curveDragPointIndex >= 0 || curveTensionSegment >= 0) && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
             if(curveDragPointIndex >= 0 && curveDragPointIndex < static_cast<int>(lane->curvePoints.size())) {
                 const double minimumBeat = curveDragPointIndex > 0 ? lane->curvePoints[curveDragPointIndex - 1].beat + 1.0 / kPPQ : 0.0;
                 const double maximumBeat = curveDragPointIndex + 1 < static_cast<int>(lane->curvePoints.size())
