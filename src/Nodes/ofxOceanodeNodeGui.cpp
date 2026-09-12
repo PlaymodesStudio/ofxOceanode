@@ -616,24 +616,21 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                     if(container.getTimelineManager().isStepLaneCompatible(absParam)){
                         auto& timelineManager = container.getTimelineManager();
                         const std::string timelineParameterPath = container.getCustomGuiParameterPath(absParam);
-                        bool parameterIsTimelined = false;
-                        std::string boundTrackId;
-                        std::string boundBindingId;
-                        ofxOceanodeTimelineAutomationMode boundMode = ofxOceanodeTimelineAutomationMode::Replace;
+                        struct BoundTimelineLocation {
+                            std::string trackId;
+                            std::string trackName;
+                            std::string bindingId;
+                        };
+                        std::vector<BoundTimelineLocation> boundLocations;
                         for(const auto& timelineTrack : timelineManager.getTracks()){
-                            const auto bindingIt = std::find_if(timelineTrack.bindings.begin(), timelineTrack.bindings.end(), [&](const auto& binding){
-                                return binding.parameterPath == timelineParameterPath;
-                            });
-                            if(bindingIt != timelineTrack.bindings.end()){
-                                parameterIsTimelined = true;
-                                boundTrackId = timelineTrack.id;
-                                boundBindingId = bindingIt->id;
-                                boundMode = bindingIt->mode;
-                                break;
+                            for(const auto& binding : timelineTrack.bindings){
+                                if(binding.parameterPath == timelineParameterPath){
+                                    boundLocations.push_back({timelineTrack.id, timelineTrack.name, binding.id});
+                                }
                             }
                         }
 
-                        if(ImGui::BeginMenu("Add to Timeline Track", !parameterIsTimelined)){
+                        if(ImGui::BeginMenu("Add to Timeline Track")){
                             if(ImGui::Selectable("New Timeline Track")){
                                 const std::string trackId = timelineManager.createTrack();
                                 if(!timelineManager.addBinding(trackId, absParam).empty()) {
@@ -656,11 +653,18 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                             }
                             ImGui::EndMenu();
                         }
-                        if(parameterIsTimelined){
-                            ImGui::TextDisabled("Timeline automation active (%s)", ofxOceanodeTimelineManager::modeToString(boundMode).c_str());
+                        if(boundLocations.size() == 1){
                             if(ImGui::Selectable("Remove from Timeline")){
-                                timelineManager.removeBinding(boundTrackId, boundBindingId);
+                                timelineManager.removeBinding(boundLocations.front().trackId,
+                                                              boundLocations.front().bindingId);
                             }
+                        }else if(boundLocations.size() > 1 && ImGui::BeginMenu("Remove from Timeline")){
+                            for(const auto& location : boundLocations){
+                                if(ImGui::MenuItem(location.trackName.c_str())){
+                                    timelineManager.removeBinding(location.trackId, location.bindingId);
+                                }
+                            }
+                            ImGui::EndMenu();
                         }
                     }
                     ImGui::Separator();
