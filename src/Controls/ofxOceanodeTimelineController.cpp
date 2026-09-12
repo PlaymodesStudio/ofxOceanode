@@ -677,7 +677,14 @@ void ofxOceanodeTimelineController::draw() {
                 pendingClipId = clip.id;
                 pendingLaneId = lane != nullptr ? lane->id : (clip.lanes.empty() ? "" : clip.lanes.front().id);
                 const double clickedBeat = beatAtOffset(mouse.x - min.x);
-                if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && lane != nullptr) {
+                // A collapsed track's row is drawn (see trackCollapsed
+                // branch below) purely as a compact overview -- it has no
+                // visible clip editor dock for an opened editor to sit
+                // under, so opening one here would leave it floating
+                // disconnected from the (still collapsed) clip it belongs
+                // to. Double-clicking a clip while its track is collapsed
+                // does nothing until the track is expanded first.
+                if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && lane != nullptr && !trackCollapsed) {
                     editorTrackId = track.id;
                     editorClipId = clip.id;
                     editorLaneId = lane->id;
