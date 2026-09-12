@@ -10,6 +10,7 @@
 class ofxOceanodeContainer;
 class ofxOceanodeTimelineManager;
 struct ofxOceanodeTimelineTrack;
+struct ofxOceanodeTimelineParameterBinding;
 
 class ofxOceanodeTimelineController : public ofxOceanodeBaseController {
 public:
@@ -24,6 +25,8 @@ private:
                      double endBeat, double beatPosition, float fallbackBpm);
     void drawLaneEditor(ofxOceanodeTimelineManager& timeline, const ofxOceanodeTimelineTrack& track,
                         float contentWidth, double endBeat, double beatPosition);
+    void drawBlendModeOptions(ofxOceanodeTimelineManager& timeline, const std::string& trackId,
+                             const ofxOceanodeTimelineParameterBinding& binding);
     void drawRenamePopup(ofxOceanodeTimelineManager& timeline);
     void drawClipPopup(ofxOceanodeTimelineManager& timeline);
     double getContentEndBeat(const ofxOceanodeTimelineManager& timeline) const;

@@ -202,6 +202,37 @@ double ofxOceanodeTimelineController::pixelsToBeat(const ofxOceanodeTimelineMana
     return (low + high) * 0.5;
 }
 
+// Shared by every place a binding's blend mode can be changed: the
+// per-binding row's own context menu, and the track-header menu (so the
+// mode is reachable even while the track is collapsed and that row isn't
+// drawn at all).
+void ofxOceanodeTimelineController::drawBlendModeOptions(ofxOceanodeTimelineManager& timeline,
+                                                         const std::string& trackId,
+                                                         const ofxOceanodeTimelineParameterBinding& binding) {
+    struct BlendModeOption {
+        ofxOceanodeTimelineAutomationMode mode;
+        const char* label;
+        const char* hint;
+    };
+    static const BlendModeOption options[] = {
+        {ofxOceanodeTimelineAutomationMode::Replace, "Replace",
+         "Overrides any other binding driving this parameter"},
+        {ofxOceanodeTimelineAutomationMode::Add, "Add",
+         "Adds this binding's value to whatever else drives this parameter"},
+        {ofxOceanodeTimelineAutomationMode::Multiply, "Multiply",
+         "Multiplies this binding's value with whatever else drives this parameter"},
+        {ofxOceanodeTimelineAutomationMode::Min, "Min",
+         "Keeps the lowest value among all contributors"},
+        {ofxOceanodeTimelineAutomationMode::Max, "Max",
+         "Keeps the highest value among all contributors"},
+    };
+    for(const auto& option : options) {
+        if(ImGui::MenuItem(option.label, nullptr, binding.mode == option.mode))
+            timeline.setBindingMode(trackId, binding.id, option.mode);
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", option.hint);
+    }
+}
+
 void ofxOceanodeTimelineController::draw() {
     if(container == nullptr) return;
     auto& timeline = container->getTimelineManager();
@@ -412,6 +443,26 @@ void ofxOceanodeTimelineController::draw() {
                 pendingDurationBeats = 4.0;
                 requestClipPopup = true;
                 ImGui::CloseCurrentPopup();
+            }
+            if(!track.bindings.empty()) {
+                // Reachable here too (not just the per-binding row's own
+                // menu) because that row only exists while the track is
+                // expanded -- a collapsed track would otherwise have no way
+                // to reach blend mode at all.
+                if(ImGui::BeginMenu("Blend mode")) {
+                    if(track.bindings.size() == 1) {
+                        drawBlendModeOptions(timeline, track.id, track.bindings.front());
+                    } else {
+                        for(const auto& binding : track.bindings) {
+                            const std::string label = compactParameterName(binding.parameterPath);
+                            if(ImGui::BeginMenu(label.c_str())) {
+                                drawBlendModeOptions(timeline, track.id, binding);
+                                ImGui::EndMenu();
+                            }
+                        }
+                    }
+                    ImGui::EndMenu();
+                }
             }
             ImGui::EndPopup();
         }
@@ -725,28 +776,7 @@ void ofxOceanodeTimelineController::draw() {
                     // combines with the others -- e.g. a piano-roll gate set
                     // to Multiply onto a level curve driven by Replace.
                     if(ImGui::BeginMenu("Blend mode")) {
-                        struct BlendModeOption {
-                            ofxOceanodeTimelineAutomationMode mode;
-                            const char* label;
-                            const char* hint;
-                        };
-                        static const BlendModeOption options[] = {
-                            {ofxOceanodeTimelineAutomationMode::Replace, "Replace",
-                             "Overrides any other binding driving this parameter"},
-                            {ofxOceanodeTimelineAutomationMode::Add, "Add",
-                             "Adds this binding's value to whatever else drives this parameter"},
-                            {ofxOceanodeTimelineAutomationMode::Multiply, "Multiply",
-                             "Multiplies this binding's value with whatever else drives this parameter"},
-                            {ofxOceanodeTimelineAutomationMode::Min, "Min",
-                             "Keeps the lowest value among all contributors"},
-                            {ofxOceanodeTimelineAutomationMode::Max, "Max",
-                             "Keeps the highest value among all contributors"},
-                        };
-                        for(const auto& option : options) {
-                            if(ImGui::MenuItem(option.label, nullptr, binding.mode == option.mode))
-                                timeline.setBindingMode(track.id, binding.id, option.mode);
-                            if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", option.hint);
-                        }
+                        drawBlendModeOptions(timeline, track.id, binding);
                         ImGui::EndMenu();
                     }
                     ImGui::EndPopup();
