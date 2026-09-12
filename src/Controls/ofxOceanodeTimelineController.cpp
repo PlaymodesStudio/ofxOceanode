@@ -984,13 +984,26 @@ void ofxOceanodeTimelineController::drawBpmLane(ofxOceanodeTimelineManager& time
         if(ImGui::DragFloat("##bpmManual", &manualBpm, 0.1f, 1.0f, 999.0f, "%.1f"))
             container->setBpm(manualBpm);
     }
+    // Same 4 shapes as a curve lane (Step/Linear/Log-Exp/Sigmoid), reusing
+    // the shared curve math so the BPM curve is evaluated, drawn and timed
+    // the exact same way a regular automation curve is.
+    const auto bpmInterpolation = curveInterpolationMode(timeline.getBpmInterpolation());
     if(!collapsed) {
+        ImGui::SameLine();
+        int interpolationMode = static_cast<int>(bpmInterpolation);
+        ImGui::SetNextItemWidth(105.0f);
+        if(ImGui::Combo("Mode##bpmInterpolation", &interpolationMode, kCurveInterpolationNames, 4)) {
+            timeline.setBpmInterpolation(kCurveInterpolationNames[interpolationMode]);
+            bpmTensionSegment = -1;
+        }
         float minimum = timeline.getBpmMinimum();
         float maximum = timeline.getBpmMaximum();
         ImGui::SetNextItemWidth(70.0f);
         if(ImGui::DragFloat("Min##bpm", &minimum, 0.5f, 1.0f, 998.0f, "%.0f")) timeline.setBpmRange(minimum, maximum);
         ImGui::SetNextItemWidth(70.0f);
         if(ImGui::DragFloat("Max##bpm", &maximum, 0.5f, minimum + 1.0f, 999.0f, "%.0f")) timeline.setBpmRange(minimum, maximum);
+        if(bpmInterpolation == CurveInterpolationMode::LogExp) ImGui::TextDisabled("Alt-drag a segment vertically to shape it");
+        else if(bpmInterpolation == CurveInterpolationMode::Sigmoid) ImGui::TextDisabled("Alt-drag a segment freely to shape it");
     }
 
     ImGui::SetCursorScreenPos(timelineMin);
@@ -1015,8 +1028,10 @@ void ofxOceanodeTimelineController::drawBpmLane(ofxOceanodeTimelineManager& time
     }
 
     auto& sourcePoints = timeline.getBpmAutomationPoints();
-    if(bpmDragPointIndex < 0)
+    auto& sourceTensions = timeline.getBpmCurveTensions();
+    if(bpmDragPointIndex < 0 && bpmTensionSegment < 0)
         std::sort(sourcePoints.begin(), sourcePoints.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
+    sourceTensions.resize(sourcePoints.empty() ? 0 : sourcePoints.size() - 1);
     std::vector<ofxOceanodeTimelineCurvePoint> points = sourcePoints;
     if(points.empty()) points.push_back({0.0, fallbackBpm});
     std::sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
@@ -1029,11 +1044,30 @@ void ofxOceanodeTimelineController::drawBpmLane(ofxOceanodeTimelineManager& time
     if(points.size() == 1) {
         dl->AddLine(ImVec2(timelineMin.x, bpmToY(points.front().value)),
                     ImVec2(max.x, bpmToY(points.front().value)), IM_COL32(155, 170, 255, 220), 2.0f);
-    } else {
+    } else if(bpmInterpolation == CurveInterpolationMode::Step) {
         for(size_t i = 1; i < points.size(); ++i) {
             const ImVec2 a(timelineMin.x + beatToPixels(timeline, points[i - 1].beat, fallbackBpm), bpmToY(points[i - 1].value));
             const ImVec2 b(timelineMin.x + beatToPixels(timeline, points[i].beat, fallbackBpm), bpmToY(points[i].value));
-            dl->AddLine(a, b, IM_COL32(155, 170, 255, 230), 2.0f);
+            dl->AddLine(a, ImVec2(b.x, a.y), IM_COL32(155, 170, 255, 230), 2.0f);
+            dl->AddLine(ImVec2(b.x, a.y), b, IM_COL32(155, 170, 255, 230), 2.0f);
+        }
+    } else {
+        for(size_t i = 1; i < points.size(); ++i) {
+            const auto tension = i - 1 < sourceTensions.size() ? sourceTensions[i - 1] : ofxOceanodeTimelineCurveTension{};
+            const float x1 = timelineMin.x + beatToPixels(timeline, points[i - 1].beat, fallbackBpm);
+            const float x2 = timelineMin.x + beatToPixels(timeline, points[i].beat, fallbackBpm);
+            const int samples = std::max(16, static_cast<int>(std::abs(x2 - x1) / 4.0f));
+            for(int sample = 0; sample < samples; ++sample) {
+                const float t1 = sample / static_cast<float>(samples);
+                const float t2 = (sample + 1) / static_cast<float>(samples);
+                const double beat1 = points[i - 1].beat + (points[i].beat - points[i - 1].beat) * t1;
+                const double beat2 = points[i - 1].beat + (points[i].beat - points[i - 1].beat) * t2;
+                const float value1 = ofLerp(points[i - 1].value, points[i].value, curveSegmentShape(t1, bpmInterpolation, tension));
+                const float value2 = ofLerp(points[i - 1].value, points[i].value, curveSegmentShape(t2, bpmInterpolation, tension));
+                const ImVec2 a(timelineMin.x + beatToPixels(timeline, beat1, fallbackBpm), bpmToY(value1));
+                const ImVec2 b(timelineMin.x + beatToPixels(timeline, beat2, fallbackBpm), bpmToY(value2));
+                dl->AddLine(a, b, IM_COL32(155, 170, 255, 230), 2.0f);
+            }
         }
     }
     if(!collapsed) for(const auto& point : points) {
@@ -1068,29 +1102,67 @@ void ofxOceanodeTimelineController::drawBpmLane(ofxOceanodeTimelineManager& time
             if(bpmValuePointIndex >= 0) ImGui::OpenPopup("BPM point value");
         } else if(ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             bpmDragPointIndex = -1;
+            bpmTensionSegment = -1;
             for(int i = static_cast<int>(sourcePoints.size()) - 1; i >= 0; --i) {
                 if(std::abs(sourcePoints[i].beat - beat) <= tolerance && std::abs(bpmToY(sourcePoints[i].value) - mouse.y) <= 9.0f) {
                     bpmDragPointIndex = i;
                     break;
                 }
             }
-            if(bpmDragPointIndex < 0) {
+            if(bpmDragPointIndex < 0 && ImGui::GetIO().KeyAlt &&
+               (bpmInterpolation == CurveInterpolationMode::LogExp || bpmInterpolation == CurveInterpolationMode::Sigmoid) &&
+               sourcePoints.size() > 1) {
+                for(size_t i = 1; i < sourcePoints.size(); ++i) {
+                    const auto& a = sourcePoints[i - 1];
+                    const auto& b = sourcePoints[i];
+                    if(beat < a.beat || beat > b.beat) continue;
+                    const float t = static_cast<float>((beat - a.beat) / std::max(1e-9, b.beat - a.beat));
+                    const auto tension = i - 1 < sourceTensions.size() ? sourceTensions[i - 1] : ofxOceanodeTimelineCurveTension{};
+                    const float segmentValue = ofLerp(a.value, b.value, curveSegmentShape(t, bpmInterpolation, tension));
+                    const float segmentY = bpmToY(segmentValue);
+                    if(std::abs(mouse.y - segmentY) <= 12.0f) {
+                        bpmTensionSegment = static_cast<int>(i - 1);
+                        bpmTensionDragStartX = mouse.x;
+                        bpmTensionDragStartY = mouse.y;
+                        bpmTensionStartInflection = tension.inflection;
+                        bpmTensionStartSteepness = tension.steepness;
+                    }
+                    break;
+                }
+            }
+            if(bpmDragPointIndex < 0 && bpmTensionSegment < 0 && !ImGui::GetIO().KeyAlt) {
                 sourcePoints.push_back({beat, value});
                 std::sort(sourcePoints.begin(), sourcePoints.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
+                sourceTensions.resize(sourcePoints.empty() ? 0 : sourcePoints.size() - 1);
                 bpmDragPointIndex = static_cast<int>(std::min_element(sourcePoints.begin(), sourcePoints.end(), [&](const auto& a, const auto& b) {
                     return std::abs(a.beat - beat) < std::abs(b.beat - beat);
                 }) - sourcePoints.begin());
             }
         }
-        if(bpmDragPointIndex >= 0 && bpmDragPointIndex < static_cast<int>(sourcePoints.size()) &&
-           ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-            const double minimumBeat = bpmDragPointIndex > 0
-                ? sourcePoints[bpmDragPointIndex - 1].beat + 1.0 / kPPQ : 0.0;
-            const double maximumBeat = bpmDragPointIndex + 1 < static_cast<int>(sourcePoints.size())
-                ? sourcePoints[bpmDragPointIndex + 1].beat - 1.0 / kPPQ : endBeat;
-            sourcePoints[bpmDragPointIndex].beat = std::max(minimumBeat,
-                std::min(std::max(minimumBeat, maximumBeat), beat));
-            sourcePoints[bpmDragPointIndex].value = value;
+        // Once a point or a tension handle has been grabbed, keep updating
+        // it for as long as the mouse button is held, even if the cursor
+        // strays outside the lane's rect, matching the curve lane editor.
+        if((bpmDragPointIndex >= 0 || bpmTensionSegment >= 0) && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            if(bpmDragPointIndex >= 0 && bpmDragPointIndex < static_cast<int>(sourcePoints.size())) {
+                const double minimumBeat = bpmDragPointIndex > 0
+                    ? sourcePoints[bpmDragPointIndex - 1].beat + 1.0 / kPPQ : 0.0;
+                const double maximumBeat = bpmDragPointIndex + 1 < static_cast<int>(sourcePoints.size())
+                    ? sourcePoints[bpmDragPointIndex + 1].beat - 1.0 / kPPQ : endBeat;
+                sourcePoints[bpmDragPointIndex].beat = std::max(minimumBeat,
+                    std::min(std::max(minimumBeat, maximumBeat), beat));
+                sourcePoints[bpmDragPointIndex].value = value;
+            } else if(bpmTensionSegment >= 0 && bpmTensionSegment < static_cast<int>(sourceTensions.size())) {
+                auto& tension = sourceTensions[bpmTensionSegment];
+                if(bpmInterpolation == CurveInterpolationMode::Sigmoid) {
+                    tension.inflection = ofClamp(bpmTensionStartInflection +
+                        (mouse.x - bpmTensionDragStartX) / std::max(1.0f, max.x - timelineMin.x), 0.01f, 0.99f);
+                } else {
+                    tension.inflection = 0.5f;
+                }
+                const float steepnessDelta = -(mouse.y - bpmTensionDragStartY) /
+                    std::max(1.0f, (graphBottom - graphTop) / 3.0f);
+                tension.steepness = ofClamp(bpmTensionStartSteepness * std::exp(steepnessDelta * 0.5f), 0.1f, 10.0f);
+            }
         }
     }
     if(ImGui::BeginPopup("BPM point value")) {
@@ -1102,15 +1174,18 @@ void ofxOceanodeTimelineController::drawBpmLane(ofxOceanodeTimelineManager& time
             }
             if(ImGui::Button("Delete point")) {
                 sourcePoints.erase(sourcePoints.begin() + bpmValuePointIndex);
+                sourceTensions.resize(sourcePoints.empty() ? 0 : sourcePoints.size() - 1);
                 bpmValuePointIndex = -1;
                 ImGui::CloseCurrentPopup();
             }
         }
         ImGui::EndPopup();
     }
-    if(ImGui::IsMouseReleased(ImGuiMouseButton_Left) && bpmDragPointIndex >= 0) {
-        std::sort(sourcePoints.begin(), sourcePoints.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
+    if(ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+        if(bpmDragPointIndex >= 0)
+            std::sort(sourcePoints.begin(), sourcePoints.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
         bpmDragPointIndex = -1;
+        bpmTensionSegment = -1;
     }
     if(collapsed && canvasHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
         timeline.setBpmLaneCollapsed(false);

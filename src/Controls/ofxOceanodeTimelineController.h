@@ -94,6 +94,11 @@ private:
     int bpmDragPointIndex = -1;
     int bpmValuePointIndex = -1;
     float bpmNumericValue = 120.0f;
+    int bpmTensionSegment = -1;
+    float bpmTensionDragStartX = 0.0f;
+    float bpmTensionDragStartY = 0.0f;
+    float bpmTensionStartInflection = 0.5f;
+    float bpmTensionStartSteepness = 1.0f;
     int curveDragPointIndex = -1;
     int curveValuePointIndex = -1;
     float curveNumericValue = 0.0f;

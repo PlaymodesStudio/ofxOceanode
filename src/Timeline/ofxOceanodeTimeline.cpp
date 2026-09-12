@@ -961,13 +961,23 @@ float ofxOceanodeTimelineManager::evaluateBpm(double beat, float fallbackBpm) co
     beat = std::max(0.0, beat);
     if(beat <= points.front().beat) return ofClamp(points.front().value, bpmMinimum, bpmMaximum);
     if(beat >= points.back().beat) return ofClamp(points.back().value, bpmMinimum, bpmMaximum);
+    const auto mode = curveInterpolationMode(bpmInterpolation);
     for(size_t i = 1; i < points.size(); ++i) {
         if(beat > points[i].beat) continue;
         const double span = std::max(kEpsilon, points[i].beat - points[i - 1].beat);
         const float t = static_cast<float>(ofClamp((beat - points[i - 1].beat) / span, 0.0, 1.0));
-        return ofClamp(ofLerp(points[i - 1].value, points[i].value, t), bpmMinimum, bpmMaximum);
+        const auto tension = i - 1 < bpmCurveTensions.size() ? bpmCurveTensions[i - 1] : ofxOceanodeTimelineCurveTension{};
+        return ofClamp(ofLerp(points[i - 1].value, points[i].value, curveSegmentShape(t, mode, tension)), bpmMinimum, bpmMaximum);
     }
     return std::max(1.0f, fallbackBpm);
+}
+
+void ofxOceanodeTimelineManager::setBpmInterpolation(const std::string& interpolation) {
+    bpmInterpolation = interpolation;
+    // Topology/shape changes should not retain hidden shaping state from a
+    // different mode, mirroring resetCurveTensions() for a lane's curve.
+    bpmCurveTensions.assign(bpmAutomationPoints.empty() ? 0 : bpmAutomationPoints.size() - 1,
+                            ofxOceanodeTimelineCurveTension{});
 }
 
 double ofxOceanodeTimelineManager::beatToSeconds(double beat, float fallbackBpm) const {
@@ -976,6 +986,7 @@ double ofxOceanodeTimelineManager::beatToSeconds(double beat, float fallbackBpm)
         return beat * 60.0 / std::max(1.0f, fallbackBpm);
 
     const auto& points = bpmAutomationPoints;
+    const auto mode = curveInterpolationMode(bpmInterpolation);
     auto clampedBpm = [&](float value) {
         return static_cast<double>(ofClamp(value, bpmMinimum, bpmMaximum));
     };
@@ -987,6 +998,40 @@ double ofxOceanodeTimelineManager::beatToSeconds(double beat, float fallbackBpm)
         return std::abs(slope) <= kEpsilon
             ? duration * 60.0 / startBpm
             : 60.0 * std::log(endBpm / startBpm) / slope;
+    };
+    // Elapsed time under a segment is the integral of 60/bpm(x) over its
+    // length. That has a closed form only when bpm(x) is linear in x
+    // (integrateLinearBpm above); Step holds at the start value the whole
+    // way and jumps at the very boundary (an instant, so it contributes
+    // nothing extra); Log/Exp and Sigmoid have no closed form for this, so
+    // they're integrated numerically with a fixed Simpson's rule -- the
+    // shapes are smooth and bounded, so this is far more precise than the
+    // pixel/ruler math this feeds needs. `upToFraction` lets the same
+    // helper answer both "the whole segment" (1.0) and "partway into it"
+    // (< 1.0, for the segment beat actually falls in).
+    auto integrateSegmentSeconds = [&](double segmentDuration, double startBpm, double endBpm,
+                                       const ofxOceanodeTimelineCurveTension& tension, double upToFraction) {
+        upToFraction = ofClamp(upToFraction, 0.0, 1.0);
+        if(segmentDuration <= kEpsilon || upToFraction <= 0.0) return 0.0;
+        startBpm = std::max(1.0, startBpm);
+        endBpm = std::max(1.0, endBpm);
+        if(mode == CurveInterpolationMode::Step)
+            return segmentDuration * upToFraction * 60.0 / startBpm;
+        if(mode == CurveInterpolationMode::Linear) {
+            if(upToFraction >= 1.0 - 1e-9) return integrateLinearBpm(segmentDuration, startBpm, endBpm);
+            const double partialEndBpm = startBpm + (endBpm - startBpm) * upToFraction;
+            return integrateLinearBpm(segmentDuration * upToFraction, startBpm, partialEndBpm);
+        }
+        constexpr int steps = 64;
+        const double h = upToFraction / steps;
+        auto integrand = [&](double x) {
+            const float shaped = curveSegmentShape(static_cast<float>(x), mode, tension);
+            const double bpm = std::max(1.0, startBpm + (endBpm - startBpm) * static_cast<double>(shaped));
+            return 60.0 / bpm;
+        };
+        double sum = integrand(0.0) + integrand(upToFraction);
+        for(int i = 1; i < steps; ++i) sum += integrand(i * h) * (i % 2 == 0 ? 2.0 : 4.0);
+        return segmentDuration * (h / 3.0) * sum;
     };
 
     const double firstBeat = std::max(0.0, points.front().beat);
@@ -1001,14 +1046,14 @@ double ofxOceanodeTimelineManager::beatToSeconds(double beat, float fallbackBpm)
         if(segmentDuration <= kEpsilon) continue;
         const double startBpm = clampedBpm(points[i - 1].value);
         const double endBpm = clampedBpm(points[i].value);
+        const auto tension = i - 1 < bpmCurveTensions.size() ? bpmCurveTensions[i - 1] : ofxOceanodeTimelineCurveTension{};
         if(beat >= segmentEnd) {
-            seconds += integrateLinearBpm(segmentDuration, startBpm, endBpm);
+            seconds += integrateSegmentSeconds(segmentDuration, startBpm, endBpm, tension, 1.0);
             continue;
         }
         if(beat > segmentStart) {
-            const double partialDuration = beat - segmentStart;
-            const double partialEndBpm = startBpm + (endBpm - startBpm) * partialDuration / segmentDuration;
-            seconds += integrateLinearBpm(partialDuration, startBpm, partialEndBpm);
+            const double fraction = (beat - segmentStart) / segmentDuration;
+            seconds += integrateSegmentSeconds(segmentDuration, startBpm, endBpm, tension, fraction);
         }
         return seconds;
     }
@@ -1219,6 +1264,8 @@ void ofxOceanodeTimelineManager::clear() {
     bpmMinimum = 20.0f;
     bpmMaximum = 300.0f;
     bpmAutomationPoints.clear();
+    bpmCurveTensions.clear();
+    bpmInterpolation = "Linear";
     loopEnabled = false;
     loopStartBeat = 0.0;
     loopEndBeat = 4.0;
@@ -1266,10 +1313,14 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
         {"collapsed", bpmLaneCollapsed},
         {"minimum", bpmMinimum},
         {"maximum", bpmMaximum},
-        {"points", ofJson::array()}
+        {"interpolation", bpmInterpolation},
+        {"points", ofJson::array()},
+        {"tensions", ofJson::array()}
     };
     for(const auto& point : bpmAutomationPoints)
         json["tempo"]["points"].push_back({{"beat", point.beat}, {"bpm", point.value}});
+    for(const auto& tension : bpmCurveTensions)
+        json["tempo"]["tensions"].push_back({{"inflection", tension.inflection}, {"steepness", tension.steepness}});
     json["loop"] = {
         {"enabled", loopEnabled},
         {"startBeat", loopStartBeat},
@@ -1362,6 +1413,11 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
         bpmAutomationEnabled = tempo.value("enabled", false);
         bpmLaneCollapsed = tempo.value("collapsed", true);
         setBpmRange(tempo.value("minimum", 20.0f), tempo.value("maximum", 300.0f));
+        bpmInterpolation = tempo.value("interpolation", std::string("Linear"));
+        if(bpmInterpolation != "Step" && bpmInterpolation != "Linear" &&
+           bpmInterpolation != "Log / Exp" && bpmInterpolation != "Sigmoid") {
+            bpmInterpolation = "Linear";
+        }
         if(tempo.contains("points") && tempo["points"].is_array()) {
             for(const auto& point : tempo["points"]) {
                 if(!point.is_object()) continue;
@@ -1374,6 +1430,16 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
         std::sort(bpmAutomationPoints.begin(), bpmAutomationPoints.end(), [](const auto& a, const auto& b) {
             return a.beat < b.beat;
         });
+        if(tempo.contains("tensions") && tempo["tensions"].is_array()) {
+            for(const auto& tensionJson : tempo["tensions"]) {
+                if(!tensionJson.is_object()) continue;
+                bpmCurveTensions.push_back({
+                    ofClamp(tensionJson.value("inflection", 0.5f), 0.01f, 0.99f),
+                    ofClamp(tensionJson.value("steepness", 1.0f), 0.1f, 10.0f)
+                });
+            }
+        }
+        bpmCurveTensions.resize(bpmAutomationPoints.empty() ? 0 : bpmAutomationPoints.size() - 1);
     }
     if(json.contains("loop") && json["loop"].is_object()) {
         const auto& loop = json["loop"];

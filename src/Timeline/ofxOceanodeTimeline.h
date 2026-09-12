@@ -256,6 +256,10 @@ public:
     void setBpmRange(float minimum, float maximum);
     std::vector<ofxOceanodeTimelineCurvePoint>& getBpmAutomationPoints() { return bpmAutomationPoints; }
     const std::vector<ofxOceanodeTimelineCurvePoint>& getBpmAutomationPoints() const { return bpmAutomationPoints; }
+    std::vector<ofxOceanodeTimelineCurveTension>& getBpmCurveTensions() { return bpmCurveTensions; }
+    const std::vector<ofxOceanodeTimelineCurveTension>& getBpmCurveTensions() const { return bpmCurveTensions; }
+    const std::string& getBpmInterpolation() const { return bpmInterpolation; }
+    void setBpmInterpolation(const std::string& interpolation);
     float evaluateBpm(double beat, float fallbackBpm) const;
     double beatToSeconds(double beat, float fallbackBpm) const;
 
@@ -302,6 +306,8 @@ private:
     float bpmMinimum = 20.0f;
     float bpmMaximum = 300.0f;
     std::vector<ofxOceanodeTimelineCurvePoint> bpmAutomationPoints;
+    std::vector<ofxOceanodeTimelineCurveTension> bpmCurveTensions;
+    std::string bpmInterpolation = "Linear";
     bool loopEnabled = false;
     double loopStartBeat = 0.0;
     double loopEndBeat = 4.0;
