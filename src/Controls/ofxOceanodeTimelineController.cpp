@@ -1366,14 +1366,14 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     // so letting two expanded lanes both respond to the mouse in the same
     // frame would let them stomp on each other's notes/points. Click a
     // lane's header (or its canvas) to focus it before editing it.
-    const float clipIndent = 14.0f;
+    const float clipIndent = 20.0f;
     ImGui::Dummy(ImVec2(contentWidth, 22.0f));
     {
         const ImVec2 clipHeaderMin = ImGui::GetItemRectMin();
         const ImVec2 clipHeaderMax = ImGui::GetItemRectMax();
         const float headerZoneLeft = clipHeaderMin.x + kLabelWidth;
         ImDrawList* headerDl = ImGui::GetWindowDrawList();
-        headerDl->AddRectFilled(clipHeaderMin, ImVec2(headerZoneLeft, clipHeaderMax.y),
+        headerDl->AddRectFilled(ImVec2(clipHeaderMin.x + clipIndent, clipHeaderMin.y), ImVec2(headerZoneLeft, clipHeaderMax.y),
                                 mutedTrackColor(track.color, 0.25f, 0.44f));
         headerDl->AddLine(ImVec2(headerZoneLeft - 1.0f, clipHeaderMin.y), ImVec2(headerZoneLeft - 1.0f, clipHeaderMax.y),
                           IM_COL32(track.color.r, track.color.g, track.color.b, 210));
@@ -1408,7 +1408,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         const ImVec2 rowMax = ImGui::GetItemRectMax();
         const float rowZoneLeft = rowMin.x + kLabelWidth;
         ImDrawList* rowDl = ImGui::GetWindowDrawList();
-        rowDl->AddRectFilled(rowMin, ImVec2(rowZoneLeft, rowMax.y), mutedTrackColor(track.color, 0.18f, 0.30f));
+        rowDl->AddRectFilled(ImVec2(rowMin.x + clipIndent, rowMin.y), ImVec2(rowZoneLeft, rowMax.y), mutedTrackColor(track.color, 0.18f, 0.30f));
         ImGui::SetCursorScreenPos(ImVec2(rowMin.x + 5.0f + clipIndent, rowMin.y + 2.0f));
         if(ImGui::SmallButton((">##laneExpand" + lane->id).c_str())) collapsedLaneIds.erase(lane->id);
         ImGui::SameLine();
@@ -1437,7 +1437,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     ImDrawList* dl = ImGui::GetWindowDrawList();
 
     dl->AddRectFilled(editorMin, editorMax, mutedTrackColor(track.color, 0.13f, 0.26f));
-    dl->AddRectFilled(editorMin, ImVec2(zoneLeft, editorMax.y),
+    dl->AddRectFilled(ImVec2(editorMin.x + clipIndent, editorMin.y), ImVec2(zoneLeft, editorMax.y),
                       mutedTrackColor(track.color, 0.25f, 0.44f));
     dl->AddLine(ImVec2(zoneLeft - 1.0f, editorMin.y), ImVec2(zoneLeft - 1.0f, editorMax.y), IM_COL32(track.color.r, track.color.g, track.color.b, isFocused ? 210 : 120));
 
