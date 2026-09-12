@@ -908,6 +908,19 @@ void ofxOceanodeTimelineController::drawBpmLane(ofxOceanodeTimelineManager& time
     ImGui::SameLine();
     bool enabled = timeline.isBpmAutomationEnabled();
     if(ImGui::Checkbox("Auto##bpmAuto", &enabled)) timeline.setBpmAutomationEnabled(enabled);
+    if(!enabled) {
+        // With automation off, this lane still shows Oceanode's actual BPM
+        // (the flat line below), but there was no way to type an exact
+        // value here - only via the separate transport toolbar or the Time
+        // controller. Both write through container->setBpm(), and this
+        // reads transportState.bpm fresh every frame, so all three stay in
+        // sync regardless of which one last changed it.
+        ImGui::SameLine();
+        float manualBpm = fallbackBpm;
+        ImGui::SetNextItemWidth(70.0f);
+        if(ImGui::DragFloat("##bpmManual", &manualBpm, 0.1f, 1.0f, 999.0f, "%.1f"))
+            container->setBpm(manualBpm);
+    }
     if(!collapsed) {
         float minimum = timeline.getBpmMinimum();
         float maximum = timeline.getBpmMaximum();
