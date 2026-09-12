@@ -1669,6 +1669,20 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     }
     if(ImGui::IsItemHovered()) ImGui::SetTooltip("Remove this lane (deletes the whole clip if it's the only one)");
 
+    // Same narrow-column concern as the Start/Len row above: a labelled
+    // widget's on-screen width is its own SetNextItemWidth PLUS the trailing
+    // label ImGui draws after it, and several of the Editor tab's widgets
+    // (particularly the piano role combos) were sized for the wider,
+    // non-piano-roll case. Clamp each one to what's actually left on its row
+    // so the label can't run past the available width and disappear behind
+    // the pinned piano keyboard strip.
+    auto labeledWidgetWidth = [](float desired, const char* label) {
+        const float avail = ImGui::GetContentRegionAvail().x;
+        const float labelWidth = ImGui::CalcTextSize(label).x;
+        const float budget = avail - labelWidth - ImGui::GetStyle().ItemInnerSpacing.x - 2.0f;
+        return std::max(24.0f, std::min(desired, budget));
+    };
+
     if(ImGui::BeginTabBar("##clipPropertyTabs")) {
         if(ImGui::BeginTabItem("Clip")) {
             const std::string parameterPreview = lane->bindingIds.empty()
@@ -1689,13 +1703,23 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
 
             float start = static_cast<float>(clip->startBeat);
             float duration = static_cast<float>(clip->durationBeats);
-            const bool compactPianoProperties = lane->type == ofxOceanodeTimelineLaneType::PianoRoll;
-            ImGui::TextUnformatted("Start"); ImGui::SameLine(compactPianoProperties ? 45.0f : 58.0f);
-            ImGui::SetNextItemWidth(compactPianoProperties ? 48.0f : 62.0f);
+            // A piano roll lane's properties column is narrower than other
+            // lane types' (it shares its width with the pinned keyboard
+            // strip to its right), so fixed pixel offsets tuned for the
+            // wider case can push the Len field past the available width --
+            // where it's clipped away right where the keyboard begins.
+            // Size both fields from the row's actual available width instead.
+            const float startLabelWidth = ImGui::CalcTextSize("Start").x + 6.0f;
+            const float lenLabelWidth = ImGui::CalcTextSize("Len").x + 6.0f;
+            const float startLenSpacing = ImGui::GetStyle().ItemSpacing.x;
+            const float startLenFieldWidth = std::max(28.0f,
+                (ImGui::GetContentRegionAvail().x - startLabelWidth - lenLabelWidth - startLenSpacing * 2.0f) * 0.5f);
+            ImGui::TextUnformatted("Start"); ImGui::SameLine(startLabelWidth);
+            ImGui::SetNextItemWidth(startLenFieldWidth);
             if(ImGui::DragFloat("##clipStart", &start, static_cast<float>(editIncrement()), 0.0f, 9999.0f, "%.3g"))
                 timeline.setClipTiming(track.id, clip->id, snapBeat(start), clip->durationBeats);
             ImGui::SameLine(); ImGui::TextUnformatted("Len"); ImGui::SameLine();
-            ImGui::SetNextItemWidth(compactPianoProperties ? 42.0f : 55.0f);
+            ImGui::SetNextItemWidth(startLenFieldWidth);
             if(ImGui::DragFloat("##clipLength", &duration, static_cast<float>(editIncrement()), static_cast<float>(1.0 / kPPQ), 9999.0f, "%.3g")) {
                 const double newLength = std::max(1.0 / kPPQ, snapBeat(duration));
                 const double clipStretch = stretch(*clip);
@@ -1715,7 +1739,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         if(ImGui::BeginTabItem("Editor")) {
             int divisionIndex = divisionIndexForBeats(lane->beatsPerStep);
             auto drawDivision = [&]() {
-                ImGui::SetNextItemWidth(94.0f);
+                ImGui::SetNextItemWidth(labeledWidgetWidth(94.0f, "Grid"));
                 if(ImGui::BeginCombo("Grid", kDivisionOptions[divisionIndex].label)) {
                     for(int i = 1; i < kDivisionOptionCount; ++i) {
                         if(ImGui::Selectable(kDivisionOptions[i].label, i == divisionIndex)) {
@@ -1729,14 +1753,14 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
 
             if(lane->type == ofxOceanodeTimelineLaneType::Step) {
                 int steps = std::max(1, lane->stepCount);
-                ImGui::SetNextItemWidth(94.0f);
+                ImGui::SetNextItemWidth(labeledWidgetWidth(94.0f, "Steps"));
                 if(ImGui::DragInt("Steps", &steps, 0.2f, 1, 128)) {
                     lane->stepCount = steps;
                 }
                 drawDivision();
                 int behavior = lane->behavior == "Always" ? 1 : lane->behavior == "Mute" ? 2 : 0;
                 const char* behaviors[] = {"Probability", "Always", "Mute"};
-                ImGui::SetNextItemWidth(94.0f);
+                ImGui::SetNextItemWidth(labeledWidgetWidth(94.0f, "Mode"));
                 if(ImGui::Combo("Mode", &behavior, behaviors, 3)) lane->behavior = behaviors[behavior];
                 ImGui::Checkbox("Probability", &lane->probabilityEnabled);
             } else if(lane->type == ofxOceanodeTimelineLaneType::Curve) {
@@ -1756,7 +1780,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 auto drawPianoRole = [&](const char* label, std::string& roleId) {
                     const auto* currentBinding = roleId.empty() ? nullptr : timeline.getBinding(track.id, roleId);
                     const std::string preview = currentBinding == nullptr ? "None" : compactParameterName(currentBinding->parameterPath);
-                    ImGui::SetNextItemWidth(112.0f);
+                    ImGui::SetNextItemWidth(labeledWidgetWidth(112.0f, label));
                     if(ImGui::BeginCombo(label, preview.c_str())) {
                         if(ImGui::Selectable("None", currentBinding == nullptr)) {
                             const std::string previousRoleId = roleId;
@@ -1792,12 +1816,12 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 drawPianoRole("Gate", lane->pianoGateBindingId);
                 drawPianoRole("Velocity", lane->pianoVelocityBindingId);
                 drawDivision();
-                ImGui::SetNextItemWidth(94.0f);
+                ImGui::SetNextItemWidth(labeledWidgetWidth(94.0f, "Low"));
                 ImGui::DragInt("Low", &lane->pianoLowPitch, 0.25f, 0, 127);
-                ImGui::SetNextItemWidth(94.0f);
+                ImGui::SetNextItemWidth(labeledWidgetWidth(94.0f, "High"));
                 ImGui::DragInt("High", &lane->pianoHighPitch, 0.25f, 0, 127);
                 lane->pianoHighPitch = std::max(lane->pianoLowPitch, lane->pianoHighPitch);
-                ImGui::SetNextItemWidth(94.0f);
+                ImGui::SetNextItemWidth(labeledWidgetWidth(94.0f, "Vel"));
                 ImGui::SliderFloat("Vel", &lane->pianoDefaultVelocity, 0.0f, 1.0f, "%.2f");
                 ImGui::Checkbox("Snap", &lane->pianoSnapToGrid);
                 ImGui::SameLine(); ImGui::Checkbox("Mono", &lane->pianoMonophonic);
