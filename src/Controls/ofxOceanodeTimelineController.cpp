@@ -1257,23 +1257,32 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         dl->AddRectFilled(ImVec2(keyboardLeft, rollTop), ImVec2(keyboardRight, rollBottom),
                           IM_COL32(205, 205, 200, 255));
         const float pitchHeight = (rollBottom - rollTop) / static_cast<float>(highPitch - lowPitch + 1);
+        // Black keys are drawn on the side away from the note grid (like the
+        // shank of a real key, which doesn't reach all the way to the front
+        // edge). Each row is clipped to its own bounds so a black key can
+        // never visually bleed into the semitone above or below it.
+        const float blackKeyRight = keyboardLeft + kPianoKeyboardWidth * 0.70f;
         for(int keyboardPitch = lowPitch; keyboardPitch <= highPitch; ++keyboardPitch) {
             const float keyBottom = rollBottom - (keyboardPitch - lowPitch) * pitchHeight;
             const float keyTop = keyBottom - pitchHeight;
             const int noteClass = keyboardPitch % 12;
             const bool blackKey = noteClass == 1 || noteClass == 3 || noteClass == 6 || noteClass == 8 || noteClass == 10;
+            dl->PushClipRect(ImVec2(keyboardLeft, keyTop), ImVec2(keyboardRight, keyBottom), true);
             if(blackKey) {
-                dl->AddRectFilled(ImVec2(keyboardLeft + kPianoKeyboardWidth * 0.30f, keyTop),
-                                  ImVec2(keyboardRight, keyBottom), IM_COL32(30, 31, 34, 255));
+                dl->AddRectFilled(ImVec2(keyboardLeft, keyTop),
+                                  ImVec2(blackKeyRight, keyBottom), IM_COL32(30, 31, 34, 255));
             } else {
                 dl->AddLine(ImVec2(keyboardLeft, keyTop), ImVec2(keyboardRight, keyTop),
                             IM_COL32(75, 75, 75, 185));
             }
-            if(noteClass == 0 && pitchHeight >= 11.0f) {
+            if(noteClass == 0 && pitchHeight >= 13.0f) {
                 char noteLabel[8];
                 std::snprintf(noteLabel, sizeof(noteLabel), "C%d", keyboardPitch / 12 - 1);
-                dl->AddText(ImVec2(keyboardLeft + 2.0f, keyTop), IM_COL32(45, 45, 45, 230), noteLabel);
+                const float textHeight = ImGui::GetFontSize();
+                const float textY = keyTop + (pitchHeight - textHeight) * 0.5f;
+                dl->AddText(ImVec2(keyboardLeft + 2.0f, textY), IM_COL32(45, 45, 45, 230), noteLabel);
             }
+            dl->PopClipRect();
         }
         dl->AddRect(ImVec2(keyboardLeft, rollTop), ImVec2(keyboardRight, rollBottom),
                     IM_COL32(track.color.r, track.color.g, track.color.b, 210));
