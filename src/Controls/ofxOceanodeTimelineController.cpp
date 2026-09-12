@@ -1745,11 +1745,37 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
             const float keyTop = keyBottom - pitchHeight;
             const int noteClass = keyboardPitch % 12;
             const bool blackKey = noteClass == 1 || noteClass == 3 || noteClass == 6 || noteClass == 8 || noteClass == 10;
+            // Clicking (and, while held, dragging across) a key previews it:
+            // the lane's Gate/Pitch bindings get a live override for as long
+            // as the mouse is down, so the bound parameters sound the note
+            // immediately -- like pressing a real keyboard -- without
+            // writing anything into the clip.
+            const bool keyPressedHere = pianoKeyboardPreviewActive && pianoKeyboardPreviewTrackId == track.id &&
+                pianoKeyboardPreviewPitch == keyboardPitch;
+            const bool keyHovered = ImGui::IsMouseHoveringRect(ImVec2(keyboardLeft, keyTop), ImVec2(keyboardRight, keyBottom));
+            if(keyHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                // Match the canvas's own convention (see editorCanvasHovered
+                // above): clicking anywhere interactive on an unfocused
+                // lane focuses it, rather than silently doing nothing.
+                if(!isFocused) editorLaneId = lane->id;
+                pianoKeyboardPreviewActive = true;
+                pianoKeyboardPreviewTrackId = track.id;
+                pianoKeyboardPreviewGateBindingId = lane->pianoGateBindingId;
+                pianoKeyboardPreviewPitchBindingId = lane->pianoPitchBindingId;
+                pianoKeyboardPreviewPitch = keyboardPitch;
+                if(!lane->pianoGateBindingId.empty()) timeline.setLiveOverride(track.id, lane->pianoGateBindingId, "1");
+                if(!lane->pianoPitchBindingId.empty()) timeline.setLiveOverride(track.id, lane->pianoPitchBindingId, ofToString(keyboardPitch));
+            } else if(pianoKeyboardPreviewActive && pianoKeyboardPreviewTrackId == track.id && keyHovered &&
+                      ImGui::IsMouseDown(ImGuiMouseButton_Left) && pianoKeyboardPreviewPitch != keyboardPitch) {
+                pianoKeyboardPreviewPitch = keyboardPitch;
+                if(!pianoKeyboardPreviewPitchBindingId.empty()) timeline.setLiveOverride(track.id, pianoKeyboardPreviewPitchBindingId, ofToString(keyboardPitch));
+            }
             dl->PushClipRect(ImVec2(keyboardLeft, keyTop), ImVec2(keyboardRight, keyBottom), true);
             if(blackKey) {
                 dl->AddRectFilled(ImVec2(keyboardLeft, keyTop),
-                                  ImVec2(blackKeyRight, keyBottom), IM_COL32(30, 31, 34, 255));
+                                  ImVec2(blackKeyRight, keyBottom), keyPressedHere ? IM_COL32(90, 150, 230, 255) : IM_COL32(30, 31, 34, 255));
             } else {
+                if(keyPressedHere) dl->AddRectFilled(ImVec2(keyboardLeft, keyTop), ImVec2(keyboardRight, keyBottom), IM_COL32(140, 185, 240, 255));
                 dl->AddLine(ImVec2(keyboardLeft, keyTop), ImVec2(keyboardRight, keyTop),
                             IM_COL32(75, 75, 75, 185));
             }
@@ -1764,6 +1790,15 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         }
         dl->AddRect(ImVec2(keyboardLeft, rollTop), ImVec2(keyboardRight, rollBottom),
                     IM_COL32(track.color.r, track.color.g, track.color.b, 210));
+        if(pianoKeyboardPreviewActive && pianoKeyboardPreviewTrackId == track.id && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+            if(!pianoKeyboardPreviewGateBindingId.empty()) timeline.clearLiveOverride(track.id, pianoKeyboardPreviewGateBindingId);
+            if(!pianoKeyboardPreviewPitchBindingId.empty()) timeline.clearLiveOverride(track.id, pianoKeyboardPreviewPitchBindingId);
+            pianoKeyboardPreviewActive = false;
+            pianoKeyboardPreviewTrackId.clear();
+            pianoKeyboardPreviewGateBindingId.clear();
+            pianoKeyboardPreviewPitchBindingId.clear();
+            pianoKeyboardPreviewPitch = -1;
+        }
 
         // Vertical scrollbar: a thumb sized to the fraction of the full
         // 0-127 pitch range currently visible, positioned so pitch 127 is at

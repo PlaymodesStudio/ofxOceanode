@@ -117,6 +117,13 @@ struct ofxOceanodeTimelineParameterBinding {
     ofxOceanodeTimelineLaneType laneType = ofxOceanodeTimelineLaneType::Step;
     bool bypass = false;
     bool missingTarget = false;
+    // A live override takes priority over whatever clip automation computes
+    // for this binding's parameter, for as long as it's set. Used by the
+    // piano roll's keyboard strip so clicking a key sounds a note
+    // immediately regardless of playhead/clip content, without touching any
+    // clip data. Never serialized -- it's momentary UI interaction state.
+    bool hasLiveOverride = false;
+    std::string liveOverrideValue;
 };
 
 // A lane is an automation editor inside a clip. It may drive more than one
@@ -190,6 +197,12 @@ public:
     // update() doesn't silently override automation for that frame -
     // without paying for a second full evaluation pass.
     void applyAutomation();
+    // See ofxOceanodeTimelineParameterBinding::hasLiveOverride. setLiveOverride
+    // takes effect starting with the next evaluateAutomation()/applyAutomation()
+    // pass; the caller is responsible for calling clearLiveOverride once the
+    // interaction ends (e.g. on mouse release) -- there's no timeout.
+    void setLiveOverride(const std::string& trackId, const std::string& bindingId, const std::string& value);
+    void clearLiveOverride(const std::string& trackId, const std::string& bindingId);
     void clear();
 
     std::string createTrack(const std::string& requestedName = "Timeline Track");

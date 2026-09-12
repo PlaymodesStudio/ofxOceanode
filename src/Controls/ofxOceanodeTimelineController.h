@@ -63,6 +63,15 @@ private:
     // "use the type's default height" -- UI-only, not persisted with the
     // preset.
     std::unordered_map<std::string, float> laneEditorHeights;
+    // Piano-roll keyboard-strip "audition" state: while a key is held down,
+    // the lane's Gate/Pitch bindings get a live override (see
+    // ofxOceanodeTimelineManager::setLiveOverride) so the bound parameters
+    // sound immediately, independent of the playhead or any clip data.
+    bool pianoKeyboardPreviewActive = false;
+    std::string pianoKeyboardPreviewTrackId;
+    std::string pianoKeyboardPreviewGateBindingId;
+    std::string pianoKeyboardPreviewPitchBindingId;
+    int pianoKeyboardPreviewPitch = -1;
     char pendingTrackName[128] = {};
     int pendingNewTrackLaneType = 0;
     char pendingClipName[128] = {};

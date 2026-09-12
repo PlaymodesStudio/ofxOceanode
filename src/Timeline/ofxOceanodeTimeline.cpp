@@ -1288,12 +1288,27 @@ void ofxOceanodeTimelineManager::applyAutomation() {
             // building the combined value above.
 
             const auto valuesIt = activeValues.find(binding.parameterPath);
-            const std::string value = valuesIt == activeValues.end()
+            const std::string value = binding.hasLiveOverride ? binding.liveOverrideValue
+                : valuesIt == activeValues.end()
                 ? (zeroWhenInactivePaths.count(binding.parameterPath) > 0 ? std::string("0") : binding.defaultValue)
                 : combineAutomationValues(valuesIt->second, binding.valueType);
             if(!value.empty() && parameter->toString() != value)
                 applyAutomationValue(*parameter, value, binding.valueType);
         }
+    }
+}
+
+void ofxOceanodeTimelineManager::setLiveOverride(const std::string& trackId, const std::string& bindingId, const std::string& value) {
+    if(auto* binding = getBinding(trackId, bindingId)) {
+        binding->hasLiveOverride = true;
+        binding->liveOverrideValue = value;
+    }
+}
+
+void ofxOceanodeTimelineManager::clearLiveOverride(const std::string& trackId, const std::string& bindingId) {
+    if(auto* binding = getBinding(trackId, bindingId)) {
+        binding->hasLiveOverride = false;
+        binding->liveOverrideValue.clear();
     }
 }
 
