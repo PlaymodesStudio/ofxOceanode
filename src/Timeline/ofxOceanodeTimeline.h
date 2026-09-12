@@ -5,8 +5,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <map>
-#include <memory>
-#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -318,6 +316,7 @@ private:
     std::string makeUniqueClipId() const;
     std::string makeUniqueLaneId() const;
     void clearTimelineFlag(const ofxOceanodeTimelineTrack& track);
+    void refreshTimelineFlag(const std::string& parameterPath);
 
     ofxOceanodeContainer* container = nullptr;
     std::vector<ofxOceanodeTimelineTrack> tracks;
@@ -328,7 +327,6 @@ private:
     std::string pendingTrackRenameId;
     bool pendingTrackRenameIsNew = false;
     std::map<std::string, std::vector<std::pair<ofxOceanodeTimelineAutomationMode, std::string>>> activeAutomationValues;
-    std::set<std::string> zeroWhenInactiveAutomationPaths;
     bool bpmAutomationEnabled = false;
     bool bpmLaneCollapsed = true;
     float bpmMinimum = 20.0f;
