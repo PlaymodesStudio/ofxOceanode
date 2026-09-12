@@ -1328,7 +1328,12 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
             const int noteClass = pitch % 12;
             const bool blackKey = noteClass == 1 || noteClass == 3 || noteClass == 6 || noteClass == 8 || noteClass == 10;
             if(blackKey) dl->AddRectFilled(ImVec2(left, y), ImVec2(right, y + pitchHeight), IM_COL32(255, 255, 255, 8));
-            dl->AddLine(ImVec2(left, y), ImVec2(right, y), pitch % 12 == 0 ? IM_COL32(125, 125, 125, 165) : IM_COL32(65, 65, 65, 100));
+            // `y` is the top edge of this pitch's row, i.e. the boundary with
+            // the row above it. The octave separator belongs below C (the
+            // B/C boundary), which is the top edge of B's own row (noteClass
+            // 11) -- not the top edge of C's row (that would be the C/C#
+            // boundary, one semitone too high).
+            dl->AddLine(ImVec2(left, y), ImVec2(right, y), noteClass == 11 ? IM_COL32(125, 125, 125, 165) : IM_COL32(65, 65, 65, 100));
         }
         const double grid = std::max(1.0 / kPPQ, lane->beatsPerStep);
         const double content = std::max(1.0 / kPPQ, clip->contentDurationBeats);
