@@ -817,9 +817,24 @@ bool ofxOceanodeTimelineManager::addBindingToLane(const std::string& trackId, co
     if(std::find(lane->bindingIds.begin(), lane->bindingIds.end(), bindingId) != lane->bindingIds.end()) return true;
     lane->bindingIds.push_back(bindingId);
     if(lane->type == ofxOceanodeTimelineLaneType::PianoRoll) {
-        if(lane->pianoPitchBindingId.empty()) lane->pianoPitchBindingId = bindingId;
-        else if(lane->pianoGateBindingId.empty()) lane->pianoGateBindingId = bindingId;
-        else if(lane->pianoVelocityBindingId.empty()) lane->pianoVelocityBindingId = bindingId;
+        // Only auto-assign the next open role slot when this binding hasn't
+        // already been explicitly placed into one. The per-role UI combo
+        // (Pitch/Gate/Velocity) sets its own role field itself BEFORE
+        // calling this function, purely to make sure the binding also ends
+        // up in the generic bindingIds list -- without this guard, e.g.
+        // assigning "Gate" while Pitch was still empty would silently ALSO
+        // assign that same binding to Pitch (the next empty slot found
+        // below), corrupting the automation with a stray extra
+        // contribution (the note's raw pitch number) any time a note
+        // played. Only a fresh lane with no role set at all should get the
+        // Pitch-then-Gate-then-Velocity auto-fill.
+        const bool alreadyRoled = lane->pianoPitchBindingId == bindingId ||
+            lane->pianoGateBindingId == bindingId || lane->pianoVelocityBindingId == bindingId;
+        if(!alreadyRoled) {
+            if(lane->pianoPitchBindingId.empty()) lane->pianoPitchBindingId = bindingId;
+            else if(lane->pianoGateBindingId.empty()) lane->pianoGateBindingId = bindingId;
+            else if(lane->pianoVelocityBindingId.empty()) lane->pianoVelocityBindingId = bindingId;
+        }
     }
     return true;
 }
