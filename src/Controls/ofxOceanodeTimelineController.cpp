@@ -686,11 +686,14 @@ void ofxOceanodeTimelineController::draw() {
                                   mutedTrackColor(track.color, automated ? 0.34f : 0.23f, 0.48f));
                 dl->AddRect(min, ImVec2(min.x + kLabelWidth, max.y), IM_COL32(track.color.r, track.color.g, track.color.b, 210));
                 dl->PushClipRect(ImVec2(min.x + 5.0f, min.y), ImVec2(min.x + kLabelWidth - 7.0f, max.y), true);
-                dl->AddText(ImVec2(min.x + 7, min.y + 6), automated ? IM_COL32(245, 250, 255, 255) : IM_COL32(180, 180, 180, 255), binding.parameterPath.c_str());
+                std::string bindingLabel = binding.parameterPath;
+                if(binding.mode != ofxOceanodeTimelineAutomationMode::Replace)
+                    bindingLabel += "  [" + ofxOceanodeTimelineManager::modeToString(binding.mode) + "]";
+                dl->AddText(ImVec2(min.x + 7, min.y + 6), automated ? IM_COL32(245, 250, 255, 255) : IM_COL32(180, 180, 180, 255), bindingLabel.c_str());
                 dl->PopClipRect();
 
                 const std::string bindingMenuId = "##bindingMenu" + track.id + binding.id;
-                if(ImGui::IsMouseHoveringRect(laneMin, max) && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                if(ImGui::IsMouseHoveringRect(min, max) && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                     const double clickedBeat = beatAtOffset(ImGui::GetIO().MousePos.x - laneMin.x);
                     bool overClip = false;
                     for(const auto& clip : track.clips) {
@@ -701,7 +704,7 @@ void ofxOceanodeTimelineController::draw() {
                         }
                     }
                     if(!overClip) {
-                        pendingStartBeat = snapBeat(clickedBeat);
+                        pendingStartBeat = snapBeat(std::max(0.0, clickedBeat));
                         ImGui::OpenPopup(bindingMenuId.c_str());
                     }
                 }
@@ -715,6 +718,36 @@ void ofxOceanodeTimelineController::draw() {
                         pendingDurationBeats = 4.0;
                         requestClipPopup = true;
                         ImGui::CloseCurrentPopup();
+                    }
+                    ImGui::Separator();
+                    // When more than one binding (possibly on other tracks)
+                    // drives the same parameter, this decides how this one
+                    // combines with the others -- e.g. a piano-roll gate set
+                    // to Multiply onto a level curve driven by Replace.
+                    if(ImGui::BeginMenu("Blend mode")) {
+                        struct BlendModeOption {
+                            ofxOceanodeTimelineAutomationMode mode;
+                            const char* label;
+                            const char* hint;
+                        };
+                        static const BlendModeOption options[] = {
+                            {ofxOceanodeTimelineAutomationMode::Replace, "Replace",
+                             "Overrides any other binding driving this parameter"},
+                            {ofxOceanodeTimelineAutomationMode::Add, "Add",
+                             "Adds this binding's value to whatever else drives this parameter"},
+                            {ofxOceanodeTimelineAutomationMode::Multiply, "Multiply",
+                             "Multiplies this binding's value with whatever else drives this parameter"},
+                            {ofxOceanodeTimelineAutomationMode::Min, "Min",
+                             "Keeps the lowest value among all contributors"},
+                            {ofxOceanodeTimelineAutomationMode::Max, "Max",
+                             "Keeps the highest value among all contributors"},
+                        };
+                        for(const auto& option : options) {
+                            if(ImGui::MenuItem(option.label, nullptr, binding.mode == option.mode))
+                                timeline.setBindingMode(track.id, binding.id, option.mode);
+                            if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", option.hint);
+                        }
+                        ImGui::EndMenu();
                     }
                     ImGui::EndPopup();
                 }

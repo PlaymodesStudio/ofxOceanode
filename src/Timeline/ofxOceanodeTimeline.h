@@ -8,13 +8,25 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 class ofxOceanodeAbstractParameter;
 class ofxOceanodeContainer;
 
+// How a binding's per-frame value should combine with whatever other
+// bindings already write to the same parameter. Replace is the classic
+// single-source case; the others let several lanes/tracks drive one
+// parameter together (e.g. a piano-roll gate multiplying a level curve).
+// The base contributor's own mode is irrelevant (nothing precedes it to
+// combine with) -- each later contributor's mode decides how it blends
+// onto the running result, the same way layer blend modes work.
 enum class ofxOceanodeTimelineAutomationMode {
-    Replace
+    Replace,
+    Add,
+    Multiply,
+    Min,
+    Max
 };
 
 enum class ofxOceanodeTimelineLaneType {
@@ -197,6 +209,7 @@ public:
     bool isStepLaneCompatible(const ofxOceanodeAbstractParameter& parameter) const;
     bool removeBinding(const std::string& trackId, const std::string& bindingId);
     bool setLaneType(const std::string& trackId, const std::string& bindingId, ofxOceanodeTimelineLaneType laneType);
+    bool setBindingMode(const std::string& trackId, const std::string& bindingId, ofxOceanodeTimelineAutomationMode mode);
     ofxOceanodeTimelineParameterBinding* getBinding(const std::string& trackId, const std::string& bindingId);
     const ofxOceanodeTimelineParameterBinding* getBinding(const std::string& trackId, const std::string& bindingId) const;
 
@@ -279,7 +292,7 @@ private:
     uint64_t nextLaneNumber = 1;
     std::string pendingTrackRenameId;
     bool pendingTrackRenameIsNew = false;
-    std::map<std::string, std::vector<std::string>> activeAutomationValues;
+    std::map<std::string, std::vector<std::pair<ofxOceanodeTimelineAutomationMode, std::string>>> activeAutomationValues;
     std::set<std::string> zeroWhenInactiveAutomationPaths;
     bool bpmAutomationEnabled = false;
     bool bpmLaneCollapsed = true;

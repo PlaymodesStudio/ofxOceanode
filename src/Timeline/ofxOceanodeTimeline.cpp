@@ -74,21 +74,33 @@ double positiveModulo(double value, double length) {
     return wrapped;
 }
 
-std::string combineAutomationValues(const std::vector<std::string>& values, const std::string& valueType) {
+std::string combineAutomationValues(const std::vector<std::pair<ofxOceanodeTimelineAutomationMode, std::string>>& values,
+                                    const std::string& valueType) {
     if(values.empty()) return std::string();
-    if(valueType == typeid(float).name()) {
-        float result = 0.0f;
-        for(const auto& value : values) result += ofToFloat(value);
-        return ofToString(result);
+    const bool isFloat = valueType == typeid(float).name();
+    const bool isInt = valueType == typeid(int).name();
+    if(!isFloat && !isInt) {
+        // Non-scalar values don't have a defined numeric combine yet, so
+        // whichever contributor evaluated last simply wins (old behaviour).
+        return values.back().second;
     }
-    if(valueType == typeid(int).name()) {
-        int result = 0;
-        for(const auto& value : values) result += ofToInt(value);
-        return ofToString(result);
+    // The first contributor seeds the result -- there is nothing before it
+    // to combine with, so its own mode is irrelevant. Every later
+    // contributor blends onto the running result using its own mode, the
+    // same way layer blend modes stack in an image editor.
+    double result = ofToDouble(values.front().second);
+    for(size_t i = 1; i < values.size(); ++i) {
+        const double contribution = ofToDouble(values[i].second);
+        switch(values[i].first) {
+            case ofxOceanodeTimelineAutomationMode::Add: result += contribution; break;
+            case ofxOceanodeTimelineAutomationMode::Multiply: result *= contribution; break;
+            case ofxOceanodeTimelineAutomationMode::Min: result = std::min(result, contribution); break;
+            case ofxOceanodeTimelineAutomationMode::Max: result = std::max(result, contribution); break;
+            case ofxOceanodeTimelineAutomationMode::Replace:
+            default: result = contribution; break;
+        }
     }
-    // Non-scalar values retain Replace semantics until their dedicated editor
-    // supplies a type-aware multi-value operation.
-    return values.back();
+    return isInt ? ofToString(static_cast<int>(std::lround(result))) : ofToString(static_cast<float>(result));
 }
 
 bool clipSourceBeat(const ofxOceanodeTimelineClip& clip, double globalBeat, double& sourceBeat) {
@@ -682,6 +694,15 @@ bool ofxOceanodeTimelineManager::setLaneType(const std::string& trackId,
     return true;
 }
 
+bool ofxOceanodeTimelineManager::setBindingMode(const std::string& trackId,
+                                                const std::string& bindingId,
+                                                ofxOceanodeTimelineAutomationMode mode) {
+    auto* binding = getBinding(trackId, bindingId);
+    if(binding == nullptr) return false;
+    binding->mode = mode;
+    return true;
+}
+
 std::string ofxOceanodeTimelineManager::createClip(const std::string& trackId,
                                                    const std::string& requestedName,
                                                    double startBeat,
@@ -1081,8 +1102,13 @@ void ofxOceanodeTimelineManager::evaluateAutomation() {
                     if(!hasValue && lane.type != ofxOceanodeTimelineLaneType::Step) continue;
                     if(!hasValue) value = "0";
                     for(const auto& bindingId : lane.bindingIds) {
-                        if(const auto* binding = getBinding(track.id, bindingId))
-                            activeValues[binding->parameterPath].push_back(mapNormalizedLaneValue(lane, *binding, value));
+                        if(const auto* binding = getBinding(track.id, bindingId)) {
+                            // A bypassed binding shouldn't contribute to a
+                            // shared parameter's combined value at all.
+                            if(binding->bypass) continue;
+                            activeValues[binding->parameterPath].emplace_back(
+                                binding->mode, mapNormalizedLaneValue(lane, *binding, value));
+                        }
                     }
                 } else {
                     std::vector<const ofxOceanodeTimelinePianoNote*> activeNotes;
@@ -1110,6 +1136,7 @@ void ofxOceanodeTimelineManager::evaluateAutomation() {
                     if(lane.pianoMonophonic && activeNotes.size() > 1) activeNotes.erase(activeNotes.begin(), activeNotes.end() - 1);
                     for(size_t bindingIndex = 0; bindingIndex < 3; ++bindingIndex) {
                         if(const auto* binding = getBinding(track.id, roleBindingIds[bindingIndex])) {
+                            if(binding->bypass) continue;
                             std::vector<std::string> noteValues;
                             for(const auto* activeNote : activeNotes) {
                                 if(bindingIndex == 0) noteValues.push_back(ofToString(activeNote->pitch));
@@ -1124,7 +1151,7 @@ void ofxOceanodeTimelineManager::evaluateAutomation() {
                             std::string value = vectorTarget ? joinAutomationValues(noteValues) : noteValues.back();
                             if(bindingIndex == 2 && !vectorTarget)
                                 value = mapNormalizedLaneValue(lane, *binding, value);
-                            activeValues[binding->parameterPath].push_back(value);
+                            activeValues[binding->parameterPath].emplace_back(binding->mode, value);
                         }
                     }
                 }
@@ -1155,7 +1182,11 @@ void ofxOceanodeTimelineManager::applyAutomation() {
             }
             binding.missingTarget = false;
             parameter->setTimelined(true);
-            if(binding.mode != ofxOceanodeTimelineAutomationMode::Replace) continue;
+            // Every binding pointing at this parameter path shares the same
+            // already-combined result (combineAutomationValues folded each
+            // contributor's own mode in already), so there is nothing left
+            // to gate on binding.mode here -- it only mattered while
+            // building the combined value above.
 
             const auto valuesIt = activeValues.find(binding.parameterPath);
             const std::string value = valuesIt == activeValues.end()
@@ -1194,10 +1225,21 @@ void ofxOceanodeTimelineManager::clear() {
 }
 
 std::string ofxOceanodeTimelineManager::modeToString(ofxOceanodeTimelineAutomationMode mode) {
-    return mode == ofxOceanodeTimelineAutomationMode::Replace ? "Replace" : "Replace";
+    switch(mode) {
+        case ofxOceanodeTimelineAutomationMode::Add: return "Add";
+        case ofxOceanodeTimelineAutomationMode::Multiply: return "Multiply";
+        case ofxOceanodeTimelineAutomationMode::Min: return "Min";
+        case ofxOceanodeTimelineAutomationMode::Max: return "Max";
+        case ofxOceanodeTimelineAutomationMode::Replace:
+        default: return "Replace";
+    }
 }
 
-ofxOceanodeTimelineAutomationMode ofxOceanodeTimelineManager::modeFromString(const std::string&) {
+ofxOceanodeTimelineAutomationMode ofxOceanodeTimelineManager::modeFromString(const std::string& mode) {
+    if(mode == "Add") return ofxOceanodeTimelineAutomationMode::Add;
+    if(mode == "Multiply") return ofxOceanodeTimelineAutomationMode::Multiply;
+    if(mode == "Min") return ofxOceanodeTimelineAutomationMode::Min;
+    if(mode == "Max") return ofxOceanodeTimelineAutomationMode::Max;
     return ofxOceanodeTimelineAutomationMode::Replace;
 }
 
