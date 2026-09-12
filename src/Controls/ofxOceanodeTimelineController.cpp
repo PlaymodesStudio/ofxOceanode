@@ -24,6 +24,9 @@ constexpr float kEdgePixels = 8.0f;
 constexpr float kPianoKeyboardWidth = 38.0f;
 constexpr float kPianoScrollbarWidth = 10.0f;
 constexpr float kPianoZoomButtonHeight = 14.0f;
+constexpr float kLaneResizeHandleHeight = 6.0f;
+constexpr float kLaneEditorMinHeight = 90.0f;
+constexpr float kLaneEditorMaxHeight = 640.0f;
 
 using ofxOceanodeTimelineCurve::CurveInterpolationMode;
 using ofxOceanodeTimelineCurve::curveInterpolationMode;
@@ -1494,8 +1497,10 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         continue;
     }
 
-    const float editorHeight = lane->type == ofxOceanodeTimelineLaneType::PianoRoll
+    const float defaultEditorHeight = lane->type == ofxOceanodeTimelineLaneType::PianoRoll
         ? 270.0f : 190.0f;
+    const auto laneHeightIt = laneEditorHeights.find(lane->id);
+    const float editorHeight = laneHeightIt != laneEditorHeights.end() ? laneHeightIt->second : defaultEditorHeight;
     // Reserve the whole dock row first, then give only the timeline half an
     // input item. This leaves the left configuration zone interactive.
     ImGui::Dummy(ImVec2(contentWidth, editorHeight));
@@ -1515,6 +1520,29 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     dl->AddRectFilled(ImVec2(editorMin.x + clipIndent, editorMin.y), ImVec2(zoneLeft, editorMax.y),
                       mutedTrackColor(track.color, 0.25f, 0.44f));
     dl->AddLine(ImVec2(zoneLeft - 1.0f, editorMin.y), ImVec2(zoneLeft - 1.0f, editorMax.y), IM_COL32(track.color.r, track.color.g, track.color.b, isFocused ? 210 : 120));
+
+    // A thin grip along the row's bottom edge resizes this lane's editor
+    // height by dragging. Placed right here (before any lane-type-specific
+    // content below, and before any of this function's early "continue"
+    // exits) so it's present for every lane regardless of which branch
+    // below ends up drawing its content, at the cost of sitting underneath
+    // whatever that content draws over the same pixels -- an acceptable
+    // trade since every lane type already leaves a few pixels of margin
+    // above its own row's bottom edge.
+    {
+        const ImVec2 handleMin(editorMin.x, editorMax.y - kLaneResizeHandleHeight);
+        const ImVec2 handleMax(editorMax.x, editorMax.y);
+        ImGui::SetCursorScreenPos(handleMin);
+        ImGui::InvisibleButton(("##laneResizeHandle" + lane->id).c_str(), ImVec2(handleMax.x - handleMin.x, kLaneResizeHandleHeight));
+        const bool resizeHovered = ImGui::IsItemHovered();
+        const bool resizeActive = ImGui::IsItemActive();
+        if(resizeHovered || resizeActive) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+        if(resizeActive && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+            laneEditorHeights[lane->id] = ofClamp(editorHeight + ImGui::GetIO().MouseDelta.y, kLaneEditorMinHeight, kLaneEditorMaxHeight);
+        }
+        dl->AddRectFilled(handleMin, handleMax,
+                          resizeActive ? IM_COL32(190, 190, 200, 220) : resizeHovered ? IM_COL32(150, 150, 160, 180) : IM_COL32(0, 0, 0, 0));
+    }
 
     ImGui::SetCursorScreenPos(ImVec2(editorMin.x + 5.0f, editorMin.y + 4.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(5.0f, 4.0f));

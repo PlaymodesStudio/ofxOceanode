@@ -5,6 +5,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 class ofxOceanodeContainer;
@@ -57,6 +58,11 @@ private:
     // this set means expanded -- most lanes are expanded most of the
     // time, so "collapsed" is the state worth tracking explicitly.
     std::set<std::string> collapsedLaneIds;
+    // Per-lane editor height override (keyed by lane id), set by dragging
+    // the resize handle at the bottom of a lane's editor row. Absence means
+    // "use the type's default height" -- UI-only, not persisted with the
+    // preset.
+    std::unordered_map<std::string, float> laneEditorHeights;
     char pendingTrackName[128] = {};
     int pendingNewTrackLaneType = 0;
     char pendingClipName[128] = {};
