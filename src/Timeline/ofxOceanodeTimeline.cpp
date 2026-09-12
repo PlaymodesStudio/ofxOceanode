@@ -1173,6 +1173,22 @@ void ofxOceanodeTimelineManager::evaluateAutomation() {
                         !lane.pianoVelocityBindingId.empty() ? lane.pianoVelocityBindingId : (lane.bindingIds.size() > 2 ? lane.bindingIds[2] : std::string())
                     };
                     if(activeNotes.empty()) {
+                        // No note is sounding right now. Pitch holds its
+                        // last value (skip it, same as before a note ever
+                        // played), but Gate and Velocity are conceptually
+                        // "off" -- they must still contribute an explicit 0
+                        // rather than nothing at all, otherwise a shared
+                        // parameter driven by e.g. a Curve lane AND this
+                        // lane's Gate (Multiply) never actually gets
+                        // silenced: combineAutomationValues only zeroes a
+                        // parameter when it has zero contributors, and the
+                        // Curve lane would still be contributing every beat.
+                        for(size_t bindingIndex = 1; bindingIndex < 3; ++bindingIndex) {
+                            if(const auto* binding = getBinding(track.id, roleBindingIds[bindingIndex])) {
+                                if(binding->bypass) continue;
+                                activeValues[binding->parameterPath].emplace_back(binding->mode, std::string("0"));
+                            }
+                        }
                         continue;
                     }
                     std::sort(activeNotes.begin(), activeNotes.end(), [](const auto* a, const auto* b) {
