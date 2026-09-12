@@ -1804,12 +1804,29 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 lane->pianoLowPitch = newHigh - newRangeSize + 1;
                 lane->pianoHighPitch = newHigh;
             };
-            ImGui::PushID(("##pianoZoom" + lane->id).c_str());
-            ImGui::SetCursorScreenPos(ImVec2(pianoScrollbarLeft, rollTop));
-            if(ImGui::Button("+", ImVec2(pianoZoomButtonWidth, kPianoZoomButtonHeight))) applyPianoZoom(1.0f / 1.2f);
-            ImGui::SetCursorScreenPos(ImVec2(pianoScrollbarLeft, rollBottom - kPianoZoomButtonHeight));
-            if(ImGui::Button("-", ImVec2(pianoZoomButtonWidth, kPianoZoomButtonHeight))) applyPianoZoom(1.2f);
-            ImGui::PopID();
+            // Drawn by hand (InvisibleButton + manual fill/text) rather
+            // than ImGui::Button, matching every other absolutely-positioned
+            // control on this canvas -- a themed Button here came out
+            // invisible: it's added to the same window draw list as the
+            // hand-drawn scrollbar, and at this 10x14 size ImGui's own
+            // frame padding could make it decide there was nothing worth
+            // submitting.
+            const auto drawPianoZoomButton = [&](const std::string& idSuffix, const ImVec2& buttonMin, const char* glyph, float factor) {
+                const ImVec2 buttonMax(buttonMin.x + pianoZoomButtonWidth, buttonMin.y + kPianoZoomButtonHeight);
+                ImGui::SetCursorScreenPos(buttonMin);
+                ImGui::InvisibleButton(("##pianoZoom" + idSuffix + lane->id).c_str(), ImVec2(pianoZoomButtonWidth, kPianoZoomButtonHeight));
+                const bool zoomHovered = ImGui::IsItemHovered();
+                const bool zoomActive = ImGui::IsItemActive();
+                dl->AddRectFilled(buttonMin, buttonMax,
+                                  zoomActive ? IM_COL32(150, 150, 160, 255) : zoomHovered ? IM_COL32(110, 110, 120, 255) : IM_COL32(60, 60, 66, 255), 2.0f);
+                const ImVec2 textSize = ImGui::CalcTextSize(glyph);
+                dl->AddText(ImVec2(buttonMin.x + (pianoZoomButtonWidth - textSize.x) * 0.5f,
+                                   buttonMin.y + (kPianoZoomButtonHeight - textSize.y) * 0.5f),
+                           IM_COL32(230, 230, 235, 255), glyph);
+                if(ImGui::IsItemClicked()) applyPianoZoom(factor);
+            };
+            drawPianoZoomButton("In", ImVec2(pianoScrollbarLeft, rollTop), "+", 1.0f / 1.2f);
+            drawPianoZoomButton("Out", ImVec2(pianoScrollbarLeft, rollBottom - kPianoZoomButtonHeight), "-", 1.2f);
         }
 
         dl->AddRectFilled(ImVec2(left, velocityTop), ImVec2(right, velocityBottom), IM_COL32(28, 28, 31, 255));
