@@ -22,7 +22,7 @@ void ofxOceanodeTime::setup(std::shared_ptr<ofxOceanodeContainer> c, std::shared
     frameGlobalTimeState.previous = globalTimeState;
     frameGlobalTimeState.current = globalTimeState;
     
-    parameters.add(isPlaying.set("Is Playing", true));
+    parameters.add(isPlaying.set("Is Playing", false));
     parameters.add(frameMode.set("Frame Mode", false));
     parameters.add(frameInterval.set("Frame Interval", 1));
     parameters.add(stop.set("Stop"));

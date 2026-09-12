@@ -13,7 +13,7 @@ enum class TransportDriverMode {
 };
 
 struct ofxOceanodeTransportState {
-    bool isPlaying = true;
+    bool isPlaying = false;
     float bpm = 120.0f;
     double beatPosition = 0.0;
     uint64_t steadyTimeUs = 0;
