@@ -86,10 +86,16 @@ private:
     std::string draggingClipId;
     double dragOffsetBeats = 0.0;
     double dragInitialContentDuration = 4.0;
+    double dragInitialContentStretch = 1.0;
     float dragTimelineOriginX = 0.0f;
     bool requestRenamePopup = false;
     bool pendingNewTrackDialog = false;
     bool requestClipPopup = false;
+    // Track removal is deferred until the track iteration has finished;
+    // erasing from timeline.getTracks() inside its context menu would
+    // invalidate the current track and every clip/lane reference below it.
+    bool requestTrackDeletion = false;
+    std::string trackDeletionId;
     bool requestClipDeletion = false;
     std::string clipDeletionTrackId;
     std::string clipDeletionClipId;

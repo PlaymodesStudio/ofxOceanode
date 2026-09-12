@@ -24,14 +24,18 @@ constexpr float kEdgePixels = 8.0f;
 constexpr float kPianoKeyboardWidth = 38.0f;
 constexpr float kPianoScrollbarWidth = 10.0f;
 constexpr float kPianoZoomButtonHeight = 14.0f;
-constexpr float kLaneResizeHandleHeight = 6.0f;
+constexpr float kLaneResizeHandleHeight = 10.0f;
 constexpr float kLaneEditorMinHeight = 90.0f;
 constexpr float kLaneEditorMaxHeight = 640.0f;
 
 using ofxOceanodeTimelineCurve::CurveInterpolationMode;
 using ofxOceanodeTimelineCurve::curveInterpolationMode;
-using ofxOceanodeTimelineCurve::sigmoidFlex;
 using ofxOceanodeTimelineCurve::curveSegmentShape;
+using ofxOceanodeTimelineClipTime::cycleDuration;
+using ofxOceanodeTimelineClipTime::sourceDuration;
+using ofxOceanodeTimelineClipTime::sourceToTimelineBeat;
+using ofxOceanodeTimelineClipTime::stretch;
+using ofxOceanodeTimelineClipTime::timelineToSourceBeat;
 
 constexpr const char* kCurveInterpolationNames[] = {
     "Step", "Linear", "Log / Exp", "Sigmoid"
@@ -66,18 +70,6 @@ int divisionIndexForBeats(double beats) {
 std::string compactParameterName(const std::string& path) {
     const size_t slash = path.find_last_of('/');
     return slash == std::string::npos ? path : path.substr(slash + 1);
-}
-
-double sourceToTimelineBeat(const ofxOceanodeTimelineClip& clip, double sourceBeat, int cycle = 0) {
-    const double content = std::max(1.0 / kPPQ, clip.contentDurationBeats);
-    if(clip.repeatContent) return clip.startBeat + cycle * content + sourceBeat;
-    return clip.startBeat + sourceBeat * clip.durationBeats / content;
-}
-
-double timelineToSourceBeat(const ofxOceanodeTimelineClip& clip, double timelineBeat) {
-    const double local = std::max(0.0, timelineBeat - clip.startBeat);
-    if(clip.repeatContent) return std::fmod(local, std::max(1.0 / kPPQ, clip.contentDurationBeats));
-    return local * std::max(1.0 / kPPQ, clip.contentDurationBeats) / std::max(1.0 / kPPQ, clip.durationBeats);
 }
 
 const ImU32 kGrid = IM_COL32(70, 70, 70, 115);
@@ -164,12 +156,6 @@ double ofxOceanodeTimelineController::getContentEndBeat(const ofxOceanodeTimelin
     for(const auto& track : timeline.getTracks()) {
         for(const auto& clip : track.clips) {
             endBeat = std::max(endBeat, clip.startBeat + clip.durationBeats);
-            for(const auto& lane : clip.lanes) {
-                endBeat = std::max(endBeat, clip.startBeat + clip.contentDurationBeats);
-                for(const auto& step : lane.step.steps) {
-                    endBeat = std::max(endBeat, clip.startBeat + step.startBeat + std::max(0.0, step.durationBeats));
-                }
-            }
         }
     }
     return endBeat;
@@ -486,7 +472,7 @@ void ofxOceanodeTimelineController::draw() {
                     : track.bindings.front().laneType == ofxOceanodeTimelineLaneType::Curve ? 1
                     : track.bindings.front().laneType == ofxOceanodeTimelineLaneType::PianoRoll ? 2 : 0;
                 pendingStartBeat = snapBeat(transportState.beatPosition);
-                pendingDurationBeats = 4.0;
+                pendingDurationBeats = timeline.getBeatsPerBar();
                 requestClipPopup = true;
                 ImGui::CloseCurrentPopup();
             }
@@ -569,8 +555,7 @@ void ofxOceanodeTimelineController::draw() {
                 const auto interpolation = curveInterpolationMode(lane->curveInterpolation);
                 auto points = lane->curvePoints;
                 std::sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
-                const double content = std::max(1.0 / kPPQ, clip.contentDurationBeats);
-                const int cycles = clip.repeatContent ? static_cast<int>(std::ceil(clip.durationBeats / content)) : 1;
+                const int cycles = clip.repeatContent ? static_cast<int>(std::ceil(clip.durationBeats / cycleDuration(clip))) : 1;
                 dl->PushClipRect(ImVec2(left + 1.0f, min.y + 3.0f), ImVec2(right - 1.0f, max.y - 3.0f), true);
                 for(int cycle = 0; cycle < cycles; ++cycle) {
                     for(size_t i = 1; i < points.size(); ++i) {
@@ -607,8 +592,7 @@ void ofxOceanodeTimelineController::draw() {
                 return;
             }
             if(lane->type == ofxOceanodeTimelineLaneType::PianoRoll) {
-                const double content = std::max(1.0 / kPPQ, clip.contentDurationBeats);
-                const int cycles = clip.repeatContent ? static_cast<int>(std::ceil(clip.durationBeats / content)) : 1;
+                const int cycles = clip.repeatContent ? static_cast<int>(std::ceil(clip.durationBeats / cycleDuration(clip))) : 1;
                 dl->PushClipRect(ImVec2(left + 1.0f, min.y + 3.0f), ImVec2(right - 1.0f, max.y - 3.0f), true);
                 for(int cycle = 0; cycle < cycles; ++cycle) {
                     for(const auto& note : lane->pianoNotes) {
@@ -622,37 +606,39 @@ void ofxOceanodeTimelineController::draw() {
                 return;
             }
             const double patternLength = std::max(1.0 / kPPQ, lane->stepCount * lane->beatsPerStep);
-            const double sourceSpan = clip.repeatContent ? clip.durationBeats : clip.contentDurationBeats;
-            const int cycles = std::max(1, static_cast<int>(std::ceil(sourceSpan / patternLength)));
+            const double content = sourceDuration(clip);
+            const int clipCycles = clip.repeatContent
+                ? std::max(1, static_cast<int>(std::ceil(clip.durationBeats / cycleDuration(clip)))) : 1;
+            const int patternCycles = std::max(1, static_cast<int>(std::ceil(content / patternLength)));
             dl->PushClipRect(ImVec2(left + 1.0f, min.y + 3.0f), ImVec2(right - 1.0f, max.y - 3.0f), true);
-            for(int cycle = 0; cycle < cycles; ++cycle) {
-                const double offset = cycle * patternLength;
-                if(cycle > 0) {
-                    const double markerBeat = clip.repeatContent
-                        ? clip.startBeat + offset : sourceToTimelineBeat(clip, offset);
-                    const float markerX = min.x + beatOffset(markerBeat);
-                    dl->AddLine(ImVec2(markerX, min.y + 3.0f), ImVec2(markerX, max.y - 3.0f),
-                                IM_COL32(track.color.r, track.color.g, track.color.b, 245), 2.0f);
-                }
-                for(size_t index = 0; index < lane->step.steps.size(); ++index) {
-                    const auto& step = lane->step.steps[index];
-                    const double stepEnd = std::min(patternLength, step.startBeat +
-                        (step.durationBeats > 0.0 ? step.durationBeats : lane->beatsPerStep));
-                    const double startSource = offset + step.startBeat;
-                    const double endSource = offset + stepEnd;
-                    const double start = clip.repeatContent ? clip.startBeat + startSource : sourceToTimelineBeat(clip, startSource);
-                    const double end = clip.repeatContent ? clip.startBeat + endSource : sourceToTimelineBeat(clip, endSource);
-                    if(end <= start) continue;
-                    const float sx1 = min.x + beatOffset(start);
-                    const float sx2 = min.x + beatOffset(end);
-                    const float probability = ofClamp(step.probability, 0.0f, 1.0f);
-                    const float top = max.y - 6.0f - probability * (max.y - min.y - 12.0f);
-                    dl->AddRectFilled(ImVec2(std::max(sx1, min.x) + 2, top), ImVec2(std::min(sx2, max.x) - 2, max.y - 6), IM_COL32(245, 245, 245, 85), 2);
+            for(int clipCycle = 0; clipCycle < clipCycles; ++clipCycle) {
+                for(int patternCycle = 0; patternCycle < patternCycles; ++patternCycle) {
+                    const double offset = patternCycle * patternLength;
+                    if(clipCycle > 0 || patternCycle > 0) {
+                        const float markerX = min.x + beatOffset(sourceToTimelineBeat(clip, offset, clipCycle));
+                        dl->AddLine(ImVec2(markerX, min.y + 3.0f), ImVec2(markerX, max.y - 3.0f),
+                                    IM_COL32(track.color.r, track.color.g, track.color.b, 245), 2.0f);
+                    }
+                    for(const auto& step : lane->step.steps) {
+                        const double stepEnd = std::min(patternLength, step.startBeat +
+                            (step.durationBeats > 0.0 ? step.durationBeats : lane->beatsPerStep));
+                        const double startSource = offset + step.startBeat;
+                        const double endSource = std::min(content, offset + stepEnd);
+                        if(startSource >= content || endSource <= startSource) continue;
+                        const float sx1 = min.x + beatOffset(sourceToTimelineBeat(clip, startSource, clipCycle));
+                        const float sx2 = min.x + beatOffset(sourceToTimelineBeat(clip, endSource, clipCycle));
+                        const float probability = ofClamp(step.probability, 0.0f, 1.0f);
+                        const float top = max.y - 6.0f - probability * (max.y - min.y - 12.0f);
+                        dl->AddRectFilled(ImVec2(std::max(sx1, min.x) + 2, top),
+                                              ImVec2(std::min(sx2, max.x) - 2, max.y - 6),
+                                              IM_COL32(245, 245, 245, 85), 2);
+                    }
                 }
             }
             dl->PopClipRect();
         };
 
+        bool clipInteractionClaimedThisFrame = false;
         auto handleClip = [&](const ofxOceanodeTimelineClip& clip, const ofxOceanodeTimelineLane* lane,
                               const ImVec2& min, const ImVec2& max) {
             const ImVec2 mouse = ImGui::GetIO().MousePos;
@@ -712,6 +698,7 @@ void ofxOceanodeTimelineController::draw() {
                     draggingClipId = clip.id;
                     dragOffsetBeats = clickedBeat - clip.startBeat;
                     dragInitialContentDuration = clip.contentDurationBeats;
+                    dragInitialContentStretch = clip.contentStretch;
                     dragTimelineOriginX = min.x;
                 }
             }
@@ -732,9 +719,14 @@ void ofxOceanodeTimelineController::draw() {
                 double contentDuration = editClip->contentDurationBeats;
                 if(ImGui::InputDouble("Start", &start, editIncrement(), 1.0, "%.3f"))
                     timeline.setClipTiming(track.id, clip.id, snapBeat(start), editClip->durationBeats);
-                if(ImGui::InputDouble("Duration", &duration, editIncrement(), 1.0, "%.3f"))
-                    timeline.setClipTiming(track.id, clip.id, editClip->startBeat,
-                                           std::max(1.0 / kPPQ, snapBeat(duration)));
+                if(ImGui::InputDouble("Duration", &duration, editIncrement(), 1.0, "%.3f")) {
+                    const double newDuration = std::max(1.0 / kPPQ, snapBeat(duration));
+                    timeline.setClipTiming(track.id, clip.id, editClip->startBeat, newDuration);
+                    if(!editClip->repeatContent) {
+                        editClip->contentStretch = newDuration /
+                            std::max(1.0 / kPPQ, editClip->contentDurationBeats);
+                    }
+                }
                 if(ImGui::InputDouble("Content", &contentDuration, editIncrement(), 1.0, "%.3f"))
                     timeline.setClipContentDuration(track.id, clip.id,
                                                     std::max(1.0 / kPPQ, snapBeat(contentDuration)),
@@ -742,6 +734,11 @@ void ofxOceanodeTimelineController::draw() {
                 bool repeat = editClip->repeatContent;
                 if(ImGui::Checkbox("Repeat content", &repeat))
                     timeline.setClipContentDuration(track.id, clip.id, editClip->contentDurationBeats, repeat);
+                ImGui::Separator();
+                if(ImGui::MenuItem("Consolidate content"))
+                    timeline.consolidateClipContent(track.id, clip.id);
+                if(ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Permanently remove source data hidden beyond the clip's right edge");
                 ImGui::Separator();
             }
             auto* selectedLane = timeline.getLane(track.id, clip.id, pendingLaneId);
@@ -863,7 +860,7 @@ void ofxOceanodeTimelineController::draw() {
                         pendingClipLaneType = binding.laneType == ofxOceanodeTimelineLaneType::Curve ? 1
                             : binding.laneType == ofxOceanodeTimelineLaneType::PianoRoll ? 2 : 0;
                         pendingClipName[0] = '\0';
-                        pendingDurationBeats = 4.0;
+                        pendingDurationBeats = timeline.getBeatsPerBar();
                         requestClipPopup = true;
                         ImGui::CloseCurrentPopup();
                     }
@@ -1595,8 +1592,9 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
             ImGui::SetNextItemWidth(compactPianoProperties ? 42.0f : 55.0f);
             if(ImGui::DragFloat("##clipLength", &duration, static_cast<float>(editIncrement()), static_cast<float>(1.0 / kPPQ), 9999.0f, "%.3g")) {
                 const double newLength = std::max(1.0 / kPPQ, snapBeat(duration));
+                const double clipStretch = stretch(*clip);
                 timeline.setClipTiming(track.id, clip->id, clip->startBeat, newLength);
-                timeline.setClipContentDuration(track.id, clip->id, newLength, false);
+                timeline.setClipContentDuration(track.id, clip->id, newLength / clipStretch, false);
             }
 
             if(lane->type != ofxOceanodeTimelineLaneType::PianoRoll) {
@@ -1617,8 +1615,6 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                         if(ImGui::Selectable(kDivisionOptions[i].label, i == divisionIndex)) {
                             divisionIndex = i;
                             lane->beatsPerStep = kDivisionOptions[i].beats;
-                            lane->beatDivision = kDivisionOptions[i].label;
-                            lane->step.lengthBeats = std::max(1, lane->stepCount) * lane->beatsPerStep;
                         }
                     }
                     ImGui::EndCombo();
@@ -1630,7 +1626,6 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 ImGui::SetNextItemWidth(94.0f);
                 if(ImGui::DragInt("Steps", &steps, 0.2f, 1, 128)) {
                     lane->stepCount = steps;
-                    lane->step.lengthBeats = lane->stepCount * lane->beatsPerStep;
                 }
                 drawDivision();
                 int behavior = lane->behavior == "Always" ? 1 : lane->behavior == "Mute" ? 2 : 0;
@@ -1909,19 +1904,19 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
             dl->AddLine(ImVec2(left, y), ImVec2(right, y), noteClass == 11 ? IM_COL32(125, 125, 125, 165) : IM_COL32(65, 65, 65, 100));
         }
         const double grid = std::max(1.0 / kPPQ, lane->beatsPerStep);
-        const double content = std::max(1.0 / kPPQ, clip->contentDurationBeats);
-        const double sourceSpan = clip->repeatContent ? clip->durationBeats : content;
-        const int gridCount = static_cast<int>(std::ceil(sourceSpan / grid));
-        for(int i = 0; i <= gridCount; ++i) {
-            const double source = i * grid;
-            const double global = clip->repeatContent ? clip->startBeat + source : sourceToTimelineBeat(*clip, source);
-            const float x = timelineMin.x + beatOffset(global);
-            if(x < left || x > right) continue;
-            const bool contentBoundary = clip->repeatContent && i > 0 && std::fmod(source, content) < 1e-6;
-            dl->AddLine(ImVec2(x, rollTop), ImVec2(x, probabilityBottom), contentBoundary ? IM_COL32(track.color.r, track.color.g, track.color.b, 225) : kGrid, contentBoundary ? 2.0f : 1.0f);
+        const double content = sourceDuration(*clip);
+        const int cycles = clip->repeatContent ? std::max(1, static_cast<int>(std::ceil(clip->durationBeats / cycleDuration(*clip)))) : 1;
+        const int gridCount = static_cast<int>(std::ceil(content / grid));
+        for(int cycle = 0; cycle < cycles; ++cycle) {
+            for(int i = 0; i <= gridCount; ++i) {
+                const double source = std::min(content, i * grid);
+                const float x = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, source, cycle));
+                if(x < left || x > right) continue;
+                const bool contentBoundary = clip->repeatContent && i == 0 && cycle > 0;
+                dl->AddLine(ImVec2(x, rollTop), ImVec2(x, probabilityBottom), contentBoundary ? IM_COL32(track.color.r, track.color.g, track.color.b, 225) : kGrid, contentBoundary ? 2.0f : 1.0f);
+            }
         }
 
-        const int cycles = clip->repeatContent ? std::max(1, static_cast<int>(std::ceil(clip->durationBeats / content))) : 1;
         dl->PushClipRect(ImVec2(left, rollTop), ImVec2(right, probabilityBottom), true);
         for(int cycle = 0; cycle < cycles; ++cycle) {
             for(size_t noteIndex = 0; noteIndex < lane->pianoNotes.size(); ++noteIndex) {
@@ -1952,9 +1947,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         const bool probabilityHovered = ImGui::IsMouseHoveringRect(ImVec2(left, probabilityTop), ImVec2(right, probabilityBottom));
         const ImVec2 mouse = ImGui::GetIO().MousePos;
         const double timelineBeat = beatAtOffset(mouse.x - timelineMin.x);
-        double sourceBeat = clip->repeatContent
-            ? std::fmod(std::max(0.0, timelineBeat - clip->startBeat), content)
-            : timelineToSourceBeat(*clip, timelineBeat);
+        double sourceBeat = timelineToSourceBeat(*clip, timelineBeat);
         const int pitch = ofClamp(highPitch - static_cast<int>((mouse.y - rollTop) / pitchHeight), lowPitch, highPitch);
         const double snappedSource = lane->pianoSnapToGrid ? std::round(sourceBeat / grid) * grid : sourceBeat;
         auto hitPianoValueHandle = [&]() {
@@ -2226,12 +2219,13 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         std::sort(lane->curvePoints.begin(), lane->curvePoints.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
         lane->curveTensions.resize(lane->curvePoints.empty() ? 0 : lane->curvePoints.size() - 1);
         const auto& points = lane->curvePoints;
-        const double content = std::max(1.0 / kPPQ, clip->contentDurationBeats);
-        const int cycles = clip->repeatContent ? std::max(1, static_cast<int>(std::ceil(clip->durationBeats / content))) : 1;
+        const double content = sourceDuration(*clip);
+        const double repeatCycleDuration = cycleDuration(*clip);
+        const int cycles = clip->repeatContent ? std::max(1, static_cast<int>(std::ceil(clip->durationBeats / repeatCycleDuration))) : 1;
         dl->PushClipRect(ImVec2(left, curveTop), ImVec2(right, curveBottom), true);
         for(int cycle = 0; cycle < cycles; ++cycle) {
             if(cycle > 0) {
-                const float markerX = timelineMin.x + beatOffset(clip->startBeat + cycle * content);
+                const float markerX = timelineMin.x + beatOffset(clip->startBeat + cycle * repeatCycleDuration);
                 dl->AddLine(ImVec2(markerX, curveTop), ImVec2(markerX, curveBottom), IM_COL32(track.color.r, track.color.g, track.color.b, 220), 2.0f);
             }
             for(size_t i = 1; i < points.size(); ++i) {
@@ -2281,7 +2275,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         const double curveTimelineBeat = beatAtOffset(curveMouse.x - timelineMin.x);
         const double curveSourceBeat = timelineToSourceBeat(*clip, curveTimelineBeat);
         const int hoveredCycle = clip->repeatContent
-            ? std::max(0, static_cast<int>(std::floor(std::max(0.0, curveTimelineBeat - clip->startBeat) / content))) : 0;
+            ? std::max(0, static_cast<int>(std::floor(std::max(0.0, curveTimelineBeat - clip->startBeat) / repeatCycleDuration))) : 0;
         const float curveValue = lane->curveClamp
             ? ofClamp((curveBottom - curveMouse.y) / (curveBottom - curveTop), 0.0f, 1.0f)
             : (curveBottom - curveMouse.y) / (curveBottom - curveTop);
@@ -2402,51 +2396,57 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     const float cellTop = editorMin.y + 10.0f;
     const float cellBottom = editorMax.y - 10.0f;
     if(right > left) {
-        dl->AddRectFilled(ImVec2(left, editorMin.y + 3), ImVec2(right, editorMax.y - 3), IM_COL32(track.color.r, track.color.g, track.color.b, 50), 2);
-        const double sourceSpan = clip->repeatContent ? clip->durationBeats : clip->contentDurationBeats;
-        const int cycles = std::max(1, static_cast<int>(std::ceil(sourceSpan / patternLength)));
+        dl->AddRectFilled(ImVec2(left, editorMin.y + 3),
+                          ImVec2(right, editorMax.y - kLaneResizeHandleHeight),
+                          IM_COL32(track.color.r, track.color.g, track.color.b, 50), 2);
+        const double content = sourceDuration(*clip);
+        const int clipCycles = clip->repeatContent
+            ? std::max(1, static_cast<int>(std::ceil(clip->durationBeats / cycleDuration(*clip)))) : 1;
+        const int patternCycles = std::max(1, static_cast<int>(std::ceil(content / patternLength)));
         dl->PushClipRect(ImVec2(left, cellTop), ImVec2(right, cellBottom), true);
-        for(int cycle = 0; cycle < cycles; ++cycle) {
-            const double sourceOffset = cycle * patternLength;
-            const double cycleStartBeat = clip->repeatContent
-                ? clip->startBeat + sourceOffset : sourceToTimelineBeat(*clip, sourceOffset);
-            const double cycleEndBeat = clip->repeatContent
-                ? clip->startBeat + sourceOffset + patternLength : sourceToTimelineBeat(*clip, sourceOffset + patternLength);
-            const float cycleX1 = timelineMin.x + beatOffset(cycleStartBeat);
-            const float cycleX2 = timelineMin.x + beatOffset(cycleEndBeat);
-            if(cycle > 0) {
-                dl->AddRectFilled(ImVec2(cycleX1, cellTop), ImVec2(cycleX2, cellBottom), IM_COL32(255, 255, 255, cycle % 2 ? 10 : 18));
-                dl->AddLine(ImVec2(cycleX1, cellTop), ImVec2(cycleX1, cellBottom), IM_COL32(track.color.r, track.color.g, track.color.b, 245), 2.0f);
-            }
-            for(int index = 0; index < stepCount; ++index) {
-                const double dataBeat = index * beatsPerStep;
-                const double sourceStart = sourceOffset + dataBeat;
-                const double sourceEnd = sourceStart + beatsPerStep;
-                const double globalStart = clip->repeatContent
-                    ? clip->startBeat + sourceStart : sourceToTimelineBeat(*clip, sourceStart);
-                const double globalEnd = clip->repeatContent
-                    ? clip->startBeat + sourceEnd : sourceToTimelineBeat(*clip, sourceEnd);
-                const float x1 = timelineMin.x + beatOffset(globalStart);
-                const float x2 = timelineMin.x + beatOffset(globalEnd);
-                if(x2 < left || x1 > right) continue;
-                dl->AddLine(ImVec2(x1, cellTop), ImVec2(x1, cellBottom), index == 0 ? kBar : kGrid, index == 0 ? 1.5f : 1.0f);
-                const auto stepIt = std::find_if(lane->step.steps.begin(), lane->step.steps.end(), [&](const auto& step) {
-                    return std::abs(step.startBeat - dataBeat) < 1.0 / kPPQ;
-                });
-                const float probability = stepIt == lane->step.steps.end() ? 0.0f : ofClamp(stepIt->probability, 0.0f, 1.0f);
-                if(probability > 0.0f) {
-                    const float fillTop = cellBottom - probability * (cellBottom - cellTop);
-                    const int alpha = cycle == 0 ? 215 : 125;
-                    dl->AddRectFilled(ImVec2(std::max(x1, left) + 1, fillTop), ImVec2(std::min(x2, right) - 1, cellBottom),
-                                      IM_COL32(240, 240, 240, alpha), 2);
-                } else {
-                    dl->AddRect(ImVec2(std::max(x1, left) + 1, cellTop), ImVec2(std::min(x2, right) - 1, cellBottom),
-                                IM_COL32(130, 130, 130, cycle == 0 ? 110 : 65), 1.0f);
+        for(int clipCycle = 0; clipCycle < clipCycles; ++clipCycle) {
+            for(int patternCycle = 0; patternCycle < patternCycles; ++patternCycle) {
+                const double sourceOffset = patternCycle * patternLength;
+                const double cycleSourceEnd = std::min(content, sourceOffset + patternLength);
+                const float cycleX1 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, sourceOffset, clipCycle));
+                const float cycleX2 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, cycleSourceEnd, clipCycle));
+                const bool firstPattern = clipCycle == 0 && patternCycle == 0;
+                if(!firstPattern) {
+                    dl->AddRectFilled(ImVec2(cycleX1, cellTop), ImVec2(cycleX2, cellBottom),
+                                      IM_COL32(255, 255, 255, patternCycle % 2 ? 10 : 18));
+                    dl->AddLine(ImVec2(cycleX1, cellTop), ImVec2(cycleX1, cellBottom),
+                                IM_COL32(track.color.r, track.color.g, track.color.b, 245), 2.0f);
                 }
-                if(cycle == 0 && x2 - x1 > 28.0f && stepIt != lane->step.steps.end()) {
-                    char probabilityLabel[16];
-                    std::snprintf(probabilityLabel, sizeof(probabilityLabel), "%.0f%%", probability * 100.0f);
-                    dl->AddText(ImVec2(std::max(x1, left) + 3, cellTop + 3), IM_COL32(35, 35, 35, 230), probabilityLabel);
+                for(int index = 0; index < stepCount; ++index) {
+                    const double dataBeat = index * beatsPerStep;
+                    const double sourceStart = sourceOffset + dataBeat;
+                    const double sourceEnd = std::min(content, sourceStart + beatsPerStep);
+                    if(sourceStart >= content || sourceEnd <= sourceStart) continue;
+                    const float x1 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, sourceStart, clipCycle));
+                    const float x2 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, sourceEnd, clipCycle));
+                    if(x2 < left || x1 > right) continue;
+                    dl->AddLine(ImVec2(x1, cellTop), ImVec2(x1, cellBottom),
+                                index == 0 ? kBar : kGrid, index == 0 ? 1.5f : 1.0f);
+                    const auto stepIt = std::find_if(lane->step.steps.begin(), lane->step.steps.end(), [&](const auto& step) {
+                        return std::abs(step.startBeat - dataBeat) < 1.0 / kPPQ;
+                    });
+                    const float probability = stepIt == lane->step.steps.end() ? 0.0f : ofClamp(stepIt->probability, 0.0f, 1.0f);
+                    if(probability > 0.0f) {
+                        const float fillTop = cellBottom - probability * (cellBottom - cellTop);
+                        dl->AddRectFilled(ImVec2(std::max(x1, left) + 1, fillTop),
+                                              ImVec2(std::min(x2, right) - 1, cellBottom),
+                                              IM_COL32(240, 240, 240, firstPattern ? 215 : 125), 2);
+                    } else {
+                        dl->AddRect(ImVec2(std::max(x1, left) + 1, cellTop),
+                                    ImVec2(std::min(x2, right) - 1, cellBottom),
+                                    IM_COL32(130, 130, 130, firstPattern ? 110 : 65), 1.0f);
+                    }
+                    if(firstPattern && x2 - x1 > 28.0f && stepIt != lane->step.steps.end()) {
+                        char probabilityLabel[16];
+                        std::snprintf(probabilityLabel, sizeof(probabilityLabel), "%.0f%%", probability * 100.0f);
+                        dl->AddText(ImVec2(std::max(x1, left) + 3, cellTop + 3),
+                                    IM_COL32(35, 35, 35, 230), probabilityLabel);
+                    }
                 }
             }
         }
@@ -2456,8 +2456,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         const bool inStepEditor = ImGui::IsMouseHoveringRect(ImVec2(left, cellTop), ImVec2(right, cellBottom));
         if(inStepEditor && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseDown(ImGuiMouseButton_Left))) {
             const double timelineBeat = beatAtOffset(mouse.x - timelineMin.x);
-            const double sourceBeat = clip->repeatContent
-                ? std::max(0.0, timelineBeat - clip->startBeat) : timelineToSourceBeat(*clip, timelineBeat);
+            const double sourceBeat = timelineToSourceBeat(*clip, timelineBeat);
             const double patternBeat = std::fmod(sourceBeat, patternLength);
             const int index = ofClamp(static_cast<int>(std::floor(patternBeat / beatsPerStep)), 0, stepCount - 1);
             const double cellBeat = index * beatsPerStep;
@@ -2477,8 +2476,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         }
         if(inStepEditor && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
             const double timelineBeat = beatAtOffset(mouse.x - timelineMin.x);
-            const double sourceBeat = clip->repeatContent
-                ? std::max(0.0, timelineBeat - clip->startBeat) : timelineToSourceBeat(*clip, timelineBeat);
+            const double sourceBeat = timelineToSourceBeat(*clip, timelineBeat);
             const double patternBeat = std::fmod(sourceBeat, patternLength);
             const int index = ofClamp(static_cast<int>(std::floor(patternBeat / beatsPerStep)), 0, stepCount - 1);
             const double cellBeat = index * beatsPerStep;
