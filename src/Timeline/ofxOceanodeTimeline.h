@@ -4,7 +4,9 @@
 #include "ofMain.h"
 #include <algorithm>
 #include <cstdint>
+#include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -65,6 +67,26 @@ struct ofxOceanodeTimelineCurveTension {
     float inflection = 0.5f;
     float steepness = 1.0f;
 };
+
+// Shared by both automation evaluation (ofxOceanodeTimeline.cpp) and the
+// timeline editor (ofxOceanodeTimelineController.cpp) so a curve always
+// renders exactly what gets applied to the parameter. The steepness range
+// is kept symmetric under reciprocal (0.1 <-> 10) so the "logarithmic" and
+// "exponential" ends of LogExp bend by comparable amounts instead of one
+// side collapsing into a near-step curve before the other looks bent at all.
+namespace ofxOceanodeTimelineCurve {
+    enum class CurveInterpolationMode {
+        Step,
+        Linear,
+        LogExp,
+        Sigmoid
+    };
+
+    CurveInterpolationMode curveInterpolationMode(const std::string& name);
+    float sigmoidFlex(float x, float inflection, float steepness);
+    float curveSegmentShape(float x, CurveInterpolationMode interpolation,
+                            const ofxOceanodeTimelineCurveTension& tension);
+}
 
 struct ofxOceanodeTimelinePianoNote {
     double startBeat = 0.0;
@@ -143,7 +165,19 @@ public:
     explicit ofxOceanodeTimelineManager(ofxOceanodeContainer* container = nullptr);
 
     void setContainer(ofxOceanodeContainer* container);
+    // Applies automation for the current frame. Equivalent to calling
+    // evaluateAutomation() followed by applyAutomation().
     void update();
+    // Recomputes this frame's active lane values, resolves the loop/BPM
+    // automation, and applies live piano-roll pitch ranges. Call once per
+    // frame, before node updates.
+    void evaluateAutomation();
+    // Re-applies the values computed by the last evaluateAutomation() call,
+    // without recomputing them. Intended to be called again after node
+    // updates, so a node that writes back to its own parameter during
+    // update() doesn't silently override automation for that frame -
+    // without paying for a second full evaluation pass.
+    void applyAutomation();
     void clear();
 
     std::string createTrack(const std::string& requestedName = "Timeline Track");
@@ -245,6 +279,8 @@ private:
     uint64_t nextLaneNumber = 1;
     std::string pendingTrackRenameId;
     bool pendingTrackRenameIsNew = false;
+    std::map<std::string, std::vector<std::string>> activeAutomationValues;
+    std::set<std::string> zeroWhenInactiveAutomationPaths;
     bool bpmAutomationEnabled = false;
     bool bpmLaneCollapsed = true;
     float bpmMinimum = 20.0f;

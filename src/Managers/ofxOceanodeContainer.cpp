@@ -116,7 +116,8 @@ void ofxOceanodeContainer::update(){
     // Timeline automation is an input to nodes. Apply it before their update
     // callbacks so node outputs observe the value in the same frame instead
     // of one frame later.
-    if(timelineManager != nullptr) timelineManager->update();
+    if(timelineManager != nullptr) timelineManager->evaluateAutomation();
+    if(timelineManager != nullptr) timelineManager->applyAutomation();
 
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
@@ -134,8 +135,10 @@ void ofxOceanodeContainer::update(){
 
     // Some node models publish values from update() back into their own
     // parameters. Re-assert automation so the parameter and its GUI remain
-    // authoritative while nodes still receive it before their update.
-    if(timelineManager != nullptr) timelineManager->update();
+    // authoritative while nodes still receive it before their update. This
+    // re-applies the values evaluateAutomation() already computed above
+    // instead of re-scanning every track/clip/lane a second time.
+    if(timelineManager != nullptr) timelineManager->applyAutomation();
 }
 
 void ofxOceanodeContainer::draw(){

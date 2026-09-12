@@ -9,15 +9,7 @@
 #include <map>
 #include <set>
 
-namespace {
-constexpr double kEpsilon = 1e-9;
-
-enum class CurveInterpolationMode {
-    Step,
-    Linear,
-    LogExp,
-    Sigmoid
-};
+namespace ofxOceanodeTimelineCurve {
 
 CurveInterpolationMode curveInterpolationMode(const std::string& name) {
     if(name == "Step") return CurveInterpolationMode::Step;
@@ -25,6 +17,55 @@ CurveInterpolationMode curveInterpolationMode(const std::string& name) {
     if(name == "Sigmoid") return CurveInterpolationMode::Sigmoid;
     return CurveInterpolationMode::Linear;
 }
+
+float sigmoidFlex(float x, float inflection, float steepness) {
+    x = ofClamp(x, 0.0f, 1.0f);
+    inflection = ofClamp(inflection, 0.01f, 0.99f);
+    steepness = ofClamp(steepness, 0.1f, 10.0f);
+    // The neutral sigmoid must be an exact identity. Besides avoiding tiny
+    // floating-point bends, this makes newly-created curve segments truly
+    // linear in both evaluation and drawing.
+    if(std::abs(inflection - 0.5f) <= 1e-6f && std::abs(steepness - 1.0f) <= 1e-6f) return x;
+    constexpr float epsilon = 0.0001f;
+    if(x < epsilon) return 0.0f;
+    if(x > 1.0f - epsilon) return 1.0f;
+    const float xSafe = ofClamp(x, epsilon, 1.0f - epsilon);
+    const float pSafe = ofClamp(inflection, epsilon, 1.0f - epsilon);
+    const float a = std::pow(xSafe / pSafe, steepness);
+    const float b = std::pow((1.0f - xSafe) / (1.0f - pSafe), steepness);
+    const float denominator = a + b;
+    return denominator < epsilon ? 0.5f : a / denominator;
+}
+
+float curveSegmentShape(float x, CurveInterpolationMode interpolation,
+                        const ofxOceanodeTimelineCurveTension& tension) {
+    x = ofClamp(x, 0.0f, 1.0f);
+    switch(interpolation) {
+        case CurveInterpolationMode::Step: return x >= 1.0f ? 1.0f : 0.0f;
+        case CurveInterpolationMode::Linear: return x;
+        case CurveInterpolationMode::LogExp:
+            // steepness is clamped symmetrically around 1 (0.1 <-> 10) so the
+            // "logarithmic" (steepness < 1) and "exponential" (steepness > 1)
+            // ends are true reciprocals of each other and bend by comparable
+            // amounts. A lower bound closer to 0 makes pow(x, steepness)
+            // degenerate into a near-vertical rise right at x=0 followed by a
+            // flat plateau, which reads as "broken" rather than "logarithmic".
+            return std::pow(x, ofClamp(tension.steepness, 0.1f, 10.0f));
+        case CurveInterpolationMode::Sigmoid:
+            return sigmoidFlex(x, tension.inflection, tension.steepness);
+    }
+    return x;
+}
+
+} // namespace ofxOceanodeTimelineCurve
+
+namespace {
+using ofxOceanodeTimelineCurve::CurveInterpolationMode;
+using ofxOceanodeTimelineCurve::curveInterpolationMode;
+using ofxOceanodeTimelineCurve::sigmoidFlex;
+using ofxOceanodeTimelineCurve::curveSegmentShape;
+
+constexpr double kEpsilon = 1e-9;
 
 double positiveModulo(double value, double length) {
     if(length <= kEpsilon) return 0.0;
@@ -62,39 +103,6 @@ bool clipSourceBeat(const ofxOceanodeTimelineClip& clip, double globalBeat, doub
         sourceBeat = localBeat * contentDuration / duration;
     }
     return true;
-}
-
-float sigmoidFlex(float x, float inflection, float steepness) {
-    x = ofClamp(x, 0.0f, 1.0f);
-    inflection = ofClamp(inflection, 0.01f, 0.99f);
-    steepness = ofClamp(steepness, 0.05f, 10.0f);
-    // The neutral sigmoid must be an exact identity. Besides avoiding tiny
-    // floating-point bends, this makes newly-created curve segments truly
-    // linear in both evaluation and drawing.
-    if(std::abs(inflection - 0.5f) <= 1e-6f && std::abs(steepness - 1.0f) <= 1e-6f) return x;
-    constexpr float epsilon = 0.0001f;
-    if(x < epsilon) return 0.0f;
-    if(x > 1.0f - epsilon) return 1.0f;
-    const float xSafe = ofClamp(x, epsilon, 1.0f - epsilon);
-    const float pSafe = ofClamp(inflection, epsilon, 1.0f - epsilon);
-    const float a = std::pow(xSafe / pSafe, steepness);
-    const float b = std::pow((1.0f - xSafe) / (1.0f - pSafe), steepness);
-    const float denominator = a + b;
-    return denominator < epsilon ? 0.5f : a / denominator;
-}
-
-float curveSegmentShape(float x, CurveInterpolationMode interpolation,
-                        const ofxOceanodeTimelineCurveTension& tension) {
-    x = ofClamp(x, 0.0f, 1.0f);
-    switch(interpolation) {
-        case CurveInterpolationMode::Step: return x >= 1.0f ? 1.0f : 0.0f;
-        case CurveInterpolationMode::Linear: return x;
-        case CurveInterpolationMode::LogExp:
-            return std::pow(x, ofClamp(tension.steepness, 0.05f, 10.0f));
-        case CurveInterpolationMode::Sigmoid:
-            return sigmoidFlex(x, tension.inflection, tension.steepness);
-    }
-    return x;
 }
 
 bool evaluateCurve(const ofxOceanodeTimelineLane& lane, double beat, std::string& value) {
@@ -995,6 +1003,11 @@ void ofxOceanodeTimelineManager::setLoopRange(double startBeat, double endBeat) 
 }
 
 void ofxOceanodeTimelineManager::update() {
+    evaluateAutomation();
+    applyAutomation();
+}
+
+void ofxOceanodeTimelineManager::evaluateAutomation() {
     if(container == nullptr) return;
     auto transport = container->getTransportState();
 
@@ -1019,9 +1032,11 @@ void ofxOceanodeTimelineManager::update() {
         int low = 127;
         int high = 0;
     };
-    std::map<std::string, std::vector<std::string>> activeValues;
+    auto& activeValues = activeAutomationValues;
+    auto& zeroWhenInactivePaths = zeroWhenInactiveAutomationPaths;
+    activeValues.clear();
+    zeroWhenInactivePaths.clear();
     std::map<std::string, PianoPitchRange> pianoPitchRanges;
-    std::set<std::string> zeroWhenInactivePaths;
     for(const auto& track : tracks) {
         for(const auto& clip : track.clips) {
             for(const auto& lane : clip.lanes) {
@@ -1115,9 +1130,24 @@ void ofxOceanodeTimelineManager::update() {
                 }
             }
         }
+    }
+}
 
+void ofxOceanodeTimelineManager::applyAutomation() {
+    if(container == nullptr) return;
+    const auto& activeValues = activeAutomationValues;
+    const auto& zeroWhenInactivePaths = zeroWhenInactiveAutomationPaths;
+    for(auto& track : tracks) {
         for(auto& binding : track.bindings) {
-            if(container == nullptr || binding.bypass) continue;
+            if(binding.bypass) {
+                // A bypassed binding stops driving its parameter, but it was
+                // marked isTimelined() while active; clear that so the node
+                // GUI's automation badge doesn't stay on for a binding that
+                // no longer applies.
+                if(auto* parameter = container->findCustomGuiParameter(binding.parameterPath))
+                    parameter->setTimelined(false);
+                continue;
+            }
             auto* parameter = container->findCustomGuiParameter(binding.parameterPath);
             if(parameter == nullptr) {
                 binding.missingTarget = true;
@@ -1421,7 +1451,7 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
                                 if(!tensionJson.is_object()) continue;
                                 lane.curveTensions.push_back({
                                     ofClamp(tensionJson.value("inflection", 0.5f), 0.01f, 0.99f),
-                                    ofClamp(tensionJson.value("steepness", 1.0f), 0.05f, 10.0f)
+                                    ofClamp(tensionJson.value("steepness", 1.0f), 0.1f, 10.0f)
                                 });
                             }
                         }

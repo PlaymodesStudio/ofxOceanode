@@ -23,23 +23,14 @@ constexpr float kCollapsedHeight = 38.0f;
 constexpr float kEdgePixels = 8.0f;
 constexpr float kPianoKeyboardWidth = 38.0f;
 
-enum class CurveInterpolationMode {
-    Step,
-    Linear,
-    LogExp,
-    Sigmoid
-};
+using ofxOceanodeTimelineCurve::CurveInterpolationMode;
+using ofxOceanodeTimelineCurve::curveInterpolationMode;
+using ofxOceanodeTimelineCurve::sigmoidFlex;
+using ofxOceanodeTimelineCurve::curveSegmentShape;
 
 constexpr const char* kCurveInterpolationNames[] = {
     "Step", "Linear", "Log / Exp", "Sigmoid"
 };
-
-CurveInterpolationMode curveInterpolationMode(const std::string& name) {
-    if(name == "Step") return CurveInterpolationMode::Step;
-    if(name == "Log / Exp") return CurveInterpolationMode::LogExp;
-    if(name == "Sigmoid") return CurveInterpolationMode::Sigmoid;
-    return CurveInterpolationMode::Linear;
-}
 
 struct DivisionOption {
     const char* label;
@@ -82,35 +73,6 @@ double timelineToSourceBeat(const ofxOceanodeTimelineClip& clip, double timeline
     const double local = std::max(0.0, timelineBeat - clip.startBeat);
     if(clip.repeatContent) return std::fmod(local, std::max(1.0 / kPPQ, clip.contentDurationBeats));
     return local * std::max(1.0 / kPPQ, clip.contentDurationBeats) / std::max(1.0 / kPPQ, clip.durationBeats);
-}
-
-float sigmoidFlex(float x, float inflection, float steepness) {
-    x = ofClamp(x, 0.0f, 1.0f);
-    inflection = ofClamp(inflection, 0.01f, 0.99f);
-    steepness = ofClamp(steepness, 0.05f, 10.0f);
-    if(std::abs(inflection - 0.5f) <= 1e-6f && std::abs(steepness - 1.0f) <= 1e-6f) return x;
-    constexpr float epsilon = 0.0001f;
-    if(x < epsilon) return 0.0f;
-    if(x > 1.0f - epsilon) return 1.0f;
-    const float xSafe = ofClamp(x, epsilon, 1.0f - epsilon);
-    const float pSafe = ofClamp(inflection, epsilon, 1.0f - epsilon);
-    const float a = std::pow(xSafe / pSafe, steepness);
-    const float b = std::pow((1.0f - xSafe) / (1.0f - pSafe), steepness);
-    return a + b < epsilon ? 0.5f : a / (a + b);
-}
-
-float curveSegmentShape(float x, CurveInterpolationMode interpolation,
-                        const ofxOceanodeTimelineCurveTension& tension) {
-    x = ofClamp(x, 0.0f, 1.0f);
-    switch(interpolation) {
-        case CurveInterpolationMode::Step: return x >= 1.0f ? 1.0f : 0.0f;
-        case CurveInterpolationMode::Linear: return x;
-        case CurveInterpolationMode::LogExp:
-            return std::pow(x, ofClamp(tension.steepness, 0.05f, 10.0f));
-        case CurveInterpolationMode::Sigmoid:
-            return sigmoidFlex(x, tension.inflection, tension.steepness);
-    }
-    return x;
 }
 
 const ImU32 kGrid = IM_COL32(70, 70, 70, 115);
@@ -371,6 +333,18 @@ void ofxOceanodeTimelineController::draw() {
         const float headerTextY = headerMin.y + (trackHeaderHeight - ImGui::GetTextLineHeight()) * 0.5f;
         dl->AddText(ImVec2(headerMin.x + 7, headerTextY), IM_COL32(235, 235, 235, 255), trackCollapsed ? ">" : "v");
         dl->AddText(ImVec2(headerMin.x + 22, headerTextY), IM_COL32(235, 235, 235, 255), track.name.c_str());
+        // A binding's target parameter can disappear (node deleted, preset
+        // loaded on a different graph, ...). The manager keeps the binding
+        // and its data instead of dropping it, but that's invisible unless
+        // the editor surfaces it somewhere - otherwise automation silently
+        // stops applying with no clue why.
+        const bool hasMissingTarget = std::any_of(track.bindings.begin(), track.bindings.end(),
+            [](const auto& binding) { return binding.missingTarget && !binding.bypass; });
+        if(hasMissingTarget) {
+            const float nameWidth = ImGui::CalcTextSize(track.name.c_str()).x;
+            dl->AddText(ImVec2(headerMin.x + 22 + nameWidth + 6, headerTextY),
+                       IM_COL32(255, 165, 60, 255), "[missing target]");
+        }
 
         const ImVec2 headerInteractionMax(trackCollapsed ? headerMin.x + kLabelWidth : headerMax.x,
                                           headerMax.y);
@@ -1611,7 +1585,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 }
                 const float steepnessDelta = -(curveMouse.y - curveTensionDragStartY) /
                     std::max(1.0f, (curveBottom - curveTop) / 3.0f);
-                tension.steepness = ofClamp(curveTensionStartSteepness * std::exp(steepnessDelta * 0.5f), 0.05f, 10.0f);
+                tension.steepness = ofClamp(curveTensionStartSteepness * std::exp(steepnessDelta * 0.5f), 0.1f, 10.0f);
             }
         }
         if(ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
