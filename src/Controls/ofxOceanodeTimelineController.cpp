@@ -505,6 +505,21 @@ void ofxOceanodeTimelineController::draw() {
                     }
                     ImGui::EndMenu();
                 }
+                // Same reasoning as "Blend mode" above -- give a collapsed
+                // track a way to unbind a parameter without having to
+                // expand it first to reach the per-binding row's own menu.
+                if(ImGui::BeginMenu("Remove from Timeline")) {
+                    for(const auto& binding : track.bindings) {
+                        const std::string label = compactParameterName(binding.parameterPath);
+                        if(ImGui::Selectable(label.c_str())) {
+                            removeBindingTrackId = track.id;
+                            removeBindingId = binding.id;
+                            requestRemoveBinding = true;
+                            ImGui::CloseCurrentPopup();
+                        }
+                    }
+                    ImGui::EndMenu();
+                }
             }
             ImGui::EndPopup();
         }
@@ -850,6 +865,13 @@ void ofxOceanodeTimelineController::draw() {
                         drawBlendModeOptions(timeline, track.id, binding);
                         ImGui::EndMenu();
                     }
+                    ImGui::Separator();
+                    if(ImGui::Selectable("Remove from Timeline")) {
+                        removeBindingTrackId = track.id;
+                        removeBindingId = binding.id;
+                        requestRemoveBinding = true;
+                        ImGui::CloseCurrentPopup();
+                    }
                     ImGui::EndPopup();
                 }
                 dl->PushClipRect(ImVec2(zoneLeft, min.y), ImVec2(max.x, max.y), true);
@@ -906,6 +928,13 @@ void ofxOceanodeTimelineController::draw() {
         requestClipDeletion = false;
         clipDeletionTrackId.clear();
         clipDeletionClipId.clear();
+    }
+
+    if(requestRemoveBinding) {
+        timeline.removeBinding(removeBindingTrackId, removeBindingId);
+        requestRemoveBinding = false;
+        removeBindingTrackId.clear();
+        removeBindingId.clear();
     }
 
     if(requestAddLane) {

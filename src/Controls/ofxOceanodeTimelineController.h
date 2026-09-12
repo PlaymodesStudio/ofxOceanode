@@ -78,6 +78,14 @@ private:
     bool requestClipDeletion = false;
     std::string clipDeletionTrackId;
     std::string clipDeletionClipId;
+    // "Remove from Timeline" (on a binding's row, or on a collapsed track's
+    // header menu) unbinds a parameter entirely. Deferred for the same
+    // reason as clip deletion above: both popups that can request this are
+    // opened mid-iteration over track.bindings, and code later in that same
+    // iteration still reads the binding being removed.
+    bool requestRemoveBinding = false;
+    std::string removeBindingTrackId;
+    std::string removeBindingId;
     // A clip can hold more than one lane (e.g. a curve and a step pattern
     // combined into one clip); these back the clip editor's "Add lane" /
     // "Remove this lane" controls. The actual mutation is deferred to a
