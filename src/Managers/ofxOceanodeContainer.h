@@ -10,6 +10,7 @@
 #define ofxOceanodeContainer_h
 
 #include "ofxOceanodeTransport.h"
+#include "Timeline/ofxOceanodeTimeline.h"
 #include "ofxOceanodeConnection.h"
 #include "ofxOceanodeNode.h"
 #include "CustomGui/ofxOceanodeCustomGuiLayout.h"
@@ -155,6 +156,8 @@ public:
     std::shared_ptr<ofxOceanodeTransport> getTransport() const { return transport; }
     ofxOceanodeTransportState getTransportState() const;
     ofxOceanodeFrameTransportState getFrameTransportState() const;
+    ofxOceanodeTimelineManager& getTimelineManager(){ return *timelineManager; }
+    const ofxOceanodeTimelineManager& getTimelineManager() const { return *timelineManager; }
 	
 	// Node encapsulation functionality
 	void encapsulateSelectedNodes(const string& macroName = "Encapsulated");
@@ -309,6 +312,7 @@ private:
     float bpm;
     float phase;
     std::shared_ptr<ofxOceanodeTransport> transport;
+    std::unique_ptr<ofxOceanodeTimelineManager> timelineManager;
     
 #ifdef OFXOCEANODE_USE_MIDI
     bool isListeningMidi;

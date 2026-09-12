@@ -14,6 +14,7 @@
 #include "ofxOceanodeHierarchyController.h"
 #include "ofxOceanodeLogController.h"
 #include "ofxOceanodeGlobalVariablesController.h"
+#include "ofxOceanodeTimelineController.h"
 #include "imgui.h"
 #include "ofxOceanodeShared.h"
 
@@ -39,6 +40,7 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     auto logger = make_shared<ofxOceanodeLogController>();
     controllers.push_back(logger);
     controllers.push_back(make_shared<ofxOceanodeGlobalVariablesController>(container));
+    controllers.push_back(make_shared<ofxOceanodeTimelineController>(container));
     
     ofSetLoggerChannel(logger);
 

@@ -86,6 +86,9 @@ public:
     void loadPreset(std::string presetPathRelativeToData); //call preset via path
     
     void loadPreset(std::string bank, std::string name); //call preset via bank and name
+
+    ofxOceanodeTimelineManager& getTimelineManager(){ return container->getTimelineManager(); }
+    const ofxOceanodeTimelineManager& getTimelineManager() const { return container->getTimelineManager(); }
     
    template<typename T>
     void registerScope(std::function<void(ofxOceanodeAbstractParameter* p, ImVec2 size)> func){

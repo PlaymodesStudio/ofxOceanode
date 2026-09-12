@@ -30,6 +30,7 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     if(registry == nullptr) registry = make_shared<ofxOceanodeNodeRegistry>();
     if(typesRegistry == nullptr) typesRegistry = make_shared<ofxOceanodeTypesRegistry>();
     if(transport == nullptr) transport = make_shared<ofxOceanodeTransport>();
+    timelineManager = std::make_unique<ofxOceanodeTimelineManager>(this);
     transformationMatrix = glm::mat4(1.0);
     bpm = 120;
     phase = 0;
@@ -75,6 +76,7 @@ void ofxOceanodeContainer::clearContainer(){
     // Clear scope callback first to prevent auto-saves triggered by parameter
     // destructors during teardown (app exit or preset switching)
     ofxOceanodeScope::getInstance()->setScopeChangedCallback(nullptr);
+    if(timelineManager != nullptr) timelineManager->clear();
     
     connections.clear();
     customGuiPanels.clear();
@@ -111,6 +113,11 @@ void ofxOceanodeContainer::update(){
         }
     }
 #endif
+    // Timeline automation is an input to nodes. Apply it before their update
+    // callbacks so node outputs observe the value in the same frame instead
+    // of one frame later.
+    if(timelineManager != nullptr) timelineManager->update();
+
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             if(node.second->getActive())
@@ -124,6 +131,11 @@ void ofxOceanodeContainer::update(){
                 node.second->update(args);
         }
     }
+
+    // Some node models publish values from update() back into their own
+    // parameters. Re-assert automation so the parameter and its GUI remain
+    // authoritative while nodes still receive it before their update.
+    if(timelineManager != nullptr) timelineManager->update();
 }
 
 void ofxOceanodeContainer::draw(){
@@ -278,6 +290,8 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     loadPreset_midiBindings(presetFolderPath);
     
     loadPreset_loadNodePreset(presetFolderPath);
+
+    if(timelineManager != nullptr) timelineManager->loadPreset(presetFolderPath);
     
     loadPreset_activateConnections();
     
@@ -1147,7 +1161,8 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 	
 	saveScope(presetFolderPath);
 	saveCustomGuis(presetFolderPath);
-    saveCustomGuiSnapshots(presetFolderPath);
+	saveCustomGuiSnapshots(presetFolderPath);
+	if(timelineManager != nullptr) timelineManager->savePreset(presetFolderPath);
 	
 }
 
