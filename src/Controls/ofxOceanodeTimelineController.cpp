@@ -739,7 +739,15 @@ void ofxOceanodeTimelineController::draw() {
             if(px >= zoneLeft && px <= max.x) dl->AddLine(ImVec2(px, min.y), ImVec2(px, max.y), kPlayhead, 2);
             dl->PopClipRect();
             ImGui::SetCursorPosY(headerY + kCollapsedHeight);
-            if(stepEditorOpen && editorTrackId == track.id) drawLaneEditor(timeline, track, contentWidth, endBeat, transportState.beatPosition);
+            // A collapsed track hides its rows entirely, so any clip editor
+            // still open for it would float disconnected from what it's
+            // editing -- close it rather than keep drawing it.
+            if(stepEditorOpen && editorTrackId == track.id) {
+                stepEditorOpen = false;
+                editorTrackId.clear();
+                editorClipId.clear();
+                editorLaneId.clear();
+            }
         } else {
             int index = 0;
             // Rows sharing a clip.id (a clip with more than one lane,
