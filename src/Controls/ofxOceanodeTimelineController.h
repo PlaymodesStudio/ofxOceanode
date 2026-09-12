@@ -63,6 +63,12 @@ private:
     // "use the type's default height" -- UI-only, not persisted with the
     // preset.
     std::unordered_map<std::string, float> laneEditorHeights;
+    // The resize grip is handled from its screen rectangle instead of as an
+    // overlapping ImGui item. This keeps the editor canvas/child window from
+    // stealing the active id after the drag has started.
+    std::string resizingLaneId;
+    float laneResizeStartMouseY = 0.0f;
+    float laneResizeStartHeight = 0.0f;
     // Piano-roll keyboard-strip "audition" state: while a key is held down,
     // the lane's Gate/Pitch bindings get a live override (see
     // ofxOceanodeTimelineManager::setLiveOverride) so the bound parameters
@@ -132,6 +138,9 @@ private:
     std::vector<PianoDragSnapshotEntry> pianoDragSnapshot;
     double pianoDragAnchorStartBeat = 0.0;
     int pianoDragAnchorPitch = 0;
+    struct PianoValueDragSnapshotEntry { int index; float value; };
+    std::vector<PianoValueDragSnapshotEntry> pianoValueDragSnapshot;
+    float pianoValueDragAnchorValue = 0.0f;
     bool pianoMarqueeActive = false;
     float pianoMarqueeStartX = 0.0f;
     float pianoMarqueeStartY = 0.0f;

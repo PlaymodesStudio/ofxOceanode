@@ -1258,6 +1258,10 @@ void ofxOceanodeTimelineController::drawBpmLane(ofxOceanodeTimelineManager& time
     dl->AddRectFilled(min, ImVec2(zoneLeft, max.y), IM_COL32(85, 90, 150, 75));
     dl->AddLine(ImVec2(zoneLeft - 1.0f, min.y), ImVec2(zoneLeft - 1.0f, max.y), IM_COL32(125, 135, 225, 190));
 
+    // Keep every BPM control inside the fixed properties column. The combo
+    // used to continue the top row after the Auto/manual controls, which put
+    // it over the automation canvas on narrower windows.
+    ImGui::PushClipRect(min, ImVec2(zoneLeft, max.y), true);
     ImGui::SetCursorScreenPos(ImVec2(min.x + 5.0f, min.y + 4.0f));
     ImGui::SetNextItemAllowOverlap();
     if(ImGui::SmallButton(collapsed ? ">##bpmCollapse" : "v##bpmCollapse"))
@@ -1285,22 +1289,35 @@ void ofxOceanodeTimelineController::drawBpmLane(ofxOceanodeTimelineManager& time
     // the exact same way a regular automation curve is.
     const auto bpmInterpolation = curveInterpolationMode(timeline.getBpmInterpolation());
     if(!collapsed) {
-        ImGui::SameLine();
         int interpolationMode = static_cast<int>(bpmInterpolation);
-        ImGui::SetNextItemWidth(105.0f);
-        if(ImGui::Combo("Mode##bpmInterpolation", &interpolationMode, kCurveInterpolationNames, 4)) {
+        ImGui::SetCursorScreenPos(ImVec2(min.x + 5.0f, min.y + 35.0f));
+        ImGui::TextUnformatted("Mode");
+        ImGui::SetCursorScreenPos(ImVec2(min.x + 55.0f, min.y + 31.0f));
+        ImGui::SetNextItemWidth(std::max(1.0f, zoneLeft - min.x - 61.0f));
+        if(ImGui::Combo("##bpmInterpolation", &interpolationMode, kCurveInterpolationNames, 4)) {
             timeline.setBpmInterpolation(kCurveInterpolationNames[interpolationMode]);
             bpmTensionSegment = -1;
         }
         float minimum = timeline.getBpmMinimum();
         float maximum = timeline.getBpmMaximum();
-        ImGui::SetNextItemWidth(70.0f);
-        if(ImGui::DragFloat("Min##bpm", &minimum, 0.5f, 1.0f, 998.0f, "%.0f")) timeline.setBpmRange(minimum, maximum);
-        ImGui::SetNextItemWidth(70.0f);
-        if(ImGui::DragFloat("Max##bpm", &maximum, 0.5f, minimum + 1.0f, 999.0f, "%.0f")) timeline.setBpmRange(minimum, maximum);
-        if(bpmInterpolation == CurveInterpolationMode::LogExp) ImGui::TextDisabled("Alt-drag a segment vertically to shape it");
-        else if(bpmInterpolation == CurveInterpolationMode::Sigmoid) ImGui::TextDisabled("Alt-drag a segment freely to shape it");
+        const float rangeStartX = min.x + 55.0f;
+        const float rangeAvailable = std::max(2.0f, zoneLeft - rangeStartX - 6.0f);
+        const float rangeFieldWidth = std::max(1.0f, (rangeAvailable - 4.0f) * 0.5f);
+        ImGui::SetCursorScreenPos(ImVec2(min.x + 5.0f, min.y + 64.0f));
+        ImGui::TextUnformatted("Range");
+        ImGui::SetCursorScreenPos(ImVec2(rangeStartX, min.y + 60.0f));
+        ImGui::SetNextItemWidth(rangeFieldWidth);
+        if(ImGui::DragFloat("##bpmMin", &minimum, 0.5f, 1.0f, 998.0f, "%.0f")) timeline.setBpmRange(minimum, maximum);
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Minimum BPM");
+        ImGui::SameLine(0.0f, 4.0f);
+        ImGui::SetNextItemWidth(rangeFieldWidth);
+        if(ImGui::DragFloat("##bpmMax", &maximum, 0.5f, minimum + 1.0f, 999.0f, "%.0f")) timeline.setBpmRange(minimum, maximum);
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Maximum BPM");
+        ImGui::SetCursorScreenPos(ImVec2(min.x + 55.0f, min.y + 89.0f));
+        if(bpmInterpolation == CurveInterpolationMode::LogExp) ImGui::TextDisabled("Alt-drag vertically");
+        else if(bpmInterpolation == CurveInterpolationMode::Sigmoid) ImGui::TextDisabled("Alt-drag freely");
     }
+    ImGui::PopClipRect();
 
     const float bpmCanvasStartX = std::max(zoneLeft, timelineMin.x);
     ImGui::SetCursorScreenPos(ImVec2(bpmCanvasStartX, timelineMin.y));
@@ -1500,7 +1517,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                                                   double beatPosition) {
     auto* clip = timeline.getClip(editorTrackId, editorClipId);
     if(clip == nullptr || clip->lanes.empty()) {
-        stepEditorOpen = false;
+        clipEditorOpen = false;
         return;
     }
     if(timeline.getLane(editorTrackId, editorClipId, editorLaneId) == nullptr) {
@@ -1587,48 +1604,58 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     const float editorCanvasStartX = std::max(zoneLeft, timelineMin.x);
     ImGui::SetCursorScreenPos(ImVec2(editorCanvasStartX, timelineMin.y));
     ImGui::InvisibleButton(("##clipEditorCanvas" + editorTrackId + editorClipId + lane->id).c_str(),
-                           ImVec2(std::max(1.0f, contentWidth - kLabelWidth - (editorCanvasStartX - timelineMin.x)), editorHeight));
+                           ImVec2(std::max(1.0f, contentWidth - kLabelWidth - (editorCanvasStartX - timelineMin.x)),
+                                  std::max(1.0f, editorHeight - kLaneResizeHandleHeight)));
     const bool editorCanvasHovered = ImGui::IsItemHovered() && ImGui::GetIO().MousePos.x >= zoneLeft;
     if(!isFocused && editorCanvasHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) editorLaneId = lane->id;
     ImDrawList* dl = ImGui::GetWindowDrawList();
 
-    dl->AddRectFilled(editorMin, editorMax, mutedTrackColor(track.color, 0.13f, 0.26f));
+    // Leave the hierarchy gutter to the left of the lane indentation
+    // untouched; both the editor and its properties panel belong visually
+    // below the indented clip header.
+    dl->AddRectFilled(ImVec2(editorMin.x + clipIndent, editorMin.y), editorMax,
+                      mutedTrackColor(track.color, 0.13f, 0.26f));
     dl->AddRectFilled(ImVec2(editorMin.x + clipIndent, editorMin.y), ImVec2(zoneLeft, editorMax.y),
                       mutedTrackColor(track.color, 0.25f, 0.44f));
     dl->AddLine(ImVec2(zoneLeft - 1.0f, editorMin.y), ImVec2(zoneLeft - 1.0f, editorMax.y), IM_COL32(track.color.r, track.color.g, track.color.b, isFocused ? 210 : 120));
 
-    // A thin grip along the row's bottom edge resizes this lane's editor
-    // height by dragging. Placed right here (before any lane-type-specific
-    // content below, and before any of this function's early "continue"
-    // exits) so it's present for every lane regardless of which branch
-    // below ends up drawing its content, at the cost of sitting underneath
-    // whatever that content draws over the same pixels -- an acceptable
-    // trade since every lane type already leaves a few pixels of margin
-    // above its own row's bottom edge.
+    // The bottom strip is excluded from both the canvas item and properties
+    // child. Track the drag directly from its rectangle so later editor
+    // widgets cannot replace the handle's active ImGui id mid-drag.
     {
-        const ImVec2 handleMin(editorMin.x, editorMax.y - kLaneResizeHandleHeight);
+        const ImVec2 handleMin(editorMin.x + clipIndent, editorMax.y - kLaneResizeHandleHeight);
         const ImVec2 handleMax(editorMax.x, editorMax.y);
-        ImGui::SetCursorScreenPos(handleMin);
-        ImGui::InvisibleButton(("##laneResizeHandle" + lane->id).c_str(), ImVec2(handleMax.x - handleMin.x, kLaneResizeHandleHeight));
-        const bool resizeHovered = ImGui::IsItemHovered();
-        const bool resizeActive = ImGui::IsItemActive();
-        if(resizeHovered || resizeActive) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-        if(resizeActive && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-            laneEditorHeights[lane->id] = ofClamp(editorHeight + ImGui::GetIO().MouseDelta.y, kLaneEditorMinHeight, kLaneEditorMaxHeight);
+        const bool resizeHovered = ImGui::IsMouseHoveringRect(handleMin, handleMax);
+        if(resizeHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            resizingLaneId = lane->id;
+            laneResizeStartMouseY = ImGui::GetIO().MousePos.y;
+            laneResizeStartHeight = editorHeight;
+            editorLaneId = lane->id;
         }
-        dl->AddRectFilled(handleMin, handleMax,
-                          resizeActive ? IM_COL32(190, 190, 200, 220) : resizeHovered ? IM_COL32(150, 150, 160, 180) : IM_COL32(0, 0, 0, 0));
+        const bool resizeActive = resizingLaneId == lane->id && ImGui::IsMouseDown(ImGuiMouseButton_Left);
+        if(resizeHovered || resizeActive) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+        if(resizeActive) {
+            laneEditorHeights[lane->id] = ofClamp(laneResizeStartHeight + ImGui::GetIO().MousePos.y - laneResizeStartMouseY,
+                                                  kLaneEditorMinHeight, kLaneEditorMaxHeight);
+        }
+        if(resizingLaneId == lane->id && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) resizingLaneId.clear();
+        const float separatorY = editorMax.y - kLaneResizeHandleHeight * 0.5f;
+        dl->AddLine(ImVec2(handleMin.x, separatorY), ImVec2(handleMax.x, separatorY),
+                    resizeActive ? IM_COL32(205, 205, 215, 235)
+                                 : resizeHovered ? IM_COL32(160, 160, 170, 205)
+                                                 : IM_COL32(80, 80, 86, 110),
+                    resizeActive ? 2.0f : 1.0f);
     }
 
-    ImGui::SetCursorScreenPos(ImVec2(editorMin.x + 5.0f, editorMin.y + 4.0f));
+    ImGui::SetCursorScreenPos(ImVec2(editorMin.x + 5.0f + clipIndent, editorMin.y + 4.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(5.0f, 4.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(5.0f, 4.0f));
     const float pianoKeyboardReserve = lane->type == ofxOceanodeTimelineLaneType::PianoRoll
         ? kPianoKeyboardWidth + kPianoScrollbarWidth + 9.0f : 0.0f;
     ImGui::BeginChild(("##clipProperties" + editorTrackId + editorClipId + lane->id).c_str(),
-                      ImVec2(kLabelWidth - 10.0f - pianoKeyboardReserve, editorHeight - 8.0f), false,
+                      ImVec2(kLabelWidth - 10.0f - clipIndent - pianoKeyboardReserve,
+                             editorHeight - 8.0f - kLaneResizeHandleHeight), false,
                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-    ImGui::Indent(clipIndent);
     if(ImGui::SmallButton(("v##laneCollapse" + lane->id).c_str())) collapsedLaneIds.insert(lane->id);
     ImGui::SameLine();
     if(ImGui::Selectable((laneLabel + "##laneHeader" + lane->id).c_str(), isFocused,
@@ -1731,16 +1758,30 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                     const std::string preview = currentBinding == nullptr ? "None" : compactParameterName(currentBinding->parameterPath);
                     ImGui::SetNextItemWidth(112.0f);
                     if(ImGui::BeginCombo(label, preview.c_str())) {
-                        if(ImGui::Selectable("None", currentBinding == nullptr)) roleId.clear();
+                        if(ImGui::Selectable("None", currentBinding == nullptr)) {
+                            const std::string previousRoleId = roleId;
+                            roleId.clear();
+                            const bool stillUsed = lane->pianoPitchBindingId == previousRoleId ||
+                                lane->pianoGateBindingId == previousRoleId ||
+                                lane->pianoVelocityBindingId == previousRoleId;
+                            if(!previousRoleId.empty() && !stillUsed)
+                                timeline.removeBindingFromLane(track.id, clip->id, lane->id, previousRoleId);
+                        }
                         for(const auto& candidate : track.bindings) {
                             const bool selected = candidate.id == roleId;
                             const std::string compactName = compactParameterName(candidate.parameterPath);
                             if(ImGui::Selectable(compactName.c_str(), selected)) {
+                                const std::string previousRoleId = roleId;
                                 if(&roleId != &lane->pianoPitchBindingId && lane->pianoPitchBindingId == candidate.id) lane->pianoPitchBindingId.clear();
                                 if(&roleId != &lane->pianoGateBindingId && lane->pianoGateBindingId == candidate.id) lane->pianoGateBindingId.clear();
                                 if(&roleId != &lane->pianoVelocityBindingId && lane->pianoVelocityBindingId == candidate.id) lane->pianoVelocityBindingId.clear();
                                 roleId = candidate.id;
                                 timeline.addBindingToLane(track.id, clip->id, lane->id, candidate.id);
+                                const bool previousStillUsed = lane->pianoPitchBindingId == previousRoleId ||
+                                    lane->pianoGateBindingId == previousRoleId ||
+                                    lane->pianoVelocityBindingId == previousRoleId;
+                                if(!previousRoleId.empty() && previousRoleId != candidate.id && !previousStillUsed)
+                                    timeline.removeBindingFromLane(track.id, clip->id, lane->id, previousRoleId);
                             }
                             if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", candidate.parameterPath.c_str());
                         }
@@ -2218,6 +2259,21 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 pianoDragNoteIndex = hitPianoValueHandle();
                 if(pianoDragNoteIndex >= 0) {
                     pianoDragMode = velocityHovered ? PianoDragMode::Velocity : PianoDragMode::Probability;
+                    if(pianoSelectedNoteIndices.count(pianoDragNoteIndex) == 0) {
+                        pianoSelectedNoteIndices.clear();
+                        pianoSelectedNoteIndices.insert(pianoDragNoteIndex);
+                    }
+                    const auto& anchorNote = lane->pianoNotes[pianoDragNoteIndex];
+                    pianoValueDragAnchorValue = pianoDragMode == PianoDragMode::Velocity
+                        ? anchorNote.velocity : anchorNote.probability;
+                    pianoValueDragSnapshot.clear();
+                    for(int index : pianoSelectedNoteIndices) {
+                        if(index < 0 || index >= static_cast<int>(lane->pianoNotes.size())) continue;
+                        const auto& selectedNote = lane->pianoNotes[index];
+                        pianoValueDragSnapshot.push_back({index,
+                            pianoDragMode == PianoDragMode::Velocity
+                                ? selectedNote.velocity : selectedNote.probability});
+                    }
                 }
             }
         }
@@ -2243,17 +2299,28 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                     dragged.pitch = ofClamp(entry.pitch + deltaPitch, lowPitch, highPitch);
                 }
             } else if(pianoDragMode == PianoDragMode::Velocity) {
-                note.velocity = ofClamp((velocityBottom - mouse.y) /
-                                        std::max(1.0f, velocityBottom - velocityTop - 3.0f), 0.0f, 1.0f);
+                const float targetValue = ofClamp((velocityBottom - mouse.y) /
+                    std::max(1.0f, velocityBottom - velocityTop - 3.0f), 0.0f, 1.0f);
+                const float delta = targetValue - pianoValueDragAnchorValue;
+                for(const auto& entry : pianoValueDragSnapshot) {
+                    if(entry.index < 0 || entry.index >= static_cast<int>(lane->pianoNotes.size())) continue;
+                    lane->pianoNotes[entry.index].velocity = ofClamp(entry.value + delta, 0.0f, 1.0f);
+                }
             } else if(pianoDragMode == PianoDragMode::Probability) {
-                note.probability = ofClamp((probabilityBottom - mouse.y) /
-                                           std::max(1.0f, probabilityBottom - probabilityTop - 3.0f), 0.0f, 1.0f);
+                const float targetValue = ofClamp((probabilityBottom - mouse.y) /
+                    std::max(1.0f, probabilityBottom - probabilityTop - 3.0f), 0.0f, 1.0f);
+                const float delta = targetValue - pianoValueDragAnchorValue;
+                for(const auto& entry : pianoValueDragSnapshot) {
+                    if(entry.index < 0 || entry.index >= static_cast<int>(lane->pianoNotes.size())) continue;
+                    lane->pianoNotes[entry.index].probability = ofClamp(entry.value + delta, 0.0f, 1.0f);
+                }
             }
         }
         if(ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
             pianoDragMode = PianoDragMode::None;
             pianoDragNoteIndex = -1;
             pianoDragSnapshot.clear();
+            pianoValueDragSnapshot.clear();
         }
         if(ImGui::BeginPopup("Piano note value")) {
             if(pianoNumericNoteIndex >= 0 &&
