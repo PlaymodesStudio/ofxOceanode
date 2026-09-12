@@ -1345,14 +1345,79 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                                                   float contentWidth, double endBeat,
                                                   double beatPosition) {
     auto* clip = timeline.getClip(editorTrackId, editorClipId);
-    auto* lane = timeline.getLane(editorTrackId, editorClipId, editorLaneId);
-    if(clip == nullptr || lane == nullptr) {
+    if(clip == nullptr || clip->lanes.empty()) {
         stepEditorOpen = false;
         return;
+    }
+    if(timeline.getLane(editorTrackId, editorClipId, editorLaneId) == nullptr) {
+        editorLaneId = clip->lanes.front().id;
     }
     const float fallbackBpm = container->getTransportState().bpm;
     auto beatOffset = [&](double beat) { return beatToPixels(timeline, beat, fallbackBpm); };
     auto beatAtOffset = [&](float pixels) { return pixelsToBeat(timeline, pixels, fallbackBpm, endBeat); };
+
+    // A clip can hold more than one lane (e.g. a curve and a step pattern
+    // combined together). The clip gets one header row (name / add lane /
+    // close); each lane below it is its own independently collapsible
+    // block, stacked vertically and indented to read as nested under the
+    // clip. Only the focused lane (editorLaneId) reacts to canvas
+    // clicks/drags -- the drag/selection state further down (piano note
+    // drag, curve point drag, step painting) is shared single-lane state,
+    // so letting two expanded lanes both respond to the mouse in the same
+    // frame would let them stomp on each other's notes/points. Click a
+    // lane's header (or its canvas) to focus it before editing it.
+    const float clipIndent = 14.0f;
+    ImGui::Dummy(ImVec2(contentWidth, 22.0f));
+    {
+        const ImVec2 clipHeaderMin = ImGui::GetItemRectMin();
+        const ImVec2 clipHeaderMax = ImGui::GetItemRectMax();
+        const float headerZoneLeft = clipHeaderMin.x + kLabelWidth;
+        ImDrawList* headerDl = ImGui::GetWindowDrawList();
+        headerDl->AddRectFilled(clipHeaderMin, ImVec2(headerZoneLeft, clipHeaderMax.y),
+                                mutedTrackColor(track.color, 0.25f, 0.44f));
+        headerDl->AddLine(ImVec2(headerZoneLeft - 1.0f, clipHeaderMin.y), ImVec2(headerZoneLeft - 1.0f, clipHeaderMax.y),
+                          IM_COL32(track.color.r, track.color.g, track.color.b, 210));
+        ImGui::SetCursorScreenPos(ImVec2(clipHeaderMin.x + 5.0f + clipIndent, clipHeaderMin.y + 2.0f));
+        ImGui::TextColored(ImVec4(track.color.r / 255.0f, track.color.g / 255.0f, track.color.b / 255.0f, 1.0f),
+                           "%s", clip->name.c_str());
+        ImGui::SameLine(kLabelWidth - 50.0f);
+        if(ImGui::SmallButton("+##addLane")) ImGui::OpenPopup("##addLaneTypePopup");
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Add another lane to this clip");
+        ImGui::SameLine();
+        if(ImGui::SmallButton("x")) stepEditorOpen = false;
+        if(ImGui::BeginPopup("##addLaneTypePopup")) {
+            if(ImGui::MenuItem("Step Sequencer")) { requestAddLane = true; pendingAddLaneType = 0; }
+            if(ImGui::MenuItem("Curve")) { requestAddLane = true; pendingAddLaneType = 1; }
+            if(ImGui::MenuItem("Piano Roll")) { requestAddLane = true; pendingAddLaneType = 2; }
+            ImGui::EndPopup();
+        }
+        finishAbsoluteLayout(ImVec2(clipHeaderMin.x, clipHeaderMax.y));
+    }
+
+    for(size_t laneIndex = 0; laneIndex < clip->lanes.size(); ++laneIndex) {
+    auto* lane = &clip->lanes[laneIndex];
+    const bool isFocused = lane->id == editorLaneId;
+    std::string laneLabel = laneTypeName(lane->type);
+    if(!lane->bindingIds.empty()) {
+        if(const auto* laneBoundParam = timeline.getBinding(track.id, lane->bindingIds.front()))
+            laneLabel += ": " + compactParameterName(laneBoundParam->parameterPath);
+    }
+    if(collapsedLaneIds.count(lane->id) > 0) {
+        ImGui::Dummy(ImVec2(contentWidth, 22.0f));
+        const ImVec2 rowMin = ImGui::GetItemRectMin();
+        const ImVec2 rowMax = ImGui::GetItemRectMax();
+        const float rowZoneLeft = rowMin.x + kLabelWidth;
+        ImDrawList* rowDl = ImGui::GetWindowDrawList();
+        rowDl->AddRectFilled(rowMin, ImVec2(rowZoneLeft, rowMax.y), mutedTrackColor(track.color, 0.18f, 0.30f));
+        ImGui::SetCursorScreenPos(ImVec2(rowMin.x + 5.0f + clipIndent, rowMin.y + 2.0f));
+        if(ImGui::SmallButton((">##laneExpand" + lane->id).c_str())) collapsedLaneIds.erase(lane->id);
+        ImGui::SameLine();
+        ImGui::Selectable((laneLabel + "##laneHeaderCollapsed" + lane->id).c_str(), isFocused,
+                          ImGuiSelectableFlags_None, ImVec2(ImGui::GetContentRegionAvail().x - 4.0f, 0));
+        if(ImGui::IsItemClicked()) editorLaneId = lane->id;
+        finishAbsoluteLayout(ImVec2(rowMin.x, rowMax.y));
+        continue;
+    }
 
     const float editorHeight = lane->type == ofxOceanodeTimelineLaneType::PianoRoll
         ? 270.0f : 190.0f;
@@ -1365,60 +1430,38 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     const ImVec2 timelineMin(zoneLeft - timelineScrollX, editorMin.y);
     const float editorCanvasStartX = std::max(zoneLeft, timelineMin.x);
     ImGui::SetCursorScreenPos(ImVec2(editorCanvasStartX, timelineMin.y));
-    ImGui::InvisibleButton(("##clipEditorCanvas" + editorTrackId + editorClipId + editorLaneId).c_str(),
+    ImGui::InvisibleButton(("##clipEditorCanvas" + editorTrackId + editorClipId + lane->id).c_str(),
                            ImVec2(std::max(1.0f, contentWidth - kLabelWidth - (editorCanvasStartX - timelineMin.x)), editorHeight));
     const bool editorCanvasHovered = ImGui::IsItemHovered() && ImGui::GetIO().MousePos.x >= zoneLeft;
+    if(!isFocused && editorCanvasHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) editorLaneId = lane->id;
     ImDrawList* dl = ImGui::GetWindowDrawList();
 
     dl->AddRectFilled(editorMin, editorMax, mutedTrackColor(track.color, 0.13f, 0.26f));
     dl->AddRectFilled(editorMin, ImVec2(zoneLeft, editorMax.y),
                       mutedTrackColor(track.color, 0.25f, 0.44f));
-    dl->AddLine(ImVec2(zoneLeft - 1.0f, editorMin.y), ImVec2(zoneLeft - 1.0f, editorMax.y), IM_COL32(track.color.r, track.color.g, track.color.b, 210));
+    dl->AddLine(ImVec2(zoneLeft - 1.0f, editorMin.y), ImVec2(zoneLeft - 1.0f, editorMax.y), IM_COL32(track.color.r, track.color.g, track.color.b, isFocused ? 210 : 120));
 
     ImGui::SetCursorScreenPos(ImVec2(editorMin.x + 5.0f, editorMin.y + 4.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(5.0f, 4.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(5.0f, 4.0f));
     const float pianoKeyboardReserve = lane->type == ofxOceanodeTimelineLaneType::PianoRoll
         ? kPianoKeyboardWidth + 5.0f : 0.0f;
-    ImGui::BeginChild(("##clipProperties" + editorTrackId + editorClipId + editorLaneId).c_str(),
+    ImGui::BeginChild(("##clipProperties" + editorTrackId + editorClipId + lane->id).c_str(),
                       ImVec2(kLabelWidth - 10.0f - pianoKeyboardReserve, editorHeight - 8.0f), false,
                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-    ImGui::TextColored(ImVec4(track.color.r / 255.0f, track.color.g / 255.0f, track.color.b / 255.0f, 1.0f),
-                       "%s", clip->name.c_str());
-    ImGui::SameLine(ImGui::GetWindowWidth() - 27.0f);
-    if(ImGui::SmallButton("x")) stepEditorOpen = false;
-
-    // A clip can hold more than one lane (e.g. a curve and a step pattern
-    // combined together); this chip row lets the user switch which lane is
-    // being edited below, and add or remove lanes from this clip.
-    for(size_t laneIndex = 0; laneIndex < clip->lanes.size(); ++laneIndex) {
-        auto& laneEntry = clip->lanes[laneIndex];
-        if(laneIndex > 0) ImGui::SameLine();
-        const bool isCurrentLane = laneEntry.id == lane->id;
-        std::string chipLabel = laneTypeName(laneEntry.type);
-        if(!laneEntry.bindingIds.empty()) {
-            if(const auto* boundParam = timeline.getBinding(track.id, laneEntry.bindingIds.front()))
-                chipLabel += ": " + compactParameterName(boundParam->parameterPath);
-        }
-        if(isCurrentLane) {
-            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(track.color.r / 255.0f, track.color.g / 255.0f, track.color.b / 255.0f, 0.6f));
-        }
-        if(ImGui::Selectable((chipLabel + "##lane" + laneEntry.id).c_str(), isCurrentLane,
-                             ImGuiSelectableFlags_None,
-                             ImVec2(ImGui::CalcTextSize(chipLabel.c_str()).x + 16.0f, 0))) {
-            editorLaneId = laneEntry.id;
-        }
-        if(isCurrentLane) ImGui::PopStyleColor();
+    ImGui::Indent(clipIndent);
+    if(ImGui::SmallButton(("v##laneCollapse" + lane->id).c_str())) collapsedLaneIds.insert(lane->id);
+    ImGui::SameLine();
+    if(ImGui::Selectable((laneLabel + "##laneHeader" + lane->id).c_str(), isFocused,
+                         ImGuiSelectableFlags_None, ImVec2(ImGui::GetContentRegionAvail().x - 22.0f, 0))) {
+        editorLaneId = lane->id;
     }
     ImGui::SameLine();
-    if(ImGui::SmallButton("+##addLane")) ImGui::OpenPopup("##addLaneTypePopup");
-    if(ImGui::IsItemHovered()) ImGui::SetTooltip("Add another lane to this clip");
-    if(ImGui::BeginPopup("##addLaneTypePopup")) {
-        if(ImGui::MenuItem("Step Sequencer")) { requestAddLane = true; pendingAddLaneType = 0; }
-        if(ImGui::MenuItem("Curve")) { requestAddLane = true; pendingAddLaneType = 1; }
-        if(ImGui::MenuItem("Piano Roll")) { requestAddLane = true; pendingAddLaneType = 2; }
-        ImGui::EndPopup();
+    if(ImGui::SmallButton(("x##removeLane" + lane->id).c_str())) {
+        requestRemoveLane = true;
+        pendingRemoveLaneId = lane->id;
     }
+    if(ImGui::IsItemHovered()) ImGui::SetTooltip("Remove this lane (deletes the whole clip if it's the only one)");
 
     if(ImGui::BeginTabBar("##clipPropertyTabs")) {
         if(ImGui::BeginTabItem("Clip")) {
@@ -1459,12 +1502,6 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 ImGui::SameLine(); ImGui::TextUnformatted("to"); ImGui::SameLine(); ImGui::SetNextItemWidth(55.0f);
                 ImGui::DragFloat("##rangeMax", &lane->valueMax, 0.01f, -99999.0f, 99999.0f, "%.4g");
             }
-            ImGui::TextDisabled("%s", laneTypeName(lane->type));
-            if(ImGui::SmallButton("Remove this lane")) {
-                requestRemoveLane = true;
-                pendingRemoveLaneId = lane->id;
-            }
-            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Deletes the whole clip if this is its only lane");
             ImGui::EndTabItem();
         }
 
@@ -1561,7 +1598,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     const float right = std::min(editorMax.x, clipX2);
     if(right <= left) {
         finishAbsoluteLayout(ImVec2(editorMin.x, editorMax.y));
-        return;
+        continue;
     }
 
     // Everything below draws actual clip content (notes / curve / steps),
@@ -1573,7 +1610,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         // The note selection is keyed by index into this lane's pianoNotes,
         // so switching to a different lane must drop it -- otherwise stale
         // indices could highlight (or, worse, delete) unrelated notes.
-        if(pianoSelectionLaneId != lane->id) {
+        if(isFocused && pianoSelectionLaneId != lane->id) {
             pianoSelectionLaneId = lane->id;
             pianoSelectedNoteIndices.clear();
             pianoDragSnapshot.clear();
@@ -1660,7 +1697,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 const float x2 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, note.startBeat + note.durationBeats, cycle));
                 const float y2 = rollBottom - (note.pitch - lowPitch) * pitchHeight;
                 const float y1 = y2 - pitchHeight + 1.0f;
-                const bool selected = pianoSelectedNoteIndices.count(static_cast<int>(noteIndex)) > 0;
+                const bool selected = isFocused && pianoSelectedNoteIndices.count(static_cast<int>(noteIndex)) > 0;
                 dl->AddRectFilled(ImVec2(x1 + 1.0f, y1), ImVec2(x2 - 1.0f, y2),
                                   selected ? IM_COL32(250, 210, 90, 245) : IM_COL32(track.color.r, track.color.g, track.color.b, cycle == 0 ? 225 : 135), 2.0f);
                 dl->AddLine(ImVec2(x2 - 3.0f, y1 + 1.0f), ImVec2(x2 - 3.0f, y2 - 1.0f), IM_COL32(255, 255, 255, 180), 1.0f);
@@ -1675,6 +1712,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         }
         dl->PopClipRect();
 
+        if(isFocused) {
         const bool hovered = ImGui::IsMouseHoveringRect(ImVec2(left, rollTop), ImVec2(right, rollBottom));
         const bool velocityHovered = ImGui::IsMouseHoveringRect(ImVec2(left, velocityTop), ImVec2(right, velocityBottom));
         const bool probabilityHovered = ImGui::IsMouseHoveringRect(ImVec2(left, probabilityTop), ImVec2(right, probabilityBottom));
@@ -1902,11 +1940,12 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
             }
             ImGui::EndPopup();
         }
+        } // isFocused (piano roll interaction)
         const float playheadX = timelineMin.x + beatOffset(beatPosition);
         if(playheadX >= zoneLeft && playheadX <= editorMax.x) dl->AddLine(ImVec2(playheadX, editorMin.y), ImVec2(playheadX, editorMax.y), kPlayhead, 2.0f);
         dl->PopClipRect();
         finishAbsoluteLayout(ImVec2(editorMin.x, editorMax.y));
-        return;
+        continue;
     }
 
     if(lane->type == ofxOceanodeTimelineLaneType::Curve) {
@@ -1976,6 +2015,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         // Require the editor canvas item itself to be hoverable, not merely
         // geometric overlap. This prevents clicks in the numeric popup from
         // passing through and creating a point underneath it.
+        if(isFocused) {
         const bool curveHovered = editorCanvasHovered && !ImGui::IsPopupOpen("Curve point value") && right > left &&
             ImGui::IsMouseHoveringRect(ImVec2(left, curveTop), ImVec2(right, curveBottom));
         const ImVec2 curveMouse = ImGui::GetIO().MousePos;
@@ -2088,12 +2128,13 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
             }
             ImGui::EndPopup();
         }
+        } // isFocused (curve interaction)
         const float playheadX = timelineMin.x + beatOffset(beatPosition);
         if(playheadX >= zoneLeft && playheadX <= editorMax.x) dl->AddLine(ImVec2(playheadX, editorMin.y), ImVec2(playheadX, editorMax.y), kPlayhead, 2.0f);
-        if(editorCanvasHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) stepEditorOpen = false;
+        if(isFocused && editorCanvasHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) stepEditorOpen = false;
         dl->PopClipRect();
         finishAbsoluteLayout(ImVec2(editorMin.x, editorMax.y));
-        return;
+        continue;
     }
 
     const int stepCount = std::max(1, lane->stepCount);
@@ -2151,6 +2192,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
             }
         }
         dl->PopClipRect();
+        if(isFocused) {
         const ImVec2 mouse = ImGui::GetIO().MousePos;
         const bool inStepEditor = ImGui::IsMouseHoveringRect(ImVec2(left, cellTop), ImVec2(right, cellBottom));
         if(inStepEditor && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseDown(ImGuiMouseButton_Left))) {
@@ -2165,7 +2207,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 return std::abs(step.startBeat - cellBeat) < 1.0 / kPPQ;
             });
             if(stepIt == lane->step.steps.end()) {
-                timeline.setClipStep(editorTrackId, editorClipId, editorLaneId, cellBeat, value, beatsPerStep);
+                timeline.setClipStep(editorTrackId, editorClipId, lane->id, cellBeat, value, beatsPerStep);
                 stepIt = std::find_if(lane->step.steps.begin(), lane->step.steps.end(), [&](const auto& step) {
                     return std::abs(step.startBeat - cellBeat) < 1.0 / kPPQ;
                 });
@@ -2186,19 +2228,21 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
             });
             std::string value = "1";
             if(stepIt == lane->step.steps.end()) {
-                timeline.setClipStep(editorTrackId, editorClipId, editorLaneId, cellBeat, value, beatsPerStep);
+                timeline.setClipStep(editorTrackId, editorClipId, lane->id, cellBeat, value, beatsPerStep);
                 stepIt = std::find_if(lane->step.steps.begin(), lane->step.steps.end(), [&](const auto& step) {
                     return std::abs(step.startBeat - cellBeat) < 1.0 / kPPQ;
                 });
             }
             if(stepIt != lane->step.steps.end()) stepIt->probability = stepIt->probability > 0.5f ? 0.0f : 1.0f;
         }
+        } // isFocused (step interaction)
     }
     const float playheadX = timelineMin.x + beatOffset(beatPosition);
     if(playheadX >= zoneLeft && playheadX <= editorMax.x) dl->AddLine(ImVec2(playheadX, editorMin.y), ImVec2(playheadX, editorMax.y), kPlayhead, 2.0f);
-    if(editorCanvasHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) stepEditorOpen = false;
+    if(isFocused && editorCanvasHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) stepEditorOpen = false;
     dl->PopClipRect();
     finishAbsoluteLayout(ImVec2(editorMin.x, editorMax.y));
+    } // end for(laneIndex : clip->lanes)
 }
 
 void ofxOceanodeTimelineController::drawRenamePopup(ofxOceanodeTimelineManager& timeline) {

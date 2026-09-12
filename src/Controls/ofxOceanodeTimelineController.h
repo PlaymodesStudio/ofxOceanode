@@ -52,6 +52,11 @@ private:
     std::string editorTrackId;
     std::string editorClipId;
     std::string editorLaneId;
+    // Independent expand/collapse state for each lane in a multi-lane
+    // clip's editor (keyed by lane id, globally unique). Absence from
+    // this set means expanded -- most lanes are expanded most of the
+    // time, so "collapsed" is the state worth tracking explicitly.
+    std::set<std::string> collapsedLaneIds;
     char pendingTrackName[128] = {};
     int pendingNewTrackLaneType = 0;
     char pendingClipName[128] = {};
