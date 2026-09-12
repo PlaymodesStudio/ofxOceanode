@@ -41,6 +41,10 @@ private:
     float pixelsPerSecond = 140.0f;
     int visibleBars = 8;
     double rulerSnapBeats = 0.25;
+    // Horizontal scroll is fully manual (not native ImGui ScrollX) so the
+    // left-hand label/properties column can stay pinned in place while only
+    // the beat-based content to its right slides underneath it.
+    float timelineScrollX = 0.0f;
 
     std::string pendingTrackId;
     std::string pendingClipId;
