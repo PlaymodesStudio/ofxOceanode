@@ -269,7 +269,16 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     }
     // Draw a list of nodes on the left side
     bool open_context_menu = false;
+    bool open_outlet_context_menu = false;
     static ofxOceanodeNode* customGuiContextNode = nullptr;
+    static ofxOceanodeAbstractParameter* portalizeSourceParameter = nullptr;
+    struct PendingPortalAlignment {
+        ofxOceanodeContainer* container;
+        string receiverNode;
+        string sinkNode;
+        string sinkParameter;
+    };
+    static vector<PendingPortalAlignment> pendingPortalAlignments;
     string node_hovered_in_list = "";
     string node_hovered_in_scene = "";
     
@@ -337,6 +346,146 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }
             }
         };
+
+        auto hasPortalizableConnections = [](ofxOceanodeAbstractParameter* sourceParameter){
+            if(sourceParameter == nullptr) return false;
+            for(auto* connection : sourceParameter->getOutConnections()){
+                if(dynamic_cast<abstractPortal*>(connection->getSinkParameter().getNodeModel()) == nullptr) return true;
+            }
+            return false;
+        };
+
+        auto getPortalizableOutputs = [&](const vector<ofxOceanodeNode*>& nodes){
+            vector<ofxOceanodeAbstractParameter*> outputs;
+            for(auto* node : nodes){
+                for(auto& parameter : node->getParameters()){
+                    auto output = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(parameter);
+                    if(output != nullptr && hasPortalizableConnections(output.get())) outputs.push_back(output.get());
+                }
+            }
+            return outputs;
+        };
+
+        auto portalizeOutput = [&](ofxOceanodeAbstractParameter* sourceParameter){
+            if(sourceParameter == nullptr) return false;
+
+            vector<ofxOceanodeAbstractConnection*> originalConnections;
+            for(auto* connection : sourceParameter->getOutConnections()){
+                if(dynamic_cast<abstractPortal*>(connection->getSinkParameter().getNodeModel()) == nullptr){
+                    originalConnections.push_back(connection);
+                }
+            }
+            if(originalConnections.empty()) return false;
+
+            const string typeName = container->getTypesRegistry()->getTypeNameFromTypeDescription(sourceParameter->valueType());
+            const string portalTypeName = "Portal " + typeName;
+            if(typeName.empty() || container->getRegistry()->getRegisteredModels().count(portalTypeName) == 0){
+                ofLogWarning("Portalize") << "No portal registered for output type " << sourceParameter->valueType();
+                return false;
+            }
+
+            string portalName = sourceParameter->getGroupHierarchyNames()[0] + "." + sourceParameter->getName();
+            const string portalNameBase = portalName;
+            int nameSuffix = 2;
+            auto portalNameExists = [&](const string& name){
+                for(auto* node : container->getAllModules()){
+                    auto* portalModel = dynamic_cast<abstractPortal*>(&node->getNodeModel());
+                    if(portalModel != nullptr && portalModel->getName() == name) return true;
+                }
+                return false;
+            };
+            while(portalNameExists(portalName)){
+                portalName = portalNameBase + " " + ofToString(nameSuffix++);
+            }
+
+            vector<ofxOceanodeAbstractParameter*> sinkParameters;
+            for(auto* connection : originalConnections){
+                auto* sink = &connection->getSinkParameter();
+                sinkParameters.push_back(sink);
+            }
+
+            vector<ofxOceanodeNode*> createdPortals;
+            vector<ofxOceanodeAbstractParameter*> receiverValues;
+            auto* senderNode = container->createNodeFromName(portalTypeName);
+            if(senderNode == nullptr) return false;
+            createdPortals.push_back(senderNode);
+
+            auto preparePortal = [&](ofxOceanodeNode* portalNode) -> ofxOceanodeAbstractParameter*{
+                if(!portalNode->getParameters().contains("Name") || !portalNode->getParameters().contains("Value")) return nullptr;
+                portalNode->getNodeGui().setVisibility(false); // Pin positions are initialized on the next frame.
+                portalNode->getNodeModel().getParameter<string>("Name").set(portalName);
+                return &static_cast<ofxOceanodeAbstractParameter&>(portalNode->getParameters().get("Value"));
+            };
+
+            auto* senderValue = preparePortal(senderNode);
+            if(senderValue == nullptr){
+                senderNode->deleteSelf();
+                return false;
+            }
+
+            auto* sourceGui = container->getGuiFromModel(sourceParameter->getNodeModel());
+            if(sourceGui != nullptr){
+                glm::vec2 position = sourceGui->getPosition() + glm::vec2(sourceGui->getRectangle().getWidth() + GRID_SIZE, 0);
+                senderNode->getNodeGui().setPosition(snap_to_grid ? snapToGrid(position) : position);
+            }
+
+            for(auto* sinkParameter : sinkParameters){
+                auto* receiverNode = container->createNodeFromName(portalTypeName);
+                if(receiverNode == nullptr){
+                    for(auto* portalNode : createdPortals) portalNode->deleteSelf();
+                    return false;
+                }
+                createdPortals.push_back(receiverNode);
+
+                auto* receiverValue = preparePortal(receiverNode);
+                if(receiverValue == nullptr){
+                    for(auto* portalNode : createdPortals) portalNode->deleteSelf();
+                    return false;
+                }
+                receiverValues.push_back(receiverValue);
+
+                auto* sinkGui = container->getGuiFromModel(sinkParameter->getNodeModel());
+                if(sinkGui != nullptr){
+                    glm::vec2 position = sinkGui->getPosition() - glm::vec2(getTotalNodeWidth() + GRID_SIZE, 0);
+                    receiverNode->getNodeGui().setPosition(snap_to_grid ? snapToGrid(position) : position);
+                }
+            }
+
+            if(container->createConnection(*sourceParameter, *senderValue) == nullptr){
+                for(auto* portalNode : createdPortals) portalNode->deleteSelf();
+                return false;
+            }
+
+            size_t replacedConnections = 0;
+            for(size_t i = 0; i < originalConnections.size(); i++){
+                originalConnections[i]->deleteSelf();
+                if(container->createConnection(*receiverValues[i], *sinkParameters[i]) == nullptr){
+                    for(auto* portalNode : createdPortals) portalNode->deleteSelf();
+                    for(size_t j = 0; j <= replacedConnections; j++){
+                        container->createConnection(*sourceParameter, *sinkParameters[j]);
+                    }
+                    ofLogWarning("Portalize") << "Could not reconnect portal receiver; original connections restored";
+                    return false;
+                }
+                replacedConnections++;
+            }
+
+            for(size_t i = 0; i < sinkParameters.size(); i++){
+                pendingPortalAlignments.push_back({
+                    container.get(),
+                    createdPortals[i + 1]->getParameters().getEscapedName(),
+                    sinkParameters[i]->getGroupHierarchyNames()[0],
+                    sinkParameters[i]->getName()
+                });
+            }
+
+            return true;
+        };
+
+        if(portalizeSelectionRequested){
+            portalizeSelectionRequested = false;
+            for(auto* output : getPortalizableOutputs(container->getSelectedModules())) portalizeOutput(output);
+        }
 
         // Detect canvas tab activation — consistent check for both active-canvas-ID
         // and layout switching. Uses dock tab selection when available to avoid
@@ -869,8 +1018,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 NODE_WIDTH_TEXT   * zoomLevel,
                 NODE_WIDTH_WIDGET * zoomLevel,
                 zoomLevel)){
-                bool node_contents_hovered = ImGui::IsAnyItemHovered();
-
                 ImGui::PopStyleVar();          // FramePadding (pushed last, popped first)
                 ImGui::SetWindowFontScale(1.0f);
                 if(zoomFont) ImGui::PopFont();
@@ -900,7 +1047,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 {
                     isAnyNodeHovered = true;
                     node_hovered_in_scene = nodeId;
-                    if(ImGui::IsMouseClicked(1) && !node_contents_hovered){
+                    if(ImGui::IsMouseClicked(1) && ImGui::GetMousePos().y <= node_rect_header.y){
                         open_context_menu = true;
                         customGuiContextNode = node;
                     }
@@ -1032,7 +1179,12 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
                             draw_list->AddCircleFilled(bulletPosition, bulletSize, OceanodeColors::U32(OceanodeColors::ConnectionBullet));
                             if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
-                                if(ImGui::IsMouseClicked(0)){
+                                if(ImGui::IsMouseClicked(1) && hasPortalizableConnections(param.get())){
+                                    portalizeSourceParameter = param.get();
+                                    open_outlet_context_menu = true;
+                                    open_context_menu = true;
+                                    customGuiContextNode = nullptr;
+                                }else if(ImGui::IsMouseClicked(0)){
                                     nodeGui.setSelected(false); //Deselect node if we are making connections
                                     isCreatingConnection = true;
                                     tempSourceParameter = param.get();
@@ -1087,6 +1239,38 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
             ImGui::PopID();
   }
+
+        for(auto it = pendingPortalAlignments.begin(); it != pendingPortalAlignments.end();){
+            if(it->container != container.get()){
+                ++it;
+                continue;
+            }
+
+            const auto& nodesByGroup = container->getParameterGroupNodesMap();
+            auto receiverIt = nodesByGroup.find(it->receiverNode);
+            auto sinkIt = nodesByGroup.find(it->sinkNode);
+            if(receiverIt == nodesByGroup.end() || sinkIt == nodesByGroup.end()
+               || !receiverIt->second->getParameters().contains("Value")
+               || !sinkIt->second->getParameters().contains(it->sinkParameter)){
+                it = pendingPortalAlignments.erase(it);
+                continue;
+            }
+
+            auto& receiverGui = receiverIt->second->getNodeGui();
+            auto& sinkGui = sinkIt->second->getNodeGui();
+            if(receiverGui.getVisibility() && sinkGui.getVisibility()){
+                auto& receiverValue = static_cast<ofxOceanodeAbstractParameter&>(receiverIt->second->getParameters().get("Value"));
+                auto& sinkParameter = static_cast<ofxOceanodeAbstractParameter&>(sinkIt->second->getParameters().get(it->sinkParameter));
+                const float deltaY = sinkGui.getSinkConnectionPositionFromParameter(sinkParameter).y
+                                   - receiverGui.getSourceConnectionPositionFromParameter(receiverValue).y;
+                glm::vec2 position = receiverGui.getPosition();
+                position.y += deltaY / zoomLevel;
+                receiverGui.setPosition(position);
+                it = pendingPortalAlignments.erase(it);
+            }else{
+                ++it;
+            }
+        }
         
         // Move selected comments along with nodes (once per frame, outside the node loop)
         if(someSelectedModuleMove != "" && moveSelectedModulesWithDrag != glm::vec2(0,0)){
@@ -1394,6 +1578,18 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         
         
         
+        if(open_outlet_context_menu){
+            ImGui::OpenPopup("Outlet Connection");
+        }
+        if(ImGui::BeginPopup("Outlet Connection")){
+            if(hasPortalizableConnections(portalizeSourceParameter) && ImGui::Selectable("Portalize")){
+                portalizeOutput(portalizeSourceParameter);
+                portalizeSourceParameter = nullptr;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
         if(open_context_menu && customGuiContextNode != nullptr){
             ImGui::OpenPopup("Canvas Custom GUIs");
         }
@@ -1403,6 +1599,18 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
         if(ImGui::BeginPopup("Canvas Custom GUIs")){
             if(customGuiContextNode != nullptr){
+                auto selectedNodes = container->getSelectedModules();
+                bool contextNodeIsSelected = std::find(selectedNodes.begin(), selectedNodes.end(), customGuiContextNode) != selectedNodes.end();
+                if(contextNodeIsSelected && selectedNodes.size() > 1){
+                    auto connectedOutputs = getPortalizableOutputs(selectedNodes);
+                    if(!connectedOutputs.empty()){
+                        if(ImGui::Selectable("Portalize Selection")){
+                            for(auto* output : connectedOutputs) portalizeOutput(output);
+                            ImGui::CloseCurrentPopup();
+                        }
+                        ImGui::Separator();
+                    }
+                }
                 drawCustomGuiManagementMenu();
             }
             ImGui::EndPopup();

@@ -426,6 +426,36 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			ImGui::MenuItem("Metrics", NULL, &show_app_metrics);
             ImGui::EndMenu();
         }
+
+        if(ImGui::BeginMenu("Edit"))
+        {
+            const string activeCanvasId = ofxOceanodeShared::getActiveCanvasUniqueID().empty()
+                ? canvas.getUniqueID() : ofxOceanodeShared::getActiveCanvasUniqueID();
+            ofxOceanodeContainer* activeContainer = container->getContainerForCanvasID(activeCanvasId);
+            ofxOceanodeCanvas* activeCanvas = nullptr;
+            std::function<void(ofxOceanodeContainer*, ofxOceanodeCanvas*)> findActiveCanvas =
+            [&](ofxOceanodeContainer* currentContainer, ofxOceanodeCanvas* currentCanvas){
+                if(activeCanvas != nullptr || currentContainer == nullptr || currentCanvas == nullptr) return;
+                if(currentCanvas->getUniqueID() == activeCanvasId){
+                    activeCanvas = currentCanvas;
+                    return;
+                }
+                for(auto* node : currentContainer->getAllModules()){
+                    if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
+                        findActiveCanvas(macro->getContainer().get(), macro->getCanvas());
+                    }
+                }
+            };
+            findActiveCanvas(container.get(), &canvas);
+            if(activeContainer == nullptr) activeContainer = container.get();
+            if(activeCanvas == nullptr) activeCanvas = &canvas;
+
+            const bool hasSelection = activeContainer->getSelectedModules().size() > 1;
+            if(ImGui::MenuItem("Portalize Selection", nullptr, false, hasSelection)){
+                activeCanvas->requestPortalizeSelection();
+            }
+            ImGui::EndMenu();
+        }
 		
 		if(ImGui::BeginMenu("View"))
 		{
