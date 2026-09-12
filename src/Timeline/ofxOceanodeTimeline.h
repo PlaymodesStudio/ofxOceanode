@@ -270,9 +270,12 @@ public:
     bool savePreset(const std::string& presetFolderPath) const;
     bool loadPreset(const std::string& presetFolderPath);
 
-private:
+    // Public because the controller UI displays a binding's blend mode
+    // (e.g. next to the parameter name) and needs to turn it into a label.
     static std::string modeToString(ofxOceanodeTimelineAutomationMode mode);
     static ofxOceanodeTimelineAutomationMode modeFromString(const std::string& mode);
+
+private:
     static std::string laneTypeToString(ofxOceanodeTimelineLaneType laneType);
     static ofxOceanodeTimelineLaneType laneTypeFromString(const std::string& laneType);
     static std::string makeId(const char* prefix, uint64_t number);
