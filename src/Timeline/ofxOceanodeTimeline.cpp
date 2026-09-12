@@ -84,20 +84,43 @@ std::string combineAutomationValues(const std::vector<std::pair<ofxOceanodeTimel
         // whichever contributor evaluated last simply wins (old behaviour).
         return values.back().second;
     }
-    // The first contributor seeds the result -- there is nothing before it
-    // to combine with, so its own mode is irrelevant. Every later
-    // contributor blends onto the running result using its own mode, the
-    // same way layer blend modes stack in an image editor.
-    double result = ofToDouble(values.front().second);
-    for(size_t i = 1; i < values.size(); ++i) {
+    // A Replace contributor is the "base" signal -- everything else
+    // (Add/Multiply/Min/Max) is a modulator applied on top of it. That base
+    // must win by MEANING, not by vector position: which lane got added to
+    // the clip first is an authoring accident the user has no reason to
+    // track, so e.g. a Curve (left at the default Replace mode) driving
+    // Levels together with a piano-roll Gate set to Multiply must multiply
+    // correctly whichever lane happens to be earlier in the list. Find the
+    // last Replace contributor (if several plain/overwrite lanes share the
+    // parameter, the most recently evaluated one is the base, matching the
+    // old strictly-positional behaviour in that case) and fold every other
+    // contributor onto it, in their original relative order, using each
+    // one's own mode.
+    int baseIndex = -1;
+    for(size_t i = 0; i < values.size(); ++i) {
+        if(values[i].first == ofxOceanodeTimelineAutomationMode::Replace) baseIndex = static_cast<int>(i);
+    }
+    // No explicit Replace contributor at all (every lane driving this
+    // parameter has its own blend mode) -- fall back to the first
+    // contributor as the seed. Its own mode is irrelevant here since there
+    // is nothing before it to combine with (Add against 0, Multiply against
+    // 1, Min/Max against +-infinity all simplify to just its value).
+    if(baseIndex < 0) baseIndex = 0;
+    double result = ofToDouble(values[static_cast<size_t>(baseIndex)].second);
+    for(size_t i = 0; i < values.size(); ++i) {
+        if(static_cast<int>(i) == baseIndex) continue;
+        // Any OTHER Replace contributor is a superseded plain/overwrite
+        // signal -- the one at baseIndex already won that contest above, so
+        // an earlier Replace entry must not clobber the base or the
+        // modulators folded onto it while iterating past it.
+        if(values[i].first == ofxOceanodeTimelineAutomationMode::Replace) continue;
         const double contribution = ofToDouble(values[i].second);
         switch(values[i].first) {
             case ofxOceanodeTimelineAutomationMode::Add: result += contribution; break;
             case ofxOceanodeTimelineAutomationMode::Multiply: result *= contribution; break;
             case ofxOceanodeTimelineAutomationMode::Min: result = std::min(result, contribution); break;
             case ofxOceanodeTimelineAutomationMode::Max: result = std::max(result, contribution); break;
-            case ofxOceanodeTimelineAutomationMode::Replace:
-            default: result = contribution; break;
+            default: break;
         }
     }
     return isInt ? ofToString(static_cast<int>(std::lround(result))) : ofToString(static_cast<float>(result));
