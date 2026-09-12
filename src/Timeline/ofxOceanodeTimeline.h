@@ -269,6 +269,15 @@ public:
     double getLoopEndBeat() const { return loopEndBeat; }
     void setLoopRange(double startBeat, double endBeat);
 
+    // The timeline isn't always 4/4: numerator/denominator are stored and
+    // persisted like any other project setting, and getBeatsPerBar() is
+    // what every bar-line/grid computation in the timeline UI should use
+    // instead of assuming 4 beats (quarter notes) per bar.
+    int getTimeSignatureNumerator() const { return timeSignatureNumerator; }
+    int getTimeSignatureDenominator() const { return timeSignatureDenominator; }
+    double getBeatsPerBar() const { return timeSignatureNumerator * (4.0 / timeSignatureDenominator); }
+    void setTimeSignature(int numerator, int denominator);
+
     ofJson toJson() const;
     void fromJson(const ofJson& json);
     bool savePreset(const std::string& presetFolderPath) const;
@@ -311,6 +320,8 @@ private:
     bool loopEnabled = false;
     double loopStartBeat = 0.0;
     double loopEndBeat = 4.0;
+    int timeSignatureNumerator = 4;
+    int timeSignatureDenominator = 4;
 };
 
 #endif

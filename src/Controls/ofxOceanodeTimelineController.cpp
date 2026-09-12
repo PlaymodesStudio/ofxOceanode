@@ -14,7 +14,6 @@
 #include <utility>
 
 namespace {
-constexpr double kBarBeats = 4.0;
 constexpr double kPPQ = 24.0;
 constexpr float kLabelWidth = 230.0f;
 constexpr float kRulerHeight = 64.0f;
@@ -154,7 +153,8 @@ ofxOceanodeTimelineController::ofxOceanodeTimelineController(std::shared_ptr<ofx
 : ofxOceanodeBaseController("Timeline"), container(std::move(_container)) {}
 
 double ofxOceanodeTimelineController::getContentEndBeat(const ofxOceanodeTimelineManager& timeline) const {
-    double endBeat = std::max(kBarBeats, static_cast<double>(visibleBars) * kBarBeats);
+    const double barBeats = timeline.getBeatsPerBar();
+    double endBeat = std::max(barBeats, static_cast<double>(visibleBars) * barBeats);
     if(timeline.isLoopEnabled()) endBeat = std::max(endBeat, timeline.getLoopEndBeat());
     for(const auto& point : timeline.getBpmAutomationPoints()) endBeat = std::max(endBeat, point.beat);
     for(const auto& track : timeline.getTracks()) {
@@ -284,6 +284,35 @@ void ofxOceanodeTimelineController::draw() {
     ImGui::SameLine();
     ImGui::SetNextItemWidth(80.0f);
     ImGui::DragInt("Bars", &visibleBars, 1.0f, 1, 256);
+    ImGui::SameLine();
+    {
+        // Time signature: numerator is free-typed (any meter is valid),
+        // denominator is restricted to the conventional note-value set so
+        // getBeatsPerBar() (numerator * 4/denominator, in quarter-note
+        // beats) always lands on a sane grid.
+        int tsNumerator = timeline.getTimeSignatureNumerator();
+        int tsDenominator = timeline.getTimeSignatureDenominator();
+        ImGui::TextUnformatted("Time Sig");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(38.0f);
+        if(ImGui::DragInt("##timeSigNum", &tsNumerator, 0.1f, 1, 64))
+            timeline.setTimeSignature(tsNumerator, tsDenominator);
+        ImGui::SameLine(0.0f, 3.0f);
+        ImGui::TextUnformatted("/");
+        ImGui::SameLine(0.0f, 3.0f);
+        ImGui::SetNextItemWidth(46.0f);
+        char tsDenomLabel[8];
+        std::snprintf(tsDenomLabel, sizeof(tsDenomLabel), "%d", tsDenominator);
+        if(ImGui::BeginCombo("##timeSigDenom", tsDenomLabel)) {
+            for(int option : {1, 2, 4, 8, 16, 32}) {
+                char optionLabel[8];
+                std::snprintf(optionLabel, sizeof(optionLabel), "%d", option);
+                if(ImGui::Selectable(optionLabel, option == tsDenominator))
+                    timeline.setTimeSignature(tsNumerator, option);
+            }
+            ImGui::EndCombo();
+        }
+    }
     ImGui::SameLine();
     int rulerDivision = divisionIndexForBeats(rulerSnapBeats);
     ImGui::SetNextItemWidth(82.0f);
@@ -493,7 +522,7 @@ void ofxOceanodeTimelineController::draw() {
             for(int i = 0; i <= lines; ++i) {
                 const double beat = i * grid;
                 const float x = min.x + beatOffset(beat);
-                const bool isBar = std::fmod(beat, kBarBeats) < 0.001;
+                const bool isBar = std::fmod(beat, timeline.getBeatsPerBar()) < 0.001;
                 const bool quarter = std::fmod(beat, 1.0) < 0.001;
                 if(isBar || quarter || beatOffset(beat + grid) - beatOffset(beat) >= 4.0f)
                     dl->AddLine(ImVec2(x, min.y), ImVec2(x, max.y), isBar ? kBar : quarter ? IM_COL32(92, 92, 92, 145) : kGrid, isBar ? 1.5f : 1.0f);
@@ -1009,13 +1038,13 @@ void ofxOceanodeTimelineController::drawRuler(ofxOceanodeTimelineManager& timeli
     for(int i = 0; i <= gridLines; ++i) {
         const double beat = i * grid;
         const float x = laneMin.x + beatToPixels(timeline, beat, bpm);
-        const bool bar = std::fmod(beat, kBarBeats) < 0.001;
+        const bool bar = std::fmod(beat, timeline.getBeatsPerBar()) < 0.001;
         const bool quarter = std::fmod(beat, 1.0) < 0.001;
         if(bar || quarter || beatToPixels(timeline, beat + grid, bpm) - beatToPixels(timeline, beat, bpm) >= 4.0f)
             dl->AddLine(ImVec2(x, rulerDividerY), ImVec2(x, max.y), bar ? kBar : quarter ? IM_COL32(95, 95, 95, 165) : kGrid, bar ? 1.5f : 1.0f);
         if(bar) {
             char beatLabel[16];
-            std::snprintf(beatLabel, sizeof(beatLabel), "%d", static_cast<int>(beat / kBarBeats) + 1);
+            std::snprintf(beatLabel, sizeof(beatLabel), "%d", static_cast<int>(beat / timeline.getBeatsPerBar()) + 1);
             dl->AddText(ImVec2(x + 5, rulerDividerY + 5), IM_COL32(235, 235, 235, 255), beatLabel);
         }
     }
@@ -1051,7 +1080,7 @@ void ofxOceanodeTimelineController::drawRuler(ofxOceanodeTimelineManager& timeli
         pixelsToBeat(timeline, mouse.x - laneMin.x, bpm, endBeat), 0.0, endBeat);
     const double mouseBeat = snapBeat(rawMouseBeat);
     if(hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-        const double loopLength = kBarBeats;
+        const double loopLength = timeline.getBeatsPerBar();
         const double loopStart = snapBeat(std::max(0.0, mouseBeat - loopLength * 0.5));
         timeline.setLoopEnabled(true);
         timeline.setLoopRange(loopStart, loopStart + loopLength);
@@ -1168,7 +1197,7 @@ void ofxOceanodeTimelineController::drawBpmLane(ofxOceanodeTimelineManager& time
     for(int i = 0; i <= gridLines; ++i) {
         const double beat = i * grid;
         const float x = timelineMin.x + beatToPixels(timeline, beat, fallbackBpm);
-        const bool bar = std::fmod(beat, kBarBeats) < 0.001;
+        const bool bar = std::fmod(beat, timeline.getBeatsPerBar()) < 0.001;
         if(bar || beatToPixels(timeline, beat + grid, fallbackBpm) - beatToPixels(timeline, beat, fallbackBpm) >= 4.0f)
             dl->AddLine(ImVec2(x, graphTop), ImVec2(x, graphBottom), bar ? kBar : kGrid, bar ? 1.5f : 1.0f);
     }
@@ -2045,7 +2074,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         for(int gridIndex = 0; gridIndex <= curveGridLines; ++gridIndex) {
             const double beat = gridIndex * curveGrid;
             const float x = timelineMin.x + beatOffset(beat);
-            const bool bar = std::fmod(beat, kBarBeats) < 0.001;
+            const bool bar = std::fmod(beat, timeline.getBeatsPerBar()) < 0.001;
             if(bar || beatOffset(beat + curveGrid) - beatOffset(beat) >= 4.0f)
                 dl->AddLine(ImVec2(x, curveTop), ImVec2(x, curveBottom), bar ? kBar : kGrid, bar ? 1.5f : 1.0f);
         }

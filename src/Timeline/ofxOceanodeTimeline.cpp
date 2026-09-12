@@ -1308,6 +1308,13 @@ void ofxOceanodeTimelineManager::clear() {
     loopEnabled = false;
     loopStartBeat = 0.0;
     loopEndBeat = 4.0;
+    timeSignatureNumerator = 4;
+    timeSignatureDenominator = 4;
+}
+
+void ofxOceanodeTimelineManager::setTimeSignature(int numerator, int denominator) {
+    timeSignatureNumerator = std::max(1, numerator);
+    timeSignatureDenominator = std::max(1, denominator);
 }
 
 std::string ofxOceanodeTimelineManager::modeToString(ofxOceanodeTimelineAutomationMode mode) {
@@ -1364,6 +1371,10 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
         {"enabled", loopEnabled},
         {"startBeat", loopStartBeat},
         {"endBeat", loopEndBeat}
+    };
+    json["timeSignature"] = {
+        {"numerator", timeSignatureNumerator},
+        {"denominator", timeSignatureDenominator}
     };
     json["tracks"] = ofJson::array();
     for(const auto& track : tracks) {
@@ -1484,6 +1495,10 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
         const auto& loop = json["loop"];
         loopEnabled = loop.value("enabled", false);
         setLoopRange(loop.value("startBeat", 0.0), loop.value("endBeat", 4.0));
+    }
+    if(json.contains("timeSignature") && json["timeSignature"].is_object()) {
+        const auto& signature = json["timeSignature"];
+        setTimeSignature(signature.value("numerator", 4), signature.value("denominator", 4));
     }
 
     for(const auto& trackJson : json["tracks"]) {
