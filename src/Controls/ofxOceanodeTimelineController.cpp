@@ -1424,34 +1424,47 @@ void ofxOceanodeTimelineController::drawBpmLane(ofxOceanodeTimelineManager& time
                     break;
                 }
             }
-            if(bpmDragPointIndex < 0 && ImGui::GetIO().KeyAlt &&
-               (bpmInterpolation == CurveInterpolationMode::LogExp || bpmInterpolation == CurveInterpolationMode::Sigmoid) &&
-               sourcePoints.size() > 1) {
-                for(size_t i = 1; i < sourcePoints.size(); ++i) {
-                    const auto& a = sourcePoints[i - 1];
-                    const auto& b = sourcePoints[i];
-                    if(beat < a.beat || beat > b.beat) continue;
-                    const float t = static_cast<float>((beat - a.beat) / std::max(1e-9, b.beat - a.beat));
-                    const auto tension = i - 1 < sourceTensions.size() ? sourceTensions[i - 1] : ofxOceanodeTimelineCurveTension{};
-                    const float segmentValue = ofLerp(a.value, b.value, curveSegmentShape(t, bpmInterpolation, tension));
-                    const float segmentY = bpmToY(segmentValue);
-                    if(std::abs(mouse.y - segmentY) <= 12.0f) {
-                        bpmTensionSegment = static_cast<int>(i - 1);
-                        bpmTensionDragStartX = mouse.x;
-                        bpmTensionDragStartY = mouse.y;
-                        bpmTensionStartInflection = tension.inflection;
-                        bpmTensionStartSteepness = tension.steepness;
+            if(bpmDragPointIndex >= 0 && ImGui::GetIO().KeyShift) {
+                // Matches the regular curve lane editor's shift-click-to-delete
+                // gesture. Tensions are keyed by segment index, so removing a
+                // point shifts every tension after it -- reset them the same
+                // way the curve editor does rather than leave stale shaping on
+                // the wrong (now different) pair of neighbours.
+                sourcePoints.erase(sourcePoints.begin() + bpmDragPointIndex);
+                sourceTensions.assign(sourcePoints.size() > 0 ? sourcePoints.size() - 1 : 0,
+                                      ofxOceanodeTimelineCurveTension{});
+                bpmDragPointIndex = -1;
+                bpmValuePointIndex = -1;
+            } else {
+                if(bpmDragPointIndex < 0 && ImGui::GetIO().KeyAlt &&
+                   (bpmInterpolation == CurveInterpolationMode::LogExp || bpmInterpolation == CurveInterpolationMode::Sigmoid) &&
+                   sourcePoints.size() > 1) {
+                    for(size_t i = 1; i < sourcePoints.size(); ++i) {
+                        const auto& a = sourcePoints[i - 1];
+                        const auto& b = sourcePoints[i];
+                        if(beat < a.beat || beat > b.beat) continue;
+                        const float t = static_cast<float>((beat - a.beat) / std::max(1e-9, b.beat - a.beat));
+                        const auto tension = i - 1 < sourceTensions.size() ? sourceTensions[i - 1] : ofxOceanodeTimelineCurveTension{};
+                        const float segmentValue = ofLerp(a.value, b.value, curveSegmentShape(t, bpmInterpolation, tension));
+                        const float segmentY = bpmToY(segmentValue);
+                        if(std::abs(mouse.y - segmentY) <= 12.0f) {
+                            bpmTensionSegment = static_cast<int>(i - 1);
+                            bpmTensionDragStartX = mouse.x;
+                            bpmTensionDragStartY = mouse.y;
+                            bpmTensionStartInflection = tension.inflection;
+                            bpmTensionStartSteepness = tension.steepness;
+                        }
+                        break;
                     }
-                    break;
                 }
-            }
-            if(bpmDragPointIndex < 0 && bpmTensionSegment < 0 && !ImGui::GetIO().KeyAlt) {
-                sourcePoints.push_back({beat, value});
-                std::sort(sourcePoints.begin(), sourcePoints.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
-                sourceTensions.resize(sourcePoints.empty() ? 0 : sourcePoints.size() - 1);
-                bpmDragPointIndex = static_cast<int>(std::min_element(sourcePoints.begin(), sourcePoints.end(), [&](const auto& a, const auto& b) {
-                    return std::abs(a.beat - beat) < std::abs(b.beat - beat);
-                }) - sourcePoints.begin());
+                if(bpmDragPointIndex < 0 && bpmTensionSegment < 0 && !ImGui::GetIO().KeyAlt) {
+                    sourcePoints.push_back({beat, value});
+                    std::sort(sourcePoints.begin(), sourcePoints.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
+                    sourceTensions.resize(sourcePoints.empty() ? 0 : sourcePoints.size() - 1);
+                    bpmDragPointIndex = static_cast<int>(std::min_element(sourcePoints.begin(), sourcePoints.end(), [&](const auto& a, const auto& b) {
+                        return std::abs(a.beat - beat) < std::abs(b.beat - beat);
+                    }) - sourcePoints.begin());
+                }
             }
         }
         // Once a point or a tension handle has been grabbed, keep updating
