@@ -23,6 +23,7 @@ constexpr float kRowHeight = 28.0f;
 constexpr float kCollapsedHeight = 38.0f;
 constexpr float kEdgePixels = 8.0f;
 constexpr float kPianoKeyboardWidth = 38.0f;
+constexpr float kPianoScrollbarWidth = 10.0f;
 
 using ofxOceanodeTimelineCurve::CurveInterpolationMode;
 using ofxOceanodeTimelineCurve::curveInterpolationMode;
@@ -1445,7 +1446,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(5.0f, 4.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(5.0f, 4.0f));
     const float pianoKeyboardReserve = lane->type == ofxOceanodeTimelineLaneType::PianoRoll
-        ? kPianoKeyboardWidth + 5.0f : 0.0f;
+        ? kPianoKeyboardWidth + kPianoScrollbarWidth + 9.0f : 0.0f;
     ImGui::BeginChild(("##clipProperties" + editorTrackId + editorClipId + lane->id).c_str(),
                       ImVec2(kLabelWidth - 10.0f - pianoKeyboardReserve, editorHeight - 8.0f), false,
                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
@@ -1616,8 +1617,6 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
             pianoDragSnapshot.clear();
             pianoMarqueeActive = false;
         }
-        const int lowPitch = ofClamp(lane->pianoLowPitch, 0, 127);
-        const int highPitch = ofClamp(lane->pianoHighPitch, lowPitch, 127);
         const float rollTop = editorMin.y + 8.0f;
         const float rollBottom = editorMax.y - 66.0f;
         const float velocityTop = rollBottom + 5.0f;
@@ -1626,6 +1625,44 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         const float probabilityBottom = editorMax.y - 6.0f;
         const float keyboardRight = zoneLeft - 1.0f;
         const float keyboardLeft = keyboardRight - kPianoKeyboardWidth;
+        const float pianoScrollbarRight = keyboardLeft - 4.0f;
+        const float pianoScrollbarLeft = pianoScrollbarRight - kPianoScrollbarWidth;
+
+        // Mouse wheel over the keys/notes area zooms (Ctrl held) or pans (no
+        // modifier) the visible pitch window -- the same window the
+        // scrollbar below drags, and the same Low/High fields editable in
+        // the Piano tab, so whichever way it's changed the view persists
+        // with the clip like any other lane setting.
+        if(isFocused && rollBottom > rollTop) {
+            const int wheelLowPitch = ofClamp(lane->pianoLowPitch, 0, 127);
+            const int wheelHighPitch = ofClamp(lane->pianoHighPitch, wheelLowPitch, 127);
+            const int wheelRangeSize = wheelHighPitch - wheelLowPitch + 1;
+            const float wheelPitchHeight = (rollBottom - rollTop) / static_cast<float>(wheelRangeSize);
+            const ImVec2 wheelMouse = ImGui::GetIO().MousePos;
+            const bool overKeysOrNotes = ImGui::IsMouseHoveringRect(ImVec2(pianoScrollbarLeft, rollTop), ImVec2(right, rollBottom));
+            if(overKeysOrNotes && std::abs(ImGui::GetIO().MouseWheel) > 0.001f) {
+                const float wheel = ImGui::GetIO().MouseWheel;
+                if(ImGui::GetIO().KeyCtrl) {
+                    const int anchorPitch = ofClamp(wheelHighPitch - static_cast<int>((wheelMouse.y - rollTop) / wheelPitchHeight),
+                                                    wheelLowPitch, wheelHighPitch);
+                    const int newRangeSize = std::clamp(static_cast<int>(std::lround(wheelRangeSize / std::pow(1.12f, wheel))), 1, 128);
+                    const double anchorFraction = wheelRangeSize > 0
+                        ? static_cast<double>(wheelHighPitch - anchorPitch) / static_cast<double>(wheelRangeSize) : 0.0;
+                    int newHigh = anchorPitch + static_cast<int>(std::lround(anchorFraction * newRangeSize));
+                    newHigh = ofClamp(newHigh, newRangeSize - 1, 127);
+                    lane->pianoLowPitch = newHigh - newRangeSize + 1;
+                    lane->pianoHighPitch = newHigh;
+                } else {
+                    const int step = static_cast<int>(std::lround(wheel * std::max(1.0f, wheelRangeSize * 0.15f)));
+                    const int newLow = ofClamp(wheelLowPitch + step, 0, std::max(0, 128 - wheelRangeSize));
+                    lane->pianoLowPitch = newLow;
+                    lane->pianoHighPitch = newLow + wheelRangeSize - 1;
+                }
+            }
+        }
+
+        const int lowPitch = ofClamp(lane->pianoLowPitch, 0, 127);
+        const int highPitch = ofClamp(lane->pianoHighPitch, lowPitch, 127);
         dl->AddRectFilled(ImVec2(keyboardLeft, rollTop), ImVec2(keyboardRight, rollBottom),
                           IM_COL32(205, 205, 200, 255));
         const float pitchHeight = (rollBottom - rollTop) / static_cast<float>(highPitch - lowPitch + 1);
@@ -1658,6 +1695,54 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         }
         dl->AddRect(ImVec2(keyboardLeft, rollTop), ImVec2(keyboardRight, rollBottom),
                     IM_COL32(track.color.r, track.color.g, track.color.b, 210));
+
+        // Vertical scrollbar: a thumb sized to the fraction of the full
+        // 0-127 pitch range currently visible, positioned so pitch 127 is at
+        // the top and pitch 0 at the bottom (matching the keyboard above).
+        // Dragging pans without changing zoom; clicking the track jumps the
+        // window there -- the same conventions as the horizontal timeline
+        // scrollbar drawn by hand below the whole viewport.
+        if(isFocused) {
+            const int scrollRangeSize = highPitch - lowPitch + 1;
+            const int maxLowPitch = std::max(0, 128 - scrollRangeSize);
+            const float scrollTrackHeight = std::max(1.0f, rollBottom - rollTop);
+            const float pianoThumbHeight = std::min(scrollTrackHeight,
+                std::max(16.0f, scrollTrackHeight * static_cast<float>(scrollRangeSize) / 128.0f));
+            const float pianoThumbTravel = std::max(0.0f, scrollTrackHeight - pianoThumbHeight);
+            const float pianoLowFraction = maxLowPitch > 0 ? static_cast<float>(lowPitch) / static_cast<float>(maxLowPitch) : 0.0f;
+            const float pianoThumbTop = rollTop + pianoThumbTravel * (1.0f - pianoLowFraction);
+            const ImVec2 pianoScrollThumbMin(pianoScrollbarLeft, pianoThumbTop);
+            const ImVec2 pianoScrollThumbMax(pianoScrollbarRight, pianoThumbTop + pianoThumbHeight);
+
+            dl->AddRectFilled(ImVec2(pianoScrollbarLeft, rollTop), ImVec2(pianoScrollbarRight, rollBottom),
+                              IM_COL32(20, 20, 20, 255));
+
+            ImGui::SetCursorScreenPos(ImVec2(pianoScrollbarLeft, rollTop));
+            ImGui::InvisibleButton(("##pianoVScrollbar" + lane->id).c_str(),
+                                   ImVec2(std::max(1.0f, pianoScrollbarRight - pianoScrollbarLeft), scrollTrackHeight));
+            const bool pianoThumbHovered = ImGui::IsItemHovered();
+            const bool pianoThumbActive = ImGui::IsItemActive();
+            if(maxLowPitch > 0) {
+                if(ImGui::IsItemClicked() && !ImGui::IsMouseHoveringRect(pianoScrollThumbMin, pianoScrollThumbMax)) {
+                    const float targetThumbTop = ofClamp(ImGui::GetIO().MousePos.y - pianoThumbHeight * 0.5f,
+                                                         rollTop, rollTop + pianoThumbTravel);
+                    const float targetFraction = 1.0f - (targetThumbTop - rollTop) / std::max(1.0f, pianoThumbTravel);
+                    lane->pianoLowPitch = ofClamp(static_cast<int>(std::lround(targetFraction * maxLowPitch)), 0, maxLowPitch);
+                    lane->pianoHighPitch = lane->pianoLowPitch + scrollRangeSize - 1;
+                }
+                if(pianoThumbActive && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+                    const float deltaFraction = -ImGui::GetIO().MouseDelta.y / std::max(1.0f, pianoThumbTravel);
+                    const int newLow = ofClamp(lane->pianoLowPitch + static_cast<int>(std::lround(deltaFraction * maxLowPitch)),
+                                               0, maxLowPitch);
+                    lane->pianoLowPitch = newLow;
+                    lane->pianoHighPitch = newLow + scrollRangeSize - 1;
+                }
+            }
+            dl->AddRectFilled(pianoScrollThumbMin, pianoScrollThumbMax,
+                              pianoThumbActive ? IM_COL32(150, 150, 160, 255)
+                                                : pianoThumbHovered ? IM_COL32(120, 120, 130, 255) : IM_COL32(90, 90, 100, 255), 3.0f);
+        }
+
         dl->AddRectFilled(ImVec2(left, velocityTop), ImVec2(right, velocityBottom), IM_COL32(28, 28, 31, 255));
         dl->AddRectFilled(ImVec2(left, probabilityTop), ImVec2(right, probabilityBottom), IM_COL32(24, 24, 27, 255));
         dl->AddText(ImVec2(left + 4.0f, velocityTop + 5.0f), IM_COL32(145, 145, 150, 210), "VEL");
