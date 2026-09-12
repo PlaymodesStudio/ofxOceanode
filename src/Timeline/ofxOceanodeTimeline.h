@@ -37,8 +37,7 @@ enum class ofxOceanodeTimelineLaneType {
 
 struct ofxOceanodeTimelineStep {
     double startBeat = 0.0;
-    // A non-positive duration means "hold until the next step". This keeps
-    // the old stepValueTrack behaviour while allowing explicit variable sizes.
+    // A non-positive duration uses the lane's current grid-cell length.
     double durationBeats = 0.0;
     std::string value;
     // Probability that this step fires. A value of 1 is an ordinary step and
@@ -49,20 +48,12 @@ struct ofxOceanodeTimelineStep {
 
 class ofxOceanodeTimelineStepLane {
 public:
-    double lengthBeats = 4.0;
-    bool loop = true;
-    std::string fallbackValue;
     std::vector<ofxOceanodeTimelineStep> steps;
 
     void sortSteps();
     void setStep(double startBeat, const std::string& value, double durationBeats = 0.0,
                 float probability = 1.0f);
     bool removeStep(double startBeat, double epsilon = 1e-6);
-    void clear();
-
-    // Evaluates in local lane space. Returns false when no step or fallback is
-    // active, allowing the manager to apply its gap policy later.
-    bool evaluate(double localBeat, std::string& value, bool useProbability = true) const;
 
     ofJson toJson() const;
     void fromJson(const ofJson& json);
@@ -137,7 +128,6 @@ struct ofxOceanodeTimelineLane {
     ofxOceanodeTimelineStepLane step;
     int stepCount = 16;
     double beatsPerStep = 0.25;
-    std::string beatDivision = "16th";
     float valueMin = 0.0f;
     float valueMax = 1.0f;
     bool probabilityEnabled = true;
@@ -166,9 +156,29 @@ struct ofxOceanodeTimelineClip {
     // The source length is kept separately so a clip can be stretched without
     // destroying its original content length.
     double contentDurationBeats = 4.0;
+    // Timeline beats occupied by one source beat. Keeping this independently
+    // from the total clip duration lets a stretched cycle retain its scale
+    // when the visible clip edge is later extended to add repetitions.
+    double contentStretch = 1.0;
     bool repeatContent = true;
     std::vector<ofxOceanodeTimelineLane> lanes;
 };
+
+// Canonical conversion between source beats (the data stored in a clip) and
+// timeline beats (where the clip is displayed and played). Keeping this in
+// the model prevents the controller and evaluator from developing subtly
+// different stretch/repeat behaviour.
+namespace ofxOceanodeTimelineClipTime {
+    double sourceDuration(const ofxOceanodeTimelineClip& clip);
+    double stretch(const ofxOceanodeTimelineClip& clip);
+    double cycleDuration(const ofxOceanodeTimelineClip& clip);
+    double sourceToTimelineBeat(const ofxOceanodeTimelineClip& clip,
+                                double sourceBeat, int64_t cycle = 0);
+    double timelineToSourceBeat(const ofxOceanodeTimelineClip& clip,
+                                double timelineBeat);
+    int64_t cycleIndex(const ofxOceanodeTimelineClip& clip,
+                       double timelineBeat);
+}
 
 struct ofxOceanodeTimelineTrack {
     std::string id;
@@ -250,15 +260,11 @@ public:
                        double startBeat, double durationBeats);
     bool setClipContentDuration(const std::string& trackId, const std::string& clipId,
                                  double contentDurationBeats, bool repeatContent);
+    bool consolidateClipContent(const std::string& trackId, const std::string& clipId);
     bool setClipStep(const std::string& trackId, const std::string& clipId, const std::string& laneId,
                      double startBeat, const std::string& value, double durationBeats = 0.0);
     bool removeClipStep(const std::string& trackId, const std::string& clipId, const std::string& laneId,
                         double startBeat);
-
-    bool setStep(const std::string& trackId, const std::string& bindingId,
-                 double startBeat, const std::string& value, double durationBeats = 0.0);
-    bool removeStep(const std::string& trackId, const std::string& bindingId, double startBeat);
-    bool clearSteps(const std::string& trackId, const std::string& bindingId);
 
     bool isBpmAutomationEnabled() const { return bpmAutomationEnabled; }
     void setBpmAutomationEnabled(bool enabled);

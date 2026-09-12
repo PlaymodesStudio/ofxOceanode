@@ -4,8 +4,6 @@
 #include "ofxOceanodeParameter.h"
 
 #include <cmath>
-#include <cstdlib>
-#include <limits>
 #include <map>
 #include <set>
 
@@ -62,7 +60,6 @@ float curveSegmentShape(float x, CurveInterpolationMode interpolation,
 namespace {
 using ofxOceanodeTimelineCurve::CurveInterpolationMode;
 using ofxOceanodeTimelineCurve::curveInterpolationMode;
-using ofxOceanodeTimelineCurve::sigmoidFlex;
 using ofxOceanodeTimelineCurve::curveSegmentShape;
 
 constexpr double kEpsilon = 1e-9;
@@ -325,6 +322,45 @@ bool evaluateStepSequencer(const ofxOceanodeTimelineLane& lane,
 }
 }
 
+namespace ofxOceanodeTimelineClipTime {
+
+double sourceDuration(const ofxOceanodeTimelineClip& clip) {
+    return std::max(1.0 / 24.0, clip.contentDurationBeats);
+}
+
+double stretch(const ofxOceanodeTimelineClip& clip) {
+    return std::max(1.0 / 1024.0, clip.contentStretch);
+}
+
+double cycleDuration(const ofxOceanodeTimelineClip& clip) {
+    return sourceDuration(clip) * stretch(clip);
+}
+
+double sourceToTimelineBeat(const ofxOceanodeTimelineClip& clip,
+                            double sourceBeat, int64_t cycle) {
+    const double content = sourceDuration(clip);
+    if(clip.repeatContent)
+        return clip.startBeat + (static_cast<double>(cycle) * content + sourceBeat) * stretch(clip);
+    return clip.startBeat + sourceBeat * clip.durationBeats / content;
+}
+
+double timelineToSourceBeat(const ofxOceanodeTimelineClip& clip,
+                            double timelineBeat) {
+    const double localBeat = std::max(0.0, timelineBeat - clip.startBeat);
+    if(clip.repeatContent)
+        return positiveModulo(localBeat, cycleDuration(clip)) / stretch(clip);
+    return localBeat * sourceDuration(clip) /
+        std::max(1.0 / 24.0, clip.durationBeats);
+}
+
+int64_t cycleIndex(const ofxOceanodeTimelineClip& clip, double timelineBeat) {
+    if(!clip.repeatContent) return 0;
+    return static_cast<int64_t>(std::floor(
+        std::max(0.0, timelineBeat - clip.startBeat) / cycleDuration(clip)));
+}
+
+} // namespace ofxOceanodeTimelineClipTime
+
 void ofxOceanodeTimelineStepLane::sortSteps() {
     std::sort(steps.begin(), steps.end(), [](const auto& a, const auto& b) {
         return a.startBeat < b.startBeat;
@@ -357,46 +393,8 @@ bool ofxOceanodeTimelineStepLane::removeStep(double startBeat, double epsilon) {
     return steps.size() != oldSize;
 }
 
-void ofxOceanodeTimelineStepLane::clear() {
-    steps.clear();
-}
-
-bool ofxOceanodeTimelineStepLane::evaluate(double localBeat, std::string& value, bool useProbability) const {
-    double cycle = 0.0;
-    if(lengthBeats > kEpsilon && loop) {
-        cycle = std::floor(std::max(0.0, localBeat) / lengthBeats);
-        localBeat = positiveModulo(localBeat, lengthBeats);
-    }
-    if(localBeat < -kEpsilon) return false;
-    if(lengthBeats > kEpsilon && localBeat >= lengthBeats - kEpsilon) return false;
-
-    for(size_t i = 0; i < steps.size(); ++i) {
-        const auto& step = steps[i];
-        const double start = std::max(0.0, step.startBeat);
-        if(localBeat + kEpsilon < start) break;
-
-        double end = lengthBeats > kEpsilon ? lengthBeats : std::numeric_limits<double>::infinity();
-        if(i + 1 < steps.size()) end = std::min(end, std::max(start, steps[i + 1].startBeat));
-        if(step.durationBeats > kEpsilon) end = std::min(end, start + step.durationBeats);
-        if(localBeat < end - kEpsilon || (end == std::numeric_limits<double>::infinity() && localBeat >= start)) {
-            if(useProbability && !stepProbabilityPasses(step, cycle)) return false;
-            value = step.value;
-            return true;
-        }
-    }
-
-    if(!fallbackValue.empty()) {
-        value = fallbackValue;
-        return true;
-    }
-    return false;
-}
-
 ofJson ofxOceanodeTimelineStepLane::toJson() const {
     ofJson json;
-    json["lengthBeats"] = lengthBeats;
-    json["loop"] = loop;
-    json["fallbackValue"] = fallbackValue;
     json["steps"] = ofJson::array();
     for(const auto& step : steps) {
         json["steps"].push_back({
@@ -410,9 +408,6 @@ ofJson ofxOceanodeTimelineStepLane::toJson() const {
 }
 
 void ofxOceanodeTimelineStepLane::fromJson(const ofJson& json) {
-    lengthBeats = std::max(0.0, json.value("lengthBeats", 4.0));
-    loop = json.value("loop", true);
-    fallbackValue = json.value("fallbackValue", std::string());
     steps.clear();
     if(json.contains("steps") && json["steps"].is_array()) {
         for(const auto& stepJson : json["steps"]) {
@@ -431,7 +426,14 @@ void ofxOceanodeTimelineStepLane::fromJson(const ofJson& json) {
 ofxOceanodeTimelineManager::ofxOceanodeTimelineManager(ofxOceanodeContainer* owner) : container(owner) {}
 
 void ofxOceanodeTimelineManager::setContainer(ofxOceanodeContainer* owner) {
+    if(container == owner) return;
+    for(const auto& track : tracks) clearTimelineFlag(track);
     container = owner;
+    std::set<std::string> parameterPaths;
+    for(const auto& track : tracks)
+        for(const auto& binding : track.bindings)
+            parameterPaths.insert(binding.parameterPath);
+    for(const auto& path : parameterPaths) refreshTimelineFlag(path);
 }
 
 std::string ofxOceanodeTimelineManager::makeId(const char* prefix, uint64_t number) {
@@ -786,7 +788,6 @@ std::string ofxOceanodeTimelineManager::createLane(const std::string& trackId, c
     lane.id = makeUniqueLaneId();
     lane.name = requestedName.empty() ? "Lane" : requestedName;
     lane.type = type;
-    lane.step.lengthBeats = clip->contentDurationBeats;
     lane.beatsPerStep = 0.25;
     lane.stepCount = std::max(1, static_cast<int>(std::llround(clip->contentDurationBeats / lane.beatsPerStep)));
     if(type == ofxOceanodeTimelineLaneType::Curve) {
@@ -905,7 +906,92 @@ bool ofxOceanodeTimelineManager::setClipContentDuration(const std::string& track
     if(clip == nullptr) return false;
     clip->contentDurationBeats = std::max(1.0 / 24.0, contentDurationBeats);
     clip->repeatContent = repeatContent;
+    // A non-repeating clip always maps its complete source duration over its
+    // visible duration. Mirror that effective ratio here so switching it to
+    // repetition later preserves the exact stretch the user was seeing.
+    if(!repeatContent) {
+        clip->contentStretch = std::max(1.0 / 1024.0,
+            clip->durationBeats / clip->contentDurationBeats);
+    }
     return true;
+}
+
+bool ofxOceanodeTimelineManager::consolidateClipContent(const std::string& trackId,
+                                                        const std::string& clipId) {
+    auto* clip = getClip(trackId, clipId);
+    if(clip == nullptr) return false;
+
+    const double oldSourceDuration = ofxOceanodeTimelineClipTime::sourceDuration(*clip);
+    const bool croppedRepeat = clip->repeatContent &&
+        clip->durationBeats < ofxOceanodeTimelineClipTime::cycleDuration(*clip) - kEpsilon;
+    const double visibleSourceDuration = croppedRepeat
+        ? clip->durationBeats / ofxOceanodeTimelineClipTime::stretch(*clip)
+        : oldSourceDuration;
+    const double contentEnd = std::max(1.0 / 24.0, visibleSourceDuration);
+    bool changed = false;
+
+    for(auto& lane : clip->lanes) {
+        if(lane.type == ofxOceanodeTimelineLaneType::Step) {
+            const auto oldSize = lane.step.steps.size();
+            lane.step.steps.erase(std::remove_if(lane.step.steps.begin(), lane.step.steps.end(),
+                [&](const auto& step) { return step.startBeat >= contentEnd - kEpsilon; }),
+                lane.step.steps.end());
+            changed |= lane.step.steps.size() != oldSize;
+            for(auto& step : lane.step.steps) {
+                if(step.durationBeats > kEpsilon && step.startBeat + step.durationBeats > contentEnd) {
+                    step.durationBeats = std::max(0.0, contentEnd - step.startBeat);
+                    changed = true;
+                }
+            }
+            const double stepLength = std::max(1.0 / 24.0, lane.beatsPerStep);
+            const int consolidatedSteps = std::max(1, static_cast<int>(std::ceil(contentEnd / stepLength)));
+            if(lane.stepCount > consolidatedSteps) {
+                lane.stepCount = consolidatedSteps;
+                changed = true;
+            }
+        } else if(lane.type == ofxOceanodeTimelineLaneType::PianoRoll) {
+            const auto oldSize = lane.pianoNotes.size();
+            lane.pianoNotes.erase(std::remove_if(lane.pianoNotes.begin(), lane.pianoNotes.end(),
+                [&](const auto& note) { return note.startBeat >= contentEnd - kEpsilon; }),
+                lane.pianoNotes.end());
+            changed |= lane.pianoNotes.size() != oldSize;
+            for(auto& note : lane.pianoNotes) {
+                const double maximumDuration = std::max(kEpsilon, contentEnd - note.startBeat);
+                if(note.durationBeats > maximumDuration) {
+                    note.durationBeats = maximumDuration;
+                    changed = true;
+                }
+            }
+        } else {
+            std::sort(lane.curvePoints.begin(), lane.curvePoints.end(),
+                [](const auto& a, const auto& b) { return a.beat < b.beat; });
+            std::string boundaryValue;
+            const bool hasBoundaryValue = evaluateCurve(lane, contentEnd, boundaryValue);
+            const auto firstHidden = std::upper_bound(lane.curvePoints.begin(), lane.curvePoints.end(), contentEnd + kEpsilon,
+                [](double beat, const auto& point) { return beat < point.beat; });
+            const bool removedPoints = firstHidden != lane.curvePoints.end();
+            if(removedPoints) {
+                lane.curvePoints.erase(firstHidden, lane.curvePoints.end());
+                changed = true;
+            }
+            if(removedPoints && hasBoundaryValue &&
+               (lane.curvePoints.empty() || lane.curvePoints.back().beat < contentEnd - kEpsilon)) {
+                if(lane.curvePoints.empty() && contentEnd > kEpsilon)
+                    lane.curvePoints.push_back({0.0, ofToFloat(boundaryValue)});
+                lane.curvePoints.push_back({contentEnd, ofToFloat(boundaryValue)});
+            }
+            lane.curveTensions.resize(lane.curvePoints.empty() ? 0 : lane.curvePoints.size() - 1);
+        }
+    }
+
+    if(croppedRepeat || std::abs(clip->contentDurationBeats - contentEnd) > kEpsilon) {
+        clip->contentDurationBeats = contentEnd;
+        if(croppedRepeat) clip->repeatContent = false;
+        clip->contentStretch = std::max(1.0 / 1024.0,
+            clip->durationBeats / clip->contentDurationBeats);
+        changed = true;
+    }
+    return changed;
 }
 
 bool ofxOceanodeTimelineManager::setClipStep(const std::string& trackId, const std::string& clipId,
@@ -935,48 +1021,6 @@ const ofxOceanodeTimelineParameterBinding* ofxOceanodeTimelineManager::getBindin
     if(track == nullptr) return nullptr;
     auto it = std::find_if(track->bindings.begin(), track->bindings.end(), [&](const auto& binding) { return binding.id == bindingId; });
     return it == track->bindings.end() ? nullptr : &*it;
-}
-
-bool ofxOceanodeTimelineManager::setStep(const std::string& trackId, const std::string& bindingId,
-                                         double startBeat, const std::string& value, double durationBeats) {
-    auto* track = getTrack(trackId);
-    if(track == nullptr) return false;
-    for(auto& clip : track->clips) {
-        for(auto& lane : clip.lanes) {
-            if(lane.type == ofxOceanodeTimelineLaneType::Step &&
-               std::find(lane.bindingIds.begin(), lane.bindingIds.end(), bindingId) != lane.bindingIds.end()) {
-                lane.step.setStep(startBeat, value, durationBeats);
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-bool ofxOceanodeTimelineManager::removeStep(const std::string& trackId, const std::string& bindingId, double startBeat) {
-    auto* track = getTrack(trackId);
-    if(track == nullptr) return false;
-    for(auto& clip : track->clips) {
-        for(auto& lane : clip.lanes) {
-            if(std::find(lane.bindingIds.begin(), lane.bindingIds.end(), bindingId) != lane.bindingIds.end()) return lane.step.removeStep(startBeat);
-        }
-    }
-    return false;
-}
-
-bool ofxOceanodeTimelineManager::clearSteps(const std::string& trackId, const std::string& bindingId) {
-    auto* track = getTrack(trackId);
-    if(track == nullptr) return false;
-    bool changed = false;
-    for(auto& clip : track->clips) {
-        for(auto& lane : clip.lanes) {
-            if(std::find(lane.bindingIds.begin(), lane.bindingIds.end(), bindingId) != lane.bindingIds.end()) {
-                lane.step.clear();
-                changed = true;
-            }
-        }
-    }
-    return changed;
 }
 
 void ofxOceanodeTimelineManager::setBpmAutomationEnabled(bool enabled) {
@@ -1176,11 +1220,8 @@ void ofxOceanodeTimelineManager::evaluateAutomation() {
             for(const auto& lane : clip.lanes) {
                 if(lane.type == ofxOceanodeTimelineLaneType::Step || lane.type == ofxOceanodeTimelineLaneType::Curve) {
                     std::string value;
-                    const double stepBeat = (lane.type == ofxOceanodeTimelineLaneType::Step && clip.repeatContent)
-                        ? std::max(0.0, transport.beatPosition - clip.startBeat)
-                        : sourceBeat;
                     const bool hasValue = lane.type == ofxOceanodeTimelineLaneType::Step
-                        ? evaluateStepSequencer(lane, stepBeat, value)
+                        ? evaluateStepSequencer(lane, sourceBeat, value)
                         : evaluateCurve(lane, sourceBeat, value);
                     if(!hasValue && lane.type != ofxOceanodeTimelineLaneType::Step) continue;
                     if(!hasValue) value = "0";
@@ -1206,9 +1247,9 @@ void ofxOceanodeTimelineManager::evaluateAutomation() {
                         }
                     }
                     const std::string roleBindingIds[] = {
-                        !lane.pianoPitchBindingId.empty() ? lane.pianoPitchBindingId : (lane.bindingIds.size() > 0 ? lane.bindingIds[0] : std::string()),
-                        !lane.pianoGateBindingId.empty() ? lane.pianoGateBindingId : (lane.bindingIds.size() > 1 ? lane.bindingIds[1] : std::string()),
-                        !lane.pianoVelocityBindingId.empty() ? lane.pianoVelocityBindingId : (lane.bindingIds.size() > 2 ? lane.bindingIds[2] : std::string())
+                        lane.pianoPitchBindingId,
+                        lane.pianoGateBindingId,
+                        lane.pianoVelocityBindingId
                     };
                     if(activeNotes.empty()) {
                         // No note is sounding right now. Pitch holds its
@@ -1343,8 +1384,13 @@ void ofxOceanodeTimelineManager::clear() {
 }
 
 void ofxOceanodeTimelineManager::setTimeSignature(int numerator, int denominator) {
+    const double previousBeatsPerBar = getBeatsPerBar();
     timeSignatureNumerator = std::max(1, numerator);
     timeSignatureDenominator = std::max(1, denominator);
+    if(!loopEnabled && std::abs(loopStartBeat) <= kEpsilon &&
+       std::abs(loopEndBeat - previousBeatsPerBar) <= kEpsilon) {
+        loopEndBeat = getBeatsPerBar();
+    }
 }
 
 std::string ofxOceanodeTimelineManager::modeToString(ofxOceanodeTimelineAutomationMode mode) {
@@ -1383,7 +1429,7 @@ ofxOceanodeTimelineLaneType ofxOceanodeTimelineManager::laneTypeFromString(const
 
 ofJson ofxOceanodeTimelineManager::toJson() const {
     ofJson json;
-    json["version"] = 4;
+    json["version"] = 5;
     json["tempo"] = {
         {"enabled", bpmAutomationEnabled},
         {"collapsed", bpmLaneCollapsed},
@@ -1436,6 +1482,7 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
             clipJson["startBeat"] = clip.startBeat;
             clipJson["durationBeats"] = clip.durationBeats;
             clipJson["contentDurationBeats"] = clip.contentDurationBeats;
+            clipJson["contentStretch"] = clip.contentStretch;
             clipJson["repeatContent"] = clip.repeatContent;
             clipJson["lanes"] = ofJson::array();
             for(const auto& lane : clip.lanes) {
@@ -1446,7 +1493,6 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
                 laneJson["bindingIds"] = lane.bindingIds;
                 laneJson["stepCount"] = lane.stepCount;
                 laneJson["beatsPerStep"] = lane.beatsPerStep;
-                laneJson["beatDivision"] = lane.beatDivision;
                 laneJson["valueMin"] = lane.valueMin;
                 laneJson["valueMax"] = lane.valueMax;
                 laneJson["probabilityEnabled"] = lane.probabilityEnabled;
@@ -1487,6 +1533,19 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
 void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
     clear();
     if(!json.is_object() || !json.contains("tracks") || !json["tracks"].is_array()) return;
+
+    std::set<std::string> loadedTrackIds;
+    std::set<std::string> loadedBindingIds;
+    std::set<std::string> loadedClipIds;
+    std::set<std::string> loadedLaneIds;
+    auto uniqueLoadedId = [&](std::string candidate, const char* prefix,
+                              uint64_t& counter, std::set<std::string>& usedIds) {
+        if(!candidate.empty() && usedIds.insert(candidate).second) return candidate;
+        do {
+            candidate = makeId(prefix, counter++);
+        } while(!usedIds.insert(candidate).second);
+        return candidate;
+    };
 
     if(json.contains("tempo") && json["tempo"].is_object()) {
         const auto& tempo = json["tempo"];
@@ -1534,8 +1593,8 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
     for(const auto& trackJson : json["tracks"]) {
         if(!trackJson.is_object()) continue;
         ofxOceanodeTimelineTrack track;
-        track.id = trackJson.value("id", std::string());
-        if(track.id.empty() || getTrack(track.id) != nullptr) track.id = makeUniqueTrackId();
+        track.id = uniqueLoadedId(trackJson.value("id", std::string()),
+                                  "timeline_track", nextTrackNumber, loadedTrackIds);
         track.name = makeUniqueTrackName(trackJson.value("name", std::string("Timeline Track")));
         track.collapsed = trackJson.value("collapsed", false);
         if(trackJson.contains("color") && trackJson["color"].is_object()) {
@@ -1583,28 +1642,32 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
             for(const auto& clipJson : trackJson["clips"]) {
                 if(!clipJson.is_object()) continue;
                 ofxOceanodeTimelineClip clip;
-                clip.id = clipJson.value("id", std::string());
-                if(clip.id.empty()) clip.id = makeUniqueClipId();
-                clip.name = clipJson.value("name", std::string("Clip"));
+                clip.id = uniqueLoadedId(clipJson.value("id", std::string()),
+                                          "timeline_clip", nextClipNumber, loadedClipIds);
+                clip.name = makeUniqueClipName(track, clipJson.value("name", std::string("Clip")));
                 clip.startBeat = std::max(0.0, clipJson.value("startBeat", 0.0));
                 clip.durationBeats = std::max(1.0 / 24.0, clipJson.value("durationBeats", 4.0));
                 clip.contentDurationBeats = std::max(1.0 / 24.0, clipJson.value("contentDurationBeats", clip.durationBeats));
                 clip.repeatContent = clipJson.value("repeatContent", true);
+                clip.contentStretch = std::max(1.0 / 1024.0,
+                    clipJson.value("contentStretch", clip.repeatContent
+                        ? 1.0 : clip.durationBeats / clip.contentDurationBeats));
                 if(clipJson.contains("lanes") && clipJson["lanes"].is_array()) {
                     for(const auto& laneJson : clipJson["lanes"]) {
                         if(!laneJson.is_object()) continue;
                         ofxOceanodeTimelineLane lane;
-                        lane.id = laneJson.value("id", std::string());
-                        if(lane.id.empty()) lane.id = makeUniqueLaneId();
+                        lane.id = uniqueLoadedId(laneJson.value("id", std::string()),
+                                                 "timeline_lane", nextLaneNumber, loadedLaneIds);
                         lane.name = laneJson.value("name", std::string("Lane"));
                         lane.type = laneTypeFromString(laneJson.value("laneType", std::string("Step")));
                         lane.stepCount = std::max(1, laneJson.value("stepCount", 16));
                         lane.beatsPerStep = std::max(1.0 / 24.0, laneJson.value("beatsPerStep", 0.25));
-                        lane.beatDivision = laneJson.value("beatDivision", std::string("16th"));
                         lane.valueMin = laneJson.value("valueMin", 0.0f);
                         lane.valueMax = laneJson.value("valueMax", 1.0f);
                         lane.probabilityEnabled = laneJson.value("probabilityEnabled", true);
                         lane.behavior = laneJson.value("behavior", std::string("Probability"));
+                        if(lane.behavior != "Probability" && lane.behavior != "Always" && lane.behavior != "Mute")
+                            lane.behavior = "Probability";
                         lane.pianoLowPitch = ofClamp(laneJson.value("pianoLowPitch", 36), 0, 127);
                         lane.pianoHighPitch = ofClamp(laneJson.value("pianoHighPitch", 84), lane.pianoLowPitch, 127);
                         lane.pianoSnapToGrid = laneJson.value("pianoSnapToGrid", true);
@@ -1621,11 +1684,30 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
                         }
                         if(laneJson.contains("bindingIds") && laneJson["bindingIds"].is_array()) {
                             for(const auto& bindingId : laneJson["bindingIds"]) {
-                                if(bindingId.is_string()) lane.bindingIds.push_back(bindingId.get<std::string>());
+                                if(!bindingId.is_string()) continue;
+                                const std::string id = bindingId.get<std::string>();
+                                const bool belongsToTrack = std::any_of(track.bindings.begin(), track.bindings.end(),
+                                    [&](const auto& binding) { return binding.id == id; });
+                                if(belongsToTrack && std::find(lane.bindingIds.begin(), lane.bindingIds.end(), id) == lane.bindingIds.end())
+                                    lane.bindingIds.push_back(id);
                             }
                         }
+                        auto validateRole = [&](std::string& roleId) {
+                            const bool belongsToTrack = std::any_of(track.bindings.begin(), track.bindings.end(),
+                                [&](const auto& binding) { return binding.id == roleId; });
+                            if(!belongsToTrack) roleId.clear();
+                            else if(std::find(lane.bindingIds.begin(), lane.bindingIds.end(), roleId) == lane.bindingIds.end())
+                                lane.bindingIds.push_back(roleId);
+                        };
+                        validateRole(lane.pianoPitchBindingId);
+                        validateRole(lane.pianoGateBindingId);
+                        validateRole(lane.pianoVelocityBindingId);
+                        if(lane.pianoGateBindingId == lane.pianoPitchBindingId)
+                            lane.pianoGateBindingId.clear();
+                        if(lane.pianoVelocityBindingId == lane.pianoPitchBindingId ||
+                           lane.pianoVelocityBindingId == lane.pianoGateBindingId)
+                            lane.pianoVelocityBindingId.clear();
                         if(laneJson.contains("step") && laneJson["step"].is_object()) lane.step.fromJson(laneJson["step"]);
-                        lane.step.lengthBeats = lane.stepCount * lane.beatsPerStep;
                         if(laneJson.contains("curvePoints") && laneJson["curvePoints"].is_array()) {
                             for(const auto& pointJson : laneJson["curvePoints"]) {
                                 if(!pointJson.is_object()) continue;
@@ -1652,11 +1734,11 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
                             for(const auto& noteJson : laneJson["pianoNotes"]) {
                                 if(!noteJson.is_object()) continue;
                                 lane.pianoNotes.push_back({
-                                    noteJson.value("startBeat", 0.0),
-                                    noteJson.value("durationBeats", 0.25),
-                                    noteJson.value("pitch", 60),
-                                    noteJson.value("velocity", 1.0f),
-                                    noteJson.value("probability", 1.0f)
+                                    std::max(0.0, noteJson.value("startBeat", 0.0)),
+                                    std::max(1.0 / 24.0, noteJson.value("durationBeats", 0.25)),
+                                    static_cast<int>(ofClamp(noteJson.value("pitch", 60), 0, 127)),
+                                    ofClamp(noteJson.value("velocity", 1.0f), 0.0f, 1.0f),
+                                    ofClamp(noteJson.value("probability", 1.0f), 0.0f, 1.0f)
                                 });
                             }
                         }
