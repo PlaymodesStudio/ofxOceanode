@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <unordered_map>
 #include <utility>
 
 namespace {
@@ -741,6 +742,11 @@ void ofxOceanodeTimelineController::draw() {
             if(stepEditorOpen && editorTrackId == track.id) drawLaneEditor(timeline, track, contentWidth, endBeat, transportState.beatPosition);
         } else {
             int index = 0;
+            // Rows sharing a clip.id (a clip with more than one lane,
+            // combining e.g. a curve and a step pattern on this track) are
+            // bracketed together below so it reads as one entity rather
+            // than a coincidence.
+            std::unordered_map<std::string, std::vector<std::pair<float, float>>> multiLaneClipRowSpans;
             for(const auto& binding : track.bindings) {
                 const float y = headerY + kHeaderHeight + index * kRowHeight;
                 ImGui::SetCursorPos(ImVec2(0, y));
@@ -807,11 +813,36 @@ void ofxOceanodeTimelineController::draw() {
                     if(lane == nullptr) continue;
                     drawClip(clip, lane, laneMin, max);
                     handleClip(clip, lane, laneMin, max);
+                    if(clip.lanes.size() > 1) multiLaneClipRowSpans[clip.id].push_back({min.y, max.y});
                 }
                 const float px = laneMin.x + beatOffset(transportState.beatPosition);
                 if(px >= zoneLeft && px <= max.x) dl->AddLine(ImVec2(px, min.y), ImVec2(px, max.y), kPlayhead, 2);
                 dl->PopClipRect();
                 ++index;
+            }
+            if(!multiLaneClipRowSpans.empty()) {
+                const float contentOriginX = zoneLeft - timelineScrollX;
+                const float rowRight = ImGui::GetWindowPos().x + contentWidth;
+                for(const auto& [clipId, rowSpans] : multiLaneClipRowSpans) {
+                    if(rowSpans.size() < 2) continue;
+                    const auto clipIt = std::find_if(track.clips.begin(), track.clips.end(),
+                        [&](const auto& c) { return c.id == clipId; });
+                    if(clipIt == track.clips.end()) continue;
+                    const float x1 = contentOriginX + beatOffset(clipIt->startBeat);
+                    const float x2 = contentOriginX + beatOffset(clipIt->startBeat + clipIt->durationBeats);
+                    if(x2 < zoneLeft || x1 > rowRight) continue;
+                    const float barX = std::max(zoneLeft + 2.0f, x1 - 4.0f);
+                    float top = rowSpans.front().first, bottom = rowSpans.front().second;
+                    for(const auto& span : rowSpans) {
+                        top = std::min(top, span.first);
+                        bottom = std::max(bottom, span.second);
+                    }
+                    dl->AddLine(ImVec2(barX, top + 6.0f), ImVec2(barX, bottom - 6.0f), IM_COL32(255, 210, 90, 210), 2.0f);
+                    for(const auto& span : rowSpans) {
+                        const float midY = (span.first + span.second) * 0.5f;
+                        dl->AddLine(ImVec2(barX, midY), ImVec2(barX + 4.0f, midY), IM_COL32(255, 210, 90, 210), 2.0f);
+                    }
+                }
             }
             ImGui::SetCursorPosY(headerY + kHeaderHeight + index * kRowHeight);
             if(stepEditorOpen && editorTrackId == track.id) drawLaneEditor(timeline, track, contentWidth, endBeat, transportState.beatPosition);
@@ -829,6 +860,38 @@ void ofxOceanodeTimelineController::draw() {
         requestClipDeletion = false;
         clipDeletionTrackId.clear();
         clipDeletionClipId.clear();
+    }
+
+    if(requestAddLane) {
+        requestAddLane = false;
+        const auto laneType = pendingAddLaneType == 1 ? ofxOceanodeTimelineLaneType::Curve
+            : pendingAddLaneType == 2 ? ofxOceanodeTimelineLaneType::PianoRoll
+            : ofxOceanodeTimelineLaneType::Step;
+        const char* laneName = pendingAddLaneType == 1 ? "Curve"
+            : pendingAddLaneType == 2 ? "Piano Roll" : "Step Sequencer";
+        const auto newLaneId = timeline.createLane(editorTrackId, editorClipId, laneName, laneType);
+        if(!newLaneId.empty()) editorLaneId = newLaneId;
+    }
+
+    if(requestRemoveLane) {
+        requestRemoveLane = false;
+        if(auto* clip = timeline.getClip(editorTrackId, editorClipId)) {
+            if(clip->lanes.size() <= 1) {
+                timeline.removeClip(editorTrackId, editorClipId);
+                stepEditorOpen = false;
+                editorTrackId.clear();
+                editorClipId.clear();
+                editorLaneId.clear();
+            } else {
+                timeline.removeLane(editorTrackId, editorClipId, pendingRemoveLaneId);
+                if(editorLaneId == pendingRemoveLaneId) {
+                    if(auto* clip2 = timeline.getClip(editorTrackId, editorClipId)) {
+                        if(!clip2->lanes.empty()) editorLaneId = clip2->lanes.front().id;
+                    }
+                }
+            }
+        }
+        pendingRemoveLaneId.clear();
     }
 
     if(clipDragMode != ClipDragMode::None) {
@@ -1317,6 +1380,38 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     ImGui::SameLine(ImGui::GetWindowWidth() - 27.0f);
     if(ImGui::SmallButton("x")) stepEditorOpen = false;
 
+    // A clip can hold more than one lane (e.g. a curve and a step pattern
+    // combined together); this chip row lets the user switch which lane is
+    // being edited below, and add or remove lanes from this clip.
+    for(size_t laneIndex = 0; laneIndex < clip->lanes.size(); ++laneIndex) {
+        auto& laneEntry = clip->lanes[laneIndex];
+        if(laneIndex > 0) ImGui::SameLine();
+        const bool isCurrentLane = laneEntry.id == lane->id;
+        std::string chipLabel = laneTypeName(laneEntry.type);
+        if(!laneEntry.bindingIds.empty()) {
+            if(const auto* boundParam = timeline.getBinding(track.id, laneEntry.bindingIds.front()))
+                chipLabel += ": " + compactParameterName(boundParam->parameterPath);
+        }
+        if(isCurrentLane) {
+            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(track.color.r / 255.0f, track.color.g / 255.0f, track.color.b / 255.0f, 0.6f));
+        }
+        if(ImGui::Selectable((chipLabel + "##lane" + laneEntry.id).c_str(), isCurrentLane,
+                             ImGuiSelectableFlags_None,
+                             ImVec2(ImGui::CalcTextSize(chipLabel.c_str()).x + 16.0f, 0))) {
+            editorLaneId = laneEntry.id;
+        }
+        if(isCurrentLane) ImGui::PopStyleColor();
+    }
+    ImGui::SameLine();
+    if(ImGui::SmallButton("+##addLane")) ImGui::OpenPopup("##addLaneTypePopup");
+    if(ImGui::IsItemHovered()) ImGui::SetTooltip("Add another lane to this clip");
+    if(ImGui::BeginPopup("##addLaneTypePopup")) {
+        if(ImGui::MenuItem("Step Sequencer")) { requestAddLane = true; pendingAddLaneType = 0; }
+        if(ImGui::MenuItem("Curve")) { requestAddLane = true; pendingAddLaneType = 1; }
+        if(ImGui::MenuItem("Piano Roll")) { requestAddLane = true; pendingAddLaneType = 2; }
+        ImGui::EndPopup();
+    }
+
     if(ImGui::BeginTabBar("##clipPropertyTabs")) {
         if(ImGui::BeginTabItem("Clip")) {
             const std::string parameterPreview = lane->bindingIds.empty()
@@ -1357,6 +1452,11 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 ImGui::DragFloat("##rangeMax", &lane->valueMax, 0.01f, -99999.0f, 99999.0f, "%.4g");
             }
             ImGui::TextDisabled("%s", laneTypeName(lane->type));
+            if(ImGui::SmallButton("Remove this lane")) {
+                requestRemoveLane = true;
+                pendingRemoveLaneId = lane->id;
+            }
+            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Deletes the whole clip if this is its only lane");
             ImGui::EndTabItem();
         }
 

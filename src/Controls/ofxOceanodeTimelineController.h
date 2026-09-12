@@ -73,6 +73,16 @@ private:
     bool requestClipDeletion = false;
     std::string clipDeletionTrackId;
     std::string clipDeletionClipId;
+    // A clip can hold more than one lane (e.g. a curve and a step pattern
+    // combined into one clip); these back the clip editor's "Add lane" /
+    // "Remove this lane" controls. The actual mutation is deferred to a
+    // fixed point in draw(), like clip deletion above, since createLane/
+    // removeLane can reallocate the clip's lane vector and the editor keeps
+    // pointers into it for the rest of the frame it was requested on.
+    bool requestAddLane = false;
+    int pendingAddLaneType = 0;
+    bool requestRemoveLane = false;
+    std::string pendingRemoveLaneId;
     bool stepEditorOpen = false;
     enum class PianoDragMode { None, Move, Resize, Velocity, Probability };
     PianoDragMode pianoDragMode = PianoDragMode::None;
