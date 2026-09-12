@@ -617,11 +617,18 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                         auto& timelineManager = container.getTimelineManager();
                         const std::string timelineParameterPath = container.getCustomGuiParameterPath(absParam);
                         bool parameterIsTimelined = false;
+                        std::string boundTrackId;
+                        std::string boundBindingId;
+                        ofxOceanodeTimelineAutomationMode boundMode = ofxOceanodeTimelineAutomationMode::Replace;
                         for(const auto& timelineTrack : timelineManager.getTracks()){
-                            if(std::any_of(timelineTrack.bindings.begin(), timelineTrack.bindings.end(), [&](const auto& binding){
+                            const auto bindingIt = std::find_if(timelineTrack.bindings.begin(), timelineTrack.bindings.end(), [&](const auto& binding){
                                 return binding.parameterPath == timelineParameterPath;
-                            })){
+                            });
+                            if(bindingIt != timelineTrack.bindings.end()){
                                 parameterIsTimelined = true;
+                                boundTrackId = timelineTrack.id;
+                                boundBindingId = bindingIt->id;
+                                boundMode = bindingIt->mode;
                                 break;
                             }
                         }
@@ -650,7 +657,10 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                             ImGui::EndMenu();
                         }
                         if(parameterIsTimelined){
-                            ImGui::TextDisabled("Timeline automation active (Replace)");
+                            ImGui::TextDisabled("Timeline automation active (%s)", ofxOceanodeTimelineManager::modeToString(boundMode).c_str());
+                            if(ImGui::Selectable("Remove from Timeline")){
+                                timelineManager.removeBinding(boundTrackId, boundBindingId);
+                            }
                         }
                     }
                     ImGui::Separator();
