@@ -393,14 +393,34 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }
             }
 
-            // Treat matching portals as virtual edges so portalized graphs remain together.
+            // Matching portals are a *grouping* hint only: a sender and its receiver(s)
+            // are union'd into the same connected component below (so a receiver with no
+            // other local wiring doesn't drift off as its own stray component), but this
+            // must NOT feed the rank/indegree graph (outgoing/incoming) like a real wire
+            // would. A portal is often a broadcast bus - one sender feeding receivers
+            // scattered across otherwise-unrelated subgraphs - so forcing every receiver's
+            // rank to sender_rank+1 would drag all of them (and everything downstream) out
+            // to the sender's depth. Rank stays based on real connections only.
+            //
+            // The grouping key mirrors abstractPortal::checkLocal(): a "Local" portal only
+            // matches another one in the same canvas/macro, a "Global" portal matches by
+            // type+name regardless of canvas. Without that scoping, two unrelated local
+            // portals that merely reuse a name (e.g. "in"/"out" in copies of a macro) would
+            // get lumped into one group.
             unordered_map<string, vector<int>> portalGroups;
             for(int i = 0; i < nodeCount; i++){
                 auto* portalModel = dynamic_cast<abstractPortal*>(&nodes[i]->getNodeModel());
                 if(portalModel != nullptr){
-                    portalGroups[nodes[i]->getNodeModel().nodeName() + "\n" + portalModel->getName()].push_back(i);
+                    const string scope = portalModel->isLocal() ? ("L:" + nodes[i]->getNodeModel().getParents()) : string("G");
+                    portalGroups[nodes[i]->getNodeModel().nodeName() + "\n" + portalModel->getName() + "\n" + scope].push_back(i);
                 }
             }
+            vector<unordered_set<int>> portalUnion(nodeCount);
+            auto addPortalLink = [&](int a, int b){
+                if(a == b) return;
+                portalUnion[a].insert(b);
+                portalUnion[b].insert(a);
+            };
             for(const auto& group : portalGroups){
                 vector<int> senders;
                 vector<int> receivers;
@@ -411,7 +431,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     if(value.hasOutConnections()) receivers.push_back(index);
                 }
                 for(int sender : senders){
-                    for(int receiver : receivers) addEdge(sender, receiver);
+                    for(int receiver : receivers) addPortalLink(sender, receiver);
                 }
             }
 
@@ -430,6 +450,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             };
             std::sort(ready.begin(), ready.end(), originalOrder);
 
+            vector<int> topoOrder;
+            topoOrder.reserve(nodeCount);
             size_t readyIndex = 0;
             int processedCount = 0;
             while(processedCount < nodeCount){
@@ -446,10 +468,35 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 if(processed[source]) continue;
                 processed[source] = true;
                 processedCount++;
+                topoOrder.push_back(source);
                 for(int sink : outgoing[source]){
                     if(processed[sink]) continue; // Deterministically breaks cycles.
                     rank[sink] = std::max(rank[sink], rank[source] + 1);
                     if(--indegree[sink] <= 0) ready.push_back(sink);
+                }
+            }
+
+            // The pass above only computes the *earliest possible* rank (longest path
+            // forward from real sources), so a node with no real incoming connection is
+            // pinned at rank 0 no matter how far right its real consumer sits. That's
+            // portal receivers (their real source is another portal matched by name,
+            // invisible to this graph) and macro input routers (their real source is
+            // outside this canvas) far more often than ordinary nodes - every one of them
+            // landed in the same rank-0 column, potentially many columns from the one real
+            // node each actually feeds.
+            //
+            // Walking the topological order backwards, pull every node with no real
+            // incoming edge up to just before the earliest rank among its real outgoing
+            // targets, so it sits next to what it connects to instead of being stranded at
+            // rank 0. This only ever increases a rank, so it can't violate the
+            // rank[sink] >= rank[source]+1 invariant the forward pass established.
+            for(auto it = topoOrder.rbegin(); it != topoOrder.rend(); ++it){
+                const int node = *it;
+                if(!incoming[node].empty() || outgoing[node].empty()) continue;
+                int minConsumerRank = std::numeric_limits<int>::max();
+                for(int sink : outgoing[node]) minConsumerRank = std::min(minConsumerRank, rank[sink]);
+                if(minConsumerRank != std::numeric_limits<int>::max()){
+                    rank[node] = std::max(rank[node], minConsumerRank - 1);
                 }
             }
 
@@ -490,6 +537,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             stack.push_back(neighbour);
                         }
                     }
+                    // Portal-linked nodes join the same component (see portalUnion above)
+                    // even though they don't participate in the rank/indegree graph.
+                    for(int neighbour : portalUnion[node]){
+                        if(componentOf[neighbour] == -1){
+                            componentOf[neighbour] = component;
+                            stack.push_back(neighbour);
+                        }
+                    }
                 }
             }
             std::stable_sort(components.begin(), components.end(), [&](const vector<int>& a, const vector<int>& b){
@@ -512,9 +567,16 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }
             }
 
+            // Anchor each component to where it already was, instead of packing every
+            // component into one global column stack starting at x=0. A node whose only
+            // real wire crosses out of this canvas (a macro-boundary router, or a portal
+            // matching another canvas/macro) has no in-scope edges at all, so it forms its
+            // own tiny component here even though the user sees it as connected elsewhere.
+            // Resetting such a component's origin to x=0 and stacking components
+            // top-to-bottom would yank it to the left edge of the layout. Anchoring to its
+            // own original bounding box keeps it where it visually was while still tidying
+            // up its internal layout.
             vector<glm::vec2> positions(nodeCount);
-            float componentY = 0;
-            const float componentGap = GRID_SIZE * 2.0f;
             for(const auto& component : components){
                 vector<bool> inComponent(nodeCount, false);
                 for(int node : component) inComponent[node] = true;
@@ -531,6 +593,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     if(heights[layer] > 0) heights[layer] -= verticalGap;
                     componentHeight = std::max(componentHeight, heights[layer]);
                 }
+                glm::vec2 anchor(std::numeric_limits<float>::max());
+                for(int node : component){
+                    anchor = glm::min(anchor, nodes[node]->getNodeGui().getPosition());
+                }
                 vector<float> columnX(maxRank + 1, 0);
                 float x = 0;
                 for(int layer = 0; layer <= maxRank; layer++){
@@ -539,14 +605,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     x += columnWidths[layer] + horizontalGap;
                 }
                 for(int layer = 0; layer <= maxRank; layer++){
-                    float y = componentY + (componentHeight - heights[layer]) * 0.5f;
+                    float y = anchor.y + (componentHeight - heights[layer]) * 0.5f;
                     for(int node : layers[layer]){
                         if(!inComponent[node]) continue;
-                        positions[node] = glm::vec2(columnX[layer], y);
+                        positions[node] = glm::vec2(anchor.x + columnX[layer], y);
                         y += sizes[node].y + verticalGap;
                     }
                 }
-                componentY += componentHeight + componentGap;
             }
 
             glm::vec2 oldMin(std::numeric_limits<float>::max());
@@ -565,6 +630,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 positions[i] += offset;
                 if(snap_to_grid) positions[i] = snapToGrid(positions[i]);
             }
+
             for(int i = 0; i < nodeCount; i++){
                 nodes[i]->getNodeGui().setPosition(positions[i]);
             }
