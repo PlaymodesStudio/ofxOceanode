@@ -50,10 +50,16 @@ private:
                              const ofxOceanodeTimelineTrack& track,
                              float contentWidth, double endBeat,
                              double beatPosition);
+    // timelineOriginX is where beat 0 sits for the clip rows above, already
+    // scrolled. The envelope has to be drawn against that, not against its
+    // own panel's left edge, or its grid drifts from the clips it belongs to
+    // (by a few pixels normally, and by a lot once the window is narrow
+    // enough for the properties column to stop being kLabelWidth wide).
     void drawWaveTrackVolumeAutomation(ofxOceanodeTimelineManager& timeline,
                                        ofxOceanodeTimelineTrack& track,
                                        float width, float height,
-                                       double endBeat, double beatPosition);
+                                       double endBeat, double beatPosition,
+                                       float timelineOriginX);
     void drawBlendModeOptions(ofxOceanodeTimelineManager& timeline, const std::string& trackId,
                              const ofxOceanodeTimelineParameterBinding& binding);
     void drawRenamePopup(ofxOceanodeTimelineManager& timeline);
@@ -183,6 +189,16 @@ private:
     bool requestWaveSplit = false;
     std::string waveSplitTrackId;
     std::string waveSplitClipId;
+    // Picking an audio file opens a blocking OS dialog. Asking for one from
+    // inside an ImGui popup or child means the dialog runs with that popup
+    // still on the stack and the frame half-built, so the request is only
+    // recorded here and serviced once the track loop and its popups are done
+    // (see the handler next to the wave-split one in draw()).
+    enum class WaveFileRequest { None, NewTrack, NewClip, ReplaceClip };
+    WaveFileRequest waveFileRequest = WaveFileRequest::None;
+    std::string waveFileRequestTrackId;
+    std::string waveFileRequestClipId;
+    double waveFileRequestBeat = 0.0;
     std::vector<std::pair<std::string, std::string>> keyboardClipDeletionRequests;
     // "Remove from Timeline" (on a binding's row, or on a collapsed track's
     // header menu) unbinds a parameter entirely. Deferred for the same

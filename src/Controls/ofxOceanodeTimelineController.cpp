@@ -665,12 +665,8 @@ void ofxOceanodeTimelineController::draw() {
     // the file here avoids leaving an empty track behind and makes the
     // waveform visible immediately after the track is added.
     if(ImGui::Button("Add Wave Track")) {
-        const auto result = ofSystemLoadDialog("Load wave file", false);
-        if(result.bSuccess) {
-            const auto trackId = timeline.createWaveTrack();
-            createWaveClipFromFile(timeline, trackId, result.filePath,
-                                   transportState.beatPosition, timeline.getBeatsPerBar());
-        }
+        waveFileRequest = WaveFileRequest::NewTrack;
+        waveFileRequestBeat = transportState.beatPosition;
     }
 
     // Stale entries can accumulate in selectedClips if their clip was
@@ -891,13 +887,11 @@ void ofxOceanodeTimelineController::draw() {
             }
             if(ImGui::MenuItem(track.isWaveTrack ? "Add new wave clip" : "New clip")) {
                 if(track.isWaveTrack) {
-                    // Wave clips need a file before they are useful. Keep
-                    // this action consistent with the toolbar: choose the
-                    // file first, then create the clip and waveform cache.
-                    const auto result = ofSystemLoadDialog("Load wave file", false);
-                    if(result.bSuccess)
-                        createWaveClipFromFile(timeline, track.id, result.filePath,
-                                               pendingWaveClipBeat, timeline.getBeatsPerBar());
+                    // Wave clips need a file before they are useful, so this
+                    // asks for one and creates the clip around it.
+                    waveFileRequest = WaveFileRequest::NewClip;
+                    waveFileRequestTrackId = track.id;
+                    waveFileRequestBeat = pendingWaveClipBeat;
                 } else {
                     pendingTrackId = track.id;
                     pendingClipName[0] = '\0';
@@ -1846,6 +1840,33 @@ void ofxOceanodeTimelineController::draw() {
         keyboardClipDeletionRequests.clear();
     }
 
+    if(waveFileRequest != WaveFileRequest::None) {
+        const auto request = waveFileRequest;
+        const std::string requestTrackId = waveFileRequestTrackId;
+        const std::string requestClipId = waveFileRequestClipId;
+        const double requestBeat = waveFileRequestBeat;
+        waveFileRequest = WaveFileRequest::None;
+        waveFileRequestTrackId.clear();
+        waveFileRequestClipId.clear();
+        const auto result = ofSystemLoadDialog(
+            request == WaveFileRequest::ReplaceClip ? "Replace wave file" : "Load wave file", false);
+        if(result.bSuccess) {
+            if(request == WaveFileRequest::NewTrack) {
+                // The track is only worth creating once a file is chosen --
+                // cancelling used to be the difference between an empty track
+                // and none at all.
+                const auto trackId = timeline.createWaveTrack();
+                createWaveClipFromFile(timeline, trackId, result.filePath,
+                                       requestBeat, timeline.getBeatsPerBar());
+            } else if(request == WaveFileRequest::NewClip) {
+                createWaveClipFromFile(timeline, requestTrackId, result.filePath,
+                                       requestBeat, timeline.getBeatsPerBar());
+            } else {
+                replaceWaveClipFromFile(timeline, requestTrackId, requestClipId, result.filePath);
+            }
+        }
+    }
+
     if(requestWaveSplit) {
         const std::string splitTrackId = waveSplitTrackId;
         const std::string splitClipId = waveSplitClipId;
@@ -2480,8 +2501,9 @@ void ofxOceanodeTimelineController::drawWaveClipProperties(ofxOceanodeTimelineMa
     ImGui::PopTextWrapPos();
     if(!clip.waveFilePath.empty() && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", clip.waveFilePath.c_str());
     if(ImGui::Button("Replace sample", ImVec2(-1.0f, 0.0f))) {
-        const auto result = ofSystemLoadDialog("Replace wave file", false);
-        if(result.bSuccess) replaceWaveClipFromFile(timeline, track.id, clip.id, result.filePath);
+        waveFileRequest = WaveFileRequest::ReplaceClip;
+        waveFileRequestTrackId = track.id;
+        waveFileRequestClipId = clip.id;
     }
     if(ImGui::Button("Reload waveform", ImVec2(-1.0f, 0.0f))) timeline.reloadWaveform(track.id, clip.id);
 
@@ -2498,18 +2520,37 @@ void ofxOceanodeTimelineController::drawWaveClipProperties(ofxOceanodeTimelineMa
 
 void ofxOceanodeTimelineController::drawWaveTrackVolumeAutomation(
     ofxOceanodeTimelineManager& timeline, ofxOceanodeTimelineTrack& track,
-    float width, float height, double endBeat, double beatPosition) {
-    ImGui::TextUnformatted("Track volume automation");
-    track.waveVolumeAutomationEnabled = true;
-    if(track.waveVolumePoints.empty()) {
+    float width, float height, double endBeat, double beatPosition,
+    float timelineOriginX) {
+    ImGui::TextUnformatted("Track volume");
+    ImGui::SameLine();
+    // Both of these are read by evaluateWaveTrackVolume and persisted, and
+    // neither had any way to be set: the flag was forced on here every frame
+    // and the shape was stuck at whatever a preset happened to hold.
+    ImGui::Checkbox("Automate", &track.waveVolumeAutomationEnabled);
+    if(ImGui::IsItemHovered())
+        ImGui::SetTooltip("Off plays the track at its gain alone; the envelope stays as you left it");
+    const float controlWidth = std::min(96.0f, std::max(58.0f, width * 0.22f));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(controlWidth);
+    ImGui::DragFloat("Gain", &track.waveVolume, 0.01f, 0.0f, 4.0f, "%.2f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(controlWidth);
+    if(ImGui::BeginCombo("Shape", track.waveVolumeInterpolation.c_str())) {
+        for(const char* option : {"Step", "Linear", "Log / Exp", "Sigmoid"}) {
+            if(ImGui::Selectable(option, track.waveVolumeInterpolation == option))
+                track.waveVolumeInterpolation = option;
+        }
+        ImGui::EndCombo();
+    }
+    // Through the manager's accessor rather than the member, so every path
+    // that touches these points goes through one door.
+    auto& points = timeline.getWaveTrackVolumePoints(track.id);
+    if(points.empty()) {
         const double automationEnd = std::max(1.0, endBeat);
-        track.waveVolumePoints = {{0.0, track.waveVolume},
-                                  {automationEnd, track.waveVolume}};
+        points = {{0.0, track.waveVolume}, {automationEnd, track.waveVolume}};
         track.waveVolumeTensions.assign(1, ofxOceanodeTimelineCurveTension{});
     }
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(std::min(150.0f, std::max(70.0f, width - 170.0f)));
-    ImGui::DragFloat("Track gain", &track.waveVolume, 0.01f, 0.0f, 4.0f, "%.2f");
 
     const float graphHeight = std::max(80.0f, height - 58.0f);
     ImGui::InvisibleButton("##waveTrackVolumeCanvas",
@@ -2523,13 +2564,13 @@ void ofxOceanodeTimelineController::drawWaveTrackVolumeAutomation(
 
     const float graphBpm = container != nullptr ? container->getTransportState().bpm : 120.0f;
     auto xForBeat = [&](double beat) {
-        return graphMin.x + beatToPixels(timeline, beat, graphBpm) - timelineScrollX;
+        return timelineOriginX + beatToPixels(timeline, beat, graphBpm);
     };
     auto yForValue = [&](float value) {
         return graphMax.y - 5.0f - ofClamp(value, 0.0f, 4.0f) / 4.0f * (graphMax.y - graphMin.y - 10.0f);
     };
     auto beatForX = [&](float x) {
-        return pixelsToBeat(timeline, x - graphMin.x + timelineScrollX, graphBpm, endBeat);
+        return pixelsToBeat(timeline, x - timelineOriginX, graphBpm, endBeat);
     };
 
     // Match the timeline's vertical beat/bar grid in the automation panel so
@@ -2562,7 +2603,6 @@ void ofxOceanodeTimelineController::drawWaveTrackVolumeAutomation(
     if(playheadX >= graphMin.x && playheadX <= graphMax.x)
         dl->AddLine(ImVec2(playheadX, graphMin.y), ImVec2(playheadX, graphMax.y), kPlayhead, 1.5f);
 
-    auto& points = track.waveVolumePoints;
     std::sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
     for(size_t i = 1; i < points.size(); ++i) {
         dl->AddLine(ImVec2(xForBeat(points[i - 1].beat), yForValue(points[i - 1].value)),
@@ -2641,7 +2681,8 @@ void ofxOceanodeTimelineController::drawWaveTrackEditor(
     ImGui::BeginChild("##waveTrackVolumePanel", ImVec2(automationWidth, editorHeight), true,
                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     drawWaveTrackVolumeAutomation(timeline, *editTrack, automationWidth, editorHeight,
-                                   endBeat, beatPosition);
+                                   endBeat, beatPosition,
+                                   editorMin.x + kLabelWidth - timelineScrollX);
     ImGui::EndChild();
     finishAbsoluteLayout(ImVec2(editorMin.x, editorMin.y + editorHeight));
 }

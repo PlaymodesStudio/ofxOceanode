@@ -72,6 +72,12 @@ public:
     void fromJson(const ofJson& json);
 };
 
+// Shared by every point list in the timeline, but `value` is in whatever
+// units its owner works in, and there are three: a lane's curve holds 0..1
+// (mapped through the lane's valueMin/valueMax when applied), the tempo lane
+// holds absolute BPM (clamped to bpmMinimum/bpmMaximum), and a Wave Track's
+// volume holds absolute gain (0..4). Anything moving points between two of
+// those has to convert -- see the wave-volume migration in fromJson.
 struct ofxOceanodeTimelineCurvePoint {
     double beat = 0.0;
     float value = 0.0f;
@@ -280,8 +286,9 @@ struct ofxOceanodeTimelineClip {
     float lfoOutputMax = 1.0f;
     // Audio clips belong to a Wave track. These fields intentionally live on
     // the clip rather than on a lane: a Wave track can contain several
-    // independently placed files. Per-clip volume automation is represented
-    // by an optional isWaveVolume Curve lane below.
+    // independently placed files. Volume is not here -- it belongs to the
+    // whole track (gain plus an envelope in timeline-beat space), which is
+    // what evaluateWaveClipVolume resolves.
     std::string waveFilePath;
     float waveGain = 1.0f;
     // Base playback multiplier for this audio clip. Stretching the clip
