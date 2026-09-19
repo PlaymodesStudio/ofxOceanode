@@ -100,9 +100,6 @@ void ofxOceanodeTime::setup(std::shared_ptr<ofxOceanodeContainer> c, std::shared
     controller->setTimeGroup(&parameters);
     
     
-    timer.setPeriodicEvent(1000000);
-    startThread();
-    
     ofSoundStreamSettings settings;
 
     // if you want to set the device id to be different than the default
@@ -153,10 +150,7 @@ void ofxOceanodeTime::update(){
     };
     
     getPhasorsFromContainer(container);
-    //Clear all stored phasors inside the threadChannel, to only allow 1 value to be stored in it.
     vector<shared_ptr<basePhasor>> oldPhasors;
-    while(phasorChannel.tryReceive(oldPhasors));
-    phasorChannel.send(phasors);
     while(phasorChannel2.tryReceive(oldPhasors));
     phasorChannel2.send(phasors);
     
@@ -216,17 +210,18 @@ void ofxOceanodeTime::update(){
     }
 }
 
-void ofxOceanodeTime::threadedFunction(){
-//    while(isThreadRunning()){
-//        timer.waitNext();
-//        if(!frameMode && isPlaying){
-//            phasorChannel.tryReceive(phasorsInThread);
-//            for(auto p : phasorsInThread){
-//                if(!p->isAudio())
-//                    p->threadedFunction(1000);
-//            }
-//        }
-//    }
+void ofxOceanodeTime::resetTransportToStart(){
+    if(transport != nullptr){
+        const bool wasPlaying = isPlaying.get();
+        transport->stop();
+        transport->seekToBeat(0.0);
+        // transport->stop() also clears the transport's play state. Restore
+        // the state owned by this controller so resetting while already
+        // playing does not leave the frame-step driver permanently stopped.
+        transport->setIsPlaying(wasPlaying);
+    }
+    time = 0.0f;
+    resetGlobalTime();
 }
 
 void ofxOceanodeTime::audioIn(ofSoundBuffer & input){

@@ -9,8 +9,6 @@
 #define ofxOceanodeTime_h
 
 #include "ofMain.h"
-#include "ofTimer.h"
-#include "ofThread.h"
 #include "ofxOceanodeTransport.h"
 #include <algorithm>
 #include <chrono>
@@ -128,13 +126,10 @@ namespace ofxOceanodeTimeUtils {
 
 namespace ofxOceanodeTransportUtils = ofxOceanodeTimeUtils;
 
-class ofxOceanodeTime : public ofThread{
+class ofxOceanodeTime {
 public:
-    ofxOceanodeTime(){};
-    ~ofxOceanodeTime(){
-        stopThread();
-        waitForThread(true);
-    };
+    ofxOceanodeTime() = default;
+    ~ofxOceanodeTime() = default;
     
     static ofxOceanodeTime* getInstance(){
            static ofxOceanodeTime instance;
@@ -152,13 +147,15 @@ public:
     }
     
     void update();
+    void setFrameMode(bool enabled){ frameMode = enabled; }
+    bool getFrameMode() const { return frameMode.get(); }
+    void resetTransportToStart();
     void audioIn(ofSoundBuffer & input);
     void audioOut(ofSoundBuffer & output);
     ofxOceanodeTimeState getGlobalTimeState() const;
     ofxOceanodeFrameTimeState getFrameGlobalTimeState() const;
     
 private:
-    void threadedFunction() override;
     void updateLegacyTimeFromTransport();
     TransportDriverMode getDesiredDriverMode(bool forceFrameMode) const;
     void syncGlobalTimeRealTime();
@@ -185,12 +182,7 @@ private:
     
     ofTime startTime;
     
-    ofTimer timer;
-    
-    vector<std::shared_ptr<basePhasor>> phasorsInThread;
     vector<std::shared_ptr<basePhasor>> phasorsInThread2;
-    
-    ofThreadChannel<vector<std::shared_ptr<basePhasor>>> phasorChannel;
     ofThreadChannel<vector<std::shared_ptr<basePhasor>>> phasorChannel2;
     
     std::shared_ptr<ofxOceanodeContainer> container;
