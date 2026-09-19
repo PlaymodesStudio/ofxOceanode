@@ -72,7 +72,19 @@ void ofxOceanodeControls::draw(){
             controllerVisible[inspectorName] = true;
         }
     }
-    
+
+    // Handles the "New Timeline Track" name dialog requested from a
+    // node's right-click menu on the canvas. Called unconditionally, every
+    // frame, regardless of whether the Timeline controller's own window is
+    // visible below -- that window can be toggled off, or just not the
+    // active docked tab, and the dialog still needs to show up (centered on
+    // the main canvas, not wherever the Timeline window is) the moment it's
+    // requested rather than whenever the user next happens to bring that
+    // window forward.
+    if(auto timelineController = get<ofxOceanodeTimelineController>()){
+        timelineController->drawPendingTrackPopup();
+    }
+
     for(auto &c : controllers){
         // Determine visibility
         auto it = controllerVisible.find(c->getControllerName());

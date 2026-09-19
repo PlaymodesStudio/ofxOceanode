@@ -10,16 +10,25 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <unordered_map>
 #include <utility>
 
 namespace {
 constexpr double kPPQ = 24.0;
+// Keep long timelines practical: at the minimum zoom, one hour occupies
+// about 900 px while still leaving enough scale for beat-based editing.
+constexpr float kMinPixelsPerSecond = 0.25f;
+constexpr float kMaxPixelsPerSecond = 600.0f;
+constexpr float kSnapMinimumSpacingPixels = 5.0f;
 constexpr float kLabelWidth = 230.0f;
 constexpr float kRulerHeight = 64.0f;
 constexpr float kHeaderHeight = 25.0f;
 constexpr float kRowHeight = 28.0f;
 constexpr float kCollapsedHeight = 38.0f;
+constexpr float kWaveTrackMinHeight = 48.0f;
+constexpr float kWaveTrackMaxHeight = 360.0f;
+constexpr float kWaveTrackResizeHandleHeight = 8.0f;
 constexpr float kEdgePixels = 8.0f;
 constexpr float kPianoKeyboardWidth = 38.0f;
 constexpr float kPianoScrollbarWidth = 10.0f;
@@ -67,6 +76,30 @@ int divisionIndexForBeats(double beats) {
     return best;
 }
 
+double nextWiderSnapDivision(double beats, double beatsPerBar) {
+    // Keep the musical widening predictable: 16th -> 8th -> quarter ->
+    // half -> bar, then double the number of bars each time.
+    if(beats < 1.0) return beats * 2.0;
+    if(beats < 2.0) return 2.0;
+    if(beatsPerBar > beats) return beatsPerBar;
+    return beats * 2.0;
+}
+
+double adaptiveSnapDivision(double baseBeats, double beatsPerBar,
+                            float bpm, float pixelsPerSecond) {
+    if(baseBeats <= 0.0) return baseBeats;
+
+    const double pixelsPerBeat = 60.0 / std::max(1.0f, bpm) *
+                                 std::max(kMinPixelsPerSecond, pixelsPerSecond);
+    double beats = baseBeats;
+    while(beats * pixelsPerBeat < kSnapMinimumSpacingPixels) {
+        const double wider = nextWiderSnapDivision(beats, std::max(1.0, beatsPerBar));
+        if(wider <= beats) break;
+        beats = wider;
+    }
+    return beats;
+}
+
 std::string compactParameterName(const std::string& path) {
     const size_t slash = path.find_last_of('/');
     return slash == std::string::npos ? path : path.substr(slash + 1);
@@ -86,6 +119,8 @@ ImU32 mutedTrackColor(const ofColor& color, float brightness, float saturation =
 }
 
 const ofxOceanodeTimelineLane* laneForBinding(const ofxOceanodeTimelineClip& clip, const std::string& bindingId) {
+    if(clip.isLfo && clip.lfoOutputBindingId == bindingId)
+        return clip.lanes.empty() ? nullptr : &clip.lanes.front();
     for(const auto& lane : clip.lanes) {
         if(std::find(lane.bindingIds.begin(), lane.bindingIds.end(), bindingId) != lane.bindingIds.end()) return &lane;
     }
@@ -96,7 +131,45 @@ const char* laneTypeName(ofxOceanodeTimelineLaneType type) {
     switch(type) {
         case ofxOceanodeTimelineLaneType::PianoRoll: return "Piano Roll";
         case ofxOceanodeTimelineLaneType::Curve: return "Curve";
+        case ofxOceanodeTimelineLaneType::MultiValue: return "Multi Value";
+        case ofxOceanodeTimelineLaneType::MultiSlider: return "Multi Slider";
+        case ofxOceanodeTimelineLaneType::MultiGate: return "Multi Gate";
+        case ofxOceanodeTimelineLaneType::Wave: return "Wave";
         default: return "Step Sequencer";
+    }
+}
+
+// Shared by every automation-lane selector in this file (the clip context
+// menu, the "Add lane" popup, the "New lane"/requestAddLane handler, and the
+// New Timeline Clip dialog). Wave is deliberately absent: it is a track
+// type whose clips carry audio files, not a clip automation type.
+// need to be listed, and mapped to/from the little combo/menu index ints
+// those sites already used, in one place.
+constexpr const char* kLaneTypeOptions[] = {
+    "Step Sequencer", "Curve", "Piano Roll", "Multi Value", "Multi Slider", "Multi Gate"
+};
+constexpr int kLaneTypeOptionCount = static_cast<int>(sizeof(kLaneTypeOptions) / sizeof(kLaneTypeOptions[0]));
+constexpr const char* kClipTypeOptions[] = {"Automation clip", "LFO clip"};
+
+ofxOceanodeTimelineLaneType laneTypeFromOptionIndex(int index) {
+    switch(index) {
+        case 1: return ofxOceanodeTimelineLaneType::Curve;
+        case 2: return ofxOceanodeTimelineLaneType::PianoRoll;
+        case 3: return ofxOceanodeTimelineLaneType::MultiValue;
+        case 4: return ofxOceanodeTimelineLaneType::MultiSlider;
+        case 5: return ofxOceanodeTimelineLaneType::MultiGate;
+        default: return ofxOceanodeTimelineLaneType::Step;
+    }
+}
+
+int optionIndexForLaneType(ofxOceanodeTimelineLaneType type) {
+    switch(type) {
+        case ofxOceanodeTimelineLaneType::Curve: return 1;
+        case ofxOceanodeTimelineLaneType::PianoRoll: return 2;
+        case ofxOceanodeTimelineLaneType::MultiValue: return 3;
+        case ofxOceanodeTimelineLaneType::MultiSlider: return 4;
+        case ofxOceanodeTimelineLaneType::MultiGate: return 5;
+        default: return 0;
     }
 }
 
@@ -148,6 +221,230 @@ void finishAbsoluteLayout(const ImVec2& position) {
 ofxOceanodeTimelineController::ofxOceanodeTimelineController(std::shared_ptr<ofxOceanodeContainer> _container)
 : ofxOceanodeBaseController("Timeline"), container(std::move(_container)) {}
 
+bool ofxOceanodeTimelineController::createWaveClipFromFile(ofxOceanodeTimelineManager& timeline,
+                                                            const std::string& trackId,
+                                                            const std::string& filePath,
+                                                            double startBeat,
+                                                            double durationBeats) {
+    const auto* track = timeline.getTrack(trackId);
+    if(track == nullptr || !track->isWaveTrack || filePath.empty()) return false;
+
+    const auto clipId = timeline.createClip(trackId, "Clip", snapBeat(startBeat),
+                                             std::max(1.0 / kPPQ, snapBeat(durationBeats)));
+    if(clipId.empty()) return false;
+
+    if(auto* clip = timeline.getClip(trackId, clipId)) {
+        clip->waveFilePath = filePath;
+        clip->waveGain = 1.0f;
+        const bool loaded = timeline.reloadWaveform(trackId, clipId);
+        if(loaded && clip->waveFileDurationMs > 0.0 && container != nullptr) {
+            const double bpm = std::max(1.0f, container->getTransportState().bpm);
+            const double sourceBeats = std::max(1.0 / kPPQ,
+                clip->waveFileDurationMs * bpm / 60000.0);
+            // Audio clips are content-sized by the selected file. This also
+            // gives the envelope lane a meaningful source range instead of
+            // leaving every file at the one-bar placeholder length.
+            clip->contentDurationBeats = sourceBeats;
+            clip->durationBeats = sourceBeats;
+            clip->repeatContent = false;
+            clip->contentStretch = 1.0;
+            clip->waveSourceStartBeat = 0.0;
+            clip->waveFileDurationBeats = sourceBeats;
+            clip->waveReverse = false;
+        }
+        return true;
+    }
+    timeline.removeClip(trackId, clipId);
+    return false;
+}
+
+bool ofxOceanodeTimelineController::replaceWaveClipFromFile(ofxOceanodeTimelineManager& timeline,
+                                                            const std::string& trackId,
+                                                            const std::string& clipId,
+                                                            const std::string& filePath) {
+    auto* track = timeline.getTrack(trackId);
+    auto* clip = timeline.getClip(trackId, clipId);
+    if(track == nullptr || clip == nullptr || !track->isWaveTrack || filePath.empty()) return false;
+
+    const double visibleDuration = std::max(1.0 / kPPQ, clip->durationBeats);
+    clip->waveFilePath = filePath;
+    clip->waveGain = std::max(0.0f, clip->waveGain);
+    if(!timeline.reloadWaveform(trackId, clipId)) return false;
+
+    const double bpm = container != nullptr
+        ? std::max(1.0f, container->getTransportState().bpm) : 120.0;
+    const double sourceBeats = std::max(1.0 / kPPQ,
+        clip->waveFileDurationMs * bpm / 60000.0);
+    clip->contentDurationBeats = sourceBeats;
+    clip->durationBeats = visibleDuration;
+    clip->repeatContent = false;
+    clip->contentStretch = visibleDuration / sourceBeats;
+    clip->waveSourceStartBeat = 0.0;
+    clip->waveFileDurationBeats = sourceBeats;
+    clip->waveReverse = false;
+    return true;
+}
+
+bool ofxOceanodeTimelineController::splitWaveClipAtPlayhead(ofxOceanodeTimelineManager& timeline,
+                                                            const std::string& trackId,
+                                                            const std::string& clipId,
+                                                            double playheadBeat) {
+    const auto* track = timeline.getTrack(trackId);
+    const auto* originalClip = timeline.getClip(trackId, clipId);
+    if(track == nullptr || originalClip == nullptr || !track->isWaveTrack ||
+       originalClip->waveFilePath.empty()) return false;
+
+    const double epsilon = 1.0 / kPPQ * 0.25;
+    const double clipStart = originalClip->startBeat;
+    const double clipEnd = clipStart + std::max(1.0 / kPPQ, originalClip->durationBeats);
+    if(playheadBeat <= clipStart + epsilon || playheadBeat >= clipEnd - epsilon) return false;
+
+    // A repeated clip can only be represented as two independent source
+    // ranges when the cut is in its first cycle. New Wave clips are
+    // non-repeating, but this guard avoids silently producing a different
+    // arrangement for an older preset that had Repeat content enabled.
+    const double localTimelineBeat = playheadBeat - clipStart;
+    if(originalClip->repeatContent && localTimelineBeat >= cycleDuration(*originalClip) - epsilon)
+        return false;
+
+    const ofxOceanodeTimelineClip original = *originalClip;
+    const double sourceLength = std::max(1.0 / kPPQ, original.contentDurationBeats);
+    const double sourceSplit = ofClamp(timelineToSourceBeat(original, playheadBeat),
+                                       epsilon, sourceLength - epsilon);
+    const double leftTimelineDuration = localTimelineBeat;
+    const double rightTimelineDuration = clipEnd - playheadBeat;
+    if(leftTimelineDuration <= epsilon || rightTimelineDuration <= epsilon) return false;
+
+    // Curve points are stored in source-beat space. Add an interpolated cut
+    // point to both halves so a volume envelope remains continuous at the
+    // split, then shift the right half back to source beat zero.
+    auto splitCurveLane = [&](ofxOceanodeTimelineLane& leftLane,
+                              ofxOceanodeTimelineLane& rightLane) {
+        if(leftLane.curvePoints.empty()) return;
+        std::sort(leftLane.curvePoints.begin(), leftLane.curvePoints.end(),
+                  [](const auto& a, const auto& b) { return a.beat < b.beat; });
+        const auto points = leftLane.curvePoints;
+        const auto tensions = leftLane.curveTensions;
+        const auto interpolation = curveInterpolationMode(leftLane.curveInterpolation);
+        auto valueAt = [&](double beat) {
+            if(points.size() == 1 || beat <= points.front().beat) return points.front().value;
+            if(beat >= points.back().beat) return points.back().value;
+            for(size_t i = 1; i < points.size(); ++i) {
+                if(beat > points[i].beat) continue;
+                const double span = std::max(1e-9, points[i].beat - points[i - 1].beat);
+                const float t = ofClamp(static_cast<float>((beat - points[i - 1].beat) / span), 0.0f, 1.0f);
+                const auto tension = i - 1 < tensions.size() ? tensions[i - 1] : ofxOceanodeTimelineCurveTension{};
+                return ofLerp(points[i - 1].value, points[i].value,
+                              curveSegmentShape(t, interpolation, tension));
+            }
+            return points.back().value;
+        };
+
+        const float splitValue = valueAt(sourceSplit);
+        std::vector<ofxOceanodeTimelineCurvePoint> leftPoints;
+        std::vector<ofxOceanodeTimelineCurvePoint> rightPoints;
+        for(const auto& point : points) {
+            if(point.beat < sourceSplit - epsilon) leftPoints.push_back(point);
+            if(point.beat > sourceSplit + epsilon)
+                rightPoints.push_back({point.beat - sourceSplit, point.value});
+        }
+        leftPoints.push_back({sourceSplit, splitValue});
+        rightPoints.insert(rightPoints.begin(), {0.0, splitValue});
+        leftLane.curvePoints = std::move(leftPoints);
+        rightLane.curvePoints = std::move(rightPoints);
+        resetCurveTensions(leftLane);
+        resetCurveTensions(rightLane);
+    };
+
+    auto splitLaneData = [&](ofxOceanodeTimelineLane& leftLane,
+                             ofxOceanodeTimelineLane& rightLane) {
+        if(leftLane.type == ofxOceanodeTimelineLaneType::Curve || leftLane.isWaveVolume) {
+            splitCurveLane(leftLane, rightLane);
+            return;
+        }
+        // Wave clips currently expose only a Curve volume lane, but preserve
+        // the source positions of any future auxiliary lane rather than
+        // copying points at the wrong location into the right slice.
+        for(auto& note : rightLane.pianoNotes) note.startBeat -= sourceSplit;
+        for(auto& step : rightLane.step.steps) step.startBeat -= sourceSplit;
+        for(auto& row : rightLane.multiValueRows)
+            for(auto& region : row) region.startBeat -= sourceSplit;
+        for(auto& row : rightLane.multiGateRows)
+            for(auto& region : row) region.startBeat -= sourceSplit;
+    };
+
+    // Splitting intentionally dissolves a group: the two new clips are now
+    // independent edit targets and should not drag an unrelated slice with
+    // them.
+    if(timeline.getGroupForClip(trackId, clipId) != nullptr)
+        timeline.ungroupClip(trackId, clipId);
+
+    const std::string rightClipId = timeline.createClip(trackId, original.name + " slice",
+                                                        playheadBeat, rightTimelineDuration);
+    if(rightClipId.empty()) return false;
+
+    auto* rightClip = timeline.getClip(trackId, rightClipId);
+    if(rightClip == nullptr) return false;
+    rightClip->waveFilePath = original.waveFilePath;
+    rightClip->waveGain = original.waveGain;
+    rightClip->wavePlaybackRate = original.wavePlaybackRate;
+    // For forward playback the right slice begins after the cut. For reverse
+    // playback the timeline starts at the high end of the source range, so
+    // the left slice occupies the high range and the right slice the low one.
+    rightClip->waveSourceStartBeat = original.waveReverse
+        ? original.waveSourceStartBeat
+        : original.waveSourceStartBeat + sourceSplit;
+    rightClip->waveFileDurationBeats = original.waveFileDurationBeats;
+    rightClip->waveReverse = original.waveReverse;
+    rightClip->waveNumChannels = original.waveNumChannels;
+    rightClip->waveFileDurationMs = original.waveFileDurationMs;
+    rightClip->waveformPeaks = original.waveformPeaks;
+    rightClip->contentDurationBeats = sourceLength - sourceSplit;
+    rightClip->contentStretch = original.contentStretch;
+    rightClip->repeatContent = false;
+
+    std::vector<ofxOceanodeTimelineLane> leftLanes;
+    leftLanes.reserve(original.lanes.size());
+    for(const auto& sourceLane : original.lanes) {
+        // Legacy per-clip volume lanes are now represented by the track-wide
+        // automation editor and must not be duplicated into either slice.
+        if(sourceLane.isWaveVolume) continue;
+        auto leftLane = sourceLane;
+        auto rightLane = leftLane;
+        splitLaneData(leftLane, rightLane);
+        leftLanes.push_back(leftLane);
+        const std::string newLaneId = timeline.createLane(trackId, rightClipId,
+                                                           leftLane.name, leftLane.type);
+        if(newLaneId.empty()) continue;
+        if(auto* createdLane = timeline.getLane(trackId, rightClipId, newLaneId)) {
+            *createdLane = std::move(rightLane);
+            createdLane->id = newLaneId;
+        }
+    }
+
+    if(auto* leftClip = timeline.getClip(trackId, clipId)) {
+        leftClip->durationBeats = leftTimelineDuration;
+        leftClip->contentDurationBeats = sourceSplit;
+        if(original.waveReverse)
+            leftClip->waveSourceStartBeat = original.waveSourceStartBeat + sourceLength - sourceSplit;
+        leftClip->repeatContent = false;
+        leftClip->lanes = std::move(leftLanes);
+    }
+
+    if(auto* sortedTrack = timeline.getTrack(trackId)) {
+        std::sort(sortedTrack->clips.begin(), sortedTrack->clips.end(),
+                  [](const auto& a, const auto& b) {
+                      if(std::abs(a.startBeat - b.startBeat) > 1e-9) return a.startBeat < b.startBeat;
+                      return a.id < b.id;
+                  });
+    }
+    // A split creates two new edit targets, but should not leave either slice
+    // selected. This prevents an immediate group/drag/delete action from
+    // affecting both halves just because the split command was invoked.
+    selectedClips.clear();
+    return true;
+}
+
 double ofxOceanodeTimelineController::getContentEndBeat(const ofxOceanodeTimelineManager& timeline) const {
     const double barBeats = timeline.getBeatsPerBar();
     double endBeat = std::max(barBeats, static_cast<double>(visibleBars) * barBeats);
@@ -162,16 +459,16 @@ double ofxOceanodeTimelineController::getContentEndBeat(const ofxOceanodeTimelin
 }
 
 double ofxOceanodeTimelineController::snapBeat(double beat) const {
-    if(rulerSnapBeats <= 0.0) return std::max(0.0, beat);
-    return std::max(0.0, std::round(beat / rulerSnapBeats) * rulerSnapBeats);
+    if(effectiveRulerSnapBeats <= 0.0) return std::max(0.0, beat);
+    return std::max(0.0, std::round(beat / effectiveRulerSnapBeats) * effectiveRulerSnapBeats);
 }
 
 double ofxOceanodeTimelineController::editIncrement() const {
-    return rulerSnapBeats > 0.0 ? rulerSnapBeats : 1.0 / kPPQ;
+    return effectiveRulerSnapBeats > 0.0 ? effectiveRulerSnapBeats : 1.0 / kPPQ;
 }
 
 double ofxOceanodeTimelineController::displayGridBeats() const {
-    return rulerSnapBeats > 0.0 ? rulerSnapBeats : 1.0;
+    return effectiveRulerSnapBeats > 0.0 ? effectiveRulerSnapBeats : 1.0;
 }
 
 float ofxOceanodeTimelineController::beatToPixels(const ofxOceanodeTimelineManager& timeline,
@@ -182,7 +479,8 @@ float ofxOceanodeTimelineController::beatToPixels(const ofxOceanodeTimelineManag
 double ofxOceanodeTimelineController::pixelsToBeat(const ofxOceanodeTimelineManager& timeline,
                                                    float pixels, float fallbackBpm,
                                                    double endBeatHint) const {
-    const double targetSeconds = std::max(0.0f, pixels) / std::max(1.0f, pixelsPerSecond);
+    const double targetSeconds = std::max(0.0f, pixels) /
+                                 std::max(kMinPixelsPerSecond, pixelsPerSecond);
     double low = 0.0;
     double high = std::max(1.0, endBeatHint);
     while(timeline.beatToSeconds(high, fallbackBpm) < targetSeconds && high < 1000000.0) high *= 2.0;
@@ -223,6 +521,18 @@ void ofxOceanodeTimelineController::drawBlendModeOptions(ofxOceanodeTimelineMana
             timeline.setBindingMode(trackId, binding.id, option.mode);
         if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", option.hint);
     }
+    ImGui::Separator();
+    // Add/Multiply/Min/Max have no natural ceiling of their own -- several
+    // bindings combining onto one parameter can drive it past its min/max
+    // even though each contributor individually stayed in range. This lives
+    // right below the blend modes because it's only ever relevant once one
+    // of those non-Replace modes is actually in play. It only takes effect
+    // via this parameter's first (non-bypassed) binding, the same one whose
+    // value type/default already act as the shared source of truth for it.
+    if(ImGui::MenuItem("Clamp to parameter range", nullptr, binding.clampToParameterRange))
+        timeline.setBindingClamp(trackId, binding.id, !binding.clampToParameterRange);
+    if(ImGui::IsItemHovered())
+        ImGui::SetTooltip("Keeps the combined value from Add/Multiply/Min/Max bindings within this parameter's own min/max");
 }
 
 void ofxOceanodeTimelineController::draw() {
@@ -230,6 +540,10 @@ void ofxOceanodeTimelineController::draw() {
     auto& timeline = container->getTimelineManager();
     auto transportState = container->getTransportState();
     auto transport = container->getTransport();
+    effectiveRulerSnapBeats = adaptiveSnapDivision(rulerSnapBeats,
+                                                   timeline.getBeatsPerBar(),
+                                                   transportState.bpm,
+                                                   pixelsPerSecond);
 
     if(transport != nullptr &&
        ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
@@ -239,17 +553,18 @@ void ofxOceanodeTimelineController::draw() {
         transportState = container->getTransportState();
     }
 
-    std::string requestedRename;
-    bool isNewTrack = false;
-    if(timeline.consumePendingTrackRename(requestedRename, &isNewTrack)) {
-        pendingTrackId = requestedRename;
-        if(const auto* track = timeline.getTrack(pendingTrackId)) {
-            std::strncpy(pendingTrackName, track->name.c_str(), sizeof(pendingTrackName) - 1);
-            pendingTrackName[sizeof(pendingTrackName) - 1] = '\0';
-            pendingNewTrackDialog = isNewTrack;
-            if(isNewTrack) pendingNewTrackLaneType = 0;
-            requestRenamePopup = true;
-        }
+    // S is deliberately a timeline-level shortcut rather than a text-field
+    // shortcut: it cuts the one selected Wave clip at the current transport
+    // beat and leaves both resulting slices independently editable.
+    if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+       !ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive() &&
+       !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId) &&
+       ImGui::IsKeyPressed(ImGuiKey_S, false) && selectedClips.size() == 1) {
+        const auto selected = *selectedClips.begin();
+        const auto* selectedTrack = timeline.getTrack(selected.first);
+        if(selectedTrack != nullptr && selectedTrack->isWaveTrack)
+            splitWaveClipAtPlayhead(timeline, selected.first, selected.second,
+                                    transportState.beatPosition);
     }
 
     if(transport != nullptr) {
@@ -270,7 +585,8 @@ void ofxOceanodeTimelineController::draw() {
         ImGui::Text("Beat %.3f", transportState.beatPosition);
     }
     ImGui::SetNextItemWidth(105.0f);
-    ImGui::DragFloat("Px / sec", &pixelsPerSecond, 1.0f, 30.0f, 600.0f, "%.0f");
+    ImGui::DragFloat("Px / sec", &pixelsPerSecond, 1.0f,
+                     kMinPixelsPerSecond, kMaxPixelsPerSecond, "%.2f");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(80.0f);
     ImGui::DragInt("Bars", &visibleBars, 1.0f, 1, 256);
@@ -308,8 +624,13 @@ void ofxOceanodeTimelineController::draw() {
     ImGui::SetNextItemWidth(82.0f);
     if(ImGui::BeginCombo("Snap", kDivisionOptions[rulerDivision].label)) {
         for(int i = 0; i < kDivisionOptionCount; ++i) {
-            if(ImGui::Selectable(kDivisionOptions[i].label, i == rulerDivision))
+            if(ImGui::Selectable(kDivisionOptions[i].label, i == rulerDivision)) {
                 rulerSnapBeats = kDivisionOptions[i].beats;
+                effectiveRulerSnapBeats = adaptiveSnapDivision(rulerSnapBeats,
+                                                               timeline.getBeatsPerBar(),
+                                                               transportState.bpm,
+                                                               pixelsPerSecond);
+            }
         }
         ImGui::EndCombo();
     }
@@ -326,6 +647,80 @@ void ofxOceanodeTimelineController::draw() {
         ImGui::SameLine(); ImGui::SetNextItemWidth(62.0f);
         if(ImGui::InputDouble("##loopEnd", &loopEnd, editIncrement(), 1.0, "%.3g"))
             timeline.setLoopRange(loopStart, std::max(loopStart + 1.0 / kPPQ, snapBeat(loopEnd)));
+    }
+    ImGui::SameLine();
+    // Timestamped events: discrete lanes (steps, notes, gates, multi-value
+    // blocks) are handed to a backend that can execute them at an exact
+    // instant, a lookahead ahead of the playhead. Off sends everything on the
+    // frame that crosses it, as before.
+    bool timeStamped = timeline.isSchedulingEnabled();
+    if(ImGui::Checkbox("TimeStamped", &timeStamped)) timeline.setSchedulingEnabled(timeStamped);
+    if(ImGui::IsItemHovered())
+        ImGui::SetTooltip("Send steps, notes and gates to SuperCollider with their exact time\n"
+                          "(timetagged OSC bundles) instead of on the GUI frame that crosses them.\n"
+                          "Curves and parameters without a timestamping backend are unaffected.");
+    if(timeStamped) {
+        double lookahead = timeline.getSchedulingLookaheadMs();
+        ImGui::SameLine(); ImGui::SetNextItemWidth(58.0f);
+        if(ImGui::InputDouble("ms##schedulingLookahead", &lookahead, 10.0, 50.0, "%.0f"))
+            timeline.setSchedulingLookaheadMs(lookahead);
+        if(ImGui::IsItemHovered())
+            ImGui::SetTooltip("Lookahead window. It must be longer than the worst frame interval\n"
+                              "that still has to sound on time (120 ms covers a several-frame stall).");
+    }
+
+    ImGui::SameLine();
+    // A Wave Track is created together with its first audio clip. Selecting
+    // the file here avoids leaving an empty track behind and makes the
+    // waveform visible immediately after the track is added.
+    if(ImGui::Button("Add Wave Track")) {
+        const auto result = ofSystemLoadDialog("Load wave file", false);
+        if(result.bSuccess) {
+            const auto trackId = timeline.createWaveTrack();
+            createWaveClipFromFile(timeline, trackId, result.filePath,
+                                   transportState.beatPosition, timeline.getBeatsPerBar());
+        }
+    }
+
+    // Stale entries can accumulate in selectedClips if their clip was
+    // removed some other way (e.g. loading a different preset) without
+    // going through this controller's own delete paths below -- filter
+    // them out here, once per frame, before anything reads the selection.
+    for(auto it = selectedClips.begin(); it != selectedClips.end();) {
+        if(timeline.getClip(it->first, it->second) == nullptr) it = selectedClips.erase(it);
+        else ++it;
+    }
+    // Delete acts on the timeline selection, but only while the Timeline
+    // window owns keyboard focus and no text/widget is editing. Defer the
+    // actual removals until after the track iteration below, just like the
+    // context-menu delete path, because removing a clip can reallocate its
+    // track's clip vector.
+    if(ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+       !ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive() &&
+       !selectedClips.empty() &&
+       (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false))) {
+        keyboardClipDeletionRequests.assign(selectedClips.begin(), selectedClips.end());
+        selectedClips.clear();
+    }
+    // Grouping/ungrouping is reachable two ways, per the request that
+    // prompted this: a toolbar button here for whatever is currently
+    // Shift+click-selected, and (see drawClipMenu below) a right-click
+    // menu item on the clip itself.
+    if(selectedClips.size() >= 2) {
+        ImGui::SameLine();
+        const std::string label = "Group (" + ofToString(selectedClips.size()) + ")##groupSelectedClips";
+        if(ImGui::Button(label.c_str())) {
+            timeline.groupClips(std::vector<std::pair<std::string, std::string>>(
+                selectedClips.begin(), selectedClips.end()));
+            // Selection is left as-is (not cleared) -- the clips just
+            // grouped are exactly what's still highlighted, which is the
+            // most useful confirmation that the group now contains them.
+        }
+    } else if(selectedClips.size() == 1 && timeline.getGroupForClip(selectedClips.begin()->first, selectedClips.begin()->second) != nullptr) {
+        ImGui::SameLine();
+        if(ImGui::Button("Ungroup##ungroupSelectedClip")) {
+            timeline.ungroupClip(selectedClips.begin()->first, selectedClips.begin()->second);
+        }
     }
 
     const double endBeat = getContentEndBeat(timeline);
@@ -356,9 +751,10 @@ void ofxOceanodeTimelineController::draw() {
             const float mouseViewportX = ImGui::GetIO().MousePos.x - ImGui::GetWindowPos().x;
             if(mouseViewportX >= kLabelWidth) {
                 const float secondsAtMouse = std::max(0.0f, timelineScrollX + mouseViewportX - kLabelWidth) /
-                                             std::max(1.0f, oldPixelsPerSecond);
+                                             std::max(kMinPixelsPerSecond, oldPixelsPerSecond);
                 const float zoomFactor = static_cast<float>(std::pow(1.12f, ImGui::GetIO().MouseWheel));
-                pixelsPerSecond = ofClamp(oldPixelsPerSecond * zoomFactor, 30.0f, 600.0f);
+                pixelsPerSecond = ofClamp(oldPixelsPerSecond * zoomFactor,
+                                          kMinPixelsPerSecond, kMaxPixelsPerSecond);
                 timelineScrollX = ofClamp(kLabelWidth + secondsAtMouse * pixelsPerSecond - mouseViewportX,
                                           0.0f, maxTimelineScrollX);
             } else {
@@ -368,9 +764,23 @@ void ofxOceanodeTimelineController::draw() {
         if(!zoomGesture && std::abs(ImGui::GetIO().MouseWheelH) > 0.001f)
             timelineScrollX = ofClamp(timelineScrollX - ImGui::GetIO().MouseWheelH * 55.0f, 0.0f, maxTimelineScrollX);
     }
+    // The wheel gesture may have changed the scale this frame. Refresh the
+    // derived snap before drawing the ruler and handling timeline input.
+    effectiveRulerSnapBeats = adaptiveSnapDivision(rulerSnapBeats,
+                                                   timeline.getBeatsPerBar(),
+                                                   transportState.bpm,
+                                                   pixelsPerSecond);
     drawRuler(timeline, kLabelWidth, timelineWidth, endBeat, transportState.beatPosition, transportState.bpm);
     drawBpmLane(timeline, contentWidth, endBeat, transportState.beatPosition, transportState.bpm);
     ImDrawList* dl = ImGui::GetWindowDrawList();
+
+    // Reset once per frame, before any track's handleClip can set it --
+    // unlike the per-track clipInteractionClaimedThisFrame below, this one
+    // has to survive across every track's iteration so the "clicked empty
+    // space" deselect check after the loop knows whether *any* clip on
+    // *any* track already claimed this frame's click.
+    anyClipInteractionClaimedThisFrame = false;
+    bool emptyTrackAreaClickedThisFrame = false;
 
     for(const auto& track : timeline.getTracks()) {
         const float headerY = ImGui::GetCursorPosY();
@@ -378,7 +788,14 @@ void ofxOceanodeTimelineController::draw() {
         // the model, but mixing the old Dummy height with the new branch later
         // in this loop makes SetCursorPos extend the child and asserts in End().
         const bool trackCollapsed = track.collapsed;
-        const float trackHeaderHeight = trackCollapsed ? kCollapsedHeight : kHeaderHeight;
+        // A Wave Track has no per-binding rows to expand into (see
+        // ofxOceanodeTimelineTrack::isWaveTrack) -- it always renders as the
+        // same single always-visible clip row a collapsed track would use,
+        // regardless of its own collapsed flag.
+        const bool singleRowTrack = trackCollapsed || track.isWaveTrack;
+        const float trackHeaderHeight = track.isWaveTrack
+            ? ofClamp(track.waveTrackHeight, kWaveTrackMinHeight, kWaveTrackMaxHeight)
+            : (singleRowTrack ? kCollapsedHeight : kHeaderHeight);
         bool expandTrackForEditor = false;
         ImGui::SetCursorPos(ImVec2(0, headerY));
         // Keep the header as a visual/layout item only. A full-width
@@ -387,7 +804,7 @@ void ofxOceanodeTimelineController::draw() {
         ImGui::Dummy(ImVec2(contentWidth, trackHeaderHeight));
         const ImVec2 headerMin = ImGui::GetItemRectMin();
         const ImVec2 headerMax = ImGui::GetItemRectMax();
-        if(trackCollapsed) {
+        if(singleRowTrack) {
             dl->AddRectFilled(headerMin, headerMax, mutedTrackColor(track.color, 0.17f));
             dl->AddRectFilled(headerMin, ImVec2(headerMin.x + kLabelWidth, headerMax.y),
                               mutedTrackColor(track.color, 0.27f, 0.42f));
@@ -395,7 +812,10 @@ void ofxOceanodeTimelineController::draw() {
             dl->AddRectFilled(headerMin, headerMax, mutedTrackColor(track.color, 0.27f, 0.42f));
         }
         const float headerTextY = headerMin.y + (trackHeaderHeight - ImGui::GetTextLineHeight()) * 0.5f;
-        dl->AddText(ImVec2(headerMin.x + 7, headerTextY), IM_COL32(235, 235, 235, 255), trackCollapsed ? ">" : "v");
+        // A Wave Track has nothing to expand/collapse, so it gets no
+        // chevron -- just its name, flush where the chevron would be.
+        if(!track.isWaveTrack)
+            dl->AddText(ImVec2(headerMin.x + 7, headerTextY), IM_COL32(235, 235, 235, 255), trackCollapsed ? ">" : "v");
         dl->AddText(ImVec2(headerMin.x + 22, headerTextY), IM_COL32(235, 235, 235, 255), track.name.c_str());
         // A binding's target parameter can disappear (node deleted, preset
         // loaded on a different graph, ...). The manager keeps the binding
@@ -410,7 +830,7 @@ void ofxOceanodeTimelineController::draw() {
                        IM_COL32(255, 165, 60, 255), "[missing target]");
         }
 
-        const ImVec2 headerInteractionMax(trackCollapsed ? headerMin.x + kLabelWidth : headerMax.x,
+        const ImVec2 headerInteractionMax(singleRowTrack ? headerMin.x + kLabelWidth : headerMax.x,
                                           headerMax.y);
         if(ImGui::IsMouseHoveringRect(headerMin, headerInteractionMax)) {
             if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
@@ -419,10 +839,11 @@ void ofxOceanodeTimelineController::draw() {
                 std::strncpy(pendingTrackName, track.name.c_str(), sizeof(pendingTrackName) - 1);
                 pendingTrackName[sizeof(pendingTrackName) - 1] = '\0';
                 requestRenamePopup = true;
-            } else if(ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::GetIO().MousePos.x < headerMin.x + 22) {
+            } else if(!track.isWaveTrack && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::GetIO().MousePos.x < headerMin.x + 22) {
                 if(auto* editTrack = timeline.getTrack(track.id)) editTrack->collapsed = !trackCollapsed;
             } else if(ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                 pendingTrackId = track.id;
+                pendingWaveClipBeat = transportState.beatPosition;
                 ImGui::OpenPopup(("##trackMenu" + track.id).c_str());
             }
         }
@@ -454,8 +875,20 @@ void ofxOceanodeTimelineController::draw() {
                     static_cast<unsigned char>(ofClamp(menuColor[2] * 255.0f, 0.0f, 255.0f)),
                     static_cast<unsigned char>(ofClamp(menuColor[3] * 255.0f, 0.0f, 255.0f)));
             }
-            if(ImGui::MenuItem(trackCollapsed ? "Expand track" : "Collapse track")) {
+            if(!track.isWaveTrack && ImGui::MenuItem(trackCollapsed ? "Expand track" : "Collapse track")) {
                 if(auto* editTrack = timeline.getTrack(track.id)) editTrack->collapsed = !trackCollapsed;
+            }
+            if(track.isWaveTrack) {
+                ImGui::TextDisabled("Volume automation applies to the whole track");
+                if(ImGui::MenuItem("Edit track volume automation")) {
+                    if(!track.clips.empty()) {
+                        timeline.createWaveVolumeLane(track.id, track.clips.front().id);
+                        editorTrackId = track.id;
+                        editorClipId = track.clips.front().id;
+                        editorLaneId.clear();
+                        clipEditorOpen = true;
+                    }
+                }
             }
             if(ImGui::MenuItem("Rename track")) {
                 pendingTrackId = track.id;
@@ -465,16 +898,25 @@ void ofxOceanodeTimelineController::draw() {
                 requestRenamePopup = true;
                 ImGui::CloseCurrentPopup();
             }
-            if(ImGui::MenuItem("New clip")) {
-                pendingTrackId = track.id;
-                pendingClipName[0] = '\0';
-                pendingClipBindingId = track.bindings.empty() ? std::string() : track.bindings.front().id;
-                pendingClipLaneType = track.bindings.empty() ? 0
-                    : track.bindings.front().laneType == ofxOceanodeTimelineLaneType::Curve ? 1
-                    : track.bindings.front().laneType == ofxOceanodeTimelineLaneType::PianoRoll ? 2 : 0;
-                pendingStartBeat = snapBeat(transportState.beatPosition);
-                pendingDurationBeats = timeline.getBeatsPerBar();
-                requestClipPopup = true;
+            if(ImGui::MenuItem(track.isWaveTrack ? "Add new wave clip" : "New clip")) {
+                if(track.isWaveTrack) {
+                    // Wave clips need a file before they are useful. Keep
+                    // this action consistent with the toolbar: choose the
+                    // file first, then create the clip and waveform cache.
+                    const auto result = ofSystemLoadDialog("Load wave file", false);
+                    if(result.bSuccess)
+                        createWaveClipFromFile(timeline, track.id, result.filePath,
+                                               pendingWaveClipBeat, timeline.getBeatsPerBar());
+                } else {
+                    pendingTrackId = track.id;
+                    pendingClipName[0] = '\0';
+                    pendingClipBindingId = track.bindings.empty() ? std::string() : track.bindings.front().id;
+                    pendingClipLaneType = track.bindings.empty() ? 0 : optionIndexForLaneType(track.bindings.front().laneType);
+                    pendingClipType = 0;
+                    pendingStartBeat = snapBeat(transportState.beatPosition);
+                    pendingDurationBeats = timeline.getBeatsPerBar();
+                    requestClipPopup = true;
+                }
                 ImGui::CloseCurrentPopup();
             }
             if(!track.bindings.empty()) {
@@ -551,11 +993,93 @@ void ofxOceanodeTimelineController::draw() {
                 const ImU32 fill = IM_COL32(track.color.r, track.color.g, track.color.b, lane == nullptr ? 75 : 185);
                 dl->AddRectFilled(ImVec2(left + 1, min.y + 3), ImVec2(right - 1, max.y - 3), fill, 3);
                 dl->AddRect(ImVec2(left + 1, min.y + 3), ImVec2(right - 1, max.y - 3), IM_COL32(track.color.r, track.color.g, track.color.b, 245), 3);
+                // A clip's persistent group and its (separate, ephemeral)
+                // Shift+click selection are drawn as extra outlines on top
+                // of the normal fill/border above, so a grouped clip that's
+                // also currently selected shows both at once.
+                if(const auto* group = timeline.getGroupForClip(track.id, clip.id)) {
+                    // Colour by a hash of the group id so every member of
+                    // the same group reads as one thing across every track
+                    // it touches, while a second group visible at the same
+                    // time gets a visibly different colour instead of
+                    // reusing one fixed colour for "grouped".
+                    const size_t hash = std::hash<std::string>{}(group->id);
+                    const ImU32 groupColor = IM_COL32(180 + (hash % 60), 150 + ((hash >> 8) % 90), 255 - ((hash >> 16) % 110), 235);
+                    dl->AddRect(ImVec2(left - 1, min.y + 1), ImVec2(right + 1, max.y - 1), groupColor, 4.0f, 0, 2.5f);
+                    dl->AddText(ImVec2(right - 13, min.y + 3), groupColor, "G");
+                }
+                if(selectedClips.count({track.id, clip.id}) > 0) {
+                    dl->AddRect(ImVec2(left + 1, min.y + 3), ImVec2(right - 1, max.y - 3), IM_COL32(255, 255, 255, 235), 3.0f, 0, 1.5f);
+                }
                 if(right - left > 45) {
                     std::string label = clip.name;
-                    if(lane != nullptr) label += " [" + std::string(laneTypeName(lane->type)) + "]";
+                    if(clip.isLfo) label += " [LFO]";
+                    else if(lane != nullptr) label += " [" + std::string(laneTypeName(lane->type)) + "]";
                     dl->AddText(ImVec2(left + 6, min.y + 6), IM_COL32(245, 250, 255, 255), label.c_str());
                 }
+            }
+            if(track.isWaveTrack) {
+                dl->PushClipRect(ImVec2(left + 1.0f, min.y + 3.0f), ImVec2(right - 1.0f, max.y - 3.0f), true);
+                if(clip.waveNumChannels > 0 && !clip.waveformPeaks.empty()) {
+                    constexpr int kMiniPointsPerChannel = 2000;
+                    const double miniContent = sourceDuration(clip);
+                    const double fileContent = std::max(miniContent + clip.waveSourceStartBeat,
+                        clip.waveFileDurationBeats > 0.0
+                            ? clip.waveFileDurationBeats
+                            : clip.waveFileDurationMs > 0.0
+                            ? clip.waveFileDurationMs * std::max(1.0f, transportState.bpm) / 60000.0
+                            : miniContent);
+                    const double sourceStart = ofClamp(clip.waveSourceStartBeat / fileContent, 0.0, 1.0);
+                    const double sourceSpan = ofClamp(miniContent / fileContent, 0.0, 1.0 - sourceStart);
+                    const int miniCycles = clip.repeatContent
+                        ? std::max(1, static_cast<int>(std::ceil(clip.durationBeats / cycleDuration(clip)))) : 1;
+                    const int channels = std::max(1, clip.waveNumChannels);
+                    const float channelHeight = (max.y - min.y - 6.0f) / channels;
+                    for(int cycle = 0; cycle < miniCycles; ++cycle) {
+                        for(int ch = 0; ch < channels; ++ch) {
+                            const float channelTop = min.y + 3.0f + ch * channelHeight;
+                            const float midY = channelTop + channelHeight * 0.5f;
+                            const float half = channelHeight * 0.45f;
+                            for(int pt = 0; pt < kMiniPointsPerChannel; pt += 4) {
+                                const double sourceBeatAtPoint = miniContent * (static_cast<double>(pt) / kMiniPointsPerChannel);
+                                const float x = min.x + beatOffset(sourceToTimelineBeat(clip, sourceBeatAtPoint, cycle));
+                                if(x < left || x > right) continue;
+                                const double normalizedPoint = static_cast<double>(pt) / kMiniPointsPerChannel;
+                                const double filePoint = clip.waveReverse
+                                    ? sourceStart + (1.0 - normalizedPoint) * sourceSpan
+                                    : sourceStart + normalizedPoint * sourceSpan;
+                                const int peakPoint = ofClamp(static_cast<int>(filePoint * (kMiniPointsPerChannel - 1)),
+                                                              0, kMiniPointsPerChannel - 1);
+                                const size_t index = static_cast<size_t>(ch) * kMiniPointsPerChannel + peakPoint;
+                                if(index >= clip.waveformPeaks.size()) continue;
+                                const float peak = ofClamp(clip.waveformPeaks[index] * clip.waveGain, -1.0f, 1.0f);
+                                dl->AddLine(ImVec2(x, midY), ImVec2(x, midY - peak * half), IM_COL32(245, 245, 245, 170), 1.0f);
+                            }
+                        }
+                    }
+                }
+                dl->PopClipRect();
+                return;
+            }
+            if(clip.isLfo) {
+                dl->PushClipRect(ImVec2(left + 1.0f, min.y + 3.0f), ImVec2(right - 1.0f, max.y - 3.0f), true);
+                const double content = sourceDuration(clip);
+                const int samples = std::max(24, static_cast<int>((right - left) / 3.0f));
+                const float graphTop = min.y + 5.0f;
+                const float graphBottom = max.y - 5.0f;
+                for(int sample = 0; sample < samples; ++sample) {
+                    const double source1 = content * sample / static_cast<double>(samples);
+                    const double source2 = content * (sample + 1) / static_cast<double>(samples);
+                    const float value1 = ofxOceanodeTimelineLfo::evaluate(clip, source1);
+                    const float value2 = ofxOceanodeTimelineLfo::evaluate(clip, source2);
+                    const float sx1 = min.x + beatOffset(sourceToTimelineBeat(clip, source1, 0));
+                    const float sx2 = min.x + beatOffset(sourceToTimelineBeat(clip, source2, 0));
+                    dl->AddLine(ImVec2(sx1, graphBottom - value1 * (graphBottom - graphTop)),
+                                ImVec2(sx2, graphBottom - value2 * (graphBottom - graphTop)),
+                                IM_COL32(245, 250, 255, 225), 1.5f);
+                }
+                dl->PopClipRect();
+                return;
             }
             if(lane == nullptr) return;
             if(lane->type == ofxOceanodeTimelineLaneType::Curve) {
@@ -612,6 +1136,82 @@ void ofxOceanodeTimelineController::draw() {
                 dl->PopClipRect();
                 return;
             }
+            if(lane->type == ofxOceanodeTimelineLaneType::MultiSlider) {
+                const double miniPatternLength = std::max(1.0 / kPPQ, lane->stepCount * lane->beatsPerStep);
+                const double miniContent = sourceDuration(clip);
+                const int miniClipCycles = clip.repeatContent
+                    ? std::max(1, static_cast<int>(std::ceil(clip.durationBeats / cycleDuration(clip)))) : 1;
+                const int miniPatternCycles = std::max(1, static_cast<int>(std::ceil(miniContent / miniPatternLength)));
+                const float span = lane->valueMax - lane->valueMin;
+                dl->PushClipRect(ImVec2(left + 1.0f, min.y + 3.0f), ImVec2(right - 1.0f, max.y - 3.0f), true);
+                for(int clipCycle = 0; clipCycle < miniClipCycles; ++clipCycle) {
+                    for(int patternCycle = 0; patternCycle < miniPatternCycles; ++patternCycle) {
+                        for(int index = 0; index < lane->stepCount && index < static_cast<int>(lane->multiSliderValues.size()); ++index) {
+                            const double sourceStart = patternCycle * miniPatternLength + index * lane->beatsPerStep;
+                            if(sourceStart >= miniContent) continue;
+                            const float x1 = min.x + beatOffset(sourceToTimelineBeat(clip, sourceStart, clipCycle));
+                            const float x2 = min.x + beatOffset(sourceToTimelineBeat(clip, sourceStart + lane->beatsPerStep, clipCycle));
+                            const float normalized = std::abs(span) < 1e-9f ? 0.0f
+                                : ofClamp((lane->multiSliderValues[index] - lane->valueMin) / span, 0.0f, 1.0f);
+                            const float barTop = max.y - 5.0f - normalized * (max.y - min.y - 10.0f);
+                            dl->AddRectFilled(ImVec2(x1 + 1, barTop), ImVec2(x2 - 1, max.y - 5.0f), IM_COL32(245, 245, 245, 190));
+                        }
+                    }
+                }
+                dl->PopClipRect();
+                return;
+            }
+            if(lane->type == ofxOceanodeTimelineLaneType::MultiValue || lane->type == ofxOceanodeTimelineLaneType::MultiGate) {
+                const bool isValueRow = lane->type == ofxOceanodeTimelineLaneType::MultiValue;
+                const int rowCount = std::max(1, lane->multiRowCount);
+                const int miniCycles = clip.repeatContent
+                    ? std::max(1, static_cast<int>(std::ceil(clip.durationBeats / cycleDuration(clip)))) : 1;
+                const float rowHeight = std::max(2.0f, (max.y - min.y - 10.0f) / rowCount);
+                dl->PushClipRect(ImVec2(left + 1.0f, min.y + 3.0f), ImVec2(right - 1.0f, max.y - 3.0f), true);
+                for(int r = 0; r < rowCount; ++r) {
+                    const float rTop = min.y + 5.0f + r * rowHeight;
+                    const float rBottom = rTop + rowHeight - 1.0f;
+                    for(int cycle = 0; cycle < miniCycles; ++cycle) {
+                        if(isValueRow && r < static_cast<int>(lane->multiValueRows.size())) {
+                            for(const auto& region : lane->multiValueRows[r]) {
+                                const float x1 = min.x + beatOffset(sourceToTimelineBeat(clip, region.startBeat, cycle));
+                                const float x2 = min.x + beatOffset(sourceToTimelineBeat(clip, region.end(), cycle));
+                                dl->AddRectFilled(ImVec2(x1, rTop), ImVec2(x2, rBottom), IM_COL32(245, 245, 245, 170));
+                            }
+                        } else if(!isValueRow && r < static_cast<int>(lane->multiGateRows.size())) {
+                            for(const auto& region : lane->multiGateRows[r]) {
+                                const float x1 = min.x + beatOffset(sourceToTimelineBeat(clip, region.startBeat, cycle));
+                                const float x2 = min.x + beatOffset(sourceToTimelineBeat(clip, region.end(), cycle));
+                                dl->AddRectFilled(ImVec2(x1, rTop), ImVec2(x2, rBottom), IM_COL32(245, 245, 245, 170));
+                            }
+                        }
+                    }
+                }
+                dl->PopClipRect();
+                return;
+            }
+            if(lane->type == ofxOceanodeTimelineLaneType::Wave) {
+                dl->PushClipRect(ImVec2(left + 1.0f, min.y + 3.0f), ImVec2(right - 1.0f, max.y - 3.0f), true);
+                if(lane->waveNumChannels > 0 && !lane->waveformPeaks.empty()) {
+                    constexpr int kMiniPointsPerChannel = 2000;
+                    const double miniContent = sourceDuration(clip);
+                    const int miniCycles = clip.repeatContent
+                        ? std::max(1, static_cast<int>(std::ceil(clip.durationBeats / cycleDuration(clip)))) : 1;
+                    const float midY = (min.y + max.y) * 0.5f;
+                    const float half = (max.y - min.y) * 0.5f - 4.0f;
+                    for(int cycle = 0; cycle < miniCycles; ++cycle) {
+                        for(int pt = 0; pt < kMiniPointsPerChannel; pt += 4) {
+                            const double sourceBeatAtPoint = miniContent * (static_cast<double>(pt) / kMiniPointsPerChannel);
+                            const float x = min.x + beatOffset(sourceToTimelineBeat(clip, sourceBeatAtPoint, cycle));
+                            if(x < left || x > right) continue;
+                            const float peak = ofClamp(lane->waveformPeaks[pt], -1.0f, 1.0f);
+                            dl->AddLine(ImVec2(x, midY), ImVec2(x, midY - peak * half), IM_COL32(245, 245, 245, 170), 1.0f);
+                        }
+                    }
+                }
+                dl->PopClipRect();
+                return;
+            }
             const double patternLength = std::max(1.0 / kPPQ, lane->stepCount * lane->beatsPerStep);
             const double content = sourceDuration(clip);
             const int clipCycles = clip.repeatContent
@@ -657,37 +1257,72 @@ void ofxOceanodeTimelineController::draw() {
             const float x2 = min.x + beatOffset(clip.startBeat + clip.durationBeats);
             if(!ImGui::IsMouseHoveringRect(min, max) || mouse.x < x1 || mouse.x > x2) return;
             const std::string menuId = "##clipMenu" + track.id + "_" + clip.id;
+            const std::pair<std::string, std::string> memberKey(track.id, clip.id);
             if(ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                 if(clipInteractionClaimedThisFrame) return;
                 clipInteractionClaimedThisFrame = true;
+                anyClipInteractionClaimedThisFrame = true;
                 pendingTrackId = track.id;
                 pendingClipId = clip.id;
                 pendingLaneId = lane != nullptr ? lane->id : (clip.lanes.empty() ? "" : clip.lanes.front().id);
+                // Right-clicking a clip that's part of the current multi-
+                // selection keeps that whole selection (so the popup's
+                // "Group" action groups all of it); right-clicking outside
+                // it collapses the selection down to just this clip first,
+                // the same convention the left-click branch below uses.
+                if(selectedClips.count(memberKey) == 0 || selectedClips.size() <= 1) {
+                    selectedClips.clear();
+                    selectedClips.insert(memberKey);
+                }
                 ImGui::OpenPopup(menuId.c_str());
             }
             if(ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                 if(clipInteractionClaimedThisFrame || clipDragMode != ClipDragMode::None) return;
+                // Shift is already the edge-drag modifier for Resize below,
+                // so Shift+click only takes over the *non-edge* case: a
+                // pure multi-selection toggle, not the start of any drag.
+                const bool edge = std::abs(mouse.x - x2) <= kEdgePixels;
+                if(ImGui::GetIO().KeyShift && !edge) {
+                    clipInteractionClaimedThisFrame = true;
+                    anyClipInteractionClaimedThisFrame = true;
+                    if(selectedClips.count(memberKey) > 0) selectedClips.erase(memberKey);
+                    else selectedClips.insert(memberKey);
+                    return;
+                }
                 clipInteractionClaimedThisFrame = true;
+                anyClipInteractionClaimedThisFrame = true;
                 pendingTrackId = track.id;
                 pendingClipId = clip.id;
                 pendingLaneId = lane != nullptr ? lane->id : (clip.lanes.empty() ? "" : clip.lanes.front().id);
                 const double clickedBeat = beatAtOffset(mouse.x - min.x);
-                if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && lane != nullptr) {
+                if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
                     editorTrackId = track.id;
                     editorClipId = clip.id;
-                    editorLaneId = lane->id;
+                    editorLaneId = lane != nullptr ? lane->id : std::string();
                     clipEditorOpen = true;
-                    if(trackCollapsed) {
-                        // Layout stays collapsed for the rest of this frame,
-                        // but the model expands now so the editor is docked
+                    if(singleRowTrack) {
+                        // Layout stays single-row for the rest of this frame,
+                        // but the model expands now (irrelevant for a Wave
+                        // Track, which stays single-row regardless -- see
+                        // singleRowTrack above) so the editor is docked
                         // directly below the track on the next frame.
-                        if(auto* editTrack = timeline.getTrack(track.id)) editTrack->collapsed = false;
+                        if(!track.isWaveTrack) {
+                            if(auto* editTrack = timeline.getTrack(track.id)) editTrack->collapsed = false;
+                        }
                         expandTrackForEditor = true;
                     }
                     pendingStartBeat = snapBeat(std::max(0.0, clickedBeat - clip.startBeat));
                     pendingDurationBeats = 1.0;
                 } else {
-                    const bool edge = std::abs(mouse.x - x2) <= kEdgePixels;
+                    // A plain click on a clip outside the current multi-
+                    // selection starts a fresh, single-clip selection;
+                    // clicking a clip that's already part of a bigger
+                    // selection keeps the whole thing so it can be dragged
+                    // together below instead of collapsing mid-drag.
+                    if(selectedClips.count(memberKey) == 0 || selectedClips.size() <= 1) {
+                        selectedClips.clear();
+                        selectedClips.insert(memberKey);
+                    }
                     // On macOS Cmd is the stretch modifier. Ctrl is reserved
                     // by the canvas/ImGui interaction layer and can turn a
                     // drag into a context-menu gesture.
@@ -696,9 +1331,12 @@ void ofxOceanodeTimelineController::draw() {
                     // here was why Cmd+drag never selected Stretch.
                     const bool commandDown = ImGui::GetIO().KeyCtrl ||
                         (ImGui::GetIO().KeyMods & ImGuiMod_Ctrl) != 0;
-                    clipDragMode = edge ? (ImGui::GetIO().KeyShift ? ClipDragMode::Resize
-                                                                  : commandDown ? ClipDragMode::Stretch
-                                                                                : ClipDragMode::Repeat)
+                    // Wave clips are complete audio slices: every edge drag
+                    // (plain, Cmd or Shift) stretches the whole source.
+                    clipDragMode = edge ? (track.isWaveTrack ? ClipDragMode::Stretch
+                                           : ImGui::GetIO().KeyShift ? ClipDragMode::Resize
+                                           : commandDown ? ClipDragMode::Stretch
+                                                         : ClipDragMode::Repeat)
                                         : ClipDragMode::Move;
                     draggingTrackId = track.id;
                     draggingClipId = clip.id;
@@ -706,6 +1344,31 @@ void ofxOceanodeTimelineController::draw() {
                     dragInitialContentDuration = clip.contentDurationBeats;
                     dragInitialContentStretch = clip.contentStretch;
                     dragTimelineOriginX = min.x;
+
+                    // A clip that's grouped, or that's part of a multi-
+                    // selection bigger than itself, drags/stretches as one
+                    // unit: snapshot every member's current timing now so
+                    // the whole set is scaled from this one shared
+                    // reference each frame (see groupDragSnapshot's
+                    // declaration in the header for why).
+                    groupDragSnapshot.clear();
+                    std::vector<std::pair<std::string, std::string>> dragMembers;
+                    if(const auto* group = timeline.getGroupForClip(track.id, clip.id)) {
+                        dragMembers = group->members;
+                    } else if(selectedClips.count(memberKey) > 0 && selectedClips.size() > 1) {
+                        dragMembers.assign(selectedClips.begin(), selectedClips.end());
+                    }
+                    if(dragMembers.size() > 1) {
+                        double anchorBeat = clip.startBeat;
+                        for(const auto& member : dragMembers) {
+                            if(const auto* memberClip = timeline.getClip(member.first, member.second)) {
+                                groupDragSnapshot.push_back({member.first, member.second, memberClip->startBeat,
+                                    memberClip->durationBeats, memberClip->contentDurationBeats, memberClip->contentStretch});
+                                anchorBeat = std::min(anchorBeat, memberClip->startBeat);
+                            }
+                        }
+                        groupDragAnchorBeat = anchorBeat;
+                    }
                 }
             }
         };
@@ -733,13 +1396,18 @@ void ofxOceanodeTimelineController::draw() {
                             std::max(1.0 / kPPQ, editClip->contentDurationBeats);
                     }
                 }
-                if(ImGui::InputDouble("Content", &contentDuration, editIncrement(), 1.0, "%.3f"))
+                if(!track.isWaveTrack &&
+                   ImGui::InputDouble("Content", &contentDuration, editIncrement(), 1.0, "%.3f"))
                     timeline.setClipContentDuration(track.id, clip.id,
                                                     std::max(1.0 / kPPQ, snapBeat(contentDuration)),
                                                     editClip->repeatContent);
-                bool repeat = editClip->repeatContent;
-                if(ImGui::Checkbox("Repeat content", &repeat))
-                    timeline.setClipContentDuration(track.id, clip.id, editClip->contentDurationBeats, repeat);
+                if(track.isWaveTrack) {
+                    ImGui::TextDisabled("Wave clips always play their full source when resized.");
+                } else {
+                    bool repeat = editClip->repeatContent;
+                    if(ImGui::Checkbox("Repeat content", &repeat))
+                        timeline.setClipContentDuration(track.id, clip.id, editClip->contentDurationBeats, repeat);
+                }
                 ImGui::Separator();
                 if(ImGui::MenuItem("Consolidate content"))
                     timeline.consolidateClipContent(track.id, clip.id);
@@ -748,11 +1416,34 @@ void ofxOceanodeTimelineController::draw() {
                 ImGui::Separator();
             }
             auto* selectedLane = timeline.getLane(track.id, clip.id, pendingLaneId);
-            const auto selectedType = selectedLane == nullptr ? ofxOceanodeTimelineLaneType::Step : selectedLane->type;
-            if(ImGui::MenuItem("Step Sequencer", nullptr, selectedType == ofxOceanodeTimelineLaneType::Step) && selectedLane != nullptr) timeline.setClipLaneType(track.id, clip.id, selectedLane->id, ofxOceanodeTimelineLaneType::Step);
-            if(ImGui::MenuItem("Piano Roll", nullptr, selectedType == ofxOceanodeTimelineLaneType::PianoRoll) && selectedLane != nullptr) timeline.setClipLaneType(track.id, clip.id, selectedLane->id, ofxOceanodeTimelineLaneType::PianoRoll);
-            if(ImGui::MenuItem("Curve", nullptr, selectedType == ofxOceanodeTimelineLaneType::Curve) && selectedLane != nullptr) timeline.setClipLaneType(track.id, clip.id, selectedLane->id, ofxOceanodeTimelineLaneType::Curve);
-            if(selectedLane != nullptr && ImGui::BeginMenu("Add parameter to this lane")) {
+            if(track.isWaveTrack) {
+                if(ImGui::MenuItem("Split")) {
+                    requestWaveSplit = true;
+                    waveSplitTrackId = track.id;
+                    waveSplitClipId = clip.id;
+                    ImGui::CloseCurrentPopup();
+                }
+                auto* menuEditClip = timeline.getClip(track.id, clip.id);
+                bool reverse = menuEditClip != nullptr && menuEditClip->waveReverse;
+                if(ImGui::MenuItem("Reverse", nullptr, reverse) && menuEditClip != nullptr)
+                    menuEditClip->waveReverse = !reverse;
+                ImGui::Separator();
+                if(ImGui::MenuItem("Edit track volume automation")) {
+                    timeline.createWaveVolumeLane(track.id, clip.id);
+                    editorTrackId = track.id;
+                    editorClipId = clip.id;
+                    editorLaneId.clear();
+                    clipEditorOpen = true;
+                }
+            } else {
+                const auto selectedType = selectedLane == nullptr ? ofxOceanodeTimelineLaneType::Step : selectedLane->type;
+                for(int optionIndex = 0; optionIndex < kLaneTypeOptionCount; ++optionIndex) {
+                    const auto candidateType = laneTypeFromOptionIndex(optionIndex);
+                    if(ImGui::MenuItem(kLaneTypeOptions[optionIndex], nullptr, selectedType == candidateType) && selectedLane != nullptr)
+                        timeline.setClipLaneType(track.id, clip.id, selectedLane->id, candidateType);
+                }
+            }
+            if(selectedLane != nullptr && !track.bindings.empty() && ImGui::BeginMenu("Add parameter to this lane")) {
                 for(const auto& candidate : track.bindings) {
                     const bool assigned = std::find(selectedLane->bindingIds.begin(), selectedLane->bindingIds.end(), candidate.id) != selectedLane->bindingIds.end();
                     if(ImGui::MenuItem(candidate.parameterPath.c_str(), nullptr, assigned, true)) {
@@ -762,7 +1453,7 @@ void ofxOceanodeTimelineController::draw() {
                 }
                 ImGui::EndMenu();
             }
-            if(ImGui::BeginMenu("New lane")) {
+            if(!track.bindings.empty() && ImGui::BeginMenu("New lane")) {
                 for(const auto& candidate : track.bindings) {
                     const std::string label = compactParameterName(candidate.parameterPath);
                     if(ImGui::MenuItem(label.c_str())) {
@@ -777,6 +1468,25 @@ void ofxOceanodeTimelineController::draw() {
                 ImGui::EndMenu();
             }
             ImGui::Separator();
+            // handleClip already made sure this clip's own key is part of
+            // selectedClips by the time either popup that opens this menu
+            // (this one, or the binding-row menu) is shown, so "Group"
+            // always groups the clip(s) actually selected right now.
+            if(selectedClips.size() >= 2 && selectedClips.count({track.id, clip.id}) > 0) {
+                const std::string groupLabel = "Group " + ofToString(selectedClips.size()) + " clips";
+                if(ImGui::MenuItem(groupLabel.c_str())) {
+                    timeline.groupClips(std::vector<std::pair<std::string, std::string>>(
+                        selectedClips.begin(), selectedClips.end()));
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+            if(timeline.getGroupForClip(track.id, clip.id) != nullptr) {
+                if(ImGui::MenuItem("Ungroup")) {
+                    timeline.ungroupClip(track.id, clip.id);
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+            ImGui::Separator();
             if(ImGui::MenuItem("Delete clip")) {
                 clipDeletionTrackId = track.id;
                 clipDeletionClipId = clip.id;
@@ -786,7 +1496,7 @@ void ofxOceanodeTimelineController::draw() {
             ImGui::EndPopup();
         };
 
-        if(trackCollapsed) {
+        if(singleRowTrack) {
             const ImVec2 min = headerMin, max = headerMax, laneMin(min.x + kLabelWidth - timelineScrollX, min.y);
             dl->PushClipRect(ImVec2(zoneLeft, min.y), ImVec2(max.x, max.y), true);
             drawGrid(laneMin, max);
@@ -805,17 +1515,70 @@ void ofxOceanodeTimelineController::draw() {
                 const auto* frontLane = clipIt->lanes.empty() ? nullptr : &clipIt->lanes.front();
                 handleClip(*clipIt, frontLane, laneMin, max);
             }
+            if(ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+               !clipInteractionClaimedThisFrame &&
+               ImGui::IsMouseHoveringRect(min, max) &&
+               ImGui::GetIO().MousePos.x >= zoneLeft &&
+               !(track.isWaveTrack && ImGui::GetIO().MousePos.y >= max.y - kWaveTrackResizeHandleHeight)) {
+                emptyTrackAreaClickedThisFrame = true;
+            }
+            // Wave tracks have no binding-row item to own the empty timeline
+            // area. Let a right-click anywhere in that row open the track
+            // menu, with the file clip placed at the clicked beat. A clip
+            // that was actually hit has already claimed the gesture above
+            // and keeps its own clip menu.
+            if(track.isWaveTrack && !clipInteractionClaimedThisFrame &&
+               ImGui::IsMouseHoveringRect(min, max) &&
+               ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+               ImGui::GetIO().MousePos.x >= zoneLeft) {
+                pendingTrackId = track.id;
+                pendingWaveClipBeat = snapBeat(std::max(0.0,
+                    beatAtOffset(ImGui::GetIO().MousePos.x - laneMin.x)));
+                ImGui::OpenPopup(("##trackMenu" + track.id).c_str());
+            }
             for(const auto& clip : track.clips) {
                 drawClipMenu(clip);
             }
             const float px = laneMin.x + beatOffset(transportState.beatPosition);
             if(px >= zoneLeft && px <= max.x) dl->AddLine(ImVec2(px, min.y), ImVec2(px, max.y), kPlayhead, 2);
             dl->PopClipRect();
-            ImGui::SetCursorPosY(headerY + kCollapsedHeight);
-            // A collapsed track hides its rows entirely, so any clip editor
-            // still open for it would float disconnected from what it's
-            // editing -- close it rather than keep drawing it.
-            if(clipEditorOpen && editorTrackId == track.id && !expandTrackForEditor) {
+            if(track.isWaveTrack) {
+                const ImVec2 resizeMin(headerMin.x, headerMax.y - kWaveTrackResizeHandleHeight);
+                const ImVec2 resizeMax(headerMax.x, headerMax.y);
+                const bool resizeHovered = ImGui::IsMouseHoveringRect(resizeMin, resizeMax);
+                if(resizeHovered || waveTrackResizeId == track.id) {
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+                    dl->AddLine(ImVec2(headerMin.x, headerMax.y - 1.0f),
+                                ImVec2(headerMax.x, headerMax.y - 1.0f),
+                                resizeHovered || waveTrackResizeId == track.id
+                                    ? IM_COL32(220, 220, 245, 220)
+                                    : IM_COL32(150, 150, 170, 150), 2.0f);
+                }
+                if(resizeHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                    waveTrackResizeId = track.id;
+                    waveTrackResizeStartMouseY = ImGui::GetIO().MousePos.y;
+                    waveTrackResizeStartHeight = trackHeaderHeight;
+                }
+                if(waveTrackResizeId == track.id) {
+                    if(ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                        if(auto* editTrack = timeline.getTrack(track.id)) {
+                            editTrack->waveTrackHeight = ofClamp(
+                                waveTrackResizeStartHeight +
+                                    (ImGui::GetIO().MousePos.y - waveTrackResizeStartMouseY),
+                                kWaveTrackMinHeight, kWaveTrackMaxHeight);
+                        }
+                    }
+                    if(ImGui::IsMouseReleased(ImGuiMouseButton_Left)) waveTrackResizeId.clear();
+                }
+            }
+            ImGui::SetCursorPosY(headerY + trackHeaderHeight);
+            if(track.isWaveTrack) {
+                if(clipEditorOpen && editorTrackId == track.id)
+                    drawWaveTrackEditor(timeline, track, contentWidth, endBeat, transportState.beatPosition);
+            } else if(clipEditorOpen && editorTrackId == track.id && !expandTrackForEditor) {
+                // A collapsed track hides its rows entirely, so any clip editor
+                // still open for it would float disconnected from what it's
+                // editing -- close it rather than keep drawing it.
                 clipEditorOpen = false;
                 editorTrackId.clear();
                 editorClipId.clear();
@@ -842,12 +1605,46 @@ void ofxOceanodeTimelineController::draw() {
                 dl->AddRectFilled(min, ImVec2(min.x + kLabelWidth, max.y),
                                   mutedTrackColor(track.color, automated ? 0.34f : 0.23f, 0.48f));
                 dl->AddRect(min, ImVec2(min.x + kLabelWidth, max.y), IM_COL32(track.color.r, track.color.g, track.color.b, 210));
-                dl->PushClipRect(ImVec2(min.x + 5.0f, min.y), ImVec2(min.x + kLabelWidth - 7.0f, max.y), true);
-                std::string bindingLabel = binding.parameterPath;
-                if(binding.mode != ofxOceanodeTimelineAutomationMode::Replace)
-                    bindingLabel += "  [" + ofxOceanodeTimelineManager::modeToString(binding.mode) + "]";
-                dl->AddText(ImVec2(min.x + 7, min.y + 6), automated ? IM_COL32(245, 250, 255, 255) : IM_COL32(180, 180, 180, 255), bindingLabel.c_str());
+                // Blend mode used to be findable only by right-clicking this
+                // row (or the track header) and opening a nested "Blend
+                // mode" submenu -- easy to lose track of, which is also why
+                // the in-label "[Mode]" text this chip replaces wasn't a
+                // real fix: it lived inside the PushClipRect below and
+                // simply didn't render once parameterPath filled the label
+                // column. This chip sits in its own fixed, never-clipped
+                // spot at the row's right edge, always shows the current
+                // mode, and opens the same options in a single click.
+                const float blendChipWidth = 80.0f;
+                const ImVec2 blendChipMin(min.x + kLabelWidth - blendChipWidth - 6.0f, min.y + 4.0f);
+                const ImVec2 blendChipMax(min.x + kLabelWidth - 6.0f, max.y - 4.0f);
+                const bool blendChipActive = binding.mode != ofxOceanodeTimelineAutomationMode::Replace;
+                dl->AddRectFilled(blendChipMin, blendChipMax,
+                                  blendChipActive ? IM_COL32(235, 165, 65, 220) : IM_COL32(90, 90, 95, 150), 3.0f);
+                dl->PushClipRect(ImVec2(min.x + 5.0f, min.y), ImVec2(blendChipMin.x - 4.0f, max.y), true);
+                dl->AddText(ImVec2(min.x + 7, min.y + 6), automated ? IM_COL32(245, 250, 255, 255) : IM_COL32(180, 180, 180, 255), binding.parameterPath.c_str());
                 dl->PopClipRect();
+                {
+                    const std::string blendChipLabel = ofxOceanodeTimelineManager::modeToString(binding.mode) + " v";
+                    dl->PushClipRect(blendChipMin, blendChipMax, true);
+                    dl->AddText(ImVec2(blendChipMin.x + 4.0f, blendChipMin.y + 3.0f),
+                               blendChipActive ? IM_COL32(30, 20, 5, 255) : IM_COL32(225, 225, 230, 235), blendChipLabel.c_str());
+                    dl->PopClipRect();
+                }
+                if(ImGui::IsMouseHoveringRect(blendChipMin, blendChipMax))
+                    ImGui::SetTooltip("Blend mode -- how this parameter combines with other clips/tracks driving it");
+                const std::string blendChipPopupId = "##blendModeChip" + track.id + binding.id;
+                if(ImGui::IsMouseHoveringRect(blendChipMin, blendChipMax) && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                    anyClipInteractionClaimedThisFrame = true; // not a clip click, but not empty timeline space either
+                    ImGui::OpenPopup(blendChipPopupId.c_str());
+                }
+                if(ImGui::BeginPopup(blendChipPopupId.c_str())) {
+                    // Flattened to just this one binding -- the track-header
+                    // entry point still nests a per-binding submenu because
+                    // it has to ask *which* binding first; this chip already
+                    // belongs to exactly one.
+                    drawBlendModeOptions(timeline, track.id, binding);
+                    ImGui::EndPopup();
+                }
 
                 const std::string bindingMenuId = "##bindingMenu" + track.id + binding.id;
                 if(ImGui::IsMouseHoveringRect(min, max) && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
@@ -874,9 +1671,9 @@ void ofxOceanodeTimelineController::draw() {
                     if(ImGui::MenuItem("New clip here")) {
                         pendingTrackId = track.id;
                         pendingClipBindingId = binding.id;
-                        pendingClipLaneType = binding.laneType == ofxOceanodeTimelineLaneType::Curve ? 1
-                            : binding.laneType == ofxOceanodeTimelineLaneType::PianoRoll ? 2 : 0;
+                        pendingClipLaneType = optionIndexForLaneType(binding.laneType);
                         pendingClipName[0] = '\0';
+                        pendingClipType = 0;
                         pendingDurationBeats = timeline.getBeatsPerBar();
                         requestClipPopup = true;
                         ImGui::CloseCurrentPopup();
@@ -913,6 +1710,12 @@ void ofxOceanodeTimelineController::draw() {
                     const auto* lane = laneForBinding(*clipIt, binding.id);
                     if(lane != nullptr) handleClip(*clipIt, lane, laneMin, max);
                 }
+                if(ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+                   !clipInteractionClaimedThisFrame &&
+                   ImGui::IsMouseHoveringRect(min, max) &&
+                   ImGui::GetIO().MousePos.x >= zoneLeft) {
+                    emptyTrackAreaClickedThisFrame = true;
+                }
                 const float px = laneMin.x + beatOffset(transportState.beatPosition);
                 if(px >= zoneLeft && px <= max.x) dl->AddLine(ImVec2(px, min.y), ImVec2(px, max.y), kPlayhead, 2);
                 dl->PopClipRect();
@@ -947,6 +1750,24 @@ void ofxOceanodeTimelineController::draw() {
         }
     }
 
+    if(emptyTrackAreaClickedThisFrame && container->getTransport() != nullptr) {
+        const float timelineMouseX = ImGui::GetIO().MousePos.x - zoneLeft + timelineScrollX;
+        const double rawBeat = ofClamp(
+            pixelsToBeat(timeline, timelineMouseX, transportState.bpm, endBeat), 0.0, endBeat);
+        container->getTransport()->seekToBeat(snapBeat(rawBeat));
+    }
+
+    // A plain click that landed on no clip at all (every clip's handleClip
+    // leaves anyClipInteractionClaimedThisFrame false) drops the current
+    // multi-selection, the same way clicking empty space deselects in any
+    // selection-based editor. Gated to this child window so it doesn't fire
+    // for the Group/Ungroup toolbar buttons above it (those are outside
+    // "##TimelineViewport" and handle the click themselves).
+    if(ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !anyClipInteractionClaimedThisFrame &&
+       !ImGui::GetIO().KeyShift && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows)) {
+        selectedClips.clear();
+    }
+
     if(requestTrackDeletion) {
         // Clear controller-only state before the manager destroys all of the
         // track's bindings, clips and lanes.
@@ -971,6 +1792,7 @@ void ofxOceanodeTimelineController::draw() {
             clipDragMode = ClipDragMode::None;
             draggingTrackId.clear();
             draggingClipId.clear();
+            groupDragSnapshot.clear();
         }
         if(pianoKeyboardPreviewTrackId == trackDeletionId) {
             pianoKeyboardPreviewActive = false;
@@ -978,6 +1800,12 @@ void ofxOceanodeTimelineController::draw() {
             pianoKeyboardPreviewGateBindingId.clear();
             pianoKeyboardPreviewPitchBindingId.clear();
             pianoKeyboardPreviewPitch = -1;
+        }
+        // Persistent group membership for this track's clips is cleaned up
+        // inside timeline.removeTrack() itself; only the ephemeral
+        // selection is this controller's own responsibility.
+        for(auto it = selectedClips.begin(); it != selectedClips.end();) {
+            if(it->first == trackDeletionId) it = selectedClips.erase(it); else ++it;
         }
         timeline.removeTrack(trackDeletionId);
         requestTrackDeletion = false;
@@ -1000,10 +1828,56 @@ void ofxOceanodeTimelineController::draw() {
             pianoDragSnapshot.clear();
             pianoValueDragSnapshot.clear();
         }
+        if(draggingTrackId == clipDeletionTrackId && draggingClipId == clipDeletionClipId) {
+            clipDragMode = ClipDragMode::None;
+            draggingTrackId.clear();
+            draggingClipId.clear();
+            groupDragSnapshot.clear();
+        }
+        selectedClips.erase({clipDeletionTrackId, clipDeletionClipId});
+        // removeClip() itself drops this clip from any group and dissolves
+        // that group if it falls below two members -- nothing further to
+        // clean up on the model side here.
         timeline.removeClip(clipDeletionTrackId, clipDeletionClipId);
         requestClipDeletion = false;
         clipDeletionTrackId.clear();
         clipDeletionClipId.clear();
+    }
+
+    if(!keyboardClipDeletionRequests.empty()) {
+        for(const auto& deletion : keyboardClipDeletionRequests) {
+            const auto& trackId = deletion.first;
+            const auto& clipId = deletion.second;
+            const auto* deletedClip = timeline.getClip(trackId, clipId);
+            if(deletedClip == nullptr) continue;
+            for(const auto& lane : deletedClip->lanes) {
+                collapsedLaneIds.erase(lane.id);
+                laneEditorHeights.erase(lane.id);
+            }
+            if(clipEditorOpen && editorTrackId == trackId && editorClipId == clipId) {
+                clipEditorOpen = false;
+                editorTrackId.clear();
+                editorClipId.clear();
+                editorLaneId.clear();
+            }
+            if(draggingTrackId == trackId && draggingClipId == clipId) {
+                clipDragMode = ClipDragMode::None;
+                draggingTrackId.clear();
+                draggingClipId.clear();
+                groupDragSnapshot.clear();
+            }
+            timeline.removeClip(trackId, clipId);
+        }
+        keyboardClipDeletionRequests.clear();
+    }
+
+    if(requestWaveSplit) {
+        const std::string splitTrackId = waveSplitTrackId;
+        const std::string splitClipId = waveSplitClipId;
+        requestWaveSplit = false;
+        waveSplitTrackId.clear();
+        waveSplitClipId.clear();
+        splitWaveClipAtPlayhead(timeline, splitTrackId, splitClipId, transportState.beatPosition);
     }
 
     if(requestRemoveBinding) {
@@ -1015,11 +1889,9 @@ void ofxOceanodeTimelineController::draw() {
 
     if(requestAddLane) {
         requestAddLane = false;
-        const auto laneType = pendingAddLaneType == 1 ? ofxOceanodeTimelineLaneType::Curve
-            : pendingAddLaneType == 2 ? ofxOceanodeTimelineLaneType::PianoRoll
-            : ofxOceanodeTimelineLaneType::Step;
-        const char* laneName = pendingAddLaneType == 1 ? "Curve"
-            : pendingAddLaneType == 2 ? "Piano Roll" : "Step Sequencer";
+        const int optionIndex = ofClamp(pendingAddLaneType, 0, kLaneTypeOptionCount - 1);
+        const auto laneType = laneTypeFromOptionIndex(optionIndex);
+        const char* laneName = kLaneTypeOptions[optionIndex];
         const auto newLaneId = timeline.createLane(editorTrackId, editorClipId, laneName, laneType);
         if(!newLaneId.empty()) editorLaneId = newLaneId;
     }
@@ -1053,24 +1925,87 @@ void ofxOceanodeTimelineController::draw() {
         if(ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
             if(auto* clip = timeline.getClip(draggingTrackId, draggingClipId)) {
                 const double mouseBeat = beatAtOffset(ImGui::GetIO().MousePos.x - dragTimelineOriginX);
+                // groupDragSnapshot holds the anchor clip itself too when a
+                // drag started on a grouped/multi-selected clip -- look up
+                // its own snapshot entry so the group-wide math below is
+                // relative to where *everything* was when the drag began,
+                // not just where the anchor is right now.
+                const auto anchorSnapshot = groupDragSnapshot.empty() ? groupDragSnapshot.end()
+                    : std::find_if(groupDragSnapshot.begin(), groupDragSnapshot.end(), [&](const auto& entry) {
+                        return entry.trackId == draggingTrackId && entry.clipId == draggingClipId;
+                    });
                 if(clipDragMode == ClipDragMode::Move) {
-                    timeline.setClipTiming(draggingTrackId, draggingClipId,
-                                           snapBeat(mouseBeat - dragOffsetBeats), clip->durationBeats);
+                    const double newStart = snapBeat(mouseBeat - dragOffsetBeats);
+                    if(!groupDragSnapshot.empty() && anchorSnapshot != groupDragSnapshot.end()) {
+                        const double deltaBeats = newStart - anchorSnapshot->startBeat;
+                        // Each member is clamped to beat 0 independently, same
+                        // as a single clip -- if the group is dragged far
+                        // enough left that one member would go negative while
+                        // others wouldn't, that member's offset from the rest
+                        // compresses rather than the whole group refusing to
+                        // move. Acceptable edge case; a real "keep the whole
+                        // group's relative spacing intact" clamp would need to
+                        // clamp the shared delta instead, once, before this
+                        // loop.
+                        for(const auto& entry : groupDragSnapshot) {
+                            timeline.setClipTiming(entry.trackId, entry.clipId,
+                                                   std::max(0.0, entry.startBeat + deltaBeats), entry.durationBeats);
+                        }
+                    } else {
+                        timeline.setClipTiming(draggingTrackId, draggingClipId, newStart, clip->durationBeats);
+                    }
                 }
                 else {
                     const double duration = std::max(1.0 / kPPQ, snapBeat(mouseBeat - clip->startBeat));
-                    timeline.setClipTiming(draggingTrackId, draggingClipId, clip->startBeat, duration);
-                    if(clipDragMode == ClipDragMode::Repeat) timeline.setClipContentDuration(draggingTrackId, draggingClipId, dragInitialContentDuration, true);
-                    else if(clipDragMode == ClipDragMode::Stretch) {
-                        timeline.setClipContentDuration(draggingTrackId, draggingClipId, dragInitialContentDuration, false);
-                        clip->contentStretch = duration / std::max(1.0 / kPPQ, dragInitialContentDuration);
-                    }
-                    else {
-                        // Shift-resize adds/crops source space without
-                        // changing an existing stretch ratio.
-                        clip->contentStretch = std::max(1.0 / 1024.0, dragInitialContentStretch);
-                        timeline.setClipContentDuration(draggingTrackId, draggingClipId,
-                            duration / clip->contentStretch, false);
+                    if(!groupDragSnapshot.empty() && anchorSnapshot != groupDragSnapshot.end()) {
+                        // Express the drag as a scale factor on the anchor
+                        // clip's own original span, then apply that same
+                        // factor to every member's original span (from the
+                        // snapshot) around the group's shared left edge --
+                        // the group-wide equivalent of what the single-clip
+                        // branch below does for just one clip.
+                        const double scale = duration / std::max(1.0 / kPPQ, anchorSnapshot->durationBeats);
+                        for(const auto& entry : groupDragSnapshot) {
+                            const double newMemberStart = groupDragAnchorBeat + (entry.startBeat - groupDragAnchorBeat) * scale;
+                            const double newMemberDuration = std::max(1.0 / kPPQ, entry.durationBeats * scale);
+                            timeline.setClipTiming(entry.trackId, entry.clipId, std::max(0.0, newMemberStart), newMemberDuration);
+                            const auto* memberTrack = timeline.getTrack(entry.trackId);
+                            if(memberTrack != nullptr && memberTrack->isWaveTrack) {
+                                // setClipTiming already mapped the full source
+                                // over the new duration.
+                                continue;
+                            }
+                            if(clipDragMode == ClipDragMode::Repeat) {
+                                timeline.setClipContentDuration(entry.trackId, entry.clipId, entry.contentDurationBeats, true);
+                            } else if(clipDragMode == ClipDragMode::Stretch) {
+                                timeline.setClipContentDuration(entry.trackId, entry.clipId, entry.contentDurationBeats, false);
+                                if(auto* memberClip = timeline.getClip(entry.trackId, entry.clipId))
+                                    memberClip->contentStretch = newMemberDuration / std::max(1.0 / kPPQ, entry.contentDurationBeats);
+                            } else {
+                                // Shift-resize adds/crops source space
+                                // without changing an existing stretch
+                                // ratio -- same rule as the single-clip case.
+                                if(auto* memberClip = timeline.getClip(entry.trackId, entry.clipId)) {
+                                    memberClip->contentStretch = std::max(1.0 / 1024.0, entry.contentStretch);
+                                    timeline.setClipContentDuration(entry.trackId, entry.clipId,
+                                        newMemberDuration / memberClip->contentStretch, false);
+                                }
+                            }
+                        }
+                    } else {
+                        timeline.setClipTiming(draggingTrackId, draggingClipId, clip->startBeat, duration);
+                        if(clipDragMode == ClipDragMode::Repeat) timeline.setClipContentDuration(draggingTrackId, draggingClipId, dragInitialContentDuration, true);
+                        else if(clipDragMode == ClipDragMode::Stretch) {
+                            timeline.setClipContentDuration(draggingTrackId, draggingClipId, dragInitialContentDuration, false);
+                            clip->contentStretch = duration / std::max(1.0 / kPPQ, dragInitialContentDuration);
+                        }
+                        else {
+                            // Shift-resize adds/crops source space without
+                            // changing an existing stretch ratio.
+                            clip->contentStretch = std::max(1.0 / 1024.0, dragInitialContentStretch);
+                            timeline.setClipContentDuration(draggingTrackId, draggingClipId,
+                                duration / clip->contentStretch, false);
+                        }
                     }
                 }
             }
@@ -1078,6 +2013,7 @@ void ofxOceanodeTimelineController::draw() {
             clipDragMode = ClipDragMode::None;
             draggingTrackId.clear();
             draggingClipId.clear();
+            groupDragSnapshot.clear();
         }
     }
     // Absolute positioning is used throughout the ruler, tracks and docked
@@ -1133,13 +2069,38 @@ void ofxOceanodeTimelineController::draw() {
                                             : thumbHovered ? IM_COL32(120, 120, 130, 255) : IM_COL32(90, 90, 100, 255), 3.0f);
     }
 
+    if(requestClipPopup) { ImGui::OpenPopup("New Timeline Clip"); requestClipPopup = false; }
+    drawClipPopup(timeline);
+}
+
+void ofxOceanodeTimelineController::drawPendingTrackPopup() {
+    // Deliberately independent of draw() and this controller's own window:
+    // see the declaration's comment in the header for why. This must work
+    // even on a frame where this controller's ImGui::Begin() is never
+    // called at all.
+    if(container == nullptr) return;
+    auto& timeline = container->getTimelineManager();
+
+    std::string requestedRename;
+    bool isNewTrack = false;
+    if(timeline.consumePendingTrackRename(requestedRename, &isNewTrack)) {
+        pendingTrackId = requestedRename;
+        if(const auto* track = timeline.getTrack(pendingTrackId)) {
+            std::strncpy(pendingTrackName, track->name.c_str(), sizeof(pendingTrackName) - 1);
+            pendingTrackName[sizeof(pendingTrackName) - 1] = '\0';
+            pendingNewTrackDialog = isNewTrack;
+            requestRenamePopup = true;
+        }
+    }
     if(requestRenamePopup) {
+        // Pin it to the main viewport and center it, regardless of which
+        // window/viewport happens to be focused when this fires -- see
+        // drawRenamePopup for the SetNextWindowPos/SetNextWindowViewport
+        // calls that actually do this.
         ImGui::OpenPopup(pendingNewTrackDialog ? "New Timeline Track" : "Rename Timeline Track");
         requestRenamePopup = false;
     }
-    if(requestClipPopup) { ImGui::OpenPopup("New Timeline Clip"); requestClipPopup = false; }
     drawRenamePopup(timeline);
-    drawClipPopup(timeline);
 }
 
 void ofxOceanodeTimelineController::drawRuler(ofxOceanodeTimelineManager& timeline, float labelWidth,
@@ -1158,17 +2119,22 @@ void ofxOceanodeTimelineController::drawRuler(ofxOceanodeTimelineManager& timeli
     const ImVec2 laneMin(zoneLeft - timelineScrollX, min.y);
     dl->PushClipRect(ImVec2(zoneLeft, min.y), ImVec2(max.x, max.y), true);
     const double grid = displayGridBeats();
+    const double beatsPerBar = std::max(1.0, timeline.getBeatsPerBar());
+    const float barSpacingPixels = beatToPixels(timeline, beatsPerBar, bpm);
+    int barLabelStep = 1;
+    while(barSpacingPixels * barLabelStep < 38.0f) barLabelStep *= 2;
     const int gridLines = static_cast<int>(std::ceil(endBeat / grid));
     for(int i = 0; i <= gridLines; ++i) {
         const double beat = i * grid;
         const float x = laneMin.x + beatToPixels(timeline, beat, bpm);
-        const bool bar = std::fmod(beat, timeline.getBeatsPerBar()) < 0.001;
+        const bool bar = std::fmod(beat, beatsPerBar) < 0.001;
         const bool quarter = std::fmod(beat, 1.0) < 0.001;
         if(bar || quarter || beatToPixels(timeline, beat + grid, bpm) - beatToPixels(timeline, beat, bpm) >= 4.0f)
             dl->AddLine(ImVec2(x, rulerDividerY), ImVec2(x, max.y), bar ? kBar : quarter ? IM_COL32(95, 95, 95, 165) : kGrid, bar ? 1.5f : 1.0f);
-        if(bar) {
+        const int barNumber = static_cast<int>(std::round(beat / beatsPerBar));
+        if(bar && barNumber % barLabelStep == 0) {
             char beatLabel[16];
-            std::snprintf(beatLabel, sizeof(beatLabel), "%d", static_cast<int>(beat / timeline.getBeatsPerBar()) + 1);
+            std::snprintf(beatLabel, sizeof(beatLabel), "%d", barNumber + 1);
             dl->AddText(ImVec2(x + 5, rulerDividerY + 5), IM_COL32(235, 235, 235, 255), beatLabel);
         }
     }
@@ -1224,12 +2190,12 @@ void ofxOceanodeTimelineController::drawRuler(ofxOceanodeTimelineManager& timeli
             loopDragEndBeat = timeline.getLoopEndBeat();
         } else if(container->getTransport() != nullptr) {
             loopDragMode = LoopDragMode::Scrub;
-            container->getTransport()->seekToBeat(rawMouseBeat);
+            container->getTransport()->seekToBeat(mouseBeat);
         }
     }
     if(loopDragMode != LoopDragMode::None && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
         if(loopDragMode == LoopDragMode::Scrub) {
-            if(container->getTransport() != nullptr) container->getTransport()->seekToBeat(rawMouseBeat);
+            if(container->getTransport() != nullptr) container->getTransport()->seekToBeat(mouseBeat);
         } else if(loopDragMode == LoopDragMode::Start) {
             timeline.setLoopRange(std::min(mouseBeat, timeline.getLoopEndBeat() - 1.0 / kPPQ), timeline.getLoopEndBeat());
         } else if(loopDragMode == LoopDragMode::End) {
@@ -1524,16 +2490,452 @@ void ofxOceanodeTimelineController::drawBpmLane(ofxOceanodeTimelineManager& time
     finishAbsoluteLayout(ImVec2(min.x, max.y));
 }
 
-void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& timeline,
-                                                  const ofxOceanodeTimelineTrack& track,
-                                                  float contentWidth, double endBeat,
-                                                  double beatPosition) {
+void ofxOceanodeTimelineController::drawWaveClipProperties(ofxOceanodeTimelineManager& timeline,
+                                                            const ofxOceanodeTimelineTrack& track,
+                                                            ofxOceanodeTimelineClip& clip) {
+    if(!track.isWaveTrack) return;
+
+    ImGui::SeparatorText("Audio clip properties");
+    ImGui::Text("Channels: %d   Duration: %.3fs", clip.waveNumChannels,
+                clip.waveFileDurationMs / 1000.0);
+    const std::string sampleName = clip.waveFilePath.empty()
+        ? "No file loaded" : ofFilePath::getFileName(clip.waveFilePath);
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - 4.0f);
+    ImGui::TextWrapped("Sample: %s", sampleName.c_str());
+    ImGui::PopTextWrapPos();
+    if(!clip.waveFilePath.empty() && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", clip.waveFilePath.c_str());
+    if(ImGui::Button("Replace sample", ImVec2(-1.0f, 0.0f))) {
+        const auto result = ofSystemLoadDialog("Replace wave file", false);
+        if(result.bSuccess) replaceWaveClipFromFile(timeline, track.id, clip.id, result.filePath);
+    }
+    if(ImGui::Button("Reload waveform", ImVec2(-1.0f, 0.0f))) timeline.reloadWaveform(track.id, clip.id);
+
+    ImGui::TextUnformatted("Playback rate");
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::DragFloat("##wavePlaybackRate", &clip.wavePlaybackRate, 0.01f, 0.1f, 4.0f, "%.2fx");
+    ImGui::Checkbox("Reverse", &clip.waveReverse);
+    ImGui::TextUnformatted("Clip gain");
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::DragFloat("##waveGain", &clip.waveGain, 0.01f, 0.0f, 4.0f, "%.2f");
+    ImGui::TextDisabled("Volume automation is shown on the right and applies to the whole track.");
+    ImGui::Separator();
+}
+
+void ofxOceanodeTimelineController::drawWaveTrackVolumeAutomation(
+    ofxOceanodeTimelineManager& timeline, ofxOceanodeTimelineTrack& track,
+    float width, float height, double endBeat, double beatPosition) {
+    ImGui::TextUnformatted("Track volume automation");
+    track.waveVolumeAutomationEnabled = true;
+    if(track.waveVolumePoints.empty()) {
+        const double automationEnd = std::max(1.0, endBeat);
+        track.waveVolumePoints = {{0.0, track.waveVolume},
+                                  {automationEnd, track.waveVolume}};
+        track.waveVolumeTensions.assign(1, ofxOceanodeTimelineCurveTension{});
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(std::min(150.0f, std::max(70.0f, width - 170.0f)));
+    ImGui::DragFloat("Track gain", &track.waveVolume, 0.01f, 0.0f, 4.0f, "%.2f");
+
+    const float graphHeight = std::max(80.0f, height - 58.0f);
+    ImGui::InvisibleButton("##waveTrackVolumeCanvas",
+                           ImVec2(std::max(40.0f, width - 8.0f), graphHeight));
+    const ImVec2 graphMin = ImGui::GetItemRectMin();
+    const ImVec2 graphMax = ImGui::GetItemRectMax();
+    const bool hovered = ImGui::IsItemHovered();
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    dl->AddRectFilled(graphMin, graphMax, IM_COL32(22, 24, 30, 220), 3.0f);
+    dl->AddRect(graphMin, graphMax, IM_COL32(track.color.r, track.color.g, track.color.b, 180), 3.0f);
+
+    const float graphBpm = container != nullptr ? container->getTransportState().bpm : 120.0f;
+    auto xForBeat = [&](double beat) {
+        return graphMin.x + beatToPixels(timeline, beat, graphBpm) - timelineScrollX;
+    };
+    auto yForValue = [&](float value) {
+        return graphMax.y - 5.0f - ofClamp(value, 0.0f, 4.0f) / 4.0f * (graphMax.y - graphMin.y - 10.0f);
+    };
+    auto beatForX = [&](float x) {
+        return pixelsToBeat(timeline, x - graphMin.x + timelineScrollX, graphBpm, endBeat);
+    };
+
+    // Match the timeline's vertical beat/bar grid in the automation panel so
+    // envelope points can be read against the same musical positions as the
+    // clips above.
+    const double grid = displayGridBeats();
+    const int gridLines = static_cast<int>(std::ceil(endBeat / grid));
+    for(int i = 0; i <= gridLines; ++i) {
+        const double beat = i * grid;
+        const float x = xForBeat(beat);
+        if(x < graphMin.x || x > graphMax.x) continue;
+        const bool bar = std::fmod(beat, timeline.getBeatsPerBar()) < 0.001;
+        const bool quarter = std::fmod(beat, 1.0) < 0.001;
+        dl->AddLine(ImVec2(x, graphMin.y), ImVec2(x, graphMax.y),
+                    bar ? IM_COL32(150, 155, 190, 125)
+                        : quarter ? IM_COL32(105, 110, 135, 100)
+                                  : IM_COL32(75, 80, 100, 75),
+                    bar ? 1.5f : 1.0f);
+    }
+
+    for(int level = 0; level <= 4; ++level) {
+        const float y = yForValue(static_cast<float>(level));
+        dl->AddLine(ImVec2(graphMin.x, y), ImVec2(graphMax.x, y),
+                    level == 1 ? IM_COL32(190, 190, 205, 120) : IM_COL32(90, 95, 110, 90));
+        if(level < 4)
+            dl->AddText(ImVec2(graphMin.x + 5.0f, y - 14.0f), IM_COL32(150, 155, 170, 190),
+                        ofToString(level).c_str());
+    }
+    const float playheadX = xForBeat(beatPosition);
+    if(playheadX >= graphMin.x && playheadX <= graphMax.x)
+        dl->AddLine(ImVec2(playheadX, graphMin.y), ImVec2(playheadX, graphMax.y), kPlayhead, 1.5f);
+
+    auto& points = track.waveVolumePoints;
+    std::sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
+    for(size_t i = 1; i < points.size(); ++i) {
+        dl->AddLine(ImVec2(xForBeat(points[i - 1].beat), yForValue(points[i - 1].value)),
+                    ImVec2(xForBeat(points[i].beat), yForValue(points[i].value)),
+                    IM_COL32(255, 220, 90, 235), 2.0f);
+    }
+    for(const auto& point : points) {
+        const float x = xForBeat(point.beat);
+        if(x < graphMin.x - 6.0f || x > graphMax.x + 6.0f) continue;
+        dl->AddCircleFilled(ImVec2(x, yForValue(point.value)), 4.0f, IM_COL32(255, 220, 90, 255));
+    }
+
+    if(hovered) {
+        const ImVec2 mouse = ImGui::GetIO().MousePos;
+        int nearest = -1;
+        float nearestDistance = 9.0f;
+        for(size_t i = 0; i < points.size(); ++i) {
+            const float distance = std::abs(mouse.x - xForBeat(points[i].beat));
+            if(distance < nearestDistance) {
+                nearest = static_cast<int>(i);
+                nearestDistance = distance;
+            }
+        }
+        if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+            const double beat = snapBeat(ofClamp(beatForX(mouse.x), 0.0, endBeat));
+            const float value = ofClamp(4.0f * (graphMax.y - 5.0f - mouse.y) /
+                                        std::max(1.0f, graphMax.y - graphMin.y - 10.0f), 0.0f, 4.0f);
+            timeline.addWaveTrackVolumePoint(track.id, beat, value);
+        } else if(ImGui::IsMouseClicked(ImGuiMouseButton_Right) && nearest >= 0 && points.size() > 2) {
+            timeline.removeWaveTrackVolumePoint(track.id, points[nearest].beat);
+        } else if(ImGui::IsMouseClicked(ImGuiMouseButton_Left) && nearest >= 0) {
+            waveVolumeDragPointIndex = nearest;
+        }
+    }
+    if(waveVolumeDragPointIndex >= 0 && waveVolumeDragPointIndex < static_cast<int>(points.size())) {
+        if(ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            const ImVec2 mouse = ImGui::GetIO().MousePos;
+            points[waveVolumeDragPointIndex].beat = snapBeat(ofClamp(beatForX(mouse.x), 0.0, endBeat));
+            points[waveVolumeDragPointIndex].value = ofClamp(4.0f * (graphMax.y - 5.0f - mouse.y) /
+                                                               std::max(1.0f, graphMax.y - graphMin.y - 10.0f),
+                                                               0.0f, 4.0f);
+        }
+        if(ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+            std::sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
+            track.waveVolumeTensions.resize(points.size() > 1 ? points.size() - 1 : 0);
+            waveVolumeDragPointIndex = -1;
+        }
+    }
+}
+
+void ofxOceanodeTimelineController::drawWaveTrackEditor(
+    ofxOceanodeTimelineManager& timeline, const ofxOceanodeTimelineTrack& track,
+    float contentWidth, double endBeat, double beatPosition) {
+    auto* editTrack = timeline.getTrack(track.id);
     auto* clip = timeline.getClip(editorTrackId, editorClipId);
-    if(clip == nullptr || clip->lanes.empty()) {
+    if(editTrack == nullptr || clip == nullptr) {
         clipEditorOpen = false;
         return;
     }
-    if(timeline.getLane(editorTrackId, editorClipId, editorLaneId) == nullptr) {
+
+    const float editorHeight = 250.0f;
+    ImGui::Dummy(ImVec2(contentWidth, editorHeight));
+    const ImVec2 editorMin = ImGui::GetItemRectMin();
+    const float gap = 8.0f;
+    const float propertiesWidth = std::min(kLabelWidth - 10.0f, contentWidth * 0.38f);
+    const float automationWidth = std::max(40.0f, contentWidth - propertiesWidth - gap);
+
+    ImGui::SetCursorScreenPos(editorMin);
+    // Let the properties column scroll vertically if a narrow panel needs it;
+    // the sample label and controls must never paint outside the column.
+    ImGui::BeginChild("##waveClipPropertiesPanel", ImVec2(propertiesWidth, editorHeight), true);
+    drawWaveClipProperties(timeline, track, *clip);
+    ImGui::EndChild();
+
+    ImGui::SetCursorScreenPos(ImVec2(editorMin.x + propertiesWidth + gap, editorMin.y));
+    ImGui::BeginChild("##waveTrackVolumePanel", ImVec2(automationWidth, editorHeight), true,
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    drawWaveTrackVolumeAutomation(timeline, *editTrack, automationWidth, editorHeight,
+                                   endBeat, beatPosition);
+    ImGui::EndChild();
+    finishAbsoluteLayout(ImVec2(editorMin.x, editorMin.y + editorHeight));
+}
+
+void ofxOceanodeTimelineController::drawLfoEditor(ofxOceanodeTimelineManager& timeline,
+                                                  const ofxOceanodeTimelineTrack& track,
+                                                  ofxOceanodeTimelineClip& clip,
+                                                  float contentWidth, double endBeat,
+                                                  double beatPosition) {
+    constexpr float kResultHeight = 230.0f;
+    constexpr float kAutomationHeight = 92.0f;
+    const float propertiesWidth = std::min(kLabelWidth - 10.0f, contentWidth * 0.38f);
+    const float graphWidth = std::max(40.0f, contentWidth - propertiesWidth - 8.0f);
+    const float totalHeight = 28.0f + kResultHeight +
+        static_cast<float>(clip.lanes.size()) * kAutomationHeight;
+
+    ImGui::Dummy(ImVec2(contentWidth, 24.0f));
+    const ImVec2 headerMin = ImGui::GetItemRectMin();
+    const ImVec2 headerMax = ImGui::GetItemRectMax();
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    dl->AddRectFilled(ImVec2(headerMin.x + 20.0f, headerMin.y),
+                      ImVec2(headerMin.x + kLabelWidth, headerMax.y),
+                      mutedTrackColor(track.color, 0.28f, 0.46f));
+    ImGui::SetCursorScreenPos(ImVec2(headerMin.x + 25.0f, headerMin.y + 2.0f));
+    ImGui::TextColored(ImVec4(track.color.r / 255.0f, track.color.g / 255.0f,
+                              track.color.b / 255.0f, 1.0f),
+                       "%s  [LFO]", clip.name.c_str());
+    ImGui::SameLine(kLabelWidth - 50.0f);
+    if(ImGui::SmallButton("x##closeLfoEditor")) clipEditorOpen = false;
+    finishAbsoluteLayout(ImVec2(headerMin.x, headerMax.y));
+
+    ImGui::Dummy(ImVec2(contentWidth, totalHeight));
+    const ImVec2 editorMin = ImGui::GetItemRectMin();
+    const ImVec2 editorMax = ImGui::GetItemRectMax();
+    const float graphOriginX = editorMin.x + kLabelWidth - timelineScrollX;
+    const float fallbackBpm = container->getTransportState().bpm;
+    const double contentDuration = std::max(1.0 / kPPQ, clip.contentDurationBeats);
+    auto xForSource = [&](double sourceBeat) {
+        return graphOriginX + beatToPixels(timeline, sourceBeat, fallbackBpm);
+    };
+    auto sourceForX = [&](float x) {
+        return pixelsToBeat(timeline, x - graphOriginX, fallbackBpm, contentDuration);
+    };
+    const ImU32 lfoColor = IM_COL32(track.color.r, track.color.g, track.color.b, 235);
+
+    auto drawGrid = [&](const ImVec2& graphMin, const ImVec2& graphMax) {
+        const double grid = std::max(1.0 / kPPQ, displayGridBeats());
+        const int gridLines = static_cast<int>(std::ceil(contentDuration / grid));
+        for(int i = 0; i <= gridLines; ++i) {
+            const double beat = std::min(contentDuration, i * grid);
+            const float x = xForSource(beat);
+            if(x < graphMin.x || x > graphMax.x) continue;
+            const bool bar = std::fmod(beat, timeline.getBeatsPerBar()) < 0.001;
+            dl->AddLine(ImVec2(x, graphMin.y), ImVec2(x, graphMax.y),
+                        bar ? kBar : kGrid, bar ? 1.5f : 1.0f);
+        }
+    };
+
+    // Main result view: it is sampled from the same evaluator used by
+    // playback, so changing any automation lane immediately previews the
+    // exact signal sent to the target binding.
+    const ImVec2 resultMin(editorMin.x, editorMin.y);
+    const ImVec2 resultMax(editorMin.x + contentWidth, editorMin.y + kResultHeight);
+    dl->AddRectFilled(resultMin, resultMax, IM_COL32(22, 24, 30, 230));
+    dl->AddRectFilled(ImVec2(resultMin.x, resultMin.y),
+                      ImVec2(resultMin.x + propertiesWidth, resultMax.y),
+                      mutedTrackColor(track.color, 0.25f, 0.40f));
+    dl->AddLine(ImVec2(resultMin.x + propertiesWidth, resultMin.y),
+                ImVec2(resultMin.x + propertiesWidth, resultMax.y),
+                IM_COL32(track.color.r, track.color.g, track.color.b, 190));
+    dl->AddText(ImVec2(resultMin.x + 8.0f, resultMin.y + 8.0f),
+                IM_COL32(240, 245, 255, 255), "LFO result");
+    dl->AddText(ImVec2(resultMin.x + 8.0f, resultMin.y + 28.0f),
+                IM_COL32(165, 175, 195, 220), "Morphable oscillator");
+
+    ImGui::SetCursorScreenPos(ImVec2(resultMin.x + 8.0f, resultMin.y + 54.0f));
+    ImGui::BeginChild("##lfoOutputProperties", ImVec2(std::max(80.0f, propertiesWidth - 16.0f),
+                                                        kResultHeight - 62.0f), false,
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    const auto* outputBinding = clip.lfoOutputBindingId.empty()
+        ? nullptr : timeline.getBinding(track.id, clip.lfoOutputBindingId);
+    const std::string outputPreview = outputBinding == nullptr
+        ? "No output target" : compactParameterName(outputBinding->parameterPath);
+    ImGui::SetNextItemWidth(-1.0f);
+    if(ImGui::BeginCombo("Output", outputPreview.c_str())) {
+        for(const auto& binding : track.bindings) {
+            const bool selected = binding.id == clip.lfoOutputBindingId;
+            if(ImGui::Selectable(compactParameterName(binding.parameterPath).c_str(), selected)) {
+                clip.lfoOutputBindingId = binding.id;
+                if(binding.valueType == typeid(float).name()) {
+                    if(auto* parameter = container->findCustomGuiParameter(binding.parameterPath)) {
+                        clip.lfoOutputMin = parameter->cast<float>().getParameter().getMin();
+                        clip.lfoOutputMax = parameter->cast<float>().getParameter().getMax();
+                    }
+                } else if(binding.valueType == typeid(int).name()) {
+                    if(auto* parameter = container->findCustomGuiParameter(binding.parameterPath)) {
+                        clip.lfoOutputMin = static_cast<float>(parameter->cast<int>().getParameter().getMin());
+                        clip.lfoOutputMax = static_cast<float>(parameter->cast<int>().getParameter().getMax());
+                    }
+                }
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::TextDisabled("The LFO result is mapped to this range.");
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::DragFloat("Min", &clip.lfoOutputMin, 0.01f, -99999.0f, 99999.0f, "%.4g");
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::DragFloat("Max", &clip.lfoOutputMax, 0.01f, -99999.0f, 99999.0f, "%.4g");
+    if(clip.lfoOutputMax < clip.lfoOutputMin) std::swap(clip.lfoOutputMax, clip.lfoOutputMin);
+    ImGui::EndChild();
+
+    const ImVec2 resultGraphMin(resultMin.x + propertiesWidth, resultMin.y + 6.0f);
+    const ImVec2 resultGraphMax(resultMax.x, resultMax.y - 6.0f);
+    drawGrid(resultGraphMin, resultGraphMax);
+    for(int level = 0; level <= 4; ++level) {
+        const float y = resultGraphMax.y - 8.0f - level / 4.0f *
+            (resultGraphMax.y - resultGraphMin.y - 16.0f);
+        dl->AddLine(ImVec2(resultGraphMin.x, y), ImVec2(resultGraphMax.x, y),
+                    level == 0 || level == 4 ? IM_COL32(130, 135, 150, 125) : IM_COL32(75, 80, 95, 90));
+    }
+    dl->PushClipRect(resultGraphMin, resultGraphMax, true);
+    const int samples = std::max(64, static_cast<int>(graphWidth / 2.0f));
+    for(int i = 0; i < samples; ++i) {
+        const double source1 = contentDuration * i / static_cast<double>(samples);
+        const double source2 = contentDuration * (i + 1) / static_cast<double>(samples);
+        const float value1 = ofxOceanodeTimelineLfo::evaluate(clip, source1);
+        const float value2 = ofxOceanodeTimelineLfo::evaluate(clip, source2);
+        const ImVec2 a(xForSource(source1), resultGraphMax.y - 8.0f - value1 *
+                       (resultGraphMax.y - resultGraphMin.y - 16.0f));
+        const ImVec2 b(xForSource(source2), resultGraphMax.y - 8.0f - value2 *
+                       (resultGraphMax.y - resultGraphMin.y - 16.0f));
+        dl->AddLine(a, b, lfoColor, 2.0f);
+    }
+    dl->PopClipRect();
+    const double resultSourceBeat = timelineToSourceBeat(clip, beatPosition);
+    const float resultPlayheadX = xForSource(resultSourceBeat);
+    if(resultPlayheadX >= resultGraphMin.x && resultPlayheadX <= resultGraphMax.x)
+        dl->AddLine(ImVec2(resultPlayheadX, resultGraphMin.y), ImVec2(resultPlayheadX, resultGraphMax.y), kPlayhead, 1.5f);
+
+    auto sampleLane = [](const ofxOceanodeTimelineLane& lane, double beat) {
+        if(lane.curvePoints.empty()) return 0.0f;
+        if(lane.curvePoints.size() == 1) return lane.curvePoints.front().value;
+        if(beat <= lane.curvePoints.front().beat) return lane.curvePoints.front().value;
+        for(size_t i = 1; i < lane.curvePoints.size(); ++i) {
+            if(beat > lane.curvePoints[i].beat) continue;
+            const auto& a = lane.curvePoints[i - 1];
+            const auto& b = lane.curvePoints[i];
+            const float t = ofClamp(static_cast<float>((beat - a.beat) /
+                std::max(1e-9, b.beat - a.beat)), 0.0f, 1.0f);
+            const auto tension = i - 1 < lane.curveTensions.size()
+                ? lane.curveTensions[i - 1] : ofxOceanodeTimelineCurveTension{};
+            return ofLerp(a.value, b.value, curveSegmentShape(t,
+                curveInterpolationMode(lane.curveInterpolation), tension));
+        }
+        return lane.curvePoints.back().value;
+    };
+
+    for(size_t laneIndex = 0; laneIndex < clip.lanes.size(); ++laneIndex) {
+        auto& lane = clip.lanes[laneIndex];
+        const float rowY = editorMin.y + kResultHeight + laneIndex * kAutomationHeight;
+        const ImVec2 rowMin(editorMin.x, rowY);
+        const ImVec2 rowMax(editorMin.x + contentWidth, rowY + kAutomationHeight - 2.0f);
+        const bool focused = editorLaneId == lane.id;
+        dl->AddRectFilled(rowMin, rowMax, IM_COL32(27, 29, 35, 235));
+        dl->AddRectFilled(rowMin, ImVec2(rowMin.x + propertiesWidth, rowMax.y),
+                          mutedTrackColor(track.color, focused ? 0.30f : 0.21f, 0.42f));
+        dl->AddLine(ImVec2(rowMin.x + propertiesWidth, rowMin.y),
+                    ImVec2(rowMin.x + propertiesWidth, rowMax.y),
+                    IM_COL32(track.color.r, track.color.g, track.color.b, focused ? 220 : 150));
+        ImGui::SetCursorScreenPos(ImVec2(rowMin.x + 8.0f, rowMin.y + 8.0f));
+        ImGui::BeginChild(("##lfoLaneProperties" + lane.id).c_str(),
+                          ImVec2(std::max(80.0f, propertiesWidth - 16.0f), kAutomationHeight - 14.0f), false,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        ImGui::TextUnformatted(lane.name.c_str());
+        const float current = ofxOceanodeTimelineLfo::evaluateParameter(clip, lane.lfoParameter,
+                                                                          resultSourceBeat, 0.0f);
+        ImGui::TextDisabled("%.3g", current);
+        ImGui::EndChild();
+
+        const ImVec2 graphMin(rowMin.x + propertiesWidth, rowMin.y + 4.0f);
+        const ImVec2 graphMax(rowMax.x, rowMax.y - 4.0f);
+        ImGui::SetCursorScreenPos(graphMin);
+        ImGui::InvisibleButton(("##lfoLaneCanvas" + lane.id).c_str(),
+                               ImVec2(std::max(1.0f, graphWidth), std::max(1.0f, graphMax.y - graphMin.y)));
+        const bool hovered = ImGui::IsItemHovered() && ImGui::GetIO().MousePos.x >= rowMin.x + propertiesWidth;
+        drawGrid(graphMin, graphMax);
+        dl->AddLine(ImVec2(graphMin.x, graphMax.y - 5.0f), ImVec2(graphMax.x, graphMax.y - 5.0f), IM_COL32(95, 100, 115, 110));
+        dl->PushClipRect(graphMin, graphMax, true);
+        for(int i = 0; i < samples; ++i) {
+            const double source1 = contentDuration * i / static_cast<double>(samples);
+            const double source2 = contentDuration * (i + 1) / static_cast<double>(samples);
+            const float value1 = sampleLane(lane, source1);
+            const float value2 = sampleLane(lane, source2);
+            dl->AddLine(ImVec2(xForSource(source1), graphMax.y - 6.0f - value1 * (graphMax.y - graphMin.y - 12.0f)),
+                        ImVec2(xForSource(source2), graphMax.y - 6.0f - value2 * (graphMax.y - graphMin.y - 12.0f)),
+                        lfoColor, focused ? 2.0f : 1.5f);
+        }
+        for(const auto& point : lane.curvePoints) {
+            const float x = xForSource(point.beat);
+            if(x >= graphMin.x - 6.0f && x <= graphMax.x + 6.0f)
+                dl->AddCircleFilled(ImVec2(x, graphMax.y - 6.0f - point.value * (graphMax.y - graphMin.y - 12.0f)),
+                                     focused ? 4.0f : 3.0f, focused ? IM_COL32(245, 235, 150, 255) : lfoColor);
+        }
+        dl->PopClipRect();
+
+        if(hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            editorLaneId = lane.id;
+            lfoDragLaneId = lane.id;
+            lfoDragPointIndex = -1;
+            const ImVec2 mouse = ImGui::GetIO().MousePos;
+            const double beat = snapBeat(ofClamp(sourceForX(mouse.x), 0.0, contentDuration));
+            const float value = ofClamp((graphMax.y - 6.0f - mouse.y) /
+                                        std::max(1.0f, graphMax.y - graphMin.y - 12.0f), 0.0f, 1.0f);
+            float nearest = 9.0f;
+            for(int i = static_cast<int>(lane.curvePoints.size()) - 1; i >= 0; --i) {
+                const float px = xForSource(lane.curvePoints[i].beat);
+                const float py = graphMax.y - 6.0f - lane.curvePoints[i].value * (graphMax.y - graphMin.y - 12.0f);
+                const float distance = std::hypot(mouse.x - px, mouse.y - py);
+                if(distance < nearest) { nearest = distance; lfoDragPointIndex = i; }
+            }
+            if(lfoDragPointIndex >= 0 && ImGui::GetIO().KeyShift && lane.curvePoints.size() > 2) {
+                lane.curvePoints.erase(lane.curvePoints.begin() + lfoDragPointIndex);
+                lane.curveTensions.resize(lane.curvePoints.size() > 1 ? lane.curvePoints.size() - 1 : 0);
+                lfoDragPointIndex = -1;
+            } else if(lfoDragPointIndex < 0) {
+                lfoDragPointIndex = insertLinearCurvePoint(lane, {beat, value});
+            }
+        }
+        if(lfoDragLaneId == lane.id && lfoDragPointIndex >= 0 &&
+           lfoDragPointIndex < static_cast<int>(lane.curvePoints.size()) &&
+           ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            const ImVec2 mouse = ImGui::GetIO().MousePos;
+            const double beat = snapBeat(ofClamp(sourceForX(mouse.x), 0.0, contentDuration));
+            const double minimum = lfoDragPointIndex > 0
+                ? lane.curvePoints[lfoDragPointIndex - 1].beat + 1.0 / kPPQ : 0.0;
+            const double maximum = lfoDragPointIndex + 1 < static_cast<int>(lane.curvePoints.size())
+                ? lane.curvePoints[lfoDragPointIndex + 1].beat - 1.0 / kPPQ : contentDuration;
+            lane.curvePoints[lfoDragPointIndex].beat = std::max(minimum, std::min(maximum, beat));
+            lane.curvePoints[lfoDragPointIndex].value = ofClamp((graphMax.y - 6.0f - mouse.y) /
+                std::max(1.0f, graphMax.y - graphMin.y - 12.0f), 0.0f, 1.0f);
+        }
+    }
+    if(ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+        if(!lfoDragLaneId.empty()) {
+            if(auto* lane = timeline.getLane(track.id, clip.id, lfoDragLaneId))
+                std::sort(lane->curvePoints.begin(), lane->curvePoints.end(),
+                          [](const auto& a, const auto& b) { return a.beat < b.beat; });
+        }
+        lfoDragLaneId.clear();
+        lfoDragPointIndex = -1;
+    }
+    finishAbsoluteLayout(ImVec2(editorMin.x, editorMax.y));
+}
+
+void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& timeline,
+                                                   const ofxOceanodeTimelineTrack& track,
+                                                   float contentWidth, double endBeat,
+                                                   double beatPosition) {
+    auto* clip = timeline.getClip(editorTrackId, editorClipId);
+    if(clip == nullptr || (clip->lanes.empty() && !track.isWaveTrack)) {
+        clipEditorOpen = false;
+        return;
+    }
+    if(clip->isLfo) {
+        drawLfoEditor(timeline, track, *clip, contentWidth, endBeat, beatPosition);
+        return;
+    }
+    if(!clip->lanes.empty() && timeline.getLane(editorTrackId, editorClipId, editorLaneId) == nullptr) {
         editorLaneId = clip->lanes.front().id;
     }
     const float fallbackBpm = container->getTransportState().bpm;
@@ -1570,18 +2972,30 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         ImGui::SameLine();
         if(ImGui::SmallButton("x")) clipEditorOpen = false;
         if(ImGui::BeginPopup("##addLaneTypePopup")) {
-            if(ImGui::MenuItem("Step Sequencer")) { requestAddLane = true; pendingAddLaneType = 0; }
-            if(ImGui::MenuItem("Curve")) { requestAddLane = true; pendingAddLaneType = 1; }
-            if(ImGui::MenuItem("Piano Roll")) { requestAddLane = true; pendingAddLaneType = 2; }
+            if(track.isWaveTrack) {
+                if(ImGui::MenuItem("Edit track volume automation")) {
+                    timeline.createWaveVolumeLane(track.id, clip->id);
+                    editorLaneId.clear();
+                }
+            } else {
+                for(int optionIndex = 0; optionIndex < kLaneTypeOptionCount; ++optionIndex) {
+                    if(ImGui::MenuItem(kLaneTypeOptions[optionIndex])) { requestAddLane = true; pendingAddLaneType = optionIndex; }
+                }
+            }
             ImGui::EndPopup();
         }
         finishAbsoluteLayout(ImVec2(clipHeaderMin.x, clipHeaderMax.y));
     }
 
+    if(track.isWaveTrack && clip != nullptr)
+        drawWaveClipProperties(timeline, track, *clip);
+
+    if(clip->lanes.empty()) return;
+
     for(size_t laneIndex = 0; laneIndex < clip->lanes.size(); ++laneIndex) {
     auto* lane = &clip->lanes[laneIndex];
     const bool isFocused = lane->id == editorLaneId;
-    std::string laneLabel = laneTypeName(lane->type);
+    std::string laneLabel = lane->isWaveVolume ? "Volume" : laneTypeName(lane->type);
     if(!lane->bindingIds.empty()) {
         if(const auto* laneBoundParam = timeline.getBinding(track.id, lane->bindingIds.front()))
             laneLabel += ": " + compactParameterName(laneBoundParam->parameterPath);
@@ -1740,7 +3154,9 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 timeline.setClipContentDuration(track.id, clip->id, newLength / clipStretch, false);
             }
 
-            if(lane->type != ofxOceanodeTimelineLaneType::PianoRoll) {
+            if(lane->type != ofxOceanodeTimelineLaneType::PianoRoll &&
+               lane->type != ofxOceanodeTimelineLaneType::MultiGate &&
+               lane->type != ofxOceanodeTimelineLaneType::Wave) {
                 ImGui::TextUnformatted("Range"); ImGui::SameLine(58.0f); ImGui::SetNextItemWidth(62.0f);
                 ImGui::DragFloat("##rangeMin", &lane->valueMin, 0.01f, -99999.0f, 99999.0f, "%.4g");
                 ImGui::SameLine(); ImGui::TextUnformatted("to"); ImGui::SameLine(); ImGui::SetNextItemWidth(55.0f);
@@ -1788,7 +3204,61 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 const auto selectedInterpolation = curveInterpolationMode(lane->curveInterpolation);
                 if(selectedInterpolation == CurveInterpolationMode::LogExp) ImGui::TextDisabled("Alt-drag vertically");
                 else if(selectedInterpolation == CurveInterpolationMode::Sigmoid) ImGui::TextDisabled("Alt-drag freely");
-                ImGui::Checkbox("Clamp 0..1", &lane->curveClamp);
+                ImGui::Checkbox("Clamp to range", &lane->curveClamp);
+                if(ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Clamp curve values to the configured Range min..max");
+                int curveSnap = std::max(0, lane->valueQuantizeSteps);
+                ImGui::SetNextItemWidth(labeledWidgetWidth(94.0f, "Value Snap"));
+                if(ImGui::DragInt("Value Snap", &curveSnap, 0.1f, 0, 64))
+                    lane->valueQuantizeSteps = std::max(0, curveSnap);
+                if(lane->valueQuantizeSteps >= 2) ImGui::TextDisabled("%d levels", lane->valueQuantizeSteps);
+            } else if(lane->type == ofxOceanodeTimelineLaneType::MultiValue ||
+                      lane->type == ofxOceanodeTimelineLaneType::MultiGate) {
+                int rows = std::max(1, lane->multiRowCount);
+                ImGui::SetNextItemWidth(labeledWidgetWidth(94.0f, "Rows"));
+                if(ImGui::DragInt("Rows", &rows, 0.1f, 1, 16))
+                    timeline.setLaneMultiRowCount(track.id, clip->id, lane->id, rows);
+                drawDivision();
+                if(lane->type == ofxOceanodeTimelineLaneType::MultiValue) {
+                    ImGui::TextDisabled("Dbl-click a block to edit");
+                    if(ImGui::Checkbox("Integer", &lane->multiValueInteger) && lane->multiValueInteger) {
+                        for(auto& row : lane->multiValueRows)
+                            for(auto& region : row)
+                                region.value = std::round(region.value);
+                    }
+                } else ImGui::TextDisabled("Drag to draw gates");
+            } else if(lane->type == ofxOceanodeTimelineLaneType::MultiSlider) {
+                int steps = std::max(1, lane->stepCount);
+                ImGui::SetNextItemWidth(labeledWidgetWidth(94.0f, "Steps"));
+                if(ImGui::DragInt("Steps", &steps, 0.2f, 1, 128)) {
+                    lane->stepCount = steps;
+                    lane->multiSliderValues.resize(static_cast<size_t>(steps), 0.0f);
+                }
+                drawDivision();
+                int sliderSnap = std::max(0, lane->valueQuantizeSteps);
+                ImGui::SetNextItemWidth(labeledWidgetWidth(94.0f, "Value Snap"));
+                if(ImGui::DragInt("Value Snap", &sliderSnap, 0.1f, 0, 64))
+                    lane->valueQuantizeSteps = std::max(0, sliderSnap);
+                if(lane->valueQuantizeSteps >= 2) ImGui::TextDisabled("%d levels", lane->valueQuantizeSteps);
+            } else if(lane->type == ofxOceanodeTimelineLaneType::Wave) {
+                char waveBuffer[256];
+                std::snprintf(waveBuffer, sizeof(waveBuffer), "%s", lane->waveFilePath.c_str());
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                if(ImGui::InputText("##waveFilePath", waveBuffer, sizeof(waveBuffer)))
+                    lane->waveFilePath = waveBuffer;
+                if(ImGui::IsItemDeactivatedAfterEdit())
+                    timeline.reloadWaveform(track.id, clip->id, lane->id);
+                if(ImGui::Button("Load...")) {
+                    const auto result = ofSystemLoadDialog("Load wave file", false);
+                    if(result.bSuccess) {
+                        lane->waveFilePath = result.filePath;
+                        timeline.reloadWaveform(track.id, clip->id, lane->id);
+                    }
+                }
+                ImGui::SetNextItemWidth(labeledWidgetWidth(94.0f, "Gain"));
+                ImGui::DragFloat("Gain", &lane->waveGain, 0.01f, 0.0f, 4.0f, "%.2f");
+                if(lane->waveNumChannels > 0) ImGui::TextDisabled("%d ch, %.2fs", lane->waveNumChannels, lane->waveFileDurationMs / 1000.0);
+                else if(!lane->waveFilePath.empty()) ImGui::TextDisabled("Failed to load");
             } else {
                 auto drawPianoRole = [&](const char* label, std::string& roleId) {
                     const auto* currentBinding = roleId.empty() ? nullptr : timeline.getBinding(track.id, roleId);
@@ -2386,10 +3856,35 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     if(lane->type == ofxOceanodeTimelineLaneType::Curve) {
         const auto interpolation = curveInterpolationMode(lane->curveInterpolation);
         const float curveTop = editorMin.y + 8.0f, curveBottom = editorMax.y - 8.0f;
-        for(int row = 0; row <= 4; ++row) {
-            const float y = curveTop + (curveBottom - curveTop) * row / 4.0f;
-            dl->AddLine(ImVec2(timelineMin.x, y), ImVec2(editorMax.x, y), IM_COL32(75, 75, 75, 120));
+        const float curveValueSpan = lane->valueMax - lane->valueMin;
+        const float curveRangeMin = std::min(lane->valueMin, lane->valueMax);
+        const float curveRangeMax = std::max(lane->valueMin, lane->valueMax);
+        const auto curveValueToY = [&](float normalizedValue) {
+            if(std::abs(curveValueSpan) < 1e-9f) return curveBottom;
+            const float actualValue = lane->valueMin + normalizedValue * curveValueSpan;
+            const float visibleValue = ofClamp((actualValue - curveRangeMin) /
+                                               std::max(1e-9f, curveRangeMax - curveRangeMin),
+                                               0.0f, 1.0f);
+            return curveBottom - visibleValue * (curveBottom - curveTop);
+        };
+        if(lane->valueQuantizeSteps >= 2) {
+            for(int row = 0; row <= lane->valueQuantizeSteps; ++row) {
+                const float y = curveTop + (curveBottom - curveTop) * row / static_cast<float>(lane->valueQuantizeSteps);
+                dl->AddLine(ImVec2(timelineMin.x, y), ImVec2(editorMax.x, y), IM_COL32(150, 140, 80, 150));
+            }
+        } else {
+            for(int row = 0; row <= 4; ++row) {
+                const float y = curveTop + (curveBottom - curveTop) * row / 4.0f;
+                dl->AddLine(ImVec2(timelineMin.x, y), ImVec2(editorMax.x, y), IM_COL32(75, 75, 75, 120));
+            }
         }
+        char curveMaxLabel[32];
+        char curveMinLabel[32];
+        std::snprintf(curveMaxLabel, sizeof(curveMaxLabel), "%.4g", lane->valueMax);
+        std::snprintf(curveMinLabel, sizeof(curveMinLabel), "%.4g", lane->valueMin);
+        dl->AddText(ImVec2(left + 5.0f, curveTop + 2.0f), IM_COL32(205, 205, 210, 220), curveMaxLabel);
+        dl->AddText(ImVec2(left + 5.0f, curveBottom - ImGui::GetTextLineHeight() - 2.0f),
+                    IM_COL32(205, 205, 210, 220), curveMinLabel);
         const double curveGrid = displayGridBeats();
         const int curveGridLines = static_cast<int>(std::ceil(endBeat / curveGrid));
         for(int gridIndex = 0; gridIndex <= curveGridLines; ++gridIndex) {
@@ -2416,8 +3911,8 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 if(interpolation == CurveInterpolationMode::Step) {
                     const float x1 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, points[i - 1].beat, cycle));
                     const float x2 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, points[i].beat, cycle));
-                    const float y1 = curveBottom - points[i - 1].value * (curveBottom - curveTop);
-                    const float y2 = curveBottom - points[i].value * (curveBottom - curveTop);
+                    const float y1 = curveValueToY(points[i - 1].value);
+                    const float y2 = curveValueToY(points[i].value);
                     const ImU32 color = IM_COL32(track.color.r, track.color.g, track.color.b, cycle == 0 ? 240 : 130);
                     dl->AddLine(ImVec2(x1, y1), ImVec2(x2, y1), color, 2.0f);
                     dl->AddLine(ImVec2(x2, y1), ImVec2(x2, y2), color, 2.0f);
@@ -2436,14 +3931,14 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                     const float value2 = ofLerp(points[i - 1].value, points[i].value,
                                                 curveSegmentShape(t2, interpolation, tension));
                     const ImVec2 a(timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, source1, cycle)),
-                                   curveBottom - value1 * (curveBottom - curveTop));
+                                   curveValueToY(value1));
                     const ImVec2 b(timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, source2, cycle)),
-                                   curveBottom - value2 * (curveBottom - curveTop));
+                                   curveValueToY(value2));
                     dl->AddLine(a, b, IM_COL32(track.color.r, track.color.g, track.color.b, cycle == 0 ? 240 : 130), 2.0f);
                 }
             }
             for(const auto& point : points) {
-                const ImVec2 p(timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, point.beat, cycle)), curveBottom - point.value * (curveBottom - curveTop));
+                const ImVec2 p(timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, point.beat, cycle)), curveValueToY(point.value));
                 dl->AddCircleFilled(p, cycle == 0 ? 4.0f : 3.0f, IM_COL32(245, 245, 245, cycle == 0 ? 230 : 115));
             }
         }
@@ -2459,14 +3954,19 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         const double curveSourceBeat = timelineToSourceBeat(*clip, curveTimelineBeat);
         const int hoveredCycle = clip->repeatContent
             ? std::max(0, static_cast<int>(std::floor(std::max(0.0, curveTimelineBeat - clip->startBeat) / repeatCycleDuration))) : 0;
-        const float curveValue = lane->curveClamp
-            ? ofClamp((curveBottom - curveMouse.y) / (curveBottom - curveTop), 0.0f, 1.0f)
-            : (curveBottom - curveMouse.y) / (curveBottom - curveTop);
+        float curveValue = (curveBottom - curveMouse.y) / (curveBottom - curveTop);
+        if(lane->curveClamp && std::abs(curveValueSpan) > 1e-9f) {
+            const float actualValue = ofClamp(lane->valueMin + curveValue * curveValueSpan,
+                                              curveRangeMin, curveRangeMax);
+            curveValue = (actualValue - lane->valueMin) / curveValueSpan;
+        }
+        if(lane->valueQuantizeSteps >= 2)
+            curveValue = std::round(curveValue * lane->valueQuantizeSteps) / static_cast<float>(lane->valueQuantizeSteps);
         auto hitPoint = [&]() {
             for(int i = static_cast<int>(lane->curvePoints.size()) - 1; i >= 0; --i) {
                 const auto& point = lane->curvePoints[i];
                 const float pointX = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, point.beat, hoveredCycle));
-                const float pointY = curveBottom - point.value * (curveBottom - curveTop);
+                const float pointY = curveValueToY(point.value);
                 if(std::abs(curveMouse.x - pointX) <= 8.0f && std::abs(curveMouse.y - pointY) <= 8.0f) return i;
             }
             return -1;
@@ -2498,7 +3998,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                     const auto tension = lane->curveTensions[i - 1];
                     const float segmentValue = ofLerp(a.value, b.value,
                         curveSegmentShape(t, interpolation, tension));
-                    const float segmentY = curveBottom - segmentValue * (curveBottom - curveTop);
+                    const float segmentY = curveValueToY(segmentValue);
                     if(std::abs(curveMouse.y - segmentY) <= 12.0f) {
                         curveTensionSegment = static_cast<int>(i - 1);
                         curveTensionDragStartX = curveMouse.x;
@@ -2551,10 +4051,13 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 ImGui::SetNextItemWidth(110.0f);
                 if(ImGui::InputFloat("Value", &curveNumericValue, 0.001f, 0.01f, "%.6g")) {
                     const float span = lane->valueMax - lane->valueMin;
-                    const float normalized = std::abs(span) < 1e-9f ? 0.0f
-                        : (curveNumericValue - lane->valueMin) / span;
-                    lane->curvePoints[curveValuePointIndex].value = lane->curveClamp
-                        ? ofClamp(normalized, 0.0f, 1.0f) : normalized;
+                    float actualValue = curveNumericValue;
+                    if(lane->curveClamp)
+                        actualValue = ofClamp(actualValue,
+                                              std::min(lane->valueMin, lane->valueMax),
+                                              std::max(lane->valueMin, lane->valueMax));
+                    lane->curvePoints[curveValuePointIndex].value = std::abs(span) < 1e-9f ? 0.0f
+                        : (actualValue - lane->valueMin) / span;
                 }
                 if(ImGui::Button("Delete point")) {
                     eraseCurvePointWithTensions(*lane, static_cast<size_t>(curveValuePointIndex));
@@ -2565,6 +4068,349 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
             ImGui::EndPopup();
         }
         } // isFocused (curve interaction)
+        const float playheadX = timelineMin.x + beatOffset(beatPosition);
+        if(playheadX >= zoneLeft && playheadX <= editorMax.x) dl->AddLine(ImVec2(playheadX, editorMin.y), ImVec2(playheadX, editorMax.y), kPlayhead, 2.0f);
+        if(isFocused && editorCanvasHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) clipEditorOpen = false;
+        dl->PopClipRect();
+        finishAbsoluteLayout(ImVec2(editorMin.x, editorMax.y));
+        continue;
+    }
+
+    if(lane->type == ofxOceanodeTimelineLaneType::MultiSlider) {
+        if(static_cast<int>(lane->multiSliderValues.size()) != std::max(1, lane->stepCount))
+            lane->multiSliderValues.resize(static_cast<size_t>(std::max(1, lane->stepCount)), 0.0f);
+        const int stepCount = std::max(1, lane->stepCount);
+        const double beatsPerStep = std::max(1.0 / kPPQ, lane->beatsPerStep);
+        const double patternLength = stepCount * beatsPerStep;
+        const float cellTop = editorMin.y + 10.0f;
+        const float cellBottom = editorMax.y - 10.0f;
+        const float span = lane->valueMax - lane->valueMin;
+        if(right > left) {
+            dl->AddRectFilled(ImVec2(left, editorMin.y + 3), ImVec2(right, editorMax.y - kLaneResizeHandleHeight),
+                              IM_COL32(track.color.r, track.color.g, track.color.b, 50), 2);
+            if(lane->valueQuantizeSteps >= 2) {
+                for(int row = 0; row <= lane->valueQuantizeSteps; ++row) {
+                    const float y = cellTop + (cellBottom - cellTop) * row / static_cast<float>(lane->valueQuantizeSteps);
+                    dl->AddLine(ImVec2(left, y), ImVec2(right, y), IM_COL32(150, 140, 80, 150));
+                }
+            }
+            const double content = sourceDuration(*clip);
+            const int clipCycles = clip->repeatContent ? std::max(1, static_cast<int>(std::ceil(clip->durationBeats / cycleDuration(*clip)))) : 1;
+            const int patternCycles = std::max(1, static_cast<int>(std::ceil(content / patternLength)));
+            dl->PushClipRect(ImVec2(left, cellTop), ImVec2(right, cellBottom), true);
+            for(int clipCycle = 0; clipCycle < clipCycles; ++clipCycle) {
+                for(int patternCycle = 0; patternCycle < patternCycles; ++patternCycle) {
+                    const double sourceOffset = patternCycle * patternLength;
+                    const double cycleSourceEnd = std::min(content, sourceOffset + patternLength);
+                    const float cycleX1 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, sourceOffset, clipCycle));
+                    const float cycleX2 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, cycleSourceEnd, clipCycle));
+                    const bool firstPattern = clipCycle == 0 && patternCycle == 0;
+                    if(!firstPattern) {
+                        dl->AddRectFilled(ImVec2(cycleX1, cellTop), ImVec2(cycleX2, cellBottom),
+                                          IM_COL32(255, 255, 255, patternCycle % 2 ? 10 : 18));
+                        dl->AddLine(ImVec2(cycleX1, cellTop), ImVec2(cycleX1, cellBottom),
+                                    IM_COL32(track.color.r, track.color.g, track.color.b, 245), 2.0f);
+                    }
+                    for(int index = 0; index < stepCount; ++index) {
+                        const double dataBeat = index * beatsPerStep;
+                        const double sourceStart = sourceOffset + dataBeat;
+                        const double sourceEnd = std::min(content, sourceStart + beatsPerStep);
+                        if(sourceStart >= content || sourceEnd <= sourceStart) continue;
+                        const float x1 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, sourceStart, clipCycle));
+                        const float x2 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, sourceEnd, clipCycle));
+                        if(x2 < left || x1 > right) continue;
+                        dl->AddLine(ImVec2(x1, cellTop), ImVec2(x1, cellBottom),
+                                    index == 0 ? kBar : kGrid, index == 0 ? 1.5f : 1.0f);
+                        const float value = index < static_cast<int>(lane->multiSliderValues.size()) ? lane->multiSliderValues[index] : 0.0f;
+                        const float normalized = std::abs(span) < 1e-9f ? 0.0f : ofClamp((value - lane->valueMin) / span, 0.0f, 1.0f);
+                        const float fillTop = cellBottom - normalized * (cellBottom - cellTop);
+                        dl->AddRectFilled(ImVec2(std::max(x1, left) + 1, fillTop),
+                                          ImVec2(std::min(x2, right) - 1, cellBottom),
+                                          IM_COL32(track.color.r, track.color.g, track.color.b, firstPattern ? 210 : 120), 2);
+                        dl->AddRect(ImVec2(std::max(x1, left) + 1, cellTop),
+                                    ImVec2(std::min(x2, right) - 1, cellBottom),
+                                    IM_COL32(130, 130, 130, firstPattern ? 110 : 65), 1.0f);
+                        if(firstPattern && x2 - x1 > 28.0f) {
+                            char valueLabel[16];
+                            std::snprintf(valueLabel, sizeof(valueLabel), "%.2g", value);
+                            dl->AddText(ImVec2(std::max(x1, left) + 3, cellTop + 3), IM_COL32(240, 240, 240, 220), valueLabel);
+                        }
+                    }
+                }
+            }
+            dl->PopClipRect();
+            if(isFocused) {
+                const ImVec2 mouse = ImGui::GetIO().MousePos;
+                const bool inSliderEditor = ImGui::IsMouseHoveringRect(ImVec2(left, cellTop), ImVec2(right, cellBottom));
+                if(inSliderEditor && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseDown(ImGuiMouseButton_Left))) {
+                    const double timelineBeat = beatAtOffset(mouse.x - timelineMin.x);
+                    const double sourceBeat = timelineToSourceBeat(*clip, timelineBeat);
+                    const double patternBeat = std::fmod(sourceBeat, patternLength);
+                    const int index = ofClamp(static_cast<int>(std::floor(patternBeat / beatsPerStep)), 0, stepCount - 1);
+                    if(index >= 0 && index < static_cast<int>(lane->multiSliderValues.size())) {
+                        float normalized = ofClamp((cellBottom - mouse.y) / (cellBottom - cellTop), 0.0f, 1.0f);
+                        if(lane->valueQuantizeSteps >= 2)
+                            normalized = std::round(normalized * lane->valueQuantizeSteps) / static_cast<float>(lane->valueQuantizeSteps);
+                        lane->multiSliderValues[index] = lane->valueMin + normalized * span;
+                    }
+                }
+                if(inSliderEditor && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                    const double timelineBeat = beatAtOffset(mouse.x - timelineMin.x);
+                    const double sourceBeat = timelineToSourceBeat(*clip, timelineBeat);
+                    const double patternBeat = std::fmod(sourceBeat, patternLength);
+                    const int index = ofClamp(static_cast<int>(std::floor(patternBeat / beatsPerStep)), 0, stepCount - 1);
+                    if(index >= 0 && index < static_cast<int>(lane->multiSliderValues.size())) lane->multiSliderValues[index] = 0.0f;
+                }
+            } // isFocused (multi-slider interaction)
+        }
+        const float playheadX = timelineMin.x + beatOffset(beatPosition);
+        if(playheadX >= zoneLeft && playheadX <= editorMax.x) dl->AddLine(ImVec2(playheadX, editorMin.y), ImVec2(playheadX, editorMax.y), kPlayhead, 2.0f);
+        if(isFocused && editorCanvasHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) clipEditorOpen = false;
+        dl->PopClipRect();
+        finishAbsoluteLayout(ImVec2(editorMin.x, editorMax.y));
+        continue;
+    }
+
+    if(lane->type == ofxOceanodeTimelineLaneType::MultiValue || lane->type == ofxOceanodeTimelineLaneType::MultiGate) {
+        const bool isValueRow = lane->type == ofxOceanodeTimelineLaneType::MultiValue;
+        const int rowCount = std::max(1, lane->multiRowCount);
+        if(isValueRow) {
+            if(static_cast<int>(lane->multiValueRows.size()) != rowCount) lane->multiValueRows.resize(static_cast<size_t>(rowCount));
+        } else {
+            if(static_cast<int>(lane->multiGateRows.size()) != rowCount) lane->multiGateRows.resize(static_cast<size_t>(rowCount));
+        }
+        const float rowsTop = editorMin.y + 6.0f;
+        const float rowsBottom = editorMax.y - 6.0f;
+        const float rowGap = 3.0f;
+        const float rowHeight = std::max(6.0f, (rowsBottom - rowsTop - rowGap * std::max(0, rowCount - 1)) / rowCount);
+        auto rowTopY = [&](int r) { return rowsTop + r * (rowHeight + rowGap); };
+        auto rowBottomY = [&](int r) { return rowTopY(r) + rowHeight; };
+        const int clipCycles = clip->repeatContent ? std::max(1, static_cast<int>(std::ceil(clip->durationBeats / cycleDuration(*clip)))) : 1;
+        const float span = lane->valueMax - lane->valueMin;
+        {
+            const double multiGrid = displayGridBeats();
+            const int multiGridLines = static_cast<int>(std::ceil(endBeat / multiGrid));
+            for(int gridIndex = 0; gridIndex <= multiGridLines; ++gridIndex) {
+                const double beat = gridIndex * multiGrid;
+                const float x = timelineMin.x + beatOffset(beat);
+                const bool bar = std::fmod(beat, timeline.getBeatsPerBar()) < 0.001;
+                if(bar || beatOffset(beat + multiGrid) - beatOffset(beat) >= 4.0f)
+                    dl->AddLine(ImVec2(x, rowsTop), ImVec2(x, rowsBottom), bar ? kBar : kGrid, bar ? 1.5f : 1.0f);
+            }
+        }
+        dl->PushClipRect(ImVec2(left, rowsTop), ImVec2(right, rowsBottom), true);
+        for(int r = 0; r < rowCount; ++r) {
+            const float rTop = rowTopY(r), rBottom = rowBottomY(r);
+            dl->AddRectFilled(ImVec2(left, rTop), ImVec2(right, rBottom), IM_COL32(255, 255, 255, r % 2 ? 8 : 14));
+            for(int cycle = 0; cycle < clipCycles; ++cycle) {
+                if(isValueRow) {
+                    for(const auto& region : lane->multiValueRows[r]) {
+                        const float x1 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, region.startBeat, cycle));
+                        const float x2 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, region.end(), cycle));
+                        if(x2 < left || x1 > right) continue;
+                        const float normalized = std::abs(span) < 1e-9f ? 0.0f : ofClamp((region.value - lane->valueMin) / span, 0.0f, 1.0f);
+                        const float fillTop = rBottom - normalized * (rBottom - rTop);
+                        dl->AddRectFilled(ImVec2(std::max(x1, left) + 1, fillTop), ImVec2(std::min(x2, right) - 1, rBottom),
+                                          IM_COL32(track.color.r, track.color.g, track.color.b, cycle == 0 ? 220 : 110), 2);
+                        dl->AddRect(ImVec2(std::max(x1, left) + 1, rTop), ImVec2(std::min(x2, right) - 1, rBottom),
+                                    IM_COL32(200, 200, 200, cycle == 0 ? 160 : 70), 1.0f);
+                        if(cycle == 0 && x2 - x1 > 26.0f) {
+                            char valueLabel[16];
+                            std::snprintf(valueLabel, sizeof(valueLabel), lane->multiValueInteger ? "%.0f" : "%.3g", region.value);
+                            dl->AddText(ImVec2(std::max(x1, left) + 3, rTop + 2), IM_COL32(240, 240, 240, 225), valueLabel);
+                        }
+                    }
+                } else {
+                    for(const auto& region : lane->multiGateRows[r]) {
+                        const float x1 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, region.startBeat, cycle));
+                        const float x2 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, region.end(), cycle));
+                        if(x2 < left || x1 > right) continue;
+                        dl->AddRectFilled(ImVec2(std::max(x1, left) + 1, rTop + 1), ImVec2(std::min(x2, right) - 1, rBottom - 1),
+                                          IM_COL32(track.color.r, track.color.g, track.color.b, cycle == 0 ? 225 : 115), 2);
+                    }
+                }
+            }
+        }
+        dl->PopClipRect();
+        if(isFocused) {
+            const ImVec2 mouse = ImGui::GetIO().MousePos;
+            const double timelineBeat = beatAtOffset(mouse.x - timelineMin.x);
+            const double sourceBeat = timelineToSourceBeat(*clip, timelineBeat);
+            int hoveredRow = -1;
+            for(int r = 0; r < rowCount; ++r) {
+                if(mouse.y >= rowTopY(r) && mouse.y <= rowBottomY(r)) { hoveredRow = r; break; }
+            }
+            const bool inRegionEditor = editorCanvasHovered && mouse.x >= left && mouse.x <= right &&
+                mouse.y >= rowsTop && mouse.y <= rowsBottom;
+
+            auto hitValueRegion = [&](int r, double beat) -> int {
+                if(!isValueRow || r < 0 || r >= static_cast<int>(lane->multiValueRows.size())) return -1;
+                const auto& regionsInRow = lane->multiValueRows[r];
+                for(int i = static_cast<int>(regionsInRow.size()) - 1; i >= 0; --i)
+                    if(beat >= regionsInRow[i].startBeat && beat <= regionsInRow[i].end()) return i;
+                return -1;
+            };
+            auto hitGateRegion = [&](int r, double beat) -> int {
+                if(isValueRow || r < 0 || r >= static_cast<int>(lane->multiGateRows.size())) return -1;
+                const auto& regionsInRow = lane->multiGateRows[r];
+                for(int i = static_cast<int>(regionsInRow.size()) - 1; i >= 0; --i)
+                    if(beat >= regionsInRow[i].startBeat && beat <= regionsInRow[i].end()) return i;
+                return -1;
+            };
+            auto hitRegion = [&](int r, double beat) { return isValueRow ? hitValueRegion(r, beat) : hitGateRegion(r, beat); };
+
+            if(inRegionEditor && hoveredRow >= 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                const int hit = hitRegion(hoveredRow, sourceBeat);
+                if(hit >= 0) {
+                    if(isValueRow) lane->multiValueRows[hoveredRow].erase(lane->multiValueRows[hoveredRow].begin() + hit);
+                    else lane->multiGateRows[hoveredRow].erase(lane->multiGateRows[hoveredRow].begin() + hit);
+                }
+            }
+            if(isValueRow && inRegionEditor && hoveredRow >= 0 && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                const int hit = hitRegion(hoveredRow, sourceBeat);
+                if(hit >= 0) {
+                    multiValueEditRow = hoveredRow;
+                    multiValueEditIndex = hit;
+                    multiValueEditNumeric = lane->multiValueInteger
+                        ? std::round(lane->multiValueRows[hoveredRow][hit].value)
+                        : lane->multiValueRows[hoveredRow][hit].value;
+                    ImGui::OpenPopup("Multi value block");
+                }
+            }
+            if(inRegionEditor && hoveredRow >= 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+               regionDragMode == RegionDragMode::None) {
+                const int hit = hitRegion(hoveredRow, sourceBeat);
+                if(hit >= 0) {
+                    const double regionStart = isValueRow ? lane->multiValueRows[hoveredRow][hit].startBeat : lane->multiGateRows[hoveredRow][hit].startBeat;
+                    const double regionDuration = isValueRow ? lane->multiValueRows[hoveredRow][hit].durationBeats : lane->multiGateRows[hoveredRow][hit].durationBeats;
+                    const int hoveredCycle = clip->repeatContent
+                        ? std::max(0, static_cast<int>(std::floor(std::max(0.0, timelineBeat - clip->startBeat) / cycleDuration(*clip)))) : 0;
+                    const float x2 = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, regionStart + regionDuration, hoveredCycle));
+                    const bool nearRightEdge = std::abs(mouse.x - x2) <= 6.0f;
+                    regionDragMode = nearRightEdge ? RegionDragMode::ResizeRight : RegionDragMode::Move;
+                    regionDragRow = hoveredRow;
+                    regionDragIndex = hit;
+                    regionDragAnchorBeat = sourceBeat;
+                    regionDragOriginalStart = regionStart;
+                    regionDragOriginalDuration = regionDuration;
+                } else {
+                    const double gridStep = std::max(1.0 / kPPQ, lane->beatsPerStep);
+                    const double startBeat = std::max(0.0, std::floor(sourceBeat / gridStep) * gridStep);
+                    if(isValueRow) {
+                        ofxOceanodeTimelineValueRegion newRegion;
+                        newRegion.startBeat = startBeat;
+                        newRegion.durationBeats = gridStep;
+                        newRegion.value = lane->valueMin + ofClamp((rowBottomY(hoveredRow) - mouse.y) / std::max(1.0f, rowHeight), 0.0f, 1.0f) * span;
+                        if(lane->multiValueInteger) newRegion.value = std::round(newRegion.value);
+                        lane->multiValueRows[hoveredRow].push_back(newRegion);
+                        regionDragIndex = static_cast<int>(lane->multiValueRows[hoveredRow].size()) - 1;
+                    } else {
+                        ofxOceanodeTimelineGateRegion newRegion;
+                        newRegion.startBeat = startBeat;
+                        newRegion.durationBeats = gridStep;
+                        lane->multiGateRows[hoveredRow].push_back(newRegion);
+                        regionDragIndex = static_cast<int>(lane->multiGateRows[hoveredRow].size()) - 1;
+                    }
+                    regionDragMode = RegionDragMode::Create;
+                    regionDragRow = hoveredRow;
+                    regionDragAnchorBeat = startBeat;
+                    regionDragOriginalStart = startBeat;
+                    regionDragOriginalDuration = gridStep;
+                }
+            }
+            const int regionRowCount = isValueRow ? static_cast<int>(lane->multiValueRows.size()) : static_cast<int>(lane->multiGateRows.size());
+            if(regionDragMode != RegionDragMode::None && ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+               regionDragRow >= 0 && regionDragRow < regionRowCount) {
+                const int regionCount = isValueRow ? static_cast<int>(lane->multiValueRows[regionDragRow].size())
+                                                    : static_cast<int>(lane->multiGateRows[regionDragRow].size());
+                if(regionDragIndex >= 0 && regionDragIndex < regionCount) {
+                    double newStart = regionDragOriginalStart;
+                    double newDuration = regionDragOriginalDuration;
+                    const double gridStep = std::max(1.0 / kPPQ, lane->beatsPerStep);
+                    if(regionDragMode == RegionDragMode::Move) {
+                        newStart = std::max(0.0, regionDragOriginalStart + (sourceBeat - regionDragAnchorBeat));
+                        newStart = std::max(0.0, std::round(newStart / gridStep) * gridStep);
+                    } else {
+                        newDuration = std::max(1.0 / kPPQ, sourceBeat - newStart);
+                        newDuration = std::max(gridStep, std::round(newDuration / gridStep) * gridStep);
+                    }
+                    if(isValueRow) {
+                        auto& region = lane->multiValueRows[regionDragRow][regionDragIndex];
+                        region.startBeat = newStart;
+                        region.durationBeats = newDuration;
+                        const float rTop = rowTopY(regionDragRow), rBottom = rowBottomY(regionDragRow);
+                        region.value = lane->valueMin + ofClamp((rBottom - mouse.y) / std::max(1.0f, rBottom - rTop), 0.0f, 1.0f) * span;
+                        if(lane->multiValueInteger) region.value = std::round(region.value);
+                    } else {
+                        auto& region = lane->multiGateRows[regionDragRow][regionDragIndex];
+                        region.startBeat = newStart;
+                        region.durationBeats = newDuration;
+                    }
+                }
+            }
+            if(ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+                regionDragMode = RegionDragMode::None;
+                regionDragRow = -1;
+                regionDragIndex = -1;
+            }
+            if(isValueRow && ImGui::BeginPopup("Multi value block")) {
+                if(multiValueEditRow >= 0 && multiValueEditRow < static_cast<int>(lane->multiValueRows.size()) &&
+                   multiValueEditIndex >= 0 && multiValueEditIndex < static_cast<int>(lane->multiValueRows[multiValueEditRow].size())) {
+                    ImGui::SetNextItemWidth(110.0f);
+                    if(ImGui::InputFloat("Value", &multiValueEditNumeric, 0.001f, 0.01f, lane->multiValueInteger ? "%.0f" : "%.6g")) {
+                        multiValueEditNumeric = lane->multiValueInteger ? std::round(multiValueEditNumeric) : multiValueEditNumeric;
+                        lane->multiValueRows[multiValueEditRow][multiValueEditIndex].value = multiValueEditNumeric;
+                    }
+                    if(ImGui::Button("Delete block")) {
+                        lane->multiValueRows[multiValueEditRow].erase(lane->multiValueRows[multiValueEditRow].begin() + multiValueEditIndex);
+                        multiValueEditRow = -1;
+                        multiValueEditIndex = -1;
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                ImGui::EndPopup();
+            }
+        } // isFocused (multi-value / multi-gate interaction)
+        const float playheadX = timelineMin.x + beatOffset(beatPosition);
+        if(playheadX >= zoneLeft && playheadX <= editorMax.x) dl->AddLine(ImVec2(playheadX, editorMin.y), ImVec2(playheadX, editorMax.y), kPlayhead, 2.0f);
+        dl->PopClipRect();
+        finishAbsoluteLayout(ImVec2(editorMin.x, editorMax.y));
+        continue;
+    }
+
+    if(lane->type == ofxOceanodeTimelineLaneType::Wave) {
+        const float waveTop = editorMin.y + 8.0f;
+        const float waveBottom = editorMax.y - 8.0f;
+        dl->PushClipRect(ImVec2(left, waveTop), ImVec2(right, waveBottom), true);
+        dl->AddRectFilled(ImVec2(left, waveTop), ImVec2(right, waveBottom), IM_COL32(20, 20, 22, 160));
+        if(lane->waveNumChannels > 0 && !lane->waveformPeaks.empty()) {
+            constexpr int kPointsPerChannel = 2000;
+            const int channels = lane->waveNumChannels;
+            const float channelHeight = (waveBottom - waveTop) / channels;
+            const double content = sourceDuration(*clip);
+            const int clipCycles = clip->repeatContent ? std::max(1, static_cast<int>(std::ceil(clip->durationBeats / cycleDuration(*clip)))) : 1;
+            for(int ch = 0; ch < channels; ++ch) {
+                const float chTop = waveTop + ch * channelHeight;
+                const float chMid = chTop + channelHeight * 0.5f;
+                const float chHalf = channelHeight * 0.5f - 2.0f;
+                for(int cycle = 0; cycle < clipCycles; ++cycle) {
+                    for(int pt = 0; pt < kPointsPerChannel; ++pt) {
+                        const double sourceBeatAtPoint = content * (static_cast<double>(pt) / kPointsPerChannel);
+                        const float x = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, sourceBeatAtPoint, cycle));
+                        if(x < left - 2.0f || x > right + 2.0f) continue;
+                        const float peak = ofClamp(lane->waveformPeaks[static_cast<size_t>(ch) * kPointsPerChannel + pt], -1.0f, 1.0f);
+                        const float y = chMid - peak * chHalf;
+                        dl->AddLine(ImVec2(x, chMid), ImVec2(x, y),
+                                    IM_COL32(track.color.r, track.color.g, track.color.b, cycle == 0 ? 235 : 110), 1.0f);
+                    }
+                }
+                if(ch > 0) dl->AddLine(ImVec2(left, chTop), ImVec2(right, chTop), IM_COL32(70, 70, 70, 120));
+            }
+        } else {
+            dl->AddText(ImVec2(left + 6.0f, waveTop + 6.0f), IM_COL32(180, 180, 180, 200),
+                        lane->waveFilePath.empty() ? "No file loaded" : "Failed to load waveform");
+        }
+        dl->PopClipRect();
         const float playheadX = timelineMin.x + beatOffset(beatPosition);
         if(playheadX >= zoneLeft && playheadX <= editorMax.x) dl->AddLine(ImVec2(playheadX, editorMin.y), ImVec2(playheadX, editorMax.y), kPlayhead, 2.0f);
         if(isFocused && editorCanvasHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) clipEditorOpen = false;
@@ -2687,24 +4533,19 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
 
 void ofxOceanodeTimelineController::drawRenamePopup(ofxOceanodeTimelineManager& timeline) {
     const char* popupTitle = pendingNewTrackDialog ? "New Timeline Track" : "Rename Timeline Track";
+    // This can be requested from a node's right-click menu on the main
+    // canvas while this controller's own window is elsewhere (a background
+    // docked tab, or a separate OS-level window under multi-viewport
+    // docking) -- without an explicit position/viewport, ImGui would anchor
+    // the popup to wherever it happened to be called from, which is exactly
+    // the "shows up in the Timeline window instead of on the canvas" bug
+    // this fixes. Force it onto the main viewport, centered, every time.
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(!ImGui::BeginPopupModal(popupTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
     ImGui::InputText("Name", pendingTrackName, sizeof(pendingTrackName));
-    if(pendingNewTrackDialog) {
-        const char* editorTypes[] = {"Step Sequencer", "Curve", "Piano Roll"};
-        ImGui::Combo("Automation type", &pendingNewTrackLaneType, editorTypes, 3);
-    }
     if(ImGui::Button(pendingNewTrackDialog ? "Create" : "Save")) {
         timeline.renameTrack(pendingTrackId, pendingTrackName);
-        if(pendingNewTrackDialog) {
-            const auto laneType = pendingNewTrackLaneType == 1 ? ofxOceanodeTimelineLaneType::Curve
-                : pendingNewTrackLaneType == 2 ? ofxOceanodeTimelineLaneType::PianoRoll
-                : ofxOceanodeTimelineLaneType::Step;
-            if(auto* track = timeline.getTrack(pendingTrackId)) {
-                std::vector<std::string> bindingIds;
-                for(const auto& binding : track->bindings) bindingIds.push_back(binding.id);
-                for(const auto& bindingId : bindingIds) timeline.setLaneType(pendingTrackId, bindingId, laneType);
-            }
-        }
         pendingNewTrackDialog = false;
         ImGui::CloseCurrentPopup();
     }
@@ -2716,6 +4557,7 @@ void ofxOceanodeTimelineController::drawRenamePopup(ofxOceanodeTimelineManager& 
 void ofxOceanodeTimelineController::drawClipPopup(ofxOceanodeTimelineManager& timeline) {
     if(!ImGui::BeginPopupModal("New Timeline Clip", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
     ImGui::InputText("Name", pendingClipName, sizeof(pendingClipName));
+    ImGui::Combo("Clip type", &pendingClipType, kClipTypeOptions, 2);
     if(const auto* track = timeline.getTrack(pendingTrackId)) {
         const auto* selectedBinding = pendingClipBindingId.empty()
             ? nullptr : timeline.getBinding(pendingTrackId, pendingClipBindingId);
@@ -2726,30 +4568,36 @@ void ofxOceanodeTimelineController::drawClipPopup(ofxOceanodeTimelineManager& ti
                 const std::string label = compactParameterName(binding.parameterPath);
                 if(ImGui::Selectable(label.c_str(), binding.id == pendingClipBindingId)) {
                     pendingClipBindingId = binding.id;
-                    pendingClipLaneType = binding.laneType == ofxOceanodeTimelineLaneType::Curve ? 1
-                        : binding.laneType == ofxOceanodeTimelineLaneType::PianoRoll ? 2 : 0;
+                    pendingClipLaneType = optionIndexForLaneType(binding.laneType);
                 }
                 if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", binding.parameterPath.c_str());
             }
             ImGui::EndCombo();
         }
     }
-    const char* editorTypes[] = {"Step Sequencer", "Curve", "Piano Roll"};
-    ImGui::Combo("Automation type", &pendingClipLaneType, editorTypes, 3);
+    if(pendingClipType == 0)
+        ImGui::Combo("Automation type", &pendingClipLaneType, kLaneTypeOptions, kLaneTypeOptionCount);
     ImGui::InputDouble("Start beat", &pendingStartBeat, editIncrement(), 1.0, "%.4f");
     ImGui::InputDouble("Duration", &pendingDurationBeats, editIncrement(), 1.0, "%.4f");
     if(ImGui::Button("Create Clip")) {
-        const auto clipId = timeline.createClip(pendingTrackId, pendingClipName[0] == '\0' ? "Clip" : pendingClipName,
-                                                snapBeat(pendingStartBeat), std::max(1.0 / kPPQ, snapBeat(pendingDurationBeats)));
-        if(const auto* binding = timeline.getBinding(pendingTrackId, pendingClipBindingId)) {
-            const auto laneType = pendingClipLaneType == 1 ? ofxOceanodeTimelineLaneType::Curve
-                : pendingClipLaneType == 2 ? ofxOceanodeTimelineLaneType::PianoRoll
-                : ofxOceanodeTimelineLaneType::Step;
+        const double startBeat = snapBeat(pendingStartBeat);
+        const double durationBeats = std::max(1.0 / kPPQ, snapBeat(pendingDurationBeats));
+        const auto clipId = pendingClipType == 1
+            ? timeline.createLfoClip(pendingTrackId, pendingClipBindingId,
+                                     pendingClipName[0] == '\0' ? "LFO" : pendingClipName,
+                                     startBeat, durationBeats)
+            : timeline.createClip(pendingTrackId, pendingClipName[0] == '\0' ? "Clip" : pendingClipName,
+                                  startBeat, durationBeats);
+        if(pendingClipType == 0) {
+            if(const auto* binding = timeline.getBinding(pendingTrackId, pendingClipBindingId)) {
+            const auto laneType = laneTypeFromOptionIndex(pendingClipLaneType);
             const auto laneId = timeline.createLane(pendingTrackId, clipId, binding->parameterPath, laneType);
             if(!laneId.empty()) {
                 timeline.addBindingToLane(pendingTrackId, clipId, laneId, binding->id);
                 if(auto* lane = timeline.getLane(pendingTrackId, clipId, laneId)) {
-                    if(laneType != ofxOceanodeTimelineLaneType::PianoRoll) {
+                    if(laneType != ofxOceanodeTimelineLaneType::PianoRoll &&
+                       laneType != ofxOceanodeTimelineLaneType::MultiGate &&
+                       laneType != ofxOceanodeTimelineLaneType::Wave) {
                         if(auto* parameter = container->findCustomGuiParameter(binding->parameterPath)) {
                             if(binding->valueType == typeid(float).name()) {
                                 lane->valueMin = parameter->cast<float>().getParameter().getMin();
@@ -2761,6 +4609,7 @@ void ofxOceanodeTimelineController::drawClipPopup(ofxOceanodeTimelineManager& ti
                         }
                     }
                 }
+            }
             }
         }
         ImGui::CloseCurrentPopup();

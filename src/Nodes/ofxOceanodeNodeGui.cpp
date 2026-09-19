@@ -643,6 +643,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                             if(!timelineManager.getTracks().empty()){
                                 ImGui::Separator();
                                 for(const auto& timelineTrack : timelineManager.getTracks()){
+                                    if(timelineTrack.isWaveTrack) continue;
                                     const bool alreadyBound = std::any_of(timelineTrack.bindings.begin(), timelineTrack.bindings.end(), [&](const auto& binding){
                                         return binding.parameterPath == timelineParameterPath;
                                     });
