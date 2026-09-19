@@ -2692,21 +2692,27 @@ void ofxOceanodeTimelineController::drawLfoEditor(ofxOceanodeTimelineManager& ti
                                                   ofxOceanodeTimelineClip& clip,
                                                   float contentWidth, double endBeat,
                                                   double beatPosition) {
-    constexpr float kResultHeight = 230.0f;
-    constexpr float kAutomationHeight = 92.0f;
-    const float propertiesWidth = std::min(kLabelWidth - 10.0f, contentWidth * 0.38f);
-    const float graphWidth = std::max(40.0f, contentWidth - propertiesWidth - 8.0f);
-    const float totalHeight = 28.0f + kResultHeight +
-        static_cast<float>(clip.lanes.size()) * kAutomationHeight;
+    // Laid out like drawLaneEditor's rows rather than as one fixed block: a
+    // row per section, each reserving its own height from laneEditorHeights,
+    // foldable through collapsedLaneIds and resizable by the same bottom
+    // strip. The result view is a row like any other -- it just has no lane
+    // behind it, so it borrows a key that cannot collide with a lane id.
+    const float clipIndent = 20.0f;
+    const std::string resultKey = "lfoResult:" + clip.id;
+    constexpr float kDefaultResultHeight = 230.0f;
+    constexpr float kDefaultLaneHeight = 120.0f;
 
-    ImGui::Dummy(ImVec2(contentWidth, 24.0f));
+    ImGui::Dummy(ImVec2(contentWidth, 22.0f));
     const ImVec2 headerMin = ImGui::GetItemRectMin();
     const ImVec2 headerMax = ImGui::GetItemRectMax();
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    dl->AddRectFilled(ImVec2(headerMin.x + 20.0f, headerMin.y),
+    dl->AddRectFilled(ImVec2(headerMin.x + clipIndent, headerMin.y),
                       ImVec2(headerMin.x + kLabelWidth, headerMax.y),
                       mutedTrackColor(track.color, 0.28f, 0.46f));
-    ImGui::SetCursorScreenPos(ImVec2(headerMin.x + 25.0f, headerMin.y + 2.0f));
+    dl->AddLine(ImVec2(headerMin.x + kLabelWidth - 1.0f, headerMin.y),
+                ImVec2(headerMin.x + kLabelWidth - 1.0f, headerMax.y),
+                IM_COL32(track.color.r, track.color.g, track.color.b, 210));
+    ImGui::SetCursorScreenPos(ImVec2(headerMin.x + 5.0f + clipIndent, headerMin.y + 2.0f));
     ImGui::TextColored(ImVec4(track.color.r / 255.0f, track.color.g / 255.0f,
                               track.color.b / 255.0f, 1.0f),
                        "%s  [LFO]", clip.name.c_str());
@@ -2714,20 +2720,24 @@ void ofxOceanodeTimelineController::drawLfoEditor(ofxOceanodeTimelineManager& ti
     if(ImGui::SmallButton("x##closeLfoEditor")) clipEditorOpen = false;
     finishAbsoluteLayout(ImVec2(headerMin.x, headerMax.y));
 
-    ImGui::Dummy(ImVec2(contentWidth, totalHeight));
-    const ImVec2 editorMin = ImGui::GetItemRectMin();
-    const ImVec2 editorMax = ImGui::GetItemRectMax();
-    const float graphOriginX = editorMin.x + kLabelWidth - timelineScrollX;
+    // Every row is a full-width block starting at the same x, so one origin
+    // serves them all -- and it is kLabelWidth, the same gutter the clip rows
+    // and every other lane editor use.
+    const float rowOriginX = headerMin.x;
+    const float graphOriginX = rowOriginX + kLabelWidth - timelineScrollX;
+    const float graphWidth = std::max(40.0f, contentWidth - kLabelWidth);
     const float fallbackBpm = container->getTransportState().bpm;
     const double contentDuration = std::max(1.0 / kPPQ, clip.contentDurationBeats);
+    const ImU32 lfoColor = IM_COL32(track.color.r, track.color.g, track.color.b, 235);
+    const int samples = std::max(64, static_cast<int>(graphWidth / 2.0f));
+    const double resultSourceBeat = timelineToSourceBeat(clip, beatPosition);
+
     auto xForSource = [&](double sourceBeat) {
         return graphOriginX + beatToPixels(timeline, sourceBeat, fallbackBpm);
     };
     auto sourceForX = [&](float x) {
         return pixelsToBeat(timeline, x - graphOriginX, fallbackBpm, contentDuration);
     };
-    const ImU32 lfoColor = IM_COL32(track.color.r, track.color.g, track.color.b, 235);
-
     auto drawGrid = [&](const ImVec2& graphMin, const ImVec2& graphMax) {
         const double grid = std::max(1.0 / kPPQ, displayGridBeats());
         const int gridLines = static_cast<int>(std::ceil(contentDuration / grid));
@@ -2740,153 +2750,223 @@ void ofxOceanodeTimelineController::drawLfoEditor(ofxOceanodeTimelineManager& ti
                         bar ? kBar : kGrid, bar ? 1.5f : 1.0f);
         }
     };
+    auto drawPlayhead = [&](const ImVec2& graphMin, const ImVec2& graphMax) {
+        const float x = xForSource(resultSourceBeat);
+        if(x >= graphMin.x && x <= graphMax.x)
+            dl->AddLine(ImVec2(x, graphMin.y), ImVec2(x, graphMax.y), kPlayhead, 1.5f);
+    };
 
-    // Main result view: it is sampled from the same evaluator used by
-    // playback, so changing any automation lane immediately previews the
-    // exact signal sent to the target binding.
-    const ImVec2 resultMin(editorMin.x, editorMin.y);
-    const ImVec2 resultMax(editorMin.x + contentWidth, editorMin.y + kResultHeight);
-    dl->AddRectFilled(resultMin, resultMax, IM_COL32(22, 24, 30, 230));
-    dl->AddRectFilled(ImVec2(resultMin.x, resultMin.y),
-                      ImVec2(resultMin.x + propertiesWidth, resultMax.y),
-                      mutedTrackColor(track.color, 0.25f, 0.40f));
-    dl->AddLine(ImVec2(resultMin.x + propertiesWidth, resultMin.y),
-                ImVec2(resultMin.x + propertiesWidth, resultMax.y),
-                IM_COL32(track.color.r, track.color.g, track.color.b, 190));
-    dl->AddText(ImVec2(resultMin.x + 8.0f, resultMin.y + 8.0f),
-                IM_COL32(240, 245, 255, 255), "LFO result");
-    dl->AddText(ImVec2(resultMin.x + 8.0f, resultMin.y + 28.0f),
-                IM_COL32(165, 175, 195, 220), "Morphable oscillator");
+    // One folded row, shared by the result view and the lanes. Returns true
+    // when its label was clicked, which is how a lane takes focus.
+    auto drawCollapsedRow = [&](const std::string& key, const std::string& label, bool focused) {
+        ImGui::Dummy(ImVec2(contentWidth, 22.0f));
+        const ImVec2 rowMin = ImGui::GetItemRectMin();
+        const ImVec2 rowMax = ImGui::GetItemRectMax();
+        ImDrawList* rowDl = ImGui::GetWindowDrawList();
+        rowDl->AddRectFilled(ImVec2(rowMin.x + clipIndent, rowMin.y),
+                             ImVec2(rowMin.x + kLabelWidth, rowMax.y),
+                             mutedTrackColor(track.color, 0.18f, 0.30f));
+        ImGui::SetCursorScreenPos(ImVec2(rowMin.x + 5.0f + clipIndent, rowMin.y + 2.0f));
+        if(ImGui::SmallButton((">##lfoExpand" + key).c_str())) collapsedLaneIds.erase(key);
+        ImGui::SameLine();
+        ImGui::Selectable((label + "##lfoHeaderCollapsed" + key).c_str(), focused,
+                          ImGuiSelectableFlags_None, ImVec2(ImGui::GetContentRegionAvail().x - 4.0f, 0));
+        const bool clicked = ImGui::IsItemClicked();
+        finishAbsoluteLayout(ImVec2(rowMin.x, rowMax.y));
+        return clicked;
+    };
 
-    ImGui::SetCursorScreenPos(ImVec2(resultMin.x + 8.0f, resultMin.y + 54.0f));
-    ImGui::BeginChild("##lfoOutputProperties", ImVec2(std::max(80.0f, propertiesWidth - 16.0f),
-                                                        kResultHeight - 62.0f), false,
-                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-    const auto* outputBinding = clip.lfoOutputBindingId.empty()
-        ? nullptr : timeline.getBinding(track.id, clip.lfoOutputBindingId);
-    const std::string outputPreview = outputBinding == nullptr
-        ? "No output target" : compactParameterName(outputBinding->parameterPath);
-    ImGui::SetNextItemWidth(-1.0f);
-    if(ImGui::BeginCombo("Output", outputPreview.c_str())) {
-        for(const auto& binding : track.bindings) {
-            const bool selected = binding.id == clip.lfoOutputBindingId;
-            if(ImGui::Selectable(compactParameterName(binding.parameterPath).c_str(), selected)) {
-                clip.lfoOutputBindingId = binding.id;
-                if(binding.valueType == typeid(float).name()) {
-                    if(auto* parameter = container->findCustomGuiParameter(binding.parameterPath)) {
-                        clip.lfoOutputMin = parameter->cast<float>().getParameter().getMin();
-                        clip.lfoOutputMax = parameter->cast<float>().getParameter().getMax();
-                    }
-                } else if(binding.valueType == typeid(int).name()) {
-                    if(auto* parameter = container->findCustomGuiParameter(binding.parameterPath)) {
-                        clip.lfoOutputMin = static_cast<float>(parameter->cast<int>().getParameter().getMin());
-                        clip.lfoOutputMax = static_cast<float>(parameter->cast<int>().getParameter().getMax());
+    struct LfoRow {
+        ImVec2 rowMin, rowMax, graphMin, graphMax;
+        float height = 0.0f;
+        bool canvasHovered = false;
+    };
+    // Reserves one row, paints its background, runs the bottom resize strip
+    // and hands back the graph rectangle -- the same sequence, in the same
+    // order, as an ordinary lane editor row.
+    auto beginRow = [&](const std::string& key, float defaultHeight, bool focused) {
+        LfoRow row;
+        const auto heightIt = laneEditorHeights.find(key);
+        row.height = heightIt != laneEditorHeights.end() ? heightIt->second : defaultHeight;
+        ImGui::Dummy(ImVec2(contentWidth, row.height));
+        row.rowMin = ImGui::GetItemRectMin();
+        row.rowMax = ImGui::GetItemRectMax();
+        const float zoneLeft = row.rowMin.x + kLabelWidth;
+        // The canvas stops short of the resize strip so the two can never
+        // fight over the same click.
+        ImGui::SetCursorScreenPos(ImVec2(zoneLeft, row.rowMin.y));
+        ImGui::InvisibleButton(("##lfoRowCanvas" + editorTrackId + editorClipId + key).c_str(),
+                               ImVec2(std::max(1.0f, contentWidth - kLabelWidth),
+                                      std::max(1.0f, row.height - kLaneResizeHandleHeight)));
+        row.canvasHovered = ImGui::IsItemHovered() && ImGui::GetIO().MousePos.x >= zoneLeft;
+
+        dl->AddRectFilled(ImVec2(row.rowMin.x + clipIndent, row.rowMin.y), row.rowMax,
+                          IM_COL32(27, 29, 35, 235));
+        dl->AddRectFilled(ImVec2(row.rowMin.x + clipIndent, row.rowMin.y),
+                          ImVec2(zoneLeft, row.rowMax.y),
+                          mutedTrackColor(track.color, focused ? 0.30f : 0.21f, 0.42f));
+        dl->AddLine(ImVec2(zoneLeft - 1.0f, row.rowMin.y), ImVec2(zoneLeft - 1.0f, row.rowMax.y),
+                    IM_COL32(track.color.r, track.color.g, track.color.b, focused ? 220 : 150));
+
+        const ImVec2 handleMin(row.rowMin.x + clipIndent, row.rowMax.y - kLaneResizeHandleHeight);
+        const ImVec2 handleMax(row.rowMax.x, row.rowMax.y);
+        const bool resizeHovered = ImGui::IsMouseHoveringRect(handleMin, handleMax);
+        if(resizeHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            resizingLaneId = key;
+            laneResizeStartMouseY = ImGui::GetIO().MousePos.y;
+            laneResizeStartHeight = row.height;
+        }
+        const bool resizeActive = resizingLaneId == key && ImGui::IsMouseDown(ImGuiMouseButton_Left);
+        if(resizeHovered || resizeActive) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+        if(resizeActive) {
+            laneEditorHeights[key] = ofClamp(laneResizeStartHeight + ImGui::GetIO().MousePos.y - laneResizeStartMouseY,
+                                             kLaneEditorMinHeight, kLaneEditorMaxHeight);
+        }
+        if(resizingLaneId == key && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) resizingLaneId.clear();
+        const float separatorY = row.rowMax.y - kLaneResizeHandleHeight * 0.5f;
+        dl->AddLine(ImVec2(handleMin.x, separatorY), ImVec2(handleMax.x, separatorY),
+                    resizeActive ? IM_COL32(205, 205, 215, 235)
+                                 : resizeHovered ? IM_COL32(160, 160, 170, 205)
+                                                 : IM_COL32(80, 80, 86, 110),
+                    resizeActive ? 2.0f : 1.0f);
+
+        row.graphMin = ImVec2(zoneLeft, row.rowMin.y + 5.0f);
+        row.graphMax = ImVec2(row.rowMax.x, row.rowMax.y - 5.0f - kLaneResizeHandleHeight);
+        return row;
+    };
+    // Opens the row's left-hand properties child with its fold button; the
+    // caller fills it and closes it with EndChild, hence the "begin" name.
+    auto beginRowProperties = [&](const LfoRow& row, const std::string& key) {
+        ImGui::SetCursorScreenPos(ImVec2(row.rowMin.x + 5.0f + clipIndent, row.rowMin.y + 4.0f));
+        ImGui::BeginChild(("##lfoRowProperties" + editorTrackId + editorClipId + key).c_str(),
+                          ImVec2(kLabelWidth - 10.0f - clipIndent,
+                                 std::max(1.0f, row.height - 8.0f - kLaneResizeHandleHeight)), false,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        if(ImGui::SmallButton(("v##lfoCollapse" + key).c_str())) collapsedLaneIds.insert(key);
+        ImGui::SameLine();
+    };
+
+    // --- result row ------------------------------------------------------
+    // Sampled from the same evaluator playback uses, so editing any control
+    // lane below previews exactly what the target binding receives.
+    if(collapsedLaneIds.count(resultKey) > 0) {
+        drawCollapsedRow(resultKey, "LFO result", false);
+    } else {
+        const auto row = beginRow(resultKey, kDefaultResultHeight, false);
+        beginRowProperties(row, resultKey);
+        ImGui::TextUnformatted("LFO result");
+        const auto* outputBinding = clip.lfoOutputBindingId.empty()
+            ? nullptr : timeline.getBinding(track.id, clip.lfoOutputBindingId);
+        const std::string outputPreview = outputBinding == nullptr
+            ? "No output target" : compactParameterName(outputBinding->parameterPath);
+        ImGui::SetNextItemWidth(-1.0f);
+        if(ImGui::BeginCombo("Output", outputPreview.c_str())) {
+            for(const auto& binding : track.bindings) {
+                const bool selected = binding.id == clip.lfoOutputBindingId;
+                if(ImGui::Selectable(compactParameterName(binding.parameterPath).c_str(), selected)) {
+                    clip.lfoOutputBindingId = binding.id;
+                    if(binding.valueType == typeid(float).name()) {
+                        if(auto* parameter = container->findCustomGuiParameter(binding.parameterPath)) {
+                            clip.lfoOutputMin = parameter->cast<float>().getParameter().getMin();
+                            clip.lfoOutputMax = parameter->cast<float>().getParameter().getMax();
+                        }
+                    } else if(binding.valueType == typeid(int).name()) {
+                        if(auto* parameter = container->findCustomGuiParameter(binding.parameterPath)) {
+                            clip.lfoOutputMin = static_cast<float>(parameter->cast<int>().getParameter().getMin());
+                            clip.lfoOutputMax = static_cast<float>(parameter->cast<int>().getParameter().getMax());
+                        }
                     }
                 }
             }
+            ImGui::EndCombo();
         }
-        ImGui::EndCombo();
-    }
-    ImGui::TextDisabled("The LFO result is mapped to this range.");
-    ImGui::SetNextItemWidth(-1.0f);
-    ImGui::DragFloat("Min", &clip.lfoOutputMin, 0.01f, -99999.0f, 99999.0f, "%.4g");
-    ImGui::SetNextItemWidth(-1.0f);
-    ImGui::DragFloat("Max", &clip.lfoOutputMax, 0.01f, -99999.0f, 99999.0f, "%.4g");
-    if(clip.lfoOutputMax < clip.lfoOutputMin) std::swap(clip.lfoOutputMax, clip.lfoOutputMin);
-    ImGui::EndChild();
-
-    const ImVec2 resultGraphMin(resultMin.x + propertiesWidth, resultMin.y + 6.0f);
-    const ImVec2 resultGraphMax(resultMax.x, resultMax.y - 6.0f);
-    drawGrid(resultGraphMin, resultGraphMax);
-    for(int level = 0; level <= 4; ++level) {
-        const float y = resultGraphMax.y - 8.0f - level / 4.0f *
-            (resultGraphMax.y - resultGraphMin.y - 16.0f);
-        dl->AddLine(ImVec2(resultGraphMin.x, y), ImVec2(resultGraphMax.x, y),
-                    level == 0 || level == 4 ? IM_COL32(130, 135, 150, 125) : IM_COL32(75, 80, 95, 90));
-    }
-    dl->PushClipRect(resultGraphMin, resultGraphMax, true);
-    const int samples = std::max(64, static_cast<int>(graphWidth / 2.0f));
-    for(int i = 0; i < samples; ++i) {
-        const double source1 = contentDuration * i / static_cast<double>(samples);
-        const double source2 = contentDuration * (i + 1) / static_cast<double>(samples);
-        const float value1 = ofxOceanodeTimelineLfo::evaluate(clip, source1);
-        const float value2 = ofxOceanodeTimelineLfo::evaluate(clip, source2);
-        const ImVec2 a(xForSource(source1), resultGraphMax.y - 8.0f - value1 *
-                       (resultGraphMax.y - resultGraphMin.y - 16.0f));
-        const ImVec2 b(xForSource(source2), resultGraphMax.y - 8.0f - value2 *
-                       (resultGraphMax.y - resultGraphMin.y - 16.0f));
-        dl->AddLine(a, b, lfoColor, 2.0f);
-    }
-    dl->PopClipRect();
-    const double resultSourceBeat = timelineToSourceBeat(clip, beatPosition);
-    const float resultPlayheadX = xForSource(resultSourceBeat);
-    if(resultPlayheadX >= resultGraphMin.x && resultPlayheadX <= resultGraphMax.x)
-        dl->AddLine(ImVec2(resultPlayheadX, resultGraphMin.y), ImVec2(resultPlayheadX, resultGraphMax.y), kPlayhead, 1.5f);
-
-    auto sampleLane = [](const ofxOceanodeTimelineLane& lane, double beat) {
-        return valueAtBeat(lane.curvePoints, lane.curveTensions, lane.curveInterpolation, beat, 0.0f);
-    };
-
-    for(size_t laneIndex = 0; laneIndex < clip.lanes.size(); ++laneIndex) {
-        auto& lane = clip.lanes[laneIndex];
-        const float rowY = editorMin.y + kResultHeight + laneIndex * kAutomationHeight;
-        const ImVec2 rowMin(editorMin.x, rowY);
-        const ImVec2 rowMax(editorMin.x + contentWidth, rowY + kAutomationHeight - 2.0f);
-        const bool focused = editorLaneId == lane.id;
-        dl->AddRectFilled(rowMin, rowMax, IM_COL32(27, 29, 35, 235));
-        dl->AddRectFilled(rowMin, ImVec2(rowMin.x + propertiesWidth, rowMax.y),
-                          mutedTrackColor(track.color, focused ? 0.30f : 0.21f, 0.42f));
-        dl->AddLine(ImVec2(rowMin.x + propertiesWidth, rowMin.y),
-                    ImVec2(rowMin.x + propertiesWidth, rowMax.y),
-                    IM_COL32(track.color.r, track.color.g, track.color.b, focused ? 220 : 150));
-        ImGui::SetCursorScreenPos(ImVec2(rowMin.x + 8.0f, rowMin.y + 8.0f));
-        ImGui::BeginChild(("##lfoLaneProperties" + lane.id).c_str(),
-                          ImVec2(std::max(80.0f, propertiesWidth - 16.0f), kAutomationHeight - 14.0f), false,
-                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-        ImGui::TextUnformatted(lane.name.c_str());
-        const float current = ofxOceanodeTimelineLfo::evaluateParameter(clip, lane.lfoParameter,
-                                                                          resultSourceBeat, 0.0f);
-        ImGui::TextDisabled("%.3g", current);
+        ImGui::TextDisabled("The LFO result is mapped to this range.");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("Min", &clip.lfoOutputMin, 0.01f, -99999.0f, 99999.0f, "%.4g");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("Max", &clip.lfoOutputMax, 0.01f, -99999.0f, 99999.0f, "%.4g");
+        if(clip.lfoOutputMax < clip.lfoOutputMin) std::swap(clip.lfoOutputMax, clip.lfoOutputMin);
         ImGui::EndChild();
 
-        const ImVec2 graphMin(rowMin.x + propertiesWidth, rowMin.y + 4.0f);
-        const ImVec2 graphMax(rowMax.x, rowMax.y - 4.0f);
-        ImGui::SetCursorScreenPos(graphMin);
-        ImGui::InvisibleButton(("##lfoLaneCanvas" + lane.id).c_str(),
-                               ImVec2(std::max(1.0f, graphWidth), std::max(1.0f, graphMax.y - graphMin.y)));
-        const bool hovered = ImGui::IsItemHovered() && ImGui::GetIO().MousePos.x >= rowMin.x + propertiesWidth;
-        drawGrid(graphMin, graphMax);
-        dl->AddLine(ImVec2(graphMin.x, graphMax.y - 5.0f), ImVec2(graphMax.x, graphMax.y - 5.0f), IM_COL32(95, 100, 115, 110));
-        dl->PushClipRect(graphMin, graphMax, true);
+        drawGrid(row.graphMin, row.graphMax);
+        for(int level = 0; level <= 4; ++level) {
+            const float y = row.graphMax.y - 8.0f - level / 4.0f *
+                (row.graphMax.y - row.graphMin.y - 16.0f);
+            dl->AddLine(ImVec2(row.graphMin.x, y), ImVec2(row.graphMax.x, y),
+                        level == 0 || level == 4 ? IM_COL32(130, 135, 150, 125) : IM_COL32(75, 80, 95, 90));
+        }
+        dl->PushClipRect(row.graphMin, row.graphMax, true);
         for(int i = 0; i < samples; ++i) {
             const double source1 = contentDuration * i / static_cast<double>(samples);
             const double source2 = contentDuration * (i + 1) / static_cast<double>(samples);
-            const float value1 = sampleLane(lane, source1);
-            const float value2 = sampleLane(lane, source2);
-            dl->AddLine(ImVec2(xForSource(source1), graphMax.y - 6.0f - value1 * (graphMax.y - graphMin.y - 12.0f)),
-                        ImVec2(xForSource(source2), graphMax.y - 6.0f - value2 * (graphMax.y - graphMin.y - 12.0f)),
+            const float value1 = ofxOceanodeTimelineLfo::evaluate(clip, source1);
+            const float value2 = ofxOceanodeTimelineLfo::evaluate(clip, source2);
+            const ImVec2 a(xForSource(source1), row.graphMax.y - 8.0f - value1 *
+                           (row.graphMax.y - row.graphMin.y - 16.0f));
+            const ImVec2 b(xForSource(source2), row.graphMax.y - 8.0f - value2 *
+                           (row.graphMax.y - row.graphMin.y - 16.0f));
+            dl->AddLine(a, b, lfoColor, 2.0f);
+        }
+        dl->PopClipRect();
+        drawPlayhead(row.graphMin, row.graphMax);
+        finishAbsoluteLayout(ImVec2(row.rowMin.x, row.rowMax.y));
+    }
+
+    // --- one row per oscillator control ----------------------------------
+    for(size_t laneIndex = 0; laneIndex < clip.lanes.size(); ++laneIndex) {
+        auto& lane = clip.lanes[laneIndex];
+        const bool focused = editorLaneId == lane.id;
+        const float current = ofxOceanodeTimelineLfo::evaluateParameter(clip, lane.lfoParameter,
+                                                                        resultSourceBeat, 0.0f);
+        if(collapsedLaneIds.count(lane.id) > 0) {
+            char collapsedLabel[96];
+            std::snprintf(collapsedLabel, sizeof(collapsedLabel), "%s   %.3g", lane.name.c_str(), current);
+            if(drawCollapsedRow(lane.id, collapsedLabel, focused)) editorLaneId = lane.id;
+            continue;
+        }
+
+        const auto row = beginRow(lane.id, kDefaultLaneHeight, focused);
+        beginRowProperties(row, lane.id);
+        if(ImGui::Selectable((lane.name + "##lfoLaneHeader" + lane.id).c_str(), focused,
+                             ImGuiSelectableFlags_None, ImVec2(ImGui::GetContentRegionAvail().x - 4.0f, 0))) {
+            editorLaneId = lane.id;
+        }
+        ImGui::TextDisabled("%.3g", current);
+        ImGui::EndChild();
+
+        drawGrid(row.graphMin, row.graphMax);
+        dl->AddLine(ImVec2(row.graphMin.x, row.graphMax.y - 1.0f),
+                    ImVec2(row.graphMax.x, row.graphMax.y - 1.0f), IM_COL32(95, 100, 115, 110));
+        const float valueSpan = std::max(1.0f, row.graphMax.y - row.graphMin.y - 12.0f);
+        auto yForValue = [&](float value) { return row.graphMax.y - 6.0f - value * valueSpan; };
+        dl->PushClipRect(row.graphMin, row.graphMax, true);
+        for(int i = 0; i < samples; ++i) {
+            const double source1 = contentDuration * i / static_cast<double>(samples);
+            const double source2 = contentDuration * (i + 1) / static_cast<double>(samples);
+            dl->AddLine(ImVec2(xForSource(source1), yForValue(valueAtBeat(lane.curvePoints, lane.curveTensions, lane.curveInterpolation, source1, 0.0f))),
+                        ImVec2(xForSource(source2), yForValue(valueAtBeat(lane.curvePoints, lane.curveTensions, lane.curveInterpolation, source2, 0.0f))),
                         lfoColor, focused ? 2.0f : 1.5f);
         }
         for(const auto& point : lane.curvePoints) {
             const float x = xForSource(point.beat);
-            if(x >= graphMin.x - 6.0f && x <= graphMax.x + 6.0f)
-                dl->AddCircleFilled(ImVec2(x, graphMax.y - 6.0f - point.value * (graphMax.y - graphMin.y - 12.0f)),
-                                     focused ? 4.0f : 3.0f, focused ? IM_COL32(245, 235, 150, 255) : lfoColor);
+            if(x >= row.graphMin.x - 6.0f && x <= row.graphMax.x + 6.0f)
+                dl->AddCircleFilled(ImVec2(x, yForValue(point.value)), focused ? 4.0f : 3.0f,
+                                    focused ? IM_COL32(245, 235, 150, 255) : lfoColor);
         }
         dl->PopClipRect();
+        drawPlayhead(row.graphMin, row.graphMax);
 
-        if(hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        if(row.canvasHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             editorLaneId = lane.id;
             lfoDragLaneId = lane.id;
             lfoDragPointIndex = -1;
             const ImVec2 mouse = ImGui::GetIO().MousePos;
             const double beat = snapBeat(ofClamp(sourceForX(mouse.x), 0.0, contentDuration));
-            const float value = ofClamp((graphMax.y - 6.0f - mouse.y) /
-                                        std::max(1.0f, graphMax.y - graphMin.y - 12.0f), 0.0f, 1.0f);
+            const float value = ofClamp((row.graphMax.y - 6.0f - mouse.y) / valueSpan, 0.0f, 1.0f);
             float nearest = 9.0f;
             for(int i = static_cast<int>(lane.curvePoints.size()) - 1; i >= 0; --i) {
                 const float px = xForSource(lane.curvePoints[i].beat);
-                const float py = graphMax.y - 6.0f - lane.curvePoints[i].value * (graphMax.y - graphMin.y - 12.0f);
+                const float py = yForValue(lane.curvePoints[i].value);
                 const float distance = std::hypot(mouse.x - px, mouse.y - py);
                 if(distance < nearest) { nearest = distance; lfoDragPointIndex = i; }
             }
@@ -2908,10 +2988,11 @@ void ofxOceanodeTimelineController::drawLfoEditor(ofxOceanodeTimelineManager& ti
             const double maximum = lfoDragPointIndex + 1 < static_cast<int>(lane.curvePoints.size())
                 ? lane.curvePoints[lfoDragPointIndex + 1].beat - 1.0 / kPPQ : contentDuration;
             lane.curvePoints[lfoDragPointIndex].beat = std::max(minimum, std::min(maximum, beat));
-            lane.curvePoints[lfoDragPointIndex].value = ofClamp((graphMax.y - 6.0f - mouse.y) /
-                std::max(1.0f, graphMax.y - graphMin.y - 12.0f), 0.0f, 1.0f);
+            lane.curvePoints[lfoDragPointIndex].value = ofClamp((row.graphMax.y - 6.0f - mouse.y) / valueSpan, 0.0f, 1.0f);
         }
+        finishAbsoluteLayout(ImVec2(row.rowMin.x, row.rowMax.y));
     }
+
     if(ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
         if(!lfoDragLaneId.empty()) {
             if(auto* lane = timeline.getLane(track.id, clip.id, lfoDragLaneId))
@@ -2921,7 +3002,6 @@ void ofxOceanodeTimelineController::drawLfoEditor(ofxOceanodeTimelineManager& ti
         lfoDragLaneId.clear();
         lfoDragPointIndex = -1;
     }
-    finishAbsoluteLayout(ImVec2(editorMin.x, editorMax.y));
 }
 
 void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& timeline,
