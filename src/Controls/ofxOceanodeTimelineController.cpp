@@ -40,6 +40,7 @@ constexpr float kLaneEditorMaxHeight = 640.0f;
 using ofxOceanodeTimelineCurve::CurveInterpolationMode;
 using ofxOceanodeTimelineCurve::curveInterpolationMode;
 using ofxOceanodeTimelineCurve::curveSegmentShape;
+using ofxOceanodeTimelineCurve::valueAtBeat;
 using ofxOceanodeTimelineClipTime::cycleDuration;
 using ofxOceanodeTimelineClipTime::sourceDuration;
 using ofxOceanodeTimelineClipTime::sourceToTimelineBeat;
@@ -144,7 +145,7 @@ const char* laneTypeName(ofxOceanodeTimelineLaneType type) {
 // of a hand-maintained ternary chain per site.
 //
 // Two counts, one table. Wave is absent from both: it is a track type whose
-// clips carry audio files, not something a clip's lane can be. LFO is only
+// clips carry audio files, and a Wave *lane* no longer exists at all. LFO is only
 // reachable through kClipCreationOptionCount, i.e. only where a whole clip
 // is being created -- an LFO is a self-contained modulator clip with its own
 // oscillator-control lanes, so it is a kind of clip to create (alongside a
@@ -332,22 +333,8 @@ bool ofxOceanodeTimelineController::splitWaveClipAtPlayhead(ofxOceanodeTimelineM
                   [](const auto& a, const auto& b) { return a.beat < b.beat; });
         const auto points = leftLane.curvePoints;
         const auto tensions = leftLane.curveTensions;
-        const auto interpolation = curveInterpolationMode(leftLane.curveInterpolation);
-        auto valueAt = [&](double beat) {
-            if(points.size() == 1 || beat <= points.front().beat) return points.front().value;
-            if(beat >= points.back().beat) return points.back().value;
-            for(size_t i = 1; i < points.size(); ++i) {
-                if(beat > points[i].beat) continue;
-                const double span = std::max(1e-9, points[i].beat - points[i - 1].beat);
-                const float t = ofClamp(static_cast<float>((beat - points[i - 1].beat) / span), 0.0f, 1.0f);
-                const auto tension = i - 1 < tensions.size() ? tensions[i - 1] : ofxOceanodeTimelineCurveTension{};
-                return ofLerp(points[i - 1].value, points[i].value,
-                              curveSegmentShape(t, interpolation, tension));
-            }
-            return points.back().value;
-        };
-
-        const float splitValue = valueAt(sourceSplit);
+        const float splitValue = valueAtBeat(points, tensions, leftLane.curveInterpolation,
+                                             sourceSplit, points.front().value);
         std::vector<ofxOceanodeTimelineCurvePoint> leftPoints;
         std::vector<ofxOceanodeTimelineCurvePoint> rightPoints;
         for(const auto& point : points) {
@@ -365,7 +352,7 @@ bool ofxOceanodeTimelineController::splitWaveClipAtPlayhead(ofxOceanodeTimelineM
 
     auto splitLaneData = [&](ofxOceanodeTimelineLane& leftLane,
                              ofxOceanodeTimelineLane& rightLane) {
-        if(leftLane.type == ofxOceanodeTimelineLaneType::Curve || leftLane.isWaveVolume) {
+        if(leftLane.type == ofxOceanodeTimelineLaneType::Curve) {
             splitCurveLane(leftLane, rightLane);
             return;
         }
@@ -413,9 +400,6 @@ bool ofxOceanodeTimelineController::splitWaveClipAtPlayhead(ofxOceanodeTimelineM
     std::vector<ofxOceanodeTimelineLane> leftLanes;
     leftLanes.reserve(original.lanes.size());
     for(const auto& sourceLane : original.lanes) {
-        // Legacy per-clip volume lanes are now represented by the track-wide
-        // automation editor and must not be duplicated into either slice.
-        if(sourceLane.isWaveVolume) continue;
         auto leftLane = sourceLane;
         auto rightLane = leftLane;
         splitLaneData(leftLane, rightLane);
@@ -1190,28 +1174,6 @@ void ofxOceanodeTimelineController::draw() {
                                 const float x2 = min.x + beatOffset(sourceToTimelineBeat(clip, region.end(), cycle));
                                 dl->AddRectFilled(ImVec2(x1, rTop), ImVec2(x2, rBottom), IM_COL32(245, 245, 245, 170));
                             }
-                        }
-                    }
-                }
-                dl->PopClipRect();
-                return;
-            }
-            if(lane->type == ofxOceanodeTimelineLaneType::Wave) {
-                dl->PushClipRect(ImVec2(left + 1.0f, min.y + 3.0f), ImVec2(right - 1.0f, max.y - 3.0f), true);
-                if(lane->waveNumChannels > 0 && !lane->waveformPeaks.empty()) {
-                    constexpr int kMiniPointsPerChannel = 2000;
-                    const double miniContent = sourceDuration(clip);
-                    const int miniCycles = clip.repeatContent
-                        ? std::max(1, static_cast<int>(std::ceil(clip.durationBeats / cycleDuration(clip)))) : 1;
-                    const float midY = (min.y + max.y) * 0.5f;
-                    const float half = (max.y - min.y) * 0.5f - 4.0f;
-                    for(int cycle = 0; cycle < miniCycles; ++cycle) {
-                        for(int pt = 0; pt < kMiniPointsPerChannel; pt += 4) {
-                            const double sourceBeatAtPoint = miniContent * (static_cast<double>(pt) / kMiniPointsPerChannel);
-                            const float x = min.x + beatOffset(sourceToTimelineBeat(clip, sourceBeatAtPoint, cycle));
-                            if(x < left || x > right) continue;
-                            const float peak = ofClamp(lane->waveformPeaks[pt], -1.0f, 1.0f);
-                            dl->AddLine(ImVec2(x, midY), ImVec2(x, midY - peak * half), IM_COL32(245, 245, 245, 170), 1.0f);
                         }
                     }
                 }
@@ -2821,21 +2783,7 @@ void ofxOceanodeTimelineController::drawLfoEditor(ofxOceanodeTimelineManager& ti
         dl->AddLine(ImVec2(resultPlayheadX, resultGraphMin.y), ImVec2(resultPlayheadX, resultGraphMax.y), kPlayhead, 1.5f);
 
     auto sampleLane = [](const ofxOceanodeTimelineLane& lane, double beat) {
-        if(lane.curvePoints.empty()) return 0.0f;
-        if(lane.curvePoints.size() == 1) return lane.curvePoints.front().value;
-        if(beat <= lane.curvePoints.front().beat) return lane.curvePoints.front().value;
-        for(size_t i = 1; i < lane.curvePoints.size(); ++i) {
-            if(beat > lane.curvePoints[i].beat) continue;
-            const auto& a = lane.curvePoints[i - 1];
-            const auto& b = lane.curvePoints[i];
-            const float t = ofClamp(static_cast<float>((beat - a.beat) /
-                std::max(1e-9, b.beat - a.beat)), 0.0f, 1.0f);
-            const auto tension = i - 1 < lane.curveTensions.size()
-                ? lane.curveTensions[i - 1] : ofxOceanodeTimelineCurveTension{};
-            return ofLerp(a.value, b.value, curveSegmentShape(t,
-                curveInterpolationMode(lane.curveInterpolation), tension));
-        }
-        return lane.curvePoints.back().value;
+        return valueAtBeat(lane.curvePoints, lane.curveTensions, lane.curveInterpolation, beat, 0.0f);
     };
 
     for(size_t laneIndex = 0; laneIndex < clip.lanes.size(); ++laneIndex) {
@@ -3008,7 +2956,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     for(size_t laneIndex = 0; laneIndex < clip->lanes.size(); ++laneIndex) {
     auto* lane = &clip->lanes[laneIndex];
     const bool isFocused = lane->id == editorLaneId;
-    std::string laneLabel = lane->isWaveVolume ? "Volume" : laneTypeName(lane->type);
+    std::string laneLabel = laneTypeName(lane->type);
     if(!lane->bindingIds.empty()) {
         if(const auto* laneBoundParam = timeline.getBinding(track.id, lane->bindingIds.front()))
             laneLabel += ": " + compactParameterName(laneBoundParam->parameterPath);
@@ -3253,25 +3201,6 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 if(ImGui::DragInt("Value Snap", &sliderSnap, 0.1f, 0, 64))
                     lane->valueQuantizeSteps = std::max(0, sliderSnap);
                 if(lane->valueQuantizeSteps >= 2) ImGui::TextDisabled("%d levels", lane->valueQuantizeSteps);
-            } else if(lane->type == ofxOceanodeTimelineLaneType::Wave) {
-                char waveBuffer[256];
-                std::snprintf(waveBuffer, sizeof(waveBuffer), "%s", lane->waveFilePath.c_str());
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if(ImGui::InputText("##waveFilePath", waveBuffer, sizeof(waveBuffer)))
-                    lane->waveFilePath = waveBuffer;
-                if(ImGui::IsItemDeactivatedAfterEdit())
-                    timeline.reloadWaveform(track.id, clip->id, lane->id);
-                if(ImGui::Button("Load...")) {
-                    const auto result = ofSystemLoadDialog("Load wave file", false);
-                    if(result.bSuccess) {
-                        lane->waveFilePath = result.filePath;
-                        timeline.reloadWaveform(track.id, clip->id, lane->id);
-                    }
-                }
-                ImGui::SetNextItemWidth(labeledWidgetWidth(94.0f, "Gain"));
-                ImGui::DragFloat("Gain", &lane->waveGain, 0.01f, 0.0f, 4.0f, "%.2f");
-                if(lane->waveNumChannels > 0) ImGui::TextDisabled("%d ch, %.2fs", lane->waveNumChannels, lane->waveFileDurationMs / 1000.0);
-                else if(!lane->waveFilePath.empty()) ImGui::TextDisabled("Failed to load");
             } else {
                 auto drawPianoRole = [&](const char* label, std::string& roleId) {
                     const auto* currentBinding = roleId.empty() ? nullptr : timeline.getBinding(track.id, roleId);
@@ -4386,47 +4315,6 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         } // isFocused (multi-value / multi-gate interaction)
         const float playheadX = timelineMin.x + beatOffset(beatPosition);
         if(playheadX >= zoneLeft && playheadX <= editorMax.x) dl->AddLine(ImVec2(playheadX, editorMin.y), ImVec2(playheadX, editorMax.y), kPlayhead, 2.0f);
-        dl->PopClipRect();
-        finishAbsoluteLayout(ImVec2(editorMin.x, editorMax.y));
-        continue;
-    }
-
-    if(lane->type == ofxOceanodeTimelineLaneType::Wave) {
-        const float waveTop = editorMin.y + 8.0f;
-        const float waveBottom = editorMax.y - 8.0f;
-        dl->PushClipRect(ImVec2(left, waveTop), ImVec2(right, waveBottom), true);
-        dl->AddRectFilled(ImVec2(left, waveTop), ImVec2(right, waveBottom), IM_COL32(20, 20, 22, 160));
-        if(lane->waveNumChannels > 0 && !lane->waveformPeaks.empty()) {
-            constexpr int kPointsPerChannel = 2000;
-            const int channels = lane->waveNumChannels;
-            const float channelHeight = (waveBottom - waveTop) / channels;
-            const double content = sourceDuration(*clip);
-            const int clipCycles = clip->repeatContent ? std::max(1, static_cast<int>(std::ceil(clip->durationBeats / cycleDuration(*clip)))) : 1;
-            for(int ch = 0; ch < channels; ++ch) {
-                const float chTop = waveTop + ch * channelHeight;
-                const float chMid = chTop + channelHeight * 0.5f;
-                const float chHalf = channelHeight * 0.5f - 2.0f;
-                for(int cycle = 0; cycle < clipCycles; ++cycle) {
-                    for(int pt = 0; pt < kPointsPerChannel; ++pt) {
-                        const double sourceBeatAtPoint = content * (static_cast<double>(pt) / kPointsPerChannel);
-                        const float x = timelineMin.x + beatOffset(sourceToTimelineBeat(*clip, sourceBeatAtPoint, cycle));
-                        if(x < left - 2.0f || x > right + 2.0f) continue;
-                        const float peak = ofClamp(lane->waveformPeaks[static_cast<size_t>(ch) * kPointsPerChannel + pt], -1.0f, 1.0f);
-                        const float y = chMid - peak * chHalf;
-                        dl->AddLine(ImVec2(x, chMid), ImVec2(x, y),
-                                    IM_COL32(track.color.r, track.color.g, track.color.b, cycle == 0 ? 235 : 110), 1.0f);
-                    }
-                }
-                if(ch > 0) dl->AddLine(ImVec2(left, chTop), ImVec2(right, chTop), IM_COL32(70, 70, 70, 120));
-            }
-        } else {
-            dl->AddText(ImVec2(left + 6.0f, waveTop + 6.0f), IM_COL32(180, 180, 180, 200),
-                        lane->waveFilePath.empty() ? "No file loaded" : "Failed to load waveform");
-        }
-        dl->PopClipRect();
-        const float playheadX = timelineMin.x + beatOffset(beatPosition);
-        if(playheadX >= zoneLeft && playheadX <= editorMax.x) dl->AddLine(ImVec2(playheadX, editorMin.y), ImVec2(playheadX, editorMax.y), kPlayhead, 2.0f);
-        if(isFocused && editorCanvasHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) clipEditorOpen = false;
         dl->PopClipRect();
         finishAbsoluteLayout(ImVec2(editorMin.x, editorMax.y));
         continue;

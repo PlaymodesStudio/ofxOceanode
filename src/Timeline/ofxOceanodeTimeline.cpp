@@ -57,14 +57,40 @@ float curveSegmentShape(float x, CurveInterpolationMode interpolation,
     return x;
 }
 
+float valueAtBeat(const std::vector<ofxOceanodeTimelineCurvePoint>& points,
+                  const std::vector<ofxOceanodeTimelineCurveTension>& tensions,
+                  const std::string& interpolation, double beat, float fallback) {
+    if(points.empty()) return fallback;
+    if(points.size() == 1) return points.front().value;
+    if(beat <= points.front().beat) return points.front().value;
+    if(beat >= points.back().beat) return points.back().value;
+    const auto mode = curveInterpolationMode(interpolation);
+    for(size_t i = 1; i < points.size(); ++i) {
+        if(beat > points[i].beat) continue;
+        const double span = std::max(1e-9, points[i].beat - points[i - 1].beat);
+        const float t = static_cast<float>(ofClamp((beat - points[i - 1].beat) / span, 0.0, 1.0));
+        const auto tension = i - 1 < tensions.size() ? tensions[i - 1] : ofxOceanodeTimelineCurveTension{};
+        return ofLerp(points[i - 1].value, points[i].value, curveSegmentShape(t, mode, tension));
+    }
+    return points.back().value;
+}
+
 } // namespace ofxOceanodeTimelineCurve
 
 namespace {
+using ofxOceanodeTimelineCurve::valueAtBeat;
 using ofxOceanodeTimelineCurve::CurveInterpolationMode;
 using ofxOceanodeTimelineCurve::curveInterpolationMode;
 using ofxOceanodeTimelineCurve::curveSegmentShape;
 
 constexpr double kEpsilon = 1e-9;
+
+// Bumped when the shape of the document changes in a way a reader has to
+// know about. Every field is parsed with its own default, so an older file
+// loads without any version test; this exists to notice a file written by a
+// NEWER build, where a silent partial load would be the wrong answer.
+// 6 clip groups, 7 wave tracks, 8 self-contained LFO clips.
+constexpr int kPresetVersion = 8;
 
 double positiveModulo(double value, double length) {
     if(length <= kEpsilon) return 0.0;
@@ -231,6 +257,174 @@ void normalizeWaveClipMapping(ofxOceanodeTimelineClip& clip) {
     clip.contentStretch = std::max(1.0 / 1024.0, clip.durationBeats / clip.contentDurationBeats);
 }
 
+// Reads a WAV file's channel count, duration and a fixed-size peak cache.
+// PCM 8/16/24/32 only, first fmt/data chunks used -- the same reader, with
+// the same limitations, as the standalone Wave Track node this mirrors, so
+// both caches look identical. Pure file IO with no SuperCollider
+// dependency, safe to call whether or not an audio provider is registered.
+// filePath is in/out: it is rewritten when the file is found through the
+// data/Samples search path rather than as given.
+bool readWaveformCache(std::string& filePath, int& outNumChannels,
+                       double& outDurationMs, std::vector<float>& outPeaks) {
+    outNumChannels = 0;
+    outDurationMs = 0.0;
+    outPeaks.clear();
+    if(filePath.empty()) return true;
+
+    const std::string resolvedPath = resolveTimelineAudioPath(filePath);
+    if(resolvedPath != filePath && ofFile::doesFileExist(resolvedPath))
+        filePath = resolvedPath;
+
+    ofFile file(filePath, ofFile::ReadOnly, true);
+    if(!file.is_open()) {
+        ofLogWarning("ofxOceanodeTimeline") << "Could not open wave file: " << filePath;
+        return false;
+    }
+
+    // Minimal RIFF/WAVE reader -- same approach and same limitations
+    // (PCM 16/24/32-bit only, first fmt/data chunks used) as the old
+    // standalone Wave Track node's getFileInfo/loadWaveformCache
+    // (ofxOceanodeSuperCollider/waveTrack.h), which this mirrors closely
+    // enough to keep the two waveform caches visually identical.
+    char riff[4], wave[4];
+    uint32_t riffSize = 0;
+    if(!file.read((char*)&riff, 4) || !file.read((char*)&riffSize, 4) || !file.read((char*)&wave, 4)) {
+        ofLogWarning("ofxOceanodeTimeline") << "Invalid or truncated wave header: " << filePath;
+        file.close();
+        return false;
+    }
+    if(std::strncmp(riff, "RIFF", 4) != 0 || std::strncmp(wave, "WAVE", 4) != 0) {
+        ofLogWarning("ofxOceanodeTimeline") << "Selected file is not a RIFF/WAVE file: " << filePath;
+        file.close();
+        return false;
+    }
+
+    int numChannels = 0;
+    uint32_t sampleRate = 0;
+    uint16_t bitsPerSample = 0;
+    uint16_t formatType = 0;
+    uint32_t dataSize = 0;
+    bool haveFmt = false, haveData = false;
+    std::streamoff dataStart = 0;
+
+    while(true) {
+        char chunkId[4];
+        uint32_t chunkSize = 0;
+        if(!file.read((char*)&chunkId, 4)) break;
+        if(!file.read((char*)&chunkSize, 4)) break;
+
+        if(std::strncmp(chunkId, "fmt ", 4) == 0 && chunkSize >= 16) {
+            uint16_t channels = 0, bits = 0;
+            uint32_t srate = 0, byteRate = 0;
+            uint16_t blockAlign = 0;
+            file.read((char*)&formatType, 2);
+            file.read((char*)&channels, 2);
+            file.read((char*)&srate, 4);
+            file.read((char*)&byteRate, 4);
+            file.read((char*)&blockAlign, 2);
+            file.read((char*)&bits, 2);
+            numChannels = channels;
+            sampleRate = srate;
+            bitsPerSample = bits;
+            haveFmt = true;
+            if(chunkSize > 16) {
+                const uint32_t extraBytes = chunkSize - 16;
+                // WAVE_FORMAT_EXTENSIBLE wraps the real PCM/float subtype
+                // in a 40-byte fmt chunk. Recover that subtype so a 32-bit
+                // PCM file is not interpreted as IEEE float samples.
+                if(formatType == 0xFFFE && extraBytes >= 24) {
+                    uint16_t extensionSize = 0, validBits = 0, subtype = 0;
+                    uint32_t channelMask = 0;
+                    file.read((char*)&extensionSize, 2);
+                    file.read((char*)&validBits, 2);
+                    file.read((char*)&channelMask, 4);
+                    file.read((char*)&subtype, 2);
+                    formatType = subtype;
+                    if(extraBytes > 10) file.seekg(extraBytes - 10, std::ios::cur);
+                } else {
+                    file.seekg(extraBytes, std::ios::cur);
+                }
+            }
+        } else if(std::strncmp(chunkId, "data", 4) == 0) {
+            dataSize = chunkSize;
+            dataStart = file.tellg();
+            haveData = true;
+            break;
+        } else {
+            file.seekg(chunkSize, std::ios::cur);
+        }
+        if(chunkSize & 1u) file.seekg(1, std::ios::cur);
+    }
+
+    if(!haveFmt || !haveData || sampleRate == 0 || numChannels <= 0 || numChannels > 16 || bitsPerSample == 0) {
+        ofLogWarning("ofxOceanodeTimeline") << "Wave file has no usable fmt/data chunks: " << filePath;
+        file.close();
+        return false;
+    }
+
+    const int bytesPerSample = bitsPerSample / 8;
+    if((bitsPerSample != 8 && bitsPerSample != 16 && bitsPerSample != 24 && bitsPerSample != 32) ||
+       bytesPerSample <= 0) {
+        ofLogWarning("ofxOceanodeTimeline") << "Unsupported wave bit depth (" << bitsPerSample
+            << ") in " << filePath;
+        file.close();
+        return false;
+    }
+    const int totalFrames = bytesPerSample > 0 ? static_cast<int>(dataSize / (bytesPerSample * numChannels)) : 0;
+    outDurationMs = totalFrames > 0
+        ? static_cast<double>(totalFrames) / sampleRate * 1000.0 : 0.0;
+    outNumChannels = numChannels;
+
+    constexpr int kPointsPerChannel = 2000;
+    const int framesPerPoint = std::max(1, totalFrames / kPointsPerChannel);
+    outPeaks.assign(static_cast<size_t>(numChannels) * kPointsPerChannel, 0.0f);
+
+    file.seekg(dataStart, std::ios::beg);
+    std::vector<char> frameBuf(static_cast<size_t>(bytesPerSample) * numChannels);
+    for(int pt = 0; pt < kPointsPerChannel; ++pt) {
+        const int startFrame = pt * framesPerPoint;
+        const int endFrame = std::min(startFrame + framesPerPoint, totalFrames);
+        std::vector<float> minVals(numChannels, 1.0f);
+        std::vector<float> maxVals(numChannels, -1.0f);
+        for(int f = startFrame; f < endFrame; ++f) {
+            if(!file.read(frameBuf.data(), frameBuf.size())) break;
+            for(int ch = 0; ch < numChannels; ++ch) {
+                float sample = 0.0f;
+                const size_t offset = static_cast<size_t>(ch) * bytesPerSample;
+                if(bitsPerSample == 8) {
+                    const auto raw = static_cast<unsigned char>(frameBuf[offset]);
+                    sample = (static_cast<float>(raw) - 128.0f) / 128.0f;
+                } else if(bitsPerSample == 16) {
+                    int16_t raw = 0;
+                    std::memcpy(&raw, frameBuf.data() + offset, 2);
+                    sample = raw / 32768.0f;
+                } else if(bitsPerSample == 24) {
+                    int32_t raw = 0;
+                    std::memcpy(&raw, frameBuf.data() + offset, 3);
+                    if(raw & 0x800000) raw |= (int32_t)0xFF000000;
+                    sample = raw / 8388608.0f;
+                } else if(bitsPerSample == 32) {
+                    if(formatType == 1) {
+                        int32_t raw = 0;
+                        std::memcpy(&raw, frameBuf.data() + offset, 4);
+                        sample = raw / 2147483648.0f;
+                    } else {
+                        std::memcpy(&sample, frameBuf.data() + offset, 4);
+                    }
+                }
+                if(sample < minVals[ch]) minVals[ch] = sample;
+                if(sample > maxVals[ch]) maxVals[ch] = sample;
+            }
+        }
+        for(int ch = 0; ch < numChannels; ++ch) {
+            const float peak = std::abs(maxVals[ch]) >= std::abs(minVals[ch]) ? maxVals[ch] : minVals[ch];
+            outPeaks[static_cast<size_t>(ch) * kPointsPerChannel + pt] = peak;
+        }
+    }
+    file.close();
+    return true;
+}
+
 bool clipSourceBeat(const ofxOceanodeTimelineClip& clip, double globalBeat, double& sourceBeat) {
     const double duration = std::max(1.0 / 24.0, clip.durationBeats);
     if(globalBeat < clip.startBeat - kEpsilon || globalBeat >= clip.startBeat + duration - kEpsilon) return false;
@@ -241,44 +435,9 @@ bool clipSourceBeat(const ofxOceanodeTimelineClip& clip, double globalBeat, doub
 
 bool evaluateCurve(const ofxOceanodeTimelineLane& lane, double beat, std::string& value) {
     if(lane.curvePoints.empty()) return false;
-    if(lane.curvePoints.size() == 1) {
-        value = ofToString(lane.curvePoints.front().value);
-        return true;
-    }
-    const auto& points = lane.curvePoints;
-    if(beat <= points.front().beat) value = ofToString(points.front().value);
-    else if(beat >= points.back().beat) value = ofToString(points.back().value);
-    else {
-        for(size_t i = 1; i < points.size(); ++i) {
-            if(beat > points[i].beat) continue;
-            const double span = std::max(kEpsilon, points[i].beat - points[i - 1].beat);
-            const float t = static_cast<float>(ofClamp((beat - points[i - 1].beat) / span, 0.0, 1.0));
-            const auto tension = i - 1 < lane.curveTensions.size()
-                ? lane.curveTensions[i - 1] : ofxOceanodeTimelineCurveTension{};
-            value = ofToString(ofLerp(points[i - 1].value, points[i].value,
-                                      curveSegmentShape(t, curveInterpolationMode(lane.curveInterpolation), tension)));
-            break;
-        }
-    }
+    value = ofToString(valueAtBeat(lane.curvePoints, lane.curveTensions,
+                                   lane.curveInterpolation, beat, 0.0f));
     return true;
-}
-
-float evaluateCurvePoints(const std::vector<ofxOceanodeTimelineCurvePoint>& points,
-                          const std::vector<ofxOceanodeTimelineCurveTension>& tensions,
-                          const std::string& interpolation, double beat, float fallback) {
-    if(points.empty()) return fallback;
-    if(points.size() == 1) return points.front().value;
-    if(beat <= points.front().beat) return points.front().value;
-    if(beat >= points.back().beat) return points.back().value;
-    for(size_t i = 1; i < points.size(); ++i) {
-        if(beat > points[i].beat) continue;
-        const double span = std::max(kEpsilon, points[i].beat - points[i - 1].beat);
-        const float t = static_cast<float>(ofClamp((beat - points[i - 1].beat) / span, 0.0, 1.0));
-        const auto tension = i - 1 < tensions.size() ? tensions[i - 1] : ofxOceanodeTimelineCurveTension{};
-        return ofLerp(points[i - 1].value, points[i].value,
-                      curveSegmentShape(t, curveInterpolationMode(interpolation), tension));
-    }
-    return points.back().value;
 }
 
 std::string mapNormalizedLaneValue(const ofxOceanodeTimelineLane& lane,
@@ -342,8 +501,8 @@ const LfoParameterDefinition* lfoParameterDefinition(const std::string& id) {
 
 float normalizedLfoLaneValue(const ofxOceanodeTimelineLane& lane, double beat,
                              float fallback) {
-    return evaluateCurvePoints(lane.curvePoints, lane.curveTensions,
-                               lane.curveInterpolation, beat, fallback);
+    return valueAtBeat(lane.curvePoints, lane.curveTensions,
+                       lane.curveInterpolation, beat, fallback);
 }
 
 } // namespace
@@ -916,8 +1075,8 @@ float ofxOceanodeTimelineManager::evaluateWaveTrackVolume(const std::string& tra
     // its plain gain, whatever points happen to be stored.
     if(!track->waveVolumeAutomationEnabled || track->waveVolumePoints.empty())
         return ofClamp(track->waveVolume, 0.0f, 4.0f);
-    return ofClamp(evaluateCurvePoints(track->waveVolumePoints, track->waveVolumeTensions,
-                                       track->waveVolumeInterpolation, beat, track->waveVolume), 0.0f, 4.0f);
+    return ofClamp(valueAtBeat(track->waveVolumePoints, track->waveVolumeTensions,
+                               track->waveVolumeInterpolation, beat, track->waveVolume), 0.0f, 4.0f);
 }
 
 std::vector<ofxOceanodeTimelineCurvePoint>& ofxOceanodeTimelineManager::getWaveTrackVolumePoints(const std::string& trackId) {
@@ -1105,31 +1264,6 @@ bool ofxOceanodeTimelineManager::removeBinding(const std::string& trackId, const
     }
     track->bindings.erase(it);
     refreshTimelineFlag(parameterPath);
-    return true;
-}
-
-bool ofxOceanodeTimelineManager::setLaneType(const std::string& trackId,
-                                             const std::string& bindingId,
-                                             ofxOceanodeTimelineLaneType laneType) {
-    auto* binding = getBinding(trackId, bindingId);
-    if(binding == nullptr) return false;
-    binding->laneType = laneType;
-    if(auto* track = getTrack(trackId)) {
-        for(auto& clip : track->clips) {
-            for(auto& lane : clip.lanes) {
-                if(std::find(lane.bindingIds.begin(), lane.bindingIds.end(), bindingId) != lane.bindingIds.end()) {
-                    lane.type = laneType;
-                    if(laneType == ofxOceanodeTimelineLaneType::PianoRoll) {
-                        lane.valueMin = 0.0f;
-                        lane.valueMax = 1.0f;
-                        if(lane.pianoPitchBindingId.empty()) lane.pianoPitchBindingId = bindingId;
-                        else if(lane.pianoGateBindingId.empty() && lane.pianoPitchBindingId != bindingId) lane.pianoGateBindingId = bindingId;
-                        else if(lane.pianoVelocityBindingId.empty() && lane.pianoPitchBindingId != bindingId && lane.pianoGateBindingId != bindingId) lane.pianoVelocityBindingId = bindingId;
-                    }
-                }
-            }
-        }
-    }
     return true;
 }
 
@@ -1407,187 +1541,30 @@ bool ofxOceanodeTimelineManager::setLaneMultiRowCount(const std::string& trackId
     return true;
 }
 
-bool ofxOceanodeTimelineManager::reloadWaveform(const std::string& trackId, const std::string& clipId,
-                                                const std::string& laneId) {
-    auto* lane = getLane(trackId, clipId, laneId);
-    if(lane == nullptr) return false;
-    lane->waveNumChannels = 0;
-    lane->waveFileDurationMs = 0.0;
-    lane->waveformPeaks.clear();
-    if(lane->waveFilePath.empty()) return true;
-
-    const std::string resolvedPath = resolveTimelineAudioPath(lane->waveFilePath);
-    if(resolvedPath != lane->waveFilePath && ofFile::doesFileExist(resolvedPath))
-        lane->waveFilePath = resolvedPath;
-
-    ofFile file(lane->waveFilePath, ofFile::ReadOnly, true);
-    if(!file.is_open()) {
-        ofLogWarning("ofxOceanodeTimeline") << "Could not open wave file: " << lane->waveFilePath;
-        return false;
-    }
-
-    // Minimal RIFF/WAVE reader -- same approach and same limitations
-    // (PCM 16/24/32-bit only, first fmt/data chunks used) as the old
-    // standalone Wave Track node's getFileInfo/loadWaveformCache
-    // (ofxOceanodeSuperCollider/waveTrack.h), which this mirrors closely
-    // enough to keep the two waveform caches visually identical.
-    char riff[4], wave[4];
-    uint32_t riffSize = 0;
-    if(!file.read((char*)&riff, 4) || !file.read((char*)&riffSize, 4) || !file.read((char*)&wave, 4)) {
-        ofLogWarning("ofxOceanodeTimeline") << "Invalid or truncated wave header: " << lane->waveFilePath;
-        file.close();
-        return false;
-    }
-    if(std::strncmp(riff, "RIFF", 4) != 0 || std::strncmp(wave, "WAVE", 4) != 0) {
-        ofLogWarning("ofxOceanodeTimeline") << "Selected file is not a RIFF/WAVE file: " << lane->waveFilePath;
-        file.close();
-        return false;
-    }
-
-    int numChannels = 0;
-    uint32_t sampleRate = 0;
-    uint16_t bitsPerSample = 0;
-    uint16_t formatType = 0;
-    uint32_t dataSize = 0;
-    bool haveFmt = false, haveData = false;
-    std::streamoff dataStart = 0;
-
-    while(true) {
-        char chunkId[4];
-        uint32_t chunkSize = 0;
-        if(!file.read((char*)&chunkId, 4)) break;
-        if(!file.read((char*)&chunkSize, 4)) break;
-
-        if(std::strncmp(chunkId, "fmt ", 4) == 0 && chunkSize >= 16) {
-            uint16_t channels = 0, bits = 0;
-            uint32_t srate = 0, byteRate = 0;
-            uint16_t blockAlign = 0;
-            file.read((char*)&formatType, 2);
-            file.read((char*)&channels, 2);
-            file.read((char*)&srate, 4);
-            file.read((char*)&byteRate, 4);
-            file.read((char*)&blockAlign, 2);
-            file.read((char*)&bits, 2);
-            numChannels = channels;
-            sampleRate = srate;
-            bitsPerSample = bits;
-            haveFmt = true;
-            if(chunkSize > 16) {
-                const uint32_t extraBytes = chunkSize - 16;
-                // WAVE_FORMAT_EXTENSIBLE wraps the real PCM/float subtype
-                // in a 40-byte fmt chunk. Recover that subtype so a 32-bit
-                // PCM file is not interpreted as IEEE float samples.
-                if(formatType == 0xFFFE && extraBytes >= 24) {
-                    uint16_t extensionSize = 0, validBits = 0, subtype = 0;
-                    uint32_t channelMask = 0;
-                    file.read((char*)&extensionSize, 2);
-                    file.read((char*)&validBits, 2);
-                    file.read((char*)&channelMask, 4);
-                    file.read((char*)&subtype, 2);
-                    formatType = subtype;
-                    if(extraBytes > 10) file.seekg(extraBytes - 10, std::ios::cur);
-                } else {
-                    file.seekg(extraBytes, std::ios::cur);
-                }
-            }
-        } else if(std::strncmp(chunkId, "data", 4) == 0) {
-            dataSize = chunkSize;
-            dataStart = file.tellg();
-            haveData = true;
-            break;
-        } else {
-            file.seekg(chunkSize, std::ios::cur);
-        }
-        if(chunkSize & 1u) file.seekg(1, std::ios::cur);
-    }
-
-    if(!haveFmt || !haveData || sampleRate == 0 || numChannels <= 0 || numChannels > 16 || bitsPerSample == 0) {
-        ofLogWarning("ofxOceanodeTimeline") << "Wave file has no usable fmt/data chunks: " << lane->waveFilePath;
-        file.close();
-        return false;
-    }
-
-    const int bytesPerSample = bitsPerSample / 8;
-    if((bitsPerSample != 8 && bitsPerSample != 16 && bitsPerSample != 24 && bitsPerSample != 32) ||
-       bytesPerSample <= 0) {
-        ofLogWarning("ofxOceanodeTimeline") << "Unsupported wave bit depth (" << bitsPerSample
-            << ") in " << lane->waveFilePath;
-        file.close();
-        return false;
-    }
-    const int totalFrames = bytesPerSample > 0 ? static_cast<int>(dataSize / (bytesPerSample * numChannels)) : 0;
-    lane->waveFileDurationMs = totalFrames > 0
-        ? static_cast<double>(totalFrames) / sampleRate * 1000.0 : 0.0;
-    lane->waveNumChannels = numChannels;
-
-    constexpr int kPointsPerChannel = 2000;
-    const int framesPerPoint = std::max(1, totalFrames / kPointsPerChannel);
-    lane->waveformPeaks.assign(static_cast<size_t>(numChannels) * kPointsPerChannel, 0.0f);
-
-    file.seekg(dataStart, std::ios::beg);
-    std::vector<char> frameBuf(static_cast<size_t>(bytesPerSample) * numChannels);
-    for(int pt = 0; pt < kPointsPerChannel; ++pt) {
-        const int startFrame = pt * framesPerPoint;
-        const int endFrame = std::min(startFrame + framesPerPoint, totalFrames);
-        std::vector<float> minVals(numChannels, 1.0f);
-        std::vector<float> maxVals(numChannels, -1.0f);
-        for(int f = startFrame; f < endFrame; ++f) {
-            if(!file.read(frameBuf.data(), frameBuf.size())) break;
-            for(int ch = 0; ch < numChannels; ++ch) {
-                float sample = 0.0f;
-                const size_t offset = static_cast<size_t>(ch) * bytesPerSample;
-                if(bitsPerSample == 8) {
-                    const auto raw = static_cast<unsigned char>(frameBuf[offset]);
-                    sample = (static_cast<float>(raw) - 128.0f) / 128.0f;
-                } else if(bitsPerSample == 16) {
-                    int16_t raw = 0;
-                    std::memcpy(&raw, frameBuf.data() + offset, 2);
-                    sample = raw / 32768.0f;
-                } else if(bitsPerSample == 24) {
-                    int32_t raw = 0;
-                    std::memcpy(&raw, frameBuf.data() + offset, 3);
-                    if(raw & 0x800000) raw |= (int32_t)0xFF000000;
-                    sample = raw / 8388608.0f;
-                } else if(bitsPerSample == 32) {
-                    if(formatType == 1) {
-                        int32_t raw = 0;
-                        std::memcpy(&raw, frameBuf.data() + offset, 4);
-                        sample = raw / 2147483648.0f;
-                    } else {
-                        std::memcpy(&sample, frameBuf.data() + offset, 4);
-                    }
-                }
-                if(sample < minVals[ch]) minVals[ch] = sample;
-                if(sample > maxVals[ch]) maxVals[ch] = sample;
-            }
-        }
-        for(int ch = 0; ch < numChannels; ++ch) {
-            const float peak = std::abs(maxVals[ch]) >= std::abs(minVals[ch]) ? maxVals[ch] : minVals[ch];
-            lane->waveformPeaks[static_cast<size_t>(ch) * kPointsPerChannel + pt] = peak;
-        }
-    }
-    file.close();
-    return true;
-}
-
 bool ofxOceanodeTimelineManager::reloadWaveform(const std::string& trackId, const std::string& clipId) {
     auto* clip = getClip(trackId, clipId);
     if(clip == nullptr) return false;
-    // Reuse the established RIFF reader/cache builder while keeping the new
-    // track-level data model independent of the legacy Wave-lane fields.
-    ofxOceanodeTimelineLane cacheLane;
-    cacheLane.id = "__wave_clip_cache__";
-    cacheLane.type = ofxOceanodeTimelineLaneType::Wave;
-    cacheLane.waveFilePath = clip->waveFilePath;
-    clip->lanes.push_back(cacheLane);
-    const bool result = reloadWaveform(trackId, clipId, cacheLane.id);
-    const auto& built = clip->lanes.back();
-    if(built.waveFilePath != clip->waveFilePath && ofFile::doesFileExist(built.waveFilePath))
-        clip->waveFilePath = built.waveFilePath;
-    clip->waveNumChannels = built.waveNumChannels;
-    clip->waveFileDurationMs = built.waveFileDurationMs;
-    clip->waveformPeaks = built.waveformPeaks;
-    clip->lanes.pop_back();
+    const bool result = readWaveformCache(clip->waveFilePath, clip->waveNumChannels,
+                                          clip->waveFileDurationMs, clip->waveformPeaks);
+    // waveFileDurationMs is tempo-independent; waveFileDurationBeats is not.
+    // Re-derive the beat-domain length at the tempo in force now and carry
+    // this clip's own source range across with it, so a slice keeps pointing
+    // at the same audio instead of being clamped (by normalizeWaveClipMapping
+    // below) against a length measured at whatever tempo was set when the
+    // file was first imported.
+    if(container != nullptr && clip->waveFileDurationMs > 0.0) {
+        const double bpm = std::max(1.0f, container->getTransportState().bpm);
+        const double refreshedBeats = clip->waveFileDurationMs * bpm / 60000.0;
+        if(clip->waveFileDurationBeats > kEpsilon) {
+            const double ratio = refreshedBeats / clip->waveFileDurationBeats;
+            if(std::abs(ratio - 1.0) > 1e-9) {
+                clip->waveSourceStartBeat *= ratio;
+                clip->contentDurationBeats *= ratio;
+            }
+        }
+        clip->waveFileDurationBeats = refreshedBeats;
+        normalizeWaveClipMapping(*clip);
+    }
     return result;
 }
 
@@ -1654,6 +1631,10 @@ bool ofxOceanodeTimelineManager::setClipLaneType(const std::string& trackId, con
     auto* lane = getLane(trackId, clipId, laneId);
     auto* clip = getClip(trackId, clipId);
     if(lane == nullptr) return false;
+    // Wave is a track type, not a lane type -- createLane refuses it and
+    // loading folds the old Wave-lane format onto the clip, so nothing may
+    // reintroduce one here either.
+    if(type == ofxOceanodeTimelineLaneType::Wave) return false;
     const auto previousType = lane->type;
     lane->type = type;
     if(previousType == ofxOceanodeTimelineLaneType::Wave && type != ofxOceanodeTimelineLaneType::Wave)
@@ -2875,7 +2856,7 @@ ofxOceanodeTimelineLaneType ofxOceanodeTimelineManager::laneTypeFromString(const
 
 ofJson ofxOceanodeTimelineManager::toJson() const {
     ofJson json;
-    json["version"] = 8; // 8 adds self-contained LFO clips
+    json["version"] = kPresetVersion;
     json["tempo"] = {
         {"enabled", bpmAutomationEnabled},
         {"collapsed", bpmLaneCollapsed},
@@ -2909,7 +2890,6 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
         trackJson["name"] = track.name;
         trackJson["collapsed"] = track.collapsed;
         trackJson["isWaveTrack"] = track.isWaveTrack;
-        trackJson["waveTrackHeight"] = track.waveTrackHeight;
         trackJson["waveVolume"] = track.waveVolume;
         trackJson["waveVolumeAutomationEnabled"] = track.waveVolumeAutomationEnabled;
         trackJson["waveVolumeInterpolation"] = track.waveVolumeInterpolation;
@@ -3013,12 +2993,10 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
                 laneJson["multiValueInteger"] = lane.multiValueInteger;
                 laneJson["multiSliderValues"] = lane.multiSliderValues;
                 laneJson["valueQuantizeSteps"] = lane.valueQuantizeSteps;
-                laneJson["isWaveVolume"] = lane.isWaveVolume;
                 laneJson["lfoParameter"] = lane.lfoParameter;
-                // Legacy Wave-lane fields remain readable below, but new
-                // audio is serialized at clip level.
-                laneJson["waveFilePath"] = lane.waveFilePath;
-                laneJson["waveGain"] = lane.waveGain;
+                // The Wave lane and the per-clip volume lane are load-only
+                // (see ofxOceanodeTimelineLane): audio and its envelope are
+                // written at clip and track level instead.
                 clipJson["lanes"].push_back(std::move(laneJson));
             }
             trackJson["clips"].push_back(std::move(clipJson));
@@ -3039,6 +3017,12 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
 }
 
 void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
+    const int fileVersion = json.value("version", kPresetVersion);
+    if(fileVersion > kPresetVersion) {
+        ofLogWarning("ofxOceanodeTimeline")
+            << "Timeline was written by a newer version (" << fileVersion << " > " << kPresetVersion
+            << "); anything this build does not know about will be dropped on the next save.";
+    }
     clear();
     if(!json.is_object() || !json.contains("tracks") || !json["tracks"].is_array()) return;
 
@@ -3122,7 +3106,6 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
         track.name = makeUniqueTrackName(trackJson.value("name", std::string("Timeline Track")));
         track.collapsed = trackJson.value("collapsed", false);
         track.isWaveTrack = trackJson.value("isWaveTrack", false);
-        track.waveTrackHeight = ofClamp(trackJson.value("waveTrackHeight", 96.0f), 48.0f, 360.0f);
         track.waveVolume = ofClamp(trackJson.value("waveVolume", 1.0f), 0.0f, 4.0f);
         // Track automation is always present for Wave Tracks. The old flag is
         // still read for compatibility, but it must not make legacy presets
@@ -3418,15 +3401,7 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
     // final. Legacy Wave lanes were migrated to their containing clip above.
     for(auto& track : tracks) {
         for(auto& clip : track.clips) {
-            if(track.isWaveTrack && !clip.waveFilePath.empty()) {
-                reloadWaveform(track.id, clip.id);
-                if(clip.waveFileDurationBeats <= 0.0 && clip.waveFileDurationMs > 0.0) {
-                    const double bpm = container != nullptr
-                        ? std::max(1.0f, container->getTransportState().bpm) : 120.0;
-                    clip.waveFileDurationBeats = clip.waveFileDurationMs * bpm / 60000.0;
-                }
-                normalizeWaveClipMapping(clip);
-            }
+            if(track.isWaveTrack && !clip.waveFilePath.empty()) reloadWaveform(track.id, clip.id);
         }
     }
 

@@ -102,6 +102,14 @@ namespace ofxOceanodeTimelineCurve {
     float sigmoidFlex(float x, float inflection, float steepness);
     float curveSegmentShape(float x, CurveInterpolationMode interpolation,
                             const ofxOceanodeTimelineCurveTension& tension);
+    // The value a point list holds at one beat, shaped by the matching
+    // per-segment tension. Everything that reads a curve goes through this
+    // -- automation, a Wave track's volume, an LFO control and the editor's
+    // own drawing -- so none of them can drift from what is applied.
+    // Points must be sorted by beat; fallback answers an empty list.
+    float valueAtBeat(const std::vector<ofxOceanodeTimelineCurvePoint>& points,
+                      const std::vector<ofxOceanodeTimelineCurveTension>& tensions,
+                      const std::string& interpolation, double beat, float fallback = 0.0f);
 }
 
 struct ofxOceanodeTimelinePianoNote {
@@ -235,18 +243,14 @@ struct ofxOceanodeTimelineLane {
     // (no value snapping) -- separate from beatsPerStep, which is the
     // existing *time*-axis grid every lane type already has.
     int valueQuantizeSteps = 0;
-    // Kept for backwards-compatible loading of the first Wave-lane format.
-    // New timelines store audio on the clip itself, because Wave is a track
-    // type, not an automation/lane type.
+    // Read-only remnants of the first Wave format, in which audio and its
+    // volume envelope were lanes inside a clip. Nothing creates either any
+    // more: createLane refuses the Wave type, no selector offers it, and
+    // fromJson folds both onto the clip and its track and drops the lane.
+    // They are still parsed so old presets keep loading, and are no longer
+    // written back out.
     std::string waveFilePath;
     float waveGain = 1.0f;
-    int waveNumChannels = 0;
-    double waveFileDurationMs = 0.0;
-    std::vector<float> waveformPeaks; // not persisted -- see waveNumChannels for its layout
-    // A Curve lane with no parameter binding can be used as the audio
-    // volume envelope for a clip on a Wave track. Keeping this marker
-    // explicit avoids overloading an ordinary unbound Curve lane and keeps
-    // the envelope in the clip's own source-beat space.
     bool isWaveVolume = false;
     // LFO clips use ordinary Curve data for their parameter automation, but
     // keep the semantic role here so the evaluator and editor do not have to
@@ -334,17 +338,17 @@ struct ofxOceanodeTimelineTrack {
     std::vector<ofxOceanodeTimelineClip> clips;
     // A Wave Track is created via ofxOceanodeTimelineManager::createWaveTrack
     // and never gets any bindings -- it isn't automation for a parameter at
-    // all, just audio clips (each holding exactly one Wave lane) arranged on
-    // the timeline. Kept as a plain flag on an ordinary track, rather than a
+    // all, just audio clips (each carrying its own file) arranged on the
+    // timeline. Kept as a plain flag on an ordinary track, rather than a
     // parallel data structure, so it still gets every other track feature
     // (color, collapse, clip grouping, JSON persistence) for free; the
     // controller uses this flag to render it as a single always-visible row
     // (there's nothing to expand into per-binding rows) and to skip the
     // usual parameter-picking step when creating a clip on it.
     bool isWaveTrack = false;
-    // Height of the single Wave Track row in the timeline. This is persisted
-    // because a taller waveform is part of the timeline layout, not a
-    // transient editor preference.
+    // Height of the single Wave Track row in the timeline. Not persisted:
+    // editor layout (lane heights, collapsed lanes, zoom, snap) is session
+    // state everywhere else in the timeline, and this was the one exception.
     float waveTrackHeight = 96.0f;
     // Track-wide volume controls. The automation points live in global
     // timeline-beat space and affect every clip on this Wave Track.
@@ -380,7 +384,7 @@ struct ofxOceanodeTimelineClipGroup {
 // on the implementer's side: a small bridge class inside
 // ofxOceanodeSuperCollider, gated by its own build flag, implements this
 // interface and registers itself via setWaveAudioProvider below. With no
-// provider registered, Wave lanes are visual-only -- the waveform displays
+// provider registered, wave clips are visual-only -- the waveform displays
 // and the clip can be positioned/stretched like any other clip, but
 // nothing actually plays.
 class ofxOceanodeTimelineWaveAudioProvider {
@@ -394,7 +398,7 @@ public:
                                 int numChannels, double clipContentStartBeat, double contentDurationBeats,
                                 double sourceStartBeat, double sourceFileDurationBeats,
                                 float playbackRate, bool reverse, float bpm, bool isPlaying, bool active,
-                                bool forceTransportSync = false) = 0;
+                                bool forceTransportSync) = 0;
     virtual void releaseWaveClip(const std::string& trackId, const std::string& clipId) = 0;
 };
 
@@ -444,7 +448,6 @@ public:
     bool getParameterTrackColor(const ofxOceanodeAbstractParameter& parameter, ofColor& color) const;
     bool isStepLaneCompatible(const ofxOceanodeAbstractParameter& parameter) const;
     bool removeBinding(const std::string& trackId, const std::string& bindingId);
-    bool setLaneType(const std::string& trackId, const std::string& bindingId, ofxOceanodeTimelineLaneType laneType);
     bool setBindingMode(const std::string& trackId, const std::string& bindingId, ofxOceanodeTimelineAutomationMode mode);
     bool setBindingClamp(const std::string& trackId, const std::string& bindingId, bool clampToParameterRange);
     ofxOceanodeTimelineParameterBinding* getBinding(const std::string& trackId, const std::string& bindingId);
@@ -496,18 +499,21 @@ public:
     // the old standalone Wave Track node's own reader). Pure file IO, no
     // SuperCollider dependency -- safe to call unconditionally regardless
     // of whether a wave audio provider is registered. Called automatically
-    // by fromJson()/loadPreset() for every Wave lane, and should also be
-    // called by the controller whenever the user edits waveFilePath.
-    bool reloadWaveform(const std::string& trackId, const std::string& clipId, const std::string& laneId);
+    // by fromJson()/loadPreset() for every wave clip, and by the controller
+    // whenever the user points a clip at a different file. It also re-derives
+    // waveFileDurationBeats at the current tempo -- see the definition.
     bool reloadWaveform(const std::string& trackId, const std::string& clipId);
 
-    // Evaluates the optional per-clip Wave volume lane. A clip without one
-    // uses unity; the legacy track-level volume fields remain readable for
-    // old presets but are no longer the authoring model.
+    // A wave clip's volume at one beat. Volume is a property of the whole
+    // Wave Track (gain plus an optional envelope in timeline-beat space), so
+    // this resolves the clip's track; it stays clip-scoped because that is
+    // what the audio provider asks for.
     float evaluateWaveClipVolume(const std::string& trackId, const std::string& clipId,
                                  double beat) const;
-    // Compatibility entry point: enables the track-wide volume editor for a
-    // Wave Track. It no longer creates a lane inside the supplied clip.
+    // Opens/prepares the track-wide volume envelope for a Wave Track, seeding
+    // a flat one from the track's gain if it has none yet. Named for the
+    // per-clip lane this replaced; it creates no lane, and the returned
+    // string is only a stable handle for the editor, not a lane id.
     std::string createWaveVolumeLane(const std::string& trackId, const std::string& clipId);
 
     float evaluateWaveTrackVolume(const std::string& trackId, double beat) const;
