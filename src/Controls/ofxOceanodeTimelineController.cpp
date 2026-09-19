@@ -139,17 +139,24 @@ const char* laneTypeName(ofxOceanodeTimelineLaneType type) {
     }
 }
 
-// Shared by every automation-lane selector in this file (the clip context
-// menu, the "Add lane" popup, the "New lane"/requestAddLane handler, and the
-// New Timeline Clip dialog). Wave is deliberately absent: it is a track
-// type whose clips carry audio files, not a clip automation type.
-// need to be listed, and mapped to/from the little combo/menu index ints
-// those sites already used, in one place.
+// Every type the user can pick from a combo or menu in this file, with the
+// little index ints those sites use mapped to/from it in one place instead
+// of a hand-maintained ternary chain per site.
+//
+// Two counts, one table. Wave is absent from both: it is a track type whose
+// clips carry audio files, not something a clip's lane can be. LFO is only
+// reachable through kClipCreationOptionCount, i.e. only where a whole clip
+// is being created -- an LFO is a self-contained modulator clip with its own
+// oscillator-control lanes, so it is a kind of clip to create (alongside a
+// Curve or Step Sequencer one, which is how it reads to the user) rather
+// than a type an individual lane can be switched to. Selectors that change
+// or add a lane pass kLaneTypeOptionCount and so never offer it.
 constexpr const char* kLaneTypeOptions[] = {
-    "Step Sequencer", "Curve", "Piano Roll", "Multi Value", "Multi Slider", "Multi Gate"
+    "Step Sequencer", "Curve", "Piano Roll", "Multi Value", "Multi Slider", "Multi Gate", "LFO"
 };
-constexpr int kLaneTypeOptionCount = static_cast<int>(sizeof(kLaneTypeOptions) / sizeof(kLaneTypeOptions[0]));
-constexpr const char* kClipTypeOptions[] = {"Automation clip", "LFO clip"};
+constexpr int kClipCreationOptionCount = static_cast<int>(sizeof(kLaneTypeOptions) / sizeof(kLaneTypeOptions[0]));
+constexpr int kLaneTypeOptionCount = kClipCreationOptionCount - 1;
+constexpr int kLfoClipOptionIndex = kClipCreationOptionCount - 1;
 
 ofxOceanodeTimelineLaneType laneTypeFromOptionIndex(int index) {
     switch(index) {
@@ -912,7 +919,6 @@ void ofxOceanodeTimelineController::draw() {
                     pendingClipName[0] = '\0';
                     pendingClipBindingId = track.bindings.empty() ? std::string() : track.bindings.front().id;
                     pendingClipLaneType = track.bindings.empty() ? 0 : optionIndexForLaneType(track.bindings.front().laneType);
-                    pendingClipType = 0;
                     pendingStartBeat = snapBeat(transportState.beatPosition);
                     pendingDurationBeats = timeline.getBeatsPerBar();
                     requestClipPopup = true;
@@ -1435,6 +1441,14 @@ void ofxOceanodeTimelineController::draw() {
                     editorLaneId.clear();
                     clipEditorOpen = true;
                 }
+            } else if(clip.isLfo) {
+                // An LFO clip's lanes are its oscillator controls (frequency,
+                // skew, pulse width, ...), not automation lanes the user
+                // points at a parameter. Retyping one, or adding a sibling to
+                // it, would quietly break the clip, so this menu offers none
+                // of that -- the LFO editor (double-click the clip) is where
+                // it is edited.
+                ImGui::TextDisabled("LFO clip -- double-click to edit");
             } else {
                 const auto selectedType = selectedLane == nullptr ? ofxOceanodeTimelineLaneType::Step : selectedLane->type;
                 for(int optionIndex = 0; optionIndex < kLaneTypeOptionCount; ++optionIndex) {
@@ -1443,7 +1457,7 @@ void ofxOceanodeTimelineController::draw() {
                         timeline.setClipLaneType(track.id, clip.id, selectedLane->id, candidateType);
                 }
             }
-            if(selectedLane != nullptr && !track.bindings.empty() && ImGui::BeginMenu("Add parameter to this lane")) {
+            if(selectedLane != nullptr && !clip.isLfo && !track.bindings.empty() && ImGui::BeginMenu("Add parameter to this lane")) {
                 for(const auto& candidate : track.bindings) {
                     const bool assigned = std::find(selectedLane->bindingIds.begin(), selectedLane->bindingIds.end(), candidate.id) != selectedLane->bindingIds.end();
                     if(ImGui::MenuItem(candidate.parameterPath.c_str(), nullptr, assigned, true)) {
@@ -1453,7 +1467,7 @@ void ofxOceanodeTimelineController::draw() {
                 }
                 ImGui::EndMenu();
             }
-            if(!track.bindings.empty() && ImGui::BeginMenu("New lane")) {
+            if(!clip.isLfo && !track.bindings.empty() && ImGui::BeginMenu("New lane")) {
                 for(const auto& candidate : track.bindings) {
                     const std::string label = compactParameterName(candidate.parameterPath);
                     if(ImGui::MenuItem(label.c_str())) {
@@ -1673,7 +1687,6 @@ void ofxOceanodeTimelineController::draw() {
                         pendingClipBindingId = binding.id;
                         pendingClipLaneType = optionIndexForLaneType(binding.laneType);
                         pendingClipName[0] = '\0';
-                        pendingClipType = 0;
                         pendingDurationBeats = timeline.getBeatsPerBar();
                         requestClipPopup = true;
                         ImGui::CloseCurrentPopup();
@@ -4557,7 +4570,12 @@ void ofxOceanodeTimelineController::drawRenamePopup(ofxOceanodeTimelineManager& 
 void ofxOceanodeTimelineController::drawClipPopup(ofxOceanodeTimelineManager& timeline) {
     if(!ImGui::BeginPopupModal("New Timeline Clip", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
     ImGui::InputText("Name", pendingClipName, sizeof(pendingClipName));
-    ImGui::Combo("Clip type", &pendingClipType, kClipTypeOptions, 2);
+    // One list, LFO included. This used to be two combos -- an "Automation
+    // clip / LFO clip" question here and an "Automation type" one below --
+    // which asked twice for a single decision and made the LFO look like a
+    // different category of thing rather than another kind of clip.
+    ImGui::Combo("Clip type", &pendingClipLaneType, kLaneTypeOptions, kClipCreationOptionCount);
+    const bool isLfoClip = pendingClipLaneType == kLfoClipOptionIndex;
     if(const auto* track = timeline.getTrack(pendingTrackId)) {
         const auto* selectedBinding = pendingClipBindingId.empty()
             ? nullptr : timeline.getBinding(pendingTrackId, pendingClipBindingId);
@@ -4568,27 +4586,28 @@ void ofxOceanodeTimelineController::drawClipPopup(ofxOceanodeTimelineManager& ti
                 const std::string label = compactParameterName(binding.parameterPath);
                 if(ImGui::Selectable(label.c_str(), binding.id == pendingClipBindingId)) {
                     pendingClipBindingId = binding.id;
-                    pendingClipLaneType = optionIndexForLaneType(binding.laneType);
+                    // Picking a parameter pre-selects the type it is bound
+                    // with -- but never over an explicit LFO choice, which
+                    // is not a lane type and must not be silently undone.
+                    if(!isLfoClip) pendingClipLaneType = optionIndexForLaneType(binding.laneType);
                 }
                 if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", binding.parameterPath.c_str());
             }
             ImGui::EndCombo();
         }
     }
-    if(pendingClipType == 0)
-        ImGui::Combo("Automation type", &pendingClipLaneType, kLaneTypeOptions, kLaneTypeOptionCount);
     ImGui::InputDouble("Start beat", &pendingStartBeat, editIncrement(), 1.0, "%.4f");
     ImGui::InputDouble("Duration", &pendingDurationBeats, editIncrement(), 1.0, "%.4f");
     if(ImGui::Button("Create Clip")) {
         const double startBeat = snapBeat(pendingStartBeat);
         const double durationBeats = std::max(1.0 / kPPQ, snapBeat(pendingDurationBeats));
-        const auto clipId = pendingClipType == 1
+        const auto clipId = isLfoClip
             ? timeline.createLfoClip(pendingTrackId, pendingClipBindingId,
                                      pendingClipName[0] == '\0' ? "LFO" : pendingClipName,
                                      startBeat, durationBeats)
             : timeline.createClip(pendingTrackId, pendingClipName[0] == '\0' ? "Clip" : pendingClipName,
                                   startBeat, durationBeats);
-        if(pendingClipType == 0) {
+        if(!isLfoClip) {
             if(const auto* binding = timeline.getBinding(pendingTrackId, pendingClipBindingId)) {
             const auto laneType = laneTypeFromOptionIndex(pendingClipLaneType);
             const auto laneId = timeline.createLane(pendingTrackId, clipId, binding->parameterPath, laneType);

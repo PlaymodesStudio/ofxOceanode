@@ -129,7 +129,6 @@ private:
     char pendingClipName[128] = {};
     std::string pendingClipBindingId;
     int pendingClipLaneType = 0;
-    int pendingClipType = 0;
     double pendingStartBeat = 0.0;
     double pendingDurationBeats = 1.0;
     // Beat used by a Wave Track's context-menu "Add new wave clip" action.
