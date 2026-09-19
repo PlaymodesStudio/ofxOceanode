@@ -604,7 +604,17 @@ bool evaluateMultiSlider(const ofxOceanodeTimelineLane& lane, double localBeat, 
     int index = static_cast<int>(std::floor(patternBeat / cellLength));
     index = std::min(std::max(index, 0), stepCount - 1);
     const float raw = index < static_cast<int>(lane.multiSliderValues.size()) ? lane.multiSliderValues[index] : 0.0f;
-    value = ofToString(ofClamp(raw, 0.0f, 1.0f));
+    // A cell holds a REAL value in the lane's own valueMin..valueMax units
+    // (that is the whole point of this lane type, and what the editor writes
+    // and the previews read). Every lane evaluator here returns a normalized
+    // 0..1 value that the caller maps back through the lane's range, so undo
+    // the range here rather than handing the raw value over as if it were
+    // already normalized -- doing that clamped anything above 1 and then
+    // re-expanded it to valueMax, so a 0..127 lane answered 127 for every
+    // cell a user could actually paint. No clamp: the round trip is then
+    // exact for values outside the range too.
+    const float span = lane.valueMax - lane.valueMin;
+    value = ofToString(std::abs(span) < 1e-9f ? 0.0f : (raw - lane.valueMin) / span);
     return true;
 }
 
@@ -901,8 +911,11 @@ float ofxOceanodeTimelineManager::evaluateWaveClipVolume(const std::string& trac
 
 float ofxOceanodeTimelineManager::evaluateWaveTrackVolume(const std::string& trackId, double beat) const {
     const auto* track = getTrack(trackId);
-    if(track == nullptr || !track->isWaveTrack) return 0.0f;
-    if(track->waveVolumePoints.empty()) return ofClamp(track->waveVolume, 0.0f, 4.0f);
+    if(track == nullptr || !track->isWaveTrack) return 1.0f;
+    // The automation toggle is authoritative: with it off the track plays at
+    // its plain gain, whatever points happen to be stored.
+    if(!track->waveVolumeAutomationEnabled || track->waveVolumePoints.empty())
+        return ofClamp(track->waveVolume, 0.0f, 4.0f);
     return ofClamp(evaluateCurvePoints(track->waveVolumePoints, track->waveVolumeTensions,
                                        track->waveVolumeInterpolation, beat, track->waveVolume), 0.0f, 4.0f);
 }
@@ -1079,6 +1092,10 @@ bool ofxOceanodeTimelineManager::removeBinding(const std::string& trackId, const
     if(it == track->bindings.end()) return false;
     const std::string parameterPath = it->parameterPath;
     for(auto& clip : track->clips) {
+        // An LFO clip points at its output binding from the clip itself, not
+        // through a lane -- without this it kept a dangling id and silently
+        // stopped driving anything.
+        if(clip.lfoOutputBindingId == bindingId) clip.lfoOutputBindingId.clear();
         for(auto& lane : clip.lanes) {
             lane.bindingIds.erase(std::remove(lane.bindingIds.begin(), lane.bindingIds.end(), bindingId), lane.bindingIds.end());
             if(lane.pianoPitchBindingId == bindingId) lane.pianoPitchBindingId.clear();
@@ -1745,6 +1762,42 @@ bool ofxOceanodeTimelineManager::consolidateClipContent(const std::string& track
                     changed = true;
                 }
             }
+        } else if(lane.type == ofxOceanodeTimelineLaneType::MultiValue ||
+                  lane.type == ofxOceanodeTimelineLaneType::MultiGate) {
+            // Blocks live in source beats like steps and notes do, so they
+            // get the same treatment: drop the ones that start past the new
+            // end, crop the one straddling it.
+            auto trimRows = [&](auto& rows) {
+                for(auto& row : rows) {
+                    const auto oldSize = row.size();
+                    row.erase(std::remove_if(row.begin(), row.end(),
+                        [&](const auto& region) { return region.startBeat >= contentEnd - kEpsilon; }),
+                        row.end());
+                    changed |= row.size() != oldSize;
+                    for(auto& region : row) {
+                        const double maximumDuration = std::max(kEpsilon, contentEnd - region.startBeat);
+                        if(region.durationBeats > maximumDuration) {
+                            region.durationBeats = maximumDuration;
+                            changed = true;
+                        }
+                    }
+                }
+            };
+            if(lane.type == ofxOceanodeTimelineLaneType::MultiValue) trimRows(lane.multiValueRows);
+            else trimRows(lane.multiGateRows);
+        } else if(lane.type == ofxOceanodeTimelineLaneType::MultiSlider) {
+            // A dense grid has no per-cell start to test: shortening it is
+            // shortening the grid, exactly as the Step branch does.
+            const double cellLength = std::max(1.0 / 24.0, lane.beatsPerStep);
+            const int consolidatedSteps = std::max(1, static_cast<int>(std::ceil(contentEnd / cellLength)));
+            if(lane.stepCount > consolidatedSteps) {
+                lane.stepCount = consolidatedSteps;
+                changed = true;
+            }
+            if(static_cast<int>(lane.multiSliderValues.size()) != lane.stepCount) {
+                lane.multiSliderValues.resize(static_cast<size_t>(std::max(1, lane.stepCount)), 0.0f);
+                changed = true;
+            }
         } else {
             std::sort(lane.curvePoints.begin(), lane.curvePoints.end(),
                 [](const auto& a, const auto& b) { return a.beat < b.beat; });
@@ -1789,7 +1842,8 @@ bool ofxOceanodeTimelineManager::setClipStep(const std::string& trackId, const s
 bool ofxOceanodeTimelineManager::removeClipStep(const std::string& trackId, const std::string& clipId,
                                                 const std::string& laneId, double startBeat) {
     auto* lane = getLane(trackId, clipId, laneId);
-    return lane != nullptr && lane->step.removeStep(startBeat);
+    if(lane == nullptr || lane->type != ofxOceanodeTimelineLaneType::Step) return false;
+    return lane->step.removeStep(startBeat);
 }
 
 ofxOceanodeTimelineParameterBinding* ofxOceanodeTimelineManager::getBinding(const std::string& trackId, const std::string& bindingId) {
@@ -2165,7 +2219,6 @@ void ofxOceanodeTimelineManager::evaluateAutomation() {
     if(container == nullptr) return;
     loopWrappedThisFrame = false;
     auto transport = container->getTransportState();
-    bool loopWrappedThisFrame = false;
 
     const bool crossedLoopEnd = !hasEvaluatedTransportBeat ||
         lastEvaluatedTransportBeat < loopEndBeat - kEpsilon;
@@ -2559,6 +2612,18 @@ void ofxOceanodeTimelineManager::runScheduler(const ofxOceanodeTransportState& t
     }
     for(const auto& track : tracks) {
         for(const auto& clip : track.clips) {
+            if(clip.isLfo) {
+                // An LFO is a continuous modulator, exactly like the curve
+                // below -- but it reaches its target from the clip, not
+                // through a lane's bindingIds, so the lane scan below cannot
+                // see it. Without this it was left "schedulable" while
+                // collectChangeBeats only ever produced its clip edges, so
+                // every intermediate value reached the backend through the
+                // correction path, once per frame.
+                if(const auto* binding = getBinding(track.id, clip.lfoOutputBindingId))
+                    targets[binding->parameterPath].schedulable = false;
+                continue;
+            }
             for(const auto& lane : clip.lanes) {
                 if(lane.type != ofxOceanodeTimelineLaneType::Curve) continue;
                 // A curve changes every frame: there is nothing discrete to
@@ -2581,8 +2646,12 @@ void ofxOceanodeTimelineManager::runScheduler(const ofxOceanodeTransportState& t
         schedulablePaths.push_back(entry.first);
     }
     if(schedulablePaths.empty()) {
-        scheduledBackendPaths.clear();
+        // Same rule as every other invalidation path: events already handed
+        // to a backend cannot be recalled, so correct them before forgetting
+        // they exist. sendScheduleCorrections clears scheduledPaths itself.
+        if(!scheduledPaths.empty()) sendScheduleCorrections(nowUs);
         scheduledPaths.clear();
+        scheduledBackendPaths.clear();
         return;
     }
 
