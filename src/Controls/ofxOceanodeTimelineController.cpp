@@ -1342,6 +1342,11 @@ void ofxOceanodeTimelineController::draw() {
             if(!ImGui::BeginPopup(menuId.c_str())) return;
             ImGui::TextUnformatted(clip.name.c_str());
             ImGui::Separator();
+            if(ImGui::MenuItem("Rename clip")) {
+                requestClipRename(track.id, clip);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::Separator();
             // These values are edited on the selected clip, never on the
             // track or on the other clips in it.
             if(auto* editClip = timeline.getClip(track.id, clip.id)) {
@@ -2067,6 +2072,11 @@ void ofxOceanodeTimelineController::draw() {
 
     if(requestClipPopup) { ImGui::OpenPopup("New Timeline Clip"); requestClipPopup = false; }
     drawClipPopup(timeline);
+    if(requestClipRenamePopup) {
+        ImGui::OpenPopup("Rename Timeline Clip");
+        requestClipRenamePopup = false;
+    }
+    drawClipRenamePopup(timeline);
 }
 
 void ofxOceanodeTimelineController::drawPendingTrackPopup() {
@@ -2492,6 +2502,11 @@ void ofxOceanodeTimelineController::drawWaveClipProperties(ofxOceanodeTimelineMa
     if(!track.isWaveTrack) return;
 
     ImGui::SeparatorText("Audio clip properties");
+    ImGui::Text("Name: %s", clip.name.c_str());
+    if(ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Double-click to rename this clip");
+        if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) requestClipRename(track.id, clip);
+    }
     ImGui::Text("Channels: %d   Duration: %.3fs", clip.waveNumChannels,
                 clip.waveFileDurationMs / 1000.0);
     const std::string sampleName = clip.waveFilePath.empty()
@@ -2716,6 +2731,10 @@ void ofxOceanodeTimelineController::drawLfoEditor(ofxOceanodeTimelineManager& ti
     ImGui::TextColored(ImVec4(track.color.r / 255.0f, track.color.g / 255.0f,
                               track.color.b / 255.0f, 1.0f),
                        "%s  [LFO]", clip.name.c_str());
+    if(ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Double-click to rename this clip");
+        if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) requestClipRename(track.id, clip);
+    }
     ImGui::SameLine(kLabelWidth - 50.0f);
     if(ImGui::SmallButton("x##closeLfoEditor")) clipEditorOpen = false;
     finishAbsoluteLayout(ImVec2(headerMin.x, headerMax.y));
@@ -3048,6 +3067,10 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         ImGui::SetCursorScreenPos(ImVec2(clipHeaderMin.x + 5.0f + clipIndent, clipHeaderMin.y + 2.0f));
         ImGui::TextColored(ImVec4(track.color.r / 255.0f, track.color.g / 255.0f, track.color.b / 255.0f, 1.0f),
                            "%s", clip->name.c_str());
+        if(ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Double-click to rename this clip");
+            if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) requestClipRename(track.id, *clip);
+        }
         ImGui::SameLine(kLabelWidth - 50.0f);
         if(ImGui::SmallButton("+##addLane")) ImGui::OpenPopup("##addLaneTypePopup");
         if(ImGui::IsItemHovered()) ImGui::SetTooltip("Add another lane to this clip");
@@ -4551,6 +4574,33 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     dl->PopClipRect();
     finishAbsoluteLayout(ImVec2(editorMin.x, editorMax.y));
     } // end for(laneIndex : clip->lanes)
+}
+
+void ofxOceanodeTimelineController::requestClipRename(const std::string& trackId,
+                                                       const ofxOceanodeTimelineClip& clip) {
+    clipRenameTrackId = trackId;
+    clipRenameClipId = clip.id;
+    std::strncpy(pendingClipRenameName, clip.name.c_str(), sizeof(pendingClipRenameName) - 1);
+    pendingClipRenameName[sizeof(pendingClipRenameName) - 1] = '\0';
+    requestClipRenamePopup = true;
+}
+
+void ofxOceanodeTimelineController::drawClipRenamePopup(ofxOceanodeTimelineManager& timeline) {
+    if(!ImGui::BeginPopupModal("Rename Timeline Clip", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+    if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+    const bool nameEntered = ImGui::InputText(
+        "Name", pendingClipRenameName, sizeof(pendingClipRenameName),
+        ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+    const bool savePressed = ImGui::Button("Save");
+    ImGui::SameLine();
+    const bool cancelPressed = ImGui::Button("Cancel");
+    if((nameEntered || savePressed) && pendingClipRenameName[0] != '\0') {
+        timeline.renameClip(clipRenameTrackId, clipRenameClipId, pendingClipRenameName);
+        ImGui::CloseCurrentPopup();
+    } else if(cancelPressed) {
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
 }
 
 void ofxOceanodeTimelineController::drawRenamePopup(ofxOceanodeTimelineManager& timeline) {

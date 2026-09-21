@@ -1368,6 +1368,7 @@ bool ofxOceanodeTimelineManager::renameClip(const std::string& trackId, const st
     auto* track = getTrack(trackId);
     auto* clip = getClip(trackId, clipId);
     if(track == nullptr || clip == nullptr || requestedName.empty()) return false;
+    if(clip->name == requestedName) return true;
     clip->name = makeUniqueClipName(*track, requestedName);
     return true;
 }

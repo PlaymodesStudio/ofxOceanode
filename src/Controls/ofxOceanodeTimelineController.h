@@ -62,6 +62,8 @@ private:
                                        float timelineOriginX);
     void drawBlendModeOptions(ofxOceanodeTimelineManager& timeline, const std::string& trackId,
                              const ofxOceanodeTimelineParameterBinding& binding);
+    void requestClipRename(const std::string& trackId, const ofxOceanodeTimelineClip& clip);
+    void drawClipRenamePopup(ofxOceanodeTimelineManager& timeline);
     void drawRenamePopup(ofxOceanodeTimelineManager& timeline);
     void drawClipPopup(ofxOceanodeTimelineManager& timeline);
     bool createWaveClipFromFile(ofxOceanodeTimelineManager& timeline,
@@ -133,6 +135,9 @@ private:
     int pianoKeyboardPreviewPitch = -1;
     char pendingTrackName[128] = {};
     char pendingClipName[128] = {};
+    char pendingClipRenameName[128] = {};
+    std::string clipRenameTrackId;
+    std::string clipRenameClipId;
     std::string pendingClipBindingId;
     int pendingClipLaneType = 0;
     double pendingStartBeat = 0.0;
@@ -178,6 +183,7 @@ private:
     bool requestRenamePopup = false;
     bool pendingNewTrackDialog = false;
     bool requestClipPopup = false;
+    bool requestClipRenamePopup = false;
     // Track removal is deferred until the track iteration has finished;
     // erasing from timeline.getTracks() inside its context menu would
     // invalidate the current track and every clip/lane reference below it.
