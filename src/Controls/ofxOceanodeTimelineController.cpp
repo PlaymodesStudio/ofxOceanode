@@ -464,14 +464,15 @@ double ofxOceanodeTimelineController::displayGridBeats() const {
 
 float ofxOceanodeTimelineController::beatToPixels(const ofxOceanodeTimelineManager& timeline,
                                                   double beat, float fallbackBpm) const {
-    return static_cast<float>(timeline.beatToSeconds(std::max(0.0, beat), fallbackBpm) * pixelsPerSecond);
+    return static_cast<float>(timeline.beatToSeconds(std::max(0.0, beat), fallbackBpm) *
+                              timeline.getViewState().pixelsPerSecond);
 }
 
 double ofxOceanodeTimelineController::pixelsToBeat(const ofxOceanodeTimelineManager& timeline,
                                                    float pixels, float fallbackBpm,
                                                    double endBeatHint) const {
     const double targetSeconds = std::max(0.0f, pixels) /
-                                 std::max(kMinPixelsPerSecond, pixelsPerSecond);
+                                 std::max(kMinPixelsPerSecond, timeline.getViewState().pixelsPerSecond);
     double low = 0.0;
     double high = std::max(1.0, endBeatHint);
     while(timeline.beatToSeconds(high, fallbackBpm) < targetSeconds && high < 1000000.0) high *= 2.0;
@@ -529,6 +530,9 @@ void ofxOceanodeTimelineController::drawBlendModeOptions(ofxOceanodeTimelineMana
 void ofxOceanodeTimelineController::draw() {
     if(container == nullptr) return;
     auto& timeline = container->getTimelineManager();
+    auto& viewState = timeline.getViewState();
+    float& pixelsPerSecond = viewState.pixelsPerSecond;
+    float& timelineScrollX = viewState.scrollX;
     auto transportState = container->getTransportState();
     auto transport = container->getTransport();
     effectiveRulerSnapBeats = adaptiveSnapDivision(rulerSnapBeats,
@@ -2112,6 +2116,9 @@ void ofxOceanodeTimelineController::drawPendingTrackPopup() {
 void ofxOceanodeTimelineController::drawRuler(ofxOceanodeTimelineManager& timeline, float labelWidth,
                                               float timelineWidth, double endBeat,
                                               double beatPosition, float bpm) {
+    const auto& viewState = timeline.getViewState();
+    const float pixelsPerSecond = viewState.pixelsPerSecond;
+    const float timelineScrollX = viewState.scrollX;
     const float width = labelWidth + timelineWidth;
     ImGui::InvisibleButton("##timelineRuler", ImVec2(width, kRulerHeight));
     const ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
@@ -2218,6 +2225,7 @@ void ofxOceanodeTimelineController::drawRuler(ofxOceanodeTimelineManager& timeli
 void ofxOceanodeTimelineController::drawBpmLane(ofxOceanodeTimelineManager& timeline,
                                                 float contentWidth, double endBeat,
                                                 double beatPosition, float fallbackBpm) {
+    const float timelineScrollX = timeline.getViewState().scrollX;
     const bool collapsed = timeline.isBpmLaneCollapsed();
     const float height = collapsed ? 29.0f : 132.0f;
     ImGui::Dummy(ImVec2(contentWidth, height));
@@ -2671,6 +2679,7 @@ void ofxOceanodeTimelineController::drawWaveTrackVolumeAutomation(
 void ofxOceanodeTimelineController::drawWaveTrackEditor(
     ofxOceanodeTimelineManager& timeline, const ofxOceanodeTimelineTrack& track,
     float contentWidth, double endBeat, double beatPosition) {
+    const float timelineScrollX = timeline.getViewState().scrollX;
     auto* editTrack = timeline.getTrack(track.id);
     auto* clip = timeline.getClip(editorTrackId, editorClipId);
     if(editTrack == nullptr || clip == nullptr) {
@@ -2707,6 +2716,7 @@ void ofxOceanodeTimelineController::drawLfoEditor(ofxOceanodeTimelineManager& ti
                                                   ofxOceanodeTimelineClip& clip,
                                                   float contentWidth, double endBeat,
                                                   double beatPosition) {
+    const float timelineScrollX = timeline.getViewState().scrollX;
     // Laid out like drawLaneEditor's rows rather than as one fixed block: a
     // row per section, each reserving its own height from laneEditorHeights,
     // foldable through collapsedLaneIds and resizable by the same bottom
@@ -3027,6 +3037,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                                                    const ofxOceanodeTimelineTrack& track,
                                                    float contentWidth, double endBeat,
                                                    double beatPosition) {
+    const float timelineScrollX = timeline.getViewState().scrollX;
     auto* clip = timeline.getClip(editorTrackId, editorClipId);
     if(clip == nullptr || (clip->lanes.empty() && !track.isWaveTrack)) {
         clipEditorOpen = false;

@@ -382,6 +382,16 @@ struct ofxOceanodeTimelineClipGroup {
     std::vector<std::pair<std::string, std::string>> members;
 };
 
+// Editor viewport state belongs to the preset just like the timeline data:
+// switching presets should restore both the horizontal scale and the place
+// the user was looking at. Keeping it on the manager also means savePreset()
+// always sees the latest values even though the editor is owned by a separate
+// controller.
+struct ofxOceanodeTimelineViewState {
+    float pixelsPerSecond = 140.0f;
+    float scrollX = 0.0f;
+};
+
 // Optional, addon-agnostic hook that lets a project which also includes
 // ofxOceanodeSuperCollider drive REAL audio playback for Wave tracks,
 // without ofxOceanodeTimeline itself ever depending on SuperCollider types
@@ -549,6 +559,9 @@ public:
     const ofxOceanodeTimelineClipGroup* getGroupForClip(const std::string& trackId, const std::string& clipId) const;
     const std::vector<ofxOceanodeTimelineClipGroup>& getClipGroups() const { return clipGroups; }
 
+    ofxOceanodeTimelineViewState& getViewState() { return viewState; }
+    const ofxOceanodeTimelineViewState& getViewState() const { return viewState; }
+
     bool isBpmAutomationEnabled() const { return bpmAutomationEnabled; }
     void setBpmAutomationEnabled(bool enabled);
     bool isBpmLaneCollapsed() const { return bpmLaneCollapsed; }
@@ -665,6 +678,7 @@ private:
     ofxOceanodeContainer* container = nullptr;
     std::vector<ofxOceanodeTimelineTrack> tracks;
     std::vector<ofxOceanodeTimelineClipGroup> clipGroups;
+    ofxOceanodeTimelineViewState viewState;
     uint64_t nextTrackNumber = 1;
     uint64_t nextBindingNumber = 1;
     uint64_t nextClipNumber = 1;

@@ -89,8 +89,12 @@ constexpr double kEpsilon = 1e-9;
 // know about. Every field is parsed with its own default, so an older file
 // loads without any version test; this exists to notice a file written by a
 // NEWER build, where a silent partial load would be the wrong answer.
-// 6 clip groups, 7 wave tracks, 8 self-contained LFO clips.
-constexpr int kPresetVersion = 8;
+// 6 clip groups, 7 wave tracks, 8 self-contained LFO clips,
+// 9 preset-backed editor zoom and horizontal position.
+constexpr int kPresetVersion = 9;
+constexpr float kDefaultTimelinePixelsPerSecond = 140.0f;
+constexpr float kMinTimelinePixelsPerSecond = 0.25f;
+constexpr float kMaxTimelinePixelsPerSecond = 600.0f;
 
 double positiveModulo(double value, double length) {
     if(length <= kEpsilon) return 0.0;
@@ -2778,6 +2782,7 @@ void ofxOceanodeTimelineManager::clear() {
     for(const auto& track : tracks) clearTimelineFlag(track);
     tracks.clear();
     clipGroups.clear();
+    viewState = {};
     nextTrackNumber = 1;
     nextBindingNumber = 1;
     nextClipNumber = 1;
@@ -2858,6 +2863,10 @@ ofxOceanodeTimelineLaneType ofxOceanodeTimelineManager::laneTypeFromString(const
 ofJson ofxOceanodeTimelineManager::toJson() const {
     ofJson json;
     json["version"] = kPresetVersion;
+    json["view"] = {
+        {"pixelsPerSecond", viewState.pixelsPerSecond},
+        {"scrollX", viewState.scrollX}
+    };
     json["tempo"] = {
         {"enabled", bpmAutomationEnabled},
         {"collapsed", bpmLaneCollapsed},
@@ -3025,7 +3034,15 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
             << "); anything this build does not know about will be dropped on the next save.";
     }
     clear();
-    if(!json.is_object() || !json.contains("tracks") || !json["tracks"].is_array()) return;
+    if(!json.is_object()) return;
+    if(json.contains("view") && json["view"].is_object()) {
+        const auto& view = json["view"];
+        viewState.pixelsPerSecond = ofClamp(
+            view.value("pixelsPerSecond", kDefaultTimelinePixelsPerSecond),
+            kMinTimelinePixelsPerSecond, kMaxTimelinePixelsPerSecond);
+        viewState.scrollX = std::max(0.0f, view.value("scrollX", 0.0f));
+    }
+    if(!json.contains("tracks") || !json["tracks"].is_array()) return;
 
     std::set<std::string> loadedTrackIds;
     std::set<std::string> loadedBindingIds;

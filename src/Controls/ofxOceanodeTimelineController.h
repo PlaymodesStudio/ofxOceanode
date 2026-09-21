@@ -88,17 +88,11 @@ private:
                         float fallbackBpm, double endBeatHint) const;
 
     std::shared_ptr<ofxOceanodeContainer> container;
-    float pixelsPerSecond = 140.0f;
     int visibleBars = 8;
     double rulerSnapBeats = 0.25;
     // Derived from the selected snap and current zoom. The selected value is
     // kept separately so zooming back in restores the user's finer grid.
     double effectiveRulerSnapBeats = 0.25;
-    // Horizontal scroll is fully manual (not native ImGui ScrollX) so the
-    // left-hand label/properties column can stay pinned in place while only
-    // the beat-based content to its right slides underneath it.
-    float timelineScrollX = 0.0f;
-
     std::string pendingTrackId;
     std::string pendingClipId;
     std::string pendingLaneId;
