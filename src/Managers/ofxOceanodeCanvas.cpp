@@ -325,30 +325,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
         };
 
-        auto drawCustomGuiManagementMenu = [&](){
-            if(ImGui::Selectable("Create Custom GUI...")){
-                container->requestCreateCustomGui("", CustomGuiWidgetType::Slider, true);
-            }
-            if(!container->getCustomGuiPanelsData().empty()){
-                ImGui::Separator();
-                for(const auto& panel : container->getCustomGuiPanelsData()){
-                    if(ImGui::BeginMenu(panel.name.c_str())){
-                        if(ImGui::Selectable("Open")){
-                            container->openCustomGuiPanel(panel.id, false);
-                        }
-                        if(ImGui::Selectable("Edit")){
-                            container->openCustomGuiPanel(panel.id, true);
-                        }
-                        ImGui::Separator();
-                        if(ImGui::Selectable("Delete")){
-                            container->deleteCustomGuiPanel(panel.id);
-                        }
-                        ImGui::EndMenu();
-                    }
-                }
-            }
-        };
-
         auto hasPortalizableConnections = [](ofxOceanodeAbstractParameter* sourceParameter){
             if(sourceParameter == nullptr) return false;
             for(auto* connection : sourceParameter->getOutConnections()){
@@ -1327,6 +1303,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 // Nodes are visited front to back; claim the first node under
                 // the pointer so an obscured header cannot receive the click.
                 bool nodeOwnsRightClick = false;
+                bool nodeHeaderRightClickInSelection = false;
                 if(!rightClickClaimedByNode && ImGui::IsMouseClicked(1) &&
                    ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
                    ImGui::IsMouseHoveringRect(node_rect_min, node_rect_max)){
@@ -1334,11 +1311,26 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     nodeOwnsRightClick = true;
                     const bool hasHeader = !(node->getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
                     if(hasHeader && ImGui::IsMouseHoveringRect(node_rect_min, node_rect_header)){
-                        deselectAllNodes();
-                        nodeGui.setSelected(true);
-                        lastSelectedNode = nodeId;
-                        ofxOceanodeShared::nodeSelectedInCanvas(node);
-                        ofxOceanodeShared::requestInspectorFocus();
+                        // Right-clicking a node that is already part of a
+                        // multi-node selection must not collapse that selection:
+                        // the context menu's own "Auto Layout Selection" and
+                        // "Portalize Selection" entries are gated on the context
+                        // node being in a selection of more than one, so
+                        // deselecting here would remove the very options the
+                        // click was likely aiming for. The Inspector is left
+                        // alone in that case too -- it only ever shows a single
+                        // node, so there is nothing meaningful to focus it on.
+                        auto currentSelection = container->getSelectedModules();
+                        const bool keepExistingSelection = currentSelection.size() > 1 &&
+                            std::find(currentSelection.begin(), currentSelection.end(), node) != currentSelection.end();
+                        nodeHeaderRightClickInSelection = keepExistingSelection;
+                        if(!keepExistingSelection){
+                            deselectAllNodes();
+                            nodeGui.setSelected(true);
+                            lastSelectedNode = nodeId;
+                            ofxOceanodeShared::nodeSelectedInCanvas(node);
+                            ofxOceanodeShared::requestInspectorFocus();
+                        }
                         isAnyNodeHovered = true;
                         node_hovered_in_scene = nodeId;
                     }
@@ -1355,7 +1347,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 {
                     isAnyNodeHovered = true;
                     node_hovered_in_scene = nodeId;
-                    if(nodeOwnsRightClick && ImGui::GetMousePos().y <= node_rect_header.y){
+                    if(nodeOwnsRightClick && nodeHeaderRightClickInSelection &&
+                       ImGui::GetMousePos().y <= node_rect_header.y){
                         open_context_menu = true;
                         customGuiContextNode = node;
                     }
@@ -1924,13 +1917,19 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         }
 
         if(open_context_menu && customGuiContextNode != nullptr){
-            ImGui::OpenPopup("Canvas Custom GUIs");
+            ImGui::OpenPopup("Node Selection Menu");
         }
 
         ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 0.7f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
-        if(ImGui::BeginPopup("Canvas Custom GUIs")){
+        if(ImGui::BeginPopup("Node Selection Menu")){
+            // This menu is only ever opened for a node that belongs to a
+            // multi-node selection, so everything in it acts on that selection.
+            // The canvas-wide "Auto Layout Canvas" and the Custom GUI
+            // management menu used to live here too; both are reachable from
+            // the canvas right-click and the View menu, and neither had
+            // anything to do with the node that was clicked.
             if(customGuiContextNode != nullptr){
                 auto selectedNodes = container->getSelectedModules();
                 bool contextNodeIsSelected = std::find(selectedNodes.begin(), selectedNodes.end(), customGuiContextNode) != selectedNodes.end();
@@ -1939,28 +1938,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         autoLayoutNodes(selectedNodes);
                         ImGui::CloseCurrentPopup();
                     }
-                }
-                auto allNodes = container->getAllModules();
-                if(allNodes.size() > 1){
-                    if(ImGui::Selectable("Auto Layout Canvas")){
-                        autoLayoutNodes(allNodes);
-                        ImGui::CloseCurrentPopup();
-                    }
-                }
-                if((contextNodeIsSelected && selectedNodes.size() > 1) || allNodes.size() > 1){
-                    ImGui::Separator();
-                }
-                if(contextNodeIsSelected && selectedNodes.size() > 1){
                     auto connectedOutputs = getPortalizableOutputs(selectedNodes);
                     if(!connectedOutputs.empty()){
                         if(ImGui::Selectable("Portalize Selection")){
                             for(auto* output : connectedOutputs) portalizeOutput(output);
                             ImGui::CloseCurrentPopup();
                         }
-                        ImGui::Separator();
                     }
                 }
-                drawCustomGuiManagementMenu();
             }
             ImGui::EndPopup();
         }
