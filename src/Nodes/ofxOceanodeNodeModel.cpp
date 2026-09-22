@@ -48,6 +48,30 @@ shared_ptr<ofxOceanodeAbstractParameter> ofxOceanodeNodeModel::addParameter(ofAb
     return dynamic_pointer_cast<ofxOceanodeAbstractParameter>(*(parameters.end()-1));
 }
 
+// Tolerant JSON -> vector conversion for preset loading. Presets can contain
+// null entries (NaN/inf are written as null by nlohmann::json) or numbers stored
+// as strings; nlohmann's get<vector<T>>() throws on those. Unreadable entries
+// become 0. Returns false if the value can't be read at all (keep current value).
+template<typename T>
+static bool oceanodeJsonToVector(const ofJson &value, vector<T> &out){
+	auto toScalar = [](const ofJson &v) -> T {
+		if(v.is_number() || v.is_boolean()) return v.get<T>();
+		if(v.is_string()) return (T)ofToFloat(v.get<string>());
+		return T(0);
+	};
+	if(value.is_array()){
+		out.clear();
+		out.reserve(value.size());
+		for(const auto &v : value) out.push_back(toScalar(v));
+		return true;
+	}
+	if(value.is_number() || value.is_boolean() || value.is_string()){
+		out = vector<T>(1, toScalar(value));
+		return true;
+	}
+	return false;
+}
+
 void ofxOceanodeNodeModel::deserializeParameter(ofJson &json, ofAbstractParameter &p){
 	const string name = p.getEscapedName();
 	// Missing key: keep the current value (json[name] on a missing key yields null and throws on conversion)
