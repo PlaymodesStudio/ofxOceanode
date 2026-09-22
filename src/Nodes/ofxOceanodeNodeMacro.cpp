@@ -15,7 +15,7 @@
 // ─── Constructor ─────────────────────────────────────────────────────────────
 
 ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
-	color = ofColor::black;
+	color = ofColor(255,128,0);
 	description = "Encapsulation of a graph";
 	showWindow = false;
 	lastActiveState = true;
