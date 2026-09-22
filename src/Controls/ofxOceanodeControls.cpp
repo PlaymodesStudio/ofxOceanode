@@ -69,14 +69,10 @@ void ofxOceanodeControls::draw(){
         inspectorName = inspector->getControllerName();
         const bool wasVisible = controllerVisible[inspectorName];
         const bool autoShowHide = ofxOceanodeShared::getAutoInspectorShowHide();
-        const bool hasSelection = autoShowHide && inspector->hasAnySelectedNode();
+        const bool hasSelection = inspector->hasAnySelectedNode();
         bool showInspector = !autoShowHide || hasSelection;
-        if(autoShowHide && !hasSelection)
+        if(!hasSelection)
             ofxOceanodeShared::consumeInspectorFocusRequest();
-        if(!autoShowHide){
-            inspectorPreviousTabID = 0;
-            inspectorPreviousDockID = 0;
-        }
 
         // The canvas processes mouse release later in this frame. Keep its dock
         // size unchanged until that release has been handled, even if a node was
@@ -87,7 +83,9 @@ void ofxOceanodeControls::draw(){
             showInspector = false;
         }
 
-        if(autoShowHide && wasVisible && !showInspector){
+        // Restore the tab that was active before the Inspector took focus when
+        // selection ends, whether the Inspector will hide or remain open.
+        if(!hasSelection && inspectorPreviousTabID != 0){
             ImGuiWindow* window = ImGui::FindWindowByName(inspectorName.c_str());
             ImGuiDockNode* dock = window ? window->DockNode : nullptr;
             if(dock && dock->ID == inspectorPreviousDockID && dock->TabBar &&
@@ -106,8 +104,8 @@ void ofxOceanodeControls::draw(){
         // the Inspector's appearance.
         focusInspectorWindow = showInspector && ofxOceanodeShared::consumeInspectorFocusRequest();
         activateInspectorTab = showInspector && (focusInspectorWindow || (autoShowHide && !wasVisible));
-        if(activateInspectorTab && autoShowHide){
-            // Capture the active sibling before Begin() adds the Inspector tab.
+        if(activateInspectorTab){
+            // Capture the active sibling before selecting the Inspector tab.
             ImGuiWindow* window = ImGui::FindWindowByName(inspectorName.c_str());
             ImGuiDockNode* dock = window ? window->DockNode : nullptr;
             if(!dock && window && window->DockId)
