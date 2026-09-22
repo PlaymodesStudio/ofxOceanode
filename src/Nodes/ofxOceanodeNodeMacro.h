@@ -197,6 +197,7 @@ private:
 	// ─── Core containers ──────────────────────────────────────────────────
 	ofxOceanodeCanvas canvas;
 	shared_ptr<ofxOceanodeContainer> container;
+	ofxOceanodeContainer* parentContainer = nullptr;
 	shared_ptr<ofxOceanodeNodeRegistry> registry;
 	shared_ptr<ofxOceanodeTypesRegistry> typesRegistry;
 	
