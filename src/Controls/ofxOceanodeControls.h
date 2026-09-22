@@ -10,6 +10,7 @@
 
 #include "ofMain.h"
 #include "ofxOceanodeBaseController.h"
+#include "imgui.h"
 
 class ofxOceanodeContainer;
 class ofxOceanodeCanvas;
@@ -53,6 +54,8 @@ private:
     ofEventListeners listeners;
     vector<shared_ptr<ofxOceanodeBaseController>> controllers;
     std::map<std::string, bool> controllerVisible;
+    ImGuiID inspectorPreviousTabID = 0;
+    ImGuiID inspectorPreviousDockID = 0;
 };
 
 #endif /* ofxOceanodeControls_h */
