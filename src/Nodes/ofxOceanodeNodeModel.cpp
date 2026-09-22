@@ -49,19 +49,26 @@ shared_ptr<ofxOceanodeAbstractParameter> ofxOceanodeNodeModel::addParameter(ofAb
 }
 
 void ofxOceanodeNodeModel::deserializeParameter(ofJson &json, ofAbstractParameter &p){
+	const string name = p.getEscapedName();
+	// Missing key: keep the current value (json[name] on a missing key yields null and throws on conversion)
+	if(!json.contains(name) || json[name].is_null()) return;
+	const ofJson &value = json[name];
 	if(p.valueType() == typeid(vector<float>).name()){
-		float value = 0;
-		if(json[p.getEscapedName()].is_string()){
-			p.cast<vector<float>>() = vector<float>(1, ofToFloat(json[p.getEscapedName()]));
-		}else{
-			p.cast<vector<float>>() = vector<float>(1, float(json[p.getEscapedName()]));
+		if(value.is_array()){
+			p.cast<vector<float>>() = value.get<vector<float>>();
+		}else if(value.is_string()){
+			p.cast<vector<float>>() = vector<float>(1, ofToFloat(value.get<string>()));
+		}else if(value.is_number() || value.is_boolean()){
+			p.cast<vector<float>>() = vector<float>(1, value.get<float>());
 		}
 	}
 	else if(p.valueType() == typeid(vector<int>).name()){
-		if(json[p.getEscapedName()].is_string()){
-			p.cast<vector<int>>() = vector<int>(1, ofToInt(json[p.getEscapedName()]));
-		}else{
-			p.cast<vector<int>>() = vector<int>(1, int(json[p.getEscapedName()]));
+		if(value.is_array()){
+			p.cast<vector<int>>() = value.get<vector<int>>();
+		}else if(value.is_string()){
+			p.cast<vector<int>>() = vector<int>(1, ofToInt(value.get<string>()));
+		}else if(value.is_number() || value.is_boolean()){
+			p.cast<vector<int>>() = vector<int>(1, value.get<int>());
 		}
 	}else{
 		ofDeserialize(json, p);
