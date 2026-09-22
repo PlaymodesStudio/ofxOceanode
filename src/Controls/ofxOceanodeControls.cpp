@@ -16,6 +16,7 @@
 #include "ofxOceanodeGlobalVariablesController.h"
 #include "ofxOceanodeTimelineController.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "ofxOceanodeShared.h"
 
 #ifdef OFXOCEANODE_USE_OSC
@@ -61,16 +62,68 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
 
 
 void ofxOceanodeControls::draw(){
-    // Sync Inspector visibility with node selection state (only when auto show/hide is enabled)
+    // Sync Inspector visibility with node selection state.
     auto inspector = get<ofxOceanodeInspectorController>();
     std::string inspectorName;
+    bool activateInspectorTab = false;
+    bool focusInspectorWindow = false;
     if(inspector){
         inspectorName = inspector->getControllerName();
-        if(ofxOceanodeShared::getAutoInspectorShowHide()){
-            controllerVisible[inspectorName] = inspector->hasAnySelectedNode();
-        } else {
-            controllerVisible[inspectorName] = true;
+        const bool wasVisible = controllerVisible[inspectorName];
+        const bool autoShowHide = ofxOceanodeShared::getAutoInspectorShowHide();
+        const bool hasSelection = inspector->hasAnySelectedNode();
+        bool showInspector = !autoShowHide || hasSelection;
+        if(!hasSelection)
+            ofxOceanodeShared::consumeInspectorFocusRequest();
+
+        // The canvas processes mouse release later in this frame. Keep its dock
+        // size unchanged until that release has been handled, even if a node was
+        // selected on mouse down in the previous frame.
+        if(autoShowHide && showInspector && !wasVisible &&
+           (ImGui::IsMouseDown(0) || ImGui::IsMouseReleased(0) ||
+            ImGui::IsMouseDown(1) || ImGui::IsMouseReleased(1))){
+            showInspector = false;
         }
+
+        // Restore the tab that was active before the Inspector took focus when
+        // selection ends, whether the Inspector will hide or remain open.
+        if(!hasSelection && inspectorPreviousTabID != 0){
+            ImGuiWindow* window = ImGui::FindWindowByName(inspectorName.c_str());
+            ImGuiDockNode* dock = window ? window->DockNode : nullptr;
+            if(dock && dock->ID == inspectorPreviousDockID && dock->TabBar &&
+               inspectorPreviousTabID != 0 &&
+               ImGui::TabBarFindTabByID(dock->TabBar, inspectorPreviousTabID) &&
+               (dock->TabBar->SelectedTabId == window->TabId ||
+                dock->TabBar->NextSelectedTabId == window->TabId)){
+                dock->TabBar->NextSelectedTabId = inspectorPreviousTabID;
+            }
+            inspectorPreviousTabID = 0;
+            inspectorPreviousDockID = 0;
+        }
+
+        // A header right-click requests activation even when auto show/hide is
+        // disabled. Leave the request pending while a mouse interaction delays
+        // the Inspector's appearance.
+        focusInspectorWindow = showInspector && ofxOceanodeShared::consumeInspectorFocusRequest();
+        activateInspectorTab = showInspector && (focusInspectorWindow || (autoShowHide && !wasVisible));
+        if(activateInspectorTab){
+            // Capture the active sibling before selecting the Inspector tab.
+            ImGuiWindow* window = ImGui::FindWindowByName(inspectorName.c_str());
+            ImGuiDockNode* dock = window ? window->DockNode : nullptr;
+            if(!dock && window && window->DockId)
+                dock = ImGui::DockBuilderGetNode(window->DockId);
+            if(!dock && !window)
+                dock = ImGui::DockBuilderGetNode(ofxOceanodeShared::getLeftNodeID());
+            const ImGuiID selectedTabID = dock && dock->TabBar ? dock->TabBar->SelectedTabId : 0;
+            if(selectedTabID && (!window || selectedTabID != window->TabId)){
+                inspectorPreviousDockID = dock->ID;
+                inspectorPreviousTabID = selectedTabID;
+            }else if(!wasVisible){
+                inspectorPreviousDockID = 0;
+                inspectorPreviousTabID = 0;
+            }
+        }
+        controllerVisible[inspectorName] = showInspector;
     }
 
     // Handles the "New Timeline Track" name dialog requested from a
@@ -94,12 +147,18 @@ void ofxOceanodeControls::draw(){
         // truly disappears from the tab bar.
         if(!isVisible) continue;
 
-        // Use NoFocusOnAppearing so that when the Inspector reappears after a
-        // node is first selected it does NOT steal focus away from the canvas
-        // (which was the root cause of needing to click twice to move/delete).
+        // Automatic appearance keeps keyboard focus on the canvas. A header
+        // right-click explicitly focuses the Inspector, including when floating.
         ImGui::SetNextWindowDockID(ofxOceanodeShared::getLeftNodeID(), ImGuiCond_FirstUseEver);
+        if(focusInspectorWindow && c->getControllerName() == inspectorName)
+            ImGui::SetNextWindowFocus();
         if(ImGui::Begin(c->getControllerName().c_str(), nullptr, ImGuiWindowFlags_NoFocusOnAppearing)){
             c->draw();
+        }
+        if(activateInspectorTab && c->getControllerName() == inspectorName){
+            ImGuiWindow* window = ImGui::GetCurrentWindow();
+            if(window->DockNode && window->DockNode->TabBar)
+                window->DockNode->TabBar->NextSelectedTabId = window->TabId;
         }
         ImGui::End();
     }

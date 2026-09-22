@@ -300,6 +300,16 @@ public:
 		return getInstance().autoInspectorShowHide;
 	}
 
+	static void requestInspectorFocus(){
+		getInstance().inspectorFocusRequested = true;
+	}
+
+	static bool consumeInspectorFocusRequest(){
+		bool requested = getInstance().inspectorFocusRequested;
+		getInstance().inspectorFocusRequested = false;
+		return requested;
+	}
+
 	// Node dimensions (mirrors ofxOceanodeCanvas values, updated by the canvas)
 	static int getNodeWidthWidget(){ return getInstance().nodeWidthWidget; }
 	static int getNodeWidthText()  { return getInstance().nodeWidthText; }
@@ -496,6 +506,7 @@ private:
 
 	// Auto Inspector show/hide
 	bool autoInspectorShowHide = true;
+	bool inspectorFocusRequested = false;
 
 	// Active canvas tracking
 	string activeCanvasUniqueID = "";

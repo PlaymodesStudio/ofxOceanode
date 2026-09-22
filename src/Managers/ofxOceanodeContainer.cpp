@@ -18,12 +18,76 @@
 #include "Nodes/MacroSnapshotSystem.h"
 #include "Nodes/MacroRouterValueDispatch.h"
 #include "imgui.h"
+#include <cfloat>
+#include <deque>
 
 #ifdef OFXOCEANODE_USE_MIDI
 #include "ofxOceanodeMidiBinding.h"
 #include "ofxMidiIn.h"
 #include "ofxMidiOut.h"
 #endif
+
+namespace {
+    struct ConnectionFailureInfo {
+        std::string connection;
+        std::string reason;
+    };
+
+    struct ConnectionErrorDialogData {
+        std::string canvasIdPath;
+        std::string canvasNamePath;
+        std::vector<ConnectionFailureInfo> failedConnections;
+    };
+
+    std::deque<ConnectionErrorDialogData> pendingConnectionErrorDialogs;
+
+    void drawConnectionErrorDialogContents()
+    {
+        if(pendingConnectionErrorDialogs.empty()) return;
+
+        constexpr const char* popupId = "Connection error##ofxOceanodeConnectionError";
+        if(!ImGui::IsPopupOpen(popupId)) ImGui::OpenPopup(popupId);
+
+        ImGui::SetNextWindowSizeConstraints(ImVec2(760.0f, 0.0f), ImVec2(760.0f, FLT_MAX));
+        if(ImGui::BeginPopupModal(popupId, nullptr,
+                                  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)){
+            const auto& error = pendingConnectionErrorDialogs.front();
+
+            ImGui::TextUnformatted("Could not create one or more connections");
+            ImGui::Separator();
+
+            ImGui::TextDisabled("MACRO IDS");
+            ImGui::TextWrapped("%s", error.canvasIdPath.c_str());
+            ImGui::Spacing();
+
+            ImGui::TextDisabled("MACRO NAMES");
+            ImGui::TextWrapped("%s", error.canvasNamePath.c_str());
+            ImGui::Spacing();
+
+            ImGui::TextDisabled("FAILED CONNECTIONS");
+            for(const auto& failure : error.failedConnections){
+                ImGui::Bullet();
+                ImGui::SameLine();
+                ImGui::TextWrapped("%s", failure.connection.c_str());
+                ImGui::Indent();
+                ImGui::TextDisabled("Reason:");
+                ImGui::SameLine();
+                ImGui::TextWrapped("%s", failure.reason.c_str());
+                ImGui::Unindent();
+                ImGui::Spacing();
+            }
+
+            ImGui::Spacing();
+            constexpr float buttonWidth = 160.0f;
+            ImGui::SetCursorPosX((ImGui::GetWindowWidth() - buttonWidth) * 0.5f);
+            if(ImGui::Button("OK", ImVec2(buttonWidth, 0.0f))){
+                pendingConnectionErrorDialogs.pop_front();
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+    }
+}
 
 
 ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry, shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry, shared_ptr<ofxOceanodeTransport> _transport) : registry(_registry), typesRegistry(_typesRegistry), transport(_transport){
@@ -182,6 +246,12 @@ void ofxOceanodeContainer::draw(){
         pendingDeletedCustomGuiPanelId.clear();
         deleteCustomGuiPanel(panelId);
     }
+
+}
+
+void ofxOceanodeContainer::drawPendingConnectionErrorDialog()
+{
+    drawConnectionErrorDialogContents();
 }
 
 void ofxOceanodeContainer::activate(){
@@ -1024,7 +1094,7 @@ void ofxOceanodeContainer::loadPreset_loadConnections(string presetFolderPath){
         oldConnectionsInfo[i][2] = connections[i]->getSinkParameter().getGroupHierarchyNames()[0];
 
     }
-    std::vector<string> notCreatedConnectionInfo;
+    std::vector<ConnectionFailureInfo> notCreatedConnectionInfo;
     for (ofJson::iterator sourceModule = json.begin(); sourceModule != json.end(); ++sourceModule) {
         for (ofJson::iterator sourceParameter = sourceModule.value().begin(); sourceParameter != sourceModule.value().end(); ++sourceParameter) {
             for (ofJson::iterator sinkModule = sourceParameter.value().begin(); sinkModule != sourceParameter.value().end(); ++sinkModule) {
@@ -1041,9 +1111,17 @@ void ofxOceanodeContainer::loadPreset_loadConnections(string presetFolderPath){
                         }
                     }
                     if(!connectionExist){
-                        auto connection = createConnectionFromInfo(sourceModule.key(), sourceParameter.key(), sinkModule.key(), sinkParameter.key(), false);
+                        std::string failureReason;
+                        auto connection = createConnectionFromInfo(sourceModule.key(), sourceParameter.key(),
+                                                                   sinkModule.key(), sinkParameter.key(),
+                                                                   false, &failureReason);
                         if(connection == nullptr){ //Connection could not be made
-                            notCreatedConnectionInfo.push_back(sourceModule.key() + "/" + sourceParameter.key() + " -> " + sinkModule.key() + "/" + sinkParameter.key());
+                            if(failureReason.empty()) failureReason = "Unknown connection error.";
+                            notCreatedConnectionInfo.push_back({
+                                sourceModule.key() + "/" + sourceParameter.key() + " -> " +
+                                    sinkModule.key() + "/" + sinkParameter.key(),
+                                std::move(failureReason)
+                            });
                         }
                     }
                 }
@@ -1051,9 +1129,14 @@ void ofxOceanodeContainer::loadPreset_loadConnections(string presetFolderPath){
         }
     }
     if(notCreatedConnectionInfo.size() != 0){
-        std::string message = "ERROR\nCOULD NOT CREATE CONNECTIONS\nIN " + getCanvasID();
-        for(auto l : notCreatedConnectionInfo) message += "\n" + l;
-        ofSystemAlertDialog(message);
+        std::string canvasIdPath = getCanvasID();
+        std::string canvasNamePath = getCanvasDisplayPath();
+        ofStringReplace(canvasIdPath, " / ", " > ");
+        ofStringReplace(canvasNamePath, " / ", " > ");
+
+        pendingConnectionErrorDialogs.push_back({canvasIdPath,
+                                                 canvasNamePath,
+                                                 std::move(notCreatedConnectionInfo)});
     }
 }
 
@@ -2822,16 +2905,64 @@ void ofxOceanodeContainer::addNewMidiMessageListener(ofxMidiListener* listener){
 
 #endif
 
-ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter, bool active){
+ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(string sourceModule, string sourceParameter,
+                                                                              string sinkModule, string sinkParameter,
+                                                                              bool active, string* failureReason){
+    if(failureReason != nullptr) failureReason->clear();
+    auto fail = [failureReason](const std::string& reason) -> ofxOceanodeAbstractConnection* {
+        if(failureReason != nullptr) *failureReason = reason;
+        return nullptr;
+    };
+
     auto sourceModuleRef = parameterGroupNodesMap.count(sourceModule) == 1 ? parameterGroupNodesMap[sourceModule] : nullptr;
     auto sinkModuleRef = parameterGroupNodesMap.count(sinkModule) == 1 ? parameterGroupNodesMap[sinkModule] : nullptr;
-    if(sourceModuleRef == nullptr || sinkModuleRef == nullptr) return nullptr;
-    if(sourceModuleRef->getParameters().contains(sourceParameter) && sinkModuleRef->getParameters().contains(sinkParameter)){
-        ofAbstractParameter &source = sourceModuleRef->getParameters().get(sourceParameter);
-        ofAbstractParameter &sink = sinkModuleRef->getParameters().get(sinkParameter);
-        return createConnection(static_cast<ofxOceanodeAbstractParameter &>(source), static_cast<ofxOceanodeAbstractParameter &>(sink), active);
+    if(sourceModuleRef == nullptr && sinkModuleRef == nullptr){
+        return fail("Source node '" + sourceModule + "' and destination node '" + sinkModule +
+                    "' do not exist in this canvas (name or ID mismatch).");
     }
-    return nullptr;
+    if(sourceModuleRef == nullptr){
+        return fail("Source node '" + sourceModule + "' does not exist in this canvas (name or ID mismatch).");
+    }
+    if(sinkModuleRef == nullptr){
+        return fail("Destination node '" + sinkModule + "' does not exist in this canvas (name or ID mismatch).");
+    }
+
+    const bool sourceParameterExists = sourceModuleRef->getParameters().contains(sourceParameter);
+    const bool sinkParameterExists = sinkModuleRef->getParameters().contains(sinkParameter);
+    if(!sourceParameterExists && !sinkParameterExists){
+        return fail("Source parameter '" + sourceParameter + "' is missing from '" + sourceModule +
+                    "', and destination parameter '" + sinkParameter + "' is missing from '" + sinkModule +
+                    "' (name mismatch).");
+    }
+    if(!sourceParameterExists){
+        return fail("Source parameter '" + sourceParameter + "' does not exist on node '" + sourceModule +
+                    "' (name mismatch).");
+    }
+    if(!sinkParameterExists){
+        return fail("Destination parameter '" + sinkParameter + "' does not exist on node '" + sinkModule +
+                    "' (name mismatch).");
+    }
+
+    auto& source = static_cast<ofxOceanodeAbstractParameter&>(sourceModuleRef->getParameters().get(sourceParameter));
+    auto& sink = static_cast<ofxOceanodeAbstractParameter&>(sinkModuleRef->getParameters().get(sinkParameter));
+    auto connection = createConnection(source, sink, active);
+    if(connection != nullptr) return connection;
+
+    auto readableType = [this](const std::string& typeDescription){
+        if(typeDescription == typeid(float).name()) return std::string("float");
+        if(typeDescription == typeid(int).name()) return std::string("int");
+        if(typeDescription == typeid(bool).name()) return std::string("bool");
+        if(typeDescription == typeid(void).name()) return std::string("trigger");
+        if(typeDescription == typeid(std::string).name()) return std::string("string");
+        if(typeDescription == typeid(std::vector<float>).name()) return std::string("float vector");
+        if(typeDescription == typeid(std::vector<int>).name()) return std::string("int vector");
+        if(typeDescription == typeid(std::vector<std::string>).name()) return std::string("string vector");
+        const std::string registeredName = typesRegistry->getTypeNameFromTypeDescription(typeDescription);
+        return registeredName.empty() ? typeDescription : registeredName;
+    };
+
+    return fail("Incompatible parameter types, or no converter is registered: " +
+                readableType(source.valueType()) + " -> " + readableType(sink.valueType()) + ".");
 }
 
 ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active){

@@ -16,6 +16,7 @@
 #include "CustomGui/ofxOceanodeCustomGuiLayout.h"
 #include "ofxOceanodeNodeGui.h"
 #include <cstdint>
+#include <functional>
 #include <unordered_set>
 
 class ofxOceanodeNodeModel;
@@ -72,6 +73,7 @@ public:
     
     void update();
     void draw();
+    static void drawPendingConnectionErrorDialog();
     
     void activate();
     void deactivate();
@@ -112,7 +114,10 @@ public:
         return connectionRef;
     }
     
-    ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter, string sinkModule, string sinkParameter, bool active = true);
+    ofxOceanodeAbstractConnection* createConnectionFromInfo(string sourceModule, string sourceParameter,
+                                                            string sinkModule, string sinkParameter,
+                                                            bool active = true,
+                                                            string* failureReason = nullptr);
     ofxOceanodeAbstractConnection* createConnection(ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active = true);
     
     shared_ptr<ofxOceanodeNodeRegistry> getRegistry(){return registry;};
@@ -243,6 +248,10 @@ public:
     
     void setCanvasID(string s){canvasID = s;};
     string getCanvasID(){return canvasID;};
+    void setCanvasDisplayPathProvider(std::function<std::string()> provider){canvasDisplayPathProvider = std::move(provider);}
+    std::string getCanvasDisplayPath() const {
+        return canvasDisplayPathProvider ? canvasDisplayPathProvider() : canvasID;
+    }
 
     /// Read-only access to the dynamic node map, keyed by node-type name.
     /// Each value is a map from integer identifier to the shared_ptr<ofxOceanodeNode>.
@@ -335,6 +344,7 @@ private:
     void midiBindingBound(const void * sender, string &portName);
 #endif
     string canvasID;
+    std::function<std::string()> canvasDisplayPathProvider;
 	
 	// Encapsulation support structures and methods
 		struct InternalConnection {

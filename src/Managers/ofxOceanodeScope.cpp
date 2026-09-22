@@ -601,7 +601,7 @@ void ofxOceanodeScope::draw(){
             else if(
                 centralNode != NULL
                 && centralNode->IsLeafNode()
-                && scopedParameters.size() > 1
+                && !scopedParameters.empty()
                 && !IsScopeWindowPendingDock(scopedParameters, centralNode->ID)
             )
             {

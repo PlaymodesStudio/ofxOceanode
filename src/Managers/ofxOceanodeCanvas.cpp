@@ -1229,6 +1229,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         });
 		
         std::unordered_set<std::string> deletedIds;
+        bool rightClickClaimedByNode = false;
         // Display nodes
         //Iterating over the map gives errors as we are removing elements from the map during the iteration.
         for(auto nodePair : nodesVisibleInThisFrame)
@@ -1320,6 +1321,28 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ImVec2 node_rect_header = ImVec2(node_rect_min.x + screenSize.x, node_rect_min.y + 29.0f * zoomLevel);
                 // Keep a local alias for backward compatibility in this scope
                 glm::vec2 size = screenSize;
+
+                // The arrow, name and X are separate ImGui items, so the node's
+                // invisible body button cannot reliably detect a header click.
+                // Nodes are visited front to back; claim the first node under
+                // the pointer so an obscured header cannot receive the click.
+                bool nodeOwnsRightClick = false;
+                if(!rightClickClaimedByNode && ImGui::IsMouseClicked(1) &&
+                   ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
+                   ImGui::IsMouseHoveringRect(node_rect_min, node_rect_max)){
+                    rightClickClaimedByNode = true;
+                    nodeOwnsRightClick = true;
+                    const bool hasHeader = !(node->getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
+                    if(hasHeader && ImGui::IsMouseHoveringRect(node_rect_min, node_rect_header)){
+                        deselectAllNodes();
+                        nodeGui.setSelected(true);
+                        lastSelectedNode = nodeId;
+                        ofxOceanodeShared::nodeSelectedInCanvas(node);
+                        ofxOceanodeShared::requestInspectorFocus();
+                        isAnyNodeHovered = true;
+                        node_hovered_in_scene = nodeId;
+                    }
+                }
                 
                 // Display node box
                 draw_list->ChannelsSetCurrent(nodeDrawChannel); // Background
@@ -1332,7 +1355,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 {
                     isAnyNodeHovered = true;
                     node_hovered_in_scene = nodeId;
-                    if(ImGui::IsMouseClicked(1) && ImGui::GetMousePos().y <= node_rect_header.y){
+                    if(nodeOwnsRightClick && ImGui::GetMousePos().y <= node_rect_header.y){
                         open_context_menu = true;
                         customGuiContextNode = node;
                     }

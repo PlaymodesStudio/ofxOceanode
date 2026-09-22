@@ -974,6 +974,11 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         ImGui::EndPopup();
     }
 
+    // Connection errors are queued while presets load. Render them from the
+    // persistent DockSpace window so OpenPopup and BeginPopupModal use the
+    // same stable ImGui ID stack on every frame.
+    ofxOceanodeContainer::drawPendingConnectionErrorDialog();
+
     ImGui::End(); // End DockSpace window — must come after all popup code above
 }
 

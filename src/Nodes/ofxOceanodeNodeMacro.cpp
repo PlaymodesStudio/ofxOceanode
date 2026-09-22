@@ -15,7 +15,7 @@
 // ─── Constructor ─────────────────────────────────────────────────────────────
 
 ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
-	color = ofColor::black;
+	color = ofColor(255,128,0);
 	description = "Encapsulation of a graph";
 	showWindow = false;
 	lastActiveState = true;
@@ -87,6 +87,7 @@ void ofxOceanodeNodeMacro::draw(ofEventArgs &a){
 
 void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
 	ofxOceanodeNodeModel::setContainer(container);
+	parentContainer = container;
 	registry = container->getRegistry();
 	typesRegistry = container->getTypesRegistry();
 	canvasParentID = container->getCanvasID();
@@ -222,6 +223,16 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	
 	canvas.setContainer(container);
 	canvas.setup("Macro " + ofToString(getNumIdentifier()), canvasParentID);
+	// Resolve names when needed so renamed macros and preset changes stay current.
+	container->setCanvasDisplayPathProvider([this](){
+		string name = presetManager.isLocal() ? localName.get() : presetManager.getCurrentMacro();
+		if(name.empty()) name = "Macro " + ofToString(getNumIdentifier());
+		if(parentContainer == nullptr) return name;
+		const string parentID = parentContainer->getCanvasID();
+		if(parentID.empty() || parentID == "Canvas" || parentID == "0") return name;
+		const string parentPath = parentContainer->getCanvasDisplayPath();
+		return parentPath.empty() ? name : parentPath + " / " + name;
+	});
 	
 	// get Snap params from shared
 	bool b = ofxOceanodeShared::getSnapToGrid();
@@ -241,6 +252,8 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			loadRouterSortFromJson(sortJson);
 		}
 		presetManager.setInnerPresetLoadingPath(additionalInfo);
+		// The name must be available if loading this macro raises a connection error.
+		presetManager.setCurrentMacro(ofFilePath::getFileName(additionalInfo));
 		container->loadPreset(additionalInfo);
 		presetManager.setInnerPresetLoadingPath("");
 		isLoadingPreset = false;
@@ -879,6 +892,10 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 // ─── Preset lifecycle overrides ──────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::loadBeforeConnections(ofJson &json){
+	// Nested connection errors occur before the usual inspector-parameter load.
+	if(json.contains(localName.getEscapedName()) && json[localName.getEscapedName()].is_string()){
+		ofDeserialize(json, localName);
+	}
 }
 
 void ofxOceanodeNodeMacro::presetRecallBeforeSettingParameters(ofJson &json){
