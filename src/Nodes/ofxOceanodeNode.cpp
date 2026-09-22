@@ -232,18 +232,36 @@ void ofxOceanodeNode::loadInspectorParametersFromJson(ofJson json){
     }
 }
 
+// Tolerant JSON -> vector conversion for preset loading. Presets can contain
+// null entries (NaN/inf are written as null by nlohmann::json) or numbers stored
+// as strings; nlohmann's get<vector<T>>() throws on those. Unreadable entries
+// become 0. Returns false if the value can't be read at all (keep current value).
+template<typename T>
+static bool oceanodeJsonToVector(const ofJson &value, vector<T> &out){
+	auto toScalar = [](const ofJson &v) -> T {
+		if(v.is_number() || v.is_boolean()) return v.get<T>();
+		if(v.is_string()) return (T)ofToFloat(v.get<string>());
+		return T(0);
+	};
+	if(value.is_array()){
+		out.clear();
+		out.reserve(value.size());
+		for(const auto &v : value) out.push_back(toScalar(v));
+		return true;
+	}
+	if(value.is_number() || value.is_boolean() || value.is_string()){
+		out = vector<T>(1, toScalar(value));
+		return true;
+	}
+	return false;
+}
+
 void ofxOceanodeNode::deserializeParameter(ofJson &json, ofxOceanodeAbstractParameter &p, bool persistentPreset){
 	if((((!persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) || (persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject)))) && json.count(p.getEscapedName()) && !p.hasInConnection()){
 		if(p.valueType() == typeid(vector<float>).name()){
 			auto& param = p.cast<vector<float>>().getParameter();
 			vector<float> values;
-			if(json[p.getEscapedName()].is_array()){
-				values = json[p.getEscapedName()].get<vector<float>>();
-			}else if(json[p.getEscapedName()].is_string()){
-				values = vector<float>(1, ofToFloat(json[p.getEscapedName()]));
-			}else{
-				values = vector<float>(1, float(json[p.getEscapedName()]));
-			}
+			if(!oceanodeJsonToVector(json[p.getEscapedName()], values)) return;
 			if(!values.empty()){
 				auto mins = param.getMin();
 				auto maxs = param.getMax();
@@ -259,13 +277,7 @@ void ofxOceanodeNode::deserializeParameter(ofJson &json, ofxOceanodeAbstractPara
 		else if(p.valueType() == typeid(vector<int>).name()){
 			auto& param = p.cast<vector<int>>().getParameter();
 			vector<int> values;
-			if(json[p.getEscapedName()].is_array()){
-				values = json[p.getEscapedName()].get<vector<int>>();
-			}else if(json[p.getEscapedName()].is_string()){
-				values = vector<int>(1, ofToInt(json[p.getEscapedName()]));
-			}else{
-				values = vector<int>(1, int(json[p.getEscapedName()]));
-			}
+			if(!oceanodeJsonToVector(json[p.getEscapedName()], values)) return;
 			if(!values.empty()){
 				auto mins = param.getMin();
 				auto maxs = param.getMax();
