@@ -368,6 +368,274 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             return outputs;
         };
 
+        auto autoLayoutNodes = [&](vector<ofxOceanodeNode*> nodes){
+            if(nodes.size() < 2) return;
+
+            const int nodeCount = (int)nodes.size();
+            unordered_map<ofxOceanodeNodeModel*, int> nodeIndices;
+            vector<unordered_set<int>> outgoing(nodeCount);
+            vector<unordered_set<int>> incoming(nodeCount);
+            for(int i = 0; i < nodeCount; i++){
+                nodeIndices[&nodes[i]->getNodeModel()] = i;
+            }
+
+            auto addEdge = [&](int source, int sink){
+                if(source == sink || outgoing[source].count(sink) != 0) return;
+                outgoing[source].insert(sink);
+                incoming[sink].insert(source);
+            };
+
+            for(const auto& connection : container->getAllConnections()){
+                auto sourceIt = nodeIndices.find(connection->getSourceParameter().getNodeModel());
+                auto sinkIt = nodeIndices.find(connection->getSinkParameter().getNodeModel());
+                if(sourceIt != nodeIndices.end() && sinkIt != nodeIndices.end()){
+                    addEdge(sourceIt->second, sinkIt->second);
+                }
+            }
+
+            // Matching portals are a *grouping* hint only: a sender and its receiver(s)
+            // are union'd into the same connected component below (so a receiver with no
+            // other local wiring doesn't drift off as its own stray component), but this
+            // must NOT feed the rank/indegree graph (outgoing/incoming) like a real wire
+            // would. A portal is often a broadcast bus - one sender feeding receivers
+            // scattered across otherwise-unrelated subgraphs - so forcing every receiver's
+            // rank to sender_rank+1 would drag all of them (and everything downstream) out
+            // to the sender's depth. Rank stays based on real connections only.
+            //
+            // The grouping key mirrors abstractPortal::checkLocal(): a "Local" portal only
+            // matches another one in the same canvas/macro, a "Global" portal matches by
+            // type+name regardless of canvas. Without that scoping, two unrelated local
+            // portals that merely reuse a name (e.g. "in"/"out" in copies of a macro) would
+            // get lumped into one group.
+            unordered_map<string, vector<int>> portalGroups;
+            for(int i = 0; i < nodeCount; i++){
+                auto* portalModel = dynamic_cast<abstractPortal*>(&nodes[i]->getNodeModel());
+                if(portalModel != nullptr){
+                    const string scope = portalModel->isLocal() ? ("L:" + nodes[i]->getNodeModel().getParents()) : string("G");
+                    portalGroups[nodes[i]->getNodeModel().nodeName() + "\n" + portalModel->getName() + "\n" + scope].push_back(i);
+                }
+            }
+            vector<unordered_set<int>> portalUnion(nodeCount);
+            auto addPortalLink = [&](int a, int b){
+                if(a == b) return;
+                portalUnion[a].insert(b);
+                portalUnion[b].insert(a);
+            };
+            for(const auto& group : portalGroups){
+                vector<int> senders;
+                vector<int> receivers;
+                for(int index : group.second){
+                    if(!nodes[index]->getParameters().contains("Value")) continue;
+                    auto& value = static_cast<ofxOceanodeAbstractParameter&>(nodes[index]->getParameters().get("Value"));
+                    if(value.hasInConnection()) senders.push_back(index);
+                    if(value.hasOutConnections()) receivers.push_back(index);
+                }
+                for(int sender : senders){
+                    for(int receiver : receivers) addPortalLink(sender, receiver);
+                }
+            }
+
+            vector<int> indegree(nodeCount, 0);
+            vector<int> rank(nodeCount, 0);
+            vector<bool> processed(nodeCount, false);
+            vector<int> ready;
+            for(int i = 0; i < nodeCount; i++){
+                indegree[i] = (int)incoming[i].size();
+                if(indegree[i] == 0) ready.push_back(i);
+            }
+            auto originalOrder = [&](int a, int b){
+                const glm::vec2 pa = nodes[a]->getNodeGui().getPosition();
+                const glm::vec2 pb = nodes[b]->getNodeGui().getPosition();
+                return pa.x == pb.x ? pa.y < pb.y : pa.x < pb.x;
+            };
+            std::sort(ready.begin(), ready.end(), originalOrder);
+
+            vector<int> topoOrder;
+            topoOrder.reserve(nodeCount);
+            size_t readyIndex = 0;
+            int processedCount = 0;
+            while(processedCount < nodeCount){
+                if(readyIndex >= ready.size()){
+                    int cycleRoot = -1;
+                    for(int i = 0; i < nodeCount; i++){
+                        if(!processed[i] && (cycleRoot == -1 || originalOrder(i, cycleRoot))) cycleRoot = i;
+                    }
+                    if(cycleRoot == -1) break;
+                    ready.push_back(cycleRoot);
+                }
+
+                const int source = ready[readyIndex++];
+                if(processed[source]) continue;
+                processed[source] = true;
+                processedCount++;
+                topoOrder.push_back(source);
+                for(int sink : outgoing[source]){
+                    if(processed[sink]) continue; // Deterministically breaks cycles.
+                    rank[sink] = std::max(rank[sink], rank[source] + 1);
+                    if(--indegree[sink] <= 0) ready.push_back(sink);
+                }
+            }
+
+            // The pass above only computes the *earliest possible* rank (longest path
+            // forward from real sources), so a node with no real incoming connection is
+            // pinned at rank 0 no matter how far right its real consumer sits. That's
+            // portal receivers (their real source is another portal matched by name,
+            // invisible to this graph) and macro input routers (their real source is
+            // outside this canvas) far more often than ordinary nodes - every one of them
+            // landed in the same rank-0 column, potentially many columns from the one real
+            // node each actually feeds.
+            //
+            // Walking the topological order backwards, pull every node with no real
+            // incoming edge up to just before the earliest rank among its real outgoing
+            // targets, so it sits next to what it connects to instead of being stranded at
+            // rank 0. This only ever increases a rank, so it can't violate the
+            // rank[sink] >= rank[source]+1 invariant the forward pass established.
+            for(auto it = topoOrder.rbegin(); it != topoOrder.rend(); ++it){
+                const int node = *it;
+                if(!incoming[node].empty() || outgoing[node].empty()) continue;
+                int minConsumerRank = std::numeric_limits<int>::max();
+                for(int sink : outgoing[node]) minConsumerRank = std::min(minConsumerRank, rank[sink]);
+                if(minConsumerRank != std::numeric_limits<int>::max()){
+                    rank[node] = std::max(rank[node], minConsumerRank - 1);
+                }
+            }
+
+            const int maxRank = *std::max_element(rank.begin(), rank.end());
+            vector<vector<int>> layers(maxRank + 1);
+            vector<float> originalY(nodeCount);
+            for(int i = 0; i < nodeCount; i++){
+                layers[rank[i]].push_back(i);
+                originalY[i] = nodes[i]->getNodeGui().getPosition().y;
+            }
+            for(auto& layer : layers){
+                std::stable_sort(layer.begin(), layer.end(), [&](int a, int b){
+                    return originalY[a] < originalY[b];
+                });
+            }
+
+            vector<int> componentOf(nodeCount, -1);
+            vector<vector<int>> components;
+            for(int root = 0; root < nodeCount; root++){
+                if(componentOf[root] != -1) continue;
+                const int component = (int)components.size();
+                components.push_back({});
+                vector<int> stack = {root};
+                componentOf[root] = component;
+                while(!stack.empty()){
+                    const int node = stack.back();
+                    stack.pop_back();
+                    components.back().push_back(node);
+                    for(int neighbour : outgoing[node]){
+                        if(componentOf[neighbour] == -1){
+                            componentOf[neighbour] = component;
+                            stack.push_back(neighbour);
+                        }
+                    }
+                    for(int neighbour : incoming[node]){
+                        if(componentOf[neighbour] == -1){
+                            componentOf[neighbour] = component;
+                            stack.push_back(neighbour);
+                        }
+                    }
+                    // Portal-linked nodes join the same component (see portalUnion above)
+                    // even though they don't participate in the rank/indegree graph.
+                    for(int neighbour : portalUnion[node]){
+                        if(componentOf[neighbour] == -1){
+                            componentOf[neighbour] = component;
+                            stack.push_back(neighbour);
+                        }
+                    }
+                }
+            }
+            std::stable_sort(components.begin(), components.end(), [&](const vector<int>& a, const vector<int>& b){
+                auto top = [&](const vector<int>& component){
+                    float y = std::numeric_limits<float>::max();
+                    for(int node : component) y = std::min(y, originalY[node]);
+                    return y;
+                };
+                return top(a) < top(b);
+            });
+
+            vector<glm::vec2> sizes(nodeCount);
+            const float horizontalGap = GRID_SIZE;
+            const float verticalGap = GRID_SIZE;
+            for(int layer = 0; layer <= maxRank; layer++){
+                for(int node : layers[layer]){
+                    const ofRectangle rectangle = nodes[node]->getNodeGui().getRectangle();
+                    sizes[node] = glm::vec2(std::max(rectangle.getWidth(), (float)getTotalNodeWidth()),
+                                            std::max(rectangle.getHeight(), (float)GRID_SIZE));
+                }
+            }
+
+            // Anchor each component to where it already was, instead of packing every
+            // component into one global column stack starting at x=0. A node whose only
+            // real wire crosses out of this canvas (a macro-boundary router, or a portal
+            // matching another canvas/macro) has no in-scope edges at all, so it forms its
+            // own tiny component here even though the user sees it as connected elsewhere.
+            // Resetting such a component's origin to x=0 and stacking components
+            // top-to-bottom would yank it to the left edge of the layout. Anchoring to its
+            // own original bounding box keeps it where it visually was while still tidying
+            // up its internal layout.
+            vector<glm::vec2> positions(nodeCount);
+            for(const auto& component : components){
+                vector<bool> inComponent(nodeCount, false);
+                for(int node : component) inComponent[node] = true;
+                vector<float> columnWidths(maxRank + 1, 0);
+                vector<float> heights(maxRank + 1, 0);
+                float componentHeight = 0;
+                for(int layer = 0; layer <= maxRank; layer++){
+                    for(int node : layers[layer]){
+                        if(inComponent[node]){
+                            columnWidths[layer] = std::max(columnWidths[layer], sizes[node].x);
+                            heights[layer] += sizes[node].y + verticalGap;
+                        }
+                    }
+                    if(heights[layer] > 0) heights[layer] -= verticalGap;
+                    componentHeight = std::max(componentHeight, heights[layer]);
+                }
+                glm::vec2 anchor(std::numeric_limits<float>::max());
+                for(int node : component){
+                    anchor = glm::min(anchor, nodes[node]->getNodeGui().getPosition());
+                }
+                vector<float> columnX(maxRank + 1, 0);
+                float x = 0;
+                for(int layer = 0; layer <= maxRank; layer++){
+                    if(columnWidths[layer] == 0) continue;
+                    columnX[layer] = x;
+                    x += columnWidths[layer] + horizontalGap;
+                }
+                for(int layer = 0; layer <= maxRank; layer++){
+                    float y = anchor.y + (componentHeight - heights[layer]) * 0.5f;
+                    for(int node : layers[layer]){
+                        if(!inComponent[node]) continue;
+                        positions[node] = glm::vec2(anchor.x + columnX[layer], y);
+                        y += sizes[node].y + verticalGap;
+                    }
+                }
+            }
+
+            glm::vec2 oldMin(std::numeric_limits<float>::max());
+            glm::vec2 oldMax(std::numeric_limits<float>::lowest());
+            glm::vec2 newMin(std::numeric_limits<float>::max());
+            glm::vec2 newMax(std::numeric_limits<float>::lowest());
+            for(int i = 0; i < nodeCount; i++){
+                const glm::vec2 oldPosition = nodes[i]->getNodeGui().getPosition();
+                oldMin = glm::min(oldMin, oldPosition);
+                oldMax = glm::max(oldMax, oldPosition + sizes[i]);
+                newMin = glm::min(newMin, positions[i]);
+                newMax = glm::max(newMax, positions[i] + sizes[i]);
+            }
+            const glm::vec2 offset = (oldMin + oldMax - newMin - newMax) * 0.5f;
+            for(int i = 0; i < nodeCount; i++){
+                positions[i] += offset;
+                if(snap_to_grid) positions[i] = snapToGrid(positions[i]);
+            }
+
+            for(int i = 0; i < nodeCount; i++){
+                nodes[i]->getNodeGui().setPosition(positions[i]);
+            }
+        };
+
         // The right-click "Portalize" flow lets the user rename the portal
         // before it's created; everything else (Portalize Selection, and the
         // uniquification below) keeps using this same default.
@@ -494,6 +762,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         if(portalizeSelectionRequested){
             portalizeSelectionRequested = false;
             for(auto* output : getPortalizableOutputs(container->getSelectedModules())) portalizeOutput(output);
+        }
+        if(autoLayoutSelectionRequested){
+            autoLayoutSelectionRequested = false;
+            autoLayoutNodes(container->getSelectedModules());
+        }
+        if(autoLayoutCanvasRequested){
+            autoLayoutCanvasRequested = false;
+            autoLayoutNodes(container->getAllModules());
         }
 
         // Detect canvas tab activation — consistent check for both active-canvas-ID
@@ -1658,6 +1934,22 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             if(customGuiContextNode != nullptr){
                 auto selectedNodes = container->getSelectedModules();
                 bool contextNodeIsSelected = std::find(selectedNodes.begin(), selectedNodes.end(), customGuiContextNode) != selectedNodes.end();
+                if(contextNodeIsSelected && selectedNodes.size() > 1){
+                    if(ImGui::Selectable("Auto Layout Selection")){
+                        autoLayoutNodes(selectedNodes);
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                auto allNodes = container->getAllModules();
+                if(allNodes.size() > 1){
+                    if(ImGui::Selectable("Auto Layout Canvas")){
+                        autoLayoutNodes(allNodes);
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                if((contextNodeIsSelected && selectedNodes.size() > 1) || allNodes.size() > 1){
+                    ImGui::Separator();
+                }
                 if(contextNodeIsSelected && selectedNodes.size() > 1){
                     auto connectedOutputs = getPortalizableOutputs(selectedNodes);
                     if(!connectedOutputs.empty()){
