@@ -98,6 +98,8 @@ public:
 	
 	void setSnapToGrid(bool b){snap_to_grid=b;};
 	bool getSnapToGrid(){return snap_to_grid;};
+
+    void requestPortalizeSelection(){portalizeSelectionRequested = true;}
 	
 	
 private:
@@ -163,6 +165,7 @@ private:
 
     bool show_grid = true;
     bool snap_to_grid = false;
+    bool portalizeSelectionRequested = false;
     
     string node_selected = "";
     glm::vec2 newNodeClickPos;
