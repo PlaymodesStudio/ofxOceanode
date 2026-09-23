@@ -1347,7 +1347,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 {
                     isAnyNodeHovered = true;
                     node_hovered_in_scene = nodeId;
-                    if(nodeOwnsRightClick && nodeHeaderRightClickInSelection && !node_contents_hovered){
+                    if(nodeOwnsRightClick && nodeHeaderRightClickInSelection &&
+                       ImGui::GetMousePos().y <= node_rect_header.y){
                         open_context_menu = true;
                         customGuiContextNode = node;
                     }
