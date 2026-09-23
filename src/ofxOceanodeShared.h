@@ -41,6 +41,12 @@ struct macroCategory{
 
 class ofxOceanodeShared{
 public:
+    // Time retains a container until its static destructor. Construct this
+    // registry first so portal callbacks remain valid during that teardown.
+    static void initialize(){
+        (void)getInstance();
+    }
+
     struct CustomRegionRenderContext {
         bool active = false;
         float width = 0.0f;

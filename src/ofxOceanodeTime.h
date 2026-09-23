@@ -128,7 +128,7 @@ namespace ofxOceanodeTransportUtils = ofxOceanodeTimeUtils;
 
 class ofxOceanodeTime {
 public:
-    ofxOceanodeTime() = default;
+    ofxOceanodeTime();
     ~ofxOceanodeTime() = default;
     
     static ofxOceanodeTime* getInstance(){

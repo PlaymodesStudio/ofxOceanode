@@ -163,6 +163,26 @@ static bool IsScopeWindowPendingDock(
     return false;
 }
 
+static ImGuiWindow* FindCurrentScopeWindowInNode(
+    const std::vector<ofxOceanodeScopeItem>& scopedParameters,
+    ImGuiDockNode* dockNode
+)
+{
+    if(dockNode == NULL) return NULL;
+
+    ImGuiWindow* firstScopeWindow = NULL;
+    for(const auto& item : scopedParameters)
+    {
+        ImGuiWindow* window = ImGui::FindWindowByName(item.windowName.c_str());
+        if(window == NULL || window->DockNode != dockNode) continue;
+
+        if(window == dockNode->VisibleWindow) return window;
+        if(firstScopeWindow == NULL) firstScopeWindow = window;
+    }
+
+    return firstScopeWindow;
+}
+
 static void ReturnScopeWindowToTop(
     ImGuiWindow* window,
     ImGuiID dockspaceID,
@@ -590,13 +610,14 @@ void ofxOceanodeScope::draw(){
         {
             ImGuiDockNode* rootNode = ImGui::DockBuilderGetNode(dockspace_id);
             ImGuiDockNode* centralNode = rootNode != NULL ? rootNode->CentralNode : NULL;
+            ImGuiWindow* centralScopeWindow = FindCurrentScopeWindowInNode(
+                scopedParameters,
+                centralNode
+            );
 
-            if(centralNode != NULL && centralNode->Windows.Size > 0)
+            if(centralScopeWindow != NULL)
             {
-                ImGuiWindow* centralWindow = centralNode->VisibleWindow != NULL
-                    ? centralNode->VisibleWindow
-                    : centralNode->Windows[0];
-                lastCentralScopeWindowID = centralWindow->ID;
+                lastCentralScopeWindowID = centralScopeWindow->ID;
             }
             else if(
                 centralNode != NULL
