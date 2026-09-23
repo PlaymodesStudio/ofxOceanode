@@ -10,6 +10,12 @@
 #include "phasor.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeColors.h"
+#include "ofxOceanodeShared.h"
+
+ofxOceanodeTime::ofxOceanodeTime(){
+    // Shared must outlive the container released by this singleton's destructor.
+    ofxOceanodeShared::initialize();
+}
 
 void ofxOceanodeTime::setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOceanodeBPMController> contr){
     container = c;

@@ -31,7 +31,7 @@ public:
 
 class ofxOceanodeTime : public ofThread{
 public:
-    ofxOceanodeTime(){};
+    ofxOceanodeTime();
     ~ofxOceanodeTime(){
         stopThread();
         waitForThread(true);
