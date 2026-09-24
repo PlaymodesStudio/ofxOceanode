@@ -16,6 +16,14 @@ class bufferHeader: public ofxOceanodeNodeModel
 {
 public:
     bufferHeader(string typelabel, T1 val, bool minmax = false) : ofxOceanodeNodeModel("Header " + typelabel){
+        description = "Reads samples from a connected Buffer and sends them as a vector.\n\n"
+                      "Buffer Input -> Connect the Output of a Buffer of the same type.\n"
+                      "Copies -> Number of samples to read.\n"
+                      "Offset -> With one copy, the distance from the newest sample. With multiple copies and one Offset value, the spacing between samples: the reads start at 0, then 1, 2, and so on times that value. Supply exactly one Offset per copy to choose each distance separately.\n"
+                      "Output -> Samples in Offset order.\n"
+                      "Overflow -> True when a requested time reaches the oldest timestamp or a sample index exceeds the oldest sample. An out-of-range read returns the oldest sample.\n\n"
+                      "Inspector: Offset as Position -> Off: Offset is a delay in milliseconds from the newest stored timestamp; the nearest stored sample is used. On: Offset is a sample index back from the newest sample, with 0 being the newest and fractional positions rounded down.\n"
+                      "Inspector: Calculate On Update -> On: refresh Output every update. Off: refresh only when Copies, Offset, or Buffer Input changes. New samples in the same Buffer do not trigger a refresh in this mode.";
         myBuffer = nullptr;
         addParameter(bufferInput.set("Buffer Input", nullptr));
         addParameter(numCopies.set("Copies", 1, 1, INT_MAX));
