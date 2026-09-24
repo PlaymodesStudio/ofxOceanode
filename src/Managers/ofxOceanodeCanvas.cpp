@@ -2787,15 +2787,18 @@ glm::mat4 ofxOceanodeCanvas::translateMatrixWithoutScale(const glm::mat4 &m, glm
 }
 
 void ofxOceanodeCanvas::deselectAllNodes(){
+    bool hadSelectedNodes = false;
     for(auto &n: container->getParameterGroupNodesMap()){
+        hadSelectedNodes |= n.second->getNodeGui().getSelected();
         n.second->getNodeGui().setSelected(false);
     }
     container->deselectAllComments();
-    // Notify listeners (NodesController, etc.) that the selection was cleared
-    // so the tree view stops highlighting any node. Without this the controller
-    // keeps the last-selected item visually selected even when the canvas
-    // has nothing selected.
-    ofxOceanodeShared::nodeSelectedInCanvas(nullptr);
+    // Hidden canvas tabs call this every frame. Notify only when a node was
+    // actually deselected, so an empty canvas cannot repeatedly clear the
+    // shared selection or request updates in the navigation controllers.
+    if(hadSelectedNodes){
+        ofxOceanodeShared::nodeSelectedInCanvas(nullptr);
+    }
 }
 
 void ofxOceanodeCanvas::selectAllNodes(){
