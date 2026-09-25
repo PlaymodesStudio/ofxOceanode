@@ -35,8 +35,12 @@ ofxOceanodeHierarchyController::ofxOceanodeHierarchyController(
     // When a node is selected in a canvas, highlight the canvas containing that node
     nodeSelectedListener = ofxOceanodeShared::getNodeSelectedInCanvasEvent().newListener(
         [this](ofxOceanodeNode* node){
+            // Only a new selection requests centering. Deselecting (including
+            // notifications from hidden canvases) must preserve manual scrolling.
+            if(node != nullptr && node != selectedNodePtr){
+                scrollToSelected = true;
+            }
             selectedNodePtr = node;  // may be nullptr for deselect-all
-            scrollToSelected = true;
         });
 }
 
@@ -222,18 +226,29 @@ void ofxOceanodeHierarchyController::draw()
     }
 
     // -----------------------------------------------------------------------
-    // Zoom slider (compact, above the scrollable region)
+    // Zoom slider and canvas-style modifier + trackpad zoom
     // -----------------------------------------------------------------------
+    constexpr float minHierarchyScale = 0.4f;
+    constexpr float maxHierarchyScale = 2.0f;
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::SliderFloat("##hierZoom", &hierarchyScale, 0.4f, 2.0f, "Zoom %.2f×");
+    ImGui::SliderFloat("##hierZoom", &hierarchyScale, minHierarchyScale, maxHierarchyScale, "Zoom %.2f×");
+
+    const ImGuiIO& io = ImGui::GetIO();
+    const ImVec2 childStart = ImGui::GetCursorScreenPos();
+    const float scaleBeforeWheel = hierarchyScale;
+    if(ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && io.MousePos.y >= childStart.y &&
+       (io.KeyCtrl || io.KeySuper) && io.MouseWheel != 0.0f){
+        hierarchyScale = ofClamp(hierarchyScale * (1.0f + io.MouseWheel * 0.1f),
+                                 minHierarchyScale, maxHierarchyScale);
+    }
 
     // -----------------------------------------------------------------------
     // Layout constants (all scaled by hierarchyScale)
     // -----------------------------------------------------------------------
     const float NODE_W     = 150.0f * hierarchyScale;
     const float NODE_H     = 26.0f  * hierarchyScale;
-    const float HGAP       = 20.0f  * hierarchyScale;
-    const float VGAP       = 8.0f   * hierarchyScale;
+    const float HGAP       = 60.0f  * hierarchyScale;
+    const float VGAP       = 20.0f   * hierarchyScale;
     const float INDENT_W   = NODE_W + HGAP;
     const float TEXT_PAD_X = 8.0f   * hierarchyScale;
 
@@ -258,11 +273,28 @@ void ofxOceanodeHierarchyController::draw()
     int totalRows = rowCounter > 0 ? rowCounter : 1;
     float totalH = totalRows * (NODE_H + VGAP) + 8.0f;
     float totalW = INDENT_W * 8.0f;
+    for(const auto& entry : entries){
+        totalW = std::max(totalW, entry.depth * INDENT_W + NODE_W + 8.0f);
+    }
 
     // -----------------------------------------------------------------------
     // Begin scrollable child region
     // -----------------------------------------------------------------------
+    if(hierarchyScale != scaleBeforeWheel){
+        // The child starts at the parent's cursor and has no padding. Keep the
+        // graph coordinate under the mouse fixed as its scale changes. The
+        // four-pixel inset is part of the graph origin below.
+        const ImVec2 mouse = ImGui::GetMousePos();
+        const float ratio = hierarchyScale / scaleBeforeWheel;
+        const ImVec2 scrollTarget(
+            std::max(0.0f, hierarchyScroll.x * ratio + (mouse.x - childStart.x - 4.0f) * (ratio - 1.0f)),
+            std::max(0.0f, hierarchyScroll.y * ratio + (mouse.y - childStart.y - 4.0f) * (ratio - 1.0f)));
+        // Supply the new content bounds before ImGui clamps the new scroll.
+        ImGui::SetNextWindowContentSize(ImVec2(totalW, totalH));
+        ImGui::SetNextWindowScroll(scrollTarget);
+    }
     ImGui::BeginChild("##hierarchyScroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+    hierarchyScroll = glm::vec2(ImGui::GetScrollX(), ImGui::GetScrollY());
     
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 origin  = ImGui::GetCursorScreenPos();

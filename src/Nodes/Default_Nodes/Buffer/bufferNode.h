@@ -20,6 +20,13 @@ public:
                std::function<T1(T2&)> _returnFunction = [](T2 &container)->T1{return container;},
                std::function<bool(T1&)> _checkFunction = [](T1 &data)->bool{return true;}
                ) :  timeGenerator("Buffer " + typelabel), assignFunction(_assignFunction), returnFunction(_returnFunction), checkFunction(_checkFunction){
+        description = "Stores a bounded history of Input values for a Header of the same type. A new sample is recorded when Input changes while Rec is on.\n\n"
+                      "Rec -> Enables recording.\n"
+                      "Timestamp -> If connected, supplies each sample's timestamp; otherwise the node uses its current time.\n"
+                      "Max Size -> Maximum number of stored samples. Older samples are discarded as new ones arrive.\n"
+                      "Clear -> Empties the history.\n"
+                      "Output -> The Buffer connection for a Header; it is not the latest sample value.\n"
+                      "Inspector: Last Frame Ms -> Time span in milliseconds between the newest and oldest stored samples, updated when Input changes.";
         myBuffer = std::make_unique<buffer<T1, T2>>(assignFunction, returnFunction);
     }
     ~bufferNode(){}
@@ -89,6 +96,11 @@ public:
                std::function<std::vector<T>(std::vector<T>&)> _returnFunction = [](std::vector<T> &container)->std::vector<T>{return container;},
                std::function<bool(std::vector<T>&)> _checkFunction = [](std::vector<T> &data)->bool{return true;}
                ) :  ofxOceanodeNodeModel("Buffer " + typelabel), assignFunction(_assignFunction), returnFunction(_returnFunction), checkFunction(_checkFunction){
+                   description = "Stores a bounded history of Input vectors for a Header of the same type. A new vector is recorded when Input changes while Rec is on.\n\n"
+                                 "Rec -> Enables recording.\n"
+                                 "Timestamp -> If connected, supplies each vector's timestamp; otherwise the current clock time is used.\n"
+                                 "Max Size -> Maximum number of stored vectors. Older vectors are discarded as new ones arrive.\n"
+                                 "Output -> The Buffer connection for a Header; it is not the latest vector value.";
                    myBuffer = std::make_unique<buffer<std::vector<T>, std::vector<T>>>(assignFunction, returnFunction);
                    if(minmax){
                        addParameter(input.set("Input", std::vector<T>(1, val),

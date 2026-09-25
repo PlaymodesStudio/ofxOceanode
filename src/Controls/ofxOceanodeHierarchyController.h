@@ -71,7 +71,8 @@ private:
     float pendingClickTime = -1.0f;    // Time when the click was registered
 
     // Zoom / scale
-    float hierarchyScale = 1.0f;       // Zoom factor (0.4 – 2.0); controlled by slider
+    float hierarchyScale = 1.0f;       // Zoom factor (0.4 – 2.0); slider or modifier + scroll
+    glm::vec2 hierarchyScroll = glm::vec2(0.0f); // Last child scroll, for cursor-anchored zoom
     
     // Event listeners
     ofEventListener activeCanvasListener;
