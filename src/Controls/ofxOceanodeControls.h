@@ -22,6 +22,10 @@ public:
     ~ofxOceanodeControls(){};
     
     void draw();
+    // Called inside Oceanode's active menu bar.
+    void drawMenu(const std::string& controllerName);
+    void drawMenus(const std::string& excludedControllerName = "");
+    void drawPopups();
     void update();
     
     template<class T>
