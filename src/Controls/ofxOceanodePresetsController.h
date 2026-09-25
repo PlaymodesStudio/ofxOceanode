@@ -15,12 +15,15 @@ public:
     ofxOceanodePresetsController(shared_ptr<ofxOceanodeContainer> _container);
     ~ofxOceanodePresetsController(){};
     
-    void draw();
-    void update();
+    void draw() override;
+    void drawPopups() override;
+    void update() override;
+    bool isMenuController() const override { return true; }
     
     void loadPresetFromNumber(int num);
     
 private:
+    void drawPresetList();
     void createPreset(string name);
     
     void loadPreset(string name, string bank);
@@ -31,6 +34,14 @@ private:
     map<string, string> currentPreset;
     vector<string> banks;
     int currentBank;
+
+    enum class PopupRequest { None, NewBank, SaveAs, Delete };
+    PopupRequest popupRequest = PopupRequest::None;
+    char bankNameBuffer[256] = {};
+    char presetNameBuffer[256] = {};
+    int saveAsBank = 0;
+    string deleteBankName;
+    string deletePresetName;
 
     bool newPresetCreated;
     int loadPresetInNextUpdate;
