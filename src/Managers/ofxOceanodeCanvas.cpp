@@ -67,161 +67,67 @@ ImFont* ofxOceanodeCanvas::getZoomFont() const {
     return nullptr; // fallback to current font
 }
 
-void ofxOceanodeCanvas::setupFonts() {
+void ofxOceanodeCanvas::setupFonts(const std::string& regularPath, const std::string& boldPath) {
     ImGuiIO& io = ImGui::GetIO();
-    std::string fontPath = ofToDataPath("config/font/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Medium.ttf", true);
-
-    // Detect Retina / HiDPI pixel density.
-    // Strategy 1: ask OpenGL for the actual framebuffer width and compare to the
-    // logical window width.  This is reliable at any point after window creation
-    // because it queries the real framebuffer rather than a cached OF value.
-    // Strategy 2: fall back to ofAppGLFWWindow::getPixelScreenCoordScale().
-    float scale = 1.0f;
-
-    GLint viewport[4];
-    glGetIntegerv(GL_VIEWPORT, viewport);
-    float fbWidth = (float)viewport[2];
-    float winWidth = (float)ofGetWindowWidth();
-    if(winWidth > 0.0f && fbWidth > winWidth) {
-        scale = fbWidth / winWidth;
-    } else {
-        // Fallback: ask GLFW window directly
-        ofAppGLFWWindow* glfwWindow = dynamic_cast<ofAppGLFWWindow*>(ofGetWindowPtr());
-        if(glfwWindow) {
-            scale = (float)glfwWindow->getPixelScreenCoordScale();
-        }
-    }
-    ofLogNotice("ofxOceanodeCanvas") << "Font pixel scale: " << scale
-                                     << " (fbWidth=" << fbWidth << ", winWidth=" << winWidth << ")";
-
-    // Load fonts at LOGICAL pixel size — do NOT multiply by scale and do NOT set
-    // FontGlobalScale.  Loading at physical size (×scale) then compensating with
-    // FontGlobalScale=1/scale caused ImFont::FontSize (stored at atlas size) to
-    // diverge from g.FontSize (layout size after the global scale multiplier).
-    // That divergence trips an assertion inside InputTextEx at line 4785 when
-    // ImGui does cursor/click-position math on a multiline text widget.
-    ImFontConfig fontCfg;
-    fontCfg.OversampleH = 2;   // 2 is sufficient at 2× physical — saves atlas memory
-    fontCfg.OversampleV = 2;   // increase from default 1 for vertical sharpness
-
-    ofFile fontFile(fontPath);
-    if(!fontFile.exists()) {
-        ofLogWarning("ofxOceanodeCanvas") << "JetBrainsMono font not found at: " << fontPath;
-        ofLogWarning("ofxOceanodeCanvas") << "Using default ImGui font for zoom system";
-        for(int i = 0; i < 9; i++) {
-            zoomFonts[i] = io.Fonts->AddFontDefault();
+    IM_ASSERT(!ImGui::GetCurrentContext()->WithinFrameScope);
+    const std::string fontPath = ofToDataPath(regularPath, true);
+    const std::string boldFontPath = ofToDataPath(boldPath, true);
+    const bool hasRegular = !regularPath.empty() && ofFile(fontPath).exists();
+    const bool hasBold = !boldPath.empty() && ofFile(boldFontPath).exists();
+    // Missing files have a separate cache entry so Refresh can discover a
+    // newly installed regular/bold face without reusing the fallback fonts.
+    const auto key = std::make_pair(hasRegular ? regularPath : "", hasBold ? boldPath : "");
+    auto cached = fontCache.find(key);
+    if(cached != fontCache.end()) {
+        for(int i = 0; i < 9; ++i) {
+            zoomFonts[i] = cached->second[i];
+            zoomFontsBold[i] = cached->second[i + 9];
         }
     } else {
-        // Add default (index 3) FIRST — ImGui uses the first added font as default
-        // This ensures the main UI font is 14px, not 8px
-        zoomFonts[3] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[3], &fontCfg);
+        if(!hasRegular) {
+            ofLogWarning("ofxOceanodeCanvas") << "Font not found: " << fontPath
+                << "; using the built-in ImGui font";
+        }
 
-        // Add the remaining fonts
-        zoomFonts[0] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[0], &fontCfg);
-        zoomFonts[1] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[1], &fontCfg);
-        zoomFonts[2] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[2], &fontCfg);
-        zoomFonts[4] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[4], &fontCfg);
-        zoomFonts[5] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[5], &fontCfg);
-        zoomFonts[6] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[6], &fontCfg);
-        zoomFonts[7] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[7], &fontCfg);
-        zoomFonts[8] = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[8], &fontCfg);
-
-        // Validate and fall back any that failed
-        for(int i = 0; i < 9; i++) {
+        // Keep logical sizes: scaling the atlas size breaks InputText layout
+        // and cursor calculations. Canvas zoom continues to use the same sizes.
+        ImFontConfig cfg;
+        cfg.OversampleH = 2;
+        cfg.OversampleV = 2;
+        std::array<ImFont*, 18> fonts{};
+        for(int i = 0; i < 9; ++i) {
+            zoomFonts[i] = hasRegular
+                ? io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[i], &cfg)
+                : nullptr;
             if(!zoomFonts[i]) {
-                ofLogWarning("ofxOceanodeCanvas") << "Failed to load font size " << ZOOM_FONT_SIZES[i];
-                zoomFonts[i] = io.Fonts->AddFontDefault();
+                ImFontConfig fallbackCfg = cfg;
+                fallbackCfg.SizePixels = ZOOM_FONT_SIZES[i];
+                zoomFonts[i] = io.Fonts->AddFontDefault(&fallbackCfg);
             }
+            zoomFontsBold[i] = hasBold
+                ? io.Fonts->AddFontFromFileTTF(boldFontPath.c_str(), ZOOM_FONT_SIZES[i], &cfg)
+                : nullptr;
+            fonts[i] = zoomFonts[i];
+            fonts[i + 9] = zoomFontsBold[i];
+        }
+        fontCache.emplace(key, fonts);
+        io.Fonts->Build();
+
+        // Recreate the GPU font texture using the active renderer.
+        if(ofIsGLProgrammableRenderer()) {
+            ImGui_ImplOpenGL3_DestroyDeviceObjects();
+            ImGui_ImplOpenGL3_CreateDeviceObjects();
+        } else {
+            ImGui_ImplOpenGL2_DestroyDeviceObjects();
+            ImGui_ImplOpenGL2_CreateDeviceObjects();
         }
     }
 
-    // ── Bold fonts (ExtraBold) for node titles ──────────────────────────
-    std::string boldFontPath = ofToDataPath("config/font/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ExtraBold.ttf", true);
-    ofFile boldFontFile(boldFontPath);
-    if(!boldFontFile.exists()) {
-        ofLogWarning("ofxOceanodeCanvas") << "JetBrainsMono ExtraBold font not found at: " << boldFontPath;
-        ofLogWarning("ofxOceanodeCanvas") << "Bold node titles will fall back to regular font";
-        for(int i = 0; i < 9; i++) {
-            zoomFontsBold[i] = nullptr; // nullptr signals "no bold available"
-        }
-    } else {
-        ImFontConfig boldCfg;
-        boldCfg.OversampleH = 2;
-        boldCfg.OversampleV = 2;
-        boldCfg.MergeMode   = false;
-
-        for(int i = 0; i < 9; i++) {
-            zoomFontsBold[i] = io.Fonts->AddFontFromFileTTF(boldFontPath.c_str(), ZOOM_FONT_SIZES[i], &boldCfg);
-            if(!zoomFontsBold[i]) {
-                ofLogWarning("ofxOceanodeCanvas") << "Failed to load bold font size " << ZOOM_FONT_SIZES[i];
-            }
-        }
-    }
-
-    // Rebuild the font atlas after adding fonts (called after gui.setup() created the context)
-    io.Fonts->Build();
-
-    // ── DIAGNOSTIC: Font atlas state after build ───────────────────────────
-    ofLogNotice("ofxOceanodeCanvas::setupFonts") << "--- Font Atlas Diagnostic ---";
-    ofLogNotice("ofxOceanodeCanvas::setupFonts") << "Total fonts in atlas: " << io.Fonts->Fonts.Size;
-    for(int _di = 0; _di < io.Fonts->Fonts.Size; _di++) {
-        ImFont* _f = io.Fonts->Fonts[_di];
-        bool isZoom3 = (_f == zoomFonts[3]);
-        ofLogNotice("ofxOceanodeCanvas::setupFonts")
-            << "  Fonts[" << _di << "] @ " << (void*)_f
-            << (isZoom3 ? "  <-- zoomFonts[3] (JetBrainsMono 14px)" : "");
-    }
-    ofLogNotice("ofxOceanodeCanvas::setupFonts")
-        << "io.FontDefault (before fix) = " << (void*)io.FontDefault
-        << (io.FontDefault == nullptr ? "  (NULL => was using Fonts[0])" : "");
-    ofLogNotice("ofxOceanodeCanvas::setupFonts")
-        << "zoomFonts[3]   = " << (void*)zoomFonts[3];
-    if(io.Fonts->Fonts.Size > 0) {
-        bool defaultIsZoom3 = (io.Fonts->Fonts[0] == zoomFonts[3]);
-        ofLogNotice("ofxOceanodeCanvas::setupFonts")
-            << "Fonts[0] == zoomFonts[3]: " << (defaultIsZoom3 ? "YES (atlas order correct)" : "NO  (built-in font is Fonts[0]; io.FontDefault fix is required)");
-    }
-    // ── END DIAGNOSTIC ─────────────────────────────────────────────────────
-
-    // ── FIX: Explicitly set the global default font to JetBrainsMono-Medium 14px.
-    // Without this, ImGui falls back to Fonts->Fonts[0].  Because ofxImGui's
-    // gui.setup() calls AddFontDefault() before setupFonts() runs, Fonts[0] is
-    // the built-in ImGui font — not JetBrainsMono — so every window/menu/widget
-    // that does NOT call PushFont() renders with the wrong font.
-    if(zoomFonts[3]) {
-        io.FontDefault = zoomFonts[3];
-        ofLogNotice("ofxOceanodeCanvas::setupFonts")
-            << "io.FontDefault set to zoomFonts[3] (JetBrainsMono-Medium 14px)";
-    }
-
-    // Publish the base (zoom=1.0) font size so that render-time code in other
-    // translation units (e.g. macro GUI) can compute the current zoom factor via
-    // ImGui::GetFontSize() / ofxOceanodeShared::getZoomBaseFontSize() without
-    // hard-coding the canvas-internal ZOOM_FONT_SIZES constant.
-    ofxOceanodeShared::setZoomBaseFontSize(ZOOM_FONT_SIZES[3]);
-
-    // Publish the base frame height so NodeGui and other classes can derive the
-    // correct row height without duplicating this formula.
-    {
-        static constexpr float BASE_FRAME_PADDING_Y = 1.0f;
-        static constexpr float BASE_FRAME_HEIGHT = ZOOM_FONT_SIZES[3] + 2.0f * BASE_FRAME_PADDING_Y;
-        ofxOceanodeShared::setBaseFrameHeight(BASE_FRAME_HEIGHT);
-    }
-
-    // FontGlobalScale is intentionally left at its default (1.0).  Fonts are now
-    // loaded at logical pixel size so no global scaling compensation is needed.
-    // Setting FontGlobalScale < 1 caused ImFont::FontSize (atlas size) to diverge
-    // from g.FontSize (layout size), which triggered an assertion in InputTextEx.
+    io.FontDefault = zoomFonts[3];
     io.FontGlobalScale = 1.0f;
-
-    // Recreate the GPU font texture for whichever renderer is active
-    if(ofIsGLProgrammableRenderer()) {
-        ImGui_ImplOpenGL3_DestroyDeviceObjects();
-        ImGui_ImplOpenGL3_CreateDeviceObjects();
-    } else {
-        ImGui_ImplOpenGL2_DestroyDeviceObjects();
-        ImGui_ImplOpenGL2_CreateDeviceObjects();
-    }
+    ofxOceanodeShared::setCurrentBoldFont(nullptr);
+    ofxOceanodeShared::setZoomBaseFontSize(ZOOM_FONT_SIZES[3]);
+    ofxOceanodeShared::setBaseFrameHeight(ZOOM_FONT_SIZES[3] + 2.0f);
 }
 
 void ofxOceanodeCanvas::setup(string _uid, string _pid){

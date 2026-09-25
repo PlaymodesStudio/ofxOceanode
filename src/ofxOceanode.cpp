@@ -11,6 +11,11 @@
 #include "ofxOceanodeTimeController.h"
 #include "imgui_internal.h"
 #include "defaultNodes.h"
+#include <climits>
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include FT_SFNT_NAMES_H
+#include FT_TRUETYPE_TABLES_H
 
 ofxOceanode::ofxOceanode(){
     nodeRegistry = make_shared<ofxOceanodeNodeRegistry>();
@@ -141,7 +146,7 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Mapper_1/Min_Input");
     OceanodeTheme* oceanodeTheme = new OceanodeTheme();
     gui.setup(oceanodeTheme, false, ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable, false);
-	canvas.setupFonts();
+    refreshThemeFonts();
     loadDefaultGUILayout();
     // Auto-load default theme if pointer file exists
     {
@@ -154,6 +159,8 @@ void ofxOceanode::setup(){
             }
         }
     }
+
+    applyThemeFont();
 
     presetLoadedListener = ofxOceanodeShared::getPresetHasLoadedEvent().newListener([this](){
         if(ofxOceanodeShared::getPresetLoadType() != ofxOceanodePresetLoadType_FullPreset){
@@ -242,6 +249,8 @@ void ofxOceanode::update(){
 }
 
 void ofxOceanode::draw(){
+    // Font atlas changes must happen before NewFrame, after the last frame rendered.
+    applyThemeFont();
     if(!pendingIniLoad.empty()){
         loadGUILayoutFromDisk(pendingIniLoad);
         pendingIniLoad.clear();
@@ -772,6 +781,11 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 
 			if(ImGui::MenuItem("Save current GUI layout")){
 				memset(saveLayoutNameBuf, 0, sizeof(saveLayoutNameBuf));
+				string layoutName = currentLayoutName;
+				if(layoutName.size() >= 4 && layoutName.compare(layoutName.size() - 4, 4, ".ini") == 0){
+					layoutName.resize(layoutName.size() - 4);
+				}
+				strncpy(saveLayoutNameBuf, layoutName.c_str(), sizeof(saveLayoutNameBuf) - 1);
 				openSaveLayoutPopup = true;
 			}
 
@@ -898,6 +912,8 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             if(ImGui::MenuItem("Reset to Built-in Theme")){
                 OceanodeTheme base;
                 base.setup();
+                themeFontFamily.clear();
+                pendingThemeFontChange = true;
                 currentThemeName = "OceanodeTheme (built-in)";
             }
             ImGui::EndMenu();
@@ -964,6 +980,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
                 if(!d.exists()) d.create(true);
                 string fullPath = dirPath + string(saveLayoutNameBuf) + ".ini";
                 ImGui::SaveIniSettingsToDisk(fullPath.c_str());
+                currentLayoutName = string(saveLayoutNameBuf) + ".ini";
             }
             ImGui::CloseCurrentPopup();
         }
@@ -1263,9 +1280,114 @@ void ofxOceanode::loadDefaultGUILayout(){
     currentLayoutName = filename;
 }
 
+namespace {
+// Prefer the typographic family (name ID 16): legacy family names often
+// split Medium/Light/etc. into separate families. Windows names are UTF-16BE.
+std::string themeFontFamilyName(FT_Face face){
+    for(FT_UInt i = 0; i < FT_Get_Sfnt_Name_Count(face); ++i){
+        FT_SfntName name;
+        if(FT_Get_Sfnt_Name(face, i, &name) != 0 || name.name_id != 16) continue;
+        if(name.platform_id != 0 && !(name.platform_id == 3 && (name.encoding_id == 1 || name.encoding_id == 10))) continue;
+        std::string result;
+        for(FT_UInt j = 0; j + 1 < name.string_len; j += 2){
+            uint32_t cp = (uint32_t(name.string[j]) << 8) | name.string[j + 1];
+            if(cp >= 0xD800 && cp <= 0xDBFF && j + 3 < name.string_len){
+                const uint32_t low = (uint32_t(name.string[j + 2]) << 8) | name.string[j + 3];
+                if(low >= 0xDC00 && low <= 0xDFFF){
+                    cp = 0x10000 + ((cp - 0xD800) << 10) + low - 0xDC00;
+                    j += 2;
+                }
+            }
+            if(cp != 0 && !(cp >= 0xD800 && cp <= 0xDFFF)) ofUTF8Append(result, cp);
+        }
+        if(!result.empty()) return result;
+    }
+    return face->family_name ? face->family_name : "";
+}
+}
+
+void ofxOceanode::refreshThemeFonts(){
+    themeFontFamilies.clear();
+    FT_Library library = nullptr;
+    if(FT_Init_FreeType(&library) != 0){
+        themeFontWarning = "Could not read the font folder.";
+        return;
+    }
+    struct Candidate {
+        ThemeFontFamily family;
+        int regularScore = INT_MAX;
+        int boldScore = INT_MAX;
+    };
+    std::map<std::string, Candidate> families;
+    std::function<void(const std::string&)> scan = [&](const std::string& relativeDir){
+        ofDirectory dir(ofToDataPath(relativeDir, true));
+        if(!dir.exists()) return;
+        dir.listDir();
+        dir.sort();
+        for(const auto& file : dir.getFiles()){
+            // Avoid recursion loops through linked directories.
+            if(file.isLink()) continue;
+            const std::string path = relativeDir + "/" + file.getFileName();
+            if(file.isDirectory()){
+                scan(path);
+                continue;
+            }
+            const std::string ext = ofToLower(file.getExtension());
+            if(ext != "ttf" && ext != "otf") continue;
+            FT_Face face = nullptr;
+            if(FT_New_Face(library, ofToDataPath(path, true).c_str(), 0, &face) != 0) continue;
+            const std::string familyName = themeFontFamilyName(face);
+            if(FT_IS_SCALABLE(face) && !familyName.empty()){
+                auto& candidate = families[familyName];
+                candidate.family.name = familyName;
+                const auto* os2 = static_cast<const TT_OS2*>(FT_Get_Sfnt_Table(face, ft_sfnt_os2));
+                const int weight = os2 && os2->usWeightClass ? os2->usWeightClass
+                    : ((face->style_flags & FT_STYLE_FLAG_BOLD) ? 700 : 400);
+                const bool italic = (face->style_flags & FT_STYLE_FLAG_ITALIC) != 0;
+                // Prefer upright static faces. Variable fonts can still supply
+                // their default instance when no static equivalent is present.
+                const int penalty = (italic ? 2000 : 0) + (FT_HAS_MULTIPLE_MASTERS(face) ? 1000 : 0);
+                const int regularScore = penalty + std::abs(weight - 400);
+                if(regularScore < candidate.regularScore){
+                    candidate.regularScore = regularScore;
+                    candidate.family.regularPath = path;
+                }
+                const int boldScore = penalty + std::abs(weight - 700);
+                if(!italic && weight >= 600 && boldScore < candidate.boldScore){
+                    candidate.boldScore = boldScore;
+                    candidate.family.boldPath = path;
+                }
+            }
+            FT_Done_Face(face);
+        }
+    };
+    scan("config/font");
+    FT_Done_FreeType(library);
+    for(const auto& entry : families) themeFontFamilies.push_back(entry.second.family);
+    pendingThemeFontChange = true;
+}
+
+void ofxOceanode::applyThemeFont(){
+    if(!pendingThemeFontChange) return;
+    pendingThemeFontChange = false;
+    themeFontWarning.clear();
+    if(!themeFontFamily.empty()){
+        for(const auto& family : themeFontFamilies){
+            if(family.name == themeFontFamily && ofFile(ofToDataPath(family.regularPath, true)).exists()){
+                canvas.setupFonts(family.regularPath, family.boldPath);
+                return;
+            }
+        }
+        themeFontWarning = "Font family '" + themeFontFamily + "' is unavailable. Using the built-in default.";
+        ofLogWarning("ofxOceanode") << themeFontWarning;
+    }
+    canvas.setupFonts();
+}
+
 void ofxOceanode::saveTheme(const std::string& name){
     ofDirectory::createDirectory(ofToDataPath("config/themes", true), true, true);
     ofJson j;
+    j["fontFamily"] = themeFontFamily;
     ImVec4* colors = ImGui::GetStyle().Colors;
     for(int i = 0; i < ImGuiCol_COUNT; i++){
         string colorName = ImGui::GetStyleColorName(i);
@@ -1294,6 +1416,9 @@ void ofxOceanode::loadTheme(const std::string& name){
     // Reset to OceanodeTheme baseline before applying JSON overrides
     OceanodeTheme base;
     base.setup();
+    themeFontFamily = j.contains("fontFamily") && j["fontFamily"].is_string()
+        ? j["fontFamily"].get<std::string>() : "";
+    pendingThemeFontChange = true;
 
     ImVec4* colors = ImGui::GetStyle().Colors;
     for(int i = 0; i < ImGuiCol_COUNT; i++){
@@ -1342,6 +1467,8 @@ void ofxOceanode::drawThemeEditorWindow(){
         if(ImGui::Button("Reset to Default")){
             OceanodeTheme defaultTheme;
             defaultTheme.setup();
+            themeFontFamily.clear();
+            pendingThemeFontChange = true;
             currentThemeName = "OceanodeTheme (built-in)";
         }
 
@@ -1379,6 +1506,34 @@ void ofxOceanode::drawThemeEditorWindow(){
                                       ImGuiColorEditFlags_AlphaBar |
                                       ImGuiColorEditFlags_AlphaPreviewHalf);
                     ImGui::PopID();
+                }
+                ImGui::EndChild();
+                ImGui::EndTabItem();
+            }
+
+            if(ImGui::BeginTabItem("Font")){
+                ImGui::TextUnformatted("Default font family");
+                ImGui::TextDisabled("Fonts from bin/data/config/font (including subfolders)");
+                if(ImGui::Button("Refresh font list")) refreshThemeFonts();
+                ImGui::TextWrapped("Choose a family to preview it throughout the app. Use Theme > Save Theme to keep your choice.");
+                if(!themeFontWarning.empty()) ImGui::TextWrapped("%s", themeFontWarning.c_str());
+                ImGui::Separator();
+                ImGui::BeginChild("##fontfamilies", ImVec2(0, 0), false);
+                if(ImGui::Selectable("Built-in default (JetBrains Mono)", themeFontFamily.empty())){
+                    themeFontFamily.clear();
+                    pendingThemeFontChange = true;
+                }
+                for(const auto& family : themeFontFamilies){
+                    ImGui::PushID(family.name.c_str());
+                    if(ImGui::Selectable(family.name.c_str(), themeFontFamily == family.name)){
+                        themeFontFamily = family.name;
+                        pendingThemeFontChange = true;
+                    }
+                    if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", family.regularPath.c_str());
+                    ImGui::PopID();
+                }
+                if(themeFontFamilies.empty()){
+                    ImGui::TextWrapped("No usable fonts found. Add .ttf or .otf files to bin/data/config/font, then refresh the list.");
                 }
                 ImGui::EndChild();
                 ImGui::EndTabItem();

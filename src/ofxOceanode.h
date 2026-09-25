@@ -187,6 +187,17 @@ private:
     // Theme editor state
     bool showThemeEditor = false;
     void drawThemeEditorWindow();
+    struct ThemeFontFamily {
+        std::string name;
+        std::string regularPath;
+        std::string boldPath;
+    };
+    std::vector<ThemeFontFamily> themeFontFamilies;
+    std::string themeFontFamily; // Empty selects the built-in JetBrains Mono pair.
+    std::string themeFontWarning;
+    bool pendingThemeFontChange = true;
+    void refreshThemeFonts();
+    void applyThemeFont();
 
     // Theme save/load state
     std::string currentThemeName;
