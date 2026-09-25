@@ -11,6 +11,8 @@
 
 #include "ofMain.h"
 #include "ofxOceanodeShared.h"
+#include <array>
+#include <map>
 
 class ofxOceanodeContainer;
 class ofxOceanodeNodeGui;
@@ -57,7 +59,9 @@ public:
     int getCeilingFontIndex() const;
     bool shouldRenderText() const;
 
-    void setupFonts();  // Must be called BEFORE gui.setup() / ImGui font atlas is built
+    // Call after gui.setup(), outside an ImGui frame. Paths are relative to data.
+    void setupFonts(const std::string& regularPath = "config/font/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Medium.ttf",
+                    const std::string& boldPath = "config/font/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ExtraBold.ttf");
 
     void bringOnTop(){onTop = true;};
     // Request focus on this canvas window. The canvas will apply the focus
@@ -195,6 +199,8 @@ private:
 	// Pre-cached fonts for zoom levels (static: shared across all canvas instances via ImGui's single font atlas)
 	static ImFont* zoomFonts[9];
 	static ImFont* zoomFontsBold[9];
+    // Reuse visited families without clearing fonts owned by other app components.
+    std::map<std::pair<std::string, std::string>, std::array<ImFont*, 18>> fontCache;
 	static constexpr float ZOOM_FONT_SIZES[9] = {8.0f, 10.0f, 12.0f, 14.0f, 18.0f, 22.0f, 28.0f, 36.0f, 48.0f};
 
 	// Get the appropriate font for current zoom level
