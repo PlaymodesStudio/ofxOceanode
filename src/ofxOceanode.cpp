@@ -780,6 +780,11 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 
 			if(ImGui::MenuItem("Save current GUI layout")){
 				memset(saveLayoutNameBuf, 0, sizeof(saveLayoutNameBuf));
+				string layoutName = currentLayoutName;
+				if(layoutName.size() >= 4 && layoutName.compare(layoutName.size() - 4, 4, ".ini") == 0){
+					layoutName.resize(layoutName.size() - 4);
+				}
+				strncpy(saveLayoutNameBuf, layoutName.c_str(), sizeof(saveLayoutNameBuf) - 1);
 				openSaveLayoutPopup = true;
 			}
 
@@ -974,6 +979,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
                 if(!d.exists()) d.create(true);
                 string fullPath = dirPath + string(saveLayoutNameBuf) + ".ini";
                 ImGui::SaveIniSettingsToDisk(fullPath.c_str());
+                currentLayoutName = string(saveLayoutNameBuf) + ".ini";
             }
             ImGui::CloseCurrentPopup();
         }
