@@ -145,8 +145,6 @@ private:
     ofxImGui::Gui gui;
     void showManualWindow(bool *b);
     void showHelpPopUp();
-    bool firstDraw;
-    bool settingsLoaded;
     bool showMode;
 	bool snapToGrid;
     std::map<std::string, bool> savedViewConfig;
@@ -165,15 +163,15 @@ private:
     ofEventListener presetSavedListener;
     bool hasActivePreset = false;
     std::string pendingIniLoad; // empty means no pending load
-    bool pendingPresetsTabActivation = false; // force Presets tab active after preset load
 
     // Metadata for the most recently loaded ImGui layout. ImGui restores only
     // windows present in the .ini file, so controllers introduced after the
-    // layout was saved need a deterministic default docking destination.
+    // layout was saved dock beside Nodes (legacy layouts also work).
     std::string loadedGUILayoutData;
     ImGuiID loadedGUILayoutLeftDockId = 0;
     bool pendingControllerDockReconciliation = false;
     void loadGUILayoutFromDisk(const std::string& path);
+    ImGuiID resolveControllerDockID() const;
     void reconcileMissingControllerWindows();
 
     // GUI layout management state

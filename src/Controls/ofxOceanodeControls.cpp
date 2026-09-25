@@ -18,6 +18,26 @@
 #include "imgui_internal.h"
 #include "ofxOceanodeShared.h"
 
+#include <algorithm>
+#include <cfloat>
+
+namespace {
+void constrainMenuHeightToHostWindow(){
+    const float windowBottom = ImGui::GetWindowPos().y + ImGui::GetWindowSize().y;
+    const float menuBottom = ImGui::GetCursorScreenPos().y + ImGui::GetFrameHeight();
+    const float maxHeight = std::max(1.0f, windowBottom - menuBottom - ImGui::GetStyle().WindowPadding.y);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, maxHeight));
+}
+
+bool beginTopLevelMenu(const char* label){
+    const ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing.x * 1.5f, spacing.y));
+    const bool open = ImGui::BeginMenu(label);
+    ImGui::PopStyleVar();
+    return open;
+}
+}
+
 #ifdef OFXOCEANODE_USE_OSC
     #include "ofxOceanodeOSCController.h"
     #include "ofxOceanodeOSCVariablesController.h"
@@ -52,9 +72,9 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     controllers.push_back(make_shared<ofxOceanodeMidiController>(get<ofxOceanodePresetsController>(), container));
 #endif
     
-    // Initialize all controllers as visible
+    // Initialize window controllers as visible.
     for(auto &c : controllers){
-        controllerVisible[c->getControllerName()] = true;
+        if(!c->isMenuController()) controllerVisible[c->getControllerName()] = true;
     }
 }
 
@@ -125,6 +145,8 @@ void ofxOceanodeControls::draw(){
     }
     
     for(auto &c : controllers){
+        if(c->isMenuController()) continue;
+
         // Determine visibility
         auto it = controllerVisible.find(c->getControllerName());
         bool isVisible = (it == controllerVisible.end()) || it->second;
@@ -147,6 +169,41 @@ void ofxOceanodeControls::draw(){
                 window->DockNode->TabBar->NextSelectedTabId = window->TabId;
         }
         ImGui::End();
+    }
+}
+
+void ofxOceanodeControls::drawMenu(const std::string& controllerName){
+    for(auto &c : controllers){
+        if(!c->isMenuController() || c->getControllerName() != controllerName) continue;
+        ImGui::PushID(c.get());
+        constrainMenuHeightToHostWindow();
+        if(beginTopLevelMenu(c->getControllerName().c_str())){
+            c->draw();
+            ImGui::EndMenu();
+        }
+        ImGui::PopID();
+        return;
+    }
+}
+
+void ofxOceanodeControls::drawMenus(const std::string& excludedControllerName){
+    for(auto &c : controllers){
+        if(!c->isMenuController() || c->getControllerName() == excludedControllerName) continue;
+        ImGui::PushID(c.get());
+        constrainMenuHeightToHostWindow();
+        if(beginTopLevelMenu(c->getControllerName().c_str())){
+            c->draw();
+            ImGui::EndMenu();
+        }
+        ImGui::PopID();
+    }
+}
+
+void ofxOceanodeControls::drawPopups(){
+    for(auto &c : controllers){
+        ImGui::PushID(c.get());
+        c->drawPopups();
+        ImGui::PopID();
     }
 }
 

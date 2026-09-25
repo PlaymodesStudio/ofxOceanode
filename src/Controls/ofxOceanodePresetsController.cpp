@@ -9,11 +9,11 @@
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeShared.h"
 #include "imgui.h"
-#include "ofxOceanodeColors.h"
-
-int mouseAction=0;
 
 namespace {
+const ImVec4 bankTextColor(1.0f, 1.0f, 1.0f, 1.0f);
+const ImVec4 presetItemTextColor(150.0f / 255.0f, 150.0f / 255.0f, 150.0f / 255.0f, 1.0f);
+
 string sanitizePresetName(string name){
     ofStringReplace(name, " ", "_");
     return name;
@@ -52,6 +52,7 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
     if(dir.listDir() == 0){
         banks.push_back("Initial_Bank");
     }
+    sort(banks.begin(), banks.end());
     currentBank = 0;
 
     presetListener = container->loadPresetEvent.newListener([this](pair<string, string> presetInfo){
@@ -95,250 +96,154 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
 }
 
 void ofxOceanodePresetsController::draw(){
-    auto vector_getter = [](void* vec, int idx, const char** out_text)
-    {
-        auto& vector = *static_cast<std::vector<std::string>*>(vec);
-        if (idx < 0 || idx >= static_cast<int>(vector.size())) { return false; }
-        *out_text = vector.at(idx).c_str();
-        return true;
-    };
-
-    // Bank related
-    ImGui::Text("%s","Bank:");
+    const string& bankName = banks[currentBank];
+    const string& presetName = currentPreset[bankName];
+    ImGui::TextUnformatted("Bank:");
     ImGui::SameLine();
-    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::Text("%s",banks[currentBank].c_str());
-    ImGui::PopStyleColor();
-    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-	
-	if(ImGui::Button("[+]##newBank")){
-		ImGui::OpenPopup("Add New Bank");
-	}
-	ImGui::SameLine();
-	if(ImGui::Button("Reload Macros")){
-		ofxOceanodeShared::updateMacrosStructure();
-	}
-	
-    ImGui::PopStyleColor();
-    
-    if(ImGui::BeginPopupModal("Add New Bank", NULL, ImGuiWindowFlags_AlwaysAutoResize)){
-        static char cString[256];
-        if (ImGui::InputText("Bank Name", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
-        {
-            string proposedNewName(cString);
-            ofStringReplace(proposedNewName, " ", "_");
-            if(find(banks.begin(), banks.end(), proposedNewName) == banks.end()){
-                if(proposedNewName != ""){
-                    banks.push_back(proposedNewName);
-                    currentBank = banks.size()-1;
-                    currentPreset[banks[currentBank]] = "";
-                }
-                ImGui::CloseCurrentPopup();
-            }
-            strcpy(cString, "");
-        }
-        if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsItemActive()){
-            strcpy(cString, "");
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
+    ImGui::TextColored(bankTextColor, "%s", bankName.c_str());
+    ImGui::TextUnformatted("Preset:");
+    ImGui::SameLine();
+    ImGui::TextColored(presetItemTextColor, "%s", presetName.empty() ? "-" : presetName.c_str());
+    ImGui::Separator();
+
+    if(ImGui::MenuItem("Save Preset", nullptr, false, !presetName.empty())){
+        savePreset(presetName, bankName);
     }
-    
-    // Preset related
-
-    // preset name, by default = "-" until it's loaded or saved.
-    string presetName = "-";
-    if(currentPreset[banks[currentBank]]=="")
-    {
-        presetName = "-";
+    if(ImGui::MenuItem("Save Preset As...")){
+        popupRequest = PopupRequest::SaveAs;
     }
-    else presetName = currentPreset[banks[currentBank]];
-    ImGui::Text("Preset: ");
-    ImGui::SameLine();
-    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::Text("%s",presetName.c_str());
-    ImGui::PopStyleColor(1);
+    if(ImGui::MenuItem("Delete Preset...", nullptr, false, !presetName.empty())){
+        deleteBankName = bankName;
+        deletePresetName = presetName;
+        popupRequest = PopupRequest::Delete;
+    }
+    ImGui::Separator();
+    if(ImGui::MenuItem("New Bank...")){
+        popupRequest = PopupRequest::NewBank;
+    }
+    if(ImGui::MenuItem("Reload Macros")){
+        ofxOceanodeShared::updateMacrosStructure();
+    }
+    ImGui::Separator();
+    drawPresetList();
+}
 
-    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-
-    if(ImGui::Button("[+]##newPreset")){}
-    ImGui::SameLine();
-    if(ImGui::Button("[-]")){
+void ofxOceanodePresetsController::drawPopups(){
+    // MenuItem closes the menu. Open and render dialogs here instead, using
+    // the persistent DockSpace ID stack supplied by ofxOceanodeControls.
+    if(popupRequest == PopupRequest::NewBank){
+        bankNameBuffer[0] = '\0';
+        ImGui::OpenPopup("Add New Bank");
+    }else if(popupRequest == PopupRequest::SaveAs){
+        presetNameBuffer[0] = '\0';
+        saveAsBank = currentBank;
+        ImGui::OpenPopup("Save Preset As");
+    }else if(popupRequest == PopupRequest::Delete){
         ImGui::OpenPopup("Delete Preset?");
     }
-    ImGui::SameLine();
-    if(ImGui::Button("[S]")){
-        if(presetName != "-") savePreset(currentPreset[banks[currentBank]],banks[currentBank]);
-    }
-    ImGui::SameLine();
-	
-	bool firstSaveAsOpen = false;
-    if(ImGui::Button("[SA]")){
-		ImGui::OpenPopup("Save preset as :");
-		firstSaveAsOpen = true;
-	}
-    
-	ImGui::PopStyleColor(1);
-	
-    if (ImGui::BeginPopupModal("Delete Preset?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        ImGui::Text("%s", (presetName + "\n").c_str());
-        ImGui::Separator();
-        
-        if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown((ImGuiKey_Enter))) {
+    popupRequest = PopupRequest::None;
+
+    if(ImGui::BeginPopupModal("Add New Bank", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+        if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 22.0f);
+        const bool enter = ImGui::InputText("Bank Name", bankNameBuffer, sizeof(bankNameBuffer), ImGuiInputTextFlags_EnterReturnsTrue);
+        const string requestedName = sanitizePresetName(bankNameBuffer);
+        const bool duplicate = find(banks.begin(), banks.end(), requestedName) != banks.end();
+        const bool canCreate = !requestedName.empty() && !duplicate;
+        if(duplicate) ImGui::TextDisabled("A bank with this name already exists.");
+        ImGui::BeginDisabled(!canCreate);
+        const bool create = ImGui::Button("Create");
+        ImGui::EndDisabled();
+        if(canCreate && (enter || create)){
+            banks.push_back(requestedName);
+            sort(banks.begin(), banks.end());
+            currentBank = distance(banks.begin(), find(banks.begin(), banks.end(), requestedName));
+            currentPreset[requestedName] = "";
+            bankPresets[requestedName];
             ImGui::CloseCurrentPopup();
-            deletePreset(presetName,banks[currentBank]);
         }
-        ImGui::SetItemDefaultFocus();
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(120,0))) { ImGui::CloseCurrentPopup(); }
+        if(ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
-    
-	ImGui::SetNextWindowSize(ImVec2(200,100));
-    
-    if(ImGui::BeginPopupModal("Save preset as :", NULL)){
-        static char cString[256];
 
-		if(firstSaveAsOpen){
-			ImGui::SetKeyboardFocusHere(0);
-		}
-        
-        if (ImGui::InputText("##Preset Name : ", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
-        {
-            const string requestedName = sanitizePresetName(string(cString));
-            if(!requestedName.empty()){
-                if(!presetNameExists(bankPresets[banks[currentBank]], requestedName)){
-                    createPreset(requestedName);
-                    newPresetCreated = true;
-                    strcpy(cString, "");
-                    ImGui::CloseCurrentPopup();
-                }
-            }
-        }
-        
-        if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsItemActive()){
-            strcpy(cString, "");
-        }
-        if(ImGui::Combo("Bank ", &currentBank, vector_getter, static_cast<void*>(&banks), banks.size())){
-            //TODO: Do something when load bank?
-        }
-        if (ImGui::Button("Cancel"))
-        {
-            strcpy(cString, "");
+    if(ImGui::BeginPopupModal("Save Preset As", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+        if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+        ImGui::PushItemWidth(ImGui::GetFontSize() * 22.0f);
+        const bool enter = ImGui::InputText("Preset Name", presetNameBuffer, sizeof(presetNameBuffer), ImGuiInputTextFlags_EnterReturnsTrue);
+        auto vector_getter = [](void* vec, int idx, const char** out_text){
+            auto& values = *static_cast<vector<string>*>(vec);
+            if(idx < 0 || idx >= static_cast<int>(values.size())) return false;
+            *out_text = values[idx].c_str();
+            return true;
+        };
+        ImGui::Combo("Bank", &saveAsBank, vector_getter, &banks, banks.size());
+        ImGui::PopItemWidth();
+        const string requestedName = sanitizePresetName(presetNameBuffer);
+        const bool duplicate = presetNameExists(bankPresets[banks[saveAsBank]], requestedName);
+        const bool canSave = !requestedName.empty() && !duplicate;
+        if(duplicate) ImGui::TextDisabled("A preset with this name already exists in this bank.");
+        ImGui::BeginDisabled(!canSave);
+        const bool save = ImGui::Button("Save");
+        ImGui::EndDisabled();
+        if(canSave && (enter || save)){
+            currentBank = saveAsBank;
+            createPreset(requestedName);
             ImGui::CloseCurrentPopup();
         }
+        ImGui::SameLine();
+        if(ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
 
-    float child_h = ImGui::GetContentRegionAvail().y;
-    float child_w = ImGui::GetContentRegionAvail().x;
-    //ImGuiWindowFlags child_flags = ImGuiWindowFlags_MenuBar;
-    ImGui::BeginChild("Preset List", ImVec2(child_w, child_h), true);
-
-    // Draw Preset List
-
-    ImGuiStyle style = ImGui::GetStyle();
-
-    sort(banks.begin(), banks.end());
-    for(int b=0;b<banks.size();b++)
-    {
-        if(b==currentBank)
-        {
-            ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::SelectedNodeText);
-            ImGui::PushStyleColor(ImGuiCol_WindowBg, style.Colors[ImGuiCol_WindowBg]);
+    if(ImGui::BeginPopupModal("Delete Preset?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+        ImGui::Text("Bank: %s", deleteBankName.c_str());
+        ImGui::Text("Preset: %s", deletePresetName.c_str());
+        ImGui::Separator();
+        const bool confirmWithEnter = !ImGui::IsWindowAppearing() && ImGui::IsKeyPressed(ImGuiKey_Enter, false);
+        if(ImGui::Button("Delete", ImVec2(120, 0)) || confirmWithEnter){
+            deletePreset(deletePresetName, deleteBankName);
+            ImGui::CloseCurrentPopup();
         }
-        else
-        {
-            ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
-            ImGui::PushStyleColor(ImGuiCol_WindowBg, style.Colors[ImGuiCol_WindowBg]);
-        }
-        
-        //ImGui::SetNextItemOpen(true);
-        
-        if (ImGui::TreeNode(banks[b].c_str()))
-        {
-            ImGui::Separator();
-            ImGui::PushStyleColor(ImGuiCol_Text,style.Colors[ImGuiCol_Text]);
-            string presetName;
+        ImGui::SameLine();
+        if(ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+}
 
-            
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive,style.Colors[ImGuiCol_TabActive] );
-            for (int n = 0; n < bankPresets[banks[b]].size(); n++)
-            {
-                presetName = bankPresets[banks[b]][n];
-                
-                bool isCurrentPreset = (presetName == currentPreset[banks[currentBank]]);
-                if((isCurrentPreset)&&(b==currentBank)) ImGui::PushStyleColor(ImGuiCol_Text,OceanodeColors::SelectedNodeText);
-                
-                ImGui::Text((ofToString(n+1)+"|").c_str());
-                ImGui::SameLine();
-                ImGui::Selectable((presetName).c_str());
-                if((isCurrentPreset)&&(b==currentBank)) ImGui::PopStyleColor();
-                
-                // reordering presets
-                
-                if (ImGui::IsItemActive() && ImGui::IsItemClicked(0))
-                {
-                    mouseAction=1;
-                }
-                
-                if (ImGui::IsItemActive() && !ImGui::IsItemHovered())
-                {
-                    //currentBank = b;
-                    //currentPreset[banks[b]] = presetName;
-                    
-                    mouseAction=2;
-                    
-                    int n_next = n + (ImGui::GetMouseDragDelta(0).y < 0.f ? -1 : 1);
-                    if (n_next >= 0 && n_next < bankPresets[banks[b]].size())
-                    {
-                        string nOldPresetName = ofToString(n+1) +  "--" + bankPresets[banks[b]][n];
-                        string nNextOldPresetName = ofToString(n_next+1) +  "--" + bankPresets[banks[b]][n_next];
-
-                        // reorder data
-                        bankPresets[banks[b]][n] = bankPresets[banks[b]][n_next];
-                        bankPresets[banks[b]][n_next] = presetName;
-                        
-                        ImGui::ResetMouseDragDelta();
-
-                        // reorder in folder
-                        string nNewPresentName =  ofToString(n+1) +  "--" + bankPresets[banks[b]][n];
-                        string nNextNewPresetName = ofToString(n_next+1) +  "--" + bankPresets[banks[b]][n_next];
-                        string dirPath = "./Presets/" + banks[b];
-                        ofDirectory dir;
-                        dir.open(dirPath);
-
-                        std::filesystem::rename(dir.getAbsolutePath()+"/"+nOldPresetName,dir.getAbsolutePath()+"/" + nNextNewPresetName);
-                        std::filesystem::rename(dir.getAbsolutePath()+"/"+nNextOldPresetName,dir.getAbsolutePath()+"/" + nNewPresentName);
-                        
-                    }
-
-                }
-                if ((ImGui::IsItemHovered() && ImGui::IsMouseReleased(0)))
-                {
-                    
-                    /*if(ImGui::GetIO().KeyShift){
+void ofxOceanodePresetsController::drawPresetList(){
+    ImGui::TextUnformatted("Load Preset");
+    // The menu grows with the expanded banks. ImGui limits oversized popup
+    // menus to the viewport and gives the menu itself a scrollbar.
+    ImGui::PushStyleColor(ImGuiCol_Text, presetItemTextColor);
+    for(int b = 0; b < banks.size(); ++b){
+        const string& bankName = banks[b];
+        ImGui::SetNextItemOpen(b == currentBank, ImGuiCond_Once);
+        ImGui::PushStyleColor(ImGuiCol_Text, bankTextColor);
+        const bool bankOpen = ImGui::TreeNode(bankName.c_str());
+        ImGui::PopStyleColor();
+        if(bankOpen){
+            const auto& presets = bankPresets[bankName];
+            if(presets.empty()) ImGui::TextDisabled("No presets in this bank");
+            ImGuiListClipper clipper;
+            clipper.Begin(static_cast<int>(presets.size()));
+            while(clipper.Step()){
+                for(int n = clipper.DisplayStart; n < clipper.DisplayEnd; ++n){
+                    const string label = ofToString(n + 1) + " | " + presets[n];
+                    const bool selected = b == currentBank && presets[n] == currentPreset[bankName];
+                    ImGui::PushID(n);
+                    if(ImGui::Selectable(label.c_str(), selected, ImGuiSelectableFlags_NoAutoClosePopups)){
                         currentBank = b;
-                        currentPreset[banks[b]] = presetName;
-                        savePreset(bankPresets[banks[b]][n], banks[b]);
-                    }else*/
-					if(mouseAction==1)
-                    {
-                        currentBank = b;
-                        currentPreset[banks[b]] = presetName;
-                        loadPreset(bankPresets[banks[b]][n], banks[b]);
-                        currentPreset[banks[b]] = bankPresets[banks[b]][n];
+                        loadPreset(presets[n], bankName);
+                        currentPreset[bankName] = presets[n];
                     }
-                    mouseAction=0;
+                    ImGui::PopID();
                 }
             }
             ImGui::TreePop();
-            ImGui::PopStyleColor(2);
         }
-        ImGui::PopStyleColor(2);
     }
-    ImGui::EndChild();
+    ImGui::PopStyleColor();
 }
 
 void ofxOceanodePresetsController::createPreset(string name){
@@ -437,41 +342,25 @@ void ofxOceanodePresetsController::savePreset(string name, string bank)
 }
 void ofxOceanodePresetsController::deletePreset(string presetName, string bankName)
 {
-    // delete from folder
-    ofDirectory dir;
-    int n = distance(bankPresets[banks[currentBank]].begin(),
-                     find(bankPresets[banks[currentBank]].begin(),
-                          bankPresets[banks[currentBank]].end(),
-                          presetName)
-                     );
-    
-    string myPath = "./Presets/" + banks[currentBank] +"/" + ofToString(n+1) +  "--" + presetName;
-    dir.open(myPath);
-    cout << dir.getAbsolutePath() << endl;
-    
-    if(true)
-    {
-        if(std::filesystem::remove_all(dir.getAbsolutePath()))
-        {
-            // delete data
-            cout << "Deleted :" << dir.getAbsolutePath() << endl;
-            bankPresets[banks[currentBank]].erase(find(bankPresets[banks[currentBank]].begin(),bankPresets[banks[currentBank]].end(),currentPreset[banks[currentBank]]));
-            
-            // rename needed data and folders
-            string dirPath = "./Presets/" + banks[currentBank];
-            ofDirectory dir;
-            dir.open(dirPath);
-            cout << dir.getAbsolutePath() << endl;
-            for(int i=n;i<bankPresets[banks[currentBank]].size();i++){
-                string oldPresentName =  ofToString(i+2) +  "--" + bankPresets[banks[currentBank]][i];
-                string newPresentName =  ofToString(i+1) +  "--" + bankPresets[banks[currentBank]][i];
-                cout << "renaming "<< oldPresentName << " to " << newPresentName << endl;
-                std::filesystem::rename(dir.getAbsolutePath()+"/"+oldPresentName,dir.getAbsolutePath()+"/" + newPresentName);
-            }
+    // The confirmation dialog holds its own target: external preset loads may
+    // change the current bank while the dialog is open.
+    auto bankIt = bankPresets.find(bankName);
+    if(bankIt == bankPresets.end()) return;
+    auto& presets = bankIt->second;
+    auto presetIt = find(presets.begin(), presets.end(), presetName);
+    if(presetIt == presets.end()) return;
+    const int index = distance(presets.begin(), presetIt);
+
+    ofDirectory bankDirectory("./Presets/" + bankName);
+    const string bankPath = bankDirectory.getAbsolutePath();
+    const string presetPath = bankPath + "/" + ofToString(index + 1) + "--" + presetName;
+    if(std::filesystem::remove_all(presetPath)){
+        presets.erase(presetIt);
+        if(currentPreset[bankName] == presetName) currentPreset[bankName].clear();
+        for(int i = index; i < presets.size(); ++i){
+            const string oldName = ofToString(i + 2) + "--" + presets[i];
+            const string newName = ofToString(i + 1) + "--" + presets[i];
+            std::filesystem::rename(bankPath + "/" + oldName, bankPath + "/" + newName);
         }
     }
-    update();
-    
-    
-    
 }

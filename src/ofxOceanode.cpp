@@ -21,8 +21,6 @@ ofxOceanode::ofxOceanode(){
     typesRegistry = ofxOceanodeTypesRegistry::getInstance();
     scope = ofxOceanodeScope::getInstance();
     oceanodeTime = ofxOceanodeTime::getInstance();
-    firstDraw = true;
-    settingsLoaded = false;
     showMode = false;
     
 #ifdef OFXOCEANODE_USE_OSC
@@ -168,7 +166,6 @@ void ofxOceanode::setup(){
         string iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
         if(ofFile(iniPath).exists()){
             pendingIniLoad = iniPath;   // defer — will be applied before next NewFrame
-            pendingPresetsTabActivation = true; // force Presets tab active after layout restore
             // Cache the content for preservation during future saves
             ofBuffer buf = ofBufferFromFile(iniPath);
             ofxOceanodeShared::getLayoutContentCache()[iniPath] = buf.getText();
@@ -254,13 +251,6 @@ void ofxOceanode::draw(){
         loadGUILayoutFromDisk(pendingIniLoad);
         pendingIniLoad.clear();
     }
-    if(pendingPresetsTabActivation){
-        ImGuiWindow* presetsWin = ImGui::FindWindowByName("Presets");
-        if(presetsWin && presetsWin->DockNode && presetsWin->DockNode->TabBar){
-            presetsWin->DockNode->TabBar->NextSelectedTabId = presetsWin->ID;
-        }
-        pendingPresetsTabActivation = false;
-    }
     // Deferred canvas layout switching (save previous, load new)
     {
         string& pendingSave = ofxOceanodeShared::getPendingLayoutSavePath();
@@ -293,6 +283,11 @@ void ofxOceanode::draw(){
     reconcileMissingControllerWindows();
     bool showDocker = true;
     ShowExampleAppDockSpace(&showDocker);
+    // Refresh references every frame, including after preset/layout loads and
+    // manual docking. This only updates IDs; it never rearranges saved windows.
+    ofxOceanodeShared::setLeftNodeID(resolveControllerDockID());
+    ImGuiDockNode* centralNode = ImGui::DockBuilderGetCentralNode(ofxOceanodeShared::getDockspaceID());
+    ofxOceanodeShared::setCentralNodeID(centralNode ? centralNode->ID : 0);
     if(showMode){
         drawShowModeWindow();
 		container->draw();
@@ -311,24 +306,6 @@ void ofxOceanode::draw(){
         drawThemeEditorWindow();
     }
 
-    //Make Presets the current active tab on the first frame
-    if(firstDraw){
-        if(settingsLoaded){
-            ImGuiWindow* canvasWin = ImGui::FindWindowByName("Canvas");
-            ImGuiWindow* presetsWin = ImGui::FindWindowByName("Presets");
-            if(canvasWin && canvasWin->DockNode && presetsWin && presetsWin->DockNode){
-                ofxOceanodeShared::setCentralNodeID(canvasWin->DockNode->ID);
-                ofxOceanodeShared::setLeftNodeID(presetsWin->DockNode->ID);
-            }
-        }
-        ImGuiDockNode* leftNode = ImGui::DockBuilderGetNode(ofxOceanodeShared::getLeftNodeID());
-        ImGuiWindow* presetsWin = ImGui::FindWindowByName("Presets");
-        if(leftNode && leftNode->TabBar && presetsWin){
-            leftNode->TabBar->NextSelectedTabId = presetsWin->ID;
-        }
-        firstDraw = false;
-    }
-    
     gui.end();
     gui.draw();
 }
@@ -339,6 +316,7 @@ void ofxOceanode::loadGUILayoutFromDisk(const std::string& path){
     ofBuffer layoutBuffer = ofBufferFromFile(path);
     loadedGUILayoutData = layoutBuffer.getText();
     std::string currentWindow;
+    std::map<std::string, ImGuiID> windowDockIds;
     const std::string windowPrefix = "[Window][";
 
     for(std::string line : ofSplitString(loadedGUILayoutData, "\n", false, false)){
@@ -349,49 +327,98 @@ void ofxOceanode::loadGUILayoutFromDisk(const std::string& path){
             continue;
         }
 
-        // The Presets controller is the stable semantic anchor for the LEFT
-        // controller pane. Numeric dock IDs are layout-specific and must not be
-        // hard-coded.
-        if(currentWindow == "Presets" && line.rfind("DockId=", 0) == 0){
+        if(line.rfind("DockId=", 0) == 0){
             std::string dockIdText = line.substr(7);
             size_t comma = dockIdText.find(',');
             if(comma != std::string::npos) dockIdText.erase(comma);
 
             try{
-                loadedGUILayoutLeftDockId = static_cast<ImGuiID>(std::stoul(dockIdText, nullptr, 0));
+                windowDockIds[currentWindow] = static_cast<ImGuiID>(std::stoul(dockIdText, nullptr, 0));
             }catch(const std::exception&){
-                loadedGUILayoutLeftDockId = 0;
+                // Ignore malformed docking metadata and try another controller.
+            }
+        }
+    }
+
+    // Nodes is the primary reference. MiniMap and Presets are compatibility
+    // fallbacks for older layouts without a docked Nodes entry.
+    for(const char* anchorName : {"Nodes", "MiniMap", "Presets"}){
+        auto anchor = windowDockIds.find(anchorName);
+        if(anchor != windowDockIds.end() && anchor->second != 0){
+            loadedGUILayoutLeftDockId = anchor->second;
+            break;
+        }
+    }
+    if(loadedGUILayoutLeftDockId == 0){
+        for(const auto& controller : controls->getControllers()){
+            if(controller->isMenuController()) continue;
+            auto dock = windowDockIds.find(controller->getControllerName());
+            if(dock != windowDockIds.end() && dock->second != 0){
+                loadedGUILayoutLeftDockId = dock->second;
+                break;
             }
         }
     }
 
     ImGui::LoadIniSettingsFromDisk(path.c_str());
+    // Docking IDs are local to this layout. Never reuse the previous layout's
+    // default destinations while the new windows are being restored.
+    ofxOceanodeShared::setLeftNodeID(0);
+    ofxOceanodeShared::setCentralNodeID(0);
     pendingControllerDockReconciliation = true;
+}
+
+ImGuiID ofxOceanode::resolveControllerDockID() const{
+    const ImGuiID dockspaceID = ofxOceanodeShared::getDockspaceID();
+    auto usableDockID = [dockspaceID](ImGuiID id) -> ImGuiID {
+        ImGuiDockNode* node = id ? ImGui::DockBuilderGetNode(id) : nullptr;
+        if(!node || node->IsSplitNode()) return 0;
+        // A floating dock group or a nested Scope dockspace is not the main
+        // controller pane, even if it happens to reuse an old numeric ID.
+        if(dockspaceID && ImGui::DockNodeGetRootNode(node)->ID != dockspaceID) return 0;
+        return id;
+    };
+    auto windowDockID = [&](const char* name) -> ImGuiID {
+        if(ImGuiWindow* window = ImGui::FindWindowByName(name)){
+            if(ImGuiID id = usableDockID(window->DockId)) return id;
+        }
+        // Hidden controllers may have saved settings without a live window.
+        if(ImGuiWindowSettings* settings = ImGui::FindWindowSettingsByID(ImHashStr(name))){
+            return usableDockID(settings->DockId);
+        }
+        return 0;
+    };
+
+    // During restoration the saved anchor takes precedence over windows that
+    // have not yet been submitted. Afterwards, follow Nodes when it is moved.
+    if(pendingControllerDockReconciliation){
+        if(ImGuiID id = usableDockID(loadedGUILayoutLeftDockId)) return id;
+    }
+    if(ImGuiID id = windowDockID("Nodes")) return id;
+    if(ImGuiID id = windowDockID("MiniMap")) return id;
+    for(const auto& controller : controls->getControllers()){
+        if(controller->isMenuController()) continue;
+        if(ImGuiID id = windowDockID(controller->getControllerName().c_str())) return id;
+    }
+    return usableDockID(ofxOceanodeShared::getLeftNodeID());
 }
 
 void ofxOceanode::reconcileMissingControllerWindows(){
     if(!pendingControllerDockReconciliation) return;
 
-    ImGuiID leftDockId = loadedGUILayoutLeftDockId;
-
-    // If the file did not contain a usable Presets DockId, retry on a later
-    // frame using the live Presets window. This also supports layouts created
-    // from the built-in DockSpace fallback.
-    if(leftDockId == 0 || ImGui::DockBuilderGetNode(leftDockId) == nullptr){
-        ImGuiWindow* presetsWindow = ImGui::FindWindowByName("Presets");
-        if(presetsWindow != nullptr && presetsWindow->DockNode != nullptr){
-            leftDockId = presetsWindow->DockNode->ID;
-        }
-    }
+    const ImGuiID leftDockId = resolveControllerDockID();
 
     // The DockSpace/anchor may not exist on the first frame of a layout without
     // docking data. Leave the request pending and retry next frame.
     if(leftDockId == 0 || ImGui::DockBuilderGetNode(leftDockId) == nullptr) return;
 
+    ofxOceanodeShared::setLeftNodeID(leftDockId);
+
     auto layoutLines = ofSplitString(loadedGUILayoutData, "\n", false, false);
     for(std::string& line : layoutLines) line = ofTrim(line);
 
     for(const auto& controller : controls->getControllers()){
+        if(controller->isMenuController()) continue;
         const std::string windowName = controller->getControllerName();
         const std::string windowHeader = "[Window][" + windowName + "]";
         bool windowWasSaved = false;
@@ -482,8 +509,6 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Left, 0.2, &leftNode_id, &centralNode_id);
             ofxOceanodeShared::setCentralNodeID(centralNode_id);
             ofxOceanodeShared::setLeftNodeID(leftNode_id);
-        }else{
-            settingsLoaded = true;
         }
     }
     else
@@ -501,24 +526,20 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 	ImVec4 popupBg = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
 	ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(popupBg.x * 0.75f, popupBg.y * 0.75f, popupBg.z * 0.75f, popupBg.w));
 
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 6.0f));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f, 6.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12.0f, 6.0f));
     if (ImGui::BeginMenuBar())
     {
-        if (ImGui::BeginMenu("File"))
-        {
-            if (ImGui::MenuItem("New")) {}
-            if (ImGui::MenuItem("Open")) {}
-            if (ImGui::BeginMenu("Open Recent")) {
-                if(ImGui::MenuItem("Recent1.oceanode")){}
-                if(ImGui::MenuItem("Recent2.oceanode")){}
-                ImGui::EndMenu();
-            }
-			ImGui::MenuItem("Metrics", NULL, &show_app_metrics);
-            ImGui::EndMenu();
-        }
+        auto beginTopLevelMenu = [](const char* label){
+            const ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing.x * 1.5f, spacing.y));
+            const bool open = ImGui::BeginMenu(label);
+            ImGui::PopStyleVar();
+            return open;
+        };
+        controls->drawMenu("Presets");
 
-        if(ImGui::BeginMenu("Edit"))
+        if(beginTopLevelMenu("Edit"))
         {
             const string activeCanvasId = ofxOceanodeShared::getActiveCanvasUniqueID().empty()
                 ? canvas.getUniqueID() : ofxOceanodeShared::getActiveCanvasUniqueID();
@@ -554,8 +575,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             }
             ImGui::EndMenu();
         }
+
+        controls->drawMenus("Presets");
 		
-		if(ImGui::BeginMenu("View"))
+		if(beginTopLevelMenu("View"))
 		{
 		    auto& controllers = controls->getControllers();
 		    auto& visibility = controls->getControllersVisibility();
@@ -570,6 +593,12 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 		    // Sync any new controllers added after init
 		    for(auto &c : controllers){
 		        const std::string& name = c->getControllerName();
+		        if(c->isMenuController()){
+		            // Discard window visibility entries saved before migration to a menu.
+		            pendingVisibility.erase(name);
+		            visibility.erase(name);
+		            continue;
+		        }
 		        if(pendingVisibility.find(name) == pendingVisibility.end()){
 		            pendingVisibility[name] = visibility.count(name) ? visibility.at(name) : true;
 		        }
@@ -668,7 +697,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 		    ImGui::EndMenu();
 		}
 
-		if(ImGui::BeginMenu("Config"))
+		if(beginTopLevelMenu("Config"))
 		{
 			// Show actual running FPS (read-only) with color feedback
 			int currentFPS = (int)ofGetFrameRate();
@@ -837,7 +866,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			ImGui::EndMenu();
 		}
 
-        if(ImGui::BeginMenu("Theme"))
+        if(beginTopLevelMenu("Theme"))
         {
             if(ImGui::MenuItem("Edit Theme", nullptr, &showThemeEditor)){}
             ImGui::Separator();
@@ -913,21 +942,25 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             ImGui::EndMenu();
         }
 
-        if(ImGui::BeginMenu("Help"))
+        if(beginTopLevelMenu("Help"))
         {
             ImGui::MenuItem("Show User Manual", "CMD+L", &showManual);
             if(ImGui::MenuItem("Show Help", "CMD+H")){
                 showHelp = true;
             }
+            ImGui::Separator();
+            ImGui::MenuItem("Metrics", nullptr, &show_app_metrics);
             ImGui::EndMenu();
         }
         ImGui::EndMenuBar();
     }
     ImGui::PopStyleVar(2);
-    ImGui::PopStyleColor(1); // matches PushStyleColor(ImGuiCol_PopupBg)
+    ImGui::PopStyleColor();
     // NOTE: ImGui::End() is intentionally deferred until AFTER all popup
     // OpenPopup/BeginPopupModal calls below, so the DockSpace window is still
     // the active window context when the popups are registered.
+
+    controls->drawPopups();
 
     if(showHelp){
         ImGui::OpenPopup("Here are some tips:");
