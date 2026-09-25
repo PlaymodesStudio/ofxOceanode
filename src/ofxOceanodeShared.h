@@ -75,17 +75,12 @@ public:
     }
     
     static void setCentralNodeID(unsigned int _cnid){
-        auto &instance = getInstance();
-        if(instance.getCentralNodeIDFromInstance() == 0){
-            instance.setCentralNodeIDFromInstance(_cnid);
-        }
+        getInstance().setCentralNodeIDFromInstance(_cnid);
     }
     
     static void setLeftNodeID(unsigned int _lnid){
-        auto &instance = getInstance();
-        if(instance.getLeftNodeIDFromInstance() == 0){
-            instance.setLeftNodeIDFromInstance(_lnid);
-        }
+        // Layout loads and user docking can replace the original node IDs.
+        getInstance().setLeftNodeIDFromInstance(_lnid);
     }
 	
 	static std::shared_ptr<macroCategory> getMacroDirectoryStructure(){

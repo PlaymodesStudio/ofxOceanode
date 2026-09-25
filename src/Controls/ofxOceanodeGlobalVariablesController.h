@@ -48,7 +48,9 @@ public:
     ofxOceanodeGlobalVariablesController(shared_ptr<ofxOceanodeContainer> _container);
     ~ofxOceanodeGlobalVariablesController(){};
     
-    void draw();
+    void draw() override;
+    void drawPopups() override;
+    bool isMenuController() const override { return true; }
     
     void save();
     void load();
@@ -57,6 +59,12 @@ private:
     shared_ptr<ofxOceanodeContainer> container;
 
     std::vector<std::shared_ptr<globalVariablesGroup>> groups;
+    bool newGroupRequested = false;
+    bool newVariableRequested = false;
+    std::string newVariableGroupName;
+    char newGroupName[255] = {};
+    char newVariableName[255] = {};
+    int newVariableType = 0;
 };
 
 #endif /* ofxOceanodeGlobalVariablesController_h */
