@@ -7,7 +7,14 @@
 
 #include "ofxOceanodePresetsController.h"
 #include "ofxOceanodeContainer.h"
+#include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeShared.h"
+#include "ofxOceanodeNode.h"
+#include "ofxOceanodeNodeModel.h"
+#include "ofxOceanodeNodeGui.h"
+#include <filesystem>
+#include <map>
+#include <set>
 #include "imgui.h"
 
 namespace {
@@ -21,6 +28,30 @@ string sanitizePresetName(string name){
 
 bool presetNameExists(const vector<string>& existingPresets, const string& requestedName){
     return find(existingPresets.begin(), existingPresets.end(), sanitizePresetName(requestedName)) != existingPresets.end();
+}
+
+bool sameChanges(const GlobalMacroSaveReview& a, const GlobalMacroSaveReview& b){
+    if(a.changes.size() != b.changes.size()) return false;
+    for(size_t i = 0; i < a.changes.size(); ++i){
+        const auto& left = a.changes[i];
+        const auto& right = b.changes[i];
+        if(left.item != right.item || left.field != right.field ||
+           left.saved != right.saved || left.current != right.current ||
+           left.savedFull != right.savedFull || left.currentFull != right.currentFull) return false;
+    }
+    return true;
+}
+
+vector<GlobalMacroSaveReview> collapseEquivalentReviews(vector<GlobalMacroSaveReview> reviews){
+    vector<GlobalMacroSaveReview> uniqueReviews;
+    for(auto& review : reviews){
+        auto duplicate = std::find_if(uniqueReviews.begin(), uniqueReviews.end(), [&](const auto& prior){
+            return prior.globalPath == review.globalPath && sameChanges(prior, review);
+        });
+        if(duplicate != uniqueReviews.end()) duplicate->alsoUsedAt.push_back(review.instancePath);
+        else uniqueReviews.push_back(std::move(review));
+    }
+    return uniqueReviews;
 }
 }
 
@@ -141,6 +172,10 @@ void ofxOceanodePresetsController::drawPopups(){
         ImGui::OpenPopup("Save Preset As");
     }else if(popupRequest == PopupRequest::Delete){
         ImGui::OpenPopup("Delete Preset?");
+    }else if(popupRequest == PopupRequest::ReviewSave){
+        ImGui::OpenPopup("Review Global Macros");
+    }else if(popupRequest == PopupRequest::SaveResult){
+        ImGui::OpenPopup("Preset Save Result");
     }
     popupRequest = PopupRequest::None;
 
@@ -190,8 +225,7 @@ void ofxOceanodePresetsController::drawPopups(){
         const bool save = ImGui::Button("Save");
         ImGui::EndDisabled();
         if(canSave && (enter || save)){
-            currentBank = saveAsBank;
-            createPreset(requestedName);
+            beginSavePreset(requestedName, banks[saveAsBank], true);
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
@@ -210,6 +244,14 @@ void ofxOceanodePresetsController::drawPopups(){
         }
         ImGui::SameLine();
         if(ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
+    drawGlobalMacroSaveReview();
+
+    if(ImGui::BeginPopupModal("Preset Save Result", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+        ImGui::TextWrapped("%s", saveResultText.c_str());
+        if(ImGui::Button("OK") || ImGui::IsKeyPressed(ImGuiKey_Enter)) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
 }
@@ -247,21 +289,6 @@ void ofxOceanodePresetsController::drawPresetList(){
         }
     }
     ImGui::PopStyleColor();
-}
-
-void ofxOceanodePresetsController::createPreset(string name){
-    if(!hasSelectedBank()) return;
-    name = sanitizePresetName(name);
-    if(name.empty()) return;
-    if(presetNameExists(bankPresets[banks[currentBank]], name)){
-        ofLogWarning("ofxOceanodePresetsController")
-            << "Refusing to create duplicate preset '" << name << "' in bank '" << banks[currentBank] << "'";
-        return;
-    }
-    bankPresets[banks[currentBank]].push_back(name);
-    currentPreset[banks[currentBank]] = bankPresets[banks[currentBank]].back();
-    savePreset(name, banks[currentBank]);
-    newPresetCreated = true;
 }
 
 void ofxOceanodePresetsController::update(){
@@ -334,16 +361,204 @@ void ofxOceanodePresetsController::savePreset(string name, string bank)
         return;
     }
 
-    int presetIndex = distance(presets.begin(), presetIt);
-    string myPath = "./Presets/" + bank + "/" + ofToString(presetIndex+1) +  "--" + name;
-	
-	ofxOceanodeShared::setCurrentPresetPath(myPath);
-	ofxOceanodeShared::setCurrentBankName(bank);
-	ofxOceanodeShared::setCurrentPresetName(name);
+    beginSavePreset(name, bank, false);
+}
 
-	container->savePreset(myPath);
-	ofxOceanodeShared::presetWasSaved();
-	
+void ofxOceanodePresetsController::beginSavePreset(string name, string bank, bool createNew){
+    name = sanitizePresetName(name);
+    if(name.empty() || bankPresets.find(bank) == bankPresets.end()) return;
+    if(createNew && presetNameExists(bankPresets[bank], name)) return;
+
+    auto request = std::make_unique<PendingSave>();
+    request->name = std::move(name);
+    request->bank = std::move(bank);
+    request->createNew = createNew;
+    request->reviews = collapseEquivalentReviews(collectGlobalMacroSaveReviews(*container));
+    request->saveChoices.resize(request->reviews.size(), false);
+    pendingSave = std::move(request);
+    if(pendingSave->reviews.empty()) finishSavePreset();
+    else popupRequest = PopupRequest::ReviewSave;
+}
+
+void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
+    if(!ImGui::BeginPopupModal("Review Global Macros", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+    if(!pendingSave || pendingSave->reviewIndex >= pendingSave->reviews.size()){
+        ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+        return;
+    }
+
+    auto& request = *pendingSave;
+    auto& review = request.reviews[request.reviewIndex];
+    ImGui::Text("Save Preset: %s / %s", request.bank.c_str(), request.name.c_str());
+    ImGui::Text("Global macro %zu of %zu (%zu changes)", request.reviewIndex + 1,
+                request.reviews.size(), review.changes.size());
+    ImGui::Separator();
+    ImGui::Text("Macro: %s", review.name.c_str());
+    ImGui::TextWrapped("Folder: %s", review.globalPath.c_str());
+    ImGui::TextWrapped("Used at: %s", review.instancePath.c_str());
+    for(const auto& path : review.alsoUsedAt) ImGui::TextWrapped("Also used at: %s", path.c_str());
+    if(!request.warning.empty()) ImGui::TextWrapped("%s", request.warning.c_str());
+
+    bool samePathAlreadySelected = false;
+    bool conflictingInstances = false;
+    for(size_t i = 0; i < request.reviews.size(); ++i){
+        if(i == request.reviewIndex || request.reviews[i].globalPath != review.globalPath) continue;
+        if(!sameChanges(request.reviews[i], review)) conflictingInstances = true;
+        if(i < request.reviewIndex && request.saveChoices[i]) samePathAlreadySelected = true;
+    }
+    if(conflictingInstances) ImGui::TextWrapped("Other instances of this macro have different edits. Choose only one instance to write to this folder.");
+    if(samePathAlreadySelected) ImGui::TextWrapped("Another instance has already been chosen for this folder.");
+
+    ImGui::Separator();
+    const float maxHeight = std::min(ImGui::GetTextLineHeightWithSpacing() * 18.0f,
+                                     ImGui::GetIO().DisplaySize.y * 0.45f);
+    ImGui::BeginChild("Changes", ImVec2(std::min(760.0f, ImGui::GetIO().DisplaySize.x * 0.8f), maxHeight), true);
+    std::string lastLocation;
+    for(size_t changeIndex = 0; changeIndex < review.changes.size(); ++changeIndex){
+        const auto& change = review.changes[changeIndex];
+        ImGui::PushID(static_cast<int>(changeIndex));
+        if(change.location != lastLocation){
+            ImGui::SeparatorText(change.location.c_str());
+            lastLocation = change.location;
+        }
+        ImGui::TextWrapped("%s / %s", change.item.c_str(), change.field.c_str());
+        ImGui::Indent();
+        ImGui::TextWrapped("Saved: %s", change.saved.c_str());
+        ImGui::TextWrapped("Current: %s", change.current.c_str());
+        if(change.savedFull.size() > change.saved.size() ||
+           change.currentFull.size() > change.current.size()){
+            if(ImGui::TreeNode("Full values")){
+                ImGui::TextWrapped("Saved: %s", change.savedFull.c_str());
+                ImGui::TextWrapped("Current: %s", change.currentFull.c_str());
+                ImGui::TreePop();
+            }
+        }
+        ImGui::Unindent();
+        ImGui::PopID();
+    }
+    ImGui::EndChild();
+    ImGui::TextWrapped("Save writes the complete current global macro to this folder.");
+
+    if(request.writing){
+        if(ImGui::Button("Retry macro save")){
+            ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+            finishSavePreset();
+            return;
+        }
+        ImGui::SameLine();
+        if(ImGui::Button("Stop saving")){
+            saveResultText = "Preset was not saved. A global macro save failed and may have changed files in " +
+                             review.globalPath + ".";
+            for(const auto& name : request.savedMacros) saveResultText += "\nSaved before failure: " + name;
+            pendingSave.reset();
+            ImGui::CloseCurrentPopup();
+            popupRequest = PopupRequest::SaveResult;
+        }
+        ImGui::EndPopup();
+        return;
+    }
+
+    ImGui::BeginDisabled(samePathAlreadySelected);
+    const bool saveMacro = ImGui::Button("Save this macro");
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    const bool skipMacro = ImGui::Button("Skip this macro");
+    ImGui::SameLine();
+    const bool cancel = ImGui::Button("Cancel preset save") || ImGui::IsKeyPressed(ImGuiKey_Escape);
+    if(cancel){
+        pendingSave.reset();
+        ImGui::CloseCurrentPopup();
+    }else if(saveMacro || skipMacro){
+        request.saveChoices[request.reviewIndex] = saveMacro;
+        request.reviewIndex++;
+        request.warning.clear();
+        if(request.reviewIndex == request.reviews.size()){
+            ImGui::CloseCurrentPopup();
+            finishSavePreset();
+        }
+    }
+    ImGui::EndPopup();
+}
+
+void ofxOceanodePresetsController::finishSavePreset(){
+    if(!pendingSave) return;
+    auto& request = *pendingSave;
+    if(!request.writing && !request.reviews.empty()){
+        const auto currentReviews = collapseEquivalentReviews(collectGlobalMacroSaveReviews(*container));
+        bool stale = currentReviews.size() != request.reviews.size();
+        if(!stale){
+            for(size_t i = 0; i < currentReviews.size(); ++i){
+                const auto& current = currentReviews[i];
+                const auto& reviewed = request.reviews[i];
+                if(current.instance != reviewed.instance || current.globalPath != reviewed.globalPath ||
+                   current.instancePath != reviewed.instancePath || current.alsoUsedAt != reviewed.alsoUsedAt ||
+                   !sameChanges(current, reviewed)) stale = true;
+            }
+        }
+        if(stale){
+            request.warning = "The macro changed during review. Please review the updated changes.";
+            request.reviews = currentReviews;
+            request.saveChoices.assign(request.reviews.size(), false);
+            request.reviewIndex = 0;
+            if(request.reviews.empty()){
+                finishSavePreset();
+                return;
+            }
+            popupRequest = PopupRequest::ReviewSave;
+            return;
+        }
+    }
+
+    request.writing = true;
+
+    const size_t presetIndex = request.createNew
+        ? bankPresets[request.bank].size()
+        : std::distance(bankPresets[request.bank].begin(),
+                        std::find(bankPresets[request.bank].begin(), bankPresets[request.bank].end(), request.name));
+    const string presetPath = "./Presets/" + request.bank + "/" +
+                              ofToString(presetIndex + 1) + "--" + request.name;
+
+    for(size_t i = request.nextWriteIndex; i < request.reviews.size(); ++i){
+        auto& review = request.reviews[i];
+        if(!request.saveChoices[i]){
+            request.skippedMacros.push_back(review.name);
+            request.nextWriteIndex = i + 1;
+            continue;
+        }
+        if(!review.instance->saveGlobalDefinition(false)){
+            request.warning = "Could not finish saving this global macro. Retry, or stop without saving the preset. The macro folder may have been partly written.";
+            request.reviewIndex = i;
+            popupRequest = PopupRequest::ReviewSave;
+            return;
+        }
+        request.savedMacros.push_back(review.name);
+        request.nextWriteIndex = i + 1;
+    }
+
+    if(request.createNew){
+        bankPresets[request.bank].push_back(request.name);
+        newPresetCreated = true;
+    }
+    auto bankPosition = std::find(banks.begin(), banks.end(), request.bank);
+    if(bankPosition != banks.end()) currentBank = std::distance(banks.begin(), bankPosition);
+    currentPreset[request.bank] = request.name;
+    ofxOceanodeShared::setCurrentPresetPath(presetPath);
+    ofxOceanodeShared::setCurrentBankName(request.bank);
+    ofxOceanodeShared::setCurrentPresetName(request.name);
+    container->savePreset(presetPath);
+    ofxOceanodeShared::presetWasSaved();
+
+    if(!request.reviews.empty()){
+        saveResultText = "Preset saved: " + request.bank + " / " + request.name + "\n";
+        saveResultText += "Global macros saved: " + ofToString(request.savedMacros.size()) +
+                          "\nGlobal macros skipped: " + ofToString(request.skippedMacros.size());
+        for(const auto& name : request.savedMacros) saveResultText += "\n  Saved: " + name;
+        for(const auto& name : request.skippedMacros) saveResultText += "\n  Skipped: " + name;
+        popupRequest = PopupRequest::SaveResult;
+    }
+    pendingSave.reset();
 }
 void ofxOceanodePresetsController::deletePreset(string presetName, string bankName)
 {
@@ -368,4 +583,340 @@ void ofxOceanodePresetsController::deletePreset(string presetName, string bankNa
             std::filesystem::rename(bankPath + "/" + oldName, bankPath + "/" + newName);
         }
     }
+}
+
+// Global macro review compares live saveable state with the macro folder.
+namespace {
+
+ofJson readJson(const std::string& path){
+    if(!ofFile::doesFileExist(path)) return ofJson();
+    try { return ofLoadJson(path); }
+    catch(const std::exception& e){
+        ofLogWarning("GlobalMacroSaveReview") << "Could not read " << path << ": " << e.what();
+        return ofJson();
+    }
+}
+
+std::string canonicalMacroPath(const std::string& path){
+    try { return std::filesystem::weakly_canonical(ofToDataPath(path, true)).string(); }
+    catch(...) { return ofToDataPath(path, true); }
+}
+
+ofJson field(const ofJson& object, const std::string& key){
+    if(object.is_object()){
+        auto it = object.find(key);
+        if(it != object.end()) return *it;
+    }
+    return ofJson();
+}
+
+std::string preview(const ofJson& value){
+    if(value.is_null()) return "(none)";
+    std::string result;
+    try { result = value.is_string() ? value.get<std::string>() : value.dump(); }
+    catch(...) { return "(value preview unavailable)"; }
+    if(result.size() > 160){
+        const std::string prefix = value.is_array() ? "Array (" + ofToString(value.size()) + ") " :
+                                   value.is_object() ? "Object (" + ofToString(value.size()) + " fields) " : "";
+        result = prefix + result.substr(0, 157) + "...";
+    }
+    return result;
+}
+
+std::string fullValue(const ofJson& value){
+    if(value.is_null()) return "(none)";
+    try { return value.dump(2); }
+    catch(...) { return "(value preview unavailable)"; }
+}
+
+void addChange(std::vector<GlobalMacroSaveChange>& changes, const std::string& location,
+               const std::string& item, const std::string& name,
+               const ofJson& saved, const ofJson& current){
+    if(saved == current) return;
+    changes.push_back({location, item, name, preview(saved), preview(current),
+                       fullValue(saved), fullValue(current)});
+}
+
+void compareJson(std::vector<GlobalMacroSaveChange>& changes, const std::string& location,
+                 const std::string& item, const std::string& name,
+                 const ofJson& saved, const ofJson& current, int depth = 0){
+    if(saved == current) return;
+    if(depth < 4 && saved.is_object() && current.is_object()){
+        std::set<std::string> keys;
+        for(auto it = saved.begin(); it != saved.end(); ++it) keys.insert(it.key());
+        for(auto it = current.begin(); it != current.end(); ++it) keys.insert(it.key());
+        for(const auto& key : keys){
+            compareJson(changes, location, item, name + " / " + key,
+                        field(saved, key), field(current, key), depth + 1);
+        }
+        return;
+    }
+    addChange(changes, location, item, name, saved, current);
+}
+
+std::string nodeKey(ofxOceanodeNode& node){
+    auto& model = node.getNodeModel();
+    std::string name = model.nodeName();
+    ofStringReplace(name, " ", "_");
+    return name + "_" + ofToString(model.getNumIdentifier());
+}
+
+std::string nodeLabel(ofxOceanodeNode& node){
+    auto& model = node.getNodeModel();
+    std::string label = model.nodeName() + " [Node " + ofToString(model.getNumIdentifier()) + "]";
+    if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&model)){
+        label += " " + (macro->isLocal() ? macro->getLocalMacroName() : macro->getCurrentMacroName());
+    }
+    return label;
+}
+
+std::string savedNodeKey(const std::string& type, const std::string& id){
+    std::string name = type;
+    ofStringReplace(name, " ", "_");
+    return name + "_" + ofToString(ofToInt(id));
+}
+
+ofJson nodePosition(ofxOceanodeNode& node){
+    const auto position = node.getNodeGui().getPosition();
+    return {position.x, position.y};
+}
+
+std::set<std::string> currentConnections(ofxOceanodeContainer& container){
+    std::set<std::string> result;
+    for(const auto& connection : container.getAllConnections()){
+        if(connection->getIsPersistent()) continue;
+        auto& source = connection->getSourceParameter();
+        auto& sink = connection->getSinkParameter();
+        result.insert(source.getNodeModel()->getParameterGroup().getEscapedName() + "/" +
+                      source.getName() + " -> " +
+                      sink.getNodeModel()->getParameterGroup().getEscapedName() + "/" + sink.getName());
+    }
+    return result;
+}
+
+std::set<std::string> savedConnections(const ofJson& json){
+    std::set<std::string> result;
+    if(!json.is_object()) return result;
+    for(auto sourceNode = json.begin(); sourceNode != json.end(); ++sourceNode){
+        if(!sourceNode.value().is_object()) continue;
+        for(auto sourceField = sourceNode.value().begin(); sourceField != sourceNode.value().end(); ++sourceField){
+            if(!sourceField.value().is_object()) continue;
+            for(auto sinkNode = sourceField.value().begin(); sinkNode != sourceField.value().end(); ++sinkNode){
+                if(!sinkNode.value().is_object()) continue;
+                for(auto sinkField = sinkNode.value().begin(); sinkField != sinkNode.value().end(); ++sinkField){
+                    result.insert(sourceNode.key() + "/" + sourceField.key() + " -> " +
+                                  sinkNode.key() + "/" + sinkField.key());
+                }
+            }
+        }
+    }
+    return result;
+}
+
+ofJson currentComments(ofxOceanodeContainer& container){
+    ofJson json;
+    auto& comments = container.getComments();
+    json["NumComments"] = comments.size();
+    for(size_t i = 0; i < comments.size(); ++i){
+        auto& c = comments[i];
+        auto& entry = json["Comments"][i];
+        entry["Text"] = c.text;
+        entry["Size"]["X"] = c.size.x;
+        entry["Size"]["Y"] = c.size.y;
+        entry["Pos"]["X"] = c.position.x;
+        entry["Pos"]["Y"] = c.position.y;
+        entry["Color"]["R"] = c.color.r;
+        entry["Color"]["G"] = c.color.g;
+        entry["Color"]["B"] = c.color.b;
+        entry["TextColor"]["R"] = c.textColor.r;
+        entry["TextColor"]["G"] = c.textColor.g;
+        entry["TextColor"]["B"] = c.textColor.b;
+    }
+    return json;
+}
+
+ofJson normalizedCustomGuis(ofJson json){
+    auto panels = field(json, "panels");
+    if(!panels.is_array()) return ofJson::array();
+    for(auto& panel : panels){
+        if(!panel.is_object()) continue;
+        panel.erase("windowState");
+        panel.erase("designMode");
+        if(panel.contains("layout") && panel["layout"].is_object()) panel["layout"].erase("zoom");
+    }
+    return panels;
+}
+
+ofJson normalizedCustomGuiSnapshots(ofJson json){
+    auto banks = field(json, "banks");
+    if(!banks.is_array()) return ofJson::array();
+    for(auto& bank : banks){
+        if(bank.is_object()) bank.erase("currentSnapshotId");
+    }
+    return banks;
+}
+
+void compareContainer(ofxOceanodeContainer& container, const std::string& savedFolder,
+                      const std::string& location, std::vector<GlobalMacroSaveChange>& changes);
+
+void compareNode(ofxOceanodeContainer& owner, ofxOceanodeNode& node,
+                 const std::string& savedFolder, const std::string& location,
+                 std::vector<GlobalMacroSaveChange>& changes){
+    auto& model = node.getNodeModel();
+    const std::string label = nodeLabel(node);
+    const ofJson saved = readJson(savedFolder + "/" + nodeKey(node) + ".json");
+    ofJson parameters = node.saveParametersToJson(false);
+    ofJson inspector;
+    node.saveInspectorParametersToJson(inspector);
+
+    if(parameters.is_object()){
+        for(auto it = parameters.begin(); it != parameters.end(); ++it){
+            if(owner.wasValueUserEdited(node, it.key(), it.value()))
+                addChange(changes, location, label, it.key(), field(saved, it.key()), it.value());
+        }
+    }
+    if(inspector.is_object()){
+        for(auto it = inspector.begin(); it != inspector.end(); ++it){
+            if(owner.wasValueUserEdited(node, it.key(), it.value(), true))
+                addChange(changes, location, label, "Inspector / " + it.key(),
+                          field(saved, it.key()), it.value());
+        }
+    }
+
+    ofJson modelData;
+    model.presetSave(modelData);
+    if(modelData.is_object()){
+        for(auto it = modelData.begin(); it != modelData.end(); ++it){
+            if(parameters.contains(it.key()) || inspector.contains(it.key())) continue;
+            // These presetSave fields describe running output, external window
+            // placement, or the current snapshot choice, not macro edits.
+            if(it.key() == "AllCurvesOutput" || it.key() == "ExtWindowRect" ||
+               it.key() == "ExtWindowMode" || it.key() == "SelectedSnapshotSlot") continue;
+            compareJson(changes, location, label, it.key(), field(saved, it.key()), it.value());
+        }
+    }
+
+    if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&model)){
+        const ofJson local = macro->isLocal();
+        const ofJson savedLocal = saved.is_object() ? ofJson(saved.value("LocalPreset", true)) : ofJson(true);
+        addChange(changes, location, label, "Local macro", savedLocal, local);
+        if(macro->isLocal()){
+            const ofJson savedOrder = field(saved, "RouterSortOrder");
+            const ofJson currentOrder = macro->getRouterSortOrder();
+            if(macro->wasRouterOrderUserEdited() &&
+               !(savedOrder.is_null() && currentOrder.empty())){
+                addChange(changes, location, label, "Router order", savedOrder, currentOrder);
+            }
+            const std::string childFolder = savedFolder + "/" + nodeKey(node);
+            // The local child is part of the owning global macro's definition.
+            compareContainer(*macro->getContainer(), childFolder,
+                             location + " > " + label, changes);
+        }else{
+            const ofJson oldMacro = field(saved, "Macro");
+            const ofJson currentMacro = macro->getCurrentMacroName();
+            addChange(changes, location, label, "Referenced macro", oldMacro, currentMacro);
+            const ofJson category = macro->getCurrentMacroCategory();
+            const ofJson oldCategory = field(saved, "CategoryStruct");
+            addChange(changes, location, label, "Macro category", oldCategory, category);
+            addChange(changes, location, label, "Referenced folder", field(saved, "MacroPath"),
+                      macro->getCurrentMacroPath());
+        }
+    }
+}
+
+void compareContainer(ofxOceanodeContainer& container, const std::string& savedFolder,
+                      const std::string& location, std::vector<GlobalMacroSaveChange>& changes){
+    const ofJson modules = readJson(savedFolder + "/modules.json");
+    std::map<std::string, ofxOceanodeNode*> liveNodes;
+    for(auto* node : container.getAllModules()){
+        const std::string key = nodeKey(*node);
+        liveNodes[key] = node;
+        auto& model = node->getNodeModel();
+        const std::string type = model.nodeName();
+        const std::string id = node->getIsPersistent()
+            ? ofToString(model.getNumIdentifier())
+            : ofToString(model.getNumIdentifier(), 2, '0');
+        const ofJson savedPosition = field(field(modules, type), id);
+        if(savedPosition.is_null()){
+            changes.push_back({location, nodeLabel(*node), "Node added", "(absent)", "present"});
+            continue;
+        }
+        if(!savedPosition.is_array() || savedPosition.size() < 2){
+            changes.push_back({location, nodeLabel(*node), "Saved position", preview(savedPosition), preview(nodePosition(*node))});
+        }else{
+            const ofJson savedXY = {savedPosition[0], savedPosition[1]};
+            addChange(changes, location, nodeLabel(*node), "Position", savedXY, nodePosition(*node));
+        }
+        compareNode(container, *node, savedFolder, location, changes);
+    }
+    if(modules.is_object()){
+        for(auto type = modules.begin(); type != modules.end(); ++type){
+            if(!type.value().is_object()) continue;
+            for(auto id = type.value().begin(); id != type.value().end(); ++id){
+                if(liveNodes.count(savedNodeKey(type.key(), id.key())) == 0){
+                    changes.push_back({location, type.key() + " [Node " + ofToString(ofToInt(id.key())) + "]",
+                                       "Node removed", "present", "(absent)"});
+                }
+            }
+        }
+    }
+
+    const auto savedLinks = savedConnections(readJson(savedFolder + "/connections.json"));
+    const auto liveLinks = currentConnections(container);
+    for(const auto& link : liveLinks){
+        if(savedLinks.count(link) == 0) changes.push_back({location, link, "Connection added", "(absent)", "present"});
+    }
+    for(const auto& link : savedLinks){
+        if(liveLinks.count(link) == 0) changes.push_back({location, link, "Connection removed", "present", "(absent)"});
+    }
+
+    compareJson(changes, location, "Comments", "Comments",
+                readJson(savedFolder + "/comments.json"), currentComments(container));
+    compareJson(changes, location, "Custom GUI", "Panels",
+                normalizedCustomGuis(readJson(savedFolder + "/custom_guis.json")),
+                normalizedCustomGuis(container.getCustomGuisJsonForReview()));
+    compareJson(changes, location, "Custom GUI snapshots", "Snapshots",
+                normalizedCustomGuiSnapshots(readJson(savedFolder + "/custom_gui_snapshots.json")),
+                normalizedCustomGuiSnapshots(container.getCustomGuiSnapshotsJsonForReview()));
+#ifdef OFXOCEANODE_USE_MIDI
+    compareJson(changes, location, "MIDI bindings", "Bindings",
+                readJson(savedFolder + "/midi.json"), container.getMidiBindingsJsonForReview());
+#endif
+}
+
+void visitMacros(ofxOceanodeContainer& container, const std::string& breadcrumb,
+                 std::set<ofxOceanodeNodeMacro*>& visited,
+                 std::vector<GlobalMacroSaveReview>& reviews){
+    for(auto* node : container.getAllModules()){
+        auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel());
+        if(macro == nullptr || !visited.insert(macro).second) continue;
+        const std::string instancePath = breadcrumb + " > " + nodeLabel(*node);
+        if(!macro->isLocal() && !macro->getCurrentMacroPath().empty()){
+            GlobalMacroSaveReview review;
+            review.instance = macro;
+            review.name = macro->getCurrentMacroName();
+            review.globalPath = canonicalMacroPath(macro->getCurrentMacroPath());
+            review.instancePath = instancePath;
+            compareContainer(*macro->getContainer(), review.globalPath, instancePath, review.changes);
+            const ofJson savedSort = readJson(review.globalPath + "/router_sort_order.json");
+            const ofJson currentSort = macro->getRouterSortOrder();
+            const ofJson oldOrder = field(savedSort, "RouterSortOrder");
+            if(macro->wasRouterOrderUserEdited() && !(oldOrder.is_null() && currentSort.empty()))
+                addChange(review.changes, instancePath, "Macro interface", "Router order", oldOrder, currentSort);
+            if(!review.changes.empty()) reviews.push_back(std::move(review));
+        }
+        visitMacros(*macro->getContainer(), instancePath, visited, reviews);
+    }
+}
+
+} // namespace
+
+std::vector<GlobalMacroSaveReview> collectGlobalMacroSaveReviews(ofxOceanodeContainer& root){
+    std::vector<GlobalMacroSaveReview> reviews;
+    std::set<ofxOceanodeNodeMacro*> visited;
+    visitMacros(root, "Canvas", visited, reviews);
+    std::sort(reviews.begin(), reviews.end(), [](const auto& a, const auto& b){
+        return a.instancePath < b.instancePath;
+    });
+    return reviews;
 }
