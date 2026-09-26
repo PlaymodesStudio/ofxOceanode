@@ -394,7 +394,93 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
 	    });
     }
 
+    clearUserEditedValues();
+
     return true;
+}
+
+namespace {
+std::string userEditedValueKey(ofxOceanodeNode& node, const std::string& field, bool inspector){
+    auto& model = node.getNodeModel();
+    return model.nodeName() + "_" + ofToString(model.getNumIdentifier()) +
+           (inspector ? "/inspector/" : "/parameter/") + field;
+}
+}
+
+void ofxOceanodeContainer::recordUserEditedValues(ofxOceanodeNode& node,
+                                                    const ofJson& before,
+                                                    const ofJson& after,
+                                                    bool inspector){
+    if(!before.is_object() || !after.is_object()) return;
+    for(auto it = after.begin(); it != after.end(); ++it){
+        auto old = before.find(it.key());
+        if(old == before.end() || *old == it.value()) continue;
+        if(!inspector){
+            bool skip = false;
+            for(auto& entry : node.getParameters()){
+                auto* parameter = dynamic_cast<ofxOceanodeAbstractParameter*>(entry.get());
+                if(parameter == nullptr || parameter->getEscapedName() != it.key()) continue;
+                skip = parameter->hasInConnection() ||
+                       (parameter->getFlags() & ofxOceanodeParameterFlags_DisableSavePreset);
+                break;
+            }
+            if(skip) continue;
+        }
+        userEditedValues[userEditedValueKey(node, it.key(), inspector)] = it.value();
+    }
+}
+
+bool ofxOceanodeContainer::wasValueUserEdited(ofxOceanodeNode& node,
+                                                const std::string& field,
+                                                const ofJson& current,
+                                                bool inspector) const{
+    auto it = userEditedValues.find(userEditedValueKey(node, field, inspector));
+    return it != userEditedValues.end() && it->second == current;
+}
+
+void ofxOceanodeContainer::clearUserEditedValues(){
+    userEditedValues.clear();
+}
+
+ofJson ofxOceanodeContainer::getCustomGuisJsonForReview() const{
+    return customGuiPanelsToJson(customGuiPanelsData);
+}
+
+ofJson ofxOceanodeContainer::getCustomGuiSnapshotsJsonForReview() const{
+    std::vector<CustomGuiSnapshotBank> sanitizedBanks;
+    for(auto bank : customGuiSnapshotBanks){
+        if(bank.customGuiId.empty()) continue;
+        const CustomGuiPanelData* panel = getCustomGuiPanelData(bank.customGuiId);
+        if(panel == nullptr) continue;
+        bank.customGuiName = panel->name;
+        bank.snapshots.erase(std::remove_if(bank.snapshots.begin(), bank.snapshots.end(), [](const CustomGuiSnapshotData& snapshot){
+            return snapshot.id.empty() || snapshot.parameterValues.empty();
+        }), bank.snapshots.end());
+        for(size_t i = 0; i < bank.snapshots.size(); ++i){
+            if(bank.snapshots[i].slot < 0) bank.snapshots[i].slot = static_cast<int>(i);
+        }
+        std::sort(bank.snapshots.begin(), bank.snapshots.end(), [](const CustomGuiSnapshotData& a, const CustomGuiSnapshotData& b){
+            return a.slot < b.slot;
+        });
+        if(!bank.snapshots.empty()) sanitizedBanks.push_back(std::move(bank));
+    }
+    return customGuiSnapshotBanksToJson(sanitizedBanks);
+}
+
+ofJson ofxOceanodeContainer::getMidiBindingsJsonForReview() const{
+#ifdef OFXOCEANODE_USE_MIDI
+    ofJson json;
+    for(const auto& bindingsPair : midiBindings){
+        const auto parts = ofSplitString(bindingsPair.first, "-|-\");
+        if(parts.size() < 2) continue;
+        for(size_t i = 0; i < bindingsPair.second.size(); ++i){
+            bindingsPair.second[i]->savePreset(json[parts[0]][parts[1]][i]);
+        }
+    }
+    return json;
+#else
+    return ofJson();
+#endif
 }
 
 void ofxOceanodeContainer::saveCustomGuis(const std::string& presetPath)

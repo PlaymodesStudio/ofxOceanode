@@ -162,21 +162,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 			ImGui::OpenPopup("Save Macro As :");
 			firstSaveAsOpen = true;
 		}else{
-			container->savePreset(presetManager.getCurrentMacroPath());
-				saveMacroLayout(presetManager.getCurrentMacroPath());
-					snapshotSystem.save(presetManager.isLocal(), presetManager.getCurrentMacroPath(), presetManager.getPresetPath(), nodeName(), getNumIdentifier());
-			// Save router sort order to the macro folder
-			{
-				string sortOrderFile = presetManager.getCurrentMacroPath() + "/router_sort_order.json";
-				ofJson sortJson;
-				if(!sortOrder.getOrder().empty()) {
-					ofJson sortArr = ofJson::array();
-					for(const auto& e : sortOrder.getOrder()) sortArr.push_back(e);
-					sortJson["RouterSortOrder"] = sortArr;
-				}
-				ofSavePrettyJson(sortOrderFile, sortJson);
-			}
-			ofxOceanodeShared::macroUpdated(presetManager.getCurrentMacroPath());
+			saveGlobalDefinition();
 		}
 	}
 	
@@ -574,6 +560,12 @@ void ofxOceanodeNodeMacro::syncParameterGroupToSortOrder() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::renderRouterSortInterface() {
+	struct UserEditGuard {
+		const std::vector<string>& order;
+		std::vector<string> before;
+		bool& edited;
+		~UserEditGuard(){ if(order != before) edited = true; }
+	} userEditGuard{sortOrder.getOrder(), sortOrder.getOrder(), routerOrderUserEdited};
 	const float zoomLevel = ofxOceanodeShared::getZoomLevel();
 //	ImGui::SeparatorText("Router Management");
 	ImGui::TextDisabled("Drag to reorder, double-click to rename.");
