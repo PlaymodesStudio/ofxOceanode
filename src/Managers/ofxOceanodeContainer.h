@@ -241,6 +241,16 @@ public:
     const std::unordered_map<string, ofxOceanodeNode*> & getParameterGroupNodesMap(){return parameterGroupNodesMap;};
 	
     vector<ofxOceanodeComment> &getComments(){return comments;};
+    // Records value changes made while an editor control is being drawn.
+    // Runtime updates outside those controls do not enter this set.
+    void recordUserEditedValues(ofxOceanodeNode& node, const ofJson& before,
+                                const ofJson& after, bool inspector = false);
+    bool wasValueUserEdited(ofxOceanodeNode& node, const std::string& field,
+                            const ofJson& current, bool inspector = false) const;
+    void clearUserEditedValues();
+    ofJson getCustomGuisJsonForReview() const;
+    ofJson getCustomGuiSnapshotsJsonForReview() const;
+    ofJson getMidiBindingsJsonForReview() const;
 	vector<int> getSelectedCommentIndices();
 	void deselectAllComments();
     
@@ -305,6 +315,7 @@ private:
     std::string customGuiStoragePath;
     bool customGuisDirty = false;
     bool customGuiParametersNeedPruning = false;
+    std::unordered_map<std::string, ofJson> userEditedValues;
     bool customGuiSnapshotsDirty = false;
     std::string pendingScopeSavePath;
     std::uint64_t pendingScopeSaveDeadlineMillis = 0;

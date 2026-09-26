@@ -9,6 +9,8 @@
 #define ofxOceanodePresetsController_h
 
 #include "ofxOceanodeBaseController.h"
+#include "GlobalMacroSaveReview.h"
+#include <memory>
 
 class ofxOceanodePresetsController: public ofxOceanodeBaseController{
 public:
@@ -24,10 +26,12 @@ public:
     
 private:
     void drawPresetList();
-    void createPreset(string name);
     
     void loadPreset(string name, string bank);
     void savePreset(string name, string bank);
+    void beginSavePreset(string name, string bank, bool createNew);
+    void finishSavePreset();
+    void drawGlobalMacroSaveReview();
     void deletePreset(string name, string bank);
     
     map<string, vector<string>> bankPresets;
@@ -35,13 +39,28 @@ private:
     vector<string> banks;
     int currentBank;
 
-    enum class PopupRequest { None, NewBank, SaveAs, Delete };
+    enum class PopupRequest { None, NewBank, SaveAs, Delete, ReviewSave, SaveResult };
     PopupRequest popupRequest = PopupRequest::None;
     char bankNameBuffer[256] = {};
     char presetNameBuffer[256] = {};
     int saveAsBank = 0;
     string deleteBankName;
     string deletePresetName;
+    struct PendingSave {
+        string name;
+        string bank;
+        bool createNew = false;
+        bool writing = false;
+        size_t reviewIndex = 0;
+        size_t nextWriteIndex = 0;
+        string warning;
+        vector<GlobalMacroSaveReview> reviews;
+        vector<bool> saveChoices;
+        vector<string> savedMacros;
+        vector<string> skippedMacros;
+    };
+    std::unique_ptr<PendingSave> pendingSave;
+    string saveResultText;
 
     bool newPresetCreated;
     int loadPresetInNextUpdate;
