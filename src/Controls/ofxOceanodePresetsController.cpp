@@ -246,6 +246,9 @@ void ofxOceanodePresetsController::drawPopups(){
 
     drawGlobalMacroSaveReview();
 
+    const float resultWidth = std::min(620.0f, ImGui::GetIO().DisplaySize.x * 0.85f);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(resultWidth, 0.0f),
+                                        ImVec2(resultWidth, ImGui::GetIO().DisplaySize.y * 0.85f));
     if(ImGui::BeginPopupModal("Preset Save Result", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
         ImGui::TextWrapped("%s", saveResultText.c_str());
         if(ImGui::Button("OK") || ImGui::IsKeyPressed(ImGuiKey_Enter)) ImGui::CloseCurrentPopup();
@@ -875,8 +878,10 @@ void compareContainer(ofxOceanodeContainer& container, const std::string& savedF
                 normalizedCustomGuiSnapshots(readJson(savedFolder + "/custom_gui_snapshots.json")),
                 normalizedCustomGuiSnapshots(container.getCustomGuiSnapshotsJsonForReview()));
 #ifdef OFXOCEANODE_USE_MIDI
+    ofJson savedMidi = readJson(savedFolder + "/midi.json");
+    if(savedMidi.is_null()) savedMidi = ofJson::object();
     compareJson(changes, location, "MIDI bindings", "Bindings",
-                readJson(savedFolder + "/midi.json"), container.getMidiBindingsJsonForReview());
+                savedMidi, container.getMidiBindingsJsonForReview());
 #endif
 }
 
