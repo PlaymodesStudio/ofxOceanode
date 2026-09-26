@@ -412,6 +412,8 @@ void ofxOceanodeContainer::recordUserEditedValues(ofxOceanodeNode& node,
                                                     const ofJson& after,
                                                     bool inspector){
     if(!before.is_object() || !after.is_object()) return;
+    ofJson saveableValues;
+    bool readSaveableValues = false;
     for(auto it = after.begin(); it != after.end(); ++it){
         auto old = before.find(it.key());
         if(old == before.end() || *old == it.value()) continue;
@@ -426,7 +428,15 @@ void ofxOceanodeContainer::recordUserEditedValues(ofxOceanodeNode& node,
             }
             if(skip) continue;
         }
-        userEditedValues[userEditedValueKey(node, it.key(), inspector)] = it.value();
+        if(!readSaveableValues){
+            if(inspector) node.saveInspectorParametersToJson(saveableValues);
+            else saveableValues = node.saveParametersToJson(false);
+            readSaveableValues = true;
+        }
+        if(!saveableValues.is_object()) continue;
+        auto savedField = saveableValues.find(it.key());
+        if(savedField == saveableValues.end()) continue;
+        userEditedValues[userEditedValueKey(node, it.key(), inspector)] = *savedField;
     }
 }
 
