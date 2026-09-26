@@ -471,7 +471,7 @@ ofJson ofxOceanodeContainer::getMidiBindingsJsonForReview() const{
 #ifdef OFXOCEANODE_USE_MIDI
     ofJson json;
     for(const auto& bindingsPair : midiBindings){
-        const auto parts = ofSplitString(bindingsPair.first, "-|-\");
+        const auto parts = ofSplitString(bindingsPair.first, "-|-");
         if(parts.size() < 2) continue;
         for(size_t i = 0; i < bindingsPair.second.size(); ++i){
             bindingsPair.second[i]->savePreset(json[parts[0]][parts[1]][i]);
