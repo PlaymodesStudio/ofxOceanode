@@ -469,7 +469,7 @@ ofJson ofxOceanodeContainer::getCustomGuiSnapshotsJsonForReview() const{
 
 ofJson ofxOceanodeContainer::getMidiBindingsJsonForReview() const{
 #ifdef OFXOCEANODE_USE_MIDI
-    ofJson json;
+    ofJson json = ofJson::object();
     for(const auto& bindingsPair : midiBindings){
         const auto parts = ofSplitString(bindingsPair.first, "-|-");
         if(parts.size() < 2) continue;
