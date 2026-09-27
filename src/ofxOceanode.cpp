@@ -51,6 +51,9 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<chaoticOscillator>("Generators");
     nodeRegistry->registerModel<phasor>("Generators");
     nodeRegistry->registerModel<lfoTrack>("Generators");
+#ifdef OFXOCEANODE_USE_MIDI
+    nodeRegistry->registerModel<midiClockNode>("Generators");
+#endif
     nodeRegistry->registerModel<simpleNumberGenerator>("Generators");
     nodeRegistry->registerModel<simpleNormalizedNumberGenerator>("Generators");
     nodeRegistry->registerModel<counter>("Generators");

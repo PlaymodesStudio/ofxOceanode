@@ -10,6 +10,7 @@
 #include <vector>
 
 class ofxOceanodeContainer;
+class ofxOceanodeAbstractParameter;
 class ofxOceanodeTimelineManager;
 struct ofxOceanodeTimelineTrack;
 struct ofxOceanodeTimelineClip;
@@ -75,6 +76,9 @@ private:
                                  const std::string& trackId,
                                  const std::string& clipId,
                                  const std::string& filePath);
+    // Shortens a Wave clip from the left (cuts there and drops the left part).
+    bool trimWaveClipStart(ofxOceanodeTimelineManager& timeline, const std::string& trackId,
+                           const std::string& clipId, double newStartBeat);
     bool splitWaveClipAtPlayhead(ofxOceanodeTimelineManager& timeline,
                                  const std::string& trackId,
                                  const std::string& clipId,
@@ -143,7 +147,7 @@ private:
     int waveVolumeValuePointIndex = -1;   // right-click "Set value" on a volume point
     float waveVolumeNumericValue = 1.0f;
 
-    enum class ClipDragMode { None, Move, Resize, Stretch, Repeat };
+    enum class ClipDragMode { None, Move, Resize, Stretch, Repeat, TrimStart };
     ClipDragMode clipDragMode = ClipDragMode::None;
     std::string draggingTrackId;
     std::string draggingClipId;
@@ -151,6 +155,18 @@ private:
     double dragInitialContentDuration = 4.0;
     double dragInitialContentStretch = 1.0;
     float dragTimelineOriginX = 0.0f;
+    // A press only becomes a drag once the mouse has moved: a plain click
+    // (or the double-click that opens the editor) must not change the clip.
+    float clipDragStartMouseX = 0.0f;
+    bool clipDragCommitted = false;
+    // Left-edge trim: previewed while dragging, applied on release.
+    double trimPreviewBeat = 0.0;
+    float dragRowTop = 0.0f, dragRowBottom = 0.0f;
+    // Screen rows of the clip editor drawn this frame (a click there is not a
+    // click on empty timeline space).
+    float editorScreenTop = 0.0f, editorScreenBottom = 0.0f;
+    bool editorScreenValid = false;
+    bool lastClickInEditor = false; // Delete then edits the editor's content, not the clip
     // Ephemeral multi-clip selection built with Shift+click on a clip (see
     // handleClip in the .cpp). This is the input to the "Group" button/menu
     // item and to a plain drag that keeps multiple selected clips moving
@@ -189,6 +205,43 @@ private:
     std::string clipDeletionTrackId;
     std::string clipDeletionClipId;
     bool requestWaveSplit = false;
+    std::vector<std::string> midiPortChoices; // MIDI clock sync popup
+
+    // ---- Markers ----
+    std::string markerDragId;          // pressed marker (a click jumps, a drag moves it)
+    float markerDragStartX = 0.0f;
+    bool markerDragMoved = false;
+    std::string markerMenuId;          // marker under a right-click ("" = empty ruler)
+    double markerMenuBeat = 0.0;
+    std::string markerRenameId;
+    char markerRenameBuffer[128] = "";
+    bool requestMarkerRename = false;
+    // Jumps (marker clicks) can wait for the next bar while playing.
+    bool quantizeJumps = false;
+    bool pendingJump = false;
+    double pendingJumpTarget = 0.0;
+    double pendingJumpAt = 0.0;
+    uint64_t pendingJumpLoopCount = 0;
+    void jumpToBeat(double beat);
+    void drawMarkerRenamePopup(ofxOceanodeTimelineManager& timeline);
+
+    // ---- View ----
+    bool followPlayhead = false;       // scroll to keep the playhead in view while playing
+    bool requestZoomToFit = false;     // fit every clip and marker in the visible width
+    std::vector<double> tapTimes;      // tap tempo (seconds)
+
+    // ---- Clip box selection ----
+    struct ClipScreenRect { std::string trackId, clipId; float x1, y1, x2, y2; };
+    std::vector<ClipScreenRect> clipScreenRects; // clips drawn this frame
+    bool marqueePending = false;       // pressed on empty track space
+    bool marqueeActive = false;        // dragged far enough: selecting
+    float marqueeStartX = 0.0f, marqueeStartY = 0.0f;
+    bool marqueeAdditive = false;
+    double clipMenuBeat = 0.0;         // beat under the right-click that opened a clip menu
+    double clipSplitBeat = 0.0;
+    bool requestClipSplit = false;
+    std::string clipSplitTrackId;
+    std::string clipSplitClipId;
     std::string waveSplitTrackId;
     std::string waveSplitClipId;
     // Picking an audio file opens a blocking OS dialog. Asking for one from
@@ -268,6 +321,40 @@ private:
     std::string bindingDragId;
     float bindingDragStartY = 0.0f;
     bool bindingDragActive = false;
+    // Dragging a parameter row's bottom edge to change its height.
+    std::string rowResizeTrackId;
+    std::string rowResizeBindingId;
+    float rowResizeStartY = 0.0f;
+    float rowResizeStartHeight = 0.0f;
+    // The clip editor opens right below this parameter row (the row it was opened from).
+    std::string editorAnchorBindingId;
+    // Binding of the row whose clips are being handled (empty for single-row tracks).
+    std::string currentRowBindingId;
+
+    // "Piano Roll" dialog: picks the pitch/gate/velocity parameters of a
+    // note group (a new one, or retargeting an existing one).
+    struct NoteRoleCandidate {
+        std::string path;
+        std::string label;       // "Node / Parameter"
+        bool sameNode = false;   // on the node the dialog was opened from
+        ofxOceanodeAbstractParameter* parameter = nullptr;
+    };
+    std::vector<NoteRoleCandidate> noteSetupCandidates;
+    std::string noteSetupRolePaths[3];        // pitch, gate, velocity
+    char noteSetupName[128] = "";
+    char noteSetupFilter[64] = "";
+    std::string noteSetupTrackId;             // empty: a new track
+    bool noteSetupTrackFixed = false;         // opened from a track row
+    std::string noteSetupEditGroupId;         // retargeting this group
+    double noteSetupClipStart = 0.0;
+    double noteSetupClipDuration = 4.0;
+    bool requestNoteSetupPopup = false;
+    // source: the parameter it was opened from (its node's parameters are
+    // offered first and used to guess the roles). trackId empty: choose.
+    void openNoteGroupSetup(ofxOceanodeTimelineManager& timeline, ofxOceanodeAbstractParameter* source,
+                            const std::string& trackId, const std::string& editGroupId,
+                            double clipStart = -1.0, double clipDuration = -1.0);
+    void drawNoteGroupSetupPopup(ofxOceanodeTimelineManager& timeline);
     std::string lfoDragLaneId;
     int lfoDragPointIndex = -1;
     // LFO editor point selection (Delete/Backspace or right-click > Delete point)

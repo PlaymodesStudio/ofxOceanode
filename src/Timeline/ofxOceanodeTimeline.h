@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <deque>
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <string>
 #include <utility>
@@ -161,6 +162,7 @@ struct ofxOceanodeTimelineParameterBinding {
     ofxOceanodeTimelineLaneType laneType = ofxOceanodeTimelineLaneType::Curve; // default clip type for new parameters
     bool bypass = false;
     bool missingTarget = false;
+    float rowHeight = 28.0f; // timeline row height in pixels (resizable from the row's bottom edge)
     // A live override takes priority over whatever clip automation computes
     // for this binding's parameter, for as long as it's set. Used by the
     // piano roll's keyboard strip so clicking a key sounds a note
@@ -199,6 +201,9 @@ struct ofxOceanodeTimelineLane {
     bool probabilityEnabled = true;
     // Probability: roll the gate, Always: ignore probability, Mute: no output.
     std::string behavior = "Probability";
+    // Seed of the probability rolls (steps, notes): each lane gets its own at
+    // creation, so lanes don't roll together; change it for another pattern.
+    int probabilitySeed = 0;
     int pianoLowPitch = 36;
     int pianoHighPitch = 84;
     bool pianoSnapToGrid = true;
@@ -365,10 +370,36 @@ namespace ofxOceanodeTimelineLfo {
     // Evaluates the complete LFO result in normalized 0..1 space. The shape
     // is intentionally shared by playback and the editor's result view.
     float evaluate(const ofxOceanodeTimelineClip& clip, double sourceBeat);
+    // Oscillator cycles accumulated from source beat 0 (integrated frequency).
+    double cyclesAt(const ofxOceanodeTimelineClip& clip, double sourceBeat);
     float evaluateParameter(const ofxOceanodeTimelineClip& clip,
                             const std::string& parameter,
                             double sourceBeat, float fallback);
 }
+
+// A note group shows the parameters a piano roll drives (pitch, gate,
+// velocity) as a single timeline row. The member bindings stay ordinary
+// bindings of the track, kept adjacent in its binding order; every piano-roll
+// lane that uses a member follows the group's roles.
+struct ofxOceanodeTimelineNoteGroup {
+    std::string id;
+    std::string name;
+    std::string pitchBindingId;
+    std::string gateBindingId;
+    std::string velocityBindingId;
+    bool expanded = false;       // show the member rows under the group row
+    float rowHeight = 48.0f;     // height of the group row in the timeline
+    std::vector<std::string> members() const {
+        std::vector<std::string> ids;
+        for(const auto* id : {&pitchBindingId, &gateBindingId, &velocityBindingId})
+            if(!id->empty()) ids.push_back(*id);
+        return ids;
+    }
+    bool contains(const std::string& bindingId) const {
+        return !bindingId.empty() &&
+            (pitchBindingId == bindingId || gateBindingId == bindingId || velocityBindingId == bindingId);
+    }
+};
 
 struct ofxOceanodeTimelineTrack {
     std::string id;
@@ -377,6 +408,7 @@ struct ofxOceanodeTimelineTrack {
     bool collapsed = false;
     std::vector<ofxOceanodeTimelineParameterBinding> bindings;
     std::vector<ofxOceanodeTimelineClip> clips;
+    std::vector<ofxOceanodeTimelineNoteGroup> noteGroups;
     // A Wave Track is created via ofxOceanodeTimelineManager::createWaveTrack
     // and never gets any bindings -- it isn't automation for a parameter at
     // all, just audio clips (each carrying its own file) arranged on the
@@ -409,6 +441,14 @@ struct ofxOceanodeTimelineTrack {
 // track-independent clip would be the "real" version of a combined clip,
 // but is a much bigger restructure than what grouping already-existing
 // clips needs.)
+// A named position on the timeline (a cue): shown on the ruler, jumped to
+// by clicking it.
+struct ofxOceanodeTimelineMarker {
+    std::string id;
+    std::string name;
+    double beat = 0.0;
+};
+
 struct ofxOceanodeTimelineClipGroup {
     std::string id;
     // (trackId, clipId) pairs, in the order they were grouped -- not
@@ -465,6 +505,10 @@ public:
     // automation, and applies live piano-roll pitch ranges. Call once per
     // frame, before node updates.
     void evaluateAutomation();
+    // Parameter lookups by path are cached between these two calls (while
+    // no node can be added or deleted). Nothing is kept across frames.
+    void beginParameterCache();
+    void endParameterCache();
     // Re-applies the values computed by the last evaluateAutomation() call,
     // without recomputing them. Intended to be called again after node
     // updates, so a node that writes back to its own parameter during
@@ -504,6 +548,39 @@ public:
     bool setBindingMode(const std::string& trackId, const std::string& bindingId, ofxOceanodeTimelineAutomationMode mode);
     bool setBindingClamp(const std::string& trackId, const std::string& bindingId, bool clampToParameterRange);
     ofxOceanodeTimelineParameterBinding* getBinding(const std::string& trackId, const std::string& bindingId);
+    // Reorders a track's bindings to the given id order (ids not listed keep
+    // their relative order at the end). Note groups are kept together.
+    bool setBindingOrder(const std::string& trackId, const std::vector<std::string>& orderedBindingIds);
+
+    // Note groups: a piano roll's pitch/gate/velocity parameters as one row.
+    // A binding belongs to at most one group; assigning it to a group takes
+    // it out of any other.
+    std::string createNoteGroup(const std::string& trackId, const std::string& name,
+                                const std::string& pitchBindingId, const std::string& gateBindingId,
+                                const std::string& velocityBindingId);
+    bool setNoteGroupRoles(const std::string& trackId, const std::string& groupId,
+                           const std::string& pitchBindingId, const std::string& gateBindingId,
+                           const std::string& velocityBindingId);
+    bool renameNoteGroup(const std::string& trackId, const std::string& groupId, const std::string& name);
+    // removeBindings: also remove the member parameters from the timeline;
+    // otherwise they become ordinary rows again.
+    bool removeNoteGroup(const std::string& trackId, const std::string& groupId, bool removeBindings);
+    ofxOceanodeTimelineNoteGroup* getNoteGroup(const std::string& trackId, const std::string& groupId);
+    static const ofxOceanodeTimelineNoteGroup* findNoteGroupForBinding(const ofxOceanodeTimelineTrack& track,
+                                                                        const std::string& bindingId);
+    // Creates a clip with one piano-roll lane driving the group's roles; the
+    // key range follows the pitch parameter's range when it is a note range.
+    std::string createNoteGroupClip(const std::string& trackId, const std::string& groupId,
+                                    const std::string& requestedName, double startBeat, double durationBeats,
+                                    std::string* laneIdOut = nullptr);
+    // "Add to Timeline as Piano Roll..." from a parameter's right-click menu:
+    // queued here, shown by the timeline controller (like track renames).
+    void requestNoteGroupSetup(ofxOceanodeAbstractParameter* parameter) { pendingNoteGroupSetupParameter = parameter; }
+    ofxOceanodeAbstractParameter* consumePendingNoteGroupSetup() {
+        auto* parameter = pendingNoteGroupSetupParameter;
+        pendingNoteGroupSetupParameter = nullptr;
+        return parameter;
+    }
     const ofxOceanodeTimelineParameterBinding* getBinding(const std::string& trackId, const std::string& bindingId) const;
 
     std::string createClip(const std::string& trackId,
@@ -523,6 +600,14 @@ public:
     // control existed), initialised to the control's default.
     void ensureLfoLanes(const std::string& trackId, const std::string& clipId);
     bool renameClip(const std::string& trackId, const std::string& clipId, const std::string& requestedName);
+    // Cuts an automation or LFO clip in two at a timeline beat; the right
+    // part becomes a new clip (returned) and both halves play exactly what
+    // the original played. Repeating clips are cut anywhere (the right part
+    // keeps repeating from the phase it was cut at). Not for Wave clips.
+    std::string splitClip(const std::string& trackId, const std::string& clipId, double timelineBeat);
+    // Moves a clip's start, keeping its end and what plays under it (the left
+    // part is dropped). Growing to the left works for repeating clips only.
+    bool trimClipStart(const std::string& trackId, const std::string& clipId, double newStartBeat);
     bool removeClip(const std::string& trackId, const std::string& clipId);
     ofxOceanodeTimelineClip* getClip(const std::string& trackId, const std::string& clipId);
     const ofxOceanodeTimelineClip* getClip(const std::string& trackId, const std::string& clipId) const;
@@ -627,6 +712,14 @@ public:
 
     bool isLoopEnabled() const { return loopEnabled; }
     bool didLoopWrapThisFrame() const { return loopWrappedThisFrame; }
+    // ---- Markers ----
+    const std::vector<ofxOceanodeTimelineMarker>& getMarkers() const { return markers; }
+    std::string addMarker(double beat, const std::string& name = std::string());
+    bool removeMarker(const std::string& markerId);
+    bool moveMarker(const std::string& markerId, double beat);
+    bool renameMarker(const std::string& markerId, const std::string& name);
+    const ofxOceanodeTimelineMarker* getMarker(const std::string& markerId) const;
+
     void setLoopEnabled(bool enabled) {
         if(loopEnabled != enabled) hasEvaluatedTransportBeat = false;
         loopEnabled = enabled;
@@ -709,7 +802,7 @@ private:
                             std::vector<double>& outBeats) const;
     double beatAfterSeconds(double startBeat, double seconds, float fallbackBpm) const;
     void runScheduler(const ofxOceanodeTransportState& transport, bool loopWrappedThisFrame);
-    void sendScheduleCorrections(uint64_t nowUs);
+    void sendScheduleCorrections(uint64_t nowUs, const std::set<std::string>* onlyPaths = nullptr);
 
     struct ScheduledPathState {
         bool initialized = false;
@@ -725,6 +818,7 @@ private:
     ofxOceanodeContainer* container = nullptr;
     std::vector<ofxOceanodeTimelineTrack> tracks;
     std::vector<ofxOceanodeTimelineClipGroup> clipGroups;
+    std::vector<ofxOceanodeTimelineMarker> markers; // sorted by beat
     ofxOceanodeTimelineViewState viewState;
     uint64_t nextTrackNumber = 1;
     uint64_t nextBindingNumber = 1;
@@ -733,10 +827,40 @@ private:
     uint64_t nextGroupNumber = 1;
     std::string pendingTrackRenameId;
     bool pendingTrackRenameIsNew = false;
+    mutable std::string failedLoadPath; // timeline.json that could not be read
+    // Per-update cache of parameter lookups by path (see update()).
+    ofxOceanodeAbstractParameter* findParameterCached(const std::string& path) const;
+    mutable std::unordered_map<std::string, ofxOceanodeAbstractParameter*> parameterCache;
+    bool parameterCacheActive = false;
+    // beatToSeconds(): seconds at each tempo point (see there).
+    mutable std::vector<double> tempoSecondsAtPoint;
+    mutable uint64_t tempoSecondsCacheSignature = 0;
+    mutable bool tempoSecondsCacheValid = false;
+    // A piano roll narrows its pitch parameter's range to the keys it shows;
+    // the original range is kept here and restored when no piano roll drives
+    // that parameter any more.
+    struct SavedParameterRange {
+        std::string valueType;
+        float floatMin = 0.0f, floatMax = 0.0f;
+        int intMin = 0, intMax = 0;
+        std::vector<float> floatVectorMin, floatVectorMax;
+        std::vector<int> intVectorMin, intVectorMax;
+    };
+    mutable std::map<std::string, SavedParameterRange> savedPianoRanges;
+    ofxOceanodeAbstractParameter* pendingNoteGroupSetupParameter = nullptr;
+    // Drops dangling roles, removes empty groups and keeps each group's
+    // members adjacent (in pitch, gate, velocity order) in the binding list.
+    void normalizeNoteGroups(ofxOceanodeTimelineTrack& track);
+    // The two halves of a clip cut at a timeline beat (see splitClip).
+    bool computeClipSplit(const ofxOceanodeTimelineClip& original, double timelineBeat,
+                          ofxOceanodeTimelineClip& left, ofxOceanodeTimelineClip& right) const;
+    // Points every piano-roll lane that uses any of affectedBindingIds at the group's roles.
+    void syncNoteGroupLanes(ofxOceanodeTimelineTrack& track, const ofxOceanodeTimelineNoteGroup& group,
+                            const std::vector<std::string>& affectedBindingIds);
     std::map<std::string, std::vector<std::pair<ofxOceanodeTimelineAutomationMode, std::string>>> activeAutomationValues;
     bool bpmAutomationEnabled = false;
     bool bpmLaneCollapsed = true;
-    bool bpmLaneVisible = true;
+    bool bpmLaneVisible = false; // hidden by default; toggled from the ruler
     float bpmMinimum = 20.0f;
     float bpmMaximum = 300.0f;
     std::vector<ofxOceanodeTimelineCurvePoint> bpmAutomationPoints;
@@ -752,12 +876,24 @@ private:
     // while the audio provider is being resynchronised.
     bool hasEvaluatedTransportBeat = false;
     double lastEvaluatedTransportBeat = 0.0;
+    // Back-to-back repeated notes/steps/gate blocks (one ends exactly where
+    // the next, equal one starts) get a short gate-off at the join so they
+    // retrigger instead of merging into one long gate (overlapping ones do
+    // merge). In timeline beats; long enough (>= 1.2 frames, >= 10 ms) that
+    // the per-frame path always sees it, and the scheduler uses the same value.
+    double retriggerGapBeats = 1.0 / 48.0;
     int timeSignatureNumerator = 4;
     int timeSignatureDenominator = 4;
     bool schedulingEnabled = true;
     double schedulingLookaheadMs = 120.0;
     bool hasScheduleCursor = false;
     double scheduleCursorBeat = 0.0;
+    // Loop pass the cursor belongs to (it can already be in the next pass,
+    // when events past the loop end were scheduled before the wrap).
+    uint64_t scheduleCursorPass = 0;
+    uint64_t lastSeenLoopCount = 0;
+    bool hasSeenLoopCount = false;
+    bool scheduleUsesTempoMap = true; // false while an external clock sets the tempo
     uint64_t lastSeenTransportGeneration = 0;
     bool hasSeenTransportGeneration = false;
     std::map<std::string, ScheduledPathState> scheduledPaths;

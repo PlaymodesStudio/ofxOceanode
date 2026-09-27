@@ -77,6 +77,13 @@ namespace ofxOceanodeTimeUtils {
         return frameState.current.beatPosition + epsilon < frameState.previous.beatPosition;
     }
 
+    // The transport wrapped at its loop end this frame (continuous playback,
+    // not a seek: the position went from before loopEnd to after loopStart).
+    inline bool didLoopWrap(const ofxOceanodeFrameTransportState &frameState) {
+        return frameState.previous.loopCount != frameState.current.loopCount &&
+               !didGenerationChange(frameState);
+    }
+
     inline bool didTransportDiscontinuity(const ofxOceanodeFrameTransportState &frameState, double epsilon = StepEpsilon) {
         return didGenerationChange(frameState) || didBeatRewind(frameState, epsilon);
     }

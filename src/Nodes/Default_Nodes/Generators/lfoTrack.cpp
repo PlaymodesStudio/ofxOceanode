@@ -77,12 +77,26 @@ void lfoTrack::update(ofEventArgs &a) {
     valueOut = sample.value;
     if(activeOut.get() != sample.active) activeOut = sample.active;
 
-    // Reset on each wrap during continuous forward playback only (not on seeks,
-    // stop or loop jumps), so scrubbing does not spray triggers.
-    const bool continuous = !ofxOceanodeTimeUtils::didTransportDiscontinuity(frameState) &&
-        frameState.current.beatPosition > frameState.previous.beatPosition;
-    if(hasLastCycle && continuous && sample.active && sample.cycle > lastCycle) {
-        resetOut.trigger();
+    // Reset on each wrap during continuous forward playback only (not on seeks
+    // or stop), so scrubbing does not spray triggers. A loop wrap is continuous:
+    // it fires when a cycle completes before the loop end, or the loop restarts
+    // on the start of a cycle, or a cycle completes after the loop start.
+    auto& timeline = hostContainer->getTimelineManager();
+    if(ofxOceanodeTimeUtils::didLoopWrap(frameState)) {
+        const auto& state = frameState.current;
+        const double eps = ofxOceanodeTimeUtils::StepEpsilon;
+        const auto beforeEnd = timeline.evaluateLfoTrack(selectedTrackId, state.loopEndBeat - eps);
+        const auto atStart = timeline.evaluateLfoTrack(selectedTrackId, state.loopStartBeat);
+        const bool fire = (hasLastCycle && beforeEnd.active && beforeEnd.cycle > lastCycle) ||
+            (atStart.active && atStart.phase <= 1e-4f) ||
+            (sample.active && atStart.active && sample.cycle > atStart.cycle);
+        if(fire) resetOut.trigger();
+    } else {
+        const bool continuous = !ofxOceanodeTimeUtils::didTransportDiscontinuity(frameState) &&
+            frameState.current.beatPosition > frameState.previous.beatPosition;
+        if(hasLastCycle && continuous && sample.active && sample.cycle > lastCycle) {
+            resetOut.trigger();
+        }
     }
     lastCycle = sample.cycle;
     hasLastCycle = true;

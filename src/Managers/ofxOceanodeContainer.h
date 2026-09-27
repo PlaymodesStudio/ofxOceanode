@@ -32,6 +32,7 @@ class ofxOceanodeCustomGuiPanel;
 
 #ifdef OFXOCEANODE_USE_MIDI
 class ofxOceanodeAbstractMidiBinding;
+class ofxOceanodeMidiClock;
 class ofxMidiIn;
 class ofxMidiOut;
 class ofxMidiListener;
@@ -181,6 +182,13 @@ public:
 #endif
     
 #ifdef OFXOCEANODE_USE_MIDI
+    // Built-in transport sync to an external MIDI clock (root container only;
+    // nullptr in macro containers). Settings are saved with the project.
+    ofxOceanodeMidiClock* getMidiClockSync() { return midiClockSync.get(); }
+    void setMidiClockSyncEnabled(bool enabled);
+    bool isMidiClockSyncEnabled() const { return midiClockSyncEnabled; }
+    void setMidiClockSyncPort(const std::string& port);
+
     void setIsListeningMidi(bool b);
     shared_ptr<ofxOceanodeAbstractMidiBinding> createMidiBinding(ofxOceanodeAbstractParameter &p, bool isPersistent = false, int _id = -1);
     bool removeLastMidiBinding(ofxOceanodeAbstractParameter &p);
@@ -330,6 +338,8 @@ private:
     std::unique_ptr<ofxOceanodeTimelineManager> timelineManager;
     
 #ifdef OFXOCEANODE_USE_MIDI
+    std::unique_ptr<ofxOceanodeMidiClock> midiClockSync;
+    bool midiClockSyncEnabled = false;
     bool isListeningMidi;
     map<string, vector<shared_ptr<ofxOceanodeAbstractMidiBinding>>> midiBindings;
     map<string, vector<shared_ptr<ofxOceanodeAbstractMidiBinding>>> persistentMidiBindings;

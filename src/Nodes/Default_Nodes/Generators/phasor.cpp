@@ -163,10 +163,27 @@ double phasor::calculateTransportLockedCycles(double beatPosition, size_t index)
 }
 
 // Transport-locked equivalent of basePhasor::phasorCycle: fire Reset when phasor 0
-// completes a cycle during continuous forward playback. Seeks / stop / loop-wraps
-// bump the transport generation (or rewind) and are deliberately ignored, so
+// completes a cycle during continuous forward playback (loop wraps included).
+// Seeks / stop bump the transport generation and are deliberately ignored, so
 // scrubbing does not spray triggers.
 void phasor::checkTransportLockedCycle(const ofxOceanodeFrameTransportState &frameState){
+    if(ofxOceanodeTimeUtils::didLoopWrap(frameState)) {
+        // Playback went [previous .. loopEnd) then [loopStart .. current]: fire
+        // if a cycle completes in either part, or the loop restarts on a cycle start.
+        const auto& state = frameState.current;
+        const double eps = ofxOceanodeTimeUtils::StepEpsilon;
+        auto cycleAt = [&](double beat) { return std::floor(calculateTransportLockedCycles(beat, 0) + eps); };
+        const double startCycles = calculateTransportLockedCycles(state.loopStartBeat, 0);
+        const bool startsOnCycle = std::abs(startCycles - std::round(startCycles)) <= 1e-4;
+        const bool fire = cycleAt(state.loopEndBeat - eps) > cycleAt(frameState.previous.beatPosition) ||
+            cycleAt(state.beatPosition) > cycleAt(state.loopStartBeat) || startsOnCycle;
+        if(fire && (loop_Param || cycleAt(state.beatPosition) < 1.0)) {
+            selfTrigger = true;
+            resetPhase_Param.trigger();
+            selfTrigger = false;
+        }
+        return;
+    }
     if(ofxOceanodeTimeUtils::didTransportDiscontinuity(frameState)) return;
     if(frameState.current.beatPosition <= frameState.previous.beatPosition) return;
 

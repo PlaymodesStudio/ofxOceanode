@@ -30,7 +30,7 @@ void ofxOceanodeTime::setup(std::shared_ptr<ofxOceanodeContainer> c, std::shared
     
     parameters.add(isPlaying.set("Is Playing", false));
     parameters.add(frameMode.set("Frame Mode", false));
-    parameters.add(frameInterval.set("Frame Interval", 1));
+    parameters.add(frameInterval.set("Frame Interval", 1, 1, 120));
     parameters.add(stop.set("Stop"));
     parameters.add(time.set("Time", 0));
     parameters.add(globalTime.set("Global Time", 0));
@@ -46,6 +46,8 @@ void ofxOceanodeTime::setup(std::shared_ptr<ofxOceanodeContainer> c, std::shared
     }));
     
     listeners.push(stop.newListener([this](){
+        // Following an external clock: the master owns play state and position.
+        if(transport != nullptr && transport->hasExternalClock()) return;
         if(transport != nullptr){
             transport->stop();
         }
@@ -63,7 +65,7 @@ void ofxOceanodeTime::setup(std::shared_ptr<ofxOceanodeContainer> c, std::shared
         if(transport != nullptr){
             const auto state = transport->getState();
             const double beatsPerSecond = std::max(0.0f, state.bpm) / 60.0;
-            const double currentTime = beatsPerSecond > 0.0 ? state.beatPosition / beatsPerSecond : 0.0;
+            const double currentTime = state.seconds;
             const double newTime = std::max(0.0, currentTime + static_cast<double>(f));
             const double newBeat = newTime * beatsPerSecond;
             transport->seekToBeat(newBeat);
@@ -170,7 +172,7 @@ void ofxOceanodeTime::update(){
     }
 
     const bool shouldAdvanceFrameStep = desiredDriverMode == TransportDriverMode::FrameStep &&
-                                        (ofGetFrameNum() % frameInterval == 0 || forceFrameMode);
+                                        (ofGetFrameNum() % std::max(1, frameInterval.get()) == 0 || forceFrameMode);
 
     if(desiredDriverMode == TransportDriverMode::FrameStep){
         if(shouldAdvanceFrameStep){
@@ -191,7 +193,7 @@ void ofxOceanodeTime::update(){
         }
     }else{
         syncGlobalTimeRealTime();
-        if(isPlaying){
+        if(isPlaying || desiredDriverMode == TransportDriverMode::External){
             if(transport != nullptr){
                 transport->syncRealTime();
             }else{
@@ -207,11 +209,15 @@ void ofxOceanodeTime::update(){
     }
     globalTime = frameGlobalTimeState.current.time;
 
+    // Time generators get full double precision (the float parameters above
+    // lose milliseconds after a few hours).
+    const double preciseTime = transport != nullptr ? transport->getTimeInSeconds() : static_cast<double>(time.get());
+    const double preciseGlobalTime = frameGlobalTimeState.current.time;
     for(auto c : timeGenerators){
         if(dynamic_cast<counter*>(c) != nullptr) {
-            c->setTime(globalTime);
+            c->setTime(preciseGlobalTime);
         } else {
-            c->setTime(time);
+            c->setTime(preciseTime);
         }
     }
 }
@@ -231,7 +237,9 @@ void ofxOceanodeTime::resetTransportToStart(){
 }
 
 void ofxOceanodeTime::audioIn(ofSoundBuffer & input){
-    if(transport != nullptr && transport->getState().driverMode != TransportDriverMode::RealTime){
+    // Free-running phasors keep running in real time under an external clock too;
+    // only frame-step (offline) rendering stops them here.
+    if(transport != nullptr && transport->getState().driverMode == TransportDriverMode::FrameStep){
         return;
     }
     if(!frameMode){
@@ -251,7 +259,7 @@ void ofxOceanodeTime::audioIn(ofSoundBuffer & input){
 }
 
 void ofxOceanodeTime::audioOut(ofSoundBuffer & input){
-    if(transport != nullptr && transport->getState().driverMode != TransportDriverMode::RealTime){
+    if(transport != nullptr && transport->getState().driverMode == TransportDriverMode::FrameStep){
         return;
     }
     if(!frameMode){
@@ -290,8 +298,8 @@ void ofxOceanodeTime::updateLegacyTimeFromTransport(){
         return;
     }
     const auto state = transport->getState();
-    const double beatsPerSecond = std::max(0.0f, state.bpm) / 60.0;
-    time = beatsPerSecond > 0.0 ? state.beatPosition / beatsPerSecond : 0.0;
+    // Accumulated play time: a tempo change no longer makes it jump or run backwards.
+    time = state.seconds;
     if(isPlaying.get() != state.isPlaying){
         isPlaying = state.isPlaying;
     }
@@ -299,6 +307,10 @@ void ofxOceanodeTime::updateLegacyTimeFromTransport(){
 }
 
 TransportDriverMode ofxOceanodeTime::getDesiredDriverMode(bool forceFrameMode) const{
+    // An external clock (e.g. MIDI clock) owns the transport: it wins over frame mode.
+    if(transport != nullptr && transport->hasExternalClock()){
+        return TransportDriverMode::External;
+    }
     if(frameMode || forceFrameMode){
         return TransportDriverMode::FrameStep;
     }

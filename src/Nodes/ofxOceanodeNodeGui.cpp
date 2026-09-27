@@ -654,6 +654,16 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                             }
                             ImGui::EndMenu();
                         }
+                        {
+                            // Pitch, gate and velocity as one piano-roll row; the
+                            // timeline shows a dialog to pick the other two.
+                            const std::string valueType = absParam.valueType();
+                            if((valueType == typeid(float).name() || valueType == typeid(int).name() ||
+                                valueType == typeid(bool).name()) &&
+                               ImGui::Selectable("Add to Timeline as Piano Roll...")){
+                                timelineManager.requestNoteGroupSetup(&absParam);
+                            }
+                        }
                         if(boundLocations.size() == 1){
                             if(ImGui::Selectable("Remove from Timeline")){
                                 timelineManager.removeBinding(boundLocations.front().trackId,

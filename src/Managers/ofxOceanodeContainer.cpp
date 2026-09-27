@@ -22,6 +22,7 @@
 #include <deque>
 
 #ifdef OFXOCEANODE_USE_MIDI
+#include "ofxOceanodeMidiClock.h"
 #include "ofxOceanodeMidiBinding.h"
 #include "ofxMidiIn.h"
 #include "ofxMidiOut.h"
@@ -93,6 +94,10 @@ namespace {
 ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry, shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry, shared_ptr<ofxOceanodeTransport> _transport) : registry(_registry), typesRegistry(_typesRegistry), transport(_transport){
     if(registry == nullptr) registry = make_shared<ofxOceanodeNodeRegistry>();
     if(typesRegistry == nullptr) typesRegistry = make_shared<ofxOceanodeTypesRegistry>();
+#ifdef OFXOCEANODE_USE_MIDI
+    // Only the root container (the one that creates the transport) owns the clock sync.
+    if(transport == nullptr) midiClockSync = std::make_unique<ofxOceanodeMidiClock>();
+#endif
     if(transport == nullptr) transport = make_shared<ofxOceanodeTransport>();
     timelineManager = std::make_unique<ofxOceanodeTimelineManager>(this);
     transformationMatrix = glm::mat4(1.0);
@@ -125,6 +130,26 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
 ofxOceanodeContainer::~ofxOceanodeContainer(){
     clearContainer();
 }
+
+#ifdef OFXOCEANODE_USE_MIDI
+void ofxOceanodeContainer::setMidiClockSyncEnabled(bool enabled){
+    if(!midiClockSync) return;
+    midiClockSyncEnabled = enabled;
+    if(enabled){
+        midiClockSync->open(midiClockSync->getPortName());
+        midiClockSync->setDriveTransport(transport, true);
+    }else{
+        midiClockSync->setDriveTransport(transport, false);
+        midiClockSync->close(); // keeps the port name for next time
+    }
+}
+
+void ofxOceanodeContainer::setMidiClockSyncPort(const std::string& port){
+    if(!midiClockSync) return;
+    if(midiClockSyncEnabled) midiClockSync->open(port);
+    else midiClockSync->rememberPort(port);
+}
+#endif
 
 void ofxOceanodeContainer::invalidateCustomGuiMembershipIndex()
 {
@@ -178,6 +203,7 @@ void ofxOceanodeContainer::clearContainer(){
 void ofxOceanodeContainer::update(){
     ofEventArgs args;
 #ifdef OFXOCEANODE_USE_MIDI
+    if(midiClockSync) midiClockSync->update();
     for(auto &paramBinds : midiBindings){
         for(auto &bind : paramBinds.second){
             bind->update();
@@ -192,8 +218,11 @@ void ofxOceanodeContainer::update(){
     // Timeline automation is an input to nodes. Apply it before their update
     // callbacks so node outputs observe the value in the same frame instead
     // of one frame later.
+    if(timelineManager != nullptr) timelineManager->beginParameterCache();
     if(timelineManager != nullptr) timelineManager->evaluateAutomation();
     if(timelineManager != nullptr) timelineManager->applyAutomation();
+    // Node updates below may add or delete nodes (a preset load): stop caching.
+    if(timelineManager != nullptr) timelineManager->endParameterCache();
 
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
@@ -389,6 +418,21 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     loadPreset_loadNodePreset(presetFolderPath);
 
     if(timelineManager != nullptr) timelineManager->loadPreset(presetFolderPath);
+#ifdef OFXOCEANODE_USE_MIDI
+    if(midiClockSync) {
+        const ofJson syncJson = ofLoadJson(presetFolderPath + "/transportSync.json");
+        const bool enable = syncJson.is_object() && syncJson.value("enabled", false);
+        if(syncJson.is_object()) {
+            midiClockSync->core().setReaperMode(syncJson.value("reaperMode", true));
+            midiClockSync->core().setClockOnly(syncJson.value("clockOnly", false));
+            midiClockSync->core().setStopOnClockLoss(syncJson.value("stopOnClockLoss", true));
+            midiClockSync->core().setOffsetMs(syncJson.value("offsetMs", 0.0f));
+            midiClockSync->core().setTempoWindow(syncJson.value("tempoWindow", 24));
+            midiClockSync->rememberPort(syncJson.value("port", std::string()));
+        }
+        setMidiClockSyncEnabled(enable);
+    }
+#endif
     
     loadPreset_activateConnections();
     
@@ -1320,6 +1364,20 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 	saveCustomGuis(presetFolderPath);
 	saveCustomGuiSnapshots(presetFolderPath);
 	if(timelineManager != nullptr) timelineManager->savePreset(presetFolderPath);
+#ifdef OFXOCEANODE_USE_MIDI
+    if(midiClockSync) {
+        // Built-in transport sync (MIDI clock) settings, per project.
+        ofJson syncJson;
+        syncJson["enabled"] = midiClockSyncEnabled;
+        syncJson["port"] = midiClockSync->getPortName();
+        syncJson["reaperMode"] = midiClockSync->core().getReaperMode();
+        syncJson["clockOnly"] = midiClockSync->core().getClockOnly();
+        syncJson["stopOnClockLoss"] = midiClockSync->core().getStopOnClockLoss();
+        syncJson["offsetMs"] = midiClockSync->core().getOffsetMs();
+        syncJson["tempoWindow"] = midiClockSync->core().getTempoWindow();
+        ofSavePrettyJson(presetFolderPath + "/transportSync.json", syncJson);
+    }
+#endif
 	
 }
 
