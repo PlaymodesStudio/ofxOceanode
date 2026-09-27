@@ -116,7 +116,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
             const bool trackUserValue = !(absParam.getFlags() & (ofxOceanodeParameterFlags_DisableSavePreset |
                                                                  ofxOceanodeParameterFlags_ReadOnly)) &&
                                         !absParam.hasInConnection();
-            if(trackUserValue) ofSerialize(valueBefore, absParam);
+            if(trackUserValue) node.saveParameterToJson(valueBefore, absParam);
             string uniqueId = absParam.getName();
             const bool publishedInCustomGui = container.customGuiContainsParameterAnywhere(absParam);
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::BeginDisabled();
@@ -721,7 +721,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
             
             if(trackUserValue){
                 ofJson valueAfter;
-                ofSerialize(valueAfter, absParam);
+                node.saveParameterToJson(valueAfter, absParam);
                 container.recordUserEditedValues(node, valueBefore, valueAfter);
             }
             ImGui::PopID();
