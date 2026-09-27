@@ -285,7 +285,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     }
     nodeModel->setNumIdentifier(toBeCreatedId);
     nodeModel->setContainer(this);
-    auto node = make_shared<ofxOceanodeNode>(move(nodeModel));
+    auto node = make_shared<ofxOceanodeNode>(std::move(nodeModel));
 	node->setup(additionalInfo);
 	auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);
 #ifdef OFXOCEANODE_USE_MIDI
@@ -2613,7 +2613,8 @@ bool ofxOceanodeContainer::recallCustomGuiSnapshot(const std::string& panelId, c
 {
     if(snapshotId.empty()) return false;
     CustomGuiSnapshotBank* bank = getCustomGuiSnapshotBank(panelId);
-    if(bank == nullptr) return false;
+    const CustomGuiPanelData* panel = getCustomGuiPanelData(panelId);
+    if(bank == nullptr || panel == nullptr) return false;
 
     auto it = std::find_if(bank->snapshots.begin(), bank->snapshots.end(), [&](const CustomGuiSnapshotData& snapshot){
         return snapshot.id == snapshotId;
