@@ -714,8 +714,8 @@ ImU32 getVUMeterColorDB(float dbLevel)
 void drawVUMeterDisplay(const std::vector<float>& levels, const ImVec2& itemSize, ImDrawList* drawList, const ImVec2& min, const ImVec2& max, bool vertical)
 {
     const int numChans = std::max(1, (int)levels.size());
-    drawList->AddRectFilled(min, max, IM_COL32(15, 15, 15, 255), 2.0f);
-    drawList->AddRect(min, max, IM_COL32(100, 100, 100, 255), 2.0f);
+    drawList->AddRectFilled(min, max, IM_COL32(15, 15, 15, 255), 0.0f);
+    drawList->AddRect(min, max, IM_COL32(100, 100, 100, 255), 0.0f);
 
     if(vertical){
         const float leftMargin = std::min(20.0f, itemSize.x * 0.12f);
@@ -880,7 +880,7 @@ bool renderTextureLikeWidget(CustomGuiWidgetRenderContext& context, CustomGuiWid
         ImTextureID textureID = (ImTextureID)(uintptr_t)texture->texData.textureID;
         drawList->AddImage(textureID, min, max, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, widget.color.a));
     }else{
-        drawList->AddRect(min, max, IM_COL32(160, 160, 160, 180), 2.0f);
+        drawList->AddRect(min, max, IM_COL32(160, 160, 160, 180), 0.0f);
         drawList->AddText(ImVec2(min.x + 6.0f, min.y + 6.0f), IM_COL32(200, 200, 200, 220), unavailableLabel);
     }
     ImGui::EndGroup();
@@ -935,8 +935,8 @@ bool renderWaveformWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         const ImVec2 min = ImGui::GetItemRectMin();
         const ImVec2 max = ImGui::GetItemRectMax();
-        drawList->AddRectFilled(min, max, IM_COL32(12, 12, 16, 255), 2.0f);
-        drawList->AddRect(min, max, IM_COL32(70, 70, 80, 255), 2.0f);
+        drawList->AddRectFilled(min, max, IM_COL32(12, 12, 16, 255), 0.0f);
+        drawList->AddRect(min, max, IM_COL32(70, 70, 80, 255), 0.0f);
 
         const bool ready = scope->sync(port, channels, timeWindow);
         if(ready){

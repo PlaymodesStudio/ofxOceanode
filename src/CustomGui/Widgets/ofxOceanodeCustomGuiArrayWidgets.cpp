@@ -42,21 +42,13 @@ bool supportsPianoKeyboardWidget(ofxOceanodeAbstractParameter& parameter)
 
 void initializeMultiSliderWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
 {
-    widget.spanW = 3;
-    widget.spanH = 3;
+    widget.spanW = 8;
+    widget.spanH = 5;
     ensureWidgetBodyColor(widget);
     ensureWidgetLabelColor(widget);
     widget.config["labelFontScale"] = widget.config.value("labelFontScale", 1.0f);
     widget.config["valueFontScale"] = widget.config.value("valueFontScale", 1.0f);
-    int size = 1;
-    if(isFloatVectorParameter(parameter)){
-        size = std::max(1, (int)parameter.cast<std::vector<float>>().getParameter().get().size());
-    }else if(isIntVectorParameter(parameter)){
-        size = std::max(1, (int)parameter.cast<std::vector<int>>().getParameter().get().size());
-    }
-    widget.spanW = std::max(widget.spanW, size);
     widget.config["vertical"] = true;
-    widget.config["barSpacingPx"] = widget.config.value("barSpacingPx", 1.0f);
     if(isIntParameter(parameter)){
         const auto& param = parameter.cast<int>().getParameter();
         widget.config["quantization"] = widget.config.value("quantization", std::max(2, param.getMax() - param.getMin() + 1));
@@ -332,8 +324,8 @@ bool drawMultiToggleGrid(const CustomGuiWidgetRenderContext& context, CustomGuiW
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const ImVec2 min = ImGui::GetItemRectMin();
     const ImVec2 max = ImGui::GetItemRectMax();
-    drawList->AddRectFilled(min, max, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 2.0f);
-    drawList->AddRect(min, max, IM_COL32(90, 90, 90, 255), 2.0f);
+    drawList->AddRectFilled(min, max, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 0.0f);
+    drawList->AddRect(min, max, IM_COL32(90, 90, 90, 255), 0.0f);
 
     static ImGuiID activePaintWidget = 0;
     static bool paintState = false;
@@ -378,8 +370,8 @@ bool drawMultiToggleGrid(const CustomGuiWidgetRenderContext& context, CustomGuiW
             const ImU32 fillColor = cellOn
                 ? IM_COL32((int)(onColor.x * 255.0f), (int)(onColor.y * 255.0f), (int)(onColor.z * 255.0f), (int)(onColor.w * 255.0f))
                 : IM_COL32(65, 65, 65, 255);
-            drawList->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y1), fillColor, 1.5f);
-            drawList->AddRect(ImVec2(x0, y0), ImVec2(x1, y1), cellOn ? IM_COL32(255, 255, 255, 80) : IM_COL32(110, 110, 110, 180), 1.5f);
+            drawList->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y1), fillColor, 0.0f);
+            drawList->AddRect(ImVec2(x0, y0), ImVec2(x1, y1), cellOn ? IM_COL32(255, 255, 255, 80) : IM_COL32(110, 110, 110, 180), 0.0f);
         }
     }
 
@@ -662,12 +654,6 @@ void drawMultiSliderProperties(CustomGuiWidgetPropertiesContext& context, Custom
     bool vertical = widget.config.value("vertical", true);
     if(ImGui::Checkbox("Vertical", &vertical)){
         widget.config["vertical"] = vertical;
-        context.container.markCustomGuisDirty();
-    }
-
-    float barSpacing = std::max(0.0f, widget.config.value("barSpacingPx", 1.0f));
-    if(ImGui::InputFloat("Bar Gap Px", &barSpacing, 0.25f, 1.0f, "%.2f")){
-        widget.config["barSpacingPx"] = std::max(0.0f, barSpacing);
         context.container.markCustomGuisDirty();
     }
 
