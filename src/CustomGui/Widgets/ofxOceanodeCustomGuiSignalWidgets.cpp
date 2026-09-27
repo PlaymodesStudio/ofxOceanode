@@ -2,6 +2,7 @@
 #include "CustomGui/Widgets/ofxOceanodeCustomGuiSignalWidgets.h"
 #include "CustomGui/Widgets/ofxOceanodeCustomGuiWidgetHelpers.h"
 #include "Managers/ofxOceanodeContainer.h"
+#include "Managers/ofxOceanodeScope.h"
 #include <algorithm>
 #include <cfloat>
 #include <cstdint>
@@ -22,6 +23,53 @@
 namespace {
 
 using namespace ofxOceanodeCustomGuiWidgetHelpers;
+
+bool supportsScopeWidget(ofxOceanodeAbstractParameter& parameter)
+{
+    return ofxOceanodeScope::getInstance()->canScope(&parameter);
+}
+
+void initializeScopeWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
+{
+    widget.spanW = 8;
+    widget.spanH = 5;
+    widget.config["showValue"] = false;
+    // Allow renderer controls (for example texture aspect ratio) in Run mode.
+    widget.config["interactive"] = true;
+}
+
+bool renderScopeWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget,
+                       ofxOceanodeAbstractParameter* parameter)
+{
+    ImGui::BeginGroup();
+    drawWidgetLabel(context, widget, context.label);
+    const ImVec2 size = widgetItemSize(context);
+    const ofColor bodyColor = widgetBodyColor(widget);
+    pushWidgetFrameColors(bodyColor, widget.color);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, colorToImVec4(bodyColor));
+    ImGui::PushStyleColor(ImGuiCol_PlotLines, colorToImVec4(widget.color));
+    ImGui::PushStyleColor(ImGuiCol_PlotLinesHovered, colorToImVec4(widget.color));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+    if(context.designMode || !context.interactive) flags |= ImGuiWindowFlags_NoInputs;
+
+    // Some addon renderers query the current window instead of using size.
+    // A child gives them both a bounded content region and a distinct ID scope.
+    if(ImGui::BeginChild("##scope", size, false, flags)){
+        const ImVec2 available = ImGui::GetContentRegionAvail();
+        if(parameter == nullptr){
+            ImGui::TextDisabled("Parameter unavailable");
+        }else if(!ofxOceanodeScope::getInstance()->drawParameter(
+                     parameter, ImVec2(std::max(1.0f, available.x), std::max(1.0f, available.y)))){
+            ImGui::TextDisabled("Scope unavailable");
+        }
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor(11);
+    ImGui::EndGroup();
+    return true;
+}
 
 constexpr float kScBusFftSampleRate = 44100.0f;
 constexpr float kScBusFftFreqMin = 20.0f;
@@ -1186,6 +1234,11 @@ namespace ofxOceanodeCustomGuiSignalWidgets {
 
 void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 {
+    registerWidget(registry, CustomGuiWidgetType::Scope,
+                   supportsScopeWidget,
+                   initializeScopeWidget,
+                   renderScopeWidget);
+
     registerWidget(registry, CustomGuiWidgetType::Waveform,
                    supportsWaveformWidget,
                    initializeWaveformWidget,
