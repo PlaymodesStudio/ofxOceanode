@@ -604,46 +604,20 @@ void drawMultiToggleProperties(CustomGuiWidgetPropertiesContext& context, Custom
 {
     if(parameter == nullptr) return;
 
+    int vectorSize = 0;
     if(isFloatVectorParameter(*parameter)){
-        auto& param = parameter->cast<std::vector<float>>().getParameter();
-        auto values = param.get();
-        auto mins = param.getMin();
-        auto maxs = param.getMax();
-        int vectorSize = std::max(1, (int)values.size());
-        if(ImGui::SliderInt("Vector Size", &vectorSize, 1, 64)){
-            float fillValue = values.empty() ? 0.0f : values.back();
-            float fillMin = mins.empty() ? 0.0f : mins.back();
-            float fillMax = maxs.empty() ? 1.0f : maxs.back();
-            values.resize(vectorSize, fillValue);
-            mins.resize(vectorSize, fillMin);
-            maxs.resize(vectorSize, fillMax);
-            param.setMin(mins);
-            param.setMax(maxs);
-            param.set(values);
-            widget.config["cols"] = vectorSize;
-            widget.config["rows"] = 1;
-            context.container.markCustomGuisDirty();
-        }
+        vectorSize = static_cast<int>(parameter->cast<std::vector<float>>().getParameter().get().size());
     }else if(isIntVectorParameter(*parameter)){
-        auto& param = parameter->cast<std::vector<int>>().getParameter();
-        auto values = param.get();
-        auto mins = param.getMin();
-        auto maxs = param.getMax();
-        int vectorSize = std::max(1, (int)values.size());
-        if(ImGui::SliderInt("Vector Size", &vectorSize, 1, 64)){
-            int fillValue = values.empty() ? 0 : values.back();
-            int fillMin = mins.empty() ? 0 : mins.back();
-            int fillMax = maxs.empty() ? 1 : maxs.back();
-            values.resize(vectorSize, fillValue);
-            mins.resize(vectorSize, fillMin);
-            maxs.resize(vectorSize, fillMax);
-            param.setMin(mins);
-            param.setMax(maxs);
-            param.set(values);
-            widget.config["cols"] = vectorSize;
-            widget.config["rows"] = 1;
-            context.container.markCustomGuisDirty();
-        }
+        vectorSize = static_cast<int>(parameter->cast<std::vector<int>>().getParameter().get().size());
+    }else{
+        return;
+    }
+    vectorSize = std::max(1, vectorSize);
+    if(ImGui::SliderInt("Vector Size", &vectorSize, 1, 64)){
+        context.container.resizeCustomGuiParameterVector(*parameter, vectorSize);
+        widget.config["cols"] = vectorSize;
+        widget.config["rows"] = 1;
+        context.container.markCustomGuisDirty();
     }
 }
 

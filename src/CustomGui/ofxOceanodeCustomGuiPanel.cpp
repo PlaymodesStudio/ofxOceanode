@@ -1202,38 +1202,7 @@ void ofxOceanodeCustomGuiPanel::drawSetVectorSizePopup()
     }
 
     if(ImGui::Button("Apply")){
-        const std::string type = parameter->valueType();
-        if(type == typeid(std::vector<float>).name()){
-            auto& param = parameter->cast<std::vector<float>>().getParameter();
-            auto values = param.get();
-            auto mins = param.getMin();
-            auto maxs = param.getMax();
-            const int newSize = std::max(1, setVectorSizeValue);
-            const float fillValue = values.empty() ? 0.0f : values.back();
-            const float fillMin = mins.empty() ? 0.0f : mins.back();
-            const float fillMax = maxs.empty() ? 1.0f : maxs.back();
-            values.resize(newSize, fillValue);
-            mins.resize(newSize, fillMin);
-            maxs.resize(newSize, fillMax);
-            param.setMin(mins);
-            param.setMax(maxs);
-            param.set(values);
-        }else if(type == typeid(std::vector<int>).name()){
-            auto& param = parameter->cast<std::vector<int>>().getParameter();
-            auto values = param.get();
-            auto mins = param.getMin();
-            auto maxs = param.getMax();
-            const int newSize = std::max(1, setVectorSizeValue);
-            const int fillValue = values.empty() ? 0 : values.back();
-            const int fillMin = mins.empty() ? 0 : mins.back();
-            const int fillMax = maxs.empty() ? 1 : maxs.back();
-            values.resize(newSize, fillValue);
-            mins.resize(newSize, fillMin);
-            maxs.resize(newSize, fillMax);
-            param.setMin(mins);
-            param.setMax(maxs);
-            param.set(values);
-        }
+        container.resizeCustomGuiParameterVector(*parameter, setVectorSizeValue);
         ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
