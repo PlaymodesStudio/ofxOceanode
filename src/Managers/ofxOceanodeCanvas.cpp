@@ -931,7 +931,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(color.r/4, color.g/4, color.b/4, 200));
+        ofColor canvasBackground(color.r/4, color.g/4, color.b/4, 200);
+        if(!parentID.empty()){
+            // Macro tint: 25% more saturated and 25% darker.
+            canvasBackground.setSaturation(canvasBackground.getSaturation() * 1.25f);
+            canvasBackground.setBrightness(canvasBackground.getBrightness() * 0.75f);
+        }
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(canvasBackground.r, canvasBackground.g, canvasBackground.b, canvasBackground.a));
         
 		ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
 		      contentRegionSize = glm::vec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y);
