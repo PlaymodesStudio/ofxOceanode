@@ -65,7 +65,7 @@ bool sameChanges(const GlobalMacroSaveReview& a, const GlobalMacroSaveReview& b)
     for(size_t i = 0; i < a.changes.size(); ++i){
         const auto& left = a.changes[i];
         const auto& right = b.changes[i];
-        if(left.item != right.item || left.field != right.field ||
+        if(left.kind != right.kind || left.item != right.item || left.field != right.field ||
            left.saved != right.saved || left.current != right.current ||
            left.savedFull != right.savedFull || left.currentFull != right.currentFull) return false;
     }
@@ -461,7 +461,8 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
                             ? change.location.substr(prefix.size()) : change.location) + " / ";
         }
         changeTitle += change.item;
-        drawReviewChangeTitle(changeTitle, change.field);
+        drawReviewChangeTitle(changeTitle, change.kind == GlobalMacroSaveChange::Kind::MacroReplacement
+                                          ? "Macro replacement" : change.field);
         if(change.field == "Node added" || change.field == "Connection added"){
             ImGui::NewLine();
         }else{
@@ -832,7 +833,30 @@ void compareNode(ofxOceanodeContainer& owner, ofxOceanodeNode& node,
 
     if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&model)){
         const ofJson local = macro->isLocal();
-        const ofJson savedLocal = saved.is_object() ? ofJson(saved.value("LocalPreset", true)) : ofJson(true);
+        const bool savedWasLocal = saved.is_object() ? saved.value("LocalPreset", true) : true;
+        const ofJson savedLocal = savedWasLocal;
+        if(saved.is_object() && savedWasLocal && !macro->isLocal()){
+            const std::string localName = saved.value("Local_Name", std::string("Local"));
+            const std::string macroName = macro->getCurrentMacroName();
+            std::string categoryName;
+            for(const auto& part : macro->getCurrentMacroCategory()){
+                if(!categoryName.empty()) categoryName += " / ";
+                categoryName += part;
+            }
+            const std::string oldLabel = "Local Macro \"" + localName + "\"";
+            const std::string newLabel = "Global Macro \"" + macroName + "\"" +
+                (categoryName.empty() ? "" : " (" + categoryName + ")");
+            const ofJson oldIdentity = {{"LocalPreset", true}, {"Local_Name", localName}};
+            const ofJson newIdentity = {{"LocalPreset", false}, {"Macro", macroName},
+                                        {"CategoryStruct", macro->getCurrentMacroCategory()},
+                                        {"MacroPath", macro->getCurrentMacroPath()}};
+            changes.push_back({location,
+                               model.nodeName() + " [" + ofToString(model.getNumIdentifier()) + "]",
+                               "Macro replacement", oldLabel, newLabel,
+                               fullValue(oldIdentity), fullValue(newIdentity),
+                               GlobalMacroSaveChange::Kind::MacroReplacement});
+            return;
+        }
         addChange(changes, location, label, "Local macro", savedLocal, local);
         if(macro->isLocal()){
             const ofJson savedOrder = field(saved, "RouterSortOrder");
