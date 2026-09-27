@@ -1475,7 +1475,7 @@ bool ofxOceanodeCustomGuiPanel::renderWidget(CustomGuiWidget& widget, ofxOceanod
     const bool trackUserValue = editedNode != nullptr && parameter != nullptr &&
                                 !parameter->hasInConnection() &&
                                 !(parameter->getFlags() & ofxOceanodeParameterFlags_DisableSavePreset);
-    if(trackUserValue) ofSerialize(valuesBefore, *parameter);
+    if(trackUserValue) editedNode->saveParameterToJson(valuesBefore, *parameter);
 
     ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
@@ -1488,7 +1488,7 @@ bool ofxOceanodeCustomGuiPanel::renderWidget(CustomGuiWidget& widget, ofxOceanod
     ImGui::SetWindowFontScale(1.0f);
     if(trackUserValue){
         ofJson valuesAfter;
-        ofSerialize(valuesAfter, *parameter);
+        editedNode->saveParameterToJson(valuesAfter, *parameter);
         container.recordUserEditedValues(*editedNode, valuesBefore, valuesAfter);
     }
     return rendered;
