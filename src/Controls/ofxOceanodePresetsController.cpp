@@ -380,7 +380,10 @@ void ofxOceanodePresetsController::beginSavePreset(string name, string bank, boo
 }
 
 void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
-    if(!ImGui::BeginPopupModal("Review Global Macros", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGui::GetStyleColorVec4(ImGuiCol_WindowBg));
+    const bool open = ImGui::BeginPopupModal("Review Global Macros", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::PopStyleColor();
+    if(!open) return;
     if(!pendingSave || pendingSave->reviewIndex >= pendingSave->reviews.size()){
         ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
