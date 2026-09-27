@@ -937,8 +937,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             // so bright colors can actually produce a light canvas after the
             // accumulated saturation and brightness adjustments.
             canvasBackground = ofColor(color.r/2, color.g/2, color.b/2, 200);
-            canvasBackground.setSaturation(canvasBackground.getSaturation() * 0.28125f);
-            canvasBackground.setBrightness(canvasBackground.getBrightness() * 1.953125f);
+            canvasBackground.setSaturation(canvasBackground.getSaturation() * 0.3f);
+            canvasBackground.setBrightness(canvasBackground.getBrightness() * 1.0f);
         }
         // Judge the visible background after the translucent canvas tint is
         // blended over WindowBg, using perceived brightness on a 0-255 scale.
