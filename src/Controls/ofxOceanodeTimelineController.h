@@ -133,13 +133,15 @@ private:
     std::string clipRenameTrackId;
     std::string clipRenameClipId;
     std::string pendingClipBindingId;
-    int pendingClipLaneType = 0;
+    int pendingClipLaneType = 1; // Curve
     double pendingStartBeat = 0.0;
     double pendingDurationBeats = 1.0;
     // Beat used by a Wave Track's context-menu "Add new wave clip" action.
     // Header clicks use the playhead; empty-row clicks use the clicked beat.
     double pendingWaveClipBeat = 0.0;
     int waveVolumeDragPointIndex = -1;
+    int waveVolumeValuePointIndex = -1;   // right-click "Set value" on a volume point
+    float waveVolumeNumericValue = 1.0f;
 
     enum class ClipDragMode { None, Move, Resize, Stretch, Repeat };
     ClipDragMode clipDragMode = ClipDragMode::None;
@@ -259,8 +261,27 @@ private:
     float curveTensionDragStartY = 0.0f;
     float curveTensionStartInflection = 0.5f;
     float curveTensionStartSteepness = 1.0f;
+    // Clip editors folded down to their header row (session state, per clip id).
+    std::set<std::string> foldedClipEditors;
+    // Dragging a parameter row's label to reorder it within its track.
+    std::string bindingDragTrackId;
+    std::string bindingDragId;
+    float bindingDragStartY = 0.0f;
+    bool bindingDragActive = false;
     std::string lfoDragLaneId;
     int lfoDragPointIndex = -1;
+    // LFO editor point selection (Delete/Backspace or right-click > Delete point)
+    std::string lfoSelectedClipId;
+    std::string lfoSelectedLaneId;
+    int lfoSelectedPointIndex = -1;
+    // LFO editor Alt-drag tension editing (Log/Exp, Sigmoid)
+    int lfoTensionSegment = -1;
+    bool lfoValueDragActive = false; // dragging the constant in an LFO lane's "Value" mode
+    float lfoPointNumericValue = 0.0f; // right-click "Set value" field (real units)
+    float lfoTensionDragStartX = 0.0f;
+    float lfoTensionDragStartY = 0.0f;
+    float lfoTensionStartInflection = 0.5f;
+    float lfoTensionStartSteepness = 1.0f;
     enum class LoopDragMode { None, Scrub, Start, End, Move };
     LoopDragMode loopDragMode = LoopDragMode::None;
     double loopDragAnchorBeat = 0.0;

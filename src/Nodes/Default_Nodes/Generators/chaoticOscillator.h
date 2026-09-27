@@ -29,7 +29,28 @@ public:
     
 	void resetPhase();
     
+    void loadBeforeConnections(ofJson &json) override{
+        // Restore the mode before connections so a saved "Step" connection finds its input.
+        deserializeParameter(json, syncToTransport_Param);
+    }
+    
 private:
+    // Sync To Transport mode: values are a pure function of (Seed, Step, Phase, params),
+    // so scrubbing / seeking the timeline gives exactly what normal playback gives.
+    void setStepInputVisible(bool visible);
+    void computeTransport();
+    uint64_t channelSeedKey(int i);
+    ofParameter<bool> syncToTransport_Param;
+    ofParameter<vector<float>> step_Param; // only present in Sync To Transport mode
+    uint64_t sessionSalt;
+    
+    // Seed handling shared by both modes.
+    int channelSeed(int i);          // per-channel seed (0 = non-deterministic)
+    void restartFromSeedInput();     // Seed input received: restart every channel's sequence
+    ofParameter<bool> laneSeeds_Param; // single positive Seed -> Seed + lane per channel
+    uint64_t lastSeedFrame = 0;
+    vector<int> lastSeedValue;
+
     void phasorInListener(vector<float> &phasor);
     vector<baseChaoticOscillator> baseChOsc;
     

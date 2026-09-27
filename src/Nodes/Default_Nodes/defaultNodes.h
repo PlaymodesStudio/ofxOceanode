@@ -11,6 +11,7 @@
 #include "oscillator.h"
 #include "chaoticOscillator.h"
 #include "phasor.h"
+#include "lfoTrack.h"
 #include "mapper.h"
 #include "indexer.h"
 #include "ranger.h"

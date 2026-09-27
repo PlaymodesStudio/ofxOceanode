@@ -9,6 +9,7 @@
 
 #include "baseRandomGenerator.h"
 #include "ofMath.h"
+#include "ofxOceanodeDeterministicRandom.h"
 
 baseRandomGenerator::baseRandomGenerator(){
     oldPhasor = 0;
@@ -20,6 +21,19 @@ baseRandomGenerator::baseRandomGenerator(){
     randomValue = randomValueNotModulated = dist(mt);
 	modulateNewRandom();
     accumulateCycles = 0;
+}
+
+void baseRandomGenerator::requestSeed(int seed_, bool force){
+	if(!force && seed_ == seed) return;
+	if(justWrapped){
+		// The seed arrived in the same frame as a cycle boundary (e.g. right after the
+		// phasor restarted): restart now so the new sequence begins with this cycle,
+		// regardless of whether the seed or the phase was delivered first.
+		restartSeedSequence(seed_);
+	}else{
+		seed = seed_;
+		setSeedFlag = true; // restart at this channel's next cycle boundary
+	}
 }
 
 void baseRandomGenerator::nextSeed(int seed_){
@@ -34,7 +48,8 @@ float baseRandomGenerator::computeFunc(float phasor){
     linPhase = fmod(linPhase, 1);
     
     float val = 0;
-    if(linPhase < oldPhasor){
+    justWrapped = linPhase < oldPhasor;
+    if(justWrapped){
         oldRandomValue = randomValue;
 		if(setSeedFlag){
 			//std::cout << indexNormalized*4 << " | " << phasor << " / " << linPhase << " - " << oldPhasor << std::endl;
@@ -46,8 +61,7 @@ float baseRandomGenerator::computeFunc(float phasor){
 			}
 			
 			float indexPosShifted = (fmod(indexNormalized, 1))*length_Param;
-			if(indexPosShifted == floor(indexPosShifted)) indexPosShifted-=1;
-			for(int i = 0; i < floor(indexPosShifted); i++){
+			for(int i = 0; i < floor(indexPosShifted + 1e-4f); i++){
 				dist(mt);
 			}
 			
@@ -145,8 +159,7 @@ void baseRandomGenerator::restartSeedSequence(int _seed){
 	}
 	
 	float indexPosShifted = (fmod(indexNormalized, 1))*length_Param;
-	if(indexPosShifted == floor(indexPosShifted)) indexPosShifted-=1;
-	for(int i = 0; i < floor(indexPosShifted); i++){
+	for(int i = 0; i < floor(indexPosShifted + 1e-4f); i++){
 		dist(mt);
 	}
 	
@@ -154,4 +167,71 @@ void baseRandomGenerator::restartSeedSequence(int _seed){
 	modulateNewRandom();
 	oldPhasor = -1;
 	setSeedFlag = false;
+}
+
+// ───── Transport (deterministic) mode ─────
+
+float baseRandomGenerator::deterministicShaped(uint64_t seedKey, int64_t step, uint64_t attempt){
+    const float u = ofxOceanodeDeterministicRandom::uniform(seedKey, step, attempt);
+    float value;
+    if(customDiscreteDistribution.size() > 1){
+        value = (float)ofxOceanodeDeterministicRandom::discreteIndex(customDiscreteDistribution, u) / (customDiscreteDistribution.size() - 1);
+    }else{
+        value = u;
+    }
+    computePreInterp(value);
+    return value;
+}
+
+float baseRandomGenerator::deterministicNonRepeat(uint64_t seedKey, int64_t step){
+    const bool cacheMatches = detCache.valid
+        && detCache.seedKey == seedKey
+        && detCache.pow == pow_Param
+        && detCache.biPow == biPow_Param
+        && detCache.quant == quant_Param
+        && detCache.dist == customDiscreteDistribution;
+    if(cacheMatches && detCache.step == step) return detCache.value;
+
+    const int64_t anchor = step < 0 ? step : 0;
+    int64_t k;
+    float prev;
+    if(cacheMatches && detCache.step < step && detCache.step >= anchor){
+        k = detCache.step;
+        prev = detCache.value;
+    }else{
+        k = anchor;
+        prev = deterministicShaped(seedKey, anchor, 0);
+    }
+    while(k < step){
+        k++;
+        uint64_t attempt = 0;
+        float v = deterministicShaped(seedKey, k, attempt);
+        while(v == prev && attempt < 64){
+            attempt++;
+            v = deterministicShaped(seedKey, k, attempt);
+        }
+        prev = v;
+    }
+
+    detCache.valid = true;
+    detCache.seedKey = seedKey;
+    detCache.pow = pow_Param;
+    detCache.biPow = biPow_Param;
+    detCache.quant = quant_Param;
+    detCache.dist = customDiscreteDistribution;
+    detCache.step = step;
+    detCache.value = prev;
+    return prev;
+}
+
+float baseRandomGenerator::computeDeterministic(int64_t step, uint64_t seedKey){
+    float value = (nonRepeat && quant_Param != 1)
+        ? deterministicNonRepeat(seedKey, step)
+        : deterministicShaped(seedKey, step, 0);
+
+    // Deterministic counterpart of computeMultiplyMod (Rnd Add is per-step, not per-frame).
+    if(randomAdd_Param)
+        value += randomAdd_Param * ofxOceanodeDeterministicRandom::uniform(seedKey, step, 0xADDull);
+    value = ofClamp(value, 0.0, 1.0);
+    return ofMap(value, 0, 1, min_Param, max_Param);
 }

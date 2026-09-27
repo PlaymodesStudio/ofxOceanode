@@ -483,19 +483,23 @@ struct LfoParameterDefinition {
     float minimum;
     float maximum;
     float defaultValue;
+    const char* name; // lane name shown in the editor
 };
 
+// Single source for the LFO controls: evaluation ranges and the lanes a clip gets.
 constexpr LfoParameterDefinition kLfoParameters[] = {
-    {"frequency", 0.125f, 64.0f, 4.0f},
-    {"roundness", 0.0f, 1.0f, 0.5f},
-    {"skew", -1.0f, 1.0f, 0.0f},
-    {"pw", 0.0f, 1.0f, 0.5f},
-    {"pow", -1.0f, 1.0f, 0.0f},
-    {"bipow", -1.0f, 1.0f, 0.0f},
-    {"phaseOffset", 0.0f, 1.0f, 0.0f},
-    {"scale", 0.0f, 2.0f, 1.0f},
-    {"yOffset", -1.0f, 1.0f, 0.0f}
+    {"frequency", 0.125f, 64.0f, 4.0f, "Frequency (beats)"},
+    {"roundness", 0.0f, 1.0f, 0.5f, "Roundness"},
+    {"skew", -1.0f, 1.0f, 0.0f, "Skew"},
+    {"pw", 0.0f, 1.0f, 0.5f, "Pulse width"},
+    {"pow", -1.0f, 1.0f, 0.0f, "Pow"},
+    {"bipow", -1.0f, 1.0f, 0.0f, "BiPow"},
+    {"phaseOffset", 0.0f, 1.0f, 0.0f, "Phase offset"},
+    {"scale", 0.0f, 2.0f, 1.0f, "Scale"},
+    {"yOffset", -1.0f, 1.0f, 0.0f, "Y offset"}
 };
+
+constexpr float kFrequencyGridFactors[3] = {1.0f, 2.0f / 3.0f, 1.5f}; // straight, triplet, dotted
 
 const LfoParameterDefinition* lfoParameterDefinition(const std::string& id) {
     for(const auto& definition : kLfoParameters)
@@ -503,15 +507,235 @@ const LfoParameterDefinition* lfoParameterDefinition(const std::string& id) {
     return nullptr;
 }
 
+bool lfoLaneIsLog(const ofxOceanodeTimelineLane& lane) {
+    return lane.lfoParameter == "frequency";
+}
+
+// Linear, or logarithmic when requested and the range is strictly positive.
+double lfoMapNormalized(float minimum, float maximum, bool logScale, float normalized) {
+    const double n = ofClamp(normalized, 0.0f, 1.0f);
+    if(logScale && minimum > 0.0f && maximum > minimum)
+        return minimum * std::pow(static_cast<double>(maximum) / minimum, n);
+    return minimum + n * (maximum - minimum);
+}
+float lfoUnmapValue(float minimum, float maximum, bool logScale, float value) {
+    if(logScale && minimum > 0.0f && maximum > minimum) {
+        const double v = std::max<double>(value, minimum);
+        return ofClamp(static_cast<float>(std::log(v / minimum) / std::log(static_cast<double>(maximum) / minimum)), 0.0f, 1.0f);
+    }
+    if(std::abs(maximum - minimum) < 1e-9f) return 0.0f;
+    return ofClamp((value - minimum) / (maximum - minimum), 0.0f, 1.0f);
+}
+
 float normalizedLfoLaneValue(const ofxOceanodeTimelineLane& lane, double beat,
                              float fallback) {
+    if(lane.curveInterpolation == "Value") return lane.lfoValue;
     return valueAtBeat(lane.curvePoints, lane.curveTensions,
                        lane.curveInterpolation, beat, fallback);
+}
+
+// ---------------------------------------------------------------------------
+// LFO phase with an automated "frequency" (= cycle length in beats).
+//
+// The phase is the number of cycles accumulated from source beat 0:
+//     cycles(b) = integral_0^b  1 / period(x) dx
+// so a frequency change bends the oscillator's speed smoothly instead of
+// rescaling the whole elapsed time (sourceBeat / period), which made the
+// phase jump more the further into the clip the change happened. With a
+// constant period this is exactly sourceBeat / period, as before.
+//
+// Step and Linear segments are integrated in closed form; Log/Exp and
+// Sigmoid with fixed-resolution Simpson (end-clustered), so results are deterministic and
+// identical during playback, scrubbing and in the editor. Per-point running
+// totals are cached per clip and rebuilt when the curve changes.
+// ---------------------------------------------------------------------------
+
+constexpr double kMinLfoPeriodBeats = 1.0 / 1024.0;
+constexpr int kLfoSimpsonIntervals = 256; // even
+
+struct LfoPeriodCurve {
+    const LfoParameterDefinition* definition = nullptr;
+    const ofxOceanodeTimelineLane* lane = nullptr;
+    CurveInterpolationMode mode = CurveInterpolationMode::Linear;
+
+    double periodForNormalized(float normalized) const {
+        return std::max(kMinLfoPeriodBeats,
+            lfoMapNormalized(definition->minimum, definition->maximum, lfoLaneIsLog(*lane), normalized));
+    }
+    double pointPeriod(size_t i) const {
+        return periodForNormalized(lane->curvePoints[i].value);
+    }
+    // Cycles accumulated from point i-1 to fraction t (0..1) of segment i.
+    double segmentCycles(size_t i, double t) const {
+        const auto& p0 = lane->curvePoints[i - 1];
+        const auto& p1 = lane->curvePoints[i];
+        const double span = p1.beat - p0.beat;
+        if(span <= kEpsilon || t <= 0.0) return 0.0;
+        t = std::min(t, 1.0);
+        const double P0 = pointPeriod(i - 1);
+        const double P1 = pointPeriod(i);
+        const bool inRange = p0.value >= 0.0f && p0.value <= 1.0f && p1.value >= 0.0f && p1.value <= 1.0f;
+        if(mode == CurveInterpolationMode::Step) {
+            return span * t / P0; // value holds until the next point
+        }
+        if(mode == CurveInterpolationMode::Linear && inRange) {
+            if(lfoLaneIsLog(*lane) && definition->minimum > 0.0f) {
+                // Log scale: the period is exponential in t, P(t) = P0 * r^t.
+                const double r = P1 / P0;
+                if(std::abs(r - 1.0) < 1e-9) return span * t / P0;
+                return span / P0 * (1.0 - std::pow(r, -t)) / std::log(r);
+            }
+            const double dP = P1 - P0;
+            if(std::abs(dP) < 1e-9) return span * t / P0;
+            return span * std::log((P0 + dP * t) / P0) / dP;
+        }
+        const auto tension = i - 1 < lane->curveTensions.size()
+            ? lane->curveTensions[i - 1] : ofxOceanodeTimelineCurveTension{};
+        auto inversePeriod = [&](double u) {
+            const float shaped = curveSegmentShape(static_cast<float>(u), mode, tension);
+            return 1.0 / periodForNormalized(ofLerp(p0.value, p1.value, shaped));
+        };
+        // Simpson in s with u = t * (1 - cos(pi s)) / 2: samples cluster at both ends,
+        // where steep Log/Exp and Sigmoid shapes have their sharp corners.
+        auto integrand = [&](double s) {
+            const double u = t * 0.5 * (1.0 - std::cos(PI * s));
+            const double du = t * 0.5 * PI * std::sin(PI * s);
+            return inversePeriod(u) * du;
+        };
+        const double h = 1.0 / kLfoSimpsonIntervals;
+        double sum = integrand(0.0) + integrand(1.0);
+        for(int k = 1; k < kLfoSimpsonIntervals; ++k) {
+            sum += (k % 2 == 1 ? 4.0 : 2.0) * integrand(k * h);
+        }
+        return span * h / 3.0 * sum;
+    }
+};
+
+struct LfoCyclesCache {
+    uint64_t signature = 0;
+    std::vector<double> atPoint; // cycles from the first point to point i
+};
+
+uint64_t lfoCurveSignature(const ofxOceanodeTimelineLane& lane, const LfoParameterDefinition& definition) {
+    uint64_t h = 1469598103934665603ull; // FNV-1a over the curve data
+    auto mixBytes = [&h](const void* data, size_t size) {
+        const unsigned char* bytes = static_cast<const unsigned char*>(data);
+        for(size_t i = 0; i < size; ++i) { h ^= bytes[i]; h *= 1099511628211ull; }
+    };
+    for(const auto& point : lane.curvePoints) { mixBytes(&point.beat, sizeof(point.beat)); mixBytes(&point.value, sizeof(point.value)); }
+    for(const auto& tension : lane.curveTensions) { mixBytes(&tension.inflection, sizeof(float)); mixBytes(&tension.steepness, sizeof(float)); }
+    mixBytes(lane.curveInterpolation.data(), lane.curveInterpolation.size());
+    mixBytes(&definition.minimum, sizeof(float));
+    mixBytes(&definition.maximum, sizeof(float));
+    const size_t count = lane.curvePoints.size();
+    mixBytes(&count, sizeof(count));
+    return h;
+}
+
+// Cycles from source beat 0 to sourceBeat.
+double lfoCycles(const ofxOceanodeTimelineClip& clip, double sourceBeat) {
+    const auto* definition = lfoParameterDefinition("frequency");
+    const ofxOceanodeTimelineLane* frequencyLane = nullptr;
+    for(const auto& lane : clip.lanes) {
+        if(lane.lfoParameter == "frequency") { frequencyLane = &lane; break; }
+    }
+    if(definition != nullptr && frequencyLane != nullptr && frequencyLane->curveInterpolation == "Value") {
+        const double period = std::max<double>(kMinLfoPeriodBeats, lfoMapNormalized(definition->minimum,
+            definition->maximum, true, frequencyLane->lfoValue));
+        return sourceBeat / period; // constant frequency
+    }
+    if(definition == nullptr || frequencyLane == nullptr || frequencyLane->curvePoints.empty()) {
+        const double period = definition == nullptr ? 4.0 : std::max<double>(kMinLfoPeriodBeats, definition->defaultValue);
+        return sourceBeat / period;
+    }
+
+    LfoPeriodCurve curve;
+    curve.definition = definition;
+    curve.lane = frequencyLane;
+    curve.mode = curveInterpolationMode(frequencyLane->curveInterpolation);
+    const auto& points = frequencyLane->curvePoints;
+    if(points.size() == 1) return sourceBeat / curve.pointPeriod(0);
+
+    // Running totals per point, cached per clip (rebuilt only when the curve changes).
+    static thread_local std::map<std::string, LfoCyclesCache> caches;
+    if(caches.size() > 256) caches.clear();
+    LfoCyclesCache& cache = caches[clip.id];
+    const uint64_t signature = lfoCurveSignature(*frequencyLane, *definition);
+    if(cache.signature != signature || cache.atPoint.size() != points.size()) {
+        cache.signature = signature;
+        cache.atPoint.assign(points.size(), 0.0);
+        for(size_t i = 1; i < points.size(); ++i) {
+            cache.atPoint[i] = cache.atPoint[i - 1] + curve.segmentCycles(i, 1.0);
+        }
+    }
+
+    // G(b): cycles from the first point to b (signed); constant period outside the points.
+    auto G = [&](double b) {
+        if(b <= points.front().beat) return (b - points.front().beat) / curve.pointPeriod(0);
+        if(b >= points.back().beat) {
+            const size_t last = points.size() - 1;
+            return cache.atPoint[last] + (b - points.back().beat) / curve.pointPeriod(last);
+        }
+        size_t i = 1;
+        while(i < points.size() && points[i].beat < b) ++i; // same segment search as valueAtBeat
+        const double span = std::max(1e-9, points[i].beat - points[i - 1].beat);
+        return cache.atPoint[i - 1] + curve.segmentCycles(i, (b - points[i - 1].beat) / span);
+    };
+    return G(sourceBeat) - G(0.0);
 }
 
 } // namespace
 
 namespace ofxOceanodeTimelineLfo {
+
+float laneValueFromNormalized(const ofxOceanodeTimelineLane& lane, float normalized) {
+    return static_cast<float>(lfoMapNormalized(lane.valueMin, lane.valueMax, lfoLaneIsLog(lane), normalized));
+}
+
+float laneNormalizedFromValue(const ofxOceanodeTimelineLane& lane, float value) {
+    return lfoUnmapValue(lane.valueMin, lane.valueMax, lfoLaneIsLog(lane), value);
+}
+
+const std::vector<float>& frequencyGridValues(int mode) {
+    struct Grids {
+        std::vector<float> values[3];
+        Grids() {
+            const auto* definition = lfoParameterDefinition("frequency");
+            const float lo = definition != nullptr ? definition->minimum : 0.125f;
+            const float hi = definition != nullptr ? definition->maximum : 64.0f;
+            for(int m = 0; m < 3; ++m) {
+                for(int exponent = -4; exponent <= 7; ++exponent) {
+                    const float value = std::ldexp(1.0f, exponent) * kFrequencyGridFactors[m];
+                    if(value >= lo - 1e-6f && value <= hi + 1e-6f) values[m].push_back(value);
+                }
+            }
+        }
+    };
+    static const Grids grids;
+    return grids.values[std::max(0, std::min(2, mode))];
+}
+
+std::string frequencyGridLabel(float beats, int mode) {
+    const int m = std::max(0, std::min(2, mode));
+    const float base = beats / kFrequencyGridFactors[m]; // the straight length it derives from
+    std::string label = base < 1.0f ? "1/" + ofToString(static_cast<int>(std::lround(1.0f / base)))
+                                    : ofToString(static_cast<int>(std::lround(base)));
+    if(m == 1) label += "T";
+    else if(m == 2) label += ".";
+    return label;
+}
+
+float snapFrequencyValue(float beats, int mode) {
+    // Nearest grid value in log distance (musically: nearest note length of the mode).
+    const auto& grid = frequencyGridValues(mode);
+    float best = grid.front();
+    double bestDistance = 1e30;
+    for(float g : grid) {
+        const double distance = std::abs(std::log(std::max(1e-6f, beats) / g));
+        if(distance < bestDistance) { bestDistance = distance; best = g; }
+    }
+    return best;
+}
 
 float evaluateParameter(const ofxOceanodeTimelineClip& clip,
                         const std::string& parameter, double sourceBeat,
@@ -520,18 +744,20 @@ float evaluateParameter(const ofxOceanodeTimelineClip& clip,
     if(definition == nullptr) return fallback;
     for(const auto& lane : clip.lanes) {
         if(lane.lfoParameter != parameter) continue;
-        const float defaultNormalized = (definition->defaultValue - definition->minimum) /
-            (definition->maximum - definition->minimum);
+        const float defaultNormalized = lfoUnmapValue(definition->minimum, definition->maximum,
+                                                      lfoLaneIsLog(lane), definition->defaultValue);
         const float normalized = normalizedLfoLaneValue(lane, sourceBeat, defaultNormalized);
-        return definition->minimum + ofClamp(normalized, 0.0f, 1.0f) *
-            (definition->maximum - definition->minimum);
+        return static_cast<float>(lfoMapNormalized(definition->minimum, definition->maximum,
+                                                   lfoLaneIsLog(lane), normalized));
     }
     return fallback;
 }
 
 float evaluate(const ofxOceanodeTimelineClip& clip, double sourceBeat) {
-    const float frequency = std::max(1.0f / 1024.0f,
-        evaluateParameter(clip, "frequency", sourceBeat, 4.0f));
+    // Phase from the integrated frequency curve (see lfoCycles), wrapped in double
+    // precision before handing it to the oscillator.
+    const double cycles = lfoCycles(clip, sourceBeat);
+    const double phase = cycles - std::floor(cycles);
     baseOscillator oscillator;
     oscillator.phaseOffset_Param = evaluateParameter(clip, "phaseOffset", sourceBeat, 0.0f);
     oscillator.pow_Param = evaluateParameter(clip, "pow", sourceBeat, 0.0f);
@@ -546,7 +772,7 @@ float evaluate(const ofxOceanodeTimelineClip& clip, double sourceBeat) {
     oscillator.invert_Param = 0.0f;
     oscillator.skew_Param = evaluateParameter(clip, "skew", sourceBeat, 0.0f);
     oscillator.roundness_Param = evaluateParameter(clip, "roundness", sourceBeat, 0.5f);
-    return oscillator.computeFunc(static_cast<float>(sourceBeat / frequency));
+    return oscillator.computeFunc(static_cast<float>(phase));
 }
 
 } // namespace ofxOceanodeTimelineLfo
@@ -1248,6 +1474,21 @@ bool ofxOceanodeTimelineManager::isStepLaneCompatible(const ofxOceanodeAbstractP
            type == typeid(std::vector<std::string>).name();
 }
 
+bool ofxOceanodeTimelineManager::moveBinding(const std::string& trackId, const std::string& bindingId, int newIndex) {
+    auto* track = getTrack(trackId);
+    if(track == nullptr || track->bindings.empty()) return false;
+    auto it = std::find_if(track->bindings.begin(), track->bindings.end(),
+                           [&](const auto& binding) { return binding.id == bindingId; });
+    if(it == track->bindings.end()) return false;
+    const int from = static_cast<int>(it - track->bindings.begin());
+    const int to = std::max(0, std::min(newIndex, static_cast<int>(track->bindings.size()) - 1));
+    if(from == to) return false;
+    auto binding = std::move(*it);
+    track->bindings.erase(it);
+    track->bindings.insert(track->bindings.begin() + to, std::move(binding));
+    return true;
+}
+
 bool ofxOceanodeTimelineManager::removeBinding(const std::string& trackId, const std::string& bindingId) {
     auto* track = getTrack(trackId);
     if(track == nullptr) return false;
@@ -1332,39 +1573,85 @@ std::string ofxOceanodeTimelineManager::createLfoClip(const std::string& trackId
         }
     }
 
-    struct Definition {
-        const char* id;
-        const char* name;
-        float minimum;
-        float maximum;
-        float defaultValue;
-    };
-    constexpr Definition definitions[] = {
-        {"frequency", "Frequency (beats)", 0.125f, 64.0f, 4.0f},
-        {"roundness", "Roundness", 0.0f, 1.0f, 0.5f},
-        {"skew", "Skew", -1.0f, 1.0f, 0.0f},
-        {"pw", "Pulse width", 0.0f, 1.0f, 0.5f},
-        {"pow", "Pow", -1.0f, 1.0f, 0.0f},
-        {"bipow", "BiPow", -1.0f, 1.0f, 0.0f},
-        {"phaseOffset", "Phase offset", 0.0f, 1.0f, 0.0f},
-        {"scale", "Scale", 0.0f, 2.0f, 1.0f},
-        {"yOffset", "Y offset", -1.0f, 1.0f, 0.0f}
-    };
-    for(const auto& definition : definitions) {
-        const auto laneId = createLane(trackId, clipId, definition.name,
-                                       ofxOceanodeTimelineLaneType::Curve);
+    ensureLfoLanes(trackId, clipId);
+    return clipId;
+}
+
+namespace {
+// Cycles started in the first `sourceBeats` of an LFO clip's content: a partial
+// final cycle counts as started, so the next segment begins a new cycle index.
+double lfoCyclesStarted(const ofxOceanodeTimelineClip& clip, double sourceBeats) {
+    if(sourceBeats <= kEpsilon) return 0.0;
+    const double cycles = lfoCycles(clip, sourceBeats);
+    return cycles <= 1e-9 ? 0.0 : std::ceil(cycles - 1e-9);
+}
+
+// Cycles started over a whole clip (all its repeats, including a partial last one).
+double lfoClipCyclesStarted(const ofxOceanodeTimelineClip& clip) {
+    using namespace ofxOceanodeTimelineClipTime;
+    const double content = sourceDuration(clip);
+    if(!clip.repeatContent) return lfoCyclesStarted(clip, content);
+    const double duration = std::max(1.0 / 24.0, clip.durationBeats);
+    const double repeatLength = cycleDuration(clip);
+    const double fullRepeats = std::floor(duration / repeatLength + 1e-9);
+    const double partialSource = (duration - fullRepeats * repeatLength) / stretch(clip);
+    return fullRepeats * lfoCyclesStarted(clip, content) + lfoCyclesStarted(clip, partialSource);
+}
+} // namespace
+
+ofxOceanodeTimelineLfoSample ofxOceanodeTimelineManager::evaluateLfoTrack(const std::string& trackId,
+                                                                         double beat) const {
+    ofxOceanodeTimelineLfoSample sample;
+    const auto* track = getTrack(trackId);
+    if(track == nullptr) return sample;
+
+    std::vector<const ofxOceanodeTimelineClip*> clips;
+    for(const auto& clip : track->clips) if(clip.isLfo) clips.push_back(&clip);
+    std::sort(clips.begin(), clips.end(), [](const auto* a, const auto* b) { return a->startBeat < b->startBeat; });
+
+    double cyclesBefore = 0.0;
+    for(const auto* clip : clips) {
+        double sourceBeat = 0.0;
+        if(clipSourceBeat(*clip, beat, sourceBeat)) {
+            // Earlier repeats of this clip, then the position inside the current one.
+            const int64_t repeat = ofxOceanodeTimelineClipTime::cycleIndex(*clip, beat);
+            cyclesBefore += static_cast<double>(repeat) *
+                lfoCyclesStarted(*clip, ofxOceanodeTimelineClipTime::sourceDuration(*clip));
+            const double cycles = lfoCycles(*clip, sourceBeat);
+            const double whole = std::floor(cycles);
+            sample.active = true;
+            sample.cycle = cyclesBefore + whole;
+            sample.phase = static_cast<float>(cycles - whole);
+            sample.value = ofxOceanodeTimelineLfo::evaluate(*clip, sourceBeat);
+            return sample;
+        }
+        if(beat < clip->startBeat) break; // in a gap before this clip
+        cyclesBefore += lfoClipCyclesStarted(*clip);
+    }
+    sample.cycle = cyclesBefore;
+    return sample;
+}
+
+void ofxOceanodeTimelineManager::ensureLfoLanes(const std::string& trackId, const std::string& clipId) {
+    auto* clip = getClip(trackId, clipId);
+    if(clip == nullptr || !clip->isLfo) return;
+    for(const auto& definition : kLfoParameters) {
+        const bool present = std::any_of(clip->lanes.begin(), clip->lanes.end(),
+            [&](const auto& lane) { return lane.lfoParameter == definition.id; });
+        if(present) continue;
+        const auto laneId = createLane(trackId, clipId, definition.name, ofxOceanodeTimelineLaneType::Curve);
+        clip = getClip(trackId, clipId); // createLane may reallocate
         if(auto* lane = getLane(trackId, clipId, laneId)) {
             lane->lfoParameter = definition.id;
             lane->valueMin = definition.minimum;
             lane->valueMax = definition.maximum;
-            const float normalized = (definition.defaultValue - definition.minimum) /
-                (definition.maximum - definition.minimum);
-            lane->curvePoints = {{0.0, normalized},
-                                 {clip->contentDurationBeats, normalized}};
+            if(lane->lfoParameter == "frequency") lane->lfoSnap = true;
+            const float normalized = lfoUnmapValue(definition.minimum, definition.maximum,
+                                                   lfoLaneIsLog(*lane), definition.defaultValue);
+            lane->curvePoints = {{0.0, normalized}, {clip->contentDurationBeats, normalized}};
             lane->curveTensions.assign(1, ofxOceanodeTimelineCurveTension{});
         }
     }
-    return clipId;
 }
 
 bool ofxOceanodeTimelineManager::renameClip(const std::string& trackId, const std::string& clipId,
@@ -2794,6 +3081,7 @@ void ofxOceanodeTimelineManager::clear() {
     invalidateSchedule();
     bpmAutomationEnabled = false;
     bpmLaneCollapsed = true;
+    bpmLaneVisible = true;
     bpmMinimum = 20.0f;
     bpmMaximum = 300.0f;
     bpmAutomationPoints.clear();
@@ -2870,6 +3158,7 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
     json["tempo"] = {
         {"enabled", bpmAutomationEnabled},
         {"collapsed", bpmLaneCollapsed},
+        {"visible", bpmLaneVisible},
         {"minimum", bpmMinimum},
         {"maximum", bpmMaximum},
         {"interpolation", bpmInterpolation},
@@ -3003,7 +3292,11 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
                 laneJson["multiValueInteger"] = lane.multiValueInteger;
                 laneJson["multiSliderValues"] = lane.multiSliderValues;
                 laneJson["valueQuantizeSteps"] = lane.valueQuantizeSteps;
+                laneJson["valueSnap"] = lane.valueSnap;
                 laneJson["lfoParameter"] = lane.lfoParameter;
+                laneJson["lfoValue"] = lane.lfoValue;
+                laneJson["lfoSnap"] = lane.lfoSnap;
+                laneJson["lfoSnapMode"] = lane.lfoSnapMode;
                 // The Wave lane and the per-clip volume lane are load-only
                 // (see ofxOceanodeTimelineLane): audio and its envelope are
                 // written at clip and track level instead.
@@ -3069,6 +3362,7 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
         const auto& tempo = json["tempo"];
         bpmAutomationEnabled = tempo.value("enabled", false);
         bpmLaneCollapsed = tempo.value("collapsed", true);
+        bpmLaneVisible = tempo.value("visible", true);
         setBpmRange(tempo.value("minimum", 20.0f), tempo.value("maximum", 300.0f));
         bpmInterpolation = tempo.value("interpolation", std::string("Linear"));
         if(bpmInterpolation != "Step" && bpmInterpolation != "Linear" &&
@@ -3235,8 +3529,12 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
                         lane.curveClamp = laneJson.value("curveClamp", true);
                         lane.isWaveVolume = laneJson.value("isWaveVolume", false);
                         lane.lfoParameter = laneJson.value("lfoParameter", std::string());
+                        lane.lfoValue = ofClamp(laneJson.value("lfoValue", 0.5f), 0.0f, 1.0f);
+                        lane.lfoSnap = laneJson.value("lfoSnap", false);
+                        lane.lfoSnapMode = std::max(0, std::min(2, laneJson.value("lfoSnapMode", 0)));
                         lane.curveInterpolation = laneJson.value("curveInterpolation", std::string("Linear"));
-                        if(lane.curveInterpolation != "Step" && lane.curveInterpolation != "Linear" &&
+                        const bool lfoValueMode = !lane.lfoParameter.empty() && lane.curveInterpolation == "Value";
+                        if(!lfoValueMode && lane.curveInterpolation != "Step" && lane.curveInterpolation != "Linear" &&
                            lane.curveInterpolation != "Log / Exp" && lane.curveInterpolation != "Sigmoid") {
                             lane.curveInterpolation = "Linear";
                         }
@@ -3344,6 +3642,8 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
                                 lane.multiSliderValues.push_back(v.get<float>());
                         }
                         lane.valueQuantizeSteps = std::max(0, laneJson.value("valueQuantizeSteps", 0));
+                        // Before the toggle existed, a step count of 2+ meant snapping was on.
+                        lane.valueSnap = laneJson.value("valueSnap", lane.valueQuantizeSteps >= 2);
                         lane.waveFilePath = laneJson.value("waveFilePath", std::string());
                         lane.waveGain = ofClamp(laneJson.value("waveGain", 1.0f), 0.0f, 4.0f);
                         if(lane.isWaveVolume) {
@@ -3449,6 +3749,16 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
         }
     }
     nextGroupNumber = clipGroups.size() + 1;
+
+    // Give loaded LFO clips any control lane they are missing (collect ids first:
+    // adding lanes must not happen while iterating the clip containers).
+    std::vector<std::pair<std::string, std::string>> lfoClipIds;
+    for(const auto& track : tracks) {
+        for(const auto& clip : track.clips) {
+            if(clip.isLfo) lfoClipIds.emplace_back(track.id, clip.id);
+        }
+    }
+    for(const auto& ids : lfoClipIds) ensureLfoLanes(ids.first, ids.second);
 }
 
 bool ofxOceanodeTimelineManager::savePreset(const std::string& presetFolderPath) const {

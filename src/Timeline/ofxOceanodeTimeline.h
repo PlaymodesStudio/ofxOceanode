@@ -158,7 +158,7 @@ struct ofxOceanodeTimelineParameterBinding {
     std::string valueType;
     std::string defaultValue;
     ofxOceanodeTimelineAutomationMode mode = ofxOceanodeTimelineAutomationMode::Replace;
-    ofxOceanodeTimelineLaneType laneType = ofxOceanodeTimelineLaneType::Step;
+    ofxOceanodeTimelineLaneType laneType = ofxOceanodeTimelineLaneType::Curve; // default clip type for new parameters
     bool bypass = false;
     bool missingTarget = false;
     // A live override takes priority over whatever clip automation computes
@@ -249,6 +249,9 @@ struct ofxOceanodeTimelineLane {
     // (no value snapping) -- separate from beatsPerStep, which is the
     // existing *time*-axis grid every lane type already has.
     int valueQuantizeSteps = 0;
+    // Curve lanes: snap edited values to valueQuantizeSteps levels. The step
+    // count is kept when snapping is switched off.
+    bool valueSnap = false;
     // Read-only remnants of the first Wave format, in which audio and its
     // volume envelope were lanes inside a clip. Nothing creates either any
     // more: createLane refuses the Wave type, no selector offers it, and
@@ -262,6 +265,15 @@ struct ofxOceanodeTimelineLane {
     // keep the semantic role here so the evaluator and editor do not have to
     // infer it from the user-facing lane name.
     std::string lfoParameter;
+    // LFO lanes also offer a "Value" mode (curveInterpolation == "Value"): the
+    // control holds this constant (normalized 0..1 like curve point values)
+    // and the curve points are kept untouched for when another mode is chosen.
+    float lfoValue = 0.5f;
+    // Frequency lane: point / value edits snap to the musical grid values.
+    bool lfoSnap = false;
+    // Frequency lane grid: 0 = straight, 1 = triplet, 2 = dotted. Changing it
+    // only affects new edits; existing points keep their values.
+    int lfoSnapMode = 0;
 };
 
 struct ofxOceanodeTimelineClip {
@@ -327,7 +339,29 @@ namespace ofxOceanodeTimelineClipTime {
                        double timelineBeat);
 }
 
+// One LFO track sampled at a timeline beat (see ofxOceanodeTimelineManager::evaluateLfoTrack).
+struct ofxOceanodeTimelineLfoSample {
+    bool active = false;  // an LFO clip covers this beat
+    float value = 0.0f;   // shaped LFO result, normalized 0..1 (as the clip draws it)
+    float phase = 0.0f;   // raw 0..1 ramp of the current cycle, before shaping/phase offset
+    double cycle = 0.0;   // whole cycles counted from the timeline start, continuous across
+                          // clips and repeats; increments exactly when phase wraps
+};
+
 namespace ofxOceanodeTimelineLfo {
+    // Normalized (0..1, as stored in curve points / lfoValue) <-> real value
+    // for an LFO lane. The frequency lane is logarithmic: every halving of the
+    // cycle length gets the same vertical space; other lanes are linear.
+    float laneValueFromNormalized(const ofxOceanodeTimelineLane& lane, float normalized);
+    float laneNormalizedFromValue(const ofxOceanodeTimelineLane& lane, float value);
+    // Musical reference values (cycle length in beats) for the frequency lane:
+    // grid lines in the editor and snap targets. mode: 0 straight (powers of
+    // two), 1 triplet (x 2/3), 2 dotted (x 3/2), within the frequency range.
+    const std::vector<float>& frequencyGridValues(int mode = 0);
+    float snapFrequencyValue(float beats, int mode = 0);
+    // Label for a grid value, e.g. 1/4, 2T (triplet), 1/2. (dotted)
+    std::string frequencyGridLabel(float beats, int mode = 0);
+
     // Evaluates the complete LFO result in normalized 0..1 space. The shape
     // is intentionally shared by playback and the editor's result view.
     float evaluate(const ofxOceanodeTimelineClip& clip, double sourceBeat);
@@ -465,6 +499,8 @@ public:
     bool getParameterTrackColor(const ofxOceanodeAbstractParameter& parameter, ofColor& color) const;
     bool isStepLaneCompatible(const ofxOceanodeAbstractParameter& parameter) const;
     bool removeBinding(const std::string& trackId, const std::string& bindingId);
+    // Moves a parameter row within its track (newIndex is clamped). The order is saved.
+    bool moveBinding(const std::string& trackId, const std::string& bindingId, int newIndex);
     bool setBindingMode(const std::string& trackId, const std::string& bindingId, ofxOceanodeTimelineAutomationMode mode);
     bool setBindingClamp(const std::string& trackId, const std::string& bindingId, bool clampToParameterRange);
     ofxOceanodeTimelineParameterBinding* getBinding(const std::string& trackId, const std::string& bindingId);
@@ -479,6 +515,13 @@ public:
                               const std::string& requestedName = "LFO",
                               double startBeat = 0.0,
                               double durationBeats = 4.0);
+    // Samples the LFO clips of a track at a timeline beat. A pure function of the
+    // beat, so playback, scrubbing and seeking give identical results. Between or
+    // outside clips: active = false, phase 0, cycle holds the count reached so far.
+    ofxOceanodeTimelineLfoSample evaluateLfoTrack(const std::string& trackId, double beat) const;
+    // Adds any LFO control lane the clip is missing (e.g. clips saved before a
+    // control existed), initialised to the control's default.
+    void ensureLfoLanes(const std::string& trackId, const std::string& clipId);
     bool renameClip(const std::string& trackId, const std::string& clipId, const std::string& requestedName);
     bool removeClip(const std::string& trackId, const std::string& clipId);
     ofxOceanodeTimelineClip* getClip(const std::string& trackId, const std::string& clipId);
@@ -566,6 +609,10 @@ public:
     void setBpmAutomationEnabled(bool enabled);
     bool isBpmLaneCollapsed() const { return bpmLaneCollapsed; }
     void setBpmLaneCollapsed(bool collapsed) { bpmLaneCollapsed = collapsed; }
+    // Show/hide the tempo (BPM) automation row. Hidden only affects the editor:
+    // tempo automation keeps playing.
+    bool isBpmLaneVisible() const { return bpmLaneVisible; }
+    void setBpmLaneVisible(bool visible) { bpmLaneVisible = visible; }
     float getBpmMinimum() const { return bpmMinimum; }
     float getBpmMaximum() const { return bpmMaximum; }
     void setBpmRange(float minimum, float maximum);
@@ -689,6 +736,7 @@ private:
     std::map<std::string, std::vector<std::pair<ofxOceanodeTimelineAutomationMode, std::string>>> activeAutomationValues;
     bool bpmAutomationEnabled = false;
     bool bpmLaneCollapsed = true;
+    bool bpmLaneVisible = true;
     float bpmMinimum = 20.0f;
     float bpmMaximum = 300.0f;
     std::vector<ofxOceanodeTimelineCurvePoint> bpmAutomationPoints;

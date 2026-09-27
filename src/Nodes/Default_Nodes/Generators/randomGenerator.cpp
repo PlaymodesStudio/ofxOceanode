@@ -6,6 +6,7 @@
 //
 
 #include "randomGenerator.h"
+#include "ofxOceanodeDeterministicRandom.h"
 
 void randomGenerator::setup(){
     color = ofColor(0, 200, 255);
@@ -72,7 +73,22 @@ void randomGenerator::setup(){
         }
     }));
     listeners.push(seed.newListener([this](vector<int> &val){
-        seedChanged = true;
+        // A seed that arrives on its own restarts the sequence even if the value is unchanged,
+        // so re-sending the seed (e.g. at the start of a timeline) reliably restarts it.
+        // A seed streamed every frame (e.g. from a Number node) only restarts when it changes,
+        // otherwise the sequence could never advance.
+        const uint64_t frame = ofGetFrameNum();
+        const bool isolatedSend = frame > lastSeedFrame + 1;
+        const bool changed = val != lastSeedValue;
+        lastSeedFrame = frame;
+        lastSeedValue = val;
+        // Transport mode: recompute right away so chained randoms (Output -> Seed) settle
+        // to the correct value within the same frame, whatever the evaluation order.
+        if(syncToTransport_Param){
+            computeTransport();
+            return;
+        }
+        if(changed || isolatedSend) restartFromSeedInput();
     }));
     listeners.push(length_Param.newListener([this](vector<float> &val){
         for(int i = 0; i < baseChGen.size(); i++){
@@ -102,6 +118,27 @@ void randomGenerator::setup(){
     addOutputParameter(output.set("Output", {0}, {0}, {1}));
     
     addInspectorParameter(nonRepeat.set("Non Repeating", false));
+    
+    addInspectorParameter(laneSeeds_Param.set("Lane Seeds", false));
+    listeners.push(laneSeeds_Param.newListener([this](bool &){
+        if(syncToTransport_Param) computeTransport();
+        else restartFromSeedInput();
+    }));
+    
+    sessionSalt = ofxOceanodeDeterministicRandom::makeSessionSalt();
+    addInspectorParameter(syncToTransport_Param.set("Sync To Transport", false));
+    listeners.push(syncToTransport_Param.newListener([this](bool &b){
+        setStepInputVisible(b);
+        if(b) computeTransport();
+        else seedChanged = true;
+    }));
+    listeners.push(step_Param.newListener([this](vector<float> &){
+        // With a connected Phase (e.g. a Phasor), computation happens when the phase arrives;
+        // the Phasor sends Cycle before Phase, so both are up to date by then.
+        if(syncToTransport_Param && !getOceanodeParameter(phasorIn).hasInConnection()){
+            computeTransport();
+        }
+    }));
     
     listeners.push(phasorIn.newListener(this, &randomGenerator::phasorInListener));
     desiredLength = 1;
@@ -147,23 +184,22 @@ void randomGenerator::presetRecallBeforeSettingParameters(ofJson &json){
 }
 
 void randomGenerator::phasorInListener(vector<float> &phasor){
+    bool resized = false;
     if(phasor.size() != baseChGen.size() && phasor.size() != 1 && index_Param->size() == 1){
         resize(phasor.size());
+        resized = true;
     }
-    else if(seedChanged){
+    if(syncToTransport_Param){
+        computeTransport();
+        oldPhasor = phasor[0];
+        return;
+    }
+    if(!resized && seedChanged){
 		if(phasor.size() == 1 && phasor[0] > oldPhasor){
 //			ofLog() << phasor[0] << " - " << oldPhasor;
 		}else{
 			for(int i = 0; i < baseChGen.size(); i++){
-				if(getValueForPosition(seed.get(), i) == 0){
-					baseChGen[i].nextSeed(0);
-				}else{
-					if(seed->size() == 1 && seed->at(0) < 0){
-						baseChGen[i].nextSeed(seed->at(0) - (10*getValueForPosition(index_Param.get(), i)*baseChGen.size()));
-					}else{
-						baseChGen[i].nextSeed(getValueForPosition(seed.get(), i));
-					}
-				}
+				baseChGen[i].nextSeed(channelSeed(i));
 			}
 			seedChanged = false;
 		}
@@ -175,16 +211,74 @@ void randomGenerator::phasorInListener(vector<float> &phasor){
 	oldPhasor = phasor[0];
 }
 
+void randomGenerator::setStepInputVisible(bool visible){
+    const bool present = getParameterGroup().contains("Step");
+    if(visible && !present){
+        addParameter(step_Param.set("Step", {0}, {0}, {FLT_MAX}));
+    }else if(!visible && present){
+        getOceanodeParameter(step_Param).removeAllConnections();
+        removeParameter("Step");
+    }
+}
+
+int randomGenerator::channelSeed(int i){
+    const int s = getValueForPosition(seed.get(), i);
+    if(s == 0) return 0;
+    if(seed->size() == 1 && seed->at(0) < 0){
+        return seed->at(0) - static_cast<int>(10*getValueForPosition(index_Param.get(), i)*baseChGen.size());
+    }
+    // Lane Seeds: a single positive seed gives each channel its own sequence (Seed + lane).
+    if(laneSeeds_Param && seed->size() == 1) return s + i;
+    return s;
+}
+
+void randomGenerator::restartFromSeedInput(){
+    seedChanged = false;
+    for(int i = 0; i < baseChGen.size(); i++){
+        // Restarts now if this channel just crossed a cycle boundary, else at its next one.
+        baseChGen[i].requestSeed(channelSeed(i), true);
+    }
+    // Refresh the output in case a channel restarted immediately (same phase: no new draw).
+    const vector<float> phase = phasorIn.get();
+    if(phase.empty()) return;
+    result.resize(baseChGen.size());
+    for(int i = 0; i < baseChGen.size(); i++){
+        result[i] = baseChGen[i].computeFunc(getValueForPosition(phase, i));
+    }
+    output = result;
+}
+
+uint64_t randomGenerator::channelSeedKey(int i){
+    const int s = channelSeed(i);
+    if(s == 0){
+        return ofxOceanodeDeterministicRandom::mix(sessionSalt ^ static_cast<uint64_t>(i));
+    }
+    return ofxOceanodeDeterministicRandom::seedKey(s, sessionSalt);
+}
+
+void randomGenerator::computeTransport(){
+    const auto &phase = phasorIn.get();
+    const auto &steps = step_Param.get();
+    if(phase.empty() || steps.empty()) return;
+    result.resize(baseChGen.size());
+    for(int i = 0; i < baseChGen.size(); i++){
+        // Same wrap positions as computeFunc(): a new value every time
+        // (phase + index*length + phaseOffset) crosses an integer.
+        const float p = getValueForPosition(phase, i);
+        const int length = static_cast<int>(getValueForPosition(length_Param.get(), i));
+        const float offset = getValueForPosition(index_Param.get(), i) * length + getValueForPosition(phaseOffset_Param.get(), i);
+        const int64_t step = ofxOceanodeDeterministicRandom::stepFromFloat(getValueForPosition(steps, i))
+            + static_cast<int64_t>(std::floor(p + offset));
+        result[i] = baseChGen[i].computeDeterministic(step, channelSeedKey(i));
+    }
+    output = result;
+}
+
 void randomGenerator::resetPhase(){
+	if(syncToTransport_Param) return; // position comes from the transport
 	seedChanged = false;
-	if(seed->size() == 1 && seed->at(0) < 0){
-		for(int i = 0; i < baseChGen.size(); i++){
-			baseChGen[i].restartSeedSequence(seed->at(0) - (10*getValueForPosition(index_Param.get(), i)*baseChGen.size()));
-		}
-	}else{
-		for(int i = 0; i < baseChGen.size(); i++){
-			baseChGen[i].restartSeedSequence(getValueForPosition(seed.get(), i));
-		}
+	for(int i = 0; i < baseChGen.size(); i++){
+		baseChGen[i].restartSeedSequence(channelSeed(i));
 	}
 	if(!getOceanodeParameter(phasorIn).hasInConnection()){
 //		vector<float> temp = {1};

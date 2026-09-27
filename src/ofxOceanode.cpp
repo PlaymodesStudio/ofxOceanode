@@ -50,6 +50,7 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<oscillator>("Generators");
     nodeRegistry->registerModel<chaoticOscillator>("Generators");
     nodeRegistry->registerModel<phasor>("Generators");
+    nodeRegistry->registerModel<lfoTrack>("Generators");
     nodeRegistry->registerModel<simpleNumberGenerator>("Generators");
     nodeRegistry->registerModel<simpleNormalizedNumberGenerator>("Generators");
     nodeRegistry->registerModel<counter>("Generators");

@@ -6,6 +6,7 @@
 //
 
 #include "chaoticOscillator.h"
+#include "ofxOceanodeDeterministicRandom.h"
 
 void chaoticOscillator::setup(){
     color = ofColor(0, 200, 255);
@@ -94,7 +95,22 @@ void chaoticOscillator::setup(){
         }
     }));
     listeners.push(seed.newListener([this](vector<int> &val){
-        seedChanged = true;
+        // A seed that arrives on its own restarts the sequence even if the value is unchanged,
+        // so re-sending the seed (e.g. at the start of a timeline) reliably restarts it.
+        // A seed streamed every frame (e.g. from a Number node) only restarts when it changes,
+        // otherwise the sequence could never advance.
+        const uint64_t frame = ofGetFrameNum();
+        const bool isolatedSend = frame > lastSeedFrame + 1;
+        const bool changed = val != lastSeedValue;
+        lastSeedFrame = frame;
+        lastSeedValue = val;
+        // Transport mode: recompute right away so chained randoms (Output -> Seed) settle
+        // to the correct value within the same frame, whatever the evaluation order.
+        if(syncToTransport_Param){
+            computeTransport();
+            return;
+        }
+        if(changed || isolatedSend) restartFromSeedInput();
     }));
     listeners.push(length_Param.newListener([this](vector<float> &val){
         for(int i = 0; i < baseChOsc.size(); i++){
@@ -124,6 +140,27 @@ void chaoticOscillator::setup(){
     addParameter(invert_Param.set("Invert", {0}, {0}, {1}));
     
     addOutputParameter(output.set("Output", {0}, {0}, {1}));
+    
+    addInspectorParameter(laneSeeds_Param.set("Lane Seeds", false));
+    listeners.push(laneSeeds_Param.newListener([this](bool &){
+        if(syncToTransport_Param) computeTransport();
+        else restartFromSeedInput();
+    }));
+    
+    sessionSalt = ofxOceanodeDeterministicRandom::makeSessionSalt();
+    addInspectorParameter(syncToTransport_Param.set("Sync To Transport", false));
+    listeners.push(syncToTransport_Param.newListener([this](bool &b){
+        setStepInputVisible(b);
+        if(b) computeTransport();
+        else seedChanged = true;
+    }));
+    listeners.push(step_Param.newListener([this](vector<float> &){
+        // With a connected Phase (e.g. a Phasor), computation happens when the phase arrives;
+        // the Phasor sends Cycle before Phase, so both are up to date by then.
+        if(syncToTransport_Param && !getOceanodeParameter(phasorIn).hasInConnection()){
+            computeTransport();
+        }
+    }));
     
     listeners.push(phasorIn.newListener(this, &chaoticOscillator::phasorInListener));
     desiredLength = 1;
@@ -173,23 +210,22 @@ void chaoticOscillator::presetRecallBeforeSettingParameters(ofJson &json){
 }
 
 void chaoticOscillator::phasorInListener(vector<float> &phasor){
+    bool resized = false;
     if(phasor.size() != baseChOsc.size() && phasor.size() != 1 && index_Param->size() == 1){
         resize(phasor.size());
+        resized = true;
     }
-    else if(seedChanged){
+    if(syncToTransport_Param){
+        computeTransport();
+        oldPhasor = phasor[0];
+        return;
+    }
+    if(!resized && seedChanged){
 		if(phasor.size() == 1 && phasor[0] > oldPhasor){
 //			ofLog() << phasor[0] << " - " << oldPhasor;
 		}else{
 			for(int i = 0; i < baseChOsc.size(); i++){
-				if(getValueForPosition(seed.get(), i) == 0){
-					baseChOsc[i].nextSeed(0);
-				}else{
-					if(seed->size() == 1 && seed->at(0) < 0){
-						baseChOsc[i].nextSeed(seed->at(0) - (10*getValueForPosition(index_Param.get(), i)*baseChOsc.size()));
-					}else{
-						baseChOsc[i].nextSeed(getValueForPosition(seed.get(), i));
-					}
-				}
+				baseChOsc[i].nextSeed(channelSeed(i));
 			}
 			seedChanged = false;
 		}
@@ -201,16 +237,68 @@ void chaoticOscillator::phasorInListener(vector<float> &phasor){
 	oldPhasor = phasor[0];
 }
 
+void chaoticOscillator::setStepInputVisible(bool visible){
+    const bool present = getParameterGroup().contains("Step");
+    if(visible && !present){
+        addParameter(step_Param.set("Step", {0}, {0}, {FLT_MAX}));
+    }else if(!visible && present){
+        getOceanodeParameter(step_Param).removeAllConnections();
+        removeParameter("Step");
+    }
+}
+
+int chaoticOscillator::channelSeed(int i){
+    const int s = getValueForPosition(seed.get(), i);
+    if(s == 0) return 0;
+    if(seed->size() == 1 && seed->at(0) < 0){
+        return seed->at(0) - static_cast<int>(10*getValueForPosition(index_Param.get(), i)*baseChOsc.size());
+    }
+    // Lane Seeds: a single positive seed gives each channel its own sequence (Seed + lane).
+    if(laneSeeds_Param && seed->size() == 1) return s + i;
+    return s;
+}
+
+void chaoticOscillator::restartFromSeedInput(){
+    seedChanged = false;
+    for(int i = 0; i < baseChOsc.size(); i++){
+        // Restarts now if this channel just crossed a cycle boundary, else at its next one.
+        baseChOsc[i].requestSeed(channelSeed(i), true);
+    }
+    // Refresh the output in case a channel restarted immediately (same phase: no new draw).
+    const vector<float> phase = phasorIn.get();
+    if(phase.empty()) return;
+    result.resize(baseChOsc.size());
+    for(int i = 0; i < baseChOsc.size(); i++){
+        result[i] = baseChOsc[i].computeFunc(getValueForPosition(phase, i));
+    }
+    output = result;
+}
+
+uint64_t chaoticOscillator::channelSeedKey(int i){
+    const int s = channelSeed(i);
+    if(s == 0){
+        return ofxOceanodeDeterministicRandom::mix(sessionSalt ^ static_cast<uint64_t>(i));
+    }
+    return ofxOceanodeDeterministicRandom::seedKey(s, sessionSalt);
+}
+
+void chaoticOscillator::computeTransport(){
+    const auto &phase = phasorIn.get();
+    const auto &steps = step_Param.get();
+    if(phase.empty() || steps.empty()) return;
+    result.resize(baseChOsc.size());
+    for(int i = 0; i < baseChOsc.size(); i++){
+        const int64_t step = ofxOceanodeDeterministicRandom::stepFromFloat(getValueForPosition(steps, i));
+        result[i] = baseChOsc[i].computeDeterministic(getValueForPosition(phase, i), step, channelSeedKey(i));
+    }
+    output = result;
+}
+
 void chaoticOscillator::resetPhase(){
+	if(syncToTransport_Param) return; // position comes from the transport
 	seedChanged = false;
-	if(seed->size() == 1 && seed->at(0) < 0){
-		for(int i = 0; i < baseChOsc.size(); i++){
-			baseChOsc[i].restartSeedSequence(seed->at(0) - (10*getValueForPosition(index_Param.get(), i)*baseChOsc.size()));
-		}
-	}else{
-		for(int i = 0; i < baseChOsc.size(); i++){
-			baseChOsc[i].restartSeedSequence(getValueForPosition(seed.get(), i));
-		}
+	for(int i = 0; i < baseChOsc.size(); i++){
+		baseChOsc[i].restartSeedSequence(channelSeed(i));
 	}
 	
 }

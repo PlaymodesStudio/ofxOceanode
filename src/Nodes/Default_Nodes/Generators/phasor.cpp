@@ -81,7 +81,12 @@ void phasor::setup(){
 void phasor::update(ofEventArgs &e)
 {
     if(syncToTransport_Param){
-        phasorMonitor = calculateTransportLockedPhasors(getFrameTransportState().current.beatPosition);
+        const auto frameState = getFrameTransportState();
+        // Cycle goes out before Phase: phase-driven receivers (Random Generator /
+        // Random Oscillator) store the step and compute when the phase arrives.
+        updateTransportLockedCycleOutput(frameState.current.beatPosition, false);
+        phasorMonitor = calculateTransportLockedPhasors(frameState.current.beatPosition);
+        checkTransportLockedCycle(frameState);
     }else if(!basePh->isAudio()){
         phasorMonitor = basePh->getPhasors();
     }
@@ -98,8 +103,46 @@ void phasor::setBpm(float bpm){
     bpm_Param = bpm;
 }
 
+void phasor::loadBeforeConnections(ofJson &json){
+    // Restore the mode before connections so a saved "Cycle" connection finds its output.
+    deserializeParameter(json, syncToTransport_Param);
+}
+
+void phasor::setCycleOutputVisible(bool visible){
+    const bool present = getParameterGroup().contains("Cycle");
+    if(visible && !present){
+        addOutputParameter(cycle_Param.set("Cycle", {0}, {0}, {FLT_MAX}), ofxOceanodeParameterFlags_DisableSavePreset | ofxOceanodeParameterFlags_DisableSaveProject);
+    }else if(!visible && present){
+        getOceanodeParameter(cycle_Param).removeAllConnections();
+        removeParameter("Cycle");
+    }
+}
+
+vector<float> phasor::calculateTransportLockedCycleCounts(double beatPosition) const{
+    const size_t numPhasors = getTransportLockedPhasorCount();
+    vector<float> cycles(numPhasors, 0.0f);
+    for(size_t i = 0; i < numPhasors; i++){
+        double c = std::floor(calculateTransportLockedCycles(beatPosition, i) + ofxOceanodeTimeUtils::StepEpsilon);
+        if(c < 0) c = 0;
+        if(!loop_Param && c > 1) c = 1; // non-looping phasor: finished, hold
+        cycles[i] = static_cast<float>(c);
+    }
+    return cycles;
+}
+
+void phasor::updateTransportLockedCycleOutput(double beatPosition, bool force){
+    if(!getParameterGroup().contains("Cycle")) return;
+    vector<float> cycles = calculateTransportLockedCycleCounts(beatPosition);
+    // Only notify on change: receivers (e.g. Random Values) regenerate on every step change.
+    if(force || cycles != cycle_Param.get()){
+        cycle_Param = cycles;
+    }
+}
+
 void phasor::handleSyncToTransportChanged(bool syncEnabled){
+    setCycleOutputVisible(syncEnabled);
     if(syncEnabled){
+        updateTransportLockedCycleOutput(getFrameTransportState().current.beatPosition, true);
         if(audioRate_Param) {
             audioRate_Param = false;
         }else{
@@ -113,16 +156,37 @@ void phasor::handleSyncToTransportChanged(bool syncEnabled){
     }
 }
 
+double phasor::calculateTransportLockedCycles(double beatPosition, size_t index) const{
+    const double beatDiv = std::max(static_cast<double>(getValueForIndex(beatsDiv_Param.get(), index)), ofxOceanodeTimeUtils::StepEpsilon);
+    const double beatMult = static_cast<double>(getValueForIndex(beatsMult_Param.get(), index));
+    return beatPosition * beatMult / beatDiv;
+}
+
+// Transport-locked equivalent of basePhasor::phasorCycle: fire Reset when phasor 0
+// completes a cycle during continuous forward playback. Seeks / stop / loop-wraps
+// bump the transport generation (or rewind) and are deliberately ignored, so
+// scrubbing does not spray triggers.
+void phasor::checkTransportLockedCycle(const ofxOceanodeFrameTransportState &frameState){
+    if(ofxOceanodeTimeUtils::didTransportDiscontinuity(frameState)) return;
+    if(frameState.current.beatPosition <= frameState.previous.beatPosition) return;
+
+    const double prevCycle = std::floor(calculateTransportLockedCycles(frameState.previous.beatPosition, 0) + ofxOceanodeTimeUtils::StepEpsilon);
+    const double currCycle = std::floor(calculateTransportLockedCycles(frameState.current.beatPosition, 0) + ofxOceanodeTimeUtils::StepEpsilon);
+    if(currCycle <= prevCycle) return;
+    // Non-looping phasor only ends once (first cycle).
+    if(!loop_Param && prevCycle >= 1.0) return;
+
+    selfTrigger = true;
+    resetPhase_Param.trigger();
+    selfTrigger = false;
+}
+
 vector<float> phasor::calculateTransportLockedRawPhasors(double beatPosition) const{
     const size_t numPhasors = getTransportLockedPhasorCount();
     vector<float> rawPhases(numPhasors, 0.0f);
-    const auto &beatDivs = beatsDiv_Param.get();
-    const auto &beatMults = beatsMult_Param.get();
 
     for(size_t i = 0; i < numPhasors; i++){
-        const double beatDiv = std::max(static_cast<double>(getValueForIndex(beatDivs, i)), ofxOceanodeTimeUtils::StepEpsilon);
-        const double beatMult = static_cast<double>(getValueForIndex(beatMults, i));
-        const double rawCycles = beatPosition * beatMult / beatDiv;
+        const double rawCycles = calculateTransportLockedCycles(beatPosition, i);
 
         if(!loop_Param && rawCycles >= 1.0){
             rawPhases[i] = 0.0f;

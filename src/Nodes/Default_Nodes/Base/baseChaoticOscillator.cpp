@@ -9,6 +9,7 @@
 
 #include "baseChaoticOscillator.h"
 #include "ofMath.h"
+#include "ofxOceanodeDeterministicRandom.h"
 
 baseChaoticOscillator::baseChaoticOscillator(){
     oldPhasor = 0;
@@ -26,6 +27,19 @@ baseChaoticOscillator::baseChaoticOscillator(){
     setSeedFlag = false;
 }
 
+void baseChaoticOscillator::requestSeed(int seed_, bool force){
+	if(!force && seed_ == seed) return;
+	if(justWrapped){
+		// The seed arrived in the same frame as a cycle boundary (e.g. right after the
+		// phasor restarted): restart now so the new sequence begins with this cycle,
+		// regardless of whether the seed or the phase was delivered first.
+		restartSeedSequence(seed_);
+	}else{
+		seed = seed_;
+		setSeedFlag = true; // restart at this channel's next cycle boundary
+	}
+}
+
 void baseChaoticOscillator::nextSeed(int seed_){
 	if(seed_ != seed){
 		setSeedFlag = true;
@@ -33,10 +47,7 @@ void baseChaoticOscillator::nextSeed(int seed_){
 	}
 }
 
-float baseChaoticOscillator::computeFunc(float phasor){
-    float linPhase = phasor + (indexNormalized*length_Param) + phaseOffset_Param;
-    linPhase = fmod(linPhase, 1);
-    
+float baseChaoticOscillator::warpPhase(float linPhase){
     if(pulseWidth_Param < 0.5){
         linPhase = ofMap(linPhase, 0.5-pulseWidth_Param, 0.5+pulseWidth_Param, 0, 1, true);
         if(skew_Param < 0 && linPhase == 1) linPhase = 0;
@@ -65,10 +76,16 @@ float baseChaoticOscillator::computeFunc(float phasor){
         else
             skewedLinPhase = ofMap(linPhase, 0, ((1-fabs(skew_Param))*0.5), 0.0, 0.5, true);
     }
-    linPhase = skewedLinPhase;
+    return skewedLinPhase;
+}
+
+float baseChaoticOscillator::computeFunc(float phasor){
+    float linPhase = phasor + (indexNormalized*length_Param) + phaseOffset_Param;
+    linPhase = fmod(linPhase, 1);
+    linPhase = warpPhase(linPhase);
     
-    float val = 0;
-    if(linPhase < oldPhasor){
+    justWrapped = linPhase < oldPhasor;
+    if(justWrapped){
 		if(setSeedFlag){
 			//std::cout << indexNormalized*4 << " | " << phasor << " / " << linPhase << " - " << oldPhasor << std::endl;
 			if(seed == 0){
@@ -79,8 +96,7 @@ float baseChaoticOscillator::computeFunc(float phasor){
 			}
 			
 			float indexPosShifted = (fmod(indexNormalized, 1))*length_Param;
-			if(indexPosShifted == floor(indexPosShifted)) indexPosShifted-=1;
-			for(int i = 0; i < floor(indexPosShifted); i++){
+			for(int i = 0; i < floor(indexPosShifted + 1e-4f); i++){
 				dist(mt);
 			}
 			
@@ -101,6 +117,17 @@ float baseChaoticOscillator::computeFunc(float phasor){
 		futureRandomNotModulated = futureRandom;
 		computePreInterp(futureRandom);
     }
+    
+    float val = interpolate(linPhase, pastRandom, oldRandom, newRandom, futureRandom);
+    computeMultiplyMod(val);
+    
+    oldPhasor = linPhase;
+    
+    return ofClamp(val, 0, 1);
+}
+
+float baseChaoticOscillator::interpolate(float linPhase, float pastRandom, float oldRandom, float newRandom, float futureRandom){
+    float val = 0;
     //rand2
     float lin_interp = oldRandom*(1-linPhase) + newRandom*linPhase;
     
@@ -126,12 +153,7 @@ float baseChaoticOscillator::computeFunc(float phasor){
             val = curve_interp;
         }
     }
-    
-    computeMultiplyMod(val);
-    
-    oldPhasor = linPhase;
-    
-    return ofClamp(val, 0, 1);
+    return val;
 }
 
 void baseChaoticOscillator::computePreInterp(float &value){
@@ -160,10 +182,14 @@ void baseChaoticOscillator::computePreInterp(float &value){
 }
 
 void baseChaoticOscillator::computeMultiplyMod(float &value){
+    computeMultiplyMod(value, randomAdd_Param ? ofRandom(1) : 0.0f);
+}
+
+void baseChaoticOscillator::computeMultiplyMod(float &value, float randomAddUnit){
     
     //random Add
     if(randomAdd_Param)
-        value += randomAdd_Param*ofRandom(1);
+        value += randomAdd_Param*randomAddUnit;
     
     value = ofClamp(value, 0.0, 1.0);
     
@@ -210,8 +236,7 @@ void baseChaoticOscillator::restartSeedSequence(int _seed){
 	}
 	
 	float indexPosShifted = (fmod(indexNormalized, 1))*length_Param;
-	if(indexPosShifted == floor(indexPosShifted)) indexPosShifted-=1;
-	for(int i = 0; i < floor(indexPosShifted); i++){
+	for(int i = 0; i < floor(indexPosShifted + 1e-4f); i++){
 		dist(mt);
 	}
 	
@@ -222,4 +247,35 @@ void baseChaoticOscillator::restartSeedSequence(int _seed){
 	modulateNewRandom();
 	oldPhasor = -1;
 	setSeedFlag = false;
+}
+
+// ───── Transport (deterministic) mode ─────
+
+float baseChaoticOscillator::deterministicPoint(uint64_t seedKey, int64_t step){
+    const float u = ofxOceanodeDeterministicRandom::uniform(seedKey, step, 0);
+    float value;
+    if(customDiscreteDistribution.size() > 1){
+        value = (float)ofxOceanodeDeterministicRandom::discreteIndex(customDiscreteDistribution, u) / (customDiscreteDistribution.size() - 1);
+    }else{
+        value = u;
+    }
+    computePreInterp(value);
+    return value;
+}
+
+float baseChaoticOscillator::computeDeterministic(float phasor, int64_t step, uint64_t seedKey){
+    // Same wrap positions as computeFunc(): the segment advances every time
+    // (phase + index*length + phaseOffset) crosses an integer.
+    const float raw = phasor + (indexNormalized*length_Param) + phaseOffset_Param;
+    const float wholeCycles = std::floor(raw);
+    const int64_t segment = step + static_cast<int64_t>(wholeCycles);
+    const float linPhase = warpPhase(raw - wholeCycles);
+
+    float val = interpolate(linPhase,
+                            deterministicPoint(seedKey, segment - 1),
+                            deterministicPoint(seedKey, segment),
+                            deterministicPoint(seedKey, segment + 1),
+                            deterministicPoint(seedKey, segment + 2));
+    computeMultiplyMod(val, ofxOceanodeDeterministicRandom::uniform(seedKey, segment, 0xADDull));
+    return ofClamp(val, 0, 1);
 }

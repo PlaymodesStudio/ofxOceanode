@@ -240,12 +240,18 @@ public:
     
     void resetPhase() override;
     void setBpm(float bpm) override;
+    void loadBeforeConnections(ofJson &json) override;
     
     shared_ptr<basePhasor> getBasePhasor(){return basePh;};
 private:
     void handleSyncToTransportChanged(bool syncEnabled);
     vector<float> calculateTransportLockedRawPhasors(double beatPosition) const;
     vector<float> calculateTransportLockedPhasors(double beatPosition) const;
+    double calculateTransportLockedCycles(double beatPosition, size_t index) const;
+    void checkTransportLockedCycle(const ofxOceanodeFrameTransportState &frameState);
+    vector<float> calculateTransportLockedCycleCounts(double beatPosition) const;
+    void updateTransportLockedCycleOutput(double beatPosition, bool force);
+    void setCycleOutputVisible(bool visible);
     size_t getTransportLockedPhasorCount() const;
     float getValueForIndex(const vector<float> &values, size_t index) const;
 
@@ -262,6 +268,7 @@ private:
     ofParameter<void>   resetPhase_Param;
     ofParameter<bool>   audioRate_Param;
     ofParameter<bool>   syncToTransport_Param;
+    ofParameter<vector<float>>  cycle_Param; // only present in Sync To Transport mode
     float phaseOffset;
     
     ofEventListeners parameterAutoSettersListeners;
