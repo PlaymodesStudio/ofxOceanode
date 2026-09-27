@@ -126,6 +126,7 @@ void ofxOceanodeCanvas::setupFonts(const std::string& regularPath, const std::st
     io.FontDefault = zoomFonts[3];
     io.FontGlobalScale = 1.0f;
     ofxOceanodeShared::setCurrentBoldFont(nullptr);
+    ofxOceanodeShared::setDefaultBoldFont(zoomFontsBold[3]);
     ofxOceanodeShared::setZoomBaseFontSize(ZOOM_FONT_SIZES[3]);
     ofxOceanodeShared::setBaseFrameHeight(ZOOM_FONT_SIZES[3] + 2.0f);
 }
