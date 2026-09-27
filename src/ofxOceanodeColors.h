@@ -33,7 +33,8 @@ struct OceanodeColors {
     inline static ImVec4 SelectedBorder       = {1.00f,  0.498f, 0.00f,  1.00f}; // selected comment/node border
 
     // ── Connection lines ─────────────────────────────────────────────────────
-    inline static ImVec4 ConnectionLine               = {0.784f, 0.784f, 0.784f, 0.502f}; // idle Bezier wire
+    inline static ImVec4 ConnectionLineLight          = {0.00f,  0.00f,  0.00f,  1.00f};  // wire on a light canvas
+    inline static ImVec4 ConnectionLineDark           = {1.00f,  1.00f,  1.00f,  1.00f};  // wire on a dark canvas
     inline static ImVec4 ConnectionDragging           = {1.00f,  1.00f,  1.00f,  0.251f}; // dragging, no valid target
     inline static ImVec4 ConnectionDraggingReachable  = {1.00f,  1.00f,  1.00f,  0.502f}; // dragging, valid target reachable
 
@@ -122,7 +123,8 @@ struct OceanodeColors {
         ConnectionBullet     = {0.00f,  0.00f,  0.00f,  1.00f};
         SelectedBorder       = {1.00f,  0.498f, 0.00f,  1.00f};
 
-        ConnectionLine               = {0.784f, 0.784f, 0.784f, 0.502f};
+        ConnectionLineLight          = {0.00f,  0.00f,  0.00f,  1.00f};
+        ConnectionLineDark           = {1.00f,  1.00f,  1.00f,  1.00f};
         ConnectionDragging           = {1.00f,  1.00f,  1.00f,  0.251f};
         ConnectionDraggingReachable  = {1.00f,  1.00f,  1.00f,  0.502f};
 
@@ -195,7 +197,8 @@ struct OceanodeColors {
             { "OC_ConnectionBullet",     &ConnectionBullet     },
             { "OC_SelectedBorder",       &SelectedBorder       },
             // Connection lines
-            { "OC_ConnectionLine",               &ConnectionLine               },
+            { "OC_ConnectionLineLight",          &ConnectionLineLight          },
+            { "OC_ConnectionLineDark",           &ConnectionLineDark           },
             { "OC_ConnectionDragging",           &ConnectionDragging           },
             { "OC_ConnectionDraggingReachable",  &ConnectionDraggingReachable  },
             // Canvas grid
