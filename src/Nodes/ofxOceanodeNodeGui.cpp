@@ -572,7 +572,6 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                 }
                 
 				// Push custom style colors
-				ImGui::PushStyleColor(ImGuiCol_PopupBg, OceanodeColors::PopupBg);
 				ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
 				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
 				ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
@@ -688,7 +687,6 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 #endif
 #ifdef OFXOCEANODE_USE_OSC
                     ImGui::Separator();
-					ImGui::PushStyleColor(ImGuiCol_PopupBg, OceanodeColors::PopupBg);
 					ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
 
                     //ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
@@ -698,14 +696,14 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 						string tt = getParameters().getEscapedName() + "/" +absParam.getEscapedName();
 						ImGui::SetTooltip(tt.c_str());
 					}
-					ImGui::PopStyleColor(2);
+					ImGui::PopStyleColor();
 
 #endif
                     ImGui::Separator();
                     ImGui::EndPopup();
                 }
     // Always pop the same number you pushed
-    ImGui::PopStyleColor(3);
+    ImGui::PopStyleColor(2);
     ImGui::PopStyleVar();
 
                 ImGui::PopStyleColor(6);

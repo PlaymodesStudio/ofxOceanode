@@ -76,7 +76,6 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 		ImGui::OpenPopup("Macro");
 	}
 	
-	ImGui::PushStyleColor(ImGuiCol_PopupBg, OceanodeColors::PopupBg);
 	ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
 	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
@@ -119,7 +118,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 		
 		ImGui::EndPopup();
 	}
-	ImGui::PopStyleColor(3);
+	ImGui::PopStyleColor(2);
 	ImGui::PopStyleVar();
 	
 	if(addBank){

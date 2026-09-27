@@ -287,6 +287,9 @@ void ofxOceanode::draw(){
         }
     }
     gui.begin();
+    // ImGui uses PopupBg for menus and modals; derive it from WindowBg each frame.
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.Colors[ImGuiCol_PopupBg] = style.Colors[ImGuiCol_WindowBg];
     // DockBuilder operations are expected before the DockSpace is submitted.
     // This only affects registered controllers absent from the loaded file;
     // windows with an explicit saved DockId remain untouched.
@@ -497,10 +500,6 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     if (show_app_metrics){ImGui::ShowMetricsWindow(&show_app_metrics);}
     if (showManual) showManualWindow(&showManual);
 	
-	// make the bacground of the menus 25% darker to get better contrast with the main GUI,
-	ImVec4 popupBg = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
-	ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(popupBg.x * 0.75f, popupBg.y * 0.75f, popupBg.z * 0.75f, popupBg.w));
-
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 6.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12.0f, 6.0f));
     if (ImGui::BeginMenuBar())
@@ -929,7 +928,6 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         ImGui::EndMenuBar();
     }
     ImGui::PopStyleVar(2);
-    ImGui::PopStyleColor(1); // matches PushStyleColor(ImGuiCol_PopupBg)
     // NOTE: ImGui::End() is intentionally deferred until AFTER all popup
     // OpenPopup/BeginPopupModal calls below, so the DockSpace window is still
     // the active window context when the popups are registered.
@@ -1388,6 +1386,7 @@ void ofxOceanode::saveTheme(const std::string& name){
     ofJson j;
     j["fontFamily"] = themeFontFamily;
     ImVec4* colors = ImGui::GetStyle().Colors;
+    colors[ImGuiCol_PopupBg] = colors[ImGuiCol_WindowBg];
     for(int i = 0; i < ImGuiCol_COUNT; i++){
         string colorName = ImGui::GetStyleColorName(i);
         j["colors"][colorName] = { colors[i].x, colors[i].y, colors[i].z, colors[i].w };
@@ -1430,6 +1429,8 @@ void ofxOceanode::loadTheme(const std::string& name){
             }
         }
     }
+    // Old themes may contain a separate PopupBg; WindowBg now controls both.
+    colors[ImGuiCol_PopupBg] = colors[ImGuiCol_WindowBg];
     // Load custom Oceanode semantic colours (optional: gracefully absent in old theme files)
     if(j.contains("oceanodeColors")){
         for(auto& field : OceanodeColors::getFields()){
@@ -1477,8 +1478,11 @@ void ofxOceanode::drawThemeEditorWindow(){
         if(ImGui::BeginTabBar("##themeditor_tabs")){
 
             if(ImGui::BeginTabItem("ImGui Colors")){
-                std::vector<int> colorIndices(ImGuiCol_COUNT);
-                for(int i = 0; i < ImGuiCol_COUNT; i++) colorIndices[i] = i;
+                ImGui::TextDisabled("WindowBg also controls popup and modal backgrounds.");
+                std::vector<int> colorIndices;
+                for(int i = 0; i < ImGuiCol_COUNT; i++){
+                    if(i != ImGuiCol_PopupBg) colorIndices.push_back(i);
+                }
                 std::sort(colorIndices.begin(), colorIndices.end(), [](int a, int b){
                     return strcmp(ImGui::GetStyleColorName(a), ImGui::GetStyleColorName(b)) < 0;
                 });
@@ -1487,9 +1491,11 @@ void ofxOceanode::drawThemeEditorWindow(){
                 for(int idx : colorIndices){
                     const char* colorName = ImGui::GetStyleColorName(idx);
                     ImGui::PushID(idx);
-                    ImGui::ColorEdit4(colorName, (float*)&colors[idx],
-                                      ImGuiColorEditFlags_AlphaBar |
-                                      ImGuiColorEditFlags_AlphaPreviewHalf);
+                    if(ImGui::ColorEdit4(colorName, (float*)&colors[idx],
+                                       ImGuiColorEditFlags_AlphaBar |
+                                       ImGuiColorEditFlags_AlphaPreviewHalf) && idx == ImGuiCol_WindowBg){
+                        colors[ImGuiCol_PopupBg] = colors[ImGuiCol_WindowBg];
+                    }
                     ImGui::PopID();
                 }
                 ImGui::EndChild();

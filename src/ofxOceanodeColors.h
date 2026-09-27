@@ -55,7 +55,8 @@ struct OceanodeColors {
     inline static ImVec4 ActiveItemHighlight  = {0.40f, 0.90f, 0.40f, 1.00f}; // "currently selected" green tick
 
     // ── Popups & context menus ───────────────────────────────────────────────
-    inline static ImVec4 PopupBg             = {0.12f, 0.12f, 0.12f, 1.00f}; // darker sub-popup background
+    // Legacy field kept for source compatibility; popup backgrounds use ImGuiCol_WindowBg.
+    inline static ImVec4 PopupBg             = {0.12f, 0.12f, 0.12f, 1.00f};
     inline static ImVec4 PopupDimmedText     = {0.70f, 0.70f, 0.70f, 0.70f}; // dimmed text in context popups
     inline static ImVec4 TransparentButton   = {0.00f, 0.00f, 0.00f, 0.00f}; // invisible-background buttons
 
@@ -211,7 +212,6 @@ struct OceanodeColors {
             // App UI
             { "OC_ActiveItemHighlight",  &ActiveItemHighlight  },
             // Popups
-            { "OC_PopupBg",             &PopupBg             },
             { "OC_PopupDimmedText",     &PopupDimmedText     },
             { "OC_TransparentButton",   &TransparentButton   },
             // Search

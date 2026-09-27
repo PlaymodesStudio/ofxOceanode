@@ -1721,7 +1721,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ImGui::OpenPopup("Comment");
                 c.openPopupInNext = false;
             }
-			ImGui::PushStyleColor(ImGuiCol_PopupBg, OceanodeColors::PopupBg);
 			ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
@@ -1741,7 +1740,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }
                 ImGui::EndPopup();
             }
-			ImGui::PopStyleColor(3);
+			ImGui::PopStyleColor(2);
 			ImGui::PopStyleVar();
 
             ImGui::PopID();
@@ -1832,7 +1831,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             ImGui::OpenPopup("Node Selection Menu");
         }
 
-        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 0.7f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
         if(ImGui::BeginPopup("Node Selection Menu")){
@@ -1861,7 +1859,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
             ImGui::EndPopup();
         }
-        ImGui::PopStyleColor(2);
+        ImGui::PopStyleColor();
         ImGui::PopStyleVar();
         container->drawCustomGuiCreationModal();
 
