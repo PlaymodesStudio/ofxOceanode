@@ -7,6 +7,8 @@ class ofxOceanodeContainer;
 class ofxOceanodeNodeMacro;
 
 struct GlobalMacroSaveChange {
+    enum class Kind { Value, MacroReplacement };
+
     std::string location;
     std::string item;
     std::string field;
@@ -14,6 +16,7 @@ struct GlobalMacroSaveChange {
     std::string current;
     std::string savedFull;
     std::string currentFull;
+    Kind kind = Kind::Value;
 };
 
 struct GlobalMacroSaveReview {
