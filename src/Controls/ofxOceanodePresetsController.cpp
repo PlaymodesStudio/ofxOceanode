@@ -21,6 +21,36 @@ namespace {
 const ImVec4 bankTextColor(1.0f, 1.0f, 1.0f, 1.0f);
 const ImVec4 presetItemTextColor(150.0f / 255.0f, 150.0f / 255.0f, 150.0f / 255.0f, 1.0f);
 
+void drawReviewText(const std::string& text, ImGuiCol color, bool bold = false){
+    ImFont* font = bold ? ofxOceanodeShared::getDefaultBoldFont() : nullptr;
+    if(font) ImGui::PushFont(font);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(color));
+    ImGui::TextWrapped("%s", text.c_str());
+    ImGui::PopStyleColor();
+    if(font) ImGui::PopFont();
+}
+
+void drawReviewLabelValue(const std::string& label, const std::string& value){
+    drawReviewText(label, ImGuiCol_Text, true);
+    ImGui::SameLine();
+    drawReviewText(value, ImGuiCol_TextDisabled);
+}
+
+void drawReviewChangeTitle(const std::string& path, const std::string& parameter){
+    const std::string prefix = path + " / ";
+    const float availableWidth = ImGui::GetContentRegionAvail().x;
+    const float prefixWidth = ImGui::CalcTextSize(prefix.c_str()).x;
+    ImFont* boldFont = ofxOceanodeShared::getDefaultBoldFont();
+    if(boldFont) ImGui::PushFont(boldFont);
+    const float parameterWidth = ImGui::CalcTextSize(parameter.c_str()).x;
+    if(boldFont) ImGui::PopFont();
+
+    drawReviewText(prefix, ImGuiCol_TextDisabled);
+    // Keep long paths wrapped; move the parameter to the next line if needed.
+    if(prefixWidth + parameterWidth <= availableWidth) ImGui::SameLine(0.0f, 0.0f);
+    drawReviewText(parameter, ImGuiCol_Text, true);
+}
+
 string sanitizePresetName(string name){
     ofStringReplace(name, " ", "_");
     return name;
@@ -380,6 +410,9 @@ void ofxOceanodePresetsController::beginSavePreset(string name, string bank, boo
 }
 
 void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
+    const float reviewWidth = std::min(920.0f, ImGui::GetIO().DisplaySize.x * 0.85f);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(reviewWidth, 0.0f),
+                                        ImVec2(reviewWidth, ImGui::GetIO().DisplaySize.y * 0.9f));
     ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGui::GetStyleColorVec4(ImGuiCol_WindowBg));
     const bool open = ImGui::BeginPopupModal("Review Global Macros", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::PopStyleColor();
@@ -392,14 +425,13 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
 
     auto& request = *pendingSave;
     auto& review = request.reviews[request.reviewIndex];
-    ImGui::Text("Save Preset: %s / %s", request.bank.c_str(), request.name.c_str());
-    ImGui::Text("Global macro %zu of %zu (%zu changes)", request.reviewIndex + 1,
-                request.reviews.size(), review.changes.size());
-    ImGui::Separator();
-    ImGui::Text("Macro: %s", review.name.c_str());
-    ImGui::TextWrapped("Folder: %s", review.globalPath.c_str());
-    ImGui::TextWrapped("Used at: %s", review.instancePath.c_str());
+    drawReviewLabelValue("Preset:", request.bank + " / " + request.name + "  |  Review " +
+                         ofToString(request.reviewIndex + 1) + " of " + ofToString(request.reviews.size()));
+    drawReviewLabelValue("Macro:", review.name);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+    ImGui::TextWrapped("%s", review.instancePath.c_str());
     for(const auto& path : review.alsoUsedAt) ImGui::TextWrapped("Also used at: %s", path.c_str());
+    ImGui::PopStyleColor();
     if(!request.warning.empty()) ImGui::TextWrapped("%s", request.warning.c_str());
 
     bool samePathAlreadySelected = false;
@@ -409,38 +441,38 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
         if(!sameChanges(request.reviews[i], review)) conflictingInstances = true;
         if(i < request.reviewIndex && request.saveChoices[i]) samePathAlreadySelected = true;
     }
-    if(conflictingInstances) ImGui::TextWrapped("Other instances of this macro have different edits. Choose only one instance to write to this folder.");
-    if(samePathAlreadySelected) ImGui::TextWrapped("Another instance has already been chosen for this folder.");
+    if(conflictingInstances) ImGui::TextWrapped("Other instances of this macro have different edits. Choose only one instance to save as the global macro.");
+    if(samePathAlreadySelected) ImGui::TextWrapped("Another instance has already been chosen to save this global macro.");
 
     ImGui::Separator();
+    // Size short reviews to their content and keep longer lists scrollable.
     const float maxHeight = std::min(ImGui::GetTextLineHeightWithSpacing() * 18.0f,
                                      ImGui::GetIO().DisplaySize.y * 0.45f);
-    ImGui::BeginChild("Changes", ImVec2(std::min(760.0f, ImGui::GetIO().DisplaySize.x * 0.8f), maxHeight), true);
-    std::string lastLocation;
+    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(reviewWidth, maxHeight));
+    ImGui::BeginChild("Changes", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY);
     for(size_t changeIndex = 0; changeIndex < review.changes.size(); ++changeIndex){
         const auto& change = review.changes[changeIndex];
         ImGui::PushID(static_cast<int>(changeIndex));
-        if(change.location != lastLocation){
-            ImGui::SeparatorText(change.location.c_str());
-            lastLocation = change.location;
+        if(changeIndex > 0) ImGui::Spacing();
+        std::string changeTitle = review.name + " / ";
+        if(change.location != review.instancePath){
+            const std::string prefix = review.instancePath + " > ";
+            changeTitle += (change.location.rfind(prefix, 0) == 0
+                            ? change.location.substr(prefix.size()) : change.location) + " / ";
         }
-        ImGui::TextWrapped("%s / %s", change.item.c_str(), change.field.c_str());
-        ImGui::Indent();
-        ImGui::TextWrapped("Saved: %s", change.saved.c_str());
-        ImGui::TextWrapped("Current: %s", change.current.c_str());
-        if(change.savedFull.size() > change.saved.size() ||
-           change.currentFull.size() > change.current.size()){
-            if(ImGui::TreeNode("Full values")){
-                ImGui::TextWrapped("Saved: %s", change.savedFull.c_str());
-                ImGui::TextWrapped("Current: %s", change.currentFull.c_str());
-                ImGui::TreePop();
-            }
+        changeTitle += change.item;
+        drawReviewChangeTitle(changeTitle, change.field);
+        if(change.field == "Node added" || change.field == "Connection added"){
+            ImGui::NewLine();
+        }else{
+            ImGui::Indent();
+            drawReviewLabelValue("Old:", change.saved);
+            drawReviewLabelValue("New:", change.current);
+            ImGui::Unindent();
         }
-        ImGui::Unindent();
         ImGui::PopID();
     }
     ImGui::EndChild();
-    ImGui::TextWrapped("Save writes the complete current global macro to this folder.");
 
     if(request.writing){
         if(ImGui::Button("Retry macro save")){
@@ -665,7 +697,7 @@ std::string nodeKey(ofxOceanodeNode& node){
 
 std::string nodeLabel(ofxOceanodeNode& node){
     auto& model = node.getNodeModel();
-    std::string label = model.nodeName() + " [Node " + ofToString(model.getNumIdentifier()) + "]";
+    std::string label = model.nodeName() + " [" + ofToString(model.getNumIdentifier()) + "]";
     if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&model)){
         label += " " + (macro->isLocal() ? macro->getLocalMacroName() : macro->getCurrentMacroName());
     }
@@ -856,7 +888,7 @@ void compareContainer(ofxOceanodeContainer& container, const std::string& savedF
             if(!type.value().is_object()) continue;
             for(auto id = type.value().begin(); id != type.value().end(); ++id){
                 if(liveNodes.count(savedNodeKey(type.key(), id.key())) == 0){
-                    changes.push_back({location, type.key() + " [Node " + ofToString(ofToInt(id.key())) + "]",
+                    changes.push_back({location, type.key() + " [" + ofToString(ofToInt(id.key())) + "]",
                                        "Node removed", "present", "(absent)"});
                 }
             }
