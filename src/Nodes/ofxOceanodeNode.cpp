@@ -185,28 +185,27 @@ ofJson ofxOceanodeNode::saveParametersToJson(bool persistentPreset){
     ofJson json;
     for(int i = 0; i < getParameters().size(); i++){
         ofxOceanodeAbstractParameter& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
-        if((!persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) || (persistentPreset && !(p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject))){
-			if(p.valueType() == typeid(vector<float>).name()){
-				auto vecF = p.cast<vector<float>>().getParameter().get();
-				if(vecF.size() == 1){
-					json[p.getEscapedName()] = vecF[0];
-				}else{
-					json[p.getEscapedName()] = vecF;
-				}
-			}
-			else if(p.valueType() == typeid(vector<int>).name()){
-				auto vecI = p.cast<vector<int>>().getParameter().get();
-				if(vecI.size() == 1){
-					json[p.getEscapedName()] = vecI[0];
-				}else{
-					json[p.getEscapedName()] = vecI;
-				}
-			}else{
-				 ofSerialize(json, p);
-			}
-        }
+        saveParameterToJson(json, p, persistentPreset);
     }
     return json;
+}
+
+void ofxOceanodeNode::saveParameterToJson(ofJson &json, ofxOceanodeAbstractParameter &p,
+                                           bool persistentPreset){
+    if((!persistentPreset && (p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) ||
+       (persistentPreset && (p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject))) return;
+
+    if(p.valueType() == typeid(vector<float>).name()){
+        const auto vecF = p.cast<vector<float>>().getParameter().get();
+        if(vecF.size() == 1) json[p.getEscapedName()] = vecF[0];
+        else json[p.getEscapedName()] = vecF;
+    }else if(p.valueType() == typeid(vector<int>).name()){
+        const auto vecI = p.cast<vector<int>>().getParameter().get();
+        if(vecI.size() == 1) json[p.getEscapedName()] = vecI[0];
+        else json[p.getEscapedName()] = vecI;
+    }else{
+        ofSerialize(json, p);
+    }
 }
 bool ofxOceanodeNode::loadParametersFromJson(ofJson json, bool persistentPreset){
     for (ofJson::iterator it = json.begin(); it != json.end(); ++it) {
