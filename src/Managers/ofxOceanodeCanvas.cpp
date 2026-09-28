@@ -126,6 +126,7 @@ void ofxOceanodeCanvas::setupFonts(const std::string& regularPath, const std::st
     io.FontDefault = zoomFonts[3];
     io.FontGlobalScale = 1.0f;
     ofxOceanodeShared::setCurrentBoldFont(nullptr);
+    ofxOceanodeShared::setDefaultBoldFont(zoomFontsBold[3]);
     ofxOceanodeShared::setZoomBaseFontSize(ZOOM_FONT_SIZES[3]);
     ofxOceanodeShared::setBaseFrameHeight(ZOOM_FONT_SIZES[3] + 2.0f);
 }
@@ -937,8 +938,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             // so bright colors can actually produce a light canvas after the
             // accumulated saturation and brightness adjustments.
             canvasBackground = ofColor(color.r/2, color.g/2, color.b/2, 200);
-            canvasBackground.setSaturation(canvasBackground.getSaturation() * 0.3f);
-            canvasBackground.setBrightness(canvasBackground.getBrightness() * 1.0f);
+            canvasBackground.setSaturation(canvasBackground.getSaturation() * 0.28125f);
+            canvasBackground.setBrightness(canvasBackground.getBrightness() * 1.953125f);
         }
         // Judge the visible background after the translucent canvas tint is
         // blended over WindowBg, using perceived brightness on a 0-255 scale.

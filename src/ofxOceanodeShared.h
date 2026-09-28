@@ -75,17 +75,12 @@ public:
     }
     
     static void setCentralNodeID(unsigned int _cnid){
-        auto &instance = getInstance();
-        if(instance.getCentralNodeIDFromInstance() == 0){
-            instance.setCentralNodeIDFromInstance(_cnid);
-        }
+        getInstance().setCentralNodeIDFromInstance(_cnid);
     }
     
     static void setLeftNodeID(unsigned int _lnid){
-        auto &instance = getInstance();
-        if(instance.getLeftNodeIDFromInstance() == 0){
-            instance.setLeftNodeIDFromInstance(_lnid);
-        }
+        // Layout loads and user docking can replace the original node IDs.
+        getInstance().setLeftNodeIDFromInstance(_lnid);
     }
 	
 	static std::shared_ptr<macroCategory> getMacroDirectoryStructure(){
@@ -338,6 +333,10 @@ public:
 	static ImFont* getCurrentBoldFont(){ return getInstance().currentBoldFont; }
 	static void    setCurrentBoldFont(ImFont* f){ getInstance().currentBoldFont = f; }
 
+	// Theme bold font at the default UI size, independent of canvas zoom.
+	static ImFont* getDefaultBoldFont(){ return getInstance().defaultBoldFont; }
+	static void    setDefaultBoldFont(ImFont* f){ getInstance().defaultBoldFont = f; }
+
 	// Continuous zoom level — set by the active ofxOceanodeCanvas each frame before
 	// rendering node GUIs, so any code that needs a smooth zoom factor can read it
 	// instead of deriving a stepped value from the discrete font size.
@@ -505,6 +504,7 @@ private:
 
 	// Bold font for the current render context (set by the active canvas each frame).
 	ImFont* currentBoldFont = nullptr;
+	ImFont* defaultBoldFont = nullptr;
 
 	// Snap to Grid
 	bool snapToGrid = false;

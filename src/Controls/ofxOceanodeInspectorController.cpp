@@ -75,6 +75,7 @@ void ofxOceanodeInspectorController::draw(){
     }
 
     auto &node = selectedNodes[0].second;
+    auto* owningContainer = container->getContainerForCanvasID(node->getNodeModel().getParents());
 
     ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 0.0f);
 
@@ -112,6 +113,9 @@ void ofxOceanodeInspectorController::draw(){
     if(ImGui::TreeNode("Inspector Parameters")){
         for(int i = 0; i < node->getInspectorParameters().size(); i++){
             ofAbstractParameter &absParam = node->getInspectorParameters().get(i);
+            const bool trackUserValue = absParam.valueType() != typeid(std::function<void()>).name();
+            ofJson valueBefore;
+            if(trackUserValue) ofSerialize(valueBefore, absParam);
             string uniqueId = absParam.getName();
             ImGui::PushID(uniqueId.c_str());
 
@@ -286,6 +290,11 @@ void ofxOceanodeInspectorController::draw(){
                         ImGui::SetKeyboardFocusHere(-1);
                     }
                 }
+            }
+            if(trackUserValue && owningContainer != nullptr){
+                ofJson valueAfter;
+                ofSerialize(valueAfter, absParam);
+                owningContainer->recordUserEditedValues(*node, valueBefore, valueAfter, true);
             }
             ImGui::PopID();
         }

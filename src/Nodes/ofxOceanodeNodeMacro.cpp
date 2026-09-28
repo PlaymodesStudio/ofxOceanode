@@ -663,6 +663,37 @@ void ofxOceanodeNodeMacro::allNodesCreated(){
 
 // ─── Macro save/load ─────────────────────────────────────────────────────────
 
+namespace {
+void clearSavedUserEdits(ofxOceanodeContainer& container){
+	container.clearUserEditedValues();
+	for(auto* node : container.getAllModules()){
+		auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel());
+		if(macro != nullptr && macro->isLocal()) clearSavedUserEdits(*macro->getContainer());
+	}
+}
+}
+
+bool ofxOceanodeNodeMacro::saveGlobalDefinition(bool notifyOtherInstances){
+	if(presetManager.isLocal() || presetManager.getCurrentMacroPath().empty()) return false;
+	const string path = presetManager.getCurrentMacroPath();
+	container->savePreset(path);
+	saveMacroLayout(path);
+	snapshotSystem.save(false, path, presetManager.getPresetPath(), nodeName(), getNumIdentifier());
+
+	ofJson sortJson;
+	if(!sortOrder.getOrder().empty()){
+		ofJson entries = ofJson::array();
+		for(const auto& entry : sortOrder.getOrder()) entries.push_back(entry);
+		sortJson["RouterSortOrder"] = entries;
+	}
+	const bool savedOrder = ofSavePrettyJson(path + "/router_sort_order.json", sortJson);
+	if(!savedOrder || !ofFile::doesFileExist(path + "/modules.json")) return false;
+	clearSavedUserEdits(*container);
+	routerOrderUserEdited = false;
+	if(notifyOtherInstances) ofxOceanodeShared::macroUpdated(path);
+	return true;
+}
+
 void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 	if(presetManager.isLocal()){
 		string localPath = path + "/" + nodeName() + "_" + ofToString(getNumIdentifier());
@@ -723,24 +754,6 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 		json["CategoryStruct"] = presetManager.getCurrentCategory();
 		json["Macro"] = presetManager.getCurrentMacro();
 		json["MacroPath"] = presetManager.getCurrentMacroPath();
-
-		// For global macros: save router sort order to the macro folder so
-		// it persists independently of which preset loads this macro (and so
-		// "reload macro" from the popup also picks it up).
-		if(!presetManager.getCurrentMacroPath().empty()) {
-			string sortOrderFile = presetManager.getCurrentMacroPath() + "/router_sort_order.json";
-			ofJson sortJson;
-			if(!sortOrder.getOrder().empty()) {
-				ofJson sortArr = ofJson::array();
-				for(const auto& e : sortOrder.getOrder()) sortArr.push_back(e);
-				sortJson["RouterSortOrder"] = sortArr;
-			}
-			ofSavePrettyJson(sortOrderFile, sortJson);
-			
-			// Save macro layout to global macro folder
-			saveMacroLayout(presetManager.getCurrentMacroPath());
-			canvas.setLayoutIniPath(presetManager.getCurrentMacroPath() + "/ImGuiLayout.ini");
-		}
 	}
 
 	json["RetriggerSnapshotOnActive"] = retriggerSnapshotOnActive.get();

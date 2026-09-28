@@ -52,6 +52,8 @@ public:
     void saveConfig(string filename, bool persistentPreset = false);
     
     ofJson saveParametersToJson(bool persistentPreset = false);
+    void saveParameterToJson(ofJson &json, ofxOceanodeAbstractParameter &parameter,
+                             bool persistentPreset = false);
     bool loadParametersFromJson(ofJson json, bool persistentPreset = false);
     
     void saveInspectorParametersToJson(ofJson &json);

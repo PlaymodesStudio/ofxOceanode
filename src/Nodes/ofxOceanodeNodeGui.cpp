@@ -112,6 +112,11 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
+            ofJson valueBefore;
+            const bool trackUserValue = !(absParam.getFlags() & (ofxOceanodeParameterFlags_DisableSavePreset |
+                                                                 ofxOceanodeParameterFlags_ReadOnly)) &&
+                                        !absParam.hasInConnection();
+            if(trackUserValue) node.saveParameterToJson(valueBefore, absParam);
             string uniqueId = absParam.getName();
             const bool publishedInCustomGui = container.customGuiContainsParameterAnywhere(absParam);
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::BeginDisabled();
@@ -714,6 +719,11 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
             inputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
             outputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y/2);
             
+            if(trackUserValue){
+                ofJson valueAfter;
+                node.saveParameterToJson(valueAfter, absParam);
+                container.recordUserEditedValues(node, valueBefore, valueAfter);
+            }
             ImGui::PopID();
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::EndDisabled();
         } //endFor
