@@ -450,6 +450,7 @@ bool ofxOceanodeContainer::wasValueUserEdited(ofxOceanodeNode& node,
 
 void ofxOceanodeContainer::clearUserEditedValues(){
     userEditedValues.clear();
+    for(auto* node : getAllModules()) node->getNodeModel().clearUserEditMarkers();
 }
 
 ofJson ofxOceanodeContainer::getCustomGuisJsonForReview() const{
