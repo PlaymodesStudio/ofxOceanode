@@ -37,6 +37,9 @@ constexpr float kWaveTrackMinHeight = 48.0f;
 constexpr float kWaveTrackMaxHeight = 360.0f;
 constexpr float kWaveTrackResizeHandleHeight = 8.0f;
 constexpr float kEdgePixels = 8.0f;
+// Parameter rows are indented under their track header by half the clip
+// editor's indent (20 px), so the hierarchy reads track > row > editor.
+constexpr float kParameterRowIndent = 10.0f;
 constexpr float kPianoKeyboardWidth = 38.0f;
 constexpr float kPianoScrollbarWidth = 10.0f;
 constexpr float kPianoZoomButtonHeight = 14.0f;
@@ -520,7 +523,7 @@ double ofxOceanodeTimelineController::getContentEndBeat(const ofxOceanodeTimelin
 }
 
 double ofxOceanodeTimelineController::snapBeat(double beat) const {
-    if(effectiveRulerSnapBeats <= 0.0) return std::max(0.0, beat);
+    if(!snapEnabled || effectiveRulerSnapBeats <= 0.0) return std::max(0.0, beat);
     return std::max(0.0, std::round(beat / effectiveRulerSnapBeats) * effectiveRulerSnapBeats);
 }
 
@@ -635,74 +638,285 @@ void ofxOceanodeTimelineController::draw() {
             timeline.splitClip(selected.first, selected.second, transportState.beatPosition);
     }
 
+    // ======================= Toolbar =======================
+    // Two rows of grouped controls. Row 1: transport, position, tempo, meter,
+    // sync. Row 2: loop, grid, view, output timing, tracks. Groups are split
+    // by thin vertical rules; transport and toggles are drawn as icons.
+    // Darker panel behind both rows: widgets draw on channel 1, the panel is
+    // filled on channel 0 once the rows' height is known.
+    auto* toolbarDl = ImGui::GetWindowDrawList();
+    toolbarDl->ChannelsSplit(2);
+    toolbarDl->ChannelsSetCurrent(1);
+    const float toolbarPad = 5.0f;
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + toolbarPad);
+    const float toolbarTop = ImGui::GetCursorScreenPos().y - toolbarPad;
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 5.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 3.0f));
+    const float toolbarHeight = ImGui::GetFrameHeight();
+    enum class ToolIcon { Play, Pause, Stop, ToStart, Loop, Follow, Fit, ZoomIn, ZoomOut, Dots, Tap, Clock, Magnet };
+    auto drawIcon = [&](ImDrawList* dl, ToolIcon icon, ImVec2 c, float s, ImU32 col) {
+        switch(icon) {
+            case ToolIcon::Play:
+                dl->AddTriangleFilled(ImVec2(c.x - s * 0.35f, c.y - s * 0.45f), ImVec2(c.x - s * 0.35f, c.y + s * 0.45f),
+                                      ImVec2(c.x + s * 0.45f, c.y), col);
+                break;
+            case ToolIcon::Pause:
+                dl->AddRectFilled(ImVec2(c.x - s * 0.38f, c.y - s * 0.42f), ImVec2(c.x - s * 0.1f, c.y + s * 0.42f), col, 1.0f);
+                dl->AddRectFilled(ImVec2(c.x + s * 0.1f, c.y - s * 0.42f), ImVec2(c.x + s * 0.38f, c.y + s * 0.42f), col, 1.0f);
+                break;
+            case ToolIcon::Stop:
+                dl->AddRectFilled(ImVec2(c.x - s * 0.36f, c.y - s * 0.36f), ImVec2(c.x + s * 0.36f, c.y + s * 0.36f), col, 1.5f);
+                break;
+            case ToolIcon::ToStart:
+                dl->AddRectFilled(ImVec2(c.x - s * 0.42f, c.y - s * 0.4f), ImVec2(c.x - s * 0.26f, c.y + s * 0.4f), col);
+                dl->AddTriangleFilled(ImVec2(c.x + s * 0.42f, c.y - s * 0.42f), ImVec2(c.x + s * 0.42f, c.y + s * 0.42f),
+                                      ImVec2(c.x - s * 0.22f, c.y), col);
+                break;
+            case ToolIcon::Loop: {
+                const float r = s * 0.42f;
+                dl->PathArcTo(c, r, 0.35f * 3.14159265f, 1.85f * 3.14159265f, 16);
+                dl->PathStroke(col, 0, 1.8f);
+                const ImVec2 tip(c.x + r * std::cos(0.35f * 3.14159265f), c.y + r * std::sin(0.35f * 3.14159265f));
+                dl->AddTriangleFilled(ImVec2(tip.x + s * 0.2f, tip.y - s * 0.02f), ImVec2(tip.x - s * 0.12f, tip.y - s * 0.18f),
+                                      ImVec2(tip.x - s * 0.02f, tip.y + s * 0.2f), col);
+                break;
+            }
+            case ToolIcon::Follow: // playhead line with a chevron pulling it along
+                dl->AddLine(ImVec2(c.x - s * 0.3f, c.y - s * 0.45f), ImVec2(c.x - s * 0.3f, c.y + s * 0.45f), col, 1.8f);
+                dl->AddLine(ImVec2(c.x - s * 0.02f, c.y - s * 0.28f), ImVec2(c.x + s * 0.28f, c.y), col, 1.8f);
+                dl->AddLine(ImVec2(c.x + s * 0.28f, c.y), ImVec2(c.x - s * 0.02f, c.y + s * 0.28f), col, 1.8f);
+                break;
+            case ToolIcon::Fit: { // four corners
+                const float o = s * 0.42f, l = s * 0.2f;
+                for(int sx = -1; sx <= 1; sx += 2)
+                    for(int sy = -1; sy <= 1; sy += 2) {
+                        const ImVec2 k(c.x + sx * o, c.y + sy * o);
+                        dl->AddLine(k, ImVec2(k.x - sx * l, k.y), col, 1.6f);
+                        dl->AddLine(k, ImVec2(k.x, k.y - sy * l), col, 1.6f);
+                    }
+                break;
+            }
+            case ToolIcon::ZoomIn:
+                dl->AddLine(ImVec2(c.x - s * 0.36f, c.y), ImVec2(c.x + s * 0.36f, c.y), col, 1.8f);
+                dl->AddLine(ImVec2(c.x, c.y - s * 0.36f), ImVec2(c.x, c.y + s * 0.36f), col, 1.8f);
+                break;
+            case ToolIcon::ZoomOut:
+                dl->AddLine(ImVec2(c.x - s * 0.36f, c.y), ImVec2(c.x + s * 0.36f, c.y), col, 1.8f);
+                break;
+            case ToolIcon::Dots:
+                for(int i = -1; i <= 1; ++i) dl->AddCircleFilled(ImVec2(c.x + i * s * 0.3f, c.y), s * 0.09f, col);
+                break;
+            case ToolIcon::Tap:
+                dl->AddCircle(c, s * 0.4f, col, 16, 1.6f);
+                dl->AddCircleFilled(c, s * 0.16f, col);
+                break;
+            case ToolIcon::Magnet: { // horseshoe magnet, poles up
+                const float r = s * 0.3f;
+                const float legTop = c.y - s * 0.42f;
+                const float bendY = c.y + s * 0.08f;
+                dl->PathArcTo(ImVec2(c.x, bendY), r, 0.0f, 3.14159265f, 14);
+                dl->PathStroke(col, 0, s * 0.2f);
+                dl->AddLine(ImVec2(c.x - r, bendY), ImVec2(c.x - r, legTop), col, s * 0.2f);
+                dl->AddLine(ImVec2(c.x + r, bendY), ImVec2(c.x + r, legTop), col, s * 0.2f);
+                // Pole tips.
+                const float tip = s * 0.14f;
+                dl->AddRectFilled(ImVec2(c.x - r - s * 0.11f, legTop - tip * 0.3f), ImVec2(c.x - r + s * 0.11f, legTop + tip), col);
+                dl->AddRectFilled(ImVec2(c.x + r - s * 0.11f, legTop - tip * 0.3f), ImVec2(c.x + r + s * 0.11f, legTop + tip), col);
+                break;
+            }
+            case ToolIcon::Clock:
+                dl->AddCircle(c, s * 0.42f, col, 20, 1.6f);
+                dl->AddLine(c, ImVec2(c.x, c.y - s * 0.28f), col, 1.6f);
+                dl->AddLine(c, ImVec2(c.x + s * 0.2f, c.y + s * 0.08f), col, 1.6f);
+                break;
+        }
+    };
+    // Square icon button. `on` tints it with `accent` (toggles, playing).
+    auto iconButton = [&](const char* id, ToolIcon icon, const char* tooltip, bool on = false,
+                          ImU32 accent = IM_COL32(95, 150, 235, 255), bool enabled = true) {
+        const ImVec2 size(toolbarHeight + 2.0f, toolbarHeight);
+        const ImVec2 pos = ImGui::GetCursorScreenPos();
+        const bool pressed = ImGui::InvisibleButton(id, size) && enabled;
+        const bool hovered = ImGui::IsItemHovered() && enabled;
+        const bool held = ImGui::IsItemActive() && enabled;
+        auto* dl = ImGui::GetWindowDrawList();
+        ImU32 bg = on ? accent : ImGui::GetColorU32(held ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+        if(on && hovered) bg = (accent & 0x00FFFFFF) | 0xE6000000;
+        dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), bg, 3.0f);
+        const ImU32 fg = !enabled ? IM_COL32(120, 120, 120, 160) : on ? IM_COL32(15, 18, 24, 255) : IM_COL32(225, 228, 235, 255);
+        drawIcon(dl, icon, ImVec2(pos.x + size.x * 0.5f, pos.y + size.y * 0.5f), size.y * 0.52f, fg);
+        if(tooltip != nullptr && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", tooltip);
+        return pressed;
+    };
+    // Thin vertical rule between groups.
+    auto groupSeparator = [&]() {
+        ImGui::SameLine(0.0f, 9.0f);
+        const ImVec2 pos = ImGui::GetCursorScreenPos();
+        ImGui::GetWindowDrawList()->AddLine(ImVec2(pos.x, pos.y + 2.0f), ImVec2(pos.x, pos.y + toolbarHeight - 2.0f),
+                                            IM_COL32(255, 255, 255, 38), 1.0f);
+        ImGui::Dummy(ImVec2(1.0f, toolbarHeight));
+        ImGui::SameLine(0.0f, 9.0f);
+    };
+    // Small dim caption in front of a group (kept to a word).
+    auto caption = [&](const char* text) {
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("%s", text);
+        ImGui::SameLine(0.0f, 5.0f);
+    };
+    // ---- Row 1: transport | position | tempo | meter | sync ----
     if(transport != nullptr) {
         // Following an external clock: position, play state and tempo come from it.
         const bool externalClock = transport->hasExternalClock();
-        if(externalClock) ImGui::BeginDisabled();
-        if(ImGui::Button(transportState.isPlaying ? "Pause" : "Play")) transport->setIsPlaying(!transportState.isPlaying);
-        ImGui::SameLine();
-        if(ImGui::Button("Stop")) transport->stop();
-        ImGui::SameLine();
-        if(ImGui::Button("Reset")) transport->seekToBeat(0.0);
-        if(externalClock) ImGui::EndDisabled();
-        ImGui::SameLine();
-        float bpm = transportState.bpm;
-        if(externalClock) {
-            ImGui::Text("BPM %.1f (ext)", bpm);
-        } else if(timeline.isBpmAutomationEnabled()) {
-            ImGui::Text("BPM %.1f (auto)", bpm);
-        } else {
-            ImGui::SetNextItemWidth(90.0f);
-            if(ImGui::DragFloat("BPM", &bpm, 0.1f, 1.0f, 999.0f, "%.1f")) container->setBpm(bpm);
-            ImGui::SameLine();
-            // Tap tempo: the average of the last taps; a pause of 2 s starts over.
-            if(ImGui::Button("Tap##timelineTapTempo")) {
-                const double now = ofGetElapsedTimef();
-                if(!tapTimes.empty() && now - tapTimes.back() > 2.0) tapTimes.clear();
-                tapTimes.push_back(now);
-                if(tapTimes.size() > 8) tapTimes.erase(tapTimes.begin());
-                if(tapTimes.size() >= 2) {
-                    const double interval = (tapTimes.back() - tapTimes.front()) / (tapTimes.size() - 1);
-                    if(interval > 0.0) container->setBpm(ofClamp(static_cast<float>(60.0 / interval), 20.0f, 400.0f));
+        const char* lockedTip = "Following an external clock";
+        if(iconButton("##tbToStart", ToolIcon::ToStart, externalClock ? lockedTip : "Back to the start", false, 0, !externalClock))
+            transport->seekToBeat(0.0);
+        ImGui::SameLine(0.0f, 2.0f);
+        if(iconButton("##tbStop", ToolIcon::Stop, externalClock ? lockedTip : "Stop (back to the start)", false, 0, !externalClock))
+            transport->stop();
+        ImGui::SameLine(0.0f, 2.0f);
+        if(iconButton("##tbPlay", transportState.isPlaying ? ToolIcon::Pause : ToolIcon::Play,
+                      externalClock ? lockedTip : (transportState.isPlaying ? "Pause (Space)" : "Play (Space)"),
+                      transportState.isPlaying, IM_COL32(90, 205, 125, 255), !externalClock))
+            transport->setIsPlaying(!transportState.isPlaying);
+
+        groupSeparator();
+        {
+            // Position readout: bar . beat . sixteenth, and the song time.
+            const double beatsPerBar = std::max(1e-6, timeline.getBeatsPerBar());
+            const double beat = std::max(0.0, transportState.beatPosition);
+            const int bar = static_cast<int>(std::floor(beat / beatsPerBar)) + 1;
+            const double inBar = beat - (bar - 1) * beatsPerBar;
+            const int beatInBar = static_cast<int>(std::floor(inBar)) + 1;
+            const int sixteenth = static_cast<int>(std::floor((inBar - std::floor(inBar)) * 4.0)) + 1;
+            const double seconds = timeline.beatToSeconds(beat, transportState.bpm);
+            const int minutes = static_cast<int>(seconds / 60.0);
+            char positionText[32];
+            char timeText[32];
+            std::snprintf(positionText, sizeof(positionText), "%3d. %d. %d", bar, beatInBar, sixteenth);
+            std::snprintf(timeText, sizeof(timeText), "%d:%06.3f", minutes, seconds - minutes * 60.0);
+            const ImVec2 pos = ImGui::GetCursorScreenPos();
+            const ImVec2 size(170.0f, toolbarHeight);
+            ImGui::Dummy(size);
+            auto* dl = ImGui::GetWindowDrawList();
+            dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(12, 14, 18, 255), 3.0f);
+            dl->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(255, 255, 255, 25), 3.0f);
+            const float textY = pos.y + (size.y - ImGui::GetTextLineHeight()) * 0.5f;
+            dl->AddText(ImVec2(pos.x + 8.0f, textY),
+                        transportState.isPlaying ? IM_COL32(120, 235, 160, 255) : IM_COL32(230, 232, 238, 255), positionText);
+            const float timeWidth = ImGui::CalcTextSize(timeText).x;
+            dl->AddText(ImVec2(pos.x + size.x - timeWidth - 8.0f, textY), IM_COL32(150, 155, 165, 255), timeText);
+            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Bar . beat . sixteenth    song time\nBeat %.3f", beat);
+        }
+
+        groupSeparator();
+        {
+            float bpm = transportState.bpm;
+            if(externalClock || timeline.isBpmAutomationEnabled()) {
+                // Read-only: the tempo comes from the clock or the tempo lane.
+                ImGui::BeginDisabled();
+                ImGui::SetNextItemWidth(78.0f);
+                ImGui::DragFloat("##tbBpmRead", &bpm, 0.0f, 0.0f, 0.0f, "%.1f BPM");
+                ImGui::EndDisabled();
+                ImGui::SameLine(0.0f, 4.0f);
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextColored(externalClock ? ImVec4(0.45f, 0.95f, 0.5f, 1.0f) : ImVec4(0.95f, 0.75f, 0.35f, 1.0f),
+                                   externalClock ? "EXT" : "AUTO");
+                if(ImGui::IsItemHovered())
+                    ImGui::SetTooltip(externalClock ? "Tempo from the external clock" : "Tempo from the tempo lane");
+            } else {
+                ImGui::SetNextItemWidth(78.0f);
+                if(ImGui::DragFloat("##tbBpm", &bpm, 0.1f, 1.0f, 999.0f, "%.1f BPM")) container->setBpm(bpm);
+                if(ImGui::IsItemHovered()) ImGui::SetTooltip("Tempo (drag, or double-click to type)");
+                ImGui::SameLine(0.0f, 2.0f);
+                // Tap tempo: the average of the last taps; a pause of 2 s starts over.
+                if(iconButton("##tbTap", ToolIcon::Tap, "Tap tempo: tap on the beat")) {
+                    const double now = ofGetElapsedTimef();
+                    if(!tapTimes.empty() && now - tapTimes.back() > 2.0) tapTimes.clear();
+                    tapTimes.push_back(now);
+                    if(tapTimes.size() > 8) tapTimes.erase(tapTimes.begin());
+                    if(tapTimes.size() >= 2) {
+                        const double interval = (tapTimes.back() - tapTimes.front()) / (tapTimes.size() - 1);
+                        if(interval > 0.0) container->setBpm(ofClamp(static_cast<float>(60.0 / interval), 20.0f, 400.0f));
+                    }
                 }
             }
-            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Tap on the beat to set the tempo");
         }
-        ImGui::SameLine();
-        ImGui::Text("Beat %.3f", transportState.beatPosition);
+
+        groupSeparator();
+        {
+            // Meter: numerator is free (any meter is valid), the denominator is
+            // a note value so getBeatsPerBar() always lands on a sane grid.
+            int tsNumerator = timeline.getTimeSignatureNumerator();
+            int tsDenominator = timeline.getTimeSignatureDenominator();
+            ImGui::SetNextItemWidth(28.0f);
+            if(ImGui::DragInt("##timeSigNum", &tsNumerator, 0.1f, 1, 64))
+                timeline.setTimeSignature(tsNumerator, tsDenominator);
+            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Time signature");
+            ImGui::SameLine(0.0f, 3.0f);
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("/");
+            ImGui::SameLine(0.0f, 3.0f);
+            ImGui::SetNextItemWidth(30.0f);
+            char tsDenomLabel[8];
+            std::snprintf(tsDenomLabel, sizeof(tsDenomLabel), "%d", tsDenominator);
+            if(ImGui::BeginCombo("##timeSigDenom", tsDenomLabel, ImGuiComboFlags_NoArrowButton)) {
+                for(int option : {1, 2, 4, 8, 16, 32}) {
+                    char optionLabel[8];
+                    std::snprintf(optionLabel, sizeof(optionLabel), "%d", option);
+                    if(ImGui::Selectable(optionLabel, option == tsDenominator))
+                        timeline.setTimeSignature(tsNumerator, option);
+                }
+                ImGui::EndCombo();
+            }
+            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Time signature");
+        }
 #ifdef OFXOCEANODE_USE_MIDI
         if(auto* clockSync = container->getMidiClockSync()) {
-            ImGui::SameLine();
+            groupSeparator();
+            caption("Sync");
             const char* syncModes[] = {"Internal", "MIDI Clock"};
             int syncMode = container->isMidiClockSyncEnabled() ? 1 : 0;
-            ImGui::SetNextItemWidth(95.0f);
-            if(ImGui::Combo("Sync##transportSync", &syncMode, syncModes, 2))
+            ImGui::SetNextItemWidth(92.0f);
+            if(ImGui::Combo("##transportSync", &syncMode, syncModes, 2))
                 container->setMidiClockSyncEnabled(syncMode == 1);
             if(ImGui::IsItemHovered())
                 ImGui::SetTooltip("Internal: Oceanode runs its own transport.\n"
                                   "MIDI Clock: follow an external MIDI clock (play/stop, song position, tempo).");
-            ImGui::SameLine();
-            if(ImGui::SmallButton("...##midiClockSyncSettingsButton")) ImGui::OpenPopup("##midiClockSyncSettings");
-            if(ImGui::IsItemHovered()) ImGui::SetTooltip("MIDI clock port and options");
+            ImGui::SameLine(0.0f, 2.0f);
+            if(iconButton("##midiClockSyncSettingsButton", ToolIcon::Dots, "MIDI clock port and options"))
+                ImGui::OpenPopup("##midiClockSyncSettings");
+            // Status: a coloured dot and a word; details in the tooltip.
+            ImU32 statusColor = 0;
+            std::string statusText;
+            std::string statusTip;
             if(container->isMidiClockSyncEnabled()) {
                 const auto clockStatus = clockSync->status();
-                ImGui::SameLine();
-                if(clockSync->getPortName().empty())
-                    ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f), "choose a port (...)");
-                else if(!clockSync->isOpen())
-                    ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f), "port not available");
-                else if(!clockStatus.receiving)
-                    ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "no clock");
-                else
-                    ImGui::TextColored(ImVec4(0.45f, 0.95f, 0.5f, 1.0f), "%s %.1f BPM",
-                                       clockStatus.playing ? "PLAY" : "STOP", clockStatus.bpm);
-                if(!clockSync->isDrivingTransport()) {
-                    ImGui::SameLine();
-                    ImGui::TextDisabled("(another source drives the transport)");
+                if(clockSync->getPortName().empty()) {
+                    statusColor = IM_COL32(255, 165, 50, 255); statusText = "no port"; statusTip = "Choose a MIDI port in the options (...)";
+                } else if(!clockSync->isOpen()) {
+                    statusColor = IM_COL32(255, 165, 50, 255); statusText = "offline"; statusTip = "Port not available (retrying): " + clockSync->getPortName();
+                } else if(!clockStatus.receiving) {
+                    statusColor = IM_COL32(255, 90, 90, 255); statusText = "no clock"; statusTip = "No clock arriving on " + clockSync->getPortName();
+                } else {
+                    statusColor = IM_COL32(110, 240, 130, 255);
+                    statusText = clockStatus.playing ? "play" : "stop";
+                    statusTip = clockSync->getPortName() + ": " + ofToString(clockStatus.bpm, 1) + " BPM";
                 }
+                if(!clockSync->isDrivingTransport()) statusTip += "\n(another source drives the transport)";
             } else if(externalClock) {
-                ImGui::SameLine();
-                ImGui::TextDisabled("Transport driven by a MIDI Clock node");
+                statusColor = IM_COL32(110, 240, 130, 255); statusText = "node"; statusTip = "Transport driven by a MIDI Clock node";
+            }
+            if(!statusText.empty()) {
+                ImGui::SameLine(0.0f, 6.0f);
+                const ImVec2 pos = ImGui::GetCursorScreenPos();
+                const float textWidth = ImGui::CalcTextSize(statusText.c_str()).x;
+                ImGui::Dummy(ImVec2(14.0f + textWidth, toolbarHeight));
+                auto* dl = ImGui::GetWindowDrawList();
+                dl->AddCircleFilled(ImVec2(pos.x + 5.0f, pos.y + toolbarHeight * 0.5f), 4.0f, statusColor);
+                dl->AddText(ImVec2(pos.x + 13.0f, pos.y + (toolbarHeight - ImGui::GetTextLineHeight()) * 0.5f),
+                            IM_COL32(200, 204, 212, 255), statusText.c_str());
+                if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", statusTip.c_str());
             }
             if(ImGui::BeginPopup("##midiClockSyncSettings")) {
                 if(ImGui::IsWindowAppearing()) midiPortChoices = ofxOceanodeMidiClock::availablePorts();
@@ -745,104 +959,122 @@ void ofxOceanodeTimelineController::draw() {
         }
 #endif
     }
-    ImGui::SetNextItemWidth(105.0f);
-    ImGui::DragFloat("Px / sec", &pixelsPerSecond, 1.0f,
-                     kMinPixelsPerSecond, kMaxPixelsPerSecond, "%.2f");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(80.0f);
-    ImGui::DragInt("Bars", &visibleBars, 1.0f, 1, 256);
-    ImGui::SameLine();
+
+    // ---- Row 2: loop | grid | view | output timing | tracks ----
     {
-        // Time signature: numerator is free-typed (any meter is valid),
-        // denominator is restricted to the conventional note-value set so
-        // getBeatsPerBar() (numerator * 4/denominator, in quarter-note
-        // beats) always lands on a sane grid.
-        int tsNumerator = timeline.getTimeSignatureNumerator();
-        int tsDenominator = timeline.getTimeSignatureDenominator();
-        ImGui::TextUnformatted("Time Sig");
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(38.0f);
-        if(ImGui::DragInt("##timeSigNum", &tsNumerator, 0.1f, 1, 64))
-            timeline.setTimeSignature(tsNumerator, tsDenominator);
+        bool loopEnabled = timeline.isLoopEnabled();
+        if(iconButton("##tbLoop", ToolIcon::Loop, loopEnabled ? "Loop on" : "Loop off", loopEnabled, IM_COL32(120, 135, 240, 255)))
+            timeline.setLoopEnabled(!loopEnabled);
+        ImGui::SameLine(0.0f, 4.0f);
+        ImGui::BeginDisabled(!loopEnabled);
+        double loopStart = timeline.getLoopStartBeat();
+        double loopEnd = timeline.getLoopEndBeat();
+        ImGui::SetNextItemWidth(56.0f);
+        if(ImGui::InputDouble("##loopStart", &loopStart, 0.0, 0.0, "%.3g"))
+            timeline.setLoopRange(snapBeat(loopStart), loopEnd);
+        if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("Loop start (beats)");
         ImGui::SameLine(0.0f, 3.0f);
-        ImGui::TextUnformatted("/");
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("-");
         ImGui::SameLine(0.0f, 3.0f);
-        ImGui::SetNextItemWidth(46.0f);
-        char tsDenomLabel[8];
-        std::snprintf(tsDenomLabel, sizeof(tsDenomLabel), "%d", tsDenominator);
-        if(ImGui::BeginCombo("##timeSigDenom", tsDenomLabel)) {
-            for(int option : {1, 2, 4, 8, 16, 32}) {
-                char optionLabel[8];
-                std::snprintf(optionLabel, sizeof(optionLabel), "%d", option);
-                if(ImGui::Selectable(optionLabel, option == tsDenominator))
-                    timeline.setTimeSignature(tsNumerator, option);
+        ImGui::SetNextItemWidth(56.0f);
+        if(ImGui::InputDouble("##loopEnd", &loopEnd, 0.0, 0.0, "%.3g"))
+            timeline.setLoopRange(loopStart, std::max(loopStart + 1.0 / kPPQ, snapBeat(loopEnd)));
+        if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("Loop end (beats)");
+        ImGui::EndDisabled();
+    }
+
+    groupSeparator();
+    if(iconButton("##tbSnapToggle", ToolIcon::Magnet,
+                  snapEnabled ? "Snap to grid: on (clips, markers, loop, playhead)" : "Snap to grid: off",
+                  snapEnabled, IM_COL32(235, 95, 95, 255)))
+        snapEnabled = !snapEnabled;
+    ImGui::SameLine(0.0f, 4.0f);
+    {
+        int rulerDivision = divisionIndexForBeats(rulerSnapBeats);
+        ImGui::SetNextItemWidth(64.0f);
+        if(ImGui::BeginCombo("##tbSnap", kDivisionOptions[rulerDivision].label)) {
+            for(int i = 0; i < kDivisionOptionCount; ++i) {
+                if(ImGui::Selectable(kDivisionOptions[i].label, i == rulerDivision)) {
+                    rulerSnapBeats = kDivisionOptions[i].beats;
+                    effectiveRulerSnapBeats = adaptiveSnapDivision(rulerSnapBeats,
+                                                                   timeline.getBeatsPerBar(),
+                                                                   transportState.bpm,
+                                                                   pixelsPerSecond);
+                }
             }
             ImGui::EndCombo();
         }
-    }
-    ImGui::SameLine();
-    int rulerDivision = divisionIndexForBeats(rulerSnapBeats);
-    ImGui::SetNextItemWidth(82.0f);
-    if(ImGui::BeginCombo("Snap", kDivisionOptions[rulerDivision].label)) {
-        for(int i = 0; i < kDivisionOptionCount; ++i) {
-            if(ImGui::Selectable(kDivisionOptions[i].label, i == rulerDivision)) {
-                rulerSnapBeats = kDivisionOptions[i].beats;
-                effectiveRulerSnapBeats = adaptiveSnapDivision(rulerSnapBeats,
-                                                               timeline.getBeatsPerBar(),
-                                                               transportState.bpm,
-                                                               pixelsPerSecond);
-            }
-        }
-        ImGui::EndCombo();
-    }
-    ImGui::SameLine();
-    if(ImGui::Button("Fit##zoomToFit")) requestZoomToFit = true;
-    if(ImGui::IsItemHovered()) ImGui::SetTooltip("Zoom to fit every clip and marker");
-    ImGui::SameLine();
-    ImGui::Checkbox("Follow", &followPlayhead);
-    if(ImGui::IsItemHovered()) ImGui::SetTooltip("Scroll to keep the playhead in view while playing");
-    ImGui::SameLine();
-    bool loopEnabled = timeline.isLoopEnabled();
-    if(ImGui::Checkbox("Loop", &loopEnabled)) timeline.setLoopEnabled(loopEnabled);
-    if(loopEnabled) {
-        double loopStart = timeline.getLoopStartBeat();
-        double loopEnd = timeline.getLoopEndBeat();
-        ImGui::SameLine(); ImGui::SetNextItemWidth(62.0f);
-        if(ImGui::InputDouble("##loopStart", &loopStart, editIncrement(), 1.0, "%.3g"))
-            timeline.setLoopRange(snapBeat(loopStart), loopEnd);
-        ImGui::SameLine(); ImGui::TextUnformatted("to");
-        ImGui::SameLine(); ImGui::SetNextItemWidth(62.0f);
-        if(ImGui::InputDouble("##loopEnd", &loopEnd, editIncrement(), 1.0, "%.3g"))
-            timeline.setLoopRange(loopStart, std::max(loopStart + 1.0 / kPPQ, snapBeat(loopEnd)));
-    }
-    ImGui::SameLine();
-    // Timestamped events: discrete lanes (steps, notes, gates, multi-value
-    // blocks) are handed to a backend that can execute them at an exact
-    // instant, a lookahead ahead of the playhead. Off sends everything on the
-    // frame that crosses it, as before.
-    bool timeStamped = timeline.isSchedulingEnabled();
-    if(ImGui::Checkbox("TimeStamped", &timeStamped)) timeline.setSchedulingEnabled(timeStamped);
-    if(ImGui::IsItemHovered())
-        ImGui::SetTooltip("Send steps, notes and gates to SuperCollider with their exact time\n"
-                          "(timetagged OSC bundles) instead of on the GUI frame that crosses them.\n"
-                          "Curves and parameters without a timestamping backend are unaffected.");
-    if(timeStamped) {
-        double lookahead = timeline.getSchedulingLookaheadMs();
-        ImGui::SameLine(); ImGui::SetNextItemWidth(58.0f);
-        if(ImGui::InputDouble("ms##schedulingLookahead", &lookahead, 10.0, 50.0, "%.0f"))
-            timeline.setSchedulingLookaheadMs(lookahead);
-        if(ImGui::IsItemHovered())
-            ImGui::SetTooltip("Lookahead window. It must be longer than the worst frame interval\n"
-                              "that still has to sound on time (120 ms covers a several-frame stall).");
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Grid and snap division");
     }
 
-    ImGui::SameLine();
+    groupSeparator();
+    {
+        if(iconButton("##tbZoomOut", ToolIcon::ZoomOut, "Zoom out"))
+            pixelsPerSecond = ofClamp(pixelsPerSecond / 1.4f, kMinPixelsPerSecond, kMaxPixelsPerSecond);
+        ImGui::SameLine(0.0f, 2.0f);
+        ImGui::SetNextItemWidth(58.0f);
+        ImGui::DragFloat("##tbPxPerSec", &pixelsPerSecond, 1.0f, kMinPixelsPerSecond, kMaxPixelsPerSecond, "%.0f px/s");
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Zoom: pixels per second (mouse wheel over the timeline also zooms)");
+        ImGui::SameLine(0.0f, 2.0f);
+        if(iconButton("##tbZoomIn", ToolIcon::ZoomIn, "Zoom in"))
+            pixelsPerSecond = ofClamp(pixelsPerSecond * 1.4f, kMinPixelsPerSecond, kMaxPixelsPerSecond);
+        ImGui::SameLine(0.0f, 4.0f);
+        if(iconButton("##tbFit", ToolIcon::Fit, "Zoom to fit every clip and marker")) requestZoomToFit = true;
+        ImGui::SameLine(0.0f, 4.0f);
+        if(iconButton("##tbFollow", ToolIcon::Follow, followPlayhead ? "Follow playhead: on" : "Follow playhead: off",
+                      followPlayhead, IM_COL32(240, 185, 80, 255)))
+            followPlayhead = !followPlayhead;
+        ImGui::SameLine(0.0f, 6.0f);
+        ImGui::SetNextItemWidth(62.0f);
+        ImGui::DragInt("##tbBars", &visibleBars, 0.25f, 1, 256, "%d bars");
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Timeline length");
+    }
+
+    groupSeparator();
+    {
+        // Timestamped events: discrete lanes (steps, notes, gates, multi-value
+        // blocks) are handed to a backend that can execute them at an exact
+        // instant, a lookahead ahead of the playhead. Off sends everything on
+        // the frame that crosses it.
+        const bool timeStamped = timeline.isSchedulingEnabled();
+        if(iconButton("##tbTimeStamped", ToolIcon::Clock,
+                      "Timestamped: send steps, notes and gates to SuperCollider with their exact time\n"
+                      "(timetagged OSC bundles) instead of on the GUI frame that crosses them.\n"
+                      "Curves and parameters without a timestamping backend are unaffected.",
+                      timeStamped, IM_COL32(90, 205, 205, 255)))
+            timeline.setSchedulingEnabled(!timeStamped);
+        ImGui::SameLine(0.0f, 4.0f);
+        ImGui::BeginDisabled(!timeStamped);
+        float lookahead = static_cast<float>(timeline.getSchedulingLookaheadMs());
+        ImGui::SetNextItemWidth(78.0f);
+        if(ImGui::DragFloat("##schedulingLookahead", &lookahead, 1.0f, 0.0f, 1000.0f, "%.0f ms ahead"))
+            timeline.setSchedulingLookaheadMs(lookahead);
+        if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("Lookahead window. It must be longer than the worst frame interval\n"
+                              "that still has to sound on time (120 ms covers a several-frame stall).");
+        ImGui::EndDisabled();
+    }
+
+    groupSeparator();
     // A Wave Track is created together with its first audio clip. Selecting
     // the file here avoids leaving an empty track behind and makes the
     // waveform visible immediately after the track is added.
-    if(ImGui::Button("Add Wave Track")) {
+    if(ImGui::Button("+ Wave Track")) {
         waveFileRequest = WaveFileRequest::NewTrack;
         waveFileRequestBeat = transportState.beatPosition;
+    }
+    if(ImGui::IsItemHovered()) ImGui::SetTooltip("New track with an audio file");
+    ImGui::PopStyleVar(3);
+    {
+        // Stop just short of the next row (the style's item spacing below the rows).
+        const float bottom = ImGui::GetItemRectMax().y + std::max(1.0f, ImGui::GetStyle().ItemSpacing.y - 1.0f);
+        const float left = ImGui::GetWindowPos().x;
+        const float right = left + ImGui::GetWindowWidth();
+        toolbarDl->ChannelsSetCurrent(0);
+        toolbarDl->AddRectFilled(ImVec2(left, toolbarTop), ImVec2(right, bottom), IM_COL32(17, 18, 21, 255));
+        toolbarDl->AddLine(ImVec2(left, bottom), ImVec2(right, bottom), IM_COL32(0, 0, 0, 200), 1.0f);
+        toolbarDl->ChannelsMerge();
     }
 
     // Stale entries can accumulate in selectedClips if their clip was
@@ -1199,9 +1431,12 @@ void ofxOceanodeTimelineController::draw() {
             if(right <= left) return;
             if(drawChrome) {
                 clipScreenRects.push_back({track.id, clip.id, left + 1.0f, min.y + 3.0f, right - 1.0f, max.y - 3.0f});
-                const ImU32 fill = IM_COL32(track.color.r, track.color.g, track.color.b, lane == nullptr ? 75 : 185);
-                dl->AddRectFilled(ImVec2(left + 1, min.y + 3), ImVec2(right - 1, max.y - 3), fill, 3);
-                dl->AddRect(ImVec2(left + 1, min.y + 3), ImVec2(right - 1, max.y - 3), IM_COL32(track.color.r, track.color.g, track.color.b, 245), 3);
+                // Square, no outline; a selected clip is shown by a brighter fill.
+                const bool clipSelected = selectedClips.count({track.id, clip.id}) > 0;
+                auto lift = [&](unsigned char c) { return static_cast<int>(c + (255 - c) * (clipSelected ? 0.45f : 0.0f)); };
+                const ImU32 fill = IM_COL32(lift(track.color.r), lift(track.color.g), lift(track.color.b),
+                                            clipSelected ? 235 : (lane == nullptr ? 75 : 185));
+                dl->AddRectFilled(ImVec2(left + 1, min.y + 3), ImVec2(right - 1, max.y - 3), fill);
                 // A clip's persistent group and its (separate, ephemeral)
                 // Shift+click selection are drawn as extra outlines on top
                 // of the normal fill/border above, so a grouped clip that's
@@ -1214,11 +1449,8 @@ void ofxOceanodeTimelineController::draw() {
                     // reusing one fixed colour for "grouped".
                     const size_t hash = std::hash<std::string>{}(group->id);
                     const ImU32 groupColor = IM_COL32(180 + (hash % 60), 150 + ((hash >> 8) % 90), 255 - ((hash >> 16) % 110), 235);
-                    dl->AddRect(ImVec2(left - 1, min.y + 1), ImVec2(right + 1, max.y - 1), groupColor, 4.0f, 0, 2.5f);
+                    dl->AddRect(ImVec2(left - 1, min.y + 1), ImVec2(right + 1, max.y - 1), groupColor, 0.0f, 0, 2.5f);
                     dl->AddText(ImVec2(right - 13, min.y + 3), groupColor, "G");
-                }
-                if(selectedClips.count({track.id, clip.id}) > 0) {
-                    dl->AddRect(ImVec2(left + 1, min.y + 3), ImVec2(right - 1, max.y - 3), IM_COL32(255, 255, 255, 235), 3.0f, 0, 1.5f);
                 }
                 if(right - left > 45) {
                     std::string label = clip.name;
@@ -1964,23 +2196,24 @@ void ofxOceanodeTimelineController::draw() {
                     ImGui::InvisibleButton(("##noteGroup" + track.id + group.id).c_str(), ImVec2(contentWidth, groupHeight));
                     rowY += groupHeight;
                     const ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax(), laneMin(min.x + kLabelWidth - timelineScrollX, min.y);
+                    const ImVec2 labelMin(min.x + kParameterRowIndent, min.y); // rows sit indented under their track
                     rowUnits.push_back({groupMembers, min.y, max.y});
                     constexpr float kGroupResizeGrip = 5.0f;
-                    const ImVec2 gripMin(min.x, max.y - kGroupResizeGrip), gripMax(min.x + kLabelWidth, max.y);
+                    const ImVec2 gripMin(labelMin.x, max.y - kGroupResizeGrip), gripMax(min.x + kLabelWidth, max.y);
                     const bool popupOpen = ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId);
                     const bool gripHovered = rowResizeTrackId.empty() && bindingDragTrackId.empty() && !popupOpen &&
                         hoverRect(gripMin, gripMax);
-                    dl->AddRectFilled(min, max, mutedTrackColor(track.color, 0.17f));
+                    dl->AddRectFilled(labelMin, max, mutedTrackColor(track.color, 0.17f));
                     dl->PushClipRect(ImVec2(zoneLeft, min.y), ImVec2(max.x, max.y), true);
                     drawGrid(laneMin, max);
                     dl->PopClipRect();
-                    dl->AddRectFilled(min, ImVec2(min.x + kLabelWidth, max.y), mutedTrackColor(track.color, 0.38f, 0.55f));
-                    dl->AddRect(min, ImVec2(min.x + kLabelWidth, max.y), IM_COL32(track.color.r, track.color.g, track.color.b, 230));
+                    dl->AddRectFilled(labelMin, ImVec2(min.x + kLabelWidth, max.y), mutedTrackColor(track.color, 0.38f, 0.55f));
+                    dl->AddLine(ImVec2(labelMin.x, max.y - 0.5f), ImVec2(min.x + kLabelWidth, max.y - 0.5f), IM_COL32(0, 0, 0, 140), 1.0f); // row divider, on the resize edge
                     // Expand arrow: shows the member parameter rows underneath.
-                    const ImVec2 arrowMin(min.x + 2.0f, min.y + 2.0f), arrowMax(min.x + 20.0f, min.y + 24.0f);
+                    const ImVec2 arrowMin(labelMin.x + 2.0f, min.y + 2.0f), arrowMax(labelMin.x + 20.0f, min.y + 24.0f);
                     const bool arrowHovered = !popupOpen && hoverRect(arrowMin, arrowMax);
                     const ImU32 arrowColor = arrowHovered ? IM_COL32(255, 255, 255, 255) : IM_COL32(215, 220, 230, 230);
-                    const ImVec2 arrowCenter(min.x + 11.0f, min.y + 13.0f);
+                    const ImVec2 arrowCenter(labelMin.x + 11.0f, min.y + 13.0f);
                     if(group.expanded)
                         dl->AddTriangleFilled(ImVec2(arrowCenter.x - 5, arrowCenter.y - 3), ImVec2(arrowCenter.x + 5, arrowCenter.y - 3),
                                               ImVec2(arrowCenter.x, arrowCenter.y + 4), arrowColor);
@@ -1993,12 +2226,12 @@ void ofxOceanodeTimelineController::draw() {
                     }
                     // Name, and which parameters it drives.
                     const float labelRight = min.x + kLabelWidth - 6.0f;
-                    dl->PushClipRect(ImVec2(min.x + 20.0f, min.y), ImVec2(labelRight, max.y), true);
-                    dl->AddText(ImVec2(min.x + 22.0f, min.y + 6.0f), IM_COL32(245, 250, 255, 255), group.name.c_str());
+                    dl->PushClipRect(ImVec2(labelMin.x + 20.0f, min.y), ImVec2(labelRight, max.y), true);
+                    dl->AddText(ImVec2(labelMin.x + 22.0f, min.y + 6.0f), IM_COL32(245, 250, 255, 255), group.name.c_str());
                     struct RoleTag { const char* label; const std::string* id; };
                     const RoleTag roleTags[3] = {{"pitch", &group.pitchBindingId}, {"gate", &group.gateBindingId}, {"vel", &group.velocityBindingId}};
                     const bool tagsOnOwnLine = groupHeight >= 40.0f;
-                    float tagX = tagsOnOwnLine ? min.x + 22.0f : min.x + 30.0f + ImGui::CalcTextSize(group.name.c_str()).x;
+                    float tagX = tagsOnOwnLine ? labelMin.x + 22.0f : labelMin.x + 30.0f + ImGui::CalcTextSize(group.name.c_str()).x;
                     const float tagY = tagsOnOwnLine ? min.y + 23.0f : min.y + 6.0f;
                     for(const auto& tag : roleTags) {
                         if(tag.id->empty()) continue;
@@ -2143,6 +2376,7 @@ void ofxOceanodeTimelineController::draw() {
                 ImGui::InvisibleButton(("##binding" + track.id + binding.id).c_str(), ImVec2(contentWidth, rowHeight));
                 rowY += rowHeight;
                 const ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax(), laneMin(min.x + kLabelWidth - timelineScrollX, min.y);
+                const ImVec2 labelMin(min.x + kParameterRowIndent, min.y); // rows sit indented under their track
                 if(noteGroup != nullptr && !rowUnits.empty()) rowUnits.back().bottom = max.y;
                 else rowUnits.push_back({{binding.id}, min.y, max.y});
                 // Member rows of an expanded note group: indented, and they
@@ -2155,26 +2389,26 @@ void ofxOceanodeTimelineController::draw() {
                 };
                 // Bottom edge of the label column: drag to resize the row.
                 constexpr float kResizeGrip = 5.0f;
-                const ImVec2 gripMin(min.x, max.y - kResizeGrip), gripMax(min.x + kLabelWidth, max.y);
+                const ImVec2 gripMin(labelMin.x, max.y - kResizeGrip), gripMax(min.x + kLabelWidth, max.y);
                 const bool gripHovered = rowResizeTrackId.empty() && bindingDragTrackId.empty() &&
                     hoverRect(gripMin, gripMax) &&
                     !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId);
-                dl->AddRectFilled(min, max, mutedTrackColor(track.color, 0.17f));
+                dl->AddRectFilled(labelMin, max, mutedTrackColor(track.color, 0.17f));
                 dl->PushClipRect(ImVec2(zoneLeft, min.y), ImVec2(max.x, max.y), true);
                 drawGrid(laneMin, max);
                 dl->PopClipRect();
                 bool automated = false;
                 for(const auto& clip : track.clips) automated = automated || rowLane(clip) != nullptr;
-                dl->AddRectFilled(min, ImVec2(min.x + kLabelWidth, max.y),
+                dl->AddRectFilled(labelMin, ImVec2(min.x + kLabelWidth, max.y),
                                   mutedTrackColor(track.color, automated ? 0.34f : 0.23f, 0.48f));
                 if(noteGroup != nullptr) {
                     // Tie the member row to its group row above.
-                    dl->AddLine(ImVec2(min.x + 7.0f, min.y), ImVec2(min.x + 7.0f, lastGroupMember ? min.y + 14.0f : max.y),
+                    dl->AddLine(ImVec2(labelMin.x + 7.0f, min.y), ImVec2(labelMin.x + 7.0f, lastGroupMember ? min.y + 14.0f : max.y),
                                 IM_COL32(track.color.r, track.color.g, track.color.b, 200), 2.0f);
-                    dl->AddLine(ImVec2(min.x + 7.0f, min.y + 14.0f), ImVec2(min.x + 12.0f, min.y + 14.0f),
+                    dl->AddLine(ImVec2(labelMin.x + 7.0f, min.y + 14.0f), ImVec2(labelMin.x + 12.0f, min.y + 14.0f),
                                 IM_COL32(track.color.r, track.color.g, track.color.b, 200), 2.0f);
                 }
-                dl->AddRect(min, ImVec2(min.x + kLabelWidth, max.y), IM_COL32(track.color.r, track.color.g, track.color.b, 210));
+                dl->AddLine(ImVec2(labelMin.x, max.y - 0.5f), ImVec2(min.x + kLabelWidth, max.y - 0.5f), IM_COL32(0, 0, 0, 140), 1.0f); // row divider, on the resize edge
                 // Blend mode used to be findable only by right-clicking this
                 // row (or the track header) and opening a nested "Blend
                 // mode" submenu -- easy to lose track of, which is also why
@@ -2190,7 +2424,7 @@ void ofxOceanodeTimelineController::draw() {
                 const bool blendChipActive = binding.mode != ofxOceanodeTimelineAutomationMode::Replace;
                 dl->AddRectFilled(blendChipMin, blendChipMax,
                                   blendChipActive ? IM_COL32(235, 165, 65, 220) : IM_COL32(90, 90, 95, 150), 3.0f);
-                dl->PushClipRect(ImVec2(min.x + 5.0f, min.y), ImVec2(blendChipMin.x - 4.0f, max.y), true);
+                dl->PushClipRect(ImVec2(labelMin.x + 5.0f, min.y), ImVec2(blendChipMin.x - 4.0f, max.y), true);
                 {
                     std::string rowLabel = binding.parameterPath;
                     if(noteGroup != nullptr) {
@@ -2199,7 +2433,7 @@ void ofxOceanodeTimelineController::draw() {
                         rowLabel = std::string(role) + ": " + rowLabel;
                     }
                     if(binding.bypass) rowLabel += "  (bypassed)";
-                    dl->AddText(ImVec2(min.x + 7 + memberIndent, min.y + 6),
+                    dl->AddText(ImVec2(labelMin.x + 7 + memberIndent, min.y + 6),
                                 automated || noteGroup != nullptr ? IM_COL32(245, 250, 255, 255) : IM_COL32(180, 180, 180, 255),
                                 rowLabel.c_str());
                 }
@@ -2525,7 +2759,7 @@ void ofxOceanodeTimelineController::draw() {
                 // Highlight what the box will select.
                 for(const auto& rect : clipScreenRects) {
                     if(rect.x2 < boxMin.x || rect.x1 > boxMax.x || rect.y2 < boxMin.y || rect.y1 > boxMax.y) continue;
-                    boxDl->AddRect(ImVec2(rect.x1, rect.y1), ImVec2(rect.x2, rect.y2), IM_COL32(255, 255, 255, 235), 3.0f, 0, 1.5f);
+                    boxDl->AddRectFilled(ImVec2(rect.x1, rect.y1), ImVec2(rect.x2, rect.y2), IM_COL32(255, 255, 255, 70));
                 }
                 boxDl->AddRectFilled(boxMin, boxMax, IM_COL32(120, 170, 255, 40));
                 boxDl->AddRect(boxMin, boxMax, IM_COL32(150, 190, 255, 200));

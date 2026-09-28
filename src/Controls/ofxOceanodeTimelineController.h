@@ -94,6 +94,7 @@ private:
     std::shared_ptr<ofxOceanodeContainer> container;
     int visibleBars = 8;
     double rulerSnapBeats = 0.25;
+    bool snapEnabled = true; // magnet toggle: clip, marker, loop and playhead moves snap to the grid
     // Derived from the selected snap and current zoom. The selected value is
     // kept separately so zooming back in restores the user's finer grid.
     double effectiveRulerSnapBeats = 0.25;

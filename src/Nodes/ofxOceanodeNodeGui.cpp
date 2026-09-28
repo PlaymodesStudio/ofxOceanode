@@ -181,10 +181,11 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                 if(publishedInTimeline){
                     const ImVec2 labelMin = ImGui::GetCursorScreenPos();
                     const ImVec2 labelMax(labelMin.x + nodeWidthText, labelMin.y + ImGui::GetFrameHeight());
-                    const ImVec2 badgeMin(labelMin.x + 2.0f, labelMin.y + 2.0f);
-                    const ImVec2 badgeMax(labelMax.x - 5.0f, labelMax.y - 2.0f);
-                    ImGui::GetWindowDrawList()->AddRectFilled(badgeMin, badgeMax, IM_COL32(timelineTrackColor.r, timelineTrackColor.g, timelineTrackColor.b, 105), 3.0f);
-                    ImGui::GetWindowDrawList()->AddRect(badgeMin, badgeMax, IM_COL32(timelineTrackColor.r, timelineTrackColor.g, timelineTrackColor.b, 220), 3.0f, 0, 1.0f);
+                    // Square block starting a few pixels before the label, so the
+                    // first letter sits inside it rather than on its edge.
+                    const ImVec2 badgeMin(labelMin.x - 4.0f, labelMin.y + 1.0f);
+                    const ImVec2 badgeMax(labelMax.x - 5.0f, labelMax.y - 1.0f);
+                    ImGui::GetWindowDrawList()->AddRectFilled(badgeMin, badgeMax, IM_COL32(timelineTrackColor.r, timelineTrackColor.g, timelineTrackColor.b, 105));
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(
                         std::min(1.0f, timelineTrackColor.r / 255.0f + 0.35f),
                         std::min(1.0f, timelineTrackColor.g / 255.0f + 0.35f),
