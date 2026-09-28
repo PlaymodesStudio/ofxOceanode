@@ -105,6 +105,12 @@ public:
 	bool isLocal(){
 		return presetManager.isLocal();
 	}
+	const string& getCurrentMacroPath() const { return presetManager.getCurrentMacroPath(); }
+	const std::deque<string>& getCurrentMacroCategory() const { return presetManager.getCurrentCategory(); }
+	const std::vector<string>& getRouterSortOrder() const { return sortOrder.getOrder(); }
+	bool wasRouterOrderUserEdited() const { return routerOrderUserEdited; }
+	string getLocalMacroName() const { return localName.get(); }
+	bool saveGlobalDefinition(bool notifyOtherInstances = true);
 
 	bool isActive() const {
 		return active.get();
@@ -171,7 +177,7 @@ private:
 	ofColor getSortSeparatorColor(const std::string& entry) const { return sortOrder.getSortSeparatorColor(entry); }
 	std::string makeSortSeparatorEntry(const std::string& label, const ofColor& color) const { return sortOrder.makeSortSeparatorEntry(label, color); }
 	bool isRouterInSortOrder(const std::string& routerName) const { return sortOrder.isRouterInSortOrder(routerName); }
-	void loadRouterSortFromJson(const ofJson& json) { sortOrder.loadRouterSortFromJson(json); }
+	void loadRouterSortFromJson(const ofJson& json) { sortOrder.loadRouterSortFromJson(json); routerOrderUserEdited = false; }
 
 	// ─── Interpolation inline helper ──────────────────────────────────────
 	bool shouldInterpolateType(const std::string& type) const { return MacroRouterValueDispatch::shouldInterpolate(type); }
@@ -216,6 +222,7 @@ private:
 	ofEventListeners deleteListeners;
 	ofEventListeners presetActionsListeners;
 	std::unordered_map<string, ofEventListeners> inoutListeners;
+	bool routerOrderUserEdited = false;
 	
 	// ─── Basic state ──────────────────────────────────────────────────────
 	bool showWindow;
