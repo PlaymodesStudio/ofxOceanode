@@ -31,6 +31,24 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
 	minimizedViewCallback = [this](ImVec2 size) { renderMinimizedView(size); };
 }
 
+void ofxOceanodeNodeMacro::markMacroReferenceUserEdited(){
+	macroReferenceUserEdited = true;
+	editedReferenceIsLocal = presetManager.isLocal();
+	editedReferenceName = presetManager.getCurrentMacro();
+	editedReferenceCategory = presetManager.getCurrentCategory();
+}
+
+bool ofxOceanodeNodeMacro::wasMacroReferenceUserEdited() const{
+	return macroReferenceUserEdited &&
+	       editedReferenceIsLocal == presetManager.isLocal() &&
+	       editedReferenceName == presetManager.getCurrentMacro() &&
+	       editedReferenceCategory == presetManager.getCurrentCategory();
+}
+
+void ofxOceanodeNodeMacro::clearUserEditMarkers(){
+	macroReferenceUserEdited = false;
+}
+
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::update(ofEventArgs &a){
@@ -200,18 +218,22 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	}));
 	
 	presetControlRef->addReceiveFunc<int>([this](const int &i){
+		clearUserEditMarkers();
 		presetManager.loadMacroInsideCategory(i);
 	});
 	
 	presetControlRef->addReceiveFunc<float>([this](const float &f){
+		clearUserEditMarkers();
 		presetManager.loadMacroInsideCategory(floor(f));
 	});
 	
 	presetControlRef->addReceiveFunc<vector<int>>([this](const vector<int> &vi){
+		clearUserEditMarkers();
 		presetManager.loadMacroInsideCategory(vi[0]);
 	});
 	
 	presetControlRef->addReceiveFunc<vector<float>>([this](const vector<float> &vf){
+		clearUserEditMarkers();
 		presetManager.loadMacroInsideCategory(floor(vf[0]));
 	});
 	

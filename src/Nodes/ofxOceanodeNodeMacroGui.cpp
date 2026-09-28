@@ -114,7 +114,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 			return false;
 		};
 		
-		drawCategory(macroDirectoryStructure);
+		if(drawCategory(macroDirectoryStructure)) markMacroReferenceUserEdited();
 		
 		ImGui::EndPopup();
 	}
@@ -146,6 +146,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 		if(!presetManager.isLocal()){
 			container->loadPreset(presetManager.getCurrentMacroPath());
 		}
+		markMacroReferenceUserEdited();
 	}
 	ImGui::SameLine();
 	bool prevShowWindow = showWindow;
@@ -207,6 +208,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 					presetManager.setCurrentMacroPath(saveAsCategoryWithSlash + string(proposedNewName));
 					presetManager.getCurrentCategory() = presetManager.getSaveAsTempCategory();
 					presetManager.setCurrentCategoryMacro(macroDirectoryStructure);
+					markMacroReferenceUserEdited();
 						saveMacroLayout(presetManager.getCurrentMacroPath());
 						// Save router sort order to the macro folder
 					{

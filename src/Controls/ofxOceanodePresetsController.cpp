@@ -840,7 +840,9 @@ void compareNode(ofxOceanodeContainer& owner, ofxOceanodeNode& node,
         const ofJson local = macro->isLocal();
         const bool savedWasLocal = saved.is_object() ? saved.value("LocalPreset", true) : true;
         const ofJson savedLocal = savedWasLocal;
+        const bool referenceUserEdited = macro->wasMacroReferenceUserEdited();
         if(saved.is_object() && savedWasLocal && !macro->isLocal()){
+            if(!referenceUserEdited) return;
             const std::string localName = saved.value("Local_Name", std::string("Local"));
             const std::string macroName = macro->getCurrentMacroName();
             std::string categoryName;
@@ -862,7 +864,7 @@ void compareNode(ofxOceanodeContainer& owner, ofxOceanodeNode& node,
                                GlobalMacroSaveChange::Kind::MacroReplacement});
             return;
         }
-        addChange(changes, location, label, "Local macro", savedLocal, local);
+        if(referenceUserEdited) addChange(changes, location, label, "Local macro", savedLocal, local);
         if(macro->isLocal()){
             const ofJson savedOrder = field(saved, "RouterSortOrder");
             const ofJson currentOrder = macro->getRouterSortOrder();
@@ -870,19 +872,21 @@ void compareNode(ofxOceanodeContainer& owner, ofxOceanodeNode& node,
                !(savedOrder.is_null() && currentOrder.empty())){
                 addChange(changes, location, label, "Router order", savedOrder, currentOrder);
             }
-            const std::string childFolder = savedFolder + "/" + nodeKey(node);
-            // The local child is part of the owning global macro's definition.
-            compareContainer(*macro->getContainer(), childFolder,
-                             location + " > " + label, changes);
+            if(savedWasLocal || referenceUserEdited){
+                const std::string childFolder = savedFolder + "/" + nodeKey(node);
+                // The local child is part of the owning global macro's definition.
+                compareContainer(*macro->getContainer(), childFolder,
+                                 location + " > " + label, changes);
+            }
         }else{
+            // MacroPath is resolved during loading and may change between
+            // missing, relative, and absolute forms without a user edit.
             const ofJson oldMacro = field(saved, "Macro");
             const ofJson currentMacro = macro->getCurrentMacroName();
-            addChange(changes, location, label, "Referenced macro", oldMacro, currentMacro);
+            if(referenceUserEdited) addChange(changes, location, label, "Referenced macro", oldMacro, currentMacro);
             const ofJson category = macro->getCurrentMacroCategory();
             const ofJson oldCategory = field(saved, "CategoryStruct");
-            addChange(changes, location, label, "Macro category", oldCategory, category);
-            addChange(changes, location, label, "Referenced folder", field(saved, "MacroPath"),
-                      macro->getCurrentMacroPath());
+            if(referenceUserEdited) addChange(changes, location, label, "Macro category", oldCategory, category);
         }
     }
 }
