@@ -109,6 +109,9 @@ public:
 	const std::deque<string>& getCurrentMacroCategory() const { return presetManager.getCurrentCategory(); }
 	const std::vector<string>& getRouterSortOrder() const { return sortOrder.getOrder(); }
 	bool wasRouterOrderUserEdited() const { return routerOrderUserEdited; }
+	void markMacroReferenceUserEdited();
+	bool wasMacroReferenceUserEdited() const;
+	void clearUserEditMarkers() override;
 	string getLocalMacroName() const { return localName.get(); }
 	bool saveGlobalDefinition(bool notifyOtherInstances = true);
 
@@ -223,6 +226,10 @@ private:
 	ofEventListeners presetActionsListeners;
 	std::unordered_map<string, ofEventListeners> inoutListeners;
 	bool routerOrderUserEdited = false;
+	bool macroReferenceUserEdited = false;
+	bool editedReferenceIsLocal = true;
+	string editedReferenceName;
+	std::deque<string> editedReferenceCategory;
 	
 	// ─── Basic state ──────────────────────────────────────────────────────
 	bool showWindow;
