@@ -22,6 +22,7 @@ public:
     
 private:
     void createPreset(string name);
+    bool hasSelectedBank() const { return currentBank >= 0 && currentBank < static_cast<int>(banks.size()); }
     
     void loadPreset(string name, string bank);
     void savePreset(string name, string bank);
