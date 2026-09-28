@@ -56,6 +56,9 @@ public:
     virtual void resetPhase(){};
     
     virtual void presetSave(ofJson &json){};
+    // Models with computed presetSave fields can require an explicit user edit.
+    virtual bool shouldReviewPresetSaveField(const std::string&, const ofJson&) const { return true; }
+    virtual void clearUserEditMarkers() {};
 	virtual void macroSave(ofJson &json, string path){};
     virtual void presetRecallBeforeSettingParameters(ofJson &json){};
     virtual void presetRecallAfterSettingParameters(ofJson &json){};

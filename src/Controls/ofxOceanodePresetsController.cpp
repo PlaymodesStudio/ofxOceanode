@@ -827,6 +827,7 @@ void compareNode(ofxOceanodeContainer& owner, ofxOceanodeNode& node,
     if(modelData.is_object()){
         for(auto it = modelData.begin(); it != modelData.end(); ++it){
             if(parameters.contains(it.key()) || inspector.contains(it.key())) continue;
+            if(!model.shouldReviewPresetSaveField(it.key(), it.value())) continue;
             // These presetSave fields describe running output, external window
             // placement, or the current snapshot choice, not macro edits.
             if(it.key() == "AllCurvesOutput" || it.key() == "ExtWindowRect" ||
