@@ -22,7 +22,7 @@ public:
         colors[ImGuiCol_TextDisabled]           = ImVec4(0.55f, 0.55f, 0.55f, 1.00f);
         colors[ImGuiCol_WindowBg]               = ImVec4(0.16f, 0.16f, 0.16f, 1.00f);
         colors[ImGuiCol_ChildBg]                = ImVec4(1.00f, 0.00f, 0.00f, 0.00f);
-        colors[ImGuiCol_PopupBg]                = ImVec4(0.16f, 0.16f, 0.16f, 1.00f);
+        colors[ImGuiCol_PopupBg]                = colors[ImGuiCol_WindowBg];
         colors[ImGuiCol_Border]                 = ImVec4(0.10f, 0.10f, 0.10f, 1.00f);
         colors[ImGuiCol_BorderShadow]           = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
         colors[ImGuiCol_FrameBg]                = ImVec4(0.33f, 0.33f, 0.33f, 0.25f);

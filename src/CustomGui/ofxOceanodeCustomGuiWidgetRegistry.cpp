@@ -29,7 +29,7 @@ const CustomGuiWidgetDefinition* ofxOceanodeCustomGuiWidgetRegistry::getWidget(C
 std::vector<CustomGuiWidgetType> ofxOceanodeCustomGuiWidgetRegistry::getCompatibleWidgets(ofxOceanodeAbstractParameter& parameter) const
 {
     std::vector<CustomGuiWidgetType> result;
-    for(int typeIndex = (int)CustomGuiWidgetType::Slider; typeIndex <= (int)CustomGuiWidgetType::CustomRegion; typeIndex++){
+    for(int typeIndex = (int)CustomGuiWidgetType::Slider; typeIndex <= (int)CustomGuiWidgetType::Scope; typeIndex++){
         auto it = definitions.find(typeIndex);
         if(it == definitions.end()) continue;
         if(it->second.supportsParameter && it->second.supportsParameter(parameter)){

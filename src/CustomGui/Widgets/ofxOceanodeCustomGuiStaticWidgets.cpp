@@ -58,7 +58,7 @@ bool renderBackgroundPanelWidget(CustomGuiWidgetRenderContext& context, CustomGu
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const ImVec2 min = ImGui::GetItemRectMin();
     const ImVec2 max = ImGui::GetItemRectMax();
-    drawList->AddRectFilled(min, max, IM_COL32(widget.color.r, widget.color.g, widget.color.b, widget.color.a), 4.0f);
+    drawList->AddRectFilled(min, max, IM_COL32(widget.color.r, widget.color.g, widget.color.b, widget.color.a), 0.0f);
 
     const bool showLabel = widget.config.value("showLabel", true);
     if(showLabel && !widget.label.empty()){
@@ -119,7 +119,7 @@ bool renderImageWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& w
         ImTextureID textureID = (ImTextureID)(uintptr_t)image->getTexture().texData.textureID;
         drawList->AddImage(textureID, min, max, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, widget.color.a));
     }else{
-        drawList->AddRect(min, max, IM_COL32(160, 160, 160, 180), 2.0f);
+        drawList->AddRect(min, max, IM_COL32(160, 160, 160, 180), 0.0f);
         drawList->AddText(ImVec2(min.x + 6.0f, min.y + 6.0f), IM_COL32(200, 200, 200, 220), imagePath.empty() ? "Image path..." : "Image not found");
     }
     ImGui::EndGroup();

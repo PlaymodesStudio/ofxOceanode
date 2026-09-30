@@ -33,7 +33,8 @@ struct OceanodeColors {
     inline static ImVec4 SelectedBorder       = {1.00f,  0.498f, 0.00f,  1.00f}; // selected comment/node border
 
     // ── Connection lines ─────────────────────────────────────────────────────
-    inline static ImVec4 ConnectionLine               = {0.784f, 0.784f, 0.784f, 0.502f}; // idle Bezier wire
+    inline static ImVec4 ConnectionLineLight          = {0.00f,  0.00f,  0.00f,  1.00f};  // wire on a light canvas
+    inline static ImVec4 ConnectionLineDark           = {1.00f,  1.00f,  1.00f,  1.00f};  // wire on a dark canvas
     inline static ImVec4 ConnectionDragging           = {1.00f,  1.00f,  1.00f,  0.251f}; // dragging, no valid target
     inline static ImVec4 ConnectionDraggingReachable  = {1.00f,  1.00f,  1.00f,  0.502f}; // dragging, valid target reachable
 
@@ -55,7 +56,8 @@ struct OceanodeColors {
     inline static ImVec4 ActiveItemHighlight  = {0.40f, 0.90f, 0.40f, 1.00f}; // "currently selected" green tick
 
     // ── Popups & context menus ───────────────────────────────────────────────
-    inline static ImVec4 PopupBg             = {0.12f, 0.12f, 0.12f, 1.00f}; // darker sub-popup background
+    // Legacy field kept for source compatibility; popup backgrounds use ImGuiCol_WindowBg.
+    inline static ImVec4 PopupBg             = {0.12f, 0.12f, 0.12f, 1.00f};
     inline static ImVec4 PopupDimmedText     = {0.70f, 0.70f, 0.70f, 0.70f}; // dimmed text in context popups
     inline static ImVec4 TransparentButton   = {0.00f, 0.00f, 0.00f, 0.00f}; // invisible-background buttons
 
@@ -125,7 +127,8 @@ struct OceanodeColors {
         ConnectionBullet     = {0.00f,  0.00f,  0.00f,  1.00f};
         SelectedBorder       = {1.00f,  0.498f, 0.00f,  1.00f};
 
-        ConnectionLine               = {0.784f, 0.784f, 0.784f, 0.502f};
+        ConnectionLineLight          = {0.00f,  0.00f,  0.00f,  1.00f};
+        ConnectionLineDark           = {1.00f,  1.00f,  1.00f,  1.00f};
         ConnectionDragging           = {1.00f,  1.00f,  1.00f,  0.251f};
         ConnectionDraggingReachable  = {1.00f,  1.00f,  1.00f,  0.502f};
 
@@ -201,7 +204,8 @@ struct OceanodeColors {
             { "OC_ConnectionBullet",     &ConnectionBullet     },
             { "OC_SelectedBorder",       &SelectedBorder       },
             // Connection lines
-            { "OC_ConnectionLine",               &ConnectionLine               },
+            { "OC_ConnectionLineLight",          &ConnectionLineLight          },
+            { "OC_ConnectionLineDark",           &ConnectionLineDark           },
             { "OC_ConnectionDragging",           &ConnectionDragging           },
             { "OC_ConnectionDraggingReachable",  &ConnectionDraggingReachable  },
             // Canvas grid
@@ -218,7 +222,6 @@ struct OceanodeColors {
             // App UI
             { "OC_ActiveItemHighlight",  &ActiveItemHighlight  },
             // Popups
-            { "OC_PopupBg",             &PopupBg             },
             { "OC_PopupDimmedText",     &PopupDimmedText     },
             { "OC_TransparentButton",   &TransparentButton   },
             // Search

@@ -32,7 +32,8 @@ enum class CustomGuiWidgetType {
 	Texture,
 	Image,
     SnapshotMatrix,
-    CustomRegion
+    CustomRegion,
+    Scope
 };
 
 struct CustomGuiParameterReference {
@@ -128,6 +129,7 @@ inline std::string customGuiWidgetTypeToString(CustomGuiWidgetType type)
 	        case CustomGuiWidgetType::Image: return "Image";
             case CustomGuiWidgetType::SnapshotMatrix: return "SnapshotMatrix";
             case CustomGuiWidgetType::CustomRegion: return "CustomRegion";
+            case CustomGuiWidgetType::Scope: return "Scope";
     }
     return "Slider";
 }
@@ -159,6 +161,7 @@ inline CustomGuiWidgetType customGuiWidgetTypeFromString(const std::string& type
 	    if(type == "Image") return CustomGuiWidgetType::Image;
     if(type == "SnapshotMatrix") return CustomGuiWidgetType::SnapshotMatrix;
     if(type == "CustomRegion") return CustomGuiWidgetType::CustomRegion;
+    if(type == "Scope") return CustomGuiWidgetType::Scope;
     return CustomGuiWidgetType::Slider;
 }
 

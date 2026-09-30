@@ -17,10 +17,12 @@ public:
     ofxOceanodeCustomGuiPanel(ofxOceanodeContainer& container, const std::string& panelId);
 
     void draw();
+    const std::string& getId() const { return panelId; }
 
     bool addParameter(ofxOceanodeAbstractParameter& parameter, CustomGuiWidgetType type);
     bool containsParameter(ofxOceanodeAbstractParameter& parameter) const;
     bool removeParameter(const std::string& parameterPath);
+    void removeUnavailableParameters();
 
     std::vector<CustomGuiWidgetType> getCompatibleWidgetTypes(ofxOceanodeAbstractParameter& parameter) const;
     CustomGuiWidgetType getDefaultWidgetType(ofxOceanodeAbstractParameter& parameter) const;
@@ -70,6 +72,7 @@ private:
     std::string setVectorSizeLabel;
     int setVectorSizeValue = 1;
     bool requestOpenWidgetPropertiesPopup = false;
+    bool resetWidgetInteraction = false;
     int propertiesWidgetIndex = -1;
     bool requestOpenRenameSnapshotPopup = false;
     bool requestOpenDeleteSnapshotPopup = false;

@@ -2,6 +2,7 @@
 #include "CustomGui/Widgets/ofxOceanodeCustomGuiSignalWidgets.h"
 #include "CustomGui/Widgets/ofxOceanodeCustomGuiWidgetHelpers.h"
 #include "Managers/ofxOceanodeContainer.h"
+#include "Managers/ofxOceanodeScope.h"
 #include <algorithm>
 #include <cfloat>
 #include <cstdint>
@@ -22,6 +23,53 @@
 namespace {
 
 using namespace ofxOceanodeCustomGuiWidgetHelpers;
+
+bool supportsScopeWidget(ofxOceanodeAbstractParameter& parameter)
+{
+    return ofxOceanodeScope::getInstance()->canScope(&parameter);
+}
+
+void initializeScopeWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&)
+{
+    widget.spanW = 8;
+    widget.spanH = 5;
+    widget.config["showValue"] = false;
+    // Allow renderer controls (for example texture aspect ratio) in Run mode.
+    widget.config["interactive"] = true;
+}
+
+bool renderScopeWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& widget,
+                       ofxOceanodeAbstractParameter* parameter)
+{
+    ImGui::BeginGroup();
+    drawWidgetLabel(context, widget, context.label);
+    const ImVec2 size = widgetItemSize(context);
+    const ofColor bodyColor = widgetBodyColor(widget);
+    pushWidgetFrameColors(bodyColor, widget.color);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, colorToImVec4(bodyColor));
+    ImGui::PushStyleColor(ImGuiCol_PlotLines, colorToImVec4(widget.color));
+    ImGui::PushStyleColor(ImGuiCol_PlotLinesHovered, colorToImVec4(widget.color));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+    if(context.designMode || !context.interactive) flags |= ImGuiWindowFlags_NoInputs;
+
+    // Some addon renderers query the current window instead of using size.
+    // A child gives them both a bounded content region and a distinct ID scope.
+    if(ImGui::BeginChild("##scope", size, false, flags)){
+        const ImVec2 available = ImGui::GetContentRegionAvail();
+        if(parameter == nullptr){
+            ImGui::TextDisabled("Parameter unavailable");
+        }else if(!ofxOceanodeScope::getInstance()->drawParameter(
+                     parameter, ImVec2(std::max(1.0f, available.x), std::max(1.0f, available.y)))){
+            ImGui::TextDisabled("Scope unavailable");
+        }
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor(11);
+    ImGui::EndGroup();
+    return true;
+}
 
 constexpr float kScBusFftSampleRate = 44100.0f;
 constexpr float kScBusFftFreqMin = 20.0f;
@@ -714,8 +762,8 @@ ImU32 getVUMeterColorDB(float dbLevel)
 void drawVUMeterDisplay(const std::vector<float>& levels, const ImVec2& itemSize, ImDrawList* drawList, const ImVec2& min, const ImVec2& max, bool vertical)
 {
     const int numChans = std::max(1, (int)levels.size());
-    drawList->AddRectFilled(min, max, IM_COL32(15, 15, 15, 255), 2.0f);
-    drawList->AddRect(min, max, IM_COL32(100, 100, 100, 255), 2.0f);
+    drawList->AddRectFilled(min, max, IM_COL32(15, 15, 15, 255), 0.0f);
+    drawList->AddRect(min, max, IM_COL32(100, 100, 100, 255), 0.0f);
 
     if(vertical){
         const float leftMargin = std::min(20.0f, itemSize.x * 0.12f);
@@ -880,7 +928,7 @@ bool renderTextureLikeWidget(CustomGuiWidgetRenderContext& context, CustomGuiWid
         ImTextureID textureID = (ImTextureID)(uintptr_t)texture->texData.textureID;
         drawList->AddImage(textureID, min, max, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, widget.color.a));
     }else{
-        drawList->AddRect(min, max, IM_COL32(160, 160, 160, 180), 2.0f);
+        drawList->AddRect(min, max, IM_COL32(160, 160, 160, 180), 0.0f);
         drawList->AddText(ImVec2(min.x + 6.0f, min.y + 6.0f), IM_COL32(200, 200, 200, 220), unavailableLabel);
     }
     ImGui::EndGroup();
@@ -935,8 +983,8 @@ bool renderWaveformWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         const ImVec2 min = ImGui::GetItemRectMin();
         const ImVec2 max = ImGui::GetItemRectMax();
-        drawList->AddRectFilled(min, max, IM_COL32(12, 12, 16, 255), 2.0f);
-        drawList->AddRect(min, max, IM_COL32(70, 70, 80, 255), 2.0f);
+        drawList->AddRectFilled(min, max, IM_COL32(12, 12, 16, 255), 0.0f);
+        drawList->AddRect(min, max, IM_COL32(70, 70, 80, 255), 0.0f);
 
         const bool ready = scope->sync(port, channels, timeWindow);
         if(ready){
@@ -1186,6 +1234,11 @@ namespace ofxOceanodeCustomGuiSignalWidgets {
 
 void registerWidgets(ofxOceanodeCustomGuiWidgetRegistry& registry)
 {
+    registerWidget(registry, CustomGuiWidgetType::Scope,
+                   supportsScopeWidget,
+                   initializeScopeWidget,
+                   renderScopeWidget);
+
     registerWidget(registry, CustomGuiWidgetType::Waveform,
                    supportsWaveformWidget,
                    initializeWaveformWidget,

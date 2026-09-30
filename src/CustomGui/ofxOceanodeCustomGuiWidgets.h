@@ -7,6 +7,9 @@
 class ofxOceanodeAbstractParameter;
 
 namespace ofxOceanodeCustomGuiWidgets {
+    inline bool canResizeVector(CustomGuiWidgetType type) {
+        return type == CustomGuiWidgetType::MultiSlider || type == CustomGuiWidgetType::MultiToggle;
+    }
     bool defaultInteractiveState(ofxOceanodeAbstractParameter& parameter);
     bool isInteractive(const CustomGuiWidget& widget, ofxOceanodeAbstractParameter* parameter);
 }

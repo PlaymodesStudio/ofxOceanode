@@ -324,30 +324,27 @@ bool drawScalarSliderBar(const CustomGuiWidgetRenderContext& context,
     const float fontSize = std::max(1.0f, ImGui::GetFontSize() * widgetValueFontScale(widget));
     const float slimThickness = std::max(2.0f, std::round((verticalSlider ? itemSize.y : itemSize.x) * 0.04f));
 
-    drawList->AddRectFilled(min, max, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 3.0f);
+    drawList->AddRectFilled(min, max, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 0.0f);
 
     if(verticalSlider){
         const float valueY = max.y - itemSize.y * normalized;
         if(sliderMode == SliderVisualMode::Anchored){
             drawList->AddRectFilled(ImVec2(min.x, valueY),
                                     ImVec2(max.x, max.y),
-                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a),
-                                    3.0f);
+                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a), 0.0f);
         }else if(sliderMode == SliderVisualMode::CenteredBar){
             const float lineTop = ofClamp(valueY - slimThickness * 0.5f, min.y, max.y);
             const float lineBottom = ofClamp(valueY + slimThickness * 0.5f, min.y, max.y);
             drawList->AddRectFilled(ImVec2(min.x, lineTop),
                                     ImVec2(max.x, lineBottom),
-                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a),
-                                    2.0f);
+                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a), 0.0f);
         }else{
             const float centerY = min.y + itemSize.y * 0.5f;
             const float fillTop = std::min(centerY, valueY);
             const float fillBottom = std::max(centerY, valueY);
             drawList->AddRectFilled(ImVec2(min.x, fillTop),
                                     ImVec2(max.x, fillBottom),
-                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a),
-                                    3.0f);
+                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a), 0.0f);
             drawList->AddLine(ImVec2(min.x, centerY), ImVec2(max.x, centerY), IM_COL32(255, 255, 255, 60), 1.0f);
         }
     }else{
@@ -355,29 +352,26 @@ bool drawScalarSliderBar(const CustomGuiWidgetRenderContext& context,
         if(sliderMode == SliderVisualMode::Anchored){
             drawList->AddRectFilled(ImVec2(min.x, min.y),
                                     ImVec2(valueX, max.y),
-                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a),
-                                    3.0f);
+                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a), 0.0f);
         }else if(sliderMode == SliderVisualMode::CenteredBar){
             const float lineLeft = ofClamp(valueX - slimThickness * 0.5f, min.x, max.x);
             const float lineRight = ofClamp(valueX + slimThickness * 0.5f, min.x, max.x);
             drawList->AddRectFilled(ImVec2(lineLeft, min.y),
                                     ImVec2(lineRight, max.y),
-                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a),
-                                    2.0f);
+                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a), 0.0f);
         }else{
             const float centerX = min.x + itemSize.x * 0.5f;
             const float fillLeft = std::min(centerX, valueX);
             const float fillRight = std::max(centerX, valueX);
             drawList->AddRectFilled(ImVec2(fillLeft, min.y),
                                     ImVec2(fillRight, max.y),
-                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a),
-                                    3.0f);
+                                    IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a), 0.0f);
             drawList->AddLine(ImVec2(centerX, min.y), ImVec2(centerX, max.y), IM_COL32(255, 255, 255, 60), 1.0f);
         }
     }
 
     if(hovered || active){
-        drawList->AddRect(min, max, IM_COL32(255, 255, 255, active ? 220 : 120), 3.0f, 0, active ? 2.0f : 1.0f);
+        drawList->AddRect(min, max, IM_COL32(255, 255, 255, active ? 220 : 120), 0.0f, 0, active ? 2.0f : 1.0f);
     }
 
     bool changed = false;
@@ -934,7 +928,7 @@ bool renderColorSwatchWidget(CustomGuiWidgetRenderContext& context, CustomGuiWid
     const ofColor bodyColor = widgetBodyColor(widget, ofColor(60, 60, 60, 255));
 
     const float checker = std::max(6.0f, std::min(14.0f, std::min(itemSize.x, itemSize.y) * 0.15f));
-    drawList->AddRectFilled(min, max, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 4.0f);
+    drawList->AddRectFilled(min, max, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 0.0f);
     for(float y = min.y; y < max.y; y += checker){
         for(float x = min.x; x < max.x; x += checker){
             const bool dark = (((int)((x - min.x) / checker) + (int)((y - min.y) / checker)) % 2) == 0;
@@ -949,12 +943,10 @@ bool renderColorSwatchWidget(CustomGuiWidgetRenderContext& context, CustomGuiWid
                             IM_COL32((int)std::round(color[0] * 255.0f),
                                      (int)std::round(color[1] * 255.0f),
                                      (int)std::round(color[2] * 255.0f),
-                                     (int)std::round(color[3] * 255.0f)),
-                            4.0f);
+                                     (int)std::round(color[3] * 255.0f)), 0.0f);
     drawList->AddRect(min,
                       max,
-                      hovered ? IM_COL32(255, 255, 255, 220) : IM_COL32(100, 100, 100, 255),
-                      4.0f, 0, hovered ? 2.0f : 1.0f);
+                      hovered ? IM_COL32(255, 255, 255, 220) : IM_COL32(100, 100, 100, 255), 0.0f, 0, hovered ? 2.0f : 1.0f);
 
     bool changed = false;
     if(ImGui::BeginPopup("Color Swatch Picker")){
