@@ -48,9 +48,9 @@ void MacroPresetManager::updateCategoryFromPath(const std::string& path) {
 }
 
 void MacroPresetManager::loadMacroInsideCategory(int newPresetIndex) {
-    if(newPresetIndex < currentCategoryMacro->macros.size() && currentCategoryMacro->macros[newPresetIndex].first != currentMacro){
-        nextPresetPath = currentCategoryMacro->macros[newPresetIndex].second;
-        currentMacroPath = nextPresetPath;
-        currentMacro = currentCategoryMacro->macros[newPresetIndex].first;
-    }
+    if(!currentCategoryMacro || newPresetIndex < 0 ||
+       static_cast<size_t>(newPresetIndex) >= currentCategoryMacro->macros.size()) return;
+
+    const auto& selectedPath = currentCategoryMacro->macros[newPresetIndex].second;
+    nextPresetPath = !localPreset && selectedPath == currentMacroPath ? "" : selectedPath;
 }

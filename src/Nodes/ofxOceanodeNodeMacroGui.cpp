@@ -87,10 +87,6 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 			for(auto d : category->categories){
 				if(ImGui::BeginMenu(d->name.c_str())){
 					if(drawCategory(d)){
-						if(presetManager.getCurrentCategory().size() == 0){
-								presetManager.getCurrentCategoryMacro() = d;
-							}
-							presetManager.getCurrentCategory().push_front(d->name);
 						ImGui::EndMenu();
 						return true;
 					}
@@ -104,17 +100,17 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 				}
 			for(auto m : category->macros){
 				if(ImGui::MenuItem(m.first.c_str())){
-					presetManager.setNextPresetPath(m.second);
-					presetManager.setCurrentMacroPath(m.second);
-					presetManager.setCurrentMacro(m.first);
-					presetManager.getCurrentCategory().clear();
+					const bool changingMacro = presetManager.isLocal() ||
+					                           m.second != presetManager.getCurrentMacroPath();
+					presetManager.setNextPresetPath(changingMacro ? m.second : "");
+					pendingMacroReferenceUserEdited = changingMacro;
 					return true;
 				}
 			}
 			return false;
 		};
 		
-		if(drawCategory(macroDirectoryStructure)) markMacroReferenceUserEdited();
+		drawCategory(macroDirectoryStructure);
 		
 		ImGui::EndPopup();
 	}

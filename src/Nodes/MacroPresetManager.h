@@ -61,8 +61,8 @@ public:
     /// Parse a file path to populate currentCategory, currentMacro, currentCategoryMacro.
     void updateCategoryFromPath(const std::string& path);
 
-    /// Load a macro by index within the current category; sets nextPresetPath
-    /// and currentMacroPath/currentMacro for deferred loading in update().
+    /// Queue a macro by index within the current category. The current identity
+    /// stays unchanged until the graph has actually loaded in update().
     void loadMacroInsideCategory(int newPresetIndex);
 
     // ── Bank/preset state (possibly legacy, moved to reduce clutter) ────────

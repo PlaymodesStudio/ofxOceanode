@@ -227,6 +227,7 @@ private:
 	std::unordered_map<string, ofEventListeners> inoutListeners;
 	bool routerOrderUserEdited = false;
 	bool macroReferenceUserEdited = false;
+	bool pendingMacroReferenceUserEdited = false;
 	bool editedReferenceIsLocal = true;
 	string editedReferenceName;
 	std::deque<string> editedReferenceCategory;
