@@ -47,12 +47,20 @@ bool ofxOceanodeNodeMacro::wasMacroReferenceUserEdited() const{
 
 void ofxOceanodeNodeMacro::clearUserEditMarkers(){
 	macroReferenceUserEdited = false;
+	pendingMacroReferenceUserEdited = false;
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 	if(presetManager.getNextPresetPath() != ""){
+		const string targetPath = presetManager.getNextPresetPath();
+		if(!ofFile::doesFileExist(targetPath + "/modules.json")){
+			ofLogWarning("Macro") << "Cannot load selected macro: " << targetPath;
+			presetManager.clearNextPresetPath();
+			pendingMacroReferenceUserEdited = false;
+			return;
+		}
 		// Clear snapshots when changing presets to avoid data persistence
 		snapshotSystem.clearAll();
 		
@@ -62,7 +70,7 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 		// Load router sort order from the macro folder BEFORE loadPreset() so
 		// allNodesCreated() can apply it (same logic as macroLoad global branch).
 		{
-			string sortOrderFile = presetManager.getNextPresetPath() + "/router_sort_order.json";
+			string sortOrderFile = targetPath + "/router_sort_order.json";
 			ofJson sortJson;
 			if(ofFile::doesFileExist(sortOrderFile)) {
 				sortJson = ofLoadJson(sortOrderFile);
@@ -71,21 +79,36 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 		}
 
 		//if(clearContainerOnLoad) container->clearContainer();
-		presetManager.setInnerPresetLoadingPath(presetManager.getNextPresetPath());
-		container->loadPreset(presetManager.getNextPresetPath());
+		presetManager.setInnerPresetLoadingPath(targetPath);
+		const bool loaded = container->loadPreset(targetPath);
 		presetManager.setInnerPresetLoadingPath("");
+		if(!loaded){
+			isLoadingPreset = false;
+			ofLogWarning("Macro") << "Cannot load selected macro: " << targetPath;
+			if(presetManager.getNextPresetPath() == targetPath){
+				presetManager.clearNextPresetPath();
+				pendingMacroReferenceUserEdited = false;
+			}
+			return;
+		}
+
+		presetManager.updateCategoryFromPath(targetPath);
+		presetManager.setCurrentMacroPath(targetPath);
+		if(presetManager.getNextPresetPath() == targetPath){
+			presetManager.clearNextPresetPath();
+			if(pendingMacroReferenceUserEdited) markMacroReferenceUserEdited();
+			pendingMacroReferenceUserEdited = false;
+		}
 
 		// Explicitly load snapshots from the global macro path
-		snapshotSystem.loadFromPath(presetManager.getNextPresetPath());
+		snapshotSystem.loadFromPath(targetPath);
 		if(!snapshotSystem.isEmpty()) {
 			showSnapshotMatrix = true;
 		}
 
 		// Set macro layout path for the newly selected global path
-		loadMacroLayout(presetManager.getNextPresetPath());
-
+		loadMacroLayout(targetPath);
 		isLoadingPreset = false;
-		presetManager.clearNextPresetPath();
 	}
 	if(active){
 		container->update();
@@ -696,7 +719,8 @@ void clearSavedUserEdits(ofxOceanodeContainer& container){
 }
 
 bool ofxOceanodeNodeMacro::saveGlobalDefinition(bool notifyOtherInstances){
-	if(presetManager.isLocal() || presetManager.getCurrentMacroPath().empty()) return false;
+	if(presetManager.isLocal() || isLoadingPreset || presetManager.getCurrentMacroPath().empty() ||
+	   !presetManager.getNextPresetPath().empty()) return false;
 	const string path = presetManager.getCurrentMacroPath();
 	container->savePreset(path);
 	saveMacroLayout(path);
@@ -792,6 +816,8 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 }
 
 void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
+	presetManager.clearNextPresetPath();
+	pendingMacroReferenceUserEdited = false;
 //	if(json.count(clearContainerOnLoad.getEscapedName()) == 0){
 //		clearContainerOnLoad = false;
 //	}else{
