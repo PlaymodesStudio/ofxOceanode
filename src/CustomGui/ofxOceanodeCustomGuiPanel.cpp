@@ -72,6 +72,24 @@ void ofxOceanodeCustomGuiPanel::draw()
     static ImVec2 marqueeCurrentMouse = ImVec2(0, 0);
     static std::string marqueePanelId;
 
+    if(resetWidgetInteraction){
+        if(draggedWidgetPanelId == panelId){
+            draggedWidgetIndex = -1;
+            draggedWidgetIndices.clear();
+            dragAnchorPositions.clear();
+            draggedWidgetPanelId.clear();
+        }
+        if(resizedWidgetPanelId == panelId){
+            resizedWidgetIndex = -1;
+            resizedWidgetPanelId.clear();
+        }
+        if(marqueePanelId == panelId){
+            marqueeSelectionActive = false;
+            marqueePanelId.clear();
+        }
+        resetWidgetInteraction = false;
+    }
+
     auto isWidgetSelected = [&](int index){
         return std::find(selectedWidgetIndices.begin(), selectedWidgetIndices.end(), index) != selectedWidgetIndices.end();
     };
@@ -418,11 +436,6 @@ void ofxOceanodeCustomGuiPanel::draw()
                    (widget.type == CustomGuiWidgetType::Image && widget.config.value("sendToBack", false));
         };
 
-        auto rectsIntersect = [&](const ImVec2& minA, const ImVec2& maxA, const ImVec2& minB, const ImVec2& maxB){
-            return minA.x < maxB.x && maxA.x > minB.x &&
-                   minA.y < maxB.y && maxA.y > minB.y;
-        };
-
         auto rectContainsRect = [&](const ImVec2& outerMin, const ImVec2& outerMax, const ImVec2& innerMin, const ImVec2& innerMax){
             return innerMin.x >= outerMin.x && innerMax.x <= outerMax.x &&
                    innerMin.y >= outerMin.y && innerMax.y <= outerMax.y;
@@ -466,19 +479,6 @@ void ofxOceanodeCustomGuiPanel::draw()
             return topIndex;
         };
 
-        auto findBackgroundPanelAt = [&](const ImVec2& mousePos){
-            int panelIndex = -1;
-            for(size_t index = 0; index < panel->layout.widgets.size(); index++){
-                const auto& widget = panel->layout.widgets[index];
-                if(widget.type != CustomGuiWidgetType::BackgroundPanel) continue;
-                const auto rect = getWidgetRect(widget);
-                if(ImGui::IsMouseHoveringRect(rect.first, rect.second)){
-                    panelIndex = (int)index;
-                }
-            }
-            return panelIndex;
-        };
-
         ImDrawList* panelDrawList = ImGui::GetWindowDrawList();
         panelDrawList->AddRectFilled(originScreen,
                                      ImVec2(originScreen.x + panelWidth, originScreen.y + panelHeight),
@@ -496,7 +496,6 @@ void ofxOceanodeCustomGuiPanel::draw()
 
         const int topmostHoveredWidgetIndex = panel->designMode ? findTopmostWidgetAt(ImGui::GetIO().MousePos) : -1;
         const int topmostResizeHandleIndex = panel->designMode ? findTopmostResizeHandleAt(ImGui::GetIO().MousePos) : -1;
-        const int hoveredBackgroundPanelIndex = panel->designMode ? findBackgroundPanelAt(ImGui::GetIO().MousePos) : -1;
         const bool gridHovered = panel->designMode && ImGui::IsItemHovered();
         const bool foregroundWidgetHovered =
             topmostHoveredWidgetIndex >= 0 &&
@@ -560,6 +559,13 @@ void ofxOceanodeCustomGuiPanel::draw()
             drawGridOverlay(overlayLayout, originScreen);
         }
 
+        struct EditOutline {
+            ImVec2 min, max;
+            ImU32 color;
+            float thickness;
+            bool locked;
+        };
+        std::vector<EditOutline> editOutlines;
         int widgetToRemove = -1;
         auto drawWidgetAtIndex = [&](size_t i){
             auto& widget = panel->layout.widgets[i];
@@ -568,6 +574,10 @@ void ofxOceanodeCustomGuiPanel::draw()
             const float w = widget.spanW * panel->layout.cellWidth * panel->layout.zoom;
             const float h = widget.spanH * panel->layout.cellHeight * panel->layout.zoom;
 
+            // The layout owns this rectangle even when the renderer has no
+            // content (an empty vector, missing parameter, or custom drawing).
+            ImGui::SetCursorPos(ImVec2(x, y));
+            ImGui::Dummy(ImVec2(w, h));
             ImGui::SetCursorPos(ImVec2(x, y));
             ImGui::PushID((int)i);
             bool hasParameter = !(widget.type == CustomGuiWidgetType::Label ||
@@ -587,23 +597,21 @@ void ofxOceanodeCustomGuiPanel::draw()
             }
 
             if(panel->designMode){
-                ImDrawList* drawList = ImGui::GetWindowDrawList();
                 const auto widgetRect = getWidgetRect(widget);
                 const ImVec2 min = widgetRect.first;
                 const ImVec2 max = widgetRect.second;
                 const bool selected = isWidgetSelected((int)i);
                 const bool locked = widget.config.value("locked", false);
-                drawList->AddRect(min, max,
-                                  locked ? IM_COL32(120, 180, 255, 220) :
-                                  (selected ? IM_COL32(255, 255, 255, 220) : IM_COL32(255, 180, 40, 180)),
-                                  2.0f, 0, selected ? 2.0f : 1.5f);
+                editOutlines.push_back({min, max,
+                    locked ? IM_COL32(120, 180, 255, 220) :
+                    (selected ? IM_COL32(255, 255, 255, 220) : IM_COL32(255, 180, 40, 180)),
+                    selected ? 2.0f : 1.5f, locked});
 
                 bool hovered = topmostHoveredWidgetIndex == (int)i && ImGui::IsMouseHoveringRect(min, max);
                 ImVec2 handleMin(max.x - 12.0f, max.y - 12.0f);
                 bool resizeHovered = !locked &&
                                      topmostResizeHandleIndex == (int)i &&
                                      ImGui::IsMouseHoveringRect(handleMin, max);
-                if(!locked) ImGui::GetForegroundDrawList()->AddRectFilled(handleMin, max, IM_COL32(255, 180, 40, 220), 1.0f);
                 if(!anyPopupOpen && (hovered || resizeHovered) && ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
                     const bool shiftPressed = ImGui::GetIO().KeyShift;
                     if(ctrlPressed){
@@ -611,20 +619,10 @@ void ofxOceanodeCustomGuiPanel::draw()
                         marqueePanelId = panel->id;
                         marqueeAnchorMouse = ImGui::GetIO().MousePos;
                         marqueeCurrentMouse = marqueeAnchorMouse;
-                    }else if(!shiftPressed && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
-                             hoveredBackgroundPanelIndex >= 0){
-                        const auto panelRect = getWidgetRect(panel->layout.widgets[hoveredBackgroundPanelIndex]);
-                        selectedWidgetIndices.clear();
-                        selectedWidgetIndices.push_back(hoveredBackgroundPanelIndex);
-                        for(size_t otherIndex = 0; otherIndex < panel->layout.widgets.size(); otherIndex++){
-                            if((int)otherIndex == hoveredBackgroundPanelIndex) continue;
-                            const auto& otherWidget = panel->layout.widgets[otherIndex];
-                            if(otherWidget.type == CustomGuiWidgetType::BackgroundPanel) continue;
-                            const auto otherRect = getWidgetRect(otherWidget);
-                            if(rectsIntersect(panelRect.first, panelRect.second, otherRect.first, otherRect.second)){
-                                selectedWidgetIndices.push_back((int)otherIndex);
-                            }
-                        }
+                    }else if(!shiftPressed && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && hovered){
+                        selectedWidgetIndices = {(int)i};
+                        propertiesWidgetIndex = (int)i;
+                        requestOpenWidgetPropertiesPopup = true;
                     }else if(shiftPressed){
                         auto selectedIt = std::find(selectedWidgetIndices.begin(), selectedWidgetIndices.end(), (int)i);
                         if(selectedIt == selectedWidgetIndices.end()) selectedWidgetIndices.push_back((int)i);
@@ -633,7 +631,7 @@ void ofxOceanodeCustomGuiPanel::draw()
                         selectedWidgetIndices = {(int)i};
                     }
 
-                    if(ctrlPressed){
+                    if(ctrlPressed || requestOpenWidgetPropertiesPopup){
                     }else if(!shiftPressed && resizeHovered){
                         resizedWidgetIndex = (int)i;
                         resizedWidgetPanelId = panel->id;
@@ -728,7 +726,8 @@ void ofxOceanodeCustomGuiPanel::draw()
                     ImGui::EndPopup();
                 }
             }else if(parameter != nullptr){
-                if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)){
+                if(widget.type != CustomGuiWidgetType::Scope &&
+                   ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)){
                     resetParameterToDefaultValue(widget, *parameter);
                 }
                 if(ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)){
@@ -736,12 +735,13 @@ void ofxOceanodeCustomGuiPanel::draw()
                 }
                 if(ImGui::BeginPopup("Widget Context")){
                     const std::string parameterType = parameter->valueType();
-                    const bool canResetToDefault = widgetSupportsDefaultValue(*parameter);
+                    const bool canResetToDefault = widget.type != CustomGuiWidgetType::Scope && widgetSupportsDefaultValue(*parameter);
                     const bool canSetValue =
-                        parameterType == typeid(float).name() ||
+                        widget.type != CustomGuiWidgetType::Scope &&
+                        (parameterType == typeid(float).name() ||
                         parameterType == typeid(int).name() ||
                         parameterType == typeid(std::vector<float>).name() ||
-                        parameterType == typeid(std::vector<int>).name();
+                        parameterType == typeid(std::vector<int>).name());
                     const bool canSetVectorSize =
                         (widget.type == CustomGuiWidgetType::MultiSlider ||
                          widget.type == CustomGuiWidgetType::MultiToggle) &&
@@ -811,6 +811,43 @@ void ofxOceanodeCustomGuiPanel::draw()
             if(widget.type != CustomGuiWidgetType::BackgroundPanel &&
                !(widget.type == CustomGuiWidgetType::Image && widget.config.value("sendToBack", false))){
                 drawWidgetAtIndex(i);
+            }
+        }
+
+        // A final, input-transparent child keeps handles above widget children
+        // (Scopes/custom regions), but clipped and ordered with this panel.
+        if(!editOutlines.empty()){
+            ImGuiWindow* window = ImGui::GetCurrentWindow();
+            const ImVec2 clipMin(std::max(window->ClipRect.Min.x, originScreen.x),
+                                std::max(window->ClipRect.Min.y, originScreen.y));
+            const ImVec2 clipMax = window->ClipRect.Max;
+            if(clipMax.x > clipMin.x && clipMax.y > clipMin.y){
+                const ImVec2 savedCursor = ImGui::GetCursorPos();
+                const ImVec2 savedCursorMax = window->DC.CursorMaxPos;
+                ImGui::SetCursorScreenPos(clipMin);
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+                ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0f);
+                if(ImGui::BeginChild("##edit_outlines", clipMax - clipMin, false,
+                    ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground |
+                    ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+                    ImGuiWindowFlags_NoSavedSettings)){
+                    ImDrawList* overlay = ImGui::GetWindowDrawList();
+                    for(const auto& outline : editOutlines){
+                        overlay->AddRect(outline.min, outline.max, outline.color, 0.0f, 0, outline.thickness);
+                        if(!outline.locked){
+                            const ImVec2 handleMin(std::max(outline.min.x, outline.max.x - 12.0f),
+                                                   std::max(outline.min.y, outline.max.y - 12.0f));
+                            overlay->AddRectFilled(handleMin, outline.max, IM_COL32(255, 180, 40, 220));
+                        }
+                    }
+                }
+                ImGui::EndChild();
+                ImGui::PopStyleVar(2);
+                window->DC.CursorMaxPos = savedCursorMax;
+                ImGui::SetCursorPos(savedCursor);
+                // A restored cursor can sit beyond CursorMaxPos by item
+                // spacing. Submit it to the layout before ending the window.
+                ImGui::Dummy(ImVec2(0, 0));
             }
         }
 
@@ -1165,38 +1202,7 @@ void ofxOceanodeCustomGuiPanel::drawSetVectorSizePopup()
     }
 
     if(ImGui::Button("Apply")){
-        const std::string type = parameter->valueType();
-        if(type == typeid(std::vector<float>).name()){
-            auto& param = parameter->cast<std::vector<float>>().getParameter();
-            auto values = param.get();
-            auto mins = param.getMin();
-            auto maxs = param.getMax();
-            const int newSize = std::max(1, setVectorSizeValue);
-            const float fillValue = values.empty() ? 0.0f : values.back();
-            const float fillMin = mins.empty() ? 0.0f : mins.back();
-            const float fillMax = maxs.empty() ? 1.0f : maxs.back();
-            values.resize(newSize, fillValue);
-            mins.resize(newSize, fillMin);
-            maxs.resize(newSize, fillMax);
-            param.setMin(mins);
-            param.setMax(maxs);
-            param.set(values);
-        }else if(type == typeid(std::vector<int>).name()){
-            auto& param = parameter->cast<std::vector<int>>().getParameter();
-            auto values = param.get();
-            auto mins = param.getMin();
-            auto maxs = param.getMax();
-            const int newSize = std::max(1, setVectorSizeValue);
-            const int fillValue = values.empty() ? 0 : values.back();
-            const int fillMin = mins.empty() ? 0 : mins.back();
-            const int fillMax = maxs.empty() ? 1 : maxs.back();
-            values.resize(newSize, fillValue);
-            mins.resize(newSize, fillMin);
-            maxs.resize(newSize, fillMax);
-            param.setMin(mins);
-            param.setMax(maxs);
-            param.set(values);
-        }
+        container.resizeCustomGuiParameterVector(*parameter, setVectorSizeValue);
         ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
@@ -1465,7 +1471,13 @@ bool ofxOceanodeCustomGuiPanel::renderWidget(CustomGuiWidget& widget, ofxOceanod
     };
 
     ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_GrabRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, 0.0f);
     const bool rendered = definition->render(context, widget, parameter);
+    ImGui::PopStyleVar(5);
     ImGui::SetWindowFontScale(1.0f);
     return rendered;
 }
@@ -1528,10 +1540,12 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                 container.markCustomGuisDirty();
             }
 
-            float valueFontScale = std::max(0.2f, widget.config.value("valueFontScale", widget.config.value("fontScale", 1.0f)));
-            if(ImGui::InputFloat("Value Font Size", &valueFontScale, 0.05f, 0.2f, "%.2f")){
-                widget.config["valueFontScale"] = std::max(0.2f, valueFontScale);
-                container.markCustomGuisDirty();
+            if(widget.type != CustomGuiWidgetType::Scope){
+                float valueFontScale = std::max(0.2f, widget.config.value("valueFontScale", widget.config.value("fontScale", 1.0f)));
+                if(ImGui::InputFloat("Value Font Size", &valueFontScale, 0.05f, 0.2f, "%.2f")){
+                    widget.config["valueFontScale"] = std::max(0.2f, valueFontScale);
+                    container.markCustomGuisDirty();
+                }
             }
         }
         if(widget.type != CustomGuiWidgetType::Label){
@@ -1717,7 +1731,11 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                     for(CustomGuiWidgetType compatibleType : compatibleTypes){
                         const std::string compatibleTypeLabel = customGuiWidgetTypeToString(compatibleType);
                         const bool selected = compatibleType == widget.type;
-                        if(ImGui::Selectable(compatibleTypeLabel.c_str(), selected) && !selected){
+                        const bool canUseType = selected || container.canAddParameterToCustomGui(
+                            panelId, *parameter, compatibleType, static_cast<int>(widgetIndex));
+                        if(ImGui::Selectable(compatibleTypeLabel.c_str(), selected,
+                                             canUseType ? 0 : ImGuiSelectableFlags_Disabled) && !selected){
+                            const CustomGuiWidget previousWidget = widget;
                             if(const CustomGuiWidgetDefinition* oldDefinition =
                                    ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(widget.type)){
                                 if(oldDefinition->cleanup){
@@ -1738,6 +1756,15 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                             widget.label = label;
                             widget.color = color;
                             widget.config = ofJson::object();
+                            for(const char* key : {"labelColor", "bodyColor"}){
+                                if(previousWidget.config.contains(key)) widget.config[key] = previousWidget.config[key];
+                            }
+                            if(ofxOceanodeCustomGuiWidgets::canResizeVector(compatibleType) &&
+                               previousWidget.config.contains("vectorSizeRestore")){
+                                widget.config["vectorSizeRestore"] = previousWidget.config["vectorSizeRestore"];
+                            }
+                            container.inheritCustomGuiVectorSize(widget);
+                            container.restoreCustomGuiVectorSize(previousWidget);
 
                             const CustomGuiWidgetDefinition* newDefinition =
                                 ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(compatibleType);
@@ -1779,15 +1806,15 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
         }
 
         bool interactive = ofxOceanodeCustomGuiWidgets::isInteractive(widget, parameter);
-        if(parameter != nullptr && parameter->valueType() != typeid(std::string).name()){
-            if(ImGui::Checkbox("Interactive", &interactive)){
+        if(parameter != nullptr && (widget.type == CustomGuiWidgetType::Scope || parameter->valueType() != typeid(std::string).name())){
+            if(ImGui::Checkbox(widget.type == CustomGuiWidgetType::Scope ? "Scope Controls" : "Interactive", &interactive)){
                 widget.config["interactive"] = interactive;
                 container.markCustomGuisDirty();
             }
         }
 
         bool showValue = shouldShowNumericValue(widget);
-	        if(parameter != nullptr &&
+	        if(parameter != nullptr && widget.type != CustomGuiWidgetType::Scope &&
 		   (parameter->valueType() == typeid(float).name() ||
 		    parameter->valueType() == typeid(int).name() ||
 		    parameter->valueType() == typeid(std::vector<float>).name() ||
@@ -1798,7 +1825,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
             }
         }
 
-	        if(parameter != nullptr &&
+	        if(parameter != nullptr && widget.type != CustomGuiWidgetType::Scope &&
 		   (parameter->valueType() == typeid(float).name() ||
 		    parameter->valueType() == typeid(int).name() ||
 		    parameter->valueType() == typeid(std::vector<float>).name())){
@@ -1898,7 +1925,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
             }
         }
 
-        if(parameter != nullptr){
+        if(parameter != nullptr && widget.type != CustomGuiWidgetType::Scope){
             drawWidgetDefaultValueProperties(widget, *parameter);
         }
 
@@ -1961,8 +1988,7 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
     const bool useCustomRange = widget.config.value("useCustomRange", false);
     const int quantization = std::max(0, widget.config.value("quantization", 0));
     const float valueFontSize = std::max(1.0f, ImGui::GetFontSize() * ofxOceanodeCustomGuiWidgetHelpers::widgetValueFontScale(widget));
-    const float barSpacing = std::max(0.0f, widget.config.value("barSpacingPx", 1.0f));
-    const float edgePadding = std::max(1.0f, barSpacing * 0.5f + 0.5f);
+    const float edgePadding = 0.0f;
     float fallbackMinValue = 0.0f;
     float fallbackMaxValue = 1.0f;
     if(useCustomRange){
@@ -2015,16 +2041,16 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
                              std::max(1.0f, contentMax.y - contentMin.y));
 
     const ofColor bodyColor = ofxOceanodeCustomGuiWidgetHelpers::widgetBodyColor(widget);
-    drawList->AddRectFilled(min, max, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 2.0f);
+    drawList->AddRectFilled(min, max, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 0.0f);
 
     const float majorSize = vertical ? contentSize.x : contentSize.y;
-    const float totalSpacing = barSpacing * std::max(0, visibleCount - 1);
-    const float slotSize = std::max(1.0f, (majorSize - totalSpacing) / (float)visibleCount);
+    const float slotSize = majorSize / (float)visibleCount;
+    ImGui::PushClipRect(min, max, true);
     bool changed = false;
 
     auto setValueFromMouse = [&](const ImVec2& mousePos){
         const float majorPos = vertical ? (mousePos.x - contentMin.x) : (mousePos.y - contentMin.y);
-        int index = (int)std::floor(majorPos / std::max(1.0f, slotSize + barSpacing));
+        int index = (int)std::floor(majorPos / slotSize);
         index = ofClamp(index, 0, visibleCount - 1);
 
         const auto range = resolvedRangeForIndex(index);
@@ -2065,17 +2091,11 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
         const float normalized = ofClamp((value[i] - minValue) / (maxValue - minValue), 0.0f, 1.0f);
 
         if(vertical){
-            const float x0 = contentMin.x + i * (slotSize + barSpacing);
+            const float x0 = contentMin.x + i * slotSize;
             const float x1 = x0 + slotSize;
-            const float trackInset = std::min(1.0f, std::max(0.0f, slotSize * 0.08f));
+            const float trackInset = 0.0f;
             const float trackLeft = x0 + trackInset;
             const float trackRight = x1 - trackInset;
-            if(i > 0 && barSpacing > 0.0f){
-                drawList->AddLine(ImVec2(x0 - barSpacing * 0.5f, contentMin.y), ImVec2(x0 - barSpacing * 0.5f, contentMax.y), IM_COL32(80, 80, 80, 255));
-            }
-            drawList->AddRectFilled(ImVec2(trackLeft, contentMin.y),
-                                    ImVec2(trackRight, contentMax.y),
-                                    IM_COL32(50, 50, 50, 110));
             float fillTop = contentMax.y - contentSize.y * normalized;
             if(normalized > 0.0f){
                 fillTop = std::min(fillTop, contentMax.y - 1.0f);
@@ -2093,17 +2113,11 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
                 }
             }
         }else{
-            const float y0 = contentMin.y + i * (slotSize + barSpacing);
+            const float y0 = contentMin.y + i * slotSize;
             const float y1 = y0 + slotSize;
-            const float trackInset = std::min(1.0f, std::max(0.0f, slotSize * 0.08f));
+            const float trackInset = 0.0f;
             const float trackTop = y0 + trackInset;
             const float trackBottom = y1 - trackInset;
-            if(i > 0 && barSpacing > 0.0f){
-                drawList->AddLine(ImVec2(contentMin.x, y0 - barSpacing * 0.5f), ImVec2(contentMax.x, y0 - barSpacing * 0.5f), IM_COL32(80, 80, 80, 255));
-            }
-            drawList->AddRectFilled(ImVec2(contentMin.x, trackTop),
-                                    ImVec2(contentMax.x, trackBottom),
-                                    IM_COL32(50, 50, 50, 110));
             float fillRight = contentMin.x + contentSize.x * normalized;
             if(normalized > 0.0f){
                 fillRight = std::max(fillRight, contentMin.x + 1.0f);
@@ -2123,10 +2137,12 @@ bool ofxOceanodeCustomGuiPanel::drawMultiSliderWidget(CustomGuiWidget& widget,
         }
     }
 
+    ImGui::PopClipRect();
+
     if(isHovered){
         const ImVec2 mousePos = ImGui::GetIO().MousePos;
         const float majorPos = vertical ? (mousePos.x - contentMin.x) : (mousePos.y - contentMin.y);
-        int hoveredIndex = (int)std::floor(majorPos / std::max(1.0f, slotSize + barSpacing));
+        int hoveredIndex = (int)std::floor(majorPos / slotSize);
         hoveredIndex = ofClamp(hoveredIndex, 0, visibleCount - 1);
         const std::string tooltipValue = (integerVector || integerScalar)
             ? ofToString((int)std::round(value[hoveredIndex]))
@@ -2202,11 +2218,12 @@ bool ofxOceanodeCustomGuiPanel::removeWidgetsByIndices(const std::vector<int>& w
             propertiesWidgetIndex--;
         }
 
-        const auto& widget = panel->layout.widgets[index];
+        const auto widget = panel->layout.widgets[index];
         if(const CustomGuiWidgetDefinition* definition = ofxOceanodeCustomGuiWidgetRegistry::instance().getWidget(widget.type)){
             if(definition->cleanup) definition->cleanup(panel->id, widget.parameterRef.parameterPath);
         }
         panel->layout.widgets.erase(panel->layout.widgets.begin() + index);
+        container.restoreCustomGuiVectorSize(widget);
         removed = true;
     }
 
@@ -2215,8 +2232,24 @@ bool ofxOceanodeCustomGuiPanel::removeWidgetsByIndices(const std::vector<int>& w
     selectedWidgetIndices.clear();
     ensureLayoutFitsWidgets(panel->layout);
     container.markCustomGuisDirty();
-    if(ImGui::IsPopupOpen("Widget Properties")) ImGui::ClosePopupToLevel(0, true);
+    resetWidgetInteraction = true;
+    if(ImGui::GetCurrentContext() != nullptr && ImGui::GetCurrentContext()->CurrentWindow != nullptr &&
+       ImGui::IsPopupOpen("Widget Properties")) ImGui::ClosePopupToLevel(0, true);
     return true;
+}
+
+void ofxOceanodeCustomGuiPanel::removeUnavailableParameters()
+{
+    const auto* panel = getPanelData();
+    if(panel == nullptr) return;
+    std::vector<int> removed;
+    for(size_t i = 0; i < panel->layout.widgets.size(); ++i){
+        const auto& widget = panel->layout.widgets[i];
+        if(!widget.parameterRef.parameterPath.empty() && findParameter(widget) == nullptr){
+            removed.push_back(static_cast<int>(i));
+        }
+    }
+    removeWidgetsByIndices(removed);
 }
 
 bool ofxOceanodeCustomGuiPanel::removeSelectedWidgets()
@@ -2261,7 +2294,7 @@ bool ofxOceanodeCustomGuiPanel::addParameter(ofxOceanodeAbstractParameter& param
     CustomGuiPanelData* panel = getPanelData();
     if(panel == nullptr) return false;
 
-    if(containsParameter(parameter)) return false;
+    if(!container.canAddParameterToCustomGui(panelId, parameter, type)) return false;
 
     const std::string parameterPath = container.getCustomGuiParameterPath(parameter);
 
@@ -2277,6 +2310,11 @@ bool ofxOceanodeCustomGuiPanel::addParameter(ofxOceanodeAbstractParameter& param
     }
     widget.type = type;
     widget.label = parameter.getName();
+    widget.config["labelColor"] = customGuiColorToJson(widget.color);
+    ofColor bodyColor = widget.color;
+    bodyColor.setSaturation(bodyColor.getSaturation() * 0.5f);
+    bodyColor.setBrightness(bodyColor.getBrightness() * 0.5f);
+    widget.config["bodyColor"] = customGuiColorToJson(bodyColor);
     widget.config["interactive"] = ofxOceanodeCustomGuiWidgets::defaultInteractiveState(parameter);
     widget.config["showValue"] = true;
 
@@ -2284,6 +2322,7 @@ bool ofxOceanodeCustomGuiPanel::addParameter(ofxOceanodeAbstractParameter& param
         if(definition->initializeWidget) definition->initializeWidget(widget, parameter);
     }
 
+    container.inheritCustomGuiVectorSize(widget);
     auto cell = findNextAvailableCell(panel->layout, widget.spanW, widget.spanH);
     widget.gridX = cell.first;
     widget.gridY = cell.second;

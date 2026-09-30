@@ -931,7 +931,26 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(color.r/4, color.g/4, color.b/4, 200));
+        ofColor canvasBackground(color.r/4, color.g/4, color.b/4, 200);
+        if(!parentID.empty()){
+            // Macro canvases use their Inspector color. Start with half its RGB
+            // so bright colors can actually produce a light canvas after the
+            // accumulated saturation and brightness adjustments.
+            canvasBackground = ofColor(color.r/2, color.g/2, color.b/2, 200);
+            canvasBackground.setSaturation(canvasBackground.getSaturation() * 0.3f);
+            canvasBackground.setBrightness(canvasBackground.getBrightness() * 0.75f);
+        }
+        // Judge the visible background after the translucent canvas tint is
+        // blended over WindowBg, using perceived brightness on a 0-255 scale.
+        const ImVec4 windowBackground = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
+        const float canvasAlpha = canvasBackground.a / 255.0f * ImGui::GetStyle().Alpha;
+        const glm::vec3 visibleBackground = glm::mix(
+            glm::vec3(windowBackground.x, windowBackground.y, windowBackground.z),
+            glm::vec3(canvasBackground.r, canvasBackground.g, canvasBackground.b) / 255.0f,
+            canvasAlpha);
+        const glm::vec3 luminanceWeights(0.299f, 0.587f, 0.114f);
+        const bool darkCanvas = glm::dot(visibleBackground, luminanceWeights) * 255.0f < 50.0f;
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(canvasBackground.r, canvasBackground.g, canvasBackground.b, canvasBackground.a));
         
 		ImGui::BeginChild("scrolling_region", ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
 		      contentRegionSize = glm::vec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y);
@@ -1715,7 +1734,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ImGui::OpenPopup("Comment");
                 c.openPopupInNext = false;
             }
-			ImGui::PushStyleColor(ImGuiCol_PopupBg, OceanodeColors::PopupBg);
 			ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
@@ -1735,7 +1753,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }
                 ImGui::EndPopup();
             }
-			ImGui::PopStyleColor(3);
+			ImGui::PopStyleColor(2);
 			ImGui::PopStyleVar();
 
             ImGui::PopID();
@@ -1826,7 +1844,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             ImGui::OpenPopup("Node Selection Menu");
         }
 
-        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 0.7f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
         if(ImGui::BeginPopup("Node Selection Menu")){
@@ -1855,7 +1872,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
             ImGui::EndPopup();
         }
-        ImGui::PopStyleColor(2);
+        ImGui::PopStyleColor();
         ImGui::PopStyleVar();
         container->drawCustomGuiCreationModal();
 
@@ -2230,6 +2247,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         
         // Display links
         draw_list->ChannelsSetCurrent(1); // Background
+        const ImU32 connectionLineColor = darkCanvas
+            ? OceanodeColors::U32(OceanodeColors::ConnectionLineDark)
+            : OceanodeColors::U32(OceanodeColors::ConnectionLineLight);
         
         std::vector<ofxOceanodeAbstractConnection*> drawnConnections;
         
@@ -2246,7 +2266,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter()) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                         glm::vec2  controlPoint(0,0);
                         controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);
-                        draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, OceanodeColors::U32(OceanodeColors::ConnectionLine), connectionWidth);
+                        draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, connectionLineColor, connectionWidth);
                         drawnConnections.push_back(connection);
                     }
                 }
@@ -2264,13 +2284,20 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
             glm::vec2  controlPoint(0,0);
             controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);
-            ImColor c;
+            ImVec4 c;
             if(connectionIsDoable){
                 c = OceanodeColors::ConnectionDraggingReachable;
             }else{
                 c = OceanodeColors::ConnectionDragging;
             }
-            draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, c, connectionWidth);
+            if(darkCanvas){
+                const ImVec4& darkLine = OceanodeColors::ConnectionLineDark;
+                c.x = darkLine.x;
+                c.y = darkLine.y;
+                c.z = darkLine.z;
+                c.w *= darkLine.w;
+            }
+            draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, OceanodeColors::U32(c), connectionWidth);
         }
         
         draw_list->ChannelsMerge();

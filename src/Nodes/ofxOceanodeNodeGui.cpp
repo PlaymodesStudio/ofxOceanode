@@ -572,7 +572,6 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                 }
                 
 				// Push custom style colors
-				ImGui::PushStyleColor(ImGuiCol_PopupBg, OceanodeColors::PopupBg);
 				ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
 				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
 				ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
@@ -638,16 +637,13 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                             ImGui::Separator();
                             for(const auto& panel : container.getCustomGuiPanelsData()){
                                 if(ImGui::BeginMenu(panel.name.c_str())){
-                                    bool alreadyAdded = container.customGuiContainsParameter(panel.id, absParam);
-                                    if(alreadyAdded){
-                                        ImGui::TextDisabled("Already added");
-                                        ImGui::Separator();
-                                    }
                                     for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
                                         CustomGuiWidgetType widgetType = customTypes[widgetIndex];
+                                        const bool canAdd = container.canAddParameterToCustomGui(panel.id, absParam, widgetType);
                                         std::string label = customGuiWidgetTypeToString(widgetType);
                                         if(widgetType == defaultType) label += " (default)";
-                                        if(ImGui::Selectable(label.c_str(), false, alreadyAdded ? ImGuiSelectableFlags_Disabled : 0)){
+                                        if(!canAdd) label += " (already added)";
+                                        if(ImGui::Selectable(label.c_str(), false, canAdd ? 0 : ImGuiSelectableFlags_Disabled)){
                                             container.addParameterToCustomGui(panel.id, absParam, widgetType);
                                             container.openCustomGuiPanel(panel.id, true);
                                         }
@@ -661,7 +657,12 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                     }
                     if(anyRemoval && ImGui::BeginMenu("Remove from Custom GUI")){
                         for(const auto& panel : container.getCustomGuiPanelsData()){
-                            if(ImGui::Selectable(panel.name.c_str(), false, container.customGuiContainsParameter(panel.id, absParam) ? 0 : ImGuiSelectableFlags_Disabled)){
+                            const std::string path = container.getCustomGuiParameterPath(absParam);
+                            const auto count = std::count_if(panel.layout.widgets.begin(), panel.layout.widgets.end(), [&](const CustomGuiWidget& widget){
+                                return widget.parameterRef.parameterPath == path;
+                            });
+                            const std::string label = panel.name + (count > 1 ? " (all widgets)" : "");
+                            if(ImGui::Selectable(label.c_str(), false, count > 0 ? 0 : ImGuiSelectableFlags_Disabled)){
                                 container.removeParameterFromCustomGui(panel.id, absParam);
                             }
                         }
@@ -688,7 +689,6 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 #endif
 #ifdef OFXOCEANODE_USE_OSC
                     ImGui::Separator();
-					ImGui::PushStyleColor(ImGuiCol_PopupBg, OceanodeColors::PopupBg);
 					ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
 
                     //ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
@@ -698,14 +698,14 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 						string tt = getParameters().getEscapedName() + "/" +absParam.getEscapedName();
 						ImGui::SetTooltip(tt.c_str());
 					}
-					ImGui::PopStyleColor(2);
+					ImGui::PopStyleColor();
 
 #endif
                     ImGui::Separator();
                     ImGui::EndPopup();
                 }
     // Always pop the same number you pushed
-    ImGui::PopStyleColor(3);
+    ImGui::PopStyleColor(2);
     ImGui::PopStyleVar();
 
                 ImGui::PopStyleColor(6);

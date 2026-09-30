@@ -52,7 +52,7 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
     if(dir.listDir() == 0){
         banks.push_back("Initial_Bank");
     }
-    currentBank = 0;
+    currentBank = -1; // No bank selected until a preset is loaded/saved or a bank is chosen.
 
     presetListener = container->loadPresetEvent.newListener([this](pair<string, string> presetInfo){
         string bankName = presetInfo.first;
@@ -107,7 +107,7 @@ void ofxOceanodePresetsController::draw(){
     ImGui::Text("%s","Bank:");
     ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::Text("%s",banks[currentBank].c_str());
+    ImGui::Text("%s", hasSelectedBank() ? banks[currentBank].c_str() : "-");
     ImGui::PopStyleColor();
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 	
@@ -148,11 +148,8 @@ void ofxOceanodePresetsController::draw(){
 
     // preset name, by default = "-" until it's loaded or saved.
     string presetName = "-";
-    if(currentPreset[banks[currentBank]]=="")
-    {
-        presetName = "-";
-    }
-    else presetName = currentPreset[banks[currentBank]];
+    if(hasSelectedBank() && !currentPreset[banks[currentBank]].empty())
+        presetName = currentPreset[banks[currentBank]];
     ImGui::Text("Preset: ");
     ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
@@ -163,6 +160,7 @@ void ofxOceanodePresetsController::draw(){
 
     if(ImGui::Button("[+]##newPreset")){}
     ImGui::SameLine();
+    ImGui::BeginDisabled(presetName == "-");
     if(ImGui::Button("[-]")){
         ImGui::OpenPopup("Delete Preset?");
     }
@@ -170,6 +168,7 @@ void ofxOceanodePresetsController::draw(){
     if(ImGui::Button("[S]")){
         if(presetName != "-") savePreset(currentPreset[banks[currentBank]],banks[currentBank]);
     }
+    ImGui::EndDisabled();
     ImGui::SameLine();
 	
 	bool firstSaveAsOpen = false;
@@ -187,7 +186,7 @@ void ofxOceanodePresetsController::draw(){
         
         if (ImGui::Button("OK", ImVec2(120,0)) || ImGui::IsKeyDown((ImGuiKey_Enter))) {
             ImGui::CloseCurrentPopup();
-            deletePreset(presetName,banks[currentBank]);
+            if(hasSelectedBank() && presetName != "-") deletePreset(presetName,banks[currentBank]);
         }
         ImGui::SetItemDefaultFocus();
         ImGui::SameLine();
@@ -207,7 +206,7 @@ void ofxOceanodePresetsController::draw(){
         if (ImGui::InputText("##Preset Name : ", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
         {
             const string requestedName = sanitizePresetName(string(cString));
-            if(!requestedName.empty()){
+            if(hasSelectedBank() && !requestedName.empty()){
                 if(!presetNameExists(bankPresets[banks[currentBank]], requestedName)){
                     createPreset(requestedName);
                     newPresetCreated = true;
@@ -254,7 +253,7 @@ void ofxOceanodePresetsController::draw(){
             ImGui::PushStyleColor(ImGuiCol_WindowBg, style.Colors[ImGuiCol_WindowBg]);
         }
         
-        //ImGui::SetNextItemOpen(true);
+        ImGui::SetNextItemOpen(b == currentBank, ImGuiCond_Once);
         
         if (ImGui::TreeNode(banks[b].c_str()))
         {
@@ -268,7 +267,7 @@ void ofxOceanodePresetsController::draw(){
             {
                 presetName = bankPresets[banks[b]][n];
                 
-                bool isCurrentPreset = (presetName == currentPreset[banks[currentBank]]);
+                bool isCurrentPreset = b == currentBank && presetName == currentPreset[banks[b]];
                 if((isCurrentPreset)&&(b==currentBank)) ImGui::PushStyleColor(ImGuiCol_Text,OceanodeColors::SelectedNodeText);
                 
                 ImGui::Text((ofToString(n+1)+"|").c_str());
@@ -342,6 +341,7 @@ void ofxOceanodePresetsController::draw(){
 }
 
 void ofxOceanodePresetsController::createPreset(string name){
+    if(!hasSelectedBank()) return;
     name = sanitizePresetName(name);
     if(name.empty()) return;
     if(presetNameExists(bankPresets[banks[currentBank]], name)){
@@ -360,7 +360,7 @@ void ofxOceanodePresetsController::update(){
     if(loadPresetInNextUpdate != 0){
         int toLoad = loadPresetInNextUpdate;
         string itemToLoad;
-        if(toLoad<bankPresets[banks[currentBank]].size())
+        if(hasSelectedBank() && toLoad >= 0 && toLoad < bankPresets[banks[currentBank]].size())
         {
             itemToLoad = bankPresets[banks[currentBank]][toLoad];
             loadPreset(itemToLoad, banks[currentBank]);
@@ -437,6 +437,7 @@ void ofxOceanodePresetsController::savePreset(string name, string bank)
 }
 void ofxOceanodePresetsController::deletePreset(string presetName, string bankName)
 {
+    if(!hasSelectedBank()) return;
     // delete from folder
     ofDirectory dir;
     int n = distance(bankPresets[banks[currentBank]].begin(),

@@ -201,7 +201,12 @@ public:
     bool renameCustomGuiPanel(const std::string& panelId, const std::string& requestedName);
     bool customGuiPanelHasSnapshotEligibleParameters(const std::string& panelId) const;
     bool addParameterToCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter, CustomGuiWidgetType type);
+    bool canAddParameterToCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter,
+                                  CustomGuiWidgetType type, int ignoredWidgetIndex = -1) const;
     bool removeParameterFromCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter);
+    void resizeCustomGuiParameterVector(ofxOceanodeAbstractParameter& parameter, int size);
+    void inheritCustomGuiVectorSize(CustomGuiWidget& widget) const;
+    void restoreCustomGuiVectorSize(const CustomGuiWidget& removedWidget);
     bool customGuiContainsParameter(const std::string& panelId, ofxOceanodeAbstractParameter& parameter) const;
     bool customGuiContainsParameterAnywhere(ofxOceanodeAbstractParameter& parameter) const;
     std::vector<CustomGuiWidgetType> getCompatibleCustomGuiWidgetTypes(ofxOceanodeAbstractParameter& parameter) const;
@@ -274,6 +279,7 @@ private:
     void flushPendingScopeSave();
     void rebuildCustomGuiMembershipIndexIfNeeded() const;
     void rebuildCustomGuiPanels();
+    void pruneCustomGuiParameters();
     std::string getCustomGuiFilePath(const std::string& presetPath) const;
     std::string getCustomGuiSnapshotsFilePath(const std::string& presetPath) const;
     std::string makeUniqueCustomGuiName(const std::string& baseName = "Custom GUI") const;
@@ -298,6 +304,7 @@ private:
     mutable bool customGuiMembershipIndexDirty = true;
     std::string customGuiStoragePath;
     bool customGuisDirty = false;
+    bool customGuiParametersNeedPruning = false;
     bool customGuiSnapshotsDirty = false;
     std::string pendingScopeSavePath;
     std::uint64_t pendingScopeSaveDeadlineMillis = 0;
