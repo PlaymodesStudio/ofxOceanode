@@ -9,6 +9,7 @@
 #include "ofxOceanodeTheme.h"
 #include "ofxOceanodeShared.h"
 #include "imgui_internal.h"
+#include "ofxOceanodeFloatingWindowDecor.h"
 #include "defaultNodes.h"
 #include <climits>
 #include <ft2build.h>
@@ -145,6 +146,7 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Mapper_1/Min_Input");
     OceanodeTheme* oceanodeTheme = new OceanodeTheme();
     gui.setup(oceanodeTheme, false, ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable, false);
+    ofxOceanodeFloatingWindowDecor::install();   // border + shadow on undocked windows
     refreshThemeFonts();
     loadDefaultGUILayout();
     // Auto-load default theme if pointer file exists
@@ -1498,6 +1500,11 @@ void ofxOceanode::drawThemeEditorWindow(){
 
             if(ImGui::BeginTabItem("Oceanode Colors")){
                 ImGui::BeginChild("##colorscroll_oc", ImVec2(0, 0), false);
+                // Floating window decoration sizes (colours: OC_FloatingWindow* below)
+                ImGui::Checkbox("Floating window border / shadow", &ofxOceanodeFloatingWindowDecor::Enabled);
+                ImGui::SliderFloat("Floating border thickness", &ofxOceanodeFloatingWindowDecor::BorderThickness, 0.0f, 4.0f, "%.1f px");
+                ImGui::SliderFloat("Floating shadow size", &ofxOceanodeFloatingWindowDecor::ShadowSize, 0.0f, 40.0f, "%.0f px");
+                ImGui::Separator();
                 auto fields = OceanodeColors::getFields();
                 for(int i = 0; i < (int)fields.size(); i++){
                     ImGui::PushID(i + ImGuiCol_COUNT);
