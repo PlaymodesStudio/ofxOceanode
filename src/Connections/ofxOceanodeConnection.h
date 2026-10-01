@@ -35,6 +35,13 @@ public:
         }
     }
     
+    // Full graph teardown must not restore values or invoke custom disconnect
+    // callbacks: their listeners may refer to nodes already being destroyed.
+    void prepareForDestruction(){
+        active = false;
+        restoreOnDestruction = false;
+    }
+
     void deleteSelf(){
         destroyConnection.notify();
     }
@@ -48,6 +55,7 @@ public:
     ofEvent<void> destroyConnection;
 protected:
     bool active;
+    bool restoreOnDestruction = true;
     
     virtual void passValueFunc() = 0;
     virtual void restoreValue() = 0;
@@ -71,7 +79,8 @@ public:
     }
     
     ~ofxOceanodeCustomConnection(){
-        restoreValue();
+        parameterEventListener.unsubscribe();
+        if(restoreOnDestruction) restoreValue();
     };
     
 private:
@@ -99,7 +108,8 @@ public:
     }
     
     ~ofxOceanodeCustomConnection(){
-        restoreValue();
+        parameterEventListener.unsubscribe();
+        if(restoreOnDestruction) restoreValue();
     };
     
 private:
@@ -126,7 +136,8 @@ public:
         passValueFunc();
     }
     ~ofxOceanodeConnection(){
-        restoreValue();
+        parameterEventListener.unsubscribe();
+        if(restoreOnDestruction) restoreValue();
     };
     
 private:
@@ -155,7 +166,8 @@ public:
         passValueFunc();
     }
     ~ofxOceanodeConnection(){
-        restoreValue();
+        parameterEventListener.unsubscribe();
+        if(restoreOnDestruction) restoreValue();
     };
     
 private:
@@ -190,7 +202,8 @@ public:
         passValueFunc();
     }
     ~ofxOceanodeConnection(){
-        restoreValue();
+        parameterEventListener.unsubscribe();
+        if(restoreOnDestruction) restoreValue();
     };
     
 private:
@@ -219,7 +232,8 @@ public:
         passValueFunc();
     }
     ~ofxOceanodeConnection(){
-        restoreValue();
+        parameterEventListener.unsubscribe();
+        if(restoreOnDestruction) restoreValue();
     };
     
 private:

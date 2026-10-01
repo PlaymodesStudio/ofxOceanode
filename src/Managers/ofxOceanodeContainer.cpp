@@ -30,6 +30,17 @@
 #endif
 
 namespace {
+    // Container mutation is synchronous. Keep the state scoped to this thread
+    // and counted so an inner macro cannot end its parent's teardown guard.
+    thread_local unsigned int containerClearDepth = 0;
+
+    struct ContainerClearGuard {
+        ContainerClearGuard(){ ++containerClearDepth; }
+        ~ContainerClearGuard(){ --containerClearDepth; }
+        ContainerClearGuard(const ContainerClearGuard&) = delete;
+        ContainerClearGuard& operator=(const ContainerClearGuard&) = delete;
+    };
+
     struct ConnectionFailureInfo {
         std::string connection;
         std::string reason;
@@ -135,7 +146,13 @@ void ofxOceanodeContainer::invalidateCustomGuiParameterPathCache()
     customGuiParameterPathCache.clear();
 }
 
+bool ofxOceanodeContainer::isClearingContainers(){
+    return containerClearDepth != 0;
+}
+
 void ofxOceanodeContainer::clearContainer(){
+    // Declared first so the guard also covers destruction of toDelete below.
+    const ContainerClearGuard clearGuard;
     const bool ownsGlobalScope = getCanvasID().empty()
         || getCanvasID() == "Canvas"
         || getCanvasID() == "0";
@@ -147,6 +164,11 @@ void ofxOceanodeContainer::clearContainer(){
         ofxOceanodeScope::getInstance()->setScopeChangedCallback(nullptr);
     }
     
+    // Silence every connection before deleting any of them. Restoring inputs
+    // here can run node/macro callbacks against a partially dismantled graph.
+    for(auto &connection : connections){
+        connection->prepareForDestruction();
+    }
     connections.clear();
     customGuiPanels.clear();
     customGuiPanelsData.clear();

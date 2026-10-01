@@ -68,6 +68,9 @@ public:
     ~ofxOceanodeContainer();
     
     void clearContainer();
+    // True throughout graph deletion, including nested macro containers.
+    // Addons must not traverse/rebuild graphs while their nodes are disappearing.
+    static bool isClearingContainers();
     
     void update();
     void draw();
