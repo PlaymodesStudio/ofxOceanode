@@ -2105,13 +2105,25 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             
             ImGui::Separator();
             
-            if(ImGui::BeginMenu("Modules")){
+            auto beginNewNodeMenu = [](const char* label){
+                // ImGui uses ItemInnerSpacing.x as the horizontal overlap of
+                // cascading menus. A negative overlap leaves a 10 px gap,
+                // while keeping its normal left/right placement at screen edges.
+                // Scope this to BeginMenu so other widgets retain their spacing.
+                const ImVec2 innerSpacing = ImGui::GetStyle().ItemInnerSpacing;
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(-5.0f, innerSpacing.y));
+                const bool open = ImGui::BeginMenu(label);
+                ImGui::PopStyleVar();
+                return open;
+            };
+
+            if(beginNewNodeMenu("Modules")){
                 bool selectedModule = false;
                 for(int i = 0; i < categoriesVector.size() && !selectedModule; i++){
                     vector<string> subcategoriesSplit = ofSplitString(categoriesVector[i], "/");
                     int openedMenus = 0;
                     for(auto subCategory : subcategoriesSplit){
-                        if(ImGui::BeginMenu(subCategory.c_str())){
+                        if(beginNewNodeMenu(subCategory.c_str())){
                             openedMenus++;
                         }else{
                             break;
@@ -2148,20 +2160,20 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
             
             //TODO: Implement
-            if(ImGui::BeginMenu("Module Groups")){
+            if(beginNewNodeMenu("Module Groups")){
                 ImGui::MenuItem("Example 1");
                 ImGui::MenuItem("Example 2");
                 ImGui::MenuItem("Example 3");
                 ImGui::EndMenu();
             }
             
-            if(ImGui::BeginMenu("Macros")){
+            if(beginNewNodeMenu("Macros")){
 				auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
 				
 				std::function<void(shared_ptr<macroCategory>)> drawCategory =
-				[this, &drawCategory](shared_ptr<macroCategory> category){
+				[this, &drawCategory, &beginNewNodeMenu](shared_ptr<macroCategory> category){
 					for(auto d : category->categories){
-						if(ImGui::BeginMenu(d->name.c_str())){
+						if(beginNewNodeMenu(d->name.c_str())){
 							drawCategory(d);
 							ImGui::EndMenu();
 						}
@@ -2186,7 +2198,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
             
             //TODO: How to add scripts?
-            if(ImGui::BeginMenu("Scripts")){
+            if(beginNewNodeMenu("Scripts")){
                 ImGui::MenuItem("Example 1");
                 ImGui::MenuItem("Example 2");
                 ImGui::MenuItem("Example 3");

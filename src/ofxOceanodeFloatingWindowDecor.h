@@ -2,20 +2,22 @@
 //  ofxOceanodeFloatingWindowDecor.h
 //  ofxOceanode
 //
-//  Border + drop shadow for floating (undocked) ImGui windows, so a window
-//  hovering over the canvas doesn't blend into the background.
+//  Border + drop shadow for floating (undocked) ImGui windows, menu dropdowns
+//  and popups, so surfaces hovering over the canvas stand out.
 //
 //  Installed once with install() after the ImGui context exists. An
 //  EndFramePre context hook runs after every window of the frame has been
 //  submitted (Oceanode panels, node windows...), finds the floating window
 //  trees — a standalone top-level window, or the host of a floating dock node
 //  holding several docked windows — and draws, in the draw list of the tree's
-//  last-rendered window:
+//  last-rendered content window (before any nested popup/menu):
 //    • a soft shadow outside the window rectangle (so it covers what is
 //      behind the window but stays under windows in front of it)
 //    • an outline on the window edge
-//  Docked windows, the fullscreen dockspace host, child windows, popups,
-//  tooltips and windows living in their own OS viewport are left alone.
+//  Each popup, including child submenus and modals, is decorated separately
+//  in its own viewport. Docked windows, the fullscreen dockspace host (including
+//  the menu bar), ordinary child windows and tooltips are left alone, as are
+//  ordinary floating windows living in their own OS viewport.
 //
 //  Colours: OceanodeColors::FloatingWindowBorder / FloatingWindowShadow
 //  (Theme Editor, saved with themes). Sizes: the variables below.
@@ -33,22 +35,31 @@
 namespace ofxOceanodeFloatingWindowDecor {
 
 inline bool  Enabled         = true;
-inline float BorderThickness = 1.5f;   // px (scaled by FontGlobalScale-independent pixels)
-inline float ShadowSize      = 14.0f;  // px the shadow extends beyond the window
-inline int   ShadowSteps     = 10;     // rings used to fake the blur
+inline float BorderThickness = 1.0f;   // px (scaled by FontGlobalScale-independent pixels)
+inline float ShadowSize      = 34.0f;  // px the shadow extends beyond the window
+inline int   ShadowSteps     = 34;     // rings used to fake the blur
 
 namespace detail {
 
 inline bool isVisible(const ImGuiWindow* w) { return w && w->Active && !w->Hidden; }
 
-// Last window rendered for this tree (RenderWindowsDrawLists renders a
-// window, then its DC.ChildWindows recursively — docked windows included)
+// Last content window rendered for this surface, including docked windows.
+// Popup children are separate surfaces: putting a parent's decoration in a
+// submenu's draw list would paint the parent's shadow/border over that submenu.
 inline ImGuiWindow* lastRendered(ImGuiWindow* w) {
     for(int i = w->DC.ChildWindows.Size - 1; i >= 0; i--) {
         ImGuiWindow* c = w->DC.ChildWindows[i];
-        if(isVisible(c)) return lastRendered(c);
+        if(isVisible(c) && !(c->Flags & (ImGuiWindowFlags_Popup | ImGuiWindowFlags_Tooltip)))
+            return lastRendered(c);
     }
     return w;
+}
+
+inline bool isPopupSurface(const ImGuiWindow* w) {
+    // Submenus can also have ChildWindow set; do not apply the floating-root
+    // exclusions to them. Popup covers menus, context menus, combos and modals.
+    return isVisible(w) && (w->Flags & ImGuiWindowFlags_Popup) &&
+           !(w->Flags & ImGuiWindowFlags_Tooltip) && w->Viewport;
 }
 
 inline bool isFloatingRoot(const ImGuiWindow* w, const ImGuiViewport* mainVp) {
@@ -103,7 +114,8 @@ inline void onEndFramePre(ImGuiContext* ctx, ImGuiContextHook*) {
     const ImGuiViewport* mainVp = ImGui::GetMainViewport();
     for(int i = 0; i < g.Windows.Size; i++) {
         ImGuiWindow* w = g.Windows[i];
-        if(isFloatingRoot(w, mainVp)) decorate(w, mainVp);
+        if(isPopupSurface(w)) decorate(w, w->Viewport);
+        else if(isFloatingRoot(w, mainVp)) decorate(w, mainVp);
     }
 }
 

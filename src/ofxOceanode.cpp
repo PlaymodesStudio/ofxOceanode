@@ -11,7 +11,9 @@
 #include "imgui_internal.h"
 #include "ofxOceanodeFloatingWindowDecor.h"
 #include "defaultNodes.h"
+#include <algorithm>
 #include <climits>
+#include <cstring>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_SFNT_NAMES_H
@@ -144,7 +146,7 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Mapper_1/Min_Input");
     OceanodeTheme* oceanodeTheme = new OceanodeTheme();
     gui.setup(oceanodeTheme, false, ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable, false);
-    ofxOceanodeFloatingWindowDecor::install();   // border + shadow on undocked windows
+    ofxOceanodeFloatingWindowDecor::install();   // border + shadow on undocked windows and popups
     refreshThemeFonts();
     loadDefaultGUILayout();
     // Auto-load default theme if pointer file exists
@@ -1539,12 +1541,15 @@ void ofxOceanode::drawThemeEditorWindow(){
 
             if(ImGui::BeginTabItem("Oceanode Colors")){
                 ImGui::BeginChild("##colorscroll_oc", ImVec2(0, 0), false);
-                // Floating window decoration sizes (colours: OC_FloatingWindow* below)
-                ImGui::Checkbox("Floating window border / shadow", &ofxOceanodeFloatingWindowDecor::Enabled);
-                ImGui::SliderFloat("Floating border thickness", &ofxOceanodeFloatingWindowDecor::BorderThickness, 0.0f, 4.0f, "%.1f px");
-                ImGui::SliderFloat("Floating shadow size", &ofxOceanodeFloatingWindowDecor::ShadowSize, 0.0f, 40.0f, "%.0f px");
+                // Shared window/popup decoration sizes (colours: OC_FloatingWindow* below)
+                ImGui::Checkbox("Floating window / popup border and shadow", &ofxOceanodeFloatingWindowDecor::Enabled);
+                ImGui::SliderFloat("Window / popup border thickness", &ofxOceanodeFloatingWindowDecor::BorderThickness, 0.0f, 4.0f, "%.1f px");
+                ImGui::SliderFloat("Window / popup shadow size", &ofxOceanodeFloatingWindowDecor::ShadowSize, 0.0f, 40.0f, "%.0f px");
                 ImGui::Separator();
                 auto fields = OceanodeColors::getFields();
+                std::sort(fields.begin(), fields.end(), [](const OceanodeColors::ColorField& a, const OceanodeColors::ColorField& b){
+                    return strcmp(a.name, b.name) < 0;
+                });
                 for(int i = 0; i < (int)fields.size(); i++){
                     ImGui::PushID(i + ImGuiCol_COUNT);
                     ImGui::ColorEdit4(fields[i].name, (float*)fields[i].ptr,

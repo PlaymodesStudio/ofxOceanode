@@ -110,9 +110,9 @@ struct OceanodeColors {
     inline static ImVec4 CurveAsymmetryGuide   = {0.00f, 1.00f, 1.00f, 0.251f}; // asymmetry guide (cyan)
     inline static ImVec4 CurveBParameterGuide  = {1.00f, 0.00f, 0.00f, 0.251f}; // B-parameter guide (red)
 
-    // ── Floating windows (ofxOceanodeFloatingWindowDecor.h) ───────────────────
-    inline static ImVec4 FloatingWindowBorder  = {0.42f, 0.42f, 0.42f, 1.00f};  // outline of undocked windows
-    inline static ImVec4 FloatingWindowShadow  = {0.00f, 0.00f, 0.00f, 0.45f};  // drop shadow (alpha = strength)
+    // ── Floating windows & popups (ofxOceanodeFloatingWindowDecor.h) ──────────
+    inline static ImVec4 FloatingWindowBorder  = {0.42f, 0.42f, 0.42f, 1.00f};  // outline of undocked windows and popups
+    inline static ImVec4 FloatingWindowShadow  = {0.50f, 0.50f, 0.50f, 0.45f};  // shared grey shadow (alpha = strength)
 
     // ─────────────────────────────────────────────────────────────────────────
     // Helpers
@@ -192,7 +192,7 @@ struct OceanodeColors {
         CurveBParameterGuide  = {1.00f, 0.00f, 0.00f, 0.251f};
 
         FloatingWindowBorder  = {0.42f, 0.42f, 0.42f, 1.00f};
-        FloatingWindowShadow  = {0.00f, 0.00f, 0.00f, 0.45f};
+        FloatingWindowShadow  = {0.50f, 0.50f, 0.50f, 0.45f};
     }
 
     /// Returns all named colour fields for use by the theme editor / save / load.
