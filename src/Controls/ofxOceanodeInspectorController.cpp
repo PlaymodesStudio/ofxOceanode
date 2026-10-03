@@ -303,7 +303,7 @@ void ofxOceanodeInspectorController::draw(){
 
     ImGui::Separator();
 
-    // Scope - fixed height per output parameter
+    // Scope - square texture previews when aspect ratio is disabled
     {
         auto &nodeGui = node->getNodeGui();
 
@@ -325,6 +325,11 @@ void ofxOceanodeInspectorController::draw(){
                 ofxOceanodeAbstractParameter &p = static_cast<ofxOceanodeAbstractParameter&>(nodeGui.getParameters().get(i));
 
                 auto size = ImVec2(ImGui::GetContentRegionAvail().x, scopeHeight);
+                const bool isTexture = p.valueType() == typeid(ofTexture).name() ||
+                                       p.valueType() == typeid(ofTexture*).name();
+                if(isTexture && !(p.getFlags() & ofxOceanodeParameterFlags_ScopeKeepAspectRatio)){
+                    size.y = size.x;
+                }
 
                 ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(nodeGui.getColor()*0.75f));
                 ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(nodeGui.getColor()*0.75f));
@@ -336,7 +341,7 @@ void ofxOceanodeInspectorController::draw(){
                 // is filled entirely by the scope visualization.
                 ImGui::Text("%s", (p.getGroupHierarchyNames().front() + "/" + p.getName()).c_str());
 
-                // Remove window padding so the scope fills the full 2x height.
+                // Remove window padding so the scope fills the preview area.
                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
                 ImGui::BeginChild(("Child_" + p.getGroupHierarchyNames().front() + "/" + p.getName()).c_str(), size, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
