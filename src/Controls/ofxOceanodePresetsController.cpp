@@ -168,8 +168,6 @@ void ofxOceanodePresetsController::draw(){
     ImGui::TextColored(presetItemTextColor, "%s", presetName.empty() ? "-" : presetName.c_str());
     ImGui::Separator();
 
-    // Allow repeated preset actions without dismissing the menu.
-    ImGui::PushItemFlag(ImGuiItemFlags_AutoClosePopups, false);
     if(ImGui::MenuItem("Save Preset", nullptr, false, !presetName.empty())){
         savePreset(presetName, bankName);
     }
@@ -188,7 +186,6 @@ void ofxOceanodePresetsController::draw(){
     if(ImGui::MenuItem("Reload Macros")){
         ofxOceanodeShared::updateMacrosStructure();
     }
-    ImGui::PopItemFlag();
     ImGui::Separator();
     drawPresetList();
 }
