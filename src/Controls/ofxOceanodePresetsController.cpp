@@ -168,6 +168,8 @@ void ofxOceanodePresetsController::draw(){
     ImGui::TextColored(presetItemTextColor, "%s", presetName.empty() ? "-" : presetName.c_str());
     ImGui::Separator();
 
+    // Allow repeated preset actions without dismissing the menu.
+    ImGui::PushItemFlag(ImGuiItemFlags_AutoClosePopups, false);
     if(ImGui::MenuItem("Save Preset", nullptr, false, !presetName.empty())){
         savePreset(presetName, bankName);
     }
@@ -186,13 +188,14 @@ void ofxOceanodePresetsController::draw(){
     if(ImGui::MenuItem("Reload Macros")){
         ofxOceanodeShared::updateMacrosStructure();
     }
+    ImGui::PopItemFlag();
     ImGui::Separator();
     drawPresetList();
 }
 
 void ofxOceanodePresetsController::drawPopups(){
-    // MenuItem closes the menu. Open and render dialogs here instead, using
-    // the persistent DockSpace ID stack supplied by ofxOceanodeControls.
+    // Render dialogs outside the menu using the persistent DockSpace ID stack
+    // supplied by ofxOceanodeControls, so they remain open independently.
     if(popupRequest == PopupRequest::NewBank){
         bankNameBuffer[0] = '\0';
         ImGui::OpenPopup("Add New Bank");

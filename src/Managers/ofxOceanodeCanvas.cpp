@@ -163,14 +163,15 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     }
 
     //Draw Guis
-    if(onTop){
+    const bool popupOpen = ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
+    if(onTop && !popupOpen){
         ImGui::SetNextWindowFocus();
         onTop = false;
     }
     // focusPending is set by requestFocus(). We defer the actual focus call
     // until isFirstDraw is false, because the isFirstDraw path below calls
     // ImGui::FocusWindow(parentID) which would steal focus away again.
-    if(focusPending && !isFirstDraw){
+    if(focusPending && !isFirstDraw && !popupOpen){
         ImGui::SetNextWindowFocus();
         focusPending = false;
     }
@@ -206,7 +207,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     } else {
         windowName = uniqueID + "###" + uniqueID;
     }
-    if(ImGui::Begin(windowName.c_str(), open)){
+    // Preset loads can create canvases while the Presets menu is still open.
+    // Taking focus on appearance would dismiss that menu.
+    const ImGuiWindowFlags windowFlags = popupOpen ? ImGuiWindowFlags_NoFocusOnAppearing : ImGuiWindowFlags_None;
+    if(ImGui::Begin(windowName.c_str(), open, windowFlags)){
         auto prepareNewNodeModal = [&](){
             searchField = "";
             lastSearchField = "";
@@ -2668,7 +2672,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     }
 
     //TODO: Find better way to to this, when macro created, recoverr focus on canvas, should be its parent. something like. container->getParentCanvas? Or set a id in canvas as "Parent Canvas".
-    if(isFirstDraw && parentID != ""){
+    if(isFirstDraw && parentID != "" && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel)){
         ImGuiID parentWinID = ImHashStr(parentID.c_str(), 0, 0);
         ImGuiWindow* parentWin = ImGui::FindWindowByID(parentWinID);
         if(parentWin) ImGui::FocusWindow(parentWin);

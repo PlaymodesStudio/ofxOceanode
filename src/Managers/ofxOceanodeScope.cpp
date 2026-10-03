@@ -420,6 +420,9 @@ void ofxOceanodeScope::setup(){
 void ofxOceanodeScope::draw(){
 
     if(scopedParameters.size() > 0){
+        // Restored scopes must not dismiss the menu used to load their preset.
+        const ImGuiWindowFlags focusFlags = ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel)
+            ? ImGuiWindowFlags_NoFocusOnAppearing : ImGuiWindowFlags_None;
         const bool mouseDown = ImGui::IsMouseDown(0);
         const bool runDockMaintenance = !mouseDown
             && (dockMaintenancePending || scopeInteractionInProgress);
@@ -430,7 +433,7 @@ void ofxOceanodeScope::draw(){
 
         // Do NOT set the window class for the main "Scopes" window
         // so it can be docked anywhere in the main application
-        ImGui::Begin("Scopes", NULL, ImGuiWindowFlags_NoScrollbar);
+        ImGui::Begin("Scopes", NULL, ImGuiWindowFlags_NoScrollbar | focusFlags);
         
         // Apply saved window configuration on first frame after load
         if(windowConfig.hasConfig){
@@ -533,7 +536,7 @@ void ofxOceanodeScope::draw(){
             // Guide first-time windows into the dockspace initially.
             ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
 
-            if(ImGui::Begin(windowName.c_str(), &open))
+            if(ImGui::Begin(windowName.c_str(), &open, focusFlags))
             {
                 if(mouseDown
                     && !scopeInteractionInProgress

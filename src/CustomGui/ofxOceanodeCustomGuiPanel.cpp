@@ -155,7 +155,10 @@ void ofxOceanodeCustomGuiPanel::draw()
     }
 
     bool openState = panel->windowState.isOpen;
-    const bool beginVisible = ImGui::Begin(title.c_str(), &openState, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_HorizontalScrollbar);
+    // A panel restored by a preset load must leave an open menu focused.
+    const ImGuiWindowFlags focusFlags = ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel)
+        ? ImGuiWindowFlags_NoFocusOnAppearing : ImGuiWindowFlags_None;
+    const bool beginVisible = ImGui::Begin(title.c_str(), &openState, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_HorizontalScrollbar | focusFlags);
     if(openState != panel->windowState.isOpen){
         panel->windowState.isOpen = openState;
         container.markCustomGuisDirty();
