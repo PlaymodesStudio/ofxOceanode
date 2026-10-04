@@ -1223,6 +1223,7 @@ void ofxOceanodeTimelineController::draw() {
     anyClipInteractionClaimedThisFrame = false;
     bool emptyTrackAreaClickedThisFrame = false;
     clipScreenRects.clear(); // refilled by drawClip below, for box selection
+    clipDropRows.clear();    // refilled per clip row below, for Cmd+drag duplicate
 
     for(const auto& track : timeline.getTracks()) {
         const float headerY = ImGui::GetCursorPosY();
@@ -1725,8 +1726,10 @@ void ofxOceanodeTimelineController::draw() {
                 // Edge zones shrink on narrow clips so a short clip can still be moved.
                 const float edgeZone = std::min(kEdgePixels, (x2 - x1) * 0.25f);
                 const bool edge = mouse.x >= x2 - edgeZone;
-                const bool leftEdge = !edge && mouse.x <= x1 + edgeZone && !ImGui::GetIO().KeyShift;
-                if(ImGui::GetIO().KeyShift && !edge) {
+                // The left edge trims; with Shift it can also extend the
+                // clip to the left (adding empty time in front).
+                const bool leftEdge = !edge && mouse.x <= x1 + edgeZone;
+                if(ImGui::GetIO().KeyShift && !edge && !leftEdge) {
                     clipInteractionClaimedThisFrame = true;
                     anyClipInteractionClaimedThisFrame = true;
                     if(selectedClips.count(memberKey) > 0) selectedClips.erase(memberKey);
@@ -1784,13 +1787,19 @@ void ofxOceanodeTimelineController::draw() {
                         (ImGui::GetIO().KeyMods & ImGuiMod_Ctrl) != 0;
                     // Wave clips are complete audio slices: every edge drag
                     // (plain, Cmd or Shift) stretches the whole source.
+                    // Cmd on the body (not on an edge) drags out a copy instead.
                     clipDragMode = edge ? (track.isWaveTrack ? ClipDragMode::Stretch
                                            : ImGui::GetIO().KeyShift ? ClipDragMode::Resize
                                            : commandDown ? ClipDragMode::Stretch
                                                          : ClipDragMode::Repeat)
                                         : leftEdge ? ClipDragMode::TrimStart
+                                        : commandDown ? ClipDragMode::Duplicate
                                         : ClipDragMode::Move;
                     clipDragStartMouseX = mouse.x;
+                    clipDragStartMouseY = mouse.y;
+                    trimExtends = leftEdge && ImGui::GetIO().KeyShift;
+                    dragSourceBindingId = currentRowBindingId;
+                    dragSourceLaneId = lane != nullptr ? lane->id : (clip.lanes.empty() ? std::string() : clip.lanes.front().id);
                     clipDragCommitted = false;
                     trimPreviewBeat = clip.startBeat;
                     dragRowTop = min.y;
@@ -2029,6 +2038,7 @@ void ofxOceanodeTimelineController::draw() {
             }
             // Later clips are drawn on top, so hit-test in reverse order and
             // let the visually topmost overlapping clip own the gesture.
+            clipDropRows.push_back({track.id, std::string(), min.y, max.y});
             for(auto clipIt = track.clips.rbegin(); clipIt != track.clips.rend(); ++clipIt) {
                 const auto* frontLane = clipIt->lanes.empty() ? nullptr : &clipIt->lanes.front();
                 handleClip(*clipIt, frontLane, laneMin, max);
@@ -2359,6 +2369,7 @@ void ofxOceanodeTimelineController::draw() {
                     for(const auto& clip : track.clips) {
                         if(const auto* lane = groupLane(clip)) drawClip(clip, lane, laneMin, max);
                     }
+                    clipDropRows.push_back({track.id, groupMembers.front(), min.y, max.y});
                     currentRowBindingId = groupMembers.front();
                     for(auto clipIt = track.clips.rbegin(); clipIt != track.clips.rend(); ++clipIt) {
                         if(const auto* lane = groupLane(*clipIt)) handleClip(*clipIt, lane, laneMin, max);
@@ -2581,6 +2592,7 @@ void ofxOceanodeTimelineController::draw() {
                     drawClip(clip, lane, laneMin, max);
                     if(clip.lanes.size() > 1) multiLaneClipRowSpans[clip.id].push_back({min.y, max.y});
                 }
+                clipDropRows.push_back({track.id, binding.id, min.y, max.y});
                 currentRowBindingId = binding.id;
                 for(auto clipIt = track.clips.rbegin(); clipIt != track.clips.rend(); ++clipIt) {
                     const auto* lane = rowLane(*clipIt);
@@ -2989,11 +3001,63 @@ void ofxOceanodeTimelineController::draw() {
     }
 
     if(clipDragMode != ClipDragMode::None) {
+        // A duplicate can be dropped straight up or down onto another row,
+        // so vertical movement starts that drag too.
+        const float dragThreshold = std::max(3.0f, ImGui::GetIO().MouseDragThreshold);
         if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && !clipDragCommitted &&
-           std::abs(ImGui::GetIO().MousePos.x - clipDragStartMouseX) >= std::max(3.0f, ImGui::GetIO().MouseDragThreshold)) {
+           (std::abs(ImGui::GetIO().MousePos.x - clipDragStartMouseX) >= dragThreshold ||
+            (clipDragMode == ClipDragMode::Duplicate &&
+             std::abs(ImGui::GetIO().MousePos.y - clipDragStartMouseY) >= dragThreshold))) {
             clipDragCommitted = true;
         }
-        if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && clipDragMode == ClipDragMode::TrimStart) {
+        if(clipDragMode == ClipDragMode::Duplicate) {
+            // Where the copy would land: the row under the mouse, at the
+            // snapped beat the grabbed point is dragged to.
+            const ImVec2 mousePos = ImGui::GetIO().MousePos;
+            const ClipDropRow* dropRow = nullptr;
+            for(const auto& row : clipDropRows) {
+                if(mousePos.y >= row.top && mousePos.y < row.bottom) { dropRow = &row; break; }
+            }
+            const auto* sourceClip = timeline.getClip(draggingTrackId, draggingClipId);
+            const double dropStart = std::max(0.0, snapBeat(beatAtOffset(mousePos.x - dragTimelineOriginX) - dragOffsetBeats));
+            // Same row: the whole clip. Any other row: the grabbed lane, now
+            // driving that row's parameter. Another track's single row: the
+            // whole clip, mapped onto that track's matching parameters.
+            const bool sameRow = dropRow != nullptr && dropRow->trackId == draggingTrackId &&
+                (dropRow->bindingId.empty() || dropRow->bindingId == dragSourceBindingId);
+            const std::string dropBindingId = dropRow == nullptr || sameRow ? std::string() : dropRow->bindingId;
+            if(ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                if(clipDragCommitted && sourceClip != nullptr && dropRow != nullptr) {
+                    ImDrawList* ghostDl = ImGui::GetWindowDrawList();
+                    const float x1 = dragTimelineOriginX + beatOffset(dropStart);
+                    const float x2 = dragTimelineOriginX + beatOffset(dropStart + sourceClip->durationBeats);
+                    const ImVec2 ghostMin(x1, dropRow->top + 2.0f), ghostMax(x2, dropRow->bottom - 2.0f);
+                    ghostDl->AddRectFilled(ghostMin, ghostMax, IM_COL32(255, 255, 255, 40), 3.0f);
+                    ghostDl->AddRect(ghostMin, ghostMax, IM_COL32(255, 255, 255, 200), 3.0f, 0, 1.5f);
+                    ghostDl->AddText(ImVec2(x1 + 5.0f, dropRow->top + 4.0f), IM_COL32(255, 255, 255, 220),
+                                     ("+ " + sourceClip->name).c_str());
+                }
+            } else {
+                if(clipDragCommitted && sourceClip != nullptr && dropRow != nullptr) {
+                    const std::string newClipId = timeline.duplicateClip(draggingTrackId, draggingClipId,
+                        dropRow->trackId, dropStart, dragSourceLaneId, dropBindingId);
+                    if(newClipId.empty()) {
+                        ofLogWarning("ofxOceanodeTimelineController")
+                            << "Cannot duplicate \"" << sourceClip->name << "\" there: "
+                            << "no matching parameter on that track, or a piano roll dropped outside a note group, "
+                            << "or a Wave clip outside a Wave track";
+                    } else {
+                        selectedClips.clear();
+                        selectedClips.insert({dropRow->trackId, newClipId});
+                    }
+                }
+                clipDragMode = ClipDragMode::None;
+                clipDragCommitted = false;
+                draggingTrackId.clear();
+                draggingClipId.clear();
+                groupDragSnapshot.clear();
+            }
+        } else if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && clipDragMode == ClipDragMode::TrimStart) {
             // Preview only; the trim is applied on release.
             if(clipDragCommitted) {
                 if(const auto* clip = timeline.getClip(draggingTrackId, draggingClipId)) {
@@ -3001,7 +3065,9 @@ void ofxOceanodeTimelineController::draw() {
                     const double mouseBeat = beatAtOffset(ImGui::GetIO().MousePos.x - dragTimelineOriginX);
                     // Repeating automation can grow to the left (its content repeats);
                     // one-shot and Wave clips can only be shortened.
-                    const bool canGrow = clip->repeatContent && trimTrack != nullptr && !trimTrack->isWaveTrack;
+                    // Shift extends any (non-Wave, non-LFO) clip with empty time.
+                    const bool canGrow = trimTrack != nullptr && !trimTrack->isWaveTrack &&
+                        (clip->repeatContent || (trimExtends && !clip->isLfo));
                     const double lowest = canGrow ? 0.0 : clip->startBeat;
                     const double highest = clip->startBeat + clip->durationBeats - 1.0 / kPPQ;
                     trimPreviewBeat = ofClamp(snapBeat(mouseBeat), lowest, highest);
@@ -3108,6 +3174,7 @@ void ofxOceanodeTimelineController::draw() {
                 const auto* trimClip = timeline.getClip(draggingTrackId, draggingClipId);
                 if(trimTrack != nullptr && trimClip != nullptr && std::abs(trimPreviewBeat - trimClip->startBeat) > 1e-9) {
                     if(trimTrack->isWaveTrack) trimWaveClipStart(timeline, draggingTrackId, draggingClipId, trimPreviewBeat);
+                    else if(trimExtends) timeline.extendClipStart(draggingTrackId, draggingClipId, trimPreviewBeat);
                     else timeline.trimClipStart(draggingTrackId, draggingClipId, trimPreviewBeat);
                 }
             }

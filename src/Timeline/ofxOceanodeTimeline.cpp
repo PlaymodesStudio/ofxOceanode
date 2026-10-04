@@ -2170,6 +2170,101 @@ std::string ofxOceanodeTimelineManager::splitClip(const std::string& trackId, co
     return rightId;
 }
 
+std::string ofxOceanodeTimelineManager::duplicateClip(const std::string& srcTrackId, const std::string& clipId,
+                                                      const std::string& dstTrackId, double newStartBeat,
+                                                      const std::string& srcLaneId,
+                                                      const std::string& dstBindingId) {
+    const auto* srcTrack = getTrack(srcTrackId);
+    const auto* dstTrack = getTrack(dstTrackId);
+    const auto* sourceClip = getClip(srcTrackId, clipId);
+    if(srcTrack == nullptr || dstTrack == nullptr || sourceClip == nullptr) return std::string();
+    if(srcTrack->isWaveTrack != dstTrack->isWaveTrack) return std::string();
+    // A value copy: createClip below may reallocate the source track's clips.
+    ofxOceanodeTimelineClip copy = *sourceClip;
+    const bool sameTrack = srcTrackId == dstTrackId;
+
+    // The destination track's binding for the parameter a source binding drives.
+    auto mapBinding = [&](const std::string& bindingId) -> std::string {
+        if(bindingId.empty() || sameTrack) return bindingId;
+        const auto* binding = getBinding(srcTrackId, bindingId);
+        if(binding == nullptr) return std::string();
+        for(const auto& candidate : dstTrack->bindings)
+            if(candidate.parameterPath == binding->parameterPath) return candidate.id;
+        return std::string();
+    };
+    auto mapIds = [&](std::vector<std::string>& ids) {
+        std::vector<std::string> mapped;
+        for(const auto& id : ids) {
+            const std::string target = mapBinding(id);
+            if(!target.empty() && std::find(mapped.begin(), mapped.end(), target) == mapped.end()) mapped.push_back(target);
+        }
+        ids = std::move(mapped);
+    };
+
+    if(!dstBindingId.empty()) {
+        if(dstTrack->isWaveTrack || getBinding(dstTrackId, dstBindingId) == nullptr) return std::string();
+        if(copy.isLfo) {
+            // The lanes are the oscillator's own controls; only the output moves.
+            copy.lfoOutputBindingId = dstBindingId;
+            for(auto& lane : copy.lanes) mapIds(lane.bindingIds);
+        } else {
+            const auto laneIt = std::find_if(copy.lanes.begin(), copy.lanes.end(),
+                                             [&](const auto& lane) { return lane.id == srcLaneId; });
+            if(laneIt == copy.lanes.end()) return std::string();
+            ofxOceanodeTimelineLane lane = *laneIt;
+            if(lane.type == ofxOceanodeTimelineLaneType::PianoRoll) {
+                const auto* group = findNoteGroupForBinding(*dstTrack, dstBindingId);
+                if(group == nullptr) return std::string();
+                lane.pianoPitchBindingId = group->pitchBindingId;
+                lane.pianoGateBindingId = group->gateBindingId;
+                lane.pianoVelocityBindingId = group->velocityBindingId;
+                lane.bindingIds = group->members();
+            } else {
+                lane.bindingIds = {dstBindingId};
+            }
+            copy.lanes = {lane};
+        }
+    } else if(!sameTrack && !dstTrack->isWaveTrack) {
+        if(copy.isLfo) {
+            copy.lfoOutputBindingId = mapBinding(copy.lfoOutputBindingId);
+            if(copy.lfoOutputBindingId.empty()) return std::string();
+            for(auto& lane : copy.lanes) mapIds(lane.bindingIds);
+        } else {
+            std::vector<ofxOceanodeTimelineLane> kept;
+            for(auto lane : copy.lanes) {
+                mapIds(lane.bindingIds);
+                if(lane.type == ofxOceanodeTimelineLaneType::PianoRoll) {
+                    lane.pianoPitchBindingId = mapBinding(lane.pianoPitchBindingId);
+                    lane.pianoGateBindingId = mapBinding(lane.pianoGateBindingId);
+                    lane.pianoVelocityBindingId = mapBinding(lane.pianoVelocityBindingId);
+                }
+                if(!lane.bindingIds.empty()) kept.push_back(std::move(lane));
+            }
+            if(kept.empty()) return std::string();
+            copy.lanes = std::move(kept);
+        }
+    }
+
+    const std::string newId = createClip(dstTrackId, copy.name, newStartBeat, copy.durationBeats);
+    auto* newClip = getClip(dstTrackId, newId);
+    if(newClip == nullptr) return std::string();
+    copy.id = newId;
+    copy.name = newClip->name;
+    copy.startBeat = std::max(0.0, newStartBeat);
+    // Lanes go in one at a time: makeUniqueLaneId() only avoids ids already
+    // in the timeline, so ids handed out before insertion could repeat.
+    auto lanes = std::move(copy.lanes);
+    copy.lanes.clear();
+    *newClip = std::move(copy);
+    for(auto& lane : lanes) {
+        lane.id = makeUniqueLaneId();
+        ++nextLaneNumber;
+        if(auto* clip = getClip(dstTrackId, newId)) clip->lanes.push_back(std::move(lane));
+    }
+    invalidateSchedule();
+    return newId;
+}
+
 bool ofxOceanodeTimelineManager::trimClipStart(const std::string& trackId, const std::string& clipId, double newStartBeat) {
     auto* track = getTrack(trackId);
     auto* clip = getClip(trackId, clipId);
@@ -2196,6 +2291,61 @@ bool ofxOceanodeTimelineManager::trimClipStart(const std::string& trackId, const
     trimmed.durationBeats = end - newStartBeat;
     // Same clip (id, name, lane ids): only its start and content moved.
     *clip = trimmed;
+    std::sort(track->clips.begin(), track->clips.end(), [](const auto& a, const auto& b) {
+        if(std::abs(a.startBeat - b.startBeat) > 1e-9) return a.startBeat < b.startBeat;
+        return a.id < b.id;
+    });
+    invalidateSchedule();
+    return true;
+}
+
+bool ofxOceanodeTimelineManager::extendClipStart(const std::string& trackId, const std::string& clipId, double newStartBeat) {
+    auto* track = getTrack(trackId);
+    auto* clip = getClip(trackId, clipId);
+    if(track == nullptr || clip == nullptr || track->isWaveTrack) return false;
+    newStartBeat = std::max(0.0, newStartBeat);
+    if(newStartBeat >= clip->startBeat - 1e-9 || clip->isLfo) return trimClipStart(trackId, clipId, newStartBeat);
+
+    const double stretch = ofxOceanodeTimelineClipTime::stretch(*clip);
+    auto isGridLane = [](const ofxOceanodeTimelineLane& lane) {
+        return lane.type == ofxOceanodeTimelineLaneType::Step || lane.type == ofxOceanodeTimelineLaneType::MultiSlider;
+    };
+    // Step grids (Step, Multi Slider) can only grow by whole cells, so the
+    // added source time is a whole number of the first grid lane's cells --
+    // never more than fits before beat 0.
+    const double maxSourceDelta = clip->startBeat / stretch;
+    double sourceDelta = (clip->startBeat - newStartBeat) / stretch;
+    for(const auto& lane : clip->lanes) {
+        if(!isGridLane(lane)) continue;
+        const double cell = std::max(1.0 / 24.0, lane.beatsPerStep);
+        sourceDelta = std::min(std::round(sourceDelta / cell), std::floor(maxSourceDelta / cell + 1e-9)) * cell;
+        break;
+    }
+    sourceDelta = std::min(sourceDelta, maxSourceDelta);
+    if(sourceDelta <= 1e-9) return false;
+
+    for(auto& lane : clip->lanes) {
+        for(auto& point : lane.curvePoints) point.beat += sourceDelta;
+        for(auto& note : lane.pianoNotes) note.startBeat += sourceDelta;
+        for(auto& row : lane.multiValueRows) for(auto& region : row) region.startBeat += sourceDelta;
+        for(auto& row : lane.multiGateRows) for(auto& region : row) region.startBeat += sourceDelta;
+        if(!isGridLane(lane)) continue;
+        // A grid lane with another cell size shifts by as many of its own
+        // cells as fit (its pattern may then sit slightly off).
+        const double cell = std::max(1.0 / 24.0, lane.beatsPerStep);
+        const int addedCells = static_cast<int>(std::llround(sourceDelta / cell));
+        if(addedCells <= 0) continue;
+        for(auto& step : lane.step.steps) step.startBeat += addedCells * cell;
+        lane.step.sortSteps();
+        if(lane.type == ofxOceanodeTimelineLaneType::MultiSlider)
+            lane.multiSliderValues.insert(lane.multiSliderValues.begin(), static_cast<size_t>(addedCells), 0.0f);
+        lane.stepCount += addedCells;
+    }
+
+    clip->contentDurationBeats = ofxOceanodeTimelineClipTime::sourceDuration(*clip) + sourceDelta;
+    const double end = clip->startBeat + clip->durationBeats;
+    clip->startBeat = std::max(0.0, clip->startBeat - sourceDelta * stretch);
+    clip->durationBeats = end - clip->startBeat;
     std::sort(track->clips.begin(), track->clips.end(), [](const auto& a, const auto& b) {
         if(std::abs(a.startBeat - b.startBeat) > 1e-9) return a.startBeat < b.startBeat;
         return a.id < b.id;

@@ -605,9 +605,28 @@ public:
     // the original played. Repeating clips are cut anywhere (the right part
     // keeps repeating from the phase it was cut at). Not for Wave clips.
     std::string splitClip(const std::string& trackId, const std::string& clipId, double timelineBeat);
+    // Copies a clip, with fresh clip/lane ids, to dstTrackId at newStartBeat
+    // and returns the new clip's id ("" when it cannot go there).
+    //  - dstBindingId empty: the whole clip. On another track every binding is
+    //    remapped to that track's binding of the same parameter; lanes with no
+    //    match are dropped (nothing left: refused).
+    //  - dstBindingId set: only the lane srcLaneId, now driving that binding (a
+    //    piano roll needs a note group's row and takes its pitch/gate/velocity;
+    //    an LFO clip is copied whole with its output moved there).
+    // Wave clips only go to Wave tracks.
+    std::string duplicateClip(const std::string& srcTrackId, const std::string& clipId,
+                              const std::string& dstTrackId, double newStartBeat,
+                              const std::string& srcLaneId = std::string(),
+                              const std::string& dstBindingId = std::string());
     // Moves a clip's start, keeping its end and what plays under it (the left
     // part is dropped). Growing to the left works for repeating clips only.
     bool trimClipStart(const std::string& trackId, const std::string& clipId, double newStartBeat);
+    // Shift+drag of the left edge. Moving the start earlier adds empty source
+    // time in front of the content, which stays where it is on the timeline
+    // (works for one-shot clips too, unlike trimClipStart, which can only grow
+    // repeating content by whole cycles). Moving it later is a plain trim.
+    // LFO clips (whose phase runs from the clip start) fall back to trimClipStart.
+    bool extendClipStart(const std::string& trackId, const std::string& clipId, double newStartBeat);
     bool removeClip(const std::string& trackId, const std::string& clipId);
     ofxOceanodeTimelineClip* getClip(const std::string& trackId, const std::string& clipId);
     const ofxOceanodeTimelineClip* getClip(const std::string& trackId, const std::string& clipId) const;

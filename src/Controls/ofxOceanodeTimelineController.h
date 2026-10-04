@@ -148,7 +148,9 @@ private:
     int waveVolumeValuePointIndex = -1;   // right-click "Set value" on a volume point
     float waveVolumeNumericValue = 1.0f;
 
-    enum class ClipDragMode { None, Move, Resize, Stretch, Repeat, TrimStart };
+    // Duplicate: Cmd+drag on a clip's body drops a copy on whichever row the
+    // mouse is over (same row, another parameter row, another track).
+    enum class ClipDragMode { None, Move, Resize, Stretch, Repeat, TrimStart, Duplicate };
     ClipDragMode clipDragMode = ClipDragMode::None;
     std::string draggingTrackId;
     std::string draggingClipId;
@@ -160,8 +162,20 @@ private:
     // (or the double-click that opens the editor) must not change the clip.
     float clipDragStartMouseX = 0.0f;
     bool clipDragCommitted = false;
+    float clipDragStartMouseY = 0.0f;
+    // Duplicate drag: the row and lane it started on, and every clip row
+    // drawn this frame (rebuilt each frame) to find the one under the mouse.
+    std::string dragSourceBindingId;
+    std::string dragSourceLaneId;
+    struct ClipDropRow {
+        std::string trackId;
+        std::string bindingId; // empty: a single-row (collapsed / Wave) track
+        float top = 0.0f, bottom = 0.0f;
+    };
+    std::vector<ClipDropRow> clipDropRows;
     // Left-edge trim: previewed while dragging, applied on release.
     double trimPreviewBeat = 0.0;
+    bool trimExtends = false; // Shift on the left edge: extendClipStart instead of trimClipStart
     float dragRowTop = 0.0f, dragRowBottom = 0.0f;
     // Screen rows of the clip editor drawn this frame (a click there is not a
     // click on empty timeline space).
