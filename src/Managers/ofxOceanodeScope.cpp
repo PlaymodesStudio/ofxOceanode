@@ -149,18 +149,36 @@ static ImGuiWindow* FindScopeWindowToFillCentralNode(
     return bestWindow;
 }
 
-static bool IsScopeWindowPendingDock(
-    const std::vector<ofxOceanodeScopeItem>& scopedParameters,
-    ImGuiID dockNodeID
-)
+// CentralNode is a cached pointer: a merge can delete that node before ImGui
+// refreshes the cache in DockSpace(). Walk the live tree after our own edits.
+static ImGuiDockNode* FindLiveScopeCentralNode(ImGuiDockNode* node)
 {
-    for(const auto& item : scopedParameters)
-    {
-        ImGuiWindow* window = ImGui::FindWindowByName(item.windowName.c_str());
-        if(window != NULL && window->DockNode == NULL && window->DockId == dockNodeID) return true;
-    }
+    if(node == NULL) return NULL;
+    if(node->IsCentralNode()) return node;
+    if(ImGuiDockNode* central = FindLiveScopeCentralNode(node->ChildNodes[0])) return central;
+    return FindLiveScopeCentralNode(node->ChildNodes[1]);
+}
 
-    return false;
+static ImGuiDockNode* RefreshScopeCentralNode(ImGuiID dockspaceID)
+{
+    ImGuiDockNode* root = ImGui::DockBuilderGetNode(dockspaceID);
+    if(root == NULL) return NULL;
+    root->CentralNode = FindLiveScopeCentralNode(root);
+    return root->CentralNode;
+}
+
+static bool IsScopeDockingBusy()
+{
+    // A delivered drop still has a request pending until the next NewFrame().
+    // Mouse-up alone is not permission to split, merge or move its nodes.
+    return ImGui::IsMouseDown(0) || GImGui->MovingWindow != NULL
+        || ImGui::IsDragDropActive() || GImGui->DockContext.Requests.Size != 0;
+}
+
+static bool IsScopeWindowContained(ImGuiWindow* window, ImGuiID dockspaceID)
+{
+    return window != NULL && window->DockNode != NULL
+        && ImGui::DockNodeGetRootNode(window->DockNode)->ID == dockspaceID;
 }
 
 static ImGuiWindow* FindCurrentScopeWindowInNode(
@@ -418,271 +436,180 @@ void ofxOceanodeScope::setup(){
 }
 
 void ofxOceanodeScope::draw(){
+    if(scopedParameters.empty()) return;
 
-    if(scopedParameters.size() > 0){
-        // Restored scopes must not dismiss the menu used to load their preset.
-        const ImGuiWindowFlags focusFlags = ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel)
-            ? ImGuiWindowFlags_NoFocusOnAppearing : ImGuiWindowFlags_None;
-        const bool mouseDown = ImGui::IsMouseDown(0);
-        const bool runDockMaintenance = !mouseDown
-            && (dockMaintenancePending || scopeInteractionInProgress);
+    // Restored scopes must not dismiss the menu used to load their preset.
+    const ImGuiWindowFlags focusFlags = ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel)
+        ? ImGuiWindowFlags_NoFocusOnAppearing : ImGuiWindowFlags_None;
+    ImGuiWindowClass window_class;
+    window_class.ClassId = ImGui::GetID("ScopesClass");
+    window_class.DockingAllowUnclassed = false;
 
-        ImGuiWindowClass window_class;
-        window_class.ClassId = ImGui::GetID("ScopesClass");
-        window_class.DockingAllowUnclassed = false;
+    // The outer container remains dockable in the main application.
+    ImGui::Begin("Scopes", NULL, ImGuiWindowFlags_NoScrollbar | focusFlags);
+    if(windowConfig.hasConfig){
+        ImGui::SetWindowPos(ImVec2(windowConfig.posX, windowConfig.posY), ImGuiCond_Always);
+        ImGui::SetWindowSize(ImVec2(windowConfig.width, windowConfig.height), ImGuiCond_Always);
+        windowConfig.hasConfig = false;
+    }
 
-        // Do NOT set the window class for the main "Scopes" window
-        // so it can be docked anywhere in the main application
-        ImGui::Begin("Scopes", NULL, ImGuiWindowFlags_NoScrollbar | focusFlags);
-        
-        // Apply saved window configuration on first frame after load
-        if(windowConfig.hasConfig){
-            ImGui::SetWindowPos(ImVec2(windowConfig.posX, windowConfig.posY), ImGuiCond_Always);
-            ImGui::SetWindowSize(ImVec2(windowConfig.width, windowConfig.height), ImGuiCond_Always);
-            windowConfig.hasConfig = false; // Only apply once
+    const ImGuiID dockspace_id = ImGui::GetID("ScopesDockSpace");
+    const bool canMaintainDocking = !isLoadingFromPreset && !IsScopeDockingBusy();
+    bool topologyChanged = false;
+
+    // All topology edits happen before DockSpace() and before any scope Begin().
+    // Check containment on every idle frame, including changes applied by ImGui
+    // after our previous pass. Healthy layouts are never rebuilt.
+    if(canMaintainDocking)
+    {
+        if(ImGui::DockBuilderGetNode(dockspace_id) == NULL)
+        {
+            ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+            const ImVec2 available = ImGui::GetContentRegionAvail();
+            ImGui::DockBuilderSetNodeSize(dockspace_id,
+                ImVec2(std::max(available.x, 4.0f), std::max(available.y, 4.0f)));
+            topologyChanged = true;
         }
-        
-        ImGuiID dockspace_id = ImGui::GetID("ScopesDockSpace");
-        ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None, &window_class);
+        RefreshScopeCentralNode(dockspace_id);
 
-        // Manual additions can happen before this dockspace exists. Process
-        // one queued split now. One per frame ensures any earlier queued
-        // window exists before the next split has to move it.
-        if(!pendingDockWindows.empty() && !isLoadingFromPreset)
+        // Bind one addition per frame so its window exists before another split.
+        if(!pendingDockWindows.empty())
         {
             const auto& pending = pendingDockWindows.front();
-            if(DockScopeWindowAtBottom(
-                pending.windowName,
-                dockspace_id,
-                pending.scopeCountAtAdd
-            ))
+            if(DockScopeWindowAtBottom(pending.windowName, dockspace_id,
+                std::min(pending.scopeCountAtAdd, scopedParameters.size())))
             {
                 pendingDockWindows.erase(pendingDockWindows.begin());
-                dockMaintenancePending = true;
+                topologyChanged = true;
+                ImGui::DockBuilderFinish(dockspace_id);
             }
         }
 
-        ImGuiDockNode* dockRootNode = ImGui::DockBuilderGetNode(dockspace_id);
-
-        // Take a dock-tree snapshot only when an interaction begins. Comparing
-        // it on release detects split/dock changes without an O(N) tree walk in
-        // steady-state frames.
-        if(mouseDown
-            && !scopeInteractionInProgress
-            && ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows))
+        // Wait for queued additions before enforcing containment; their first
+        // Begin() also needs a chance to restore a saved DockId.
+        if(pendingDockWindows.empty())
         {
-            scopeInteractionInProgress = true;
-            scopeWindowRectChangedDuringInteraction = false;
-            dockLayoutSignatureAtInteractionStart = GetDockLayoutSignature(dockRootNode);
-        }
-
-        ImVec2 currentPos = ImGui::GetWindowPos();
-        ImVec2 currentSize = ImGui::GetWindowSize();
-        
-        if(lastWindowConfig.hasConfig){
-            bool posChanged = (currentPos.x != lastWindowConfig.posX || currentPos.y != lastWindowConfig.posY);
-            bool sizeChanged = (currentSize.x != lastWindowConfig.width || currentSize.y != lastWindowConfig.height);
-            
-            // Proportional dock layout rescaling.
-            // When the Scopes window is resized, walk the dock-tree and rewrite
-            // each split node's SizeRef so the children keep their share of the
-            // parent. Without this, ImGui keeps one child at its absolute pixel
-            // size and dumps all extra/missing space onto the other child.
-            if(sizeChanged){
-                ImGuiDockNode* rootNode = ImGui::DockBuilderGetNode(dockspace_id);
-                if(rootNode != NULL){
-                    ImVec2 oldSize(lastWindowConfig.width, lastWindowConfig.height);
-                    ImVec2 newSize = currentSize;
-                    RescaleDockNodeProportional(rootNode, oldSize, newSize);
-                }
-            }
-            
-            if(posChanged || sizeChanged){
-                if(scopeInteractionInProgress)
-                {
-                    scopeWindowRectChangedDuringInteraction = true;
-                }
-            }
-        }
-        
-        // Update last window config for next frame
-        lastWindowConfig.hasConfig = true;
-        lastWindowConfig.posX = currentPos.x;
-        lastWindowConfig.posY = currentPos.y;
-        lastWindowConfig.width = currentSize.x;
-        lastWindowConfig.height = currentSize.y;
-        
-        ImGui::End();
-
-        for(int i = 0; i < scopedParameters.size(); i++)
-        {
-            auto &p = scopedParameters[i];
-            
-            const std::string& windowName = p.windowName;
-
-            bool open = true;
-            
-            // We want them to be dockable within the class, but not become floating windows outside the main app.
-            // ImGuiDockNodeFlags_NoUndocking prevents them from being moved AT ALL once docked.
-            // Instead, we rely on DockingAlwaysTabBar and DockingAllowUnclassed=false to keep them contained.
-            // To prevent floating, we can use ImGuiWindowFlags_NoMove on the window itself, but that might prevent dragging tabs.
-            // Actually, ImGui handles this: if DockingAllowUnclassed is false, it can only dock into nodes of the same class.
-            // If we want to prevent it from being dragged outside to become a floating window, we can set DockingAlwaysTabBar.
-            window_class.DockingAlwaysTabBar = false;
-            window_class.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_None; // Remove NoUndocking so they can be rearranged
-            
-            ImGui::SetNextWindowClass(&window_class);
-            
-            // Guide first-time windows into the dockspace initially.
-            ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
-
-            if(ImGui::Begin(windowName.c_str(), &open, focusFlags))
+            for(const auto& item : scopedParameters)
             {
-                if(mouseDown
-                    && !scopeInteractionInProgress
-                    && ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows))
-                {
-                    scopeInteractionInProgress = true;
-                    scopeWindowRectChangedDuringInteraction = false;
-                    dockLayoutSignatureAtInteractionStart = GetDockLayoutSignature(
-                        ImGui::DockBuilderGetNode(dockspace_id)
-                    );
-                }
+                ImGuiWindow* window = ImGui::FindWindowByName(item.windowName.c_str());
+                if(window == NULL || IsScopeWindowContained(window, dockspace_id)) continue;
 
-                ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(p.color*0.75f));
-                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(p.color*0.75f));
-                ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(p.color*0.75f));
-                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-                ImGui::PushStyleColor(ImGuiCol_Border, OceanodeColors::TransparentButton);
-                
-                drawParameter(p.parameter, ImGui::GetContentRegionAvail(), p.renderer);
-                
-                ImGui::PopStyleColor(5);
-            }
-            ImGui::End();
+                // SetWindowDock() can leave a valid destination awaiting Begin().
+                // Preserve that assignment rather than adding another split.
+                ImGuiDockNode* destination = ImGui::DockBuilderGetNode(window->DockId);
+                if(window->DockNode == NULL && destination != NULL
+                    && ImGui::DockNodeGetRootNode(destination)->ID == dockspace_id) continue;
 
-            if(!open)
-            {
-                ofxOceanodeScope::getInstance()->removeParameter(p.parameter);
-                i--; // Adjust index since we removed an element
+                ReturnScopeWindowToTop(window, dockspace_id, scopedParameters.size());
+                RefreshScopeCentralNode(dockspace_id);
+                ImGui::DockBuilderFinish(dockspace_id);
+                topologyChanged = true;
             }
-            else if(runDockMaintenance)
-            {
-                // After the window has been drawn, check if it ended up floating outside
-                // the Scopes dockspace. If so (and the user is not actively dragging it),
-                // force it back into the Scopes dockspace for the next frame.
-                // We use the internal SetWindowDock() directly rather than SetNextWindowDockID()
-                // to avoid racing with ImGui's own drag-and-drop docking requests.
-                ImGuiWindow* scopeWindow = ImGui::FindWindowByName(windowName.c_str());
-                if(scopeWindow)
-                {
-                    bool isFloatingOutsideScopes = false;
-                    if (scopeWindow->DockNode == NULL)
-                    {
-                        isFloatingOutsideScopes = true;
-                    }
-                    else
-                    {
-                        ImGuiDockNode* rootNode = ImGui::DockNodeGetRootNode(scopeWindow->DockNode);
-                        if (rootNode->ID != dockspace_id)
-                        {
-                            isFloatingOutsideScopes = true;
-                        }
-                    }
-                    
-                    if (isFloatingOutsideScopes)
-                    {
-                        ReturnScopeWindowToTop(
-                            scopeWindow,
-                            dockspace_id,
-                            scopedParameters.size()
-                        );
-                    }
-                }
-            }
-        }
 
-        // ImGui deliberately keeps the central dock node alive when its last
-        // window is dragged elsewhere. For the Scopes dockspace that leaves a
-        // permanent patch of empty background. Once the drag has finished,
-        // move the first remaining visible scope in spatial reading order into
-        // the empty central node: top to bottom, and left to right within each
-        // row. Moving a single-window non-central leaf makes ImGui merge that
-        // leaf with its sibling automatically.
-        if(runDockMaintenance)
-        {
-            ImGuiDockNode* rootNode = ImGui::DockBuilderGetNode(dockspace_id);
-            ImGuiDockNode* centralNode = rootNode != NULL ? rootNode->CentralNode : NULL;
-            ImGuiWindow* centralScopeWindow = FindCurrentScopeWindowInNode(
-                scopedParameters,
-                centralNode
-            );
-
-            if(centralScopeWindow != NULL)
+            ImGuiDockNode* root = ImGui::DockBuilderGetNode(dockspace_id);
+            ImGuiDockNode* central = RefreshScopeCentralNode(dockspace_id);
+            ImGuiWindow* centralWindow = FindCurrentScopeWindowInNode(scopedParameters, central);
+            if(centralWindow != NULL)
             {
-                lastCentralScopeWindowID = centralScopeWindow->ID;
+                lastCentralScopeWindowID = centralWindow->ID;
             }
-            else if(
-                centralNode != NULL
-                && centralNode->IsLeafNode()
-                && !scopedParameters.empty()
-                && !IsScopeWindowPendingDock(scopedParameters, centralNode->ID)
-            )
+            else if(central != NULL && central->IsLeafNode() && central->Windows.empty())
             {
+                // A central node survives when its last tab moves away. Fill it
+                // using the first remaining scope in spatial reading order.
                 ImGuiWindow* donor = FindScopeWindowToFillCentralNode(
-                    scopedParameters,
-                    rootNode,
-                    lastCentralScopeWindowID
-                );
-
-                // If the remembered central window is the only available
-                // candidate, filling the hole is preferable to leaving it.
-                if(donor == NULL)
-                {
-                    donor = FindScopeWindowToFillCentralNode(
-                        scopedParameters,
-                        rootNode,
-                        0
-                    );
-                }
-
+                    scopedParameters, root, lastCentralScopeWindowID);
+                if(donor == NULL) donor = FindScopeWindowToFillCentralNode(scopedParameters, root, 0);
                 if(donor != NULL)
                 {
-                    const ImGuiID donorWindowID = donor->ID;
-
-                    // Removing a single-window donor may merge its old node
-                    // and invalidate the previous central-node pointer/ID.
-                    // Undock first, then reacquire the central node before
-                    // assigning the new dock destination.
                     ImGui::DockContextProcessUndockWindow(GImGui, donor, true);
-                    rootNode = ImGui::DockBuilderGetNode(dockspace_id);
-                    centralNode = rootNode != NULL ? rootNode->CentralNode : NULL;
-                    if(centralNode != NULL)
+                    central = RefreshScopeCentralNode(dockspace_id);
+                    if(central != NULL)
                     {
-                        ImGui::SetWindowDock(donor, centralNode->ID, ImGuiCond_Always);
-                        lastCentralScopeWindowID = donorWindowID;
+                        ImGui::SetWindowDock(donor, central->ID, ImGuiCond_Always);
+                        lastCentralScopeWindowID = donor->ID;
                     }
+                    ImGui::DockBuilderFinish(dockspace_id);
+                    topologyChanged = true;
                 }
-            }
-
-            dockMaintenancePending = false;
-
-            if(scopeInteractionInProgress)
-            {
-                const unsigned long long currentSignature = GetDockLayoutSignature(
-                    ImGui::DockBuilderGetNode(dockspace_id)
-                );
-                if(scopeWindowRectChangedDuringInteraction
-                    || currentSignature != dockLayoutSignatureAtInteractionStart)
-                {
-                    notifyScopeChanged();
-                }
-
-                scopeInteractionInProgress = false;
-                scopeWindowRectChangedDuringInteraction = false;
             }
         }
     }
+
+    const ImVec2 currentPos = ImGui::GetWindowPos();
+    const ImVec2 currentSize = ImGui::GetWindowSize();
+    // Resize the existing tree before ImGui calculates this frame's layout.
+    // Use content dimensions, excluding the outer container's title/padding.
+    if(lastWindowConfig.hasConfig
+        && (currentSize.x != lastWindowConfig.width || currentSize.y != lastWindowConfig.height))
+    {
+        ImGuiDockNode* root = ImGui::DockBuilderGetNode(dockspace_id);
+        if(root != NULL)
+        {
+            const ImVec2 available = ImGui::GetContentRegionAvail();
+            RescaleDockNodeProportional(root, root->Size,
+                ImVec2(std::max(available.x, 4.0f), std::max(available.y, 4.0f)));
+        }
+    }
+    lastWindowConfig.hasConfig = true;
+    lastWindowConfig.posX = currentPos.x;
+    lastWindowConfig.posY = currentPos.y;
+    lastWindowConfig.width = currentSize.x;
+    lastWindowConfig.height = currentSize.y;
+
+    ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None, &window_class);
+    ImGui::End();
+
+    for(int i = 0; i < scopedParameters.size(); i++)
+    {
+        auto& p = scopedParameters[i];
+        bool open = true;
+        // Classes restrict destinations; floating during a drag is permitted.
+        // The idle maintenance phase returns scopes released outside Scopes.
+        ImGui::SetNextWindowClass(&window_class);
+        ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
+        if(ImGui::Begin(p.windowName.c_str(), &open, focusFlags))
+        {
+            ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(p.color*0.75f));
+            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(p.color*0.75f));
+            ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(p.color*0.75f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            ImGui::PushStyleColor(ImGuiCol_Border, OceanodeColors::TransparentButton);
+            drawParameter(p.parameter, ImGui::GetContentRegionAvail(), p.renderer);
+            ImGui::PopStyleColor(5);
+        }
+        ImGui::End();
+        if(!open)
+        {
+            removeParameter(p.parameter);
+            topologyChanged = true;
+            i--;
+        }
+    }
+
+    // Observe only here: drawing may have just queued a new drop. Never edit its
+    // source/destination nodes, and require another idle frame after any repair.
+    bool settled = canMaintainDocking && !IsScopeDockingBusy() && !topologyChanged
+        && pendingDockWindows.empty();
+    for(const auto& item : scopedParameters)
+    {
+        if(!IsScopeWindowContained(ImGui::FindWindowByName(item.windowName.c_str()), dockspace_id))
+            settled = false;
+    }
+    ImGuiDockNode* root = ImGui::DockBuilderGetNode(dockspace_id);
+    ImGuiDockNode* central = FindLiveScopeCentralNode(root);
+    if(!scopedParameters.empty() && FindCurrentScopeWindowInNode(scopedParameters, central) == NULL)
+        settled = false;
+
+    if(settled)
+    {
+        const unsigned long long signature = GetDockLayoutSignature(root);
+        if(signature != lastSettledDockLayoutSignature
+            && (dockMaintenancePending || lastSettledDockLayoutSignature != 0))
+            notifyScopeChanged();
+        lastSettledDockLayoutSignature = signature;
+    }
+    dockMaintenancePending = !settled;
 }
 
 bool ofxOceanodeScope::addParameter(
@@ -723,7 +650,7 @@ bool ofxOceanodeScope::addParameter(
     p->setScoped(true);
 
     // DockBuilder may not exist at add time. Queue one cold-path action for
-    // the next draw, where the dockspace is guaranteed to have been submitted.
+    // the next idle draw, before the dockspace is submitted.
     if(!isLoadingFromPreset)
     {
         PendingDockWindow pending;
@@ -808,8 +735,7 @@ void ofxOceanodeScope::clearScopedParameters() {
     pendingDockWindows.clear();
     lastCentralScopeWindowID = 0;
     dockMaintenancePending = true;
-    scopeInteractionInProgress = false;
-    scopeWindowRectChangedDuringInteraction = false;
+    lastSettledDockLayoutSignature = 0;
 }
 
 ofxOceanodeScopeWindowConfig ofxOceanodeScope::getWindowConfig() const {

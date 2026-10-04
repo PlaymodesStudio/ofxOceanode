@@ -161,9 +161,7 @@ private:
     void notifyScopeChanged();
     unsigned int lastCentralScopeWindowID = 0;
     bool dockMaintenancePending = true;
-    bool scopeInteractionInProgress = false;
-    bool scopeWindowRectChangedDuringInteraction = false;
-    unsigned long long dockLayoutSignatureAtInteractionStart = 0;
+    unsigned long long lastSettledDockLayoutSignature = 0;
     
     bool isLoadingFromPreset = false;
 };
