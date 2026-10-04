@@ -37,7 +37,8 @@ ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
 
 bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget, float zoomLevel){
     string moduleName = getParameters().getName();
-    const bool renderWidgets = (zoomLevel > 0.5f);
+    const bool renderGui = (zoomLevel > 0.5f) ||
+        (node.getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_KeepGuiVisibleAtLowZoom);
 	
 	bool isTransparent = (node.getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
 
@@ -108,7 +109,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         auto startPos = ImGui::GetCursorScreenPos();
         float cursorYBefore = ImGui::GetCursorPosY();
         
-        if(renderWidgets){
+        if(renderGui){
         
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
@@ -734,7 +735,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         }
         
         } else {
-            // zoom ≤ 0.5f: skip all parameter widgets, render single Dummy to preserve node size
+            // Ordinary nodes at zoom ≤ 0.5f: reserve their cached layout without widgets.
             if(cachedContentHeight > 0.0f){
                 ImGui::Dummy(ImVec2(nodeWidthText + nodeWidthWidget, cachedContentHeight * zoomLevel));
                 // Distribute pin Y positions evenly across the dummy area so connections
@@ -747,7 +748,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                     outputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + yPos);
                 }
             }
-        } // end if(renderWidgets)
+        } // end if(renderGui)
     }
 	else
 	{

@@ -23,7 +23,9 @@ enum ofxOceanodeNodeModelFlags_
     ofxOceanodeNodeModelFlags_WaitForFrame      = 1 << 0,   //
     ofxOceanodeNodeModelFlags_FrameDone         = 1 << 1,   //
     ofxOceanodeNodeModelFlags_ForceFrameMode    = 1 << 2,
-	ofxOceanodeNodeModelFlags_TransparentNode   = 1 << 3    //
+	ofxOceanodeNodeModelFlags_TransparentNode   = 1 << 3,   //
+    // Visual nodes keep their GUI/layout at low zoom and handle text visibility themselves.
+    ofxOceanodeNodeModelFlags_KeepGuiVisibleAtLowZoom = 1 << 4
 
 };
 
