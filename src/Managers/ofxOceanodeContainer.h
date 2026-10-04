@@ -161,10 +161,20 @@ public:
     void setBpm(float _bpm);
     void resetPhase(bool notifyTransport = true);
     std::shared_ptr<ofxOceanodeTransport> getTransport() const { return transport; }
+    // The root container creates the shared transport (and the timeline).
+    bool isTransportOwner() const { return transportOwner; }
     ofxOceanodeTransportState getTransportState() const;
     ofxOceanodeFrameTransportState getFrameTransportState() const;
-    ofxOceanodeTimelineManager& getTimelineManager(){ return *timelineManager; }
-    const ofxOceanodeTimelineManager& getTimelineManager() const { return *timelineManager; }
+    // There is a single timeline, owned by the root container. Macro
+    // containers forward to their host, so every node sees the same one.
+    ofxOceanodeTimelineManager& getTimelineManager();
+    const ofxOceanodeTimelineManager& getTimelineManager() const;
+    void setTimelineHost(ofxOceanodeContainer* host){ timelineHost = host; }
+    // Timeline binding paths name the canvas too ("Macro 1 / Macro 2::Node/param"),
+    // so the root timeline can reach parameters inside macros. Root-level
+    // parameters keep the plain "Node/param" form.
+    std::string getTimelineParameterPath(ofxOceanodeAbstractParameter& parameter) const;
+    ofxOceanodeAbstractParameter* findTimelineParameter(const std::string& parameterPath) const;
 	
 	// Node encapsulation functionality
 	void encapsulateSelectedNodes(const string& macroName = "Encapsulated");
@@ -341,8 +351,10 @@ private:
     ofParameter<glm::mat4> transformationMatrix;
     float bpm;
     float phase;
+    bool transportOwner = false;
     std::shared_ptr<ofxOceanodeTransport> transport;
     std::unique_ptr<ofxOceanodeTimelineManager> timelineManager;
+    ofxOceanodeContainer* timelineHost = nullptr;
     
 #ifdef OFXOCEANODE_USE_MIDI
     std::unique_ptr<ofxOceanodeMidiClock> midiClockSync;

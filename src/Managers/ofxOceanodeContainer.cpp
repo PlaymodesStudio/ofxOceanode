@@ -96,12 +96,15 @@ namespace {
 ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _registry, shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry, shared_ptr<ofxOceanodeTransport> _transport) : registry(_registry), typesRegistry(_typesRegistry), transport(_transport){
     if(registry == nullptr) registry = make_shared<ofxOceanodeNodeRegistry>();
     if(typesRegistry == nullptr) typesRegistry = make_shared<ofxOceanodeTypesRegistry>();
+    transportOwner = transport == nullptr;
 #ifdef OFXOCEANODE_USE_MIDI
     // Only the root container (the one that creates the transport) owns the clock sync.
-    if(transport == nullptr) midiClockSync = std::make_unique<ofxOceanodeMidiClock>();
+    if(transportOwner) midiClockSync = std::make_unique<ofxOceanodeMidiClock>();
 #endif
-    if(transport == nullptr) transport = make_shared<ofxOceanodeTransport>();
-    timelineManager = std::make_unique<ofxOceanodeTimelineManager>(this);
+    if(transportOwner) transport = make_shared<ofxOceanodeTransport>();
+    // There is one timeline: the root's. Macro containers forward to it
+    // (see setTimelineHost / getTimelineManager).
+    if(transportOwner) timelineManager = std::make_unique<ofxOceanodeTimelineManager>(this);
     transformationMatrix = glm::mat4(1.0);
     bpm = 120;
     phase = 0;
@@ -2343,6 +2346,70 @@ std::string ofxOceanodeContainer::getCustomGuiParameterPath(ofxOceanodeAbstractP
             : model->getParameterGroup().getEscapedName() + "/" + parameter.getEscapedName();
     customGuiParameterPathCache[&parameter] = path;
     return path;
+}
+
+namespace {
+const char* const kTimelineCanvasSeparator = "::";
+bool isRootCanvasID(const std::string& canvasID){
+    return canvasID.empty() || canvasID == "Canvas" || canvasID == "0";
+}
+}
+
+ofxOceanodeTimelineManager& ofxOceanodeContainer::getTimelineManager()
+{
+    if(timelineManager != nullptr) return *timelineManager;
+    if(timelineHost != nullptr) return timelineHost->getTimelineManager();
+    // A detached container (no host given): give it a timeline of its own
+    // rather than crash. Normal patches never get here.
+    timelineManager = std::make_unique<ofxOceanodeTimelineManager>(this);
+    return *timelineManager;
+}
+
+const ofxOceanodeTimelineManager& ofxOceanodeContainer::getTimelineManager() const
+{
+    return const_cast<ofxOceanodeContainer*>(this)->getTimelineManager();
+}
+
+std::string ofxOceanodeContainer::getTimelineParameterPath(ofxOceanodeAbstractParameter& parameter) const
+{
+    auto* model = parameter.getNodeModel();
+    const std::string local = (model == nullptr)
+        ? parameter.getEscapedName()
+        : model->getParameterGroup().getEscapedName() + "/" + parameter.getEscapedName();
+    const std::string canvasID = model == nullptr ? std::string() : model->getParents();
+    if(isRootCanvasID(canvasID)) return local;
+    return canvasID + kTimelineCanvasSeparator + local;
+}
+
+ofxOceanodeAbstractParameter* ofxOceanodeContainer::findTimelineParameter(const std::string& parameterPath) const
+{
+    const size_t separator = parameterPath.find(kTimelineCanvasSeparator);
+    if(separator == std::string::npos) return findCustomGuiParameter(parameterPath);
+    const std::string canvasID = parameterPath.substr(0, separator);
+    const std::string local = parameterPath.substr(separator + std::char_traits<char>::length(kTimelineCanvasSeparator));
+    if(isRootCanvasID(canvasID)) return findCustomGuiParameter(local);
+    // Walk down the macro levels. Unlike getContainerForCanvasID this neither
+    // falls back to the root nor logs: a binding to a deleted macro is simply
+    // missing (and it is looked up every frame).
+    const std::vector<std::string> levels = ofSplitString(canvasID, " / ");
+    ofxOceanodeContainer* current = const_cast<ofxOceanodeContainer*>(this);
+    std::string accumulated;
+    for(size_t i = 0; i < levels.size(); ++i) {
+        accumulated = i == 0 ? levels[i] : accumulated + " / " + levels[i];
+        ofxOceanodeContainer* next = nullptr;
+        for(auto* node : current->getAllModules()) {
+            if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
+                auto macroContainer = macro->getContainer();
+                if(macroContainer != nullptr && macroContainer->getCanvasID() == accumulated) {
+                    next = macroContainer.get();
+                    break;
+                }
+            }
+        }
+        if(next == nullptr) return nullptr;
+        current = next;
+    }
+    return current->findCustomGuiParameter(local);
 }
 
 ofxOceanodeAbstractParameter* ofxOceanodeContainer::findCustomGuiParameter(const std::string& parameterPath) const

@@ -609,6 +609,7 @@ void ofxOceanodeTimelineController::draw() {
     float& timelineScrollX = viewState.scrollX;
     auto transportState = container->getTransportState();
     auto transport = container->getTransport();
+    const bool externalClock = transport != nullptr && transport->hasExternalClock();
     effectiveRulerSnapBeats = adaptiveSnapDivision(rulerSnapBeats,
                                                    timeline.getBeatsPerBar(),
                                                    transportState.bpm,
@@ -767,7 +768,6 @@ void ofxOceanodeTimelineController::draw() {
     // ---- Row 1: transport | position | tempo | meter | sync ----
     if(transport != nullptr) {
         // Following an external clock: position, play state and tempo come from it.
-        const bool externalClock = transport->hasExternalClock();
         const char* lockedTip = "Following an external clock";
         if(iconButton("##tbToStart", ToolIcon::ToStart, externalClock ? lockedTip : "Back to the start", false, 0, !externalClock))
             transport->seekToBeat(0.0);
@@ -963,10 +963,15 @@ void ofxOceanodeTimelineController::draw() {
     // ---- Row 2: loop | grid | view | output timing | tracks ----
     {
         bool loopEnabled = timeline.isLoopEnabled();
-        if(iconButton("##tbLoop", ToolIcon::Loop, loopEnabled ? "Loop on" : "Loop off", loopEnabled, IM_COL32(120, 135, 240, 255)))
+        const bool localLoopAvailable = !externalClock;
+        const char* loopTip = localLoopAvailable ? (loopEnabled ? "Loop on" : "Loop off")
+            : "Local loop unavailable while following an external clock";
+        if(iconButton("##tbLoop", ToolIcon::Loop, loopTip,
+                      loopEnabled && localLoopAvailable,
+                      IM_COL32(120, 135, 240, 255), localLoopAvailable))
             timeline.setLoopEnabled(!loopEnabled);
         ImGui::SameLine(0.0f, 4.0f);
-        ImGui::BeginDisabled(!loopEnabled);
+        ImGui::BeginDisabled(!loopEnabled || !localLoopAvailable);
         double loopStart = timeline.getLoopStartBeat();
         double loopEnd = timeline.getLoopEndBeat();
         ImGui::SetNextItemWidth(56.0f);
@@ -2316,7 +2321,7 @@ void ofxOceanodeTimelineController::draw() {
                         }
                         {
                             const auto* pitchMember = timeline.getBinding(track.id, groupMembers.front());
-                            auto* canvasParameter = pitchMember == nullptr ? nullptr : container->findCustomGuiParameter(pitchMember->parameterPath);
+                            auto* canvasParameter = pitchMember == nullptr ? nullptr : container->findTimelineParameter(pitchMember->parameterPath);
                             if(ImGui::MenuItem("Show in Canvas", nullptr, false, canvasParameter != nullptr) && canvasParameter != nullptr)
                                 container->showParameterInCanvas(*canvasParameter);
                         }
@@ -2513,7 +2518,7 @@ void ofxOceanodeTimelineController::draw() {
                 if(ImGui::BeginPopup(bindingMenuId.c_str())) {
                     {
                         // Same as the Custom GUI's "Show in Canvas": select the owning node and centre on it.
-                        auto* boundParameter = container->findCustomGuiParameter(binding.parameterPath);
+                        auto* boundParameter = container->findTimelineParameter(binding.parameterPath);
                         if(ImGui::MenuItem("Show in Canvas", nullptr, false, boundParameter != nullptr) && boundParameter != nullptr)
                             container->showParameterInCanvas(*boundParameter);
                         ImGui::Separator();
@@ -4161,12 +4166,12 @@ void ofxOceanodeTimelineController::drawLfoEditor(ofxOceanodeTimelineManager& ti
                 if(ImGui::Selectable(compactParameterName(binding.parameterPath).c_str(), selected)) {
                     clip.lfoOutputBindingId = binding.id;
                     if(binding.valueType == typeid(float).name()) {
-                        if(auto* parameter = container->findCustomGuiParameter(binding.parameterPath)) {
+                        if(auto* parameter = container->findTimelineParameter(binding.parameterPath)) {
                             clip.lfoOutputMin = parameter->cast<float>().getParameter().getMin();
                             clip.lfoOutputMax = parameter->cast<float>().getParameter().getMax();
                         }
                     } else if(binding.valueType == typeid(int).name()) {
-                        if(auto* parameter = container->findCustomGuiParameter(binding.parameterPath)) {
+                        if(auto* parameter = container->findTimelineParameter(binding.parameterPath)) {
                             clip.lfoOutputMin = static_cast<float>(parameter->cast<int>().getParameter().getMin());
                             clip.lfoOutputMax = static_cast<float>(parameter->cast<int>().getParameter().getMax());
                         }
@@ -6189,14 +6194,18 @@ void ofxOceanodeTimelineController::openNoteGroupSetup(ofxOceanodeTimelineManage
                            [&](const auto& c) { return c.parameter == parameter.get(); })) continue;
             NoteRoleCandidate candidate;
             candidate.parameter = parameter.get();
-            candidate.path = container->getCustomGuiParameterPath(*parameter);
+            candidate.path = container->getTimelineParameterPath(*parameter);
             candidate.label = group.getName() + " / " + parameter->getName();
             candidate.sameNode = sameNode;
             noteSetupCandidates.push_back(candidate);
         }
     };
     if(sourceModel != nullptr) addFromGroup(sourceModel->getParameterGroup(), true);
-    for(auto* node : container->getAllModules()) {
+    // "Every node" means the nodes beside the source (it may sit in a macro).
+    ofxOceanodeContainer* candidateContainer = container.get();
+    if(sourceModel != nullptr && sourceModel->getHostContainer() != nullptr)
+        candidateContainer = sourceModel->getHostContainer();
+    for(auto* node : candidateContainer->getAllModules()) {
         if(node == nullptr) continue;
         addFromGroup(node->getParameters(), false);
     }
@@ -6216,7 +6225,7 @@ void ofxOceanodeTimelineController::openNoteGroupSetup(ofxOceanodeTimelineManage
         // New group: the clicked parameter takes the role its name suggests
         // (pitch if it suggests none); its node's other parameters fill the rest.
         if(source != nullptr) {
-            const std::string sourcePath = container->getCustomGuiParameterPath(*source);
+            const std::string sourcePath = container->getTimelineParameterPath(*source);
             const int sourceRole = guessNoteRole(source->getName());
             noteSetupRolePaths[sourceRole < 0 ? 0 : sourceRole] = sourcePath;
             for(const auto& candidate : noteSetupCandidates) {
@@ -6230,7 +6239,7 @@ void ofxOceanodeTimelineController::openNoteGroupSetup(ofxOceanodeTimelineManage
         noteSetupName[sizeof(noteSetupName) - 1] = '\0';
         // Default to a track where the clicked parameter already is, else a new track.
         if(noteSetupTrackId.empty() && source != nullptr) {
-            const std::string sourcePath = container->getCustomGuiParameterPath(*source);
+            const std::string sourcePath = container->getTimelineParameterPath(*source);
             for(const auto& track : timeline.getTracks()) {
                 if(track.isWaveTrack) continue;
                 if(std::any_of(track.bindings.begin(), track.bindings.end(),
@@ -6329,7 +6338,7 @@ void ofxOceanodeTimelineController::drawNoteGroupSetupPopup(ofxOceanodeTimelineM
             ofxOceanodeAbstractParameter* parameter = nullptr;
             for(const auto& candidate : noteSetupCandidates)
                 if(candidate.path == path) parameter = candidate.parameter;
-            if(parameter == nullptr) parameter = container->findCustomGuiParameter(path);
+            if(parameter == nullptr) parameter = container->findTimelineParameter(path);
             if(parameter != nullptr) roleIds[role] = timeline.addBinding(trackId, *parameter);
         }
         if(editing) {
@@ -6479,7 +6488,7 @@ void ofxOceanodeTimelineController::drawClipPopup(ofxOceanodeTimelineManager& ti
             // A piano roll plays several parameters: pick them (this row's
             // parameter is the starting point), then the group row is made.
             const auto* binding = timeline.getBinding(pendingTrackId, pendingClipBindingId);
-            auto* source = binding == nullptr ? nullptr : container->findCustomGuiParameter(binding->parameterPath);
+            auto* source = binding == nullptr ? nullptr : container->findTimelineParameter(binding->parameterPath);
             openNoteGroupSetup(timeline, source, pendingTrackId, std::string(), startBeat, durationBeats);
             if(source == nullptr && binding != nullptr) noteSetupRolePaths[0] = binding->parameterPath;
             if(pendingClipName[0] != '\0') {
@@ -6506,7 +6515,7 @@ void ofxOceanodeTimelineController::drawClipPopup(ofxOceanodeTimelineManager& ti
                     if(laneType != ofxOceanodeTimelineLaneType::PianoRoll &&
                        laneType != ofxOceanodeTimelineLaneType::MultiGate &&
                        laneType != ofxOceanodeTimelineLaneType::Wave) {
-                        if(auto* parameter = container->findCustomGuiParameter(binding->parameterPath)) {
+                        if(auto* parameter = container->findTimelineParameter(binding->parameterPath)) {
                             if(binding->valueType == typeid(float).name()) {
                                 lane->valueMin = parameter->cast<float>().getParameter().getMin();
                                 lane->valueMax = parameter->cast<float>().getParameter().getMax();

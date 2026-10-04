@@ -1467,7 +1467,7 @@ std::string ofxOceanodeTimelineManager::addBinding(const std::string& trackId,
     auto* track = getTrack(trackId);
     if(track == nullptr || track->isWaveTrack || container == nullptr || !isStepLaneCompatible(parameter)) return std::string();
 
-    const std::string path = container->getCustomGuiParameterPath(parameter);
+    const std::string path = container->getTimelineParameterPath(parameter);
     // A parameter may be published to several tracks. Each track owns an
     // independent binding (and blend mode), while duplicate bindings inside
     // one track would only create ambiguous rows and are therefore rejected.
@@ -1499,7 +1499,7 @@ std::string ofxOceanodeTimelineManager::addBinding(const std::string& trackId,
 
 bool ofxOceanodeTimelineManager::isParameterBound(const ofxOceanodeAbstractParameter& parameter) const {
     if(container == nullptr) return false;
-    const std::string path = container->getCustomGuiParameterPath(const_cast<ofxOceanodeAbstractParameter&>(parameter));
+    const std::string path = container->getTimelineParameterPath(const_cast<ofxOceanodeAbstractParameter&>(parameter));
     for(const auto& track : tracks) {
         if(std::any_of(track.bindings.begin(), track.bindings.end(), [&](const auto& binding){
             return binding.parameterPath == path;
@@ -1510,7 +1510,7 @@ bool ofxOceanodeTimelineManager::isParameterBound(const ofxOceanodeAbstractParam
 
 bool ofxOceanodeTimelineManager::getParameterTrackColor(const ofxOceanodeAbstractParameter& parameter, ofColor& color) const {
     if(container == nullptr) return false;
-    const std::string path = container->getCustomGuiParameterPath(const_cast<ofxOceanodeAbstractParameter&>(parameter));
+    const std::string path = container->getTimelineParameterPath(const_cast<ofxOceanodeAbstractParameter&>(parameter));
     for(const auto& track : tracks) {
         if(std::any_of(track.bindings.begin(), track.bindings.end(), [&](const auto& binding){
             return binding.parameterPath == path;
@@ -1723,7 +1723,7 @@ std::string ofxOceanodeTimelineManager::createNoteGroupClip(const std::string& t
         lane->pianoLowPitch = 36;
         lane->pianoHighPitch = 84;
         if(const auto* pitchBinding = getBinding(trackId, group.pitchBindingId)) {
-            if(auto* parameter = container == nullptr ? nullptr : container->findCustomGuiParameter(pitchBinding->parameterPath)) {
+            if(auto* parameter = container == nullptr ? nullptr : container->findTimelineParameter(pitchBinding->parameterPath)) {
                 float minimum = 0.0f, maximum = 0.0f;
                 bool numeric = true;
                 if(pitchBinding->valueType == typeid(float).name()) {
@@ -1827,7 +1827,7 @@ std::string ofxOceanodeTimelineManager::createLfoClip(const std::string& trackId
     clip->lfoOutputBindingId = outputBindingId;
     if(const auto* binding = getBinding(trackId, outputBindingId)) {
         if(container != nullptr) {
-            if(auto* parameter = container->findCustomGuiParameter(binding->parameterPath)) {
+            if(auto* parameter = container->findTimelineParameter(binding->parameterPath)) {
                 if(binding->valueType == typeid(float).name()) {
                     clip->lfoOutputMin = parameter->cast<float>().getParameter().getMin();
                     clip->lfoOutputMax = parameter->cast<float>().getParameter().getMax();
@@ -2870,6 +2870,25 @@ const ofxOceanodeTimelineMarker* ofxOceanodeTimelineManager::getMarker(const std
     return nullptr;
 }
 
+void ofxOceanodeTimelineManager::syncLoopToTransport() {
+    if(container == nullptr) return;
+    const auto transport = container->getTransport();
+    if(transport == nullptr) return;
+    // An external clock owns position and looping. Preserve the timeline's
+    // local setting so it can resume when sync is released, but do not apply
+    // it while the external source is in control.
+    transport->setLoop(!transport->hasExternalClock() && loopEnabled,
+                       loopStartBeat, loopEndBeat);
+}
+
+void ofxOceanodeTimelineManager::setLoopEnabled(bool enabled) {
+    if(loopEnabled == enabled) return;
+    loopEnabled = enabled;
+    hasEvaluatedTransportBeat = false;
+    invalidateSchedule();
+    syncLoopToTransport();
+}
+
 void ofxOceanodeTimelineManager::setLoopRange(double startBeat, double endBeat) {
     const double minimumLength = 1.0 / 24.0;
     loopStartBeat = std::max(0.0, std::min(startBeat, endBeat - minimumLength));
@@ -2877,6 +2896,7 @@ void ofxOceanodeTimelineManager::setLoopRange(double startBeat, double endBeat) 
     hasEvaluatedTransportBeat = false;
     // Events past the old boundary belong to a loop that no longer exists.
     invalidateSchedule();
+    syncLoopToTransport();
 }
 
 void ofxOceanodeTimelineManager::update() {
@@ -2898,10 +2918,10 @@ void ofxOceanodeTimelineManager::endParameterCache() {
 
 ofxOceanodeAbstractParameter* ofxOceanodeTimelineManager::findParameterCached(const std::string& path) const {
     if(container == nullptr) return nullptr;
-    if(!parameterCacheActive) return container->findCustomGuiParameter(path);
+    if(!parameterCacheActive) return container->findTimelineParameter(path);
     const auto it = parameterCache.find(path);
     if(it != parameterCache.end()) return it->second;
-    auto* parameter = container->findCustomGuiParameter(path);
+    auto* parameter = container->findTimelineParameter(path);
     parameterCache.emplace(path, parameter);
     return parameter;
 }
@@ -3209,6 +3229,7 @@ void ofxOceanodeTimelineManager::evaluateAutomation() {
 
     // The transport owns the loop (it wraps exactly at the loop end, keeping
     // the overshoot). Hand it the range; an external clock owns looping itself.
+    // There is a single timeline (the root's), so it alone sets the loop.
     if(auto ownerTransport = container->getTransport()) {
         ownerTransport->setLoop(!externalClock && loopEnabled, loopStartBeat, loopEndBeat);
         transport = container->getTransportState();
@@ -3825,7 +3846,7 @@ void ofxOceanodeTimelineManager::clearLiveOverride(const std::string& trackId, c
 void ofxOceanodeTimelineManager::clearTimelineFlag(const ofxOceanodeTimelineTrack& track) {
     if(container == nullptr) return;
     for(const auto& binding : track.bindings) {
-        if(auto* parameter = container->findCustomGuiParameter(binding.parameterPath)) parameter->setTimelined(false);
+        if(auto* parameter = container->findTimelineParameter(binding.parameterPath)) parameter->setTimelined(false);
     }
 }
 
@@ -3836,7 +3857,7 @@ void ofxOceanodeTimelineManager::refreshTimelineFlag(const std::string& paramete
             return binding.parameterPath == parameterPath && !binding.bypass;
         });
     });
-    if(auto* parameter = container->findCustomGuiParameter(parameterPath))
+    if(auto* parameter = container->findTimelineParameter(parameterPath))
         parameter->setTimelined(isActive);
 }
 
@@ -3870,6 +3891,7 @@ void ofxOceanodeTimelineManager::clear() {
     loopEnabled = false;
     loopStartBeat = 0.0;
     loopEndBeat = 4.0;
+    syncLoopToTransport();
     hasEvaluatedTransportBeat = false;
     lastEvaluatedTransportBeat = 0.0;
     timeSignatureNumerator = 4;

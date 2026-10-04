@@ -615,7 +615,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                     ImGui::Separator();
                     if(container.getTimelineManager().isStepLaneCompatible(absParam)){
                         auto& timelineManager = container.getTimelineManager();
-                        const std::string timelineParameterPath = container.getCustomGuiParameterPath(absParam);
+                        const std::string timelineParameterPath = container.getTimelineParameterPath(absParam);
                         struct BoundTimelineLocation {
                             std::string trackId;
                             std::string trackName;

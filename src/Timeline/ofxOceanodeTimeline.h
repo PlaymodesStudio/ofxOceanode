@@ -720,10 +720,7 @@ public:
     bool renameMarker(const std::string& markerId, const std::string& name);
     const ofxOceanodeTimelineMarker* getMarker(const std::string& markerId) const;
 
-    void setLoopEnabled(bool enabled) {
-        if(loopEnabled != enabled) hasEvaluatedTransportBeat = false;
-        loopEnabled = enabled;
-    }
+    void setLoopEnabled(bool enabled);
     double getLoopStartBeat() const { return loopStartBeat; }
     double getLoopEndBeat() const { return loopEndBeat; }
     void setLoopRange(double startBeat, double endBeat);
@@ -854,6 +851,10 @@ private:
     // The two halves of a clip cut at a timeline beat (see splitClip).
     bool computeClipSplit(const ofxOceanodeTimelineClip& original, double timelineBeat,
                           ofxOceanodeTimelineClip& left, ofxOceanodeTimelineClip& right) const;
+    // Keep the transport-side range in lockstep with edits made by the UI.
+    // Waiting for the next automation pass leaves a frame in which the icon
+    // says loop is on but the playhead can cross the old end point.
+    void syncLoopToTransport();
     // Points every piano-roll lane that uses any of affectedBindingIds at the group's roles.
     void syncNoteGroupLanes(ofxOceanodeTimelineTrack& track, const ofxOceanodeTimelineNoteGroup& group,
                             const std::vector<std::string>& affectedBindingIds);
