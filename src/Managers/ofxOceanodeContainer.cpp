@@ -151,6 +151,7 @@ bool ofxOceanodeContainer::isClearingContainers(){
 }
 
 void ofxOceanodeContainer::clearContainer(){
+    ++nodesRevision;
     // Declared first so the guard also covers destruction of toDelete below.
     const ContainerClearGuard clearGuard;
     const bool ownsGlobalScope = getCanvasID().empty()
@@ -319,10 +320,12 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     
     auto nodePtr = node.get();
     collection[nodeToBeCreatedName][toBeCreatedId] = std::move(node);
+    ++nodesRevision;
     parameterGroupNodesMap[nodePtr->getParameters().getEscapedName()] = nodePtr;
     
     //Interaction listeners
     destroyNodeListeners.push(nodePtr->deleteModule.newListener([this, nodeToBeCreatedName, toBeCreatedId, isPersistent](){
+        ++nodesRevision;
         // Defer until the canvas operation is complete, including macro remaps.
         customGuiParametersNeedPruning = true;
 #ifdef OFXOCEANODE_USE_MIDI
@@ -1679,6 +1682,7 @@ void ofxOceanodeContainer::loadPersistent(){
         }
     }else{
         persistentNodes.clear();
+        ++nodesRevision;
     }
     
     //connections.clear();

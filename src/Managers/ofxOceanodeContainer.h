@@ -192,6 +192,8 @@ public:
     
     vector<ofxOceanodeNode*> getSelectedModules();
     vector<ofxOceanodeNode*> getAllModules();
+    // Changes whenever node ownership changes, including bulk preset/teardown clears.
+    std::uint64_t getNodesRevision() const { return nodesRevision; }
     ofxOceanodeNodeGui* getGuiFromModel(ofxOceanodeNodeModel* model);
 
     const std::vector<CustomGuiPanelData>& getCustomGuiPanelsData() const { return customGuiPanelsData; }
@@ -335,6 +337,7 @@ private:
     std::shared_ptr<ofxOceanodeTypesRegistry>   typesRegistry;
     
     ofEventListeners destroyNodeListeners;
+    std::uint64_t nodesRevision = 0;
     ofEventListeners destroyConnectionListeners;
     
     ofParameter<glm::mat4> transformationMatrix;
