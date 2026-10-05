@@ -9,6 +9,8 @@
 #define baseChaoticOscillator_h
 
 #include <random>
+#include <cstdint>
+#include <vector>
 
 class baseChaoticOscillator {
 public:
@@ -18,6 +20,8 @@ public:
     void setIndexNormalized(float index){indexNormalized = index;};
 
 	void nextSeed(int seed);
+	// Seed input: restarts the sequence (even for an unchanged seed when force is true).
+	void requestSeed(int seed, bool force);
 	void restartSeedSequence(int _seed);
 
     float  phaseOffset_Param;
@@ -40,9 +44,16 @@ public:
     float computeFunc(float phasor);
     void modulateNewRandom();
     
+    // Transport mode: stateless value for a given step + phase (pure function of seedKey, step, phase, params).
+    float computeDeterministic(float phasor, int64_t step, uint64_t seedKey);
+    
 private:
+    float warpPhase(float linPhase);
+    float interpolate(float linPhase, float past, float old, float next, float future);
+    float deterministicPoint(uint64_t seedKey, int64_t step);
     void computePreInterp(float& value);
     void computeMultiplyMod(float& value);
+    void computeMultiplyMod(float& value, float randomAddUnit);
     void customPow(float & value, float pow);
     
     int accumulateCycles;
@@ -63,7 +74,8 @@ private:
     std::mt19937 mt;
     std::uniform_real_distribution<float> dist;
     
-    bool setSeedFlag;
+    bool setSeedFlag = false;
+    bool justWrapped = false;
 };
 
 #endif /* baseChaoticOscillator_h */

@@ -9,6 +9,8 @@
 #ifndef ofxOceanodeContainer_h
 #define ofxOceanodeContainer_h
 
+#include "ofxOceanodeTransport.h"
+#include "Timeline/ofxOceanodeTimeline.h"
 #include "ofxOceanodeConnection.h"
 #include "ofxOceanodeNode.h"
 #include "CustomGui/ofxOceanodeCustomGuiLayout.h"
@@ -30,6 +32,7 @@ class ofxOceanodeCustomGuiPanel;
 
 #ifdef OFXOCEANODE_USE_MIDI
 class ofxOceanodeAbstractMidiBinding;
+class ofxOceanodeMidiClock;
 class ofxMidiIn;
 class ofxMidiOut;
 class ofxMidiListener;
@@ -64,7 +67,7 @@ class ofxOceanodeContainer {
 public:
     using nodeContainerWithId = std::unordered_map<int, shared_ptr<ofxOceanodeNode>>;
     
-    ofxOceanodeContainer(std::shared_ptr<ofxOceanodeNodeRegistry> _registry = nullptr, std::shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry = nullptr);
+    ofxOceanodeContainer(std::shared_ptr<ofxOceanodeNodeRegistry> _registry = nullptr, std::shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry = nullptr, std::shared_ptr<ofxOceanodeTransport> _transport = nullptr);
     ~ofxOceanodeContainer();
     
     void clearContainer();
@@ -159,7 +162,22 @@ public:
     void markCustomGuiSnapshotsDirty();
     
     void setBpm(float _bpm);
-    void resetPhase();
+    void resetPhase(bool notifyTransport = true);
+    std::shared_ptr<ofxOceanodeTransport> getTransport() const { return transport; }
+    // The root container creates the shared transport (and the timeline).
+    bool isTransportOwner() const { return transportOwner; }
+    ofxOceanodeTransportState getTransportState() const;
+    ofxOceanodeFrameTransportState getFrameTransportState() const;
+    // There is a single timeline, owned by the root container. Macro
+    // containers forward to their host, so every node sees the same one.
+    ofxOceanodeTimelineManager& getTimelineManager();
+    const ofxOceanodeTimelineManager& getTimelineManager() const;
+    void setTimelineHost(ofxOceanodeContainer* host){ timelineHost = host; }
+    // Timeline binding paths name the canvas too ("Macro 1 / Macro 2::Node/param"),
+    // so the root timeline can reach parameters inside macros. Root-level
+    // parameters keep the plain "Node/param" form.
+    std::string getTimelineParameterPath(ofxOceanodeAbstractParameter& parameter) const;
+    ofxOceanodeAbstractParameter* findTimelineParameter(const std::string& parameterPath) const;
 	
 	// Node encapsulation functionality
 	void encapsulateSelectedNodes(const string& macroName = "Encapsulated");
@@ -177,6 +195,13 @@ public:
 #endif
     
 #ifdef OFXOCEANODE_USE_MIDI
+    // Built-in transport sync to an external MIDI clock (root container only;
+    // nullptr in macro containers). Settings are saved with the project.
+    ofxOceanodeMidiClock* getMidiClockSync() { return midiClockSync.get(); }
+    void setMidiClockSyncEnabled(bool enabled);
+    bool isMidiClockSyncEnabled() const { return midiClockSyncEnabled; }
+    void setMidiClockSyncPort(const std::string& port);
+
     void setIsListeningMidi(bool b);
     shared_ptr<ofxOceanodeAbstractMidiBinding> createMidiBinding(ofxOceanodeAbstractParameter &p, bool isPersistent = false, int _id = -1);
     bool removeLastMidiBinding(ofxOceanodeAbstractParameter &p);
@@ -343,8 +368,14 @@ private:
     ofParameter<glm::mat4> transformationMatrix;
     float bpm;
     float phase;
+    bool transportOwner = false;
+    std::shared_ptr<ofxOceanodeTransport> transport;
+    std::unique_ptr<ofxOceanodeTimelineManager> timelineManager;
+    ofxOceanodeContainer* timelineHost = nullptr;
     
 #ifdef OFXOCEANODE_USE_MIDI
+    std::unique_ptr<ofxOceanodeMidiClock> midiClockSync;
+    bool midiClockSyncEnabled = false;
     bool isListeningMidi;
     map<string, vector<shared_ptr<ofxOceanodeAbstractMidiBinding>>> midiBindings;
     map<string, vector<shared_ptr<ofxOceanodeAbstractMidiBinding>>> persistentMidiBindings;

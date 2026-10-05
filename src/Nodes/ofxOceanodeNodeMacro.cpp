@@ -127,6 +127,7 @@ void ofxOceanodeNodeMacro::draw(ofEventArgs &a){
 }
 
 void ofxOceanodeNodeMacro::setContainer(ofxOceanodeContainer* container){
+	ofxOceanodeNodeModel::setContainer(container);
 	parentContainer = container;
 	registry = container->getRegistry();
 	typesRegistry = container->getTypesRegistry();
@@ -261,7 +262,9 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	});
 	
 	// Initialize container
-	container = make_shared<ofxOceanodeContainer>(registry, typesRegistry);
+	container = make_shared<ofxOceanodeContainer>(registry, typesRegistry, hostContainer != nullptr ? hostContainer->getTransport() : nullptr);
+	// Macros share the root timeline instead of keeping a hidden one.
+	container->setTimelineHost(hostContainer);
 	newNodeListener = container->newNodeCreated.newListener(this, &ofxOceanodeNodeMacro::newNodeCreated);
 	allNodesCreatedListener = container->allNodesCreated.newListener(this, &ofxOceanodeNodeMacro::allNodesCreated);
 	

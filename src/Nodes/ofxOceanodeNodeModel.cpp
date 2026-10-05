@@ -100,8 +100,38 @@ void ofxOceanodeNodeModel::deserializeParameter(ofJson &json, ofAbstractParamete
 }
 
 void ofxOceanodeNodeModel::setContainer(ofxOceanodeContainer* container){
+    hostContainer = container;
 	canvasID = container->getCanvasID();
 };
+
+std::shared_ptr<ofxOceanodeTransport> ofxOceanodeNodeModel::getTransport() const{
+    if(hostContainer == nullptr){
+        return nullptr;
+    }
+    return hostContainer->getTransport();
+}
+
+ofxOceanodeTransportState ofxOceanodeNodeModel::getTransportState() const{
+    if(hostContainer == nullptr){
+        return {};
+    }
+    return hostContainer->getTransportState();
+}
+
+ofxOceanodeFrameTransportState ofxOceanodeNodeModel::getFrameTransportState() const{
+    if(hostContainer == nullptr){
+        return {};
+    }
+    return hostContainer->getFrameTransportState();
+}
+
+ofxOceanodeTimeState ofxOceanodeNodeModel::getGlobalTimeState() const{
+    return ofxOceanodeTime::getInstance()->getGlobalTimeState();
+}
+
+ofxOceanodeFrameTimeState ofxOceanodeNodeModel::getFrameGlobalTimeState() const{
+    return ofxOceanodeTime::getInstance()->getFrameGlobalTimeState();
+}
 
 //parameterInfo& ofxOceanodeNodeModel::addParameterToGroupAndInfo(ofAbstractParameter& p){
 //    addParameter(p);

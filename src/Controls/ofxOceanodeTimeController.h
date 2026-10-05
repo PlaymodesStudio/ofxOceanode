@@ -1,12 +1,12 @@
 //
-//  ofxOceanodeBPMController.h
+//  ofxOceanodeTimeController.h
 //  example-basic
 //
 //  Created by Eduard Frigola Bagué on 13/03/2018.
 //
 
-#ifndef ofxOceanodeBPMController_h
-#define ofxOceanodeBPMController_h
+#ifndef ofxOceanodeTimeController_h
+#define ofxOceanodeTimeController_h
 
 #include "ofxOceanodeBaseController.h"
 
@@ -14,10 +14,10 @@
     #include "ofxAubio.h"
 #endif
 
-class ofxOceanodeBPMController: public ofxOceanodeBaseController{
+class ofxOceanodeTimeController: public ofxOceanodeBaseController{
 public:
-    ofxOceanodeBPMController(shared_ptr<ofxOceanodeContainer> _container);
-    ~ofxOceanodeBPMController(){};
+    ofxOceanodeTimeController(shared_ptr<ofxOceanodeContainer> _container);
+    ~ofxOceanodeTimeController(){};
     
     void draw();
     
@@ -56,4 +56,4 @@ private:
 };
 
 
-#endif /* ofxOceanodeBPMController_h */
+#endif /* ofxOceanodeTimeController_h */

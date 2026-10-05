@@ -15,6 +15,7 @@
 #include "ofxOceanodeScope.h"
 #include "ofxOceanodeTime.h"
 #include "ofxOceanodeColors.h"
+#include <algorithm>
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node) : container(_container), node(_node){
     color = node.getColor();
@@ -120,6 +121,8 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
             if(trackUserValue) node.saveParameterToJson(valueBefore, absParam);
             string uniqueId = absParam.getName();
             const bool publishedInCustomGui = container.customGuiContainsParameterAnywhere(absParam);
+            ofColor timelineTrackColor;
+            const bool publishedInTimeline = container.getTimelineManager().getParameterTrackColor(absParam, timelineTrackColor);
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::BeginDisabled();
             ImGui::PushID(uniqueId.c_str());
             if(absParam.getFlags() & ofxOceanodeParameterFlags_NoGuiWidget){
@@ -181,6 +184,19 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
             }else{
                 
                 ImGui::SetNextItemAllowOverlap();
+                if(publishedInTimeline){
+                    const ImVec2 labelMin = ImGui::GetCursorScreenPos();
+                    const ImVec2 labelMax(labelMin.x + nodeWidthText, labelMin.y + ImGui::GetFrameHeight());
+                    // Square block starting a few pixels before the label, so the
+                    // first letter sits inside it rather than on its edge.
+                    const ImVec2 badgeMin(labelMin.x - 4.0f, labelMin.y + 1.0f);
+                    const ImVec2 badgeMax(labelMax.x - 5.0f, labelMax.y - 1.0f);
+                    ImGui::GetWindowDrawList()->AddRectFilled(badgeMin, badgeMax, IM_COL32(timelineTrackColor.r, timelineTrackColor.g, timelineTrackColor.b, 105));
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(
+                        std::min(1.0f, timelineTrackColor.r / 255.0f + 0.35f),
+                        std::min(1.0f, timelineTrackColor.g / 255.0f + 0.35f),
+                        std::min(1.0f, timelineTrackColor.b / 255.0f + 0.35f), 1.0f));
+                }
                 if(publishedInCustomGui){
                     ImGui::Text("%s", uniqueId.c_str());
 
@@ -197,6 +213,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                 }else{
                     ImGui::Text("%s", uniqueId.c_str());
                 }
+                if(publishedInTimeline) ImGui::PopStyleColor();
                 ImGui::SameLine(-1);
                 ImGui::InvisibleButton(("##InvBut_" + uniqueId).c_str(), ImVec2(nodeWidthText, ImGui::GetFrameHeight())); //Used to check later behaviours
                 {
@@ -602,6 +619,72 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                         }
                     }
                     ImGui::Separator();
+                    if(container.getTimelineManager().isStepLaneCompatible(absParam)){
+                        auto& timelineManager = container.getTimelineManager();
+                        const std::string timelineParameterPath = container.getTimelineParameterPath(absParam);
+                        struct BoundTimelineLocation {
+                            std::string trackId;
+                            std::string trackName;
+                            std::string bindingId;
+                        };
+                        std::vector<BoundTimelineLocation> boundLocations;
+                        for(const auto& timelineTrack : timelineManager.getTracks()){
+                            for(const auto& binding : timelineTrack.bindings){
+                                if(binding.parameterPath == timelineParameterPath){
+                                    boundLocations.push_back({timelineTrack.id, timelineTrack.name, binding.id});
+                                }
+                            }
+                        }
+
+                        if(ImGui::BeginMenu("Add to Timeline Track")){
+                            if(ImGui::Selectable("New Timeline Track")){
+                                const std::string trackId = timelineManager.createTrack();
+                                if(!timelineManager.addBinding(trackId, absParam).empty()) {
+                                    // The timeline controller owns the modal so
+                                    // the name is chosen before the track is
+                                    // used in the rest of the UI.
+                                    timelineManager.requestTrackRename(trackId, true);
+                                }
+                            }
+                            if(!timelineManager.getTracks().empty()){
+                                ImGui::Separator();
+                                for(const auto& timelineTrack : timelineManager.getTracks()){
+                                    if(timelineTrack.isWaveTrack) continue;
+                                    const bool alreadyBound = std::any_of(timelineTrack.bindings.begin(), timelineTrack.bindings.end(), [&](const auto& binding){
+                                        return binding.parameterPath == timelineParameterPath;
+                                    });
+                                    if(ImGui::Selectable(timelineTrack.name.c_str(), alreadyBound, alreadyBound ? ImGuiSelectableFlags_Disabled : 0)){
+                                        timelineManager.addBinding(timelineTrack.id, absParam);
+                                    }
+                                }
+                            }
+                            ImGui::EndMenu();
+                        }
+                        {
+                            // Pitch, gate and velocity as one piano-roll row; the
+                            // timeline shows a dialog to pick the other two.
+                            const std::string valueType = absParam.valueType();
+                            if((valueType == typeid(float).name() || valueType == typeid(int).name() ||
+                                valueType == typeid(bool).name()) &&
+                               ImGui::Selectable("Add to Timeline as Piano Roll...")){
+                                timelineManager.requestNoteGroupSetup(&absParam);
+                            }
+                        }
+                        if(boundLocations.size() == 1){
+                            if(ImGui::Selectable("Remove from Timeline")){
+                                timelineManager.removeBinding(boundLocations.front().trackId,
+                                                              boundLocations.front().bindingId);
+                            }
+                        }else if(boundLocations.size() > 1 && ImGui::BeginMenu("Remove from Timeline")){
+                            for(const auto& location : boundLocations){
+                                if(ImGui::MenuItem(location.trackName.c_str())){
+                                    timelineManager.removeBinding(location.trackId, location.bindingId);
+                                }
+                            }
+                            ImGui::EndMenu();
+                        }
+                    }
+                    ImGui::Separator();
                     auto customTypes = container.getCompatibleCustomGuiWidgetTypes(absParam);
                     bool anyRemoval = false;
                     for(const auto& panel : container.getCustomGuiPanelsData()){
@@ -673,16 +756,6 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                             }
                         }
                         ImGui::EndMenu();
-                    }
-                    ImGui::Separator();
-                    if(!absParam.isTimelined()){ //Param is not timelined
-                        if(ImGui::Selectable("Add to Timeline")){
-                            ofxOceanodeTime::getInstance()->addParameter(&absParam,node.getColor());
-                        }
-                    }else{
-                        if(ImGui::Selectable("Remove from Timeline")){
-                            ofxOceanodeTime::getInstance()->removeParameter(&absParam);
-                        }
                     }
 #ifdef OFXOCEANODE_USE_MIDI
                     ImGui::Separator();

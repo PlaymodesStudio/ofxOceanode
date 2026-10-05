@@ -8,39 +8,71 @@
 #include "ofxOceanodeTime.h"
 #include "ofxOceanodeContainer.h"
 #include "phasor.h"
+#include "ofxOceanodeTimeController.h"
 #include "ofxOceanodeNodeMacro.h"
-#include "ofxOceanodeColors.h"
 #include "ofxOceanodeShared.h"
+#include <algorithm>
 
 ofxOceanodeTime::ofxOceanodeTime(){
     // Shared must outlive the container released by this singleton's destructor.
     ofxOceanodeShared::initialize();
 }
 
-void ofxOceanodeTime::setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOceanodeBPMController> contr){
+void ofxOceanodeTime::setup(std::shared_ptr<ofxOceanodeContainer> c, std::shared_ptr<ofxOceanodeTimeController> contr){
     container = c;
     controller = contr;
+    transport = container->getTransport();
     startTime = ofGetCurrentTime();
+    const uint64_t nowUs = getSteadyNowUs();
+    globalTimeState.steadyTimeUs = nowUs;
+    frameGlobalTimeState.previous = globalTimeState;
+    frameGlobalTimeState.current = globalTimeState;
     
-    parameters.add(isPlaying.set("Is Playing", true));
+    parameters.add(isPlaying.set("Is Playing", false));
     parameters.add(frameMode.set("Frame Mode", false));
-    parameters.add(frameInterval.set("Frame Interval", 1));
+    parameters.add(frameInterval.set("Frame Interval", 1, 1, 120));
     parameters.add(stop.set("Stop"));
     parameters.add(time.set("Time", 0));
+    parameters.add(globalTime.set("Global Time", 0));
+    parameters.add(resetGlobalTimeCounter.set("Reset Global Time"));
     parameters.add(scrub.set("Scrub", 0));
     listeners.push(isPlaying.newListener([this](bool &b){
+        if(transport != nullptr){
+            transport->setIsPlaying(b);
+        }
         if(b){
             startTime = ofGetCurrentTime() + std::chrono::duration<double>(-time);
         }
     }));
     
     listeners.push(stop.newListener([this](){
+        // Following an external clock: the master owns play state and position.
+        if(transport != nullptr && transport->hasExternalClock()) return;
+        if(transport != nullptr){
+            transport->stop();
+        }
         isPlaying = false;
         time = 0;
-        container->resetPhase();
+        container->resetPhase(false);
+    }));
+
+    listeners.push(resetGlobalTimeCounter.newListener([this](){
+        resetGlobalTime();
+        globalTime = 0;
     }));
     
     listeners.push(scrub.newListener([this](float &f){
+        if(transport != nullptr){
+            const auto state = transport->getState();
+            const double beatsPerSecond = std::max(0.0f, state.bpm) / 60.0;
+            const double currentTime = state.seconds;
+            const double newTime = std::max(0.0, currentTime + static_cast<double>(f));
+            const double newBeat = newTime * beatsPerSecond;
+            transport->seekToBeat(newBeat);
+            time = newTime;
+            startTime = ofGetCurrentTime() + std::chrono::duration<double>(-time.get());
+            return;
+        }
         startTime = startTime + std::chrono::duration<double>(-f);
         if(!isPlaying){
             time += f;
@@ -59,7 +91,12 @@ void ofxOceanodeTime::setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOc
     {
         ofxOceanodeNodeModel *nodeModel = &node->getNodeModel();
         if(dynamic_cast<timeGenerator*>(nodeModel) != nullptr){
-            dynamic_cast<timeGenerator*>(nodeModel)->setTime(time);
+            auto *timeNode = dynamic_cast<timeGenerator*>(nodeModel);
+            if(dynamic_cast<counter*>(nodeModel) != nullptr) {
+                timeNode->setTime(globalTime);
+            } else {
+                timeNode->setTime(time);
+            }
         }
         else if(dynamic_cast<ofxOceanodeNodeMacro*>(nodeModel) != nullptr){
             newNodeInMacroListener.push(dynamic_cast<ofxOceanodeNodeMacro*>(nodeModel)->getContainer()->newNodeCreated.newListener(checkNodeModel));
@@ -70,9 +107,6 @@ void ofxOceanodeTime::setup(shared_ptr<ofxOceanodeContainer> c, shared_ptr<ofxOc
     
     controller->setTimeGroup(&parameters);
     
-    
-    timer.setPeriodicEvent(1000000);
-    startThread();
     
     ofSoundStreamSettings settings;
 
@@ -108,9 +142,9 @@ void ofxOceanodeTime::update(){
     std::function<void(shared_ptr<ofxOceanodeContainer>)> getPhasorsFromContainer = [this, &phasors, &getPhasorsFromContainer, &timeGenerators, &forceFrameMode](shared_ptr<ofxOceanodeContainer> c){
         for(auto &n : c->getAllModules()){
             ofxOceanodeNodeModel *model = &n->getNodeModel();
-//            if(model->getFlags() & ofxOceanodeNodeModelFlags_ForceFrameMode){
-//                forceFrameMode = true;
-//            }
+            if(model->getFlags() & ofxOceanodeNodeModelFlags_ForceFrameMode){
+                forceFrameMode = true;
+            }
             if(dynamic_cast<phasor*>(model) != nullptr){
                 phasors.push_back(dynamic_cast<phasor*>(model)->getBasePhasor());
             }
@@ -124,49 +158,96 @@ void ofxOceanodeTime::update(){
     };
     
     getPhasorsFromContainer(container);
-    //Clear all stored phasors inside the threadChannel, to only allow 1 value to be stored in it.
     vector<shared_ptr<basePhasor>> oldPhasors;
-    while(phasorChannel.tryReceive(oldPhasors));
-    phasorChannel.send(phasors);
     while(phasorChannel2.tryReceive(oldPhasors));
     phasorChannel2.send(phasors);
     
-    for(auto c : timeGenerators){
-        c->setTime(time);
+    const TransportDriverMode desiredDriverMode = getDesiredDriverMode(forceFrameMode);
+    if(transport != nullptr){
+        transport->setDriverMode(desiredDriverMode);
     }
-    
-    if(isPlaying){
-        if(frameMode || forceFrameMode){
-            if(ofGetFrameNum() % frameInterval == 0 || forceFrameMode){
-                float targetFR = ofGetTargetFrameRate();
-                if(targetFR == 0) targetFR = 60;
-                time += (1.0f/targetFR);
+    {
+        std::lock_guard<std::mutex> lock(globalTimeMutex);
+        globalTimeState.driverMode = desiredDriverMode;
+    }
+
+    const bool shouldAdvanceFrameStep = desiredDriverMode == TransportDriverMode::FrameStep &&
+                                        (ofGetFrameNum() % std::max(1, frameInterval.get()) == 0 || forceFrameMode);
+
+    if(desiredDriverMode == TransportDriverMode::FrameStep){
+        if(shouldAdvanceFrameStep){
+            float targetFR = ofGetTargetFrameRate();
+            if(targetFR == 0) targetFR = 60;
+            const double deltaSeconds = 1.0 / targetFR;
+            advanceGlobalTimeFrameStep(deltaSeconds);
+            if(isPlaying){
+                if(transport != nullptr){
+                    transport->advanceFrameStep(deltaSeconds);
+                }else{
+                    time += deltaSeconds;
+                }
                 for(auto p : phasors){
                     p->advanceForFrameRate(targetFR);
                 }
             }
-        }else{
-            time = std::chrono::duration<double>(ofGetCurrentTime() - startTime).count();
+        }
+    }else{
+        syncGlobalTimeRealTime();
+        if(isPlaying || desiredDriverMode == TransportDriverMode::External){
+            if(transport != nullptr){
+                transport->syncRealTime();
+            }else{
+                time = std::chrono::duration<double>(ofGetCurrentTime() - startTime).count();
+            }
+        }
+    }
+
+    latchGlobalTimeState();
+    if(transport != nullptr){
+        transport->latchFrameState();
+        updateLegacyTimeFromTransport();
+    }
+    globalTime = frameGlobalTimeState.current.time;
+
+    // Time generators get full double precision (the float parameters above
+    // lose milliseconds after a few hours).
+    const double preciseTime = transport != nullptr ? transport->getTimeInSeconds() : static_cast<double>(time.get());
+    const double preciseGlobalTime = frameGlobalTimeState.current.time;
+    for(auto c : timeGenerators){
+        if(dynamic_cast<counter*>(c) != nullptr) {
+            c->setTime(preciseGlobalTime);
+        } else {
+            c->setTime(preciseTime);
         }
     }
 }
 
-void ofxOceanodeTime::threadedFunction(){
-//    while(isThreadRunning()){
-//        timer.waitNext();
-//        if(!frameMode && isPlaying){
-//            phasorChannel.tryReceive(phasorsInThread);
-//            for(auto p : phasorsInThread){
-//                if(!p->isAudio())
-//                    p->threadedFunction(1000);
-//            }
-//        }
-//    }
+void ofxOceanodeTime::resetTransportToStart(){
+    if(transport != nullptr){
+        const bool wasPlaying = isPlaying.get();
+        transport->stop();
+        transport->seekToBeat(0.0);
+        // transport->stop() also clears the transport's play state. Restore
+        // the state owned by this controller so resetting while already
+        // playing does not leave the frame-step driver permanently stopped.
+        transport->setIsPlaying(wasPlaying);
+    }
+    time = 0.0f;
+    resetGlobalTime();
 }
 
 void ofxOceanodeTime::audioIn(ofSoundBuffer & input){
+    // Free-running phasors keep running in real time under an external clock too;
+    // only frame-step (offline) rendering stops them here.
+    if(transport != nullptr && transport->getState().driverMode == TransportDriverMode::FrameStep){
+        return;
+    }
     if(!frameMode){
+        syncGlobalTimeRealTime();
         float nominalRate = (float)input.getSampleRate() / (float)input.getNumFrames();
+        if(transport != nullptr){
+            transport->syncRealTime();
+        }
         phasorChannel2.tryReceive(phasorsInThread2);
         for(auto p : phasorsInThread2){
             if(p->isAudio())
@@ -178,7 +259,11 @@ void ofxOceanodeTime::audioIn(ofSoundBuffer & input){
 }
 
 void ofxOceanodeTime::audioOut(ofSoundBuffer & input){
+    if(transport != nullptr && transport->getState().driverMode == TransportDriverMode::FrameStep){
+        return;
+    }
     if(!frameMode){
+        syncGlobalTimeRealTime();
         // Measure actual elapsed time between callbacks to get true callback rate.
         // This is immune to hardware/software sample rate mismatches (e.g. built-in
         // speakers running at 48kHz while 44100 was requested).
@@ -194,6 +279,9 @@ void ofxOceanodeTime::audioOut(ofSoundBuffer & input){
         }
         lastAudioCallbackTime = now;
         float effectiveRate = 1.0f / elapsed;
+        if(transport != nullptr){
+            transport->syncRealTime();
+        }
 
         phasorChannel2.tryReceive(phasorsInThread2);
         for(auto p : phasorsInThread2){
@@ -205,159 +293,95 @@ void ofxOceanodeTime::audioOut(ofSoundBuffer & input){
     }
 }
 
-#include "imgui_internal.h"
-// https://github.com/ocornut/imgui/issues/1720
-bool Splitter2(int splitNum, bool split_vertically, float thickness, float* size1, float* size2, float min_size1, float min_size2, float splitter_long_axis_size = -1.0f)
-{
-    using namespace ImGui;
-    ImGuiContext& g = *GImGui;
-    ImGuiWindow* window = g.CurrentWindow;
-    ImGuiID id = window->GetID(("##Splitter" + ofToString(splitNum)).c_str());
-    ImRect bb;
-    bb.Min = window->DC.CursorPos + (split_vertically ? ImVec2(*size1, 0.0f) : ImVec2(0.0f, *size1));
-    bb.Max = bb.Min + CalcItemSize(split_vertically ? ImVec2(thickness, splitter_long_axis_size) : ImVec2(splitter_long_axis_size, thickness), 0.0f, 0.0f);
-    return SplitterBehavior(bb, id, split_vertically ? ImGuiAxis_X : ImGuiAxis_Y, size1, size2, min_size1, min_size2, 4.0f, 0.04f);
-}
-
-void ofxOceanodeTime::draw(){
-    ImGui::SetNextWindowSize(ImVec2(0, 30));
-    if(ImGui::Begin("Timeline")){
-        //Width Tables
-//        ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable;
-//        if(ImGui::BeginTable("Table", 2, flags)){
-//            ImGui::TableSetupColumn("Esquerra");
-//            ImGui::TableSetupColumn("Dreta");
-//
-//            ImGui::TableNextRow();
-//            ImGui::TableSetColumnIndex(0);
-//            ImGui::Button("Propietats timelin");
-//
-//            ImGui::TableSetColumnIndex(1);
-//
-//            float availWidth = ImGui::GetContentRegionAvail().x;
-//            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-//            draw_list->AddRectFilled(ImGui::GetCursorScreenPos(), ImGui::GetCursorScreenPos() + ImVec2(availWidth, 10), IM_COL32(255, 255, 0, 50));
-//
-//            ImGui::TableNextRow();
-//            ImGui::TableSetColumnIndex(0);
-//            ImGui::Button("Parameter");
-//            ImGui::TableSetColumnIndex(1);
-//            ImGui::Button("Currva");
-//
-//            ImGui::EndTable();
-//        }
-        //Like scope
-        float availWidth = ImGui::GetContentRegionAvail().x;
-        
-        float rulerHeight = 10;
-        float left = 100;
-        float right = availWidth-left;
-        Splitter2(0, true, 2, &left, &right, 10, 10);
-        
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        draw_list->AddRectFilled(ImGui::GetCursorScreenPos() + ImVec2(left, 0), ImGui::GetCursorScreenPos() + ImVec2(availWidth, rulerHeight), IM_COL32(255, 255, 0, 50));
-        
-        //TODO: Add timelines
-        /*
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + rulerHeight + ImGui::GetFrameHeightWithSpacing() - ImGui::GetFrameHeight());
-        ImGui::Spacing();
-        ImGui::Separator();
-        float topPos = ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y;
-        
-        if(timlinedParameters.size() > 0){
-            //ImGui::Begin("Scopes", NULL, ImGuiWindowFlags_NoScrollbar);
-            windowHeight = ImGui::GetContentRegionAvail().y;
-            for(int i = 0; i < timlinedParameters.size(); i++){
-                float topHeight = 0;
-                float bottomHeight = 0;
-                    for(int j = 0; j < i+1; j++) topHeight += timlinedParameters[j].open ? timlinedParameters[j].height : ImGui::GetFrameHeight();
-                    for(int j = i+1; j < timlinedParameters.size(); j++) bottomHeight += timlinedParameters[j].open ? timlinedParameters[j].height : ImGui::GetFrameHeight();
-                float oldTopHeight = topHeight;
-                float oldBottomHeight = bottomHeight;
-                
-                
-//                float minTop = 10;
-//                float minBottom = 10;
-                float minTop = topHeight - timlinedParameters[i].height;
-                float minBottom = 0;
-                
-                //TODO: remove hack
-//                if(timlinedParameters[i].open){
-                    if(Splitter2(i+1, false, 1, &topHeight, &bottomHeight, minTop, minBottom) && timlinedParameters[i].open){
-                        float topInc = topHeight - oldTopHeight;
-                        timlinedParameters[i].height += topInc;
-                    }
-//                }
-//                else{
-                    // Draw division no interaction
-//                }
-                    
-            }
-            
-            float accumPos = topPos;
-            for(int i = 0; i < timlinedParameters.size(); i++)
-            {
-                auto &p = timlinedParameters[i];
-                auto itemHeight = (p.height);
-//
-                auto size = ImVec2(ImGui::GetContentRegionAvail().x, itemHeight);
-//                
-                ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(p.color*0.75f));
-                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,ImVec4(p.color*0.75f));
-                ImGui::PushStyleColor(ImGuiCol_PlotHistogram,ImVec4(p.color*0.75f));
-                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-                ImGui::PushStyleColor(ImGuiCol_Border, OceanodeColors::TransparentButton);
-//
-                ImGui::SetCursorPosY(accumPos);
-                if(ImGui::TreeNode(p.parameter->getName().c_str())){
-                    p.open = true;
-                    //Draw Slider / Control
-                    ImGui::Button(p.parameter->getName().c_str());
-                    
-                    //Draw Curve
-                    ImGui::SameLine(left + 20);
-                    ImGui::BeginGroup();
-                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
-                    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-                    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(50, 50, 50, 200));
-                    ImGui::BeginChild("scrolling_region", ImVec2(right - 10, p.height - ImGui::GetFrameHeightWithSpacing()), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
-                    
-                    ImGui::EndChild();
-                    ImGui::PopStyleColor();
-                    ImGui::PopStyleVar(2);
-                    ImGui::EndGroup();
-                    
-                    accumPos += p.height;
-                    ImGui::TreePop();
-                }else{
-                    p.open = false;
-                    accumPos += ImGui::GetFrameHeight();// + (ImGui::GetStyle().ItemSpacing.y*4);
-                }
-                ImGui::PopStyleColor(5);
-                ImGui::Spacing();
-            }
-            //ImGui::End();
-        }
-         */
-        
+void ofxOceanodeTime::updateLegacyTimeFromTransport(){
+    if(transport == nullptr){
+        return;
     }
-    ImGui::End();
+    const auto state = transport->getState();
+    // Accumulated play time: a tempo change no longer makes it jump or run backwards.
+    time = state.seconds;
+    if(isPlaying.get() != state.isPlaying){
+        isPlaying = state.isPlaying;
+    }
+    startTime = ofGetCurrentTime() + std::chrono::duration<double>(-time.get());
 }
 
-void ofxOceanodeTime::addParameter(ofxOceanodeAbstractParameter* p, ofColor _color){
-    p->setTimelined(true);
-    timlinedParameters.emplace_back(p,_color, 100);
+TransportDriverMode ofxOceanodeTime::getDesiredDriverMode(bool forceFrameMode) const{
+    // An external clock (e.g. MIDI clock) owns the transport: it wins over frame mode.
+    if(transport != nullptr && transport->hasExternalClock()){
+        return TransportDriverMode::External;
+    }
+    if(frameMode || forceFrameMode){
+        return TransportDriverMode::FrameStep;
+    }
+    return TransportDriverMode::RealTime;
 }
 
-void ofxOceanodeTime::removeParameter(ofxOceanodeAbstractParameter* p){
-    p->setTimelined(false);
-    auto timelineToRemove = std::find_if(timlinedParameters.begin(), timlinedParameters.end(), [p](const ofxOceanodeTimelinedItem& i){return i.parameter == p;});
-//    float sizeBackup = timelineToRemove->sizeRelative;
-    timlinedParameters.erase(timelineToRemove);
-//    for (auto &sp : timlinedParameters) {
-//        sp.sizeRelative += ((sizeBackup - 1) / timlinedParameters.size());
-//    }
-    
+ofxOceanodeTimeState ofxOceanodeTime::getGlobalTimeState() const{
+    std::lock_guard<std::mutex> lock(globalTimeMutex);
+    return globalTimeState;
+}
+
+ofxOceanodeFrameTimeState ofxOceanodeTime::getFrameGlobalTimeState() const{
+    std::lock_guard<std::mutex> lock(globalTimeMutex);
+    return frameGlobalTimeState;
+}
+
+void ofxOceanodeTime::syncGlobalTimeRealTime(){
+    std::lock_guard<std::mutex> lock(globalTimeMutex);
+    globalTimeState.driverMode = TransportDriverMode::RealTime;
+    advanceGlobalTimeToNowLocked(getSteadyNowUs());
+}
+
+void ofxOceanodeTime::advanceGlobalTimeFrameStep(double deltaSeconds){
+    std::lock_guard<std::mutex> lock(globalTimeMutex);
+    globalTimeState.driverMode = TransportDriverMode::FrameStep;
+    const uint64_t nowUs = getSteadyNowUs();
+    advanceGlobalTimeToNowLocked(nowUs);
+    if(globalTimeState.driverMode == TransportDriverMode::FrameStep){
+        globalTimeState.time += std::max(0.0, deltaSeconds);
+    }
+    globalTimeState.steadyTimeUs = nowUs;
+}
+
+void ofxOceanodeTime::resetGlobalTime(){
+    std::lock_guard<std::mutex> lock(globalTimeMutex);
+    const uint64_t nowUs = getSteadyNowUs();
+    advanceGlobalTimeToNowLocked(nowUs);
+    globalTimeState.time = 0.0;
+    globalTimeState.generation++;
+    globalTimeState.steadyTimeUs = nowUs;
+}
+
+void ofxOceanodeTime::latchGlobalTimeState(){
+    std::lock_guard<std::mutex> lock(globalTimeMutex);
+    frameGlobalTimeState.previous = frameGlobalTimeState.current;
+    frameGlobalTimeState.current = globalTimeState;
+}
+
+uint64_t ofxOceanodeTime::getSteadyNowUs(){
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()
+    ).count();
+}
+
+void ofxOceanodeTime::advanceGlobalTimeToNowLocked(uint64_t nowUs){
+    if(globalTimeState.driverMode != TransportDriverMode::RealTime){
+        globalTimeState.steadyTimeUs = nowUs;
+        return;
+    }
+
+    if(globalTimeState.steadyTimeUs == 0){
+        globalTimeState.steadyTimeUs = nowUs;
+        return;
+    }
+
+    if(nowUs > globalTimeState.steadyTimeUs){
+        const double deltaSeconds = static_cast<double>(nowUs - globalTimeState.steadyTimeUs) / 1000000.0;
+        globalTimeState.time += deltaSeconds;
+    }
+
+    globalTimeState.steadyTimeUs = nowUs;
 }
 
 Timestamp::Timestamp() : currentTime(std::chrono::system_clock::now()) {

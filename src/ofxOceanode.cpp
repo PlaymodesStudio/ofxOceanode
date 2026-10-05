@@ -8,6 +8,7 @@
 #include "ofxOceanode.h"
 #include "ofxOceanodeTheme.h"
 #include "ofxOceanodeShared.h"
+#include "ofxOceanodeTimeController.h"
 #include "imgui_internal.h"
 #include "ofxOceanodeFloatingWindowDecor.h"
 #include "defaultNodes.h"
@@ -50,6 +51,10 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<oscillator>("Generators");
     nodeRegistry->registerModel<chaoticOscillator>("Generators");
     nodeRegistry->registerModel<phasor>("Generators");
+    nodeRegistry->registerModel<lfoTrack>("Generators");
+#ifdef OFXOCEANODE_USE_MIDI
+    nodeRegistry->registerModel<midiClockNode>("Generators");
+#endif
     nodeRegistry->registerModel<simpleNumberGenerator>("Generators");
     nodeRegistry->registerModel<simpleNormalizedNumberGenerator>("Generators");
     nodeRegistry->registerModel<counter>("Generators");
@@ -236,7 +241,7 @@ void ofxOceanode::setup(){
             visibility[kv.first] = kv.second;
         }
     }
-    oceanodeTime->setup(container, controls->get<ofxOceanodeBPMController>());
+    oceanodeTime->setup(container, controls->get<ofxOceanodeTimeController>());
 }
 
 void ofxOceanode::update(){

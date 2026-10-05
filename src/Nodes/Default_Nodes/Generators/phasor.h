@@ -20,11 +20,11 @@ public:
     void setup() override{
         time = 0;
     }
-    void    setTime(float t) {time = t;};
-    float   getTime() {return time;};
+    void    setTime(double t) {time = t;};
+    double  getTime() {return time;};
 
 private:
-    float time;
+    double time;
 };
 
 
@@ -58,7 +58,7 @@ public:
 
     void update(ofEventArgs &a) override
     {
-        output = getTime()-phaseOffset;
+        output = static_cast<float>(getTime()-phaseOffset);
     }
     
     void rstCounter()
@@ -73,7 +73,7 @@ private:
     ofParameter<float> output;
     ofParameter<bool> resetWithPhaseReset;
     ofParameter<void> resetCounter;
-    float phaseOffset;
+    double phaseOffset;
         
         
 };
@@ -124,7 +124,7 @@ public:
     void update(ofEventArgs &a) override {
         if (isRamping) {
             isRampFinish=false;
-            float elapsedTime = (getTime() - rampStartTime) * 1000.0f;
+            float elapsedTime = static_cast<float>((getTime() - rampStartTime) * 1000.0);
             if (elapsedTime < rampDurationMs) {
                 output = elapsedTime / rampDurationMs;
             } else {
@@ -164,7 +164,7 @@ private:
     ofParameter<void> forceFinish;
     ofParameter<bool> enable;
     
-    float rampStartTime; // Time in seconds
+    double rampStartTime; // Time in seconds
     float lastTNum;
 };
 
@@ -240,9 +240,21 @@ public:
     
     void resetPhase() override;
     void setBpm(float bpm) override;
+    void loadBeforeConnections(ofJson &json) override;
     
     shared_ptr<basePhasor> getBasePhasor(){return basePh;};
 private:
+    void handleSyncToTransportChanged(bool syncEnabled);
+    vector<float> calculateTransportLockedRawPhasors(double beatPosition) const;
+    vector<float> calculateTransportLockedPhasors(double beatPosition) const;
+    double calculateTransportLockedCycles(double beatPosition, size_t index) const;
+    void checkTransportLockedCycle(const ofxOceanodeFrameTransportState &frameState);
+    vector<float> calculateTransportLockedCycleCounts(double beatPosition) const;
+    void updateTransportLockedCycleOutput(double beatPosition, bool force);
+    void setCycleOutputVisible(bool visible);
+    size_t getTransportLockedPhasorCount() const;
+    float getValueForIndex(const vector<float> &values, size_t index) const;
+
     shared_ptr<basePhasor> basePh;
 
 
@@ -255,6 +267,8 @@ private:
     ofParameter<bool>   multiTrigger_Param;
     ofParameter<void>   resetPhase_Param;
     ofParameter<bool>   audioRate_Param;
+    ofParameter<bool>   syncToTransport_Param;
+    ofParameter<vector<float>>  cycle_Param; // only present in Sync To Transport mode
     float phaseOffset;
     
     ofEventListeners parameterAutoSettersListeners;
