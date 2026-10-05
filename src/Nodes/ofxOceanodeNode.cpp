@@ -83,11 +83,11 @@ bool ofxOceanodeNode::loadPreset(string presetFolderPath){
 	return true;
 }
 
-void ofxOceanodeNode::savePreset(string presetFolderPath){
+void ofxOceanodeNode::savePreset(string presetFolderPath, bool saveBeforeConnectionValues){
     string scapedNodeName = nodeModel->nodeName();
     ofStringReplace(scapedNodeName, " ", "_");
     string filename = presetFolderPath + "/" + scapedNodeName + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json";
-    ofJson json = saveParametersToJson(false);
+    ofJson json = saveParametersToJson(false, saveBeforeConnectionValues);
     saveInspectorParametersToJson(json);
     nodeModel->presetSave(json);
 	nodeModel->macroSave(json, presetFolderPath);
@@ -181,19 +181,22 @@ void ofxOceanodeNode::saveConfig(string filename, bool persistentPreset){
     
 }
 
-ofJson ofxOceanodeNode::saveParametersToJson(bool persistentPreset){
+ofJson ofxOceanodeNode::saveParametersToJson(bool persistentPreset, bool saveBeforeConnectionValues){
     ofJson json;
     for(int i = 0; i < getParameters().size(); i++){
         ofxOceanodeAbstractParameter& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
-        saveParameterToJson(json, p, persistentPreset);
+        saveParameterToJson(json, p, persistentPreset, saveBeforeConnectionValues);
     }
     return json;
 }
 
 void ofxOceanodeNode::saveParameterToJson(ofJson &json, ofxOceanodeAbstractParameter &p,
-                                           bool persistentPreset){
+                                           bool persistentPreset, bool saveBeforeConnectionValues){
     if((!persistentPreset && (p.getFlags() & ofxOceanodeParameterFlags_DisableSavePreset)) ||
        (persistentPreset && (p.getFlags() & ofxOceanodeParameterFlags_DisableSaveProject))) return;
+
+    if(saveBeforeConnectionValues && p.hasInConnection() &&
+       p.getInConnection()->serializeBeforeConnectionValue(json)) return;
 
     if(p.valueType() == typeid(vector<float>).name()){
         const auto vecF = p.cast<vector<float>>().getParameter().get();

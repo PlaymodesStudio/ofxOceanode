@@ -1560,7 +1560,7 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
     ofSavePrettyJson(presetFolderPath / "connections.json", json);
     
     for(auto &node : nodes){
-        node->savePreset(presetFolderPath);
+        node->savePreset(presetFolderPath, true);
     }
     
     // Save selected comments

@@ -34,7 +34,7 @@ public:
     void deleteSelf();
     
     bool loadPreset(string presetFolderPath);
-    void savePreset(string presetFolderPath);
+    void savePreset(string presetFolderPath, bool saveBeforeConnectionValues = false);
     
     bool loadPersistentPreset(string presetFolderPath);
     void savePersistentPreset(string presetFolderPath);
@@ -51,9 +51,9 @@ public:
     bool loadConfig(string filename, bool persistentPreset = false);
     void saveConfig(string filename, bool persistentPreset = false);
     
-    ofJson saveParametersToJson(bool persistentPreset = false);
+    ofJson saveParametersToJson(bool persistentPreset = false, bool saveBeforeConnectionValues = false);
     void saveParameterToJson(ofJson &json, ofxOceanodeAbstractParameter &parameter,
-                             bool persistentPreset = false);
+                             bool persistentPreset = false, bool saveBeforeConnectionValues = false);
     bool loadParametersFromJson(ofJson json, bool persistentPreset = false);
     
     void saveInspectorParametersToJson(ofJson &json);

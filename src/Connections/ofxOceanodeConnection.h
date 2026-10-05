@@ -51,9 +51,32 @@ public:
     
     bool getIsPersistent(){return isPersistent;};
     void setIsPersistent(bool p){isPersistent = p;};
+
+    // Clipboard copies need the sink's editable value, before this connection
+    // supplied its runtime value. Custom/trigger connections may have no snapshot.
+    virtual bool serializeBeforeConnectionValue(ofJson &json) const {return false;}
     
     ofEvent<void> destroyConnection;
 protected:
+    template<typename T>
+    bool serializeStoredValue(ofJson &json, const T &value) const {
+        if(sinkParameter->isSerializable()){
+            ofParameter<T> stored;
+            stored.set(sinkParameter->getName(), value);
+            ofSerialize(json, stored);
+        }
+        return true;
+    }
+
+    template<typename T>
+    typename std::enable_if<std::is_same<T, float>::value || std::is_same<T, int>::value, bool>::type
+    serializeStoredValue(ofJson &json, const vector<T> &value) const {
+        // Match the node preset format: one element is stored as a scalar.
+        if(value.size() == 1) json[sinkParameter->getEscapedName()] = value[0];
+        else json[sinkParameter->getEscapedName()] = value;
+        return true;
+    }
+
     bool active;
     bool restoreOnDestruction = true;
     
@@ -139,6 +162,10 @@ public:
         parameterEventListener.unsubscribe();
         if(restoreOnDestruction) restoreValue();
     };
+
+    bool serializeBeforeConnectionValue(ofJson &json) const override {
+        return serializeStoredValue(json, beforeConnectionValue);
+    }
     
 private:
     void passValueFunc(){
@@ -169,6 +196,10 @@ public:
         parameterEventListener.unsubscribe();
         if(restoreOnDestruction) restoreValue();
     };
+
+    bool serializeBeforeConnectionValue(ofJson &json) const override {
+        return serializeStoredValue(json, beforeConnectionValue);
+    }
     
 private:
     void passValueFunc(){
@@ -205,6 +236,10 @@ public:
         parameterEventListener.unsubscribe();
         if(restoreOnDestruction) restoreValue();
     };
+
+    bool serializeBeforeConnectionValue(ofJson &json) const override {
+        return serializeStoredValue(json, beforeConnectionValue);
+    }
     
 private:
     void passValueFunc(){
@@ -235,6 +270,10 @@ public:
         parameterEventListener.unsubscribe();
         if(restoreOnDestruction) restoreValue();
     };
+
+    bool serializeBeforeConnectionValue(ofJson &json) const override {
+        return serializeStoredValue(json, beforeConnectionValue);
+    }
     
 private:
     void passValueFunc(){
