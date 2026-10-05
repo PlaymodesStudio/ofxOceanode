@@ -10,6 +10,7 @@
 #include <cstring>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <set>
 
 namespace ofxOceanodeTimelineCurve {
@@ -68,14 +69,15 @@ float valueAtBeat(const std::vector<ofxOceanodeTimelineCurvePoint>& points,
     if(beat <= points.front().beat) return points.front().value;
     if(beat >= points.back().beat) return points.back().value;
     const auto mode = curveInterpolationMode(interpolation);
-    for(size_t i = 1; i < points.size(); ++i) {
-        if(beat > points[i].beat) continue;
-        const double span = std::max(1e-9, points[i].beat - points[i - 1].beat);
-        const float t = static_cast<float>(ofClamp((beat - points[i - 1].beat) / span, 0.0, 1.0));
-        const auto tension = i - 1 < tensions.size() ? tensions[i - 1] : ofxOceanodeTimelineCurveTension{};
-        return ofLerp(points[i - 1].value, points[i].value, curveSegmentShape(t, mode, tension));
-    }
-    return points.back().value;
+    const auto right = std::lower_bound(points.begin() + 1, points.end(), beat,
+        [](const ofxOceanodeTimelineCurvePoint& point, double targetBeat) {
+            return point.beat < targetBeat;
+        });
+    const size_t i = static_cast<size_t>(right - points.begin());
+    const double span = std::max(1e-9, points[i].beat - points[i - 1].beat);
+    const float t = static_cast<float>(ofClamp((beat - points[i - 1].beat) / span, 0.0, 1.0));
+    const auto tension = i - 1 < tensions.size() ? tensions[i - 1] : ofxOceanodeTimelineCurveTension{};
+    return ofLerp(points[i - 1].value, points[i].value, curveSegmentShape(t, mode, tension));
 }
 
 } // namespace ofxOceanodeTimelineCurve
@@ -93,8 +95,9 @@ constexpr double kEpsilon = 1e-9;
 // loads without any version test; this exists to notice a file written by a
 // NEWER build, where a silent partial load would be the wrong answer.
 // 6 clip groups, 7 wave tracks, 8 self-contained LFO clips,
-// 9 preset-backed editor zoom and horizontal position.
-constexpr int kPresetVersion = 9;
+// 9 preset-backed editor zoom and horizontal position,
+// 10 state-capture curve clips.
+constexpr int kPresetVersion = 10;
 constexpr float kDefaultTimelinePixelsPerSecond = 140.0f;
 constexpr float kMinTimelinePixelsPerSecond = 0.25f;
 constexpr float kMaxTimelinePixelsPerSecond = 600.0f;
@@ -155,9 +158,14 @@ std::string combineAutomationValues(const std::vector<std::pair<ofxOceanodeTimel
         return values.back().second;
     }
 
-    auto parseValue = [](const std::string& value) {
+    auto parseValue = [](const std::string& value, bool scalar) {
         std::vector<double> result;
+        if(scalar) {
+            result.push_back(ofToDouble(value));
+            return result;
+        }
         const auto tokens = ofSplitString(value, ",", true, true);
+        result.reserve(tokens.size());
         if(tokens.empty()) result.push_back(ofToDouble(value));
         else for(const auto& token : tokens) result.push_back(ofToDouble(token));
         if(result.empty()) result.push_back(0.0);
@@ -167,9 +175,10 @@ std::string combineAutomationValues(const std::vector<std::pair<ofxOceanodeTimel
     std::vector<std::vector<double>> numericValues;
     numericValues.reserve(values.size());
     size_t outputSize = 1;
+    const bool scalar = isScalarFloat || isScalarInt || isScalarBool;
     for(const auto& value : values) {
-        numericValues.push_back(parseValue(value.second));
-        if(!isScalarFloat && !isScalarInt && !isScalarBool)
+        numericValues.push_back(parseValue(value.second, scalar));
+        if(!scalar)
             outputSize = std::max(outputSize, numericValues.back().size());
     }
     auto componentAt = [](const std::vector<double>& value, size_t index) {
@@ -388,11 +397,13 @@ bool readWaveformCache(std::string& filePath, int& outNumChannels,
 
     file.seekg(dataStart, std::ios::beg);
     std::vector<char> frameBuf(static_cast<size_t>(bytesPerSample) * numChannels);
+    std::vector<float> minVals(numChannels);
+    std::vector<float> maxVals(numChannels);
     for(int pt = 0; pt < kPointsPerChannel; ++pt) {
         const int startFrame = pt * framesPerPoint;
         const int endFrame = std::min(startFrame + framesPerPoint, totalFrames);
-        std::vector<float> minVals(numChannels, 1.0f);
-        std::vector<float> maxVals(numChannels, -1.0f);
+        std::fill(minVals.begin(), minVals.end(), 1.0f);
+        std::fill(maxVals.begin(), maxVals.end(), -1.0f);
         for(int f = startFrame; f < endFrame; ++f) {
             if(!file.read(frameBuf.data(), frameBuf.size())) break;
             for(int ch = 0; ch < numChannels; ++ch) {
@@ -679,8 +690,11 @@ double lfoCycles(const ofxOceanodeTimelineClip& clip, double sourceBeat) {
             const size_t last = points.size() - 1;
             return cache.atPoint[last] + (b - points.back().beat) / curve.pointPeriod(last);
         }
-        size_t i = 1;
-        while(i < points.size() && points[i].beat < b) ++i; // same segment search as valueAtBeat
+        const auto right = std::lower_bound(points.begin() + 1, points.end(), b,
+            [](const ofxOceanodeTimelineCurvePoint& point, double targetBeat) {
+                return point.beat < targetBeat;
+            });
+        const size_t i = static_cast<size_t>(right - points.begin());
         const double span = std::max(1e-9, points[i].beat - points[i - 1].beat);
         return cache.atPoint[i - 1] + curve.segmentCycles(i, (b - points[i - 1].beat) / span);
     };
@@ -808,18 +822,21 @@ bool applyAutomationValue(ofxOceanodeAbstractParameter& parameter,
     const auto tokens = ofSplitString(value, ",", true, true);
     if(valueType == typeid(std::vector<float>).name()) {
         std::vector<float> result;
+        result.reserve(tokens.size());
         for(const auto& token : tokens) result.push_back(ofToFloat(token));
         parameter.cast<std::vector<float>>().getParameter().set(result);
         return true;
     }
     if(valueType == typeid(std::vector<int>).name()) {
         std::vector<int> result;
+        result.reserve(tokens.size());
         for(const auto& token : tokens) result.push_back(ofToInt(token));
         parameter.cast<std::vector<int>>().getParameter().set(result);
         return true;
     }
     if(valueType == typeid(std::vector<bool>).name()) {
         std::vector<bool> result;
+        result.reserve(tokens.size());
         for(const auto& token : tokens) result.push_back(ofToBool(token));
         parameter.cast<std::vector<bool>>().getParameter().set(result);
         return true;
@@ -830,6 +847,36 @@ bool applyAutomationValue(ofxOceanodeAbstractParameter& parameter,
     }
     parameter.fromString(value);
     return true;
+}
+
+// Curve and Step lanes deliberately produce one scalar stream. When their
+// destination is a numeric vector, keep the parameter's current width and
+// broadcast that scalar to every component instead of shrinking the vector
+// to one item. Explicit multi-component lanes already return comma-separated
+// values and pass through untouched.
+std::string broadcastScalarNumericVectorValue(ofxOceanodeAbstractParameter& parameter,
+                                              const std::string& value,
+                                              const std::string& valueType) {
+    const bool floatVector = valueType == typeid(std::vector<float>).name();
+    const bool intVector = valueType == typeid(std::vector<int>).name();
+    const bool boolVector = valueType == typeid(std::vector<bool>).name();
+    if(!floatVector && !intVector && !boolVector) return value;
+    const auto tokens = ofSplitString(value, ",", true, true);
+    if(tokens.size() != 1) return value;
+
+    size_t componentCount = 0;
+    if(floatVector) componentCount = parameter.cast<std::vector<float>>().getParameter().get().size();
+    else if(intVector) componentCount = parameter.cast<std::vector<int>>().getParameter().get().size();
+    else componentCount = parameter.cast<std::vector<bool>>().getParameter().get().size();
+    if(componentCount <= 1) return value;
+
+    std::string result;
+    result.reserve((tokens.front().size() + 1) * componentCount);
+    for(size_t component = 0; component < componentCount; ++component) {
+        if(component > 0) result += ",";
+        result += tokens.front();
+    }
+    return result;
 }
 
 // Clamps a combined automation value back to the target parameter's own
@@ -1192,10 +1239,107 @@ void ofxOceanodeTimelineStepLane::fromJson(const ofJson& json) {
 
 ofxOceanodeTimelineManager::ofxOceanodeTimelineManager(ofxOceanodeContainer* owner) : container(owner) {}
 
+void ofxOceanodeTimelineManager::invalidateEvaluationIndexes() {
+    evaluationIndexesValid = false;
+    bindingsByPathCache.clear();
+    trackByIdCache.clear();
+    trackEvaluationIndexes.clear();
+    pianoPitchRangesCache.clear();
+    zeroWhenInactiveBindingsCache.clear();
+    continuouslyEvaluatedPathsCache.clear();
+    parameterTrackColorCache.clear();
+    parameterTrackColorCacheFrame = std::numeric_limits<uint64_t>::max();
+}
+
+void ofxOceanodeTimelineManager::rebuildParameterTrackColorCache() const {
+    parameterTrackColorCache.clear();
+    size_t bindingCount = 0;
+    for(const auto& track : tracks) bindingCount += track.bindings.size();
+    parameterTrackColorCache.reserve(bindingCount);
+    // Preserve the previous first-track-wins behaviour for parameters that
+    // are published to more than one track.
+    for(const auto& track : tracks) {
+        for(const auto& binding : track.bindings)
+            parameterTrackColorCache.emplace(binding.parameterPath, track.color);
+    }
+    parameterTrackColorCacheFrame = static_cast<uint64_t>(ofGetFrameNum());
+}
+
+void ofxOceanodeTimelineManager::rebuildEvaluationIndexes() {
+    bindingsByPathCache.clear();
+    trackByIdCache.clear();
+    trackEvaluationIndexes.clear();
+    pianoPitchRangesCache.clear();
+    zeroWhenInactiveBindingsCache.clear();
+    continuouslyEvaluatedPathsCache.clear();
+
+    size_t bindingCount = 0;
+    for(const auto& track : tracks) bindingCount += track.bindings.size();
+    bindingsByPathCache.reserve(bindingCount);
+    trackByIdCache.reserve(tracks.size());
+    trackEvaluationIndexes.reserve(tracks.size());
+
+    for(auto& track : tracks) {
+        trackByIdCache.emplace(track.id, &track);
+        auto& index = trackEvaluationIndexes[&track];
+        index.bindingById.reserve(track.bindings.size());
+        index.clipOrder.reserve(track.clips.size());
+        for(auto& binding : track.bindings) {
+            index.bindingById.emplace(binding.id, &binding);
+            bindingsByPathCache[binding.parameterPath].push_back(&binding);
+        }
+        for(size_t clipIndex = 0; clipIndex < track.clips.size(); ++clipIndex)
+            index.clipOrder.emplace(&track.clips[clipIndex], clipIndex);
+    }
+
+    // These properties depend only on the timeline structure. Cache them once
+    // for the current update instead of rediscovering them for the playhead and
+    // again for every scheduler lookahead probe.
+    for(const auto& track : tracks) {
+        const auto trackIt = trackEvaluationIndexes.find(&track);
+        if(trackIt == trackEvaluationIndexes.end()) continue;
+        const auto bindingFor = [&](const std::string& bindingId) -> const ofxOceanodeTimelineParameterBinding* {
+            const auto bindingIt = trackIt->second.bindingById.find(bindingId);
+            return bindingIt == trackIt->second.bindingById.end() ? nullptr : bindingIt->second;
+        };
+        for(const auto& binding : track.bindings)
+            if(binding.hasLiveOverride) continuouslyEvaluatedPathsCache.emplace(binding.parameterPath);
+        for(const auto& clip : track.clips) {
+            if(clip.isLfo) {
+                if(const auto* binding = bindingFor(clip.lfoOutputBindingId))
+                    continuouslyEvaluatedPathsCache.emplace(binding->parameterPath);
+                continue;
+            }
+            for(const auto& lane : clip.lanes) {
+                if(lane.type == ofxOceanodeTimelineLaneType::Curve) {
+                    for(const auto& bindingId : lane.bindingIds)
+                        if(const auto* binding = bindingFor(bindingId))
+                            continuouslyEvaluatedPathsCache.emplace(binding->parameterPath);
+                    continue;
+                }
+                if(lane.type != ofxOceanodeTimelineLaneType::PianoRoll) continue;
+                if(const auto* binding = bindingFor(lane.pianoPitchBindingId)) {
+                    auto& range = pianoPitchRangesCache[binding->parameterPath];
+                    range.valueType = binding->valueType;
+                    range.low = std::min(range.low, static_cast<int>(ofClamp(lane.pianoLowPitch, 0, 127)));
+                    range.high = std::max(range.high, static_cast<int>(ofClamp(lane.pianoHighPitch, 0, 127)));
+                }
+                if(const auto* binding = bindingFor(lane.pianoGateBindingId))
+                    zeroWhenInactiveBindingsCache.emplace(binding);
+                if(const auto* binding = bindingFor(lane.pianoVelocityBindingId))
+                    zeroWhenInactiveBindingsCache.emplace(binding);
+            }
+        }
+    }
+    evaluationIndexesValid = true;
+    rebuildParameterTrackColorCache();
+}
+
 void ofxOceanodeTimelineManager::setContainer(ofxOceanodeContainer* owner) {
     if(container == owner) return;
     for(const auto& track : tracks) clearTimelineFlag(track);
     container = owner;
+    invalidateEvaluationIndexes();
     std::set<std::string> parameterPaths;
     for(const auto& track : tracks)
         for(const auto& binding : track.bindings)
@@ -1315,6 +1459,7 @@ std::string ofxOceanodeTimelineManager::createTrack(const std::string& requested
     track.color = defaultColors[tracks.size() % (sizeof(defaultColors) / sizeof(defaultColors[0]))];
     ++nextTrackNumber;
     tracks.push_back(std::move(track));
+    invalidateEvaluationIndexes();
     return tracks.back().id;
 }
 
@@ -1433,7 +1578,11 @@ bool ofxOceanodeTimelineManager::removeTrack(const std::string& trackId) {
     auto it = std::find_if(tracks.begin(), tracks.end(), [&](const auto& track) { return track.id == trackId; });
     if(it == tracks.end()) return false;
     std::set<std::string> affectedPaths;
-    for(const auto& binding : it->bindings) affectedPaths.insert(binding.parameterPath);
+    for(const auto& binding : it->bindings) {
+        affectedPaths.insert(binding.parameterPath);
+        stateCaptureManualOverrideKeys.erase(trackId + "\x1f" + binding.id);
+        stateCaptureLastAppliedValues.erase(binding.parameterPath);
+    }
     // Every clip on this track is about to disappear along with it -- drop
     // it from any group first so removeClipFromGroups' bookkeeping
     // (dissolving a group that drops below two members) runs the same way
@@ -1447,16 +1596,25 @@ bool ofxOceanodeTimelineManager::removeTrack(const std::string& trackId) {
         releaseWaveClipIfNeeded(trackId, clip.id);
     }
     tracks.erase(it);
+    invalidateEvaluationIndexes();
     for(const auto& path : affectedPaths) refreshTimelineFlag(path);
     return true;
 }
 
 ofxOceanodeTimelineTrack* ofxOceanodeTimelineManager::getTrack(const std::string& trackId) {
+    if(evaluationIndexesValid) {
+        const auto cached = trackByIdCache.find(trackId);
+        if(cached != trackByIdCache.end()) return cached->second;
+    }
     auto it = std::find_if(tracks.begin(), tracks.end(), [&](auto& track) { return track.id == trackId; });
     return it == tracks.end() ? nullptr : &*it;
 }
 
 const ofxOceanodeTimelineTrack* ofxOceanodeTimelineManager::getTrack(const std::string& trackId) const {
+    if(evaluationIndexesValid) {
+        const auto cached = trackByIdCache.find(trackId);
+        if(cached != trackByIdCache.end()) return cached->second;
+    }
     auto it = std::find_if(tracks.begin(), tracks.end(), [&](const auto& track) { return track.id == trackId; });
     return it == tracks.end() ? nullptr : &*it;
 }
@@ -1482,6 +1640,7 @@ std::string ofxOceanodeTimelineManager::addBinding(const std::string& trackId,
     binding.defaultValue = parameterValueForAutomation(parameter);
     binding.mode = mode;
     track->bindings.push_back(binding);
+    invalidateEvaluationIndexes();
 
     // No clip or lane is created here, whether this is the track's first
     // binding or its fifth -- a binding just joins the track's pool of
@@ -1500,26 +1659,20 @@ std::string ofxOceanodeTimelineManager::addBinding(const std::string& trackId,
 bool ofxOceanodeTimelineManager::isParameterBound(const ofxOceanodeAbstractParameter& parameter) const {
     if(container == nullptr) return false;
     const std::string path = container->getTimelineParameterPath(const_cast<ofxOceanodeAbstractParameter&>(parameter));
-    for(const auto& track : tracks) {
-        if(std::any_of(track.bindings.begin(), track.bindings.end(), [&](const auto& binding){
-            return binding.parameterPath == path;
-        })) return true;
-    }
-    return false;
+    if(parameterTrackColorCacheFrame != static_cast<uint64_t>(ofGetFrameNum()))
+        rebuildParameterTrackColorCache();
+    return parameterTrackColorCache.find(path) != parameterTrackColorCache.end();
 }
 
 bool ofxOceanodeTimelineManager::getParameterTrackColor(const ofxOceanodeAbstractParameter& parameter, ofColor& color) const {
     if(container == nullptr) return false;
     const std::string path = container->getTimelineParameterPath(const_cast<ofxOceanodeAbstractParameter&>(parameter));
-    for(const auto& track : tracks) {
-        if(std::any_of(track.bindings.begin(), track.bindings.end(), [&](const auto& binding){
-            return binding.parameterPath == path;
-        })) {
-            color = track.color;
-            return true;
-        }
-    }
-    return false;
+    if(parameterTrackColorCacheFrame != static_cast<uint64_t>(ofGetFrameNum()))
+        rebuildParameterTrackColorCache();
+    const auto it = parameterTrackColorCache.find(path);
+    if(it == parameterTrackColorCache.end()) return false;
+    color = it->second;
+    return true;
 }
 
 bool ofxOceanodeTimelineManager::isStepLaneCompatible(const ofxOceanodeAbstractParameter& parameter) const {
@@ -1547,6 +1700,7 @@ bool ofxOceanodeTimelineManager::moveBinding(const std::string& trackId, const s
     track->bindings.erase(it);
     track->bindings.insert(track->bindings.begin() + to, std::move(binding));
     normalizeNoteGroups(*track);
+    invalidateEvaluationIndexes();
     return true;
 }
 
@@ -1565,6 +1719,7 @@ bool ofxOceanodeTimelineManager::setBindingOrder(const std::string& trackId, con
     for(auto& remaining : track->bindings) ordered.push_back(std::move(remaining));
     track->bindings = std::move(ordered);
     normalizeNoteGroups(*track);
+    invalidateEvaluationIndexes();
     return true;
 }
 
@@ -1681,6 +1836,7 @@ bool ofxOceanodeTimelineManager::setNoteGroupRoles(const std::string& trackId, c
     const auto groupCopy = group;
     syncNoteGroupLanes(*track, groupCopy, affected);
     normalizeNoteGroups(*track);
+    invalidateEvaluationIndexes();
     return true;
 }
 
@@ -1760,6 +1916,8 @@ bool ofxOceanodeTimelineManager::removeBinding(const std::string& trackId, const
     auto it = std::find_if(track->bindings.begin(), track->bindings.end(), [&](const auto& binding) { return binding.id == bindingId; });
     if(it == track->bindings.end()) return false;
     const std::string parameterPath = it->parameterPath;
+    stateCaptureManualOverrideKeys.erase(trackId + "\x1f" + bindingId);
+    stateCaptureLastAppliedValues.erase(parameterPath);
     for(auto& clip : track->clips) {
         // An LFO clip points at its output binding from the clip itself, not
         // through a lane -- without this it kept a dangling id and silently
@@ -1774,6 +1932,7 @@ bool ofxOceanodeTimelineManager::removeBinding(const std::string& trackId, const
     }
     track->bindings.erase(it);
     normalizeNoteGroups(*track);
+    invalidateEvaluationIndexes();
     refreshTimelineFlag(parameterPath);
     return true;
 }
@@ -1796,6 +1955,266 @@ bool ofxOceanodeTimelineManager::setBindingClamp(const std::string& trackId,
     return true;
 }
 
+int ofxOceanodeTimelineManager::captureStateAsCurvePoints(const std::string& trackId,
+                                                          const std::string& bindingId,
+                                                          double timelineBeat) {
+    auto* track = getTrack(trackId);
+    if(track == nullptr || track->isWaveTrack || container == nullptr) return 0;
+
+    struct CaptureTarget {
+        std::string bindingId;
+        std::string parameterPath;
+        std::string valueType;
+        float value = 0.0f;
+        float rangeMin = 0.0f;
+        float rangeMax = 1.0f;
+        bool boundedRange = true;
+    };
+    std::vector<CaptureTarget> targets;
+    targets.reserve(bindingId.empty() ? track->bindings.size() : 1);
+
+    for(const auto& binding : track->bindings) {
+        if(!bindingId.empty() && binding.id != bindingId) continue;
+        auto* parameter = container->findTimelineParameter(binding.parameterPath);
+        if(parameter == nullptr) continue;
+
+        CaptureTarget target;
+        target.bindingId = binding.id;
+        target.parameterPath = binding.parameterPath;
+        target.valueType = binding.valueType;
+        if(binding.valueType == typeid(float).name()) {
+            auto& value = parameter->cast<float>().getParameter();
+            target.value = value.get();
+            target.rangeMin = value.getMin();
+            target.rangeMax = value.getMax();
+            target.boundedRange = std::isfinite(target.rangeMin) && std::isfinite(target.rangeMax) &&
+                target.rangeMax > target.rangeMin &&
+                target.rangeMin > std::numeric_limits<float>::lowest() * 0.5f &&
+                target.rangeMax < std::numeric_limits<float>::max() * 0.5f;
+        } else if(binding.valueType == typeid(int).name()) {
+            auto& value = parameter->cast<int>().getParameter();
+            target.value = static_cast<float>(value.get());
+            target.rangeMin = static_cast<float>(value.getMin());
+            target.rangeMax = static_cast<float>(value.getMax());
+            target.boundedRange = value.getMin() != std::numeric_limits<int>::lowest() &&
+                value.getMax() != std::numeric_limits<int>::max() && value.getMax() > value.getMin();
+        } else if(binding.valueType == typeid(bool).name()) {
+            target.value = parameter->cast<bool>().getParameter().get() ? 1.0f : 0.0f;
+            target.rangeMin = 0.0f;
+            target.rangeMax = 1.0f;
+        } else if(binding.valueType == typeid(std::vector<float>).name()) {
+            auto& value = parameter->cast<std::vector<float>>().getParameter();
+            const auto current = value.get();
+            const auto minimum = value.getMin();
+            const auto maximum = value.getMax();
+            target.value = current.empty() ? 0.0f : current.front();
+            target.rangeMin = minimum.empty() ? std::min(0.0f, target.value) : minimum.front();
+            target.rangeMax = maximum.empty() ? std::max(1.0f, target.value) : maximum.front();
+            target.boundedRange = !minimum.empty() && !maximum.empty() &&
+                std::isfinite(target.rangeMin) && std::isfinite(target.rangeMax) &&
+                target.rangeMax > target.rangeMin &&
+                target.rangeMin > std::numeric_limits<float>::lowest() * 0.5f &&
+                target.rangeMax < std::numeric_limits<float>::max() * 0.5f;
+        } else if(binding.valueType == typeid(std::vector<int>).name()) {
+            auto& value = parameter->cast<std::vector<int>>().getParameter();
+            const auto current = value.get();
+            const auto minimum = value.getMin();
+            const auto maximum = value.getMax();
+            target.value = current.empty() ? 0.0f : static_cast<float>(current.front());
+            target.rangeMin = minimum.empty() ? std::min(0.0f, target.value) : static_cast<float>(minimum.front());
+            target.rangeMax = maximum.empty() ? std::max(1.0f, target.value) : static_cast<float>(maximum.front());
+            target.boundedRange = !minimum.empty() && !maximum.empty() &&
+                minimum.front() != std::numeric_limits<int>::lowest() &&
+                maximum.front() != std::numeric_limits<int>::max() && maximum.front() > minimum.front();
+        } else if(binding.valueType == typeid(std::vector<bool>).name()) {
+            auto& value = parameter->cast<std::vector<bool>>().getParameter();
+            const auto current = value.get();
+            target.value = !current.empty() && current.front() ? 1.0f : 0.0f;
+            target.rangeMin = 0.0f;
+            target.rangeMax = 1.0f;
+        } else {
+            continue; // Text values cannot be interpolated as a curve.
+        }
+
+        if(!target.boundedRange) {
+            target.rangeMin = std::min(0.0f, target.value);
+            target.rangeMax = std::max(1.0f, target.value);
+            if(target.rangeMax - target.rangeMin < 1e-6f) target.rangeMax = target.rangeMin + 1.0f;
+        }
+        targets.push_back(std::move(target));
+    }
+    if(targets.empty()) return 0;
+
+    timelineBeat = std::max(0.0, timelineBeat);
+    constexpr double captureTail = 1.0 / 24.0;
+    std::string fallbackCaptureClipId;
+    for(const auto& clip : track->clips) {
+        if(!clip.isStateCapture) continue;
+        fallbackCaptureClipId = clip.id;
+        break;
+    }
+    if(fallbackCaptureClipId.empty()) {
+        fallbackCaptureClipId = createClip(trackId, "Captured State", timelineBeat, captureTail);
+        auto* created = getClip(trackId, fallbackCaptureClipId);
+        if(created == nullptr) return 0;
+        created->isStateCapture = true;
+        created->repeatContent = false;
+    }
+
+    // A shared capture clip remains shared until the user explicitly
+    // separates it. Once separated, locate each parameter's own destination
+    // by its binding so later track-level captures preserve that independence.
+    std::vector<std::string> targetClipIds;
+    targetClipIds.reserve(targets.size());
+    for(const auto& target : targets) {
+        std::string exactClipId;
+        if(const auto* currentTrack = getTrack(trackId)) {
+            for(const auto& clip : currentTrack->clips) {
+                if(!clip.isStateCapture) continue;
+                const bool ownsBinding = std::any_of(clip.lanes.begin(), clip.lanes.end(), [&](const auto& lane) {
+                    return lane.type == ofxOceanodeTimelineLaneType::Curve &&
+                        std::find(lane.bindingIds.begin(), lane.bindingIds.end(), target.bindingId) != lane.bindingIds.end();
+                });
+                if(ownsBinding) {
+                    exactClipId = clip.id;
+                    break;
+                }
+            }
+        }
+        targetClipIds.push_back(exactClipId.empty() ? fallbackCaptureClipId : exactClipId);
+    }
+
+    // Bake any user stretch into absolute point positions before growing each
+    // distinct destination clip. This is deliberately per clip: separated
+    // parameter clips may have been moved or stretched independently.
+    std::unordered_map<std::string, double> captureSourceBeats;
+    for(const auto& captureClipId : targetClipIds) {
+        if(captureSourceBeats.count(captureClipId) > 0) continue;
+        auto* captureClip = getClip(trackId, captureClipId);
+        if(captureClip == nullptr) continue;
+        std::vector<std::vector<double>> absolutePointBeats(captureClip->lanes.size());
+        for(size_t laneIndex = 0; laneIndex < captureClip->lanes.size(); ++laneIndex) {
+            const auto& lane = captureClip->lanes[laneIndex];
+            absolutePointBeats[laneIndex].reserve(lane.curvePoints.size());
+            for(const auto& point : lane.curvePoints)
+                absolutePointBeats[laneIndex].push_back(
+                    ofxOceanodeTimelineClipTime::sourceToTimelineBeat(*captureClip, point.beat));
+        }
+        const double oldEnd = captureClip->startBeat + captureClip->durationBeats;
+        const double newStart = std::min(captureClip->startBeat, timelineBeat);
+        const double newEnd = std::max(oldEnd, timelineBeat + captureTail);
+        for(size_t laneIndex = 0; laneIndex < captureClip->lanes.size(); ++laneIndex) {
+            auto& lane = captureClip->lanes[laneIndex];
+            for(size_t pointIndex = 0; pointIndex < lane.curvePoints.size(); ++pointIndex)
+                lane.curvePoints[pointIndex].beat = absolutePointBeats[laneIndex][pointIndex] - newStart;
+        }
+        captureClip->startBeat = newStart;
+        captureClip->durationBeats = std::max(captureTail, newEnd - newStart);
+        captureClip->contentDurationBeats = captureClip->durationBeats;
+        captureClip->contentStretch = 1.0;
+        captureClip->repeatContent = false;
+        captureSourceBeats[captureClipId] = timelineBeat - newStart;
+    }
+
+    auto remapCurveRange = [](ofxOceanodeTimelineLane& lane, float newMin, float newMax) {
+        if(newMax - newMin < 1e-9f) newMax = newMin + 1.0f;
+        const float oldMin = lane.valueMin;
+        const float oldSpan = lane.valueMax - lane.valueMin;
+        const float newSpan = newMax - newMin;
+        for(auto& point : lane.curvePoints) {
+            const float actual = std::abs(oldSpan) < 1e-9f ? oldMin : oldMin + point.value * oldSpan;
+            point.value = ofClamp((actual - newMin) / newSpan, 0.0f, 1.0f);
+        }
+        lane.valueMin = newMin;
+        lane.valueMax = newMax;
+    };
+    auto setCurvePoint = [](ofxOceanodeTimelineLane& lane, double beat, float value) {
+        const auto existing = std::lower_bound(lane.curvePoints.begin(), lane.curvePoints.end(), beat,
+            [](const auto& point, double candidate) { return point.beat < candidate; });
+        if(existing != lane.curvePoints.end() && std::abs(existing->beat - beat) <= 1e-6) {
+            existing->value = value;
+            return;
+        }
+        const size_t oldCount = lane.curvePoints.size();
+        auto oldTensions = lane.curveTensions;
+        oldTensions.resize(oldCount > 0 ? oldCount - 1 : 0);
+        const size_t insertionIndex = static_cast<size_t>(existing - lane.curvePoints.begin());
+        lane.curvePoints.insert(existing, {beat, value});
+        std::vector<ofxOceanodeTimelineCurveTension> tensions(
+            lane.curvePoints.size() > 0 ? lane.curvePoints.size() - 1 : 0);
+        for(size_t segment = 0; segment < tensions.size(); ++segment) {
+            if((insertionIndex > 0 && segment == insertionIndex - 1) || segment == insertionIndex) continue;
+            const size_t oldSegment = segment < insertionIndex ? segment : segment - 1;
+            if(oldSegment < oldTensions.size()) tensions[segment] = oldTensions[oldSegment];
+        }
+        lane.curveTensions = std::move(tensions);
+    };
+
+    int captured = 0;
+    for(size_t targetIndex = 0; targetIndex < targets.size(); ++targetIndex) {
+        const auto& target = targets[targetIndex];
+        const auto& captureClipId = targetClipIds[targetIndex];
+        auto* captureClip = getClip(trackId, captureClipId); // createLane may move lane storage.
+        const auto sourceBeatIt = captureSourceBeats.find(captureClipId);
+        if(captureClip == nullptr || sourceBeatIt == captureSourceBeats.end()) continue;
+        const double sourceBeat = sourceBeatIt->second;
+        ofxOceanodeTimelineLane* lane = nullptr;
+        for(auto& candidate : captureClip->lanes) {
+            if(candidate.type == ofxOceanodeTimelineLaneType::Curve &&
+               std::find(candidate.bindingIds.begin(), candidate.bindingIds.end(), target.bindingId) != candidate.bindingIds.end()) {
+                lane = &candidate;
+                break;
+            }
+        }
+        if(lane == nullptr) {
+            const auto laneId = createLane(trackId, captureClipId, target.parameterPath,
+                                           ofxOceanodeTimelineLaneType::Curve);
+            if(laneId.empty() || !addBindingToLane(trackId, captureClipId, laneId, target.bindingId)) continue;
+            lane = getLane(trackId, captureClipId, laneId);
+            if(lane == nullptr) continue;
+            lane->curvePoints.clear(); // remove createLane's generic diagonal.
+            lane->curveTensions.clear();
+            lane->valueMin = target.rangeMin;
+            lane->valueMax = target.rangeMax;
+            lane->curveInterpolation = target.valueType == typeid(bool).name() ||
+                target.valueType == typeid(std::vector<bool>).name() ? "Step" : "Linear";
+        } else if(target.boundedRange) {
+            if(std::abs(lane->valueMin - target.rangeMin) > 1e-6f ||
+               std::abs(lane->valueMax - target.rangeMax) > 1e-6f)
+                remapCurveRange(*lane, target.rangeMin, target.rangeMax);
+        } else if(target.value < lane->valueMin || target.value > lane->valueMax) {
+            remapCurveRange(*lane, std::min(lane->valueMin, target.value),
+                            std::max(lane->valueMax, target.value));
+        }
+
+        const float span = lane->valueMax - lane->valueMin;
+        const float normalized = std::abs(span) < 1e-9f ? 0.0f
+            : ofClamp((target.value - lane->valueMin) / span, 0.0f, 1.0f);
+        setCurvePoint(*lane, sourceBeat, normalized);
+
+        const std::string overrideKey = trackId + "\x1f" + target.bindingId;
+        if(stateCaptureManualOverrideKeys.erase(overrideKey) > 0) {
+            if(auto* binding = getBinding(trackId, target.bindingId)) {
+                binding->hasLiveOverride = false;
+                binding->liveOverrideValue.clear();
+            }
+        }
+        if(auto* parameter = container->findTimelineParameter(target.parameterPath))
+            stateCaptureLastAppliedValues[target.parameterPath] = parameterValueForAutomation(*parameter);
+        ++captured;
+    }
+
+    if(auto* sortedTrack = getTrack(trackId)) {
+        std::sort(sortedTrack->clips.begin(), sortedTrack->clips.end(), [](const auto& a, const auto& b) {
+            if(std::abs(a.startBeat - b.startBeat) > 1e-9) return a.startBeat < b.startBeat;
+            return a.id < b.id;
+        });
+    }
+    invalidateEvaluationIndexes();
+    invalidateSchedule();
+    return captured;
+}
+
 std::string ofxOceanodeTimelineManager::createClip(const std::string& trackId,
                                                    const std::string& requestedName,
                                                    double startBeat,
@@ -1811,6 +2230,7 @@ std::string ofxOceanodeTimelineManager::createClip(const std::string& trackId,
     clip.contentDurationBeats = clip.durationBeats;
     ++nextClipNumber;
     track->clips.push_back(std::move(clip));
+    invalidateEvaluationIndexes();
     return track->clips.back().id;
 }
 
@@ -2139,6 +2559,9 @@ std::string ofxOceanodeTimelineManager::splitClip(const std::string& trackId, co
     const ofxOceanodeTimelineClip original = *sourceClip;
     ofxOceanodeTimelineClip left, right;
     if(!computeClipSplit(original, timelineBeat, left, right)) return std::string();
+    // Keep the original/left half as the track's capture destination. The
+    // right half is an ordinary editable curve clip after the split.
+    right.isStateCapture = false;
 
     // Splitting dissolves a clip group: the halves become independent.
     if(getGroupForClip(trackId, clipId) != nullptr) ungroupClip(trackId, clipId);
@@ -2166,6 +2589,7 @@ std::string ofxOceanodeTimelineManager::splitClip(const std::string& trackId, co
             return a.id < b.id;
         });
     }
+    invalidateEvaluationIndexes();
     invalidateSchedule();
     return rightId;
 }
@@ -2181,6 +2605,9 @@ std::string ofxOceanodeTimelineManager::duplicateClip(const std::string& srcTrac
     if(srcTrack->isWaveTrack != dstTrack->isWaveTrack) return std::string();
     // A value copy: createClip below may reallocate the source track's clips.
     ofxOceanodeTimelineClip copy = *sourceClip;
+    // A duplicate is ordinary automation; otherwise the next capture would
+    // have two ambiguous destination clips on the same track.
+    copy.isStateCapture = false;
     const bool sameTrack = srcTrackId == dstTrackId;
 
     // The destination track's binding for the parameter a source binding drives.
@@ -2265,6 +2692,51 @@ std::string ofxOceanodeTimelineManager::duplicateClip(const std::string& srcTrac
     return newId;
 }
 
+int ofxOceanodeTimelineManager::separateStateCaptureClip(const std::string& trackId,
+                                                         const std::string& clipId) {
+    const auto* source = getClip(trackId, clipId);
+    const auto* track = getTrack(trackId);
+    if(source == nullptr || track == nullptr || track->isWaveTrack || source->isLfo ||
+       !source->isStateCapture || source->lanes.size() < 2) return 0;
+
+    // Copy the descriptors before duplicateClip() grows the track's clip
+    // vector and invalidates every pointer/reference into it.
+    const double startBeat = source->startBeat;
+    const auto lanes = source->lanes;
+    for(const auto& lane : lanes)
+        if(lane.bindingIds.empty()) return 0;
+
+    std::vector<std::string> createdClipIds;
+    createdClipIds.reserve(lanes.size() - 1);
+    for(size_t laneIndex = 1; laneIndex < lanes.size(); ++laneIndex) {
+        const auto newClipId = duplicateClip(trackId, clipId, trackId, startBeat,
+                                             lanes[laneIndex].id,
+                                             lanes[laneIndex].bindingIds.front());
+        if(newClipId.empty()) {
+            for(const auto& createdId : createdClipIds) removeClip(trackId, createdId);
+            return 0;
+        }
+        if(getClip(trackId, newClipId) != nullptr) {
+            createdClipIds.push_back(newClipId);
+        } else {
+            removeClip(trackId, newClipId);
+            for(const auto& createdId : createdClipIds) removeClip(trackId, createdId);
+            return 0;
+        }
+    }
+
+    for(const auto& createdId : createdClipIds)
+        if(auto* created = getClip(trackId, createdId)) created->isStateCapture = true;
+    if(getGroupForClip(trackId, clipId) != nullptr) ungroupClip(trackId, clipId);
+    if(auto* original = getClip(trackId, clipId)) {
+        original->lanes = {lanes.front()};
+        original->isStateCapture = true;
+    }
+    invalidateEvaluationIndexes();
+    invalidateSchedule();
+    return static_cast<int>(createdClipIds.size() + 1);
+}
+
 bool ofxOceanodeTimelineManager::trimClipStart(const std::string& trackId, const std::string& clipId, double newStartBeat) {
     auto* track = getTrack(trackId);
     auto* clip = getClip(trackId, clipId);
@@ -2295,6 +2767,7 @@ bool ofxOceanodeTimelineManager::trimClipStart(const std::string& trackId, const
         if(std::abs(a.startBeat - b.startBeat) > 1e-9) return a.startBeat < b.startBeat;
         return a.id < b.id;
     });
+    invalidateEvaluationIndexes();
     invalidateSchedule();
     return true;
 }
@@ -2350,6 +2823,7 @@ bool ofxOceanodeTimelineManager::extendClipStart(const std::string& trackId, con
         if(std::abs(a.startBeat - b.startBeat) > 1e-9) return a.startBeat < b.startBeat;
         return a.id < b.id;
     });
+    invalidateEvaluationIndexes();
     invalidateSchedule();
     return true;
 }
@@ -2369,13 +2843,31 @@ bool ofxOceanodeTimelineManager::removeClip(const std::string& trackId, const st
     if(track == nullptr) return false;
     if(const auto* clip = getClip(trackId, clipId)) {
         releaseWaveClipIfNeeded(trackId, clip->id);
+        if(clip->isStateCapture) {
+            for(const auto& lane : clip->lanes) {
+                for(const auto& bindingId : lane.bindingIds) {
+                    const std::string key = trackId + "\x1f" + bindingId;
+                    if(stateCaptureManualOverrideKeys.erase(key) > 0) {
+                        if(auto* binding = getBinding(trackId, bindingId)) {
+                            binding->hasLiveOverride = false;
+                            binding->liveOverrideValue.clear();
+                        }
+                    }
+                    if(const auto* binding = getBinding(trackId, bindingId))
+                        stateCaptureLastAppliedValues.erase(binding->parameterPath);
+                }
+            }
+        }
     }
     const auto oldSize = track->clips.size();
     track->clips.erase(std::remove_if(track->clips.begin(), track->clips.end(), [&](const auto& clip) {
         return clip.id == clipId;
     }), track->clips.end());
     const bool removed = track->clips.size() != oldSize;
-    if(removed) removeClipFromGroups(trackId, clipId);
+    if(removed) {
+        removeClipFromGroups(trackId, clipId);
+        invalidateEvaluationIndexes();
+    }
     return removed;
 }
 
@@ -2505,7 +2997,17 @@ bool ofxOceanodeTimelineManager::removeLane(const std::string& trackId, const st
     auto* clip = getClip(trackId, clipId);
     if(clip == nullptr) return false;
     if(const auto* lane = getLane(trackId, clipId, laneId)) {
-    if(lane->type == ofxOceanodeTimelineLaneType::Wave) releaseWaveClipIfNeeded(trackId, clipId);
+        if(lane->type == ofxOceanodeTimelineLaneType::Wave) releaseWaveClipIfNeeded(trackId, clipId);
+        if(clip->isStateCapture) {
+            for(const auto& bindingId : lane->bindingIds) {
+                const std::string key = trackId + "\x1f" + bindingId;
+                if(stateCaptureManualOverrideKeys.erase(key) == 0) continue;
+                if(auto* binding = getBinding(trackId, bindingId)) {
+                    binding->hasLiveOverride = false;
+                    binding->liveOverrideValue.clear();
+                }
+            }
+        }
     }
     const auto oldSize = clip->lanes.size();
     clip->lanes.erase(std::remove_if(clip->lanes.begin(), clip->lanes.end(), [&](const auto& lane) {
@@ -2600,7 +3102,18 @@ bool ofxOceanodeTimelineManager::removeBindingFromLane(const std::string& trackI
     if(lane->pianoPitchBindingId == bindingId) lane->pianoPitchBindingId.clear();
     if(lane->pianoGateBindingId == bindingId) lane->pianoGateBindingId.clear();
     if(lane->pianoVelocityBindingId == bindingId) lane->pianoVelocityBindingId.clear();
-    return lane->bindingIds.size() != oldSize;
+    const bool removed = lane->bindingIds.size() != oldSize;
+    const auto* clip = getClip(trackId, clipId);
+    if(removed && clip != nullptr && clip->isStateCapture) {
+        const std::string key = trackId + "\x1f" + bindingId;
+        if(stateCaptureManualOverrideKeys.erase(key) > 0) {
+            if(auto* binding = getBinding(trackId, bindingId)) {
+                binding->hasLiveOverride = false;
+                binding->liveOverrideValue.clear();
+            }
+        }
+    }
+    return removed;
 }
 
 ofxOceanodeTimelineLane* ofxOceanodeTimelineManager::getLane(const std::string& trackId, const std::string& clipId,
@@ -2629,6 +3142,17 @@ bool ofxOceanodeTimelineManager::setClipLaneType(const std::string& trackId, con
     // reintroduce one here either.
     if(type == ofxOceanodeTimelineLaneType::Wave) return false;
     const auto previousType = lane->type;
+    if(clip != nullptr && clip->isStateCapture &&
+       previousType == ofxOceanodeTimelineLaneType::Curve && type != previousType) {
+        for(const auto& bindingId : lane->bindingIds) {
+            const std::string key = trackId + "\x1f" + bindingId;
+            if(stateCaptureManualOverrideKeys.erase(key) == 0) continue;
+            if(auto* binding = getBinding(trackId, bindingId)) {
+                binding->hasLiveOverride = false;
+                binding->liveOverrideValue.clear();
+            }
+        }
+    }
     lane->type = type;
     if(previousType == ofxOceanodeTimelineLaneType::Wave && type != ofxOceanodeTimelineLaneType::Wave)
         releaseWaveClipIfNeeded(trackId, clipId);
@@ -2823,6 +3347,14 @@ bool ofxOceanodeTimelineManager::removeClipStep(const std::string& trackId, cons
 ofxOceanodeTimelineParameterBinding* ofxOceanodeTimelineManager::getBinding(const std::string& trackId, const std::string& bindingId) {
     auto* track = getTrack(trackId);
     if(track == nullptr) return nullptr;
+    if(evaluationIndexesValid) {
+        const auto trackIndex = trackEvaluationIndexes.find(track);
+        if(trackIndex != trackEvaluationIndexes.end()) {
+            const auto cached = trackIndex->second.bindingById.find(bindingId);
+            if(cached != trackIndex->second.bindingById.end())
+                return cached->second;
+        }
+    }
     auto it = std::find_if(track->bindings.begin(), track->bindings.end(), [&](auto& binding) { return binding.id == bindingId; });
     return it == track->bindings.end() ? nullptr : &*it;
 }
@@ -2830,6 +3362,13 @@ ofxOceanodeTimelineParameterBinding* ofxOceanodeTimelineManager::getBinding(cons
 const ofxOceanodeTimelineParameterBinding* ofxOceanodeTimelineManager::getBinding(const std::string& trackId, const std::string& bindingId) const {
     const auto* track = getTrack(trackId);
     if(track == nullptr) return nullptr;
+    if(evaluationIndexesValid) {
+        const auto trackIndex = trackEvaluationIndexes.find(track);
+        if(trackIndex != trackEvaluationIndexes.end()) {
+            const auto cached = trackIndex->second.bindingById.find(bindingId);
+            if(cached != trackIndex->second.bindingById.end()) return cached->second;
+        }
+    }
     auto it = std::find_if(track->bindings.begin(), track->bindings.end(), [&](const auto& binding) { return binding.id == bindingId; });
     return it == track->bindings.end() ? nullptr : &*it;
 }
@@ -3095,41 +3634,26 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
                                                      bool applyPianoRanges,
                                                      ActiveValueMap& activeValues) const {
     if(container == nullptr) return;
-    struct PianoPitchRange {
-        std::string valueType;
-        int low = 127;
-        int high = 0;
-    };
-    using BindingKey = std::pair<std::string, std::string>;
+    if(!evaluationIndexesValid)
+        const_cast<ofxOceanodeTimelineManager*>(this)->rebuildEvaluationIndexes();
     activeValues.clear();
+    activeValues.reserve(bindingsByPathCache.size());
     using LaneContributions = std::vector<std::pair<ofxOceanodeTimelineAutomationMode, std::string>>;
-    std::map<BindingKey, std::map<std::string, LaneContributions>> bindingClipValues;
-    std::set<BindingKey> zeroWhenInactiveBindings;
-    std::map<std::string, PianoPitchRange> pianoPitchRanges;
-    for(const auto& track : tracks) {
-        for(const auto& clip : track.clips) {
-            for(const auto& lane : clip.lanes) {
-                if(lane.type != ofxOceanodeTimelineLaneType::PianoRoll) continue;
-                const std::string& pitchId = lane.pianoPitchBindingId;
-                const std::string& gateId = lane.pianoGateBindingId;
-                const std::string& velocityId = lane.pianoVelocityBindingId;
-                if(const auto* binding = bindingInTrack(track, pitchId)) {
-                    auto& range = pianoPitchRanges[binding->parameterPath];
-                    range.valueType = binding->valueType;
-                    const int laneLowPitch = static_cast<int>(ofClamp(lane.pianoLowPitch, 0, 127));
-                    const int laneHighPitch = static_cast<int>(ofClamp(lane.pianoHighPitch, 0, 127));
-                    if(laneLowPitch < range.low) range.low = laneLowPitch;
-                    if(laneHighPitch > range.high) range.high = laneHighPitch;
-                }
-                if(bindingInTrack(track, gateId) != nullptr)
-                    zeroWhenInactiveBindings.emplace(track.id, gateId);
-                if(bindingInTrack(track, velocityId) != nullptr)
-                    zeroWhenInactiveBindings.emplace(track.id, velocityId);
-            }
-        }
-    }
+    using ClipContributions = std::unordered_map<const ofxOceanodeTimelineClip*, LaneContributions>;
+    std::unordered_map<const ofxOceanodeTimelineParameterBinding*, ClipContributions> bindingClipValues;
+    bindingClipValues.reserve(bindingsByPathCache.size());
+
+    auto bindingFor = [&](const ofxOceanodeTimelineTrack& track,
+                          const std::string& bindingId) -> const ofxOceanodeTimelineParameterBinding* {
+        if(bindingId.empty()) return nullptr;
+        const auto trackIt = trackEvaluationIndexes.find(&track);
+        if(trackIt == trackEvaluationIndexes.end()) return bindingInTrack(track, bindingId);
+        const auto bindingIt = trackIt->second.bindingById.find(bindingId);
+        return bindingIt == trackIt->second.bindingById.end() ? nullptr : bindingIt->second;
+    };
+
     if(applyPianoRanges) {
-        for(const auto& entry : pianoPitchRanges) {
+        for(const auto& entry : pianoPitchRangesCache) {
             if(auto* parameter = findParameterCached(entry.first)) {
                 if(savedPianoRanges.count(entry.first) == 0) {
                     // Remember the parameter's own range before narrowing it.
@@ -3156,7 +3680,7 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
         }
         // Give back the original range of parameters no piano roll drives any more.
         for(auto it = savedPianoRanges.begin(); it != savedPianoRanges.end();) {
-            if(pianoPitchRanges.count(it->first) > 0) { ++it; continue; }
+            if(pianoPitchRangesCache.find(it->first) != pianoPitchRangesCache.end()) { ++it; continue; }
             if(auto* parameter = findParameterCached(it->first)) {
                 const auto& saved = it->second;
                 const auto& type = saved.valueType;
@@ -3182,7 +3706,7 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
             double sourceBeat = 0.0;
             if(!clipSourceBeat(clip, beatPosition, sourceBeat)) continue;
             if(clip.isLfo) {
-                const auto* binding = bindingInTrack(track, clip.lfoOutputBindingId);
+                const auto* binding = bindingFor(track, clip.lfoOutputBindingId);
                 if(binding != nullptr && !binding->bypass) {
                     const float normalized = ofxOceanodeTimelineLfo::evaluate(clip, sourceBeat);
                     const float mapped = clip.lfoOutputMin + normalized *
@@ -3190,7 +3714,7 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
                     std::string value = ofToString(mapped);
                     if(binding->valueType == typeid(int).name())
                         value = ofToString(static_cast<int>(std::lround(mapped)));
-                    bindingClipValues[{track.id, binding->id}][clip.id].emplace_back(
+                    bindingClipValues[binding][&clip].emplace_back(
                         binding->mode, std::move(value));
                 }
                 continue;
@@ -3213,11 +3737,11 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
                     if(!hasValue && lane.type != ofxOceanodeTimelineLaneType::Step) continue;
                     if(!hasValue) value = "0";
                     for(const auto& bindingId : lane.bindingIds) {
-                        if(const auto* binding = bindingInTrack(track, bindingId)) {
+                        if(const auto* binding = bindingFor(track, bindingId)) {
                             // A bypassed binding shouldn't contribute to a
                             // shared parameter's combined value at all.
                             if(binding->bypass) continue;
-                            bindingClipValues[{track.id, binding->id}][clip.id].emplace_back(
+                            bindingClipValues[binding][&clip].emplace_back(
                                 binding->mode, mapNormalizedLaneValue(lane, *binding, value));
                         }
                     }
@@ -3249,13 +3773,14 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
                     }
                     const std::string value = joinAutomationValues(components);
                     for(const auto& bindingId : lane.bindingIds) {
-                        if(const auto* binding = bindingInTrack(track, bindingId)) {
+                        if(const auto* binding = bindingFor(track, bindingId)) {
                             if(binding->bypass) continue;
-                            bindingClipValues[{track.id, binding->id}][clip.id].emplace_back(binding->mode, value);
+                            bindingClipValues[binding][&clip].emplace_back(binding->mode, value);
                         }
                     }
                 } else {
                     std::vector<const ofxOceanodeTimelinePianoNote*> activeNotes;
+                    activeNotes.reserve(lane.pianoNotes.size());
                     const double pianoCycle = static_cast<double>(
                         ofxOceanodeTimelineClipTime::cycleIndex(clip, beatPosition));
                     const double noteGap = retriggerGapBeats * sourcePerTimelineBeat(clip);
@@ -3292,9 +3817,9 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
                         // parameter when it has zero contributors, and the
                         // Curve lane would still be contributing every beat.
                         for(size_t bindingIndex = 1; bindingIndex < 3; ++bindingIndex) {
-                            if(const auto* binding = bindingInTrack(track, roleBindingIds[bindingIndex])) {
+                            if(const auto* binding = bindingFor(track, roleBindingIds[bindingIndex])) {
                                 if(binding->bypass) continue;
-                                bindingClipValues[{track.id, binding->id}][clip.id].emplace_back(
+                                bindingClipValues[binding][&clip].emplace_back(
                                     binding->mode, "0");
                             }
                         }
@@ -3305,9 +3830,10 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
                     });
                     if(lane.pianoMonophonic && activeNotes.size() > 1) activeNotes.erase(activeNotes.begin(), activeNotes.end() - 1);
                     for(size_t bindingIndex = 0; bindingIndex < 3; ++bindingIndex) {
-                        if(const auto* binding = bindingInTrack(track, roleBindingIds[bindingIndex])) {
+                        if(const auto* binding = bindingFor(track, roleBindingIds[bindingIndex])) {
                             if(binding->bypass) continue;
                             std::vector<std::string> noteValues;
+                            noteValues.reserve(activeNotes.size());
                             for(const auto* activeNote : activeNotes) {
                                 if(bindingIndex == 0) noteValues.push_back(ofToString(activeNote->pitch));
                                 else if(bindingIndex == 1) noteValues.push_back("1");
@@ -3321,7 +3847,7 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
                             std::string value = vectorTarget ? joinAutomationValues(noteValues) : noteValues.back();
                             if(bindingIndex == 2 && !vectorTarget)
                                 value = mapNormalizedLaneValue(lane, *binding, value);
-                            bindingClipValues[{track.id, binding->id}][clip.id].emplace_back(
+                            bindingClipValues[binding][&clip].emplace_back(
                                 binding->mode, std::move(value));
                         }
                     }
@@ -3337,22 +3863,22 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
     // heard. Finally, expose one contribution per binding for
     // cross-track/cross-binding blending.
     for(const auto& track : tracks) {
-        std::unordered_map<std::string, std::pair<double, size_t>> clipOrder;
-        for(size_t clipIndex = 0; clipIndex < track.clips.size(); ++clipIndex)
-            clipOrder[track.clips[clipIndex].id] = {track.clips[clipIndex].startBeat, clipIndex};
+        const auto trackIndexIt = trackEvaluationIndexes.find(&track);
         for(const auto& binding : track.bindings) {
             if(binding.bypass) continue;
-            const BindingKey key{track.id, binding.id};
-            const auto clipsIt = bindingClipValues.find(key);
+            const auto clipsIt = bindingClipValues.find(&binding);
             std::string value;
             if(binding.hasLiveOverride) value = binding.liveOverrideValue;
             else if(clipsIt != bindingClipValues.end()) {
                 const LaneContributions* winner = nullptr;
                 std::pair<double, size_t> winnerOrder{-1.0, 0};
                 for(const auto& clipEntry : clipsIt->second) {
-                    const auto orderIt = clipOrder.find(clipEntry.first);
-                    const std::pair<double, size_t> order = orderIt == clipOrder.end()
-                        ? std::pair<double, size_t>{-1.0, 0} : orderIt->second;
+                    size_t clipIndex = 0;
+                    if(trackIndexIt != trackEvaluationIndexes.end()) {
+                        const auto orderIt = trackIndexIt->second.clipOrder.find(clipEntry.first);
+                        if(orderIt != trackIndexIt->second.clipOrder.end()) clipIndex = orderIt->second;
+                    }
+                    const std::pair<double, size_t> order{clipEntry.first->startBeat, clipIndex};
                     if(winner == nullptr || order > winnerOrder) {
                         winner = &clipEntry.second;
                         winnerOrder = order;
@@ -3361,7 +3887,7 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
                 if(winner != nullptr) value = combineAutomationValues(*winner, binding.valueType);
                 if(value.empty()) continue;
             }
-            else if(zeroWhenInactiveBindings.count(key) > 0) value = "0";
+            else if(zeroWhenInactiveBindingsCache.count(&binding) > 0) value = "0";
             else continue;
             activeValues[binding.parameterPath].emplace_back(binding.mode, std::move(value));
         }
@@ -3371,6 +3897,10 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
 
 void ofxOceanodeTimelineManager::evaluateAutomation() {
     if(container == nullptr) return;
+    // Track/binding/clip storage may have changed through the editor since
+    // the previous update. Rebuild once, then share the indexes across the
+    // frame evaluation, scheduler probes and both applyAutomation passes.
+    rebuildEvaluationIndexes();
     loopWrappedThisFrame = false;
     auto transport = container->getTransportState();
     // Following an external clock (MIDI clock): the master owns position, tempo and looping.
@@ -3383,6 +3913,55 @@ void ofxOceanodeTimelineManager::evaluateAutomation() {
     if(auto ownerTransport = container->getTransport()) {
         ownerTransport->setLoop(!externalClock && loopEnabled, loopStartBeat, loopEndBeat);
         transport = container->getTransportState();
+    }
+
+    // A stopped state-capture curve must still be editable from the node GUI.
+    // The GUI writes after update(), so compare the value found at the start of
+    // the next update with the last value automation itself applied. A mismatch
+    // becomes a live override and is committed/cleared by the next capture.
+    if(transport.isPlaying) {
+        if(!stateCaptureManualOverrideKeys.empty()) {
+            for(auto& track : tracks) {
+                for(auto& binding : track.bindings) {
+                    const std::string key = track.id + "\x1f" + binding.id;
+                    if(stateCaptureManualOverrideKeys.count(key) == 0) continue;
+                    binding.hasLiveOverride = false;
+                    binding.liveOverrideValue.clear();
+                }
+            }
+            stateCaptureManualOverrideKeys.clear();
+        }
+    } else {
+        std::unordered_set<std::string> checkedBindings;
+        for(auto& track : tracks) {
+            for(const auto& clip : track.clips) {
+                if(!clip.isStateCapture ||
+                   transport.beatPosition < clip.startBeat - kEpsilon ||
+                   transport.beatPosition >= clip.startBeat + clip.durationBeats - kEpsilon) continue;
+                for(const auto& lane : clip.lanes) {
+                    if(lane.type != ofxOceanodeTimelineLaneType::Curve) continue;
+                    for(const auto& bindingId : lane.bindingIds) {
+                        const std::string key = track.id + "\x1f" + bindingId;
+                        if(!checkedBindings.insert(key).second) continue;
+                        auto* binding = getBinding(track.id, bindingId);
+                        if(binding == nullptr) continue;
+                        // A piano-key preview (or another explicit caller of
+                        // setLiveOverride) owns its override lifetime. Do not
+                        // adopt and later clear it as a state-capture edit.
+                        if(binding->hasLiveOverride &&
+                           stateCaptureManualOverrideKeys.count(key) == 0) continue;
+                        auto* parameter = findParameterCached(binding->parameterPath);
+                        const auto previous = stateCaptureLastAppliedValues.find(binding->parameterPath);
+                        if(parameter == nullptr || previous == stateCaptureLastAppliedValues.end()) continue;
+                        const std::string current = parameterValueForAutomation(*parameter);
+                        if(current == previous->second) continue;
+                        binding->hasLiveOverride = true;
+                        binding->liveOverrideValue = current;
+                        stateCaptureManualOverrideKeys.insert(key);
+                    }
+                }
+            }
+        }
     }
     if(hasSeenLoopCount && transport.loopCount != lastSeenLoopCount) loopWrappedThisFrame = true;
     lastSeenLoopCount = transport.loopCount;
@@ -3465,7 +4044,7 @@ void ofxOceanodeTimelineManager::evaluateAutomation() {
 // applyAutomation() (this frame's value) and by the scheduler (the value at a
 // beat that has not been reached yet) so the two can never disagree.
 bool ofxOceanodeTimelineManager::computeParameterValue(
-        const std::vector<const ofxOceanodeTimelineParameterBinding*>& bindings,
+        const std::vector<ofxOceanodeTimelineParameterBinding*>& bindings,
         const ActiveValueMap& activeValues,
         ofxOceanodeAbstractParameter* parameter,
         std::string& outValue) const {
@@ -3480,6 +4059,7 @@ bool ofxOceanodeTimelineManager::computeParameterValue(
     // written, so it can also be changed by hand between clips.
     if(valuesIt == activeValues.end()) return false;
     std::string value = combineAutomationValues(valuesIt->second, defaultBinding->valueType);
+    value = broadcastScalarNumericVectorValue(*parameter, value, defaultBinding->valueType);
     if(defaultBinding->clampToParameterRange)
         value = clampValueToParameterRange(*parameter, value, defaultBinding->valueType);
     outValue = std::move(value);
@@ -3488,13 +4068,9 @@ bool ofxOceanodeTimelineManager::computeParameterValue(
 
 void ofxOceanodeTimelineManager::applyAutomation() {
     if(container == nullptr) return;
+    if(!evaluationIndexesValid) rebuildEvaluationIndexes();
     const auto& activeValues = activeAutomationValues;
-    std::map<std::string, std::vector<ofxOceanodeTimelineParameterBinding*>> bindingsByPath;
-    for(auto& track : tracks) {
-        for(auto& binding : track.bindings)
-            bindingsByPath[binding.parameterPath].push_back(&binding);
-    }
-    for(auto& entry : bindingsByPath) {
+    for(auto& entry : bindingsByPathCache) {
         auto* parameter = findParameterCached(entry.first);
         ofxOceanodeTimelineParameterBinding* defaultBinding = nullptr;
         for(auto* binding : entry.second) {
@@ -3505,10 +4081,11 @@ void ofxOceanodeTimelineManager::applyAutomation() {
         parameter->setTimelined(defaultBinding != nullptr);
         if(defaultBinding == nullptr) continue;
 
-        const std::vector<const ofxOceanodeTimelineParameterBinding*> bindings(
-            entry.second.begin(), entry.second.end());
         std::string value;
-        if(!computeParameterValue(bindings, activeValues, parameter, value)) continue;
+        if(!computeParameterValue(entry.second, activeValues, parameter, value)) {
+            stateCaptureLastAppliedValues.erase(entry.first);
+            continue;
+        }
         if(!value.empty() && parameterValueForAutomation(*parameter) != value) {
             // A scheduled path's backend already received this value with its
             // exact instant. The parameter, its GUI and the node graph are
@@ -3519,6 +4096,7 @@ void ofxOceanodeTimelineManager::applyAutomation() {
                 scheduledBackendPaths.count(entry.first) > 0);
             applyAutomationValue(*parameter, value, defaultBinding->valueType);
         }
+        stateCaptureLastAppliedValues[entry.first] = parameterValueForAutomation(*parameter);
     }
 }
 
@@ -3556,20 +4134,16 @@ void ofxOceanodeTimelineManager::sendScheduleCorrections(uint64_t nowUs, const s
         scheduledPaths.clear();
         return;
     }
-    std::map<std::string, std::vector<const ofxOceanodeTimelineParameterBinding*>> bindingsByPath;
-    for(const auto& track : tracks) {
-        for(const auto& binding : track.bindings)
-            bindingsByPath[binding.parameterPath].push_back(&binding);
-    }
+    if(!evaluationIndexesValid) rebuildEvaluationIndexes();
     for(auto& entry : scheduledPaths) {
         if(onlyPaths != nullptr && onlyPaths->count(entry.first) == 0) continue;
         auto& state = entry.second;
         if(state.pending.empty() && state.lastScheduledDueUs <= nowUs) continue;
         auto* parameter = findParameterCached(entry.first);
         if(parameter == nullptr) continue;
-        const auto bindingsIt = bindingsByPath.find(entry.first);
+        const auto bindingsIt = bindingsByPathCache.find(entry.first);
         std::string value;
-        if(bindingsIt == bindingsByPath.end() ||
+        if(bindingsIt == bindingsByPathCache.end() ||
            !computeParameterValue(bindingsIt->second, activeAutomationValues, parameter, value)) {
             // No longer automated: land on what is playing now, after the
             // queued events, so none of them is left standing.
@@ -3773,43 +4347,14 @@ void ofxOceanodeTimelineManager::runScheduler(const ofxOceanodeTransportState& t
     // ---- which paths can be scheduled at all -----------------------------
     struct PathTarget {
         ofxOceanodeAbstractParameter* parameter = nullptr;
-        std::vector<const ofxOceanodeTimelineParameterBinding*> bindings;
+        std::vector<ofxOceanodeTimelineParameterBinding*> bindings;
         bool schedulable = true;
     };
     std::map<std::string, PathTarget> targets;
-    for(const auto& track : tracks) {
-        for(const auto& binding : track.bindings) {
-            auto& target = targets[binding.parameterPath];
-            target.bindings.push_back(&binding);
-            // A live override (a held piano key, say) is a gesture, not a
-            // timed event.
-            if(binding.hasLiveOverride) target.schedulable = false;
-        }
-    }
-    for(const auto& track : tracks) {
-        for(const auto& clip : track.clips) {
-            if(clip.isLfo) {
-                // An LFO is a continuous modulator, exactly like the curve
-                // below -- but it reaches its target from the clip, not
-                // through a lane's bindingIds, so the lane scan below cannot
-                // see it. Without this it was left "schedulable" while
-                // collectChangeBeats only ever produced its clip edges, so
-                // every intermediate value reached the backend through the
-                // correction path, once per frame.
-                if(const auto* binding = getBinding(track.id, clip.lfoOutputBindingId))
-                    targets[binding->parameterPath].schedulable = false;
-                continue;
-            }
-            for(const auto& lane : clip.lanes) {
-                if(lane.type != ofxOceanodeTimelineLaneType::Curve) continue;
-                // A curve changes every frame: there is nothing discrete to
-                // place in time, so its parameters stay on the frame path.
-                for(const auto& bindingId : lane.bindingIds) {
-                    if(const auto* binding = getBinding(track.id, bindingId))
-                        targets[binding->parameterPath].schedulable = false;
-                }
-            }
-        }
+    for(const auto& entry : bindingsByPathCache) {
+        auto& target = targets[entry.first];
+        target.bindings = entry.second;
+        target.schedulable = continuouslyEvaluatedPathsCache.count(entry.first) == 0;
     }
 
     std::vector<std::string> schedulablePaths;
@@ -3943,11 +4488,12 @@ void ofxOceanodeTimelineManager::runScheduler(const ofxOceanodeTransportState& t
     }
     if(changes.empty()) return;
 
+    ActiveValueMap futureValues;
+    futureValues.reserve(bindingsByPathCache.size());
     for(const auto& change : changes) {
         const double beat = change.first;
         const double offsetSeconds = change.second;
         const uint64_t dueUs = nowUs + static_cast<uint64_t>(std::max(0.0, offsetSeconds) * 1000000.0);
-        ActiveValueMap futureValues;
         // Evaluate just past the boundary: every lane's own test is
         // "start <= beat < end", so the probe must land inside the new
         // step/note/region, not exactly on its edge.
@@ -3981,6 +4527,7 @@ void ofxOceanodeTimelineManager::runScheduler(const ofxOceanodeTransportState& t
 
 void ofxOceanodeTimelineManager::setLiveOverride(const std::string& trackId, const std::string& bindingId, const std::string& value) {
     if(auto* binding = getBinding(trackId, bindingId)) {
+        stateCaptureManualOverrideKeys.erase(trackId + "\x1f" + bindingId);
         binding->hasLiveOverride = true;
         binding->liveOverrideValue = value;
     }
@@ -3988,6 +4535,7 @@ void ofxOceanodeTimelineManager::setLiveOverride(const std::string& trackId, con
 
 void ofxOceanodeTimelineManager::clearLiveOverride(const std::string& trackId, const std::string& bindingId) {
     if(auto* binding = getBinding(trackId, bindingId)) {
+        stateCaptureManualOverrideKeys.erase(trackId + "\x1f" + bindingId);
         binding->hasLiveOverride = false;
         binding->liveOverrideValue.clear();
     }
@@ -4018,6 +4566,7 @@ void ofxOceanodeTimelineManager::clear() {
     invalidateSchedule();
     for(const auto& track : tracks) clearTimelineFlag(track);
     tracks.clear();
+    invalidateEvaluationIndexes();
     clipGroups.clear();
     markers.clear();
     viewState = {};
@@ -4029,6 +4578,8 @@ void ofxOceanodeTimelineManager::clear() {
     pendingTrackRenameId.clear();
     pendingTrackRenameIsNew = false;
     activeAutomationValues.clear();
+    stateCaptureLastAppliedValues.clear();
+    stateCaptureManualOverrideKeys.clear();
     invalidateSchedule();
     bpmAutomationEnabled = false;
     bpmLaneCollapsed = true;
@@ -4194,6 +4745,7 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
             clipJson["contentStretch"] = clip.contentStretch;
             clipJson["repeatContent"] = clip.repeatContent;
             clipJson["isLfo"] = clip.isLfo;
+            clipJson["isStateCapture"] = clip.isStateCapture;
             clipJson["lfoOutputBindingId"] = clip.lfoOutputBindingId;
             clipJson["lfoOutputMin"] = clip.lfoOutputMin;
             clipJson["lfoOutputMax"] = clip.lfoOutputMax;
@@ -4491,6 +5043,7 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
                     clipJson.value("contentStretch", clip.repeatContent
                         ? 1.0 : clip.durationBeats / clip.contentDurationBeats));
                 clip.isLfo = clipJson.value("isLfo", false);
+                clip.isStateCapture = clipJson.value("isStateCapture", false);
                 clip.lfoOutputBindingId = mapBinding(clipJson.value("lfoOutputBindingId", std::string()));
                 if(std::none_of(track.bindings.begin(), track.bindings.end(),
                                 [&](const auto& b) { return b.id == clip.lfoOutputBindingId; }))
@@ -4695,6 +5248,12 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
         // shorter duration) made the audio rate disagree with the position.
         if(track.isWaveTrack) {
             for(auto& clip : track.clips) normalizeWaveClipMapping(clip);
+        }
+        // A shared capture has one destination; after "Separate parameter
+        // clips" there is intentionally one destination per parameter.
+        // Wave/LFO clips can never participate in either form.
+        for(auto& clip : track.clips) {
+            if(track.isWaveTrack || clip.isLfo) clip.isStateCapture = false;
         }
         if(track.isWaveTrack && track.waveVolumePoints.empty()) {
             track.waveVolumePoints = {{0.0, track.waveVolume}, {4.0, track.waveVolume}};

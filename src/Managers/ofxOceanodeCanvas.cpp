@@ -250,6 +250,23 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             return outputs;
         };
 
+        // The node's incoming connections that are not portals yet
+        // ("Portalize Inputs" on a node's header)
+        auto getPortalizableInputConnections = [](ofxOceanodeNode* node){
+            vector<ofxOceanodeAbstractConnection*> connections;
+            if(node == nullptr) return connections;
+            if(dynamic_cast<abstractPortal*>(&node->getNodeModel()) != nullptr) return connections;
+            for(auto& parameter : node->getParameters()){
+                auto input = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(parameter);
+                if(input == nullptr) continue;
+                auto* connection = input->getInConnection();
+                if(connection == nullptr) continue;
+                if(dynamic_cast<abstractPortal*>(connection->getSourceParameter().getNodeModel()) != nullptr) continue;
+                connections.push_back(connection);
+            }
+            return connections;
+        };
+
         auto autoLayoutNodes = [&](vector<ofxOceanodeNode*> nodes){
             if(nodes.size() < 2) return;
 
@@ -638,6 +655,96 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 });
             }
 
+            return true;
+        };
+
+        // Replace one connection (source -> sink) with a portal pair. Only
+        // that connection changes; other connections of the source stay. If
+        // the source already feeds a sender portal, its name is reused and
+        // only a receiver is created.
+        auto portalizeInput = [&](ofxOceanodeAbstractConnection* connection){
+            if(connection == nullptr) return false;
+            auto* sourceParameter = &connection->getSourceParameter();
+            auto* sinkParameter = &connection->getSinkParameter();
+
+            const string typeName = container->getTypesRegistry()->getTypeNameFromTypeDescription(sourceParameter->valueType());
+            const string portalTypeName = "Portal " + typeName;
+            if(typeName.empty() || container->getRegistry()->getRegisteredModels().count(portalTypeName) == 0){
+                ofLogWarning("Portalize") << "No portal registered for output type " << sourceParameter->valueType();
+                return false;
+            }
+
+            auto preparePortal = [&](ofxOceanodeNode* portalNode, const string& name) -> ofxOceanodeAbstractParameter*{
+                if(!portalNode->getParameters().contains("Name") || !portalNode->getParameters().contains("Value")) return nullptr;
+                portalNode->getNodeGui().setVisibility(false); // Pin positions are initialized on the next frame.
+                portalNode->getNodeModel().getParameter<string>("Name").set(name);
+                return &static_cast<ofxOceanodeAbstractParameter&>(portalNode->getParameters().get("Value"));
+            };
+
+            // An existing sender on this output?
+            string portalName;
+            for(auto* out : sourceParameter->getOutConnections()){
+                auto* portalModel = dynamic_cast<abstractPortal*>(out->getSinkParameter().getNodeModel());
+                if(portalModel != nullptr){ portalName = portalModel->getName(); break; }
+            }
+
+            ofxOceanodeNode* senderNode = nullptr;
+            if(portalName.empty()){
+                portalName = computeDefaultPortalName(sourceParameter);
+                const string portalNameBase = portalName;
+                int nameSuffix = 2;
+                auto portalNameExists = [&](const string& name){
+                    for(auto* node : container->getAllModules()){
+                        auto* portalModel = dynamic_cast<abstractPortal*>(&node->getNodeModel());
+                        if(portalModel != nullptr && portalModel->getName() == name) return true;
+                    }
+                    return false;
+                };
+                while(portalNameExists(portalName)) portalName = portalNameBase + " " + ofToString(nameSuffix++);
+
+                senderNode = container->createNodeFromName(portalTypeName);
+                if(senderNode == nullptr) return false;
+                auto* senderValue = preparePortal(senderNode, portalName);
+                if(senderValue == nullptr){ senderNode->deleteSelf(); return false; }
+                auto* sourceGui = container->getGuiFromModel(sourceParameter->getNodeModel());
+                if(sourceGui != nullptr){
+                    glm::vec2 position = sourceGui->getPosition() + glm::vec2(sourceGui->getRectangle().getWidth() + GRID_SIZE, 0);
+                    senderNode->getNodeGui().setPosition(snap_to_grid ? snapToGrid(position) : position);
+                }
+                if(container->createConnection(*sourceParameter, *senderValue) == nullptr){
+                    senderNode->deleteSelf();
+                    return false;
+                }
+            }
+
+            auto* receiverNode = container->createNodeFromName(portalTypeName);
+            if(receiverNode == nullptr){ if(senderNode) senderNode->deleteSelf(); return false; }
+            auto* receiverValue = preparePortal(receiverNode, portalName);
+            if(receiverValue == nullptr){
+                receiverNode->deleteSelf();
+                if(senderNode) senderNode->deleteSelf();
+                return false;
+            }
+            auto* sinkGui = container->getGuiFromModel(sinkParameter->getNodeModel());
+            if(sinkGui != nullptr){
+                glm::vec2 position = sinkGui->getPosition() - glm::vec2(getTotalNodeWidth() + GRID_SIZE, 0);
+                receiverNode->getNodeGui().setPosition(snap_to_grid ? snapToGrid(position) : position);
+            }
+
+            connection->deleteSelf();
+            if(container->createConnection(*receiverValue, *sinkParameter) == nullptr){
+                receiverNode->deleteSelf();
+                if(senderNode) senderNode->deleteSelf();
+                container->createConnection(*sourceParameter, *sinkParameter);
+                ofLogWarning("Portalize") << "Could not reconnect portal receiver; original connection restored";
+                return false;
+            }
+            pendingPortalAlignments.push_back({
+                container.get(),
+                receiverNode->getParameters().getEscapedName(),
+                sinkParameter->getGroupHierarchyNames()[0],
+                sinkParameter->getName()
+            });
             return true;
         };
 
@@ -1272,7 +1379,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 {
                     isAnyNodeHovered = true;
                     node_hovered_in_scene = nodeId;
-                    if(nodeOwnsRightClick && nodeHeaderRightClickInSelection &&
+                    if(nodeOwnsRightClick &&
+                       (nodeHeaderRightClickInSelection || !getPortalizableInputConnections(node).empty()) &&
                        ImGui::GetMousePos().y <= node_rect_header.y){
                         open_context_menu = true;
                         customGuiContextNode = node;
@@ -1867,6 +1975,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             for(auto* output : connectedOutputs) portalizeOutput(output);
                             ImGui::CloseCurrentPopup();
                         }
+                    }
+                }
+                // This node's incoming connections become portal pairs
+                auto inputConnections = getPortalizableInputConnections(customGuiContextNode);
+                if(!inputConnections.empty()){
+                    if(ImGui::Selectable("Portalize Inputs")){
+                        for(auto* connection : inputConnections) portalizeInput(connection);
+                        ImGui::CloseCurrentPopup();
                     }
                 }
             }

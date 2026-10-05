@@ -7,8 +7,10 @@
 #include <algorithm>
 #include <cstdint>
 #include <deque>
+#include <limits>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <set>
 #include <string>
 #include <utility>
@@ -298,6 +300,10 @@ struct ofxOceanodeTimelineClip {
     // describe the oscillator controls and this binding receives the final
     // normalized result mapped through lfoOutputMin/lfoOutputMax.
     bool isLfo = false;
+    // Created by "Capture state as curve points". A track keeps at most one
+    // such clip and grows it as captures are made at new playhead positions.
+    // This is persisted so the workflow continues after loading a preset.
+    bool isStateCapture = false;
     std::string lfoOutputBindingId;
     float lfoOutputMin = 0.0f;
     float lfoOutputMax = 1.0f;
@@ -548,6 +554,15 @@ public:
     bool setBindingMode(const std::string& trackId, const std::string& bindingId, ofxOceanodeTimelineAutomationMode mode);
     bool setBindingClamp(const std::string& trackId, const std::string& bindingId, bool clampToParameterRange);
     ofxOceanodeTimelineParameterBinding* getBinding(const std::string& trackId, const std::string& bindingId);
+    // Samples the current numeric parameter value(s) into a dedicated Curve
+    // clip at timelineBeat. Numeric vectors use their first component as one
+    // scalar curve which is broadcast back across the vector's current width.
+    // An empty bindingId captures every compatible binding in the track;
+    // otherwise only that binding is sampled. The clip expands in either
+    // direction as needed. Returns the number of points set.
+    int captureStateAsCurvePoints(const std::string& trackId,
+                                  const std::string& bindingId,
+                                  double timelineBeat);
     // Reorders a track's bindings to the given id order (ids not listed keep
     // their relative order at the end). Note groups are kept together.
     bool setBindingOrder(const std::string& trackId, const std::vector<std::string>& orderedBindingIds);
@@ -618,6 +633,10 @@ public:
                               const std::string& dstTrackId, double newStartBeat,
                               const std::string& srcLaneId = std::string(),
                               const std::string& dstBindingId = std::string());
+    // Turns one multi-lane state-capture clip into one independent clip per
+    // parameter lane. Timing and curve data are preserved; later captures
+    // keep appending to the matching per-parameter destination.
+    int separateStateCaptureClip(const std::string& trackId, const std::string& clipId);
     // Moves a clip's start, keeping its end and what plays under it (the left
     // part is dropped). Growing to the left works for repeating clips only.
     bool trimClipStart(const std::string& trackId, const std::string& clipId, double newStartBeat);
@@ -800,7 +819,7 @@ private:
     void refreshTimelineFlag(const std::string& parameterPath);
     void releaseWaveClipIfNeeded(const std::string& trackId, const std::string& clipId);
 
-    using ActiveValueMap = std::map<std::string,
+    using ActiveValueMap = std::unordered_map<std::string,
         std::vector<std::pair<ofxOceanodeTimelineAutomationMode, std::string>>>;
     // Pure evaluation of every binding at one beat. evaluateAutomation() uses
     // it for the current playhead; the scheduler uses it for beats that have
@@ -808,10 +827,16 @@ private:
     // second implementation of the lane semantics.
     void collectActiveValues(double beat, bool isPlaying, bool applyPianoRanges,
                              ActiveValueMap& activeValues) const;
-    bool computeParameterValue(const std::vector<const ofxOceanodeTimelineParameterBinding*>& bindings,
+    bool computeParameterValue(const std::vector<ofxOceanodeTimelineParameterBinding*>& bindings,
                                const ActiveValueMap& activeValues,
                                ofxOceanodeAbstractParameter* parameter,
                                std::string& outValue) const;
+    // Rebuilt once before each automation evaluation and reused by the
+    // frame pass, the scheduler and the post-node re-apply. Keeping these
+    // indexes here avoids repeatedly grouping the same bindings and doing
+    // linear id lookups for every lane/change beat.
+    void rebuildEvaluationIndexes();
+    void invalidateEvaluationIndexes();
     // Beats in (fromBeat, toBeat] at which any discrete lane can change value:
     // clip edges, repeat cycles, step grid cells, step/region/note boundaries.
     void collectChangeBeats(double fromBeat, double toBeat, bool inclusiveStart,
@@ -848,6 +873,32 @@ private:
     ofxOceanodeAbstractParameter* findParameterCached(const std::string& path) const;
     mutable std::unordered_map<std::string, ofxOceanodeAbstractParameter*> parameterCache;
     bool parameterCacheActive = false;
+    std::unordered_map<std::string, std::vector<ofxOceanodeTimelineParameterBinding*>> bindingsByPathCache;
+    std::unordered_map<std::string, ofxOceanodeTimelineTrack*> trackByIdCache;
+    struct TrackEvaluationIndex {
+        std::unordered_map<std::string, ofxOceanodeTimelineParameterBinding*> bindingById;
+        std::unordered_map<const ofxOceanodeTimelineClip*, size_t> clipOrder;
+    };
+    struct PianoPitchRangeIndex {
+        std::string valueType;
+        int low = 127;
+        int high = 0;
+    };
+    mutable std::unordered_map<const ofxOceanodeTimelineTrack*, TrackEvaluationIndex> trackEvaluationIndexes;
+    std::unordered_map<std::string, PianoPitchRangeIndex> pianoPitchRangesCache;
+    std::unordered_set<const ofxOceanodeTimelineParameterBinding*> zeroWhenInactiveBindingsCache;
+    std::unordered_set<std::string> continuouslyEvaluatedPathsCache;
+    // State-capture curves let a stopped transport be auditioned from the node
+    // GUI: an external parameter edit becomes a temporary live override until
+    // the next capture commits it as a point (or playback resumes).
+    std::unordered_map<std::string, std::string> stateCaptureLastAppliedValues;
+    std::unordered_set<std::string> stateCaptureManualOverrideKeys;
+    bool evaluationIndexesValid = false;
+    // The node GUI asks this for every visible parameter. Cache path -> color
+    // once per frame instead of scanning every track/binding for every row.
+    void rebuildParameterTrackColorCache() const;
+    mutable std::unordered_map<std::string, ofColor> parameterTrackColorCache;
+    mutable uint64_t parameterTrackColorCacheFrame = std::numeric_limits<uint64_t>::max();
     // beatToSeconds(): seconds at each tempo point (see there).
     mutable std::vector<double> tempoSecondsAtPoint;
     mutable uint64_t tempoSecondsCacheSignature = 0;
@@ -877,7 +928,7 @@ private:
     // Points every piano-roll lane that uses any of affectedBindingIds at the group's roles.
     void syncNoteGroupLanes(ofxOceanodeTimelineTrack& track, const ofxOceanodeTimelineNoteGroup& group,
                             const std::vector<std::string>& affectedBindingIds);
-    std::map<std::string, std::vector<std::pair<ofxOceanodeTimelineAutomationMode, std::string>>> activeAutomationValues;
+    ActiveValueMap activeAutomationValues;
     bool bpmAutomationEnabled = false;
     bool bpmLaneCollapsed = true;
     bool bpmLaneVisible = false; // hidden by default; toggled from the ruler

@@ -219,6 +219,9 @@ private:
     bool requestClipDeletion = false;
     std::string clipDeletionTrackId;
     std::string clipDeletionClipId;
+    bool requestSeparateStateCaptureClip = false;
+    std::string separateStateCaptureTrackId;
+    std::string separateStateCaptureClipId;
     bool requestWaveSplit = false;
     std::vector<std::string> midiPortChoices; // MIDI clock sync popup
 

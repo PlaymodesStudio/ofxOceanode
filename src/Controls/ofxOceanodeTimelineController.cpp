@@ -276,6 +276,14 @@ void finishAbsoluteLayout(const ImVec2& position) {
     ImGui::SetCursorScreenPos(position);
     ImGui::Dummy(ImVec2(0.0f, 0.0f));
 }
+
+// Context menus in the Timeline contain several different kinds of actions.
+// Keep their hierarchy visually consistent without turning every group into a
+// nested submenu (the actions remain one click away).
+void contextMenuSection(const char* label, bool separator = true) {
+    if(separator) ImGui::Separator();
+    ImGui::TextDisabled("%s", label);
+}
 }
 
 ofxOceanodeTimelineController::ofxOceanodeTimelineController(std::shared_ptr<ofxOceanodeContainer> _container)
@@ -1310,6 +1318,8 @@ void ofxOceanodeTimelineController::draw() {
             ImGui::EndPopup();
         }
         if(ImGui::BeginPopup(("##trackMenu" + track.id).c_str())) {
+            ImGui::TextUnformatted(track.name.c_str());
+            contextMenuSection("Appearance");
             float menuColor[4] = {color.x, color.y, color.z, color.w};
             if(ImGui::ColorEdit4("Track color", menuColor, ImGuiColorEditFlags_AlphaBar)) {
                 if(auto* editTrack = timeline.getTrack(track.id)) editTrack->color = ofColor(
@@ -1321,27 +1331,8 @@ void ofxOceanodeTimelineController::draw() {
             if(!track.isWaveTrack && ImGui::MenuItem(trackCollapsed ? "Expand track" : "Collapse track")) {
                 if(auto* editTrack = timeline.getTrack(track.id)) editTrack->collapsed = !trackCollapsed;
             }
-            if(track.isWaveTrack) {
-                ImGui::TextDisabled("Volume automation applies to the whole track");
-                if(ImGui::MenuItem("Edit track volume automation")) {
-                    if(!track.clips.empty()) {
-                        timeline.createWaveVolumeLane(track.id, track.clips.front().id);
-                        editorTrackId = track.id;
-                        editorClipId = track.clips.front().id;
-                        editorLaneId.clear();
-                        clipEditorOpen = true;
-                    foldedClipEditors.erase(editorClipId);
-                    }
-                }
-            }
-            if(ImGui::MenuItem("Rename track")) {
-                pendingTrackId = track.id;
-                pendingNewTrackDialog = false;
-                std::strncpy(pendingTrackName, track.name.c_str(), sizeof(pendingTrackName) - 1);
-                pendingTrackName[sizeof(pendingTrackName) - 1] = '\0';
-                requestRenamePopup = true;
-                ImGui::CloseCurrentPopup();
-            }
+
+            contextMenuSection("Create");
             if(ImGui::MenuItem(track.isWaveTrack ? "Add new wave clip" : "New clip")) {
                 if(track.isWaveTrack) {
                     // Wave clips need a file before they are useful, so this
@@ -1359,6 +1350,34 @@ void ofxOceanodeTimelineController::draw() {
                     requestClipPopup = true;
                 }
                 ImGui::CloseCurrentPopup();
+            }
+            if(!track.isWaveTrack) {
+                const bool canCaptureState = std::any_of(track.bindings.begin(), track.bindings.end(), [](const auto& binding) {
+                    return binding.valueType == typeid(float).name() ||
+                           binding.valueType == typeid(int).name() ||
+                           binding.valueType == typeid(bool).name() ||
+                           binding.valueType == typeid(std::vector<float>).name() ||
+                           binding.valueType == typeid(std::vector<int>).name() ||
+                           binding.valueType == typeid(std::vector<bool>).name();
+                });
+                if(ImGui::MenuItem("Capture state as curve points", nullptr, false, canCaptureState)) {
+                    timeline.captureStateAsCurvePoints(track.id, std::string(), transportState.beatPosition);
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+
+            if(track.isWaveTrack || !track.bindings.empty()) contextMenuSection("Automation");
+            if(track.isWaveTrack) {
+                if(ImGui::MenuItem("Edit track volume automation", nullptr, false, !track.clips.empty())) {
+                    timeline.createWaveVolumeLane(track.id, track.clips.front().id);
+                    editorTrackId = track.id;
+                    editorClipId = track.clips.front().id;
+                    editorLaneId.clear();
+                    clipEditorOpen = true;
+                    foldedClipEditors.erase(editorClipId);
+                }
+                if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                    ImGui::SetTooltip("Volume automation applies to the whole track");
             }
             if(!track.bindings.empty()) {
                 // Reachable here too (not just the per-binding row's own
@@ -1379,6 +1398,7 @@ void ofxOceanodeTimelineController::draw() {
                     }
                     ImGui::EndMenu();
                 }
+                contextMenuSection("Parameters");
                 // Same reasoning as "Blend mode" above -- give a collapsed
                 // track a way to unbind a parameter without having to
                 // expand it first to reach the per-binding row's own menu.
@@ -1395,7 +1415,16 @@ void ofxOceanodeTimelineController::draw() {
                     ImGui::EndMenu();
                 }
             }
-            ImGui::Separator();
+
+            contextMenuSection("Track");
+            if(ImGui::MenuItem("Rename track")) {
+                pendingTrackId = track.id;
+                pendingNewTrackDialog = false;
+                std::strncpy(pendingTrackName, track.name.c_str(), sizeof(pendingTrackName) - 1);
+                pendingTrackName[sizeof(pendingTrackName) - 1] = '\0';
+                requestRenamePopup = true;
+                ImGui::CloseCurrentPopup();
+            }
             if(ImGui::MenuItem("Remove track")) {
                 trackDeletionId = track.id;
                 requestTrackDeletion = true;
@@ -1845,12 +1874,12 @@ void ofxOceanodeTimelineController::draw() {
             const std::string menuId = "##clipMenu" + track.id + "_" + clip.id;
             if(!ImGui::BeginPopup(menuId.c_str())) return;
             ImGui::TextUnformatted(clip.name.c_str());
-            ImGui::Separator();
+            contextMenuSection("Clip");
             if(ImGui::MenuItem("Rename clip")) {
                 requestClipRename(track.id, clip);
                 ImGui::CloseCurrentPopup();
             }
-            ImGui::Separator();
+            contextMenuSection("Timing");
             // These values are edited on the selected clip, never on the
             // track or on the other clips in it.
             if(auto* editClip = timeline.getClip(track.id, clip.id)) {
@@ -1879,14 +1908,23 @@ void ofxOceanodeTimelineController::draw() {
                     if(ImGui::Checkbox("Repeat content", &repeat))
                         timeline.setClipContentDuration(track.id, clip.id, editClip->contentDurationBeats, repeat);
                 }
-                ImGui::Separator();
+                contextMenuSection("Content");
                 if(ImGui::MenuItem("Consolidate content"))
                     timeline.consolidateClipContent(track.id, clip.id);
                 if(ImGui::IsItemHovered())
                     ImGui::SetTooltip("Permanently remove source data hidden beyond the clip's right edge");
-                ImGui::Separator();
             }
             auto* selectedLane = timeline.getLane(track.id, clip.id, pendingLaneId);
+            if(clip.isStateCapture && clip.lanes.size() > 1) {
+                if(ImGui::MenuItem("Separate parameter clips")) {
+                    requestSeparateStateCaptureClip = true;
+                    separateStateCaptureTrackId = track.id;
+                    separateStateCaptureClipId = clip.id;
+                    ImGui::CloseCurrentPopup();
+                }
+                if(ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Create one independently movable/stretchable clip per parameter");
+            }
             if(!track.isWaveTrack) {
                 // Any automation or LFO clip can be cut in two at the playhead (S).
                 const double playheadBeat = container->getTransportState().beatPosition;
@@ -1910,7 +1948,6 @@ void ofxOceanodeTimelineController::draw() {
                 }
                 if(!playheadInside && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                     ImGui::SetTooltip("Move the playhead inside the clip to split it there");
-                ImGui::Separator();
             }
             if(track.isWaveTrack) {
                 const double playheadBeat = container->getTransportState().beatPosition;
@@ -1936,7 +1973,7 @@ void ofxOceanodeTimelineController::draw() {
                 bool reverse = menuEditClip != nullptr && menuEditClip->waveReverse;
                 if(ImGui::MenuItem("Reverse", nullptr, reverse) && menuEditClip != nullptr)
                     menuEditClip->waveReverse = !reverse;
-                ImGui::Separator();
+                contextMenuSection("Automation");
                 if(ImGui::MenuItem("Edit track volume automation")) {
                     timeline.createWaveVolumeLane(track.id, clip.id);
                     editorTrackId = track.id;
@@ -1952,13 +1989,18 @@ void ofxOceanodeTimelineController::draw() {
                 // it, would quietly break the clip, so this menu offers none
                 // of that -- the LFO editor (double-click the clip) is where
                 // it is edited.
+                contextMenuSection("Editor");
                 ImGui::TextDisabled("LFO clip -- double-click to edit");
             } else {
+                contextMenuSection("Lane");
                 const auto selectedType = selectedLane == nullptr ? ofxOceanodeTimelineLaneType::Step : selectedLane->type;
-                for(int optionIndex = 0; optionIndex < kLaneTypeOptionCount; ++optionIndex) {
-                    const auto candidateType = laneTypeFromOptionIndex(optionIndex);
-                    if(ImGui::MenuItem(kLaneTypeOptions[optionIndex], nullptr, selectedType == candidateType) && selectedLane != nullptr)
-                        timeline.setClipLaneType(track.id, clip.id, selectedLane->id, candidateType);
+                if(ImGui::BeginMenu("Lane type", selectedLane != nullptr)) {
+                    for(int optionIndex = 0; optionIndex < kLaneTypeOptionCount; ++optionIndex) {
+                        const auto candidateType = laneTypeFromOptionIndex(optionIndex);
+                        if(ImGui::MenuItem(kLaneTypeOptions[optionIndex], nullptr, selectedType == candidateType))
+                            timeline.setClipLaneType(track.id, clip.id, selectedLane->id, candidateType);
+                    }
+                    ImGui::EndMenu();
                 }
             }
             if(selectedLane != nullptr && !clip.isLfo && !track.bindings.empty() && ImGui::BeginMenu("Add parameter to this lane")) {
@@ -1985,12 +2027,14 @@ void ofxOceanodeTimelineController::draw() {
                 }
                 ImGui::EndMenu();
             }
-            ImGui::Separator();
             // handleClip already made sure this clip's own key is part of
             // selectedClips by the time either popup that opens this menu
             // (this one, or the binding-row menu) is shown, so "Group"
             // always groups the clip(s) actually selected right now.
-            if(selectedClips.size() >= 2 && selectedClips.count({track.id, clip.id}) > 0) {
+            const bool canGroupSelection = selectedClips.size() >= 2 && selectedClips.count({track.id, clip.id}) > 0;
+            const bool isGrouped = timeline.getGroupForClip(track.id, clip.id) != nullptr;
+            if(canGroupSelection || isGrouped) contextMenuSection("Grouping");
+            if(canGroupSelection) {
                 const std::string groupLabel = "Group " + ofToString(selectedClips.size()) + " clips";
                 if(ImGui::MenuItem(groupLabel.c_str())) {
                     timeline.groupClips(std::vector<std::pair<std::string, std::string>>(
@@ -1998,13 +2042,13 @@ void ofxOceanodeTimelineController::draw() {
                     ImGui::CloseCurrentPopup();
                 }
             }
-            if(timeline.getGroupForClip(track.id, clip.id) != nullptr) {
+            if(isGrouped) {
                 if(ImGui::MenuItem("Ungroup")) {
                     timeline.ungroupClip(track.id, clip.id);
                     ImGui::CloseCurrentPopup();
                 }
             }
-            ImGui::Separator();
+            contextMenuSection("Remove");
             if(ImGui::MenuItem("Delete clip")) {
                 clipDeletionTrackId = track.id;
                 clipDeletionClipId = clip.id;
@@ -2316,8 +2360,8 @@ void ofxOceanodeTimelineController::draw() {
                         }
                     }
                     if(ImGui::BeginPopup(groupMenuId.c_str())) {
-                        ImGui::TextDisabled("%s", group.name.c_str());
-                        ImGui::Separator();
+                        ImGui::TextUnformatted(group.name.c_str());
+                        contextMenuSection("Create and edit");
                         if(ImGui::MenuItem("New piano roll clip here")) {
                             deferredGroupId = group.id;
                             deferredGroupAction = DeferredGroupAction::NewClip;
@@ -2326,6 +2370,7 @@ void ofxOceanodeTimelineController::draw() {
                         if(ImGui::MenuItem("Targets...")) {
                             openNoteGroupSetup(timeline, nullptr, track.id, group.id);
                         }
+                        contextMenuSection("View");
                         if(ImGui::MenuItem(group.expanded ? "Hide parameter rows" : "Show parameter rows")) {
                             if(auto* editGroup = timeline.getNoteGroup(track.id, group.id)) editGroup->expanded = !editGroup->expanded;
                         }
@@ -2335,7 +2380,7 @@ void ofxOceanodeTimelineController::draw() {
                             if(ImGui::MenuItem("Show in Canvas", nullptr, false, canvasParameter != nullptr) && canvasParameter != nullptr)
                                 container->showParameterInCanvas(*canvasParameter);
                         }
-                        ImGui::Separator();
+                        contextMenuSection("Order");
                         const int unitIndex = static_cast<int>(rowUnits.size()) - 1;
                         if(ImGui::MenuItem("Move up", nullptr, false, unitIndex > 0)) {
                             deferredMoveUnitFrom = unitIndex;
@@ -2345,7 +2390,7 @@ void ofxOceanodeTimelineController::draw() {
                             deferredMoveUnitFrom = unitIndex;
                             deferredMoveUnitTo = unitIndex + 2; // slot after the next unit
                         }
-                        ImGui::Separator();
+                        contextMenuSection("Group");
                         if(ImGui::MenuItem("Ungroup (keep parameter rows)")) {
                             deferredGroupId = group.id;
                             deferredGroupAction = DeferredGroupAction::Ungroup;
@@ -2527,13 +2572,17 @@ void ofxOceanodeTimelineController::draw() {
                     }
                 }
                 if(ImGui::BeginPopup(bindingMenuId.c_str())) {
+                    const std::string parameterLabel = compactParameterName(binding.parameterPath);
+                    ImGui::TextUnformatted(parameterLabel.c_str());
+                    if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", binding.parameterPath.c_str());
+                    contextMenuSection("Navigation");
                     {
                         // Same as the Custom GUI's "Show in Canvas": select the owning node and centre on it.
                         auto* boundParameter = container->findTimelineParameter(binding.parameterPath);
                         if(ImGui::MenuItem("Show in Canvas", nullptr, false, boundParameter != nullptr) && boundParameter != nullptr)
                             container->showParameterInCanvas(*boundParameter);
-                        ImGui::Separator();
                     }
+                    contextMenuSection(noteGroup == nullptr ? "Order" : "Group");
                     if(noteGroup == nullptr) {
                         const int unitIndex = static_cast<int>(rowUnits.size()) - 1;
                         if(ImGui::MenuItem("Move up", nullptr, false, unitIndex > 0)) {
@@ -2544,7 +2593,6 @@ void ofxOceanodeTimelineController::draw() {
                             deferredMoveUnitFrom = unitIndex;
                             deferredMoveUnitTo = unitIndex + 2; // slot after the next unit
                         }
-                        ImGui::Separator();
                     } else {
                         ImGui::TextDisabled("Part of \"%s\"", noteGroup->name.c_str());
                         if(ImGui::MenuItem("Take out of the group")) {
@@ -2552,8 +2600,8 @@ void ofxOceanodeTimelineController::draw() {
                             deferredGroupAction = DeferredGroupAction::LeaveGroup;
                             deferredLeaveBindingId = binding.id;
                         }
-                        ImGui::Separator();
                     }
+                    contextMenuSection("Create");
                     if(ImGui::MenuItem("New clip here")) {
                         pendingTrackId = track.id;
                         pendingClipBindingId = binding.id;
@@ -2563,7 +2611,16 @@ void ofxOceanodeTimelineController::draw() {
                         requestClipPopup = true;
                         ImGui::CloseCurrentPopup();
                     }
-                    ImGui::Separator();
+                    const bool canCaptureState = binding.valueType == typeid(float).name() ||
+                        binding.valueType == typeid(int).name() || binding.valueType == typeid(bool).name() ||
+                        binding.valueType == typeid(std::vector<float>).name() ||
+                        binding.valueType == typeid(std::vector<int>).name() ||
+                        binding.valueType == typeid(std::vector<bool>).name();
+                    if(ImGui::MenuItem("Capture state as curve points", nullptr, false, canCaptureState)) {
+                        timeline.captureStateAsCurvePoints(track.id, binding.id, transportState.beatPosition);
+                        ImGui::CloseCurrentPopup();
+                    }
+                    contextMenuSection("Automation");
                     // When more than one binding (possibly on other tracks)
                     // drives the same parameter, this decides how this one
                     // combines with the others -- e.g. a piano-roll gate set
@@ -2576,7 +2633,7 @@ void ofxOceanodeTimelineController::draw() {
                         // Stop automating this parameter (clips stay; the value is left alone).
                         if(auto* editBinding = timeline.getBinding(track.id, binding.id)) editBinding->bypass = !editBinding->bypass;
                     }
-                    ImGui::Separator();
+                    contextMenuSection("Remove");
                     if(ImGui::Selectable("Remove from Timeline")) {
                         removeBindingTrackId = track.id;
                         removeBindingId = binding.id;
@@ -2888,6 +2945,23 @@ void ofxOceanodeTimelineController::draw() {
         requestClipDeletion = false;
         clipDeletionTrackId.clear();
         clipDeletionClipId.clear();
+    }
+
+    if(requestSeparateStateCaptureClip) {
+        const std::string trackId = separateStateCaptureTrackId;
+        const std::string clipId = separateStateCaptureClipId;
+        requestSeparateStateCaptureClip = false;
+        separateStateCaptureTrackId.clear();
+        separateStateCaptureClipId.clear();
+        if(timeline.separateStateCaptureClip(trackId, clipId) > 1 &&
+           clipEditorOpen && editorTrackId == trackId && editorClipId == clipId) {
+            // The original keeps its first lane, but the editor may have
+            // been focused on any of the lanes that just moved to new clips.
+            clipEditorOpen = false;
+            editorTrackId.clear();
+            editorClipId.clear();
+            editorLaneId.clear();
+        }
     }
 
     if(!keyboardClipDeletionRequests.empty()) {
@@ -3426,9 +3500,10 @@ void ofxOceanodeTimelineController::drawRuler(ofxOceanodeTimelineManager& timeli
         ImGui::OpenPopup("##rulerMarkerMenu");
     }
     if(ImGui::BeginPopup("##rulerMarkerMenu")) {
-        if(const auto* marker = markerMenuId.empty() ? nullptr : timeline.getMarker(markerMenuId)) {
-            ImGui::TextDisabled("%s", marker->name.c_str());
-            ImGui::Separator();
+        const auto* marker = markerMenuId.empty() ? nullptr : timeline.getMarker(markerMenuId);
+        if(marker != nullptr) {
+            ImGui::TextUnformatted(marker->name.c_str());
+            contextMenuSection("Marker");
             if(ImGui::MenuItem("Jump here")) jumpToBeat(marker->beat);
             if(ImGui::MenuItem("Rename...")) {
                 markerRenameId = marker->id;
@@ -3436,13 +3511,18 @@ void ofxOceanodeTimelineController::drawRuler(ofxOceanodeTimelineManager& timeli
                 markerRenameBuffer[sizeof(markerRenameBuffer) - 1] = '\0';
                 requestMarkerRename = true;
             }
-            if(ImGui::MenuItem("Delete marker")) timeline.removeMarker(markerMenuId);
         } else {
+            ImGui::TextUnformatted("Ruler");
+            contextMenuSection("Markers");
             if(ImGui::MenuItem("Add marker here")) timeline.addMarker(markerMenuBeat);
             if(ImGui::MenuItem("Add marker at playhead", "M")) timeline.addMarker(snapBeat(beatPosition));
         }
-        ImGui::Separator();
+        contextMenuSection("Playback");
         ImGui::MenuItem("Wait for the next bar to jump", nullptr, &quantizeJumps);
+        if(marker != nullptr) {
+            contextMenuSection("Remove");
+            if(ImGui::MenuItem("Delete marker")) timeline.removeMarker(markerMenuId);
+        }
         ImGui::EndPopup();
     }
     if(!hoveredMarkerId.empty() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
@@ -3522,6 +3602,8 @@ void ofxOceanodeTimelineController::drawRuler(ofxOceanodeTimelineManager& timeli
         if(hoverRect(min, ImVec2(zoneLeft, max.y)) && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
             ImGui::OpenPopup("##rulerLabelMenu");
         if(ImGui::BeginPopup("##rulerLabelMenu")) {
+            ImGui::TextUnformatted("Ruler");
+            contextMenuSection("Lanes");
             if(ImGui::MenuItem("Show tempo (BPM) lane", nullptr, timeline.isBpmLaneVisible()))
                 timeline.setBpmLaneVisible(!timeline.isBpmLaneVisible());
             ImGui::EndPopup();
@@ -3782,12 +3864,15 @@ void ofxOceanodeTimelineController::drawBpmLane(ofxOceanodeTimelineManager& time
     }
     if(ImGui::BeginPopup("BPM point value")) {
         if(bpmValuePointIndex >= 0 && bpmValuePointIndex < static_cast<int>(sourcePoints.size())) {
+            ImGui::TextUnformatted("BPM point");
+            contextMenuSection("Value");
             ImGui::SetNextItemWidth(110.0f);
             if(ImGui::InputFloat("BPM", &bpmNumericValue, 0.1f, 1.0f, "%.3f")) {
                 sourcePoints[bpmValuePointIndex].value = ofClamp(bpmNumericValue,
                     timeline.getBpmMinimum(), timeline.getBpmMaximum());
             }
-            if(ImGui::Button("Delete point")) {
+            contextMenuSection("Remove");
+            if(ImGui::MenuItem("Delete point")) {
                 sourcePoints.erase(sourcePoints.begin() + bpmValuePointIndex);
                 sourceTensions.resize(sourcePoints.empty() ? 0 : sourcePoints.size() - 1);
                 bpmValuePointIndex = -1;
@@ -3986,12 +4071,14 @@ void ofxOceanodeTimelineController::drawWaveTrackVolumeAutomation(
     }
     if(ImGui::BeginPopup("Volume point value")) {
         if(waveVolumeValuePointIndex >= 0 && waveVolumeValuePointIndex < static_cast<int>(points.size())) {
+            ImGui::TextUnformatted("Volume point");
+            contextMenuSection("Value");
             ImGui::SetNextItemWidth(110.0f);
             if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
             if(ImGui::InputFloat("Value", &waveVolumeNumericValue, 0.0f, 0.0f, "%.4g"))
                 points[waveVolumeValuePointIndex].value = ofClamp(waveVolumeNumericValue, 0.0f, 4.0f);
             if(ImGui::IsItemDeactivatedAfterEdit()) waveVolumeNumericValue = ofClamp(waveVolumeNumericValue, 0.0f, 4.0f);
-            ImGui::Separator();
+            contextMenuSection("Remove");
             // Decide once: deleting changes the point count before EndDisabled.
             const bool deleteDisabled = points.size() <= 2;
             if(deleteDisabled) ImGui::BeginDisabled();
@@ -4547,6 +4634,8 @@ void ofxOceanodeTimelineController::drawLfoEditor(ofxOceanodeTimelineManager& ti
             if(!valid) {
                 ImGui::CloseCurrentPopup();
             } else {
+                ImGui::TextUnformatted("LFO point");
+                contextMenuSection("Value");
                 // Set value: type or drag an exact value (real units, e.g. beats for Frequency).
                 const float lo = std::min(lane.valueMin, lane.valueMax);
                 const float hi = std::max(lane.valueMin, lane.valueMax);
@@ -4557,7 +4646,7 @@ void ofxOceanodeTimelineController::drawLfoEditor(ofxOceanodeTimelineManager& ti
                         ofxOceanodeTimelineLfo::laneNormalizedFromValue(lane, ofClamp(lfoPointNumericValue, lo, hi));
                 }
                 if(ImGui::IsItemDeactivatedAfterEdit()) lfoPointNumericValue = ofClamp(lfoPointNumericValue, lo, hi);
-                ImGui::Separator();
+                contextMenuSection("Remove");
                 // Decide once: deleting changes the point count before EndDisabled.
                 const bool deleteDisabled = lane.curvePoints.size() <= 1;
                 if(deleteDisabled) ImGui::BeginDisabled();
@@ -5554,6 +5643,8 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
             if(pianoNumericNoteIndex >= 0 &&
                pianoNumericNoteIndex < static_cast<int>(lane->pianoNotes.size()) &&
                pianoNumericField != PianoNumericField::None) {
+                ImGui::TextUnformatted("Piano note");
+                contextMenuSection("Value");
                 ImGui::SetNextItemWidth(110.0f);
                 const char* label = pianoNumericField == PianoNumericField::Velocity
                     ? "Velocity" : "Probability";
@@ -5772,6 +5863,8 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         }
         if(ImGui::BeginPopup("Curve point value")) {
             if(curveValuePointIndex >= 0 && curveValuePointIndex < static_cast<int>(lane->curvePoints.size())) {
+                ImGui::TextUnformatted("Curve point");
+                contextMenuSection("Value");
                 ImGui::SetNextItemWidth(110.0f);
                 if(ImGui::InputFloat("Value", &curveNumericValue, 0.001f, 0.01f, "%.6g")) {
                     const float span = lane->valueMax - lane->valueMin;
@@ -5783,7 +5876,8 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                     lane->curvePoints[curveValuePointIndex].value = std::abs(span) < 1e-9f ? 0.0f
                         : (actualValue - lane->valueMin) / span;
                 }
-                if(ImGui::Button("Delete point")) {
+                contextMenuSection("Remove");
+                if(ImGui::MenuItem("Delete point")) {
                     eraseCurvePointWithTensions(*lane, static_cast<size_t>(curveValuePointIndex));
                     curveValuePointIndex = -1;
                     ImGui::CloseCurrentPopup();
