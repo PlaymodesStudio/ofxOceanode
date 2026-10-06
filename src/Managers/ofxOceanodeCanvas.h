@@ -105,7 +105,10 @@ public:
 
     void requestPortalizeSelection(){portalizeSelectionRequested = true;}
     void requestAutoLayoutSelection(){autoLayoutSelectionRequested = true;}
-    void requestAutoLayoutCanvas(){autoLayoutCanvasRequested = true;}
+    void requestAutoLayoutCanvas(bool centerAfterLayout = false){
+        autoLayoutCanvasRequested = true;
+        centerCanvasAfterAutoLayoutRequested |= centerAfterLayout;
+    }
 	
 	
 private:
@@ -174,6 +177,8 @@ private:
     bool portalizeSelectionRequested = false;
     bool autoLayoutSelectionRequested = false;
     bool autoLayoutCanvasRequested = false;
+    bool centerCanvasAfterAutoLayoutRequested = false;
+    bool centerAllNodesRequested = false;
     
     string node_selected = "";
     glm::vec2 newNodeClickPos;

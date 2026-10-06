@@ -631,6 +631,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         if(autoLayoutCanvasRequested){
             autoLayoutCanvasRequested = false;
             autoLayoutNodes(container->getAllModules());
+            centerAllNodesRequested |= centerCanvasAfterAutoLayoutRequested;
+            centerCanvasAfterAutoLayoutRequested = false;
         }
 
         // Detect canvas tab activation — consistent check for both active-canvas-ID
@@ -948,6 +950,27 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                   glm::vec2 center = getContentRegionSize() / (2.0f * zoom);
                   setScrolling(-nodePos - nodeSize / 2.0f + center);
                   pendingCenterNode = nullptr;
+              }
+              if(centerAllNodesRequested && contentRegionSize.x > 0.0f && contentRegionSize.y > 0.0f){
+                  const auto allNodes = container->getAllModules();
+                  if(!allNodes.empty()){
+                      glm::vec2 boundsMin(FLT_MAX, FLT_MAX);
+                      glm::vec2 boundsMax(-FLT_MAX, -FLT_MAX);
+                      for(auto* node : allNodes){
+                          const glm::vec2 position = node->getNodeGui().getPosition();
+                          const ofRectangle rectangle = node->getNodeGui().getRectangle();
+                          const glm::vec2 size(std::max(rectangle.getWidth(), (float)getTotalNodeWidth()),
+                                               std::max(rectangle.getHeight(), (float)GRID_SIZE));
+                          boundsMin.x = std::min(boundsMin.x, position.x);
+                          boundsMin.y = std::min(boundsMin.y, position.y);
+                          boundsMax.x = std::max(boundsMax.x, position.x + size.x);
+                          boundsMax.y = std::max(boundsMax.y, position.y + size.y);
+                      }
+                      const glm::vec2 compositionCenter = (boundsMin + boundsMax) * 0.5f;
+                      const glm::vec2 viewportCenter = contentRegionSize / (2.0f * zoomLevel);
+                      setScrolling(-compositionCenter + viewportCenter);
+                  }
+                  centerAllNodesRequested = false;
               }
 		      ImVec2 offset = ImVec2(canvasOrigin.x + scrolling.x * zoomLevel,
 		                             canvasOrigin.y + scrolling.y * zoomLevel);

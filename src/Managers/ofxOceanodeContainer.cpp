@@ -3945,6 +3945,12 @@ ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
 		// 10. Create routers and reconnect
 		createRoutersAndReconnect(macroNode, externalConnections, minPos);
 	}
+
+	// Reuse the canvas auto-layout once the pasted nodes and generated boundary
+	// routers are all present. The request remains pending while the macro is
+	// closed and centers the resulting composition when its canvas is drawn.
+	if(auto* macroCanvas = macroModel->getCanvas())
+		macroCanvas->requestAutoLayoutCanvas(true);
 	
 	ofLogNotice("Encapsulation") << "Encapsulation completed successfully";
 	return macroNode;
