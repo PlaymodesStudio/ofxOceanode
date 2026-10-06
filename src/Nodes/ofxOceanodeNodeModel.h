@@ -75,6 +75,11 @@ public:
     
     virtual void activateConnections(){};
     virtual void deactivateConnections(){};
+
+    // Sink pins for which the canvas should offer automatic upstream graph
+    // encapsulation.  The graph operation itself belongs to the container;
+    // models only opt the relevant inputs into the generic UI.
+    virtual bool canEncapsulateSubgraphFrom(ofxOceanodeAbstractParameter&) const { return false; }
     
     virtual void deactivate(){};
     virtual void activate(){};

@@ -19,6 +19,7 @@
 #include "CustomGui/ofxOceanodeCustomGuiWidgets.h"
 #include "Nodes/MacroSnapshotSystem.h"
 #include "Nodes/MacroRouterValueDispatch.h"
+#include "portal.h"
 #include "imgui.h"
 #include <cmath>
 #include <cfloat>
@@ -3492,13 +3493,108 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanod
 ///
 
 
+vector<ofxOceanodeContainer::UpstreamSubgraph>
+ofxOceanodeContainer::findExclusiveUpstreamSubgraphs(
+    const vector<ofxOceanodeAbstractParameter*>& requestedSinks) {
+    vector<UpstreamSubgraph> plans;
+    unordered_set<ofxOceanodeNode*> sinkOwners;
+    auto isPortalNode = [](ofxOceanodeNode* node) {
+        return node != nullptr && dynamic_cast<abstractPortal*>(&node->getNodeModel()) != nullptr;
+    };
+    for(auto* sink : requestedSinks) {
+        if(sink == nullptr || !sink->hasInConnection()) continue;
+        if(auto* owner = getNodeFromParameter(*sink)) sinkOwners.insert(owner);
+    }
+
+    vector<unordered_set<ofxOceanodeNode*>> closures;
+    for(auto* sink : requestedSinks) {
+        if(sink == nullptr || !sink->hasInConnection()) continue;
+        auto* sourceNode = getNodeFromParameter(sink->getInConnection()->getSourceParameter());
+        if(sourceNode == nullptr || isPortalNode(sourceNode) || sinkOwners.count(sourceNode) != 0) continue;
+
+        unordered_set<ofxOceanodeNode*> closure;
+        vector<ofxOceanodeNode*> pending{sourceNode};
+        while(!pending.empty()) {
+            auto* node = pending.back();
+            pending.pop_back();
+            if(node == nullptr || isPortalNode(node) || sinkOwners.count(node) != 0 || !closure.insert(node).second) continue;
+            for(auto& rawParameter : node->getParameters()) {
+                auto parameter = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(rawParameter);
+                if(parameter == nullptr || !parameter->hasInConnection()) continue;
+                auto* upstream = getNodeFromParameter(parameter->getInConnection()->getSourceParameter());
+                if(upstream != nullptr && !isPortalNode(upstream) && sinkOwners.count(upstream) == 0)
+                    pending.push_back(upstream);
+            }
+        }
+        if(!closure.empty()) {
+            plans.push_back({sink, {}});
+            closures.push_back(std::move(closure));
+        }
+    }
+
+    // A node reached from more than one mixer inlet is a shared dependency.
+    unordered_map<ofxOceanodeNode*, int> claims;
+    for(const auto& closure : closures)
+        for(auto* node : closure) claims[node]++;
+
+    const auto allNodes = getAllModules();
+    for(size_t i = 0; i < plans.size(); ++i) {
+        auto kept = closures[i];
+        for(auto it = kept.begin(); it != kept.end();) {
+            if(claims[*it] > 1) it = kept.erase(it);
+            else ++it;
+        }
+
+        // Removing a shared/downstream node can expose another outgoing edge.
+        // Iterate to a fixed point so every retained node is exclusive to this
+        // branch. The one permitted external edge is the selected mixer inlet.
+        bool changed = true;
+        while(changed) {
+            changed = false;
+            vector<ofxOceanodeNode*> remove;
+            for(auto* node : kept) {
+                bool escapes = false;
+                for(auto& rawParameter : node->getParameters()) {
+                    auto parameter = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(rawParameter);
+                    if(parameter == nullptr) continue;
+                    for(auto* connection : parameter->getOutConnections()) {
+                        if(&connection->getSinkParameter() == plans[i].sink) continue;
+                        auto* downstream = getNodeFromParameter(connection->getSinkParameter());
+                        if(downstream == nullptr || kept.count(downstream) == 0) {
+                            escapes = true;
+                            break;
+                        }
+                    }
+                    if(escapes) break;
+                }
+                if(escapes) remove.push_back(node);
+            }
+            for(auto* node : remove) changed |= kept.erase(node) != 0;
+        }
+
+        // Preserve deterministic node order for copy/paste and for matching
+        // recreated nodes inside the macro.
+        for(auto* node : allNodes)
+            if(kept.count(node) != 0) plans[i].nodes.push_back(node);
+    }
+    return plans;
+}
+
 void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
-	// 1. Validate selection
-	auto selectedNodes = getSelectedModules();
+	encapsulateNodes(getSelectedModules(), macroName);
+}
+
+ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
+    const vector<ofxOceanodeNode*>& nodes, const string& macroName) {
+	// 1. Validate and select exactly this precomputed branch. This keeps batch
+	// encapsulation independent from the order in which its plans are applied.
+	auto selectedNodes = nodes;
 	if(selectedNodes.empty()) {
 		ofLogWarning("Encapsulation") << "No nodes selected for encapsulation";
-		return;
+		return nullptr;
 	}
+	for(auto* node : getAllModules()) node->getNodeGui().setSelected(false);
+	for(auto* node : selectedNodes) if(node != nullptr) node->getNodeGui().setSelected(true);
 	
 	ofLogNotice("Encapsulation") << "Encapsulating " << selectedNodes.size() << " nodes";
 	
@@ -3537,14 +3633,14 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 	// 5. Cut selected nodes (this deletes them from memory)
 	if(!cutSelectedModulesWithConnections()) {
 		ofLogError("Encapsulation") << "Failed to cut selected nodes";
-		return;
+		return nullptr;
 	}
 	
 	// 6. Create macro node
 	auto macroNode = createNodeFromName("Macro");
 	if(!macroNode) {
 		ofLogError("Encapsulation") << "Failed to create macro node";
-		return;
+		return nullptr;
 	}
 	
 	macroNode->getNodeGui().setPosition(centerPos);
@@ -3555,14 +3651,16 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 	if(!macroModel) {
 		ofLogError("Encapsulation") << "Failed to cast to macro model";
 		macroNode->deleteSelf();
-		return;
+		return nullptr;
 	}
+	if(!macroName.empty() && macroModel->getInspectorParameterGroup().contains("Local Name"))
+		macroModel->getInspectorParameter<string>("Local Name").set(macroName);
 	
 	auto macroContainer = macroModel->getContainer();
 	if(!macroContainer) {
 		ofLogError("Encapsulation") << "Failed to get macro container";
 		macroNode->deleteSelf();
-		return;
+		return nullptr;
 	}
 	
 	// 8. Paste nodes inside macro
@@ -3849,6 +3947,7 @@ void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
 	}
 	
 	ofLogNotice("Encapsulation") << "Encapsulation completed successfully";
+	return macroNode;
 }
 
 vector<ofxOceanodeContainer::ExternalConnection> ofxOceanodeContainer::analyzeExternalConnections(vector<ofxOceanodeNode*> selectedNodes) {

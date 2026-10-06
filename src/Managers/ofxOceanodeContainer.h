@@ -181,6 +181,16 @@ public:
 	
 	// Node encapsulation functionality
 	void encapsulateSelectedNodes(const string& macroName = "Encapsulated");
+	struct UpstreamSubgraph {
+		ofxOceanodeAbstractParameter* sink = nullptr;
+		vector<ofxOceanodeNode*> nodes;
+	};
+	// Plans every requested sink together. Nodes used by more than one branch,
+	// or with any output outside their branch, stay outside all macros.
+	vector<UpstreamSubgraph> findExclusiveUpstreamSubgraphs(
+		const vector<ofxOceanodeAbstractParameter*>& sinks);
+	ofxOceanodeNode* encapsulateNodes(const vector<ofxOceanodeNode*>& nodes,
+	                                  const string& macroName = "Encapsulated");
 
     
     ofEvent<pair<string, string>> loadPresetEvent;

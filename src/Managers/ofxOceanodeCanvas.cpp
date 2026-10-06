@@ -178,8 +178,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     // Draw a list of nodes on the left side
     bool open_context_menu = false;
     bool open_outlet_context_menu = false;
+    bool open_inlet_context_menu = false;
     static ofxOceanodeNode* customGuiContextNode = nullptr;
     static ofxOceanodeAbstractParameter* portalizeSourceParameter = nullptr;
+    static ofxOceanodeAbstractParameter* encapsulateSinkParameter = nullptr;
     static char portalizeNameBuffer[256] = "";
     bool open_portalize_name_popup = false;
     struct PendingPortalAlignment {
@@ -751,6 +753,51 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 sinkParameter->getName()
             });
             return true;
+        };
+
+        auto encapsulateMixerSubgraphs = [&](ofxOceanodeAbstractParameter* clickedSink,
+                                             bool allInputs, bool withPortals){
+            if(clickedSink == nullptr || !clickedSink->hasInConnection()) return;
+            auto* sinkNode = container->getNodeFromParameter(*clickedSink);
+            if(sinkNode == nullptr) return;
+
+            vector<ofxOceanodeAbstractParameter*> sinks;
+            if(allInputs) {
+                for(auto& rawParameter : sinkNode->getParameters()) {
+                    auto parameter = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(rawParameter);
+                    if(parameter != nullptr && parameter->hasInConnection() &&
+                       sinkNode->getNodeModel().canEncapsulateSubgraphFrom(*parameter))
+                        sinks.push_back(parameter.get());
+                }
+            } else {
+                sinks.push_back(clickedSink);
+            }
+
+            // Every branch is planned against the same unmodified graph. This
+            // is what keeps a generator shared by two mixer inputs outside both
+            // macros instead of letting the first operation capture it.
+            auto plans = container->findExclusiveUpstreamSubgraphs(sinks);
+            int created = 0;
+            for(auto& plan : plans) {
+                if(plan.sink == nullptr || plan.nodes.empty()) {
+                    if(plan.sink != nullptr)
+                        ofLogWarning("Encapsulation") << "No exclusive nodes upstream of " << plan.sink->getName();
+                    continue;
+                }
+                const string macroName = plan.sink->getName() + " Graph";
+                auto* macroNode = container->encapsulateNodes(plan.nodes, macroName);
+                if(macroNode == nullptr) continue;
+                created++;
+
+                if(withPortals) {
+                    // Keep the macro's real input routers. Portals only replace
+                    // their parent-canvas boundary wires, reusing an existing
+                    // sender on the shared source whenever possible.
+                    auto boundaryInputs = getPortalizableInputConnections(macroNode);
+                    for(auto* connection : boundaryInputs) portalizeInput(connection);
+                }
+            }
+            ofLogNotice("Encapsulation") << "Created " << created << " independent mixer subgraph macro(s)";
         };
 
         if(portalizeSelectionRequested){
@@ -1461,7 +1508,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             draw_list->AddCircleFilled(bulletPosition, bulletSize, OceanodeColors::U32(OceanodeColors::ConnectionBullet));
                             if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
                                 connectionIsDoable = true;
-                                if(ImGui::IsMouseClicked(0)){
+                                if(ImGui::IsMouseClicked(1) && param->hasInConnection() &&
+                                   node->getNodeModel().canEncapsulateSubgraphFrom(*param)){
+                                    encapsulateSinkParameter = param.get();
+                                    open_inlet_context_menu = true;
+                                    open_context_menu = true;
+                                    customGuiContextNode = nullptr;
+                                }else if(ImGui::IsMouseClicked(0)){
                                     nodeGui.setSelected(false); //Deselect node if we are making connections
                                     isCreatingConnection = true;
                                     if(param->hasInConnection()){ //Parmaeter has sink connected
@@ -1932,6 +1985,18 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             ImGui::EndPopup();
         }
 
+        if(open_inlet_context_menu){
+            ImGui::OpenPopup("Mixer Input Connection");
+        }
+        int mixerEncapsulationAction = -1;
+        if(ImGui::BeginPopup("Mixer Input Connection")){
+            if(ImGui::Selectable("Encapsulate Subgraph")) mixerEncapsulationAction = 0;
+            if(ImGui::Selectable("Encapsulate Subgraph with Portals")) mixerEncapsulationAction = 1;
+            ImGui::Separator();
+            if(ImGui::Selectable("Encapsulate All Subgraphs")) mixerEncapsulationAction = 2;
+            if(ImGui::Selectable("Encapsulate All Subgraphs with Portals")) mixerEncapsulationAction = 3;
+            ImGui::EndPopup();
+        }
         if(open_portalize_name_popup){
             ImGui::OpenPopup("Portalize Output");
         }
@@ -2602,6 +2667,17 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
         }
         
+        // Encapsulation deletes and recreates nodes. Run it only after this
+        // frame has finished consuming nodesVisibleInThisFrame and drawing
+        // its connections; doing it directly from the popup leaves stale node
+        // pointers in those snapshots for the remainder of the draw pass.
+        if(mixerEncapsulationAction >= 0) {
+            auto* sink = encapsulateSinkParameter;
+            encapsulateSinkParameter = nullptr;
+            encapsulateMixerSubgraphs(sink, mixerEncapsulationAction >= 2,
+                                      (mixerEncapsulationAction & 1) != 0);
+        }
+
         ImGui::PopItemWidth();
         ImGui::EndChild();
         ImGui::PopStyleColor();
