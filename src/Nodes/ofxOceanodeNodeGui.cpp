@@ -991,3 +991,9 @@ glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofxOceano
 glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter){
     return inputPositions[getParameters().getPosition(parameter.getName())];
 }
+
+bool ofxOceanodeNodeGui::hasConnectionPosition(ofxOceanodeAbstractParameter& parameter){
+    if(!getParameters().contains(parameter.getName())) return false;
+    const size_t index = getParameters().getPosition(parameter.getName());
+    return index < inputPositions.size() && index < outputPositions.size();
+}

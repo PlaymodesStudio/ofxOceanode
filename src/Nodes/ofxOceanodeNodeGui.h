@@ -52,6 +52,8 @@ public:
     
     glm::vec2 getSourceConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter);
     glm::vec2 getSinkConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter);
+    // False until the node has been drawn with its current parameter list
+    bool hasConnectionPosition(ofxOceanodeAbstractParameter& parameter);
     
 #ifdef OFXOCEANODE_USE_MIDI
     void setIsListeningMidi(bool b){isListeningMidi = b;};
