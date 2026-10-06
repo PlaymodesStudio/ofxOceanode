@@ -773,7 +773,7 @@ void ofxOceanodeTimelineController::draw() {
         ImGui::TextDisabled("%s", text);
         ImGui::SameLine(0.0f, 5.0f);
     };
-    // ---- Row 1: transport | position | tempo | meter | sync ----
+    // ---- Row 1: transport | position | tempo | meter | sync | timebase ----
     if(transport != nullptr) {
         // Following an external clock: position, play state and tempo come from it.
         const char* lockedTip = "Following an external clock";
@@ -966,6 +966,18 @@ void ofxOceanodeTimelineController::draw() {
             }
         }
 #endif
+        groupSeparator();
+        caption("Timebase");
+        const char* timebaseModes[] = {"Beats", "Time"};
+        int timebaseMode = timeline.getTimebase() == ofxOceanodeTimelineTimebase::Time ? 1 : 0;
+        ImGui::SetNextItemWidth(72.0f);
+        if(ImGui::Combo("##timelineTimebase", &timebaseMode, timebaseModes, 2))
+            timeline.setTimebase(timebaseMode == 1
+                ? ofxOceanodeTimelineTimebase::Time
+                : ofxOceanodeTimelineTimebase::Beats);
+        if(ImGui::IsItemHovered())
+            ImGui::SetTooltip("Beats: tempo changes preserve musical positions.\n"
+                              "Time: manual tempo changes preserve absolute timing.");
     }
 
     // ---- Row 2: loop | grid | view | output timing | tracks ----

@@ -96,8 +96,8 @@ constexpr double kEpsilon = 1e-9;
 // NEWER build, where a silent partial load would be the wrong answer.
 // 6 clip groups, 7 wave tracks, 8 self-contained LFO clips,
 // 9 preset-backed editor zoom and horizontal position,
-// 10 state-capture curve clips.
-constexpr int kPresetVersion = 10;
+// 10 state-capture curve clips, 11 persisted timeline timebase.
+constexpr int kPresetVersion = 11;
 constexpr float kDefaultTimelinePixelsPerSecond = 140.0f;
 constexpr float kMinTimelinePixelsPerSecond = 0.25f;
 constexpr float kMaxTimelinePixelsPerSecond = 600.0f;
@@ -4570,6 +4570,7 @@ void ofxOceanodeTimelineManager::clear() {
     clipGroups.clear();
     markers.clear();
     viewState = {};
+    timebase = ofxOceanodeTimelineTimebase::Beats;
     nextTrackNumber = 1;
     nextBindingNumber = 1;
     nextClipNumber = 1;
@@ -4597,6 +4598,39 @@ void ofxOceanodeTimelineManager::clear() {
     lastEvaluatedTransportBeat = 0.0;
     timeSignatureNumerator = 4;
     timeSignatureDenominator = 4;
+}
+
+void ofxOceanodeTimelineManager::retimeForBpmChange(float oldBpm, float newBpm) {
+    if(timebase != ofxOceanodeTimelineTimebase::Time ||
+       oldBpm <= 0.0f || newBpm <= 0.0f) return;
+    const double scale = static_cast<double>(newBpm) / static_cast<double>(oldBpm);
+    if(!std::isfinite(scale) || scale <= 0.0 || std::abs(scale - 1.0) <= kEpsilon) return;
+
+    // These values live directly in global timeline-beat space.
+    for(auto& marker : markers) marker.beat *= scale;
+    for(auto& point : bpmAutomationPoints) point.beat *= scale;
+    loopStartBeat *= scale;
+    loopEndBeat = std::max(loopStartBeat + 1.0 / 24.0, loopEndBeat * scale);
+
+    for(auto& track : tracks) {
+        for(auto& point : track.waveVolumePoints) point.beat *= scale;
+        for(auto& clip : track.clips) {
+            clip.startBeat *= scale;
+            clip.durationBeats = std::max(1.0 / 24.0, clip.durationBeats * scale);
+            // Local lane data remains untouched. Scaling the local-to-global
+            // mapping is enough to preserve the absolute time of every step,
+            // note, curve point, LFO cycle and audio sample inside the clip.
+            clip.contentStretch = std::max(1.0 / 1024.0, clip.contentStretch * scale);
+            if(track.isWaveTrack) normalizeWaveClipMapping(clip);
+        }
+    }
+
+    retriggerGapBeats = ofClamp(retriggerGapBeats * scale, 1.0 / 192.0, 0.25);
+    tempoSecondsCacheValid = false;
+    hasEvaluatedTransportBeat = false;
+    invalidateEvaluationIndexes();
+    invalidateSchedule();
+    syncLoopToTransport();
 }
 
 void ofxOceanodeTimelineManager::setTimeSignature(int numerator, int denominator) {
@@ -4654,6 +4688,7 @@ ofxOceanodeTimelineLaneType ofxOceanodeTimelineManager::laneTypeFromString(const
 ofJson ofxOceanodeTimelineManager::toJson() const {
     ofJson json;
     json["version"] = kPresetVersion;
+    json["timebase"] = timebase == ofxOceanodeTimelineTimebase::Time ? "Time" : "Beats";
     json["view"] = {
         {"pixelsPerSecond", viewState.pixelsPerSecond},
         {"scrollX", viewState.scrollX}
@@ -4849,6 +4884,9 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
     }
     clear();
     if(!json.is_object()) return;
+    timebase = json.value("timebase", std::string("Beats")) == "Time"
+        ? ofxOceanodeTimelineTimebase::Time
+        : ofxOceanodeTimelineTimebase::Beats;
     if(json.contains("view") && json["view"].is_object()) {
         const auto& view = json["view"];
         viewState.pixelsPerSecond = ofClamp(
