@@ -20,6 +20,7 @@
 #include "Nodes/MacroSnapshotSystem.h"
 #include "Nodes/MacroRouterValueDispatch.h"
 #include "imgui.h"
+#include <cmath>
 #include <cfloat>
 #include <deque>
 
@@ -1857,9 +1858,30 @@ void ofxOceanodeContainer::saveCurrentPreset(){
 }
 
 void ofxOceanodeContainer::setBpm(float _bpm){
+    // In Time timebase, a manual/internal tempo edit changes the beat scale
+    // instead of moving material in seconds. Tempo automation is excluded:
+    // it deliberately describes a tempo map and calls this method every frame.
+    ofxOceanodeTransportState stateBefore;
+    bool preserveTimelineTime = false;
+    if(transport != nullptr){
+        transport->syncRealTime();
+        stateBefore = transport->getState();
+        preserveTimelineTime = timelineManager != nullptr &&
+            !transport->hasExternalClock() &&
+            !timelineManager->isBpmAutomationEnabled() &&
+            timelineManager->getTimebase() == ofxOceanodeTimelineTimebase::Time &&
+            stateBefore.bpm > 0.0f && _bpm > 0.0f &&
+            std::abs(stateBefore.bpm - _bpm) > 0.0001f;
+        if(preserveTimelineTime)
+            timelineManager->retimeForBpmChange(stateBefore.bpm, _bpm);
+    }
+
     bpm = _bpm;
     if(transport != nullptr){
         transport->setBpm(bpm);
+        if(preserveTimelineTime)
+            transport->seekToBeat(stateBefore.beatPosition *
+                static_cast<double>(_bpm) / static_cast<double>(stateBefore.bpm));
     }
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){

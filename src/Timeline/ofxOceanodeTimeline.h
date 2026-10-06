@@ -51,6 +51,15 @@ enum class ofxOceanodeTimelineLaneType {
     Wave
 };
 
+// Determines what stays fixed when the manual transport tempo changes.
+// Beats is the traditional musical timeline: beat positions are unchanged,
+// so their duration in seconds follows the tempo. Time rescales global beat
+// positions so the same material remains at the same absolute time.
+enum class ofxOceanodeTimelineTimebase {
+    Beats,
+    Time
+};
+
 struct ofxOceanodeTimelineStep {
     double startBeat = 0.0;
     // A non-positive duration uses the lane's current grid-cell length.
@@ -728,6 +737,14 @@ public:
     ofxOceanodeTimelineViewState& getViewState() { return viewState; }
     const ofxOceanodeTimelineViewState& getViewState() const { return viewState; }
 
+    ofxOceanodeTimelineTimebase getTimebase() const { return timebase; }
+    void setTimebase(ofxOceanodeTimelineTimebase value) { timebase = value; }
+    // Called before applying a manual BPM change while Time is selected.
+    // Source data inside clips remains in its local beat domain; scaling each
+    // clip's placement and stretch keeps every contained event at the same
+    // absolute time without destructively rewriting the pattern itself.
+    void retimeForBpmChange(float oldBpm, float newBpm);
+
     bool isBpmAutomationEnabled() const { return bpmAutomationEnabled; }
     void setBpmAutomationEnabled(bool enabled);
     bool isBpmLaneCollapsed() const { return bpmLaneCollapsed; }
@@ -861,6 +878,7 @@ private:
     std::vector<ofxOceanodeTimelineClipGroup> clipGroups;
     std::vector<ofxOceanodeTimelineMarker> markers; // sorted by beat
     ofxOceanodeTimelineViewState viewState;
+    ofxOceanodeTimelineTimebase timebase = ofxOceanodeTimelineTimebase::Beats;
     uint64_t nextTrackNumber = 1;
     uint64_t nextBindingNumber = 1;
     uint64_t nextClipNumber = 1;
