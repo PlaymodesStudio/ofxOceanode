@@ -123,7 +123,13 @@ private:
 class ramp : public timeGenerator {
 public:
     ramp() : timeGenerator("Ramp") {
+#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
+        description = "Generates a linear ramp from 0 to 1 over a specified duration in milliseconds. "
+                      "By default it runs independently of playback. With Sync To Transport enabled, "
+                      "it follows transport play/pause and frame-stepped rendering.";
+#else
         description = "Generates a linear ramp from 0 to 1 over a specified duration in milliseconds. The ramp starts when triggered and holds at 1 until reset by another trigger.";
+#endif
     }
 
     void setup() override {
@@ -137,6 +143,9 @@ public:
         addParameter(isRamping.set("IsRamping",false));
         addOutputParameter(isRampFinish.set("Finish",false));
         addParameter(enable.set("Enable", true));
+#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
+        addInspectorParameter(syncToTransport.set("Sync To Transport", false));
+#endif
         rampStartTime = 0;
         isRamping = false;
         isRampFinish = false;
@@ -160,14 +169,24 @@ public:
         listeners.push(forceFinish.newListener([this](){
             finishRamp();
         }));
+#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
+        listeners.push(syncToTransport.newListener([this](bool &){
+            if(isRamping) {
+                // Keep the current value continuous when changing clock source.
+                rampStartTime = getRampTime() -
+                    static_cast<double>(output.get()) * static_cast<double>(rampDurationMs.get()) / 1000.0;
+            }
+        }));
+#endif
     }
 
     void update(ofEventArgs &a) override {
         if (isRamping) {
             isRampFinish=false;
-            float elapsedTime = static_cast<float>((getTime() - rampStartTime) * 1000.0);
-            if (elapsedTime < rampDurationMs) {
-                output = elapsedTime / rampDurationMs;
+            const double elapsedTimeMs = std::max(0.0, (getRampTime() - rampStartTime) * 1000.0);
+            const double durationMs = static_cast<double>(rampDurationMs.get());
+            if (durationMs > 0.0 && elapsedTimeMs < durationMs) {
+                output = static_cast<float>(elapsedTimeMs / durationMs);
             } else {
                 output = 1;
                 isRamping = false; // Ramp completed
@@ -177,8 +196,18 @@ public:
     }
 
 private:
+    double getRampTime() {
+#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
+        return syncToTransport
+            ? getFrameTransportState().current.seconds
+            : getFrameGlobalTimeState().current.time;
+#else
+        return getTime();
+#endif
+    }
+
     void startRamp() {
-        rampStartTime = getTime();
+        rampStartTime = getRampTime();
         isRamping = true;
         isRampFinish = false;
         output = 0;
@@ -204,6 +233,9 @@ private:
     ofParameter<bool> isRampFinish;
     ofParameter<void> forceFinish;
     ofParameter<bool> enable;
+#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
+    ofParameter<bool> syncToTransport;
+#endif
     
     double rampStartTime; // Time in seconds
     float lastTNum;
