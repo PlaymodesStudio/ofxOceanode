@@ -190,6 +190,41 @@ void ofxOceanodeCanvas::resetForNewPreset(){
     centerOriginPending = true;
 }
 
+void ofxOceanodeCanvas::handleParentNavigation(){
+    // ImGui maps macOS Cmd to logical Ctrl, matching the other canvas shortcuts.
+    // Include this window's children without including its shared docking host.
+    const auto& io = ImGui::GetIO();
+    if(parentID.empty() || !ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) ||
+       !io.KeyCtrl || io.WantTextInput || ImGui::IsAnyItemActive() ||
+       ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) ||
+       !ImGui::IsKeyPressed(ImGuiKey_UpArrow, false)) return;
+
+    // A parent drawn later can receive focus in this same frame. Each press
+    // must climb exactly one level, regardless of canvas draw order.
+    static int lastNavigationFrame = -1;
+    if(lastNavigationFrame == ImGui::GetFrameCount()) return;
+
+    auto* rootContainer = ofxOceanodeShared::getRootContainer();
+    if(rootContainer == nullptr) return;
+
+    std::function<bool(ofxOceanodeContainer*)> findParent = [&](ofxOceanodeContainer* current){
+        if(current == nullptr) return false;
+        for(auto* node : current->getAllModules()){
+            if(node == nullptr) continue;
+            if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
+                if(macro->getCanvas() == this){
+                    // Reuse node navigation to show the parent, synchronize the
+                    // selection/layout, and center after its viewport is ready.
+                    return current->showNodeInCanvas(*node);
+                }
+                if(findParent(macro->getContainer().get())) return true;
+            }
+        }
+        return false;
+    };
+    if(findParent(rootContainer)) lastNavigationFrame = ImGui::GetFrameCount();
+}
+
 void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     // Save the previous shared zoom level so nested canvas draws (e.g. macros)
     // restore the parent's value when they finish.
@@ -710,6 +745,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
         }
         wasFocusedLastFrame = isActiveTab;
+        handleParentNavigation();
         ImGui::SameLine();
         ImGui::BeginGroup();
                 

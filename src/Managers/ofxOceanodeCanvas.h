@@ -113,6 +113,7 @@ public:
 	
 	
 private:
+    void handleParentNavigation();
     glm::vec3 getMatrixScale(const glm::mat4 &m);
     glm::mat4 translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector);
     
