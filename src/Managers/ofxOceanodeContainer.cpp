@@ -386,6 +386,70 @@ ofxOceanodeNode* ofxOceanodeContainer::createNodeFromName(string name, int ident
     return nullptr;
 }
 
+bool ofxOceanodeContainer::replacePortalTypeInAllInstances(abstractPortal* portal, const string& newTypeName){
+    if(portal == nullptr || portal->nodeName() == newTypeName || registry->getRegisteredModels().count(newTypeName) == 0)
+        return false;
+
+    struct ConnectionInfo {
+        ofxOceanodeAbstractParameter* other;
+        bool incoming;
+        bool persistent;
+    };
+    bool success = true;
+    for(auto* oldPortal : ofxOceanodeShared::getMatchingPortalInstances(portal)){
+        auto* owner = oldPortal->getHostContainer();
+        if(owner == nullptr || !oldPortal->getParameterGroup().contains("Value")) continue;
+        auto& oldValue = static_cast<ofxOceanodeAbstractParameter&>(oldPortal->getParameterGroup().get("Value"));
+        auto* oldNode = owner->getNodeFromParameter(oldValue);
+        if(oldNode == nullptr) continue;
+
+        vector<ConnectionInfo> connections;
+        if(auto* connection = oldValue.getInConnection()){
+            connections.push_back({&connection->getSourceParameter(), true, connection->getIsPersistent()});
+        }
+        for(auto* connection : oldValue.getOutConnections()){
+            connections.push_back({&connection->getSinkParameter(), false, connection->getIsPersistent()});
+        }
+
+        const glm::vec2 position = oldNode->getNodeGui().getPosition();
+        const bool expanded = oldNode->getNodeGui().getExpanded();
+        const bool visible = oldNode->getNodeGui().getVisibility();
+        const bool selected = oldNode->getNodeGui().getSelected();
+        const bool active = oldNode->getActive();
+        const bool persistent = oldNode->getIsPersistent();
+        const string name = oldPortal->getName();
+        const bool local = oldPortal->getInspectorParameter<bool>("Local").get();
+        const bool resend = oldPortal->getInspectorParameter<bool>("Resend On Name Change").get();
+
+        auto* newNode = owner->createNodeFromName(newTypeName, -1, persistent);
+        auto* newPortal = newNode == nullptr ? nullptr : dynamic_cast<abstractPortal*>(&newNode->getNodeModel());
+        if(newPortal == nullptr || !newPortal->getParameterGroup().contains("Value")){
+            if(newNode != nullptr) newNode->deleteSelf();
+            success = false;
+            continue;
+        }
+        auto& newValue = static_cast<ofxOceanodeAbstractParameter&>(newPortal->getParameterGroup().get("Value"));
+        newNode->getNodeGui().setPosition(position);
+        newNode->getNodeGui().setExpanded(expanded);
+        newNode->getNodeGui().setVisibility(visible);
+        newNode->getNodeGui().setSelected(selected);
+        newNode->setActive(active);
+        newPortal->getInspectorParameter<bool>("Local").set(local);
+        newPortal->setPortalName(name);
+        newPortal->getInspectorParameter<bool>("Resend On Name Change").set(resend);
+
+        oldNode->deleteSelf();
+        for(const auto& saved : connections){
+            auto* connection = saved.incoming
+                ? owner->createConnection(*saved.other, newValue)
+                : owner->createConnection(newValue, *saved.other);
+            if(connection != nullptr) connection->setIsPersistent(saved.persistent);
+            else success = false;
+        }
+    }
+    return success;
+}
+
 ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier, bool isPersistent, string additionalInfo){
     auto &collection = !isPersistent ? dynamicNodes : persistentNodes;
     int toBeCreatedId = identifier;

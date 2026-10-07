@@ -11,6 +11,8 @@
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeNodeMacro.h"
+#include "ofxOceanodeNodeRegistry.h"
+#include "ofxOceanodeShared.h"
 #include "imgui.h"
 #include "ofxOceanodeColors.h"
 
@@ -76,6 +78,7 @@ void ofxOceanodeInspectorController::draw(){
 
     auto &node = selectedNodes[0].second;
     auto* owningContainer = container->getContainerForCanvasID(node->getNodeModel().getParents());
+    if(owningContainer == nullptr) owningContainer = node->getNodeModel().getHostContainer();
 
     ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 0.0f);
 
@@ -100,6 +103,52 @@ void ofxOceanodeInspectorController::draw(){
 		ImGui::PopStyleColor();
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + padding);
 	}
+
+    if(auto* portal = dynamic_cast<abstractPortal*>(&node->getNodeModel())){
+        static abstractPortal* editedPortal = nullptr;
+        static char nameBuffer[1024] = "";
+        static string typeName;
+        if(editedPortal != portal){
+            editedPortal = portal;
+            strncpy(nameBuffer, portal->getName().c_str(), sizeof(nameBuffer) - 1);
+            nameBuffer[sizeof(nameBuffer) - 1] = '\0';
+            typeName = portal->nodeName();
+        }
+
+        ImGui::SeparatorText("Portal instances");
+        ImGui::InputText("Name##portal_instances", nameBuffer, sizeof(nameBuffer));
+        ImGui::SameLine();
+        if(nameBuffer[0] == '\0') ImGui::BeginDisabled();
+        if(ImGui::Button("Apply##portal_name")){
+            ofxOceanodeShared::replacePortalNameInAllInstances(portal, nameBuffer);
+        }
+        if(nameBuffer[0] == '\0') ImGui::EndDisabled();
+
+        vector<string> portalTypes;
+        for(const auto& model : owningContainer->getRegistry()->getRegisteredModels()){
+            if(model.first.rfind("Portal ", 0) == 0) portalTypes.push_back(model.first);
+        }
+        std::sort(portalTypes.begin(), portalTypes.end());
+        const string typeLabel = typeName.rfind("Portal ", 0) == 0 ? typeName.substr(7) : typeName;
+        if(ImGui::BeginCombo("Type##portal_instances", typeLabel.c_str())){
+            for(const auto& candidate : portalTypes){
+                const bool selected = candidate == typeName;
+                if(ImGui::Selectable(candidate.substr(7).c_str(), selected)) typeName = candidate;
+                if(selected) ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+        if(typeName == portal->nodeName()) ImGui::BeginDisabled();
+        const bool replaceType = ImGui::Button("Apply##portal_type");
+        if(typeName == portal->nodeName()) ImGui::EndDisabled();
+        if(replaceType){
+            editedPortal = nullptr;
+            ImGui::PopStyleVar();
+            owningContainer->replacePortalTypeInAllInstances(portal, typeName);
+            return;
+        }
+    }
 
 //    if(node->getNodeModel().getDescription() != ""){
 //        ImGui::Separator();

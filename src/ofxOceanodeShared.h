@@ -167,22 +167,23 @@ public:
 		map[newName].push_back(_portal);
 	}
 
-    static void replacePortalNameInAllInstances(abstractPortal* portal, const std::string& newName){
-        if(portal == nullptr || newName.empty()) return;
-
+    static std::vector<abstractPortal*> getMatchingPortalInstances(abstractPortal* portal){
+        std::vector<abstractPortal*> instances;
+        if(portal == nullptr) return instances;
         auto& map = getInstance().portalsMap;
         auto it = map.find(portal->getName());
-        if(it == map.end()) return;
+        if(it == map.end()) return instances;
 
-        // Each set migrates its portal to another map bucket, so collect the
-        // matching bus first. Matching follows normal portal routing: same
-        // value type and either the same local canvas or global scope.
-        std::vector<abstractPortal*> instances;
         for(auto* candidate : it->second){
             if(candidate != nullptr && candidate->type() == portal->type() && portal->checkLocal(candidate))
                 instances.push_back(candidate);
         }
-        for(auto* instance : instances) instance->setPortalName(newName);
+        return instances;
+    }
+
+    static void replacePortalNameInAllInstances(abstractPortal* portal, const std::string& newName){
+        if(newName.empty()) return;
+        for(auto* instance : getMatchingPortalInstances(portal)) instance->setPortalName(newName);
     }
 	
 	static void portalUpdated(abstractPortal* _portal){

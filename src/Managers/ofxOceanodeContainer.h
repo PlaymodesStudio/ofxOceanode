@@ -24,6 +24,7 @@ class ofxOceanodeNodeRegistry;
 class ofxOceanodeTypesRegistry;
 class ofxOceanodeNodeMacro;
 class ofxOceanodeCustomGuiPanel;
+class abstractPortal;
 
 
 #ifdef OFXOCEANODE_USE_OSC
@@ -85,6 +86,7 @@ public:
     
     ofxOceanodeNode* createNodeFromName(string name, int identifier = -1, bool isPersistent = false);
     ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier = -1, bool isPersistent = false, string additionalInfo = "");
+    bool replacePortalTypeInAllInstances(abstractPortal* portal, const string& newTypeName);
 	ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, string additionalInfo){return createNode(std::move(nodeModel), -1, false, additionalInfo);}
     
     template<typename ModelType>
