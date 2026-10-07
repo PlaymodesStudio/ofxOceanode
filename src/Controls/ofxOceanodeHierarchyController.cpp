@@ -41,6 +41,13 @@ ofxOceanodeHierarchyController::ofxOceanodeHierarchyController(
                 scrollToSelected = true;
             }
             selectedNodePtr = node;  // may be nullptr for deselect-all
+            if(node == nullptr){
+                pendingCenter = false;
+                pendingCenterNode = nullptr;
+                pendingCenterCanvas = nullptr;
+                pendingClickIndex = -1;
+                pendingClickTime = -1.0f;
+            }
         });
 }
 

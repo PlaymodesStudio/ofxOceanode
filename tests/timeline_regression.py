@@ -123,7 +123,9 @@ int main() {
     near(restored.getViewState().scrollX, 123.0); near(restored.getBeatsPerBar(), 3.5);
     owner.transport->seekToBeat(0.5); restored.update(); near(value.get(), 66.0);
     assert(restored.removeTrack(addTrack)); restored.update(); near(value.get(), 64.0);
+    restored.requestNoteGroupSetup(&parameter);
     restored.clear(); assert(!parameter.isTimelined() && !levelParameter.isTimelined());
+    assert(restored.consumePendingNoteGroupSetup() == nullptr);
     std::cout << "Timeline regression passed: automation, additive bindings, transport loops, state capture, LFO, wave envelope, JSON persistence, groups, markers, signature, cleanup.\n";
 }
 '''
