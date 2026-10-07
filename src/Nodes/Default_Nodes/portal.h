@@ -25,6 +25,10 @@ public:
 	string getName(){
 		return name;
 	}
+
+    void setPortalName(const string& newName){
+        name.set(newName);
+    }
     
     bool isLocal(){return local;};
     

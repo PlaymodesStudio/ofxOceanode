@@ -518,10 +518,23 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             auto* sourceParameter = &connection->getSourceParameter();
             auto* sinkParameter = &connection->getSinkParameter();
 
-            const string typeName = container->getTypesRegistry()->getTypeNameFromTypeDescription(sourceParameter->valueType());
+            const string sourceType = sourceParameter->valueType();
+            const string sinkType = sinkParameter->valueType();
+            auto isNumericFamily = [](const string& type){
+                return type == typeid(float).name() || type == typeid(int).name() ||
+                       type == typeid(vector<float>).name() || type == typeid(vector<int>).name();
+            };
+            // Input portals represent the destination boundary. If Oceanode is
+            // converting between numeric scalar/vector families, normalize the
+            // boundary to v_f so the conversion happens before the portal.
+            const string portalValueType = sourceType != sinkType &&
+                                           isNumericFamily(sourceType) && isNumericFamily(sinkType)
+                                         ? typeid(vector<float>).name()
+                                         : sinkType;
+            const string typeName = container->getTypesRegistry()->getTypeNameFromTypeDescription(portalValueType);
             const string portalTypeName = "Portal " + typeName;
             if(typeName.empty() || container->getRegistry()->getRegisteredModels().count(portalTypeName) == 0){
-                ofLogWarning("Portalize") << "No portal registered for output type " << sourceParameter->valueType();
+                ofLogWarning("Portalize") << "No portal registered for input boundary type " << portalValueType;
                 return false;
             }
 
@@ -536,7 +549,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             string portalName;
             for(auto* out : sourceParameter->getOutConnections()){
                 auto* portalModel = dynamic_cast<abstractPortal*>(out->getSinkParameter().getNodeModel());
-                if(portalModel != nullptr){ portalName = portalModel->getName(); break; }
+                if(portalModel != nullptr && out->getSinkParameter().valueType() == portalValueType){
+                    portalName = portalModel->getName();
+                    break;
+                }
             }
 
             ofxOceanodeNode* senderNode = nullptr;
@@ -740,7 +756,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 
 		ImGui::SameLine();
 		bool recenterCanvas = false;
-		if(ImGui::Button("[C]") || isFirstDraw)
+		if(ImGui::Button("[C]") || (isFirstDraw && !centerAllNodesRequested))
 		{
 			recenterCanvas = true;
 		}
@@ -981,27 +997,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                   glm::vec2 center = getContentRegionSize() / (2.0f * zoom);
                   setScrolling(-nodePos - nodeSize / 2.0f + center);
                   pendingCenterNode = nullptr;
-              }
-              if(centerAllNodesRequested && contentRegionSize.x > 0.0f && contentRegionSize.y > 0.0f){
-                  const auto allNodes = container->getAllModules();
-                  if(!allNodes.empty()){
-                      glm::vec2 boundsMin(FLT_MAX, FLT_MAX);
-                      glm::vec2 boundsMax(-FLT_MAX, -FLT_MAX);
-                      for(auto* node : allNodes){
-                          const glm::vec2 position = node->getNodeGui().getPosition();
-                          const ofRectangle rectangle = node->getNodeGui().getRectangle();
-                          const glm::vec2 size(std::max(rectangle.getWidth(), (float)getTotalNodeWidth()),
-                                               std::max(rectangle.getHeight(), (float)GRID_SIZE));
-                          boundsMin.x = std::min(boundsMin.x, position.x);
-                          boundsMin.y = std::min(boundsMin.y, position.y);
-                          boundsMax.x = std::max(boundsMax.x, position.x + size.x);
-                          boundsMax.y = std::max(boundsMax.y, position.y + size.y);
-                      }
-                      const glm::vec2 compositionCenter = (boundsMin + boundsMax) * 0.5f;
-                      const glm::vec2 viewportCenter = contentRegionSize / (2.0f * zoomLevel);
-                      setScrolling(-compositionCenter + viewportCenter);
-                  }
-                  centerAllNodesRequested = false;
               }
 		      ImVec2 offset = ImVec2(canvasOrigin.x + scrolling.x * zoomLevel,
 		                             canvasOrigin.y + scrolling.y * zoomLevel);
@@ -2550,6 +2545,36 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             encapsulateSinkParameter = nullptr;
             encapsulateMixerSubgraphs(sink, mixerEncapsulationAction >= 2,
                                       (mixerEncapsulationAction & 1) != 0);
+        }
+
+        // Center only after the node pass has refreshed every GUI rectangle.
+        // Normalize the composition around the macro canvas origin as well as
+        // centering the viewport. Merely changing `scrolling` leaves an
+        // encapsulated graph anchored at its pasted top-left (normally 0,0),
+        // so the graph is no longer centered when the macro view is recreated.
+        if(centerAllNodesRequested && contentRegionSize.x > 0.0f && contentRegionSize.y > 0.0f){
+            const auto allNodes = container->getAllModules();
+            if(!allNodes.empty()){
+                glm::vec2 boundsMin(FLT_MAX, FLT_MAX);
+                glm::vec2 boundsMax(-FLT_MAX, -FLT_MAX);
+                for(auto* node : allNodes){
+                    const glm::vec2 position = node->getNodeGui().getPosition();
+                    const ofRectangle rectangle = node->getNodeGui().getRectangle();
+                    const glm::vec2 size(std::max(rectangle.getWidth(), (float)getTotalNodeWidth()),
+                                         std::max(rectangle.getHeight(), (float)GRID_SIZE));
+                    boundsMin.x = std::min(boundsMin.x, position.x);
+                    boundsMin.y = std::min(boundsMin.y, position.y);
+                    boundsMax.x = std::max(boundsMax.x, position.x + size.x);
+                    boundsMax.y = std::max(boundsMax.y, position.y + size.y);
+                }
+                const glm::vec2 compositionCenter = (boundsMin + boundsMax) * 0.5f;
+                for(auto* node : allNodes){
+                    node->getNodeGui().setPosition(node->getNodeGui().getPosition() - compositionCenter);
+                }
+                const glm::vec2 viewportCenter = contentRegionSize / (2.0f * zoomLevel);
+                setScrolling(viewportCenter);
+            }
+            centerAllNodesRequested = false;
         }
 
         ImGui::PopItemWidth();

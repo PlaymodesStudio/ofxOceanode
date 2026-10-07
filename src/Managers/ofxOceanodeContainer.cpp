@@ -4002,7 +4002,19 @@ ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
 
 vector<ofxOceanodeContainer::ExternalConnection> ofxOceanodeContainer::analyzeExternalConnections(vector<ofxOceanodeNode*> selectedNodes) {
 	// For input routers: group by external parameter (one external → multiple internals)
-	map<ofxOceanodeAbstractParameter*, ExternalConnection> inputRouters;
+	// Keep the encapsulated destination type at the macro boundary. One external
+	// output can legally feed inputs of different types through Oceanode's
+	// connection conversions, so destination type is part of the grouping key.
+	map<pair<ofxOceanodeAbstractParameter*, string>, ExternalConnection> inputRouters;
+	auto inputBoundaryType = [](const string& sourceType, const string& sinkType) {
+		auto isNumericFamily = [](const string& type) {
+			return type == typeid(float).name() || type == typeid(int).name() ||
+			       type == typeid(vector<float>).name() || type == typeid(vector<int>).name();
+		};
+		if(sourceType != sinkType && isNumericFamily(sourceType) && isNumericFamily(sinkType))
+			return string(typeid(vector<float>).name());
+		return sinkType;
+	};
 	
 	// For output routers: group by internal parameter (one internal → multiple externals)
 	map<pair<string, string>, ExternalConnection> outputRouters; // Key: {nodeName, paramName}
@@ -4133,21 +4145,24 @@ vector<ofxOceanodeContainer::ExternalConnection> ofxOceanodeContainer::analyzeEx
 			}
 			
 			auto externalParam = &connection->getSourceParameter();
+			const string routerType = inputBoundaryType(connection->getSourceParameter().valueType(),
+			                                                connection->getSinkParameter().valueType());
 			string fullInternalNodeName = sinkNodeName;
 			string originalInternalParamName = sinkParamName;
+			auto inputKey = make_pair(externalParam, routerType);
 			
-			auto it = inputRouters.find(externalParam);
+			auto it = inputRouters.find(inputKey);
 			if(it != inputRouters.end()) {
 				it->second.internalConnections.push_back({fullInternalNodeName, originalInternalParamName});
 			} else {
 				ExternalConnection extConn;
-                extConn.routerType = connection->getSourceParameter().valueType();
+				extConn.routerType = routerType;
 				extConn.externalParam = externalParam;
 				extConn.isIncoming = true;
 				extConn.routerName = generateRouterName(originalInternalParamName, nameCounters);
 				extConn.internalConnections.push_back({fullInternalNodeName, originalInternalParamName});
 				
-				inputRouters[externalParam] = extConn;
+				inputRouters[inputKey] = extConn;
 				ofLogNotice("Encapsulation") << "    Created input router: " << extConn.routerName;
 			}
 		}

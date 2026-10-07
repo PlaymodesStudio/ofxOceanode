@@ -528,6 +528,61 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                         tempCast = cString;
                     }
                     delete[] cString;
+
+                    // Portal names identify a whole typed bus. Right-clicking
+                    // its name field can rename every matching sender/receiver
+                    // without having to visit each canvas individually.
+                    if(auto* portalModel = dynamic_cast<abstractPortal*>(&node.getNodeModel());
+                       portalModel != nullptr && absParam.getName() == "Name"){
+                        static abstractPortal* replacePortalTarget = nullptr;
+                        static char replacePortalNameBuffer[1024] = "";
+                        static bool openReplacePortalNamePopup = false;
+
+                        if(ImGui::BeginPopupContextItem("##portal_name_context")){
+                            if(ImGui::MenuItem("Replace name in all instances")){
+                                replacePortalTarget = portalModel;
+                                strncpy(replacePortalNameBuffer, portalModel->getName().c_str(),
+                                        sizeof(replacePortalNameBuffer) - 1);
+                                replacePortalNameBuffer[sizeof(replacePortalNameBuffer) - 1] = '\0';
+                                openReplacePortalNamePopup = true;
+                            }
+                            ImGui::EndPopup();
+                        }
+
+                        if(replacePortalTarget == portalModel){
+                            if(openReplacePortalNamePopup){
+                                ImGui::OpenPopup("Replace portal name in all instances");
+                                openReplacePortalNamePopup = false;
+                            }
+                            if(ImGui::BeginPopupModal("Replace portal name in all instances", nullptr,
+                                                     ImGuiWindowFlags_AlwaysAutoResize)){
+                                ImGui::TextUnformatted("New portal name:");
+                                ImGui::SetNextItemWidth(320.0f);
+                                const bool entered = ImGui::InputText("##replacement_portal_name",
+                                                                     replacePortalNameBuffer,
+                                                                     sizeof(replacePortalNameBuffer),
+                                                                     ImGuiInputTextFlags_EnterReturnsTrue |
+                                                                     ImGuiInputTextFlags_AutoSelectAll);
+                                const bool validName = replacePortalNameBuffer[0] != '\0';
+                                if(!validName) ImGui::BeginDisabled();
+                                const bool replace = ImGui::Button("Replace") || (entered && validName);
+                                if(!validName) ImGui::EndDisabled();
+                                ImGui::SameLine();
+                                const bool cancel = ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape);
+
+                                if(replace){
+                                    ofxOceanodeShared::replacePortalNameInAllInstances(
+                                        replacePortalTarget, replacePortalNameBuffer);
+                                    replacePortalTarget = nullptr;
+                                    ImGui::CloseCurrentPopup();
+                                }else if(cancel){
+                                    replacePortalTarget = nullptr;
+                                    ImGui::CloseCurrentPopup();
+                                }
+                                ImGui::EndPopup();
+                            }
+                        }
+                    }
                     isItemEditableByText = true;
                     // PARAM CHAR
                     /////////////
