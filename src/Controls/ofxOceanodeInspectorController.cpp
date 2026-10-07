@@ -303,7 +303,7 @@ void ofxOceanodeInspectorController::draw(){
 
     ImGui::Separator();
 
-    // Scope - square texture previews when aspect ratio is disabled
+    // Scope - full-width texture previews, square unless aspect ratio is kept
     {
         auto &nodeGui = node->getNodeGui();
 
@@ -327,8 +327,18 @@ void ofxOceanodeInspectorController::draw(){
                 auto size = ImVec2(ImGui::GetContentRegionAvail().x, scopeHeight);
                 const bool isTexture = p.valueType() == typeid(ofTexture).name() ||
                                        p.valueType() == typeid(ofTexture*).name();
-                if(isTexture && !(p.getFlags() & ofxOceanodeParameterFlags_ScopeKeepAspectRatio)){
+                if(isTexture){
                     size.y = size.x;
+                    if(p.getFlags() & ofxOceanodeParameterFlags_ScopeKeepAspectRatio){
+                        const ofTexture* texture = p.valueType() == typeid(ofTexture*).name()
+                            ? p.cast<ofTexture*>().getParameter().get()
+                            : &p.cast<ofTexture>().getParameter().get();
+                        if(texture != nullptr && texture->isAllocated() &&
+                           texture->getWidth() > 0.0f && texture->getHeight() > 0.0f){
+                            const float aspectRatio = texture->getWidth() / texture->getHeight();
+                            size.y = size.x / aspectRatio;
+                        }
+                    }
                 }
 
                 ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(nodeGui.getColor()*0.75f));
