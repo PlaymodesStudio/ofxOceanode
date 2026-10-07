@@ -4565,6 +4565,7 @@ void ofxOceanodeTimelineManager::clear() {
     // play with nothing to turn it off).
     invalidateSchedule();
     for(const auto& track : tracks) clearTimelineFlag(track);
+    endParameterCache();
     tracks.clear();
     invalidateEvaluationIndexes();
     clipGroups.clear();
@@ -4578,6 +4579,7 @@ void ofxOceanodeTimelineManager::clear() {
     nextGroupNumber = 1;
     pendingTrackRenameId.clear();
     pendingTrackRenameIsNew = false;
+    pendingNoteGroupSetupParameter = nullptr;
     activeAutomationValues.clear();
     stateCaptureLastAppliedValues.clear();
     stateCaptureManualOverrideKeys.clear();

@@ -57,6 +57,7 @@ bool naturalLess(const string& a, const string& b) {
 
 void queueCanvasLayout(ofxOceanodeCanvas* canvas) {
     if(!ofxOceanodeShared::getGuiLayoutChangesWithMacros()) return;
+    if(canvas->getLayoutIniPath().empty()) return;
     const string path = ofToDataPath(canvas->getLayoutIniPath());
     string& activePath = ofxOceanodeShared::getActiveCanvasLayoutPath();
     if(!path.empty() && path != activePath) {
@@ -77,6 +78,10 @@ ofxOceanodeNodesController::ofxOceanodeNodesController(shared_ptr<ofxOceanodeCon
             if(node != nullptr) {
                 scrollTreeToSelected = true;
                 forceExpandAll = true;
+            } else {
+                pendingScrollNode = nullptr;
+                scrollPendingFrames = 0;
+                scrollTreeToSelected = false;
             }
         });
 }

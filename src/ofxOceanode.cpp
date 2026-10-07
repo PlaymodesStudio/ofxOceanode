@@ -172,6 +172,18 @@ void ofxOceanode::setup(){
         if(ofxOceanodeShared::getPresetLoadType() != ofxOceanodePresetLoadType_FullPreset){
             return; // Don't reload layout for clipboard paste / duplicate
         }
+        if(ofxOceanodeShared::getCurrentPresetPath().empty()){
+            pendingIniLoad.clear();
+            ofxOceanodeShared::getPendingLayoutSavePath().clear();
+            ofxOceanodeShared::getPendingLayoutLoadPath().clear();
+            ofxOceanodeShared::getActiveCanvasLayoutPath().clear();
+            canvas.setLayoutIniPath("");
+            hasActivePreset = false;
+            canvas.resetForNewPreset();
+            ofxOceanodeShared::setActiveCanvasUniqueID(canvas.getUniqueID());
+            canvas.requestFocus();
+            return;
+        }
         string iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
         if(ofFile(iniPath).exists()){
             pendingIniLoad = iniPath;   // defer — will be applied before next NewFrame
@@ -191,7 +203,8 @@ void ofxOceanode::setup(){
         
         // Only save from ImGui state if the root canvas is active
         // (activeLayoutPath matches the preset's layout path).
-        if(activeLayoutPath == iniPath){
+        if(activeLayoutPath.empty() || activeLayoutPath == iniPath){
+            activeLayoutPath = iniPath;
             ImGui::SaveIniSettingsToDisk(iniPath.c_str());
             // Update cache
             size_t sz = 0;

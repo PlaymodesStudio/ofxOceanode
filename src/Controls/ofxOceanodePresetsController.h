@@ -25,6 +25,7 @@ public:
     void loadPresetFromNumber(int num);
     
 private:
+    void newPreset();
     void drawPresetList();
     
     void loadPreset(string name, string bank);
@@ -63,6 +64,7 @@ private:
     string saveResultText;
 
     bool newPresetCreated;
+    bool newPresetRequested = false;
     int loadPresetInNextUpdate;
     
     ofEventListener presetListener;

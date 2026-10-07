@@ -157,6 +157,12 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
 }
 
 void ofxOceanodePresetsController::draw(){
+    if(ImGui::MenuItem("New")){
+        // Tear down outside the ImGui draw pass, after the menu has closed.
+        newPresetRequested = true;
+    }
+    ImGui::Separator();
+
     const bool hasBank = currentBank >= 0 && currentBank < static_cast<int>(banks.size());
     const string bankName = hasBank ? banks[currentBank] : "";
     const string presetName = hasBank ? currentPreset[bankName] : "";
@@ -325,6 +331,11 @@ void ofxOceanodePresetsController::drawPresetList(){
 }
 
 void ofxOceanodePresetsController::update(){
+    if(newPresetRequested){
+        newPresetRequested = false;
+        newPreset();
+        return;
+    }
     //TODO: Test functionality
     if(loadPresetInNextUpdate != 0){
         int toLoad = loadPresetInNextUpdate;
@@ -338,6 +349,32 @@ void ofxOceanodePresetsController::update(){
         }
         loadPresetInNextUpdate = 0;
     }
+}
+
+void ofxOceanodePresetsController::newPreset(){
+    loadPresetInNextUpdate = 0;
+    pendingSave.reset();
+    popupRequest = PopupRequest::None;
+    saveResultText.clear();
+    deleteBankName.clear();
+    deletePresetName.clear();
+    newPresetCreated = false;
+
+    ofxOceanodeShared::startedLoadingPreset();
+    ofxOceanodeShared::nodeSelectedInCanvas(nullptr);
+    container->clearContainer();
+#ifdef OFXOCEANODE_USE_MIDI
+    container->setMidiClockSyncEnabled(false);
+#endif
+    container->resetPhase();
+
+    for(auto& preset : currentPreset) preset.second.clear();
+    currentBank = -1;
+    ofxOceanodeShared::setCurrentPresetPath("");
+    ofxOceanodeShared::setCurrentBankName("");
+    ofxOceanodeShared::setCurrentPresetName("");
+    // An empty full preset also detaches layout saving and resets the root canvas.
+    ofxOceanodeShared::finishedLoadingPreset();
 }
 
 

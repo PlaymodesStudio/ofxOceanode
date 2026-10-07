@@ -201,6 +201,7 @@ void ofxOceanodeContainer::clearContainer(){
         // still valid, then silence teardown notifications.
         flushPendingScopeSave();
         ofxOceanodeScope::getInstance()->setScopeChangedCallback(nullptr);
+        ofxOceanodeScope::getInstance()->clearScopedParameters();
     }
     if(timelineManager != nullptr) timelineManager->clear();
     
@@ -210,6 +211,23 @@ void ofxOceanodeContainer::clearContainer(){
         connection->prepareForDestruction();
     }
     connections.clear();
+    destroyConnectionListeners.unsubscribeAll();
+
+#ifdef OFXOCEANODE_USE_MIDI
+    // MIDI inputs hold raw binding pointers. Unregister both collections while
+    // their bindings and parameters are still alive, before deleting nodes.
+    for(auto* bindings : {&midiBindings, &persistentMidiBindings}){
+        for(auto& entry : *bindings){
+            for(auto& binding : entry.second){
+                for(auto& midiIn : midiIns) midiIn.second.removeListener(binding.get());
+            }
+        }
+        bindings->clear();
+    }
+    midiUnregisterlisteners.unsubscribeAll();
+    midiSenderListeners.unsubscribeAll();
+#endif
+
     customGuiPanels.clear();
     customGuiPanelsData.clear();
     customGuiSnapshotBanks.clear();
@@ -219,15 +237,30 @@ void ofxOceanodeContainer::clearContainer(){
     invalidateCustomGuiMembershipIndex();
     
     std::vector<shared_ptr<ofxOceanodeNode>> toDelete;
-    for(auto &nodeTypeMap : dynamicNodes){
-        for(auto &node : nodeTypeMap.second){
-            toDelete.push_back(node.second);
+    for(auto* nodes : {&dynamicNodes, &persistentNodes}){
+        for(auto &nodeTypeMap : *nodes){
+            for(auto &node : nodeTypeMap.second){
+                toDelete.push_back(node.second);
+            }
         }
     }
     for(auto td : toDelete) td->deleteSelf();
     
     dynamicNodes.clear();
     persistentNodes.clear();
+    parameterGroupNodesMap.clear();
+    toDelete.clear(); // Destroy nested macros while the teardown guard is active.
+    destroyNodeListeners.unsubscribeAll();
+    comments.clear();
+    userEditedValues.clear();
+    customGuiStoragePath.clear();
+    customGuisDirty = false;
+    customGuiSnapshotsDirty = false;
+    customGuiParametersNeedPruning = false;
+    customGuiCreateModalOpen = false;
+    pendingCustomGuiName = "Custom GUI";
+    pendingDeletedCustomGuiPanelId.clear();
+    pendingCustomGuiParameterPath.clear();
 }
 
 void ofxOceanodeContainer::update(){
@@ -1420,6 +1453,10 @@ void ofxOceanodeContainer::loadPreset_loadComments(string presetFolderPath){
 
 void ofxOceanodeContainer::savePreset(string presetFolderPath){
     ofLog()<<"Save Preset " << presetFolderPath << " Canvas ID : " << getCanvasID() << endl;
+    const bool ownsGlobalScope = getCanvasID().empty()
+        || getCanvasID() == "Canvas"
+        || getCanvasID() == "0";
+    if(ownsGlobalScope) flushPendingScopeSave();
     
     ofJson json;
     for(auto &nodeTypeMap : dynamicNodes){
@@ -1511,7 +1548,14 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
         ofSavePrettyJson(presetFolderPath + "/transportSync.json", syncJson);
     }
 #endif
-	
+
+    // Saving a fresh patch (or Save As) attaches future scope edits to this
+    // preset. New leaves the callback detached until a destination exists.
+    if(ownsGlobalScope){
+        ofxOceanodeScope::getInstance()->setScopeChangedCallback([this, presetFolderPath](){
+            scheduleScopeSave(presetFolderPath);
+        });
+    }
 }
 
 bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referencePosition, bool allowOutsideInputs){

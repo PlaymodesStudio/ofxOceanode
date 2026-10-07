@@ -155,6 +155,41 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
 
 }
 
+void ofxOceanodeCanvas::resetForNewPreset(){
+    isSelecting = false;
+    selectedRect = ofRectangle(0, 0, 0, 0);
+    lastSelectedNode.clear();
+    someSelectedModuleMove.clear();
+    moveSelectedModulesWithDrag = glm::vec2(0);
+    someDragAppliedToSelection = false;
+    canvasHasScolled = false;
+    returnToOldScrolling = false;
+    itemHovered = -1;
+    node_selected.clear();
+    nodesDrawingOrder.clear();
+    isCreatingConnection = false;
+    tempSourceParameter = nullptr;
+    tempSinkParameter = nullptr;
+    customGuiContextNode = nullptr;
+    portalizeSourceParameter = nullptr;
+    encapsulateSinkParameter = nullptr;
+    portalizeNameBuffer[0] = '\0';
+    pendingPortalAlignments.clear();
+    pendingCenterNode = nullptr;
+    pendingCenterFrames = 0;
+    portalizeSelectionRequested = false;
+    autoLayoutSelectionRequested = false;
+    autoLayoutCanvasRequested = false;
+    commentCheckboxStates.clear();
+    keyboardSlots.clear();
+    commentToSlot.clear();
+    searchField.clear();
+    lastSearchField.clear();
+    filteredSearchResults.clear();
+    selectedSearchResultIndex = -1;
+    centerOriginPending = true;
+}
+
 void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     // Save the previous shared zoom level so nested canvas draws (e.g. macros)
     // restore the parent's value when they finish.
@@ -180,18 +215,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     bool open_context_menu = false;
     bool open_outlet_context_menu = false;
     bool open_inlet_context_menu = false;
-    static ofxOceanodeNode* customGuiContextNode = nullptr;
-    static ofxOceanodeAbstractParameter* portalizeSourceParameter = nullptr;
-    static ofxOceanodeAbstractParameter* encapsulateSinkParameter = nullptr;
-    static char portalizeNameBuffer[256] = "";
     bool open_portalize_name_popup = false;
-    struct PendingPortalAlignment {
-        ofxOceanodeContainer* container;
-        string receiverNode;
-        string sinkNode;
-        string sinkParameter;
-    };
-    static vector<PendingPortalAlignment> pendingPortalAlignments;
     string node_hovered_in_list = "";
     string node_hovered_in_scene = "";
     
@@ -936,6 +960,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		      ImGui::PushItemWidth(120.0f);
 		      
 		      canvasOrigin = glm::vec2(ImGui::GetCursorScreenPos());
+              // Wait for the current dock/Inspector layout to supply a valid size.
+              // Center independently of grid visibility and the Shift modifier.
+              if(centerOriginPending && contentRegionSize.x > 0.0f && contentRegionSize.y > 0.0f){
+                  scrolling = contentRegionSize / (2.0f * zoomLevel);
+                  centerOriginPending = false;
+                  recenterCanvas = false;
+              }
               if(pendingCenterNode != nullptr &&
                  pendingCenterFrames <= 0 &&
                  !isFirstDraw &&
@@ -2660,7 +2691,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                 target.canvas->setScrolling(-nodePos - nodeSize / 2.0f + center);
 
                                 // 5) Optional layout switching when the user has opted in
-                                if(ofxOceanodeShared::getGuiLayoutChangesWithMacros()){
+                                if(ofxOceanodeShared::getGuiLayoutChangesWithMacros() &&
+                                   !target.canvas->getLayoutIniPath().empty()){
                                     string newIniPath = ofToDataPath(target.canvas->getLayoutIniPath());
                                     string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
                                     if(!newIniPath.empty() && newIniPath != activeLayoutPath){

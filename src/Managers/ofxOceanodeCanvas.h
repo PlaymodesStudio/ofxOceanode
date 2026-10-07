@@ -29,6 +29,7 @@ public:
     void setup(string _uid = "Canvas", string _pid = "");
     void update(){};
     void draw(bool *open = NULL, ofColor color = ofColor(255, 255, 255, 40), string title = "");
+    void resetForNewPreset();
     
     void setContainer(shared_ptr<ofxOceanodeContainer> c){container = c;};
     
@@ -179,9 +180,20 @@ private:
     glm::vec2 newNodeClickPos;
 	std::map<string, int> nodesDrawingOrder;
     
-    bool isCreatingConnection;
+    bool isCreatingConnection = false;
     ofxOceanodeAbstractParameter* tempSourceParameter = nullptr;
     ofxOceanodeAbstractParameter* tempSinkParameter = nullptr;
+    ofxOceanodeNode* customGuiContextNode = nullptr;
+    ofxOceanodeAbstractParameter* portalizeSourceParameter = nullptr;
+    ofxOceanodeAbstractParameter* encapsulateSinkParameter = nullptr;
+    char portalizeNameBuffer[256] = {};
+    struct PendingPortalAlignment {
+        ofxOceanodeContainer* container;
+        string receiverNode;
+        string sinkNode;
+        string sinkParameter;
+    };
+    vector<PendingPortalAlignment> pendingPortalAlignments;
     
     string uniqueID;
     string parentID;
@@ -191,6 +203,7 @@ private:
     bool forceDockOnNextShow = false;
     ofxOceanodeNode* pendingCenterNode = nullptr;
     int pendingCenterFrames = 0;
+    bool centerOriginPending = false;
     
     // Per-canvas layout switching
     string layoutIniPath;
