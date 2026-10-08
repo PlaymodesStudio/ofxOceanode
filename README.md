@@ -45,6 +45,10 @@ with `euclideanGenerator` as the class, and `"Generators"` as the category name.
 
 - For creating custom nodes, check out example-basic.
 
+- In a Macro canvas, press **Cmd+Up Arrow** (**Ctrl+Up Arrow** on Windows/Linux)
+  to focus its parent canvas and center on the Macro node. Each press moves up
+  one level; the shortcut is inactive while editing a widget or using a popup.
+
 
 Compatibility
 ------------
