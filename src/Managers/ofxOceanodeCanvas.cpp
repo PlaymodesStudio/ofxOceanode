@@ -2059,7 +2059,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 
                 // Add matching nodes with scores
                 for(int i = 0; i < categoriesVector.size(); i++){
-                    string group = ofSplitString(categoriesVector[i], "/").front();
+                    vector<string> path = ofSplitString(categoriesVector[i], "/");
+                    string group = (path.size() > 1 && path[1] == "Old") ? path[0] + " (Old)" : path[0];
                     for(auto &op : options[i])
                     {
                         int score = calculateSearchScore(op, searchField);
