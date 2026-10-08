@@ -156,9 +156,10 @@ private:
         string name;
         string type; // "node" or "macro"
         string macroPath; // only used for macros
+        string group; // top-level category shown as a separator in search results
         
-        SearchResultItem(const string& n, const string& t, const string& mp = "")
-            : name(n), type(t), macroPath(mp) {}
+        SearchResultItem(const string& n, const string& t, const string& mp = "", const string& g = "")
+            : name(n), type(t), macroPath(mp), group(g) {}
     };
     vector<SearchResultItem> filteredSearchResults;
     int selectedSearchResultIndex = -1;

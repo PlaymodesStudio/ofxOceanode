@@ -2059,11 +2059,12 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 
                 // Add matching nodes with scores
                 for(int i = 0; i < categoriesVector.size(); i++){
+                    string group = ofSplitString(categoriesVector[i], "/").front();
                     for(auto &op : options[i])
                     {
                         int score = calculateSearchScore(op, searchField);
                         if(score > 0){
-                            scoredResults.push_back(make_pair(SearchResultItem(op, "node"), score));
+                            scoredResults.push_back(make_pair(SearchResultItem(op, "node", "", group), score));
                         }
                     }
                 }
@@ -2077,7 +2078,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     for(auto m : category->macros){
                         int score = calculateSearchScore(m.first, searchField);
                         if(score > 0){
-                            scoredResults.push_back(make_pair(SearchResultItem(m.first, "macro", m.second), score));
+                            scoredResults.push_back(make_pair(SearchResultItem(m.first, "macro", m.second, "Macros"), score));
                         }
                     }
                 };
@@ -2085,9 +2086,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
                 collectMacros(macroDirectoryStructure);
                 
-                // Sort by score (highest first)
+                std::map<string, int> groupBestScore;
+                for(auto &r : scoredResults) groupBestScore[r.first.group] = std::max(groupBestScore[r.first.group], r.second);
+                
+                // Sort by group (best matching group first), then by score (highest first)
                 std::sort(scoredResults.begin(), scoredResults.end(),
-                    [](const pair<SearchResultItem, int>& a, const pair<SearchResultItem, int>& b) {
+                    [&groupBestScore](const pair<SearchResultItem, int>& a, const pair<SearchResultItem, int>& b) {
+                        if(a.first.group != b.first.group) return make_pair(groupBestScore[a.first.group], b.first.group) > make_pair(groupBestScore[b.first.group], a.first.group);
                         return a.second > b.second;
                     });
                 
@@ -2117,6 +2122,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 for(int i = 0; i < filteredSearchResults.size(); i++) {
                     const auto& result = filteredSearchResults[i];
                     bool isSelected = (i == selectedSearchResultIndex);
+                    
+                    if(i == 0 || result.group != filteredSearchResults[i - 1].group) ImGui::SeparatorText(result.group.c_str());
                     
                     // Highlight selected item
                     if(isSelected) {
