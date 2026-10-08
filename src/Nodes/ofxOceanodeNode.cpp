@@ -300,7 +300,22 @@ void ofxOceanodeNode::deserializeParameter(ofJson &json, ofxOceanodeAbstractPara
 				ofLogWarning("ofxOceanodeNode") << "Failed to deserialize preset value for " << p.getName() << ": invalid json type for string parameter";
 			}
 		}else{
-			ofDeserialize(json, p);
+			// p wraps an ofParameter but is not itself one. ofDeserialize
+			// checks p.type() and then casts the ofAbstractParameter reference
+			// directly to ofParameter<T>, which is undefined behavior for this
+			// wrapper (and can crash on numeric preset values).
+			const auto &value = json[p.getEscapedName()];
+			if(p.valueType() == typeid(int).name() && value.is_number_integer()){
+				p.cast<int>().getParameter() = value.get<int>();
+			}else if(p.valueType() == typeid(float).name() && value.is_number_float()){
+				p.cast<float>().getParameter() = value.get<float>();
+			}else if(p.valueType() == typeid(bool).name() && value.is_boolean()){
+				p.cast<bool>().getParameter() = value.get<bool>();
+			}else if(p.valueType() == typeid(int64_t).name() && value.is_number_integer()){
+				p.cast<int64_t>().getParameter() = value.get<int64_t>();
+			}else if(!value.is_null()){
+				p.fromString(value.is_string() ? value.get<std::string>() : value.dump());
+			}
 		}
     }
 }
