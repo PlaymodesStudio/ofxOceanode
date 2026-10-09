@@ -112,6 +112,20 @@ void ofxOceanodeCustomGuiPanel::draw()
     if(panel->designMode) title += " [DESIGN]";
     title += "###CustomGui_" + container.getCanvasID() + "_" + panel->id;
 
+    const float snapshotDropdownWidth = 180.0f;
+    const float modeButtonWidth = snapshotDropdownWidth * 0.5f;
+    const ImGuiStyle& style = ImGui::GetStyle();
+    auto smallButtonWidth = [&](const char* label){
+        return ImGui::CalcTextSize(label).x + style.FramePadding.x * 2.0f;
+    };
+    const float toolbarWidth = modeButtonWidth + style.ItemSpacing.x + snapshotDropdownWidth
+        + 6.0f + smallButtonWidth("+") + 6.0f + smallButtonWidth("Replace")
+        + 6.0f + smallButtonWidth("Rename") + 6.0f + smallButtonWidth("-")
+        + 12.0f + ImGui::CalcTextSize("[Z]").x + 6.0f + 80.0f;
+    ImGui::SetNextWindowSizeConstraints(
+        ImVec2(toolbarWidth + style.WindowPadding.x * 2.0f + style.WindowBorderSize * 2.0f, 0.0f),
+        ImVec2(FLT_MAX, FLT_MAX));
+
     auto createStaticWidget = [&](CustomGuiWidgetType type, const std::string& label, int spanW, int spanH, const ofColor& color){
         CustomGuiWidget widget;
         widget.type = type;
@@ -209,13 +223,28 @@ void ofxOceanodeCustomGuiPanel::draw()
             return nullptr;
         };
         auto* selectedSnapshot = getSelectedSnapshot();
+        float requestedZoom = panel->layout.zoom;
+        // A completed row already includes ItemSpacing.y. Add only the amount
+        // needed to make the previous row gap half as tall.
+        auto advanceHeaderRow = [](){
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() +
+                ImGui::GetFontSize() * 0.25f - ImGui::GetStyle().ItemSpacing.y * 0.5f);
+        };
 
-        if(ImGui::SmallButton(panel->designMode ? "Run" : "Edit")){
+        const bool runButton = panel->designMode;
+        const ImVec4 buttonColor = runButton ? ImVec4(0.18f, 0.36f, 0.22f, 1.0f) : ImVec4(0.42f, 0.19f, 0.19f, 1.0f);
+        const ImVec4 buttonHoverColor = runButton ? ImVec4(0.24f, 0.46f, 0.28f, 1.0f) : ImVec4(0.53f, 0.24f, 0.24f, 1.0f);
+        const ImVec4 buttonActiveColor = runButton ? ImVec4(0.14f, 0.29f, 0.17f, 1.0f) : ImVec4(0.34f, 0.15f, 0.15f, 1.0f);
+        ImGui::PushStyleColor(ImGuiCol_Button, buttonColor);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, buttonHoverColor);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, buttonActiveColor);
+        if(ImGui::Button(runButton ? "Run" : "Edit", ImVec2(modeButtonWidth, 0.0f))){
             panel->designMode = !panel->designMode;
             container.markCustomGuisDirty();
         }
+        ImGui::PopStyleColor(3);
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(180.0f);
+        ImGui::SetNextItemWidth(snapshotDropdownWidth);
         const char* snapshotPreview = selectedSnapshot != nullptr ? selectedSnapshot->name.c_str() : "Snapshots";
         if(ImGui::BeginCombo("##CustomGuiSnapshots", snapshotPreview)){
             if(snapshotBank == nullptr || snapshotBank->snapshots.empty()){
@@ -261,19 +290,26 @@ void ofxOceanodeCustomGuiPanel::draw()
         }
         if(selectedSnapshot == nullptr) ImGui::EndDisabled();
         ImGui::SameLine(0, 12.0f);
-        if(ImGui::SmallButton("-##ZoomOut")){
-            panel->layout.zoom = ofClamp(panel->layout.zoom - 0.1f, 0.25f, 4.0f);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+        if(ImGui::SmallButton("[Z]##ResetZoom")){
+            requestedZoom = 1.0f;
+        }
+        if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("Reset zoom to 1:1 (Alt+Z)");
+        ImGui::SameLine(0, 6.0f);
+        ImGui::SetNextItemWidth(80.0f);
+        float zoomPercent = requestedZoom * 100.0f;
+        if(ImGui::SliderFloat("##CustomGuiZoom", &zoomPercent, 25.0f, 400.0f, "%.0f%%")){
+            requestedZoom = ofClamp(zoomPercent / 100.0f, 0.25f, 4.0f);
+        }
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
+        if(requestedZoom != panel->layout.zoom){
+            panel->layout.zoom = requestedZoom;
             container.markCustomGuisDirty();
         }
-        ImGui::SameLine(0, 6.0f);
-        if(ImGui::SmallButton("+##ZoomIn")){
-            panel->layout.zoom = ofClamp(panel->layout.zoom + 0.1f, 0.25f, 4.0f);
-            container.markCustomGuisDirty();
-        }
-        ImGui::SameLine(0, 6.0f);
-        ImGui::Text("Zoom %.2fx", panel->layout.zoom);
         if(panel->designMode){
-            ImGui::NewLine();
+            advanceHeaderRow();
             char nameBuffer[256];
             std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", panel->name.c_str());
             ImGui::SetNextItemWidth(220);
@@ -321,28 +357,28 @@ void ofxOceanodeCustomGuiPanel::draw()
                 container.markCustomGuisDirty();
             }
 
-            ImGui::NewLine();
-            if(ImGui::SmallButton("Add Panel")){
+            advanceHeaderRow();
+            if(ImGui::SmallButton("+Panel")){
                 createStaticWidget(CustomGuiWidgetType::BackgroundPanel, "", 3, 2, ofColor(40, 40, 40, 180));
             }
             ImGui::SameLine(0, 8.0f);
-            if(ImGui::SmallButton("Add Text")){
+            if(ImGui::SmallButton("+Text")){
                 createStaticWidget(CustomGuiWidgetType::Text, "Text", 2, 1, ofColor::white);
             }
             ImGui::SameLine(0, 8.0f);
-            if(ImGui::SmallButton("Add Line")){
+            if(ImGui::SmallButton("+Line")){
                 createStaticWidget(CustomGuiWidgetType::Line, "", 2, 1, ofColor(180, 180, 180, 255));
             }
             ImGui::SameLine(0, 8.0f);
-            if(ImGui::SmallButton("Add Image")){
+            if(ImGui::SmallButton("+Image")){
                 createStaticWidget(CustomGuiWidgetType::Image, "", 3, 2, ofColor::white);
             }
             ImGui::SameLine(0, 8.0f);
-            if(ImGui::SmallButton("Add Snapshot Matrix")){
+            if(ImGui::SmallButton("+Snapshot Matrix")){
                 createStaticWidget(CustomGuiWidgetType::SnapshotMatrix, "Snapshots", 4, 2, ofColor::white);
             }
             ImGui::SameLine(0, 8.0f);
-            if(ImGui::SmallButton("Add URL")){
+            if(ImGui::SmallButton("+URL")){
                 ImGui::OpenPopup("Add URL");
             }
             if(ImGui::BeginPopupModal("Add URL", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
