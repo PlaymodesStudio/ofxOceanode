@@ -1833,11 +1833,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ImGui::ColorEdit3("TextColor", &c.textColor.r);
                 float* geometryValues[] = {&c.position.x, &c.position.y, &c.size.x, &c.size.y};
                 const char* geometryIDs[] = {"##originX", "##originY", "##width", "##height"};
-                const char* geometryFormats[] = {"X: %.1f", "Y: %.1f", "W: %.1f", "H: %.1f"};
+                const char* geometryFormats[] = {"X: %.1f", "Y: %.1f", "Width: %.1f", "Height: %.1f"};
                 const float minimumSizes[] = {32.0f, 15.0f};
+                const float geometryFieldWidth = std::max(1.0f,
+                    (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f);
                 for(int field = 0; field < 4; ++field){
-                    if(field > 0) ImGui::SameLine();
-                    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 9.0f);
+                    if(field % 2 == 1) ImGui::SameLine();
+                    ImGui::SetNextItemWidth(geometryFieldWidth);
                     bool changed = ImGui::DragFloat(geometryIDs[field], geometryValues[field], 1.0f,
                                                    0.0f, 0.0f, geometryFormats[field]);
                     if(changed && field >= 2){
