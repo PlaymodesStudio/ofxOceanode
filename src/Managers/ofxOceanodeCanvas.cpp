@@ -1413,8 +1413,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             draw_list->AddCircleFilled(bulletPosition, bulletSize, OceanodeColors::U32(OceanodeColors::ConnectionBullet));
                             if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
                                 connectionIsDoable = true;
-                                if(ImGui::IsMouseClicked(1) && param->hasInConnection() &&
-                                   node->getNodeModel().canEncapsulateSubgraphFrom(*param)){
+                                if(ImGui::IsMouseClicked(1) && param->hasInConnection()){
                                     encapsulateSinkParameter = param.get();
                                     open_inlet_context_menu = true;
                                     open_context_menu = true;
