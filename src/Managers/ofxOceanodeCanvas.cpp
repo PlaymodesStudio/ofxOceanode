@@ -2396,6 +2396,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         const ImU32 connectionLineColor = darkCanvas
             ? OceanodeColors::U32(OceanodeColors::ConnectionLineDark)
             : OceanodeColors::U32(OceanodeColors::ConnectionLineLight);
+        constexpr float nodeAttachmentTension = 1.5f;
         
         std::vector<ofxOceanodeAbstractConnection*> drawnConnections;
         
@@ -2412,7 +2413,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter()) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                         glm::vec2  controlPoint(0,0);
                         controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);
-                        draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, connectionLineColor, connectionWidth);
+                        const glm::vec2 nodeControlPoint = controlPoint * nodeAttachmentTension;
+                        draw_list->AddBezierCubic(p1, p1 + nodeControlPoint, p2 - nodeControlPoint, p2, connectionLineColor, connectionWidth);
                         drawnConnections.push_back(connection);
                     }
                 }
@@ -2430,6 +2432,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
             glm::vec2  controlPoint(0,0);
             controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);
+            const glm::vec2 nodeControlPoint = controlPoint * nodeAttachmentTension;
             ImVec4 c;
             if(connectionIsDoable){
                 c = OceanodeColors::ConnectionDraggingReachable;
@@ -2443,7 +2446,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 c.z = darkLine.z;
                 c.w *= darkLine.w;
             }
-            draw_list->AddBezierCubic(p1, p1 + controlPoint, p2 - controlPoint, p2, OceanodeColors::U32(c), connectionWidth);
+            draw_list->AddBezierCubic(p1,
+                                      p1 + (tempSourceParameter != nullptr ? nodeControlPoint : controlPoint),
+                                      p2 - (tempSourceParameter != nullptr ? controlPoint : nodeControlPoint),
+                                      p2, OceanodeColors::U32(c), connectionWidth);
         }
         
         draw_list->ChannelsMerge();
