@@ -28,6 +28,19 @@
 #include "portal.h"
 #include "ofxOceanodeAutoLayout.h"
 
+static bool isCanvasHoveredForWheel(){
+    if(!ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_NoPopupHierarchy))
+        return false;
+
+    // Child editors can opt out of wheel scrolling without losing text interaction.
+    ImGuiWindow* canvasWindow = ImGui::GetCurrentWindow();
+    for(ImGuiWindow* hovered = GImGui->HoveredWindow; hovered != canvasWindow; hovered = hovered->ParentWindow){
+        if(hovered == nullptr || !(hovered->Flags & ImGuiWindowFlags_NoScrollWithMouse))
+            return false;
+    }
+    return true;
+}
+
 // Static member definition – shared across all canvas instances (ImGui uses a single font atlas)
 ImFont* ofxOceanodeCanvas::zoomFonts[9] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 ImFont* ofxOceanodeCanvas::zoomFontsBold[9] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
@@ -1818,6 +1831,27 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 delete[] cString;
                 ImGui::ColorEdit3("Color", &c.color.r);
                 ImGui::ColorEdit3("TextColor", &c.textColor.r);
+                float* geometryValues[] = {&c.position.x, &c.position.y, &c.size.x, &c.size.y};
+                const char* geometryIDs[] = {"##originX", "##originY", "##width", "##height"};
+                const char* geometryFormats[] = {"X: %.1f", "Y: %.1f", "W: %.1f", "H: %.1f"};
+                const float minimumSizes[] = {32.0f, 15.0f};
+                for(int field = 0; field < 4; ++field){
+                    if(field > 0) ImGui::SameLine();
+                    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 9.0f);
+                    bool changed = ImGui::DragFloat(geometryIDs[field], geometryValues[field], 1.0f,
+                                                   0.0f, 0.0f, geometryFormats[field]);
+                    if(changed && field >= 2){
+                        *geometryValues[field] = std::max(*geometryValues[field], minimumSizes[field - 2]);
+                    }
+                    // Snap on commit so small mouse movements can accumulate during a drag.
+                    if(ImGui::IsItemDeactivated() && snap_to_grid){
+                        *geometryValues[field] = snapToGrid(glm::vec2(*geometryValues[field], 0.0f)).x;
+                        if(field >= 2){
+                            float snappedMinimum = ceil(minimumSizes[field - 2] / GRID_SIZE) * GRID_SIZE;
+                            *geometryValues[field] = std::max(*geometryValues[field], snappedMinimum);
+                        }
+                    }
+                }
                 if(ImGui::Button("[Remove]")){
                     removeIndex = i;
                 }
@@ -2451,7 +2485,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
             
             //TODO: Scroll amount in config
-            if(ImGui::IsWindowHovered()){
+            if(isCanvasHoveredForWheel()){
                 float wheel = ImGui::GetIO().MouseWheel;
                 float wheelH = ImGui::GetIO().MouseWheelH;
 
