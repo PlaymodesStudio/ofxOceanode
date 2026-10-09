@@ -1474,6 +1474,7 @@ bool ofxOceanodeCustomGuiPanel::renderWidget(CustomGuiWidget& widget, ofxOceanod
     };
 
     ofxOceanodeNode* editedNode = parameter != nullptr ? container.getNodeFromParameter(*parameter) : nullptr;
+    context.parameterNodeColor = editedNode != nullptr ? editedNode->getColor() : widget.color;
     ofJson valuesBefore;
     const bool trackUserValue = editedNode != nullptr && parameter != nullptr &&
                                 !parameter->hasInConnection() &&
@@ -1591,6 +1592,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                                                                                labelColorFloat[1] * 255.0f,
                                                                                labelColorFloat[2] * 255.0f,
                                                                                labelColorFloat[3] * 255.0f));
+                    widget.config["labelColorMode"] = "custom";
                     container.markCustomGuisDirty();
                 }
             }else if(widget.type == CustomGuiWidgetType::Text){
@@ -1637,6 +1639,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                                                                            textColorFloat[1] * 255.0f,
                                                                            textColorFloat[2] * 255.0f,
                                                                            textColorFloat[3] * 255.0f));
+                widget.config["labelColorMode"] = "custom";
                 container.markCustomGuisDirty();
             }
 
@@ -1690,7 +1693,9 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
             }
             }else if(widget.type == CustomGuiWidgetType::Line){
             }else{
-            ofColor labelColor = ofxOceanodeCustomGuiWidgetHelpers::widgetLabelColor(widget, ofColor::black);
+            ofxOceanodeNode* sourceNode = parameter != nullptr ? container.getNodeFromParameter(*parameter) : nullptr;
+            const ofColor nodeColor = sourceNode != nullptr ? sourceNode->getColor() : widget.color;
+            ofColor labelColor = ofxOceanodeCustomGuiWidgetHelpers::resolvedWidgetLabelColor(widget, nodeColor);
             float labelColorFloat[4] = {
                 labelColor.r / 255.0f,
                 labelColor.g / 255.0f,
@@ -1702,6 +1707,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                                                                            labelColorFloat[1] * 255.0f,
                                                                            labelColorFloat[2] * 255.0f,
                                                                            labelColorFloat[3] * 255.0f));
+                widget.config["labelColorMode"] = "custom";
                 container.markCustomGuisDirty();
             }
             ofColor bodyColor = ofxOceanodeCustomGuiWidgetHelpers::widgetBodyColor(widget);
@@ -1771,7 +1777,7 @@ bool ofxOceanodeCustomGuiPanel::drawWidgetProperties(CustomGuiWidget& widget, si
                             widget.label = label;
                             widget.color = color;
                             widget.config = ofJson::object();
-                            for(const char* key : {"labelColor", "bodyColor"}){
+                            for(const char* key : {"labelColor", "labelColorMode", "bodyColor"}){
                                 if(previousWidget.config.contains(key)) widget.config[key] = previousWidget.config[key];
                             }
                             if(ofxOceanodeCustomGuiWidgets::canResizeVector(compatibleType) &&
@@ -2325,7 +2331,8 @@ bool ofxOceanodeCustomGuiPanel::addParameter(ofxOceanodeAbstractParameter& param
     }
     widget.type = type;
     widget.label = parameter.getName();
-    widget.config["labelColor"] = customGuiColorToJson(widget.color);
+    widget.config["labelColor"] = customGuiColorToJson(ofxOceanodeCustomGuiWidgetHelpers::nodeTintTextColor(widget.color));
+    widget.config["labelColorMode"] = "nodeTint";
     ofColor bodyColor = widget.color;
     bodyColor.setSaturation(bodyColor.getSaturation() * 0.5f);
     bodyColor.setBrightness(bodyColor.getBrightness() * 0.5f);

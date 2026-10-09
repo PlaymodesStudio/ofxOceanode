@@ -28,6 +28,7 @@ struct CustomGuiWidgetRenderContext {
     std::function<bool(CustomGuiWidget&, ofxOceanodeAbstractParameter*, std::vector<float>&, const ImVec2&, bool)> drawMultiSliderWidget;
     std::function<void(const ImVec2&, float, const ImU32&)> drawVerticalMeter;
     std::function<std::shared_ptr<ofImage>(const std::string&)> loadWidgetImage;
+    ofColor parameterNodeColor = ofColor::white;
 };
 
 struct CustomGuiWidgetPropertiesContext {

@@ -158,6 +158,7 @@ void initializeWideWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter&
 void initializeSliderWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
 {
     initializeWideWidget(widget, parameter);
+    widget.spanH = 1;
     widget.config["sliderMode"] = widget.config.value("sliderMode", "anchored");
     widget.config["centeredBar"] = widget.config.value("centeredBar", false);
 }
@@ -177,6 +178,7 @@ void initializeTextDisplayWidget(CustomGuiWidget& widget, ofxOceanodeAbstractPar
 void initializeDragNumberWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& parameter)
 {
     initializeFontScaledWideWidget(widget, parameter);
+    widget.spanH = 1;
     widget.config["integerDisplay"] = widget.config.value("integerDisplay", false);
 }
 
@@ -298,6 +300,37 @@ void drawScaledCenteredValueText(const ImVec2& min,
     drawList->AddText(ImGui::GetFont(), fontSize, ImVec2(textX, textY), color, text.c_str());
 }
 
+ImVec2 prepareInlineValueLayout(const CustomGuiWidgetRenderContext& context,
+                                const CustomGuiWidget& widget)
+{
+    if(context.label.empty() || !shouldShowWidgetLabel(widget)) return context.size;
+
+    const float labelWidth = context.size.x *
+        (widget.type == CustomGuiWidgetType::DragNumber ? 0.5f : 0.25f);
+    const ImVec2 startPos = ImGui::GetCursorPos();
+    const ImVec2 screenPos = ImGui::GetCursorScreenPos();
+    const float padX = std::min(8.0f, std::max(2.0f, labelWidth * 0.08f));
+    const ofColor color = resolvedWidgetLabelColor(widget, context.parameterNodeColor, ofColor::black);
+
+    ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * widgetLabelFontScale(widget)));
+    const float fontHeight = ImGui::GetFontSize();
+    const ImVec2 textMin(screenPos.x + padX,
+                         screenPos.y + std::max(0.0f, (context.size.y - fontHeight) * 0.5f));
+    const ImVec2 textMax(screenPos.x + labelWidth, screenPos.y + context.size.y);
+    ImGui::PushStyleColor(ImGuiCol_Text, colorToImVec4(color));
+    ImGui::PushClipRect(screenPos, textMax, true);
+    ImGui::RenderTextEllipsis(ImGui::GetWindowDrawList(), textMin, textMax, textMax.x,
+                              context.label.c_str(), context.label.c_str() + context.label.size(), nullptr);
+    ImGui::PopClipRect();
+    ImGui::PopStyleColor();
+    ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
+
+    ImGui::SetCursorPos(ImVec2(startPos.x + labelWidth, startPos.y));
+    return ImVec2(std::max(1.0f, context.size.x - labelWidth), context.size.y);
+}
+
+constexpr float valueControlSideInset = 2.5f; // Five pixels less width overall.
+
 bool drawScalarSliderBar(const CustomGuiWidgetRenderContext& context,
                          const CustomGuiWidget& widget,
                          const ImVec2& itemSize,
@@ -316,6 +349,11 @@ bool drawScalarSliderBar(const CustomGuiWidgetRenderContext& context,
     const bool active = interactive && ImGui::IsItemActive();
     const ImVec2 min = ImGui::GetItemRectMin();
     const ImVec2 max = ImGui::GetItemRectMax();
+    const float sideInset = std::min(valueControlSideInset, std::max(0.0f, (itemSize.x - 1.0f) * 0.5f));
+    const float verticalInset = verticalSlider ? 0.0f : itemSize.y / 6.0f;
+    const ImVec2 barMin(min.x + sideInset, min.y + verticalInset);
+    const ImVec2 barMax(max.x - sideInset, max.y - verticalInset);
+    const float barWidth = barMax.x - barMin.x;
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const ofColor bodyColor = widgetBodyColor(widget);
     const ofColor accentColor = widget.color;
@@ -324,54 +362,54 @@ bool drawScalarSliderBar(const CustomGuiWidgetRenderContext& context,
     const float fontSize = std::max(1.0f, ImGui::GetFontSize() * widgetValueFontScale(widget));
     const float slimThickness = std::max(2.0f, std::round((verticalSlider ? itemSize.y : itemSize.x) * 0.04f));
 
-    drawList->AddRectFilled(min, max, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 0.0f);
+    drawList->AddRectFilled(barMin, barMax, IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a), 0.0f);
 
     if(verticalSlider){
         const float valueY = max.y - itemSize.y * normalized;
         if(sliderMode == SliderVisualMode::Anchored){
-            drawList->AddRectFilled(ImVec2(min.x, valueY),
-                                    ImVec2(max.x, max.y),
+            drawList->AddRectFilled(ImVec2(barMin.x, valueY),
+                                    barMax,
                                     IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a), 0.0f);
         }else if(sliderMode == SliderVisualMode::CenteredBar){
             const float lineTop = ofClamp(valueY - slimThickness * 0.5f, min.y, max.y);
             const float lineBottom = ofClamp(valueY + slimThickness * 0.5f, min.y, max.y);
-            drawList->AddRectFilled(ImVec2(min.x, lineTop),
-                                    ImVec2(max.x, lineBottom),
+            drawList->AddRectFilled(ImVec2(barMin.x, lineTop),
+                                    ImVec2(barMax.x, lineBottom),
                                     IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a), 0.0f);
         }else{
             const float centerY = min.y + itemSize.y * 0.5f;
             const float fillTop = std::min(centerY, valueY);
             const float fillBottom = std::max(centerY, valueY);
-            drawList->AddRectFilled(ImVec2(min.x, fillTop),
-                                    ImVec2(max.x, fillBottom),
+            drawList->AddRectFilled(ImVec2(barMin.x, fillTop),
+                                    ImVec2(barMax.x, fillBottom),
                                     IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a), 0.0f);
-            drawList->AddLine(ImVec2(min.x, centerY), ImVec2(max.x, centerY), IM_COL32(255, 255, 255, 60), 1.0f);
+            drawList->AddLine(ImVec2(barMin.x, centerY), ImVec2(barMax.x, centerY), IM_COL32(255, 255, 255, 60), 1.0f);
         }
     }else{
-        const float valueX = min.x + itemSize.x * normalized;
+        const float valueX = barMin.x + barWidth * normalized;
         if(sliderMode == SliderVisualMode::Anchored){
-            drawList->AddRectFilled(ImVec2(min.x, min.y),
-                                    ImVec2(valueX, max.y),
+            drawList->AddRectFilled(barMin,
+                                    ImVec2(valueX, barMax.y),
                                     IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a), 0.0f);
         }else if(sliderMode == SliderVisualMode::CenteredBar){
-            const float lineLeft = ofClamp(valueX - slimThickness * 0.5f, min.x, max.x);
-            const float lineRight = ofClamp(valueX + slimThickness * 0.5f, min.x, max.x);
-            drawList->AddRectFilled(ImVec2(lineLeft, min.y),
-                                    ImVec2(lineRight, max.y),
+            const float lineLeft = ofClamp(valueX - slimThickness * 0.5f, barMin.x, barMax.x);
+            const float lineRight = ofClamp(valueX + slimThickness * 0.5f, barMin.x, barMax.x);
+            drawList->AddRectFilled(ImVec2(lineLeft, barMin.y),
+                                    ImVec2(lineRight, barMax.y),
                                     IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a), 0.0f);
         }else{
-            const float centerX = min.x + itemSize.x * 0.5f;
+            const float centerX = barMin.x + barWidth * 0.5f;
             const float fillLeft = std::min(centerX, valueX);
             const float fillRight = std::max(centerX, valueX);
-            drawList->AddRectFilled(ImVec2(fillLeft, min.y),
-                                    ImVec2(fillRight, max.y),
+            drawList->AddRectFilled(ImVec2(fillLeft, barMin.y),
+                                    ImVec2(fillRight, barMax.y),
                                     IM_COL32(accentColor.r, accentColor.g, accentColor.b, accentColor.a), 0.0f);
-            drawList->AddLine(ImVec2(centerX, min.y), ImVec2(centerX, max.y), IM_COL32(255, 255, 255, 60), 1.0f);
+            drawList->AddLine(ImVec2(centerX, barMin.y), ImVec2(centerX, barMax.y), IM_COL32(255, 255, 255, 60), 1.0f);
         }
     }
 
     if(hovered || active){
-        drawList->AddRect(min, max, IM_COL32(255, 255, 255, active ? 220 : 120), 0.0f, 0, active ? 2.0f : 1.0f);
+        drawList->AddRect(barMin, barMax, IM_COL32(255, 255, 255, active ? 220 : 120), 0.0f, 0, active ? 2.0f : 1.0f);
     }
 
     bool changed = false;
@@ -379,7 +417,7 @@ bool drawScalarSliderBar(const CustomGuiWidgetRenderContext& context,
         const ImVec2 mousePos = ImGui::GetIO().MousePos;
         const float mouseNormalized = verticalSlider
             ? 1.0f - ofClamp((mousePos.y - min.y) / std::max(1.0f, itemSize.y), 0.0f, 1.0f)
-            : ofClamp((mousePos.x - min.x) / std::max(1.0f, itemSize.x), 0.0f, 1.0f);
+            : ofClamp((mousePos.x - barMin.x) / std::max(1.0f, barWidth), 0.0f, 1.0f);
         const float newValue = sliderMin + mouseNormalized * (sliderMax - sliderMin);
         if(newValue != value){
             value = newValue;
@@ -388,9 +426,80 @@ bool drawScalarSliderBar(const CustomGuiWidgetRenderContext& context,
     }
 
     if(showValue){
-        drawScaledCenteredValueText(min, max, valueText, fontSize, IM_COL32(245, 245, 245, 220));
+        const ofColor textColor = nodeTintTextColor(context.parameterNodeColor);
+        drawScaledCenteredValueText(barMin, barMax, valueText, fontSize,
+                                    IM_COL32(textColor.r, textColor.g, textColor.b, textColor.a));
     }
 
+    return changed;
+}
+
+template<typename DrawDrag, typename FormatValue>
+bool drawDragNumberControl(const CustomGuiWidgetRenderContext& context,
+                           const CustomGuiWidget& widget,
+                           FormatValue formatValue,
+                           DrawDrag drawDrag)
+{
+    const ImVec2 itemSize = prepareInlineValueLayout(context, widget);
+    // Match the slider text size before fitting ImGui's hidden drag frame into the bar.
+    const float displayFontSize = std::max(1.0f, ImGui::GetFontSize() * widgetValueFontScale(widget));
+    const float sideInset = std::min(valueControlSideInset, std::max(0.0f, (itemSize.x - 1.0f) * 0.5f));
+    const float barHeight = std::max(1.0f, itemSize.y * 2.0f / 3.0f);
+    const ImVec2 barSize(itemSize.x - sideInset * 2.0f, barHeight);
+    const ImVec2 startPos = ImGui::GetCursorPos();
+    ImGui::SetCursorPos(ImVec2(startPos.x + sideInset, startPos.y + (itemSize.y - barHeight) * 0.5f));
+
+    float fontScale = std::max(0.2f, context.zoom * widgetValueFontScale(widget));
+    ImGui::SetWindowFontScale(fontScale);
+    if(ImGui::GetFontSize() > barSize.y){
+        fontScale *= barSize.y / ImGui::GetFontSize();
+        ImGui::SetWindowFontScale(fontScale);
+    }
+    pushAlignedFrameStyle(context, barSize);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+
+    const ImVec2 barMin = ImGui::GetCursorScreenPos();
+    const ImVec2 barMax(barMin.x + barSize.x, barMin.y + barSize.y);
+    const ofColor bodyColor = widgetBodyColor(widget);
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    drawList->AddRectFilled(barMin, barMax,
+                            IM_COL32(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a));
+
+    const ofColor textColor = nodeTintTextColor(context.parameterNodeColor);
+    const ImVec4 transparent(0.0f, 0.0f, 0.0f, 0.0f);
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, transparent);
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, transparent);
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, transparent);
+    const ImGuiID dragId = ImGui::GetID("##value");
+    const ImVec2 mousePos = ImGui::GetIO().MousePos;
+    const bool mouseOnBar = mousePos.x >= barMin.x && mousePos.x < barMax.x &&
+                            mousePos.y >= barMin.y && mousePos.y < barMax.y;
+    const bool startingTextInput = context.interactive && mouseOnBar &&
+        ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+        (ImGui::GetIO().KeyCtrl || ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left));
+    const bool editingText = ImGui::TempInputIsActive(dragId) || startingTextInput;
+    ImGui::PushStyleColor(ImGuiCol_Text, editingText ? colorToImVec4(textColor) : transparent);
+    bool changed = false;
+    if(context.interactive){
+        ImGui::SetNextItemWidth(barSize.x);
+        changed = drawDrag();
+    }else{
+        ImGui::InvisibleButton("##value", barSize);
+    }
+    if(!context.interactive || !ImGui::TempInputIsActive(dragId)){
+        drawScaledCenteredValueText(barMin, barMax, formatValue(), displayFontSize,
+                                    IM_COL32(textColor.r, textColor.g, textColor.b, textColor.a));
+    }
+    ImGui::PopStyleColor(4);
+    ImGui::PopStyleVar();
+    popAlignedFrameStyle();
+    ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
+
+    const bool active = context.interactive && ImGui::IsItemActive();
+    if(ImGui::IsItemHovered() || active){
+        drawList->AddRect(barMin, barMax, IM_COL32(255, 255, 255, active ? 220 : 120),
+                          0.0f, 0, active ? 2.0f : 1.0f);
+    }
     return changed;
 }
 
@@ -499,7 +608,8 @@ bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& w
     const ImVec2 itemSize = widgetItemSize(context);
     const bool interactive = context.interactive;
     const bool showValue = context.showValue;
-    const bool verticalSlider = sliderIsVertical(widget, itemSize);
+    const bool verticalSlider = sliderIsVertical(widget,
+        widget.type == CustomGuiWidgetType::Slider ? context.size : itemSize);
     float value = 0.0f;
     float sliderMin = 0.0f;
     float sliderMax = 1.0f;
@@ -531,10 +641,21 @@ bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& w
     const ofColor accentColor = widget.color;
 
     ImGui::BeginGroup();
-    drawWidgetLabel(context, widget, context.label);
+    if(widget.type != CustomGuiWidgetType::Slider && widget.type != CustomGuiWidgetType::DragNumber){
+        drawWidgetLabel(context, widget, context.label);
+    }
     if(widget.type == CustomGuiWidgetType::Slider){
-        changed = drawScalarSliderBar(context, widget, itemSize, interactive, showValue, verticalSlider,
+        const ImVec2 sliderSize = prepareInlineValueLayout(context, widget);
+        changed = drawScalarSliderBar(context, widget, sliderSize, interactive, showValue, verticalSlider,
                                       sliderMin, sliderMax, value, ofToString(value, 3));
+    }else if(widget.type == CustomGuiWidgetType::DragNumber){
+        const bool integerDisplay = dragNumberUsesIntegerDisplay(widget);
+        changed = drawDragNumberControl(context, widget, [&]{
+            return integerDisplay ? ofToString((int)std::round(value)) : ofToString(value, 3);
+        }, [&]{
+            return ImGui::DragFloat("##value", &value, integerDisplay ? 1.0f : 0.01f,
+                                    sliderMin, sliderMax, integerDisplay ? "%.0f" : "%.3f");
+        });
     }else if(widget.type == CustomGuiWidgetType::MultiSlider){
         std::vector<float> sliderValue = {value};
         changed = context.drawMultiSliderWidget(widget, parameter, sliderValue, itemSize, interactive);
@@ -545,13 +666,7 @@ bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& w
         ImGui::SetNextItemWidth(widgetItemWidth(itemSize));
         pushWidgetFrameColors(bodyColor, accentColor);
 
-        if(!interactive && widget.type == CustomGuiWidgetType::DragNumber){
-            const bool integerDisplay = dragNumberUsesIntegerDisplay(widget);
-            ImGui::TextWrapped("%s",
-                               integerDisplay
-                                   ? ofToString((int)std::round(value)).c_str()
-                                   : ofToString(value, 3).c_str());
-        }else if(!interactive){
+        if(!interactive){
             const float fraction = sliderMax != sliderMin ? (value - sliderMin) / (sliderMax - sliderMin) : 0.0f;
             ImGui::ProgressBar(ofClamp(fraction, 0.0f, 1.0f), itemSize, showValue ? ofToString(value, 3).c_str() : "");
         }else if(widget.type == CustomGuiWidgetType::MultiToggle){
@@ -562,14 +677,6 @@ bool renderFloatWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& w
                 changed = true;
             }
             if(active) ImGui::PopStyleColor(3);
-        }else if(widget.type == CustomGuiWidgetType::DragNumber){
-            const bool integerDisplay = dragNumberUsesIntegerDisplay(widget);
-            changed = ImGui::DragFloat("##value",
-                                       &value,
-                                       integerDisplay ? 1.0f : 0.01f,
-                                       sliderMin,
-                                       sliderMax,
-                                       integerDisplay ? "%.0f" : "%.3f");
         }else if(verticalSlider){
             changed = ImGui::VSliderFloat("##value", itemSize, &value, sliderMin, sliderMax, showValue ? "%.3f" : "");
         }else{
@@ -603,7 +710,8 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
     const ImVec2 itemSize = widgetItemSize(context);
     const bool interactive = context.interactive;
     const bool showValue = context.showValue;
-    const bool verticalSlider = sliderIsVertical(widget, itemSize);
+    const bool verticalSlider = sliderIsVertical(widget,
+        widget.type == CustomGuiWidgetType::Slider ? context.size : itemSize);
     const int sliderMin = intRangeMin(widget, param.getMin());
     const int sliderMax = intRangeMax(widget, param.getMax());
     const auto options = parameter->cast<int>().getDropdownOptions();
@@ -614,12 +722,19 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
     const ofColor accentColor = widget.color;
 
     ImGui::BeginGroup();
-    drawWidgetLabel(context, widget, context.label);
+    if(widget.type != CustomGuiWidgetType::Slider && widget.type != CustomGuiWidgetType::DragNumber){
+        drawWidgetLabel(context, widget, context.label);
+    }
     if(widget.type == CustomGuiWidgetType::Slider){
         float scalarValue = (float)value;
-        changed = drawScalarSliderBar(context, widget, itemSize, interactive, showValue, verticalSlider,
+        const ImVec2 sliderSize = prepareInlineValueLayout(context, widget);
+        changed = drawScalarSliderBar(context, widget, sliderSize, interactive, showValue, verticalSlider,
                                       (float)sliderMin, (float)sliderMax, scalarValue, ofToString(value));
         if(changed) value = (int)std::round(ofClamp(scalarValue, (float)sliderMin, (float)sliderMax));
+    }else if(widget.type == CustomGuiWidgetType::DragNumber){
+        changed = drawDragNumberControl(context, widget, [&]{ return ofToString(value); }, [&]{
+            return ImGui::DragInt("##value", &value, 1.0f, sliderMin, sliderMax);
+        });
     }else if(widget.type == CustomGuiWidgetType::MultiSlider){
         std::vector<float> sliderValue = {(float)value};
         changed = context.drawMultiSliderWidget(widget, parameter, sliderValue, itemSize, interactive);
@@ -708,8 +823,6 @@ bool renderIntWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
                 }
                 ImGui::EndCombo();
             }
-        }else if(widget.type == CustomGuiWidgetType::DragNumber){
-            changed = ImGui::DragInt("##value", &value, 1.0f, sliderMin, sliderMax);
         }else if(verticalSlider){
             changed = ImGui::VSliderInt("##value", itemSize, &value, sliderMin, sliderMax, showValue ? "%d" : "");
         }else{
@@ -744,25 +857,13 @@ bool renderVectorDragNumberWidget(CustomGuiWidgetRenderContext& context, CustomG
 {
     if(parameter == nullptr) return false;
 
-    const ImVec2 itemSize = widgetItemSize(context);
-    const bool interactive = context.interactive;
-    const float fontScale = widgetValueFontScale(widget);
-    const ofColor bodyColor = widgetBodyColor(widget);
-    const ofColor accentColor = widget.color;
-
     ImGui::BeginGroup();
-    drawWidgetLabel(context, widget, context.label);
-    ImGui::SetWindowFontScale(std::max(0.2f, context.zoom * fontScale));
-    pushAlignedFrameStyle(context, itemSize);
-    ImGui::SetNextItemWidth(widgetItemWidth(itemSize));
-    pushWidgetFrameColors(bodyColor, accentColor);
-
     if(isFloatVectorParameter(*parameter)){
         auto& param = parameter->cast<std::vector<float>>().getParameter();
         auto value = param.get();
         if(value.empty()){
+            drawWidgetLabel(context, widget, context.label);
             ImGui::TextDisabled("Empty vector");
-            popAlignedFrameStyle();
             ImGui::EndGroup();
             return true;
         }
@@ -773,19 +874,14 @@ bool renderVectorDragNumberWidget(CustomGuiWidgetRenderContext& context, CustomG
         sliderMax = floatRangeMax(widget, sliderMax);
 
         float scalarValue = value[0];
-        bool changed = false;
         const bool integerDisplay = dragNumberUsesIntegerDisplay(widget);
-        if(!interactive){
-            if(integerDisplay) ImGui::TextWrapped("%d", (int)std::round(scalarValue));
-            else ImGui::TextWrapped("%.3f", scalarValue);
-        }else{
-            changed = ImGui::DragFloat("##value",
-                                       &scalarValue,
-                                       integerDisplay ? 1.0f : 0.01f,
-                                       sliderMin,
-                                       sliderMax,
-                                       integerDisplay ? "%.0f" : "%.3f");
-        }
+        const bool changed = drawDragNumberControl(context, widget, [&]{
+            return integerDisplay ? ofToString((int)std::round(scalarValue)) : ofToString(scalarValue, 3);
+        }, [&]{
+            return ImGui::DragFloat("##value", &scalarValue,
+                                    integerDisplay ? 1.0f : 0.01f, sliderMin, sliderMax,
+                                    integerDisplay ? "%.0f" : "%.3f");
+        });
 
         if(changed){
             value[0] = quantizeFloatValue(widget, scalarValue, sliderMin, sliderMax);
@@ -795,8 +891,8 @@ bool renderVectorDragNumberWidget(CustomGuiWidgetRenderContext& context, CustomG
         auto& param = parameter->cast<std::vector<int>>().getParameter();
         auto value = param.get();
         if(value.empty()){
+            drawWidgetLabel(context, widget, context.label);
             ImGui::TextDisabled("Empty vector");
-            popAlignedFrameStyle();
             ImGui::EndGroup();
             return true;
         }
@@ -807,12 +903,9 @@ bool renderVectorDragNumberWidget(CustomGuiWidgetRenderContext& context, CustomG
         sliderMax = intRangeMax(widget, sliderMax);
 
         int scalarValue = value[0];
-        bool changed = false;
-        if(!interactive){
-            ImGui::TextWrapped("%d", scalarValue);
-        }else{
-            changed = ImGui::DragInt("##value", &scalarValue, 1.0f, sliderMin, sliderMax);
-        }
+        const bool changed = drawDragNumberControl(context, widget, [&]{ return ofToString(scalarValue); }, [&]{
+            return ImGui::DragInt("##value", &scalarValue, 1.0f, sliderMin, sliderMax);
+        });
 
         if(changed){
             value[0] = scalarValue;
@@ -820,9 +913,6 @@ bool renderVectorDragNumberWidget(CustomGuiWidgetRenderContext& context, CustomG
         }
     }
 
-    ImGui::PopStyleColor(8);
-    popAlignedFrameStyle();
-    ImGui::SetWindowFontScale(std::max(0.5f, context.zoom));
     ImGui::EndGroup();
     return true;
 }

@@ -56,6 +56,35 @@ inline ofColor widgetLabelColor(const CustomGuiWidget& widget, const ofColor& fa
     return fallback;
 }
 
+inline ofColor nodeTintTextColor(const ofColor& sourceColor)
+{
+    // HSL lightness 75% and saturation 20% correspond to HSB brightness 80% and saturation 12.5%.
+    ofColor color;
+    color.setHsb(sourceColor.getHue(),
+                 sourceColor.getSaturation() > 0 ? 255.0f * 0.125f : 0.0f,
+                 255.0f * 0.8f);
+    color.a = 220;
+    return color;
+}
+
+inline bool widgetUsesNodeTintLabel(const CustomGuiWidget& widget)
+{
+    if(widget.parameterRef.parameterPath.empty()) return false;
+    if(widget.config.contains("labelColorMode") && widget.config["labelColorMode"].is_string()){
+        return widget.config["labelColorMode"] == "nodeTint";
+    }
+    if(!widget.config.contains("labelColor")) return true;
+    // Earlier parameter widgets stored their untouched default as the widget's node color.
+    return widget.config["labelColor"] == customGuiColorToJson(widget.color);
+}
+
+inline ofColor resolvedWidgetLabelColor(const CustomGuiWidget& widget,
+                                       const ofColor& nodeColor,
+                                       const ofColor& fallback = ofColor::black)
+{
+    return widgetUsesNodeTintLabel(widget) ? nodeTintTextColor(nodeColor) : widgetLabelColor(widget, fallback);
+}
+
 inline void ensureWidgetLabelColor(CustomGuiWidget& widget, const ofColor& fallback = ofColor::black)
 {
     if(!widget.config.contains("labelColor")){
@@ -139,7 +168,7 @@ inline void drawWidgetLabel(const CustomGuiWidgetRenderContext& context, const C
     const ImVec2 min = ImGui::GetItemRectMin();
     const ImVec2 max = ImGui::GetItemRectMax();
     const float padX = std::max(2.0f, std::min(8.0f, (context.cellSize.x > 0.0f ? context.cellSize.x : context.size.x) * 0.08f));
-    const ofColor labelColor = widgetLabelColor(widget, ofColor::black);
+    const ofColor labelColor = resolvedWidgetLabelColor(widget, context.parameterNodeColor, ofColor::black);
     const float fontSize = std::max(1.0f, ImGui::GetFontSize() * widgetLabelFontScale(widget));
     const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, label.c_str());
     const float textY = min.y + std::max(0.0f, (labelHeight - textSize.y) * 0.5f);
