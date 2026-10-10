@@ -172,7 +172,9 @@ void ofxOceanodeCustomGuiPanel::draw()
     // A panel restored by a preset load must leave an open menu focused.
     const ImGuiWindowFlags focusFlags = ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel)
         ? ImGuiWindowFlags_NoFocusOnAppearing : ImGuiWindowFlags_None;
-    const bool beginVisible = ImGui::Begin(title.c_str(), &openState, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_HorizontalScrollbar | focusFlags);
+    const bool beginVisible = ImGui::Begin(title.c_str(), &openState,
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoScrollWithMouse | focusFlags);
     if(openState != panel->windowState.isOpen){
         panel->windowState.isOpen = openState;
         container.markCustomGuisDirty();
@@ -304,10 +306,6 @@ void ofxOceanodeCustomGuiPanel::draw()
         }
         ImGui::PopStyleVar();
         ImGui::PopStyleColor();
-        if(requestedZoom != panel->layout.zoom){
-            panel->layout.zoom = requestedZoom;
-            container.markCustomGuisDirty();
-        }
         if(panel->designMode){
             advanceHeaderRow();
             char nameBuffer[256];
@@ -452,6 +450,36 @@ void ofxOceanodeCustomGuiPanel::draw()
             }
         }
 
+        // Keep the controls above the canvas while only the canvas scrolls.
+        const bool canvasVisible = ImGui::BeginChild("##CustomGuiCanvas", ImVec2(0, 0), ImGuiChildFlags_None,
+            ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        const ImGuiIO& io = ImGui::GetIO();
+        const bool canvasHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows |
+            ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_NoPopupHierarchy);
+        const ImVec2 canvasCenter = ImGui::GetCurrentWindow()->InnerRect.GetCenter();
+        ImVec2 zoomAnchor = canvasCenter;
+        const bool resetShortcut = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+            io.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_Z);
+        if(resetShortcut) requestedZoom = 1.0f;
+
+        const bool zoomModifier = io.KeyCtrl || io.KeySuper;
+        const bool wheelZoom = canvasHovered && !resetShortcut && zoomModifier && io.MouseWheel != 0.0f;
+        if(wheelZoom){
+            requestedZoom = ofClamp(requestedZoom * (1.0f + io.MouseWheel * 0.1f), 0.25f, 4.0f);
+            zoomAnchor = io.MousePos;
+        }
+        if(requestedZoom != panel->layout.zoom){
+            const float zoomRatio = requestedZoom / panel->layout.zoom;
+            const ImVec2 contentOrigin = ImGui::GetCursorScreenPos();
+            ImGui::SetScrollX(ImGui::GetScrollX() + (zoomAnchor.x - contentOrigin.x) * (zoomRatio - 1.0f));
+            ImGui::SetScrollY(ImGui::GetScrollY() + (zoomAnchor.y - contentOrigin.y) * (zoomRatio - 1.0f));
+            panel->layout.zoom = requestedZoom;
+            container.markCustomGuisDirty();
+        }else if(canvasHovered && !wheelZoom){
+            if(io.MouseWheelH != 0.0f) ImGui::SetScrollX(ImGui::GetScrollX() - io.MouseWheelH * 10.0f);
+            if(io.MouseWheel != 0.0f) ImGui::SetScrollY(ImGui::GetScrollY() - io.MouseWheel * 10.0f);
+        }
+        if(canvasVisible){
         ensureLayoutFitsWidgets(panel->layout);
         const ImVec2 canvasAvail = ImGui::GetContentRegionAvail();
         const float widgetExtentWidth = panel->layout.columns * panel->layout.cellWidth * panel->layout.zoom;
@@ -605,7 +633,6 @@ void ofxOceanodeCustomGuiPanel::draw()
             bool locked;
         };
         std::vector<EditOutline> editOutlines;
-        int widgetToRemove = -1;
         auto drawWidgetAtIndex = [&](size_t i){
             auto& widget = panel->layout.widgets[i];
             const float x = origin.x + widget.gridX * panel->layout.cellWidth * panel->layout.zoom;
@@ -912,10 +939,14 @@ void ofxOceanodeCustomGuiPanel::draw()
             }
         }
 
+        }
+        ImGui::EndChild();
+
         if(requestRemoveSelectedWidgets){
             removeSelectedWidgets();
         }
 
+        int widgetToRemove = -1;
         if(requestOpenWidgetPropertiesPopup && propertiesWidgetIndex >= 0 &&
            propertiesWidgetIndex < (int)panel->layout.widgets.size()){
             ImGui::OpenPopup("Widget Properties");
