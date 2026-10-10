@@ -298,19 +298,19 @@ void ofxOceanodeCustomGuiPanel::draw()
             requestedZoom = 1.0f;
         }
         if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("Reset zoom to 1:1 (Alt+Z)");
+        ImGui::PopStyleVar();
         ImGui::SameLine(0, 6.0f);
         ImGui::SetNextItemWidth(80.0f);
         float zoomPercent = requestedZoom * 100.0f;
         if(ImGui::SliderFloat("##CustomGuiZoom", &zoomPercent, 25.0f, 400.0f, "%.0f%%")){
             requestedZoom = ofClamp(zoomPercent / 100.0f, 0.25f, 4.0f);
         }
-        ImGui::PopStyleVar();
         ImGui::PopStyleColor();
         if(panel->designMode){
             advanceHeaderRow();
             char nameBuffer[256];
             std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", panel->name.c_str());
-            ImGui::SetNextItemWidth(220);
+            ImGui::SetNextItemWidth(110);
             if(ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer))){
                 container.renameCustomGuiPanel(panel->id, nameBuffer);
             }
@@ -449,6 +449,8 @@ void ofxOceanodeCustomGuiPanel::draw()
                 ImGui::EndPopup();
             }
         }
+
+        if(panel->designMode) advanceHeaderRow();
 
         // Keep the controls above the canvas while only the canvas scrolls.
         const bool canvasVisible = ImGui::BeginChild("##CustomGuiCanvas", ImVec2(0, 0), ImGuiChildFlags_None,
