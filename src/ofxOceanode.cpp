@@ -121,6 +121,17 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<bufferHeader<char>>("Portal", "c", ' ');
     nodeRegistry->registerModel<bufferHeader<ofColor>>("Portal", "color", ofColor::black);
     nodeRegistry->registerModel<bufferHeader<ofFloatColor>>("Portal", "color_f", ofFloatColor::black);
+
+    // HeaderPro uses an explicit offset mode; keep Header registered for saved patches.
+    nodeRegistry->registerModel<bufferHeaderPro<vector<float>>>("HeaderPro", "v_f", vector<float>(1, 0), false);
+    nodeRegistry->registerModel<bufferHeaderPro<float>>("HeaderPro", "f", 0, true);
+    nodeRegistry->registerModel<bufferHeaderPro<vector<int>>>("HeaderPro", "v_i", vector<int>(1, 0), false);
+    nodeRegistry->registerModel<bufferHeaderPro<int>>("HeaderPro", "i", 0, true);
+    nodeRegistry->registerModel<bufferHeaderPro<string>>("HeaderPro", "s", "string");
+    nodeRegistry->registerModel<bufferHeaderPro<bool>>("HeaderPro", "b", false);
+    nodeRegistry->registerModel<bufferHeaderPro<char>>("HeaderPro", "c", ' ');
+    nodeRegistry->registerModel<bufferHeaderPro<ofColor>>("HeaderPro", "color", ofColor::black);
+    nodeRegistry->registerModel<bufferHeaderPro<ofFloatColor>>("HeaderPro", "color_f", ofFloatColor::black);
     
     //Register default BufferTpes
     registerType<buffer<float>*>("buffer_f");

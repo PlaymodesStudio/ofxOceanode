@@ -213,6 +213,7 @@ public:
     Timestamp(int64_t microsecondsSinceEpoch);
 
     uint64_t epochMicroseconds() const;
+    int64_t epochMicrosecondsSigned() const;
     uint64_t epochMilliseconds() const;
 
     void update();

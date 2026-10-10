@@ -417,6 +417,11 @@ uint64_t Timestamp::epochMicroseconds() const {
     return std::chrono::duration_cast<std::chrono::microseconds>(epoch).count();
 }
 
+int64_t Timestamp::epochMicrosecondsSigned() const {
+    auto epoch = currentTime.time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::microseconds>(epoch).count();
+}
+
 uint64_t Timestamp::epochMilliseconds() const {
     auto epoch = currentTime.time_since_epoch();
     return std::chrono::duration_cast<std::chrono::milliseconds>(epoch).count();

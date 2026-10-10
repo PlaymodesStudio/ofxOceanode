@@ -26,6 +26,7 @@
 #include "portal.h"
 #include "bufferNode.h"
 #include "bufferHeader.h"
+#include "bufferHeaderPro.h"
 
 class ofxOceanode {
 public:
@@ -70,6 +71,7 @@ public:
         nodeRegistry->registerModel<router<buffer<T1, T2>*>>("Router", "buffer_" + name, nullptr);
         nodeRegistry->registerModel<portal<buffer<T1, T2>*>>("Portal", "buffer_" + name, nullptr);
         nodeRegistry->registerModel<bufferHeader<T1, T2>>("Header", name, defaultValue);
+        nodeRegistry->registerModel<bufferHeaderPro<T1, T2>>("HeaderPro", name, defaultValue);
         registerType<std::vector<T1>>("v_" + name, std::vector<T1>(1, defaultValue));
     };
     
