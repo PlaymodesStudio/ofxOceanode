@@ -141,6 +141,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 		}
 		if(!presetManager.isLocal()){
 			container->loadPreset(presetManager.getCurrentMacroPath());
+			loadGlobalDescription(presetManager.getCurrentMacroPath());
 		}
 		markMacroReferenceUserEdited();
 	}
@@ -217,6 +218,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 						}
 						ofSavePrettyJson(sortOrderFile, sortJson);
 					}
+						saveGlobalDescription(presetManager.getCurrentMacroPath());
 					snapshotSystem.save(presetManager.isLocal(), presetManager.getCurrentMacroPath(), presetManager.getPresetPath(), nodeName(), getNumIdentifier());
 					ofxOceanodeShared::updateMacrosStructure();
 				}

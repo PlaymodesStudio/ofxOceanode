@@ -1009,6 +1009,11 @@ void visitMacros(ofxOceanodeContainer& container, const std::string& breadcrumb,
             const ofJson oldOrder = field(savedSort, "RouterSortOrder");
             if(macro->wasRouterOrderUserEdited() && !(oldOrder.is_null() && currentSort.empty()))
                 addChange(review.changes, instancePath, "Macro interface", "Router order", oldOrder, currentSort);
+            const ofJson savedDescription = readJson(review.globalPath + "/description.json");
+            const ofJson currentDescription = macro->getMacroDescription();
+            if(container.wasValueUserEdited(*node, "Description", currentDescription, true))
+                addChange(review.changes, instancePath, "Macro info", "Description",
+                          field(savedDescription, "Description"), currentDescription);
             if(!review.changes.empty()) reviews.push_back(std::move(review));
         }
         visitMacros(*macro->getContainer(), instancePath, visited, reviews);

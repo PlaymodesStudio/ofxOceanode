@@ -300,11 +300,23 @@ void ofxOceanodeInspectorController::draw(){
                 else if(absParam.valueType() == typeid(string).name()){
                     auto tempCast = absParam.cast<string>();
                     string currentText = tempCast.get();
-                    size_t bufferSize = max(static_cast<size_t>(1024), currentText.length() + 256);
+                    const bool macroDescription = uniqueId == "Description" &&
+                        dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel()) != nullptr;
+                    size_t bufferSize = macroDescription
+                        ? max(static_cast<size_t>(16384), currentText.length() + 4096)
+                        : max(static_cast<size_t>(1024), currentText.length() + 256);
                     char* cString = new char[bufferSize];
                     strncpy(cString, currentText.c_str(), bufferSize - 1);
                     cString[bufferSize - 1] = '\0';
-                    if(ImGui::InputText(hiddenUniqueId.c_str(), cString, bufferSize, ImGuiInputTextFlags_EnterReturnsTrue)){
+                    if(macroDescription){
+                        ImGui::TextUnformatted(uniqueId.c_str());
+                    }
+                    const bool changed = macroDescription
+                        ? ImGui::InputTextMultiline(hiddenUniqueId.c_str(), cString, bufferSize,
+                                                    ImVec2(-1.0f, ImGui::GetTextLineHeight() * 5.0f))
+                        : ImGui::InputText(hiddenUniqueId.c_str(), cString, bufferSize,
+                                           ImGuiInputTextFlags_EnterReturnsTrue);
+                    if(changed){
                         tempCast = cString;
                     }
                     delete[] cString;

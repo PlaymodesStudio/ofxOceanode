@@ -113,6 +113,7 @@ public:
 	bool wasMacroReferenceUserEdited() const;
 	void clearUserEditMarkers() override;
 	string getLocalMacroName() const { return localName.get(); }
+	string getMacroDescription() const { return macroDescription.get(); }
 	bool saveGlobalDefinition(bool notifyOtherInstances = true);
 
 	bool isActive() const {
@@ -164,6 +165,8 @@ private:
 	// ─── ImGui layout persistence (per-macro) ────────────────────────────
 	void saveMacroLayout(const string& folderPath);
 	void loadMacroLayout(const string& folderPath);
+	bool saveGlobalDescription(const string& folderPath) const;
+	void loadGlobalDescription(const string& folderPath);
 
 	// ─── GUI rendering (implemented in ofxOceanodeNodeMacroGui.cpp) ──────
 	void renderPresetControlGui();
@@ -245,6 +248,7 @@ private:
 	ofParameter<bool> resetPhaseOnActive;
 //	ofParameter<bool> clearContainerOnLoad;
 	ofParameter<string> localName;
+	ofParameter<string> macroDescription;
 	
 	ofParameter<std::function<void()>> presetControl;
 	ofParameter<std::function<void()>> presetNaming;

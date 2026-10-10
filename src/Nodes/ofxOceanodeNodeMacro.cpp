@@ -16,7 +16,7 @@
 
 ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
 	color = ofColor(0,129,255);
-	description = "Encapsulation of a graph";
+	description = "";
 	showWindow = false;
 	lastActiveState = true;
 	isLoadingPreset = false;
@@ -108,6 +108,7 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 
 		// Set macro layout path for the newly selected global path
 		loadMacroLayout(targetPath);
+		loadGlobalDescription(targetPath);
 		isLoadingPreset = false;
 	}
 	if(active){
@@ -168,6 +169,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	//-------------------------------------
 	addInspectorSeparator("Macro Info",ofColor(250,250,250,255));
 	addInspectorParameter(localName.set("Local Name", "Local"));
+	addInspectorParameter(macroDescription.set("Description", ""));
 	// Inspector parameters : "Color"
 	//-------------------------------------
 	addInspectorParameter(colorParam.set("Color", color));
@@ -309,6 +311,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 		
 		// Set macro layout path
 		loadMacroLayout(additionalInfo);
+		loadGlobalDescription(additionalInfo);
 		
 		// Load snapshots if they exist
 		snapshotSystem.loadFromPath(additionalInfo);
@@ -341,6 +344,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 			
 			// Set macro layout path for reload
 			loadMacroLayout(presetManager.getCurrentMacroPath());
+			loadGlobalDescription(presetManager.getCurrentMacroPath());
 		}
 	});
 	
@@ -736,11 +740,29 @@ bool ofxOceanodeNodeMacro::saveGlobalDefinition(bool notifyOtherInstances){
 		sortJson["RouterSortOrder"] = entries;
 	}
 	const bool savedOrder = ofSavePrettyJson(path + "/router_sort_order.json", sortJson);
-	if(!savedOrder || !ofFile::doesFileExist(path + "/modules.json")) return false;
+	const bool savedDescription = saveGlobalDescription(path);
+	if(!savedOrder || !savedDescription || !ofFile::doesFileExist(path + "/modules.json")) return false;
 	clearSavedUserEdits(*container);
 	routerOrderUserEdited = false;
 	if(notifyOtherInstances) ofxOceanodeShared::macroUpdated(path);
 	return true;
+}
+
+bool ofxOceanodeNodeMacro::saveGlobalDescription(const string& folderPath) const{
+	ofJson json;
+	json["Description"] = macroDescription.get();
+	return ofSavePrettyJson(folderPath + "/description.json", json);
+}
+
+void ofxOceanodeNodeMacro::loadGlobalDescription(const string& folderPath){
+	const string filename = folderPath + "/description.json";
+	if(!folderPath.empty() && ofFile::doesFileExist(filename)){
+		const ofJson json = ofLoadJson(filename);
+		macroDescription = json.is_object() && json.contains("Description") && json["Description"].is_string()
+			? json["Description"].get<string>() : "";
+	}else{
+		macroDescription = "";
+	}
 }
 
 void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
@@ -965,6 +987,7 @@ void ofxOceanodeNodeMacro::presetRecallBeforeSettingParameters(ofJson &json){
 }
 
 void ofxOceanodeNodeMacro::presetRecallAfterSettingParameters(ofJson &json){
+	if(!presetManager.isLocal()) loadGlobalDescription(presetManager.getCurrentMacroPath());
 }
 
 void ofxOceanodeNodeMacro::presetWillBeLoaded(){
