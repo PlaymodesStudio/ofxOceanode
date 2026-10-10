@@ -144,6 +144,7 @@ public:
        }
     
     void setup(std::shared_ptr<ofxOceanodeContainer> c, std::shared_ptr<ofxOceanodeTimeController> contr);
+    void shutdown(const std::shared_ptr<ofxOceanodeContainer>& owner);
     
     void togglePlay(){
         isPlaying = !isPlaying;

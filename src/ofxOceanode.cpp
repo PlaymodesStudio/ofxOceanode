@@ -134,6 +134,12 @@ ofxOceanode::ofxOceanode(){
     registerType<buffer<ofFloatColor>*>("buffer_color_f");
 }
 
+ofxOceanode::~ofxOceanode(){
+    // Hosts that do not call exit() must still release the time singleton's
+    // graph references before static logger destruction.
+    oceanodeTime->shutdown(container);
+}
+
 
 void ofxOceanode::setup(){
     ofSetEscapeQuitsApp(false);
@@ -480,6 +486,7 @@ void ofxOceanode::exit(){
             ImGui::SaveIniSettingsToDisk(iniPath.c_str());
         }
     }
+    oceanodeTime->shutdown(container);
     container->clearContainer();
 }
 

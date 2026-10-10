@@ -30,7 +30,7 @@
 class ofxOceanode {
 public:
     ofxOceanode();
-    ~ofxOceanode(){};
+    ~ofxOceanode();
     
     void setup();
     

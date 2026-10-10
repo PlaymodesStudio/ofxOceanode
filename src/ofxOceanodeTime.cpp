@@ -14,7 +14,7 @@
 #include <algorithm>
 
 ofxOceanodeTime::ofxOceanodeTime(){
-    // Shared must outlive the container released by this singleton's destructor.
+    // Shared must outlive any container still held by this singleton.
     ofxOceanodeShared::initialize();
 }
 
@@ -133,6 +133,26 @@ void ofxOceanodeTime::setup(std::shared_ptr<ofxOceanodeContainer> c, std::shared
     settings.numInputChannels = 0;
     settings.bufferSize = 256;
     soundStream.setup(settings);
+}
+
+void ofxOceanodeTime::shutdown(const std::shared_ptr<ofxOceanodeContainer>& owner){
+    if(container == nullptr || container != owner) return;
+
+    // The audio callback can still access phasors from the graph. Stop it
+    // before the nodes are cleared, then release every singleton-owned graph
+    // reference while openFrameworks logging is still available.
+    soundStream.close();
+    newNodeListener.unsubscribe();
+    newNodeInMacroListener.unsubscribeAll();
+    listeners.unsubscribeAll();
+    phasorsInThread2.clear();
+    vector<shared_ptr<basePhasor>> queuedPhasors;
+    while(phasorChannel2.tryReceive(queuedPhasors)) queuedPhasors.clear();
+    checkNodeModel = nullptr;
+    controller->setTimeGroup(nullptr);
+    controller.reset();
+    transport.reset();
+    container.reset();
 }
 
 void ofxOceanodeTime::update(){
