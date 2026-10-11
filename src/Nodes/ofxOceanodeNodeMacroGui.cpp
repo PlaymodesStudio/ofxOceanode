@@ -12,6 +12,7 @@
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeColors.h"
+#include <cstdio>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // renderMinimizedView — extracted from the minimizedViewCallback lambda
@@ -441,12 +442,13 @@ void ofxOceanodeNodeMacro::renderInspectorInterface() {
 		ImGui::EndPopup();
 	}
 
+	bool snapshotsChanged = false;
 	for(auto it = snapshotSystem.getSnapshots().begin(); it != snapshotSystem.getSnapshots().end();) {
 		ImGui::PushID(it->first);
 		
 		bool shouldDelete = false;
 		char nameBuf[256];
-		strcpy(nameBuf, it->second.name.c_str());
+		std::snprintf(nameBuf, sizeof(nameBuf), "%s", it->second.name.c_str());
 		
 		// Slot number
 		ImGui::Text("Slot %d", it->first);
@@ -455,7 +457,7 @@ void ofxOceanodeNodeMacro::renderInspectorInterface() {
 		ImGui::SetNextItemWidth(150);
 		if(ImGui::InputText("##name", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue)) {
 			it->second.name = nameBuf;
-			snapshotSystem.save(presetManager.isLocal(), presetManager.getCurrentMacroPath(), presetManager.getPresetPath(), nodeName(), getNumIdentifier());
+			snapshotsChanged = true;
 		}
 		
 		// Load button
@@ -495,10 +497,15 @@ void ofxOceanodeNodeMacro::renderInspectorInterface() {
 				snapshotSystem.setCurrentSlot(-1);
 			}
 			it = snapshotSystem.getSnapshots().erase(it);
-			snapshotSystem.save(presetManager.isLocal(), presetManager.getCurrentMacroPath(), presetManager.getPresetPath(), nodeName(), getNumIdentifier());
+			snapshotsChanged = true;
 		} else {
 			++it;
 		}
+	}
+	// A global save synchronously broadcasts an update that reloads this map.
+	// Wait until the iterator is no longer in use before saving.
+	if(snapshotsChanged) {
+		snapshotSystem.save(presetManager.isLocal(), presetManager.getCurrentMacroPath(), presetManager.getPresetPath(), nodeName(), getNumIdentifier());
 	}
 }
 
