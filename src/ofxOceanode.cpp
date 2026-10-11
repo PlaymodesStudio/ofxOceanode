@@ -11,6 +11,7 @@
 #include "ofxOceanodeTimeController.h"
 #include "imgui_internal.h"
 #include "ofxOceanodeFloatingWindowDecor.h"
+#include "ofxOceanodeProportionalDocking.h"
 #include "defaultNodes.h"
 #include <algorithm>
 #include <climits>
@@ -21,6 +22,7 @@
 #include FT_TRUETYPE_TABLES_H
 
 ofxOceanode::ofxOceanode(){
+    proportionalDocking = std::make_unique<ofxOceanodeProportionalDocking>();
     nodeRegistry = make_shared<ofxOceanodeNodeRegistry>();
     typesRegistry = ofxOceanodeTypesRegistry::getInstance();
     scope = ofxOceanodeScope::getInstance();
@@ -353,6 +355,7 @@ void ofxOceanode::draw(){
 }
 
 void ofxOceanode::loadGUILayoutFromDisk(const std::string& path){
+    proportionalDocking->reset();
     loadedGUILayoutLeftDockId = 0;
 
     ofBuffer layoutBuffer = ofBufferFromFile(path);
@@ -544,7 +547,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
     {
         ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
-        ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+        proportionalDocking->dockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
         ofxOceanodeShared::setDockspaceID(dockspace_id);
         if(!ImGui::DockBuilderGetNode(dockspace_id)->IsSplitNode()){ //We dont have a split node;
             ImGuiID centralNode_id;

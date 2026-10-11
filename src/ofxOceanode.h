@@ -28,6 +28,8 @@
 #include "bufferHeader.h"
 #include "bufferHeaderPro.h"
 
+class ofxOceanodeProportionalDocking;
+
 class ofxOceanode {
 public:
     ofxOceanode();
@@ -148,6 +150,7 @@ private:
 //    vector<ofxOceanodeAbstractTimeline> timelines;
     
     ofxImGui::Gui gui;
+    std::unique_ptr<ofxOceanodeProportionalDocking> proportionalDocking;
     void showManualWindow(bool *b);
     void showHelpPopUp();
     bool showMode;
