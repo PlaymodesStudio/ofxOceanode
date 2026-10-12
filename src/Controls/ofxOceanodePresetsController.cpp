@@ -92,25 +92,43 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
     if(!dir.exists()){
         dir.createDirectory("Presets");
     }
-    for(auto bank = dir.begin() ; bank < dir.end(); bank++){
-        if(bank->isDirectory()){
-            ofDirectory bankFolder;
-            string bankName = bank->getFileName();
-            banks.push_back(bankName);
-            bankFolder.open("Presets/" + bankName);
-            bankFolder.sort();
-            bankPresets[bankName].resize(bankFolder.size());
-
-            
-            for(auto preset = bankFolder.begin(); preset < bankFolder.end(); preset++){
-                string presetName = preset->getFileName();
-                bankPresets[bankName][ofToInt(ofSplitString(presetName, "--")[0])-1]=ofSplitString(presetName, "--")[1];
-            }
-            currentPreset[bankName] = "";
-        }
-        
+    // A folder the app is not allowed to list (macOS privacy permissions, a cloud-sync
+    // provider) throws from std::filesystem: log it and carry on instead of terminating.
+    size_t numEntries = 0;
+    try{
+        numEntries = dir.listDir();
+    }catch(const std::exception& e){
+        ofLogError("ofxOceanodePresetsController") << "Cannot list Presets: " << e.what();
     }
-    if(dir.listDir() == 0){
+    for(size_t b = 0; b < numEntries; b++){
+        try{
+            if(dir.getFile(b).isDirectory()){
+                ofDirectory bankFolder;
+                string bankName = dir.getName(b);
+                bankFolder.open("Presets/" + bankName);
+                bankFolder.listDir();
+                bankFolder.sort();
+                vector<string> presets(bankFolder.size());
+
+                for(size_t p = 0; p < bankFolder.size(); p++){
+                    vector<string> parts = ofSplitString(bankFolder.getName(p), "--");
+                    int index = parts.size() > 1 ? ofToInt(parts[0]) - 1 : -1;
+                    if(index < 0){
+                        ofLogWarning("ofxOceanodePresetsController") << "Skipping " << bankName << "/" << bankFolder.getName(p) << ": not named <number>--<name>";
+                        continue;
+                    }
+                    if(index >= static_cast<int>(presets.size())) presets.resize(index + 1);
+                    presets[index] = parts[1];
+                }
+                banks.push_back(bankName);
+                bankPresets[bankName] = presets;
+                currentPreset[bankName] = "";
+            }
+        }catch(const std::exception& e){
+            ofLogError("ofxOceanodePresetsController") << "Cannot read bank " << dir.getName(b) << ": " << e.what();
+        }
+    }
+    if(numEntries == 0){
         banks.push_back("Initial_Bank");
     }
     sort(banks.begin(), banks.end());
