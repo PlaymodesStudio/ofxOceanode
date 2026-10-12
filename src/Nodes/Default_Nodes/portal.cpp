@@ -34,9 +34,14 @@ abstractPortal::abstractPortal(string typelabel) : ofxOceanodeNodeModel("Portal 
     });
     
     localListener = local.newListener([this](bool &b){
+        ofxOceanodeShared::portalListChanged();
         ofxOceanodeShared::requestPortalUpdate(this);
         resendValue();
     });
+}
+
+void abstractPortal::notifyWillBeDestroyed(){
+    ofxOceanodeShared::portalWillBeRemoved(this);
 }
 
 abstractPortal::~abstractPortal(){

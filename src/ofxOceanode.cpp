@@ -36,18 +36,19 @@ ofxOceanode::ofxOceanode(){
 #endif
     
     //Register default types
-    typesRegistry->registerType<float>("f");
-    typesRegistry->registerType<int>("i");
-    typesRegistry->registerType<bool>("b");
+    registerBuiltInType<float>("f", 0.0f);
+    registerBuiltInType<int>("i", 0);
+    registerBuiltInType<bool>("b", false);
     typesRegistry->registerType<void>("v");
-    typesRegistry->registerType<string>("s");
-    typesRegistry->registerType<char>("c");
-    typesRegistry->registerType<vector<float>>("v_f");
-    typesRegistry->registerType<vector<int>>("v_i");
-    typesRegistry->registerType<vector<string>>("v_s");
-    typesRegistry->registerType<ofColor>("color");
-    typesRegistry->registerType<ofFloatColor>("color_f");
-    typesRegistry->registerType<Timestamp>("timestamp");
+    nodeRegistry->registerModel<portalSelector<void>>("Portal", "v");
+    registerBuiltInType<string>("s", "");
+    registerBuiltInType<char>("c", ' ');
+    registerBuiltInType<vector<float>>("v_f", vector<float>(1, 0.0f));
+    registerBuiltInType<vector<int>>("v_i", vector<int>(1, 0));
+    registerBuiltInType<vector<string>>("v_s", vector<string>(1, ""));
+    registerBuiltInType<ofColor>("color", ofColor::black);
+    registerBuiltInType<ofFloatColor>("color_f", ofFloatColor::black);
+    registerBuiltInType<Timestamp>("timestamp", Timestamp());
     
     //Register default nodes
     nodeRegistry->registerModel<oscillator>("Generators");
@@ -73,6 +74,8 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<noise>("Generators");
     nodeRegistry->registerModel<randomGenerator>("Generators");
     nodeRegistry->registerModel<customGuiSnapshots>("Custom GUI");
+    nodeRegistry->registerModel<beatTransport>("Timeline");
+    nodeRegistry->registerModel<presetLoadTrigger>("General");
 
     //Register default Routers
     nodeRegistry->registerModel<router<vector<float>>>("Router", "v_f", 0, 0, 1);

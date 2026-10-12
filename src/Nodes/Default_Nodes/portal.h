@@ -15,6 +15,10 @@ class abstractPortal : public ofxOceanodeNodeModel{
 public:
 	abstractPortal(string typelabel);
 	~abstractPortal();
+
+protected:
+	void notifyWillBeDestroyed();
+public:
 	
 	std::type_index type() const {
 		return std::type_index(typeid(*this));
@@ -63,6 +67,8 @@ protected:
 template<typename T>
 class portal : public abstractPortal{
 public:
+	~portal() override { notifyWillBeDestroyed(); }
+
 	portal(string typelabel, T val, bool minmax = false) : abstractPortal(typelabel){
 		if(minmax){
 			addParameter(value.set("Value", val, std::numeric_limits<T>::lowest(), std::numeric_limits<T>::max()), ofxOceanodeParameterFlags_DisplayMinimized);
@@ -80,6 +86,8 @@ public:
 	T getValue(){
 		return value;
 	}
+
+	ofParameter<T>& getValueParameter(){ return value; }
 	
 	void setValue(T t){
 		value = t;
@@ -113,6 +121,8 @@ private:
 template<typename T>
 class portal<std::vector<T>> : public abstractPortal{
 public:
+	~portal() override { notifyWillBeDestroyed(); }
+
 	portal(string typelabel, T val, bool minmax = false) : abstractPortal(typelabel){
 		if(minmax){
 			addParameter(value.set("Value", std::vector<T>(1, val), std::vector<T>(1, std::numeric_limits<T>::lowest()), std::vector<T>(1, std::numeric_limits<T>::max())), ofxOceanodeParameterFlags_DisplayMinimized);
@@ -134,6 +144,8 @@ public:
 	std::vector<T> getValue(){
 		return value;
 	}
+
+	ofParameter<std::vector<T>>& getValueParameter(){ return value; }
 	
 	void setValue(std::vector<T> t){
 		value = t;
@@ -164,6 +176,8 @@ private:
 template<>
 class portal<void> : public abstractPortal{
 public:
+	~portal() override { notifyWillBeDestroyed(); }
+
 	portal(string typelabel) : abstractPortal(typelabel){
 		addParameter(value.set("Value"), ofxOceanodeParameterFlags_DisplayMinimized);
 	}
@@ -177,6 +191,8 @@ public:
 	void trigger() {
 		value.trigger();
 	}
+
+	ofParameter<void>& getValueParameter(){ return value; }
 
 	void resendValue() override {
 		if(!getOceanodeParameter(value).hasOutConnections()) {

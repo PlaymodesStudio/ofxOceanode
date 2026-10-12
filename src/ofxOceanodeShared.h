@@ -12,6 +12,7 @@
 #include "imgui.h"
 #include <unordered_map>
 #include <map>
+#include <cstdint>
 
 struct ImFont;
 class ofxOceanodeNode;
@@ -138,6 +139,16 @@ public:
 	
 	static void addPortal(abstractPortal* _portal){
 		getInstance().portalsMap[_portal->getName()].push_back(_portal);
+		portalListChanged();
+	}
+
+	static void portalListChanged(){ ++getInstance().portalListRevision; }
+	static std::uint64_t getPortalListRevision(){ return getInstance().portalListRevision; }
+	static ofEvent<abstractPortal*>& getPortalWillBeRemovedEvent(){
+		return getInstance().portalWillBeRemovedEvent;
+	}
+	static void portalWillBeRemoved(abstractPortal* portal){
+		getInstance().portalWillBeRemovedEvent.notify(portal);
 	}
 	
 	static void removePortal(abstractPortal* _portal){
@@ -150,6 +161,7 @@ public:
 				map.erase(it);
 			}
 		}
+		portalListChanged();
 	}
 	
 	static void updatePortalName(abstractPortal* _portal, const std::string& oldName, const std::string& newName){
@@ -165,6 +177,7 @@ public:
 		}
 		// Insert into new bucket
 		map[newName].push_back(_portal);
+		portalListChanged();
 	}
 
     static std::vector<abstractPortal*> getMatchingPortalInstances(abstractPortal* portal){
@@ -498,6 +511,8 @@ private:
 	string currentBankName = "";
 
 	std::unordered_map<std::string, std::vector<abstractPortal*>> portalsMap;
+	std::uint64_t portalListRevision = 0;
+	ofEvent<abstractPortal*> portalWillBeRemovedEvent;
     
     ofxOceanodeConfigurationFlags configurationFlags;
 	

@@ -24,6 +24,7 @@
 #include "imgui.h"
 #include "router.h"
 #include "portal.h"
+#include "Nodes/Default_Nodes/portalSelector.h"
 #include "bufferNode.h"
 #include "bufferHeader.h"
 #include "bufferHeaderPro.h"
@@ -54,10 +55,17 @@ public:
     };
     
     template<typename T>
+    void registerBuiltInType(string name, T defaultValue){
+        typesRegistry->registerType<T>(name);
+        nodeRegistry->registerModel<portalSelector<T>>("Portal", name, defaultValue);
+    };
+
+    template<typename T>
     void registerType(string name = typeid(T).name(), T defaultValue = T()){
         typesRegistry->registerType<T>(name);
         nodeRegistry->registerModel<router<T>>("Router", name, defaultValue);
 		nodeRegistry->registerModel<portal<T>>("Portal", name, defaultValue);
+		nodeRegistry->registerModel<portalSelector<T>>("Portal", name, defaultValue);
     };
     
     template<typename T1, typename T2 = T1>
@@ -68,10 +76,12 @@ public:
         typesRegistry->registerType<T1>(name);
         nodeRegistry->registerModel<router<T1>>("Router", name, defaultValue);
         nodeRegistry->registerModel<portal<T1>>("Portal", name, defaultValue);
+        nodeRegistry->registerModel<portalSelector<T1>>("Portal", name, defaultValue);
         nodeRegistry->registerModel<bufferNode<T1, T2>>("Buffer", name, defaultValue, false, bufferAssignFunction, bufferReturnFunction, bufferCheckFunction);
         typesRegistry->registerType<buffer<T1, T2>*>("buffer_" + name);
         nodeRegistry->registerModel<router<buffer<T1, T2>*>>("Router", "buffer_" + name, nullptr);
         nodeRegistry->registerModel<portal<buffer<T1, T2>*>>("Portal", "buffer_" + name, nullptr);
+        nodeRegistry->registerModel<portalSelector<buffer<T1, T2>*>>("Portal", "buffer_" + name, nullptr);
         nodeRegistry->registerModel<bufferHeader<T1, T2>>("Header", name, defaultValue);
         nodeRegistry->registerModel<bufferHeaderPro<T1, T2>>("HeaderPro", name, defaultValue);
         registerType<std::vector<T1>>("v_" + name, std::vector<T1>(1, defaultValue));
