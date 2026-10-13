@@ -168,7 +168,9 @@ void ofxOceanodeInspectorController::draw(){
             string uniqueId = absParam.getName();
             ImGui::PushID(uniqueId.c_str());
 
-            if(absParam.valueType() == typeid(std::function<void()>).name()){
+            if(node->getNodeModel().drawInspectorParameter(absParam)){
+                // The model supplied the row presentation (possibly hidden).
+            }else if(absParam.valueType() == typeid(std::function<void()>).name()){
                 // Check if this is a separator by looking at the parameter name
                 if(uniqueId.find("SEPARATOR:|") == 0){
                     // Parse separator data: "SEPARATOR:|label|r,g,b,a"

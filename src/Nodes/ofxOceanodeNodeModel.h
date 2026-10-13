@@ -42,6 +42,10 @@ public:
 	virtual void setup(string additionalInfo){};
     virtual void update(ofEventArgs &e){};
     virtual void draw(ofEventArgs &e){};
+
+    // Return true when a model renders an Inspector row itself, or hides it.
+    // Registered parameters still keep their normal preset/undo behavior.
+    virtual bool drawInspectorParameter(ofAbstractParameter &parameter){ return false; }
     
     //get parameterGroup
     ofParameterGroup &getParameterGroup(){return parameters;};

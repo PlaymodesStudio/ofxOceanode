@@ -48,6 +48,32 @@ public:
 		std::function<std::string(const std::string& code)> apply;
 	};
 
+	struct TextResult {
+		std::string text;
+		std::string error;
+	};
+
+	// Independent prose requests use the same credentials/model as this editor,
+	// and return data without invoking the code-replacement callback.
+	std::future<TextResult> generateText(const std::string &systemPrompt,
+	                                   const std::string &userPrompt, int maxTokens = 512) const {
+		if(apiKey.empty()) throw std::runtime_error("Configure the Requesty API key in the AI tab before generating a description.");
+		const auto *selected = selectedModel();
+		if(!selected) throw std::runtime_error("Choose an available model in the AI tab before generating a description.");
+		const auto key = apiKey;
+		const auto modelId = selected->id;
+		const int tokens = std::max(1, std::min(maxTokens, selected->maxOutputTokens));
+		return std::async(std::launch::async, [key, modelId, tokens, systemPrompt, userPrompt](){
+			TextResult result;
+			try{
+				const ofJson body = {{"model", modelId}, {"max_tokens", tokens}, {"system", systemPrompt},
+					{"messages", ofJson::array({{{"role", "user"}, {"content", userPrompt}}})}};
+				result.text = ofxOceanodeRequesty::parseText(ofxOceanodeRequesty::request(key, &body));
+			}catch(const std::exception &error){ result.error = error.what(); }
+			return result;
+		});
+	}
+
 	static constexpr const char* kDefaultModel = "zai/glm-5.3-flash";
 
 	void setup(const Spec& s) {
@@ -255,10 +281,7 @@ public:
 private:
 	static constexpr const char* kPopupName = "##oceanode_ai_popup";
 
-	struct Result {
-		std::string text;
-		std::string error;
-	};
+	using Result = TextResult;
 
 	Spec spec;
 
