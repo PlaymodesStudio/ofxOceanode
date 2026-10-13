@@ -53,6 +53,18 @@ public:
     void registerModel(string category, Args... args){
         nodeRegistry->registerModel<T, Args...>(category, args...);
     };
+
+    template<typename T, typename... Args>
+    bool refreshModel(string category, Args... args){
+        return nodeRegistry->refreshModel<T, Args...>(category, args...);
+    }
+
+    // Addons own their menu action and optional background-task/UI callbacks.
+    void registerConfigMenuItem(const std::string &label, std::function<void()> selected,
+                                std::function<void()> update = {}, std::function<void()> draw = {},
+                                std::function<bool()> enabled = {}){
+        configMenuItems[label] = {std::move(selected), std::move(update), std::move(draw), std::move(enabled)};
+    }
     
     template<typename T>
     void registerBuiltInType(string name, T defaultValue){
@@ -144,6 +156,11 @@ public:
 	void loadTheme(const std::string& name);
 
 private:
+    struct ConfigMenuItem {
+        std::function<void()> selected, update, draw;
+        std::function<bool()> enabled;
+    };
+    std::map<std::string, ConfigMenuItem> configMenuItems;
     ofxOceanodeCanvas canvas;
     shared_ptr<ofxOceanodeContainer> container;
     unique_ptr<ofxOceanodeControls> controls;

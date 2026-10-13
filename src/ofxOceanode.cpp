@@ -280,6 +280,8 @@ void ofxOceanode::setup(){
 }
 
 void ofxOceanode::update(){
+    for(auto &item : configMenuItems)
+        if(item.second.update) item.second.update();
 #ifdef OFXOCEANODE_USE_OSC
     receiveOsc();
 #endif
@@ -352,6 +354,9 @@ void ofxOceanode::draw(){
     if(showThemeEditor){
         drawThemeEditorWindow();
     }
+
+    for(auto &item : configMenuItems)
+        if(item.second.draw) item.second.draw();
 
     gui.end();
     gui.draw();
@@ -744,6 +749,12 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 
 		if(beginTopLevelMenu("Config"))
 		{
+            for(auto &item : configMenuItems){
+                const bool enabled = !item.second.enabled || item.second.enabled();
+                if(ImGui::MenuItem(item.first.c_str(), nullptr, false, enabled) && item.second.selected)
+                    item.second.selected();
+            }
+            if(!configMenuItems.empty()) ImGui::Separator();
 			// Show actual running FPS (read-only) with color feedback
 			int currentFPS = (int)ofGetFrameRate();
 			
