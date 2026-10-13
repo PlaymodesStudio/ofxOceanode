@@ -9,6 +9,7 @@
 #include "ofxOceanodeContainer.h"
 #include <numeric>
 #include "imgui.h"
+#include "imgui_internal.h"
 
 //DatGui
 
@@ -53,6 +54,8 @@ ofxOceanodeTimeController::ofxOceanodeTimeController(shared_ptr<ofxOceanodeConta
 }
 
 void ofxOceanodeTimeController::draw(){
+    // Follow the transport (preset loads, canvas/timeline edits) unless being edited here.
+    if(ImGui::GetActiveID() != ImGui::GetID("BPM")) bpm = container->getTransportState().bpm;
     ImGui::DragFloat("BPM", &bpm, 0.005);
     //TODO: Implement better this hack
     // Maybe discard and reset value when not presed enter??

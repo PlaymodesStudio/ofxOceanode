@@ -537,6 +537,14 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     
     loadPreset_presetWillBeLoaded();
 
+    // Tempo first: new nodes pick it up, and the timeline loaded below was
+    // saved against it (so it must not be retimed).
+    if(transportOwner){
+        const ofJson transportJson = ofLoadJson(presetFolderPath + "/transport.json");
+        if(transportJson.is_object() && transportJson.value("bpm", 0.0f) > 0.0f)
+            setBpm(transportJson.value("bpm", 120.0f), false);
+    }
+
     loadPreset_loadNodes(presetFolderPath);
     
     loadPreset_loadBeforeConnections(presetFolderPath);
@@ -1598,6 +1606,11 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 	saveCustomGuis(presetFolderPath);
 	saveCustomGuiSnapshots(presetFolderPath);
 	if(timelineManager != nullptr) timelineManager->savePreset(presetFolderPath);
+    if(transportOwner){
+        ofJson transportJson;
+        transportJson["bpm"] = bpm;
+        ofSavePrettyJson(presetFolderPath + "/transport.json", transportJson);
+    }
 #ifdef OFXOCEANODE_USE_MIDI
     if(midiClockSync) {
         // Built-in transport sync (MIDI clock) settings, per project.
@@ -1966,7 +1979,7 @@ void ofxOceanodeContainer::saveCurrentPreset(){
     saveCurrentPresetEvent.notify();
 }
 
-void ofxOceanodeContainer::setBpm(float _bpm){
+void ofxOceanodeContainer::setBpm(float _bpm, bool retimeTimeline){
     // In Time timebase, a manual/internal tempo edit changes the beat scale
     // instead of moving material in seconds. Tempo automation is excluded:
     // it deliberately describes a tempo map and calls this method every frame.
@@ -1975,7 +1988,7 @@ void ofxOceanodeContainer::setBpm(float _bpm){
     if(transport != nullptr){
         transport->syncRealTime();
         stateBefore = transport->getState();
-        preserveTimelineTime = timelineManager != nullptr &&
+        preserveTimelineTime = retimeTimeline && timelineManager != nullptr &&
             !transport->hasExternalClock() &&
             !timelineManager->isBpmAutomationEnabled() &&
             timelineManager->getTimebase() == ofxOceanodeTimelineTimebase::Time &&

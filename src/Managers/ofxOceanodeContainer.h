@@ -163,7 +163,9 @@ public:
     void saveCustomGuiSnapshots();
     void markCustomGuiSnapshotsDirty();
     
-    void setBpm(float _bpm);
+    // retimeTimeline=false sets the tempo as-is (preset load: the saved
+    // timeline already matches the saved tempo).
+    void setBpm(float _bpm, bool retimeTimeline = true);
     void resetPhase(bool notifyTransport = true);
     std::shared_ptr<ofxOceanodeTransport> getTransport() const { return transport; }
     // The root container creates the shared transport (and the timeline).

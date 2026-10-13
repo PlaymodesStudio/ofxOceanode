@@ -836,6 +836,72 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		ImGui::PopStyleColor();
 		ImGui::PopStyleVar();
 
+		// TRANSPORT: BPM, beat position, play/pause, stop (the shared global transport)
+		if(auto transport = container->getTransport()) {
+			const auto transportState = transport->getState();
+			const bool externalClock = transport->hasExternalClock();
+			const bool bpmLocked = externalClock || container->getTimelineManager().isBpmAutomationEnabled();
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2,0));
+
+			ImGui::SameLine();
+			float canvasBpm = transportState.bpm;
+			ImGui::SetNextItemWidth(72);
+			ImGui::BeginDisabled(bpmLocked);
+			if(ImGui::DragFloat("##canvasBpm", &canvasBpm, 0.1f, 1.0f, 999.0f, "%.1f BPM") && !bpmLocked)
+				container->setBpm(canvasBpm);
+			ImGui::EndDisabled();
+			if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+				ImGui::SetTooltip(externalClock ? "Tempo from the external clock" :
+				                  bpmLocked ? "Tempo from the tempo lane" : "Tempo (drag, or double-click to type)");
+
+			ImGui::SameLine();
+			double canvasBeat = transportState.beatPosition;
+			const double beatMin = 0.0;
+			ImGui::SetNextItemWidth(72);
+			ImGui::BeginDisabled(externalClock);
+			if(ImGui::DragScalar("##canvasBeat", ImGuiDataType_Double, &canvasBeat, 0.05f, &beatMin, nullptr, "%.2f") && !externalClock)
+				transport->seekToBeat(std::max(0.0, canvasBeat));
+			ImGui::EndDisabled();
+			if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+				ImGui::SetTooltip(externalClock ? "Following an external clock" : "Transport position in beats (drag, or double-click to type)");
+
+			// Square icon buttons drawn like the timeline toolbar's.
+			const float iconSize = ImGui::GetFrameHeight();
+			auto transportButton = [&](const char* id, int icon, bool on, const char* tooltip) {
+				ImGui::SameLine(0.0f, 2.0f);
+				const ImVec2 pos = ImGui::GetCursorScreenPos();
+				const ImVec2 size(iconSize + 2.0f, iconSize);
+				const bool pressed = ImGui::InvisibleButton(id, size) && !externalClock;
+				const bool hovered = ImGui::IsItemHovered() && !externalClock;
+				const bool held = ImGui::IsItemActive() && !externalClock;
+				auto* dl = ImGui::GetWindowDrawList();
+				const ImU32 accent = IM_COL32(90, 205, 125, 255);
+				const ImU32 bg = on ? accent : ImGui::GetColorU32(held ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+				dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), bg, 3.0f);
+				const ImU32 col = externalClock ? IM_COL32(120, 120, 120, 160) : on ? IM_COL32(15, 18, 24, 255) : IM_COL32(225, 228, 235, 255);
+				const ImVec2 c(pos.x + size.x * 0.5f, pos.y + size.y * 0.5f);
+				const float s = size.y * 0.52f;
+				if(icon == 0) { // play
+					dl->AddTriangleFilled(ImVec2(c.x - s * 0.35f, c.y - s * 0.45f), ImVec2(c.x - s * 0.35f, c.y + s * 0.45f),
+					                      ImVec2(c.x + s * 0.45f, c.y), col);
+				} else if(icon == 1) { // pause
+					dl->AddRectFilled(ImVec2(c.x - s * 0.38f, c.y - s * 0.42f), ImVec2(c.x - s * 0.1f, c.y + s * 0.42f), col, 1.0f);
+					dl->AddRectFilled(ImVec2(c.x + s * 0.1f, c.y - s * 0.42f), ImVec2(c.x + s * 0.38f, c.y + s * 0.42f), col, 1.0f);
+				} else { // stop
+					dl->AddRectFilled(ImVec2(c.x - s * 0.36f, c.y - s * 0.36f), ImVec2(c.x + s * 0.36f, c.y + s * 0.36f), col, 1.5f);
+				}
+				if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", externalClock ? "Following an external clock" : tooltip);
+				return pressed;
+			};
+			if(transportButton("##canvasPlay", transportState.isPlaying ? 1 : 0, transportState.isPlaying,
+			                   transportState.isPlaying ? "Pause" : "Play"))
+				transport->setIsPlaying(!transportState.isPlaying);
+			if(transportButton("##canvasStop", 2, false, "Stop (back to the start)"))
+				transport->stop();
+
+			ImGui::PopStyleVar();
+		}
+
 
 		// COMMENTS
 		
