@@ -312,7 +312,12 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                 else if(absParam.valueType() == typeid(vector<float>).name())
                 {
                     auto tempCast = absParam.cast<vector<float>>().getParameter();
-                    if(tempCast->size() == 1)
+                    if(tempCast->empty()){
+                        // Empty outputs are valid (for example, before loading an SVG).
+                        // Keep the widget/pin row without dereferencing values or bounds.
+                        ImGui::PlotHistogram(hiddenUniqueId.c_str(), static_cast<const float*>(nullptr), 0, 0, "Empty", 0.0f, 1.0f);
+                    }
+                    else if(tempCast->size() == 1)
                     {
                         if(absParam.cast<vector<float>>().getDropdownOptions().size() == 0)
                         {
@@ -426,7 +431,10 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                 else if(absParam.valueType() == typeid(vector<int>).name())
                 {
                     auto tempCast = absParam.cast<vector<int>>().getParameter();
-                    if(tempCast->size() == 1)
+                    if(tempCast->empty()){
+                        ImGui::PlotHistogram(hiddenUniqueId.c_str(), static_cast<const float*>(nullptr), 0, 0, "Empty", 0.0f, 1.0f);
+                    }
+                    else if(tempCast->size() == 1)
                     {
                         if(absParam.cast<vector<int>>().getDropdownOptions().size() == 0)
                         {
