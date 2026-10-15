@@ -16,3 +16,11 @@ void ofxOceanodeAbstractParameter::removeAllConnections(){
     
     if(hasScope) ofxOceanodeScope::getInstance()->removeParameter(this);
 };
+
+void ofxOceanodeAbstractParameter::forwardToOutConnections(){
+    setForwardTargets([this](){
+        std::vector<ofxOceanodeAbstractParameter*> sinks;
+        for(auto* connection : outConnections) sinks.push_back(&connection->getSinkParameter());
+        return sinks;
+    });
+}

@@ -209,6 +209,12 @@ public:
 		}
 	}
 	   
+	static std::vector<abstractPortal*> getPortalsNamed(const std::string& name){
+		auto& map = getInstance().portalsMap;
+		auto it = map.find(name);
+		return it != map.end() ? it->second : std::vector<abstractPortal*>();
+	}
+
 	static void requestPortalUpdate(abstractPortal* _portal){
 	 auto& map = getInstance().portalsMap;
 	 auto it = map.find(_portal->getName());

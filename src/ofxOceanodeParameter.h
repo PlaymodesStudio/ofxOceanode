@@ -141,8 +141,22 @@ public:
             it->second->execute(p);
             return true;
         }
+        // A type this parameter cannot take goes on to what it feeds; the
+        // connection is only made if one of those takes it.
+        if(forwardTargets){
+            bool accepted = false;
+            for(auto* target : forwardTargets()) accepted |= target->receiveParameter(p);
+            if(accepted) forwardedSource = p;
+            return accepted;
+        }
         return false;
     }
+    
+    // Routers and portals: pass on values of types they do not take themselves
+    // (an SC audio port into a number router) to the given parameters.
+    void setForwardTargets(std::function<std::vector<ofxOceanodeAbstractParameter*>()> targets){forwardTargets = targets;};
+    void forwardToOutConnections();
+    ofAbstractParameter* getForwardedSource(){return forwardedSource;};
     
     void addConnectFunc(std::function<void()> func){
         if(!connectFunction) connectFunction = func;
@@ -154,7 +168,12 @@ public:
         if(!disconnectFunction) disconnectFunction = func;
     }
     
-    void disconnectedParameter(){if(disconnectFunction) disconnectFunction();};
+    void disconnectedParameter(){
+        if(disconnectFunction) disconnectFunction();
+        if(forwardedSource == nullptr) return;
+        forwardedSource = nullptr;
+        if(forwardTargets) for(auto* target : forwardTargets()) target->disconnectedParameter();
+    };
     
     void setNodeModel(ofxOceanodeNodeModel* _nodeModel){nodeModel = _nodeModel;};
     ofxOceanodeNodeModel* getNodeModel(){return nodeModel;};
@@ -174,6 +193,8 @@ private:
     std::map<std::string, std::shared_ptr<BaseConnectionFunction>> connnectionFunctions;
     std::function<void()> connectFunction;
     std::function<void()> disconnectFunction;
+    std::function<std::vector<ofxOceanodeAbstractParameter*>()> forwardTargets;
+    ofAbstractParameter* forwardedSource = nullptr;
     
     ofxOceanodeNodeModel* nodeModel;
 };
