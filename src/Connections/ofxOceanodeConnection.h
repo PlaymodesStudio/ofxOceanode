@@ -20,9 +20,11 @@ public:
         active = _active;
         sourceParameter->addOutConnection(this);
         sinkParameter->setInConnection(this);
+        if(auto* forwarded = sourceParameter->getForwardedSource()) sinkParameter->receiveParameter(forwarded);
     };
 
     virtual ~ofxOceanodeAbstractConnection(){
+        if(restoreOnDestruction && sourceParameter->getForwardedSource()) sinkParameter->disconnectedParameter();
         sourceParameter->removeOutConnection(this);
         sinkParameter->removeInConnection(this);
     };

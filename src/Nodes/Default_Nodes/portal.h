@@ -25,6 +25,9 @@ public:
 	}
 	
 	void portalUpdated();
+	// Types the portal does not take (an SC audio port into a number portal)
+	// go to what the matching portals feed.
+	void forwardValueToMatchingPortals();
 	
 	string getName(){
 		return name;
@@ -81,6 +84,7 @@ public:
 		listener = value.newListener([this](T &t){
 			portalUpdated();
 		});
+		forwardValueToMatchingPortals();
 	}
 	
 	T getValue(){
@@ -139,6 +143,7 @@ public:
 		listener = value.newListener([this](std::vector<T> &t){
 			portalUpdated();
 		});
+		forwardValueToMatchingPortals();
 	}
 	
 	std::vector<T> getValue(){

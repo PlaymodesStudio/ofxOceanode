@@ -460,13 +460,22 @@ void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 		string paramName = newCreatedParam->getName();
 		while(getParameterGroup().contains(paramName)) paramName = "_" + paramName;
 		newCreatedParam->setName(paramName);
-		addParameter(*newCreatedParam.get());
+		auto pin = addParameter(*newCreatedParam.get());
+
+		// Types the router does not take (an SC audio port into a number
+		// router) go through it to what it feeds inside the macro.
+		auto* routerValue = dynamic_cast<ofxOceanodeAbstractParameter*>(&node->getParameters().get("Value"));
+		if(routerValue != nullptr){
+			routerValue->forwardToOutConnections();
+			pin->setForwardTargets([routerValue](){ return std::vector<ofxOceanodeAbstractParameter*>{routerValue}; });
+		}
 
 		ofParameter<string> nameParamFromRouter = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
 		nameParamFromRouter = paramName;
 
 		parameterGroupChanged.notify(this);
-		deleteListeners.push(node->deleteModule.newListener([this, nameParamFromRouter](){
+		deleteListeners.push(node->deleteModule.newListener([this, nameParamFromRouter, pin](){
+			pin->setForwardTargets(nullptr);
 			getParameterGroup().remove(nameParamFromRouter);
 		}, 0));
 	}

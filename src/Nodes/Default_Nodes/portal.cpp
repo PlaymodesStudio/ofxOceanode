@@ -7,6 +7,7 @@
 
 #include "portal.h"
 #include "ofxOceanodeShared.h"
+#include "ofxOceanodeConnection.h"
 
 
 
@@ -52,6 +53,21 @@ void abstractPortal::portalUpdated(){
     if(!settingViaMatch){
         ofxOceanodeShared::portalUpdated(this);
     }
+}
+
+void abstractPortal::forwardValueToMatchingPortals(){
+    auto* valueParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&getParameterGroup().get("Value"));
+    if(valueParam == nullptr) return;
+    valueParam->setForwardTargets([this](){
+        std::vector<ofxOceanodeAbstractParameter*> sinks;
+        for(auto* p : ofxOceanodeShared::getPortalsNamed(getName())){
+            if(!isMatching(p)) continue;
+            auto* matchingValue = dynamic_cast<ofxOceanodeAbstractParameter*>(&p->getParameterGroup().get("Value"));
+            if(matchingValue == nullptr) continue;
+            for(auto* connection : matchingValue->getOutConnections()) sinks.push_back(&connection->getSinkParameter());
+        }
+        return sinks;
+    });
 }
 
 void abstractPortal::activate(){
