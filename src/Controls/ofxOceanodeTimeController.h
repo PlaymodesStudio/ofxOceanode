@@ -19,7 +19,12 @@ public:
     ofxOceanodeTimeController(shared_ptr<ofxOceanodeContainer> _container);
     ~ofxOceanodeTimeController(){};
     
-    void draw();
+    void draw() override;
+    void drawPopups() override;   // every frame: the space shortcut
+    
+    // Space starts / stops the transport (Time panel checkbox, saved in config.json)
+    bool getSpaceTogglesPlay() const { return spaceTogglesPlay; }
+    void setSpaceTogglesPlay(bool b) { spaceTogglesPlay = b; }
     
     void setBPM(float _bpm);
     
@@ -53,6 +58,11 @@ private:
     
     ofParameterGroup* timeParameters;
     float scrub;
+
+    bool spaceTogglesPlay = false;   // off: space plays / pauses only in the focused timeline
+    bool spaceHeld = false;
+    bool spaceUsed = false;          // typing, dragging a control, panning the canvas
+    bool playingAtSpacePress = false;
 };
 
 

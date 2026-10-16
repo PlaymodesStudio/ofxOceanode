@@ -123,6 +123,9 @@ void ofxOceanodeTimeController::draw(){
         if(ImGui::Checkbox("Playing", (bool*)&p.get())){
             p = p;
         }
+        ImGui::SameLine();
+        ImGui::Checkbox("Space: Play / Pause", &spaceTogglesPlay);
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Space starts / stops the transport anywhere, not only in the focused timeline\n(not while typing, or holding space to pan the canvas)");
 		ImGui::SameLine();
         if(ImGui::Button("Play")){
             p = true;
@@ -144,6 +147,33 @@ void ofxOceanodeTimeController::draw(){
         if(ImGui::Button("Reset Counter")){
             timeParameters->getVoid("Reset Global Time").trigger();
         }
+    }
+}
+
+// Space toggles on release, so space + drag (canvas pan) never starts the
+// transport. Skipped while typing or dragging a control, when the mouse was
+// pressed during the hold, and when something else (the timeline, which
+// toggles on press while focused) already changed the play state.
+void ofxOceanodeTimeController::drawPopups(){
+    if(!spaceTogglesPlay || timeParameters == nullptr){
+        spaceHeld = false;
+        return;
+    }
+    ImGuiIO& io = ImGui::GetIO();
+    const bool mouseDown = ImGui::IsAnyMouseDown();
+    if(ImGui::IsKeyPressed(ImGuiKey_Space, false)){
+        spaceHeld = true;
+        spaceUsed = io.WantTextInput || ImGui::IsAnyItemActive() || mouseDown || io.KeyCtrl || io.KeySuper || io.KeyAlt;
+        playingAtSpacePress = container->getTransportState().isPlaying;
+        return;
+    }
+    if(!spaceHeld) return;
+    if(mouseDown || io.WantTextInput) spaceUsed = true;
+    if(ImGui::IsKeyReleased(ImGuiKey_Space)){
+        spaceHeld = false;
+        if(spaceUsed || container->getTransportState().isPlaying != playingAtSpacePress) return;
+        auto p = timeParameters->getBool("Is Playing");
+        p = !p.get();
     }
 }
 

@@ -1228,6 +1228,7 @@ void ofxOceanode::saveConfig(){
 	config["snapToGrid"] = canvas.getSnapToGrid();
 	config["autoInspectorShowHide"] = ofxOceanodeShared::getAutoInspectorShowHide();
 	config["guiLayoutChangesWithMacros"] = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
+	if(auto tc = controls->get<ofxOceanodeTimeController>()) config["spaceTogglesPlay"] = tc->getSpaceTogglesPlay();
 	
 	   // Create config directory if it doesn't exist
 	   string configDir = ofToDataPath("config", true);
@@ -1312,6 +1313,9 @@ void ofxOceanode::loadConfig(){
 	}
 	if(config.contains("guiLayoutChangesWithMacros")){
 		ofxOceanodeShared::setGuiLayoutChangesWithMacros(config["guiLayoutChangesWithMacros"].get<bool>());
+	}
+	if(config.contains("spaceTogglesPlay")){
+		if(auto tc = controls->get<ofxOceanodeTimeController>()) tc->setSpaceTogglesPlay(config["spaceTogglesPlay"].get<bool>());
 	}
 }
 
