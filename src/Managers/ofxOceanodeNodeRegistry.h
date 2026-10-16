@@ -56,6 +56,20 @@ public:
         return true;
     }
 
+    // refreshModel for a caller that knows the node's name: no throwaway model
+    // is constructed just to read it (refreshing hundreds of SynthDef models
+    // built and destroyed one node each)
+    template<typename ModelType, typename... Args>
+    bool refreshModelNamed(string const& name, string const category, Args... args){
+        static_assert(std::is_base_of<ofxOceanodeNodeModel, ModelType>::value, "Must pass a subclass of ofxOceanodeNodeModel");
+        const auto existing = registeredModelsCategory.find(name);
+        if(existing != registeredModelsCategory.end() && existing->second != category) return false;
+        registeredModelCreators[name] = [args...](){ return std::make_unique<ModelType>(args...); };
+        categories.insert(category);
+        registeredModelsCategory[name] = category;
+        return true;
+    }
+
     template<typename ModelType, typename... Args>
     void unregisterModel(string const category, Args... args){
         static_assert(std::is_base_of<ofxOceanodeNodeModel, ModelType>::value, "Must pass a subclass of ofxOceanodeNodeModel to registerType");
