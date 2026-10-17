@@ -203,6 +203,10 @@ private:
     ofEventListener presetLoadedListener;
     ofEventListener presetSavedListener;
     bool hasActivePreset = false;
+    // The root canvas layout file of the preset loaded / saved last: after a
+    // Save As the active layout path still names it (the new folder's file
+    // does not exist yet)
+    string rootLayoutPath;
     std::string pendingIniLoad; // empty means no pending load
 
     // Metadata for the most recently loaded ImGui layout. ImGui restores only
