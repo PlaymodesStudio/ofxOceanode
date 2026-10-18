@@ -130,7 +130,7 @@ public:
     shared_ptr<ofxOceanodeTypesRegistry> getTypesRegistry(){return typesRegistry;};
     
     bool loadPreset(string presetFolderPath);
-    void savePreset(string presetFolderPath);
+    bool savePreset(string presetFolderPath);
     const std::string& getPresetStoragePath() const { return customGuiStoragePath; }
     
     void loadPreset_presetWillBeLoaded();
@@ -148,7 +148,7 @@ public:
     bool loadClipboardModulesAndConnections(glm::vec2 referencePosition, bool allowOutsideInputs);
     void saveClipboardModulesAndConnections(vector<ofxOceanodeNode*> nodes, glm::vec2 referencePosition);
     
-    void savePersistent();
+    bool savePersistent();
     void loadPersistent();
     void updatePersistent();
     void saveCurrentPreset();
@@ -232,6 +232,21 @@ public:
     
     vector<ofxOceanodeNode*> getSelectedModules();
     vector<ofxOceanodeNode*> getAllModules();
+    struct UnusedNodePlan {
+        struct ProtectedGroup {
+            vector<string> nodes;
+            vector<string> reasons;
+            bool possiblyUnused = false;
+        };
+        std::uint64_t revision = 0;
+        vector<vector<string>> groups;
+        vector<ProtectedGroup> protectedGroups;
+        size_t connectionCount = 0;
+        size_t preservedNodes = 0;
+    };
+    UnusedNodePlan findUnusedNodes();
+    // Rechecks usage and graph ownership before deleting the reviewed plan.
+    bool removeUnusedNodes(const UnusedNodePlan& plan);
     // Changes whenever node ownership changes, including bulk preset/teardown clears.
     std::uint64_t getNodesRevision() const { return nodesRevision; }
     ofxOceanodeNodeGui* getGuiFromModel(ofxOceanodeNodeModel* model);

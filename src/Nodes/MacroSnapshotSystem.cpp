@@ -14,6 +14,7 @@
 // RouterInfo is defined in ofxOceanodeNodeMacro.h; we need the full definition
 // for storeSnapshot() to iterate over router nodes.
 #include "ofxOceanodeNodeMacro.h"
+#include "PresetSaveCleanup.h"
 
 MacroSnapshotSystem::MacroSnapshotSystem()
 	: currentSlot(-1)
@@ -107,7 +108,7 @@ void MacroSnapshotSystem::save(bool isLocal, const std::string& macroPath,
 		if(snapshots.empty()) {
 			// Delete the snapshots file if no snapshots exist
 			if(ofFile::doesFileExist(filename)) {
-				ofFile::removeFile(filename);
+				oceanodePresetSave::record(ofFile::removeFile(filename));
 				ofLogNotice("SnapshotSync") << "Deleted empty snapshots file: " << filename;
 			} else {
 				ofLogNotice("SnapshotSync") << "No snapshots file to delete";
@@ -124,7 +125,7 @@ void MacroSnapshotSystem::save(bool isLocal, const std::string& macroPath,
 				snapshotsJson[ofToString(pair.first)] = slotJson;
 			}
 
-			ofSavePrettyJson(filename, snapshotsJson);
+			oceanodePresetSave::saveJson(filename, snapshotsJson);
 			ofLogNotice("SnapshotSync") << "Saved " << snapshots.size() << " snapshots to: " << filename;
 		}
 
@@ -151,7 +152,7 @@ void MacroSnapshotSystem::save(bool isLocal, const std::string& macroPath,
 		if(snapshots.empty()) {
 			// Delete the snapshots file if no snapshots exist
 			if(ofFile::doesFileExist(snapshotsFilePath)) {
-				ofFile::removeFile(snapshotsFilePath);
+				oceanodePresetSave::record(ofFile::removeFile(snapshotsFilePath));
 				ofLogNotice("SnapshotSync") << "Deleted empty local snapshots file: " << snapshotsFilePath;
 			} else {
 				ofLogNotice("SnapshotSync") << "No local snapshots file to delete";
@@ -169,7 +170,7 @@ void MacroSnapshotSystem::save(bool isLocal, const std::string& macroPath,
 				snapshotsJson[ofToString(pair.first)] = slotJson;
 			}
 
-			ofSavePrettyJson(snapshotsFilePath, snapshotsJson);
+			oceanodePresetSave::saveJson(snapshotsFilePath, snapshotsJson);
 			ofLogNotice("SnapshotSync") << "Saved " << snapshots.size() << " local snapshots to: " << snapshotsFilePath;
 		}
 	}

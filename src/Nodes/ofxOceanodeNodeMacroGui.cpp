@@ -134,18 +134,8 @@ void ofxOceanodeNodeMacro::openMacroSaveDialog(bool toLibrary) {
 
 void ofxOceanodeNodeMacro::renderPresetControlGui() {
 	ImGui::BeginGroup();
-	const string name = presetManager.isLocal() ? localName.get() : presetManager.getCurrentMacro();
 	const float zoom = ofxOceanodeShared::getZoomLevel();
 	const float width = (ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget()) * zoom;
-	// Draw inside a fixed-size item: long names must not resize the node.
-	const ImVec2 namePosition = ImGui::GetCursorScreenPos();
-	ImGui::Dummy(ImVec2(width, ImGui::GetTextLineHeight()));
-	const ImVec4 nameClip(namePosition.x, namePosition.y, namePosition.x + width,
-		namePosition.y + ImGui::GetTextLineHeight());
-	ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(), ImGui::GetFontSize(), namePosition,
-		ImGui::GetColorU32(ImGuiCol_Text), name.empty() ? "-" : name.c_str(), nullptr, 0.f, &nameClip);
-	if(ImGui::IsItemHovered() && ImGui::CalcTextSize(name.c_str()).x > width)
-		ImGui::SetTooltip("%s", name.c_str());
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.f * zoom, ImGui::GetStyle().ItemSpacing.y));
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * zoom, ImGui::GetStyle().FramePadding.y));
 	const bool previousShow = showWindow;

@@ -37,6 +37,7 @@ ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
 }
 
 bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget, float zoomLevel){
+    headerControlHovered = false;
     string moduleName = getParameters().getName();
     const bool renderGui = (zoomLevel > 0.5f) ||
         (node.getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_KeepGuiVisibleAtLowZoom);
@@ -55,6 +56,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 		if(ImGui::ArrowButton("expand", expanded ? ImGuiDir_Down : ImGuiDir_Right)){
 			expanded = !expanded;
 		}
+        headerControlHovered = ImGui::IsItemHovered() || ImGui::IsItemActive();
 		ImGui::PopStyleColor();
 		
 		ImGui::SameLine();
@@ -99,6 +101,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 		{
 			ImGui::OpenPopup("Delete?");
 		}
+        headerControlHovered |= ImGui::IsItemHovered() || ImGui::IsItemActive();
 		ImGui::PopStyleColor(4);
 		
 		if (ImGui::BeginPopupModal("Delete?", NULL, ImGuiWindowFlags_AlwaysAutoResize))

@@ -46,6 +46,7 @@ public:
     
     void setSelected(bool b){selected = b;};
     bool getSelected(){return selected;};
+    bool isHeaderControlHovered() const { return headerControlHovered; }
     
     void setVisibility(bool b){visible = b;};
     bool getVisibility(){return visible;};
@@ -80,6 +81,7 @@ private:
     
     bool expanded;
     bool selected = false;
+    bool headerControlHovered = false;
     bool visible;
     
     bool valueHasBeenReseted = false;

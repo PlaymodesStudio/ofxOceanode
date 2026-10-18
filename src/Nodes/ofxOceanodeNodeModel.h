@@ -46,6 +46,10 @@ public:
     // this declaration recursively and rejects the Macro before constructing it.
     // Ordinary Macro loading does not apply this restriction.
     virtual std::string macroMixerBlocker() const { return {}; }
+    // Opt in only for models whose work is represented by cables and host
+    // parameter bindings. Unknown models and external effects stay alive.
+    virtual bool canRemoveWhenUnused() const { return unusedCleanupSafe; }
+    void setUnusedCleanupSafe(bool safe){ unusedCleanupSafe = safe; }
 
     // Return true when a model renders an Inspector row itself, or hides it.
     // Registered parameters still keep their normal preset/undo behavior.
@@ -249,6 +253,7 @@ private:
     ofEventListeners eventListeners;
     ofxOceanodeNodeModelFlags flags;
     bool active;
+    bool unusedCleanupSafe = false;
 };
 
 #endif /* ofxOceanodeNodeModel_h */

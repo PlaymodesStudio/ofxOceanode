@@ -16,82 +16,43 @@
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeColors.h"
 
-// ---------------------------------------------------------------------------
-// Proportional dock-node resizing helpers
-//
-// ImGui's default behavior when a docked parent window is resized is to keep
-// the absolute pixel size (SizeRef) of one split child and give all the
-// remaining space to the other child. This makes scope windows feel "sticky":
-// one keeps its size and the other one collapses/expands.
-//
-// To get a proportional resize (every child keeps its share of the parent),
-// we walk the dock node tree under ScopesDockSpace each frame the parent
-// changes size, and rewrite each split node's children SizeRef so the ratio
-// of (child0 / child1) along the split axis is preserved at the new parent
-// size. ImGui will then re-run layout with those new SizeRefs.
-// ---------------------------------------------------------------------------
+// Preserve the current split proportions only along axes whose available size
+// changed. SizeRef is an allocation hint, not necessarily the visible size
+// (especially beside the central node). Never reallocate stacked rows just
+// because their shared width changed.
 static void RescaleDockNodeProportional(ImGuiDockNode* node, ImVec2 oldSize, ImVec2 newSize)
 {
-    if(node == NULL) return;
+    if(node == NULL || !node->IsSplitNode()) return;
 
-    // For each split node, rescale the two children along the split axis so
-    // their ratio is preserved, then recurse into them.
-    if(node->ChildNodes[0] != NULL && node->ChildNodes[1] != NULL)
+    ImGuiDockNode* c0 = node->ChildNodes[0];
+    ImGuiDockNode* c1 = node->ChildNodes[1];
+    ImVec2 size0 = newSize;
+    ImVec2 size1 = newSize;
+    if(c0->IsVisible && c1->IsVisible)
     {
-        ImGuiDockNode* c0 = node->ChildNodes[0];
-        ImGuiDockNode* c1 = node->ChildNodes[1];
-
-        // SplitAxis: X = horizontal split (children side-by-side, scaled in X),
-        //            Y = vertical split (children stacked, scaled in Y).
-        if(node->SplitAxis == ImGuiAxis_X)
+        const ImGuiAxis axis = static_cast<ImGuiAxis>(node->SplitAxis);
+        size0[axis] = c0->Size[axis];
+        size1[axis] = c1->Size[axis];
+        const float total = size0[axis] + size1[axis];
+        if(oldSize[axis] != newSize[axis] && total > 0.0f)
         {
-            float oldParent = oldSize.x;
-            float newParent = newSize.x;
-            if(oldParent > 0.0f && newParent > 0.0f)
-            {
-                // Use current SizeRef.x as the source of truth for the ratio.
-                // (Fall back to Size.x if SizeRef is zero, which happens just
-                //  after a fresh split.)
-                float s0 = c0->SizeRef.x > 0.0f ? c0->SizeRef.x : c0->Size.x;
-                float s1 = c1->SizeRef.x > 0.0f ? c1->SizeRef.x : c1->Size.x;
-                float total = s0 + s1;
-                if(total > 0.0f)
-                {
-                    float ratio0 = s0 / total;
-                    c0->SizeRef.x = newParent * ratio0;
-                    c1->SizeRef.x = newParent * (1.0f - ratio0);
-                    // Keep the orthogonal axis snapped to the parent.
-                    c0->SizeRef.y = newSize.y;
-                    c1->SizeRef.y = newSize.y;
-                }
-            }
+            // Exclude the separator and use the same pixel rounding/minimum
+            // allocation as ImGui, so nested splits receive their actual next
+            // content size rather than the parent's unpartitioned SizeRef.
+            const float available = std::max(0.0f,
+                newSize[axis] - ImGui::GetStyle().DockingSeparatorSize);
+            const float minimum = ImTrunc(std::min(available,
+                ImGui::GetStyle().WindowMinSize[axis] * 2.0f) * 0.5f);
+            size0[axis] = std::max(minimum, std::min(available - minimum,
+                ImTrunc(available * (size0[axis] / total) + 0.5f)));
+            size1[axis] = available - size0[axis];
+            c0->SizeRef[axis] = size0[axis];
+            c1->SizeRef[axis] = size1[axis];
         }
-        else if(node->SplitAxis == ImGuiAxis_Y)
-        {
-            float oldParent = oldSize.y;
-            float newParent = newSize.y;
-            if(oldParent > 0.0f && newParent > 0.0f)
-            {
-                float s0 = c0->SizeRef.y > 0.0f ? c0->SizeRef.y : c0->Size.y;
-                float s1 = c1->SizeRef.y > 0.0f ? c1->SizeRef.y : c1->Size.y;
-                float total = s0 + s1;
-                if(total > 0.0f)
-                {
-                    float ratio0 = s0 / total;
-                    c0->SizeRef.y = newParent * ratio0;
-                    c1->SizeRef.y = newParent * (1.0f - ratio0);
-                    c0->SizeRef.x = newSize.x;
-                    c1->SizeRef.x = newSize.x;
-                }
-            }
-        }
-
-        // Recurse with each child's *current* size as the "old" size and the
-        // freshly-written SizeRef as the "new" size, so deeper splits also
-        // scale proportionally.
-        RescaleDockNodeProportional(c0, c0->Size, c0->SizeRef);
-        RescaleDockNodeProportional(c1, c1->Size, c1->SizeRef);
     }
+
+    if(c0->IsVisible) RescaleDockNodeProportional(c0, c0->Size, size0);
+    if(c1->IsVisible) RescaleDockNodeProportional(c1, c1->Size, size1);
 }
 
 static std::string BuildScopeWindowName(const ofxOceanodeScopeItem& item)

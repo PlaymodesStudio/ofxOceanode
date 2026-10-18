@@ -1,6 +1,7 @@
 #include "Timeline/ofxOceanodeTimeline.h"
 
 #include "Managers/ofxOceanodeContainer.h"
+#include "Managers/PresetSaveCleanup.h"
 #include "ofxOceanodeParameter.h"
 #include "Nodes/Default_Nodes/Base/baseOscillator.h"
 
@@ -5408,7 +5409,7 @@ bool ofxOceanodeTimelineManager::savePreset(const std::string& presetFolderPath)
         ofFile::copyFromTo(path, presetFolderPath + "/timeline.unreadable.json", false, true);
         failedLoadPath.clear();
     }
-    return ofSavePrettyJson(path, toJson());
+    return oceanodePresetSave::saveJson(path, toJson());
 }
 
 bool ofxOceanodeTimelineManager::loadPreset(const std::string& presetFolderPath) {

@@ -15,6 +15,7 @@
 #include "ofxOceanodeHelp.h"
 #include "defaultNodes.h"
 #include "ofxOceanodeMacroMixer.h"
+#include "Controls/PresetFileCleanupReview.h"
 #include <algorithm>
 #include <climits>
 #include <cstring>
@@ -22,6 +23,17 @@
 #include FT_FREETYPE_H
 #include FT_SFNT_NAMES_H
 #include FT_TRUETYPE_TABLES_H
+
+namespace {
+void resetPresetCanvasViews(ofxOceanodeContainer* current, ofxOceanodeCanvas* currentCanvas){
+    currentCanvas->resetViewToOrigin();
+    for(auto* node : current->getAllModules()){
+        if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
+            resetPresetCanvasViews(macro->getContainer().get(), macro->getCanvas());
+        }
+    }
+}
+}
 
 ofxOceanode::ofxOceanode(){
     proportionalDocking = std::make_unique<ofxOceanodeProportionalDocking>();
@@ -53,28 +65,28 @@ ofxOceanode::ofxOceanode(){
     registerBuiltInType<Timestamp>("timestamp", Timestamp());
     
     //Register default nodes
-    nodeRegistry->registerModel<oscillator>("Generators");
-    nodeRegistry->registerModel<chaoticOscillator>("Generators");
-    nodeRegistry->registerModel<phasor>("Generators");
+    nodeRegistry->registerModel<oscillator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<chaoticOscillator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<phasor>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
     nodeRegistry->registerModel<lfoTrack>("Generators");
 #ifdef OFXOCEANODE_USE_MIDI
     nodeRegistry->registerModel<midiClockNode>("Generators");
 #endif
-    nodeRegistry->registerModel<simpleNumberGenerator>("Generators");
-    nodeRegistry->registerModel<simpleNormalizedNumberGenerator>("Generators");
-    nodeRegistry->registerModel<counter>("Generators");
-    nodeRegistry->registerModel<ramp>("Generators");
-    nodeRegistry->registerModel<mapper>("Modifiers");
-    nodeRegistry->registerModel<ranger>("Modifiers");
-    nodeRegistry->registerModel<indexer>("Generators");
-    nodeRegistry->registerModel<reindexer>("Modifiers");
-    nodeRegistry->registerModel<smoother>("Modifiers");
-    nodeRegistry->registerModel<switcher>("Modifiers");
+    nodeRegistry->registerModel<simpleNumberGenerator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<simpleNormalizedNumberGenerator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<counter>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<ramp>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<mapper>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<ranger>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<indexer>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<reindexer>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<smoother>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<switcher>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
     nodeRegistry->registerModel<curve>("Modifiers");
 	//nodeRegistry->registerModel<curve2>("Modifiers");
     nodeRegistry->registerModel<ofxOceanodeNodeMacro>("MACRO");
-    nodeRegistry->registerModel<noise>("Generators");
-    nodeRegistry->registerModel<randomGenerator>("Generators");
+    nodeRegistry->registerModel<noise>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<randomGenerator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
     nodeRegistry->registerModel<customGuiSnapshots>("Custom GUI");
     nodeRegistry->registerModel<beatTransport>("Timeline");
     nodeRegistry->registerModel<presetLoadTrigger>("General");
@@ -199,6 +211,10 @@ void ofxOceanode::setup(){
         if(ofxOceanodeShared::getPresetLoadType() != ofxOceanodePresetLoadType_FullPreset){
             return; // Don't reload layout for clipboard paste / duplicate
         }
+        resetPresetCanvasViews(container.get(), &canvas);
+        // Menu selections can load a preset during draw; its layout is applied
+        // before the next NewFrame, so re-arm centering once that has happened.
+        presetCanvasCenterPending = true;
         if(ofxOceanodeShared::getCurrentPresetPath().empty()){
             pendingIniLoad.clear();
             ofxOceanodeShared::getPendingLayoutSavePath().clear();
@@ -342,6 +358,10 @@ void ofxOceanode::draw(){
             }
             pendingLoad.clear();
         }
+    }
+    if(presetCanvasCenterPending){
+        resetPresetCanvasViews(container.get(), &canvas);
+        presetCanvasCenterPending = false;
     }
     gui.begin();
     // ImGui uses PopupBg for menus and modals; derive it from WindowBg each frame.
@@ -645,21 +665,23 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             const string activeCanvasId = ofxOceanodeShared::getActiveCanvasUniqueID().empty()
                 ? canvas.getUniqueID() : ofxOceanodeShared::getActiveCanvasUniqueID();
             ofxOceanodeContainer* activeContainer = container->getContainerForCanvasID(activeCanvasId);
+            shared_ptr<ofxOceanodeContainer> activeContainerOwner = container;
             ofxOceanodeCanvas* activeCanvas = nullptr;
-            std::function<void(ofxOceanodeContainer*, ofxOceanodeCanvas*)> findActiveCanvas =
-            [&](ofxOceanodeContainer* currentContainer, ofxOceanodeCanvas* currentCanvas){
+            std::function<void(shared_ptr<ofxOceanodeContainer>, ofxOceanodeCanvas*)> findActiveCanvas =
+            [&](shared_ptr<ofxOceanodeContainer> currentContainer, ofxOceanodeCanvas* currentCanvas){
                 if(activeCanvas != nullptr || currentContainer == nullptr || currentCanvas == nullptr) return;
                 if(currentCanvas->getUniqueID() == activeCanvasId){
                     activeCanvas = currentCanvas;
+                    activeContainerOwner = currentContainer;
                     return;
                 }
                 for(auto* node : currentContainer->getAllModules()){
                     if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
-                        findActiveCanvas(macro->getContainer().get(), macro->getCanvas());
+                        findActiveCanvas(macro->getContainer(), macro->getCanvas());
                     }
                 }
             };
-            findActiveCanvas(container.get(), &canvas);
+            findActiveCanvas(container, &canvas);
             if(activeContainer == nullptr) activeContainer = container.get();
             if(activeCanvas == nullptr) activeCanvas = &canvas;
 
@@ -673,6 +695,17 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             }
             if(ImGui::MenuItem("Auto Layout Canvas", nullptr, false, activeContainer->getAllModules().size() > 1)){
                 activeCanvas->requestAutoLayoutCanvas();
+            }
+            ImGui::Separator();
+            if(ImGui::MenuItem("Review leftover node files", nullptr, false,
+                               !activeContainerOwner->getPresetStoragePath().empty())){
+                oceanodePresetSave::CleanupReview::instance().request(activeContainerOwner);
+            }
+            if(ImGui::MenuItem("Remove unused nodes")){
+                unusedNodeContainer = activeContainerOwner;
+                unusedNodePlan = activeContainerOwner->findUnusedNodes();
+                unusedNodesPlanChanged = false;
+                openUnusedNodesPopup = true;
             }
             ImGui::EndMenu();
         }
@@ -851,6 +884,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			bool autoInspector = ofxOceanodeShared::getAutoInspectorShowHide();
 			if(ImGui::Checkbox("Inspector auto show/hide", &autoInspector)){
 				ofxOceanodeShared::setAutoInspectorShowHide(autoInspector);
+			}
+			bool selectionCentersCanvas = ofxOceanodeShared::getSelectionCentersCanvas();
+			if(ImGui::Checkbox("Selection centers canvas", &selectionCentersCanvas)){
+				ofxOceanodeShared::setSelectionCentersCanvas(selectionCentersCanvas);
 			}
 			bool snap = canvas.getSnapToGrid();
 			if(ImGui::Checkbox("Snap To Grid",&snap))
@@ -1083,6 +1120,67 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     // the active window context when the popups are registered.
 
     controls->drawPopups();
+    oceanodePresetSave::CleanupReview::instance().draw();
+    if(openUnusedNodesPopup){
+        ImGui::OpenPopup("Remove unused nodes");
+        openUnusedNodesPopup = false;
+    }
+    ImGui::SetNextWindowSizeConstraints(ImVec2(520, 0), ImVec2(720, FLT_MAX));
+    if(ImGui::BeginPopupModal("Remove unused nodes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+        auto target = unusedNodeContainer.lock();
+        size_t nodeCount = 0;
+        for(const auto& group : unusedNodePlan.groups) nodeCount += group.size();
+        ImGui::Text("Canvas: %s", target ? target->getCanvasID().c_str() : "(closed)");
+        ImGui::Text("Remove %zu nodes in %zu groups and %zu connections.",
+                    nodeCount, unusedNodePlan.groups.size(), unusedNodePlan.connectionCount);
+        ImGui::Text("Keep %zu nodes with usage or protected models.", unusedNodePlan.preservedNodes);
+        ImGui::TextWrapped("Custom GUI, snapshots, Timeline, MIDI, Scope, persistent nodes, "
+                           "and models with standalone or unknown effects are protected, together with their connected groups.");
+        if(nodeCount == 0) ImGui::TextUnformatted("No removable unused nodes found.");
+        if(nodeCount != 0 || !unusedNodePlan.protectedGroups.empty()){
+            ImGui::BeginChild("Unused node summary", ImVec2(0, 240), true);
+            for(size_t i = 0; i < unusedNodePlan.groups.size(); ++i){
+                ImGui::Text("Remove group %zu", i + 1);
+                for(const auto& name : unusedNodePlan.groups[i]) ImGui::BulletText("%s", name.c_str());
+            }
+            for(size_t i = 0; i < unusedNodePlan.protectedGroups.size(); ++i){
+                const auto& group = unusedNodePlan.protectedGroups[i];
+                ImGui::PushID(static_cast<int>(i));
+                const string title = (group.possiblyUnused ? "Possibly unused, protected: " : "In use, protected: ")
+                    + group.nodes.front() + " (" + ofToString(group.nodes.size()) + " nodes)";
+                ImGui::SetNextItemOpen(group.possiblyUnused, ImGuiCond_Appearing);
+                if(ImGui::TreeNode(title.c_str())){
+                    for(const auto& name : group.nodes) ImGui::BulletText("%s", name.c_str());
+                    for(const auto& reason : group.reasons) ImGui::TextWrapped("%s", reason.c_str());
+                    ImGui::TreePop();
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndChild();
+        }
+        if(unusedNodesPlanChanged) ImGui::TextWrapped("Usage changed. The summary has been refreshed; review it before removing.");
+        const bool targetChanged = target && target->getNodesRevision() != unusedNodePlan.revision;
+        if(targetChanged) ImGui::TextWrapped("The canvas changed. Refresh the summary before removing.");
+        ImGui::BeginDisabled(!target || targetChanged || nodeCount == 0);
+        if(ImGui::Button("Remove", ImVec2(120, 0))){
+            if(target->removeUnusedNodes(unusedNodePlan)) ImGui::CloseCurrentPopup();
+            else {
+                unusedNodePlan = target->findUnusedNodes();
+                unusedNodesPlanChanged = true;
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!target);
+        if(ImGui::Button("Refresh", ImVec2(120, 0))){
+            unusedNodePlan = target->findUnusedNodes();
+            unusedNodesPlanChanged = false;
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if(ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
     help->draw();
 
     if(showHelp){
@@ -1290,6 +1388,7 @@ void ofxOceanode::saveConfig(){
     config["gridDivisions"] = canvas.getGridDivisions();
 	config["snapToGrid"] = canvas.getSnapToGrid();
 	config["autoInspectorShowHide"] = ofxOceanodeShared::getAutoInspectorShowHide();
+	config["selectionCentersCanvas"] = ofxOceanodeShared::getSelectionCentersCanvas();
 	config["guiLayoutChangesWithMacros"] = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
 	if(auto tc = controls->get<ofxOceanodeTimeController>()) config["spaceTogglesPlay"] = tc->getSpaceTogglesPlay();
 	
@@ -1374,6 +1473,7 @@ void ofxOceanode::loadConfig(){
 	if(config.contains("autoInspectorShowHide")){
 		ofxOceanodeShared::setAutoInspectorShowHide(config["autoInspectorShowHide"].get<bool>());
 	}
+	ofxOceanodeShared::setSelectionCentersCanvas(config.value("selectionCentersCanvas", false));
 	if(config.contains("guiLayoutChangesWithMacros")){
 		ofxOceanodeShared::setGuiLayoutChangesWithMacros(config["guiLayoutChangesWithMacros"].get<bool>());
 	}
@@ -1613,6 +1713,7 @@ void ofxOceanode::drawThemeEditorWindow(){
     if(ImGui::Begin(editorTitle.c_str(), &showThemeEditor)){
         ImGuiStyle& style = ImGui::GetStyle();
         ImVec4* colors = style.Colors;
+        bool colorFilterChanged = false;
 
         if(currentThemeName.empty()){
             ImGui::TextDisabled("OceanodeTheme (built-in)");
@@ -1627,6 +1728,28 @@ void ofxOceanode::drawThemeEditorWindow(){
             themeFontFamily.clear();
             pendingThemeFontChange = true;
             currentThemeName = "OceanodeTheme (built-in)";
+        }
+
+        ImGui::SameLine();
+        bool focusColorSearch = false;
+        if(ImGui::Button("[?]")){
+            showThemeColorSearch = !showThemeColorSearch;
+            focusColorSearch = showThemeColorSearch;
+            if(!showThemeColorSearch) themeColorSearch[0] = '\0';
+            colorFilterChanged = true;
+        }
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Filter color names in both color tabs");
+        if(showThemeColorSearch){
+            const float clearWidth = ImGui::CalcTextSize("Clear").x + style.FramePadding.x * 2.0f;
+            ImGui::SetNextItemWidth(std::max(40.0f, ImGui::GetContentRegionAvail().x - clearWidth - style.ItemSpacing.x));
+            if(focusColorSearch) ImGui::SetKeyboardFocusHere();
+            colorFilterChanged |= ImGui::InputTextWithHint("##theme_color_search", "Filter color names...",
+                                                          themeColorSearch, sizeof(themeColorSearch));
+            ImGui::SameLine();
+            if(ImGui::Button("Clear")){
+                themeColorSearch[0] = '\0';
+                colorFilterChanged = true;
+            }
         }
 
         ImGui::Separator();
@@ -1645,8 +1768,12 @@ void ofxOceanode::drawThemeEditorWindow(){
                 });
 
                 ImGui::BeginChild("##colorscroll_imgui", ImVec2(0, 0), false);
+                if(colorFilterChanged || ImGui::IsWindowAppearing()) ImGui::SetScrollY(0.0f);
+                int visibleColors = 0;
                 for(int idx : colorIndices){
                     const char* colorName = ImGui::GetStyleColorName(idx);
+                    if(themeColorSearch[0] && ImStristr(colorName, nullptr, themeColorSearch, nullptr) == nullptr) continue;
+                    ++visibleColors;
                     ImGui::PushID(idx);
                     if(ImGui::ColorEdit4(colorName, (float*)&colors[idx],
                                        ImGuiColorEditFlags_AlphaBar |
@@ -1655,28 +1782,36 @@ void ofxOceanode::drawThemeEditorWindow(){
                     }
                     ImGui::PopID();
                 }
+                if(visibleColors == 0) ImGui::TextDisabled("No matching colors.");
                 ImGui::EndChild();
                 ImGui::EndTabItem();
             }
 
             if(ImGui::BeginTabItem("Oceanode Colors")){
                 ImGui::BeginChild("##colorscroll_oc", ImVec2(0, 0), false);
+                if(colorFilterChanged || ImGui::IsWindowAppearing()) ImGui::SetScrollY(0.0f);
                 // Shared window/popup decoration sizes (colours: OC_FloatingWindow* below)
-                ImGui::Checkbox("Floating window / popup border and shadow", &ofxOceanodeFloatingWindowDecor::Enabled);
-                ImGui::SliderFloat("Window / popup border thickness", &ofxOceanodeFloatingWindowDecor::BorderThickness, 0.0f, 4.0f, "%.1f px");
-                ImGui::SliderFloat("Window / popup shadow size", &ofxOceanodeFloatingWindowDecor::ShadowSize, 0.0f, 40.0f, "%.0f px");
-                ImGui::Separator();
+                if(themeColorSearch[0] == '\0'){
+                    ImGui::Checkbox("Floating window / popup border and shadow", &ofxOceanodeFloatingWindowDecor::Enabled);
+                    ImGui::SliderFloat("Window / popup border thickness", &ofxOceanodeFloatingWindowDecor::BorderThickness, 0.0f, 4.0f, "%.1f px");
+                    ImGui::SliderFloat("Window / popup shadow size", &ofxOceanodeFloatingWindowDecor::ShadowSize, 0.0f, 40.0f, "%.0f px");
+                    ImGui::Separator();
+                }
                 auto fields = OceanodeColors::getFields();
                 std::sort(fields.begin(), fields.end(), [](const OceanodeColors::ColorField& a, const OceanodeColors::ColorField& b){
                     return strcmp(a.name, b.name) < 0;
                 });
+                int visibleColors = 0;
                 for(int i = 0; i < (int)fields.size(); i++){
+                    if(themeColorSearch[0] && ImStristr(fields[i].name, nullptr, themeColorSearch, nullptr) == nullptr) continue;
+                    ++visibleColors;
                     ImGui::PushID(i + ImGuiCol_COUNT);
                     ImGui::ColorEdit4(fields[i].name, (float*)fields[i].ptr,
                                       ImGuiColorEditFlags_AlphaBar |
                                       ImGuiColorEditFlags_AlphaPreviewHalf);
                     ImGui::PopID();
                 }
+                if(visibleColors == 0) ImGui::TextDisabled("No matching colors.");
                 ImGui::EndChild();
                 ImGui::EndTabItem();
             }

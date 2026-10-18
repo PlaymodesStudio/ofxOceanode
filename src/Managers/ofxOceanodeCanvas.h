@@ -30,6 +30,7 @@ public:
     void update(){};
     void draw(bool *open = NULL, ofColor color = ofColor(255, 255, 255, 40), string title = "");
     void resetForNewPreset();
+    void resetViewToOrigin();
     
     void setContainer(shared_ptr<ofxOceanodeContainer> c){container = c;};
     
@@ -144,6 +145,16 @@ private:
     bool canvasHasScolled = false;
     void deselectAllNodes();
     void selectAllNodes();
+
+    void rememberInspectorSelectionClick(const string& nodeID);
+    void recenterSelectionAfterInspectorLayout();
+    struct InspectorSelectionClick {
+        string nodeID;
+        glm::vec2 origin = glm::vec2(0);
+        glm::vec2 size = glm::vec2(0);
+        int lastInteractionFrame = -1;
+        bool needsCenter = false;
+    } inspectorSelectionClick;
     
     vector<string> categoriesVector;
     vector<vector<string>> options;

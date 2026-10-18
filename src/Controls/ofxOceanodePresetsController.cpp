@@ -631,6 +631,24 @@ void ofxOceanodePresetsController::finishSavePreset(){
         request.nextWriteIndex = i + 1;
     }
 
+    // Embedded sample writers need the destination context during Save As.
+    const auto previousPath = ofxOceanodeShared::getCurrentPresetPath();
+    const auto previousBank = ofxOceanodeShared::getCurrentBankName();
+    const auto previousName = ofxOceanodeShared::getCurrentPresetName();
+    ofxOceanodeShared::setCurrentPresetPath(presetPath);
+    ofxOceanodeShared::setCurrentBankName(request.bank);
+    ofxOceanodeShared::setCurrentPresetName(request.name);
+    if(!container->savePreset(presetPath)){
+        ofxOceanodeShared::setCurrentPresetPath(previousPath);
+        ofxOceanodeShared::setCurrentBankName(previousBank);
+        ofxOceanodeShared::setCurrentPresetName(previousName);
+        saveResultText = "Could not finish saving preset: " + request.bank + " / " + request.name +
+                         "\nSome files may have been written. Obsolete node files were retained unless the graph save completed. See the log for details.";
+        for(const auto& macro : request.savedMacros) saveResultText += "\nGlobal macro already saved: " + macro;
+        pendingSave.reset();
+        popupRequest = PopupRequest::SaveResult;
+        return;
+    }
     if(request.createNew){
         bankPresets[request.bank].push_back(request.name);
         newPresetCreated = true;
@@ -638,10 +656,6 @@ void ofxOceanodePresetsController::finishSavePreset(){
     auto bankPosition = std::find(banks.begin(), banks.end(), request.bank);
     if(bankPosition != banks.end()) currentBank = std::distance(banks.begin(), bankPosition);
     currentPreset[request.bank] = request.name;
-    ofxOceanodeShared::setCurrentPresetPath(presetPath);
-    ofxOceanodeShared::setCurrentBankName(request.bank);
-    ofxOceanodeShared::setCurrentPresetName(request.name);
-    container->savePreset(presetPath);
     ofxOceanodeShared::presetWasSaved();
 
     if(!request.reviews.empty()){

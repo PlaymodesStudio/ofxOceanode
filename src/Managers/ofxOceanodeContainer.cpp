@@ -24,6 +24,7 @@
 #include <cmath>
 #include <cfloat>
 #include <deque>
+#include "PresetSaveCleanup.h"
 
 #ifdef OFXOCEANODE_USE_MIDI
 #include "ofxOceanodeMidiClock.h"
@@ -720,8 +721,7 @@ void ofxOceanodeContainer::saveCustomGuis(const std::string& presetPath)
 {
     pruneCustomGuiParameters();
     customGuiStoragePath = presetPath;
-    ofSavePrettyJson(getCustomGuiFilePath(presetPath), customGuiPanelsToJson(customGuiPanelsData));
-    customGuisDirty = false;
+    customGuisDirty = !oceanodePresetSave::saveJson(getCustomGuiFilePath(presetPath), customGuiPanelsToJson(customGuiPanelsData));
 }
 
 void ofxOceanodeContainer::saveCustomGuiSnapshots(const std::string& presetPath)
@@ -753,13 +753,12 @@ void ofxOceanodeContainer::saveCustomGuiSnapshots(const std::string& presetPath)
     customGuiSnapshotBanks = sanitizedBanks;
 
     if(customGuiSnapshotBanks.empty()){
-        if(ofFile::doesFileExist(filePath)) ofFile::removeFile(filePath);
+        if(ofFile::doesFileExist(filePath)) oceanodePresetSave::record(ofFile::removeFile(filePath));
         customGuiSnapshotsDirty = false;
         return;
     }
 
-    ofSavePrettyJson(filePath, customGuiSnapshotBanksToJson(customGuiSnapshotBanks));
-    customGuiSnapshotsDirty = false;
+    customGuiSnapshotsDirty = !oceanodePresetSave::saveJson(filePath, customGuiSnapshotBanksToJson(customGuiSnapshotBanks));
 }
 
 void ofxOceanodeContainer::saveCustomGuis()
@@ -960,7 +959,7 @@ void ofxOceanodeContainer::saveScope(const std::string& presetPath)
 	
 	// Save to file
 	std::string filepath = presetPath + "/scope_config.json";
-	ofSavePrettyJson(filepath, json);
+	oceanodePresetSave::saveJson(filepath, json);
 }
 
 void ofxOceanodeContainer::scheduleScopeSave(const std::string& presetPath)
@@ -1542,7 +1541,9 @@ void ofxOceanodeContainer::loadPreset_loadComments(string presetFolderPath){
     }
 }
 
-void ofxOceanodeContainer::savePreset(string presetFolderPath){
+bool ofxOceanodeContainer::savePreset(string presetFolderPath){
+    oceanodePresetSave::Scope save;
+    try {
     ofLog()<<"Save Preset " << presetFolderPath << " Canvas ID : " << getCanvasID() << endl;
     const bool ownsGlobalScope = getCanvasID().empty()
         || getCanvasID() == "Canvas"
@@ -1564,7 +1565,9 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
             json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y, 0}; //We add an element to know is persistent
         }
     }
-    ofSavePrettyJson(presetFolderPath + "/modules.json", json);
+    std::set<std::string> registered;
+    for(const auto& model : registry->getRegisteredModels()) registered.insert(model.first);
+    if(!save.prepare(presetFolderPath, json, registered)) return false;
     
     json.clear();
     for(auto &connection : connections){
@@ -1577,7 +1580,7 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
         }
     }
     
-    ofSavePrettyJson(presetFolderPath + "/connections.json", json);
+    oceanodePresetSave::saveJson(presetFolderPath + "/connections.json", json);
     
     
     for(auto &nodeTypeMap : dynamicNodes){
@@ -1600,7 +1603,7 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
             binding->savePreset(json[ofSplitString(bindingsPair.first, "-|-")[0]][ofSplitString(bindingsPair.first, "-|-")[1]][i]);
         }
     }
-    ofSavePrettyJson(presetFolderPath + "/midi.json", json);
+    oceanodePresetSave::saveJson(presetFolderPath + "/midi.json", json);
 #endif
 	
 	json.clear();
@@ -1619,16 +1622,16 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 		json["Comments"][i]["TextColor"]["G"] = c.textColor.g;
 		json["Comments"][i]["TextColor"]["B"] = c.textColor.b;
 	}
-	ofSavePrettyJson(presetFolderPath + "/comments.json", json);
+	oceanodePresetSave::saveJson(presetFolderPath + "/comments.json", json);
 	
 	saveScope(presetFolderPath);
 	saveCustomGuis(presetFolderPath);
 	saveCustomGuiSnapshots(presetFolderPath);
-	if(timelineManager != nullptr) timelineManager->savePreset(presetFolderPath);
+	if(timelineManager != nullptr) oceanodePresetSave::record(timelineManager->savePreset(presetFolderPath));
     if(transportOwner){
         ofJson transportJson;
         transportJson["bpm"] = bpm;
-        ofSavePrettyJson(presetFolderPath + "/transport.json", transportJson);
+        oceanodePresetSave::saveJson(presetFolderPath + "/transport.json", transportJson);
     }
 #ifdef OFXOCEANODE_USE_MIDI
     if(midiClockSync) {
@@ -1641,9 +1644,11 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
         syncJson["stopOnClockLoss"] = midiClockSync->core().getStopOnClockLoss();
         syncJson["offsetMs"] = midiClockSync->core().getOffsetMs();
         syncJson["tempoWindow"] = midiClockSync->core().getTempoWindow();
-        ofSavePrettyJson(presetFolderPath + "/transportSync.json", syncJson);
+        oceanodePresetSave::saveJson(presetFolderPath + "/transportSync.json", syncJson);
     }
 #endif
+
+    if(!save.finish()) return false;
 
     // Saving a fresh patch (or Save As) attaches future scope edits to this
     // preset. New leaves the callback detached until a destination exists.
@@ -1651,6 +1656,11 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
         ofxOceanodeScope::getInstance()->setScopeChangedCallback([this, presetFolderPath](){
             scheduleScopeSave(presetFolderPath);
         });
+    }
+    return true;
+    } catch(const std::exception& error){
+        ofLogError("Preset save") << presetFolderPath << ": " << error.what();
+        return oceanodePresetSave::record(false);
     }
 }
 
@@ -1810,7 +1820,9 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
     ofSavePrettyJson(presetFolderPath / "comments.json", json);
 }
 
-void ofxOceanodeContainer::savePersistent(){
+bool ofxOceanodeContainer::savePersistent(){
+    oceanodePresetSave::Scope save;
+    try {
     ofLog()<<"Save Persistent";
     string persistentFolderPath = "Persistent";
     
@@ -1829,7 +1841,9 @@ void ofxOceanodeContainer::savePersistent(){
             json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y};
         }
     }
-    ofSavePrettyJson(persistentFolderPath + "/modules.json", json);
+    std::set<std::string> registered;
+    for(const auto& model : registry->getRegisteredModels()) registered.insert(model.first);
+    if(!save.prepare(persistentFolderPath, json, registered)) return false;
     
     json.clear();
     for(auto &connection : connections){
@@ -1840,7 +1854,7 @@ void ofxOceanodeContainer::savePersistent(){
         json[sourceParentName][sourceName][sinkParentName][sinkName];
     }
     
-    ofSavePrettyJson(persistentFolderPath + "/connections.json", json);
+    oceanodePresetSave::saveJson(persistentFolderPath + "/connections.json", json);
     
     
     for(auto &nodeTypeMap : dynamicNodes){
@@ -1868,8 +1882,13 @@ void ofxOceanodeContainer::savePersistent(){
             binding->savePreset(json[ofSplitString(bindingsPair.first, "-|-")[0]][ofSplitString(bindingsPair.first, "-|-")[1]][i]);
         }
     }
-    ofSavePrettyJson(persistentFolderPath + "/midi.json", json);
+    oceanodePresetSave::saveJson(persistentFolderPath + "/midi.json", json);
 #endif
+    return save.finish();
+    } catch(const std::exception& error){
+        ofLogError("Persistent save") << error.what();
+        return oceanodePresetSave::record(false);
+    }
 }
 
 void ofxOceanodeContainer::loadPersistent(){
@@ -3244,6 +3263,142 @@ vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules(){
         }
     }
     return modulesToCopy;
+}
+
+ofxOceanodeContainer::UnusedNodePlan ofxOceanodeContainer::findUnusedNodes(){
+    UnusedNodePlan plan;
+    plan.revision = nodesRevision;
+    const auto nodes = getAllModules();
+    std::unordered_map<ofxOceanodeNodeModel*, ofxOceanodeNode*> owners;
+    for(auto* node : nodes) owners[&node->getNodeModel()] = node;
+
+    // Bindings may live in a different canvas (including a closed Custom GUI).
+    // Resolve their actual targets, rather than guessing from node names.
+    std::unordered_set<ofxOceanodeAbstractParameter*> published;
+    auto* root = this;
+    while(root->timelineHost != nullptr) root = root->timelineHost;
+    std::function<void(ofxOceanodeContainer*)> collectBindings = [&](ofxOceanodeContainer* current){
+        for(const auto& panel : current->customGuiPanelsData){
+            for(const auto& widget : panel.layout.widgets){
+                if(auto* parameter = current->findCustomGuiParameter(widget.parameterRef.parameterPath))
+                    published.insert(parameter);
+            }
+        }
+        for(const auto& bank : current->customGuiSnapshotBanks){
+            for(const auto& snapshot : bank.snapshots){
+                for(const auto& value : snapshot.parameterValues){
+                    if(auto* parameter = current->findCustomGuiParameter(value.first)) published.insert(parameter);
+                }
+            }
+        }
+        for(auto* node : current->getAllModules()){
+            if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel()))
+                collectBindings(macro->getContainer().get());
+        }
+    };
+    collectBindings(root);
+    for(const auto& track : root->getTimelineManager().getTracks()){
+        for(const auto& binding : track.bindings){
+            if(auto* parameter = root->findTimelineParameter(binding.parameterPath)) published.insert(parameter);
+        }
+    }
+
+    std::unordered_map<ofxOceanodeNode*, vector<ofxOceanodeNode*>> neighbors;
+    std::unordered_set<ofxOceanodeNode*> used;
+    std::unordered_set<ofxOceanodeNode*> knownUsage;
+    std::unordered_map<ofxOceanodeNode*, vector<string>> reasons;
+    auto protect = [&](ofxOceanodeNode* node, const string& reason, bool known = true){
+        used.insert(node);
+        if(known) knownUsage.insert(node);
+        reasons[node].push_back(node->getParameters().getEscapedName() + ": " + reason);
+    };
+    std::unordered_map<ofxOceanodeNode*, std::unordered_set<ofxOceanodeAbstractConnection*>> nodeConnections;
+    for(auto* node : nodes){
+        if(node->getIsPersistent()) protect(node, "persistent node");
+        if(!node->getNodeModel().canRemoveWhenUnused())
+            protect(node, "standalone or unclassified model; review manually", false);
+        for(auto& abstract : node->getParameters()){
+            auto* parameter = dynamic_cast<ofxOceanodeAbstractParameter*>(abstract.get());
+            if(parameter == nullptr) continue;
+            if(parameter->isScoped()) protect(node, "Scope: " + parameter->getName());
+            if(parameter->isTimelined()) protect(node, "Timeline: " + parameter->getName());
+            if(published.count(parameter)) protect(node, "Custom GUI, snapshot or Timeline binding: " + parameter->getName());
+#ifdef OFXOCEANODE_USE_MIDI
+            const string key = parameter->getGroupHierarchyNames()[0] + "-|-" + parameter->getEscapedName();
+            const auto midi = midiBindings.find(key);
+            const auto persistentMidi = persistentMidiBindings.find(key);
+            if((midi != midiBindings.end() && !midi->second.empty()) ||
+               (persistentMidi != persistentMidiBindings.end() && !persistentMidi->second.empty()))
+                protect(node, "MIDI binding: " + parameter->getName());
+#endif
+            auto links = parameter->getOutConnections();
+            if(parameter->getInConnection()) links.push_back(parameter->getInConnection());
+            for(auto* link : links){
+                nodeConnections[node].insert(link);
+                auto* source = link->getSourceParameter().getNodeModel();
+                auto* sink = link->getSinkParameter().getNodeModel();
+                auto other = owners.find(source == &node->getNodeModel() ? sink : source);
+                if(other == owners.end()) protect(node, "connection outside this canvas");
+                else neighbors[node].push_back(other->second);
+            }
+        }
+    }
+
+    std::unordered_set<ofxOceanodeNode*> visited;
+    for(auto* node : nodes){
+        if(!visited.insert(node).second) continue;
+        vector<ofxOceanodeNode*> component{node};
+        vector<string> names;
+        std::unordered_set<ofxOceanodeAbstractConnection*> links;
+        bool hasUsage = false;
+        bool hasKnownUsage = false;
+        vector<string> groupReasons;
+        for(size_t i = 0; i < component.size(); ++i){
+            auto* member = component[i];
+            hasUsage |= used.count(member) != 0;
+            hasKnownUsage |= knownUsage.count(member) != 0;
+            groupReasons.insert(groupReasons.end(), reasons[member].begin(), reasons[member].end());
+            names.push_back(member->getParameters().getEscapedName());
+            links.insert(nodeConnections[member].begin(), nodeConnections[member].end());
+            for(auto* neighbor : neighbors[member]){
+                if(visited.insert(neighbor).second) component.push_back(neighbor);
+            }
+        }
+        std::sort(names.begin(), names.end());
+        if(hasUsage){
+            plan.preservedNodes += names.size();
+            std::sort(groupReasons.begin(), groupReasons.end());
+            groupReasons.erase(std::unique(groupReasons.begin(), groupReasons.end()), groupReasons.end());
+            plan.protectedGroups.push_back({std::move(names), std::move(groupReasons), !hasKnownUsage});
+        }
+        else {
+            plan.groups.push_back(std::move(names));
+            plan.connectionCount += links.size();
+        }
+    }
+    std::sort(plan.groups.begin(), plan.groups.end());
+    std::sort(plan.protectedGroups.begin(), plan.protectedGroups.end(),
+              [](const auto& a, const auto& b){ return a.nodes < b.nodes; });
+    return plan;
+}
+
+bool ofxOceanodeContainer::removeUnusedNodes(const UnusedNodePlan& plan){
+    const auto current = findUnusedNodes();
+    if(current.revision != plan.revision || current.groups != plan.groups ||
+       current.connectionCount != plan.connectionCount) return false;
+    // Use native deletion so cables, listeners and model resources are released.
+    for(const auto& group : plan.groups){
+        for(const auto& name : group){
+            auto found = parameterGroupNodesMap.find(name);
+            if(found == parameterGroupNodesMap.end()) continue;
+            auto* node = found->second;
+            for(auto& comment : comments){
+                comment.nodes.erase(std::remove(comment.nodes.begin(), comment.nodes.end(), node), comment.nodes.end());
+            }
+            node->deleteSelf();
+        }
+    }
+    return true;
 }
 
 vector<ofxOceanodeNode*> ofxOceanodeContainer::getAllModules(){

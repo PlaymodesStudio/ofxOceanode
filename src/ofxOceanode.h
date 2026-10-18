@@ -53,8 +53,13 @@ public:
     
     template<typename T, typename... Args>
     void registerModel(string category, Args... args){
-        nodeRegistry->registerModel<T, Args...>(category, args...);
+        nodeRegistry->registerModel<T>(category, args...);
     };
+
+    template<typename T, typename... Args>
+    void registerModel(string category, ofxOceanodeNodeRegistrationFlags registrationFlags, Args... args){
+        nodeRegistry->registerModel<T>(category, registrationFlags, args...);
+    }
 
     template<typename T, typename... Args>
     bool refreshModel(string category, Args... args){
@@ -181,6 +186,10 @@ private:
     std::map<std::string, ConfigMenuItem> configMenuItems;
     ofxOceanodeCanvas canvas;
     shared_ptr<ofxOceanodeContainer> container;
+    ofxOceanodeContainer::UnusedNodePlan unusedNodePlan;
+    std::weak_ptr<ofxOceanodeContainer> unusedNodeContainer;
+    bool openUnusedNodesPopup = false;
+    bool unusedNodesPlanChanged = false;
     unique_ptr<ofxOceanodeControls> controls;
     unique_ptr<ofxOceanodeHelp> help;
     
@@ -221,6 +230,7 @@ private:
     // does not exist yet)
     string rootLayoutPath;
     std::string pendingIniLoad; // empty means no pending load
+    bool presetCanvasCenterPending = false;
 
     // Metadata for the most recently loaded ImGui layout. ImGui restores only
     // windows present in the .ini file, so controllers introduced after the
@@ -239,6 +249,8 @@ private:
 
     // Theme editor state
     bool showThemeEditor = false;
+    bool showThemeColorSearch = false;
+    char themeColorSearch[128] = "";
     void drawThemeEditorWindow();
     struct ThemeFontFamily {
         std::string name;

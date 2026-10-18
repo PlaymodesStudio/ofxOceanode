@@ -168,6 +168,17 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
 
 }
 
+void ofxOceanodeCanvas::resetViewToOrigin(){
+    scrolling = glm::vec2(0);
+    returnToOldScrolling = false;
+    // World (0,0) belongs at the viewport center, not its top-left corner.
+    // Wait for the loaded preset's layout to provide the current canvas size.
+    centerOriginPending = true;
+    pendingCenterNode = nullptr;
+    pendingCenterFrames = 0;
+    inspectorSelectionClick = {};
+}
+
 void ofxOceanodeCanvas::resetForNewPreset(){
     isSelecting = false;
     selectedRect = ofRectangle(0, 0, 0, 0);
@@ -190,6 +201,7 @@ void ofxOceanodeCanvas::resetForNewPreset(){
     pendingPortalAlignments.clear();
     pendingCenterNode = nullptr;
     pendingCenterFrames = 0;
+    inspectorSelectionClick = {};
     portalizeSelectionRequested = false;
     autoLayoutSelectionRequested = false;
     autoLayoutCanvasRequested = false;
@@ -201,6 +213,60 @@ void ofxOceanodeCanvas::resetForNewPreset(){
     filteredSearchResults.clear();
     selectedSearchResultIndex = -1;
     centerOriginPending = true;
+}
+
+void ofxOceanodeCanvas::rememberInspectorSelectionClick(const string& nodeID){
+    if(!ofxOceanodeShared::getSelectionCentersCanvas() ||
+       !ofxOceanodeShared::getAutoInspectorShowHide()) return;
+    inspectorSelectionClick.nodeID = nodeID;
+    inspectorSelectionClick.origin = canvasOrigin;
+    inspectorSelectionClick.size = contentRegionSize;
+    inspectorSelectionClick.lastInteractionFrame = ImGui::GetFrameCount();
+    inspectorSelectionClick.needsCenter = true;
+}
+
+void ofxOceanodeCanvas::recenterSelectionAfterInspectorLayout(){
+    if(inspectorSelectionClick.nodeID.empty()) return;
+    const auto& nodes = container->getParameterGroupNodesMap();
+    auto node = nodes.find(inspectorSelectionClick.nodeID);
+    if(!ofxOceanodeShared::getSelectionCentersCanvas() ||
+       !ofxOceanodeShared::getAutoInspectorShowHide() || node == nodes.end() ||
+       !node->second->getNodeGui().getSelected() ||
+       ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1) || ImGui::IsMouseClicked(2) ||
+       ImGui::GetIO().MouseWheel != 0.0f || ImGui::GetIO().MouseWheelH != 0.0f){
+        inspectorSelectionClick = {};
+        return;
+    }
+    // Controls delays Inspector appearance through mouse release. Observe the
+    // following docking frames too: macros draw before Controls, the root after it.
+    if(ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1) ||
+       ImGui::IsMouseReleased(0) || ImGui::IsMouseReleased(1)){
+        inspectorSelectionClick.lastInteractionFrame = ImGui::GetFrameCount();
+        return;
+    }
+    if(ImGui::GetFrameCount() - inspectorSelectionClick.lastInteractionFrame > 4){
+        inspectorSelectionClick = {};
+        return;
+    }
+    if(contentRegionSize.x <= 0.0f || contentRegionSize.y <= 0.0f) return;
+
+    const auto& click = inspectorSelectionClick;
+    // Every selection click centers once, including switching nodes while the
+    // Inspector is already open. Follow any subsequent docking changes as well.
+    if(click.needsCenter || std::abs(canvasOrigin.x - click.origin.x) > 0.5f ||
+       std::abs(canvasOrigin.y - click.origin.y) > 0.5f ||
+       std::abs(contentRegionSize.x - click.size.x) > 0.5f ||
+       std::abs(contentRegionSize.y - click.size.y) > 0.5f){
+        auto& nodeGui = node->second->getNodeGui();
+        // Center the full node at its current position, including after a drag.
+        const auto rectangle = nodeGui.getRectangle();
+        const glm::vec2 target = nodeGui.getPosition() +
+            glm::vec2(rectangle.getWidth(), rectangle.getHeight()) * 0.5f;
+        scrolling = contentRegionSize / (2.0f * zoomLevel) - target;
+        inspectorSelectionClick.origin = canvasOrigin;
+        inspectorSelectionClick.size = contentRegionSize;
+        inspectorSelectionClick.needsCenter = false;
+    }
 }
 
 void ofxOceanodeCanvas::handleParentNavigation(){
@@ -284,7 +350,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     }
     // Preset loads can create canvases while the Presets menu is still open.
     // Taking focus on appearance would dismiss that menu.
-    const ImGuiWindowFlags windowFlags = popupOpen ? ImGuiWindowFlags_NoFocusOnAppearing : ImGuiWindowFlags_None;
+    const ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
+        | (popupOpen ? ImGuiWindowFlags_NoFocusOnAppearing : ImGuiWindowFlags_None);
+    // Pan inside scrolling_region only. An overflowing toolbar can otherwise
+    // scroll this outer window invisibly, shifting the child left and leaving
+    // a blank strip on its right. Clear stale/navigation offsets before Begin
+    // computes the content rectangle, including on the first frame after load.
+    ImGui::SetNextWindowScroll(ImVec2(0.0f, 0.0f));
     if(ImGui::Begin(windowName.c_str(), open, windowFlags)){
         auto prepareNewNodeModal = [&](){
             searchField = "";
@@ -1093,6 +1165,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		      ImGui::PushItemWidth(120.0f);
 		      
 		      canvasOrigin = glm::vec2(ImGui::GetCursorScreenPos());
+              recenterSelectionAfterInspectorLayout();
               // Wait for the current dock/Inspector layout to supply a valid size.
               // Center independently of grid visibility and the Shift modifier.
               if(centerOriginPending && contentRegionSize.x > 0.0f && contentRegionSize.y > 0.0f){
@@ -1273,7 +1346,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         });
 		
         std::unordered_set<std::string> deletedIds;
-        bool rightClickClaimedByNode = false;
+        bool nodeHoverClaimed = false;
         // Display nodes
         //Iterating over the map gives errors as we are removing elements from the map during the iteration.
         for(auto nodePair : nodesVisibleInThisFrame)
@@ -1366,44 +1439,26 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 // Keep a local alias for backward compatibility in this scope
                 glm::vec2 size = screenSize;
 
-                // The arrow, name and X are separate ImGui items, so the node's
-                // invisible body button cannot reliably detect a header click.
-                // Nodes are visited front to back; claim the first node under
-                // the pointer so an obscured header cannot receive the click.
-                bool nodeOwnsRightClick = false;
-                bool nodeHeaderRightClickInSelection = false;
-                if(!rightClickClaimedByNode && ImGui::IsMouseClicked(1) &&
+                // Header text and controls are separate ImGui items. Hit-test
+                // the frontmost node explicitly, while preserving arrow/X clicks.
+                bool nodeHeaderHovered = false;
+                if(!nodeHoverClaimed &&
                    ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
                    ImGui::IsMouseHoveringRect(node_rect_min, node_rect_max)){
-                    rightClickClaimedByNode = true;
-                    nodeOwnsRightClick = true;
+                    nodeHoverClaimed = true;
                     const bool hasHeader = !(node->getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
                     if(hasHeader && ImGui::IsMouseHoveringRect(node_rect_min, node_rect_header)){
-                        // Right-clicking a node that is already part of a
-                        // multi-node selection must not collapse that selection:
-                        // the context menu's own "Auto Layout Selection" and
-                        // "Portalize Selection" entries are gated on the context
-                        // node being in a selection of more than one, so
-                        // deselecting here would remove the very options the
-                        // click was likely aiming for. The Inspector is left
-                        // alone in that case too -- it only ever shows a single
-                        // node, so there is nothing meaningful to focus it on.
-                        auto currentSelection = container->getSelectedModules();
-                        const bool keepExistingSelection = currentSelection.size() > 1 &&
-                            std::find(currentSelection.begin(), currentSelection.end(), node) != currentSelection.end();
-                        nodeHeaderRightClickInSelection = keepExistingSelection;
-                        if(!keepExistingSelection){
-                            deselectAllNodes();
-                            nodeGui.setSelected(true);
-                            lastSelectedNode = nodeId;
-                            ofxOceanodeShared::nodeSelectedInCanvas(node);
-                            ofxOceanodeShared::requestInspectorFocus();
-                        }
+                        nodeHeaderHovered = !node_widgets_active && !nodeGui.isHeaderControlHovered();
                         isAnyNodeHovered = true;
                         node_hovered_in_scene = nodeId;
+                        if(ImGui::IsMouseClicked(1)){
+                            // Context belongs to the clicked node; selection stays untouched.
+                            open_context_menu = true;
+                            customGuiContextNode = node;
+                        }
                     }
                 }
-                
+
                 // Display node box
                 draw_list->ChannelsSetCurrent(nodeDrawChannel); // Background
                 ImGui::SetCursorScreenPos(node_rect_min);
@@ -1415,18 +1470,12 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 {
                     isAnyNodeHovered = true;
                     node_hovered_in_scene = nodeId;
-                    if(nodeOwnsRightClick &&
-                       (nodeHeaderRightClickInSelection || !getPortalizableInputConnections(node).empty()) &&
-                       ImGui::GetMousePos().y <= node_rect_header.y){
-                        open_context_menu = true;
-                        customGuiContextNode = node;
-                    }
                 }
                 bool node_moving_active = ImGui::IsItemActive();
                 
                 bool toCheckPress = nodeGui.getSelected() && lastSelectedNode != nodeId ? ImGui::IsMouseReleased(0) : ImGui::IsMouseClicked(0);
                 
-                if(toCheckPress && ImGui::IsItemHovered(ImGuiHoveredFlags_None)){
+                if(toCheckPress && !nodeGui.isHeaderControlHovered() && (nodeHeaderHovered || ImGui::IsItemHovered(ImGuiHoveredFlags_None))){
                     if(nodeGui.getSelected() && lastSelectedNode == nodeId) lastSelectedNode = "";
                     if(!someDragAppliedToSelection || !nodeGui.getSelected()){
                         if(!ImGui::GetIO().KeyShift){
@@ -1444,9 +1493,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             nodeGui.setSelected(!nodeGui.getSelected());
                         }
                         if(nodeGui.getSelected()) lastSelectedNode = nodeId;
+                        if(nodeGui.getSelected()) rememberInspectorSelectionClick(nodeId);
                     }
                 }
-                if(ImGui::IsMouseReleased(0) && ImGui::IsItemHovered(ImGuiHoveredFlags_None) && nodeGui.getSelected() && lastSelectedNode == nodeId){
+                if(ImGui::IsMouseReleased(0) && (nodeHeaderHovered || ImGui::IsItemHovered(ImGuiHoveredFlags_None)) && nodeGui.getSelected() && lastSelectedNode == nodeId){
                     lastSelectedNode = "";
                 }
                 
@@ -2025,18 +2075,16 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         }
 
         if(open_context_menu && customGuiContextNode != nullptr){
-            ImGui::OpenPopup("Node Selection Menu");
+            ImGui::OpenPopup("Node Context");
         }
 
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 0.7f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
-        if(ImGui::BeginPopup("Node Selection Menu")){
-            // This menu is only ever opened for a node that belongs to a
-            // multi-node selection, so everything in it acts on that selection.
-            // The canvas-wide "Auto Layout Canvas" and the Custom GUI
-            // management menu used to live here too; both are reachable from
-            // the canvas right-click and the View menu, and neither had
-            // anything to do with the node that was clicked.
+        if(ImGui::BeginPopup("Node Context")){
+            ImGui::TextUnformatted("Node Context");
+            ImGui::Separator();
+            // Selection actions apply only if the context node already belongs
+            // to that selection. Right-clicking never changes its membership.
             if(customGuiContextNode != nullptr){
                 auto selectedNodes = container->getSelectedModules();
                 bool contextNodeIsSelected = std::find(selectedNodes.begin(), selectedNodes.end(), customGuiContextNode) != selectedNodes.end();
@@ -2462,6 +2510,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         const ImU32 connectionLineColor = darkCanvas
             ? OceanodeColors::U32(OceanodeColors::ConnectionLineDark)
             : OceanodeColors::U32(OceanodeColors::ConnectionLineLight);
+        const ImU32 selectedConnectionLineColor = darkCanvas
+            ? OceanodeColors::U32(OceanodeColors::ConnectionLineSelectedDark)
+            : OceanodeColors::U32(OceanodeColors::ConnectionLineSelectedLight);
         constexpr float nodeAttachmentTension = 1.5f;
         
         std::vector<ofxOceanodeAbstractConnection*> drawnConnections;
@@ -2480,7 +2531,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         glm::vec2  controlPoint(0,0);
                         controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);
                         const glm::vec2 nodeControlPoint = controlPoint * nodeAttachmentTension;
-                        draw_list->AddBezierCubic(p1, p1 + nodeControlPoint, p2 - nodeControlPoint, p2, connectionLineColor, connectionWidth);
+                        auto* sourceGui = container->getGuiFromModel(connection->getSourceParameter().getNodeModel());
+                        auto* sinkGui = container->getGuiFromModel(connection->getSinkParameter().getNodeModel());
+                        const bool selectedConnection = (sourceGui && sourceGui->getSelected()) ||
+                                                        (sinkGui && sinkGui->getSelected());
+                        const ImU32 lineColor = selectedConnection
+                            ? selectedConnectionLineColor : connectionLineColor;
+                        draw_list->AddBezierCubic(p1, p1 + nodeControlPoint, p2 - nodeControlPoint, p2, lineColor, connectionWidth);
                         drawnConnections.push_back(connection);
                     }
                 }
