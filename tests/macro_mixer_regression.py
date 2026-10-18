@@ -99,6 +99,7 @@ def production():
     m=(ROOT/'src/Nodes/ofxOceanodeNodeModel.cpp').read_text()
     result+=m[m.index('template<typename T>\nstatic bool oceanodeJsonToVector'):m.index('void ofxOceanodeNodeModel::deserializeParameter(')]+'\n'
     for sig in ['ofColor colorFromString(', 'ofxOceanodeNodeModel::ofxOceanodeNodeModel(',
+                'string ofxOceanodeNodeModel::getDescription()',
                 'void ofxOceanodeNodeModel::setNumIdentifier(', 'void ofxOceanodeNodeModel::setContainer(',
                 'void ofxOceanodeNodeModel::deserializeParameter(',
                 'ofxOceanodeFrameTransportState ofxOceanodeNodeModel::getFrameTransportState()']:

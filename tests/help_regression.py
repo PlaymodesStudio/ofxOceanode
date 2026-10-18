@@ -23,6 +23,9 @@ struct HeavyModel : ofxOceanodeNodeModel {
     HeavyModel(ImportedSpec) { ++constructions; }
 };
 int HeavyModel::constructions = 0;
+struct ExternalModel : HeavyModel {
+    std::string macroMixerBlocker() const override { return "External test output"; }
+};
 static bool known(const std::string& name) { return name == "Phasor" || name == "Oscillator"; }
 static bool rejected(const json& plan) {
     try { ofxOceanodeHelpPlan::validate(plan, known); return false; }
@@ -38,6 +41,14 @@ int main() {
     assert(registry.refreshModelNamed<HeavyModel>("Phasor", "Core"));
     assert(!registry.getModelDescriptions().at("Phasor").empty());
     assert(HeavyModel::constructions == 0);
+    // Named refreshes retain explicit mixer exclusions, but ordinary expensive
+    // models are still registered without constructing a prototype.
+    assert(registry.refreshModelNamed<ExternalModel>("External", "Core"));
+    assert(registry.macroMixerBlocker("External") == "External test output");
+    assert(HeavyModel::constructions == 1);
+    assert(registry.refreshModelNamed<HeavyModel>("External", "Core"));
+    assert(registry.macroMixerBlocker("External").empty());
+    assert(HeavyModel::constructions == 1);
     json answer = {{"answer", "Use a Phasor."}, {"nodes", json::array()}, {"connections", json::array()}};
     assert(!rejected(answer));
     json plan = {{"answer", "Connect Phase to Phase."},
@@ -81,7 +92,7 @@ def main():
         (work / 'ofMain.h').write_text('#pragma once\n#include <nlohmann/json.hpp>\nusing ofJson = nlohmann::json;\nusing namespace std;\n')
         (work / 'ofxOceanodeNodeModel.h').write_text('#pragma once\n#include "ofMain.h"\n'
             'class ofxOceanodeNodeModel { public: virtual ~ofxOceanodeNodeModel() = default; '
-            'string nodeName() { return "SC Imported"; } string getDescription() { return "Node description"; } };\n')
+            'virtual string macroMixerBlocker() const { return {}; } string nodeName() { return "SC Imported"; } string getDescription() { return "Node description"; } };\n')
         source = work / 'test.cpp'
         source.write_text(CASES)
         command = [os.environ.get('CXX', 'clang++'), '-std=c++17', '-Wall', '-Wextra',
