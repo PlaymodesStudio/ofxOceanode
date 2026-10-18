@@ -24,6 +24,7 @@
 #include <cmath>
 #include <cfloat>
 #include <deque>
+#include "PresetSaveCleanup.h"
 
 #ifdef OFXOCEANODE_USE_MIDI
 #include "ofxOceanodeMidiClock.h"
@@ -720,8 +721,7 @@ void ofxOceanodeContainer::saveCustomGuis(const std::string& presetPath)
 {
     pruneCustomGuiParameters();
     customGuiStoragePath = presetPath;
-    ofSavePrettyJson(getCustomGuiFilePath(presetPath), customGuiPanelsToJson(customGuiPanelsData));
-    customGuisDirty = false;
+    customGuisDirty = !oceanodePresetSave::saveJson(getCustomGuiFilePath(presetPath), customGuiPanelsToJson(customGuiPanelsData));
 }
 
 void ofxOceanodeContainer::saveCustomGuiSnapshots(const std::string& presetPath)
@@ -753,13 +753,12 @@ void ofxOceanodeContainer::saveCustomGuiSnapshots(const std::string& presetPath)
     customGuiSnapshotBanks = sanitizedBanks;
 
     if(customGuiSnapshotBanks.empty()){
-        if(ofFile::doesFileExist(filePath)) ofFile::removeFile(filePath);
+        if(ofFile::doesFileExist(filePath)) oceanodePresetSave::record(ofFile::removeFile(filePath));
         customGuiSnapshotsDirty = false;
         return;
     }
 
-    ofSavePrettyJson(filePath, customGuiSnapshotBanksToJson(customGuiSnapshotBanks));
-    customGuiSnapshotsDirty = false;
+    customGuiSnapshotsDirty = !oceanodePresetSave::saveJson(filePath, customGuiSnapshotBanksToJson(customGuiSnapshotBanks));
 }
 
 void ofxOceanodeContainer::saveCustomGuis()
@@ -960,7 +959,7 @@ void ofxOceanodeContainer::saveScope(const std::string& presetPath)
 	
 	// Save to file
 	std::string filepath = presetPath + "/scope_config.json";
-	ofSavePrettyJson(filepath, json);
+	oceanodePresetSave::saveJson(filepath, json);
 }
 
 void ofxOceanodeContainer::scheduleScopeSave(const std::string& presetPath)
@@ -1542,7 +1541,9 @@ void ofxOceanodeContainer::loadPreset_loadComments(string presetFolderPath){
     }
 }
 
-void ofxOceanodeContainer::savePreset(string presetFolderPath){
+bool ofxOceanodeContainer::savePreset(string presetFolderPath){
+    oceanodePresetSave::Scope save;
+    try {
     ofLog()<<"Save Preset " << presetFolderPath << " Canvas ID : " << getCanvasID() << endl;
     const bool ownsGlobalScope = getCanvasID().empty()
         || getCanvasID() == "Canvas"
@@ -1564,7 +1565,9 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
             json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y, 0}; //We add an element to know is persistent
         }
     }
-    ofSavePrettyJson(presetFolderPath + "/modules.json", json);
+    std::set<std::string> registered;
+    for(const auto& model : registry->getRegisteredModels()) registered.insert(model.first);
+    if(!save.prepare(presetFolderPath, json, registered)) return false;
     
     json.clear();
     for(auto &connection : connections){
@@ -1577,7 +1580,7 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
         }
     }
     
-    ofSavePrettyJson(presetFolderPath + "/connections.json", json);
+    oceanodePresetSave::saveJson(presetFolderPath + "/connections.json", json);
     
     
     for(auto &nodeTypeMap : dynamicNodes){
@@ -1600,7 +1603,7 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
             binding->savePreset(json[ofSplitString(bindingsPair.first, "-|-")[0]][ofSplitString(bindingsPair.first, "-|-")[1]][i]);
         }
     }
-    ofSavePrettyJson(presetFolderPath + "/midi.json", json);
+    oceanodePresetSave::saveJson(presetFolderPath + "/midi.json", json);
 #endif
 	
 	json.clear();
@@ -1619,16 +1622,16 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
 		json["Comments"][i]["TextColor"]["G"] = c.textColor.g;
 		json["Comments"][i]["TextColor"]["B"] = c.textColor.b;
 	}
-	ofSavePrettyJson(presetFolderPath + "/comments.json", json);
+	oceanodePresetSave::saveJson(presetFolderPath + "/comments.json", json);
 	
 	saveScope(presetFolderPath);
 	saveCustomGuis(presetFolderPath);
 	saveCustomGuiSnapshots(presetFolderPath);
-	if(timelineManager != nullptr) timelineManager->savePreset(presetFolderPath);
+	if(timelineManager != nullptr) oceanodePresetSave::record(timelineManager->savePreset(presetFolderPath));
     if(transportOwner){
         ofJson transportJson;
         transportJson["bpm"] = bpm;
-        ofSavePrettyJson(presetFolderPath + "/transport.json", transportJson);
+        oceanodePresetSave::saveJson(presetFolderPath + "/transport.json", transportJson);
     }
 #ifdef OFXOCEANODE_USE_MIDI
     if(midiClockSync) {
@@ -1641,9 +1644,11 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
         syncJson["stopOnClockLoss"] = midiClockSync->core().getStopOnClockLoss();
         syncJson["offsetMs"] = midiClockSync->core().getOffsetMs();
         syncJson["tempoWindow"] = midiClockSync->core().getTempoWindow();
-        ofSavePrettyJson(presetFolderPath + "/transportSync.json", syncJson);
+        oceanodePresetSave::saveJson(presetFolderPath + "/transportSync.json", syncJson);
     }
 #endif
+
+    if(!save.finish()) return false;
 
     // Saving a fresh patch (or Save As) attaches future scope edits to this
     // preset. New leaves the callback detached until a destination exists.
@@ -1651,6 +1656,11 @@ void ofxOceanodeContainer::savePreset(string presetFolderPath){
         ofxOceanodeScope::getInstance()->setScopeChangedCallback([this, presetFolderPath](){
             scheduleScopeSave(presetFolderPath);
         });
+    }
+    return true;
+    } catch(const std::exception& error){
+        ofLogError("Preset save") << presetFolderPath << ": " << error.what();
+        return oceanodePresetSave::record(false);
     }
 }
 
@@ -1810,7 +1820,9 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
     ofSavePrettyJson(presetFolderPath / "comments.json", json);
 }
 
-void ofxOceanodeContainer::savePersistent(){
+bool ofxOceanodeContainer::savePersistent(){
+    oceanodePresetSave::Scope save;
+    try {
     ofLog()<<"Save Persistent";
     string persistentFolderPath = "Persistent";
     
@@ -1829,7 +1841,9 @@ void ofxOceanodeContainer::savePersistent(){
             json[nodeTypeMap.first][ofToString(node.first)] = {pos.x, pos.y};
         }
     }
-    ofSavePrettyJson(persistentFolderPath + "/modules.json", json);
+    std::set<std::string> registered;
+    for(const auto& model : registry->getRegisteredModels()) registered.insert(model.first);
+    if(!save.prepare(persistentFolderPath, json, registered)) return false;
     
     json.clear();
     for(auto &connection : connections){
@@ -1840,7 +1854,7 @@ void ofxOceanodeContainer::savePersistent(){
         json[sourceParentName][sourceName][sinkParentName][sinkName];
     }
     
-    ofSavePrettyJson(persistentFolderPath + "/connections.json", json);
+    oceanodePresetSave::saveJson(persistentFolderPath + "/connections.json", json);
     
     
     for(auto &nodeTypeMap : dynamicNodes){
@@ -1868,8 +1882,13 @@ void ofxOceanodeContainer::savePersistent(){
             binding->savePreset(json[ofSplitString(bindingsPair.first, "-|-")[0]][ofSplitString(bindingsPair.first, "-|-")[1]][i]);
         }
     }
-    ofSavePrettyJson(persistentFolderPath + "/midi.json", json);
+    oceanodePresetSave::saveJson(persistentFolderPath + "/midi.json", json);
 #endif
+    return save.finish();
+    } catch(const std::exception& error){
+        ofLogError("Persistent save") << error.what();
+        return oceanodePresetSave::record(false);
+    }
 }
 
 void ofxOceanodeContainer::loadPersistent(){

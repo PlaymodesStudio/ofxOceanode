@@ -15,6 +15,7 @@
 #include "ofxOceanodeHelp.h"
 #include "defaultNodes.h"
 #include "ofxOceanodeMacroMixer.h"
+#include "Controls/PresetFileCleanupReview.h"
 #include <algorithm>
 #include <climits>
 #include <cstring>
@@ -657,6 +658,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
                 activeCanvas->requestAutoLayoutCanvas();
             }
             ImGui::Separator();
+            if(ImGui::MenuItem("Review leftover node files", nullptr, false,
+                               !activeContainerOwner->getPresetStoragePath().empty())){
+                oceanodePresetSave::CleanupReview::instance().request(activeContainerOwner);
+            }
             if(ImGui::MenuItem("Remove unused nodes")){
                 unusedNodeContainer = activeContainerOwner;
                 unusedNodePlan = activeContainerOwner->findUnusedNodes();
@@ -1072,6 +1077,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     // the active window context when the popups are registered.
 
     controls->drawPopups();
+    oceanodePresetSave::CleanupReview::instance().draw();
     if(openUnusedNodesPopup){
         ImGui::OpenPopup("Remove unused nodes");
         openUnusedNodesPopup = false;

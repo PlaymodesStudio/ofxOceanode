@@ -13,6 +13,7 @@ from new_preset_regression import block
 
 PRELUDE = r'''
 #include "MacroMixerRuntime.h"
+#include "PresetSaveCleanup.h"
 #include "ofxOceanodeMacroMixer.h"
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeTypesRegistry.h"
@@ -122,7 +123,7 @@ def native_production():
     for signature in [
         'ofxOceanodeTimelineManager& ofxOceanodeContainer::getTimelineManager()',
         'void ofxOceanodeContainer::activate()', 'void ofxOceanodeContainer::deactivate()',
-        'bool ofxOceanodeContainer::loadPreset(', 'void ofxOceanodeContainer::savePreset(',
+        'bool ofxOceanodeContainer::loadPreset(', 'bool ofxOceanodeContainer::savePreset(',
         'void ofxOceanodeContainer::loadPreset_presetWillBeLoaded()',
         'void ofxOceanodeContainer::loadPreset_loadNodes(',
         'void ofxOceanodeContainer::loadPreset_loadBeforeConnections(',

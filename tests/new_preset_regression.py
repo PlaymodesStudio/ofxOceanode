@@ -273,7 +273,7 @@ def main():
     production += app[app.index("const string previousRoot = rootLayoutPath;"):
                       app.index("// Only save from ImGui state")]
     production += block(app, "if(rootActive){") + "}\n"
-    save_method = block(container, "void ofxOceanodeContainer::savePreset(string presetFolderPath)")
+    save_method = block(container, "bool ofxOceanodeContainer::savePreset(string presetFolderPath)")
     production += "void ofxOceanodeContainer::attachSavedScope(string presetFolderPath){const bool ownsGlobalScope=getCanvasID().empty() || getCanvasID()==\"Canvas\" || getCanvasID()==\"0\";"
     production += block(save_method, "if(ownsGlobalScope){") + "}\n"
     with tempfile.TemporaryDirectory(prefix="oceanode-new-preset-") as tmp:

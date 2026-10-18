@@ -131,7 +131,10 @@ void ofStringReplace(string& s,const string& from,const string& to){
     size_t p=0;while((p=s.find(from,p))!=string::npos){s.replace(p,from.size(),to);p+=to.size();}
 }
 string ofToString(int n){return to_string(n);}
-void ofSavePrettyJson(const string&,const ofJson& j){written=j;}
+namespace oceanodePresetSave {
+struct Scope { bool finish(){return true;} };
+bool saveJson(const string&,const ofJson& j){written=j;return true;}
+}
 struct ofxOceanodeNode {
     ParameterGroup group; Model model; Gui gui;
     Model* nodeModel=&model;Gui* nodeGui=&gui;

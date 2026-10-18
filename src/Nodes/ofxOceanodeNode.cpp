@@ -11,6 +11,7 @@
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeConnection.h"
 #include "ofxOceanodeNodeGui.h"
+#include "PresetSaveCleanup.h"
 
 ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){
     nodeModelListeners.push(nodeModel->deleteModule.newListener([this](){
@@ -84,6 +85,7 @@ bool ofxOceanodeNode::loadPreset(string presetFolderPath){
 }
 
 void ofxOceanodeNode::savePreset(string presetFolderPath, bool saveBeforeConnectionValues){
+    oceanodePresetSave::Scope save;
     string scapedNodeName = nodeModel->nodeName();
     ofStringReplace(scapedNodeName, " ", "_");
     string filename = presetFolderPath + "/" + scapedNodeName + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json";
@@ -92,7 +94,8 @@ void ofxOceanodeNode::savePreset(string presetFolderPath, bool saveBeforeConnect
     nodeModel->presetSave(json);
 	nodeModel->macroSave(json, presetFolderPath);
     json["expanded"] = nodeGui->getExpanded();
-    ofSavePrettyJson(filename, json);
+    oceanodePresetSave::saveJson(filename, json);
+    save.finish();
 }
 
 bool ofxOceanodeNode::loadPersistentPreset(string presetFolderPath){
@@ -112,6 +115,7 @@ bool ofxOceanodeNode::loadPersistentPreset(string presetFolderPath){
 }
 
 void ofxOceanodeNode::savePersistentPreset(string presetFolderPath){
+    oceanodePresetSave::Scope save;
     string scapedNodeName = nodeModel->nodeName();
     ofStringReplace(scapedNodeName, " ", "_");
     string filename = presetFolderPath + "/" + scapedNodeName + "_" + ofToString(nodeModel->getNumIdentifier()) + ".json";
@@ -119,7 +123,8 @@ void ofxOceanodeNode::savePersistentPreset(string presetFolderPath){
     saveInspectorParametersToJson(json);
     nodeModel->presetSave(json);
 	nodeModel->macroSave(json, presetFolderPath);
-    ofSavePrettyJson(filename, json);
+    oceanodePresetSave::saveJson(filename, json);
+    save.finish();
 }
 
 void ofxOceanodeNode::presetWillBeLoaded(){

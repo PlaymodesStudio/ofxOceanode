@@ -130,7 +130,7 @@ public:
     shared_ptr<ofxOceanodeTypesRegistry> getTypesRegistry(){return typesRegistry;};
     
     bool loadPreset(string presetFolderPath);
-    void savePreset(string presetFolderPath);
+    bool savePreset(string presetFolderPath);
     const std::string& getPresetStoragePath() const { return customGuiStoragePath; }
     
     void loadPreset_presetWillBeLoaded();
@@ -148,7 +148,7 @@ public:
     bool loadClipboardModulesAndConnections(glm::vec2 referencePosition, bool allowOutsideInputs);
     void saveClipboardModulesAndConnections(vector<ofxOceanodeNode*> nodes, glm::vec2 referencePosition);
     
-    void savePersistent();
+    bool savePersistent();
     void loadPersistent();
     void updatePersistent();
     void saveCurrentPreset();
