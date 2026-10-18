@@ -168,6 +168,15 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
 
 }
 
+void ofxOceanodeCanvas::resetViewToOrigin(){
+    scrolling = glm::vec2(0);
+    returnToOldScrolling = false;
+    centerOriginPending = false;
+    pendingCenterNode = nullptr;
+    pendingCenterFrames = 0;
+    inspectorSelectionClick = {};
+}
+
 void ofxOceanodeCanvas::resetForNewPreset(){
     isSelecting = false;
     selectedRect = ofRectangle(0, 0, 0, 0);

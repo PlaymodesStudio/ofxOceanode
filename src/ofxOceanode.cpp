@@ -199,6 +199,16 @@ void ofxOceanode::setup(){
         if(ofxOceanodeShared::getPresetLoadType() != ofxOceanodePresetLoadType_FullPreset){
             return; // Don't reload layout for clipboard paste / duplicate
         }
+        std::function<void(ofxOceanodeContainer*, ofxOceanodeCanvas*)> resetCanvasViews =
+        [&](ofxOceanodeContainer* current, ofxOceanodeCanvas* currentCanvas){
+            currentCanvas->resetViewToOrigin();
+            for(auto* node : current->getAllModules()){
+                if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
+                    resetCanvasViews(macro->getContainer().get(), macro->getCanvas());
+                }
+            }
+        };
+        resetCanvasViews(container.get(), &canvas);
         if(ofxOceanodeShared::getCurrentPresetPath().empty()){
             pendingIniLoad.clear();
             ofxOceanodeShared::getPendingLayoutSavePath().clear();
