@@ -9,13 +9,16 @@
 #define noise_h
 
 #include "ofxOceanodeNodeModel.h"
+#include <cmath>
 
 class noise : public ofxOceanodeNodeModel{
 public:
     noise() : ofxOceanodeNodeModel("Noise"){};
     void setup(){
         color = ofColor(0, 200, 255);
-        description = "Creates a Perlin noise based on a always changing input";
+        description = "Creates noise from Input and Index. Scale controls the spacing across Index, "
+                      "while Seed selects a fixed noise pattern. Scale Smooth Ms sets the exponential "
+                      "response time for Scale changes (0 = immediate).";
         addParameter(input.set("Input", {0}, {0}, {FLT_MAX}));
         addParameter(index.set("Index", {0}, {0}, {1}));
         addParameter(scale.set("Scale", 1, 0, FLT_MAX));
@@ -24,9 +27,23 @@ public:
         addOutputParameter(output.set("Output", {0}, {0}, {1}));
         
         addInspectorParameter(crossfadePercentage.set("Crossfade Pct", 0, 0, 1));
+        addInspectorParameter(scaleSmoothMs.set("Scale Smooth Ms", 100, 0, FLT_MAX));
     }
 	
     void update(ofEventArgs &a){
+        // Smooth the coordinate scale, preserving the evolving Input/Speed signal.
+        // Start directly at the loaded value so a new node has no startup sweep.
+        if(!scaleInitialized || scaleSmoothMs.get() <= 0){
+            smoothedScale = scale.get();
+            scaleInitialized = true;
+        }else{
+            const auto frameTime = getFrameGlobalTimeState();
+            const double dt = std::max(0.0, frameTime.current.time - frameTime.previous.time);
+            const double blend = -std::expm1(-dt * 1000.0 / scaleSmoothMs.get());
+            smoothedScale += (static_cast<double>(scale.get()) - smoothedScale) * blend;
+        }
+        const float effectiveScale = static_cast<float>(smoothedScale);
+
         int maxSize = max({index->size(), seed->size(), input->size()});
         vector<float> tempOut(maxSize, 0);
         //Start Values
@@ -55,11 +72,11 @@ public:
                 float indexAtIndexLooped = indexAtIndex - indexAtEnd + indexAtStart;
                 float seedAtIndexLooped = seedAtIndex - seedAtEnd + seedAtStart;
                 
-                tempOut[i] = smoothinterpolate(ofNoise((inputAtIndex * speedAtIndex) + (indexAtIndex * scale), seedAtIndex * scale),
-                                    ofNoise((inputAtIndexLooped * speedAtIndexLooped) + (indexAtIndexLooped * scale), seedAtIndexLooped * scale),
+                tempOut[i] = smoothinterpolate(ofNoise((inputAtIndex * speedAtIndex) + (indexAtIndex * effectiveScale), seedAtIndex),
+                                    ofNoise((inputAtIndexLooped * speedAtIndexLooped) + (indexAtIndexLooped * effectiveScale), seedAtIndexLooped),
                                     interpol);
             }else{
-                tempOut[i] = ofNoise((inputAtIndex * speedAtIndex) + (indexAtIndex * scale), seedAtIndex * scale);
+                tempOut[i] = ofNoise((inputAtIndex * speedAtIndex) + (indexAtIndex * effectiveScale), seedAtIndex);
             }
             
         }
@@ -92,6 +109,9 @@ private:
     ofParameter<vector<float>> input;
     ofParameter<vector<float>>  index;
 	ofParameter<float>	scale;
+    ofParameter<float> scaleSmoothMs;
+    double smoothedScale = 1.0;
+    bool scaleInitialized = false;
     ofParameter<vector<float>> speed;
     ofParameter<vector<float>> seed;
     ofParameter<vector<float>>  output;
