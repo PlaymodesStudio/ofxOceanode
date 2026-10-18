@@ -2517,9 +2517,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         const ImU32 connectionLineColor = darkCanvas
             ? OceanodeColors::U32(OceanodeColors::ConnectionLineDark)
             : OceanodeColors::U32(OceanodeColors::ConnectionLineLight);
-        const ImU32 selectedConnectionLineColor = darkCanvas
-            ? OceanodeColors::U32(OceanodeColors::ConnectionLineSelectedDark)
-            : OceanodeColors::U32(OceanodeColors::ConnectionLineSelectedLight);
         constexpr float nodeAttachmentTension = 1.5f;
         
         std::vector<ofxOceanodeAbstractConnection*> drawnConnections;
@@ -2542,8 +2539,15 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         auto* sinkGui = container->getGuiFromModel(connection->getSinkParameter().getNodeModel());
                         const bool selectedConnection = (sourceGui && sourceGui->getSelected()) ||
                                                         (sinkGui && sinkGui->getSelected());
-                        const ImU32 lineColor = selectedConnection
-                            ? selectedConnectionLineColor : connectionLineColor;
+                        ImU32 lineColor = connectionLineColor;
+                        if(selectedConnection && sourceGui){
+                            // Both incoming and outgoing wires inherit their origin node's color.
+                            ImVec4 sourceColor(sourceGui->getColor(), 0.5f);
+                            sourceColor.x *= 0.5f;
+                            sourceColor.y *= 0.5f;
+                            sourceColor.z *= 0.5f;
+                            lineColor = OceanodeColors::U32(sourceColor);
+                        }
                         draw_list->AddBezierCubic(p1, p1 + nodeControlPoint, p2 - nodeControlPoint, p2, lineColor, connectionWidth);
                         drawnConnections.push_back(connection);
                     }

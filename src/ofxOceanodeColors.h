@@ -35,8 +35,6 @@ struct OceanodeColors {
     // ── Connection lines ─────────────────────────────────────────────────────
     inline static ImVec4 ConnectionLineLight          = {0.00f,  0.00f,  0.00f,  1.00f};  // wire on a light canvas
     inline static ImVec4 ConnectionLineDark           = {1.00f,  1.00f,  1.00f,  1.00f};  // wire on a dark canvas
-    inline static ImVec4 ConnectionLineSelectedLight  = {0.85f,  0.32f,  0.00f,  1.00f};
-    inline static ImVec4 ConnectionLineSelectedDark   = {1.00f,  0.50f,  0.00f,  1.00f};
     inline static ImVec4 ConnectionDragging           = {1.00f,  1.00f,  1.00f,  0.251f}; // dragging, no valid target
     inline static ImVec4 ConnectionDraggingReachable  = {1.00f,  1.00f,  1.00f,  0.502f}; // dragging, valid target reachable
 
@@ -131,8 +129,6 @@ struct OceanodeColors {
 
         ConnectionLineLight          = {0.00f,  0.00f,  0.00f,  1.00f};
         ConnectionLineDark           = {1.00f,  1.00f,  1.00f,  1.00f};
-        ConnectionLineSelectedLight  = {0.85f,  0.32f,  0.00f,  1.00f};
-        ConnectionLineSelectedDark   = {1.00f,  0.50f,  0.00f,  1.00f};
         ConnectionDragging           = {1.00f,  1.00f,  1.00f,  0.251f};
         ConnectionDraggingReachable  = {1.00f,  1.00f,  1.00f,  0.502f};
 
@@ -210,8 +206,6 @@ struct OceanodeColors {
             // Connection lines
             { "OC_ConnectionLineLight",          &ConnectionLineLight          },
             { "OC_ConnectionLineDark",           &ConnectionLineDark           },
-            { "OC_ConnectionLineSelectedLight",  &ConnectionLineSelectedLight  },
-            { "OC_ConnectionLineSelectedDark",   &ConnectionLineSelectedDark   },
             { "OC_ConnectionDragging",           &ConnectionDragging           },
             { "OC_ConnectionDraggingReachable",  &ConnectionDraggingReachable  },
             // Canvas grid
