@@ -157,9 +157,8 @@ void ofxOceanodeInspectorController::draw(){
 //        ImGui::PopStyleColor();
 //    }
 
-	// Inspector Parameters
-    ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
-    if(ImGui::TreeNode("Inspector Parameters")){
+    // Inspector parameters are always visible.
+    {
         for(int i = 0; i < node->getInspectorParameters().size(); i++){
             ofAbstractParameter &absParam = node->getInspectorParameters().get(i);
             const bool trackUserValue = absParam.valueType() != typeid(std::function<void()>).name();
@@ -361,7 +360,6 @@ void ofxOceanodeInspectorController::draw(){
             }
             ImGui::PopID();
         }
-        ImGui::TreePop();
     }
 
     ImGui::Separator();
