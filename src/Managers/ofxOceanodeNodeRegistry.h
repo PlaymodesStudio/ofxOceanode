@@ -46,6 +46,20 @@ public:
         }
     }
     
+    // Explicit declaration for audited generators/processors with no external effects.
+    template<typename ModelType, typename... Args>
+    void registerProcessingModel(string const category, Args... args){
+        const string name = ModelType(args...).nodeName();
+        if(registeredModelCreators.count(name) != 0) return;
+        registerModel<ModelType>(category, args...);
+        auto factory = registeredModelCreators.at(name);
+        registeredModelCreators[name] = [factory](){
+            auto model = factory();
+            model->setUnusedCleanupSafe(true);
+            return model;
+        };
+    }
+
     // Refresh factories for imported effects without disturbing running nodes
     // or a model registered by another category with the same name.
     template<typename ModelType, typename... Args>

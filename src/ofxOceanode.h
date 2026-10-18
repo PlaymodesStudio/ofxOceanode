@@ -57,6 +57,11 @@ public:
     };
 
     template<typename T, typename... Args>
+    void registerProcessingModel(string category, Args... args){
+        nodeRegistry->registerProcessingModel<T>(category, args...);
+    }
+
+    template<typename T, typename... Args>
     bool refreshModel(string category, Args... args){
         return nodeRegistry->refreshModel<T, Args...>(category, args...);
     }
@@ -180,6 +185,10 @@ private:
     std::map<std::string, ConfigMenuItem> configMenuItems;
     ofxOceanodeCanvas canvas;
     shared_ptr<ofxOceanodeContainer> container;
+    ofxOceanodeContainer::UnusedNodePlan unusedNodePlan;
+    std::weak_ptr<ofxOceanodeContainer> unusedNodeContainer;
+    bool openUnusedNodesPopup = false;
+    bool unusedNodesPlanChanged = false;
     unique_ptr<ofxOceanodeControls> controls;
     unique_ptr<ofxOceanodeHelp> help;
     

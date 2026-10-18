@@ -53,28 +53,28 @@ ofxOceanode::ofxOceanode(){
     registerBuiltInType<Timestamp>("timestamp", Timestamp());
     
     //Register default nodes
-    nodeRegistry->registerModel<oscillator>("Generators");
-    nodeRegistry->registerModel<chaoticOscillator>("Generators");
-    nodeRegistry->registerModel<phasor>("Generators");
+    nodeRegistry->registerProcessingModel<oscillator>("Generators");
+    nodeRegistry->registerProcessingModel<chaoticOscillator>("Generators");
+    nodeRegistry->registerProcessingModel<phasor>("Generators");
     nodeRegistry->registerModel<lfoTrack>("Generators");
 #ifdef OFXOCEANODE_USE_MIDI
     nodeRegistry->registerModel<midiClockNode>("Generators");
 #endif
-    nodeRegistry->registerModel<simpleNumberGenerator>("Generators");
-    nodeRegistry->registerModel<simpleNormalizedNumberGenerator>("Generators");
-    nodeRegistry->registerModel<counter>("Generators");
-    nodeRegistry->registerModel<ramp>("Generators");
-    nodeRegistry->registerModel<mapper>("Modifiers");
-    nodeRegistry->registerModel<ranger>("Modifiers");
-    nodeRegistry->registerModel<indexer>("Generators");
-    nodeRegistry->registerModel<reindexer>("Modifiers");
-    nodeRegistry->registerModel<smoother>("Modifiers");
-    nodeRegistry->registerModel<switcher>("Modifiers");
+    nodeRegistry->registerProcessingModel<simpleNumberGenerator>("Generators");
+    nodeRegistry->registerProcessingModel<simpleNormalizedNumberGenerator>("Generators");
+    nodeRegistry->registerProcessingModel<counter>("Generators");
+    nodeRegistry->registerProcessingModel<ramp>("Generators");
+    nodeRegistry->registerProcessingModel<mapper>("Modifiers");
+    nodeRegistry->registerProcessingModel<ranger>("Modifiers");
+    nodeRegistry->registerProcessingModel<indexer>("Generators");
+    nodeRegistry->registerProcessingModel<reindexer>("Modifiers");
+    nodeRegistry->registerProcessingModel<smoother>("Modifiers");
+    nodeRegistry->registerProcessingModel<switcher>("Modifiers");
     nodeRegistry->registerModel<curve>("Modifiers");
 	//nodeRegistry->registerModel<curve2>("Modifiers");
     nodeRegistry->registerModel<ofxOceanodeNodeMacro>("MACRO");
-    nodeRegistry->registerModel<noise>("Generators");
-    nodeRegistry->registerModel<randomGenerator>("Generators");
+    nodeRegistry->registerProcessingModel<noise>("Generators");
+    nodeRegistry->registerProcessingModel<randomGenerator>("Generators");
     nodeRegistry->registerModel<customGuiSnapshots>("Custom GUI");
     nodeRegistry->registerModel<beatTransport>("Timeline");
     nodeRegistry->registerModel<presetLoadTrigger>("General");
@@ -615,21 +615,23 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             const string activeCanvasId = ofxOceanodeShared::getActiveCanvasUniqueID().empty()
                 ? canvas.getUniqueID() : ofxOceanodeShared::getActiveCanvasUniqueID();
             ofxOceanodeContainer* activeContainer = container->getContainerForCanvasID(activeCanvasId);
+            shared_ptr<ofxOceanodeContainer> activeContainerOwner = container;
             ofxOceanodeCanvas* activeCanvas = nullptr;
-            std::function<void(ofxOceanodeContainer*, ofxOceanodeCanvas*)> findActiveCanvas =
-            [&](ofxOceanodeContainer* currentContainer, ofxOceanodeCanvas* currentCanvas){
+            std::function<void(shared_ptr<ofxOceanodeContainer>, ofxOceanodeCanvas*)> findActiveCanvas =
+            [&](shared_ptr<ofxOceanodeContainer> currentContainer, ofxOceanodeCanvas* currentCanvas){
                 if(activeCanvas != nullptr || currentContainer == nullptr || currentCanvas == nullptr) return;
                 if(currentCanvas->getUniqueID() == activeCanvasId){
                     activeCanvas = currentCanvas;
+                    activeContainerOwner = currentContainer;
                     return;
                 }
                 for(auto* node : currentContainer->getAllModules()){
                     if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
-                        findActiveCanvas(macro->getContainer().get(), macro->getCanvas());
+                        findActiveCanvas(macro->getContainer(), macro->getCanvas());
                     }
                 }
             };
-            findActiveCanvas(container.get(), &canvas);
+            findActiveCanvas(container, &canvas);
             if(activeContainer == nullptr) activeContainer = container.get();
             if(activeCanvas == nullptr) activeCanvas = &canvas;
 
@@ -643,6 +645,13 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             }
             if(ImGui::MenuItem("Auto Layout Canvas", nullptr, false, activeContainer->getAllModules().size() > 1)){
                 activeCanvas->requestAutoLayoutCanvas();
+            }
+            ImGui::Separator();
+            if(ImGui::MenuItem("Remove unused nodes")){
+                unusedNodeContainer = activeContainerOwner;
+                unusedNodePlan = activeContainerOwner->findUnusedNodes();
+                unusedNodesPlanChanged = false;
+                openUnusedNodesPopup = true;
             }
             ImGui::EndMenu();
         }
@@ -1053,6 +1062,66 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     // the active window context when the popups are registered.
 
     controls->drawPopups();
+    if(openUnusedNodesPopup){
+        ImGui::OpenPopup("Remove unused nodes");
+        openUnusedNodesPopup = false;
+    }
+    ImGui::SetNextWindowSizeConstraints(ImVec2(520, 0), ImVec2(720, FLT_MAX));
+    if(ImGui::BeginPopupModal("Remove unused nodes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+        auto target = unusedNodeContainer.lock();
+        size_t nodeCount = 0;
+        for(const auto& group : unusedNodePlan.groups) nodeCount += group.size();
+        ImGui::Text("Canvas: %s", target ? target->getCanvasID().c_str() : "(closed)");
+        ImGui::Text("Remove %zu nodes in %zu groups and %zu connections.",
+                    nodeCount, unusedNodePlan.groups.size(), unusedNodePlan.connectionCount);
+        ImGui::Text("Keep %zu nodes with usage or protected models.", unusedNodePlan.preservedNodes);
+        ImGui::TextWrapped("Custom GUI, snapshots, Timeline, MIDI, Scope, persistent nodes, "
+                           "and models with standalone or unknown effects are protected, together with their connected groups.");
+        if(nodeCount == 0) ImGui::TextUnformatted("No removable unused nodes found.");
+        if(nodeCount != 0 || !unusedNodePlan.protectedGroups.empty()){
+            ImGui::BeginChild("Unused node summary", ImVec2(0, 240), true);
+            for(size_t i = 0; i < unusedNodePlan.groups.size(); ++i){
+                ImGui::Text("Remove group %zu", i + 1);
+                for(const auto& name : unusedNodePlan.groups[i]) ImGui::BulletText("%s", name.c_str());
+            }
+            for(size_t i = 0; i < unusedNodePlan.protectedGroups.size(); ++i){
+                const auto& group = unusedNodePlan.protectedGroups[i];
+                ImGui::PushID(static_cast<int>(i));
+                const string title = (group.possiblyUnused ? "Possibly unused, protected: " : "In use, protected: ")
+                    + group.nodes.front() + " (" + ofToString(group.nodes.size()) + " nodes)";
+                ImGui::SetNextItemOpen(group.possiblyUnused, ImGuiCond_Appearing);
+                if(ImGui::TreeNode(title.c_str())){
+                    for(const auto& name : group.nodes) ImGui::BulletText("%s", name.c_str());
+                    for(const auto& reason : group.reasons) ImGui::TextWrapped("%s", reason.c_str());
+                    ImGui::TreePop();
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndChild();
+        }
+        if(unusedNodesPlanChanged) ImGui::TextWrapped("Usage changed. The summary has been refreshed; review it before removing.");
+        const bool targetChanged = target && target->getNodesRevision() != unusedNodePlan.revision;
+        if(targetChanged) ImGui::TextWrapped("The canvas changed. Refresh the summary before removing.");
+        ImGui::BeginDisabled(!target || targetChanged || nodeCount == 0);
+        if(ImGui::Button("Remove", ImVec2(120, 0))){
+            if(target->removeUnusedNodes(unusedNodePlan)) ImGui::CloseCurrentPopup();
+            else {
+                unusedNodePlan = target->findUnusedNodes();
+                unusedNodesPlanChanged = true;
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!target);
+        if(ImGui::Button("Refresh", ImVec2(120, 0))){
+            unusedNodePlan = target->findUnusedNodes();
+            unusedNodesPlanChanged = false;
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if(ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
     help->draw();
 
     if(showHelp){
