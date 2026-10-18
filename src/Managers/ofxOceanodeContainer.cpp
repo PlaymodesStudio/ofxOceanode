@@ -521,6 +521,13 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
 }
 
 bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
+    // Embedded Macros can reject incompatible source edits before native loading
+    // touches live nodes. The ordinary host registry has no load guard.
+    try { registry->checkFolderLoad(presetFolderPath); }
+    catch(const std::exception& e) {
+        ofLogWarning("Macro source") << e.what();
+        return false;
+    }
     ofLog()<<"Load Preset " << presetFolderPath;
     customGuiStoragePath = presetFolderPath;
     const bool ownsGlobalScope = getCanvasID().empty()
@@ -2000,7 +2007,7 @@ void ofxOceanodeContainer::setBpm(float _bpm, bool retimeTimeline){
 
     bpm = _bpm;
     if(transport != nullptr){
-        if(transportOwner) transport->setBpm(bpm);
+        transport->setBpm(bpm);
         if(preserveTimelineTime)
             transport->seekToBeat(stateBefore.beatPosition *
                 static_cast<double>(_bpm) / static_cast<double>(stateBefore.bpm));

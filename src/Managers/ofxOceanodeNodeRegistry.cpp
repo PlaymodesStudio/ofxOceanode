@@ -14,6 +14,7 @@ ofxOceanodeNodeRegistry::ofxOceanodeNodeRegistry(){
 }
 
 std::unique_ptr<ofxOceanodeNodeModel> ofxOceanodeNodeRegistry::create(const string typeName){
+    checkCanCreate(typeName);
     auto it = registeredModelCreators.find(typeName);
     
     if (it != registeredModelCreators.end())

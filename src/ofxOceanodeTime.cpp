@@ -10,6 +10,7 @@
 #include "phasor.h"
 #include "ofxOceanodeTimeController.h"
 #include "ofxOceanodeNodeMacro.h"
+#include "ofxOceanodeMacroMixer.h"
 #include "ofxOceanodeShared.h"
 #include <algorithm>
 
@@ -159,7 +160,7 @@ void ofxOceanodeTime::update(){
     bool forceFrameMode = false;
     vector<shared_ptr<basePhasor>> phasors;
     vector<timeGenerator*> timeGenerators;
-    std::function<void(shared_ptr<ofxOceanodeContainer>)> getPhasorsFromContainer = [this, &phasors, &getPhasorsFromContainer, &timeGenerators, &forceFrameMode](shared_ptr<ofxOceanodeContainer> c){
+    std::function<void(ofxOceanodeContainer*)> getPhasorsFromContainer = [this, &phasors, &getPhasorsFromContainer, &timeGenerators, &forceFrameMode](ofxOceanodeContainer* c){
         for(auto &n : c->getAllModules()){
             ofxOceanodeNodeModel *model = &n->getNodeModel();
             if(model->getFlags() & ofxOceanodeNodeModelFlags_ForceFrameMode){
@@ -172,12 +173,20 @@ void ofxOceanodeTime::update(){
                 timeGenerators.push_back(dynamic_cast<timeGenerator*>(model));
             }
             else if(dynamic_cast<ofxOceanodeNodeMacro*>(model) != nullptr){
-                getPhasorsFromContainer(dynamic_cast<ofxOceanodeNodeMacro*>(model)->getContainer());
+                getPhasorsFromContainer(dynamic_cast<ofxOceanodeNodeMacro*>(model)->getContainer().get());
+            }
+            else if(auto* mixer = dynamic_cast<ofxOceanodeMacroMixer*>(model)){
+                // Only live graphs participate. Validation captures and pending
+                // requests own no running clocks. Both sides advance in a fade.
+                if(const auto* runtime = mixer->mixerRuntime()) {
+                    if(const auto* graph = runtime->origin()) getPhasorsFromContainer(graph->container.get());
+                    if(const auto* graph = runtime->destination()) getPhasorsFromContainer(graph->container.get());
+                }
             }
         }
     };
     
-    getPhasorsFromContainer(container);
+    getPhasorsFromContainer(container.get());
     vector<shared_ptr<basePhasor>> oldPhasors;
     while(phasorChannel2.tryReceive(oldPhasors));
     phasorChannel2.send(phasors);

@@ -13,6 +13,7 @@
 #include "ofxOceanodeFloatingWindowDecor.h"
 #include "ofxOceanodeProportionalDocking.h"
 #include "defaultNodes.h"
+#include "ofxOceanodeMacroMixer.h"
 #include <algorithm>
 #include <climits>
 #include <cstring>
@@ -76,6 +77,8 @@ ofxOceanode::ofxOceanode(){
     nodeRegistry->registerModel<customGuiSnapshots>("Custom GUI");
     nodeRegistry->registerModel<beatTransport>("Timeline");
     nodeRegistry->registerModel<presetLoadTrigger>("General");
+
+    nodeRegistry->registerModel<ofxOceanodeMacroMixer>("Experimental");
 
     //Register default Routers
     nodeRegistry->registerModel<router<vector<float>>>("Router", "v_f", 0, 0, 1);

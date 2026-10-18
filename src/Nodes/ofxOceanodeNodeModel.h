@@ -42,7 +42,10 @@ public:
 	virtual void setup(string additionalInfo){};
     virtual void update(ofEventArgs &e){};
     virtual void draw(ofEventArgs &e){};
-
+    // Stable capability metadata, available before setup. MacroMixer analyses
+    // this declaration recursively and rejects the Macro before constructing it.
+    // Ordinary Macro loading does not apply this restriction.
+    virtual std::string macroMixerBlocker() const { return {}; }
 
     // Return true when a model renders an Inspector row itself, or hides it.
     // Registered parameters still keep their normal preset/undo behavior.

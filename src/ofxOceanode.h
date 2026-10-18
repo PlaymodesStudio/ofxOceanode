@@ -17,6 +17,7 @@
 #include "ofxOceanodeTypesRegistry.h"
 #include "ofxOceanodeScope.h"
 #include "ofxOceanodeTime.h"
+#include "MacroMixerMixing.h"
 
 //#include "ofxOceanodeAbstractTimeline.h"
 
@@ -79,6 +80,15 @@ public:
 		nodeRegistry->registerModel<portal<T>>("Portal", name, defaultValue);
 		nodeRegistry->registerModel<portalSelector<T>>("Portal", name, defaultValue);
     };
+    template<typename T>
+    void registerType(string name,T defaultValue,MacroMixerMixing::Definition<T> mixing){
+        registerType<T>(name,defaultValue);
+        auto& registry=MacroMixerMixing::registry();
+        if(registry.registerValueType<T>(mixing.type,"Router "+name,mixing.validate,defaultValue)) {
+            registry.registerValuePolicy<T>(mixing.type,mixing.policy,mixing.label,mixing.mix,mixing.options,true);
+            if(mixing.allowSwitch) registry.registerSwitchPolicy(mixing.type);
+        }
+    }
     
     template<typename T1, typename T2 = T1>
     void registerTypeWithBufferAndHeader(string name = typeid(T1).name(), T1 defaultValue = T1(),
