@@ -1,6 +1,13 @@
 # PresetMixer → MacroMixer migration audit
 
-Audit date: 2026-10-17. No remotes were updated.
+Original migration audit: 2026-10-17. No remotes were updated during that migration.
+
+The 2026-10-18 repository cleanup committed this work by feature and integrated
+remote development changes locally. MacroMixer is retained; the PresetMixer
+implementation is available only through the preserved archive history. See
+[repository cleanup and push instructions](repository-sync-2026-10-18.md) for the
+current branches, checks and publication status. The baseline table below records
+the original migration, before those commits.
 
 Each repository has a `codex/archive-preset-mixer-2026-10-17` snapshot of its
 PresetMixer development and a `codex/macro-mixer` working branch at the baseline
@@ -35,7 +42,7 @@ Unrelated untracked regression files and build output remain untouched.
 
 Old experimental tests/fixtures and the implementation diary are available on
 Oceanode’s archive branch. New tests cover native Macro execution and the adapted
-type backends. The working implementation changes are uncommitted for review.
+type backends. At the time of the original migration, the implementation changes were uncommitted for review.
 
 Validation completed under ASan/UBSan: native Macro lifecycle, extra/selected
 routers, input injection, feedback, nested local/global Macros, positive global
