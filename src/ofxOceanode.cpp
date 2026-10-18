@@ -1662,6 +1662,7 @@ void ofxOceanode::drawThemeEditorWindow(){
     if(ImGui::Begin(editorTitle.c_str(), &showThemeEditor)){
         ImGuiStyle& style = ImGui::GetStyle();
         ImVec4* colors = style.Colors;
+        bool colorFilterChanged = false;
 
         if(currentThemeName.empty()){
             ImGui::TextDisabled("OceanodeTheme (built-in)");
@@ -1676,6 +1677,28 @@ void ofxOceanode::drawThemeEditorWindow(){
             themeFontFamily.clear();
             pendingThemeFontChange = true;
             currentThemeName = "OceanodeTheme (built-in)";
+        }
+
+        ImGui::SameLine();
+        bool focusColorSearch = false;
+        if(ImGui::Button("[?]")){
+            showThemeColorSearch = !showThemeColorSearch;
+            focusColorSearch = showThemeColorSearch;
+            if(!showThemeColorSearch) themeColorSearch[0] = '\0';
+            colorFilterChanged = true;
+        }
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Filter color names in both color tabs");
+        if(showThemeColorSearch){
+            const float clearWidth = ImGui::CalcTextSize("Clear").x + style.FramePadding.x * 2.0f;
+            ImGui::SetNextItemWidth(std::max(40.0f, ImGui::GetContentRegionAvail().x - clearWidth - style.ItemSpacing.x));
+            if(focusColorSearch) ImGui::SetKeyboardFocusHere();
+            colorFilterChanged |= ImGui::InputTextWithHint("##theme_color_search", "Filter color names...",
+                                                          themeColorSearch, sizeof(themeColorSearch));
+            ImGui::SameLine();
+            if(ImGui::Button("Clear")){
+                themeColorSearch[0] = '\0';
+                colorFilterChanged = true;
+            }
         }
 
         ImGui::Separator();
@@ -1694,8 +1717,12 @@ void ofxOceanode::drawThemeEditorWindow(){
                 });
 
                 ImGui::BeginChild("##colorscroll_imgui", ImVec2(0, 0), false);
+                if(colorFilterChanged || ImGui::IsWindowAppearing()) ImGui::SetScrollY(0.0f);
+                int visibleColors = 0;
                 for(int idx : colorIndices){
                     const char* colorName = ImGui::GetStyleColorName(idx);
+                    if(themeColorSearch[0] && ImStristr(colorName, nullptr, themeColorSearch, nullptr) == nullptr) continue;
+                    ++visibleColors;
                     ImGui::PushID(idx);
                     if(ImGui::ColorEdit4(colorName, (float*)&colors[idx],
                                        ImGuiColorEditFlags_AlphaBar |
@@ -1704,28 +1731,36 @@ void ofxOceanode::drawThemeEditorWindow(){
                     }
                     ImGui::PopID();
                 }
+                if(visibleColors == 0) ImGui::TextDisabled("No matching colors.");
                 ImGui::EndChild();
                 ImGui::EndTabItem();
             }
 
             if(ImGui::BeginTabItem("Oceanode Colors")){
                 ImGui::BeginChild("##colorscroll_oc", ImVec2(0, 0), false);
+                if(colorFilterChanged || ImGui::IsWindowAppearing()) ImGui::SetScrollY(0.0f);
                 // Shared window/popup decoration sizes (colours: OC_FloatingWindow* below)
-                ImGui::Checkbox("Floating window / popup border and shadow", &ofxOceanodeFloatingWindowDecor::Enabled);
-                ImGui::SliderFloat("Window / popup border thickness", &ofxOceanodeFloatingWindowDecor::BorderThickness, 0.0f, 4.0f, "%.1f px");
-                ImGui::SliderFloat("Window / popup shadow size", &ofxOceanodeFloatingWindowDecor::ShadowSize, 0.0f, 40.0f, "%.0f px");
-                ImGui::Separator();
+                if(themeColorSearch[0] == '\0'){
+                    ImGui::Checkbox("Floating window / popup border and shadow", &ofxOceanodeFloatingWindowDecor::Enabled);
+                    ImGui::SliderFloat("Window / popup border thickness", &ofxOceanodeFloatingWindowDecor::BorderThickness, 0.0f, 4.0f, "%.1f px");
+                    ImGui::SliderFloat("Window / popup shadow size", &ofxOceanodeFloatingWindowDecor::ShadowSize, 0.0f, 40.0f, "%.0f px");
+                    ImGui::Separator();
+                }
                 auto fields = OceanodeColors::getFields();
                 std::sort(fields.begin(), fields.end(), [](const OceanodeColors::ColorField& a, const OceanodeColors::ColorField& b){
                     return strcmp(a.name, b.name) < 0;
                 });
+                int visibleColors = 0;
                 for(int i = 0; i < (int)fields.size(); i++){
+                    if(themeColorSearch[0] && ImStristr(fields[i].name, nullptr, themeColorSearch, nullptr) == nullptr) continue;
+                    ++visibleColors;
                     ImGui::PushID(i + ImGuiCol_COUNT);
                     ImGui::ColorEdit4(fields[i].name, (float*)fields[i].ptr,
                                       ImGuiColorEditFlags_AlphaBar |
                                       ImGuiColorEditFlags_AlphaPreviewHalf);
                     ImGui::PopID();
                 }
+                if(visibleColors == 0) ImGui::TextDisabled("No matching colors.");
                 ImGui::EndChild();
                 ImGui::EndTabItem();
             }

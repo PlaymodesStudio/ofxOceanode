@@ -247,6 +247,8 @@ private:
 
     // Theme editor state
     bool showThemeEditor = false;
+    bool showThemeColorSearch = false;
+    char themeColorSearch[128] = "";
     void drawThemeEditorWindow();
     struct ThemeFontFamily {
         std::string name;
