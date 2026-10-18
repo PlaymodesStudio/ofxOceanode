@@ -787,6 +787,14 @@ void ofxOceanodeTimelineController::draw() {
                       externalClock ? lockedTip : (transportState.isPlaying ? "Pause (Space)" : "Play (Space)"),
                       transportState.isPlaying, IM_COL32(90, 205, 125, 255), !externalClock))
             transport->setIsPlaying(!transportState.isPlaying);
+        ImGui::SameLine(0.0f, 6.0f);
+        {
+            bool playOnLoad = timeline.getPlayOnPresetLoad();
+            if(ImGui::Checkbox("Play on load##tbPlayOnLoad", &playOnLoad)) timeline.setPlayOnPresetLoad(playOnLoad);
+            if(ImGui::IsItemHovered())
+                ImGui::SetTooltip("Play on preset load: when this preset is loaded, the timeline plays from the start.\n"
+                                  "Saved with the preset (off by default).");
+        }
 
         groupSeparator();
         {

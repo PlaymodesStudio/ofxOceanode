@@ -9,6 +9,12 @@
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeTypesRegistry.h"
 #include "ofxOceanodeContainer.h"
+#include "ofxOceanodeNodeHelpCatalog.h"
+
+string ofxOceanodeNodeModel::getDescription(){
+    if(!description.empty()) return description;
+    return ofxOceanodeNodeHelpDescription(nodeName());
+}
 
 ofColor colorFromString(const std::string& input) {
     // Hash the input string

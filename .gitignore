@@ -116,3 +116,4 @@ Desktop.ini
 # Project specific
 #########################
 *.json
+!docs/node-help-catalog.json

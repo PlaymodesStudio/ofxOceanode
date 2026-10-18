@@ -165,6 +165,11 @@ public:
 		canvas.forceDockWindow();
 		canvas.requestFocus();
 	}
+	bool isWindowVisible() const { return showWindow; }
+	void setWindowVisible(bool visible){
+		if(visible) activateWindow();
+		else showWindow = false;
+	}
 	
 private:
 	// ─── Node management ──────────────────────────────────────────────────

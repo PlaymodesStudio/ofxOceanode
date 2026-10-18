@@ -776,6 +776,10 @@ public:
     const ofxOceanodeTimelineMarker* getMarker(const std::string& markerId) const;
 
     void setLoopEnabled(bool enabled);
+    // Play on preset load: when a preset with this on finishes loading, the
+    // transport starts from the beginning (saved per preset, off by default)
+    bool getPlayOnPresetLoad() const { return playOnPresetLoad; }
+    void setPlayOnPresetLoad(bool enabled) { playOnPresetLoad = enabled; }
     double getLoopStartBeat() const { return loopStartBeat; }
     double getLoopEndBeat() const { return loopEndBeat; }
     void setLoopRange(double startBeat, double endBeat);
@@ -956,6 +960,7 @@ private:
     std::vector<ofxOceanodeTimelineCurveTension> bpmCurveTensions;
     std::string bpmInterpolation = "Linear";
     bool loopEnabled = false;
+    bool playOnPresetLoad = false;
     double loopStartBeat = 0.0;
     double loopEndBeat = 4.0;
     bool loopWrappedThisFrame = false;

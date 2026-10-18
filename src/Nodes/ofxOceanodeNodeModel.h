@@ -100,7 +100,7 @@ public:
 	void deserializeParameter(ofJson &json, ofAbstractParameter &p);
     
     ofColor getColor(){return color;};
-    string getDescription(){return description;};
+    string getDescription();
     
     //For Macro
     virtual bool receiveOscMessage(ofxOscMessage &m){return false;};

@@ -463,6 +463,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     nodeModel->setContainer(this);
     auto node = make_shared<ofxOceanodeNode>(std::move(nodeModel));
 	node->setup(additionalInfo);
+    registry->setModelDescription(nodeToBeCreatedName, node->getNodeModel().getDescription());
 	auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);
 #ifdef OFXOCEANODE_USE_MIDI
         nodeGui->setIsListeningMidi(isListeningMidi);
@@ -592,6 +593,17 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     loadCustomGuiSnapshots(presetFolderPath);
 	
 	resetPhase();
+
+    // The timeline's "Play on preset load": everything is in place, play from the start
+    // (not in a macro's container, nor while an external clock drives the transport)
+    if(transportOwner && transport != nullptr && timelineManager != nullptr && timelineManager->getPlayOnPresetLoad()
+#ifdef OFXOCEANODE_USE_MIDI
+       && !isMidiClockSyncEnabled()
+#endif
+    ){
+        transport->seekToBeat(0.0);
+        transport->setIsPlaying(true);
+    }
 	
 	// Re-enable scope auto-save callback AFTER all loading is complete
 	// This must be the LAST step to avoid saving during any deferred cleanup

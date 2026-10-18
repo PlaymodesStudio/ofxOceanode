@@ -4571,6 +4571,7 @@ void ofxOceanodeTimelineManager::clear() {
     clipGroups.clear();
     markers.clear();
     viewState = {};
+    playOnPresetLoad = false;
     timebase = ofxOceanodeTimelineTimebase::Beats;
     nextTrackNumber = 1;
     nextBindingNumber = 1;
@@ -4709,6 +4710,7 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
         json["tempo"]["points"].push_back({{"beat", point.beat}, {"bpm", point.value}});
     for(const auto& tension : bpmCurveTensions)
         json["tempo"]["tensions"].push_back({{"inflection", tension.inflection}, {"steepness", tension.steepness}});
+    json["playOnPresetLoad"] = playOnPresetLoad;
     json["loop"] = {
         {"enabled", loopEnabled},
         {"startBeat", loopStartBeat},
@@ -4896,6 +4898,7 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
             kMinTimelinePixelsPerSecond, kMaxTimelinePixelsPerSecond);
         viewState.scrollX = std::max(0.0f, view.value("scrollX", 0.0f));
     }
+    playOnPresetLoad = json.value("playOnPresetLoad", false);
     if(!json.contains("tracks") || !json["tracks"].is_array()) return;
 
     std::set<std::string> loadedTrackIds;

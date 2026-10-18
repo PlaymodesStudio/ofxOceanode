@@ -12,6 +12,7 @@
 #include "imgui_internal.h"
 #include "ofxOceanodeFloatingWindowDecor.h"
 #include "ofxOceanodeProportionalDocking.h"
+#include "ofxOceanodeHelp.h"
 #include "defaultNodes.h"
 #include "ofxOceanodeMacroMixer.h"
 #include <algorithm>
@@ -170,6 +171,7 @@ void ofxOceanode::setup(){
     scope->setup();
     //controls = make_unique<ofxOceanodeControls>(container);
     controls = make_unique<ofxOceanodeControls>(container,&canvas, oscReceiverPort);
+    help = make_unique<ofxOceanodeHelp>(container);
     //        timelines.emplace_back("Phasor_1/Beats_Div");
     //        timelines.emplace_back("Oscillator_1/Pow");
     //        timelines.emplace_back("Indexer_1/NumWaves");
@@ -203,6 +205,7 @@ void ofxOceanode::setup(){
             ofxOceanodeShared::getPendingLayoutLoadPath().clear();
             ofxOceanodeShared::getActiveCanvasLayoutPath().clear();
             canvas.setLayoutIniPath("");
+            rootLayoutPath.clear();
             hasActivePreset = false;
             canvas.resetForNewPreset();
             ofxOceanodeShared::setActiveCanvasUniqueID(canvas.getUniqueID());
@@ -219,16 +222,24 @@ void ofxOceanode::setup(){
         // Set main canvas layout path
         canvas.setLayoutIniPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
         ofxOceanodeShared::getActiveCanvasLayoutPath() = iniPath;
+        rootLayoutPath = iniPath;
         hasActivePreset = true;
     });
 
     presetSavedListener = ofxOceanodeShared::getPresetWasSavedEvent().newListener([this](){
         string iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
         string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
+        // Save As: the preset's path is the new folder now, but the active
+        // layout path still names the root layout of the preset saved / loaded
+        // before. That is still the root canvas (not a macro's).
+        const string previousRoot = rootLayoutPath;
+        const bool rootActive = activeLayoutPath.empty() || activeLayoutPath == iniPath ||
+                                (!previousRoot.empty() && activeLayoutPath == previousRoot);
+        rootLayoutPath = iniPath;
         
         // Only save from ImGui state if the root canvas is active
         // (activeLayoutPath matches the preset's layout path).
-        if(activeLayoutPath.empty() || activeLayoutPath == iniPath){
+        if(rootActive){
             activeLayoutPath = iniPath;
             ImGui::SaveIniSettingsToDisk(iniPath.c_str());
             // Update cache
@@ -244,11 +255,17 @@ void ofxOceanode::setup(){
         // touches ImGuiLayout.ini), so we snapshot it before any ImGui write, then
         // put it back afterwards to guarantee it isn't lost.
         else if(!activeLayoutPath.empty()){
-            // Snapshot the root layout file from disk before any ImGui write
+            // Snapshot the root layout file from disk before any ImGui write.
+            // Save As: the new folder has none yet, take the previous preset's.
             string rootLayoutContent;
             if(ofFile(iniPath).exists()){
                 ofBuffer buf = ofBufferFromFile(iniPath);
                 rootLayoutContent = buf.getText();
+            }else if(!previousRoot.empty()){
+                auto& cache = ofxOceanodeShared::getLayoutContentCache();
+                auto cached = cache.find(previousRoot);
+                if(cached != cache.end() && !cached->second.empty()) rootLayoutContent = cached->second;
+                else if(ofFile(previousRoot).exists()) rootLayoutContent = ofBufferFromFile(previousRoot).getText();
             }
             
             // Save ImGui state (which is the macro's layout) to the macro's path
@@ -283,6 +300,7 @@ void ofxOceanode::setup(){
 }
 
 void ofxOceanode::update(){
+    if(help) help->update();
     for(auto &item : configMenuItems)
         if(item.second.update) item.second.update();
 #ifdef OFXOCEANODE_USE_OSC
@@ -636,10 +654,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 		    auto& controllers = controls->getControllers();
 		    auto& visibility = controls->getControllersVisibility();
 		    
-		    // Build pending state on first open (static local map)
+		    // Refresh on open to retain visibility changes made in Window.
 		    static std::map<std::string, bool> pendingVisibility;
 		    static bool pendingInitialized = false;
-		    if(!pendingInitialized){
+		    if(!pendingInitialized || ImGui::IsWindowAppearing()){
 		        pendingVisibility = visibility;
 		        pendingInitialized = true;
 		    }
@@ -1006,8 +1024,19 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             ImGui::EndMenu();
         }
 
+        if(beginTopLevelMenu("Window"))
+        {
+            help->drawWindowMenu(*controls);
+            ImGui::MenuItem("Theme Editor", nullptr, &showThemeEditor);
+            ImGui::MenuItem("User Manual", nullptr, &showManual);
+            ImGui::MenuItem("Metrics", nullptr, &show_app_metrics);
+            ImGui::EndMenu();
+        }
+
         if(beginTopLevelMenu("Help"))
         {
+            help->drawMenu();
+            ImGui::Separator();
             ImGui::MenuItem("Show User Manual", "CMD+L", &showManual);
             if(ImGui::MenuItem("Show Help", "CMD+H")){
                 showHelp = true;
@@ -1024,6 +1053,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     // the active window context when the popups are registered.
 
     controls->drawPopups();
+    help->draw();
 
     if(showHelp){
         ImGui::OpenPopup("Here are some tips:");

@@ -31,6 +31,7 @@
 #include "bufferHeaderPro.h"
 
 class ofxOceanodeProportionalDocking;
+class ofxOceanodeHelp;
 
 class ofxOceanode {
 public:
@@ -58,6 +59,12 @@ public:
     template<typename T, typename... Args>
     bool refreshModel(string category, Args... args){
         return nodeRegistry->refreshModel<T, Args...>(category, args...);
+    }
+
+    // The same when the node's name is known (no model built to read it)
+    template<typename T, typename... Args>
+    bool refreshModelNamed(const string& name, string category, Args... args){
+        return nodeRegistry->refreshModelNamed<T, Args...>(name, category, args...);
     }
 
     // Addons own their menu action and optional background-task/UI callbacks.
@@ -174,6 +181,7 @@ private:
     ofxOceanodeCanvas canvas;
     shared_ptr<ofxOceanodeContainer> container;
     unique_ptr<ofxOceanodeControls> controls;
+    unique_ptr<ofxOceanodeHelp> help;
     
     shared_ptr<ofxOceanodeNodeRegistry> nodeRegistry;
     shared_ptr<ofxOceanodeTypesRegistry> typesRegistry;
@@ -207,6 +215,10 @@ private:
     ofEventListener presetLoadedListener;
     ofEventListener presetSavedListener;
     bool hasActivePreset = false;
+    // The root canvas layout file of the preset loaded / saved last: after a
+    // Save As the active layout path still names it (the new folder's file
+    // does not exist yet)
+    string rootLayoutPath;
     std::string pendingIniLoad; // empty means no pending load
 
     // Metadata for the most recently loaded ImGui layout. ImGui restores only

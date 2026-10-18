@@ -35,6 +35,8 @@ public:
 		std::string fixHint = "Describe the issue, or leave blank for a general repair.";
 		std::string generateButton = "Generate";
 		std::string fixButton = "Fix code";
+		std::string generateModeLabel = "Generate";
+		std::string fixModeLabel = "Fix current";
 		std::string pendingHint = "The result will replace the current code when ready.";
 		// Status shown after a successful apply.
 		std::string readyMessage = "AI code ready";
@@ -161,9 +163,9 @@ public:
 			ImGui::PopStyleColor(2);
 			return clicked;
 		};
-		if(modeButton("Generate##oceanode_ai_mode", !fixMode)) fixMode = false;
+		if(modeButton((spec.generateModeLabel + "##oceanode_ai_mode").c_str(), !fixMode)) fixMode = false;
 		ImGui::SameLine(0, 2);
-		if(modeButton("Fix current##oceanode_ai_mode", fixMode)) fixMode = true;
+		if(modeButton((spec.fixModeLabel + "##oceanode_ai_mode").c_str(), fixMode)) fixMode = true;
 
 		ImGui::Separator();
 		ImGui::Spacing();
