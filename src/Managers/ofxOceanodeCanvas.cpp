@@ -27,6 +27,8 @@
 #include "ofxOceanodeNodeMacro.h"
 #include "portal.h"
 #include "ofxOceanodeAutoLayout.h"
+#include "ofxOceanodeConnectionDrawing.h"
+#include <unordered_map>
 
 static bool isCanvasHoveredForWheel(){
     if(!ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_NoPopupHierarchy))
@@ -2518,6 +2520,20 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             ? OceanodeColors::U32(OceanodeColors::ConnectionLineDark)
             : OceanodeColors::U32(OceanodeColors::ConnectionLineLight);
         constexpr float nodeAttachmentTension = 1.5f;
+        oceanodeConnectionDrawing::Renderer connectionRenderer(draw_list);
+        std::unordered_map<string, bool> scBusTypes;
+        // Resolve the registered name once per value type per frame; the canvas
+        // does not need a SuperCollider dependency or a compiler-specific type name.
+        auto isScBusParameter = [&](ofxOceanodeAbstractParameter* parameter){
+            if(parameter == nullptr) return false;
+            const string type = parameter->valueType();
+            auto cached = scBusTypes.find(type);
+            if(cached != scBusTypes.end()) return cached->second;
+            auto registry = container->getTypesRegistry();
+            const bool scBus = registry && registry->getTypeNameFromTypeDescription(type) == "ScBus";
+            scBusTypes.emplace(type, scBus);
+            return scBus;
+        };
         
         std::unordered_set<ofxOceanodeAbstractConnection*> drawnConnections;
         
@@ -2550,7 +2566,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             sourceColor.z *= 0.5f;
                             lineColor = OceanodeColors::U32(sourceColor);
                         }
-                        draw_list->AddBezierCubic(p1, p1 + nodeControlPoint, p2 - nodeControlPoint, p2, lineColor, connectionWidth);
+                        connectionRenderer.bezier(p1, p1 + nodeControlPoint, p2 - nodeControlPoint, p2,
+                                                  lineColor, connectionWidth,
+                                                  isScBusParameter(&sourceParameter) || isScBusParameter(&sinkParameter),
+                                                  zoomLevel);
                     }
                 }
 
@@ -2583,10 +2602,12 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 c.z = darkLine.z;
                 c.w *= darkLine.w;
             }
-            draw_list->AddBezierCubic(p1,
+            connectionRenderer.bezier(p1,
                                       p1 + (tempSourceParameter != nullptr ? nodeControlPoint : controlPoint),
                                       p2 - (tempSourceParameter != nullptr ? controlPoint : nodeControlPoint),
-                                      p2, OceanodeColors::U32(c), connectionWidth);
+                                      p2, OceanodeColors::U32(c), connectionWidth,
+                                      isScBusParameter(tempSourceParameter) || isScBusParameter(tempSinkParameter),
+                                      zoomLevel);
         }
         
         draw_list->ChannelsMerge();
