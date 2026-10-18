@@ -463,6 +463,7 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     nodeModel->setContainer(this);
     auto node = make_shared<ofxOceanodeNode>(std::move(nodeModel));
 	node->setup(additionalInfo);
+    registry->setModelDescription(nodeToBeCreatedName, node->getNodeModel().getDescription());
 	auto nodeGui = make_unique<ofxOceanodeNodeGui>(*this, *node);
 #ifdef OFXOCEANODE_USE_MIDI
         nodeGui->setIsListeningMidi(isListeningMidi);

@@ -45,6 +45,12 @@ with `euclideanGenerator` as the class, and `"Generators"` as the category name.
 
 - For creating custom nodes, check out example-basic.
 
+- **Help > Search nodes** searches registered nodes and their descriptions.
+  **Help > AI assistant** answers questions or proposes a small patch through
+  Requesty, using the same credentials as Formula and DynGen.
+- **Window** lists controllers, node windows, macro canvases and custom GUIs.
+  See [Help and window menus](docs/help-and-windows.md) for setup and maintenance.
+
 - In a Macro canvas, press **Cmd+Up Arrow** (**Ctrl+Up Arrow** on Windows/Linux)
   to focus its parent canvas and center on the Macro node. Each press moves up
   one level; the shortcut is inactive while editing a widget or using a popup.

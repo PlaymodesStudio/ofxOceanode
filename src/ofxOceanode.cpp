@@ -12,6 +12,7 @@
 #include "imgui_internal.h"
 #include "ofxOceanodeFloatingWindowDecor.h"
 #include "ofxOceanodeProportionalDocking.h"
+#include "ofxOceanodeHelp.h"
 #include "defaultNodes.h"
 #include <algorithm>
 #include <climits>
@@ -167,6 +168,7 @@ void ofxOceanode::setup(){
     scope->setup();
     //controls = make_unique<ofxOceanodeControls>(container);
     controls = make_unique<ofxOceanodeControls>(container,&canvas, oscReceiverPort);
+    help = make_unique<ofxOceanodeHelp>(container);
     //        timelines.emplace_back("Phasor_1/Beats_Div");
     //        timelines.emplace_back("Oscillator_1/Pow");
     //        timelines.emplace_back("Indexer_1/NumWaves");
@@ -295,6 +297,7 @@ void ofxOceanode::setup(){
 }
 
 void ofxOceanode::update(){
+    if(help) help->update();
     for(auto &item : configMenuItems)
         if(item.second.update) item.second.update();
 #ifdef OFXOCEANODE_USE_OSC
@@ -648,10 +651,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 		    auto& controllers = controls->getControllers();
 		    auto& visibility = controls->getControllersVisibility();
 		    
-		    // Build pending state on first open (static local map)
+		    // Refresh on open to retain visibility changes made in Window.
 		    static std::map<std::string, bool> pendingVisibility;
 		    static bool pendingInitialized = false;
-		    if(!pendingInitialized){
+		    if(!pendingInitialized || ImGui::IsWindowAppearing()){
 		        pendingVisibility = visibility;
 		        pendingInitialized = true;
 		    }
@@ -1018,8 +1021,19 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             ImGui::EndMenu();
         }
 
+        if(beginTopLevelMenu("Window"))
+        {
+            help->drawWindowMenu(*controls);
+            ImGui::MenuItem("Theme Editor", nullptr, &showThemeEditor);
+            ImGui::MenuItem("User Manual", nullptr, &showManual);
+            ImGui::MenuItem("Metrics", nullptr, &show_app_metrics);
+            ImGui::EndMenu();
+        }
+
         if(beginTopLevelMenu("Help"))
         {
+            help->drawMenu();
+            ImGui::Separator();
             ImGui::MenuItem("Show User Manual", "CMD+L", &showManual);
             if(ImGui::MenuItem("Show Help", "CMD+H")){
                 showHelp = true;
@@ -1036,6 +1050,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     // the active window context when the popups are registered.
 
     controls->drawPopups();
+    help->draw();
 
     if(showHelp){
         ImGui::OpenPopup("Here are some tips:");

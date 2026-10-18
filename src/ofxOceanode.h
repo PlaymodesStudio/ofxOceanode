@@ -30,6 +30,7 @@
 #include "bufferHeaderPro.h"
 
 class ofxOceanodeProportionalDocking;
+class ofxOceanodeHelp;
 
 class ofxOceanode {
 public:
@@ -170,6 +171,7 @@ private:
     ofxOceanodeCanvas canvas;
     shared_ptr<ofxOceanodeContainer> container;
     unique_ptr<ofxOceanodeControls> controls;
+    unique_ptr<ofxOceanodeHelp> help;
     
     shared_ptr<ofxOceanodeNodeRegistry> nodeRegistry;
     shared_ptr<ofxOceanodeTypesRegistry> typesRegistry;
