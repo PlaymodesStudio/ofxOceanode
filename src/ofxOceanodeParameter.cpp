@@ -9,6 +9,13 @@
 #include "ofMath.h"
 #include "ofxOceanodeConnection.h"
 #include "ofxOceanodeScope.h"
+#include "ofxOceanodeNodeModel.h"
+
+void ofxOceanodeAbstractParameter::setNodeModel(ofxOceanodeNodeModel* model){
+    nodeModel = model;
+    profilingRecord = model ? model->getProfilingRecord() : nullptr;
+    if(profilingHook) profilingHook->setRecord(profilingRecord);
+}
 
 void ofxOceanodeAbstractParameter::removeAllConnections(){
     if(inConnection != nullptr) inConnection->deleteSelf();

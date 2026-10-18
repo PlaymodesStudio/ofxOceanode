@@ -37,6 +37,7 @@ ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
 }
 
 bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget, float zoomLevel){
+    oceanodeProfiling::Scope timing(node.getNodeModel().getProfilingRecord(), oceanodeProfiling::Phase::Gui);
     headerControlHovered = false;
     string moduleName = getParameters().getName();
     const bool renderGui = (zoomLevel > 0.5f) ||

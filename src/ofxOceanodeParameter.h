@@ -9,6 +9,7 @@
 #define ofxOceanodeParameter_h
 
 #include "ofParameter.h"
+#include "Profiling/ofxOceanodeParameterProfiling.h"
 
 class ofxOceanodeAbstractConnection;
 class ofxOceanodeNodeModel;
@@ -135,6 +136,7 @@ public:
     }
     
     bool receiveParameter(ofAbstractParameter *p){
+        oceanodeProfiling::Scope timing(profilingRecord, oceanodeProfiling::Phase::Parameters);
         auto it = connnectionFunctions.find(p->valueType());
         if(it != connnectionFunctions.end())
         {
@@ -175,10 +177,12 @@ public:
         if(forwardTargets) for(auto* target : forwardTargets()) target->disconnectedParameter();
     };
     
-    void setNodeModel(ofxOceanodeNodeModel* _nodeModel){nodeModel = _nodeModel;};
+    void setNodeModel(ofxOceanodeNodeModel* _nodeModel);
     ofxOceanodeNodeModel* getNodeModel(){return nodeModel;};
 	
 protected:
+	std::shared_ptr<oceanodeProfiling::ParameterHook> profilingHook;
+    std::shared_ptr<oceanodeProfiling::Record> profilingRecord;
 	virtual const ofParameterGroup getFirstParent() const = 0;
 	virtual void setSerializable(bool serializable)=0;
     virtual std::string escape(const std::string & str) const = 0;
@@ -196,7 +200,7 @@ private:
     std::function<std::vector<ofxOceanodeAbstractParameter*>()> forwardTargets;
     ofAbstractParameter* forwardedSource = nullptr;
     
-    ofxOceanodeNodeModel* nodeModel;
+    ofxOceanodeNodeModel* nodeModel = nullptr;
 };
 
 template<typename ParameterType>
@@ -233,11 +237,13 @@ public:
 		if(parameter == nullptr){
 			parameter = std::make_shared<ofParameter<ParameterType>>(p);
 			defaultValue = p;
+			profilingHook = oceanodeProfiling::ParameterHook::bind(*parameter);
 		}
 	}
     void bindParameter(std::shared_ptr<ofParameter<ParameterType>> &p){
         parameter = p;
         defaultValue = p.get()->get();
+        profilingHook = oceanodeProfiling::ParameterHook::bind(*parameter);
     }
 	ofParameter<ParameterType> & getParameter(){return *parameter;}
     
@@ -304,6 +310,7 @@ public:
 	//Custom
 	void bindParameter(ofParameter<void> &p){
 		parameter = std::make_shared<ofParameter<void>>(p);
+		profilingHook = oceanodeProfiling::ParameterHook::bind(*parameter);
 	}
 	ofParameter<void> & getParameter(){return *parameter;}
 	

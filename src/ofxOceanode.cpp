@@ -316,6 +316,7 @@ void ofxOceanode::setup(){
 }
 
 void ofxOceanode::update(){
+    container->getProfilingSession()->nextFrame();
     if(help) help->update();
     for(auto &item : configMenuItems)
         if(item.second.update) item.second.update();

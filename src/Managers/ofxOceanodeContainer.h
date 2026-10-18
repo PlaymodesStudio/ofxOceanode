@@ -78,6 +78,9 @@ public:
     
     void update();
     void draw();
+    std::shared_ptr<oceanodeProfiling::Session> getProfilingSession() const {
+        return timelineHost ? timelineHost->getProfilingSession() : profilingSession;
+    }
     static void drawPendingConnectionErrorDialog();
     
     void activate();
@@ -326,6 +329,7 @@ public:
     const std::unordered_map<string, nodeContainerWithId>& getDynamicNodes() const { return dynamicNodes; }
     
 private:
+    std::shared_ptr<oceanodeProfiling::Session> profilingSession = std::make_shared<oceanodeProfiling::Session>();
     struct ResolvedParameter {
         ofxOceanodeAbstractParameter* parameter;
         ofxOceanodeNode* node;

@@ -77,6 +77,7 @@ void ofxOceanodeInspectorController::draw(){
     }
 
     auto &node = selectedNodes[0].second;
+    oceanodeProfiling::Scope timing(node->getNodeModel().getProfilingRecord(), oceanodeProfiling::Phase::Gui);
     auto* owningContainer = container->getContainerForCanvasID(node->getNodeModel().getParents());
     if(owningContainer == nullptr) owningContainer = node->getNodeModel().getHostContainer();
 

@@ -34,12 +34,18 @@ void ofxOceanodeNode::setup(string additionalInfo){
 
 //TODO: remove event args
 void ofxOceanodeNode::update(ofEventArgs &e){
-    nodeModel->update(e);
+    {
+        oceanodeProfiling::Scope timing(nodeModel->getProfilingRecord(), oceanodeProfiling::Phase::Update);
+        nodeModel->update(e);
+    }
     nodeGui->update(e);
 }
 
 void ofxOceanodeNode::draw(ofEventArgs &e){
-    nodeModel->draw(e);
+    {
+        oceanodeProfiling::Scope timing(nodeModel->getProfilingRecord(), oceanodeProfiling::Phase::Draw);
+        nodeModel->draw(e);
+    }
     nodeGui->draw(e);
 }
 

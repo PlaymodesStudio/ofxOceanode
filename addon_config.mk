@@ -53,6 +53,7 @@ common:
 	# ADDON_SOURCES =
 	ADDON_SOURCES += src/Timeline/ofxOceanodeTimeline.cpp
 	ADDON_SOURCES += src/Controls/ofxOceanodeTimelineController.cpp
+	ADDON_SOURCES += src/Controls/ofxOceanodeProfilingController.cpp
 
 	# some addons need resources to be copied to the bin/data folder of the project
 	# specify here any files that need to be copied, you can use wildcards like * and ?

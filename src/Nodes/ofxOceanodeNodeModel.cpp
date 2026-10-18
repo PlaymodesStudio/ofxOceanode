@@ -34,6 +34,18 @@ ofColor colorFromString(const std::string& input) {
 }
 
 ofxOceanodeNodeModel::ofxOceanodeNodeModel(string _name) : nameIdentifier(_name){
+    profilingRecord->identity = [this](){
+        auto name = parameters.getName();
+        const auto suffix = getNodeTitleSuffix();
+        if(!suffix.empty()) name += " (" + suffix + ")";
+        return oceanodeProfiling::Record::Identity{name,
+            hostContainer ? hostContainer->getCanvasDisplayPath() : std::string()};
+    };
+    for(auto* group : {&parameters, &inspectorParameters}){
+        auto hook = oceanodeProfiling::ParameterHook::bindGroup(*group);
+        hook->setRecord(profilingRecord);
+        inspectorProfilingHooks.push_back(std::move(hook));
+    }
     parameters.setName(_name);
     color = colorFromString(_name);
     numIdentifier = -1;
@@ -107,6 +119,7 @@ void ofxOceanodeNodeModel::deserializeParameter(ofJson &json, ofAbstractParamete
 
 void ofxOceanodeNodeModel::setContainer(ofxOceanodeContainer* container){
     hostContainer = container;
+    container->getProfilingSession()->attach(profilingRecord);
 	canvasID = container->getCanvasID();
 };
 

@@ -36,7 +36,8 @@ public:
     using customGuiRegion = ofParameter<std::function<void()>>;
     
     ofxOceanodeNodeModel(string _name);
-    virtual ~ofxOceanodeNodeModel(){};
+    virtual ~ofxOceanodeNodeModel(){ profilingRecord->setEnabled(false); profilingRecord->identity = {}; };
+    const std::shared_ptr<oceanodeProfiling::Record>& getProfilingRecord() const { return profilingRecord; }
     
     virtual void setup(){};
 	virtual void setup(string additionalInfo){};
@@ -117,6 +118,12 @@ public:
     ofxOceanodeFrameTimeState getFrameGlobalTimeState() const;
     
     void addInspectorParameter(ofAbstractParameter& p){
+        inspectorParameters.add(p);
+    }
+    template<typename T> void addInspectorParameter(ofParameter<T>& p){
+        auto hook = oceanodeProfiling::ParameterHook::bind(p);
+        hook->setRecord(profilingRecord);
+        inspectorProfilingHooks.push_back(std::move(hook));
         inspectorParameters.add(p);
     }
     
@@ -246,6 +253,8 @@ protected:
     ofxOceanodeContainer* hostContainer = nullptr;
     
 private:
+    std::shared_ptr<oceanodeProfiling::Record> profilingRecord = std::make_shared<oceanodeProfiling::Record>();
+    std::vector<std::shared_ptr<oceanodeProfiling::ParameterHook>> inspectorProfilingHooks;
     string nameIdentifier;
     unsigned int numIdentifier;
 	ofParameterGroup parameters;
