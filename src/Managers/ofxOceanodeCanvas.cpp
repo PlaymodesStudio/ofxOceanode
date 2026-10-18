@@ -346,7 +346,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     }
     // Preset loads can create canvases while the Presets menu is still open.
     // Taking focus on appearance would dismiss that menu.
-    const ImGuiWindowFlags windowFlags = popupOpen ? ImGuiWindowFlags_NoFocusOnAppearing : ImGuiWindowFlags_None;
+    const ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
+        | (popupOpen ? ImGuiWindowFlags_NoFocusOnAppearing : ImGuiWindowFlags_None);
+    // Pan inside scrolling_region only. An overflowing toolbar can otherwise
+    // scroll this outer window invisibly, shifting the child left and leaving
+    // a blank strip on its right. Clear stale/navigation offsets before Begin
+    // computes the content rectangle, including on the first frame after load.
+    ImGui::SetNextWindowScroll(ImVec2(0.0f, 0.0f));
     if(ImGui::Begin(windowName.c_str(), open, windowFlags)){
         auto prepareNewNodeModal = [&](){
             searchField = "";
