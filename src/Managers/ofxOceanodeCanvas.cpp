@@ -2527,6 +2527,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         const ImU32 connectionLineColor = darkCanvas
             ? OceanodeColors::U32(OceanodeColors::ConnectionLineDark)
             : OceanodeColors::U32(OceanodeColors::ConnectionLineLight);
+        const ImU32 selectedConnectionLineColor = darkCanvas
+            ? OceanodeColors::U32(OceanodeColors::ConnectionLineSelectedDark)
+            : OceanodeColors::U32(OceanodeColors::ConnectionLineSelectedLight);
         constexpr float nodeAttachmentTension = 1.5f;
         
         std::vector<ofxOceanodeAbstractConnection*> drawnConnections;
@@ -2545,7 +2548,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         glm::vec2  controlPoint(0,0);
                         controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);
                         const glm::vec2 nodeControlPoint = controlPoint * nodeAttachmentTension;
-                        draw_list->AddBezierCubic(p1, p1 + nodeControlPoint, p2 - nodeControlPoint, p2, connectionLineColor, connectionWidth);
+                        auto* sourceGui = container->getGuiFromModel(connection->getSourceParameter().getNodeModel());
+                        auto* sinkGui = container->getGuiFromModel(connection->getSinkParameter().getNodeModel());
+                        const bool selectedConnection = (sourceGui && sourceGui->getSelected()) ||
+                                                        (sinkGui && sinkGui->getSelected());
+                        const ImU32 lineColor = selectedConnection
+                            ? selectedConnectionLineColor : connectionLineColor;
+                        draw_list->AddBezierCubic(p1, p1 + nodeControlPoint, p2 - nodeControlPoint, p2, lineColor, connectionWidth);
                         drawnConnections.push_back(connection);
                     }
                 }
