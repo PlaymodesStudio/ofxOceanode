@@ -379,6 +379,7 @@ void ofxOceanode::draw(){
     for(auto &item : configMenuItems)
         if(item.second.draw) item.second.draw();
 
+    cycleDockedTabs();
     gui.end();
     gui.draw();
 }
@@ -531,6 +532,35 @@ void ofxOceanode::exit(){
     }
     oceanodeTime->shutdown(container);
     container->clearContainer();
+}
+
+// Tab / Shift+Tab: the next / previous tab of the dock area holding the
+// focused window. Not while typing or using a widget, in a popup, or with
+// Ctrl / Cmd / Alt held (Ctrl+Tab is ImGui's own window switcher).
+void ofxOceanode::cycleDockedTabs(){
+    ImGuiIO& io = ImGui::GetIO();
+    if(!ImGui::IsKeyPressed(ImGuiKey_Tab, false)) return;
+    if(io.KeyCtrl || io.KeySuper || io.KeyAlt) return;
+    if(io.WantTextInput || ImGui::IsAnyItemActive() || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return;
+    ImGuiWindow* window = GImGui->NavWindow;
+    if(window == nullptr) return;
+    window = window->RootWindow;             // a child window: the window holding it
+    ImGuiDockNode* node = window->DockNode;
+    if(node == nullptr || node->TabBar == nullptr || node->TabBar->Tabs.Size < 2) return;
+    ImGuiTabBar* bar = node->TabBar;
+    const int count = bar->Tabs.Size;
+    int current = -1;
+    for(int i = 0; i < count; i++) if(bar->Tabs[i].Window == window) current = i;
+    if(current < 0) return;
+    // the next one with a window (skips tabs being closed)
+    for(int step = 1; step < count; step++){
+        const int i = ((current + (io.KeyShift ? -step : step)) % count + count) % count;
+        ImGuiWindow* next = bar->Tabs[i].Window;
+        if(next == nullptr) continue;
+        bar->NextSelectedTabId = next->TabId;
+        ImGui::FocusWindow(next);
+        return;
+    }
 }
 
 void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
