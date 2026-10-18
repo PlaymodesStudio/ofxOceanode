@@ -53,12 +53,12 @@ public:
     
     template<typename T, typename... Args>
     void registerModel(string category, Args... args){
-        nodeRegistry->registerModel<T, Args...>(category, args...);
+        nodeRegistry->registerModel<T>(category, args...);
     };
 
     template<typename T, typename... Args>
-    void registerProcessingModel(string category, Args... args){
-        nodeRegistry->registerProcessingModel<T>(category, args...);
+    void registerModel(string category, ofxOceanodeNodeRegistrationFlags registrationFlags, Args... args){
+        nodeRegistry->registerModel<T>(category, registrationFlags, args...);
     }
 
     template<typename T, typename... Args>

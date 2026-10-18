@@ -13,6 +13,23 @@
 #include <type_traits>
 #include "ofxOceanodeNodeHelpCatalog.h"
 
+// Registration metadata uses a distinct type so legacy integer/bool constructor
+// arguments keep their meaning when passed after the category.
+enum class ofxOceanodeNodeRegistrationFlags : unsigned int {
+    None = 0,
+    CanRemoveWhenUnused = 1u << 0
+};
+
+constexpr ofxOceanodeNodeRegistrationFlags operator|(ofxOceanodeNodeRegistrationFlags a,
+                                                     ofxOceanodeNodeRegistrationFlags b){
+    return static_cast<ofxOceanodeNodeRegistrationFlags>(static_cast<unsigned int>(a) | static_cast<unsigned int>(b));
+}
+
+constexpr ofxOceanodeNodeRegistrationFlags operator&(ofxOceanodeNodeRegistrationFlags a,
+                                                     ofxOceanodeNodeRegistrationFlags b){
+    return static_cast<ofxOceanodeNodeRegistrationFlags>(static_cast<unsigned int>(a) & static_cast<unsigned int>(b));
+}
+
 class ofxOceanodeNodeRegistry{
 public:
     using registryItemPtr             = std::unique_ptr<ofxOceanodeNodeModel>;
@@ -27,10 +44,20 @@ public:
     
     template<typename ModelType, typename... Args>
     void registerModel(string const category, Args... args){
+        registerModel<ModelType>(category, ofxOceanodeNodeRegistrationFlags::None, args...);
+    }
+
+    template<typename ModelType, typename... Args>
+    void registerModel(string const category, ofxOceanodeNodeRegistrationFlags registrationFlags, Args... args){
         static_assert(std::is_base_of<ofxOceanodeNodeModel, ModelType>::value, "Must pass a subclass of ofxOceanodeNodeModel to registerType");
         
-        registryItemCloner cloner = [args...](){
-            return std::make_unique<ModelType>(args...);
+        registryItemCloner cloner = [registrationFlags, args...](){
+            auto model = std::make_unique<ModelType>(args...);
+            if((registrationFlags & ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused) !=
+               ofxOceanodeNodeRegistrationFlags::None){
+                model->setUnusedCleanupSafe(true);
+            }
+            return model;
         };
         
         const auto prototype = cloner();
@@ -46,20 +73,6 @@ public:
         }
     }
     
-    // Explicit declaration for audited generators/processors with no external effects.
-    template<typename ModelType, typename... Args>
-    void registerProcessingModel(string const category, Args... args){
-        const string name = ModelType(args...).nodeName();
-        if(registeredModelCreators.count(name) != 0) return;
-        registerModel<ModelType>(category, args...);
-        auto factory = registeredModelCreators.at(name);
-        registeredModelCreators[name] = [factory](){
-            auto model = factory();
-            model->setUnusedCleanupSafe(true);
-            return model;
-        };
-    }
-
     // Refresh factories for imported effects without disturbing running nodes
     // or a model registered by another category with the same name.
     template<typename ModelType, typename... Args>

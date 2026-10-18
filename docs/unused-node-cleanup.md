@@ -20,9 +20,19 @@ inside a Macro to review that canvas; the command does not prune Macro internals
 from its parent canvas.
 
 Audited core numeric generators/processors and the Collection nodes declare that
-they only do parameter/cable work through `registerProcessingModel<T>()`. Other
-models can use this registration method or override
-`bool canRemoveWhenUnused() const`. Return true only when the model has no
+they only do parameter/cable work with an optional registration flag:
+
+```cpp
+o.registerModel<delta>("Collection", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+```
+
+Existing `registerModel<T>("Category")` calls remain protected by default. For
+models with constructor arguments, put the flag after the category and before
+those arguments. Flags have a distinct enum type, preserving existing integer,
+Boolean and string constructor arguments, and can be combined with `|`.
+
+Other models can use this flag or override `bool canRemoveWhenUnused() const`.
+Return true only when the model has no
 independent window, output, wireless link, global effect or externally-held
 resource not represented by host bindings. The default is false. This explicit
 policy lets addons extend coverage without silently deleting unknown work.
@@ -33,3 +43,7 @@ It covers cycles/chains, each host binding, protected models, stale previews,
 cross-canvas references, comment pruning and a 2,000-node cleanup. Production
 syntax checks cover the real host APIs; live host and hardware behavior still
 need an application rebuild.
+
+`python3 tests/node_registration_flags_regression.py` checks the registration
+overloads, legacy constructor arguments, flags, factory copies, duplicate names
+and explicit model protection overrides.
