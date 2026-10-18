@@ -250,6 +250,13 @@ void ofxOceanodeCanvas::recenterSelectionAfterInspectorLayout(){
     }
     if(contentRegionSize.x <= 0.0f || contentRegionSize.y <= 0.0f) return;
 
+    // Begin(Inspector) only makes its dock participate in the next frame's
+    // layout. Wait until it was submitted in the previous frame so we center
+    // once using the resized viewport, even when a macro draws before Controls.
+    // Hidden/Appearing are updated by Begin and would add a late frame in macros.
+    const ImGuiWindow* inspector = ImGui::FindWindowByName("Inspector");
+    if(!inspector || !inspector->WasActive) return;
+
     const auto& click = inspectorSelectionClick;
     // Every selection click centers once, including switching nodes while the
     // Inspector is already open. Follow any subsequent docking changes as well.

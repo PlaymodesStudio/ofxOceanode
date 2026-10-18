@@ -3,7 +3,8 @@
 
 Uses production Controls::draw and canvas anchor methods with isolated graph
 types. Covers node sizes, both draw orders, zoom, dragging, switching nodes/floating layouts,
-disabled centering/auto Inspector, configuration, cancellation, and expired anchors. No GPU/OF host.
+disabled centering/auto Inspector, configuration, cancellation, and expired anchors.
+Checks every transition frame for premature centering and double jumps. No GPU/OF host.
 """
 from pathlib import Path
 import os
@@ -123,6 +124,7 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
     controls.controllers.push_back(inspector);
     const char* name=macroFirst?"Macro Canvas":"Canvas";
     bool build=true,capture=false;
+    vector<glm::vec2> scrollHistory,sizeHistory,originHistory;
     auto frame=[&]{
         ImGui::NewFrame();
         ImGuiID root=ImHashStr("InspectorDock");
@@ -161,9 +163,30 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
         };
         if(macroFirst){drawCanvas();controls.draw();}
         else{controls.draw();drawCanvas();}
+        scrollHistory.push_back(canvas.scrolling);
+        sizeHistory.push_back(canvas.contentRegionSize);
+        originHistory.push_back(canvas.canvasOrigin);
         ImGui::Render();
     };
     auto idle=[&](int count){for(int i=0;i<count;++i)frame();};
+    auto checkSingleCenter=[&](glm::vec2 before,glm::vec2 beforeSize){
+        int moves=0;
+        for(size_t i=0;i<scrollHistory.size();++i){
+            if(glm::distance(scrollHistory[i],before)>.02f){
+                ++moves;
+                // The first camera move must already use the final viewport.
+                near(sizeHistory[i],canvas.contentRegionSize);
+                near(originHistory[i],canvas.canvasOrigin);
+                near(scrollHistory[i],canvas.scrolling);
+            }
+            // Resizing must not expose a frame with the old camera either.
+            if(centers && glm::distance(sizeHistory[i],beforeSize)>.02f)
+                near(scrollHistory[i],canvas.scrolling);
+            before=scrollHistory[i];
+        }
+        assert(moves==(centers?1:0));
+    };
+    auto clearHistory=[&]{scrollHistory.clear();sizeHistory.clear();originHistory.clear();};
     idle(6);
     const auto oldSize=canvas.contentRegionSize;
     const auto oldScroll=canvas.scrolling;
@@ -176,6 +199,7 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
     assert(!controls.controllerVisible["Inspector"]);
     glm::vec2 movement=drag?glm::vec2(90,-65):glm::vec2(0);
     node.gui.position+=movement;
+    clearHistory();
     io.AddMouseButtonEvent(button,false);frame();
     near(canvas.scrolling,oldScroll); // Release must finish before docking changes.
     idle(4);
@@ -183,6 +207,7 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
     if(layout<2)assert(glm::distance(canvas.contentRegionSize,oldSize)>100);
     if(centers)checkCentered(canvas,node.gui);
     else near(canvas.scrolling,oldScroll);
+    checkSingleCenter(oldScroll,oldSize);
     near(other.scrolling,otherScroll);
 
     // Once settled, future window resizing must preserve the user's camera.
@@ -203,8 +228,10 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
         glm::vec2(secondNode.gui.width-10,secondNode.gui.height-15);
     canvas.rememberInspectorSelectionClick("Node_2");
     idle(2);near(canvas.scrolling,settled);
+    clearHistory();
     io.AddMouseButtonEvent(button,false);frame();near(canvas.scrolling,settled);
     idle(4);
+    checkSingleCenter(settled,switchSize);
     near(canvas.canvasOrigin,switchOrigin);near(canvas.contentRegionSize,switchSize);
     if(centers){
         checkCentered(canvas,secondNode.gui);
@@ -212,6 +239,22 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
     }else near(canvas.scrolling,settled);
     near(other.scrolling,otherScroll);
     if(!centers){ImGui::DestroyContext();return;}
+    idle(6);settled=canvas.scrolling;
+
+    // Reopening an existing Inspector must also wait for its dock to return.
+    secondNode.gui.selected=false;
+    idle(6);assert(!controls.controllerVisible["Inspector"]);
+    const auto reopenSize=canvas.contentRegionSize;
+    inspector->node=&node;
+    const auto reopenMouse=canvas.canvasOrigin+reopenSize*glm::vec2(.7f,.6f);
+    io.AddMousePosEvent(reopenMouse.x,reopenMouse.y);frame();
+    io.AddMouseButtonEvent(button,true);capture=true;frame();idle(2);
+    near(canvas.scrolling,settled);
+    clearHistory();
+    io.AddMouseButtonEvent(button,false);frame();idle(4);
+    checkSingleCenter(settled,reopenSize);
+    checkCentered(canvas,node.gui);
+    near(other.scrolling,otherScroll);
     idle(6);settled=canvas.scrolling;
     secondNode.gui.selected=false;node.gui.selected=true;inspector->node=&node;
 
@@ -259,7 +302,7 @@ int main(){
     }
     for(bool macro:{false,true})for(int layout:{0,1,2})
         scenario(macro,1,layout,0,320,600,false,false);
-    puts("Inspector selection centering passed: 168 size/dock/zoom/draw-order scenarios, disabled setting, config defaults/round-trip and cancellation checks.");
+    puts("Inspector selection centering passed: 168 size/dock/zoom/draw-order scenarios, single camera move on Inspector appearance/reopening and node switches, disabled setting, config defaults/round-trip and cancellation checks.");
 }
 '''
 
