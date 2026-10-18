@@ -2000,7 +2000,7 @@ void ofxOceanodeContainer::setBpm(float _bpm, bool retimeTimeline){
 
     bpm = _bpm;
     if(transport != nullptr){
-        transport->setBpm(bpm);
+        if(transportOwner) transport->setBpm(bpm);
         if(preserveTimelineTime)
             transport->seekToBeat(stateBefore.beatPosition *
                 static_cast<double>(_bpm) / static_cast<double>(stateBefore.bpm));

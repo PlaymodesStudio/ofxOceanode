@@ -131,6 +131,7 @@ public:
     
     bool loadPreset(string presetFolderPath);
     void savePreset(string presetFolderPath);
+    const std::string& getPresetStoragePath() const { return customGuiStoragePath; }
     
     void loadPreset_presetWillBeLoaded();
     void loadPreset_loadNodes(string presetFolderPath);

@@ -11,6 +11,7 @@
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeShared.h"
 #include <sstream>
+#include <filesystem>
 
 // ─── Constructor ─────────────────────────────────────────────────────────────
 
@@ -50,9 +51,32 @@ void ofxOceanodeNodeMacro::clearUserEditMarkers(){
 	pendingMacroReferenceUserEdited = false;
 }
 
+ofxOceanodeNodeMacro::~ofxOceanodeNodeMacro(){
+	if(!localWorkingDirectory.empty()){
+		std::error_code error;
+		std::filesystem::remove_all(localWorkingDirectory, error);
+	}
+}
+
+const string& ofxOceanodeNodeMacro::getLocalWorkingDirectory(){
+	if(localWorkingDirectory.empty()){
+		localWorkingDirectory = (std::filesystem::temp_directory_path() /
+			("oceanode-macro-" + ofToString(ofGetElapsedTimeMicros()) + "-" +
+			 ofToString(reinterpret_cast<uintptr_t>(this)))).string();
+		ofDirectory::createDirectory(localWorkingDirectory, false, true);
+	}
+	return localWorkingDirectory;
+}
+
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::update(ofEventArgs &a){
+	if(pendingGuiAction){
+		auto action = std::move(pendingGuiAction);
+		pendingGuiAction = nullptr;
+		try { action(); }
+		catch(const std::exception& e) { guiState.saveError = e.what(); }
+	}
 	if(presetManager.getNextPresetPath() != ""){
 		const string targetPath = presetManager.getNextPresetPath();
 		if(!ofFile::doesFileExist(targetPath + "/modules.json")){
@@ -168,7 +192,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	// Inspector parameters : "Local name"
 	//-------------------------------------
 	addInspectorSeparator("Macro Info",ofColor(250,250,250,255));
-	addInspectorParameter(localName.set("Local Name", "Local"));
+	addInspectorParameter(localName.set("Local Name", ""));
 	addInspectorParameter(macroDescription.set("Description", ""));
 	// Inspector parameters : "Color"
 	//-------------------------------------
@@ -254,11 +278,13 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	});
 	
 	presetControlRef->addReceiveFunc<vector<int>>([this](const vector<int> &vi){
+		if(vi.empty()) return;
 		clearUserEditMarkers();
 		presetManager.loadMacroInsideCategory(vi[0]);
 	});
 	
 	presetControlRef->addReceiveFunc<vector<float>>([this](const vector<float> &vf){
+		if(vf.empty()) return;
 		clearUserEditMarkers();
 		presetManager.loadMacroInsideCategory(floor(vf[0]));
 	});
@@ -511,6 +537,31 @@ void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 	}
 }
 
+bool ofxOceanodeNodeMacro::loadMacroSource(const std::string& folder) {
+    if(!ofFile::doesFileExist(folder + "/modules.json")) return false;
+    presetManager.clearNextPresetPath();
+    presetManager.setLocal(true);
+    presetManager.setPresetPath(folder);
+    presetManager.setCurrentMacroPath("");
+    localName = ofFilePath::getFileName(folder);
+    snapshotSystem.clearAll();
+    isLoadingPreset = true;
+    presetManager.setInnerPresetLoadingPath(folder);
+    struct LoadingGuard {
+        bool& loading; MacroPresetManager& manager;
+        ~LoadingGuard() { loading = false; manager.setInnerPresetLoadingPath(""); }
+    } guard{isLoadingPreset,presetManager};
+    ofJson sort;
+    if(ofFile::doesFileExist(folder + "/router_sort_order.json")) sort = ofLoadJson(folder + "/router_sort_order.json");
+    loadRouterSortFromJson(sort);
+    if(!container->loadPreset(folder)) return false;
+    snapshotSystem.loadFromPath(folder);
+    showSnapshotMatrix = !snapshotSystem.isEmpty();
+    loadMacroLayout(folder);
+    loadGlobalDescription(folder);
+    return true;
+}
+
 // ─── Node lifecycle callbacks ────────────────────────────────────────────────
 
 void ofxOceanodeNodeMacro::newNodeCreated(ofxOceanodeNode* &node){
@@ -734,13 +785,12 @@ void clearSavedUserEdits(ofxOceanodeContainer& container){
 }
 }
 
-bool ofxOceanodeNodeMacro::saveGlobalDefinition(bool notifyOtherInstances){
-	if(presetManager.isLocal() || isLoadingPreset || presetManager.getCurrentMacroPath().empty() ||
-	   !presetManager.getNextPresetPath().empty()) return false;
-	const string path = presetManager.getCurrentMacroPath();
+bool ofxOceanodeNodeMacro::saveLibraryDefinition(const string& path){
+	if(path.empty() || isLoadingPreset || !presetManager.getNextPresetPath().empty()) return false;
 	container->savePreset(path);
 	saveMacroLayout(path);
-	snapshotSystem.save(false, path, presetManager.getPresetPath(), nodeName(), getNumIdentifier());
+	// Write snapshots without broadcasting a half-written definition.
+	snapshotSystem.save(true, "", path, nodeName(), getNumIdentifier());
 
 	ofJson sortJson;
 	if(!sortOrder.getOrder().empty()){
@@ -753,7 +803,51 @@ bool ofxOceanodeNodeMacro::saveGlobalDefinition(bool notifyOtherInstances){
 	if(!savedOrder || !savedDescription || !ofFile::doesFileExist(path + "/modules.json")) return false;
 	clearSavedUserEdits(*container);
 	routerOrderUserEdited = false;
+	return true;
+}
+
+bool ofxOceanodeNodeMacro::saveGlobalDefinition(bool notifyOtherInstances){
+	if(presetManager.isLocal()) return false;
+	const string path = presetManager.getCurrentMacroPath();
+	if(!saveLibraryDefinition(path)) return false;
+	ofxOceanodeShared::snapshotUpdated(path);
 	if(notifyOtherInstances) ofxOceanodeShared::macroUpdated(path);
+	return true;
+}
+
+bool ofxOceanodeNodeMacro::saveLocalDefinition(){
+	if(!presetManager.isLocal() || isLoadingPreset || !presetManager.getNextPresetPath().empty()) return false;
+	// Save just this node and its embedded graph, including Inspector metadata.
+	// A new unsaved parent uses a workspace until the parent preset is saved.
+	string parentPath = parentContainer ? parentContainer->getPresetStoragePath() : "";
+	if(parentPath.empty()) parentPath = getLocalWorkingDirectory();
+	if(parentContainer){
+		for(auto* node : parentContainer->getAllModules()){
+			if(&node->getNodeModel() != this) continue;
+			node->savePreset(parentPath);
+			const string stem = nodeName() + "_" + ofToString(getNumIdentifier());
+			return ofFile::doesFileExist(parentPath + "/" + stem + ".json") &&
+			       ofFile::doesFileExist(parentPath + "/" + stem + "/modules.json");
+		}
+	}
+	return false;
+}
+
+bool ofxOceanodeNodeMacro::importPresetContents(const string& path){
+	if(!ofFile::doesFileExist(path + "/modules.json")) return false;
+	// Work from an independent copy: layout/snapshot autosaves must never write
+	// back into the selected preset or any of its embedded local Macros.
+	const string importedPath = getLocalWorkingDirectory() + "/Import-" + ofToString(ofGetElapsedTimeMicros());
+	if(!ofDirectory(path).copyTo(importedPath, true, true)) return false;
+	if(!loadMacroSource(importedPath)) return false;
+	string name = ofFilePath::getFileName(ofFilePath::removeTrailingSlash(path));
+	const auto separator = name.find("--");
+	if(separator != string::npos) name = name.substr(separator + 2);
+	localName = name;
+	presetManager.setCurrentMacro("");
+	presetManager.getCurrentCategory().clear();
+	presetManager.setCurrentCategoryMacro(nullptr);
+	markMacroReferenceUserEdited();
 	return true;
 }
 
@@ -788,6 +882,8 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 			}
 		}
 		container->savePreset(localPath);
+		presetManager.setPresetPath(localPath);
+		saveGlobalDescription(localPath);
 		
 		// Restore cached layout (savePreset recreated the folder, deleting ImGuiLayout.ini)
 		if(!cachedLayout.empty()){
@@ -802,19 +898,8 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 		json["LocalPreset"] = true;
 		
 		// Save snapshots to a separate file in the local macro folder
+		snapshotSystem.save(true, "", localPath, nodeName(), getNumIdentifier());
 		if(!snapshotSystem.isEmpty()) {
-			string snapshotsFilePath = localPath + "/snapshots.json";
-			ofJson snapshotsJson;
-			for(const auto& pair : snapshotSystem.getSnapshots()) {
-				ofJson slotJson;
-				slotJson["name"] = pair.second.name;
-				slotJson["morphTimeMs"] = pair.second.morphTimeMs;
-				slotJson["morphBiPow"] = pair.second.morphBiPow;
-				slotJson["routerValues"] = MacroSnapshotSystem::routerValuesToJson(pair.second.routerValues);
-				snapshotsJson[ofToString(pair.first)] = slotJson;
-			}
-			ofSavePrettyJson(snapshotsFilePath, snapshotsJson);
-			
 			// Keep saving to JSON for backward compatibility
 			ofJson jsonSnapshots;
 			for(const auto& pair : snapshotSystem.getSnapshots()) {

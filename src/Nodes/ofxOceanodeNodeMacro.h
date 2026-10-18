@@ -49,6 +49,22 @@ struct MacroGuiState {
 	bool routerSortEditNeedsFocus = false;
 	char routerSortEditBuf[256] = {};
 	bool showClearAllSnapshotsPopup = false;
+	bool openLoadPopup = false;
+	bool loadSelectionIsPreset = false;
+	std::string loadSelectionPath;
+	std::string loadSelectionName;
+	bool openSavePopup = false;
+	bool closeSavePopup = false;
+	bool saveToLibrary = false;
+	bool confirmOverwrite = false;
+	bool creatingSaveFolder = false;
+	bool revealSaveFolder = false;
+	char newFolderName[256] = {};
+	char saveName[256] = {};
+	std::vector<char> saveDescription;
+	std::string saveError;
+	std::string hoverMacroPath;
+	std::string hoverMacroDescription;
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -58,11 +74,15 @@ struct MacroGuiState {
 class ofxOceanodeNodeMacro : public ofxOceanodeNodeModel{
 public:
 	ofxOceanodeNodeMacro();
-	~ofxOceanodeNodeMacro(){};
+	~ofxOceanodeNodeMacro();
+	bool drawNodeParameter(ofxOceanodeAbstractParameter& parameter, float labelWidth, float widgetWidth) override;
 	
 	// ─── Lifecycle ────────────────────────────────────────────────────────
 	void setup(){setup("");};
 	void setup(string additionalInfo);
+	// Load a standalone Macro folder using native lifecycle, routers and snapshots.
+	// The in-memory instance is local; it does not subscribe to library replacement.
+	bool loadMacroSource(const std::string& folder);
 	void update(ofEventArgs &a);
 	void draw(ofEventArgs &a);
 	
@@ -167,9 +187,18 @@ private:
 	void loadMacroLayout(const string& folderPath);
 	bool saveGlobalDescription(const string& folderPath) const;
 	void loadGlobalDescription(const string& folderPath);
+	bool saveLocalDefinition();
+	bool saveLibraryDefinition(const string& path);
+	bool importPresetContents(const string& path);
+	const string& getLocalWorkingDirectory();
 
 	// ─── GUI rendering (implemented in ofxOceanodeNodeMacroGui.cpp) ──────
 	void renderPresetControlGui();
+	void renderMacroLoadDialog();
+	void openMacroSaveDialog(bool toLibrary);
+	void renderMacroSaveDialog();
+	void renderMacroSaveLibraryTree();
+	bool createMacroLibraryFolder(const string& name);
 	void renderPresetNamingGui();
 	void renderMinimizedView(ImVec2 size);
 	void renderSnapshotMatrix();
@@ -204,6 +233,8 @@ private:
 
 	// ─── GUI state ────────────────────────────────────────────────────────
 	MacroGuiState guiState;
+	std::function<void()> pendingGuiAction;
+	string localWorkingDirectory;
 	std::function<void(ImVec2)> minimizedViewCallback;
 
 	// ─── Core containers ──────────────────────────────────────────────────

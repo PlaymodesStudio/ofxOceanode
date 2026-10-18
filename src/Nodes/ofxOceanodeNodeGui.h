@@ -60,6 +60,7 @@ public:
 #endif
     
 private:
+    void renderParameterPopup(ofxOceanodeAbstractParameter& parameter);
     
     ofEventListeners keyAndMouseListeners;
     

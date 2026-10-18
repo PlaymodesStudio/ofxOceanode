@@ -40,9 +40,15 @@ void MacroPresetManager::updateCategoryFromPath(const std::string& path) {
 
     auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
     for(int i = 0; i < currentCategory.size(); i++){
+        if(!macroDirectoryStructure) break;
         std::string categoryNameToCompare = currentCategory[i];
-        macroDirectoryStructure = *std::find_if(macroDirectoryStructure->categories.begin(), macroDirectoryStructure->categories.end(),
+        auto found = std::find_if(macroDirectoryStructure->categories.begin(), macroDirectoryStructure->categories.end(),
                                                 [categoryNameToCompare](std::shared_ptr<macroCategory> &mc){ return mc->name == categoryNameToCompare; });
+        if(found == macroDirectoryStructure->categories.end()){
+            macroDirectoryStructure = nullptr;
+            break;
+        }
+        macroDirectoryStructure = *found;
     }
     currentCategoryMacro = macroDirectoryStructure;
 }

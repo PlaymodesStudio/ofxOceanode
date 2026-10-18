@@ -12,7 +12,9 @@
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeColors.h"
+#include "MacroDialogAppearance.h"
 #include <cstdio>
+#include <filesystem>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // renderMinimizedView — extracted from the minimizedViewCallback lambda
@@ -65,239 +67,471 @@ void ofxOceanodeNodeMacro::renderMinimizedView(ImVec2 size) {
 // renderPresetControlGui — extracted from the presetControl lambda in setup()
 // ─────────────────────────────────────────────────────────────────────────────
 
-void ofxOceanodeNodeMacro::renderPresetControlGui() {
-	bool addBank = false;
-	
-	if(presetManager.isLocal()){
-		ImGui::Text(localName->c_str());
-	}else{
-		ImGui::Text("%s", presetManager.getCurrentMacro().c_str());
-	}
-	if(ImGui::IsItemClicked(1)){
-		ImGui::OpenPopup("Macro");
-	}
-	
-	ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
-	if(ImGui::BeginPopup("Macro")){
-		auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
-		
-		std::function<bool(shared_ptr<macroCategory>)> drawCategory =
-		[this, &addBank, &drawCategory](shared_ptr<macroCategory> category) -> bool{
-			for(auto d : category->categories){
-				if(ImGui::BeginMenu(d->name.c_str())){
-					if(drawCategory(d)){
-						ImGui::EndMenu();
-						return true;
-					}
-					ImGui::EndMenu();
-				}
+bool ofxOceanodeNodeMacro::drawNodeParameter(ofxOceanodeAbstractParameter& parameter,
+                                             float labelWidth, float widgetWidth) {
+	if(parameter.getName() != active.getName()) return false;
+	ImGui::BeginGroup();
+	ImGui::AlignTextToFramePadding();
+	ImGui::TextUnformatted("Active");
+	ImGui::SameLine(labelWidth, 0.f);
+	bool enabled = active.get();
+	if(ImGui::Checkbox("##Active", &enabled)) active = enabled;
+	const char* scopeLabel = presetManager.isLocal() ? "Local" : "Global";
+	const float scopeWidth = ImGui::CalcTextSize(scopeLabel).x + 2.f * ImGui::GetStyle().FramePadding.x;
+	// SameLine offsets already include the current group's canvas origin.
+	ImGui::SameLine(labelWidth + widgetWidth - scopeWidth, 0.f);
+	ImVec4 background = ImGui::GetStyleColorVec4(ImGuiCol_Button);
+	background.x = std::min(1.f, background.x + 0.18f);
+	background.y = std::min(1.f, background.y + 0.18f);
+	background.z = std::min(1.f, background.z + 0.18f);
+	ImGui::PushStyleColor(ImGuiCol_Button, background);
+	if(ImGui::Button(scopeLabel, ImVec2(scopeWidth, 0))){
+		if(presetManager.isLocal()){
+			if(presetManager.getCurrentMacroPath().empty()) openMacroSaveDialog(true);
+			else {
+				presetManager.setNextPresetPath(presetManager.getCurrentMacroPath());
+				pendingMacroReferenceUserEdited = true;
 			}
-			if(category->categories.size() != 0){
-					if(ImGui::MenuItem("Add Bank")){
-						addBank = true;
-					}
-				}
-			for(auto m : category->macros){
-				if(ImGui::MenuItem(m.first.c_str())){
-					const bool changingMacro = presetManager.isLocal() ||
-					                           m.second != presetManager.getCurrentMacroPath();
-					presetManager.setNextPresetPath(changingMacro ? m.second : "");
-					pendingMacroReferenceUserEdited = changingMacro;
-					return true;
-				}
-			}
-			return false;
-		};
-		
-		drawCategory(macroDirectoryStructure);
-		
-		ImGui::EndPopup();
-	}
-	ImGui::PopStyleColor(2);
-	ImGui::PopStyleVar();
-	
-	if(addBank){
-		ImGui::OpenPopup("Add New Macro Bank");
-	}
-	
-	if(ImGui::BeginPopupModal("Add New Macro Bank", NULL, ImGuiWindowFlags_AlwaysAutoResize)){
-		static char cString[256];
-		if (ImGui::InputText("Bank Name", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
-		{
-			// TODO: Implement bank creation
-			ImGui::CloseCurrentPopup();
-		}
-		if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsItemActive()){
-			strcpy(cString, "");
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::EndPopup();
-	}
-	
-	if(ImGui::Checkbox("Is Local?", &presetManager.getLocalRef())){
-		if(presetManager.getCurrentMacro() == ""){
-			presetManager.setLocal(true);
-		}
-		if(!presetManager.isLocal()){
-			container->loadPreset(presetManager.getCurrentMacroPath());
-			loadGlobalDescription(presetManager.getCurrentMacroPath());
-		}
-		markMacroReferenceUserEdited();
-	}
-	ImGui::SameLine();
-	bool prevShowWindow = showWindow;
-	ImGui::Checkbox("Show Window?", &showWindow);
-	if(showWindow && !prevShowWindow){
-		canvas.forceDockWindow();
-		canvas.requestFocus();
-	}
-	
-	bool firstSaveAsOpen = false;
-	if (ImGui::Button("[Save]")){
-		// If we try to save a new macro or a local preset, the save macro as window appears
-		if(presetManager.getCurrentMacroPath() == "" || presetManager.isLocal()){
-			ImGui::OpenPopup("Save Macro As :");
-			firstSaveAsOpen = true;
 		}else{
-			saveGlobalDefinition();
-		}
-	}
-	
-	ImGui::SameLine();
-	
-	if (ImGui::Button("[Save As]")){
-		ImGui::OpenPopup("Save Macro As :");
-		firstSaveAsOpen = true;
-	}
-	
-	if(ImGui::BeginPopupModal("Save Macro As :", NULL, ImGuiWindowFlags_AlwaysAutoResize)){
-		static char cString[256];
-		
-		if(firstSaveAsOpen){
-			presetManager.getSaveAsTempCategory() = presetManager.getCurrentCategory();
-			ImGui::SetKeyboardFocusHere(0);
-		}
-		
-		bool openNameAlreadyExistsPopup = false;
-		if (ImGui::InputText("##Preset Name : ", cString, 256, ImGuiInputTextFlags_EnterReturnsTrue))
-		{
-			string proposedNewName(cString);
-			ofStringReplace(proposedNewName, " ", "_");
-			
-			
-			bool nameExists = false;
-			auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
-			for(int i = 0 ; i < presetManager.getSaveAsTempCategory().size(); i++){
-				string categoryNameToCompare = presetManager.getSaveAsTempCategory()[i];
-				macroDirectoryStructure = *std::find_if(macroDirectoryStructure->categories.begin(), macroDirectoryStructure->categories.end(),
-														[categoryNameToCompare](shared_ptr<macroCategory> &mc){return mc->name == categoryNameToCompare;});
-			}
-			
-			if(!nameExists)
-			{
-				if(strcmp(proposedNewName.c_str(), "") != 0){
-					string saveAsCategoryWithSlash = ofToDataPath("Macros/", true);
-					for(auto s : presetManager.getSaveAsTempCategory()) saveAsCategoryWithSlash = saveAsCategoryWithSlash + s + "/";
-					container->savePreset(saveAsCategoryWithSlash + string(proposedNewName));
-					presetManager.setLocal(false);
-					presetManager.setCurrentMacro(string(proposedNewName));
-					presetManager.setCurrentMacroPath(saveAsCategoryWithSlash + string(proposedNewName));
-					presetManager.getCurrentCategory() = presetManager.getSaveAsTempCategory();
-					presetManager.setCurrentCategoryMacro(macroDirectoryStructure);
-					markMacroReferenceUserEdited();
-						saveMacroLayout(presetManager.getCurrentMacroPath());
-						// Save router sort order to the macro folder
-					{
-						string sortOrderFile = presetManager.getCurrentMacroPath() + "/router_sort_order.json";
-						ofJson sortJson;
-						if(!sortOrder.getOrder().empty()) {
-							ofJson sortArr = ofJson::array();
-							for(const auto& e : sortOrder.getOrder()) sortArr.push_back(e);
-							sortJson["RouterSortOrder"] = sortArr;
-						}
-						ofSavePrettyJson(sortOrderFile, sortJson);
-					}
-						saveGlobalDescription(presetManager.getCurrentMacroPath());
-					snapshotSystem.save(presetManager.isLocal(), presetManager.getCurrentMacroPath(), presetManager.getPresetPath(), nodeName(), getNumIdentifier());
-					ofxOceanodeShared::updateMacrosStructure();
+			pendingGuiAction = [this](){
+				const string path = getLocalWorkingDirectory() + "/Detached";
+				if(!saveLibraryDefinition(path)){
+					guiState.saveError = "Could not make a local copy.";
+					return;
 				}
-				strcpy(cString, "");
-				ImGui::CloseCurrentPopup();
-				presetManager.getSaveAsTempCategory().clear();
-			}
-			else
-			{
-				cout << "Preset name already existing : " << proposedNewName << endl;
-				strcpy(cString, "");
-				
-				openNameAlreadyExistsPopup = true;
-			}
-		}
-		if(openNameAlreadyExistsPopup){
-			ImGui::OpenPopup("Preset name already exists");
-		}
-		
-		if(ImGui::BeginPopupModal("Preset name already exists", NULL))
-		{
-			if (ImGui::Button("OK", ImVec2(220,0)) || (ImGui::IsKeyDown((ImGuiKey_Enter)) && !openNameAlreadyExistsPopup)) {
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::EndPopup();
-			openNameAlreadyExistsPopup = false;
-		}
-		
-		if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsItemActive()){
-			strcpy(cString, "");
-		}
-		string saveAsCategoryWithSlash;
-		for(auto s : presetManager.getSaveAsTempCategory()) saveAsCategoryWithSlash = saveAsCategoryWithSlash + s + "/";
-		if(saveAsCategoryWithSlash == "") saveAsCategoryWithSlash = "None";
-		if (ImGui::Button(saveAsCategoryWithSlash.c_str())){
-			ImGui::OpenPopup("Choose Category");
-		}
-		
-		if(ImGui::BeginPopup("Choose Category")){
-			auto macroDirectoryStructure = ofxOceanodeShared::getMacroDirectoryStructure();
-			
-			std::function<bool(shared_ptr<macroCategory>)> drawCategory =
-			[this, &drawCategory](shared_ptr<macroCategory> category) -> bool{
-				for(auto d : category->categories){
-					if(d->categories.size() == 0){
-						if(ImGui::MenuItem(d->name.c_str())){
-							presetManager.getSaveAsTempCategory().clear();
-								presetManager.getSaveAsTempCategory().push_front(d->name);
-							return true;
-						}
-					}else if(ImGui::BeginMenu(d->name.c_str())){
-						if(drawCategory(d)){
-							presetManager.getSaveAsTempCategory().push_front(d->name);
-							ImGui::EndMenu();
-							return true;
-						}
-						ImGui::EndMenu();
-					}
-				}
-				return false;
+				localName = presetManager.getCurrentMacro();
+				presetManager.setLocal(true);
+				presetManager.setPresetPath(path);
+				loadMacroLayout(path);
+				markMacroReferenceUserEdited();
 			};
-			
-			drawCategory(macroDirectoryStructure);
-			
-			ImGui::EndPopup();
 		}
-		if (ImGui::Button("Cancel"))
-		{
-			strcpy(cString, "");
-			ImGui::CloseCurrentPopup();
-			presetManager.getSaveAsTempCategory().clear();
-		}
-		ImGui::EndPopup();
 	}
-	
-	
-//	ImGui::Text(". . . . . . . . . . . . . . . . .");
-	
+	ImGui::PopStyleColor();
+	if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", presetManager.isLocal()
+		? "Use the library version, or Save As to create one."
+		: "Make a local copy of this Macro.");
+	ImGui::EndGroup();
+	return true;
+}
+
+void ofxOceanodeNodeMacro::openMacroSaveDialog(bool toLibrary) {
+	guiState.saveToLibrary = toLibrary;
+	guiState.openSavePopup = true;
+	guiState.closeSavePopup = false;
+	guiState.confirmOverwrite = false;
+	guiState.creatingSaveFolder = false;
+	guiState.revealSaveFolder = true;
+	guiState.newFolderName[0] = '\0';
+	guiState.saveError.clear();
+	const string name = presetManager.isLocal() ? localName.get() : presetManager.getCurrentMacro();
+	std::snprintf(guiState.saveName, sizeof(guiState.saveName), "%s", name.c_str());
+	const string description = macroDescription.get();
+	guiState.saveDescription.assign(std::max(size_t(4096), description.size() + 1024), '\0');
+	std::copy(description.begin(), description.end(), guiState.saveDescription.begin());
+	presetManager.getSaveAsTempCategory() = presetManager.getCurrentCategory();
+}
+
+void ofxOceanodeNodeMacro::renderPresetControlGui() {
+	ImGui::BeginGroup();
+	const string name = presetManager.isLocal() ? localName.get() : presetManager.getCurrentMacro();
+	const float zoom = ofxOceanodeShared::getZoomLevel();
+	const float width = (ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget()) * zoom;
+	// Draw inside a fixed-size item: long names must not resize the node.
+	const ImVec2 namePosition = ImGui::GetCursorScreenPos();
+	ImGui::Dummy(ImVec2(width, ImGui::GetTextLineHeight()));
+	const ImVec4 nameClip(namePosition.x, namePosition.y, namePosition.x + width,
+		namePosition.y + ImGui::GetTextLineHeight());
+	ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(), ImGui::GetFontSize(), namePosition,
+		ImGui::GetColorU32(ImGuiCol_Text), name.empty() ? "-" : name.c_str(), nullptr, 0.f, &nameClip);
+	if(ImGui::IsItemHovered() && ImGui::CalcTextSize(name.c_str()).x > width)
+		ImGui::SetTooltip("%s", name.c_str());
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.f * zoom, ImGui::GetStyle().ItemSpacing.y));
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * zoom, ImGui::GetStyle().FramePadding.y));
+	const bool previousShow = showWindow;
+	ImGui::Checkbox("Show?", &showWindow);
+	if(showWindow && !previousShow){ canvas.forceDockWindow(); canvas.requestFocus(); }
+	const float showWidth = ImGui::GetItemRectSize().x;
+	const float gap = ImGui::GetStyle().ItemSpacing.x;
+	const float loadText = ImGui::CalcTextSize("Load").x;
+	const float saveText = ImGui::CalcTextSize("Save").x;
+	const float saveAsText = ImGui::CalcTextSize("Save As").x;
+	const float padding = std::max(0.f, (width - showWidth - 3.f * gap - loadText - saveText - saveAsText) / 3.f);
+	ImGui::SameLine();
+	if(ImGui::Button("Load", ImVec2(loadText + padding, 0))){
+		guiState.openLoadPopup = true;
+		guiState.loadSelectionPath.clear();
+		guiState.loadSelectionName.clear();
+		guiState.saveError.clear();
+	}
+	ImGui::SameLine();
+	if(ImGui::Button("Save", ImVec2(saveText + padding, 0))){
+		guiState.saveError.clear();
+		if(presetManager.isLocal() && localName.get().empty()) openMacroSaveDialog(false);
+		else pendingGuiAction = [this](){
+			if(!(presetManager.isLocal() ? saveLocalDefinition() : saveGlobalDefinition()))
+				guiState.saveError = "Could not save Macro contents.";
+		};
+	}
+	ImGui::SameLine();
+	if(ImGui::Button("Save As", ImVec2(saveAsText + padding, 0))) openMacroSaveDialog(true);
+	ImGui::PopStyleVar(2);
+
+	renderMacroLoadDialog();
+	renderMacroSaveDialog();
+	if(!guiState.saveError.empty() && !ImGui::IsPopupOpen("Save Macro")){
+		ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width);
+		ImGui::TextUnformatted(guiState.saveError.c_str());
+		ImGui::PopTextWrapPos();
+	}
+	ImGui::EndGroup();
+}
+
+void ofxOceanodeNodeMacro::renderMacroLoadDialog() {
+	if(guiState.openLoadPopup){
+		ofxOceanodeShared::updateMacrosStructure();
+		guiState.hoverMacroPath.clear();
+		ImGui::OpenPopup("Load Macro Contents");
+		guiState.openLoadPopup = false;
+	}
+	if(!ImGui::IsPopupOpen("Load Macro Contents")) return;
+	const ImVec2 display = ImGui::GetIO().DisplaySize;
+	ImGui::SetNextWindowSize(ImVec2(std::min(480.f, display.x * .85f), std::min(520.f, display.y * .85f)), ImGuiCond_Appearing);
+	MacroDialogAppearance::Style appearance;
+	if(!ImGui::BeginPopupModal("Load Macro Contents", nullptr, ImGuiWindowFlags_NoResize)) return;
+
+	bool activateSelection = false;
+	ImGui::BeginChild("Sources", ImVec2(0, -2.f * ImGui::GetFrameHeightWithSpacing()), false);
+	{
+		MacroDialogAppearance::Rows rows;
+		auto selectSource = [&](const string& path, const string& name, bool isPreset){
+			const bool selected = guiState.loadSelectionPath == path && guiState.loadSelectionIsPreset == isPreset;
+			rows.begin(selected, isPreset);
+			if(ImGui::Selectable(name.c_str(), false, ImGuiSelectableFlags_NoAutoClosePopups | ImGuiSelectableFlags_AllowDoubleClick)){
+				guiState.loadSelectionPath = path;
+				guiState.loadSelectionName = name;
+				guiState.loadSelectionIsPreset = isPreset;
+				activateSelection = ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+			}
+			rows.end();
+			if(!isPreset && ImGui::IsItemHovered()){
+				if(guiState.hoverMacroPath != path){
+					guiState.hoverMacroPath = path;
+					guiState.hoverMacroDescription.clear();
+					if(ofFile::doesFileExist(path + "/description.json")){
+						const auto json = ofLoadJson(path + "/description.json");
+						if(json.is_object() && json.contains("Description") && json["Description"].is_string())
+							guiState.hoverMacroDescription = json["Description"].get<string>();
+					}
+				}
+				if(!guiState.hoverMacroDescription.empty()){
+					ImGui::BeginTooltip();
+					ImGui::PushTextWrapPos(ImGui::GetFontSize() * 30.f);
+					ImGui::TextUnformatted(guiState.hoverMacroDescription.c_str());
+					ImGui::PopTextWrapPos();
+					ImGui::EndTooltip();
+				}
+			}
+		};
+		rows.begin();
+		const bool presetsOpen = ImGui::TreeNodeEx("Preset", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
+		rows.end();
+		if(presetsOpen){
+			std::function<void(const string&, bool)> drawPresets = [&](const string& folder, bool banks){
+				ofDirectory directory(folder);
+				directory.listDir();
+				directory.sort();
+				auto entries = directory.getFiles();
+				if(!banks){
+					std::stable_sort(entries.begin(), entries.end(), [](const ofFile& a, const ofFile& b){
+						const auto aName = a.getFileName(), bName = b.getFileName();
+						const int aIndex = aName.find("--") == string::npos ? INT_MAX : ofToInt(aName);
+						const int bIndex = bName.find("--") == string::npos ? INT_MAX : ofToInt(bName);
+						return std::make_pair(aIndex, aName) < std::make_pair(bIndex, bName);
+					});
+				}
+				bool any = false;
+				for(const auto& entry : entries){
+					if(!entry.isDirectory()) continue;
+					any = true;
+					ImGui::PushID(entry.path().c_str());
+					const string filename = entry.getFileName();
+					if(ofFile::doesFileExist(entry.path() + "/modules.json")){
+						const auto separator = filename.find("--");
+						const string label = separator == string::npos ? filename
+							: ofToString(ofToInt(filename)) + " | " + filename.substr(separator + 2);
+						selectSource(entry.path(), label, true);
+					}else{
+						if(banks) ImGui::SetNextItemOpen(filename == ofxOceanodeShared::getCurrentBankName(), ImGuiCond_Once);
+						rows.begin();
+						const bool open = ImGui::TreeNodeEx(filename.c_str(), ImGuiTreeNodeFlags_SpanAvailWidth);
+						rows.end();
+						if(open){
+							drawPresets(entry.path(), false);
+							ImGui::TreePop();
+						}
+					}
+					ImGui::PopID();
+				}
+				if(!any){ rows.begin(false, true); ImGui::TextDisabled("No presets"); rows.end(); }
+			};
+			drawPresets(ofToDataPath("Presets", true), true);
+			ImGui::TreePop();
+		}
+		rows.begin();
+		const bool macrosOpen = ImGui::TreeNodeEx("Macro", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
+		rows.end();
+		if(macrosOpen){
+			std::function<void(shared_ptr<macroCategory>)> drawMacros = [&](shared_ptr<macroCategory> category){
+				if(!category) return;
+				for(const auto& child : category->categories){
+					rows.begin();
+					const bool open = ImGui::TreeNodeEx(child->name.c_str(), ImGuiTreeNodeFlags_SpanAvailWidth);
+					rows.end();
+					if(open){
+						drawMacros(child);
+						ImGui::TreePop();
+					}
+				}
+				for(const auto& macro : category->macros){
+					ImGui::PushID(macro.second.c_str());
+					selectSource(macro.second, macro.first, false);
+					ImGui::PopID();
+				}
+				if(category->categories.empty() && category->macros.empty()){
+					rows.begin(false, true); ImGui::TextDisabled("No Macros"); rows.end();
+				}
+			};
+			drawMacros(ofxOceanodeShared::getMacroDirectoryStructure());
+			ImGui::TreePop();
+		}
+	}
+	ImGui::EndChild();
+	ImGui::Separator();
+	if(guiState.loadSelectionName.empty()) ImGui::TextDisabled("Select a Preset or Macro");
+	else ImGui::TextColored(OceanodeColors::SelectedNodeText, "%s", guiState.loadSelectionName.c_str());
+	ImGui::BeginDisabled(guiState.loadSelectionPath.empty());
+	const bool load = ImGui::Button("Load");
+	ImGui::EndDisabled();
+	if(!guiState.loadSelectionPath.empty() && (load || activateSelection)){
+		const string path = guiState.loadSelectionPath;
+		if(guiState.loadSelectionIsPreset){
+			pendingGuiAction = [this, path](){
+				if(!importPresetContents(path)) guiState.saveError = "Could not import preset.";
+			};
+		}else{
+			presetManager.setNextPresetPath(path);
+			pendingMacroReferenceUserEdited = true;
+		}
+		ImGui::CloseCurrentPopup();
+	}
+	ImGui::SameLine();
+	if(ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+	ImGui::EndPopup();
+}
+
+bool ofxOceanodeNodeMacro::createMacroLibraryFolder(const string& requestedName) {
+	const string name = ofTrim(requestedName);
+	guiState.saveError.clear();
+	if(name.empty() || name == "." || name == ".." || name.back() == '.' ||
+	   name.find_first_of("/\\:*?\"<>|") != string::npos ||
+	   std::any_of(name.begin(), name.end(), [](unsigned char c){ return c < 32; })){
+		guiState.saveError = "Enter a valid folder name.";
+		return false;
+	}
+	string parent = ofToDataPath("Macros", true);
+	for(const auto& folder : presetManager.getSaveAsTempCategory()){
+		parent += "/" + folder;
+		if(ofFile::doesFileExist(parent + "/modules.json")){
+			guiState.saveError = "Select a library folder, rather than a Macro definition.";
+			return false;
+		}
+	}
+	std::error_code error;
+	if(!std::filesystem::create_directory(std::filesystem::path(parent) / name, error)){
+		guiState.saveError = error ? "Could not create folder: " + error.message()
+		                          : "A file or folder with this name already exists.";
+		return false;
+	}
+	presetManager.getSaveAsTempCategory().push_back(name);
+	guiState.creatingSaveFolder = false;
+	guiState.revealSaveFolder = true;
+	guiState.confirmOverwrite = false;
+	ofxOceanodeShared::updateMacrosStructure();
+	return true;
+}
+
+void ofxOceanodeNodeMacro::renderMacroSaveLibraryTree() {
+	ImGui::BeginChild("Save Library", ImVec2(380, 220), false);
+	{
+		MacroDialogAppearance::Rows rows;
+		std::function<void(shared_ptr<macroCategory>, std::deque<string>)> drawFolder =
+			[&](shared_ptr<macroCategory> category, std::deque<string> folders){
+				if(!category) return;
+				const auto& selected = presetManager.getSaveAsTempCategory();
+				const bool isSelected = folders == selected;
+				const bool isAncestor = folders.size() <= selected.size() &&
+					std::equal(folders.begin(), folders.end(), selected.begin());
+				if(guiState.revealSaveFolder && isAncestor) ImGui::SetNextItemOpen(true);
+				const ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow |
+					ImGuiTreeNodeFlags_SpanAvailWidth;
+				rows.begin(isSelected);
+				const bool open = ImGui::TreeNodeEx(folders.empty() ? "Macros (root)" : category->name.c_str(), flags);
+				rows.end();
+				if(ImGui::IsItemClicked() || ImGui::IsItemActivated()){
+					presetManager.getSaveAsTempCategory() = folders;
+					guiState.confirmOverwrite = false;
+					guiState.saveError.clear();
+				}
+				if(isSelected && guiState.revealSaveFolder) ImGui::SetScrollHereY(.5f);
+				if(!open) return;
+				for(const auto& child : category->categories){
+					auto nested = folders;
+					nested.push_back(child->name);
+					drawFolder(child, nested);
+				}
+				for(const auto& macro : category->macros){
+					ImGui::PushID(macro.second.c_str());
+					const bool target = isSelected && macro.first == guiState.saveName;
+					rows.begin(target);
+					if(ImGui::Selectable(macro.first.c_str(), false, ImGuiSelectableFlags_NoAutoClosePopups)){
+						presetManager.getSaveAsTempCategory() = folders;
+						std::snprintf(guiState.saveName, sizeof(guiState.saveName), "%s", macro.first.c_str());
+						guiState.confirmOverwrite = false;
+						guiState.saveError.clear();
+					}
+					rows.end();
+					ImGui::PopID();
+				}
+				ImGui::TreePop();
+			};
+		drawFolder(ofxOceanodeShared::getMacroDirectoryStructure(), {});
+		guiState.revealSaveFolder = false;
+	}
+	ImGui::EndChild();
+
+	string location = "Macros";
+	for(const auto& folder : presetManager.getSaveAsTempCategory()) location += "/" + folder;
+	ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 380);
+	ImGui::TextColored(OceanodeColors::SelectedNodeText, "Folder: %s", location.c_str());
+	ImGui::PopTextWrapPos();
+	if(!guiState.creatingSaveFolder){
+		if(ImGui::Button("New Folder")){
+			guiState.creatingSaveFolder = true;
+			guiState.newFolderName[0] = '\0';
+			guiState.saveError.clear();
+			ImGui::SetKeyboardFocusHere();
+		}
+	}
+	if(guiState.creatingSaveFolder){
+		ImGui::SetNextItemWidth(380);
+		const bool enter = ImGui::InputText("##New Folder Name", guiState.newFolderName,
+			sizeof(guiState.newFolderName), ImGuiInputTextFlags_EnterReturnsTrue);
+		if(ImGui::Button("Create Folder") || enter) createMacroLibraryFolder(guiState.newFolderName);
+		ImGui::SameLine();
+		if(ImGui::Button("Cancel Folder")){
+			guiState.creatingSaveFolder = false;
+			guiState.saveError.clear();
+		}
+	}
+}
+
+void ofxOceanodeNodeMacro::renderMacroSaveDialog() {
+	if(guiState.openSavePopup){
+		ofxOceanodeShared::updateMacrosStructure();
+		ImGui::OpenPopup("Save Macro");
+		guiState.openSavePopup = false;
+	}
+	ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
+	MacroDialogAppearance::Style appearance;
+	if(!ImGui::BeginPopupModal("Save Macro", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+	if(guiState.closeSavePopup){
+		guiState.closeSavePopup = false;
+		ImGui::CloseCurrentPopup();
+		ImGui::EndPopup();
+		return;
+	}
+	ImGui::TextDisabled("%s", guiState.saveToLibrary ? "Save to Macro library" : "Save local Macro");
+	ImGui::Separator();
+	{
+		MacroDialogAppearance::Rows rows;
+		rows.begin();
+		ImGui::BeginGroup();
+		ImGui::TextUnformatted("Name");
+		ImGui::SetNextItemWidth(380);
+		if(ImGui::InputText("##Name", guiState.saveName, sizeof(guiState.saveName))) guiState.confirmOverwrite = false;
+		ImGui::EndGroup();
+		rows.end();
+		rows.begin();
+		ImGui::BeginGroup();
+		ImGui::TextUnformatted("Description");
+		ImGui::InputTextMultiline("##Description", guiState.saveDescription.data(), guiState.saveDescription.size(), ImVec2(380, ImGui::GetTextLineHeight() * 5));
+		ImGui::EndGroup();
+		rows.end();
+	}
+	if(guiState.saveToLibrary) renderMacroSaveLibraryTree();
+	ImGui::Separator();
+
+	if(!guiState.saveError.empty()) ImGui::TextWrapped("%s", guiState.saveError.c_str());
+	if(guiState.confirmOverwrite) ImGui::TextWrapped("This Macro already exists. Overwrite its library contents?");
+	ImGui::BeginDisabled(bool(pendingGuiAction) || guiState.creatingSaveFolder);
+	if(ImGui::Button(guiState.confirmOverwrite ? "Overwrite" : "Save")){
+		string name = ofTrim(string(guiState.saveName));
+		if(guiState.saveToLibrary) ofStringReplace(name, " ", "_");
+		guiState.saveError.clear();
+		if(name.empty()) guiState.saveError = "Enter a name.";
+		else if(guiState.saveToLibrary && (name == "." || name == ".." ||
+			name.find_first_of("/\\:*?\"<>|") != string::npos || name.back() == '.' ||
+			std::any_of(name.begin(), name.end(), [](unsigned char c){ return c < 32; })))
+			guiState.saveError = "Enter a valid folder name.";
+		else {
+			string path = ofToDataPath("Macros", true);
+			for(const auto& folder : presetManager.getSaveAsTempCategory()) path += "/" + folder;
+			path += "/" + name;
+			const bool exists = guiState.saveToLibrary && ofDirectory::doesDirectoryExist(path);
+			if(exists && !ofFile::doesFileExist(path + "/modules.json"))
+				guiState.saveError = "This name belongs to a library folder. Choose another name.";
+			else if(exists && !guiState.confirmOverwrite) guiState.confirmOverwrite = true;
+			else {
+				const string description(guiState.saveDescription.data());
+				const bool toLibrary = guiState.saveToLibrary;
+				pendingGuiAction = [this, name, description, path, toLibrary](){
+					const string oldDescription = macroDescription.get();
+					const string oldName = localName.get();
+					macroDescription = description;
+					if(!toLibrary) localName = name;
+					if(!(toLibrary ? saveLibraryDefinition(path) : saveLocalDefinition())){
+						macroDescription = oldDescription;
+						localName = oldName;
+						guiState.saveError = "Could not save Macro contents.";
+						return;
+					}
+					if(toLibrary){
+						presetManager.setLocal(false);
+						presetManager.setCurrentMacroPath(path);
+						ofxOceanodeShared::updateMacrosStructure();
+						presetManager.updateCategoryFromPath(path);
+						loadMacroLayout(path);
+						markMacroReferenceUserEdited();
+						ofxOceanodeShared::snapshotUpdated(path);
+						ofxOceanodeShared::macroUpdated(path);
+					}
+					guiState.closeSavePopup = true;
+				};
+			}
+		}
+	}
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	ImGui::BeginDisabled(bool(pendingGuiAction));
+	if(ImGui::Button("Cancel")){
+		guiState.creatingSaveFolder = false;
+		guiState.saveError.clear();
+		guiState.confirmOverwrite = false;
+		ImGui::CloseCurrentPopup();
+	}
+	ImGui::EndDisabled();
+	ImGui::EndPopup();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -63,6 +63,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 			if(boldFont) ImGui::PushFont(boldFont);
 			ImGui::Text("%s", moduleName.c_str());
 			if(boldFont) ImGui::PopFont();
+
 		}
 		
 		// Keep the header width derived from the current frame's nominal layout instead
@@ -133,7 +134,11 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                 if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::EndDisabled();
                 continue;
             }
-            if(absParam.valueType() == typeid(std::function<void()>).name()){
+            if(node.getNodeModel().drawNodeParameter(absParam, nodeWidthText, nodeWidthWidget)){
+                // Custom rows retain the standard parameter context menu, pins and edit tracking.
+                if(ImGui::IsItemClicked(1)) ImGui::OpenPopup("Param Popup");
+                renderParameterPopup(absParam);
+            }else if(absParam.valueType() == typeid(std::function<void()>).name()){
                 // Check if this is a separator by looking at the parameter name
                 if(uniqueId.find("SEPARATOR:|") == 0){
                     // Parse separator data: "SEPARATOR:|label|r,g,b,a"
@@ -603,198 +608,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                     }
                 }
                 
-				// Push custom style colors
-				ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
-				ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
-				
-                if(ImGui::BeginPopup("Param Popup")){
-                    if(absParam.isScoped()){
-                        if(ImGui::Selectable("Remove from Scope")){
-                            ofxOceanodeScope::getInstance()->removeParameter(&absParam);
-                        }
-                    }else if(ofxOceanodeScope::getInstance()->canScope(&absParam)){
-                        if(ImGui::Selectable("Add to Scope")){
-                            // Extract full path information
-                            std::string canvasID = absParam.getNodeModel()->getParents();
-                            std::string nodeName = absParam.getGroupHierarchyNames().front();
-                            
-                            ofxOceanodeScope::getInstance()->addParameter(
-                                &absParam,
-                                node.getColor(),
-                                canvasID,
-                                nodeName
-                            );
-                        }
-                    }
-                    ImGui::Separator();
-                    if(container.getTimelineManager().isStepLaneCompatible(absParam)){
-                        auto& timelineManager = container.getTimelineManager();
-                        const std::string timelineParameterPath = container.getTimelineParameterPath(absParam);
-                        struct BoundTimelineLocation {
-                            std::string trackId;
-                            std::string trackName;
-                            std::string bindingId;
-                        };
-                        std::vector<BoundTimelineLocation> boundLocations;
-                        for(const auto& timelineTrack : timelineManager.getTracks()){
-                            for(const auto& binding : timelineTrack.bindings){
-                                if(binding.parameterPath == timelineParameterPath){
-                                    boundLocations.push_back({timelineTrack.id, timelineTrack.name, binding.id});
-                                }
-                            }
-                        }
-
-                        if(ImGui::BeginMenu("Add to Timeline Track")){
-                            if(ImGui::Selectable("New Timeline Track")){
-                                const std::string trackId = timelineManager.createTrack();
-                                if(!timelineManager.addBinding(trackId, absParam).empty()) {
-                                    // The timeline controller owns the modal so
-                                    // the name is chosen before the track is
-                                    // used in the rest of the UI.
-                                    timelineManager.requestTrackRename(trackId, true);
-                                }
-                            }
-                            if(!timelineManager.getTracks().empty()){
-                                ImGui::Separator();
-                                for(const auto& timelineTrack : timelineManager.getTracks()){
-                                    if(timelineTrack.isWaveTrack) continue;
-                                    const bool alreadyBound = std::any_of(timelineTrack.bindings.begin(), timelineTrack.bindings.end(), [&](const auto& binding){
-                                        return binding.parameterPath == timelineParameterPath;
-                                    });
-                                    if(ImGui::Selectable(timelineTrack.name.c_str(), alreadyBound, alreadyBound ? ImGuiSelectableFlags_Disabled : 0)){
-                                        timelineManager.addBinding(timelineTrack.id, absParam);
-                                    }
-                                }
-                            }
-                            ImGui::EndMenu();
-                        }
-                        {
-                            // Pitch, gate and velocity as one piano-roll row; the
-                            // timeline shows a dialog to pick the other two.
-                            const std::string valueType = absParam.valueType();
-                            if((valueType == typeid(float).name() || valueType == typeid(int).name() ||
-                                valueType == typeid(bool).name()) &&
-                               ImGui::Selectable("Add to Timeline as Piano Roll...")){
-                                timelineManager.requestNoteGroupSetup(&absParam);
-                            }
-                        }
-                        if(boundLocations.size() == 1){
-                            if(ImGui::Selectable("Remove from Timeline")){
-                                timelineManager.removeBinding(boundLocations.front().trackId,
-                                                              boundLocations.front().bindingId);
-                            }
-                        }else if(boundLocations.size() > 1 && ImGui::BeginMenu("Remove from Timeline")){
-                            for(const auto& location : boundLocations){
-                                if(ImGui::MenuItem(location.trackName.c_str())){
-                                    timelineManager.removeBinding(location.trackId, location.bindingId);
-                                }
-                            }
-                            ImGui::EndMenu();
-                        }
-                    }
-                    ImGui::Separator();
-                    auto customTypes = container.getCompatibleCustomGuiWidgetTypes(absParam);
-                    bool anyRemoval = false;
-                    for(const auto& panel : container.getCustomGuiPanelsData()){
-                        if(container.customGuiContainsParameter(panel.id, absParam)){
-                            anyRemoval = true;
-                            break;
-                        }
-                    }
-
-                    if(!customTypes.empty() && ImGui::BeginMenu("Add to Custom GUI")){
-                        CustomGuiWidgetType defaultType = container.getDefaultCustomGuiWidgetType(absParam);
-                        const std::string parameterPath = container.getCustomGuiParameterPath(absParam);
-
-                        if(container.getCustomGuiPanelsData().empty()){
-                            if(ImGui::BeginMenu("New Custom GUI")){
-                                for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
-                                    CustomGuiWidgetType widgetType = customTypes[widgetIndex];
-                                    std::string label = customGuiWidgetTypeToString(widgetType);
-                                    if(widgetType == defaultType) label += " (default)";
-                                    if(ImGui::Selectable(label.c_str())){
-                                        container.requestCreateCustomGui(parameterPath, widgetType, true);
-                                    }
-                                }
-                                ImGui::EndMenu();
-                            }
-                        }else{
-                            if(ImGui::BeginMenu("New Custom GUI")){
-                                for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
-                                    CustomGuiWidgetType widgetType = customTypes[widgetIndex];
-                                    std::string label = customGuiWidgetTypeToString(widgetType);
-                                    if(widgetType == defaultType) label += " (default)";
-                                    if(ImGui::Selectable(label.c_str())){
-                                        container.requestCreateCustomGui(parameterPath, widgetType, true);
-                                    }
-                                }
-                                ImGui::EndMenu();
-                            }
-
-                            ImGui::Separator();
-                            for(const auto& panel : container.getCustomGuiPanelsData()){
-                                if(ImGui::BeginMenu(panel.name.c_str())){
-                                    for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
-                                        CustomGuiWidgetType widgetType = customTypes[widgetIndex];
-                                        const bool canAdd = container.canAddParameterToCustomGui(panel.id, absParam, widgetType);
-                                        std::string label = customGuiWidgetTypeToString(widgetType);
-                                        if(widgetType == defaultType) label += " (default)";
-                                        if(!canAdd) label += " (already added)";
-                                        if(ImGui::Selectable(label.c_str(), false, canAdd ? 0 : ImGuiSelectableFlags_Disabled)){
-                                            container.addParameterToCustomGui(panel.id, absParam, widgetType);
-                                            container.openCustomGuiPanel(panel.id, true);
-                                        }
-                                    }
-                                    ImGui::EndMenu();
-                                }
-                            }
-
-                        }
-                        ImGui::EndMenu();
-                    }
-                    if(anyRemoval && ImGui::BeginMenu("Remove from Custom GUI")){
-                        for(const auto& panel : container.getCustomGuiPanelsData()){
-                            const std::string path = container.getCustomGuiParameterPath(absParam);
-                            const auto count = std::count_if(panel.layout.widgets.begin(), panel.layout.widgets.end(), [&](const CustomGuiWidget& widget){
-                                return widget.parameterRef.parameterPath == path;
-                            });
-                            const std::string label = panel.name + (count > 1 ? " (all widgets)" : "");
-                            if(ImGui::Selectable(label.c_str(), false, count > 0 ? 0 : ImGuiSelectableFlags_Disabled)){
-                                container.removeParameterFromCustomGui(panel.id, absParam);
-                            }
-                        }
-                        ImGui::EndMenu();
-                    }
-#ifdef OFXOCEANODE_USE_MIDI
-                    ImGui::Separator();
-                    if(ImGui::Selectable("Bind MIDI")){
-                        container.createMidiBinding(absParam);
-                    }
-                    if(ImGui::Selectable("Unbind last MIDI")){
-                        container.removeLastMidiBinding(absParam);
-                    }
-#endif
-#ifdef OFXOCEANODE_USE_OSC
-                    ImGui::Separator();
-					ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
-
-                    //ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
-					ImGui::Text("OSC Address");
-					if (ImGui::IsItemHovered())
-					{
-						string tt = getParameters().getEscapedName() + "/" +absParam.getEscapedName();
-						ImGui::SetTooltip(tt.c_str());
-					}
-					ImGui::PopStyleColor();
-
-#endif
-                    ImGui::Separator();
-                    ImGui::EndPopup();
-                }
-    // Always pop the same number you pushed
-    ImGui::PopStyleColor(2);
-    ImGui::PopStyleVar();
+                renderParameterPopup(absParam);
 
                 ImGui::PopStyleColor(6);
                 } // end widget rendering block
@@ -1005,4 +819,200 @@ bool ofxOceanodeNodeGui::hasConnectionPosition(ofxOceanodeAbstractParameter& par
     if(!getParameters().contains(parameter.getName())) return false;
     const size_t index = getParameters().getPosition(parameter.getName());
     return index < inputPositions.size() && index < outputPositions.size();
+}
+
+void ofxOceanodeNodeGui::renderParameterPopup(ofxOceanodeAbstractParameter& absParam){
+    // Push custom style colors
+    ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
+
+    if(ImGui::BeginPopup("Param Popup")){
+        if(absParam.isScoped()){
+            if(ImGui::Selectable("Remove from Scope")){
+                ofxOceanodeScope::getInstance()->removeParameter(&absParam);
+            }
+        }else if(ofxOceanodeScope::getInstance()->canScope(&absParam)){
+            if(ImGui::Selectable("Add to Scope")){
+                // Extract full path information
+                std::string canvasID = absParam.getNodeModel()->getParents();
+                std::string nodeName = absParam.getGroupHierarchyNames().front();
+
+                ofxOceanodeScope::getInstance()->addParameter(
+                    &absParam,
+                    node.getColor(),
+                    canvasID,
+                    nodeName
+                );
+            }
+        }
+        ImGui::Separator();
+        if(container.getTimelineManager().isStepLaneCompatible(absParam)){
+            auto& timelineManager = container.getTimelineManager();
+            const std::string timelineParameterPath = container.getTimelineParameterPath(absParam);
+            struct BoundTimelineLocation {
+                std::string trackId;
+                std::string trackName;
+                std::string bindingId;
+            };
+            std::vector<BoundTimelineLocation> boundLocations;
+            for(const auto& timelineTrack : timelineManager.getTracks()){
+                for(const auto& binding : timelineTrack.bindings){
+                    if(binding.parameterPath == timelineParameterPath){
+                        boundLocations.push_back({timelineTrack.id, timelineTrack.name, binding.id});
+                    }
+                }
+            }
+
+            if(ImGui::BeginMenu("Add to Timeline Track")){
+                if(ImGui::Selectable("New Timeline Track")){
+                    const std::string trackId = timelineManager.createTrack();
+                    if(!timelineManager.addBinding(trackId, absParam).empty()) {
+                        // The timeline controller owns the modal so
+                        // the name is chosen before the track is
+                        // used in the rest of the UI.
+                        timelineManager.requestTrackRename(trackId, true);
+                    }
+                }
+                if(!timelineManager.getTracks().empty()){
+                    ImGui::Separator();
+                    for(const auto& timelineTrack : timelineManager.getTracks()){
+                        if(timelineTrack.isWaveTrack) continue;
+                        const bool alreadyBound = std::any_of(timelineTrack.bindings.begin(), timelineTrack.bindings.end(), [&](const auto& binding){
+                            return binding.parameterPath == timelineParameterPath;
+                        });
+                        if(ImGui::Selectable(timelineTrack.name.c_str(), alreadyBound, alreadyBound ? ImGuiSelectableFlags_Disabled : 0)){
+                            timelineManager.addBinding(timelineTrack.id, absParam);
+                        }
+                    }
+                }
+                ImGui::EndMenu();
+            }
+            {
+                // Pitch, gate and velocity as one piano-roll row; the
+                // timeline shows a dialog to pick the other two.
+                const std::string valueType = absParam.valueType();
+                if((valueType == typeid(float).name() || valueType == typeid(int).name() ||
+                    valueType == typeid(bool).name()) &&
+                   ImGui::Selectable("Add to Timeline as Piano Roll...")){
+                    timelineManager.requestNoteGroupSetup(&absParam);
+                }
+            }
+            if(boundLocations.size() == 1){
+                if(ImGui::Selectable("Remove from Timeline")){
+                    timelineManager.removeBinding(boundLocations.front().trackId,
+                                                  boundLocations.front().bindingId);
+                }
+            }else if(boundLocations.size() > 1 && ImGui::BeginMenu("Remove from Timeline")){
+                for(const auto& location : boundLocations){
+                    if(ImGui::MenuItem(location.trackName.c_str())){
+                        timelineManager.removeBinding(location.trackId, location.bindingId);
+                    }
+                }
+                ImGui::EndMenu();
+            }
+        }
+        ImGui::Separator();
+        auto customTypes = container.getCompatibleCustomGuiWidgetTypes(absParam);
+        bool anyRemoval = false;
+        for(const auto& panel : container.getCustomGuiPanelsData()){
+            if(container.customGuiContainsParameter(panel.id, absParam)){
+                anyRemoval = true;
+                break;
+            }
+        }
+
+        if(!customTypes.empty() && ImGui::BeginMenu("Add to Custom GUI")){
+            CustomGuiWidgetType defaultType = container.getDefaultCustomGuiWidgetType(absParam);
+            const std::string parameterPath = container.getCustomGuiParameterPath(absParam);
+
+            if(container.getCustomGuiPanelsData().empty()){
+                if(ImGui::BeginMenu("New Custom GUI")){
+                    for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
+                        CustomGuiWidgetType widgetType = customTypes[widgetIndex];
+                        std::string label = customGuiWidgetTypeToString(widgetType);
+                        if(widgetType == defaultType) label += " (default)";
+                        if(ImGui::Selectable(label.c_str())){
+                            container.requestCreateCustomGui(parameterPath, widgetType, true);
+                        }
+                    }
+                    ImGui::EndMenu();
+                }
+            }else{
+                if(ImGui::BeginMenu("New Custom GUI")){
+                    for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
+                        CustomGuiWidgetType widgetType = customTypes[widgetIndex];
+                        std::string label = customGuiWidgetTypeToString(widgetType);
+                        if(widgetType == defaultType) label += " (default)";
+                        if(ImGui::Selectable(label.c_str())){
+                            container.requestCreateCustomGui(parameterPath, widgetType, true);
+                        }
+                    }
+                    ImGui::EndMenu();
+                }
+
+                ImGui::Separator();
+                for(const auto& panel : container.getCustomGuiPanelsData()){
+                    if(ImGui::BeginMenu(panel.name.c_str())){
+                        for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
+                            CustomGuiWidgetType widgetType = customTypes[widgetIndex];
+                            const bool canAdd = container.canAddParameterToCustomGui(panel.id, absParam, widgetType);
+                            std::string label = customGuiWidgetTypeToString(widgetType);
+                            if(widgetType == defaultType) label += " (default)";
+                            if(!canAdd) label += " (already added)";
+                            if(ImGui::Selectable(label.c_str(), false, canAdd ? 0 : ImGuiSelectableFlags_Disabled)){
+                                container.addParameterToCustomGui(panel.id, absParam, widgetType);
+                                container.openCustomGuiPanel(panel.id, true);
+                            }
+                        }
+                        ImGui::EndMenu();
+                    }
+                }
+
+            }
+            ImGui::EndMenu();
+        }
+        if(anyRemoval && ImGui::BeginMenu("Remove from Custom GUI")){
+            for(const auto& panel : container.getCustomGuiPanelsData()){
+                const std::string path = container.getCustomGuiParameterPath(absParam);
+                const auto count = std::count_if(panel.layout.widgets.begin(), panel.layout.widgets.end(), [&](const CustomGuiWidget& widget){
+                    return widget.parameterRef.parameterPath == path;
+                });
+                const std::string label = panel.name + (count > 1 ? " (all widgets)" : "");
+                if(ImGui::Selectable(label.c_str(), false, count > 0 ? 0 : ImGuiSelectableFlags_Disabled)){
+                    container.removeParameterFromCustomGui(panel.id, absParam);
+                }
+            }
+            ImGui::EndMenu();
+        }
+#ifdef OFXOCEANODE_USE_MIDI
+        ImGui::Separator();
+        if(ImGui::Selectable("Bind MIDI")){
+            container.createMidiBinding(absParam);
+        }
+        if(ImGui::Selectable("Unbind last MIDI")){
+            container.removeLastMidiBinding(absParam);
+        }
+#endif
+#ifdef OFXOCEANODE_USE_OSC
+        ImGui::Separator();
+        ImGui::PushStyleColor(ImGuiCol_Text,     OceanodeColors::PopupDimmedText);
+
+        //ImGui::Text("OSC Address: %s/%s", getParameters().getEscapedName().c_str(), absParam.getEscapedName().c_str());
+        ImGui::Text("OSC Address");
+        if (ImGui::IsItemHovered())
+        {
+            string tt = getParameters().getEscapedName() + "/" +absParam.getEscapedName();
+            ImGui::SetTooltip(tt.c_str());
+        }
+        ImGui::PopStyleColor();
+
+#endif
+        ImGui::Separator();
+        ImGui::EndPopup();
+    }
+    // Always pop the same number you pushed
+    ImGui::PopStyleColor(2);
+    ImGui::PopStyleVar();
+
 }

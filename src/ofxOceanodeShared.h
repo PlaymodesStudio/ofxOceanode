@@ -103,10 +103,7 @@ public:
 		dir.sort();
 		for(auto &folder : dir.getFiles()){
 			if(folder.isDirectory()){
-				ofDirectory dir2(folder.path());
-				dir2.sort();
-				if(dir2.size() != 0 && (!dir2.getFile(0).isDirectory() ||
-                                        (dir2.getFile(0).isDirectory() && ofStringTimesInString(dir2.getName(0), "Macro_") > 0))){
+				if(ofFile::doesFileExist(folder.path() + "/modules.json")){
 					category->macros.emplace_back(make_pair(folder.getFileName(), folder.path()));
 				}else{
 					category->categories.push_back(make_shared<macroCategory>(folder.getFileName()));
