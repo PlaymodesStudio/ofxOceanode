@@ -204,11 +204,9 @@ void ofxOceanodeCanvas::resetForNewPreset(){
     centerOriginPending = true;
 }
 
-void ofxOceanodeCanvas::rememberInspectorSelectionClick(const string& nodeID, ofxOceanodeNodeGui& nodeGui){
+void ofxOceanodeCanvas::rememberInspectorSelectionClick(const string& nodeID){
     if(!ofxOceanodeShared::getAutoInspectorShowHide()) return;
     inspectorSelectionClick.nodeID = nodeID;
-    // Keep the point relative to the node so a selection drag follows its final position.
-    inspectorSelectionClick.nodeOffset = screenToWorld(glm::vec2(ImGui::GetMousePos())) - nodeGui.getPosition();
     inspectorSelectionClick.origin = canvasOrigin;
     inspectorSelectionClick.size = contentRegionSize;
     inspectorSelectionClick.lastInteractionFrame = ImGui::GetFrameCount();
@@ -247,12 +245,11 @@ void ofxOceanodeCanvas::recenterSelectionAfterInspectorLayout(){
        std::abs(contentRegionSize.x - click.size.x) > 0.5f ||
        std::abs(contentRegionSize.y - click.size.y) > 0.5f){
         auto& nodeGui = node->second->getNodeGui();
-        // Keep the horizontal click anchor, but center the full node vertically
-        // so clicking its header also centers tall nodes at the current zoom.
+        // Center the full node at its current position, including after a drag.
+        const auto rectangle = nodeGui.getRectangle();
         const glm::vec2 target = nodeGui.getPosition() +
-            glm::vec2(click.nodeOffset.x, nodeGui.getRectangle().getHeight() * 0.5f);
-        scrolling = contentRegionSize / (2.0f * zoomLevel) -
-            target;
+            glm::vec2(rectangle.getWidth(), rectangle.getHeight()) * 0.5f;
+        scrolling = contentRegionSize / (2.0f * zoomLevel) - target;
         inspectorSelectionClick.origin = canvasOrigin;
         inspectorSelectionClick.size = contentRegionSize;
         inspectorSelectionClick.needsCenter = false;
@@ -1452,7 +1449,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         if(!keepExistingSelection){
                             deselectAllNodes();
                             nodeGui.setSelected(true);
-                            rememberInspectorSelectionClick(nodeId, nodeGui);
+                            rememberInspectorSelectionClick(nodeId);
                             lastSelectedNode = nodeId;
                             ofxOceanodeShared::nodeSelectedInCanvas(node);
                             ofxOceanodeShared::requestInspectorFocus();
@@ -1502,7 +1499,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             nodeGui.setSelected(!nodeGui.getSelected());
                         }
                         if(nodeGui.getSelected()) lastSelectedNode = nodeId;
-                        if(nodeGui.getSelected()) rememberInspectorSelectionClick(nodeId, nodeGui);
+                        if(nodeGui.getSelected()) rememberInspectorSelectionClick(nodeId);
                     }
                 }
                 if(ImGui::IsMouseReleased(0) && ImGui::IsItemHovered(ImGuiHoveredFlags_None) && nodeGui.getSelected() && lastSelectedNode == nodeId){

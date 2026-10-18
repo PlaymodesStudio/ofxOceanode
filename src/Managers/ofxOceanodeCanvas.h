@@ -145,11 +145,10 @@ private:
     void deselectAllNodes();
     void selectAllNodes();
 
-    void rememberInspectorSelectionClick(const string& nodeID, ofxOceanodeNodeGui& nodeGui);
+    void rememberInspectorSelectionClick(const string& nodeID);
     void recenterSelectionAfterInspectorLayout();
     struct InspectorSelectionClick {
         string nodeID;
-        glm::vec2 nodeOffset = glm::vec2(0);
         glm::vec2 origin = glm::vec2(0);
         glm::vec2 size = glm::vec2(0);
         int lastInteractionFrame = -1;

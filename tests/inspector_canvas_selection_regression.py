@@ -2,7 +2,7 @@
 """Check selection centering through real ImGui Inspector docking transitions.
 
 Uses production Controls::draw and canvas anchor methods with isolated graph
-types. Covers node heights, both draw orders, zoom, dragging, switching nodes/floating layouts,
+types. Covers node sizes, both draw orders, zoom, dragging, switching nodes/floating layouts,
 disabled auto Inspector, cancellation, and expired anchors. No GPU/OF host.
 """
 from pathlib import Path
@@ -28,9 +28,13 @@ FIXTURE = r'''
 using namespace std;
 struct ofxOceanodeNodeGui {
     bool selected=false; glm::vec2 position{750,-210};
-    float height=80;
-    struct Rectangle {float height; float getHeight() const {return height;}};
-    Rectangle getRectangle() const {return {height};}
+    float width=240,height=80;
+    struct Rectangle {
+        float width,height;
+        float getWidth() const {return width;}
+        float getHeight() const {return height;}
+    };
+    Rectangle getRectangle() const {return {width,height};}
     bool getSelected(){return selected;}
     glm::vec2 getPosition(){return position;}
 };
@@ -79,7 +83,7 @@ struct ofxOceanodeCanvas {
     // ANCHOR_STATE
     glm::vec2 screenToWorld(glm::vec2 p) const {return (p-canvasOrigin)/zoomLevel-scrolling;}
     glm::vec2 worldToScreen(glm::vec2 p) const {return canvasOrigin+(p+scrolling)*zoomLevel;}
-    void rememberInspectorSelectionClick(const string&,ofxOceanodeNodeGui&);
+    void rememberInspectorSelectionClick(const string&);
     void recenterSelectionAfterInspectorLayout();
 };
 '''
@@ -91,17 +95,20 @@ static void near(glm::vec2 a,glm::vec2 b){
         fprintf(stderr,"expected (%f,%f), got (%f,%f)\n",b.x,b.y,a.x,a.y);abort();
     }
 }
-static glm::vec2 target(glm::vec2 click,ofxOceanodeNodeGui& gui){
-    return {click.x,gui.position.y+gui.height*.5f};
+static void checkCentered(ofxOceanodeCanvas& canvas,ofxOceanodeNodeGui& gui){
+    const auto topLeft=canvas.worldToScreen(gui.position);
+    const auto bottomRight=canvas.worldToScreen(gui.position+glm::vec2(gui.width,gui.height));
+    // Equal opposite margins verify both axes independently of the click point.
+    near(topLeft-canvas.canvasOrigin,canvas.canvasOrigin+canvas.contentRegionSize-bottomRight);
 }
-static void scenario(bool macroFirst,float zoom,int layout,int button,float nodeHeight,bool drag=false){
+static void scenario(bool macroFirst,float zoom,int layout,int button,float nodeWidth,float nodeHeight,bool drag=false){
     ImGui::CreateContext();auto& io=ImGui::GetIO();
     io.DisplaySize={1400,900};io.DeltaTime=1.f/60;io.IniFilename=nullptr;
     io.ConfigFlags|=ImGuiConfigFlags_DockingEnable;io.ConfigInputTrickleEventQueue=false;
     unsigned char* pixels;int w,h;io.Fonts->GetTexDataAsRGBA32(&pixels,&w,&h);
     ofxOceanodeShared::automatic=true;ofxOceanodeShared::focus=false;
     ofxOceanodeNode node;ofxOceanodeContainer graph;graph.nodes["Node_1"]=&node;
-    node.gui.height=nodeHeight;
+    node.gui.width=nodeWidth;node.gui.height=nodeHeight;
     ofxOceanodeCanvas canvas;canvas.container=&graph;canvas.zoomLevel=zoom;
     // A second canvas must retain its own camera throughout the layout change.
     ofxOceanodeCanvas other;other.container=&graph;
@@ -110,7 +117,7 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
     auto inspector=make_shared<ofxOceanodeInspectorController>();inspector->node=&node;
     controls.controllers.push_back(inspector);
     const char* name=macroFirst?"Macro Canvas":"Canvas";
-    bool build=true,capture=false;glm::vec2 clickPoint(0);
+    bool build=true,capture=false;
     auto frame=[&]{
         ImGui::NewFrame();
         ImGuiID root=ImHashStr("InspectorDock");
@@ -142,8 +149,7 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
                 capture=false;node.gui.selected=true;
                 // Select near the header rather than halfway down the node.
                 node.gui.position=canvas.screenToWorld(glm::vec2(ImGui::GetMousePos()))-glm::vec2(35,10);
-                canvas.rememberInspectorSelectionClick("Node_1",node.gui);
-                clickPoint=canvas.screenToWorld(glm::vec2(ImGui::GetMousePos()));
+                canvas.rememberInspectorSelectionClick("Node_1");
                 if(button==1)ofxOceanodeShared::focus=true;
             }
             ImGui::EndChild();ImGui::End();
@@ -170,14 +176,13 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
     idle(4);
     assert(controls.controllerVisible["Inspector"]);
     if(layout<2)assert(glm::distance(canvas.contentRegionSize,oldSize)>100);
-    near(canvas.worldToScreen(target(clickPoint+movement,node.gui)),
-        canvas.canvasOrigin+canvas.contentRegionSize*.5f);
+    checkCentered(canvas,node.gui);
     near(other.scrolling,otherScroll);
 
     // Once settled, future window resizing must preserve the user's camera.
     idle(6);auto settled=canvas.scrolling;
     io.DisplaySize.x+=200;idle(3);near(canvas.scrolling,settled);
-    // Switching to a different node must center its click even when the open
+    // Switching to a different node must center its bounds even when the open
     // Inspector leaves both canvas size and position unchanged.
     ofxOceanodeNode secondNode;graph.nodes["Node_2"]=&secondNode;
     const auto switchOrigin=canvas.canvasOrigin,switchSize=canvas.contentRegionSize;
@@ -186,14 +191,16 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
     io.AddMouseButtonEvent(button,true);frame();
     node.gui.selected=false;secondNode.gui.selected=true;inspector->node=&secondNode;
     secondNode.gui.height=nodeHeight*.5f+90;
-    secondNode.gui.position=canvas.screenToWorld(glm::vec2(ImGui::GetMousePos()))-glm::vec2(35,10);
-    canvas.rememberInspectorSelectionClick("Node_2",secondNode.gui);
-    const auto secondClick=canvas.screenToWorld(glm::vec2(ImGui::GetMousePos()));
+    secondNode.gui.width=nodeWidth*.5f+70;
+    // Select near the opposite corner to ensure neither coordinate anchors to the click.
+    secondNode.gui.position=canvas.screenToWorld(glm::vec2(ImGui::GetMousePos()))-
+        glm::vec2(secondNode.gui.width-10,secondNode.gui.height-15);
+    canvas.rememberInspectorSelectionClick("Node_2");
     idle(2);near(canvas.scrolling,settled);
     io.AddMouseButtonEvent(button,false);frame();near(canvas.scrolling,settled);
     idle(4);
     near(canvas.canvasOrigin,switchOrigin);near(canvas.contentRegionSize,switchSize);
-    near(canvas.worldToScreen(target(secondClick,secondNode.gui)),switchOrigin+switchSize*.5f);
+    checkCentered(canvas,secondNode.gui);
     assert(glm::distance(canvas.scrolling,settled)>1);
     near(other.scrolling,otherScroll);
     idle(6);settled=canvas.scrolling;
@@ -201,7 +208,7 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
 
     // Cancellation prevents stale recentering after deselection/removal or opting out.
     auto cancelled=[&](int reason){
-        canvas.rememberInspectorSelectionClick("Node_1",node.gui);
+        canvas.rememberInspectorSelectionClick("Node_1");
         if(reason==0)node.gui.selected=false;
         if(reason==1)graph.nodes.clear();
         if(reason==2)ofxOceanodeShared::automatic=false;
@@ -212,25 +219,25 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
         idle(6);
     };
     for(int reason=0;reason<4;++reason)cancelled(reason);
-    // A position-only change also centers the click, even with identical size.
-    const auto worldClick=canvas.screenToWorld(glm::vec2(ImGui::GetMousePos()));
-    canvas.rememberInspectorSelectionClick("Node_1",node.gui);
+    // A position-only change also centers the node, even with identical size.
+    canvas.rememberInspectorSelectionClick("Node_1");
     canvas.canvasOrigin+=glm::vec2(40,25);
     canvas.recenterSelectionAfterInspectorLayout();
-    near(canvas.worldToScreen(target(worldClick,node.gui)),canvas.canvasOrigin+canvas.contentRegionSize*.5f);
+    checkCentered(canvas,node.gui);
     canvas.inspectorSelectionClick={};
     ofxOceanodeShared::automatic=false;
-    canvas.rememberInspectorSelectionClick("Node_1",node.gui);
+    canvas.rememberInspectorSelectionClick("Node_1");
     assert(canvas.inspectorSelectionClick.nodeID.empty());
     ImGui::DestroyContext();
 }
 int main(){
-    for(bool macro:{false,true})for(float zoom:{.25f,1.f,2.f})for(float height:{60.f,600.f,1600.f}){
-        scenario(macro,zoom,0,0,height);
-        scenario(macro,zoom,1,1,height,true);
-        scenario(macro,zoom,2,0,height);
+    for(bool macro:{false,true})for(float zoom:{.25f,1.f,2.f})
+    for(float width:{80.f,320.f,900.f})for(float height:{60.f,600.f,1600.f}){
+        scenario(macro,zoom,0,0,width,height);
+        scenario(macro,zoom,1,1,width,height,true);
+        scenario(macro,zoom,2,0,width,height);
     }
-    puts("Inspector selection centering passed: 54 height/dock/zoom/draw-order scenarios plus cancellation checks.");
+    puts("Inspector selection centering passed: 162 size/dock/zoom/draw-order scenarios plus cancellation checks.");
 }
 '''
 
