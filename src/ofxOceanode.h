@@ -229,6 +229,7 @@ private:
     // does not exist yet)
     string rootLayoutPath;
     std::string pendingIniLoad; // empty means no pending load
+    bool presetCanvasCenterPending = false;
 
     // Metadata for the most recently loaded ImGui layout. ImGui restores only
     // windows present in the .ini file, so controllers introduced after the

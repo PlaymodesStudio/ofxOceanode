@@ -24,6 +24,17 @@
 #include FT_SFNT_NAMES_H
 #include FT_TRUETYPE_TABLES_H
 
+namespace {
+void resetPresetCanvasViews(ofxOceanodeContainer* current, ofxOceanodeCanvas* currentCanvas){
+    currentCanvas->resetViewToOrigin();
+    for(auto* node : current->getAllModules()){
+        if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
+            resetPresetCanvasViews(macro->getContainer().get(), macro->getCanvas());
+        }
+    }
+}
+}
+
 ofxOceanode::ofxOceanode(){
     proportionalDocking = std::make_unique<ofxOceanodeProportionalDocking>();
     nodeRegistry = make_shared<ofxOceanodeNodeRegistry>();
@@ -200,16 +211,10 @@ void ofxOceanode::setup(){
         if(ofxOceanodeShared::getPresetLoadType() != ofxOceanodePresetLoadType_FullPreset){
             return; // Don't reload layout for clipboard paste / duplicate
         }
-        std::function<void(ofxOceanodeContainer*, ofxOceanodeCanvas*)> resetCanvasViews =
-        [&](ofxOceanodeContainer* current, ofxOceanodeCanvas* currentCanvas){
-            currentCanvas->resetViewToOrigin();
-            for(auto* node : current->getAllModules()){
-                if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
-                    resetCanvasViews(macro->getContainer().get(), macro->getCanvas());
-                }
-            }
-        };
-        resetCanvasViews(container.get(), &canvas);
+        resetPresetCanvasViews(container.get(), &canvas);
+        // Menu selections can load a preset during draw; its layout is applied
+        // before the next NewFrame, so re-arm centering once that has happened.
+        presetCanvasCenterPending = true;
         if(ofxOceanodeShared::getCurrentPresetPath().empty()){
             pendingIniLoad.clear();
             ofxOceanodeShared::getPendingLayoutSavePath().clear();
@@ -353,6 +358,10 @@ void ofxOceanode::draw(){
             }
             pendingLoad.clear();
         }
+    }
+    if(presetCanvasCenterPending){
+        resetPresetCanvasViews(container.get(), &canvas);
+        presetCanvasCenterPending = false;
     }
     gui.begin();
     // ImGui uses PopupBg for menus and modals; derive it from WindowBg each frame.

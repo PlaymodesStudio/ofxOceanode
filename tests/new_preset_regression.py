@@ -138,7 +138,7 @@ struct ofxOceanodeCanvas {
     string layoutIniPath="OldPreset/ImGuiLayout.ini";
     void setLayoutIniPath(string s){layoutIniPath=s;} string getUniqueID(){return "Canvas";}
     void requestFocus(){focused=true;}
-    void resetForNewPreset(); void center();
+    void resetForNewPreset(); void resetViewToOrigin(); void center();
 };
 struct ofxOceanodeShared {
     inline static string path="SavedPreset",bank="Bank",name="Saved",active="Macro",savePath="Macro.ini",loadPath="Macro.ini",layoutPath="Macro.ini";
@@ -234,6 +234,24 @@ int main(){
     app.canvas.contentRegionSize={0,0}; app.canvas.center(); assert(app.canvas.centerOriginPending);
     app.canvas.contentRegionSize={800,600}; app.canvas.center();
     assert(app.canvas.scrolling.x==200 && app.canvas.scrolling.y==150 && !app.canvas.centerOriginPending && !app.canvas.recenterCanvas);
+    // Loaded presets center world (0,0) using the restored viewport, at every zoom.
+    // A canvas first shown later (e.g. a hidden Macro) must retain its request.
+    for(float zoom:{.25f,1.f,2.f}){
+        for(glm::vec2 viewport:{glm::vec2(320,180),glm::vec2(900,640)}){
+            ofxOceanodeCanvas view;
+            view.zoomLevel=zoom; view.scrolling={-400,700};
+            view.resetViewToOrigin();
+            assert(view.centerOriginPending && !view.returnToOldScrolling);
+            assert(!view.pendingCenterNode && view.pendingCenterFrames==0 && view.inspectorSelectionClick.nodeID.empty());
+            view.contentRegionSize={0,0}; view.center(); assert(view.centerOriginPending);
+            view.contentRegionSize=viewport; view.center();
+            assert(!view.centerOriginPending && view.zoomLevel==zoom);
+            assert(view.scrolling.x*zoom==viewport.x*.5f && view.scrolling.y*zoom==viewport.y*.5f);
+            // Once reset is complete, ordinary panning stays where the user puts it.
+            view.scrolling={17,23}; view.center();
+            assert(view.scrolling.x==17 && view.scrolling.y==23);
+        }
+    }
     // Saving the fresh patch attaches autosaves to its new destination.
     c.attachSavedScope("FreshPreset");
     assert(ofxOceanodeScope::getInstance()->callback);
@@ -249,7 +267,7 @@ int main(){
     presets.newPresetRequested=true; presets.update(); assert(destroyedNodes==6);
     c.destroyNodeListeners.count=1; populate(c); presets.newPresetRequested=true; presets.update();
     assert(destroyedNodes==12 && notifiedNodes==12 && destroyedConnections==12);
-    cout<<"New preset regression passed: deferred menu action, nested teardown, persistent nodes, MIDI listeners, scopes, timeline ordering, preset/layout identity, repeated resets and canvas centering.\n";
+    cout<<"New preset regression passed: deferred menu action, nested teardown, persistent nodes, MIDI listeners, scopes, timeline ordering, preset/layout identity, repeated resets and loaded-preset origin centering at multiple viewport sizes/zooms.\n";
 }
 '''
 
@@ -266,6 +284,7 @@ def main():
     production += block(container, "void ofxOceanodeContainer::clearContainer()")
     for method in ("draw", "update", "newPreset"):
         production += block(presets, f"void ofxOceanodePresetsController::{method}()")
+    production += block(canvas, "void ofxOceanodeCanvas::resetViewToOrigin()")
     production += block(canvas, "void ofxOceanodeCanvas::resetForNewPreset()")
     production += "void ofxOceanodeCanvas::center(){" + block(canvas, "if(centerOriginPending &&") + "}\n"
     production += "void App::onLoaded(){" + block(app, "if(ofxOceanodeShared::getCurrentPresetPath().empty())") + "}\n"

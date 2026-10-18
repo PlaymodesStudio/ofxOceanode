@@ -171,7 +171,9 @@ void ofxOceanodeCanvas::setup(string _uid, string _pid){
 void ofxOceanodeCanvas::resetViewToOrigin(){
     scrolling = glm::vec2(0);
     returnToOldScrolling = false;
-    centerOriginPending = false;
+    // World (0,0) belongs at the viewport center, not its top-left corner.
+    // Wait for the loaded preset's layout to provide the current canvas size.
+    centerOriginPending = true;
     pendingCenterNode = nullptr;
     pendingCenterFrames = 0;
     inspectorSelectionClick = {};
