@@ -246,8 +246,13 @@ void ofxOceanodeCanvas::recenterSelectionAfterInspectorLayout(){
        std::abs(canvasOrigin.y - click.origin.y) > 0.5f ||
        std::abs(contentRegionSize.x - click.size.x) > 0.5f ||
        std::abs(contentRegionSize.y - click.size.y) > 0.5f){
+        auto& nodeGui = node->second->getNodeGui();
+        // Keep the horizontal click anchor, but center the full node vertically
+        // so clicking its header also centers tall nodes at the current zoom.
+        const glm::vec2 target = nodeGui.getPosition() +
+            glm::vec2(click.nodeOffset.x, nodeGui.getRectangle().getHeight() * 0.5f);
         scrolling = contentRegionSize / (2.0f * zoomLevel) -
-            (node->second->getNodeGui().getPosition() + click.nodeOffset);
+            target;
         inspectorSelectionClick.origin = canvasOrigin;
         inspectorSelectionClick.size = contentRegionSize;
         inspectorSelectionClick.needsCenter = false;
