@@ -2487,8 +2487,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImGui::PopStyleVar();
         //ImGui::PopStyleColor();
         
-        auto getSourceConnectionPositionFromParameter = [this](ofxOceanodeAbstractParameter& param) -> glm::vec2{
-            auto gui = container->getGuiFromModel(param.getNodeModel());
+        auto getSourceConnectionPositionFromParameter = [this](ofxOceanodeAbstractParameter& param, ofxOceanodeNodeGui* gui) -> glm::vec2{
             if(gui != nullptr){
                 if(gui->getVisibility()){
                     return gui->getSourceConnectionPositionFromParameter(param);
@@ -2499,8 +2498,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             return glm::vec2();
             //TODO: Throw exception
         };
-        auto getSinkConnectionPositionFromParameter = [this](ofxOceanodeAbstractParameter& param) -> glm::vec2{
-            auto gui = container->getGuiFromModel(param.getNodeModel());
+        auto getSinkConnectionPositionFromParameter = [this](ofxOceanodeAbstractParameter& param, ofxOceanodeNodeGui* gui) -> glm::vec2{
             if(gui != nullptr){
                 if(gui->getVisibility()){
                     return gui->getSinkConnectionPositionFromParameter(param);
@@ -2514,12 +2512,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         
         // Display links
         draw_list->ChannelsSetCurrent(1); // Background
+        const bool colorConnections = (ofxOceanodeShared::getConfigurationFlags() &
+                                       ofxOceanodeConfigurationFlags_ColorConnections) != 0;
         const ImU32 connectionLineColor = darkCanvas
             ? OceanodeColors::U32(OceanodeColors::ConnectionLineDark)
             : OceanodeColors::U32(OceanodeColors::ConnectionLineLight);
         constexpr float nodeAttachmentTension = 1.5f;
         
-        std::vector<ofxOceanodeAbstractConnection*> drawnConnections;
+        std::unordered_set<ofxOceanodeAbstractConnection*> drawnConnections;
         
         for(auto nodePair : nodesVisibleInThisFrame)
         {
@@ -2529,18 +2529,20 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 auto connections = param->getOutConnections();
                 if(param->getInConnection() != nullptr) connections.push_back(param->getInConnection());
                 for(auto connection : connections){
-                    if(std::find(drawnConnections.begin(), drawnConnections.end(), connection) == drawnConnections.end()){
-                        glm::vec2 p1 = getSourceConnectionPositionFromParameter(connection->getSourceParameter()) + glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
-                        glm::vec2 p2 = getSinkConnectionPositionFromParameter(connection->getSinkParameter()) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
+                    if(drawnConnections.insert(connection).second){
+                        auto& sourceParameter = connection->getSourceParameter();
+                        auto& sinkParameter = connection->getSinkParameter();
+                        auto* sourceGui = container->getGuiFromModel(sourceParameter.getNodeModel());
+                        auto* sinkGui = container->getGuiFromModel(sinkParameter.getNodeModel());
+                        glm::vec2 p1 = getSourceConnectionPositionFromParameter(sourceParameter, sourceGui) + glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
+                        glm::vec2 p2 = getSinkConnectionPositionFromParameter(sinkParameter, sinkGui) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                         glm::vec2  controlPoint(0,0);
                         controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);
                         const glm::vec2 nodeControlPoint = controlPoint * nodeAttachmentTension;
-                        auto* sourceGui = container->getGuiFromModel(connection->getSourceParameter().getNodeModel());
-                        auto* sinkGui = container->getGuiFromModel(connection->getSinkParameter().getNodeModel());
                         const bool selectedConnection = (sourceGui && sourceGui->getSelected()) ||
                                                         (sinkGui && sinkGui->getSelected());
                         ImU32 lineColor = connectionLineColor;
-                        if(selectedConnection && sourceGui){
+                        if((colorConnections || selectedConnection) && sourceGui){
                             // Both incoming and outgoing wires inherit their origin node's color.
                             ImVec4 sourceColor(sourceGui->getColor(), 0.5f);
                             sourceColor.x *= 0.5f;
@@ -2549,7 +2551,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             lineColor = OceanodeColors::U32(sourceColor);
                         }
                         draw_list->AddBezierCubic(p1, p1 + nodeControlPoint, p2 - nodeControlPoint, p2, lineColor, connectionWidth);
-                        drawnConnections.push_back(connection);
                     }
                 }
 
@@ -2558,11 +2559,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         if(tempSourceParameter != nullptr || tempSinkParameter != nullptr){
             glm::vec2 p1, p2;
             if(tempSourceParameter != nullptr){
-                p1 = getSourceConnectionPositionFromParameter(*tempSourceParameter) + glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
+                auto* sourceGui = container->getGuiFromModel(tempSourceParameter->getNodeModel());
+                p1 = getSourceConnectionPositionFromParameter(*tempSourceParameter, sourceGui) + glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                 p2 = ImGui::GetMousePos();
             }else{
                 p1 = ImGui::GetMousePos();
-                p2 = getSinkConnectionPositionFromParameter(*tempSinkParameter) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
+                auto* sinkGui = container->getGuiFromModel(tempSinkParameter->getNodeModel());
+                p2 = getSinkConnectionPositionFromParameter(*tempSinkParameter, sinkGui) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
             }
             glm::vec2  controlPoint(0,0);
             controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);

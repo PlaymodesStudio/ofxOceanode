@@ -960,6 +960,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			ofxOceanodeConfigurationFlags configurationFlags = ofxOceanodeShared::getConfigurationFlags();
 			ImGui::CheckboxFlags("Disable Full Render", &configurationFlags, ofxOceanodeConfigurationFlags_DisableRenderAll);
 			ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
+			ImGui::CheckboxFlags("Color Connections?", &configurationFlags, ofxOceanodeConfigurationFlags_ColorConnections);
 			ImGui::Checkbox("Show Mode", &showMode);
 			ofxOceanodeShared::setConfigurationFlags(configurationFlags);
 			

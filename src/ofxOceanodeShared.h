@@ -25,7 +25,8 @@ enum ofxOceanodeConfigurationFlags_
 {
     ofxOceanodeConfigurationFlags_None              = 0,
     ofxOceanodeConfigurationFlags_DisableRenderAll  = 1 << 0,   //Only render visible nodes
-    ofxOceanodeConfigurationFlags_DisableHistograms = 2 << 1    // Do not display histograms in vectors
+    ofxOceanodeConfigurationFlags_DisableHistograms = 2 << 1,   // Do not display histograms in vectors
+    ofxOceanodeConfigurationFlags_ColorConnections  = 1 << 3    // Color all connections by their source node
 };
 
 enum ofxOceanodePresetLoadType {
@@ -525,7 +526,7 @@ private:
 	std::uint64_t portalListRevision = 0;
 	ofEvent<abstractPortal*> portalWillBeRemovedEvent;
     
-    ofxOceanodeConfigurationFlags configurationFlags;
+    ofxOceanodeConfigurationFlags configurationFlags = ofxOceanodeConfigurationFlags_None;
 	
 	// Node dimensions
 	int nodeWidthWidget = 150;
