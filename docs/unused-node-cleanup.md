@@ -1,10 +1,16 @@
 # Remove unused nodes
 
-Edit → Remove unused nodes reviews the active canvas. The popup lists the
+Edit → Remove unused nodes reviews the active canvas in a non-modal window.
+You can keep working in the app while it stays open. The window lists the
 nodes, connected groups and cables to remove, plus protected groups and the
 reasons they are retained. Nothing is deleted until Remove is clicked. A graph
 change requires Refresh; changes to bindings are checked again at confirmation.
 The native deletion path releases cables, listeners and node resources.
+
+Click any listed node, including protected nodes, to open its owning canvas,
+select it and center the view. Macro canvases open automatically. The review
+window stays open so you can inspect successive candidates. If the graph changes,
+Refresh enables navigation again; expired canvases cannot be navigated or removed.
 
 A whole connected group is retained if any member has a Custom GUI widget,
 snapshot value, Timeline binding, MIDI binding, Scope, persistent status or a
@@ -47,3 +53,8 @@ need an application rebuild.
 `python3 tests/node_registration_flags_regression.py` checks the registration
 overloads, legacy constructor arguments, flags, factory copies, duplicate names
 and explicit model protection overrides.
+
+`python3 tests/unused_nodes_window_regression.py` exercises the review window
+with real ImGui mouse events, including non-modal app interaction, root and nested
+Macro navigation, protected entries, zoom, layout changes, stale node replacement,
+refresh, usage revalidation and expired canvases.

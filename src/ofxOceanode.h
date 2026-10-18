@@ -187,7 +187,10 @@ private:
     shared_ptr<ofxOceanodeContainer> container;
     ofxOceanodeContainer::UnusedNodePlan unusedNodePlan;
     std::weak_ptr<ofxOceanodeContainer> unusedNodeContainer;
-    bool openUnusedNodesPopup = false;
+    bool showUnusedNodesWindow = false;
+    bool focusUnusedNodesWindow = false;
+    std::string unusedNodesSelectedNode;
+    void drawUnusedNodesWindow();
     bool unusedNodesPlanChanged = false;
     unique_ptr<ofxOceanodeControls> controls;
     unique_ptr<ofxOceanodeHelp> help;
