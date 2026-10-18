@@ -128,6 +128,7 @@ struct ofxOceanodeCanvas {
     glm::vec2 moveSelectedModulesWithDrag{42},scrolling{42},contentRegionSize{800,600}; float zoomLevel=2;
     ofRectangle selectedRect{1,1,1,1};
     int itemHovered=1,pendingCenterFrames=2,selectedSearchResultIndex=1;
+    struct {string nodeID;} inspectorSelectionClick{"Old"};
     void* tempSourceParameter=this; void* tempSinkParameter=this; void* customGuiContextNode=this;
     void* portalizeSourceParameter=this; void* encapsulateSinkParameter=this; void* pendingCenterNode=this;
     char portalizeNameBuffer[256]="Old";
@@ -153,7 +154,7 @@ struct ofxOceanodeShared {
     static void updateMacrosStructure(){}
 };
 struct App {
-    ofxOceanodeCanvas canvas; string pendingIniLoad="OldPreset.ini"; bool hasActivePreset=true;
+    ofxOceanodeCanvas canvas; string pendingIniLoad="OldPreset.ini",rootLayoutPath="OldPreset.ini"; bool hasActivePreset=true;
     void onLoaded(); void onSaved(string iniPath);
 };
 namespace ImGui {
@@ -228,6 +229,7 @@ int main(){
     assert(!app.hasActivePreset && app.pendingIniLoad.empty() && app.canvas.layoutIniPath.empty());
     assert(ofxOceanodeShared::active=="Canvas" && app.canvas.focused);
     assert(!app.canvas.pendingCenterNode && !app.canvas.tempSourceParameter && !app.canvas.customGuiContextNode);
+    assert(app.canvas.inspectorSelectionClick.nodeID.empty());
     assert(!app.canvas.isSelecting && !app.canvas.isCreatingConnection && app.canvas.keyboardSlots.empty());
     app.canvas.contentRegionSize={0,0}; app.canvas.center(); assert(app.canvas.centerOriginPending);
     app.canvas.contentRegionSize={800,600}; app.canvas.center();
@@ -268,7 +270,9 @@ def main():
     production += "void ofxOceanodeCanvas::center(){" + block(canvas, "if(centerOriginPending &&") + "}\n"
     production += "void App::onLoaded(){" + block(app, "if(ofxOceanodeShared::getCurrentPresetPath().empty())") + "}\n"
     production += "void App::onSaved(string iniPath){auto& activeLayoutPath=ofxOceanodeShared::getActiveCanvasLayoutPath();"
-    production += block(app, "if(activeLayoutPath.empty() || activeLayoutPath == iniPath)") + "}\n"
+    production += app[app.index("const string previousRoot = rootLayoutPath;"):
+                      app.index("// Only save from ImGui state")]
+    production += block(app, "if(rootActive){") + "}\n"
     save_method = block(container, "void ofxOceanodeContainer::savePreset(string presetFolderPath)")
     production += "void ofxOceanodeContainer::attachSavedScope(string presetFolderPath){const bool ownsGlobalScope=getCanvasID().empty() || getCanvasID()==\"Canvas\" || getCanvasID()==\"0\";"
     production += block(save_method, "if(ownsGlobalScope){") + "}\n"
