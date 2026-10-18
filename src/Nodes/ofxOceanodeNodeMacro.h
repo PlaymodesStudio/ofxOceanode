@@ -76,6 +76,9 @@ public:
 	ofxOceanodeNodeMacro();
 	~ofxOceanodeNodeMacro();
 	bool drawNodeParameter(ofxOceanodeAbstractParameter& parameter, float labelWidth, float widgetWidth) override;
+	std::string getNodeTitleSuffix() const override {
+		return presetManager.isLocal() ? localName.get() : presetManager.getCurrentMacro();
+	}
 	
 	// ─── Lifecycle ────────────────────────────────────────────────────────
 	void setup(){setup("");};

@@ -48,6 +48,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
     bool deleteModule = false;
     
 	if (!isTransparent) {
+		const float headerStartX = ImGui::GetCursorScreenPos().x;
 		
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, OceanodeColors::TransparentButton);
 		
@@ -57,20 +58,37 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 		ImGui::PopStyleColor();
 		
 		ImGui::SameLine();
+		const float defaultContentWidth = nodeWidthText + nodeWidthWidget;
 		// Don't draw node name text below 50% zoom
 		if(zoomLevel > 0.5f){
 			ImFont* boldFont = ofxOceanodeShared::getCurrentBoldFont();
 			if(boldFont) ImGui::PushFont(boldFont);
 			ImGui::Text("%s", moduleName.c_str());
 			if(boldFont) ImGui::PopFont();
-
+			const string titleSuffix = node.getNodeModel().getNodeTitleSuffix();
+			if(!titleSuffix.empty()){
+				const float textY = ImGui::GetItemRectMin().y;
+				ImGui::SameLine();
+				ImVec2 position = ImGui::GetCursorScreenPos();
+				position.y = textY;
+					const float availableWidth = headerStartX + defaultContentWidth - ImGui::GetFrameHeight() -
+						ImGui::GetStyle().ItemSpacing.x - position.x;
+				if(availableWidth > 0.0f){
+					const ImVec2 textSize = ImGui::CalcTextSize(titleSuffix.c_str(), nullptr, false);
+					const ImVec4 clip(position.x, position.y, position.x + availableWidth,
+						position.y + textSize.y);
+					ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
+						position, ImGui::GetColorU32(ImGuiCol_Text), titleSuffix.c_str(), nullptr, 0.0f, &clip);
+					ImGui::Dummy(ImVec2(std::min(textSize.x, availableWidth), textSize.y));
+					if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", titleSuffix.c_str());
+				}
+			}
 		}
 		
 		// Keep the header width derived from the current frame's nominal layout instead
 		// of the previous cached guiRect width. A stale oversized guiRect can otherwise
 		// feed back into the header and make nodes animate back from a huge width after
 		// dock/preset layout changes.
-		const float defaultContentWidth = nodeWidthText + nodeWidthWidget;
 		ImGui::SameLine(defaultContentWidth - ImGui::GetFrameHeight(), 0.0f);
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
 		ImGui::PushStyleColor(ImGuiCol_Button, OceanodeColors::TransparentButton);

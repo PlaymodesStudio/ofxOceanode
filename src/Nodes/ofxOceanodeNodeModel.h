@@ -49,6 +49,8 @@ public:
     virtual bool drawInspectorParameter(ofAbstractParameter &parameter){ return false; }
     // Optional node-row renderer; the parameter keeps its pins and value tracking.
     virtual bool drawNodeParameter(ofxOceanodeAbstractParameter&, float, float){ return false; }
+    // Optional display text beside the node title; does not change its identity.
+    virtual std::string getNodeTitleSuffix() const { return {}; }
     
     //get parameterGroup
     ofParameterGroup &getParameterGroup(){return parameters;};
