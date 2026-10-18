@@ -214,7 +214,8 @@ void ofxOceanodeCanvas::resetForNewPreset(){
 }
 
 void ofxOceanodeCanvas::rememberInspectorSelectionClick(const string& nodeID){
-    if(!ofxOceanodeShared::getAutoInspectorShowHide()) return;
+    if(!ofxOceanodeShared::getSelectionCentersCanvas() ||
+       !ofxOceanodeShared::getAutoInspectorShowHide()) return;
     inspectorSelectionClick.nodeID = nodeID;
     inspectorSelectionClick.origin = canvasOrigin;
     inspectorSelectionClick.size = contentRegionSize;
@@ -226,7 +227,8 @@ void ofxOceanodeCanvas::recenterSelectionAfterInspectorLayout(){
     if(inspectorSelectionClick.nodeID.empty()) return;
     const auto& nodes = container->getParameterGroupNodesMap();
     auto node = nodes.find(inspectorSelectionClick.nodeID);
-    if(!ofxOceanodeShared::getAutoInspectorShowHide() || node == nodes.end() ||
+    if(!ofxOceanodeShared::getSelectionCentersCanvas() ||
+       !ofxOceanodeShared::getAutoInspectorShowHide() || node == nodes.end() ||
        !node->second->getNodeGui().getSelected() ||
        ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1) || ImGui::IsMouseClicked(2) ||
        ImGui::GetIO().MouseWheel != 0.0f || ImGui::GetIO().MouseWheelH != 0.0f){

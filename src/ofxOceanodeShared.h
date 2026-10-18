@@ -336,6 +336,14 @@ public:
 		return getInstance().autoInspectorShowHide;
 	}
 
+	static void setSelectionCentersCanvas(bool b){
+		getInstance().selectionCentersCanvas = b;
+	}
+
+	static bool getSelectionCentersCanvas(){
+		return getInstance().selectionCentersCanvas;
+	}
+
 	static void requestInspectorFocus(){
 		getInstance().inspectorFocusRequested = true;
 	}
@@ -549,6 +557,7 @@ private:
 
 	// Auto Inspector show/hide
 	bool autoInspectorShowHide = true;
+	bool selectionCentersCanvas = false;
 	bool inspectorFocusRequested = false;
 
 	// Active canvas tracking

@@ -846,6 +846,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			if(ImGui::Checkbox("Inspector auto show/hide", &autoInspector)){
 				ofxOceanodeShared::setAutoInspectorShowHide(autoInspector);
 			}
+			bool selectionCentersCanvas = ofxOceanodeShared::getSelectionCentersCanvas();
+			if(ImGui::Checkbox("Selection centers canvas", &selectionCentersCanvas)){
+				ofxOceanodeShared::setSelectionCentersCanvas(selectionCentersCanvas);
+			}
 			bool snap = canvas.getSnapToGrid();
 			if(ImGui::Checkbox("Snap To Grid",&snap))
 			{
@@ -1345,6 +1349,7 @@ void ofxOceanode::saveConfig(){
     config["gridDivisions"] = canvas.getGridDivisions();
 	config["snapToGrid"] = canvas.getSnapToGrid();
 	config["autoInspectorShowHide"] = ofxOceanodeShared::getAutoInspectorShowHide();
+	config["selectionCentersCanvas"] = ofxOceanodeShared::getSelectionCentersCanvas();
 	config["guiLayoutChangesWithMacros"] = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
 	if(auto tc = controls->get<ofxOceanodeTimeController>()) config["spaceTogglesPlay"] = tc->getSpaceTogglesPlay();
 	
@@ -1429,6 +1434,7 @@ void ofxOceanode::loadConfig(){
 	if(config.contains("autoInspectorShowHide")){
 		ofxOceanodeShared::setAutoInspectorShowHide(config["autoInspectorShowHide"].get<bool>());
 	}
+	ofxOceanodeShared::setSelectionCentersCanvas(config.value("selectionCentersCanvas", false));
 	if(config.contains("guiLayoutChangesWithMacros")){
 		ofxOceanodeShared::setGuiLayoutChangesWithMacros(config["guiLayoutChangesWithMacros"].get<bool>());
 	}
