@@ -6,7 +6,8 @@
 
 #include "phasor.h"
 
-phasor::phasor() : ofxOceanodeNodeModel("Phasor")
+// Audio Rate setup callbacks inspect this flag before its inspector is added.
+phasor::phasor() : ofxOceanodeNodeModel("Phasor"), syncToTransport_Param("Sync To Transport", false)
 {
     phaseOffset = 0;
     color = ofColor::red;

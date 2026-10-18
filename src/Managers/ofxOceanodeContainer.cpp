@@ -119,9 +119,9 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     // (see setTimelineHost / getTimelineManager).
     if(transportOwner) timelineManager = std::make_unique<ofxOceanodeTimelineManager>(this);
     transformationMatrix = glm::mat4(1.0);
-    bpm = 120;
+    bpm = transportOwner ? 120.0f : transport->getState().bpm;
     phase = 0;
-    transport->setBpm(bpm);
+    if(transportOwner) transport->setBpm(bpm);
     
 #ifdef OFXOCEANODE_USE_MIDI
     ofxMidiIn* midiIn = new ofxMidiIn();

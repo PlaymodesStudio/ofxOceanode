@@ -11,9 +11,13 @@
 #include "baseOscillator.h"
 #include "ofMath.h"
 
-baseOscillator::baseOscillator(){
-    indexNormalized = 0;
-}
+// Oscillator setup emits parameter callbacks one at a time. Those callbacks
+// compute immediately, so every calculation field must already be initialized.
+baseOscillator::baseOscillator()
+    : phaseOffset_Param(0), pow_Param(0), pulseWidth_Param(.5), quant_Param(0),
+      scale_Param(1), offset_Param(0), randomAdd_Param(0), biPow_Param(0),
+      waveSelect_Param(0), amplitude_Param(1), invert_Param(0), skew_Param(0),
+      roundness_Param(.5), indexNormalized(0) {}
 
 float baseOscillator::computeFunc(float phasor){
     float linPhase = phasor + indexNormalized + phaseOffset_Param;

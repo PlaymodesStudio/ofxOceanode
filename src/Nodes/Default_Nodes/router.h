@@ -9,6 +9,7 @@
 #define router_h
 
 #include "ofxOceanodeNodeModel.h"
+#include <type_traits>
 
 class abstractRouter : public ofxOceanodeNodeModel{
 public:
@@ -56,6 +57,16 @@ public:
     
     router(string typelabel, T val) : abstractRouter(typelabel){
         addParameter(value.set("Value", val));
+        if constexpr(std::is_same_v<T,bool>) {
+            // Macro's existing type adapter reads these even though Boolean
+            // routers expose no Min/Max controls. Never pass indeterminate bools.
+            min.set("Min",false); max.set("Max",true);
+            value.setMin(false); value.setMax(true);
+        } else if constexpr(std::is_pointer_v<T>) {
+            // Type adapters also read the hidden bounds of Texture routers.
+            // They have no numeric range; never copy uninitialized addresses.
+            min.set("Min",nullptr); max.set("Max",nullptr);
+        }
     };
     
     ofParameter<T> &getValue(){return value;};
