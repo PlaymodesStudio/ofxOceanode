@@ -1910,6 +1910,24 @@ std::string ofxOceanodeTimelineManager::createNoteGroupClip(const std::string& t
     return clipId;
 }
 
+int ofxOceanodeTimelineManager::retargetParameterPaths(const std::map<std::string, std::string>& oldToNew) {
+    int changed = 0;
+    for(auto& track : tracks) {
+        for(auto& binding : track.bindings) {
+            const auto it = oldToNew.find(binding.parameterPath);
+            if(it == oldToNew.end() || it->second.empty() || it->second == it->first) continue;
+            binding.parameterPath = it->second;
+            binding.missingTarget = false;
+            changed++;
+        }
+    }
+    if(changed > 0) {
+        invalidateEvaluationIndexes();
+        invalidateSchedule();
+    }
+    return changed;
+}
+
 bool ofxOceanodeTimelineManager::removeBinding(const std::string& trackId, const std::string& bindingId) {
     invalidateSchedule(); // correct queued events while the binding still exists
     auto* track = getTrack(trackId);

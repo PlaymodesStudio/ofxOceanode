@@ -558,6 +558,10 @@ public:
     bool getParameterTrackColor(const ofxOceanodeAbstractParameter& parameter, ofColor& color) const;
     bool isStepLaneCompatible(const ofxOceanodeAbstractParameter& parameter) const;
     bool removeBinding(const std::string& trackId, const std::string& bindingId);
+    // A parameter was renamed: the bindings that pointed at its old path now
+    // point at the new one. All pairs apply at once (names swapped between two
+    // parameters stay with their parameters). Returns the bindings changed.
+    int retargetParameterPaths(const std::map<std::string, std::string>& oldToNew);
     // Moves a parameter row within its track (newIndex is clamped). The order is saved.
     bool moveBinding(const std::string& trackId, const std::string& bindingId, int newIndex);
     bool setBindingMode(const std::string& trackId, const std::string& bindingId, ofxOceanodeTimelineAutomationMode mode);
