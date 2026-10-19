@@ -112,11 +112,11 @@ int main(){
     for(const auto& vertex:list.VtxBuffer)near(abs(vertex.pos.y),1.5f);
     reset();renderer.bezier({0,0},{1,0},{129,0},{130,0},0,2,Style::Dashed,1);assert(list.VtxBuffer.empty());
     // Round dots must remain separated and preserve their diameter at each zoom.
-    reset();list.AddCircleFilled({0,0},1.5f,color);
+    reset();list.AddCircleFilled({0,0},2.0f,color);
     const int perDot=list.VtxBuffer.Size;vector<ImDrawVert> circle(list.VtxBuffer.begin(),list.VtxBuffer.end());
     for(float zoom:{.1f,1.f,2.f}){
         reset();renderer.bezier({0,0},{1,0},{129,0},{130,0},color,2,Style::Dotted,zoom);
-        const float spacing=3+max(2.f,5.f*zoom);const int count=int(floor(130/spacing))+1;
+        const float spacing=4+max(2.f,5.f*zoom);const int count=int(floor(130/spacing))+1;
         assert(list.VtxBuffer.Size==count*perDot&&list._Path.empty());
         for(int i=0;i<count;++i)for(int j=0;j<perDot;++j){
             const auto& v=list.VtxBuffer[i*perDot+j];
@@ -131,7 +131,7 @@ int main(){
     reset();renderer.bezier({0,0},{1,0},{2,0},{3,0},color,2,Style::Dotted,1);
     assert(list.VtxBuffer.Size==perDot);
     reset();renderer.bezier({130,0},{129,0},{1,0},{0,0},color,2,Style::Dotted,1);
-    assert(list.VtxBuffer.Size==17*perDot);
+    assert(list.VtxBuffer.Size==15*perDot);
     reset();renderer.bezier({0,0},{1,0},{1e8f,0},{1e8f,0},color,2,Style::Dotted,1);
     assert(list.VtxBuffer.Size<perDot*2100&&list._Path.empty());
     reset();renderer.bezier({0,0},{1,0},{129,0},{130,0},0,2,Style::Dotted,1);assert(list.VtxBuffer.empty());

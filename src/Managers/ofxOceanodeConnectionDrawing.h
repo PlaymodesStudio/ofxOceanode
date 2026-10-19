@@ -43,6 +43,7 @@ public:
             length += distance(curve[i - 1], curve[i]);
         if(style == Style::Dotted){
             if(length <= 0.0001f) return;
+            width += 1.0f; // ScBus dots have one extra pixel of diameter.
             const float spacing = std::max(width + gapLength, length / 2048.0f);
             float remaining = spacing;
             list->AddCircleFilled(p1, width * 0.5f, color);
