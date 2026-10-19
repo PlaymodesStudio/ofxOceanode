@@ -3,16 +3,19 @@
 #include "Managers/ofxOceanodeContainer.h"
 #include "Managers/PresetSaveCleanup.h"
 #include "ofxOceanodeParameter.h"
+#include "Nodes/ofxOceanodeNodeModel.h"
 #include "Nodes/Default_Nodes/Base/baseOscillator.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <limits>
 #include <cstring>
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include <set>
+#include <type_traits>
 
 namespace ofxOceanodeTimelineCurve {
 
@@ -464,6 +467,17 @@ std::string mapNormalizedLaneValue(const ofxOceanodeTimelineLane& lane,
                                    const std::string& normalizedValue) {
     const bool vectorFloat = binding.valueType == typeid(std::vector<float>).name();
     const bool vectorInt = binding.valueType == typeid(std::vector<int>).name();
+    // a gain on a decibel axis
+    if((binding.valueType == typeid(float).name() || vectorFloat) &&
+       ofxOceanodeTimelineScale::isDecibels(lane, &binding)) {
+        const auto tokens = ofSplitString(normalizedValue, ",", true, true);
+        std::string result;
+        for(size_t i = 0; i < tokens.size(); ++i) {
+            if(i > 0) result += ",";
+            result += ofToString(ofxOceanodeTimelineScale::normalizedToGain(lane, ofToFloat(tokens[i])));
+        }
+        return result.empty() ? normalizedValue : result;
+    }
     if(lane.type == ofxOceanodeTimelineLaneType::Curve && (vectorFloat || vectorInt)) {
         const auto tokens = ofSplitString(normalizedValue, ",", true, true);
         std::string result;
@@ -930,42 +944,6 @@ std::string clampValueToParameterRange(ofxOceanodeAbstractParameter& parameter,
     return value;
 }
 
-void applyPianoPitchRange(ofxOceanodeAbstractParameter& parameter,
-                          const std::string& valueType,
-                          int lowPitch, int highPitch) {
-    lowPitch = ofClamp(lowPitch, 0, 127);
-    highPitch = ofClamp(highPitch, lowPitch, 127);
-    if(valueType == typeid(float).name()) {
-        auto& target = parameter.cast<float>().getParameter();
-        const float minimum = static_cast<float>(lowPitch);
-        const float maximum = static_cast<float>(highPitch);
-        if(target.getMin() != minimum) target.setMin(minimum);
-        if(target.getMax() != maximum) target.setMax(maximum);
-    } else if(valueType == typeid(int).name()) {
-        auto& target = parameter.cast<int>().getParameter();
-        if(target.getMin() != lowPitch) target.setMin(lowPitch);
-        if(target.getMax() != highPitch) target.setMax(highPitch);
-    } else if(valueType == typeid(std::vector<float>).name()) {
-        auto& target = parameter.cast<std::vector<float>>().getParameter();
-        size_t size = std::max(target.get().size(), target.getMin().size());
-        size = std::max(size, target.getMax().size());
-        size = std::max<size_t>(size, 1);
-        const std::vector<float> minimum(size, static_cast<float>(lowPitch));
-        const std::vector<float> maximum(size, static_cast<float>(highPitch));
-        if(target.getMin() != minimum) target.setMin(minimum);
-        if(target.getMax() != maximum) target.setMax(maximum);
-    } else if(valueType == typeid(std::vector<int>).name()) {
-        auto& target = parameter.cast<std::vector<int>>().getParameter();
-        size_t size = std::max(target.get().size(), target.getMin().size());
-        size = std::max(size, target.getMax().size());
-        size = std::max<size_t>(size, 1);
-        const std::vector<int> minimum(size, lowPitch);
-        const std::vector<int> maximum(size, highPitch);
-        if(target.getMin() != minimum) target.setMin(minimum);
-        if(target.getMax() != maximum) target.setMax(maximum);
-    }
-}
-
 std::string joinAutomationValues(const std::vector<std::string>& values) {
     std::string result;
     for(size_t i = 0; i < values.size(); ++i) {
@@ -1134,6 +1112,110 @@ bool evaluateMultiGateRow(const std::vector<ofxOceanodeTimelineGateRegion>& row,
 double sourcePerTimelineBeat(const ofxOceanodeTimelineClip& clip) {
     if(clip.repeatContent) return 1.0 / std::max(1.0 / 1024.0, clip.contentStretch);
     return std::max(1.0 / 24.0, clip.contentDurationBeats) / std::max(1.0 / 24.0, clip.durationBeats);
+}
+
+// A binding of a track we are already iterating (no track lookup by id).
+const ofxOceanodeTimelineParameterBinding* bindingInTrack(const ofxOceanodeTimelineTrack& track,
+                                                          const std::string& bindingId) {
+    if(bindingId.empty()) return nullptr;
+    for(const auto& binding : track.bindings) if(binding.id == bindingId) return &binding;
+    return nullptr;
+}
+
+double pianoNoteEnd(const ofxOceanodeTimelinePianoNote& note) {
+    return note.startBeat + std::max(1.0 / 24.0, note.durationBeats);
+}
+
+// Kit keys: C1 (36) plays slot 0, like a General MIDI drum map.
+constexpr int kKitBaseNote = 36;
+
+// Gives every note a voice slot (see ofxOceanodeTimelinePianoVoicing). Notes
+// are taken in start order; a note takes the free slot that has been free the
+// longest (so releases ring out), a new slot when the count is open (voices
+// 0), or else steals the slot whose note started first, which ends there. A
+// kit's slot is fixed by the key.
+void computePianoVoicing(const ofxOceanodeTimelineClip& clip, const ofxOceanodeTimelineLane& lane,
+                         int voices, bool kit, ofxOceanodeTimelinePianoVoicing& out) {
+    constexpr double eps = 1e-6;
+    const auto& notes = lane.pianoNotes;
+    const size_t count = notes.size();
+    out = ofxOceanodeTimelinePianoVoicing();
+    out.kit = kit;
+    out.slot.assign(count, -1);
+    out.end.resize(count);
+    out.retrigger.assign(count, 0);
+    out.wrapRetrigger.assign(count, 0);
+    for(size_t i = 0; i < count; ++i) out.end[i] = pianoNoteEnd(notes[i]);
+
+    std::vector<size_t> order(count);
+    for(size_t i = 0; i < count; ++i) order[i] = i;
+    std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+        if(std::abs(notes[a].startBeat - notes[b].startBeat) > eps) return notes[a].startBeat < notes[b].startBeat;
+        return notes[a].pitch < notes[b].pitch;
+    });
+
+    std::vector<long long> current;   // note sounding in each slot (-1: none yet)
+    std::vector<double> freeSince;    // when each slot's last note ended
+    auto ensureSlot = [&](int s) {
+        if(s < static_cast<int>(current.size())) return;
+        current.resize(s + 1, -1);
+        freeSince.resize(s + 1, -std::numeric_limits<double>::infinity());
+    };
+    if(voices > 0 && !kit) ensureSlot(voices - 1);
+
+    for(const size_t n : order) {
+        const double start = notes[n].startBeat;
+        int chosen = -1;
+        if(kit) {
+            const int s = notes[n].pitch - kKitBaseNote;
+            if(s < 0 || (voices > 0 && s >= voices)) continue;
+            ensureSlot(s);
+            chosen = s;
+        } else {
+            for(int s = 0; s < static_cast<int>(current.size()); ++s) {
+                const bool free = current[s] < 0 || out.end[current[s]] <= start + eps;
+                if(!free) continue;
+                const double since = current[s] < 0 ? freeSince[s] : out.end[current[s]];
+                const double best = chosen < 0 ? 0.0
+                    : (current[chosen] < 0 ? freeSince[chosen] : out.end[current[chosen]]);
+                if(chosen < 0 || since < best - eps) chosen = s;
+            }
+            if(chosen < 0 && voices <= 0) {
+                chosen = static_cast<int>(current.size());
+                ensureSlot(chosen);
+            }
+            if(chosen < 0) {
+                // Every slot busy: steal the one whose note started first.
+                for(int s = 0; s < static_cast<int>(current.size()); ++s)
+                    if(chosen < 0 || notes[current[s]].startBeat < notes[current[chosen]].startBeat - eps) chosen = s;
+            }
+        }
+        const long long previous = current[chosen];
+        if(previous >= 0) {
+            if(out.end[previous] > start) out.end[previous] = std::max(notes[previous].startBeat, start);
+            if(out.end[previous] >= start - eps) out.retrigger[n] = 1;
+            freeSince[chosen] = out.end[previous];
+        }
+        current[chosen] = static_cast<long long>(n);
+        out.slot[n] = chosen;
+    }
+
+    out.width = std::max(1, voices > 0 ? voices : static_cast<int>(current.size()));
+    out.slotNotes.assign(std::max<size_t>(current.size(), static_cast<size_t>(out.width)), {});
+    for(const size_t n : order)
+        if(out.slot[n] >= 0) out.slotNotes[out.slot[n]].push_back(n);
+    // A repeating clip: a slot whose last note runs into the content end
+    // touches its first note of the next repeat.
+    if(clip.repeatContent) {
+        const double length = ofxOceanodeTimelineClipTime::sourceDuration(clip);
+        for(const auto& slotNotes : out.slotNotes) {
+            if(slotNotes.empty()) continue;
+            const size_t first = slotNotes.front();
+            if(notes[first].startBeat > eps) continue;
+            for(const size_t n : slotNotes)
+                if(out.end[n] >= length - eps) { out.wrapRetrigger[first] = 1; break; }
+        }
+    }
 }
 }
 
@@ -1319,15 +1401,17 @@ void ofxOceanodeTimelineManager::rebuildEvaluationIndexes() {
                     continue;
                 }
                 if(lane.type != ofxOceanodeTimelineLaneType::PianoRoll) continue;
-                if(const auto* binding = bindingFor(lane.pianoPitchBindingId)) {
+                auto& voicing = trackIt->second.pianoVoicing[&lane];
+                computeLaneVoicing(track, clip, lane, voicing);
+                if(const auto* binding = bindingFor(lane.pianoPitchBindingId); binding != nullptr && !voicing.kit) {
                     auto& range = pianoPitchRangesCache[binding->parameterPath];
                     range.valueType = binding->valueType;
                     range.low = std::min(range.low, static_cast<int>(ofClamp(lane.pianoLowPitch, 0, 127)));
                     range.high = std::max(range.high, static_cast<int>(ofClamp(lane.pianoHighPitch, 0, 127)));
                 }
+                // Outside its clips the gate is off; pitch and velocity hold
+                // (a release still sounding keeps its note and its level).
                 if(const auto* binding = bindingFor(lane.pianoGateBindingId))
-                    zeroWhenInactiveBindingsCache.emplace(binding);
-                if(const auto* binding = bindingFor(lane.pianoVelocityBindingId))
                     zeroWhenInactiveBindingsCache.emplace(binding);
             }
         }
@@ -1640,6 +1724,9 @@ std::string ofxOceanodeTimelineManager::addBinding(const std::string& trackId,
     binding.valueType = parameter.valueType();
     binding.defaultValue = parameterValueForAutomation(parameter);
     binding.mode = mode;
+    if(auto* model = parameter.getNodeModel()) binding.valueScale = model->getTimelineValueScale(parameter);
+    // a toggle's clips default to a Toggle lane (a one-row gate)
+    if(binding.valueType == typeid(bool).name()) binding.laneType = ofxOceanodeTimelineLaneType::MultiGate;
     track->bindings.push_back(binding);
     invalidateEvaluationIndexes();
 
@@ -1861,6 +1948,55 @@ bool ofxOceanodeTimelineManager::removeNoteGroup(const std::string& trackId, con
     return true;
 }
 
+bool ofxOceanodeTimelineManager::setNoteGroupVoices(const std::string& trackId, const std::string& groupId, int voices) {
+    auto* group = getNoteGroup(trackId, groupId);
+    if(group == nullptr) return false;
+    group->voices = std::max(0, std::min(voices, 128));
+    invalidateEvaluationIndexes();
+    invalidateSchedule();
+    return true;
+}
+
+void ofxOceanodeTimelineManager::pianoLaneVoicesAndKit(const ofxOceanodeTimelineTrack& track,
+                                                       const ofxOceanodeTimelineLane& lane,
+                                                       int& voices, bool& kit, int* instrumentVoices) const {
+    voices = 0;
+    kit = false;
+    if(instrumentVoices != nullptr) *instrumentVoices = 0;
+    const ofxOceanodeTimelineNoteGroup* group = nullptr;
+    for(const auto* id : {&lane.pianoGateBindingId, &lane.pianoPitchBindingId, &lane.pianoVelocityBindingId})
+        if(group == nullptr) group = findNoteGroupForBinding(track, *id);
+    // The instrument the lane plays: the node of its gate (or pitch) parameter,
+    // when that node says this parameter is one of its note inputs.
+    for(const auto* id : {&lane.pianoGateBindingId, &lane.pianoPitchBindingId}) {
+        if(id->empty()) continue;
+        const auto* binding = bindingInTrack(track, *id);
+        auto* parameter = binding == nullptr ? nullptr : findParameterCached(binding->parameterPath);
+        auto* model = parameter == nullptr ? nullptr : parameter->getNodeModel();
+        ofxOceanodeTimelineInstrument instrument;
+        if(model == nullptr || !model->getTimelineInstrument(instrument)) continue;
+        if(instrument.gate != parameter && instrument.pitch != parameter) continue;
+        voices = std::max(0, instrument.voices);
+        kit = instrument.kit;
+        if(instrumentVoices != nullptr) *instrumentVoices = voices;
+        break;
+    }
+    if(group != nullptr && group->voices > 0) voices = group->voices;
+    if(lane.pianoMonophonic && !kit) voices = 1;
+}
+
+void ofxOceanodeTimelineManager::computeLaneVoicing(const ofxOceanodeTimelineTrack& track,
+                                                    const ofxOceanodeTimelineClip& clip,
+                                                    const ofxOceanodeTimelineLane& lane,
+                                                    ofxOceanodeTimelinePianoVoicing& out) const {
+    int voices = 0, instrumentVoices = 0;
+    bool kit = false;
+    pianoLaneVoicesAndKit(track, lane, voices, kit, &instrumentVoices);
+    computePianoVoicing(clip, lane, voices, kit, out);
+    out.outputWidth = std::max(out.width, instrumentVoices);
+    out.instrument = instrumentVoices > 0;
+}
+
 std::string ofxOceanodeTimelineManager::createNoteGroupClip(const std::string& trackId, const std::string& groupId,
                                                             const std::string& requestedName, double startBeat,
                                                             double durationBeats, std::string* laneIdOut) {
@@ -1876,30 +2012,41 @@ std::string ofxOceanodeTimelineManager::createNoteGroupClip(const std::string& t
         lane->pianoGateBindingId = group.gateBindingId;
         lane->pianoVelocityBindingId = group.velocityBindingId;
         lane->bindingIds = group.members();
-        // Show the keys the pitch parameter can actually play, when that is a note range.
+        // Show the keys the pitch parameter can actually play, when that is a
+        // note range narrower than the whole keyboard; a kit shows its pads.
         lane->pianoLowPitch = 36;
         lane->pianoHighPitch = 84;
-        if(const auto* pitchBinding = getBinding(trackId, group.pitchBindingId)) {
+        const auto* track = getTrack(trackId);
+        int voices = 0;
+        bool kit = false;
+        if(track != nullptr) pianoLaneVoicesAndKit(*track, *lane, voices, kit);
+        if(kit) {
+            lane->pianoLowPitch = 36;
+            lane->pianoHighPitch = 36 + std::max(12, voices) - 1;
+        } else if(const auto* pitchBinding = getBinding(trackId, group.pitchBindingId)) {
             if(auto* parameter = container == nullptr ? nullptr : container->findTimelineParameter(pitchBinding->parameterPath)) {
                 float minimum = 0.0f, maximum = 0.0f;
                 bool numeric = true;
-                if(pitchBinding->valueType == typeid(float).name()) {
-                    minimum = parameter->cast<float>().getParameter().getMin();
-                    maximum = parameter->cast<float>().getParameter().getMax();
-                } else if(pitchBinding->valueType == typeid(int).name()) {
-                    minimum = static_cast<float>(parameter->cast<int>().getParameter().getMin());
-                    maximum = static_cast<float>(parameter->cast<int>().getParameter().getMax());
-                } else numeric = false;
-                // Another piano roll may have narrowed it already: use the parameter's own range.
+                const auto& type = pitchBinding->valueType;
+                // A piano roll may have widened it already: use the parameter's own range.
                 const auto saved = savedPianoRanges.find(pitchBinding->parameterPath);
-                if(numeric && saved != savedPianoRanges.end()) {
-                    if(pitchBinding->valueType == typeid(float).name()) {
-                        minimum = saved->second.floatMin; maximum = saved->second.floatMax;
-                    } else {
-                        minimum = static_cast<float>(saved->second.intMin); maximum = static_cast<float>(saved->second.intMax);
-                    }
-                }
-                if(numeric && minimum >= 0.0f && maximum <= 127.0f && maximum - minimum >= 12.0f) {
+                const bool hasSaved = saved != savedPianoRanges.end();
+                auto lowest = [](const auto& v) { return v.empty() ? 0.0f : static_cast<float>(*std::min_element(v.begin(), v.end())); };
+                auto highest = [](const auto& v) { return v.empty() ? 0.0f : static_cast<float>(*std::max_element(v.begin(), v.end())); };
+                if(type == typeid(float).name()) {
+                    minimum = hasSaved ? saved->second.floatMin : parameter->cast<float>().getParameter().getMin();
+                    maximum = hasSaved ? saved->second.floatMax : parameter->cast<float>().getParameter().getMax();
+                } else if(type == typeid(int).name()) {
+                    minimum = hasSaved ? saved->second.intMin : parameter->cast<int>().getParameter().getMin();
+                    maximum = hasSaved ? saved->second.intMax : parameter->cast<int>().getParameter().getMax();
+                } else if(type == typeid(std::vector<float>).name()) {
+                    minimum = lowest(hasSaved ? saved->second.floatVectorMin : parameter->cast<std::vector<float>>().getParameter().getMin());
+                    maximum = highest(hasSaved ? saved->second.floatVectorMax : parameter->cast<std::vector<float>>().getParameter().getMax());
+                } else if(type == typeid(std::vector<int>).name()) {
+                    minimum = lowest(hasSaved ? saved->second.intVectorMin : parameter->cast<std::vector<int>>().getParameter().getMin());
+                    maximum = highest(hasSaved ? saved->second.intVectorMax : parameter->cast<std::vector<int>>().getParameter().getMax());
+                } else numeric = false;
+                if(numeric && minimum >= 0.0f && maximum <= 127.0f && maximum - minimum >= 12.0f && maximum - minimum <= 72.0f) {
                     lane->pianoLowPitch = static_cast<int>(std::ceil(minimum));
                     lane->pianoHighPitch = static_cast<int>(std::floor(maximum));
                 }
@@ -1908,6 +2055,37 @@ std::string ofxOceanodeTimelineManager::createNoteGroupClip(const std::string& t
     }
     if(laneIdOut != nullptr) *laneIdOut = laneId;
     return clipId;
+}
+
+namespace ofxOceanodeTimelineScale {
+bool isDecibels(const ofxOceanodeTimelineLane& lane, const ofxOceanodeTimelineParameterBinding* binding) {
+    if(lane.type != ofxOceanodeTimelineLaneType::Curve || lane.valueMax <= 0.0f) return false;
+    if(lane.curveScale == "dB") return true;
+    if(!lane.curveScale.empty()) return false;
+    return binding != nullptr && binding->valueScale == "dB";
+}
+float topDb(const ofxOceanodeTimelineLane& lane) {
+    return 20.0f * std::log10(std::max(1e-6f, lane.valueMax));
+}
+float normalizedToDb(const ofxOceanodeTimelineLane& lane, float normalized) {
+    if(normalized <= 0.0f) return -std::numeric_limits<float>::infinity();
+    return kDbFloor + std::min(1.0f, normalized) * (topDb(lane) - kDbFloor);
+}
+float dbToNormalized(const ofxOceanodeTimelineLane& lane, float db) {
+    if(!std::isfinite(db) || db <= kDbFloor) return 0.0f;
+    const float span = std::max(1e-6f, topDb(lane) - kDbFloor);
+    return ofClamp((db - kDbFloor) / span, 0.0f, 1.0f);
+}
+float normalizedToGain(const ofxOceanodeTimelineLane& lane, float normalized) {
+    const float floorGain = std::max(0.0f, std::min(lane.valueMin, lane.valueMax));
+    if(normalized <= 0.0f) return floorGain;
+    const float gain = std::pow(10.0f, normalizedToDb(lane, normalized) / 20.0f);
+    return ofClamp(gain, floorGain, lane.valueMax);
+}
+float gainToNormalized(const ofxOceanodeTimelineLane& lane, float gain) {
+    if(gain <= 0.0f) return 0.0f;
+    return dbToNormalized(lane, 20.0f * std::log10(gain));
+}
 }
 
 int ofxOceanodeTimelineManager::retargetParameterPaths(const std::map<std::string, std::string>& oldToNew) {
@@ -2207,7 +2385,9 @@ int ofxOceanodeTimelineManager::captureStateAsCurvePoints(const std::string& tra
         }
 
         const float span = lane->valueMax - lane->valueMin;
-        const float normalized = std::abs(span) < 1e-9f ? 0.0f
+        const bool decibels = ofxOceanodeTimelineScale::isDecibels(*lane, getBinding(trackId, target.bindingId));
+        const float normalized = decibels ? ofxOceanodeTimelineScale::gainToNormalized(*lane, target.value)
+            : std::abs(span) < 1e-9f ? 0.0f
             : ofClamp((target.value - lane->valueMin) / span, 0.0f, 1.0f);
         setCurvePoint(*lane, sourceBeat, normalized);
 
@@ -3634,16 +3814,6 @@ ofxOceanodeAbstractParameter* ofxOceanodeTimelineManager::findParameterCached(co
     return parameter;
 }
 
-namespace {
-// A binding of a track we are already iterating (no track lookup by id).
-const ofxOceanodeTimelineParameterBinding* bindingInTrack(const ofxOceanodeTimelineTrack& track,
-                                                          const std::string& bindingId) {
-    if(bindingId.empty()) return nullptr;
-    for(const auto& binding : track.bindings) if(binding.id == bindingId) return &binding;
-    return nullptr;
-}
-}
-
 // Evaluates every binding of every track at one beat, without touching any
 // parameter. evaluateAutomation() calls it for the current playhead;
 // runScheduler() calls it for beats that have not been reached yet, which is
@@ -3675,7 +3845,7 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
         for(const auto& entry : pianoPitchRangesCache) {
             if(auto* parameter = findParameterCached(entry.first)) {
                 if(savedPianoRanges.count(entry.first) == 0) {
-                    // Remember the parameter's own range before narrowing it.
+                    // Remember the parameter's own range before widening it.
                     SavedParameterRange saved;
                     saved.valueType = entry.second.valueType;
                     const auto& type = entry.second.valueType;
@@ -3694,7 +3864,34 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
                     }
                     savedPianoRanges[entry.first] = saved;
                 }
-                applyPianoPitchRange(*parameter, entry.second.valueType, entry.second.low, entry.second.high);
+                // Only ever widen the parameter's own range to fit the keys
+                // (never narrow it: that clamped its cables and its slider).
+                // Keys inside its own range: its own range, exactly.
+                const auto& saved = savedPianoRanges[entry.first];
+                const float low = entry.second.low, high = entry.second.high;
+                const auto& type = entry.second.valueType;
+                auto widen = [&](auto& target, const auto& ownMin, const auto& ownMax) {
+                    using V = std::decay_t<decltype(ownMin)>;
+                    V minimum = ownMin, maximum = ownMax;
+                    if constexpr(std::is_arithmetic_v<V>) {
+                        minimum = std::min<V>(ownMin, static_cast<V>(std::floor(low)));
+                        maximum = std::max<V>(ownMax, static_cast<V>(std::ceil(high)));
+                    } else {
+                        using E = typename V::value_type;
+                        for(auto& v : minimum) v = std::min<E>(v, static_cast<E>(std::floor(low)));
+                        for(auto& v : maximum) v = std::max<E>(v, static_cast<E>(std::ceil(high)));
+                    }
+                    if(target.getMin() != minimum) target.setMin(minimum);
+                    if(target.getMax() != maximum) target.setMax(maximum);
+                };
+                if(type == typeid(float).name())
+                    widen(parameter->cast<float>().getParameter(), saved.floatMin, saved.floatMax);
+                else if(type == typeid(int).name())
+                    widen(parameter->cast<int>().getParameter(), saved.intMin, saved.intMax);
+                else if(type == typeid(std::vector<float>).name())
+                    widen(parameter->cast<std::vector<float>>().getParameter(), saved.floatVectorMin, saved.floatVectorMax);
+                else if(type == typeid(std::vector<int>).name())
+                    widen(parameter->cast<std::vector<int>>().getParameter(), saved.intVectorMin, saved.intVectorMax);
             }
         }
         // Give back the original range of parameters no piano roll drives any more.
@@ -3798,77 +3995,117 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
                         }
                     }
                 } else {
-                    std::vector<const ofxOceanodeTimelinePianoNote*> activeNotes;
-                    activeNotes.reserve(lane.pianoNotes.size());
+                    // Piano roll: every note plays in its own voice slot (see
+                    // computePianoVoicing), so a held note keeps its voice.
+                    ofxOceanodeTimelinePianoVoicing localVoicing;
+                    const ofxOceanodeTimelinePianoVoicing* voicing = nullptr;
+                    if(const auto trackIt = trackEvaluationIndexes.find(&track); trackIt != trackEvaluationIndexes.end()) {
+                        const auto it = trackIt->second.pianoVoicing.find(&lane);
+                        if(it != trackIt->second.pianoVoicing.end() && it->second.slot.size() == lane.pianoNotes.size())
+                            voicing = &it->second;
+                    }
+                    if(voicing == nullptr) {
+                        // Notes edited since the indexes were built.
+                        computeLaneVoicing(track, clip, lane, localVoicing);
+                        voicing = &localVoicing;
+                    }
+                    const auto& notes = lane.pianoNotes;
                     const double pianoCycle = static_cast<double>(
                         ofxOceanodeTimelineClipTime::cycleIndex(clip, beatPosition));
                     const double noteGap = retriggerGapBeats * sourcePerTimelineBeat(clip);
-                    auto noteStart = [](const ofxOceanodeTimelinePianoNote& n) { return n.startBeat; };
-                    auto noteEnd = [](const ofxOceanodeTimelinePianoNote& n) {
-                        return n.startBeat + std::max(1.0 / 24.0, n.durationBeats);
+                    // Where a note's gate opens: after the retrigger gap when
+                    // its slot was still busy, so the instrument sees an edge.
+                    auto openAt = [&](size_t n) {
+                        const bool gap = voicing->retrigger[n] || (voicing->wrapRetrigger[n] && pianoCycle > 0.0);
+                        return notes[n].startBeat + (gap ? noteGap : 0.0);
                     };
-                    auto samePitch = [](const ofxOceanodeTimelinePianoNote& a, const ofxOceanodeTimelinePianoNote& b) {
-                        return a.pitch == b.pitch;
-                    };
-                    for(size_t noteIndex = 0; noteIndex < lane.pianoNotes.size(); ++noteIndex) {
-                        const auto& note = lane.pianoNotes[noteIndex];
-                        if(isPlaying && sourceBeat >= note.startBeat && sourceBeat < noteEnd(note) &&
-                           !inRetriggerGap(lane.pianoNotes, noteIndex, sourceBeat, noteGap, noteStart, noteEnd, samePitch,
-                                           clip.repeatContent ? ofxOceanodeTimelineClipTime::sourceDuration(clip) : 0.0) &&
-                           pianoProbabilityPasses(note, pianoCycle, lane.probabilitySeed)) {
-                            activeNotes.push_back(&note);
+                    const int slotCount = static_cast<int>(voicing->slotNotes.size());
+                    const int width = voicing->width;
+                    // Per slot: the note sounding now (-1: none), and the note
+                    // whose pitch/velocity the slot holds (the last one opened;
+                    // before any, the previous repeat's last or the first one).
+                    std::vector<long long> sounding(width, -1), held(width, -1);
+                    for(int slot = 0; slot < std::min(width, slotCount); ++slot) {
+                        const auto& slotNotes = voicing->slotNotes[slot];
+                        if(slotNotes.empty()) continue;
+                        for(auto it = slotNotes.rbegin(); it != slotNotes.rend(); ++it) {
+                            if(openAt(*it) > sourceBeat) continue;
+                            held[slot] = static_cast<long long>(*it);
+                            if(isPlaying && sourceBeat < voicing->end[*it] &&
+                               pianoProbabilityPasses(notes[*it], pianoCycle, lane.probabilitySeed))
+                                sounding[slot] = static_cast<long long>(*it);
+                            break;
                         }
+                        if(held[slot] < 0)
+                            held[slot] = static_cast<long long>(clip.repeatContent ? slotNotes.back() : slotNotes.front());
                     }
+                    // A scalar target plays the latest note (mono, last-note priority).
+                    long long latestSounding = -1, latestHeld = -1;
+                    for(int slot = 0; slot < width; ++slot) {
+                        auto later = [&](long long a, long long b) {
+                            return b < 0 || (a >= 0 && openAt(static_cast<size_t>(a)) > openAt(static_cast<size_t>(b)));
+                        };
+                        if(sounding[slot] >= 0 && later(sounding[slot], latestSounding)) latestSounding = sounding[slot];
+                        if(held[slot] >= 0 && later(held[slot], latestHeld)) latestHeld = held[slot];
+                    }
+
+                    // An instrument's gate is a level: without a velocity input
+                    // it carries the velocity. Other targets get 1 (a trigger).
+                    const bool gateCarriesVelocity = voicing->instrument &&
+                        bindingFor(track, lane.pianoVelocityBindingId) == nullptr;
                     const std::string roleBindingIds[] = {
                         lane.pianoPitchBindingId,
                         lane.pianoGateBindingId,
                         lane.pianoVelocityBindingId
                     };
-                    if(activeNotes.empty()) {
-                        // No note is sounding right now. Pitch holds its
-                        // last value (skip it, same as before a note ever
-                        // played), but Gate and Velocity are conceptually
-                        // "off" -- they must still contribute an explicit 0
-                        // rather than nothing at all, otherwise a shared
-                        // parameter driven by e.g. a Curve lane AND this
-                        // lane's Gate (Multiply) never actually gets
-                        // silenced: combineAutomationValues only zeroes a
-                        // parameter when it has zero contributors, and the
-                        // Curve lane would still be contributing every beat.
-                        for(size_t bindingIndex = 1; bindingIndex < 3; ++bindingIndex) {
-                            if(const auto* binding = bindingFor(track, roleBindingIds[bindingIndex])) {
-                                if(binding->bypass) continue;
-                                bindingClipValues[binding][&clip].emplace_back(
-                                    binding->mode, "0");
+                    for(size_t role = 0; role < 3; ++role) {
+                        const auto* binding = bindingFor(track, roleBindingIds[role]);
+                        if(binding == nullptr || binding->bypass) continue;
+                        const auto& type = binding->valueType;
+                        const bool vectorTarget = type == typeid(std::vector<float>).name() ||
+                            type == typeid(std::vector<int>).name() ||
+                            type == typeid(std::vector<bool>).name() ||
+                            type == typeid(std::vector<std::string>).name();
+                        const bool levelGate = gateCarriesVelocity &&
+                            (type == typeid(float).name() || type == typeid(std::vector<float>).name());
+                        // One slot's value for this role.
+                        auto valueOf = [&](long long soundingNote, long long heldNote) -> std::string {
+                            if(role == 1) {
+                                if(soundingNote < 0) return "0";
+                                return levelGate ? ofToString(notes[soundingNote].velocity) : std::string("1");
                             }
-                        }
-                        continue;
-                    }
-                    std::sort(activeNotes.begin(), activeNotes.end(), [](const auto* a, const auto* b) {
-                        return a->pitch < b->pitch;
-                    });
-                    if(lane.pianoMonophonic && activeNotes.size() > 1) activeNotes.erase(activeNotes.begin(), activeNotes.end() - 1);
-                    for(size_t bindingIndex = 0; bindingIndex < 3; ++bindingIndex) {
-                        if(const auto* binding = bindingFor(track, roleBindingIds[bindingIndex])) {
-                            if(binding->bypass) continue;
-                            std::vector<std::string> noteValues;
-                            noteValues.reserve(activeNotes.size());
-                            for(const auto* activeNote : activeNotes) {
-                                if(bindingIndex == 0) noteValues.push_back(ofToString(activeNote->pitch));
-                                else if(bindingIndex == 1) noteValues.push_back("1");
-                                else if(bindingIndex == 2) noteValues.push_back(ofToString(activeNote->velocity));
-                                else noteValues.push_back(ofToString(activeNote->pitch));
+                            if(heldNote < 0) return std::string();
+                            return role == 0 ? ofToString(notes[heldNote].pitch) : ofToString(notes[heldNote].velocity);
+                        };
+                        std::string value;
+                        if(vectorTarget) {
+                            // As wide as the target already is, so a short list
+                            // (a mono lane on a 4-voice synth) is never broadcast
+                            // to every voice: the extra voices stay closed.
+                            size_t outputWidth = static_cast<size_t>(std::max(width, voicing->outputWidth));
+                            if(auto* parameter = findParameterCached(binding->parameterPath)) {
+                                if(type == typeid(std::vector<float>).name())
+                                    outputWidth = std::max(outputWidth, parameter->cast<std::vector<float>>().getParameter().get().size());
+                                else if(type == typeid(std::vector<int>).name())
+                                    outputWidth = std::max(outputWidth, parameter->cast<std::vector<int>>().getParameter().get().size());
                             }
-                            const bool vectorTarget = binding->valueType == typeid(std::vector<float>).name() ||
-                                binding->valueType == typeid(std::vector<int>).name() ||
-                                binding->valueType == typeid(std::vector<bool>).name() ||
-                                binding->valueType == typeid(std::vector<std::string>).name();
-                            std::string value = vectorTarget ? joinAutomationValues(noteValues) : noteValues.back();
-                            if(bindingIndex == 2 && !vectorTarget)
-                                value = mapNormalizedLaneValue(lane, *binding, value);
-                            bindingClipValues[binding][&clip].emplace_back(
-                                binding->mode, std::move(value));
+                            std::vector<std::string> slotValues;
+                            slotValues.reserve(outputWidth);
+                            for(size_t slot = 0; slot < outputWidth; ++slot) {
+                                std::string slotValue = slot < static_cast<size_t>(width)
+                                    ? valueOf(sounding[slot], held[slot]) : std::string(role == 1 ? "0" : "");
+                                // A slot with no notes: like slot 0 (nothing sounds there).
+                                if(slotValue.empty()) slotValue = slotValues.empty() ? (role == 0 ? "60" : "0") : slotValues.front();
+                                slotValues.push_back(std::move(slotValue));
+                            }
+                            if(slotValues.size() == 1) slotValues.push_back(role == 1 ? "0" : slotValues.front());
+                            value = joinAutomationValues(slotValues);
+                        } else {
+                            value = valueOf(latestSounding, latestSounding >= 0 ? latestSounding : latestHeld);
+                            if(value.empty()) continue;
+                            if(role == 2) value = mapNormalizedLaneValue(lane, *binding, value);
                         }
+                        bindingClipValues[binding][&clip].emplace_back(binding->mode, std::move(value));
                     }
                 }
             }
@@ -4319,10 +4556,19 @@ void ofxOceanodeTimelineManager::collectChangeBeats(double fromBeat, double toBe
                             break;
                         }
                         case ofxOceanodeTimelineLaneType::PianoRoll: {
-                            for(const auto& note : lane.pianoNotes) {
+                            // A note stolen by a later one ends early (its voicing end).
+                            const ofxOceanodeTimelinePianoVoicing* voicing = nullptr;
+                            if(const auto trackIt = trackEvaluationIndexes.find(&track); trackIt != trackEvaluationIndexes.end()) {
+                                const auto it = trackIt->second.pianoVoicing.find(&lane);
+                                if(it != trackIt->second.pianoVoicing.end() && it->second.end.size() == lane.pianoNotes.size())
+                                    voicing = &it->second;
+                            }
+                            for(size_t n = 0; n < lane.pianoNotes.size(); ++n) {
+                                const auto& note = lane.pianoNotes[n];
                                 addSourceBeat(note.startBeat);
                                 addSourceBeat(note.startBeat + retriggerGapBeats * sourcePerTimelineBeat(clip));
-                                addSourceBeat(note.startBeat + std::max(1.0 / 24.0, note.durationBeats));
+                                addSourceBeat(pianoNoteEnd(note));
+                                if(voicing != nullptr) addSourceBeat(voicing->end[n]);
                             }
                             break;
                         }
@@ -4552,6 +4798,54 @@ void ofxOceanodeTimelineManager::setLiveOverride(const std::string& trackId, con
     }
 }
 
+void ofxOceanodeTimelineManager::setPianoKeyPreview(const std::string& trackId, const std::string& clipId,
+                                                    const std::string& laneId, int pitch) {
+    const auto* track = getTrack(trackId);
+    const auto* clip = getClip(trackId, clipId);
+    const auto* lane = getLane(trackId, clipId, laneId);
+    if(track == nullptr || clip == nullptr || lane == nullptr) return;
+    ofxOceanodeTimelinePianoVoicing voicing;
+    computeLaneVoicing(*track, *clip, *lane, voicing);
+    const int slot = voicing.kit ? pitch - kKitBaseNote : 0;
+    if(slot < 0 || (voicing.kit && slot >= voicing.outputWidth)) return;
+    auto width = [&](const ofxOceanodeTimelineParameterBinding& binding) {
+        size_t size = static_cast<size_t>(std::max({voicing.outputWidth, slot + 1, 2}));
+        if(auto* parameter = findParameterCached(binding.parameterPath)) {
+            if(binding.valueType == typeid(std::vector<float>).name())
+                size = std::max(size, parameter->cast<std::vector<float>>().getParameter().get().size());
+            else if(binding.valueType == typeid(std::vector<int>).name())
+                size = std::max(size, parameter->cast<std::vector<int>>().getParameter().get().size());
+        }
+        return size;
+    };
+    auto isVector = [](const std::string& type) {
+        return type == typeid(std::vector<float>).name() || type == typeid(std::vector<int>).name() ||
+               type == typeid(std::vector<bool>).name();
+    };
+    if(const auto* gate = getBinding(trackId, lane->pianoGateBindingId)) {
+        const bool level = voicing.instrument && lane->pianoVelocityBindingId.empty() &&
+            (gate->valueType == typeid(float).name() || gate->valueType == typeid(std::vector<float>).name());
+        const std::string on = level ? ofToString(lane->pianoDefaultVelocity) : std::string("1");
+        std::string value = on;
+        if(isVector(gate->valueType)) {
+            std::vector<std::string> slots(width(*gate), "0");
+            slots[slot] = on;
+            value = joinAutomationValues(slots);
+        }
+        setLiveOverride(trackId, gate->id, value);
+    }
+    if(const auto* pitchBinding = getBinding(trackId, lane->pianoPitchBindingId); pitchBinding != nullptr && !voicing.kit)
+        setLiveOverride(trackId, pitchBinding->id, ofToString(pitch));   // a scalar: broadcast to every voice
+}
+
+void ofxOceanodeTimelineManager::clearPianoKeyPreview(const std::string& trackId, const std::string& clipId,
+                                                      const std::string& laneId) {
+    const auto* lane = getLane(trackId, clipId, laneId);
+    if(lane == nullptr) return;
+    if(!lane->pianoGateBindingId.empty()) clearLiveOverride(trackId, lane->pianoGateBindingId);
+    if(!lane->pianoPitchBindingId.empty()) clearLiveOverride(trackId, lane->pianoPitchBindingId);
+}
+
 void ofxOceanodeTimelineManager::clearLiveOverride(const std::string& trackId, const std::string& bindingId) {
     if(auto* binding = getBinding(trackId, bindingId)) {
         stateCaptureManualOverrideKeys.erase(trackId + "\x1f" + bindingId);
@@ -4777,7 +5071,8 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
                 {"laneType", laneTypeToString(binding.laneType)},
                 {"bypass", binding.bypass},
                 {"clampToRange", binding.clampToParameterRange},
-                {"rowHeight", binding.rowHeight}
+                {"rowHeight", binding.rowHeight},
+                {"valueScale", binding.valueScale}
             });
         }
         trackJson["noteGroups"] = ofJson::array();
@@ -4789,7 +5084,8 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
                 {"gate", group.gateBindingId},
                 {"velocity", group.velocityBindingId},
                 {"expanded", group.expanded},
-                {"rowHeight", group.rowHeight}
+                {"rowHeight", group.rowHeight},
+                {"voices", group.voices}
             });
         }
         trackJson["clips"] = ofJson::array();
@@ -4837,6 +5133,7 @@ ofJson ofxOceanodeTimelineManager::toJson() const {
                 laneJson["pianoMonophonic"] = lane.pianoMonophonic;
                 laneJson["curveClamp"] = lane.curveClamp;
                 laneJson["curveInterpolation"] = lane.curveInterpolation;
+                laneJson["curveScale"] = lane.curveScale;
                 laneJson["step"] = lane.step.toJson();
                 laneJson["curvePoints"] = ofJson::array();
                 for(const auto& point : lane.curvePoints) laneJson["curvePoints"].push_back({{"beat", point.beat}, {"value", point.value}});
@@ -5082,6 +5379,7 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
                 binding.defaultValue = bindingJson.value("defaultValue", std::string());
                 binding.mode = modeFromString(bindingJson.value("mode", std::string("Replace")));
                 binding.laneType = laneTypeFromString(bindingJson.value("laneType", std::string("Step")));
+                binding.valueScale = bindingJson.value("valueScale", std::string());
                 binding.bypass = bindingJson.value("bypass", false);
                 binding.clampToParameterRange = bindingJson.value("clampToRange", true);
                 binding.rowHeight = ofClamp(bindingJson.value("rowHeight", 28.0f), 20.0f, 300.0f);
@@ -5150,6 +5448,7 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
                         lane.lfoSnap = laneJson.value("lfoSnap", false);
                         lane.lfoSnapMode = std::max(0, std::min(2, laneJson.value("lfoSnapMode", 0)));
                         lane.curveInterpolation = laneJson.value("curveInterpolation", std::string("Linear"));
+                        lane.curveScale = laneJson.value("curveScale", std::string());
                         const bool lfoValueMode = !lane.lfoParameter.empty() && lane.curveInterpolation == "Value";
                         if(!lfoValueMode && lane.curveInterpolation != "Step" && lane.curveInterpolation != "Linear" &&
                            lane.curveInterpolation != "Log / Exp" && lane.curveInterpolation != "Sigmoid") {
@@ -5335,6 +5634,7 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
                 group.velocityBindingId = mapBinding(groupJson.value("velocity", std::string()));
                 group.expanded = groupJson.value("expanded", false);
                 group.rowHeight = ofClamp(groupJson.value("rowHeight", 48.0f), 20.0f, 300.0f);
+                group.voices = ofClamp(groupJson.value("voices", 0), 0, 128);
                 // A binding belongs to one group only.
                 for(auto* role : {&group.pitchBindingId, &group.gateBindingId, &group.velocityBindingId})
                     if(findNoteGroupForBinding(track, *role) != nullptr) role->clear();

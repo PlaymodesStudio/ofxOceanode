@@ -174,9 +174,12 @@ const char* laneTypeName(ofxOceanodeTimelineLaneType type) {
 // Curve or Step Sequencer one, which is how it reads to the user) rather
 // than a type an individual lane can be switched to. Selectors that change
 // or add a lane pass kLaneTypeOptionCount and so never offer it.
+// Toggle is a Multi Gate with one row: on / off blocks for a single value
+// (mute, solo, an effect's on), the default for a bool parameter's clips.
 constexpr const char* kLaneTypeOptions[] = {
-    "Step Sequencer", "Curve", "Piano Roll", "Multi Value", "Multi Slider", "Multi Gate", "LFO"
+    "Step Sequencer", "Curve", "Piano Roll", "Multi Value", "Multi Slider", "Multi Gate", "Toggle", "LFO"
 };
+constexpr int kToggleOptionIndex = 6;
 constexpr int kClipCreationOptionCount = static_cast<int>(sizeof(kLaneTypeOptions) / sizeof(kLaneTypeOptions[0]));
 constexpr int kLaneTypeOptionCount = kClipCreationOptionCount - 1;
 constexpr int kLfoClipOptionIndex = kClipCreationOptionCount - 1;
@@ -188,8 +191,21 @@ ofxOceanodeTimelineLaneType laneTypeFromOptionIndex(int index) {
         case 3: return ofxOceanodeTimelineLaneType::MultiValue;
         case 4: return ofxOceanodeTimelineLaneType::MultiSlider;
         case 5: return ofxOceanodeTimelineLaneType::MultiGate;
+        case kToggleOptionIndex: return ofxOceanodeTimelineLaneType::MultiGate;
         default: return ofxOceanodeTimelineLaneType::Step;
     }
+}
+
+bool isToggleLane(const ofxOceanodeTimelineLane& lane) {
+    return lane.type == ofxOceanodeTimelineLaneType::MultiGate && lane.multiRowCount <= 1;
+}
+void makeToggleLane(ofxOceanodeTimelineLane* lane) {
+    if(lane == nullptr || lane->type != ofxOceanodeTimelineLaneType::MultiGate) return;
+    lane->multiRowCount = 1;
+    lane->multiGateRows.resize(1);
+}
+const char* laneDisplayName(const ofxOceanodeTimelineLane& lane) {
+    return isToggleLane(lane) ? "Toggle" : laneTypeName(lane.type);
 }
 
 int optionIndexForLaneType(ofxOceanodeTimelineLaneType type) {
@@ -201,6 +217,15 @@ int optionIndexForLaneType(ofxOceanodeTimelineLaneType type) {
         case ofxOceanodeTimelineLaneType::MultiGate: return 5;
         default: return 0;
     }
+}
+int optionIndexForLane(const ofxOceanodeTimelineLane& lane) {
+    return isToggleLane(lane) ? kToggleOptionIndex : optionIndexForLaneType(lane.type);
+}
+// A binding's default clip type: a single value's gate is a Toggle
+int optionIndexForBinding(const ofxOceanodeTimelineParameterBinding& binding) {
+    const bool vector = binding.valueType.find("vector") != std::string::npos;
+    if(binding.laneType == ofxOceanodeTimelineLaneType::MultiGate && !vector) return kToggleOptionIndex;
+    return optionIndexForLaneType(binding.laneType);
 }
 
 int insertLinearCurvePoint(ofxOceanodeTimelineLane& lane,
@@ -1364,7 +1389,7 @@ void ofxOceanodeTimelineController::draw() {
                     pendingTrackId = track.id;
                     pendingClipName[0] = '\0';
                     pendingClipBindingId = track.bindings.empty() ? std::string() : track.bindings.front().id;
-                    pendingClipLaneType = track.bindings.empty() ? 1 : optionIndexForLaneType(track.bindings.front().laneType);
+                    pendingClipLaneType = track.bindings.empty() ? 1 : optionIndexForBinding(track.bindings.front());
                     pendingStartBeat = snapBeat(transportState.beatPosition);
                     pendingDurationBeats = timeline.getBeatsPerBar();
                     requestClipPopup = true;
@@ -1510,7 +1535,7 @@ void ofxOceanodeTimelineController::draw() {
                 if(right - left > 45) {
                     std::string label = clip.name;
                     if(clip.isLfo) label += " [LFO]";
-                    else if(lane != nullptr) label += " [" + std::string(laneTypeName(lane->type)) + "]";
+                    else if(lane != nullptr) label += " [" + std::string(laneDisplayName(*lane)) + "]";
                     dl->AddText(ImVec2(left + 6, min.y + 6), IM_COL32(245, 250, 255, 255), label.c_str());
                 }
             }
@@ -2017,8 +2042,13 @@ void ofxOceanodeTimelineController::draw() {
                 if(ImGui::BeginMenu("Lane type", selectedLane != nullptr)) {
                     for(int optionIndex = 0; optionIndex < kLaneTypeOptionCount; ++optionIndex) {
                         const auto candidateType = laneTypeFromOptionIndex(optionIndex);
-                        if(ImGui::MenuItem(kLaneTypeOptions[optionIndex], nullptr, selectedType == candidateType))
+                        const bool current = selectedLane != nullptr ? optionIndexForLane(*selectedLane) == optionIndex
+                                                                     : selectedType == candidateType;
+                        if(ImGui::MenuItem(kLaneTypeOptions[optionIndex], nullptr, current)) {
                             timeline.setClipLaneType(track.id, clip.id, selectedLane->id, candidateType);
+                            if(optionIndex == kToggleOptionIndex)
+                                makeToggleLane(timeline.getLane(track.id, clip.id, selectedLane->id));
+                        }
                     }
                     ImGui::EndMenu();
                 }
@@ -2625,7 +2655,7 @@ void ofxOceanodeTimelineController::draw() {
                     if(ImGui::MenuItem("New clip here")) {
                         pendingTrackId = track.id;
                         pendingClipBindingId = binding.id;
-                        pendingClipLaneType = optionIndexForLaneType(binding.laneType);
+                        pendingClipLaneType = optionIndexForBinding(binding);
                         pendingClipName[0] = '\0';
                         pendingDurationBeats = timeline.getBeatsPerBar();
                         requestClipPopup = true;
@@ -3067,6 +3097,8 @@ void ofxOceanodeTimelineController::draw() {
         const char* laneName = kLaneTypeOptions[optionIndex];
         const auto newLaneId = timeline.createLane(editorTrackId, editorClipId, laneName, laneType);
         if(!newLaneId.empty()) editorLaneId = newLaneId;
+        if(!newLaneId.empty() && optionIndex == kToggleOptionIndex)
+            makeToggleLane(timeline.getLane(editorTrackId, editorClipId, newLaneId));
     }
 
     if(requestRemoveLane) {
@@ -4799,7 +4831,7 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
     for(size_t laneIndex = 0; laneIndex < clip->lanes.size(); ++laneIndex) {
     auto* lane = &clip->lanes[laneIndex];
     const bool isFocused = lane->id == editorLaneId;
-    std::string laneLabel = laneTypeName(lane->type);
+    std::string laneLabel = laneDisplayName(*lane);
     if(!lane->bindingIds.empty()) {
         if(const auto* laneBoundParam = timeline.getBinding(track.id, lane->bindingIds.front()))
             laneLabel += ": " + compactParameterName(laneBoundParam->parameterPath);
@@ -5017,6 +5049,32 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 ImGui::Checkbox("Clamp to range", &lane->curveClamp);
                 if(ImGui::IsItemHovered())
                     ImGui::SetTooltip("Clamp curve values to the configured Range min..max");
+                {
+                    // Scale: Auto follows the parameter (a gain: dB)
+                    const auto* scaleBinding = lane->bindingIds.empty() ? nullptr : timeline.getBinding(track.id, lane->bindingIds.front());
+                    const bool autoDb = scaleBinding != nullptr && scaleBinding->valueScale == "dB";
+                    int scale = lane->curveScale == "Linear" ? 1 : lane->curveScale == "dB" ? 2 : 0;
+                    const std::string autoLabel = std::string("Auto (") + (autoDb ? "dB" : "linear") + ")";
+                    const char* scales[] = {autoLabel.c_str(), "Linear", "dB"};
+                    ImGui::SetNextItemWidth(labeledWidgetWidth(110.0f, "Scale"));
+                    if(ImGui::Combo("Scale##curveScale", &scale, scales, 3)) {
+                        const bool wasDb = ofxOceanodeTimelineScale::isDecibels(*lane, scaleBinding);
+                        lane->curveScale = scale == 1 ? "Linear" : scale == 2 ? "dB" : "";
+                        const bool isDb = ofxOceanodeTimelineScale::isDecibels(*lane, scaleBinding);
+                        // keep the values the points stand for
+                        if(wasDb != isDb && std::abs(lane->valueMax - lane->valueMin) > 1e-9f) {
+                            for(auto& point : lane->curvePoints) {
+                                const float actual = wasDb ? ofxOceanodeTimelineScale::normalizedToGain(*lane, point.value)
+                                                           : lane->valueMin + point.value * (lane->valueMax - lane->valueMin);
+                                point.value = isDb ? ofxOceanodeTimelineScale::gainToNormalized(*lane, actual)
+                                                   : ofClamp((actual - lane->valueMin) / (lane->valueMax - lane->valueMin), 0.0f, 1.0f);
+                            }
+                        }
+                    }
+                    if(ImGui::IsItemHovered())
+                        ImGui::SetTooltip("dB: for gains (a level, a send). The curve's height is the level in decibels,\n"
+                                          "from silence at the bottom up to the range's maximum; 0 dB near the top.");
+                }
                 if(ImGui::Checkbox("Snap##curveValueSnap", &lane->valueSnap) && lane->valueSnap &&
                    lane->valueQuantizeSteps < 2) {
                     lane->valueQuantizeSteps = 8; // sensible first grid
@@ -5214,12 +5272,13 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 pianoKeyboardPreviewGateBindingId = lane->pianoGateBindingId;
                 pianoKeyboardPreviewPitchBindingId = lane->pianoPitchBindingId;
                 pianoKeyboardPreviewPitch = keyboardPitch;
-                if(!lane->pianoGateBindingId.empty()) timeline.setLiveOverride(track.id, lane->pianoGateBindingId, "1");
-                if(!lane->pianoPitchBindingId.empty()) timeline.setLiveOverride(track.id, lane->pianoPitchBindingId, ofToString(keyboardPitch));
+                pianoKeyboardPreviewClipId = clip->id;
+                pianoKeyboardPreviewLaneId = lane->id;
+                timeline.setPianoKeyPreview(track.id, clip->id, lane->id, keyboardPitch);
             } else if(pianoKeyboardPreviewActive && pianoKeyboardPreviewTrackId == track.id && keyHovered &&
                       ImGui::IsMouseDown(ImGuiMouseButton_Left) && pianoKeyboardPreviewPitch != keyboardPitch) {
                 pianoKeyboardPreviewPitch = keyboardPitch;
-                if(!pianoKeyboardPreviewPitchBindingId.empty()) timeline.setLiveOverride(track.id, pianoKeyboardPreviewPitchBindingId, ofToString(keyboardPitch));
+                timeline.setPianoKeyPreview(track.id, pianoKeyboardPreviewClipId, pianoKeyboardPreviewLaneId, keyboardPitch);
             }
             dl->PushClipRect(ImVec2(keyboardLeft, keyTop), ImVec2(keyboardRight, keyBottom), true);
             if(blackKey) {
@@ -5691,7 +5750,11 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         const float curveValueSpan = lane->valueMax - lane->valueMin;
         const float curveRangeMin = std::min(lane->valueMin, lane->valueMax);
         const float curveRangeMax = std::max(lane->valueMin, lane->valueMax);
+        // a gain on a decibel axis: the point values are positions on it
+        const auto* curveBinding = lane->bindingIds.empty() ? nullptr : timeline.getBinding(track.id, lane->bindingIds.front());
+        const bool curveDb = ofxOceanodeTimelineScale::isDecibels(*lane, curveBinding);
         const auto curveValueToY = [&](float normalizedValue) {
+            if(curveDb) return curveBottom - ofClamp(normalizedValue, 0.0f, 1.0f) * (curveBottom - curveTop);
             if(std::abs(curveValueSpan) < 1e-9f) return curveBottom;
             const float actualValue = lane->valueMin + normalizedValue * curveValueSpan;
             const float visibleValue = ofClamp((actualValue - curveRangeMin) /
@@ -5705,6 +5768,19 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 const float y = curveTop + (curveBottom - curveTop) * row / static_cast<float>(levels);
                 dl->AddLine(ImVec2(timelineMin.x, y), ImVec2(editorMax.x, y), IM_COL32(150, 140, 80, 150));
             }
+        } else if(curveDb) {
+            // dB lines (0 dB stronger), labelled on the left
+            for(float db : {0.0f, -6.0f, -12.0f, -24.0f, -36.0f, -48.0f}) {
+                if(db >= ofxOceanodeTimelineScale::topDb(*lane) - 0.5f) continue;
+                const float y = curveValueToY(ofxOceanodeTimelineScale::dbToNormalized(*lane, db));
+                dl->AddLine(ImVec2(timelineMin.x, y), ImVec2(editorMax.x, y),
+                            db == 0.0f ? IM_COL32(150, 150, 150, 170) : IM_COL32(75, 75, 75, 120));
+                char dbLabel[16];
+                std::snprintf(dbLabel, sizeof(dbLabel), "%g dB", db);
+                if(y - ImGui::GetTextLineHeight() > curveTop + ImGui::GetTextLineHeight() &&
+                   y < curveBottom - ImGui::GetTextLineHeight())
+                    dl->AddText(ImVec2(left + 5.0f, y - ImGui::GetTextLineHeight()), IM_COL32(170, 170, 178, 200), dbLabel);
+            }
         } else {
             for(int row = 0; row <= 4; ++row) {
                 const float y = curveTop + (curveBottom - curveTop) * row / 4.0f;
@@ -5713,8 +5789,13 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         }
         char curveMaxLabel[32];
         char curveMinLabel[32];
-        std::snprintf(curveMaxLabel, sizeof(curveMaxLabel), "%.4g", lane->valueMax);
-        std::snprintf(curveMinLabel, sizeof(curveMinLabel), "%.4g", lane->valueMin);
+        if(curveDb) {
+            std::snprintf(curveMaxLabel, sizeof(curveMaxLabel), "%+.1f dB", ofxOceanodeTimelineScale::topDb(*lane));
+            std::snprintf(curveMinLabel, sizeof(curveMinLabel), "-inf dB");
+        } else {
+            std::snprintf(curveMaxLabel, sizeof(curveMaxLabel), "%.4g", lane->valueMax);
+            std::snprintf(curveMinLabel, sizeof(curveMinLabel), "%.4g", lane->valueMin);
+        }
         dl->AddText(ImVec2(left + 5.0f, curveTop + 2.0f), IM_COL32(205, 205, 210, 220), curveMaxLabel);
         dl->AddText(ImVec2(left + 5.0f, curveBottom - ImGui::GetTextLineHeight() - 2.0f),
                     IM_COL32(205, 205, 210, 220), curveMinLabel);
@@ -5788,7 +5869,8 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         const int hoveredCycle = clip->repeatContent
             ? std::max(0, static_cast<int>(std::floor(std::max(0.0, curveTimelineBeat - clip->startBeat) / repeatCycleDuration))) : 0;
         float curveValue = (curveBottom - curveMouse.y) / (curveBottom - curveTop);
-        if(lane->curveClamp && std::abs(curveValueSpan) > 1e-9f) {
+        if(curveDb) curveValue = ofClamp(curveValue, 0.0f, 1.0f);
+        else if(lane->curveClamp && std::abs(curveValueSpan) > 1e-9f) {
             const float actualValue = ofClamp(lane->valueMin + curveValue * curveValueSpan,
                                               curveRangeMin, curveRangeMax);
             curveValue = (actualValue - lane->valueMin) / curveValueSpan;
@@ -5810,8 +5892,9 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         if(curveHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
             curveValuePointIndex = hitPoint();
             if(curveValuePointIndex >= 0) {
-                curveNumericValue = lane->valueMin + lane->curvePoints[curveValuePointIndex].value *
-                    (lane->valueMax - lane->valueMin);
+                const float pointValue = lane->curvePoints[curveValuePointIndex].value;
+                curveNumericValue = curveDb ? std::max(-120.0f, ofxOceanodeTimelineScale::normalizedToDb(*lane, pointValue))
+                                            : lane->valueMin + pointValue * (lane->valueMax - lane->valueMin);
                 ImGui::OpenPopup("Curve point value");
             }
         }
@@ -5886,7 +5969,13 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 ImGui::TextUnformatted("Curve point");
                 contextMenuSection("Value");
                 ImGui::SetNextItemWidth(110.0f);
-                if(ImGui::InputFloat("Value", &curveNumericValue, 0.001f, 0.01f, "%.6g")) {
+                if(curveDb) {
+                    // in dB (at or below the floor: silence)
+                    if(ImGui::InputFloat("dB", &curveNumericValue, 0.5f, 3.0f, "%.1f"))
+                        lane->curvePoints[curveValuePointIndex].value =
+                            ofxOceanodeTimelineScale::dbToNormalized(*lane, std::min(curveNumericValue, ofxOceanodeTimelineScale::topDb(*lane)));
+                    ImGui::TextDisabled("%g dB or below: silence", ofxOceanodeTimelineScale::kDbFloor);
+                } else if(ImGui::InputFloat("Value", &curveNumericValue, 0.001f, 0.01f, "%.6g")) {
                     const float span = lane->valueMax - lane->valueMin;
                     float actualValue = curveNumericValue;
                     if(lane->curveClamp)
@@ -6326,19 +6415,31 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
 }
 
 namespace {
-// Which piano-roll role a parameter name suggests: 0 pitch, 1 gate, 2 velocity, -1 none.
-int guessNoteRole(const std::string& name) {
+// How strongly a parameter name suggests a piano-roll role (0 pitch, 1 gate,
+// 2 velocity): 2 for the plain names ("Gate", "Pitch", "Velocity"), 1 when the
+// name contains one, 0 for none. Names of controls that only shape a note
+// (an envelope's velocity, a key-tracking amount, a jitter) suggest nothing.
+int noteRoleScore(const std::string& name, int role) {
     std::string lower = name;
     std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
     auto has = [&](const char* word) { return lower.find(word) != std::string::npos; };
-    if(has("gate") || has("trig") || has("noteon") || has("note on") || lower == "on") return 1;
-    if(has("vel") || has("amp") || has("dynamic")) return 2;
-    if(has("pitch") || has("note") || has("midi") || has("key")) return 0;
-    return -1;
+    static const std::vector<std::vector<std::string>> exact = {
+        {"pitch", "note", "midi", "midi note", "notes", "pitches"},
+        {"gate", "gates", "trigger/gate", "trigger", "trig", "on", "note on"},
+        {"velocity", "vel", "velocities"}};
+    if(std::find(exact[role].begin(), exact[role].end(), lower) != exact[role].end()) return 2;
+    if(has("env") || has("track") || has("jit") || has("rand") || has("mod") || has("sens") ||
+       has("glide") || has("time") || has("rate")) return 0;
+    switch(role) {
+        case 0: return has("pitch") || has("note") ? 1 : 0;
+        case 1: return has("gate") || has("trig") ? 1 : 0;
+        default: return has("velocity") ? 1 : 0;
+    }
 }
 
 bool isNoteRoleType(const std::string& valueType) {
-    return valueType == typeid(float).name() || valueType == typeid(int).name() || valueType == typeid(bool).name();
+    return valueType == typeid(float).name() || valueType == typeid(int).name() || valueType == typeid(bool).name() ||
+           valueType == typeid(std::vector<float>).name() || valueType == typeid(std::vector<int>).name();
 }
 
 bool containsCaseInsensitive(const std::string& text, const char* filter) {
@@ -6355,6 +6456,9 @@ void ofxOceanodeTimelineController::openNoteGroupSetup(ofxOceanodeTimelineManage
                                                       const std::string& trackId, const std::string& editGroupId,
                                                       double clipStart, double clipDuration) {
     noteSetupCandidates.clear();
+    noteSetupInstruments.clear();
+    noteSetupInstrument = -1;
+    noteSetupVoices = 0;
     for(auto& path : noteSetupRolePaths) path.clear();
     noteSetupFilter[0] = '\0';
     noteSetupTrackId = trackId;
@@ -6381,7 +6485,26 @@ void ofxOceanodeTimelineController::openNoteGroupSetup(ofxOceanodeTimelineManage
             noteSetupCandidates.push_back(candidate);
         }
     };
-    if(sourceModel != nullptr) addFromGroup(sourceModel->getParameterGroup(), true);
+    // An instrument node: its note inputs as one choice.
+    int sourceInstrument = -1;
+    auto addInstrument = [&](ofxOceanodeNodeModel* model) {
+        ofxOceanodeTimelineInstrument instrument;
+        if(model == nullptr || !model->getTimelineInstrument(instrument)) return;
+        NoteInstrumentCandidate candidate;
+        candidate.label = model->getParameterGroup().getName();
+        ofxOceanodeAbstractParameter* roles[3] = {instrument.pitch, instrument.gate, instrument.velocity};
+        for(int role = 0; role < 3; ++role)
+            if(roles[role] != nullptr) candidate.rolePaths[role] = container->getTimelineParameterPath(*roles[role]);
+        if(candidate.rolePaths[0].empty() && candidate.rolePaths[1].empty()) return;
+        candidate.voices = instrument.voices;
+        candidate.kit = instrument.kit;
+        if(model == sourceModel) sourceInstrument = static_cast<int>(noteSetupInstruments.size());
+        noteSetupInstruments.push_back(candidate);
+    };
+    if(sourceModel != nullptr) {
+        addFromGroup(sourceModel->getParameterGroup(), true);
+        addInstrument(sourceModel);
+    }
     // "Every node" means the nodes beside the source (it may sit in a macro).
     ofxOceanodeContainer* candidateContainer = container.get();
     if(sourceModel != nullptr && sourceModel->getHostContainer() != nullptr)
@@ -6389,7 +6512,17 @@ void ofxOceanodeTimelineController::openNoteGroupSetup(ofxOceanodeTimelineManage
     for(auto* node : candidateContainer->getAllModules()) {
         if(node == nullptr) continue;
         addFromGroup(node->getParameters(), false);
+        if(&node->getNodeModel() != sourceModel) addInstrument(&node->getNodeModel());
     }
+    // The instrument whose note inputs are exactly these roles, if any.
+    auto matchInstrument = [&]() {
+        for(size_t i = 0; i < noteSetupInstruments.size(); ++i) {
+            const auto& candidate = noteSetupInstruments[i];
+            if(std::equal(std::begin(candidate.rolePaths), std::end(candidate.rolePaths), std::begin(noteSetupRolePaths)))
+                return static_cast<int>(i);
+        }
+        return -1;
+    };
 
     if(!editGroupId.empty()) {
         // Retargeting: start from the group's current roles.
@@ -6401,30 +6534,48 @@ void ofxOceanodeTimelineController::openNoteGroupSetup(ofxOceanodeTimelineManage
             }
             std::strncpy(noteSetupName, group->name.c_str(), sizeof(noteSetupName) - 1);
             noteSetupName[sizeof(noteSetupName) - 1] = '\0';
+            noteSetupVoices = group->voices;
+            noteSetupInstrument = matchInstrument();
         }
     } else {
-        // New group: the clicked parameter takes the role its name suggests
-        // (pitch if it suggests none); its node's other parameters fill the rest.
-        if(source != nullptr) {
+        if(sourceInstrument >= 0) {
+            // Opened from an instrument: it is the target as a whole.
+            noteSetupInstrument = sourceInstrument;
+            for(int role = 0; role < 3; ++role)
+                noteSetupRolePaths[role] = noteSetupInstruments[sourceInstrument].rolePaths[role];
+        } else if(source != nullptr) {
+            // The clicked parameter takes the role its name suggests (pitch if
+            // none); its node's other parameters fill the rest, plain names first.
             const std::string sourcePath = container->getTimelineParameterPath(*source);
-            const int sourceRole = guessNoteRole(source->getName());
-            noteSetupRolePaths[sourceRole < 0 ? 0 : sourceRole] = sourcePath;
-            for(const auto& candidate : noteSetupCandidates) {
-                if(!candidate.sameNode || candidate.path == sourcePath) continue;
-                const int role = guessNoteRole(candidate.parameter->getName());
-                if(role >= 0 && noteSetupRolePaths[role].empty()) noteSetupRolePaths[role] = candidate.path;
+            int sourceRole = 0;
+            for(int role = 2; role >= 0; --role)
+                if(noteRoleScore(source->getName(), role) >= noteRoleScore(source->getName(), sourceRole)
+                   && noteRoleScore(source->getName(), role) > 0) sourceRole = role;
+            noteSetupRolePaths[sourceRole] = sourcePath;
+            for(int role = 0; role < 3; ++role) {
+                if(!noteSetupRolePaths[role].empty()) continue;
+                int bestScore = 0;
+                for(const auto& candidate : noteSetupCandidates) {
+                    if(!candidate.sameNode || candidate.path == sourcePath) continue;
+                    if(std::find(std::begin(noteSetupRolePaths), std::end(noteSetupRolePaths), candidate.path)
+                       != std::end(noteSetupRolePaths)) continue;
+                    const int score = noteRoleScore(candidate.parameter->getName(), role);
+                    if(score > bestScore) { bestScore = score; noteSetupRolePaths[role] = candidate.path; }
+                }
             }
+            noteSetupInstrument = matchInstrument();
         }
         const std::string name = sourceModel != nullptr ? sourceModel->getParameterGroup().getName() : std::string("Notes");
         std::strncpy(noteSetupName, name.c_str(), sizeof(noteSetupName) - 1);
         noteSetupName[sizeof(noteSetupName) - 1] = '\0';
-        // Default to a track where the clicked parameter already is, else a new track.
-        if(noteSetupTrackId.empty() && source != nullptr) {
-            const std::string sourcePath = container->getTimelineParameterPath(*source);
+        // Default to a track where one of these parameters already is, else a new track.
+        if(noteSetupTrackId.empty()) {
             for(const auto& track : timeline.getTracks()) {
                 if(track.isWaveTrack) continue;
-                if(std::any_of(track.bindings.begin(), track.bindings.end(),
-                               [&](const auto& b) { return b.parameterPath == sourcePath; })) {
+                if(std::any_of(track.bindings.begin(), track.bindings.end(), [&](const auto& b) {
+                       return !b.parameterPath.empty() && std::find(std::begin(noteSetupRolePaths), std::end(noteSetupRolePaths),
+                                                                    b.parameterPath) != std::end(noteSetupRolePaths);
+                   })) {
                     noteSetupTrackId = track.id;
                     break;
                 }
@@ -6439,8 +6590,8 @@ void ofxOceanodeTimelineController::drawNoteGroupSetupPopup(ofxOceanodeTimelineM
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(!ImGui::BeginPopupModal("Piano Roll##noteGroupSetup", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
     const bool editing = !noteSetupEditGroupId.empty();
-    ImGui::TextDisabled(editing ? "Parameters this piano roll plays"
-                                : "One timeline row that plays pitch, gate and velocity");
+    ImGui::TextDisabled(editing ? "What this piano roll plays"
+                                : "One timeline row that plays an instrument's notes");
     ImGui::Spacing();
     ImGui::SetNextItemWidth(260.0f);
     ImGui::InputText("Name", noteSetupName, sizeof(noteSetupName));
@@ -6460,39 +6611,86 @@ void ofxOceanodeTimelineController::drawNoteGroupSetupPopup(ofxOceanodeTimelineM
     }
     ImGui::Separator();
 
-    const char* roleLabels[3] = {"Pitch", "Gate", "Velocity"};
-    for(int role = 0; role < 3; ++role) {
-        std::string preview = "None";
-        for(const auto& candidate : noteSetupCandidates)
-            if(candidate.path == noteSetupRolePaths[role]) preview = candidate.label;
-        if(preview == "None" && !noteSetupRolePaths[role].empty()) preview = noteSetupRolePaths[role];
+    // The instrument: its Gate, Pitch and Velocity in one choice.
+    const bool hasInstrument = noteSetupInstrument >= 0 && noteSetupInstrument < static_cast<int>(noteSetupInstruments.size());
+    {
+        const char* none = "Parameters chosen by hand";
         ImGui::SetNextItemWidth(260.0f);
-        if(ImGui::BeginCombo(roleLabels[role], preview.c_str(), ImGuiComboFlags_HeightLarge)) {
-            if(ImGui::IsWindowAppearing()) {
-                noteSetupFilter[0] = '\0';
-                ImGui::SetKeyboardFocusHere();
-            }
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::InputTextWithHint("##filter", "Search parameters", noteSetupFilter, sizeof(noteSetupFilter));
-            if(ImGui::Selectable("None", noteSetupRolePaths[role].empty())) noteSetupRolePaths[role].clear();
-            bool separatorDrawn = false;
-            for(const auto& candidate : noteSetupCandidates) {
-                if(!containsCaseInsensitive(candidate.label, noteSetupFilter)) continue;
-                if(!candidate.sameNode && !separatorDrawn) {
-                    ImGui::Separator();
-                    separatorDrawn = true;
-                }
-                if(ImGui::Selectable((candidate.label + "##" + candidate.path).c_str(), candidate.path == noteSetupRolePaths[role])) {
-                    // A parameter plays one role only.
-                    for(auto& other : noteSetupRolePaths) if(other == candidate.path) other.clear();
-                    noteSetupRolePaths[role] = candidate.path;
+        if(ImGui::BeginCombo("Instrument", hasInstrument ? noteSetupInstruments[noteSetupInstrument].label.c_str() : none)) {
+            if(ImGui::Selectable(none, !hasInstrument)) noteSetupInstrument = -1;
+            for(size_t i = 0; i < noteSetupInstruments.size(); ++i) {
+                const auto& candidate = noteSetupInstruments[i];
+                const std::string label = candidate.label + (candidate.kit ? "  (kit)" : "") + "##instrument" + ofToString(i);
+                if(ImGui::Selectable(label.c_str(), static_cast<int>(i) == noteSetupInstrument)) {
+                    noteSetupInstrument = static_cast<int>(i);
+                    for(int role = 0; role < 3; ++role) noteSetupRolePaths[role] = candidate.rolePaths[role];
                 }
             }
             ImGui::EndCombo();
         }
+        if(ImGui::IsItemHovered())
+            ImGui::SetTooltip("Synths and samplers that take notes. Every note keeps its own voice.");
     }
+    const auto* instrument = hasInstrument ? &noteSetupInstruments[noteSetupInstrument] : nullptr;
+    if(instrument != nullptr && instrument->kit)
+        ImGui::TextDisabled("A kit: C1 plays pad 1, C#1 pad 2...");
+    else {
+        ImGui::SetNextItemWidth(120.0f);
+        ImGui::InputInt("Voices", &noteSetupVoices);
+        noteSetupVoices = ofClamp(noteSetupVoices, 0, 128);
+        ImGui::SameLine();
+        if(noteSetupVoices == 0)
+            ImGui::TextDisabled(instrument != nullptr ? "(%d, the instrument's)" : "(as many as overlap)",
+                                instrument != nullptr ? instrument->voices : 0);
+        if(ImGui::IsItemHovered() || ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("How many notes play at once. A note past that takes the voice of the oldest one.\n0: the instrument's own voice count.");
+    }
+
+    // The parameters, by hand (or to check what the instrument uses).
+    ImGui::SetNextItemOpen(instrument == nullptr, ImGuiCond_Appearing);
+    if(ImGui::TreeNode("Parameters")) {
+        const char* roleLabels[3] = {"Pitch", "Gate", "Velocity"};
+        for(int role = 0; role < 3; ++role) {
+            std::string preview = "None";
+            for(const auto& candidate : noteSetupCandidates)
+                if(candidate.path == noteSetupRolePaths[role]) preview = candidate.label;
+            if(preview == "None" && !noteSetupRolePaths[role].empty()) preview = noteSetupRolePaths[role];
+            ImGui::SetNextItemWidth(260.0f);
+            if(ImGui::BeginCombo(roleLabels[role], preview.c_str(), ImGuiComboFlags_HeightLarge)) {
+                if(ImGui::IsWindowAppearing()) {
+                    noteSetupFilter[0] = '\0';
+                    ImGui::SetKeyboardFocusHere();
+                }
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::InputTextWithHint("##filter", "Search parameters", noteSetupFilter, sizeof(noteSetupFilter));
+                if(ImGui::Selectable("None", noteSetupRolePaths[role].empty())) noteSetupRolePaths[role].clear();
+                // Grouped by node, the node it was opened from first.
+                std::string lastNode;
+                for(const auto& candidate : noteSetupCandidates) {
+                    if(!containsCaseInsensitive(candidate.label, noteSetupFilter)) continue;
+                    const std::string node = candidate.label.substr(0, candidate.label.find(" / "));
+                    if(node != lastNode) {
+                        ImGui::SeparatorText(node.c_str());
+                        lastNode = node;
+                    }
+                    const std::string name = candidate.label.substr(std::min(candidate.label.size(), node.size() + 3));
+                    if(ImGui::Selectable((name + "##" + candidate.path).c_str(), candidate.path == noteSetupRolePaths[role])) {
+                        // A parameter plays one role only.
+                        for(auto& other : noteSetupRolePaths) if(other == candidate.path) other.clear();
+                        noteSetupRolePaths[role] = candidate.path;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+        }
+        ImGui::TreePop();
+    }
+    // Picking parameters by hand that are not exactly an instrument's: no instrument.
+    if(hasInstrument && !std::equal(std::begin(noteSetupRolePaths), std::end(noteSetupRolePaths),
+                                    std::begin(noteSetupInstruments[noteSetupInstrument].rolePaths)))
+        noteSetupInstrument = -1;
     const bool valid = !noteSetupRolePaths[0].empty() || !noteSetupRolePaths[1].empty();
-    if(!valid) ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "Choose at least a pitch or a gate parameter");
+    if(!valid) ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "Choose an instrument, or at least a pitch or a gate parameter");
     ImGui::Spacing();
 
     ImGui::BeginDisabled(!valid);
@@ -6525,9 +6723,11 @@ void ofxOceanodeTimelineController::drawNoteGroupSetupPopup(ofxOceanodeTimelineM
         if(editing) {
             timeline.setNoteGroupRoles(trackId, noteSetupEditGroupId, roleIds[0], roleIds[1], roleIds[2]);
             timeline.renameNoteGroup(trackId, noteSetupEditGroupId, name);
+            timeline.setNoteGroupVoices(trackId, noteSetupEditGroupId, noteSetupVoices);
         } else {
             const std::string groupId = timeline.createNoteGroup(trackId, name, roleIds[0], roleIds[1], roleIds[2]);
             if(!groupId.empty()) {
+                timeline.setNoteGroupVoices(trackId, groupId, noteSetupVoices);
                 std::string laneId;
                 const std::string clipId = timeline.createNoteGroupClip(trackId, groupId, name, noteSetupClipStart,
                                                                         noteSetupClipDuration, &laneId);
@@ -6546,6 +6746,7 @@ void ofxOceanodeTimelineController::drawNoteGroupSetupPopup(ofxOceanodeTimelineM
             }
         }
         noteSetupCandidates.clear();
+        noteSetupInstruments.clear();
         ImGui::CloseCurrentPopup();
     }
     ImGui::EndPopup();
@@ -6629,7 +6830,7 @@ void ofxOceanodeTimelineController::drawClipPopup(ofxOceanodeTimelineManager& ti
                     // Picking a parameter pre-selects the type it is bound
                     // with -- but never over an explicit LFO choice, which
                     // is not a lane type and must not be silently undone.
-                    if(!isLfoClip) pendingClipLaneType = optionIndexForLaneType(binding.laneType);
+                    if(!isLfoClip) pendingClipLaneType = optionIndexForBinding(binding);
                 }
                 if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", binding.parameterPath.c_str());
             }
@@ -6691,6 +6892,7 @@ void ofxOceanodeTimelineController::drawClipPopup(ofxOceanodeTimelineManager& ti
             const auto laneType = laneTypeFromOptionIndex(pendingClipLaneType);
             const auto laneId = timeline.createLane(pendingTrackId, clipId, binding->parameterPath, laneType);
             if(!laneId.empty()) {
+                if(pendingClipLaneType == kToggleOptionIndex) makeToggleLane(timeline.getLane(pendingTrackId, clipId, laneId));
                 timeline.addBindingToLane(pendingTrackId, clipId, laneId, binding->id);
                 if(auto* lane = timeline.getLane(pendingTrackId, clipId, laneId)) {
                     if(laneType != ofxOceanodeTimelineLaneType::PianoRoll &&

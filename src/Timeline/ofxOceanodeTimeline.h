@@ -194,6 +194,9 @@ struct ofxOceanodeTimelineParameterBinding {
     // lives per-binding, matching valueType/defaultValue, rather than
     // needing a separate per-parameter table.
     bool clampToParameterRange = true;
+    // From the parameter's node (ofxOceanodeNodeModel::getTimelineValueScale):
+    // "dB" = a gain; its Curve lanes default to a decibel scale. "" = linear.
+    std::string valueScale;
 };
 
 // A lane is an automation editor inside a clip. It may drive more than one
@@ -225,6 +228,10 @@ struct ofxOceanodeTimelineLane {
     bool pianoMonophonic = false;
     bool curveClamp = true;
     std::string curveInterpolation = "Linear";
+    // Curve value scale: "" = Auto (the binding's valueScale), "Linear", "dB".
+    // dB: the 0..1 point values are a decibel axis, from silence (0) through
+    // ofxOceanodeTimelineScale::kDbFloor up to valueMax's level (1).
+    std::string curveScale;
     std::vector<ofxOceanodeTimelineCurvePoint> curvePoints;
     std::vector<ofxOceanodeTimelineCurveTension> curveTensions;
     std::vector<ofxOceanodeTimelinePianoNote> pianoNotes;
@@ -359,6 +366,19 @@ namespace ofxOceanodeTimelineClipTime {
                        double timelineBeat);
 }
 
+// Curve lanes in decibels (a gain parameter): shared by the evaluator and the
+// editor so the curve always draws what it applies. Normalized 0 is silence,
+// anything above runs from kDbFloor dB to the level of valueMax (its top).
+namespace ofxOceanodeTimelineScale {
+    constexpr float kDbFloor = -60.0f;
+    bool isDecibels(const ofxOceanodeTimelineLane& lane, const ofxOceanodeTimelineParameterBinding* binding);
+    float topDb(const ofxOceanodeTimelineLane& lane);
+    float normalizedToDb(const ofxOceanodeTimelineLane& lane, float normalized);   // -inf at 0
+    float dbToNormalized(const ofxOceanodeTimelineLane& lane, float db);
+    float normalizedToGain(const ofxOceanodeTimelineLane& lane, float normalized);
+    float gainToNormalized(const ofxOceanodeTimelineLane& lane, float gain);
+}
+
 // One LFO track sampled at a timeline beat (see ofxOceanodeTimelineManager::evaluateLfoTrack).
 struct ofxOceanodeTimelineLfoSample {
     bool active = false;  // an LFO clip covers this beat
@@ -404,6 +424,10 @@ struct ofxOceanodeTimelineNoteGroup {
     std::string velocityBindingId;
     bool expanded = false;       // show the member rows under the group row
     float rowHeight = 48.0f;     // height of the group row in the timeline
+    // Voice slots the piano roll writes to vector targets. 0 = the bound
+    // instrument's own count (ofxOceanodeNodeModel::getTimelineInstrument), or
+    // as many as the notes overlap when the targets are not an instrument.
+    int voices = 0;
     std::vector<std::string> members() const {
         std::vector<std::string> ids;
         for(const auto* id : {&pitchBindingId, &gateBindingId, &velocityBindingId})
@@ -414,6 +438,23 @@ struct ofxOceanodeTimelineNoteGroup {
         return !bindingId.empty() &&
             (pitchBindingId == bindingId || gateBindingId == bindingId || velocityBindingId == bindingId);
     }
+};
+
+// How a piano-roll lane's notes map onto voice slots. A note keeps its slot
+// from start to end, so a held note never changes voice when another starts.
+// A pure function of the lane's notes (and the voice count), so playback and
+// the scheduler's lookahead allocate identically. Indexed like pianoNotes.
+struct ofxOceanodeTimelinePianoVoicing {
+    int width = 1;                        // slots notes play in
+    int outputWidth = 1;                  // values written to a vector target (>= width:
+                                          // the instrument's voices; the rest stay closed)
+    bool kit = false;                     // slot = key - 36 (a drum kit's pads)
+    bool instrument = false;              // plays an instrument node: its gate is a level (the velocity)
+    std::vector<int> slot;                // -1: plays nowhere (a kit key out of range)
+    std::vector<double> end;              // source beat it stops (earlier when its slot is stolen)
+    std::vector<uint8_t> retrigger;       // its slot was still busy at its start: gate opens after a gap
+    std::vector<uint8_t> wrapRetrigger;   // same, against the previous repeat of the clip
+    std::vector<std::vector<size_t>> slotNotes; // per slot, its notes in start order
 };
 
 struct ofxOceanodeTimelineTrack {
@@ -536,6 +577,10 @@ public:
     // interaction ends (e.g. on mouse release) -- there's no timeout.
     void setLiveOverride(const std::string& trackId, const std::string& bindingId, const std::string& value);
     void clearLiveOverride(const std::string& trackId, const std::string& bindingId);
+    // The piano roll's keyboard: a key sounds in one voice (a kit: its own
+    // pad) through live overrides on the lane's gate and pitch, until cleared.
+    void setPianoKeyPreview(const std::string& trackId, const std::string& clipId, const std::string& laneId, int pitch);
+    void clearPianoKeyPreview(const std::string& trackId, const std::string& clipId, const std::string& laneId);
     void clear();
 
     std::string createTrack(const std::string& requestedName = "Timeline Track");
@@ -593,6 +638,8 @@ public:
     // removeBindings: also remove the member parameters from the timeline;
     // otherwise they become ordinary rows again.
     bool removeNoteGroup(const std::string& trackId, const std::string& groupId, bool removeBindings);
+    // 0 = automatic (see ofxOceanodeTimelineNoteGroup::voices).
+    bool setNoteGroupVoices(const std::string& trackId, const std::string& groupId, int voices);
     ofxOceanodeTimelineNoteGroup* getNoteGroup(const std::string& trackId, const std::string& groupId);
     static const ofxOceanodeTimelineNoteGroup* findNoteGroupForBinding(const ofxOceanodeTimelineTrack& track,
                                                                         const std::string& bindingId);
@@ -904,7 +951,15 @@ private:
     struct TrackEvaluationIndex {
         std::unordered_map<std::string, ofxOceanodeTimelineParameterBinding*> bindingById;
         std::unordered_map<const ofxOceanodeTimelineClip*, size_t> clipOrder;
+        std::unordered_map<const ofxOceanodeTimelineLane*, ofxOceanodeTimelinePianoVoicing> pianoVoicing;
     };
+    // The voice count and kit mode a piano lane plays with: the lane's mono
+    // switch, its note group's override, else the instrument it drives.
+    // instrumentVoices: the instrument's own count (0: not an instrument).
+    void pianoLaneVoicesAndKit(const ofxOceanodeTimelineTrack& track, const ofxOceanodeTimelineLane& lane,
+                               int& voices, bool& kit, int* instrumentVoices = nullptr) const;
+    void computeLaneVoicing(const ofxOceanodeTimelineTrack& track, const ofxOceanodeTimelineClip& clip,
+                            const ofxOceanodeTimelineLane& lane, ofxOceanodeTimelinePianoVoicing& out) const;
     struct PianoPitchRangeIndex {
         std::string valueType;
         int low = 127;

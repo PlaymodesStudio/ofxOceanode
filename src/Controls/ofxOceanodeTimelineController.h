@@ -130,6 +130,7 @@ private:
     bool pianoKeyboardPreviewActive = false;
     std::string pianoKeyboardPreviewTrackId;
     std::string pianoKeyboardPreviewGateBindingId;
+    std::string pianoKeyboardPreviewClipId, pianoKeyboardPreviewLaneId;
     std::string pianoKeyboardPreviewPitchBindingId;
     int pianoKeyboardPreviewPitch = -1;
     char pendingTrackName[128] = {};
@@ -366,6 +367,17 @@ private:
     std::string noteSetupEditGroupId;         // retargeting this group
     double noteSetupClipStart = 0.0;
     double noteSetupClipDuration = 4.0;
+    // Instruments in the patch (ofxOceanodeNodeModel::getTimelineInstrument):
+    // picking one fills the three roles and its voice count.
+    struct NoteInstrumentCandidate {
+        std::string label;       // the node's name
+        std::string rolePaths[3];
+        int voices = 0;
+        bool kit = false;
+    };
+    std::vector<NoteInstrumentCandidate> noteSetupInstruments;
+    int noteSetupInstrument = -1;             // index into noteSetupInstruments; -1: parameters by hand
+    int noteSetupVoices = 0;                  // the group's override; 0: automatic
     bool requestNoteSetupPopup = false;
     // source: the parameter it was opened from (its node's parameters are
     // offered first and used to guess the roles). trackId empty: choose.

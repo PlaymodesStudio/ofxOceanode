@@ -17,6 +17,19 @@
 class ofxOceanodeContainer;
 class ofxOscMessage;
 
+// A node that plays notes (see ofxOceanodeNodeModel::getTimelineInstrument):
+// the parameters a timeline piano roll drives. Gate is a level (velocity rides
+// on it when velocity is null); voices is the width the node reads, one note
+// per slot. A kit plays a fixed slot per key instead: key 36 (C1) is slot 0.
+#define OFXOCEANODE_HAS_TIMELINE_INSTRUMENT 1
+struct ofxOceanodeTimelineInstrument {
+    ofxOceanodeAbstractParameter* gate = nullptr;
+    ofxOceanodeAbstractParameter* pitch = nullptr;
+    ofxOceanodeAbstractParameter* velocity = nullptr;
+    int voices = 0;
+    bool kit = false;
+};
+
 typedef int ofxOceanodeNodeModelFlags;
 
 enum ofxOceanodeNodeModelFlags_
@@ -97,6 +110,14 @@ public:
     // input can be encapsulated on its own; models such as mixers narrow the
     // "all" action to their relevant inputs.
     virtual bool canEncapsulateSubgraphFrom(ofxOceanodeAbstractParameter&) const { return true; }
+    // How the timeline should scale a parameter's curves: "dB" for a gain
+    // (amplitude, 0 = silence) drawn and edited in decibels; "" = linear.
+    // Read when the parameter is added to a timeline track.
+    virtual std::string getTimelineValueScale(ofxOceanodeAbstractParameter&) const { return {}; }
+    // An instrument: its note inputs, so a piano roll binds to the node as a
+    // whole. Asked when a piano roll is set up and on every timeline update
+    // (voice count, kit), so keep it cheap.
+    virtual bool getTimelineInstrument(ofxOceanodeTimelineInstrument&) { return false; }
     
     virtual void deactivate(){};
     virtual void activate(){};

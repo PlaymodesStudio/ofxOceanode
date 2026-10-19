@@ -45,6 +45,10 @@ with `euclideanGenerator` as the class, and `"Generators"` as the category name.
 
 - For creating custom nodes, check out example-basic.
 
+- Start with the [beginner user manual](docs/oceanode-user-manual.md), covering
+  patching, phase, oscillator banks, indexing, waveshaping and everyday workflows.
+  An [illustrated PDF](output/pdf/oceanode-user-manual.pdf) is also available.
+
 - **Help > Search nodes** searches registered nodes and their descriptions.
   **Help > AI assistant** answers questions or proposes a small patch through
   Requesty, using the same credentials as Formula and DynGen.
