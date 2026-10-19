@@ -961,12 +961,12 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			ofxOceanodeConfigurationFlags configurationFlags = ofxOceanodeShared::getConfigurationFlags();
 			ImGui::CheckboxFlags("Disable Full Render", &configurationFlags, ofxOceanodeConfigurationFlags_DisableRenderAll);
 			ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
-			ImGui::CheckboxFlags("Color Connections?", &configurationFlags, ofxOceanodeConfigurationFlags_ColorConnections);
-			ImGui::CheckboxFlags("Dashed / Dotted lines", &configurationFlags, ofxOceanodeConfigurationFlags_DashedDottedLines);
 			ImGui::Checkbox("Show Mode", &showMode);
-			ofxOceanodeShared::setConfigurationFlags(configurationFlags);
 			
 			ImGui::SeparatorText("GUI");
+			ImGui::CheckboxFlags("Color Connections?", &configurationFlags, ofxOceanodeConfigurationFlags_ColorConnections);
+			ImGui::CheckboxFlags("Dashed / Dotted lines", &configurationFlags, ofxOceanodeConfigurationFlags_DashedDottedLines);
+			ofxOceanodeShared::setConfigurationFlags(configurationFlags);
 			bool autoInspector = ofxOceanodeShared::getAutoInspectorShowHide();
 			if(ImGui::Checkbox("Inspector auto show/hide", &autoInspector)){
 				ofxOceanodeShared::setAutoInspectorShowHide(autoInspector);
