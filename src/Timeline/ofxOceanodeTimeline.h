@@ -48,8 +48,23 @@ enum class ofxOceanodeTimelineLaneType {
     MultiValue,
     MultiSlider,
     MultiGate,
-    Wave
+    Wave,
+    Number,
+    // Sequences a dropdown parameter: like Number, each point holds an
+    // option index until the next one, but the editor shows and picks the
+    // bound parameter's option names (see ofxOceanodeTimelineDropdownOptions).
+    Dropdown
 };
+
+// Number and Dropdown lanes hold absolute values in curvePoints, each until
+// the next point -- no normalization, no interpolation.
+inline bool ofxOceanodeTimelineIsHeldValueLane(ofxOceanodeTimelineLaneType type) {
+    return type == ofxOceanodeTimelineLaneType::Number || type == ofxOceanodeTimelineLaneType::Dropdown;
+}
+
+// The option names of a scalar int/float dropdown parameter, empty for any
+// other parameter.
+std::vector<std::string> ofxOceanodeTimelineDropdownOptions(ofxOceanodeAbstractParameter& parameter);
 
 // Determines what stays fixed when the manual transport tempo changes.
 // Beats is the traditional musical timeline: beat positions are unchanged,
@@ -232,6 +247,8 @@ struct ofxOceanodeTimelineLane {
     // dB: the 0..1 point values are a decibel axis, from silence (0) through
     // ofxOceanodeTimelineScale::kDbFloor up to valueMax's level (1).
     std::string curveScale;
+    // Number reuses the point list with absolute numeric values and holds
+    // each value until the next point (no normalization or interpolation).
     std::vector<ofxOceanodeTimelineCurvePoint> curvePoints;
     std::vector<ofxOceanodeTimelineCurveTension> curveTensions;
     std::vector<ofxOceanodeTimelinePianoNote> pianoNotes;
@@ -728,6 +745,8 @@ public:
     bool consolidateClipContent(const std::string& trackId, const std::string& clipId);
     bool setClipStep(const std::string& trackId, const std::string& clipId, const std::string& laneId,
                      double startBeat, const std::string& value, double durationBeats = 0.0);
+    bool setClipNumber(const std::string& trackId, const std::string& clipId, const std::string& laneId,
+                       double beat, float value);
     bool removeClipStep(const std::string& trackId, const std::string& clipId, const std::string& laneId,
                         double startBeat);
     // MultiValue / MultiGate row count (see ofxOceanodeTimelineLane::

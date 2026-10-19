@@ -53,6 +53,96 @@ static void checkNear(double actual, double expected, int line) {
 #define near(actual, expected) checkNear(actual, expected, __LINE__)
 int main() {
     ofSeedRandom(); // OF normally constructs its random engine during app startup.
+    // Number lanes hold absolute values between arbitrarily placed entries.
+    {
+        ofxOceanodeContainer numberOwner;
+        numberOwner.transport->setDriverMode(TransportDriverMode::FrameStep);
+        ofParameter<float> output("Number", 0.0f, -100.0f, 100.0f);
+        ofxOceanodeParameter<float> target; target.bindParameter(output);
+        numberOwner.targets[target.getEscapedName()] = &target;
+        ofxOceanodeTimelineManager numbers(&numberOwner);
+        const auto t = numbers.createTrack("Numbers");
+        const auto b = numbers.addBinding(t, target);
+        const auto c = numbers.createClip(t, "Numbers", 0.0, 4.0);
+        numbers.setClipContentDuration(t, c, 4.0, false);
+        const auto l = numbers.createLane(t, c, "Number", ofxOceanodeTimelineLaneType::Number);
+        numbers.addBindingToLane(t, c, l, b);
+        assert(numbers.setClipNumber(t, c, l, 0.0, -12.5f));
+        assert(numbers.setClipNumber(t, c, l, 1.375, 42.25f));
+        assert(numbers.setClipNumber(t, c, l, 3.0, 7.0f));
+        assert(numbers.setClipNumber(t, c, l, 3.0, 8.0f));
+        assert(!numbers.setClipNumber(t, c, l, -1.0, 0.0f));
+        assert(!numbers.setClipNumber(t, c, l, 2.0, std::numeric_limits<float>::infinity()));
+        assert(numbers.getLane(t, c, l)->curvePoints.size() == 3);
+        auto evaluate = [&](double beat, float expected) {
+            numberOwner.transport->seekToBeat(beat); numbers.update();
+            if(std::abs(output.get() - expected) >= 1e-5) std::cerr << "Number beat " << beat << "\n";
+            near(output.get(), expected);
+        };
+        evaluate(0.0, -12.5f); evaluate(1.374, -12.5f);
+        evaluate(1.375, 42.25f); evaluate(2.9, 42.25f); evaluate(3.5, 8.0f);
+        evaluate(0.5, -12.5f); // seeking backwards recomputes the held value
+        std::vector<ofxOceanodeScheduledParameterEvent> events;
+        ofxOceanodeScheduling::registerParameterTarget(&target, &numbers,
+            [&](const auto& event) { events.push_back(event); return true; });
+        numberOwner.transport->seekToBeat(1.3);
+        numberOwner.transport->play(); numbers.update();
+        assert(std::any_of(events.begin(), events.end(), [](const auto& event) {
+            return !event.isCorrection && std::abs(ofToFloat(event.value) - 42.25f) < 1e-5;
+        }));
+        numberOwner.transport->pause();
+        ofxOceanodeScheduling::unregisterOwner(&numbers);
+        const auto savedNumbers = numbers.toJson();
+        numbers.fromJson(savedNumbers);
+        assert(numbers.getLane(t, c, l)->type == ofxOceanodeTimelineLaneType::Number);
+        evaluate(2.0, 42.25f);
+        const auto right = numbers.splitClip(t, c, 2.0);
+        assert(!right.empty());
+        evaluate(1.9, 42.25f); evaluate(2.0, 42.25f); evaluate(3.5, 8.0f);
+        numbers.getClip(t, right)->repeatContent = true;
+        numbers.setClipTiming(t, right, 2.0, 4.0);
+        evaluate(4.25, 42.25f); evaluate(5.5, 8.0f);
+    }
+    // Dropdown lanes select a dropdown parameter's options over time.
+    {
+        ofxOceanodeContainer dropdownOwner;
+        dropdownOwner.transport->setDriverMode(TransportDriverMode::FrameStep);
+        ofParameter<int> mode("Mode", 0, 0, 3);
+        ofxOceanodeParameter<int> target; target.bindParameter(mode);
+        target.setDropdownOptions({"Off", "Slow", "Fast", "Strobe"});
+        dropdownOwner.targets[target.getEscapedName()] = &target;
+        assert(ofxOceanodeTimelineDropdownOptions(target).size() == 4);
+        ofxOceanodeTimelineManager dropdowns(&dropdownOwner);
+        const auto t = dropdowns.createTrack("Modes");
+        const auto b = dropdowns.addBinding(t, target);
+        assert(dropdowns.getBinding(t, b)->laneType == ofxOceanodeTimelineLaneType::Dropdown);
+        const auto c = dropdowns.createClip(t, "Modes", 0.0, 4.0);
+        dropdowns.setClipContentDuration(t, c, 4.0, false);
+        const auto l = dropdowns.createLane(t, c, "Mode", ofxOceanodeTimelineLaneType::Dropdown);
+        dropdowns.addBindingToLane(t, c, l, b);
+        assert(dropdowns.setClipNumber(t, c, l, 0.0, 2.0f));
+        assert(dropdowns.setClipNumber(t, c, l, 1.0, 3.0f));
+        assert(dropdowns.setClipNumber(t, c, l, 2.5, 1.0f));
+        auto evaluate = [&](double beat, int expected) {
+            dropdownOwner.transport->seekToBeat(beat); dropdowns.update();
+            if(mode.get() != expected) std::cerr << "Dropdown beat " << beat << ": " << mode.get() << "\n";
+            assert(mode.get() == expected);
+        };
+        evaluate(0.5, 2); evaluate(1.0, 3); evaluate(2.4, 3); evaluate(3.0, 1);
+        const auto saved = dropdowns.toJson();
+        dropdowns.fromJson(saved);
+        assert(dropdowns.getLane(t, c, l)->type == ofxOceanodeTimelineLaneType::Dropdown);
+        assert(dropdowns.getLane(t, c, l)->curveInterpolation == "Step");
+        evaluate(1.5, 3);
+        // switching a Number lane to Dropdown rounds its values to indices
+        assert(dropdowns.setClipLaneType(t, c, l, ofxOceanodeTimelineLaneType::Number));
+        dropdowns.getLane(t, c, l)->curvePoints[0].value = 1.6f;
+        assert(dropdowns.setClipLaneType(t, c, l, ofxOceanodeTimelineLaneType::Dropdown));
+        near(dropdowns.getLane(t, c, l)->curvePoints[0].value, 2.0);
+        const auto right = dropdowns.splitClip(t, c, 2.0);
+        assert(!right.empty());
+        evaluate(2.2, 3); evaluate(3.0, 1);
+    }
     ofxOceanodeContainer owner;
     owner.transport->setDriverMode(TransportDriverMode::FrameStep);
     ofParameter<float> value("Value", 0.0f, 0.0f, 127.0f);
@@ -126,7 +216,7 @@ int main() {
     restored.requestNoteGroupSetup(&parameter);
     restored.clear(); assert(!parameter.isTimelined() && !levelParameter.isTimelined());
     assert(restored.consumePendingNoteGroupSetup() == nullptr);
-    std::cout << "Timeline regression passed: automation, additive bindings, transport loops, state capture, LFO, wave envelope, JSON persistence, groups, markers, signature, cleanup.\n";
+    std::cout << "Timeline regression passed: automation, dropdown lanes, additive bindings, transport loops, state capture, LFO, wave envelope, JSON persistence, groups, markers, signature, cleanup.\n";
 }
 '''
 
@@ -163,8 +253,9 @@ def main():
         (folder / "Managers/ofxOceanodeContainer.h").write_text(CONTAINER)
         cpp = folder / "regression.cpp"; cpp.write_text(CASES)
         binary = folder / "regression"
+        # The container adapter omits NodeModel RTTI; keep the other UB checks.
         command = [os.environ.get("CXX", "clang++"), "-std=c++17", "-O0", "-g", "-w",
-                   "-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-DOF_NO_FMOD",
+                   "-fsanitize=address,undefined", "-fno-sanitize=vptr", "-fno-omit-frame-pointer", "-DOF_NO_FMOD",
                    "-I" + str(folder), *["-I" + str(path) for path in includes], str(cpp),
                    str(ROOT / "src/Timeline/ofxOceanodeTimeline.cpp"),
                    str(ROOT / "src/Timeline/ofxOceanodeScheduling.cpp"),

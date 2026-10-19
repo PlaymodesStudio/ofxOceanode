@@ -100,8 +100,8 @@ constexpr double kEpsilon = 1e-9;
 // NEWER build, where a silent partial load would be the wrong answer.
 // 6 clip groups, 7 wave tracks, 8 self-contained LFO clips,
 // 9 preset-backed editor zoom and horizontal position,
-// 10 state-capture curve clips, 11 persisted timeline timebase.
-constexpr int kPresetVersion = 11;
+// 10 state-capture curve clips, 11 persisted timeline timebase, 12 Number lanes.
+constexpr int kPresetVersion = 12;
 constexpr float kDefaultTimelinePixelsPerSecond = 140.0f;
 constexpr float kMinTimelinePixelsPerSecond = 0.25f;
 constexpr float kMaxTimelinePixelsPerSecond = 600.0f;
@@ -458,7 +458,7 @@ bool clipSourceBeat(const ofxOceanodeTimelineClip& clip, double globalBeat, doub
 bool evaluateCurve(const ofxOceanodeTimelineLane& lane, double beat, std::string& value) {
     if(lane.curvePoints.empty()) return false;
     value = ofToString(valueAtBeat(lane.curvePoints, lane.curveTensions,
-                                   lane.curveInterpolation, beat, 0.0f));
+                                   ofxOceanodeTimelineIsHeldValueLane(lane.type) ? "Step" : lane.curveInterpolation, beat, 0.0f));
     return true;
 }
 
@@ -1727,6 +1727,8 @@ std::string ofxOceanodeTimelineManager::addBinding(const std::string& trackId,
     if(auto* model = parameter.getNodeModel()) binding.valueScale = model->getTimelineValueScale(parameter);
     // a toggle's clips default to a Toggle lane (a one-row gate)
     if(binding.valueType == typeid(bool).name()) binding.laneType = ofxOceanodeTimelineLaneType::MultiGate;
+    // and a dropdown's to a Dropdown lane
+    if(!ofxOceanodeTimelineDropdownOptions(parameter).empty()) binding.laneType = ofxOceanodeTimelineLaneType::Dropdown;
     track->bindings.push_back(binding);
     invalidateEvaluationIndexes();
 
@@ -1761,6 +1763,12 @@ bool ofxOceanodeTimelineManager::getParameterTrackColor(const ofxOceanodeAbstrac
     if(it == parameterTrackColorCache.end()) return false;
     color = it->second;
     return true;
+}
+
+std::vector<std::string> ofxOceanodeTimelineDropdownOptions(ofxOceanodeAbstractParameter& parameter) {
+    if(parameter.valueType() == typeid(int).name()) return parameter.cast<int>().getDropdownOptions();
+    if(parameter.valueType() == typeid(float).name()) return parameter.cast<float>().getDropdownOptions();
+    return {};
 }
 
 bool ofxOceanodeTimelineManager::isStepLaneCompatible(const ofxOceanodeAbstractParameter& parameter) const {
@@ -2674,7 +2682,7 @@ bool ofxOceanodeTimelineManager::computeClipSplit(const ofxOceanodeTimelineClip&
         if(repeating && cut > kEpsilon) rightPieces.push_back({0.0, cut, content - cut});
 
         const bool curveData = !lane.curvePoints.empty() &&
-            (lane.type == ofxOceanodeTimelineLaneType::Curve || original.isLfo);
+            (lane.type == ofxOceanodeTimelineLaneType::Curve || ofxOceanodeTimelineIsHeldValueLane(lane.type) || original.isLfo);
         if(curveData && lane.curveInterpolation != "Value") {
             rightLane.curvePoints.clear();
             rightLane.curveTensions.clear();
@@ -3176,7 +3184,10 @@ std::string ofxOceanodeTimelineManager::createLane(const std::string& trackId, c
     lane.probabilitySeed = static_cast<int>(ofRandom(1.0f, 100000.0f));
     lane.beatsPerStep = 0.25;
     lane.stepCount = std::max(1, static_cast<int>(std::llround(clip->contentDurationBeats / lane.beatsPerStep)));
-    if(type == ofxOceanodeTimelineLaneType::Curve) {
+    if(ofxOceanodeTimelineIsHeldValueLane(type)) {
+        lane.curveInterpolation = "Step";
+        lane.curvePoints = {{0.0, 0.0f}};
+    } else if(type == ofxOceanodeTimelineLaneType::Curve) {
         lane.curvePoints = {{0.0, 0.0f}, {clip->contentDurationBeats, 1.0f}};
         lane.curveTensions.push_back({0.5f, 1.0f});
     } else if(type == ofxOceanodeTimelineLaneType::MultiValue) {
@@ -3352,7 +3363,23 @@ bool ofxOceanodeTimelineManager::setClipLaneType(const std::string& trackId, con
             }
         }
     }
+    if(previousType == ofxOceanodeTimelineLaneType::Curve && ofxOceanodeTimelineIsHeldValueLane(type)) {
+        for(auto& point : lane->curvePoints)
+            point.value = lane->valueMin + point.value * (lane->valueMax - lane->valueMin);
+    } else if(ofxOceanodeTimelineIsHeldValueLane(previousType) && type == ofxOceanodeTimelineLaneType::Curve) {
+        const float span = lane->valueMax - lane->valueMin;
+        for(auto& point : lane->curvePoints)
+            point.value = std::abs(span) < 1e-9f ? 0.0f : (point.value - lane->valueMin) / span;
+    }
     lane->type = type;
+    if(ofxOceanodeTimelineIsHeldValueLane(type)) {
+        lane->curveInterpolation = "Step";
+        if(lane->curvePoints.empty()) lane->curvePoints = {{0.0, 0.0f}};
+    }
+    // a dropdown holds option indices
+    if(type == ofxOceanodeTimelineLaneType::Dropdown) {
+        for(auto& point : lane->curvePoints) point.value = std::max(0.0f, std::round(point.value));
+    }
     if(previousType == ofxOceanodeTimelineLaneType::Wave && type != ofxOceanodeTimelineLaneType::Wave)
         releaseWaveClipIfNeeded(trackId, clipId);
     if(type == ofxOceanodeTimelineLaneType::PianoRoll) {
@@ -3525,6 +3552,20 @@ bool ofxOceanodeTimelineManager::consolidateClipContent(const std::string& track
         changed = true;
     }
     return changed;
+}
+
+bool ofxOceanodeTimelineManager::setClipNumber(const std::string& trackId, const std::string& clipId,
+                                              const std::string& laneId, double beat, float value) {
+    auto* lane = getLane(trackId, clipId, laneId);
+    if(lane == nullptr || !ofxOceanodeTimelineIsHeldValueLane(lane->type) ||
+       !std::isfinite(beat) || !std::isfinite(value) || beat < 0.0) return false;
+    auto it = std::lower_bound(lane->curvePoints.begin(), lane->curvePoints.end(), beat,
+        [](const auto& point, double b) { return point.beat < b; });
+    if(it != lane->curvePoints.end() && std::abs(it->beat - beat) < kEpsilon) it->value = value;
+    else lane->curvePoints.insert(it, {beat, value});
+    lane->curveTensions.resize(lane->curvePoints.empty() ? 0 : lane->curvePoints.size() - 1);
+    invalidateSchedule();
+    return true;
 }
 
 bool ofxOceanodeTimelineManager::setClipStep(const std::string& trackId, const std::string& clipId,
@@ -3943,6 +3984,7 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
                     continue;
                 } else if(lane.type == ofxOceanodeTimelineLaneType::Step ||
                           lane.type == ofxOceanodeTimelineLaneType::Curve ||
+                          ofxOceanodeTimelineIsHeldValueLane(lane.type) ||
                           lane.type == ofxOceanodeTimelineLaneType::MultiSlider) {
                     std::string value;
                     const bool hasValue = lane.type == ofxOceanodeTimelineLaneType::Step
@@ -3958,7 +4000,11 @@ void ofxOceanodeTimelineManager::collectActiveValues(double beatPosition, bool i
                             // shared parameter's combined value at all.
                             if(binding->bypass) continue;
                             bindingClipValues[binding][&clip].emplace_back(
-                                binding->mode, mapNormalizedLaneValue(lane, *binding, value));
+                                binding->mode, ofxOceanodeTimelineIsHeldValueLane(lane.type)
+                                    ? (binding->valueType == typeid(int).name() ||
+                                       lane.type == ofxOceanodeTimelineLaneType::Dropdown
+                                        ? ofToString(static_cast<int>(std::lround(ofToFloat(value)))) : value)
+                                    : mapNormalizedLaneValue(lane, *binding, value));
                         }
                     }
                 } else if(lane.type == ofxOceanodeTimelineLaneType::MultiValue ||
@@ -4505,6 +4551,10 @@ void ofxOceanodeTimelineManager::collectChangeBeats(double fromBeat, double toBe
 
                 for(const auto& lane : clip.lanes) {
                     switch(lane.type) {
+                        case ofxOceanodeTimelineLaneType::Number:
+                        case ofxOceanodeTimelineLaneType::Dropdown:
+                            for(const auto& point : lane.curvePoints) addSourceBeat(point.beat);
+                            break;
                         case ofxOceanodeTimelineLaneType::Curve:
                         case ofxOceanodeTimelineLaneType::Wave:
                             // Continuous, or not automation at all.
@@ -4981,6 +5031,8 @@ ofxOceanodeTimelineAutomationMode ofxOceanodeTimelineManager::modeFromString(con
 std::string ofxOceanodeTimelineManager::laneTypeToString(ofxOceanodeTimelineLaneType laneType) {
     switch(laneType) {
         case ofxOceanodeTimelineLaneType::PianoRoll: return "PianoRoll";
+        case ofxOceanodeTimelineLaneType::Number: return "Number";
+        case ofxOceanodeTimelineLaneType::Dropdown: return "Dropdown";
         case ofxOceanodeTimelineLaneType::Curve: return "Curve";
         case ofxOceanodeTimelineLaneType::MultiValue: return "MultiValue";
         case ofxOceanodeTimelineLaneType::MultiSlider: return "MultiSlider";
@@ -4993,6 +5045,8 @@ std::string ofxOceanodeTimelineManager::laneTypeToString(ofxOceanodeTimelineLane
 
 ofxOceanodeTimelineLaneType ofxOceanodeTimelineManager::laneTypeFromString(const std::string& laneType) {
     if(laneType == "PianoRoll") return ofxOceanodeTimelineLaneType::PianoRoll;
+    if(laneType == "Number") return ofxOceanodeTimelineLaneType::Number;
+    if(laneType == "Dropdown") return ofxOceanodeTimelineLaneType::Dropdown;
     if(laneType == "Curve") return ofxOceanodeTimelineLaneType::Curve;
     if(laneType == "MultiValue") return ofxOceanodeTimelineLaneType::MultiValue;
     if(laneType == "MultiSlider") return ofxOceanodeTimelineLaneType::MultiSlider;
@@ -5502,6 +5556,7 @@ void ofxOceanodeTimelineManager::fromJson(const ofJson& json) {
                             }
                         }
                         lane.curveTensions.resize(lane.curvePoints.empty() ? 0 : lane.curvePoints.size() - 1);
+                        if(ofxOceanodeTimelineIsHeldValueLane(lane.type)) lane.curveInterpolation = "Step";
                         if(laneJson.contains("pianoNotes") && laneJson["pianoNotes"].is_array()) {
                             for(const auto& noteJson : laneJson["pianoNotes"]) {
                                 if(!noteJson.is_object()) continue;
