@@ -23,7 +23,7 @@ public:
     void bezier(const ImVec2& p1, const ImVec2& p2, const ImVec2& p3, const ImVec2& p4,
                 ImU32 color, float width, Style style, float zoom){
         if(style == Style::Solid){
-            list->AddBezierCubic(p1, p2, p3, p4, color, width);
+            list->AddBezierCubic(p1, p2, p3, p4, color, width + 1.0f);
             return;
         }
         if((color & IM_COL32_A_MASK) == 0 || width <= 0.0f) return;

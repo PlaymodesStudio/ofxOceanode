@@ -109,6 +109,7 @@ int main(){
     assert(list.VtxBuffer.Size<20000&&list._Path.empty());
     reset();renderer.bezier({0,0},{1,0},{129,0},{130,0},color,2,Style::Solid,1);
     assert(list.VtxBuffer.Size==4);bounds(list,0,lo,hi);near(lo,0);near(hi,130);
+    for(const auto& vertex:list.VtxBuffer)near(abs(vertex.pos.y),1.5f);
     reset();renderer.bezier({0,0},{1,0},{129,0},{130,0},0,2,Style::Dashed,1);assert(list.VtxBuffer.empty());
     // Round dots must remain separated and preserve their diameter at each zoom.
     reset();list.AddCircleFilled({0,0},1.5f,color);
