@@ -367,6 +367,42 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     // computes the content rectangle, including on the first frame after load.
     ImGui::SetNextWindowScroll(ImVec2(0.0f, 0.0f));
     if(ImGui::Begin(windowName.c_str(), open, windowFlags)){
+        // Process history before building any lists of raw node/parameter pointers.
+        const auto& editIO = ImGui::GetIO();
+        const bool editModifier = editIO.KeyCtrl || editIO.KeySuper;
+        const bool historyShortcut = editModifier && !editIO.KeyAlt &&
+            !editIO.WantTextInput && !ImGui::IsAnyItemActive() &&
+            !ImGui::IsMouseDown(0) && !ImGui::IsMouseDown(1) &&
+            ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+            ImGui::IsKeyPressed(ImGuiKey_Z, false);
+        if(historyShortcut){
+            // Clear transient raw pointers before restored nodes replace them.
+            tempSourceParameter = nullptr;
+            tempSinkParameter = nullptr;
+            isCreatingConnection = false;
+            customGuiContextNode = nullptr;
+            pendingCenterNode = nullptr;
+            portalizeSourceParameter = nullptr;
+            encapsulateSinkParameter = nullptr;
+            pendingPortalAlignments.clear();
+            someSelectedModuleMove.clear();
+            moveSelectedModulesWithDrag = glm::vec2(0);
+            someDragAppliedToSelection = false;
+            inspectorSelectionClick = {};
+            ofxOceanodeShared::nodeSelectedInCanvas(nullptr);
+            if(editIO.KeyShift) container->redoCanvasEdit();
+            else container->undoCanvasEdit();
+        }else{
+            // A gesture starts before widgets can mutate the graph and ends
+            // after mouse release/snap-to-grid. No topology scans while idle.
+            const bool editKey = ImGui::IsKeyPressed(ImGuiKey_Enter, false) ||
+                ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false) ||
+                ImGui::IsKeyPressed(ImGuiKey_Backspace, false) ||
+                (editModifier && (ImGui::IsKeyPressed(ImGuiKey_V, false) ||
+                 ImGui::IsKeyPressed(ImGuiKey_D, false) || ImGui::IsKeyPressed(ImGuiKey_X, false)));
+            if(ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1) || editKey)
+                container->beginCanvasEdit();
+        }
         auto prepareNewNodeModal = [&](){
             searchField = "";
             lastSearchField = "";
@@ -2716,7 +2752,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 moveSelectedModulesWithDrag = glm::vec2(0,0);
             }
             
-            if(ImGui::GetIO().KeyCtrl){
+            if(ImGui::GetIO().KeyCtrl || ImGui::GetIO().KeySuper){
                 if(ImGui::IsKeyPressed(ImGuiKey_C)){
                     container->copySelectedModulesWithConnections();
                     deselectAllNodes();
@@ -2838,6 +2874,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     deselectAllNodes();
                 }
     ImGui::End();
+    if(!ImGui::IsMouseDown(0) && !ImGui::IsMouseDown(1) && !isCreatingConnection)
+        container->endCanvasEdit();
 
     // ──────────────────────────────────────────────────────────────────────
     // Alt+Left/Right: cycle through matching portal instances across the whole patch.

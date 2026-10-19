@@ -73,6 +73,13 @@ bool ofxOceanodeTimelineManager::savePreset(const std::string&) const { assert(f
 void ofxOceanodeTimelineManager::retimeForBpmChange(float,float) { assert(false); }
 '''
 
+def history_adapters():
+    c=(ROOT/'src/Managers/ofxOceanodeContainer.cpp').read_text()
+    return (block(c, 'ofxOceanodeContainer::CanvasNodeSnapshot::~CanvasNodeSnapshot()') + '\n' +
+            block(c, 'void ofxOceanodeContainer::clearCanvasHistory()') + '\n' +
+            'void ofxOceanodeContainer::captureDeletedCanvasNode(ofxOceanodeNode&) { assert(!pendingCanvasEdit); clearCanvasHistory(); }\n')
+
+
 def production():
     c=(ROOT/'src/Managers/ofxOceanodeContainer.cpp').read_text()
     guard=c[c.index('    thread_local unsigned int containerClearDepth'):c.index('    struct ConnectionFailureInfo')]
@@ -113,13 +120,18 @@ def production():
         if sig.startswith('ofxOceanodeNodeGui::ofxOceanodeNodeGui'): body=body[:-1]+'++liveGui;}'
         if sig.startswith('ofxOceanodeNodeGui::~'): body=body[:-1]+'--liveGui; ++destroyedGui;}'
         result+=body+'\n'
-    return result
+    return result + history_adapters()
 
 def native_production():
-    result=production()+'\n'+SUPPORT+'\n'
+    result=production().replace(history_adapters(), '')+'\n'+SUPPORT+'\n'
     c=(ROOT/'src/Managers/ofxOceanodeContainer.cpp').read_text()
     declarations=c[c.index('    struct ConnectionFailureInfo'):c.index('    void drawConnectionErrorDialogContents')]
     result+='namespace {\n'+declarations+'}\n'
+    result += c[c.index('ofxOceanodeContainer::CanvasNodeSnapshot::~CanvasNodeSnapshot()'):]
+    for signature in ['CustomGuiPanelData* ofxOceanodeContainer::getCustomGuiPanelData(',
+                      'void ofxOceanodeContainer::markCustomGuisDirty()']:
+        result += block(c, signature) + '\n'
+
     for signature in [
         'ofxOceanodeTimelineManager& ofxOceanodeContainer::getTimelineManager()',
         'void ofxOceanodeContainer::activate()', 'void ofxOceanodeContainer::deactivate()',

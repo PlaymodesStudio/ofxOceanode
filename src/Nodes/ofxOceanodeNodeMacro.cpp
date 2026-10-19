@@ -12,7 +12,16 @@
 #include "ofxOceanodeShared.h"
 #include <sstream>
 #include <filesystem>
+#include <stdexcept>
 #include "PresetSaveCleanup.h"
+
+namespace {
+    thread_local unsigned canvasUndoSnapshotDepth = 0;
+    struct CanvasUndoSnapshotScope {
+        CanvasUndoSnapshotScope(){ ++canvasUndoSnapshotDepth; }
+        ~CanvasUndoSnapshotScope(){ --canvasUndoSnapshotDepth; }
+    };
+}
 
 // ─── Constructor ─────────────────────────────────────────────────────────────
 
@@ -872,8 +881,20 @@ void ofxOceanodeNodeMacro::loadGlobalDescription(const string& folderPath){
 	}
 }
 
+void ofxOceanodeNodeMacro::saveCanvasUndoState(ofJson& json, const string& path){
+    const CanvasUndoSnapshotScope scope;
+    oceanodePresetSave::Scope save;
+    macroSave(json, path);
+    if(!save.finish()) throw std::runtime_error("Cannot capture macro for canvas undo");
+}
+
 void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
-	if(presetManager.isLocal()){
+    if(canvasUndoSnapshotDepth && !presetManager.isLocal()){
+        json["_CanvasUndoReference"] = {{"Macro", presetManager.getCurrentMacro()},
+            {"MacroPath", presetManager.getCurrentMacroPath()},
+            {"CategoryStruct", presetManager.getCurrentCategory()}};
+    }
+	if(presetManager.isLocal() || canvasUndoSnapshotDepth){
 		string localPath = path + "/" + nodeName() + "_" + ofToString(getNumIdentifier());
 		
 		// Preserve the current canvas layout when saving to a new location.
@@ -930,7 +951,7 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 
 	// Save router sort order for local macros (stored in the preset json).
 	// Global macro sort order is saved to the macro folder above.
-	if(presetManager.isLocal()) {
+	if(presetManager.isLocal() || canvasUndoSnapshotDepth) {
 		if(!sortOrder.getOrder().empty()) {
 			ofJson sortArr = ofJson::array();
 			for(const auto& e : sortOrder.getOrder()) sortArr.push_back(e);
@@ -1070,6 +1091,18 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 		// Store the local path for future snapshot saving
 		presetManager.setPresetPath(localPath);
 	}
+    // History embeds every macro definition locally, then restores the original
+    // library identity without replacing the just-restored live graph.
+    if(json.contains("_CanvasUndoReference")){
+        const auto& reference = json["_CanvasUndoReference"];
+        presetManager.setLocal(false);
+        presetManager.setPresetPath("");
+        const auto sourcePath = reference["MacroPath"].get<string>();
+        if(!sourcePath.empty()) presetManager.updateCategoryFromPath(sourcePath);
+        presetManager.setCurrentMacro(reference["Macro"].get<string>());
+        presetManager.setCurrentMacroPath(reference["MacroPath"].get<string>());
+        presetManager.getCurrentCategory() = reference["CategoryStruct"].get<std::deque<string>>();
+    }
 	isLoadingPreset = false;
 }
 

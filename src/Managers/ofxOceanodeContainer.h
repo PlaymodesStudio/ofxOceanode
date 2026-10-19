@@ -17,6 +17,7 @@
 #include "ofxOceanodeNodeGui.h"
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <unordered_set>
 
 class ofxOceanodeNodeModel;
@@ -299,6 +300,15 @@ public:
     bool cutSelectedModulesWithConnections();
     bool pasteModulesAndConnectionsInPosition(glm::vec2 position, bool allowOutsideInputs);
     bool deleteSelectedModules();
+
+    // Canvas gestures only; runtime parameter updates never enter history.
+    void beginCanvasEdit();
+    void endCanvasEdit();
+    bool undoCanvasEdit();
+    bool redoCanvasEdit();
+    bool canUndoCanvasEdit() const { return !canvasUndo.empty(); }
+    bool canRedoCanvasEdit() const { return !canvasRedo.empty(); }
+    void clearCanvasHistory();
     
     const vector<unique_ptr<ofxOceanodeAbstractConnection>>& getAllConnections(){return connections;};
     const std::unordered_map<string, ofxOceanodeNode*> & getParameterGroupNodesMap(){return parameterGroupNodesMap;};
@@ -363,6 +373,36 @@ private:
     CustomGuiSnapshotBank* getOrCreateCustomGuiSnapshotBank(const std::string& panelId);
     int getNextAvailableCustomGuiSnapshotSlot(const CustomGuiSnapshotBank& bank) const;
     
+    struct CanvasNodeSnapshot {
+        ofJson values;
+        ofJson midi;
+        ofJson widgets;
+        std::string folder;
+        ~CanvasNodeSnapshot();
+    };
+    struct CanvasLiveNode {
+        std::uint64_t identity = 0;
+        std::string setupInfo;
+    };
+    struct CanvasEdit {
+        ofJson before;
+        ofJson after;
+        std::map<std::uint64_t, std::shared_ptr<CanvasNodeSnapshot>> snapshots;
+        size_t bytes = 0;
+    };
+    std::unordered_map<std::string, CanvasLiveNode> canvasLiveNodes;
+    std::uint64_t nextCanvasNodeIdentity = 0;
+    std::unique_ptr<CanvasEdit> pendingCanvasEdit;
+    std::vector<CanvasEdit> canvasUndo, canvasRedo;
+    bool replayingCanvasEdit = false;
+    ofJson captureCanvasGraph();
+    std::shared_ptr<CanvasNodeSnapshot> captureCanvasNode(ofxOceanodeNode& node);
+    void captureDeletedCanvasNode(ofxOceanodeNode& node);
+    bool replayCanvasEdit(CanvasEdit& edit, bool backwards);
+    bool stepCanvasHistory(bool backwards);
+    void trimCanvasHistory();
+    void measureCanvasEdit(CanvasEdit& edit);
+
     //NodeModel;
     std::unordered_map<string, nodeContainerWithId> dynamicNodes;
     std::unordered_map<string, nodeContainerWithId> persistentNodes;

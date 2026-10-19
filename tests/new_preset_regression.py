@@ -87,6 +87,8 @@ struct ofxOceanodeContainer {
     unsigned nodesRevision=0;
     string id="Canvas";
     string pendingScopeSavePath;
+    map<string,int> canvasLiveNodes{{"Old",1}};
+    void clearCanvasHistory(){}
     int resets=0,scopeSaves=0;
     ~ofxOceanodeContainer(){clearContainer();}
     string getCanvasID(){return id;}

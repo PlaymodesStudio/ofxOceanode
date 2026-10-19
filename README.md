@@ -59,6 +59,11 @@ with `euclideanGenerator` as the class, and `"Generators"` as the category name.
   to focus its parent canvas and center on the Macro node. Each press moves up
   one level; the shortcut is inactive while editing a widget or using a popup.
 
+- **Cmd+Z** undoes canvas edits; **Cmd+Shift+Z** redoes them (use **Ctrl** on
+  Windows/Linux). History covers node movement, creation/deletion, cables, and
+  paste/duplicate. Each drag or paste is one step. Each canvas keeps up to 100
+  steps within a 64 MiB serialized-state budget; New and preset loading clear it.
+  Parameter changes and playback are excluded, and text fields keep their own undo.
 
 Compatibility
 ------------

@@ -74,6 +74,9 @@ public:
     ofParameterGroup& getInspectorParameters();
 
 private:
+    friend class ofxOceanodeContainer;
+    // Declared before the model so local-macro backing files survive teardown.
+    std::shared_ptr<void> canvasHistoryStorage;
     std::unique_ptr<ofxOceanodeNodeModel> nodeModel;
     std::unique_ptr<ofxOceanodeNodeGui> nodeGui;
 	

@@ -29,6 +29,8 @@ public:
         sinkParameter->removeInConnection(this);
     };
     
+    bool getActive() const { return active; }
+
     void setActive(bool a){
         active = a;
         if(active)

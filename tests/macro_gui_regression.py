@@ -267,6 +267,39 @@ int main(int argc, char** argv) {
     ImGui::ActivateItemByID(ImHashStr("Load", 0, loadPopup->ID)); frame();
     copy.update(event); frame();
     assert(!copy.isLocal() && copy.getCurrentMacroName() == "A" && value(copy) == .7f);
+    // Real container history must retain unsaved local AND library macro graphs.
+    {
+        ofxOceanodeContainer history(registry, types, transport); history.setCanvasID("History");
+        history.beginCanvasEdit();
+        auto& wrapper = history.createNode(std::make_unique<ofxOceanodeNodeMacro>(), 1);
+        auto& local = static_cast<ofxOceanodeNodeMacro&>(wrapper.getNodeModel());
+        assert(local.loadMacroSource("Presets/Bank/01--Whole_Preset"));
+        local.getContainer()->getAllModules().front()->getNodeModel().getParameter<float>("Value") = .91f;
+        history.endCanvasEdit();
+        assert(history.undoCanvasEdit() && history.getAllModules().empty());
+        assert(history.redoCanvasEdit());
+        auto& restored = static_cast<ofxOceanodeNodeMacro&>(history.getAllModules().front()->getNodeModel());
+        assert(restored.isLocal() && value(restored) == .91f);
+        history.beginCanvasEdit(); history.getAllModules().front()->deleteSelf(); history.endCanvasEdit();
+        assert(history.undoCanvasEdit());
+        assert(value(static_cast<ofxOceanodeNodeMacro&>(history.getAllModules().front()->getNodeModel())) == .91f);
+        history.clearCanvasHistory(); // Restored local data must outlive eviction.
+
+        history.beginCanvasEdit();
+        auto& globalWrapper = history.createNode(std::make_unique<ofxOceanodeNodeMacro>(), 2, false, "Macros/Folder/A");
+        auto& global = static_cast<ofxOceanodeNodeMacro&>(globalWrapper.getNodeModel());
+        assert(!global.isLocal());
+        global.getContainer()->getAllModules().front()->getNodeModel().getParameter<float>("Value") = .92f;
+        history.endCanvasEdit();
+        assert(history.undoCanvasEdit() && history.getAllModules().size() == 1);
+        assert(history.redoCanvasEdit());
+        auto& restoredGlobal = static_cast<ofxOceanodeNodeMacro&>(history.getDynamicNodes().at("Macro").at(2)->getNodeModel());
+        assert(!restoredGlobal.isLocal() && restoredGlobal.getCurrentMacroName() == "A");
+        assert(value(restoredGlobal) == .92f);
+        assert(restoredGlobal.presetManager.getCurrentCategoryMacro());
+        assert(!restoredGlobal.presetManager.getCurrentCategoryMacro()->macros.empty());
+        assert(history.undoCanvasEdit()); assert(history.redoCanvasEdit());
+    }
     ImGui::DestroyContext(context);
     // A stale category path must safely disable indexed selection.
     macro.presetManager.updateCategoryFromPath("Macros/Missing/A");

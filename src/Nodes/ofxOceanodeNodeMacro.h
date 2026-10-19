@@ -93,6 +93,8 @@ public:
 	
 	// ─── Preset save/load ─────────────────────────────────────────────────
 	void macroSave(ofJson &json, string path);
+    // Capture the current contents, including unsaved library-macro edits.
+    void saveCanvasUndoState(ofJson& json, const string& path);
 	void macroLoad(ofJson &json, string path);
 	
 	void loadBeforeConnections(ofJson &json) override;
