@@ -314,6 +314,26 @@ void ofxOceanodeCanvas::handleParentNavigation(){
 }
 
 void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
+    // A history step may have replaced nodes from another canvas during update.
+    // Drop cached interaction pointers before any of them can be dereferenced.
+    const bool layoutPendingOnEntry = autoLayoutCanvasRequested;
+    const auto historyRevision = container->getCanvasHistoryRevision();
+    if(historyRevision != observedCanvasHistoryRevision){
+        observedCanvasHistoryRevision = historyRevision;
+        tempSourceParameter = nullptr;
+        tempSinkParameter = nullptr;
+        isCreatingConnection = false;
+        customGuiContextNode = nullptr;
+        pendingCenterNode = nullptr;
+        portalizeSourceParameter = nullptr;
+        encapsulateSinkParameter = nullptr;
+        pendingPortalAlignments.clear();
+        someSelectedModuleMove.clear();
+        moveSelectedModulesWithDrag = glm::vec2(0);
+        someDragAppliedToSelection = false;
+        inspectorSelectionClick = {};
+    }
+
     // Save the previous shared zoom level so nested canvas draws (e.g. macros)
     // restore the parent's value when they finish.
     float previousSharedZoom = ofxOceanodeShared::getZoomLevel();
@@ -339,6 +359,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     bool open_outlet_context_menu = false;
     bool open_inlet_context_menu = false;
     bool open_portalize_name_popup = false;
+    string macroExtractionKey;
     string node_hovered_in_list = "";
     string node_hovered_in_scene = "";
     
@@ -390,8 +411,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             someDragAppliedToSelection = false;
             inspectorSelectionClick = {};
             ofxOceanodeShared::nodeSelectedInCanvas(nullptr);
-            if(editIO.KeyShift) container->redoCanvasEdit();
-            else container->undoCanvasEdit();
+            container->requestCanvasHistory(editIO.KeyShift);
         }else{
             // A gesture starts before widgets can mutate the graph and ends
             // after mouse release/snap-to-grid. No topology scans while idle.
@@ -399,8 +419,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false) ||
                 ImGui::IsKeyPressed(ImGuiKey_Backspace, false) ||
                 (editModifier && (ImGui::IsKeyPressed(ImGuiKey_V, false) ||
-                 ImGui::IsKeyPressed(ImGuiKey_D, false) || ImGui::IsKeyPressed(ImGuiKey_X, false)));
-            if(ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1) || editKey)
+                 ImGui::IsKeyPressed(ImGuiKey_D, false) || ImGui::IsKeyPressed(ImGuiKey_X, false) ||
+                 ImGui::IsKeyPressed(ImGuiKey_E, false)));
+            if(!layoutPendingOnEntry && (ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1) || editKey))
                 container->beginCanvasEdit();
         }
         auto prepareNewNodeModal = [&](){
@@ -2154,6 +2175,25 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         ImGui::CloseCurrentPopup();
                     }
                 }
+                if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&customGuiContextNode->getNodeModel())){
+                    ImGui::Separator();
+                    if(ImGui::Selectable("Extract Macro", false, macro->isActive() ? ImGuiSelectableFlags_None : ImGuiSelectableFlags_Disabled)){
+                        macroExtractionKey = customGuiContextNode->getParameters().getEscapedName();
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                // An instrument (a synth that takes notes): a piano-roll row
+                // playing it, set up in the timeline's dialog.
+                ofxOceanodeTimelineInstrument instrument;
+                if(customGuiContextNode->getNodeModel().getTimelineInstrument(instrument) &&
+                   (instrument.gate != nullptr || instrument.pitch != nullptr)){
+                    ImGui::Separator();
+                    if(ImGui::Selectable("Add to Timeline as Instrument...")){
+                        container->getTimelineManager().requestNoteGroupSetup(
+                            instrument.gate != nullptr ? instrument.gate : instrument.pitch);
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
             }
             ImGui::EndPopup();
         }
@@ -2771,9 +2811,12 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     container->pasteModulesAndConnectionsInPosition(pastePosition, ImGui::GetIO().KeyShift);
                 }else if(ImGui::IsKeyPressed(ImGuiKey_A)){
                     selectAllNodes();
-				}else if(ImGui::IsKeyPressed(ImGuiKey_E)){
-					container->encapsulateSelectedNodes();
-				}
+                }else if(ImGui::IsKeyPressed(ImGuiKey_E, false) && !ImGui::IsAnyItemActive()){
+                    if(ImGui::GetIO().KeyShift){
+                        const auto selected = container->getSelectedModules();
+                        if(selected.size() == 1) macroExtractionKey = selected.front()->getParameters().getEscapedName();
+                    }else container->encapsulateSelectedNodes();
+                }
             }
             else if(ImGui::IsKeyPressed((ImGuiKey_Backspace)) && !ImGui::IsAnyItemActive()){
                 container->deleteSelectedModules();
@@ -2823,6 +2866,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
         }
         
+        if(!macroExtractionKey.empty()){
+            const auto& nodes = container->getParameterGroupNodesMap();
+            const auto found = nodes.find(macroExtractionKey);
+            if(found != nodes.end()) container->extractMacro(*found->second);
+            customGuiContextNode = nullptr;
+        }
+
         // Encapsulation deletes and recreates nodes. Run it only after this
         // frame has finished consuming nodesVisibleInThisFrame and drawing
         // its connections; doing it directly from the popup leaves stale node

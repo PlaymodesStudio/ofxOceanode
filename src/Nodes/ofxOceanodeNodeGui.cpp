@@ -915,10 +915,15 @@ void ofxOceanodeNodeGui::renderParameterPopup(ofxOceanodeAbstractParameter& absP
             }
             {
                 // Pitch, gate and velocity as one piano-roll row; the
-                // timeline shows a dialog to pick the other two.
+                // timeline shows a dialog to pick the other two (or the
+                // whole instrument, when the node is one).
                 const std::string valueType = absParam.valueType();
-                if((valueType == typeid(float).name() || valueType == typeid(int).name() ||
-                    valueType == typeid(bool).name()) &&
+                ofxOceanodeTimelineInstrument instrument;
+                const bool isInstrument = absParam.getNodeModel() != nullptr &&
+                    absParam.getNodeModel()->getTimelineInstrument(instrument);
+                if((isInstrument || valueType == typeid(float).name() || valueType == typeid(int).name() ||
+                    valueType == typeid(bool).name() || valueType == typeid(std::vector<float>).name() ||
+                    valueType == typeid(std::vector<int>).name()) &&
                    ImGui::Selectable("Add to Timeline as Piano Roll...")){
                     timelineManager.requestNoteGroupSetup(&absParam);
                 }

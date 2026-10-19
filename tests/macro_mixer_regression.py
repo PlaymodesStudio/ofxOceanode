@@ -15,6 +15,7 @@ PRELUDE = r'''
 #include "MacroMixerRuntime.h"
 #include "PresetSaveCleanup.h"
 #include "ofxOceanodeMacroMixer.h"
+#include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeTypesRegistry.h"
 #include "ofxOceanodeScope.h"
@@ -67,6 +68,7 @@ void ofxOceanodeContainer::loadCustomGuis(const std::string&) { assert(customGui
 void ofxOceanodeContainer::saveCustomGuis(const std::string&) { assert(customGuiPanels.empty()); }
 void ofxOceanodeContainer::loadCustomGuiSnapshots(const std::string&) { assert(customGuiSnapshotBanks.empty()); }
 void ofxOceanodeContainer::saveCustomGuiSnapshots(const std::string&) { assert(customGuiSnapshotBanks.empty()); }
+void ofxOceanodeContainer::rebuildCustomGuiPanels() { assert(customGuiPanels.empty()); }
 void ofxOceanodeContainer::scheduleScopeSave(const std::string&) { assert(false); }
 bool ofxOceanodeTimelineManager::loadPreset(const std::string&) { assert(false); return false; }
 bool ofxOceanodeTimelineManager::savePreset(const std::string&) const { assert(false); return false; }
@@ -77,7 +79,8 @@ def history_adapters():
     c=(ROOT/'src/Managers/ofxOceanodeContainer.cpp').read_text()
     return (block(c, 'ofxOceanodeContainer::CanvasNodeSnapshot::~CanvasNodeSnapshot()') + '\n' +
             block(c, 'void ofxOceanodeContainer::clearCanvasHistory()') + '\n' +
-            'void ofxOceanodeContainer::captureDeletedCanvasNode(ofxOceanodeNode&) { assert(!pendingCanvasEdit); clearCanvasHistory(); }\n')
+            'void ofxOceanodeContainer::captureDeletedCanvasNode(ofxOceanodeNode&) { assert(!pendingCanvasEdit); clearCanvasHistory(); }\n' +
+            'void ofxOceanodeContainer::processCanvasHistoryRequest() { assert(!requestedCanvasHistory); }\n')
 
 
 def production():
@@ -129,7 +132,11 @@ def native_production():
     result+='namespace {\n'+declarations+'}\n'
     result += c[c.index('ofxOceanodeContainer::CanvasNodeSnapshot::~CanvasNodeSnapshot()'):]
     for signature in ['CustomGuiPanelData* ofxOceanodeContainer::getCustomGuiPanelData(',
-                      'void ofxOceanodeContainer::markCustomGuisDirty()']:
+                      'void ofxOceanodeContainer::markCustomGuisDirty()',
+                      'void ofxOceanodeContainer::markCustomGuiSnapshotsDirty()',
+                      'std::string ofxOceanodeContainer::makeCustomGuiId()',
+                      'std::string ofxOceanodeContainer::makeUniqueCustomGuiName(',
+                      'vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules()']:
         result += block(c, signature) + '\n'
 
     for signature in [

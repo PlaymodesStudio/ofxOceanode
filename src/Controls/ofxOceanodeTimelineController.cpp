@@ -5229,11 +5229,19 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
             pianoMarqueeActive = false;
         }
         const float rollTop = editorMin.y + 8.0f;
-        const float rollBottom = editorMax.y - 66.0f;
-        const float velocityTop = rollBottom + 5.0f;
-        const float velocityBottom = velocityTop + 25.0f;
-        const float probabilityTop = velocityBottom + 4.0f;
+        // VEL / PROB strip heights: dragged from the handles above them (the
+        // roll keeps at least 40 px)
+        auto& strips = pianoStripHeights.try_emplace(lane->id, 25.0f, 26.0f).first->second;
+        {
+            const float room = std::max(24.0f, (editorMax.y - 15.0f) - rollTop - 40.0f);
+            strips.first = ofClamp(strips.first, 12.0f, std::max(12.0f, room - 12.0f));
+            strips.second = ofClamp(strips.second, 12.0f, std::max(12.0f, room - strips.first));
+        }
         const float probabilityBottom = editorMax.y - 6.0f;
+        const float probabilityTop = probabilityBottom - strips.second;
+        const float velocityBottom = probabilityTop - 4.0f;
+        const float velocityTop = velocityBottom - strips.first;
+        const float rollBottom = velocityTop - 5.0f;
         const float keyboardRight = zoneLeft - 1.0f;
         const float keyboardLeft = keyboardRight - kPianoKeyboardWidth;
         const float pianoScrollbarRight = keyboardLeft - 4.0f;
@@ -5460,6 +5468,31 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
         const bool hovered = hoverRect(ImVec2(left, rollTop), ImVec2(right, rollBottom));
         const bool velocityHovered = hoverRect(ImVec2(left, velocityTop), ImVec2(right, velocityBottom));
         const bool probabilityHovered = hoverRect(ImVec2(left, probabilityTop), ImVec2(right, probabilityBottom));
+        // The handles in the gaps above VEL and PROB: drag to resize the strip
+        {
+            const bool velHandle = hoverRect(ImVec2(left, rollBottom + 0.5f), ImVec2(right, velocityTop - 0.5f));
+            const bool probHandle = hoverRect(ImVec2(left, velocityBottom + 0.5f), ImVec2(right, probabilityTop - 0.5f));
+            if(pianoStripResize == 0 && (velHandle || probHandle)) {
+                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+                if(ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                    pianoStripResize = velHandle ? 1 : 2;
+                    pianoStripResizeStartY = ImGui::GetIO().MousePos.y;
+                    pianoStripResizeStartHeight = velHandle ? strips.first : strips.second;
+                }
+            }
+            if(pianoStripResize != 0) {
+                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+                if(ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                    const float h = pianoStripResizeStartHeight - (ImGui::GetIO().MousePos.y - pianoStripResizeStartY);
+                    (pianoStripResize == 1 ? strips.first : strips.second) = std::max(12.0f, h);   // clamped next frame
+                } else pianoStripResize = 0;
+            }
+            const ImU32 handleColor = IM_COL32(150, 150, 158, 150);
+            if(velHandle || pianoStripResize == 1)
+                dl->AddLine(ImVec2(left, rollBottom + 2.5f), ImVec2(right, rollBottom + 2.5f), handleColor, 2.0f);
+            if(probHandle || pianoStripResize == 2)
+                dl->AddLine(ImVec2(left, velocityBottom + 2.0f), ImVec2(right, velocityBottom + 2.0f), handleColor, 2.0f);
+        }
         const ImVec2 mouse = ImGui::GetIO().MousePos;
         const double timelineBeat = beatAtOffset(mouse.x - timelineMin.x);
         double sourceBeat = timelineToSourceBeat(*clip, timelineBeat);
@@ -5543,7 +5576,26 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                     pianoDragMode = std::abs(sourceBeat - note.startBeat - note.durationBeats) <= edgeThreshold
                         ? PianoDragMode::Resize : PianoDragMode::Move;
                     pianoDragBeatOffset = sourceBeat - note.startBeat;
-                    if(pianoDragMode == PianoDragMode::Move) {
+                    if(ImGui::GetIO().KeyShift) {
+                        // Shift+drag: stretch the selection (every note when the
+                        // grabbed one is not selected) from its first start
+                        if(pianoSelectedNoteIndices.size() <= 1 && pianoSelectedNoteIndices.count(hitIndex) > 0
+                           && !ImGui::GetIO().KeyAlt) {
+                            pianoSelectedNoteIndices.clear();
+                            for(size_t i = 0; i < lane->pianoNotes.size(); ++i) pianoSelectedNoteIndices.insert(static_cast<int>(i));
+                        }
+                        pianoDragMode = PianoDragMode::Stretch;
+                        pianoDragSnapshot.clear();
+                        double origin = std::numeric_limits<double>::max();
+                        for(int index : pianoSelectedNoteIndices) {
+                            if(index < 0 || index >= static_cast<int>(lane->pianoNotes.size())) continue;
+                            const auto& n = lane->pianoNotes[index];
+                            pianoDragSnapshot.push_back({index, n.startBeat, n.pitch, n.durationBeats});
+                            origin = std::min(origin, n.startBeat);
+                        }
+                        pianoStretchOrigin = origin == std::numeric_limits<double>::max() ? 0.0 : origin;
+                        pianoStretchGrab = std::max(sourceBeat, pianoStretchOrigin + grid * 0.25);
+                    } else if(pianoDragMode == PianoDragMode::Move) {
                         pianoDragSnapshot.clear();
                         for(int index : pianoSelectedNoteIndices) {
                             if(index >= 0 && index < static_cast<int>(lane->pianoNotes.size()))
@@ -5629,6 +5681,12 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                 pianoMarqueeActive = false;
             }
         }
+        // Cmd+A (ImGui's logical Ctrl on macOS): every note of this lane
+        if((hovered || velocityHovered || probabilityHovered) && !ImGui::IsAnyItemActive() &&
+           !ImGui::GetIO().WantTextInput && ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A, false)) {
+            pianoSelectedNoteIndices.clear();
+            for(size_t i = 0; i < lane->pianoNotes.size(); ++i) pianoSelectedNoteIndices.insert(static_cast<int>(i));
+        }
         if(hovered && !pianoSelectedNoteIndices.empty() && !ImGui::IsAnyItemActive() &&
            !ImGui::GetIO().WantTextInput &&
            (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false))) {
@@ -5694,6 +5752,22 @@ void ofxOceanodeTimelineController::drawLaneEditor(ofxOceanodeTimelineManager& t
                     dragged.startBeat = std::max(0.0, entry.startBeat + deltaBeat);
                     dragged.pitch = ofClamp(entry.pitch + deltaPitch, lowPitch, highPitch);
                 }
+            } else if(pianoDragMode == PianoDragMode::Stretch) {
+                // Every start and end scaled from the origin, then on the grid
+                // (always: Shift+drag quantizes), at least one grid step long.
+                const double factor = std::max(0.0, (sourceBeat - pianoStretchOrigin) /
+                                                    std::max(1e-6, pianoStretchGrab - pianoStretchOrigin));
+                auto onGrid = [&](double beat) { return std::round(beat / grid) * grid; };
+                for(const auto& entry : pianoDragSnapshot) {
+                    if(entry.index < 0 || entry.index >= static_cast<int>(lane->pianoNotes.size())) continue;
+                    auto& stretched = lane->pianoNotes[entry.index];
+                    const double start = std::max(0.0, onGrid(pianoStretchOrigin + (entry.startBeat - pianoStretchOrigin) * factor));
+                    double end = onGrid(pianoStretchOrigin + (entry.startBeat + entry.durationBeats - pianoStretchOrigin) * factor);
+                    if(end < start + grid) end = start + grid;
+                    stretched.startBeat = start;
+                    stretched.durationBeats = end - start;
+                }
+                ImGui::SetTooltip("Stretch x %.2f (on the grid)", factor);
             } else if(pianoDragMode == PianoDragMode::Velocity) {
                 const float targetValue = ofClamp((velocityBottom - mouse.y) /
                     std::max(1.0f, velocityBottom - velocityTop - 3.0f), 0.0f, 1.0f);

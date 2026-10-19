@@ -200,6 +200,9 @@ public:
 		const vector<ofxOceanodeAbstractParameter*>& sinks);
 	ofxOceanodeNode* encapsulateNodes(const vector<ofxOceanodeNode*>& nodes,
 	                                  const string& macroName = "Encapsulated");
+    // Move the complete contents (including boundary routers) into this canvas.
+    bool extractMacro(ofxOceanodeNode& macroNode);
+    bool extractSelectedMacro();
 
     
     ofEvent<pair<string, string>> loadPresetEvent;
@@ -306,8 +309,11 @@ public:
     void endCanvasEdit();
     bool undoCanvasEdit();
     bool redoCanvasEdit();
-    bool canUndoCanvasEdit() const { return !canvasUndo.empty(); }
-    bool canRedoCanvasEdit() const { return !canvasRedo.empty(); }
+    bool canUndoCanvasEdit() const;
+    bool canRedoCanvasEdit() const;
+    // UI requests run at the next root update, before any canvas is drawing.
+    void requestCanvasHistory(bool redo = false);
+    std::uint64_t getCanvasHistoryRevision() const;
     void clearCanvasHistory();
     
     const vector<unique_ptr<ofxOceanodeAbstractConnection>>& getAllConnections(){return connections;};
@@ -387,6 +393,9 @@ private:
     struct CanvasEdit {
         ofJson before;
         ofJson after;
+        ofJson beforeAux, afterAux;
+        ofJson nodeTransfers = ofJson::array();
+        std::uint64_t sequence = 0;
         std::map<std::uint64_t, std::shared_ptr<CanvasNodeSnapshot>> snapshots;
         size_t bytes = 0;
     };
@@ -395,6 +404,25 @@ private:
     std::unique_ptr<CanvasEdit> pendingCanvasEdit;
     std::vector<CanvasEdit> canvasUndo, canvasRedo;
     bool replayingCanvasEdit = false;
+    std::uint64_t canvasHistorySerial = 0, canvasHistoryRevision = 0;
+    int requestedCanvasHistory = 0;
+    ofxOceanodeContainer* canvasHistoryRoot();
+    void visitCanvasHistories(const std::function<void(ofxOceanodeContainer&)>& visit);
+    ofxOceanodeContainer* nextCanvasHistoryOwner(bool backwards);
+    void finishPendingCanvasEdits();
+    void processCanvasHistoryRequest();
+    ofJson captureCanvasAuxiliary() const;
+    void restoreCanvasAuxiliary(const ofJson& target, const ofJson& opposite);
+    void rollbackMacroCanvasEdit();
+    void migrateCanvasPanelsTo(ofxOceanodeContainer& target, const std::map<string, string>& nodeNames,
+                               std::vector<CustomGuiPanelData>* stagedPanels = nullptr,
+                               std::vector<CustomGuiSnapshotBank>* stagedBanks = nullptr);
+    struct MacroCanvasEditScope {
+        ofxOceanodeContainer& owner;
+        bool standalone, success = false;
+        explicit MacroCanvasEditScope(ofxOceanodeContainer& owner);
+        ~MacroCanvasEditScope();
+    };
     ofJson captureCanvasGraph();
     std::shared_ptr<CanvasNodeSnapshot> captureCanvasNode(ofxOceanodeNode& node);
     void captureDeletedCanvasNode(ofxOceanodeNode& node);
@@ -402,6 +430,8 @@ private:
     bool stepCanvasHistory(bool backwards);
     void trimCanvasHistory();
     void measureCanvasEdit(CanvasEdit& edit);
+    void synchronizeCanvasTransfers(CanvasEdit& edit, bool backwards);
+    void retargetCanvasNodeSnapshot(CanvasNodeSnapshot& snapshot, const string& type, int from, int to);
 
     //NodeModel;
     std::unordered_map<string, nodeContainerWithId> dynamicNodes;

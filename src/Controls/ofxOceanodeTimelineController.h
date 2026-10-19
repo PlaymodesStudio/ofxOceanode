@@ -293,7 +293,7 @@ private:
     bool requestRemoveLane = false;
     std::string pendingRemoveLaneId;
     bool clipEditorOpen = false;
-    enum class PianoDragMode { None, Move, Resize, Velocity, Probability };
+    enum class PianoDragMode { None, Move, Resize, Velocity, Probability, Stretch };
     PianoDragMode pianoDragMode = PianoDragMode::None;
     int pianoDragNoteIndex = -1;
     double pianoDragBeatOffset = 0.0;
@@ -303,13 +303,22 @@ private:
     // independently to the mouse.
     std::string pianoSelectionLaneId;
     std::set<int> pianoSelectedNoteIndices;
-    struct PianoDragSnapshotEntry { int index; double startBeat; int pitch; };
+    struct PianoDragSnapshotEntry { int index; double startBeat; int pitch; double durationBeats = 0.0; };
     std::vector<PianoDragSnapshotEntry> pianoDragSnapshot;
     double pianoDragAnchorStartBeat = 0.0;
     int pianoDragAnchorPitch = 0;
     struct PianoValueDragSnapshotEntry { int index; float value; };
     std::vector<PianoValueDragSnapshotEntry> pianoValueDragSnapshot;
     float pianoValueDragAnchorValue = 0.0f;
+    // Shift+drag: the selection's timing scaled from its first start (origin)
+    // by how far the grabbed beat moved, every start and end on the grid.
+    double pianoStretchOrigin = 0.0;
+    double pianoStretchGrab = 0.0;
+    // The VEL / PROB strips' heights per lane (session state, like lane heights),
+    // resized by the handles above them: 0 none, 1 VEL, 2 PROB.
+    std::map<std::string, std::pair<float, float>> pianoStripHeights;
+    int pianoStripResize = 0;
+    float pianoStripResizeStartY = 0.0f, pianoStripResizeStartHeight = 0.0f;
     bool pianoMarqueeActive = false;
     float pianoMarqueeStartX = 0.0f;
     float pianoMarqueeStartY = 0.0f;

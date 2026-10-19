@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="483.27559055118115" height="118" preserveAspectRatio="xMinYMin meet" viewBox="0 0 483 118" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="483.27559055118115" height="118"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-118)" style="clip-path: url(#clip)">
+		<g transform="">
+			<rect x="10" y="35" width="105" height="65" rx="6" ry="6" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(91%,95%,95%); fill-rule: evenodd;"/>
+			<text x="49.98876953125" y="69" style="font-family: Bold; font-size: 18px;fill: rgb(8%,20%,22%); stroke:none;" transform="translate(0,138) scale(1,-1)">0.8</text>
+			<text x="41.376953125" y="49" style="font-family: Body; font-size: 8px;fill: rgb(32%,40%,41%); stroke:none;" transform="translate(0,98) scale(1,-1)">clock phase</text>
+			<rect x="130" y="35" width="105" height="65" rx="6" ry="6" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(91%,95%,95%); fill-rule: evenodd;"/>
+			<text x="162.232421875" y="69" style="font-family: Bold; font-size: 18px;fill: rgb(8%,20%,22%); stroke:none;" transform="translate(0,138) scale(1,-1)">+ 0.4</text>
+			<text x="156.935546875" y="49" style="font-family: Body; font-size: 8px;fill: rgb(32%,40%,41%); stroke:none;" transform="translate(0,98) scale(1,-1)">member offset</text>
+			<rect x="250" y="35" width="105" height="65" rx="6" ry="6" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(91%,95%,95%); fill-rule: evenodd;"/>
+			<text x="282.232421875" y="69" style="font-family: Bold; font-size: 18px;fill: rgb(8%,20%,22%); stroke:none;" transform="translate(0,138) scale(1,-1)">= 1.2</text>
+			<text x="273.814453125" y="49" style="font-family: Body; font-size: 8px;fill: rgb(32%,40%,41%); stroke:none;" transform="translate(0,98) scale(1,-1)">before wrapping</text>
+			<rect x="370" y="35" width="105" height="65" rx="6" ry="6" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,52%); fill-rule: evenodd;"/>
+			<text x="409.98876953125" y="69" style="font-family: Bold; font-size: 18px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,138) scale(1,-1)">0.2</text>
+			<text x="397.15234375" y="49" style="font-family: Body; font-size: 8px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,98) scale(1,-1)">after wrapping</text>
+			<text x="97.05112535371555" y="12" style="font-family: Body; font-size: 9px;fill: rgb(32%,40%,41%); stroke:none;" transform="translate(0,24) scale(1,-1)">Subtract a complete turn: 1.2 and 0.2 land at the same point in the cycle.</text>
+		</g>
+	</g>
+</svg>

@@ -60,10 +60,18 @@ with `euclideanGenerator` as the class, and `"Generators"` as the category name.
   one level; the shortcut is inactive while editing a widget or using a popup.
 
 - **Cmd+Z** undoes canvas edits; **Cmd+Shift+Z** redoes them (use **Ctrl** on
-  Windows/Linux). History covers node movement, creation/deletion, cables, and
-  paste/duplicate. Each drag or paste is one step. Each canvas keeps up to 100
-  steps within a 64 MiB serialized-state budget; New and preset loading clear it.
-  Parameter changes and playback are excluded, and text fields keep their own undo.
+  Windows/Linux). History covers node movement, creation/deletion, cables,
+  paste/duplicate, and macro encapsulation/extraction. Each gesture or macro
+  operation is one step, ordered across the patch's canvases. Each canvas retains
+  up to 100 steps within a 64 MiB serialized-state budget; New and preset loading
+  clear it. History inside a moved/recreated macro is folded into that macro's
+  structural step. Parameter changes and playback are excluded; current values
+  travel with moved nodes, and text fields keep their own undo.
+- **Cmd+E** encapsulates the selection. **Cmd+Shift+E** extracts a selected active
+  Macro into its parent canvas; **Extract Macro** is also in its header menu.
+  Extraction keeps boundary routers to preserve conversions and disconnect values.
+  Disconnect cables to macro controls such as Active before extracting. Custom GUI
+  widgets and snapshot references move with the nodes; shared panels are split.
 
 Compatibility
 ------------

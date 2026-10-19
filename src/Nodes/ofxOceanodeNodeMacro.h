@@ -95,6 +95,7 @@ public:
 	void macroSave(ofJson &json, string path);
     // Capture the current contents, including unsaved library-macro edits.
     void saveCanvasUndoState(ofJson& json, const string& path);
+    std::map<string, ofxOceanodeAbstractParameter*> getExposedRouterParameters() const;
 	void macroLoad(ofJson &json, string path);
 	
 	void loadBeforeConnections(ofJson &json) override;

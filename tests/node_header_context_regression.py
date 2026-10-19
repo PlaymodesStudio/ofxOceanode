@@ -19,9 +19,12 @@ FIXTURE=r'''
 #include <cstdio>
 using namespace std;
 constexpr int ofxOceanodeNodeModelFlags_TransparentNode=1<<3;
-struct Model {int getFlags(){return 0;} string getNodeTitleSuffix(){return "Macro Name";}};
+struct ofxOceanodeTimelineInstrument {int* gate=nullptr;int* pitch=nullptr;};
+struct Model {virtual ~Model()=default;int getFlags(){return 0;} string getNodeTitleSuffix(){return "Macro Name";}bool getTimelineInstrument(ofxOceanodeTimelineInstrument&){return false;}};
+struct ofxOceanodeNodeMacro : Model {bool isActive(){return true;}};
 struct Gui {bool selected=false,expanded=true,headerControlHovered=false;bool isHeaderControlHovered(){return headerControlHovered;}bool getSelected(){return selected;}void setSelected(bool v){selected=v;}};
-struct Node {int index=0;Model model;Gui gui;auto& getNodeModel(){return model;}};
+struct Group {string getEscapedName(){return "Node_1";}};
+struct Node {int index=0;Model model;Gui gui;Group group;auto& getNodeModel(){return model;}auto& getParameters(){return group;}};
 Node nodes[2];
 int notifications=0,inspectorAnchors=0;
 struct ofxOceanodeShared {
@@ -30,6 +33,8 @@ struct ofxOceanodeShared {
 };
 struct OceanodeColors {inline static ImVec4 TransparentButton{0,0,0,0};};
 struct Container {
+    struct Timeline {void requestNoteGroupSetup(int*){}} timeline;
+    auto& getTimelineManager(){return timeline;}
     vector<Node*> getSelectedModules(){vector<Node*> out;for(auto& n:nodes)if(n.gui.selected)out.push_back(&n);return out;}
 } containerStorage;
 auto* container=&containerStorage;
@@ -40,7 +45,7 @@ vector<int*> getPortalizableOutputs(const vector<Node*>&){return {};}
 vector<int*> getPortalizableInputConnections(Node*){return {};}
 void portalizeOutput(int*){} void portalizeInput(int*){} void autoLayoutNodes(const vector<Node*>&){}
 map<string,int> nodesDrawingOrder{{"Node_1",1},{"Node_2",0}};
-string lastSelectedNode;
+string lastSelectedNode,macroExtractionKey;
 bool someDragAppliedToSelection=false,popup=false,overlap=false;
 Node* customGuiContextNode=nullptr;
 ImVec2 titlePoints[2],arrowPoint,closePoint,bodyPoint,cancelPoint;

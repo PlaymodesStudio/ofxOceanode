@@ -269,6 +269,7 @@ void ofxOceanodeContainer::clearContainer(){
 }
 
 void ofxOceanodeContainer::update(){
+    if(timelineHost == nullptr) processCanvasHistoryRequest();
     ofEventArgs args;
 #ifdef OFXOCEANODE_USE_MIDI
     if(midiClockSync) midiClockSync->update();
@@ -1685,16 +1686,26 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
     for (ofJson::iterator nodeType = json.begin(); nodeType != json.end(); ++nodeType) {
         for(ofJson::iterator nodeId = nodeType.value().begin(); nodeId != nodeType.value().end(); ++nodeId){
             ofLog() << nodeType.key() << " " << nodeId.key();
-            auto node = createNodeFromName(nodeType.key());
+            string escapedNodeName = nodeType.key();
+            ofStringReplace(escapedNodeName, " ", "_");
+            ofJson tempJson = ofLoadJson(presetFolderPath / (escapedNodeName + "_" + ofToString(ofToInt(nodeId.key())) + ".json"));
+            if(!tempJson.is_object() || tempJson.empty()) return false;
+            auto model = registry->create(nodeType.key());
+            if(!model){
+                ofLogError("Clipboard") << "Cannot create " << nodeType.key();
+                return false;
+            }
+            if(auto* router = dynamic_cast<abstractRouter*>(model.get()))
+                router->abstractRouter::loadBeforeConnections(tempJson);
+            auto* node = &createNode(std::move(model));
+            if(auto* router = dynamic_cast<abstractRouter*>(&node->getNodeModel()))
+                tempJson["Name"] = router->getNameParam().get();
             node->getNodeGui().setPosition(glm::vec2(nodeId.value()[0], nodeId.value()[1]) + referencePosition);
             node->getNodeGui().setSelected(true);
             newCreatedNodes.push_back(node);
             int newNodeId = node->getNodeModel().getNumIdentifier();
-            string escapedNodeName = nodeType.key();
-            ofStringReplace(escapedNodeName, " ", "_");
             moduleConverter[escapedNodeName][ofToInt(nodeId.key())] = newNodeId;
-            ofJson tempJson = ofLoadJson(presetFolderPath / (escapedNodeName + "_" + ofToString(ofToInt(nodeId.key())) + ".json"));
-            ofSaveJson(tempLoadFolderPath / (escapedNodeName + "_" + ofToString(newNodeId) + ".json"), tempJson);
+            if(!ofSaveJson(tempLoadFolderPath / (escapedNodeName + "_" + ofToString(newNodeId) + ".json"), tempJson)) return false;
         }
     }
 	
@@ -1807,7 +1818,20 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
     ofSavePrettyJson(presetFolderPath / "connections.json", json);
     
     for(auto &node : nodes){
-        node->savePreset(presetFolderPath, true);
+        auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel());
+        if(macro && pendingCanvasEdit && !pendingCanvasEdit->beforeAux.is_null()){
+            // Structural moves need the live contents of library macros too,
+            // including edits that have not been saved to the library definition.
+            auto state = node->saveParametersToJson(false, true);
+            node->saveInspectorParametersToJson(state);
+            node->getNodeModel().presetSave(state);
+            macro->saveCanvasUndoState(state, presetFolderPath.string());
+            state["expanded"] = node->getNodeGui().getExpanded();
+            string type = node->getNodeModel().nodeName();
+            ofStringReplace(type, " ", "_");
+            if(!ofSaveJson(presetFolderPath / (type + "_" + ofToString(node->getNodeModel().getNumIdentifier()) + ".json"), state))
+                throw std::runtime_error("Cannot stage current macro contents");
+        }else node->savePreset(presetFolderPath, true);
     }
     
     // Save selected comments
@@ -3897,6 +3921,19 @@ ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
 		ofLogWarning("Encapsulation") << "No nodes selected for encapsulation";
 		return nullptr;
 	}
+    const auto ownedNodes = getAllModules();
+    std::set<ofxOceanodeNode*> uniqueNodes;
+    for(auto* node : selectedNodes){
+        if(!node || std::find(ownedNodes.begin(), ownedNodes.end(), node) == ownedNodes.end() ||
+           node->getIsPersistent() || !registry->getRegisteredModels().count(node->getNodeModel().nodeName()) ||
+           !uniqueNodes.insert(node).second){
+            ofLogWarning("Encapsulation") << "Selection must contain distinct dynamic nodes from this canvas";
+            return nullptr;
+        }
+    }
+    if(!registry->getRegisteredModels().count("Macro")) return nullptr;
+    MacroCanvasEditScope edit(*this);
+    try {
 	for(auto* node : getAllModules()) node->getNodeGui().setSelected(false);
 	for(auto* node : selectedNodes) if(node != nullptr) node->getNodeGui().setSelected(true);
 	
@@ -3911,12 +3948,12 @@ ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
 		centerPos /= selectedNodes.size();
 	}
 	
-	// 3. CRITICAL FIX: Store node information BEFORE cutting them
-	// We need to preserve the node info before the nodes are deleted
+    // Preserve keys and source ID order before any nodes can be deleted.
 	struct NodeInfo {
 		string originalName;
 		string originalEscapedName;
 		string nodeType;
+        int identifier;
 		glm::vec2 position;
 	};
 	
@@ -3926,17 +3963,29 @@ ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
 		info.originalName = node->getParameters().getName();
 		info.originalEscapedName = node->getParameters().getEscapedName();
 		info.nodeType = node->getNodeModel().nodeName();
+        info.identifier = node->getNodeModel().getNumIdentifier();
 		info.position = node->getNodeGui().getPosition();
 		originalNodeInfo.push_back(info);
 	}
 	
+    std::sort(originalNodeInfo.begin(), originalNodeInfo.end(), [](const NodeInfo& a, const NodeInfo& b){
+        return a.nodeType == b.nodeType ? a.identifier < b.identifier : a.nodeType < b.nodeType;
+    });
+
 	// 4. Analyze external connections BEFORE cutting (nodes are still valid)
 	auto externalConnections = analyzeExternalConnections(selectedNodes);
 	ofLogNotice("Encapsulation") << "Found " << externalConnections.size() << " external connections";
+    for(const auto& boundary : externalConnections){
+        const string routerType = "Router " + typesRegistry->getTypeNameFromTypeDescription(boundary.routerType);
+        if(!registry->getRegisteredModels().count(routerType))
+            throw std::runtime_error("Required router factory is unavailable: " + routerType);
+    }
 	
-	// 5. Cut selected nodes (this deletes them from memory)
-	if(!cutSelectedModulesWithConnections()) {
-		ofLogError("Encapsulation") << "Failed to cut selected nodes";
+    // Stage a complete copy before removing the originals. Factory or paste
+    // failures can then roll back without reconstructing the user's live nodes.
+    const auto selectedComments = getSelectedCommentIndices();
+	if(!copySelectedModulesWithConnections()) {
+		ofLogError("Encapsulation") << "Failed to copy selected nodes";
 		return nullptr;
 	}
 	
@@ -3967,31 +4016,30 @@ ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
 		return nullptr;
 	}
 	
-	// 8. Paste nodes inside macro
-	if(!macroContainer->pasteModulesAndConnectionsInPosition(glm::vec2(0, 0), false)) {
-		ofLogWarning("Encapsulation") << "Failed to paste nodes inside macro";
+    // Populate the destination while the originals are still intact.
+	if(!macroContainer->pasteModulesAndConnectionsInPosition(glm::vec2(0, 0), false) ||
+       macroContainer->getAllModules().size() != selectedNodes.size()) {
+        throw std::runtime_error("Failed to paste nodes inside macro");
 	}
 	
-	// CRITICAL FIX: Replace the node mapping section in encapsulateSelectedNodes()
-	// The issue is that the mapping logic doesn't work correctly with macros
+    for(auto* node : selectedNodes) node->deleteSelf();
+    for(auto index = selectedComments.rbegin(); index != selectedComments.rend(); ++index)
+        comments.erase(comments.begin() + *index);
 
-	// 9. FIXED: Update external connections using stored node info
+    // Clipboard loading allocates nodes in source type/ID order. Use that same
+    // order to map repeated node types and nested macros deterministically.
 	auto macroNodes = macroContainer->getAllModules();
 	
-	// MACRO-AWARE FIX: Ensure any macro nodes have their parameters properly exposed
+    // Nested macros must expose their pins before boundary wires are rebuilt.
 	ensureMacroParametersExposed(macroNodes);
 	
-	// Create a mapping from original node names to new node names
-	// CRITICAL FIX: Use a smarter mapping strategy for macros
+    // Map both human-readable group names and escaped parameter paths.
 	map<string, string> nodeNameMapping;
 	map<string, string> escapedNodeNameMapping;
 		
 	if(!macroNodes.empty()) {
 		
 		ofLogNotice("Encapsulation") << "Creating node name mapping from stored info...";
-		
-		// For macros, we need to match based on exposed parameters, not just type and order
-		// because the order might change and macros have unique parameter sets
 		
 		// Collect the pasted nodes by type
 		map<string, vector<ofxOceanodeNode*>> pastedNodesByType;
@@ -4000,212 +4048,40 @@ ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
 			pastedNodesByType[nodeType].push_back(node);
 		}
 		
-		// For each original node, find its best match in the pasted nodes
-		for(size_t i = 0; i < originalNodeInfo.size(); i++) {
-			const auto& origInfo = originalNodeInfo[i];
-			string originalName = origInfo.originalName;
-			string nodeType = origInfo.nodeType;
-			
-			if(nodeType == "Macro") {
-				// SPECIAL HANDLING FOR MACROS: Match by parameter similarity
-				ofLogNotice("Encapsulation") << "Finding macro match for: " << originalName;
-				
-				// Find which parameters this original macro was involved in
-				set<string> originalMacroParams;
-				for(const auto& extConn : externalConnections) {
-					if(extConn.isIncoming) {
-						for(const auto& internalConn : extConn.internalConnections) {
-							if(internalConn.nodeName == originalName) {
-								originalMacroParams.insert(internalConn.paramName);
-							}
-						}
-					} else {
-						if(extConn.internalConnection.nodeName == originalName) {
-							originalMacroParams.insert(extConn.internalConnection.paramName);
-						}
-					}
-				}
-				
-				ofLogNotice("Encapsulation") << "Original macro " << originalName << " used parameters:";
-				for(const auto& param : originalMacroParams) {
-					ofLogNotice("Encapsulation") << "  - " << param;
-				}
-				
-				// Find the best matching macro among the pasted ones
-				ofxOceanodeNode* bestMatch = nullptr;
-				int bestScore = -1;
-				
-				for(auto pastedMacro : pastedNodesByType[nodeType]) {
-					if(nodeNameMapping.find(pastedMacro->getParameters().getName()) != nodeNameMapping.end()) {
-						continue; // Already mapped
-					}
-					
-					auto& pastedParams = pastedMacro->getParameters();
-					int score = 0;
-					
-					ofLogNotice("Encapsulation") << "Checking pasted macro: " << pastedMacro->getParameters().getName();
-					ofLogNotice("Encapsulation") << "Available parameters:";
-					for(auto& param : pastedParams) {
-						ofLogNotice("Encapsulation") << "  - " << param->getName();
-						if(originalMacroParams.count(param->getName()) > 0) {
-							score++;
-							ofLogNotice("Encapsulation") << "    MATCH!";
-						}
-					}
-					
-					ofLogNotice("Encapsulation") << "Score: " << score << "/" << originalMacroParams.size();
-					
-					if(score > bestScore) {
-						bestScore = score;
-						bestMatch = pastedMacro;
-					}
-				}
-				
-				if(bestMatch) {
-					string newName = bestMatch->getParameters().getName();
-					nodeNameMapping[originalName] = newName;
-					escapedNodeNameMapping[origInfo.originalEscapedName] = bestMatch->getParameters().getEscapedName();
-					// Mark this pasted node as used by adding reverse mapping
-					nodeNameMapping[newName] = originalName;
-					
-					ofLogNotice("Encapsulation") << "MACRO MATCH: " << originalName << " → " << newName
-						<< " (score: " << bestScore << "/" << originalMacroParams.size() << ")";
-				} else {
-					ofLogError("Encapsulation") << "No good match found for macro: " << originalName;
-				}
-			} else {
-				// Regular node logic (unchanged)
-				if(pastedNodesByType[nodeType].size() > 0) {
-					// Count how many nodes of this type we've seen before this one
-					int typeIndex = 0;
-					for(size_t j = 0; j < i; j++) {
-						if(originalNodeInfo[j].nodeType == nodeType) {
-							typeIndex++;
-						}
-					}
-					
-					if(typeIndex < pastedNodesByType[nodeType].size()) {
-						auto* mappedNode = pastedNodesByType[nodeType][typeIndex];
-						string newName = mappedNode->getParameters().getName();
-						nodeNameMapping[originalName] = newName;
-						escapedNodeNameMapping[origInfo.originalEscapedName] = mappedNode->getParameters().getEscapedName();
-						
-						ofLogNotice("Encapsulation") << "REGULAR MATCH: " << originalName << " → " << newName;
-					}
-				}
-			}
-		}
-
-		{
-			auto remapParameterPath = [&](const string& parameterPath) -> string {
-				size_t separatorPos = parameterPath.find('/');
-				if(separatorPos == string::npos) return "";
-				string originalGroupName = parameterPath.substr(0, separatorPos);
-				auto mappingIt = escapedNodeNameMapping.find(originalGroupName);
-				if(mappingIt == escapedNodeNameMapping.end()) return "";
-				return mappingIt->second + parameterPath.substr(separatorPos);
-			};
-
-			set<string> selectedEscapedNodeNames;
-			for(const auto& info : originalNodeInfo) {
-				selectedEscapedNodeNames.insert(info.originalEscapedName);
-			}
-
-			vector<CustomGuiPanelData> migratedPanels;
-			set<string> migratedPanelIds;
-            map<string, pair<string, string>> migratedPanelIdMapping;
-			for(const auto& panel : customGuiPanelsData) {
-				bool hasParameterWidgets = false;
-				bool fullyContained = true;
-				bool fullyRemappable = true;
-				CustomGuiPanelData migratedPanel = panel;
-
-				for(auto& widget : migratedPanel.layout.widgets) {
-					if(widget.parameterRef.parameterPath.empty()) continue;
-
-					hasParameterWidgets = true;
-					size_t separatorPos = widget.parameterRef.parameterPath.find('/');
-					if(separatorPos == string::npos) {
-						fullyContained = false;
-						break;
-					}
-
-					string originalGroupName = widget.parameterRef.parameterPath.substr(0, separatorPos);
-					if(selectedEscapedNodeNames.find(originalGroupName) == selectedEscapedNodeNames.end()) {
-						fullyContained = false;
-						break;
-					}
-
-					string remappedPath = remapParameterPath(widget.parameterRef.parameterPath);
-					if(remappedPath.empty()) {
-						fullyRemappable = false;
-						break;
-					}
-
-					ofxOceanodeAbstractParameter* remappedParameter = macroContainer->findCustomGuiParameter(remappedPath);
-					if(remappedParameter == nullptr) {
-						fullyRemappable = false;
-						break;
-					}
-
-					widget.parameterRef.parameterPath = remappedPath;
-					widget.parameterRef.parameterDisplayName = remappedParameter->getName();
-					if(auto* remappedNode = macroContainer->getNodeFromParameter(*remappedParameter)) {
-						widget.parameterRef.nodeDisplayName = remappedNode->getParameters().getName();
-					}
-				}
-
-				if(hasParameterWidgets && fullyContained && fullyRemappable) {
-                    const string originalPanelId = migratedPanel.id;
-					migratedPanel.id = macroContainer->makeCustomGuiId();
-					migratedPanel.name = macroContainer->makeUniqueCustomGuiName(panel.name);
-                    migratedPanelIdMapping[originalPanelId] = {migratedPanel.id, migratedPanel.name};
-					migratedPanels.push_back(std::move(migratedPanel));
-					migratedPanelIds.insert(panel.id);
-				}
-			}
-
-			if(!migratedPanels.empty()) {
-				customGuiPanelsData.erase(
-					std::remove_if(customGuiPanelsData.begin(), customGuiPanelsData.end(), [&](const CustomGuiPanelData& panel){
-						return migratedPanelIds.find(panel.id) != migratedPanelIds.end();
-					}),
-					customGuiPanelsData.end()
-				);
-
-				for(auto& panel : migratedPanels) {
-					macroContainer->customGuiPanelsData.push_back(std::move(panel));
-				}
-
-                for(const auto& pair : migratedPanelIdMapping) {
-                    auto bankIt = std::find_if(customGuiSnapshotBanks.begin(), customGuiSnapshotBanks.end(), [&](const CustomGuiSnapshotBank& bank){
-                        return bank.customGuiId == pair.first;
-                    });
-                    if(bankIt == customGuiSnapshotBanks.end()) continue;
-
-                    CustomGuiSnapshotBank migratedBank = *bankIt;
-                    migratedBank.customGuiId = pair.second.first;
-                    migratedBank.customGuiName = pair.second.second;
-                    macroContainer->customGuiSnapshotBanks.push_back(std::move(migratedBank));
+        for(auto& group : pastedNodesByType){
+            std::sort(group.second.begin(), group.second.end(), [](ofxOceanodeNode* a, ofxOceanodeNode* b){
+                return a->getNodeModel().getNumIdentifier() < b->getNodeModel().getNumIdentifier();
+            });
+        }
+        map<string, size_t> nextOfType;
+        for(const auto& original : originalNodeInfo){
+            auto& candidates = pastedNodesByType.at(original.nodeType);
+            const auto index = nextOfType[original.nodeType]++;
+            if(index >= candidates.size()) throw std::runtime_error("Incomplete macro paste");
+            auto* pasted = candidates[index];
+            nodeNameMapping[original.originalName] = pasted->getParameters().getName();
+            escapedNodeNameMapping[original.originalEscapedName] = pasted->getParameters().getEscapedName();
+        }
+        for(const auto& original : originalNodeInfo){
+            auto* moved = macroContainer->parameterGroupNodesMap.at(escapedNodeNameMapping.at(original.originalEscapedName));
+            pendingCanvasEdit->nodeTransfers.push_back({
+                {"before", {original.originalEscapedName}},
+                {"after", {macroNode->getParameters().getEscapedName(), moved->getParameters().getEscapedName()}},
+                {"beforeId", original.identifier}, {"afterId", moved->getNodeModel().getNumIdentifier()}});
+#ifdef OFXOCEANODE_USE_MIDI
+            const auto originalIdentity = pendingCanvasEdit->before["nodes"][original.originalEscapedName]["identity"].get<std::uint64_t>();
+            const auto saved = pendingCanvasEdit->snapshots.find(originalIdentity);
+            if(saved != pendingCanvasEdit->snapshots.end()){
+                for(const auto& midi : saved->second->midi){
+                    auto binding = macroContainer->createMidiBindingFromInfo(moved->getParameters().getEscapedName(),
+                        midi["parameter"].get<string>(), false, midi["id"].get<int>());
+                    if(binding){ auto json = midi["binding"]; binding->loadPreset(json); }
                 }
+            }
+#endif
+        }
+        migrateCanvasPanelsTo(*macroContainer, escapedNodeNameMapping);
 
-                customGuiSnapshotBanks.erase(
-                    std::remove_if(customGuiSnapshotBanks.begin(), customGuiSnapshotBanks.end(), [&](const CustomGuiSnapshotBank& bank){
-                        return migratedPanelIds.find(bank.customGuiId) != migratedPanelIds.end();
-                    }),
-                    customGuiSnapshotBanks.end()
-                );
-
-				rebuildCustomGuiPanels();
-				macroContainer->rebuildCustomGuiPanels();
-				markCustomGuisDirty();
-				macroContainer->markCustomGuisDirty();
-                markCustomGuiSnapshotsDirty();
-                macroContainer->markCustomGuiSnapshotsDirty();
-
-				ofLogNotice("Encapsulation") << "Migrated " << migratedPanelIds.size() << " Custom GUI panel(s) into new macro";
-			}
-		}
 	}
 
 	if(!externalConnections.empty()) {
@@ -4257,7 +4133,12 @@ ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
 		macroCanvas->requestAutoLayoutCanvas(true);
 	
 	ofLogNotice("Encapsulation") << "Encapsulation completed successfully";
+    edit.success = true;
 	return macroNode;
+    } catch(const std::exception& error){
+        ofLogError("Encapsulation") << error.what();
+        return nullptr;
+    }
 }
 
 vector<ofxOceanodeContainer::ExternalConnection> ofxOceanodeContainer::analyzeExternalConnections(vector<ofxOceanodeNode*> selectedNodes) {
@@ -4679,6 +4560,10 @@ void ofxOceanodeContainer::createRoutersAndReconnect(ofxOceanodeNode* macroNode,
 	}
 	
 	ofLogNotice("Encapsulation") << "=== ENCAPSULATION COMPLETE ===";
+    size_t expected = 0;
+    for(const auto& boundary : connections) expected += boundary.isIncoming ? 1 : boundary.externalConnections.size();
+    if(createdRouters.size() != connections.size() || reconnectedCount != expected)
+        throw std::runtime_error("Could not reconstruct every macro boundary connection");
 	ofLogNotice("Encapsulation") << "Successfully reconnected: " << reconnectedCount << " connections";
 }
 
@@ -4961,14 +4846,18 @@ void ofxOceanodeContainer::endCanvasEdit(){
     auto edit = std::move(pendingCanvasEdit);
     edit->after = captureCanvasGraph();
     if(edit->before == edit->after) return;
-    canvasRedo.clear();
+    if(!edit->beforeAux.is_null()) edit->afterAux = captureCanvasAuxiliary();
+    auto* root = canvasHistoryRoot();
+    root->visitCanvasHistories([](ofxOceanodeContainer& owner){ owner.canvasRedo.clear(); });
+    edit->sequence = ++root->canvasHistorySerial;
     measureCanvasEdit(*edit);
     canvasUndo.push_back(std::move(*edit));
     trimCanvasHistory();
 }
 
 void ofxOceanodeContainer::measureCanvasEdit(CanvasEdit& edit){
-    edit.bytes = edit.before.dump().size() + edit.after.dump().size();
+    edit.bytes = edit.before.dump().size() + edit.after.dump().size() +
+                 edit.beforeAux.dump().size() + edit.afterAux.dump().size() + edit.nodeTransfers.dump().size();
     for(const auto& snapshot : edit.snapshots)
         edit.bytes += snapshot.second->values.dump().size() + snapshot.second->midi.dump().size() +
                       snapshot.second->widgets.dump().size();
@@ -4993,6 +4882,7 @@ void ofxOceanodeContainer::clearCanvasHistory(){
     pendingCanvasEdit.reset();
     canvasUndo.clear();
     canvasRedo.clear();
+    requestedCanvasHistory = 0;
 }
 
 bool ofxOceanodeContainer::replayCanvasEdit(CanvasEdit& edit, bool backwards){
@@ -5003,6 +4893,8 @@ bool ofxOceanodeContainer::replayCanvasEdit(CanvasEdit& edit, bool backwards){
     const auto& currentNodes = current["nodes"];
     std::set<std::string> replacing;
     std::vector<std::string> restoring;
+    std::map<string, std::unique_ptr<ofxOceanodeNodeModel>> stagedModels;
+    std::map<string, ofJson> restoredValues;
     for(auto it = currentNodes.begin(); it != currentNodes.end(); ++it){
         if(!wantedNodes.contains(it.key()) || wantedNodes[it.key()]["identity"] != it.value()["identity"])
             replacing.insert(it.key());
@@ -5012,6 +4904,9 @@ bool ofxOceanodeContainer::replayCanvasEdit(CanvasEdit& edit, bool backwards){
             const auto identity = it.value()["identity"].get<std::uint64_t>();
             if(!edit.snapshots.count(identity) || !registry->getRegisteredModels().count(it.value()["type"].get<string>()))
                 throw std::runtime_error("Node state or factory is unavailable: " + it.key());
+            auto model = registry->create(it.value()["type"].get<string>());
+            if(!model) throw std::runtime_error("Cannot construct " + it.key());
+            stagedModels[it.key()] = std::move(model);
             restoring.push_back(it.key());
         }
     }
@@ -5022,6 +4917,7 @@ bool ofxOceanodeContainer::replayCanvasEdit(CanvasEdit& edit, bool backwards){
         const auto identity = currentNodes[key]["identity"].get<std::uint64_t>();
         edit.snapshots[identity] = captureCanvasNode(*node);
     }
+    synchronizeCanvasTransfers(edit, backwards);
     for(size_t i = 0; i < connections.size();){
         auto* cable = connections[i].get();
         auto& source = cable->getSourceParameter();
@@ -5038,17 +4934,23 @@ bool ofxOceanodeContainer::replayCanvasEdit(CanvasEdit& edit, bool backwards){
 
     for(const auto& key : restoring){
         const auto& info = wantedNodes[key];
-        auto model = registry->create(info["type"].get<string>());
-        if(!model) throw std::runtime_error("Cannot recreate " + key);
+        auto model = std::move(stagedModels.at(key));
         // A macro's captured definition replaces its original source during
         // macroLoad; avoid loading that source a second time in setup().
+        const auto identity = info["identity"].get<std::uint64_t>();
+        const auto snapshot = edit.snapshots.at(identity);
+        auto values = snapshot->values;
+        if(auto* router = dynamic_cast<abstractRouter*>(model.get()))
+            router->abstractRouter::loadBeforeConnections(values);
         const string setupInfo = dynamic_cast<ofxOceanodeNodeMacro*>(model.get()) ? "" : info["setup"].get<string>();
         auto& node = createNode(std::move(model), info["id"].get<int>(), info["persistent"].get<bool>(), setupInfo);
-        const auto identity = info["identity"].get<std::uint64_t>();
         canvasLiveNodes[key] = {identity, info["setup"].get<string>()};
-        const auto snapshot = edit.snapshots.at(identity);
         if(!snapshot->folder.empty()) node.canvasHistoryStorage = snapshot;
-        auto values = snapshot->values;
+        if(auto* router = dynamic_cast<abstractRouter*>(&node.getNodeModel())){
+            values["Name"] = router->getNameParam().get();
+            snapshot->values["Name"] = values["Name"];
+        }
+        restoredValues[key] = values;
         node.presetWillBeLoaded();
         node.getNodeModel().loadBeforeConnections(values);
         node.getNodeModel().macroLoad(values, snapshot->folder);
@@ -5079,7 +4981,7 @@ bool ofxOceanodeContainer::replayCanvasEdit(CanvasEdit& edit, bool backwards){
     for(const auto& key : restoring){
         auto* node = parameterGroupNodesMap.at(key);
         auto snapshot = edit.snapshots.at(wantedNodes[key]["identity"].get<std::uint64_t>());
-        auto values = snapshot->values;
+        auto values = restoredValues.at(key);
         node->getNodeModel().presetRecallBeforeSettingParameters(values);
         node->loadParametersFromJson(values, false);
         node->loadInspectorParametersFromJson(values);
@@ -5134,6 +5036,9 @@ bool ofxOceanodeContainer::replayCanvasEdit(CanvasEdit& edit, bool backwards){
             comments.push_back(std::move(c));
         }
     }
+    if(!edit.beforeAux.is_null())
+        restoreCanvasAuxiliary(backwards ? edit.beforeAux : edit.afterAux,
+                               backwards ? edit.afterAux : edit.beforeAux);
     return true;
 }
 
@@ -5159,6 +5064,7 @@ bool ofxOceanodeContainer::stepCanvasHistory(bool backwards){
         measureCanvasEdit(edit);
         destination.push_back(std::move(edit));
         trimCanvasHistory();
+        ++canvasHistoryRoot()->canvasHistoryRevision;
         return true;
     } catch(const std::exception& e){
         ofLogError("Canvas undo") << e.what();
@@ -5166,9 +5072,442 @@ bool ofxOceanodeContainer::stepCanvasHistory(bool backwards){
         catch(const std::exception& rollback){ ofLogError("Canvas undo rollback") << rollback.what(); }
         replayingCanvasEdit = false;
         clearCanvasHistory();
+        ++canvasHistoryRoot()->canvasHistoryRevision;
         return false;
     }
 }
 
-bool ofxOceanodeContainer::undoCanvasEdit(){ return stepCanvasHistory(true); }
-bool ofxOceanodeContainer::redoCanvasEdit(){ return stepCanvasHistory(false); }
+bool ofxOceanodeContainer::undoCanvasEdit(){
+    auto* root = canvasHistoryRoot();
+    root->finishPendingCanvasEdits();
+    auto* owner = root->nextCanvasHistoryOwner(true);
+    return owner && owner->stepCanvasHistory(true);
+}
+bool ofxOceanodeContainer::redoCanvasEdit(){
+    auto* root = canvasHistoryRoot();
+    root->finishPendingCanvasEdits();
+    auto* owner = root->nextCanvasHistoryOwner(false);
+    return owner && owner->stepCanvasHistory(false);
+}
+
+
+ofxOceanodeContainer* ofxOceanodeContainer::canvasHistoryRoot(){
+    auto* root = this;
+    while(root->timelineHost) root = root->timelineHost;
+    return root;
+}
+
+void ofxOceanodeContainer::visitCanvasHistories(const std::function<void(ofxOceanodeContainer&)>& visit){
+    visit(*this);
+    for(auto* node : getAllModules()){
+        if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
+            if(auto child = macro->getContainer()) child->visitCanvasHistories(visit);
+        }
+    }
+}
+
+void ofxOceanodeContainer::finishPendingCanvasEdits(){
+    // Commit children first: a parent structural operation that owns/deletes
+    // them is the last step, never an intermediate paste inside a new macro.
+    for(auto* node : getAllModules()){
+        if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
+            if(auto child = macro->getContainer()) child->finishPendingCanvasEdits();
+        }
+    }
+    endCanvasEdit();
+}
+
+ofxOceanodeContainer* ofxOceanodeContainer::nextCanvasHistoryOwner(bool backwards){
+    ofxOceanodeContainer* next = nullptr;
+    std::uint64_t sequence = backwards ? 0 : std::numeric_limits<std::uint64_t>::max();
+    visitCanvasHistories([&](ofxOceanodeContainer& owner){
+        const auto& stack = backwards ? owner.canvasUndo : owner.canvasRedo;
+        if(stack.empty()) return;
+        const auto candidate = stack.back().sequence;
+        if((backwards && candidate > sequence) || (!backwards && candidate < sequence)){
+            sequence = candidate;
+            next = &owner;
+        }
+    });
+    return next;
+}
+
+bool ofxOceanodeContainer::canUndoCanvasEdit() const {
+    return const_cast<ofxOceanodeContainer*>(this)->canvasHistoryRoot()->nextCanvasHistoryOwner(true) != nullptr;
+}
+bool ofxOceanodeContainer::canRedoCanvasEdit() const {
+    return const_cast<ofxOceanodeContainer*>(this)->canvasHistoryRoot()->nextCanvasHistoryOwner(false) != nullptr;
+}
+std::uint64_t ofxOceanodeContainer::getCanvasHistoryRevision() const {
+    return const_cast<ofxOceanodeContainer*>(this)->canvasHistoryRoot()->canvasHistoryRevision;
+}
+void ofxOceanodeContainer::requestCanvasHistory(bool redo){
+    canvasHistoryRoot()->requestedCanvasHistory = redo ? 1 : -1;
+}
+void ofxOceanodeContainer::processCanvasHistoryRequest(){
+    const int request = requestedCanvasHistory;
+    requestedCanvasHistory = 0;
+    if(!request) return;
+    ofxOceanodeShared::nodeSelectedInCanvas(nullptr);
+    if(request > 0) redoCanvasEdit();
+    else undoCanvasEdit();
+}
+
+ofJson ofxOceanodeContainer::captureCanvasAuxiliary() const {
+    return {{"panels", customGuiPanelsToJson(customGuiPanelsData)},
+            {"snapshots", customGuiSnapshotBanksToJson(customGuiSnapshotBanks)}};
+}
+
+void ofxOceanodeContainer::restoreCanvasAuxiliary(const ofJson& target, const ofJson& opposite){
+    if(target.is_null() || opposite.is_null()) return;
+    // Apply only changed IDs. Unrelated panel layout edits made since this
+    // graph operation remain intact, without introducing GUI value history.
+    auto mergeChanged = [](const ofJson& current, const ofJson& wanted, const ofJson& previous, const string& id){
+        std::map<string, ofJson> wantedById, previousById;
+        for(const auto& item : wanted) wantedById[item.at(id).get<string>()] = item;
+        for(const auto& item : previous) previousById[item.at(id).get<string>()] = item;
+        std::set<string> changed;
+        for(const auto& item : wantedById)
+            if(!previousById.count(item.first) || previousById.at(item.first) != item.second) changed.insert(item.first);
+        for(const auto& item : previousById)
+            if(!wantedById.count(item.first)) changed.insert(item.first);
+        ofJson result = ofJson::array();
+        for(const auto& item : current)
+            if(!changed.count(item.at(id).get<string>())) result.push_back(item);
+        for(size_t i = 0; i < wanted.size(); ++i){
+            if(!changed.count(wanted[i].at(id).get<string>())) continue;
+            result.insert(result.begin() + std::min(i, result.size()), wanted[i]);
+        }
+        return result;
+    };
+    const auto current = captureCanvasAuxiliary();
+    const auto panels = mergeChanged(current["panels"]["panels"], target["panels"]["panels"], opposite["panels"]["panels"], "id");
+    const auto banks = mergeChanged(current["snapshots"]["banks"], target["snapshots"]["banks"], opposite["snapshots"]["banks"], "customGuiId");
+    if(panels != current["panels"]["panels"]){
+        customGuiPanelsData = customGuiPanelsFromJson({{"panels", panels}});
+        rebuildCustomGuiPanels();
+        markCustomGuisDirty();
+    }
+    if(banks != current["snapshots"]["banks"]){
+        customGuiSnapshotBanks = customGuiSnapshotBanksFromJson({{"banks", banks}});
+        markCustomGuiSnapshotsDirty();
+    }
+}
+
+ofxOceanodeContainer::MacroCanvasEditScope::MacroCanvasEditScope(ofxOceanodeContainer& owner)
+: owner(owner), standalone(!owner.pendingCanvasEdit){
+    owner.beginCanvasEdit();
+    if(owner.pendingCanvasEdit && owner.pendingCanvasEdit->beforeAux.is_null())
+        owner.pendingCanvasEdit->beforeAux = owner.captureCanvasAuxiliary();
+}
+
+ofxOceanodeContainer::MacroCanvasEditScope::~MacroCanvasEditScope(){
+    if(!success) owner.rollbackMacroCanvasEdit();
+    else {
+        if(standalone) owner.endCanvasEdit();
+        ++owner.canvasHistoryRoot()->canvasHistoryRevision;
+        ofxOceanodeShared::nodeSelectedInCanvas(nullptr);
+    }
+}
+
+void ofxOceanodeContainer::rollbackMacroCanvasEdit(){
+    if(!pendingCanvasEdit) return;
+    auto edit = std::move(pendingCanvasEdit);
+    edit->after = captureCanvasGraph();
+    edit->afterAux = captureCanvasAuxiliary();
+    if(edit->before == edit->after && edit->beforeAux == edit->afterAux) return;
+    replayingCanvasEdit = true;
+    try { replayCanvasEdit(*edit, true); }
+    catch(const std::exception& error){
+        ofLogError("Macro edit rollback") << error.what();
+        clearCanvasHistory();
+    }
+    replayingCanvasEdit = false;
+    ++canvasHistoryRoot()->canvasHistoryRevision;
+}
+
+
+void ofxOceanodeContainer::migrateCanvasPanelsTo(ofxOceanodeContainer& target,
+                                               const std::map<string, string>& nodeNames,
+                                               std::vector<CustomGuiPanelData>* stagedPanels,
+                                               std::vector<CustomGuiSnapshotBank>* stagedBanks){
+    auto& sourcePanels = stagedPanels ? *stagedPanels : customGuiPanelsData;
+    auto& sourceBanks = stagedBanks ? *stagedBanks : customGuiSnapshotBanks;
+    auto remap = [&](const string& path){
+        const auto separator = path.find('/');
+        const auto found = nodeNames.find(path.substr(0, separator));
+        return separator == string::npos || found == nodeNames.end() ? string() : found->second + path.substr(separator);
+    };
+    bool changed = false;
+    for(size_t i = 0; i < sourcePanels.size();){
+        auto& source = sourcePanels[i];
+        CustomGuiPanelData moved = source;
+        moved.layout.widgets.clear();
+        size_t movedParameters = 0, keptParameters = 0;
+        for(const auto& widget : source.layout.widgets){
+            if(widget.parameterRef.parameterPath.empty()){
+                moved.layout.widgets.push_back(widget);
+                continue;
+            }
+            const auto path = remap(widget.parameterRef.parameterPath);
+            if(path.empty()){ ++keptParameters; continue; }
+            auto copy = widget;
+            copy.parameterRef.parameterPath = path;
+            const auto separator = path.find('/');
+            const auto targetNode = target.parameterGroupNodesMap.find(path.substr(0, separator));
+            if(targetNode != target.parameterGroupNodesMap.end())
+                copy.parameterRef.nodeDisplayName = targetNode->second->getParameters().getName();
+            moved.layout.widgets.push_back(std::move(copy));
+            ++movedParameters;
+        }
+        if(!movedParameters){ ++i; continue; }
+        const auto originalId = source.id;
+        moved.id = target.makeCustomGuiId();
+        moved.name = target.makeUniqueCustomGuiName(source.name);
+        const auto movedId = moved.id;
+        const auto movedName = moved.name;
+        target.customGuiPanelsData.push_back(std::move(moved));
+        auto bank = std::find_if(sourceBanks.begin(), sourceBanks.end(),
+            [&](const CustomGuiSnapshotBank& b){ return b.customGuiId == originalId; });
+        if(bank != sourceBanks.end()){
+            auto migrated = *bank;
+            migrated.customGuiId = movedId;
+            migrated.customGuiName = movedName;
+            for(auto& snapshot : migrated.snapshots){
+                std::map<string, CustomGuiSnapshotValue> values;
+                for(const auto& value : snapshot.parameterValues){
+                    const auto path = remap(value.first);
+                    if(!path.empty()) values[path] = value.second;
+                }
+                snapshot.parameterValues = std::move(values);
+            }
+            target.customGuiSnapshotBanks.push_back(std::move(migrated));
+            if(keptParameters){
+                for(auto& snapshot : bank->snapshots){
+                    for(auto value = snapshot.parameterValues.begin(); value != snapshot.parameterValues.end();){
+                        if(!remap(value->first).empty()) value = snapshot.parameterValues.erase(value);
+                        else ++value;
+                    }
+                }
+            }else sourceBanks.erase(bank);
+        }
+        if(keptParameters){
+            auto& widgets = source.layout.widgets;
+            widgets.erase(std::remove_if(widgets.begin(), widgets.end(), [&](const CustomGuiWidget& widget){
+                return !remap(widget.parameterRef.parameterPath).empty();
+            }), widgets.end());
+            ++i;
+        }else sourcePanels.erase(sourcePanels.begin() + i);
+        changed = true;
+    }
+    if(changed){
+        if(!stagedPanels){
+            rebuildCustomGuiPanels();
+            markCustomGuisDirty();
+            markCustomGuiSnapshotsDirty();
+        }
+        target.rebuildCustomGuiPanels();
+        target.markCustomGuisDirty();
+        target.markCustomGuiSnapshotsDirty();
+    }
+}
+
+
+bool ofxOceanodeContainer::extractSelectedMacro(){
+    const auto nodes = getSelectedModules();
+    if(nodes.size() != 1) return false;
+    return extractMacro(*nodes.front());
+}
+
+bool ofxOceanodeContainer::extractMacro(ofxOceanodeNode& macroNode){
+    const auto owned = getAllModules();
+    if(std::find(owned.begin(), owned.end(), &macroNode) == owned.end() || macroNode.getIsPersistent()) return false;
+    auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&macroNode.getNodeModel());
+    if(!macro || !macro->isActive()){
+        ofLogWarning("Macro extraction") << "Select an active dynamic Macro before extracting";
+        return false;
+    }
+    auto child = macro->getContainer();
+    if(!child) return false;
+    MacroCanvasEditScope scope(*this);
+    try {
+        auto& operation = *pendingCanvasEdit;
+        auto target = captureCanvasGraph();
+        const auto inner = child->captureCanvasGraph();
+        const auto macroKey = macroNode.getParameters().getEscapedName();
+        const auto position = macroNode.getNodeGui().getPosition();
+        glm::vec2 minimum(FLT_MAX, FLT_MAX);
+        for(auto* node : child->getAllModules()){
+            if(node->getIsPersistent() || !registry->getRegisteredModels().count(node->getNodeModel().nodeName()))
+                throw std::runtime_error("Every extracted node needs a dynamic factory in the destination canvas");
+            const auto p = node->getNodeGui().getPosition();
+            minimum.x = std::min(minimum.x, p.x);
+            minimum.y = std::min(minimum.y, p.y);
+        }
+        if(minimum.x == FLT_MAX) minimum = glm::vec2(0);
+        const auto offset = position - minimum;
+        std::map<string, string> names;
+        target["nodes"].erase(macroKey);
+        for(auto it = inner["nodes"].begin(); it != inner["nodes"].end(); ++it){
+            auto info = it.value();
+            const auto type = info["type"].get<string>();
+            int id = 1;
+            ofParameterGroup group;
+            do { group.setName(type + " " + ofToString(id++)); }
+            while(target["nodes"].contains(group.getEscapedName()));
+            --id;
+            const auto key = group.getEscapedName();
+            names[it.key()] = key;
+            const auto identity = ++nextCanvasNodeIdentity;
+            info["id"] = id;
+            info["identity"] = identity;
+            info["position"] = {info["position"][0].get<float>() + offset.x,
+                                info["position"][1].get<float>() + offset.y};
+            target["nodes"][key] = info;
+            // Replay fills this from the live source after capturing the macro
+            // itself, avoiding repeated folder saves for nested macros.
+            operation.snapshots[identity] = std::make_shared<CanvasNodeSnapshot>();
+            operation.nodeTransfers.push_back({{"before", {macroKey, it.key()}}, {"after", {key}},
+                {"beforeId", it.value()["id"]}, {"afterId", id}});
+        }
+        // Match the exposed macro pin to its actual inner router. Keeping that
+        // router preserves numeric conversion, disconnect values and fan-out.
+        std::map<string, ofJson> ports;
+        for(const auto& entry : macro->getExposedRouterParameters()){
+            auto* parameter = entry.second;
+            const auto key = parameter->getNodeModel()->getParameterGroup().getEscapedName();
+            ports[entry.first] = {names.at(key), parameter->getName()};
+        }
+        const auto oldCables = target["cables"];
+        for(auto it = oldCables.begin(); it != oldCables.end(); ++it){
+            auto cable = it.value();
+            auto& endpoints = cable["endpoints"];
+            bool changed = false;
+            for(int side : {0, 2}){
+                if(endpoints[side] != macroKey) continue;
+                const auto pin = endpoints[side + 1].get<string>();
+                if(!ports.count(pin)) throw std::runtime_error("Disconnect macro control pin before extraction: " + pin);
+                endpoints[side] = ports.at(pin)[0];
+                endpoints[side + 1] = ports.at(pin)[1];
+                changed = true;
+            }
+            if(changed){
+                target["cables"].erase(it.key());
+                target["cables"][endpoints.dump()] = cable;
+            }
+        }
+        for(const auto& entry : inner["cables"]){
+            auto cable = entry;
+            auto& endpoints = cable["endpoints"];
+            endpoints[0] = names.at(endpoints[0].get<string>());
+            endpoints[2] = names.at(endpoints[2].get<string>());
+            target["cables"][endpoints.dump()] = cable;
+        }
+        for(auto comment : inner["comments"]){
+            comment["position"][0] = comment["position"][0].get<float>() + offset.x;
+            comment["position"][1] = comment["position"][1].get<float>() + offset.y;
+            target["comments"].push_back(comment);
+        }
+        auto panels = child->customGuiPanelsData;
+        auto banks = child->customGuiSnapshotBanks;
+        operation.after = std::move(target);
+        const auto beforeAux = operation.beforeAux;
+        operation.beforeAux = ofJson(); // Apply migrated bindings after replay.
+        replayingCanvasEdit = true;
+        try { replayCanvasEdit(operation, false); }
+        catch(...){
+            operation.beforeAux = beforeAux;
+            replayingCanvasEdit = false;
+            throw;
+        }
+        replayingCanvasEdit = false;
+        operation.beforeAux = beforeAux;
+        migrateCanvasPanelsTo(*this, names, &panels, &banks);
+        operation.afterAux = captureCanvasAuxiliary();
+        scope.success = true;
+        ++canvasHistoryRoot()->canvasHistoryRevision;
+        return true;
+    } catch(const std::exception& error){
+        replayingCanvasEdit = false;
+        ofLogError("Macro extraction") << error.what();
+        return false;
+    }
+}
+
+
+void ofxOceanodeContainer::retargetCanvasNodeSnapshot(CanvasNodeSnapshot& snapshot, const string& type, int from, int to){
+    if(snapshot.folder.empty() || from == to) return;
+    const auto oldFolder = std::filesystem::path(snapshot.folder) / (type + "_" + ofToString(from));
+    const auto newFolder = std::filesystem::path(snapshot.folder) / (type + "_" + ofToString(to));
+    if(std::filesystem::exists(oldFolder))
+        std::filesystem::copy(oldFolder, newFolder, std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
+}
+
+void ofxOceanodeContainer::synchronizeCanvasTransfers(CanvasEdit& edit, bool backwards){
+    const auto& targetGraph = backwards ? edit.before : edit.after;
+    for(const auto& transfer : edit.nodeTransfers){
+        const auto& sourcePath = transfer[backwards ? "after" : "before"];
+        const auto& targetPath = transfer[backwards ? "before" : "after"];
+        auto* sourceOwner = this;
+        ofxOceanodeNode* sourceNode = nullptr;
+        for(size_t i = 0; i < sourcePath.size(); ++i){
+            const auto found = sourceOwner->parameterGroupNodesMap.find(sourcePath[i].get<string>());
+            if(found == sourceOwner->parameterGroupNodesMap.end()){ sourceNode = nullptr; break; }
+            sourceNode = found->second;
+            if(i + 1 < sourcePath.size()){
+                auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&sourceNode->getNodeModel());
+                if(!macro || !macro->getContainer()){ sourceNode = nullptr; break; }
+                sourceOwner = macro->getContainer().get();
+            }
+        }
+        if(!sourceNode) continue; // A failed operation may not have moved this node yet.
+        const auto outerKey = targetPath[0].get<string>();
+        if(!targetGraph["nodes"].contains(outerKey)) continue;
+        const int sourceId = sourceNode->getNodeModel().getNumIdentifier();
+        const int targetId = transfer[backwards ? "beforeId" : "afterId"].get<int>();
+        const auto type = sourceNode->getNodeModel().nodeName();
+        auto snapshot = sourceOwner->captureCanvasNode(*sourceNode);
+        snapshot->widgets = ofJson(); // Publications are restored by the compound auxiliary delta.
+        const auto identity = targetGraph["nodes"][outerKey]["identity"].get<std::uint64_t>();
+        if(targetPath.size() == 1){
+            const auto previous = edit.snapshots.find(identity);
+            if(dynamic_cast<abstractRouter*>(&sourceNode->getNodeModel()) && previous != edit.snapshots.end() &&
+               previous->second->values.contains("Name"))
+                snapshot->values["Name"] = previous->second->values["Name"];
+            retargetCanvasNodeSnapshot(*snapshot, type, sourceId, targetId);
+            edit.snapshots[identity] = std::move(snapshot);
+            continue;
+        }
+        const auto outer = edit.snapshots.find(identity);
+        if(outer == edit.snapshots.end() || outer->second->folder.empty())
+            throw std::runtime_error("Missing macro definition for moved node");
+        const auto& outerInfo = targetGraph["nodes"][outerKey];
+        const auto folder = std::filesystem::path(outer->second->folder) /
+            (outerInfo["type"].get<string>() + "_" + ofToString(outerInfo["id"].get<int>()));
+        string escapedType = type;
+        ofStringReplace(escapedType, " ", "_");
+        const auto filename = folder / (escapedType + "_" + ofToString(targetId) + ".json");
+        if(dynamic_cast<abstractRouter*>(&sourceNode->getNodeModel())){
+            const auto previous = ofLoadJson(filename);
+            if(previous.contains("Name")) snapshot->values["Name"] = previous["Name"];
+        }
+        if(!ofSaveJson(filename, snapshot->values)) throw std::runtime_error("Cannot update moved node state");
+        if(!snapshot->folder.empty()){
+            const auto source = std::filesystem::path(snapshot->folder) / (type + "_" + ofToString(sourceId));
+            const auto destination = folder / (type + "_" + ofToString(targetId));
+            if(std::filesystem::exists(source)){
+                std::filesystem::remove_all(destination);
+                std::filesystem::copy(source, destination, std::filesystem::copy_options::recursive);
+            }
+        }
+#ifdef OFXOCEANODE_USE_MIDI
+        auto bindings = ofLoadJson(folder / "midi.json");
+        if(!bindings.is_object()) bindings = ofJson::object();
+        const auto targetKey = targetPath.back().get<string>();
+        bindings.erase(targetKey);
+        for(const auto& midi : snapshot->midi)
+            bindings[targetKey][midi["parameter"].get<string>()][midi["id"].get<size_t>()] = midi["binding"];
+        if(!ofSaveJson(folder / "midi.json", bindings)) throw std::runtime_error("Cannot update moved MIDI bindings");
+#endif
+    }
+}

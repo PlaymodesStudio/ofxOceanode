@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="483.27559055118115" height="130" preserveAspectRatio="xMinYMin meet" viewBox="0 0 483 130" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="483.27559055118115" height="130"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-130)" style="clip-path: url(#clip)">
+		<g transform="">
+			<rect x="8" y="53" width="135" height="58" rx="7" ry="7" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(91%,95%,95%); fill-rule: evenodd;"/>
+			<text x="55.1591796875" y="88" style="font-family: Bold; font-size: 12px;fill: rgb(8%,20%,22%); stroke:none;" transform="translate(0,176) scale(1,-1)">Phasor</text>
+			<text x="31.229492187499993" y="69" style="font-family: Body; font-size: 9px;fill: rgb(32%,40%,41%); stroke:none;" transform="translate(0,138) scale(1,-1)">Progress through time</text>
+			<rect x="174" y="53" width="135" height="58" rx="7" ry="7" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(91%,95%,95%); fill-rule: evenodd;"/>
+			<text x="213.8232421875" y="88" style="font-family: Bold; font-size: 12px;fill: rgb(8%,20%,22%); stroke:none;" transform="translate(0,176) scale(1,-1)">Oscillator</text>
+			<text x="203.970703125" y="69" style="font-family: Body; font-size: 9px;fill: rgb(32%,40%,41%); stroke:none;" transform="translate(0,138) scale(1,-1)">Shape of the value</text>
+			<rect x="340" y="53" width="135" height="58" rx="7" ry="7" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(91%,95%,95%); fill-rule: evenodd;"/>
+			<text x="387.841796875" y="88" style="font-family: Bold; font-size: 12px;fill: rgb(8%,20%,22%); stroke:none;" transform="translate(0,176) scale(1,-1)">Output</text>
+			<text x="368.474365234375" y="69" style="font-family: Body; font-size: 9px;fill: rgb(32%,40%,41%); stroke:none;" transform="translate(0,138) scale(1,-1)">A changing number</text>
+			<path d="M 145,82 L 172,82 Z" style="stroke: rgb(3%,49%,52%); stroke-linecap: butt; stroke-width: 2;"/>
+			<polyline points="167 85, 172 82, 167 79" style="stroke: rgb(3%,49%,52%); stroke-linecap: butt; stroke-width: 1.5; fill: None; fill-rule: evenodd;"/>
+			<path d="M 311,82 L 338,82 Z" style="stroke: rgb(3%,49%,52%); stroke-linecap: butt; stroke-width: 2;"/>
+			<polyline points="333 85, 338 82, 333 79" style="stroke: rgb(3%,49%,52%); stroke-linecap: butt; stroke-width: 1.5; fill: None; fill-rule: evenodd;"/>
+			<text x="105.82260972871555" y="18" style="font-family: Body; font-size: 9px;fill: rgb(32%,40%,41%); stroke:none;" transform="translate(0,36) scale(1,-1)">One cable carries cycle progress; the next carries the shaped result.</text>
+		</g>
+	</g>
+</svg>

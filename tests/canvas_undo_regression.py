@@ -24,6 +24,8 @@ FIXTURE = r'''
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <functional>
+#include <limits>
 #include <memory>
 #include <set>
 #include <stdexcept>
@@ -53,8 +55,15 @@ struct ofxOceanodeNodeModel {
     virtual void macroLoad(ofJson&,string){}
     void presetRecallBeforeSettingParameters(ofJson&){} void presetRecallAfterSettingParameters(ofJson&){}
 };
+struct abstractRouter : ofxOceanodeNodeModel {
+    struct {string value;string get(){return value;}} name;
+    auto& getNameParam(){return name;}
+    void loadBeforeConnections(ofJson& json){if(json.contains("Name"))name.value=json["Name"].get<string>();}
+};
 struct ofxOceanodeNodeMacro : ofxOceanodeNodeModel {
     int innerValue=55; string folder;
+    shared_ptr<ofxOceanodeContainer> child;
+    auto getContainer(){return child;}
     void saveCanvasUndoState(ofJson& json,const string& path){
         ofstream(path+"/inner.json") << innerValue;
         json["macro"]=true;
@@ -107,11 +116,23 @@ struct ofxOceanodeComment {
 };
 enum class CustomGuiWidgetType { Slider, Scope };
 struct CustomGuiWidget { struct {string parameterPath;} parameterRef; CustomGuiWidgetType type=CustomGuiWidgetType::Slider; };
+struct CustomGuiSnapshotBank {string customGuiId;};
 struct CustomGuiPanelData {string id; struct {vector<CustomGuiWidget> widgets;} layout;};
 ofJson customGuiWidgetToJson(const CustomGuiWidget& widget){return {{"path",widget.parameterRef.parameterPath},{"type",int(widget.type)}};}
 CustomGuiWidget customGuiWidgetFromJson(const ofJson& j){CustomGuiWidget w;w.parameterRef.parameterPath=j.at("path");w.type=CustomGuiWidgetType(j.at("type").get<int>());return w;}
+ofJson customGuiPanelsToJson(const vector<CustomGuiPanelData>& panels){
+    ofJson j={{"panels",ofJson::array()}};
+    for(const auto& p:panels){ofJson widgets=ofJson::array();for(const auto& w:p.layout.widgets)widgets.push_back(customGuiWidgetToJson(w));j["panels"].push_back({{"id",p.id},{"widgets",widgets}});}return j;
+}
+vector<CustomGuiPanelData> customGuiPanelsFromJson(const ofJson& j){
+    vector<CustomGuiPanelData> out;for(const auto& p:j.at("panels")){CustomGuiPanelData item;item.id=p.at("id");for(const auto& w:p.at("widgets"))item.layout.widgets.push_back(customGuiWidgetFromJson(w));out.push_back(item);}return out;
+}
+ofJson customGuiSnapshotBanksToJson(const vector<CustomGuiSnapshotBank>& banks){ofJson j={{"banks",ofJson::array()}};for(const auto& b:banks)j["banks"].push_back({{"customGuiId",b.customGuiId}});return j;}
+vector<CustomGuiSnapshotBank> customGuiSnapshotBanksFromJson(const ofJson& j){vector<CustomGuiSnapshotBank> out;for(const auto& b:j.at("banks"))out.push_back({b.at("customGuiId")});return out;}
+struct ofxOceanodeShared { static void nodeSelectedInCanvas(void*){} };
 struct ofxOceanodeContainer {
     // HISTORY_TYPES
+    ofxOceanodeContainer* timelineHost=nullptr;
     shared_ptr<Registry> registry=make_shared<Registry>();
     unordered_map<string,unique_ptr<ofxOceanodeNode>> nodes;
     unordered_map<string,ofxOceanodeNode*> parameterGroupNodesMap;
@@ -119,6 +140,8 @@ struct ofxOceanodeContainer {
     vector<ofxOceanodeComment> comments;
     struct { void notify(void*){} } allNodesCreated;
     vector<CustomGuiPanelData> customGuiPanelsData;
+    vector<CustomGuiSnapshotBank> customGuiSnapshotBanks;
+    void rebuildCustomGuiPanels(){} void markCustomGuiSnapshotsDirty(){}
     CustomGuiPanelData* getCustomGuiPanelData(string id){for(auto& p:customGuiPanelsData)if(p.id==id)return &p;return nullptr;}
     void markCustomGuisDirty(){}
     bool rejectCable=false;
@@ -149,8 +172,10 @@ struct ofxOceanodeContainer {
     }
     auto* connect(int a,int b){return createConnectionFromInfo("Value_"+to_string(a),"Value","Value_"+to_string(b),"Value");}
     void beginCanvasEdit();void endCanvasEdit();bool undoCanvasEdit();bool redoCanvasEdit();void clearCanvasHistory();
-    bool canUndoCanvasEdit(){return !canvasUndo.empty();}bool canRedoCanvasEdit(){return !canvasRedo.empty();}
+    bool canUndoCanvasEdit() const;bool canRedoCanvasEdit() const;
+    void requestCanvasHistory(bool redo=false);uint64_t getCanvasHistoryRevision() const;
 };
+void ofxOceanodeContainer::synchronizeCanvasTransfers(CanvasEdit& edit,bool){assert(edit.nodeTransfers.empty());}
 void ofxOceanodeNode::deleteSelf(){owner->eraseNode(*this);}
 void ofxOceanodeAbstractConnection::deleteSelf(){
     auto& cables=owner->connections;
@@ -236,6 +261,34 @@ int main(){
     // Node factory failure is checked before destructive changes.
     ofxOceanodeContainer missing;missing.beginCanvasEdit();missing.add();missing.endCanvasEdit();assert(missing.undoCanvasEdit());
     missing.registry->registered.clear();assert(!missing.redoCanvasEdit());assert(missing.nodes.empty());
+    // Shared chronological order and redo branching across nested canvases.
+    ofxOceanodeContainer root;
+    auto& outer=root.add(1,"Macro");
+    auto& nestedMacro=static_cast<ofxOceanodeNodeMacro&>(outer.getNodeModel());
+    nestedMacro.child=make_shared<ofxOceanodeContainer>();auto& nested=*nestedMacro.child;
+    nested.timelineHost=&root;nested.add(1);
+    root.beginCanvasEdit();outer.gui.position={20,0};root.endCanvasEdit();
+    nested.beginCanvasEdit();nested.add(2);nested.endCanvasEdit();
+    assert(root.undoCanvasEdit() && nested.nodes.size()==1);
+    assert(nested.undoCanvasEdit() && outer.gui.position.x==0);
+    assert(nested.redoCanvasEdit() && outer.gui.position.x==20);
+    assert(root.redoCanvasEdit() && nested.nodes.size()==2);
+    assert(root.undoCanvasEdit());assert(root.canRedoCanvasEdit());
+    nested.beginCanvasEdit();nested.nodes.at("Value_1")->gui.position={8,0};nested.endCanvasEdit();
+    assert(!root.canRedoCanvasEdit());
+    const auto revision=root.getCanvasHistoryRevision();
+    nested.requestCanvasHistory();assert(root.requestedCanvasHistory==-1);
+    assert(nested.nodes.at("Value_1")->gui.position.x==8); // Deferred until update.
+    root.processCanvasHistoryRequest();assert(nested.nodes.at("Value_1")->gui.position.x==0);
+    assert(nested.getCanvasHistoryRevision()>revision);
+    // Compound auxiliary changes preserve unrelated later panel layout edits.
+    ofxOceanodeContainer compound;compound.add();
+    compound.customGuiPanelsData={ {"moved",{}}, {"unrelated",{}} };
+    {ofxOceanodeContainer::MacroCanvasEditScope edit(compound);compound.add(2);compound.customGuiPanelsData.erase(compound.customGuiPanelsData.begin());edit.success=true;}
+    compound.customGuiPanelsData[0].layout.widgets.push_back({{"Value_1/Value"},CustomGuiWidgetType::Scope});
+    assert(compound.undoCanvasEdit());assert(compound.customGuiPanelsData.size()==2);
+    assert(compound.getCustomGuiPanelData("unrelated")->layout.widgets.size()==1);
+    assert(compound.redoCanvasEdit());assert(!compound.getCustomGuiPanelData("moved"));
     cout << "Canvas undo regression passed\n";
 }
 '''
@@ -245,12 +298,12 @@ def main():
     header = (ROOT / "src/Managers/ofxOceanodeContainer.h").read_text()
     types = header[header.index("    struct CanvasNodeSnapshot {"):header.index("    //NodeModel;")]
     source = (ROOT / "src/Managers/ofxOceanodeContainer.cpp").read_text()
-    functions = source[source.index("ofxOceanodeContainer::CanvasNodeSnapshot::~CanvasNodeSnapshot()") :]
+    functions = source[source.index("ofxOceanodeContainer::CanvasNodeSnapshot::~CanvasNodeSnapshot()") :source.index("void ofxOceanodeContainer::migrateCanvasPanelsTo(")]
     fixture = FIXTURE.replace("    // HISTORY_TYPES", types)
     canvas = (ROOT / "src/Managers/ofxOceanodeCanvas.cpp").read_text()
     shortcut = canvas[canvas.index("const bool historyShortcut"):canvas.index("auto prepareNewNodeModal")]
     assert "!editIO.WantTextInput" in shortcut and "!ImGui::IsAnyItemActive()" in shortcut
-    assert "KeySuper" in canvas and "KeyShift) container->redoCanvasEdit()" in shortcut
+    assert "KeySuper" in canvas and "requestCanvasHistory(editIO.KeyShift)" in shortcut
     assert canvas.index("if(historyShortcut)") < canvas.index("for(auto nodePair : nodesVisibleInThisFrame)")
     with tempfile.TemporaryDirectory(prefix="oceanode-canvas-undo-") as tmp:
         cpp = Path(tmp) / "regression.cpp"

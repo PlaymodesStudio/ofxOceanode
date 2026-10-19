@@ -12,6 +12,7 @@
 #include "ofMain.h"
 #include "ofxOceanodeShared.h"
 #include <array>
+#include <cstdint>
 #include <map>
 
 class ofxOceanodeContainer;
@@ -114,6 +115,7 @@ public:
 	
 	
 private:
+    std::uint64_t observedCanvasHistoryRevision = 0;
     void handleParentNavigation();
     glm::vec3 getMatrixScale(const glm::mat4 &m);
     glm::mat4 translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector);

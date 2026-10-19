@@ -1394,3 +1394,16 @@ void ofxOceanodeNodeMacro::loadMacroLayout(const string& folderPath) {
 	canvas.setLayoutIniPath(iniPath);
 	ofLogNotice("ofxOceanodeNodeMacro") << "Set macro layout path to " << iniPath;
 }
+
+
+std::map<string, ofxOceanodeAbstractParameter*> ofxOceanodeNodeMacro::getExposedRouterParameters() const {
+    std::map<string, ofxOceanodeAbstractParameter*> parameters;
+    for(const auto& entry : routerManager.getRouterNodes()){
+        auto* node = entry.second.node;
+        if(!node) continue;
+        auto& group = node->getParameters();
+        const string name = group.contains("Value") ? "Value" : group.contains("Val") ? "Val" : "";
+        if(!name.empty()) parameters[entry.first] = &static_cast<ofxOceanodeAbstractParameter&>(group.get(name));
+    }
+    return parameters;
+}
