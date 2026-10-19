@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check ScBus wire classification and dashed curve geometry with real ImGui.
+"""Check ScBus dots, texture dashes and type classification with real ImGui.
 
 Uses production drawing code and the canvas type classifier. No OF/GPU/audio
 server is needed. ASan/UBSan cover curved, short, reversed and very long wires.
@@ -21,6 +21,7 @@ CODE = r'''
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 using namespace std;
 struct Registry {
     map<string,string> names;int lookups=0;
@@ -29,15 +30,28 @@ struct Registry {
 struct ofxOceanodeAbstractParameter {string type;string valueType(){return type;}};
 struct Container {shared_ptr<Registry> registry=make_shared<Registry>();auto getTypesRegistry(){return registry;}};
 static void classify(Container* container){
-    unordered_map<string,bool> scBusTypes;
+    using ConnectionStyle=oceanodeConnectionDrawing::Style;
+    unordered_map<string,ConnectionStyle> connectionStyles;
     CLASSIFIER;
+    CONNECTION_CLASSIFIER;
     ofxOceanodeAbstractParameter audio{"opaque-node-port"},number{"float"},unknown{"SC-looking-name"};
-    assert(isScBusParameter(&audio));assert(!isScBusParameter(&number));
-    assert(!isScBusParameter(&unknown));assert(!isScBusParameter(nullptr));
+    ofxOceanodeAbstractParameter texture{"texture-pointer"},textures{"texture-vector"},buffer{"texture-buffer"};
+    assert(parameterConnectionStyle(&audio)==ConnectionStyle::Dotted);
+    assert(parameterConnectionStyle(&texture)==ConnectionStyle::Dashed);
+    assert(parameterConnectionStyle(&textures)==ConnectionStyle::Dashed);
+    assert(parameterConnectionStyle(&buffer)==ConnectionStyle::Solid);
+    assert(parameterConnectionStyle(&number)==ConnectionStyle::Solid);
+    assert(parameterConnectionStyle(&unknown)==ConnectionStyle::Solid);
+    assert(parameterConnectionStyle(nullptr)==ConnectionStyle::Solid);
+    assert(connectionStyle(&audio,&number)==ConnectionStyle::Dotted);
+    assert(connectionStyle(&number,&texture)==ConnectionStyle::Dashed);
+    assert(connectionStyle(nullptr,&audio)==ConnectionStyle::Dotted);
+    assert(connectionStyle(&textures,nullptr)==ConnectionStyle::Dashed);
     int calls=container->registry->lookups;
-    assert(isScBusParameter(&audio));assert(container->registry->lookups==calls);
+    assert(parameterConnectionStyle(&audio)==ConnectionStyle::Dotted);
+    assert(container->registry->lookups==calls);
     container->registry.reset();ofxOceanodeAbstractParameter another{"unregistered"};
-    assert(!isScBusParameter(&another));
+    assert(parameterConnectionStyle(&another)==ConnectionStyle::Solid);
 }
 static void near(float a,float b){assert(abs(a-b)<.03f);}
 static void bounds(const ImDrawList& list,int offset,float& lo,float& hi){
@@ -48,16 +62,20 @@ int main(){
     ImGui::CreateContext();auto& io=ImGui::GetIO();io.IniFilename=nullptr;
     unsigned char* pixels;int w,h;io.Fonts->GetTexDataAsRGBA32(&pixels,&w,&h);
     Container container;container.registry->names["opaque-node-port"]="ScBus";
-    container.registry->names["float"]="float";classify(&container);
+    container.registry->names["float"]="float";
+    container.registry->names["texture-pointer"]="Texture";
+    container.registry->names["texture-vector"]="v_Texture";
+    container.registry->names["texture-buffer"]="buffer_Texture";classify(&container);
     io.DisplaySize={1200,800};io.DeltaTime=1.f/60;ImGui::NewFrame();
     {
     ImDrawList list(ImGui::GetDrawListSharedData());
     auto reset=[&](){list._ResetForNewFrame();list.PushClipRectFullScreen();list.Flags=ImDrawListFlags_None;};
     oceanodeConnectionDrawing::Renderer renderer(&list);
+    using Style=oceanodeConnectionDrawing::Style;
     const ImU32 color=IM_COL32(100,60,30,128);
     for(float zoom:{.1f,1.f,2.f}){
         reset();const float dash=max(3.f,8.f*zoom),gap=max(2.f,5.f*zoom),period=dash+gap;
-        renderer.bezier({0,0},{1,0},{129,0},{130,0},color,2,true,zoom);
+        renderer.bezier({0,0},{1,0},{129,0},{130,0},color,2,Style::Dashed,zoom);
         int count=int(ceil(130/period));assert(list.VtxBuffer.Size==count*4);
         for(int i=0;i<count;++i){
             float lo,hi;bounds(list,i*4,lo,hi);near(lo,i*period);near(hi,min(130.f,i*period+dash));
@@ -65,32 +83,57 @@ int main(){
         for(const auto& vertex:list.VtxBuffer){assert(vertex.col==color);near(abs(vertex.pos.y),1.5f);}
         assert(list._Path.empty());
     }
-    reset();renderer.bezier({0,0},{1,0},{2,0},{3,0},color,2,true,1);
+    reset();renderer.bezier({0,0},{1,0},{2,0},{3,0},color,2,Style::Dashed,1);
     assert(list.VtxBuffer.Size==4);float lo,hi;bounds(list,0,lo,hi);near(lo,0);near(hi,3);
-    reset();renderer.bezier({130,0},{129,0},{1,0},{0,0},color,2,true,1);
+    reset();renderer.bezier({130,0},{129,0},{1,0},{0,0},color,2,Style::Dashed,1);
     assert(list.VtxBuffer.Size==40);bounds(list,0,lo,hi);near(lo,122);near(hi,130);
-    reset();renderer.bezier({0,0},{0,0},{0,0},{0,0},color,2,true,1);
+    reset();renderer.bezier({0,0},{0,0},{0,0},{0,0},color,2,Style::Dashed,1);
     assert(list.VtxBuffer.empty()&&list._Path.empty());
-    reset();renderer.bezier({0,0},{100,900},{-100,-900},{600,0},color,2,true,1);
+    reset();renderer.bezier({0,0},{100,900},{-100,-900},{600,0},color,2,Style::Dashed,1);
     assert(list.VtxBuffer.Size>40&&list._Path.empty());
     for(const auto& v:list.VtxBuffer)assert(isfinite(v.pos.x)&&isfinite(v.pos.y)&&v.col==color);
-    reset();renderer.bezier({0,0},{1,0},{1e8f,0},{1e8f,0},color,2,true,1);
+    reset();renderer.bezier({0,0},{1,0},{1e8f,0},{1e8f,0},color,2,Style::Dashed,1);
     assert(list.VtxBuffer.Size<20000&&list._Path.empty());
-    reset();renderer.bezier({0,0},{1,0},{129,0},{130,0},color,2,false,1);
+    reset();renderer.bezier({0,0},{1,0},{129,0},{130,0},color,2,Style::Solid,1);
     assert(list.VtxBuffer.Size==4);bounds(list,0,lo,hi);near(lo,0);near(hi,130);
-    reset();renderer.bezier({0,0},{1,0},{129,0},{130,0},0,2,true,1);assert(list.VtxBuffer.empty());
+    reset();renderer.bezier({0,0},{1,0},{129,0},{130,0},0,2,Style::Dashed,1);assert(list.VtxBuffer.empty());
+    // Round dots must remain separated and preserve their diameter at each zoom.
+    reset();list.AddCircleFilled({0,0},1.5f,color);
+    const int perDot=list.VtxBuffer.Size;vector<ImDrawVert> circle(list.VtxBuffer.begin(),list.VtxBuffer.end());
+    for(float zoom:{.1f,1.f,2.f}){
+        reset();renderer.bezier({0,0},{1,0},{129,0},{130,0},color,2,Style::Dotted,zoom);
+        const float spacing=3+max(2.f,5.f*zoom);const int count=int(floor(130/spacing))+1;
+        assert(list.VtxBuffer.Size==count*perDot&&list._Path.empty());
+        for(int i=0;i<count;++i)for(int j=0;j<perDot;++j){
+            const auto& v=list.VtxBuffer[i*perDot+j];
+            near(v.pos.x,circle[j].pos.x+i*spacing);near(v.pos.y,circle[j].pos.y);assert(v.col==circle[j].col);
+        }
+    }
+    reset();renderer.bezier({0,0},{0,0},{0,0},{0,0},color,2,Style::Dotted,1);
+    assert(list.VtxBuffer.empty()&&list._Path.empty());
+    reset();renderer.bezier({0,0},{100,900},{-100,-900},{600,0},color,2,Style::Dotted,1);
+    assert(list.VtxBuffer.Size>perDot*5&&list._Path.empty());
+    for(const auto& v:list.VtxBuffer)assert(isfinite(v.pos.x)&&isfinite(v.pos.y));
+    reset();renderer.bezier({0,0},{1,0},{2,0},{3,0},color,2,Style::Dotted,1);
+    assert(list.VtxBuffer.Size==perDot);
+    reset();renderer.bezier({130,0},{129,0},{1,0},{0,0},color,2,Style::Dotted,1);
+    assert(list.VtxBuffer.Size==17*perDot);
+    reset();renderer.bezier({0,0},{1,0},{1e8f,0},{1e8f,0},color,2,Style::Dotted,1);
+    assert(list.VtxBuffer.Size<perDot*2100&&list._Path.empty());
+    reset();renderer.bezier({0,0},{1,0},{129,0},{130,0},0,2,Style::Dotted,1);assert(list.VtxBuffer.empty());
     }
     ImGui::Render();ImGui::DestroyContext();
-    puts("ScBus wires passed: registered type routing, cached lookup, zoom-aware dash gaps, colors, thickness, curves, reversed/short/degenerate/long wires and solid fallback.");
+    puts("Wire styles passed: ScBus dots, scalar/vector texture dashes, cached type routing, zoom, round dot shape, colors, thickness, curves, reversed/short/degenerate/long wires and solid fallback.");
 }
 '''
 
 def main():
     canvas=(ROOT/'src/Managers/ofxOceanodeCanvas.cpp').read_text()
-    classifier=block(canvas,'auto isScBusParameter =')
-    assert 'isScBusParameter(&sourceParameter) || isScBusParameter(&sinkParameter)' in canvas
-    assert 'isScBusParameter(tempSourceParameter) || isScBusParameter(tempSinkParameter)' in canvas
-    code=CODE.replace('CLASSIFIER',classifier)
+    classifier=block(canvas,'auto parameterConnectionStyle =')
+    connection_classifier=block(canvas,'auto connectionStyle =')
+    assert 'connectionStyle(&sourceParameter, &sinkParameter)' in canvas
+    assert 'connectionStyle(tempSourceParameter, tempSinkParameter)' in canvas
+    code=CODE.replace('CONNECTION_CLASSIFIER',connection_classifier).replace('CLASSIFIER',classifier)
     with tempfile.TemporaryDirectory(prefix='oceanode-sc-bus-lines-') as directory:
         work=Path(directory);(work/'imconfig.h').write_text('')
         cpp=work/'test.cpp';cpp.write_text(code);binary=work/'test'

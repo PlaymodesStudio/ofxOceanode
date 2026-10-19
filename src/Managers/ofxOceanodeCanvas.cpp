@@ -2521,20 +2521,26 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             : OceanodeColors::U32(OceanodeColors::ConnectionLineLight);
         constexpr float nodeAttachmentTension = 1.5f;
         oceanodeConnectionDrawing::Renderer connectionRenderer(draw_list);
-        std::unordered_map<string, bool> scBusTypes;
-        // Resolve the registered name once per value type per frame; the canvas
-        // does not need a SuperCollider dependency or a compiler-specific type name.
-        auto isScBusParameter = [&](ofxOceanodeAbstractParameter* parameter){
-            if(parameter == nullptr) return false;
+        using ConnectionStyle = oceanodeConnectionDrawing::Style;
+        std::unordered_map<string, ConnectionStyle> connectionStyles;
+        // Resolve registered type names once per type per frame, without addon dependencies.
+        auto parameterConnectionStyle = [&](ofxOceanodeAbstractParameter* parameter){
+            if(parameter == nullptr) return ConnectionStyle::Solid;
             const string type = parameter->valueType();
-            auto cached = scBusTypes.find(type);
-            if(cached != scBusTypes.end()) return cached->second;
+            auto cached = connectionStyles.find(type);
+            if(cached != connectionStyles.end()) return cached->second;
             auto registry = container->getTypesRegistry();
-            const bool scBus = registry && registry->getTypeNameFromTypeDescription(type) == "ScBus";
-            scBusTypes.emplace(type, scBus);
-            return scBus;
+            const auto style = registry
+                ? oceanodeConnectionDrawing::styleForTypeName(registry->getTypeNameFromTypeDescription(type))
+                : ConnectionStyle::Solid;
+            connectionStyles.emplace(type, style);
+            return style;
         };
-        
+        auto connectionStyle = [&](ofxOceanodeAbstractParameter* source, ofxOceanodeAbstractParameter* sink){
+            const auto style = parameterConnectionStyle(source);
+            return style != ConnectionStyle::Solid ? style : parameterConnectionStyle(sink);
+        };
+
         std::unordered_set<ofxOceanodeAbstractConnection*> drawnConnections;
         
         for(auto nodePair : nodesVisibleInThisFrame)
@@ -2568,7 +2574,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         }
                         connectionRenderer.bezier(p1, p1 + nodeControlPoint, p2 - nodeControlPoint, p2,
                                                   lineColor, connectionWidth,
-                                                  isScBusParameter(&sourceParameter) || isScBusParameter(&sinkParameter),
+                                                  connectionStyle(&sourceParameter, &sinkParameter),
                                                   zoomLevel);
                     }
                 }
@@ -2606,7 +2612,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                       p1 + (tempSourceParameter != nullptr ? nodeControlPoint : controlPoint),
                                       p2 - (tempSourceParameter != nullptr ? controlPoint : nodeControlPoint),
                                       p2, OceanodeColors::U32(c), connectionWidth,
-                                      isScBusParameter(tempSourceParameter) || isScBusParameter(tempSinkParameter),
+                                      connectionStyle(tempSourceParameter, tempSinkParameter),
                                       zoomLevel);
         }
         
