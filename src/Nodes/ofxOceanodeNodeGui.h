@@ -38,7 +38,7 @@ public:
     void enable();
     void disable();
     
-    ofColor getColor(){return color;};
+    ofColor getColor();
     
     bool getExpanded(){return expanded;};
     void setExpanded(bool e){expanded = e;};
@@ -72,7 +72,6 @@ private:
     vector<glm::vec2> inputPositions;
     vector<glm::vec2> outputPositions;
     
-    ofColor color;
     ofRectangle guiRect;
     
     bool guiToBeDestroyed;

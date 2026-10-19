@@ -18,8 +18,6 @@
 #include <algorithm>
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node) : container(_container), node(_node){
-    color = node.getColor();
-    //color.setBrightness(255);
     guiRect = ofRectangle(10, 10, 0, 0);
     guiToBeDestroyed = false;
     lastExpandedState = true;
@@ -34,6 +32,11 @@ ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOcea
 
 ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
     
+}
+
+ofColor ofxOceanodeNodeGui::getColor(){
+    // Inspector edits and preset loads change the model color after GUI creation.
+    return node.getColor();
 }
 
 bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget, float zoomLevel){
