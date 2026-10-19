@@ -32,10 +32,17 @@ struct Container {shared_ptr<Registry> registry=make_shared<Registry>();auto get
 static void classify(Container* container){
     using ConnectionStyle=oceanodeConnectionDrawing::Style;
     unordered_map<string,ConnectionStyle> connectionStyles;
+    bool patternedConnections=false;
     CLASSIFIER;
     CONNECTION_CLASSIFIER;
     ofxOceanodeAbstractParameter audio{"opaque-node-port"},number{"float"},unknown{"SC-looking-name"};
     ofxOceanodeAbstractParameter texture{"texture-pointer"},textures{"texture-vector"},buffer{"texture-buffer"};
+    // Disabled mode also bypasses registry lookup, including for drag previews.
+    assert(connectionStyle(&audio,&texture)==ConnectionStyle::Solid);
+    assert(connectionStyle(nullptr,&audio)==ConnectionStyle::Solid);
+    assert(connectionStyle(&textures,nullptr)==ConnectionStyle::Solid);
+    assert(container->registry->lookups==0);
+    patternedConnections=true;
     assert(parameterConnectionStyle(&audio)==ConnectionStyle::Dotted);
     assert(parameterConnectionStyle(&texture)==ConnectionStyle::Dashed);
     assert(parameterConnectionStyle(&textures)==ConnectionStyle::Dashed);
@@ -50,6 +57,12 @@ static void classify(Container* container){
     int calls=container->registry->lookups;
     assert(parameterConnectionStyle(&audio)==ConnectionStyle::Dotted);
     assert(container->registry->lookups==calls);
+    patternedConnections=false;
+    assert(connectionStyle(&audio,&texture)==ConnectionStyle::Solid);
+    assert(connectionStyle(nullptr,&audio)==ConnectionStyle::Solid);
+    assert(connectionStyle(&textures,nullptr)==ConnectionStyle::Solid);
+    assert(container->registry->lookups==calls);
+    patternedConnections=true;
     container->registry.reset();ofxOceanodeAbstractParameter another{"unregistered"};
     assert(parameterConnectionStyle(&another)==ConnectionStyle::Solid);
 }
@@ -123,7 +136,7 @@ int main(){
     reset();renderer.bezier({0,0},{1,0},{129,0},{130,0},0,2,Style::Dotted,1);assert(list.VtxBuffer.empty());
     }
     ImGui::Render();ImGui::DestroyContext();
-    puts("Wire styles passed: ScBus dots, scalar/vector texture dashes, cached type routing, zoom, round dot shape, colors, thickness, curves, reversed/short/degenerate/long wires and solid fallback.");
+    puts("Wire styles passed: enable/disable without type lookups, ScBus dots, scalar/vector texture dashes, cached type routing, zoom, round dot shape, colors, thickness, curves, reversed/short/degenerate/long wires and solid fallback.");
 }
 '''
 

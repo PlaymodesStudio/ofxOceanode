@@ -26,7 +26,8 @@ enum ofxOceanodeConfigurationFlags_
     ofxOceanodeConfigurationFlags_None              = 0,
     ofxOceanodeConfigurationFlags_DisableRenderAll  = 1 << 0,   //Only render visible nodes
     ofxOceanodeConfigurationFlags_DisableHistograms = 2 << 1,   // Do not display histograms in vectors
-    ofxOceanodeConfigurationFlags_ColorConnections  = 1 << 3    // Color all connections by their source node
+    ofxOceanodeConfigurationFlags_ColorConnections  = 1 << 3,   // Color all connections by their source node
+    ofxOceanodeConfigurationFlags_DashedDottedLines = 1 << 4    // Dotted ScBus and dashed texture connections
 };
 
 enum ofxOceanodePresetLoadType {

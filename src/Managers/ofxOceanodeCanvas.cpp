@@ -2516,6 +2516,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         draw_list->ChannelsSetCurrent(1); // Background
         const bool colorConnections = (ofxOceanodeShared::getConfigurationFlags() &
                                        ofxOceanodeConfigurationFlags_ColorConnections) != 0;
+        const bool patternedConnections = (ofxOceanodeShared::getConfigurationFlags() &
+                                           ofxOceanodeConfigurationFlags_DashedDottedLines) != 0;
         const ImU32 connectionLineColor = darkCanvas
             ? OceanodeColors::U32(OceanodeColors::ConnectionLineDark)
             : OceanodeColors::U32(OceanodeColors::ConnectionLineLight);
@@ -2525,7 +2527,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         std::unordered_map<string, ConnectionStyle> connectionStyles;
         // Resolve registered type names once per type per frame, without addon dependencies.
         auto parameterConnectionStyle = [&](ofxOceanodeAbstractParameter* parameter){
-            if(parameter == nullptr) return ConnectionStyle::Solid;
+            if(!patternedConnections || parameter == nullptr) return ConnectionStyle::Solid;
             const string type = parameter->valueType();
             auto cached = connectionStyles.find(type);
             if(cached != connectionStyles.end()) return cached->second;
