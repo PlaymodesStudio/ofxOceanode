@@ -27,7 +27,7 @@ public:
         addOutputParameter(output.set("Output", {0}, {0}, {1}));
         
         addInspectorParameter(crossfadePercentage.set("Crossfade Pct", 0, 0, 1));
-        addInspectorParameter(scaleSmoothMs.set("Scale Smooth Ms", 100, 0, FLT_MAX));
+        addInspectorParameter(scaleSmoothMs.set("Scale Smooth Ms", 0, 0, FLT_MAX));
     }
 	
     void update(ofEventArgs &a){

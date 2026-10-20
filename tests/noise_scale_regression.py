@@ -81,7 +81,7 @@ void tick(noise &node, double dt = 1.0 / 60) {
 int main() {
     noise node;
     node.setup();
-    near(inspector(node, "Scale Smooth Ms").get(), 100);
+    near(inspector(node, "Scale Smooth Ms").get(), 0);
     parameter<vector<float>>(node, "Input") = {0.25f};
     parameter<vector<float>>(node, "Speed") = {2};
     parameter<vector<float>>(node, "Index") = {0, 0.5f, 1};
@@ -93,6 +93,14 @@ int main() {
     for(auto sample : samples) near(sample.y, 1000);
     const float anchor = parameter<vector<float>>(node, "Output").get()[0];
 
+    // Scale changes are immediate by default; smoothing is opt-in.
+    parameter<float>(node, "Scale") = 6;
+    tick(node);
+    near(samples[1].x, 3.5); near(samples[2].x, 6.5);
+    parameter<float>(node, "Scale") = 4;
+    tick(node);
+    near(samples[2].x, 4.5);
+    inspector(node, "Scale Smooth Ms") = 100;
     parameter<float>(node, "Scale") = 8;
     tick(node);
     const float intermediateScale = samples[2].x - 0.5f;
@@ -147,6 +155,7 @@ int main() {
     noise slow, fast;
     for(noise *n : {&slow, &fast}) {
         n->setup();
+        inspector(*n, "Scale Smooth Ms") = 100;
         parameter<vector<float>>(*n, "Index") = {1};
         parameter<float>(*n, "Scale") = 0;
         tick(*n);
