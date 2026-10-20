@@ -49,6 +49,8 @@ private:
     FuncType f_;
 };
 
+#define OFXOCEANODE_HAS_HEADER_TOGGLE 1
+
 typedef int ofxOceanodeParameterFlags;
 
 enum ofxOceanodeParameterFlags_
@@ -61,7 +63,8 @@ enum ofxOceanodeParameterFlags_
     ofxOceanodeParameterFlags_DisplayMinimized      = 1 << 4,   // Scope Parameter when node minimized
     ofxOceanodeParameterFlags_ScopeKeepAspectRatio  = 1 << 5,   // Scope Parameter keeps Aspect Ratio
     ofxOceanodeParameterFlags_ReadOnly              = 1 << 6,   // Parameter cannot be interacted
-    ofxOceanodeParameterFlags_NoGuiWidget           = 1 << 7    // Parameter hidden from node GUI (pin still exists)
+    ofxOceanodeParameterFlags_NoGuiWidget           = 1 << 7,   // Parameter hidden from node GUI (pin still exists)
+    ofxOceanodeParameterFlags_HeaderToggle          = 1 << 8    // Boolean checkbox in the node header, with ordinary pins
 //	ofxOceanodeParameterFlags_CollapsingHeader    = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_NoAutoOpenOnLog// Callback on pressing TAB (for completion handling)
 };
 

@@ -52,25 +52,69 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
     ImGui::BeginGroup(); // Lock horizontal position
     
     bool deleteModule = false;
+    if(inputPositions.size() != getParameters().size()){
+        inputPositions.resize(getParameters().size());
+        outputPositions.resize(getParameters().size());
+    }
+    auto isHeaderToggle = [&](ofxOceanodeAbstractParameter& parameter){
+        return !isTransparent && (parameter.getFlags() & ofxOceanodeParameterFlags_HeaderToggle) &&
+               parameter.valueType() == typeid(bool).name();
+    };
     
 	if (!isTransparent) {
-		const float headerStartX = ImGui::GetCursorScreenPos().x;
-		
+        const float headerStartX = ImGui::GetCursorScreenPos().x;
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, OceanodeColors::TransparentButton);
 		
 		if(ImGui::ArrowButton("expand", expanded ? ImGuiDir_Down : ImGuiDir_Right)){
 			expanded = !expanded;
 		}
-        headerControlHovered = ImGui::IsItemHovered() || ImGui::IsItemActive();
+        headerControlHovered |= ImGui::IsItemHovered() || ImGui::IsItemActive();
 		ImGui::PopStyleColor();
 		
 		ImGui::SameLine();
+        for(int i = 0; i < getParameters().size(); ++i){
+            auto& parameter = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
+            if(!isHeaderToggle(parameter)) continue;
+            ImGui::PushID(i);
+            ofJson before;
+            const bool trackEdit = !parameter.hasInConnection() &&
+                !(parameter.getFlags() & (ofxOceanodeParameterFlags_DisableSavePreset | ofxOceanodeParameterFlags_ReadOnly));
+            if(trackEdit) node.saveParameterToJson(before, parameter);
+            auto value = parameter.cast<bool>().getParameter();
+            bool checked = value.get();
+            if(parameter.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::BeginDisabled();
+            if(ImGui::Checkbox("##headerToggle", &checked)) value = checked;
+            const float pinY = ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y * 0.5f;
+            inputPositions[i] = outputPositions[i] = glm::vec2(0, pinY);
+            headerControlHovered |= ImGui::IsItemHovered() || ImGui::IsItemActive();
+            if(ImGui::IsItemClicked(1)) ImGui::OpenPopup("Param Popup");
+            if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s: %s", parameter.getName().c_str(), checked ? "On" : "Off");
+            renderParameterPopup(parameter);
+            if(parameter.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::EndDisabled();
+            if(trackEdit){
+                ofJson after;
+                node.saveParameterToJson(after, parameter);
+                container.recordUserEditedValues(node, before, after);
+            }
+            ImGui::PopID();
+            ImGui::SameLine();
+        }
+
 		const float defaultContentWidth = nodeWidthText + nodeWidthWidget;
 		// Don't draw node name text below 50% zoom
 		if(zoomLevel > 0.5f){
 			ImFont* boldFont = ofxOceanodeShared::getCurrentBoldFont();
 			if(boldFont) ImGui::PushFont(boldFont);
-			ImGui::Text("%s", moduleName.c_str());
+            const ImVec2 titlePosition = ImGui::GetCursorScreenPos();
+            const float titleWidth = std::max(0.0f, headerStartX + defaultContentWidth -
+                ImGui::GetFrameHeight() - ImGui::GetStyle().ItemSpacing.x - titlePosition.x);
+            const ImVec2 titleSize = ImGui::CalcTextSize(moduleName.c_str());
+            const ImVec4 titleClip(titlePosition.x, titlePosition.y,
+                titlePosition.x + titleWidth, titlePosition.y + titleSize.y);
+            ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(), ImGui::GetFontSize(), titlePosition,
+                ImGui::GetColorU32(ImGuiCol_Text), moduleName.c_str(), nullptr, 0.0f, &titleClip);
+            ImGui::Dummy(ImVec2(std::min(titleSize.x, titleWidth), titleSize.y));
+            if(titleSize.x > titleWidth && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", moduleName.c_str());
 			if(boldFont) ImGui::PopFont();
 			const string titleSuffix = node.getNodeModel().getNodeTitleSuffix();
 			if(!titleSuffix.empty()){
@@ -125,10 +169,6 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 		}
 	}
     
-    if(inputPositions.size() != getParameters().size()){
-        inputPositions.resize(getParameters().size());
-        outputPositions.resize(getParameters().size());
-    }
     
     if(expanded){
         
@@ -141,6 +181,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
+            if(isHeaderToggle(absParam)) continue;
             ofJson valueBefore;
             const bool trackUserValue = !(absParam.getFlags() & (ofxOceanodeParameterFlags_DisableSavePreset |
                                                                  ofxOceanodeParameterFlags_ReadOnly)) &&
@@ -664,6 +705,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                 // remain anchored at sensible positions even when widgets are not rendered.
                 auto numParams = getParameters().size();
                 for(int i = 0; i < (int)numParams; i++){
+                    if(isHeaderToggle(static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i)))) continue;
                     float yPos = numParams == 1 ? (cachedContentHeight * zoomLevel) / 2.0f
                                                 : (cachedContentHeight * zoomLevel) * ((float)i / (numParams - 1));
                     inputPositions[i]  = glm::vec2(0, ImGui::GetItemRectMin().y + yPos);
@@ -791,9 +833,14 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
     }else{
 		auto numParams = getParameters().size();
 		for(int i=0 ; i < numParams; i++){
-			ofAbstractParameter &absParam = getParameters().get(i);
-			string uniqueId = absParam.getName();
-			float yPos = numParams == 1 ? ImGui::GetItemRectSize().y / 2 : ImGui::GetItemRectSize().y * ((float)i/(numParams-1));
+            auto& absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
+            if(isHeaderToggle(absParam)){
+                inputPositions[i].x = ImGui::GetItemRectMin().x;
+                outputPositions[i].x = ImGui::GetItemRectMax().x;
+                continue;
+            }
+            string uniqueId = absParam.getName();
+            float yPos = numParams == 1 ? ImGui::GetItemRectSize().y / 2 : ImGui::GetItemRectSize().y * ((float)i/(numParams-1));
 			inputPositions[i] = glm::vec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + yPos);
 			outputPositions[i] = glm::vec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + yPos);
 		}

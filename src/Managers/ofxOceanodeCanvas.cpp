@@ -1595,13 +1595,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 
                 //draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(0, 0, 0, 255), 4.0f);
                 
-                if(nodeGui.getExpanded()){
+                { // Header parameter pins remain interactive when collapsed.
                     float NODE_BULLET_MIN_SIZE = 3.0f * zoomLevel;
                     float NODE_BULLET_MAX_SIZE = 10.0f * zoomLevel;
                     float NODE_BULLET_GROW_DIST = 10.0f * zoomLevel;
                     
                     for (auto &absParam : node->getParameters()){
                         auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
+                        if(!nodeGui.getExpanded() && !(param->getFlags() & ofxOceanodeParameterFlags_HeaderToggle)) continue;
                         if(!(param->getFlags() & ofxOceanodeParameterFlags_DisableInConnection)){
                             auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                             auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
@@ -1665,6 +1666,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     }
                     for (auto &absParam : node->getParameters()){
                         auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
+                        if(!nodeGui.getExpanded() && !(param->getFlags() & ofxOceanodeParameterFlags_HeaderToggle)) continue;
                         if(!(param->getFlags() & ofxOceanodeParameterFlags_DisableOutConnection)){
                             auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                             auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
