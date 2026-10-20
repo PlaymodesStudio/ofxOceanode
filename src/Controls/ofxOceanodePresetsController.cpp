@@ -16,6 +16,7 @@
 #include <map>
 #include <set>
 #include "imgui.h"
+#include "ofxOceanodeMenu.h"
 
 namespace {
 const ImVec4 bankTextColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -175,12 +176,6 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
 }
 
 void ofxOceanodePresetsController::draw(){
-    if(ImGui::MenuItem("New")){
-        // Tear down outside the ImGui draw pass, after the menu has closed.
-        newPresetRequested = true;
-    }
-    ImGui::Separator();
-
     const bool hasBank = currentBank >= 0 && currentBank < static_cast<int>(banks.size());
     const string bankName = hasBank ? banks[currentBank] : "";
     const string presetName = hasBank ? currentPreset[bankName] : "";
@@ -192,25 +187,24 @@ void ofxOceanodePresetsController::draw(){
     ImGui::TextColored(presetItemTextColor, "%s", presetName.empty() ? "-" : presetName.c_str());
     ImGui::Separator();
 
+    if(ImGui::MenuItem("New Preset")){
+        // Tear down outside the ImGui draw pass, after the menu has closed.
+        newPresetRequested = true;
+    }
+    if(ImGui::MenuItem("New Bank")){
+        popupRequest = PopupRequest::NewBank;
+    }
     if(ImGui::MenuItem("Save Preset", nullptr, false, !presetName.empty())){
         savePreset(presetName, bankName);
     }
-    if(ImGui::MenuItem("Save Preset As...")){
+    if(ImGui::MenuItem("Save Preset As")){
         popupRequest = PopupRequest::SaveAs;
     }
-    if(ImGui::MenuItem("Delete Preset...", nullptr, false, !presetName.empty())){
+    if(ImGui::MenuItem("Delete Preset", nullptr, false, !presetName.empty())){
         deleteBankName = bankName;
         deletePresetName = presetName;
         popupRequest = PopupRequest::Delete;
     }
-    ImGui::Separator();
-    if(ImGui::MenuItem("New Bank...")){
-        popupRequest = PopupRequest::NewBank;
-    }
-    if(ImGui::MenuItem("Reload Macros")){
-        ofxOceanodeShared::updateMacrosStructure();
-    }
-    ImGui::Separator();
     drawPresetList();
 }
 
@@ -314,7 +308,7 @@ void ofxOceanodePresetsController::drawPopups(){
 }
 
 void ofxOceanodePresetsController::drawPresetList(){
-    ImGui::TextUnformatted("Load Preset");
+    ofxOceanodeMenu::section("Load Preset");
     // The menu grows with the expanded banks. ImGui limits oversized popup
     // menus to the viewport and gives the menu itself a scrollbar.
     ImGui::PushStyleColor(ImGuiCol_Text, presetItemTextColor);

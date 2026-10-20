@@ -10,6 +10,7 @@
 
 #include "buffer.h"
 #include "ofxOceanodeNodeModel.h"
+#include "ofxOceanodeShared.h"
 #include "phasor.h"
 
 template <typename T1, typename T2 = T1>
@@ -20,7 +21,7 @@ public:
                std::function<T1(T2&)> _returnFunction = [](T2 &container)->T1{return container;},
                std::function<bool(T1&)> _checkFunction = [](T1 &data)->bool{return true;}
                ) :  timeGenerator("Buffer " + typelabel), assignFunction(_assignFunction), returnFunction(_returnFunction), checkFunction(_checkFunction){
-        description = "Stores a bounded history of Input values for a Header or HeaderPro of the same type. A new sample is recorded when Input changes while Rec is on.\n\n"
+        description = "Stores a bounded history of Input values for a Header or HeaderPro of the same type. A new sample is recorded when Input changes while Rec is on. Input changes during preset loading are not recorded, so temporary initialization values do not enter the history.\n\n"
                       "Rec -> Enables recording.\n"
                       "Timestamp -> If connected, supplies each sample's timestamp; otherwise the current wall clock time is used.\n"
                       "Max Size -> Maximum number of stored samples. Older samples are discarded as new ones arrive.\n"
@@ -43,7 +44,9 @@ public:
         addInspectorParameter(lastFrameMs.set("Last Frame Ms",0,0,FLT_MAX));
         
         listeners.push(input.newListener([this](T1 &object){
-            if(checkFunction(object) && rec){
+            // Restoring parameters and reactivating connections can send an
+            // upstream node's default value before it has computed live output.
+            if(!ofxOceanodeShared::isPresetLoading() && checkFunction(object) && rec){
                 if(getOceanodeParameter(timestamp).hasInConnection()){
                     myBuffer->addFrame(input.get(), timestamp);
                 }else{
@@ -98,7 +101,7 @@ public:
                std::function<std::vector<T>(std::vector<T>&)> _returnFunction = [](std::vector<T> &container)->std::vector<T>{return container;},
                std::function<bool(std::vector<T>&)> _checkFunction = [](std::vector<T> &data)->bool{return true;}
                ) :  ofxOceanodeNodeModel("Buffer " + typelabel), assignFunction(_assignFunction), returnFunction(_returnFunction), checkFunction(_checkFunction){
-                   description = "Stores a bounded history of Input vectors for a Header or HeaderPro of the same type. A new vector is recorded when Input changes while Rec is on.\n\n"
+                   description = "Stores a bounded history of Input vectors for a Header or HeaderPro of the same type. A new vector is recorded when Input changes while Rec is on. Input changes during preset loading are not recorded, so temporary initialization values do not enter the history.\n\n"
                                  "Rec -> Enables recording.\n"
                                  "Timestamp -> If connected, supplies each vector's timestamp; otherwise the current wall clock time is used.\n"
                                  "Max Size -> Maximum number of stored vectors. Older vectors are discarded as new ones arrive.\n"
@@ -121,7 +124,7 @@ public:
         addParameter(output.set("Output", myBuffer.get()));
         
         listeners.push(input.newListener([this](std::vector<T> &object){
-            if(checkFunction(object) && rec){
+            if(!ofxOceanodeShared::isPresetLoading() && checkFunction(object) && rec){
                 if(getOceanodeParameter(timestamp).hasInConnection()){
                     myBuffer->addFrame(input.get(), timestamp);
                 }else{

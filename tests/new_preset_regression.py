@@ -164,11 +164,12 @@ vector<string> items; bool clickNew=true;
 string savedLayoutPath;
 void SaveIniSettingsToDisk(const char* path){savedLayoutPath=path;}
 const char* SaveIniSettingsToMemory(size_t* size){*size=6;return "Layout";}
-bool MenuItem(const char* name,const char* =nullptr,bool=false,bool=true){items.push_back(name);return string(name)=="New" && exchange(clickNew,false);}
+bool MenuItem(const char* name,const char* =nullptr,bool=false,bool=true){items.push_back(name);return string(name)=="New Preset" && exchange(clickNew,false);}
 void Separator(){} void TextUnformatted(const char*){} void SameLine(){}
 template<class... Args> void TextColored(Args...){}
 }
 int bankTextColor=0,presetItemTextColor=0;
+namespace ofxOceanodeMenu { void section(const char*){} }
 struct ofxOceanodePresetsController {
     shared_ptr<ofxOceanodeContainer> container;
     bool newPresetRequested=false,newPresetCreated=true; int loadPresetInNextUpdate=1,currentBank=0,loads=0;
@@ -209,7 +210,7 @@ int main(){
     ofxOceanodePresetsController presets; presets.container=make_shared<ofxOceanodeContainer>();
     auto& c=*presets.container; populate(c);
     presets.draw();
-    assert(ImGui::items.front()=="New" && presets.newPresetRequested);
+    assert(ImGui::items.front()=="New Preset" && presets.newPresetRequested);
     assert(destroyedNodes==0 && !c.dynamicNodes.empty()); // no mutation inside menu draw
     presets.update();
     assert(destroyedNodes==6 && notifiedNodes==6 && destroyedConnections==6);

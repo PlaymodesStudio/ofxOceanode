@@ -15,15 +15,38 @@ metadata directly through setModelDescription. Named imported-model factories
 also retain a supplied spec's public description field without constructing a
 throwaway model. Catalog keys ending in a space describe dynamic type families.
 
-Window lists controllers, node Show toggles, macro canvases, custom GUIs and
-utility windows (Help, Theme Editor, User Manual and Metrics). Canvas focuses
-the root canvas.
+Window lists controllers, node Show toggles, macro canvases and custom GUIs.
+Canvas focuses the root canvas.
+Visibility checkboxes appear to the left of every window name. Controller
+selections take effect together with Apply at the end of the Controllers section;
+the other sections update immediately and keep the menu open. Reopening Window
+discards unapplied controller selections. Window replaces the former View menu.
+Custom GUIs includes New Custom GUI for the active canvas and an Options menu
+beside each panel for Edit and Delete.
 It includes nodes inside nested macros and uses their canvas path to distinguish
 instances. Toggles named Show, Show.Win, Show Window, Show GUI, Show Editor,
 Show Snapshot?, Show All and Show Split are discovered in normal and Inspector
 parameters. Display options such as Show Names and Show Clipping are excluded.
 Macros use an explicit canvas visibility API. External OS windows using Show.Win
 also appear. Custom GUIs and controllers use their existing visibility state.
+
+Config includes Rendering, GUI, Layout and Theme sections. Theme contains the
+editor, theme Save/Load, default selection and built-in reset; there is no
+separate Theme top menu. Help has two sections: Documentation (User Manual and
+Quick tips) and Utilities (Search nodes, AI assistant, Metrics, Reload Macros and addon actions
+such as Textures' Update Effects). Each action appears once. Theme Editor is
+available in Config's Theme section.
+
+Presets starts with the current Bank and Preset status, then New Preset, New Bank,
+Save Preset, Save Preset As and Delete Preset, followed by the LOAD PRESET section.
+
+All menu subsection headings use ofxOceanodeMenu::section in
+src/ofxOceanodeMenu.h. It capitalizes titles and uses ImGui's titled separator
+style, shared by Config, Edit, Presets, Window, Help, Global Variables and OSC
+Variables. Change that
+helper to restyle their headings together. Addons can register Help > Utilities
+actions with registerUtilityMenuItem; update/draw callbacks run even while the
+menu is closed, and its optional enabled callback controls availability.
 
 The assistant
 -------------

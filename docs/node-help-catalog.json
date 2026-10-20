@@ -399,7 +399,7 @@
     "addon": "ofxEloiNodes"
   },
   "Buffer ": {
-    "description": "Stores a bounded history of Input values for a Header or HeaderPro of the same type. A new sample is recorded when Input changes while Rec is on.\n\nRec -> Enables recording.\nTimestamp -> If connected, supplies each sample's timestamp; otherwise the current wall clock time is used.\nMax Size -> Maximum number of stored samples. Older samples are discarded as new ones arrive.\nClear -> Empties the history.\nOutput -> The Buffer connection for a Header or HeaderPro; it is not the latest sample value.\nInspector: Last Frame Ms -> Available time span in milliseconds backward from the newest sample, updated when Input changes.",
+    "description": "Stores a bounded history of Input values for a Header or HeaderPro of the same type. A new sample is recorded when Input changes while Rec is on. Input changes during preset loading are not recorded, so temporary initialization values do not enter the history.\n\nRec -> Enables recording.\nTimestamp -> If connected, supplies each sample's timestamp; otherwise the current wall clock time is used.\nMax Size -> Maximum number of stored samples. Older samples are discarded as new ones arrive.\nClear -> Empties the history.\nOutput -> The Buffer connection for a Header or HeaderPro; it is not the latest sample value.\nInspector: Last Frame Ms -> Available time span in milliseconds backward from the newest sample, updated when Input changes.",
     "parameters": [
       "Input",
       "Rec",
@@ -2224,14 +2224,16 @@
     "addon": "ofxOceanode"
   },
   "HeaderPro ": {
-    "description": "Reads samples from a connected Buffer and sends them as a vector.\n\nBuffer Input -> Connect the Output of a Buffer of the same type.\nCopies -> Number of samples to read.\nOffset Mode -> Frames: sample index back from newest (0 is newest; fractions round down). Ms: milliseconds back from the newest timestamp, using the nearest sample. Normalized: position across the stored samples (0 is newest, 1 is oldest).\nOffset -> With one copy, the requested position in the selected mode. With multiple copies and one Offset value, reads at 0, 1, 2, and so on times that value. Supply one Offset per copy for individual positions.\nOutput -> Samples in Offset order.\nOverflow -> True when a Frames or Normalized position exceeds the oldest sample, or an Ms delay exceeds the available timestamp history. An out-of-range read returns the oldest available sample. Zero Ms reads the newest sample without overflow.\n\nInspector: Calculate On Update -> On: refresh Output every update and when the Buffer records a sample. Off: refresh only when Copies, Offset, Offset Mode, or Buffer Input changes. New samples in the same Buffer do not trigger a refresh in this mode.",
+    "description": "Reads samples from a connected Buffer and sends them as a vector.\n\nBuffer Input -> Connect the Output of a Buffer of the same type.\nCopies -> Number of samples to read.\nOffset Mode -> Frames: sample index back from newest (0 is newest; fractions round down). Ms: milliseconds back from the newest timestamp, using the nearest sample. Normalized: position across the stored samples (0 is newest, 1 is oldest).\nOffset -> With one copy, the requested position in the selected mode. With multiple copies and one Offset value, reads at 0, 1, 2, and so on times that value. Supply one Offset per copy for individual positions.\nOutput -> Samples in Offset order.\nOverflow -> True when a Frames or Normalized position exceeds the oldest sample, or a requested Ms delay exceeds the available timestamp history, including when Fit Available History compresses the reads. Without fitting, an out-of-range read returns the oldest available sample. Zero Ms reads the newest sample without overflow.\n\nInspector: Fit Available History -> Off by default. In Ms mode, proportionally compress all requested delays when the largest exceeds the recorded time span. Their relative spacing is preserved as history grows; original delays are used once enough history exists. An empty or disconnected Buffer produces an empty Output and Overflow is true. With one sample, all copies read that sample. Frames and Normalized modes are unchanged.\nInspector: Calculate On Update -> On: refresh Output every update and when the Buffer records a sample. Off: refresh only when Copies, Offset, Offset Mode, Fit Available History, or Buffer Input changes. New samples in the same Buffer do not trigger a refresh in this mode.",
     "parameters": [
       "Buffer Input",
       "Copies",
+      "Offset Mode",
       "Offset",
       "Overflow",
       "Output",
-      "Calculate On Update"
+      "Calculate On Update",
+      "Fit Available History"
     ],
     "source": "Default_Nodes/Buffer/bufferHeaderPro.h",
     "addon": "ofxOceanode"

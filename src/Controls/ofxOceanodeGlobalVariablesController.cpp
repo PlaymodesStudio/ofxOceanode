@@ -10,6 +10,7 @@
 #include "ofxOceanodeNodeRegistry.h"
 #include "globalVariables.h"
 #include "imgui.h"
+#include "ofxOceanodeMenu.h"
 
 #include <algorithm>
 
@@ -114,9 +115,8 @@ ofxOceanodeGlobalVariablesController::ofxOceanodeGlobalVariablesController(share
 void ofxOceanodeGlobalVariablesController::draw(){
     if(ImGui::MenuItem("Save Global Variables")) save();
     if(ImGui::MenuItem("Load Global Variables")) load();
+    ofxOceanodeMenu::section("Groups");
     if(ImGui::MenuItem("New Group...")) newGroupRequested = true;
-    ImGui::Separator();
-    ImGui::TextUnformatted("Groups");
 
     string groupToDelete;
     for(const auto& group : groups){

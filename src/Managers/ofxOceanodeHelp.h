@@ -17,6 +17,7 @@ private:
     std::shared_ptr<ofxOceanodeContainer> root;
     ofxOceanodeAIAssistant assistant;
     bool visible = false;
+    std::map<std::string, bool> pendingControllerVisibility;
     bool openAssistant = false;
     int requestedTab = -1;
     bool patchRequested = false;

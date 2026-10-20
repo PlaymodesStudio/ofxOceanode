@@ -79,6 +79,13 @@ public:
                                 std::function<bool()> enabled = {}){
         configMenuItems[label] = {std::move(selected), std::move(update), std::move(draw), std::move(enabled)};
     }
+
+    // Utility actions appear in Help > Utilities and keep running when its menu is closed.
+    void registerUtilityMenuItem(const std::string &label, std::function<void()> selected,
+                                 std::function<void()> update = {}, std::function<void()> draw = {},
+                                 std::function<bool()> enabled = {}){
+        utilityMenuItems[label] = {std::move(selected), std::move(update), std::move(draw), std::move(enabled)};
+    }
     
     template<typename T>
     void registerBuiltInType(string name, T defaultValue){
@@ -183,11 +190,11 @@ private:
     void registerDefaultTypes();      // ofxOceanodeDefaultTypes.cpp
     void registerDefaultNodes();      // ofxOceanodeDefaultNodes.cpp
     void registerDefaultRouting();    // ofxOceanodeDefaultRouting.cpp
-    struct ConfigMenuItem {
+    struct MenuItemCallbacks {
         std::function<void()> selected, update, draw;
         std::function<bool()> enabled;
     };
-    std::map<std::string, ConfigMenuItem> configMenuItems;
+    std::map<std::string, MenuItemCallbacks> configMenuItems, utilityMenuItems;
     ofxOceanodeCanvas canvas;
     shared_ptr<ofxOceanodeContainer> container;
     ofxOceanodeContainer::UnusedNodePlan unusedNodePlan;
