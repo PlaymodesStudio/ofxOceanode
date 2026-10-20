@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <fstream>
 #include <set>
+#include <cmath>
+#include <optional>
 
 namespace {
 namespace fs = std::filesystem;
@@ -40,12 +42,14 @@ fs::path globalMacro(const ofJson& json, const fs::path& file) {
     return found->second;
 }
 void analyse(ofxOceanodeNodeRegistry& registry, const fs::path& path,
-             const MacroMixerContract* contract, std::set<fs::path>& ancestors) {
+             const MacroMixerContract* contract, std::set<fs::path>& ancestors, ofJson* definition = nullptr) {
     const auto folder = fs::canonical(path);
     require(ancestors.size() < 64 && ancestors.insert(folder).second, folder.string(),
         "Recursive Macro file dependency (feedback cables inside a Macro are supported)");
     struct Leave { std::set<fs::path>& paths; fs::path path; ~Leave() { paths.erase(path); } } leave{ancestors,folder};
-    const auto modules = read(folder / "modules.json");
+    auto modules = read(folder / "modules.json");
+    if(modules.is_null()) modules=ofJson::object(); // Native saver uses null for an empty graph.
+    if(definition) *definition = {{"folder",folder.string()},{"nodes",ofJson::object()}};
     require(modules.is_object(), folder.string(), "Expected a Macro modules object");
     struct Router { std::string key, model; };
     std::map<std::string, std::vector<Router>> routers;
@@ -67,19 +71,23 @@ void analyse(ofxOceanodeNodeRegistry& registry, const fs::path& path,
             const auto file = folder / (key + ".json");
             const auto data = read(file);
             require(data.is_object(), file.string(), "Expected node settings object");
+            ofJson* entry = definition ? &(*definition)["nodes"][key] : nullptr;
+            if(entry) *entry = {{"model",model.key()},{"id",id},{"settings",data}};
             if(model.key().rfind("Router ", 0) == 0 && contract) {
                 const auto name = data.at("Name").get<std::string>();
                 routers[name].push_back({key,model.key()});
             }
             if(model.key() == "Macro") {
                 const auto nested = data.value("LocalPreset", true) ? folder / key : globalMacro(data,file);
-                analyse(registry, nested, nullptr, ancestors);
+                analyse(registry, nested, nullptr, ancestors, entry ? &(*entry)["graph"] : nullptr);
             }
         }
     }
     // Validate references, never sort or rewrite cables. The native loader owns
     // parameter types, dynamic ports, event propagation and feedback behavior.
-    const auto cables = read(folder / "connections.json");
+    auto cables = read(folder / "connections.json");
+    if(cables.is_null()) cables=ofJson::object();
+    if(definition) (*definition)["connections"] = cables;
     require(cables.is_object(), folder.string(), "Expected Macro connections object");
     std::set<std::pair<std::string,std::string>> driven;
     for(auto from = cables.begin(); from != cables.end(); ++from) {
@@ -143,12 +151,14 @@ MacroMixerSource::Revision MacroMixerSource::importFolder(ofxOceanodeContainer& 
         }
         const auto source = fs::canonical(folder);
         std::set<fs::path> ancestors;
-        analyse(*parent.getRegistry(), source, &contract, ancestors);
+        ofJson definition;
+        analyse(*parent.getRegistry(), source, &contract, ancestors, &definition);
         static std::atomic<uint64_t> sequence{0};
         auto revision = std::make_shared<MacroMixerRevision>();
         revision->macroID = existingID.empty() ? "macro-" + std::to_string(ofGetSystemTimeMicros()) + "-" + std::to_string(++sequence) : existingID;
         revision->displayName = source.filename().string(); revision->sourcePath = source.string();
         revision->interface = contract;
+        revision->definition = std::move(definition);
         revision->importNotices = {"Runs as an ordinary Macro, including nested Macros, native connections and clocks.",
             "Only selected routers participate in mixing; additional routers retain their native behavior.",
             "External outputs are rejected recursively. Analysis and Refresh never execute source nodes.",
@@ -248,7 +258,920 @@ bool MacroMixerSource::Graph::update() {
 }
 bool MacroMixerSource::Graph::draw() {
     if(!failure.empty()) return false;
-    try { ofEventArgs args; macro->draw(args); validateOutputs(); }
+    try { ofEventArgs args; macro->draw(args); drawMorphConnections(); validateOutputs(); }
     catch(const std::exception& e) { failure = e.what(); }
     return failure.empty();
+}
+
+
+namespace {
+using MorphValue = MacroMixerSource::MorphValue;
+using MorphPath = MacroMixerSource::MorphPath;
+
+bool morphEditable(ofxOceanodeNodeModel& model, ofxOceanodeAbstractParameter& p,
+                   ofxOceanodeNodeMacro& owner, const MacroMixerSource::Graph& graph, bool root) {
+    // Portal receivers have no incoming cable, but their values are driven by
+    // the shared Portal service. Writing saved values here would feed them back
+    // into their senders and compete with the graph's actual controls.
+    if(model.nodeName().rfind("Portal ",0)==0) return false;
+    // OF reports numeric vectors as non-serializable; the native Oceanode
+    // preset saver explicitly handles them, so use that same exception here.
+    const bool numericVector=p.valueType()==typeid(std::vector<float>).name() || p.valueType()==typeid(std::vector<int>).name();
+    if(p.hasInConnection() || (!p.isSerializable() && !numericVector) || p.isReadOnly() ||
+       (p.getFlags() & (ofxOceanodeParameterFlags_DisableInConnection |
+                        ofxOceanodeParameterFlags_DisableSavePreset | ofxOceanodeParameterFlags_ReadOnly))) return false;
+    if(auto* router = dynamic_cast<abstractRouter*>(&model)) {
+        // Names, bounds and library/interface metadata must remain the target's.
+        if(p.getName() != "Value" || router->isExcludeFromSnapshot()) return false;
+        const auto& name = router->getNameParam().get();
+        if(owner.getParameterGroup().contains(name)) {
+            auto* pin = dynamic_cast<ofxOceanodeAbstractParameter*>(&owner.getParameterGroup().get(name));
+            if(pin && pin->hasInConnection()) return false;
+        }
+        if(root) for(const auto& r : graph.revision->contract().routers)
+            if(r.direction == "Input" && r.name == name) return false;
+    }
+    return true;
+}
+
+template<typename T> bool finiteMorph(const T& value) {
+    if constexpr(std::is_same_v<T,float>) return std::isfinite(value);
+    else if constexpr(std::is_same_v<T,std::vector<float>>) {
+        return std::all_of(value.begin(),value.end(),[](float v) { return std::isfinite(v); });
+    } else if constexpr(std::is_same_v<T,ofFloatColor>) {
+        return std::isfinite(value.r) && std::isfinite(value.g) && std::isfinite(value.b) && std::isfinite(value.a);
+    } else return true;
+}
+
+template<typename T> bool captureMorph(ofxOceanodeAbstractParameter& p, std::optional<MorphValue>& result) {
+    if(p.valueType() != typeid(T).name()) return false;
+    const auto& value = p.cast<T>().getParameter().get();
+    if(finiteMorph(value)) {
+        bool discrete = std::is_same_v<T,bool> || std::is_same_v<T,std::string>;
+        if constexpr(std::is_arithmetic_v<T> || std::is_same_v<T,std::vector<int>> || std::is_same_v<T,std::vector<float>>)
+            discrete = discrete || !p.cast<T>().getDropdownOptions().empty();
+        result = MorphValue{value,discrete};
+    }
+    return true;
+}
+std::optional<MorphValue> captureMorph(ofxOceanodeAbstractParameter& p) {
+    std::optional<MorphValue> result;
+    (captureMorph<float>(p,result) || captureMorph<int>(p,result) || captureMorph<bool>(p,result) ||
+     captureMorph<std::string>(p,result) || captureMorph<std::vector<float>>(p,result) ||
+     captureMorph<std::vector<int>>(p,result) || captureMorph<ofColor>(p,result) || captureMorph<ofFloatColor>(p,result));
+    return result;
+}
+
+void captureMorphContainer(const MacroMixerSource::Graph& graph, ofxOceanodeContainer& container,
+                           ofxOceanodeNodeMacro& owner, const MorphPath& prefix,
+                           MacroMixerSource::MorphSnapshot& values) {
+    if(prefix.size() >= 128) return;
+    for(auto* node : container.getAllModules()) {
+        auto& model = node->getNodeModel();
+        auto path = prefix;
+        path.push_back(model.nodeName()); path.push_back(std::to_string(model.getNumIdentifier()));
+        if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&model)) {
+            if(auto child = macro->getContainer()) captureMorphContainer(graph,*child,*macro,path,values);
+            continue; // Macro pins mirror child routers; never morph them twice.
+        }
+        auto& parameters = model.getParameterGroup();
+        for(int i = 0; i < parameters.size(); ++i) {
+            auto* p = dynamic_cast<ofxOceanodeAbstractParameter*>(&parameters.get(i));
+            if(!p || !morphEditable(model,*p,owner,graph,prefix.empty())) continue;
+            if(auto value = captureMorph(*p)) {
+                auto key = path; key.push_back(p->getName()); values.emplace(std::move(key),std::move(*value));
+            }
+        }
+    }
+}
+
+ofxOceanodeAbstractParameter* findMorphParameter(const MacroMixerSource::Graph& graph, const MorphPath& path) {
+    auto* container = graph.container.get();
+    auto* owner = graph.macro;
+    for(size_t i = 0; i + 2 < path.size(); i += 2) {
+        ofxOceanodeNodeModel* model = nullptr;
+        const auto& nodes = container->getDynamicNodes();
+        const auto type = nodes.find(path[i]);
+        if(type != nodes.end()) {
+            const auto node = type->second.find(std::stoi(path[i+1]));
+            if(node != type->second.end()) model = &node->second->getNodeModel();
+        }
+        // Ordinary saved Macro nodes use the indexed path above. Preserve
+        // native persistent nodes too, if a nested Macro supplies any.
+        if(!model) for(auto* node : container->getAllModules()) {
+            auto& candidate = node->getNodeModel();
+            if(candidate.nodeName() == path[i] && std::to_string(candidate.getNumIdentifier()) == path[i+1]) {
+                model = &candidate; break;
+            }
+        }
+        if(!model) return nullptr;
+        if(i + 3 == path.size()) {
+            auto& group = model->getParameterGroup();
+            if(!group.contains(path.back())) return nullptr;
+            auto* p = dynamic_cast<ofxOceanodeAbstractParameter*>(&group.get(path.back()));
+            return p && morphEditable(*model,*p,*owner,graph,i == 0) ? p : nullptr;
+        }
+        owner = dynamic_cast<ofxOceanodeNodeMacro*>(model);
+        if(!owner || !owner->getContainer()) return nullptr;
+        container = owner->getContainer().get();
+    }
+    return nullptr;
+}
+
+template<typename T> T morphNumber(T a, T b, float t) {
+    const double value = (1.0-double(t))*double(a) + double(t)*double(b);
+    if constexpr(std::is_integral_v<T>) return T(std::clamp(std::round(value),
+        double(std::numeric_limits<T>::lowest()),double(std::numeric_limits<T>::max())));
+    else return T(value);
+}
+template<typename T> T morphValue(const T& a, const T& b, float t, bool discrete) {
+    if(t <= 0) return a;
+    if(t >= 1) return b;
+    if(discrete) return t < .5f ? a : b;
+    if constexpr(std::is_same_v<T,float> || std::is_same_v<T,int>) return morphNumber(a,b,t);
+    else if constexpr(std::is_same_v<T,std::vector<float>> || std::is_same_v<T,std::vector<int>>) {
+        if(a.size() != b.size()) return t < .5f ? a : b;
+        T value; value.reserve(b.size());
+        for(size_t i = 0; i < b.size(); ++i) value.push_back(morphNumber(a[i],b[i],t));
+        return value;
+    } else if constexpr(std::is_same_v<T,ofColor> || std::is_same_v<T,ofFloatColor>) {
+        T value;
+        for(size_t i = 0; i < 4; ++i) value[i] = morphNumber(a[i],b[i],t);
+        return value;
+    } else return t < .5f ? a : b;
+}
+
+using MorphEdges = std::set<std::vector<std::string>>;
+MorphEdges savedEdges(const ofJson& connections) {
+    MorphEdges edges;
+    for(auto from=connections.begin(); from!=connections.end(); ++from)
+        for(auto out=from.value().begin(); out!=from.value().end(); ++out)
+            for(auto to=out.value().begin(); to!=out.value().end(); ++to)
+                for(auto in=to.value().begin(); in!=to.value().end(); ++in)
+                    edges.insert({from.key(),out.key(),to.key(),in.key()});
+    return edges;
+}
+std::string morphNodeKey(ofxOceanodeNodeModel& model) {
+    return escaped(model.nodeName())+"_"+std::to_string(model.getNumIdentifier());
+}
+MorphEdges liveEdges(ofxOceanodeContainer& container) {
+    MorphEdges edges;
+    for(const auto& cable : container.getAllConnections()) {
+        auto& from=cable->getSourceParameter(); auto& to=cable->getSinkParameter();
+        auto* a=from.getNodeModel(); auto* b=to.getNodeModel();
+        if(!a || !b || !cable->getActive()) throw std::runtime_error("Live Macro cables changed");
+        edges.insert({morphNodeKey(*a),from.getName(),morphNodeKey(*b),to.getName()});
+    }
+    return edges;
+}
+
+MorphValue savedMorphValue(const MorphValue& prototype, const ofJson& json) {
+    auto result=prototype;
+    std::visit([&](auto& value) {
+        using T=std::decay_t<decltype(value)>;
+        if constexpr(std::is_same_v<T,std::vector<float>> || std::is_same_v<T,std::vector<int>>) {
+            using Number=typename T::value_type;
+            auto scalar=[](const ofJson& item)->Number {
+                if(item.is_number() || item.is_boolean()) return item.get<Number>();
+                if(item.is_string()) return Number(ofToFloat(item.get<std::string>()));
+                throw std::runtime_error("Invalid saved morph vector");
+            };
+            value.clear();
+            if(json.is_array()) for(const auto& item:json) value.push_back(scalar(item));
+            else value.push_back(scalar(json));
+        } else if constexpr(std::is_same_v<T,std::string>) {
+            value=json.is_string() ? json.get<std::string>() : json.dump();
+        } else {
+            // Use an independent native parameter so OF's string/color/Boolean
+            // preset encoding is decoded without firing any graph listeners.
+            ofParameter<T> decoded; decoded.set("Morph",value);
+            if constexpr(std::is_arithmetic_v<T>) {
+                if(json.is_number() || json.is_boolean()) decoded=json.get<T>();
+                else decoded.fromString(json.get<std::string>());
+            } else decoded.fromString(json.is_string() ? json.get<std::string>() : json.dump());
+            value=decoded.get();
+        }
+        if(!finiteMorph(value)) throw std::runtime_error("Non-finite saved morph control");
+    },result.value);
+    return result;
+}
+
+// Match instances before comparing settings. Saved IDs are local labels, not
+// cross-preset identities. Named interfaces and unique model types anchor the
+// correspondence; port roles propagate it through repeated model types.
+using MorphMatches = std::map<std::string,std::string>; // target -> running
+MorphMatches matchMorphNodes(const ofJson& original, const ofJson& target) {
+    const auto& before=original.at("nodes"); const auto& after=target.at("nodes");
+    MorphMatches matches; std::set<std::string> used;
+    auto match=[&](const std::string& oldKey,const std::string& newKey) {
+        if(used.count(oldKey) || matches.count(newKey) || before.at(oldKey).at("model")!=after.at(newKey).at("model")) return false;
+        used.insert(oldKey); matches.emplace(newKey,oldKey); return true;
+    };
+    std::map<std::string,std::vector<std::string>> oldTypes,newTypes,oldNames,newNames;
+    auto index=[](const ofJson& nodes, auto& types, auto& names) {
+        for(auto it=nodes.begin();it!=nodes.end();++it) {
+            const auto model=it.value().at("model").template get<std::string>();
+            types[model].push_back(it.key());
+            if(model.rfind("Router ",0)==0 || model.rfind("Portal ",0)==0) {
+                const auto& settings=it.value().at("settings");
+                if(settings.contains("Name")) names[model+"/"+settings.at("Name").dump()+"/"+settings.value("Local",ofJson()).dump()].push_back(it.key());
+            }
+        }
+    };
+    index(before,oldTypes,oldNames); index(after,newTypes,newNames);
+    for(const auto& entry:newNames) if(entry.second.size()==1 && oldNames[entry.first].size()==1)
+        match(oldNames[entry.first].front(),entry.second.front());
+    for(const auto& entry:newTypes) if(entry.second.size()==1 && oldTypes[entry.first].size()==1)
+        match(oldTypes[entry.first].front(),entry.second.front());
+    const auto a=savedEdges(original.at("connections")),b=savedEdges(target.at("connections"));
+    auto propagate=[&]() {
+        bool changed=false;
+        // Work from a snapshot: discovering a match can add another anchor.
+        const auto anchors=matches;
+        for(const auto& anchor:anchors) {
+            std::map<std::string,std::vector<std::string>> oldInputs,newInputs;
+            for(const auto& e:a) if(e[2]==anchor.second) oldInputs[e[3]]=e;
+            for(const auto& e:b) if(e[2]==anchor.first) newInputs[e[3]]=e;
+            for(const auto& input:newInputs) {
+                const auto old=oldInputs.find(input.first);
+                if(old!=oldInputs.end() && old->second[1]==input.second[1])
+                    changed=match(old->second[0],input.second[0]) || changed;
+            }
+            // A fan-out only identifies a counterpart if that port role is
+            // unique on both sides. Never choose an arbitrary sibling.
+            std::map<std::vector<std::string>,std::set<std::string>> oldOutputs,newOutputs;
+            for(const auto& e:a) if(e[0]==anchor.second && !used.count(e[2]))
+                oldOutputs[{e[1],before.at(e[2]).at("model").get<std::string>(),e[3]}].insert(e[2]);
+            for(const auto& e:b) if(e[0]==anchor.first && !matches.count(e[2]))
+                newOutputs[{e[1],after.at(e[2]).at("model").get<std::string>(),e[3]}].insert(e[2]);
+            for(const auto& output:newOutputs) {
+                const auto old=oldOutputs.find(output.first);
+                if(output.second.size()==1 && old!=oldOutputs.end() && old->second.size()==1)
+                    changed=match(*old->second.begin(),*output.second.begin()) || changed;
+            }
+        }
+        return changed;
+    };
+    while(propagate()) {}
+    // Preserve established identities for unanchored parts of the graph. Port
+    // roles above take precedence when an ID was reused for a different role.
+    for(auto it=after.begin();it!=after.end();++it) if(before.contains(it.key())) match(it.key(),it.key());
+    while(propagate()) {}
+    return matches;
+}
+
+ofJson alignMorphDefinition(const ofJson& original, const ofJson& target, size_t depth=0) {
+    if(depth>=64) throw std::runtime_error("Macro matching nesting limit");
+    auto matches=matchMorphNodes(original,target);
+    const auto& before=original.at("nodes"); const auto& after=target.at("nodes");
+    std::set<std::string> occupied;
+    for(auto it=before.begin();it!=before.end();++it) occupied.insert(it.key());
+    for(const auto& match:matches) occupied.insert(match.second);
+    // Unmatched target nodes are ordinary additions. A matched instance may
+    // already occupy their saved ID, so give the addition a free runtime ID.
+    for(auto it=after.begin();it!=after.end();++it) if(!matches.count(it.key())) {
+        auto key=it.key(); int id=it.value().at("id").get<int>();
+        const auto model=it.value().at("model").get<std::string>();
+        while(occupied.count(key)) {
+            if(id==std::numeric_limits<int>::max()) throw std::runtime_error("No free Macro node ID");
+            key=escaped(model)+"_"+std::to_string(++id);
+        }
+        occupied.insert(key); matches.emplace(it.key(),key);
+    }
+    auto result=target; result["nodes"]=ofJson::object(); result["connections"]=ofJson::object();
+    for(auto it=after.begin();it!=after.end();++it) {
+        const auto& key=matches.at(it.key()); auto entry=it.value();
+        entry["id"]=std::stoi(key.substr(key.rfind('_')+1));
+        if(before.contains(key) && before.at(key).contains("graph") && entry.contains("graph"))
+            entry["graph"]=alignMorphDefinition(before.at(key).at("graph"),entry.at("graph"),depth+1);
+        result["nodes"][key]=std::move(entry);
+    }
+    const auto& cables=target.at("connections");
+    for(const auto& edge:savedEdges(cables)) result["connections"][matches.at(edge[0])][edge[1]][matches.at(edge[2])][edge[3]]=
+        cables.at(edge[0]).at(edge[1]).at(edge[2]).at(edge[3]);
+    return result;
+}
+
+void alignMorphValues(const ofJson& original,const ofJson& target,
+                      const MacroMixerSource::MorphSnapshot& source, const MorphPath& oldPrefix,
+                      const MorphPath& newPrefix,MacroMixerSource::MorphSnapshot& result) {
+    if(oldPrefix.size()>=128) return;
+    for(const auto& match:matchMorphNodes(original,target)) {
+        const auto& a=original.at("nodes").at(match.second); const auto& b=target.at("nodes").at(match.first);
+        auto oldPath=oldPrefix,newPath=newPrefix;
+        oldPath.push_back(a.at("model").get<std::string>()); oldPath.push_back(std::to_string(a.at("id").get<int>()));
+        newPath.push_back(b.at("model").get<std::string>()); newPath.push_back(std::to_string(b.at("id").get<int>()));
+        if(a.contains("graph") && b.contains("graph")) {
+            alignMorphValues(a.at("graph"),b.at("graph"),source,oldPath,newPath,result); continue;
+        }
+        for(auto value=source.lower_bound(oldPath);value!=source.end();++value) {
+            const auto& path=value->first;
+            if(path.size()<oldPath.size() || !std::equal(oldPath.begin(),oldPath.end(),path.begin())) break;
+            if(path.size()!=oldPath.size()+1) continue;
+            auto key=newPath; key.push_back(path.back()); result.emplace(std::move(key),value->second);
+        }
+    }
+}
+
+std::string morphLocation(const MorphPath& prefix,const std::string& node,const std::string& port="");
+struct MorphContainerEdit {
+    ofxOceanodeContainer* container;
+    ofJson original, target;
+    std::vector<std::string> added, removed;
+    MorphPath path;
+};
+// A whole nested Macro can be staged through native recall and retired as one
+// unit. Edits to existing published interfaces/shared Portal services still need
+// their own reconciliation strategy.
+bool morphStageable(const ofJson& entry) {
+    const auto model=entry.at("model").get<std::string>();
+    return model.rfind("Router ",0)!=0 && model.rfind("Portal ",0)!=0;
+}
+
+bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer& container,
+                     ofxOceanodeNodeMacro& owner, const ofJson& original, const ofJson& target,
+                     const ofJson* overrides, const MorphPath& prefix,
+                     MacroMixerSource::MorphSnapshot& values, std::vector<MorphContainerEdit>& edits) {
+    if(prefix.size()>=128 || !original.is_object() || !target.is_object())
+        throw std::runtime_error("Invalid or excessively nested Macro definition");
+    const auto& before=original.at("nodes"); const auto& after=target.at("nodes");
+    const auto nodes=container.getAllModules();
+    std::set<std::string> liveNodes; for(auto* node:nodes) liveNodes.insert(morphNodeKey(node->getNodeModel()));
+    for(const auto& key:liveNodes) if(!before.contains(key)) throw std::runtime_error(morphLocation(prefix,key)+": live node added since activation");
+    for(auto it=before.begin();it!=before.end();++it) if(!liveNodes.count(it.key())) throw std::runtime_error(morphLocation(prefix,it.key())+": live node removed since activation");
+    const auto expected=savedEdges(original.at("connections")),actual=liveEdges(container);
+    if(expected!=actual) {
+        auto all=expected; all.insert(actual.begin(),actual.end());
+        for(const auto& edge:all) if(expected.count(edge)!=actual.count(edge))
+            throw std::runtime_error(morphLocation(prefix,edge[2],edge[3])+": live cable differs ("+edge[0]+" / "+edge[1]+")");
+    }
+    MorphContainerEdit edit{&container,original,target,{},{},prefix};
+    for(auto it=before.begin();it!=before.end();++it) if(!after.contains(it.key())) {
+        if(!morphStageable(it.value())) throw std::runtime_error("Unmatched interface/service node removed: "+it.key());
+        edit.removed.push_back(it.key());
+    }
+    for(auto it=after.begin();it!=after.end();++it) if(!before.contains(it.key())) {
+        if(!morphStageable(it.value())) throw std::runtime_error("Unmatched interface/service node added: "+it.key());
+        edit.added.push_back(it.key());
+    }
+    edits.push_back(std::move(edit));
+    for(auto* node:nodes) {
+        auto& model=node->getNodeModel(); const auto key=morphNodeKey(model);
+        if(!before.contains(key)) return false;
+        if(!after.contains(key)) continue;
+        const auto& a=before.at(key); const auto& b=after.at(key);
+        if(a.at("model")!=b.at("model") || a.at("id")!=b.at("id")) return false;
+        auto oldConfig=a.at("settings"), newConfig=b.at("settings");
+        auto path=prefix; path.push_back(model.nodeName()); path.push_back(std::to_string(model.getNumIdentifier()));
+        auto& params=model.getParameterGroup();
+        for(int i=0;i<params.size();++i) {
+            auto& p=params.get(i);
+            // Router names and bounds define the Macro's interface. Inspectors
+            // and unknown custom-save data also remain compatibility checks.
+            if(dynamic_cast<abstractRouter*>(&model) && p.getName()!="Value") continue;
+            if(model.nodeName().rfind("Portal ",0)==0 && p.getName()!="Value") continue;
+            if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model)) {
+                bool mirrored=false;
+                if(auto child=macro->getContainer()) for(auto* n:child->getAllModules())
+                    if(auto* router=dynamic_cast<abstractRouter*>(&n->getNodeModel())) mirrored|=router->getNameParam().get()==p.getName();
+                // Active/Snapshot and other Macro lifecycle controls are not
+                // router mirrors and cannot be silently discarded on reuse.
+                if(!mirrored) continue;
+            } else if(auto* parameter=dynamic_cast<ofxOceanodeAbstractParameter*>(&p)) {
+                if(!parameter->hasInConnection() && !(parameter->getFlags()&ofxOceanodeParameterFlags_DisableInConnection)
+                   && !captureMorph(*parameter)) continue; // Unsupported control/configuration.
+            }
+            oldConfig.erase(p.getEscapedName()); newConfig.erase(p.getEscapedName());
+        }
+        // Ignore stale saved readouts when a node now correctly declares them
+        // transient. Actual Inspector configuration still requires native recall.
+        for(auto& inspector:model.getInspectorParameterGroup()) if(!inspector->isSerializable() || inspector->isReadOnly()) {
+            oldConfig.erase(inspector->getEscapedName()); newConfig.erase(inspector->getEscapedName());
+        }
+        oldConfig.erase("expanded"); newConfig.erase("expanded");
+        if(oldConfig!=newConfig) {
+            std::set<std::string> fields;
+            for(auto it=oldConfig.begin();it!=oldConfig.end();++it) fields.insert(it.key());
+            for(auto it=newConfig.begin();it!=newConfig.end();++it) fields.insert(it.key());
+            for(const auto& field:fields) if(!oldConfig.contains(field) || !newConfig.contains(field) || oldConfig.at(field)!=newConfig.at(field))
+                throw std::runtime_error(morphLocation(prefix,key)+": saved configuration differs ("+field+")");
+        }
+        if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model)) {
+            if(!a.contains("graph") || !b.contains("graph") || !macro->getContainer()) return false;
+            if(!readMorphTarget(graph,*macro->getContainer(),*macro,a.at("graph"),b.at("graph"),&b.at("settings"),path,values,edits)) return false;
+            continue;
+        }
+        for(int i=0;i<params.size();++i) {
+            auto* p=dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get(i));
+            if(!p || !morphEditable(model,*p,owner,graph,prefix.empty())) continue;
+            const ofJson* saved=&b.at("settings"); std::string name=p->getEscapedName();
+            if(auto* router=dynamic_cast<abstractRouter*>(&model)) {
+                const auto pinName=router->getNameParam().get();
+                if(overrides && owner.getParameterGroup().contains(pinName)) {
+                    const auto& pin=owner.getParameterGroup().get(pinName);
+                    if(overrides->contains(pin.getEscapedName())) { saved=overrides; name=pin.getEscapedName(); }
+                }
+            }
+            if(!saved->contains(name) || saved->at(name).is_null()) continue;
+            if(auto prototype=captureMorph(*p)) {
+                auto control=path; control.push_back(p->getName());
+                values.emplace(std::move(control),savedMorphValue(*prototype,saved->at(name)));
+            }
+        }
+    }
+    return true;
+}
+}
+
+namespace {
+ofxOceanodeNode* morphNode(ofxOceanodeContainer& container, const std::string& key) {
+    for(auto* node:container.getAllModules()) if(morphNodeKey(node->getNodeModel())==key) return node;
+    return nullptr;
+}
+ofxOceanodeAbstractParameter* morphPort(ofxOceanodeContainer& container, const std::string& key, const std::string& name) {
+    auto* node=morphNode(container,key);
+    if(!node || !node->getParameters().contains(name)) return nullptr;
+    return dynamic_cast<ofxOceanodeAbstractParameter*>(&node->getParameters().get(name));
+}
+ofxOceanodeAbstractConnection* morphCable(ofxOceanodeContainer& container, const std::vector<std::string>& edge) {
+    for(const auto& cable:container.getAllConnections()) {
+        auto& a=cable->getSourceParameter(); auto& b=cable->getSinkParameter();
+        if(a.getNodeModel() && b.getNodeModel() && morphNodeKey(*a.getNodeModel())==edge[0] &&
+           a.getName()==edge[1] && morphNodeKey(*b.getNodeModel())==edge[2] && b.getName()==edge[3]) return cable.get();
+    }
+    return nullptr;
+}
+void removeMorphCable(ofxOceanodeAbstractConnection* cable) {
+    if(cable) { cable->prepareForDestruction(); cable->deleteSelf(); }
+}
+void removeMorphNode(ofxOceanodeContainer& container, const std::string& key) {
+    if(auto* node=morphNode(container,key)) {
+        // Native cable destructors normally restore editable values. Structural
+        // morph teardown must not write into nodes as they are being retired.
+        for(size_t i=0;i<container.getAllConnections().size();) {
+            auto* cable=container.getAllConnections()[i].get();
+            if(cable->getSourceParameter().getNodeModel()==&node->getNodeModel() ||
+               cable->getSinkParameter().getNodeModel()==&node->getNodeModel()) removeMorphCable(cable);
+            else ++i;
+        }
+        node->deleteSelf();
+    }
+}
+void verifyMorphGraph(ofxOceanodeContainer& container,const ofJson& definition,size_t depth=0) {
+    if(depth>=64 || container.getAllModules().size()!=definition.at("nodes").size() ||
+       liveEdges(container)!=savedEdges(definition.at("connections")))
+        throw std::runtime_error("Added Macro graph did not load completely");
+    for(auto* node:container.getAllModules()) {
+        auto& model=node->getNodeModel(); const auto key=morphNodeKey(model);
+        if(!definition.at("nodes").contains(key)) throw std::runtime_error("Added Macro node identities differ");
+        if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model)) {
+            const auto& entry=definition.at("nodes").at(key);
+            if(!entry.contains("graph") || !macro->getContainer()) throw std::runtime_error("Added nested Macro is unavailable");
+            verifyMorphGraph(*macro->getContainer(),entry.at("graph"),depth+1);
+        }
+    }
+}
+std::string morphLocation(const MorphPath& prefix,const std::string& node,const std::string& port) {
+    std::string result;
+    for(size_t i=0;i+1<prefix.size();i+=2) result+=prefix[i]+" "+prefix[i+1]+" / ";
+    result+=node; if(!port.empty()) result+=" / "+port; return result;
+}
+MacroMixerMorphPolicy morphPolicy(const std::string& type,const MacroMixerMorphPolicies& policies,bool discrete=false) {
+    const auto found=policies.find(type);
+    const auto& policy=MacroMixerMixing::registry().policy(type,found!=policies.end() ? found->second.policy : discrete ? "switch" : type=="Texture" ? "crossfade" : "");
+    return {policy.id,policy.options(found==policies.end() ? ofJson::object() : found->second.options)};
+}
+struct MorphCablePlan {
+    ofxOceanodeAbstractParameter* sink=nullptr;
+    std::optional<MorphValue> target,editable;
+    std::string type;
+    MacroMixerMorphPolicy policy;
+};
+MorphCablePlan planMorphCable(ofxOceanodeContainer& c,const ofJson& target,const std::string& key,const std::string& name,
+                             const std::vector<std::string>& a,const std::vector<std::string>& b,const MacroMixerMorphPolicies& policies,bool preview=false) {
+    MorphCablePlan plan; auto* sink=plan.sink=morphPort(c,key,name);
+    if(!sink || sink->isReadOnly() || (sink->getFlags() & (ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_ReadOnly)))
+        throw std::runtime_error("Changed cable targets a protected/calculated parameter");
+    if(auto* model=sink->getNodeModel()) {
+        if(model->nodeName().rfind("Portal ",0)==0) throw std::runtime_error("Changed Portal service wiring");
+        if(auto* router=dynamic_cast<abstractRouter*>(model)) if(router->isExcludeFromSnapshot()) throw std::runtime_error("Changed snapshot-excluded router wiring");
+    }
+    plan.type=MacroMixerMixing::portType(*sink);
+    auto prototype=captureMorph(*sink);
+    if(!prototype && plan.type.empty()) throw std::runtime_error("Changed cable uses an unsupported control type");
+    if(!plan.type.empty()) {
+        plan.policy=morphPolicy(plan.type,policies,prototype && prototype->discrete);
+        const auto& policy=MacroMixerMixing::registry().policy(plan.type,plan.policy.policy);
+        if(policy.createProcessor && (!policy.ready || !policy.retire))
+            throw std::runtime_error("Changed "+plan.type+" connection policy lacks backend readiness/retirement support");
+    }
+    if(prototype) {
+        const auto& settings=target.at("nodes").at(key).at("settings");
+        const bool saved=settings.contains(sink->getEscapedName()) && !settings.at(sink->getEscapedName()).is_null();
+        if(!saved && (a.empty() || b.empty())) throw std::runtime_error("Changed cable lacks a fixed endpoint value");
+        if((sink->getFlags()&ofxOceanodeParameterFlags_DisableSavePreset) && (a.empty() || b.empty()))
+            throw std::runtime_error("Transient input needs live sources at both endpoints");
+        plan.target=saved ? savedMorphValue(*prototype,settings.at(sink->getEscapedName())) : *prototype;
+        if(!saved) std::visit([&](auto& value) { using T=std::decay_t<decltype(value)>; value=sink->cast<T>().getDefaultValue(); },plan.target->value);
+        plan.editable=*prototype;
+        if(!a.empty()) {
+            auto* cable=morphCable(c,a); ofJson editable=ofJson::object();
+            if(!cable || !cable->serializeBeforeConnectionValue(editable) || !editable.contains(sink->getEscapedName()))
+                throw std::runtime_error("Cannot retain origin cable's editable value");
+            plan.editable=savedMorphValue(*prototype,editable.at(sink->getEscapedName()));
+        }
+    } else if(plan.type!="Texture" && !MacroMixerMixing::registry().policy(plan.type,plan.policy.policy).createProcessor && (a.empty() || b.empty()))
+        throw std::runtime_error("Changed "+plan.type+" connection needs live sources at both endpoints");
+    for(const auto& edge:{a,b}) if(!edge.empty()) {
+        auto* source=morphPort(c,edge[0],edge[1]);
+        if(!source && preview && target.at("nodes").contains(edge[0])) continue;
+        if(!source) throw std::runtime_error("Changed cable source is unavailable");
+        if(plan.target) {
+            const auto value=captureMorph(*source);
+            const auto numeric=[](size_t i) { return i==0 || i==1 || i==4 || i==5; };
+            if(!value || (value->value.index()!=plan.target->value.index() && !(numeric(value->value.index())&&numeric(plan.target->value.index()))))
+                throw std::runtime_error("Changed cable has incompatible signal types");
+        } else if(MacroMixerMixing::portType(*source)!=plan.type) throw std::runtime_error("Changed cable has incompatible signal types");
+    }
+    return plan;
+}
+void writeMorphControl(ofxOceanodeAbstractParameter& p, const MorphValue& control, bool silent) {
+    std::visit([&](const auto& value) {
+        using T=std::decay_t<decltype(value)>;
+        if(p.valueType()!=typeid(T).name()) throw std::runtime_error("Changed morph sink type");
+        auto parameter=p.cast<T>().getParameter();
+        if(parameter.get()!=value) {
+            if(silent) parameter.setWithoutEventNotifications(value);
+            else parameter=value;
+        }
+    },control.value);
+}
+void detachMorphProxy(ofxOceanodeAbstractParameter& p) {
+    if(p.hasInConnection()) p.getInConnection()->prepareForDestruction();
+    for(auto* cable:p.getOutConnections()) cable->prepareForDestruction();
+    p.removeAllConnections();
+}
+struct MorphSignal {
+    virtual ~MorphSignal() = default;
+    virtual void progress(float t)=0;
+    virtual void draw() {}
+    virtual bool ready() const { return true; }
+    virtual void retire(const std::shared_ptr<void>&) {}
+    virtual void disconnect()=0;
+    virtual void constant(bool destination, bool silent=false)=0;
+};
+template<typename T> struct TypedMorphSignal : MorphSignal {
+    ofParameter<T> a,b,out,sink;
+    ofxOceanodeParameter<T> inputA,inputB,output;
+    ofEventListeners listeners;
+    T saved;
+    float t=0;
+    bool discrete=false, valid=true, publishing=false;
+    TypedMorphSignal(ofxOceanodeAbstractParameter& p, const MorphValue& target)
+    :sink(p.cast<T>().getParameter()),saved(std::get<T>(target.value)),discrete(target.discrete) {
+        a.set("Origin",sink.get()); b.set("Destination",saved); out.set("Blend",sink.get());
+        inputA.bindParameter(a); inputB.bindParameter(b); output.bindParameter(out);
+        listeners.push(a.newListener([this](T&) { refresh(); }));
+        listeners.push(b.newListener([this](T&) { refresh(); }));
+    }
+    ~TypedMorphSignal() override { disconnect(); }
+    void refresh() {
+        // Feedback cables can return to this input while it publishes. Native
+        // ofParameter suppresses recursive events too; retain the same boundary.
+        if(publishing) return;
+        const auto value=morphValue(a.get(),b.get(),t,discrete);
+        valid=finiteMorph(value);
+        if(valid && out.get()!=value) {
+            publishing=true;
+            try { out=value; } catch(...) { publishing=false; throw; }
+            publishing=false;
+        }
+    }
+    void progress(float value) override {
+        t=value; refresh();
+        if(!valid) throw std::runtime_error("Non-finite changed-cable morph signal");
+    }
+    void disconnect() override {
+        listeners.unsubscribeAll();
+        detachMorphProxy(output); detachMorphProxy(inputA); detachMorphProxy(inputB);
+    }
+    void constant(bool destination, bool silent=false) override {
+        const auto& value=destination ? saved : a.get();
+        if(sink.get()!=value) {
+            if(silent) sink.setWithoutEventNotifications(value);
+            else sink=value;
+        }
+    }
+};
+struct PolicyMorphSignal : MorphSignal {
+    std::string type; MacroMixerMorphPolicy policy;
+    std::shared_ptr<ofxOceanodeAbstractParameter> inputA,inputB,output;
+    ofParameterGroup inputs;
+    ofEventListener listener;
+    MacroMixerMixing::Policy::Function renderer,processor;
+    std::function<void(const MacroMixerMixing::Value&,bool)> writeSink;
+    MacroMixerMixing::Value saved;
+    float t=0; bool publishing=false;
+    std::string failure;
+    PolicyMorphSignal(ofxOceanodeContainer& container,const std::string& key,const std::string& name,const MorphCablePlan& plan)
+    :type(plan.type),policy(plan.policy),saved(MacroMixerMixing::neutral(type)) {
+        auto a=MacroMixerMixing::readPort(type,*plan.sink);
+        if(plan.target) std::visit([&](const auto& value) {
+            using T=std::decay_t<decltype(value)>;
+            if constexpr(std::is_constructible_v<MacroMixerMixing::Value,T>) saved=value;
+        },plan.target->value);
+        inputA=MacroMixerMixing::makePort(type,"Origin",a);
+        inputB=MacroMixerMixing::makePort(type,"Destination",saved);
+        output=MacroMixerMixing::makePort(type,"Blend",a);
+        inputs.add(*inputA); inputs.add(*inputB);
+        writeSink=[&container,key,name,type=type](const MacroMixerMixing::Value& value,bool silent) {
+            if(auto* p=morphPort(container,key,name)) if(MacroMixerMixing::portType(*p)==type) MacroMixerMixing::writePort(type,*p,value,silent);
+        };
+        const auto& definition=MacroMixerMixing::registry().policy(type,policy.policy);
+        if(definition.createRenderer) renderer=definition.createRenderer();
+        if(definition.createProcessor) processor=definition.createProcessor();
+        listener=inputs.parameterChangedE().newListener([this](ofAbstractParameter&) { if(!renderer && !processor) refresh(); });
+    }
+    ~PolicyMorphSignal() override { disconnect(); }
+    void refresh() {
+        if(publishing) return;
+        publishing=true;
+        try {
+            auto a=MacroMixerMixing::readPort(type,*inputA),b=MacroMixerMixing::readPort(type,*inputB);
+            MacroMixerMixing::Registry::validate(type,a); MacroMixerMixing::Registry::validate(type,b);
+            auto result=renderer ? renderer(a,b,t,policy.options) : processor ? processor(a,b,t,policy.options) : MacroMixerMixing::registry().mix(type,policy.policy,a,b,t,policy.options);
+            MacroMixerMixing::Registry::validate(type,result);
+            MacroMixerMixing::writePort(type,*output,result); failure.clear();
+        } catch(const std::exception& e) { failure=e.what(); }
+        publishing=false;
+    }
+    void progress(float value) override { t=value; if(!renderer) { refresh(); if(!failure.empty()) throw std::runtime_error(failure); } }
+    void draw() override { if(renderer) { MacroMixerMixing::drawIsolated([&] { refresh(); }); if(!failure.empty()) throw std::runtime_error(failure); } }
+    bool ready() const override {
+        if(!processor) return true;
+        const auto value=MacroMixerMixing::readPort(type,*output);
+        MacroMixerMixing::Registry::validate(type,value);
+        return MacroMixerMixing::registry().policy(type,policy.policy).ready(value);
+    }
+    void retire(const std::shared_ptr<void>& lease) override {
+        if(processor) MacroMixerMixing::registry().policy(type,policy.policy).retire(MacroMixerMixing::readPort(type,*output),lease);
+    }
+    void disconnect() override {
+        listener.unsubscribe();
+        detachMorphProxy(*output); detachMorphProxy(*inputA); detachMorphProxy(*inputB);
+    }
+    void constant(bool destination,bool silent=false) override {
+        // The new native cable immediately supplies a resource endpoint. Never
+        // preserve a borrowed address as its editable disconnect value.
+        writeSink(destination ? saved : MacroMixerMixing::readPort(type,*inputA),silent);
+    }
+};
+}
+
+// Owns temporary control cables outside the saved graph. Native connections
+// perform scalar/vector conversions and event propagation into the blend inputs;
+// the blend output drives the ordinary sink (including mirrored Macro pins).
+// Destruction rolls back topology before Graph destroys its native containers.
+struct MacroMixerMorphTopology {
+    struct Signal {
+        ofxOceanodeContainer* container;
+        std::vector<std::string> before,after;
+        std::shared_ptr<MorphSignal> blend;
+        std::optional<MorphValue> originEditable;
+        std::string type;
+    };
+    std::vector<MorphContainerEdit> edits;
+    std::vector<Signal> signals;
+    std::vector<std::pair<ofxOceanodeContainer*,std::string>> created;
+    std::vector<std::pair<ofxOceanodeContainer*,std::vector<std::string>>> newCables;
+    ofJson targetDefinition;
+    std::shared_ptr<ofxOceanodeContainer> hostLease;
+    bool complete=false;
+    // A container lease alone cannot retain nodes erased from its registry.
+    // Keep native node owners as well, including whole departing Macros.
+    std::shared_ptr<void> retirementLease() {
+        struct Lease {
+            std::shared_ptr<ofxOceanodeContainer> host;
+            std::vector<std::shared_ptr<ofxOceanodeNode>> nodes;
+            std::vector<std::shared_ptr<MorphSignal>> signals;
+        };
+        auto lease=std::make_shared<Lease>(); lease->host=hostLease;
+        for(auto& edit:edits) for(auto& model:edit.container->getDynamicNodes()) for(auto& node:model.second) lease->nodes.push_back(node.second);
+        for(auto& signal:signals) lease->signals.push_back(signal.blend);
+        return lease;
+    }
+    ~MacroMixerMorphTopology() { if(!complete) { try { rollback(); } catch(...) {} } }
+    void rollback() {
+        auto lease=retirementLease();
+        for(auto& signal:signals) signal.blend->disconnect();
+        for(auto& cable:newCables) removeMorphCable(morphCable(*cable.first,cable.second));
+        for(auto& signal:signals) {
+            if(!signal.before.empty()) {
+                if(!morphCable(*signal.container,signal.before)) {
+                    auto* source=morphPort(*signal.container,signal.before[0],signal.before[1]);
+                    auto* sink=morphPort(*signal.container,signal.before[2],signal.before[3]);
+                    if(source && sink) {
+                        if(signal.originEditable) writeMorphControl(*sink,*signal.originEditable,true);
+                        else MacroMixerMixing::writePort(signal.type,*sink,MacroMixerMixing::neutral(signal.type));
+                        signal.container->createConnection(*source,*sink);
+                    }
+                }
+            } else signal.blend->constant(false);
+        }
+        for(auto it=created.rbegin();it!=created.rend();++it) removeMorphNode(*it->first,it->second);
+        for(auto& signal:signals) signal.blend->retire(lease);
+        complete=true;
+    }
+    bool ready() const { for(auto& signal:signals) if(!signal.blend->ready()) return false; return true; }
+    void progress(float t) { for(auto& signal:signals) signal.blend->progress(t); }
+    void draw() { for(auto& signal:signals) signal.blend->draw(); }
+    void commit() {
+        auto lease=retirementLease();
+        for(auto& signal:signals) signal.blend->disconnect();
+        for(auto& signal:signals) {
+            signal.blend->constant(true,!signal.after.empty()); // Native cable retains the destination editable value.
+            if(!signal.after.empty()) addCable(*signal.container,signal.after);
+        }
+        for(auto& edit:edits) for(const auto& key:edit.removed) removeMorphNode(*edit.container,key);
+        for(auto& signal:signals) signal.blend->retire(lease);
+        complete=true;
+    }
+    void addCable(ofxOceanodeContainer& container, const std::vector<std::string>& edge) {
+        auto* from=morphPort(container,edge[0],edge[1]); auto* to=morphPort(container,edge[2],edge[3]);
+        if(!from || !to || !container.createConnection(*from,*to)) throw std::runtime_error("Cannot create changed Macro cable");
+        newCables.emplace_back(&container,edge);
+    }
+    void prepare(ofxOceanodeContainer& host,const MacroMixerMorphPolicies& policies) {
+        for(auto& edit:edits) {
+            auto& c=*edit.container;
+            for(const auto& key:edit.added) {
+                const auto& entry=edit.target.at("nodes").at(key);
+                auto* node=c.createNodeFromName(entry.at("model").get<std::string>(),entry.at("id").get<int>());
+                if(!node) throw std::runtime_error("Cannot create added Macro node");
+                created.emplace_back(&c,key);
+                auto json=entry.at("settings"); auto& model=node->getNodeModel();
+                node->presetWillBeLoaded(); model.loadBeforeConnections(json);
+                if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model)) {
+                    if(!entry.contains("graph")) throw std::runtime_error("Added Macro definition is unavailable");
+                    macro->macroLoadFromFolder(json,entry.at("graph").at("folder").get<std::string>());
+                    verifyMorphGraph(*macro->getContainer(),entry.at("graph"));
+                } else model.macroLoad(json,edit.target.at("folder").get<std::string>());
+                node->loadParametersFromJson(json); node->loadInspectorParametersFromJson(json);
+            }
+            if(!edit.added.empty()) c.allNodesCreated.notify(&c);
+        }
+        for(auto& edit:edits) {
+            auto& c=*edit.container;
+            const auto before=savedEdges(edit.original.at("connections")),after=savedEdges(edit.target.at("connections"));
+            std::map<std::pair<std::string,std::string>,std::vector<std::string>> oldInputs,newInputs;
+            for(const auto& edge:before) oldInputs[{edge[2],edge[3]}]=edge;
+            for(const auto& edge:after) newInputs[{edge[2],edge[3]}]=edge;
+            auto inputs=oldInputs; for(const auto& entry:newInputs) inputs.emplace(entry.first,entry.second);
+            for(const auto& input:inputs) {
+                const auto& key=input.first.first; const auto& name=input.first.second;
+                const auto old=oldInputs.find(input.first),next=newInputs.find(input.first);
+                const std::vector<std::string> a=old==oldInputs.end()?std::vector<std::string>{}:old->second;
+                const std::vector<std::string> b=next==newInputs.end()?std::vector<std::string>{}:next->second;
+                if(a==b || !edit.target.at("nodes").contains(key)) continue;
+                if(!edit.original.at("nodes").contains(key)) { addCable(c,b); continue; }
+                try {
+                    const auto plan=planMorphCable(c,edit.target,key,name,a,b,policies);
+                    std::shared_ptr<MorphSignal> blend;
+                    ofxOceanodeAbstractParameter *inputA=nullptr,*inputB=nullptr,*output=nullptr;
+                    if(!plan.type.empty()) {
+                        auto mixer=std::make_shared<PolicyMorphSignal>(c,key,name,plan);
+                        inputA=mixer->inputA.get(); inputB=mixer->inputB.get(); output=mixer->output.get(); blend=mixer;
+                    } else std::visit([&](const auto& value) {
+                        using T=std::decay_t<decltype(value)>;
+                        auto mixer=std::make_shared<TypedMorphSignal<T>>(*plan.sink,*plan.target);
+                        inputA=&mixer->inputA; inputB=&mixer->inputB; output=&mixer->output; blend=mixer;
+                    },plan.target->value);
+                    signals.push_back({&c,a,b,blend,plan.editable,plan.type});
+                    if(!a.empty() && !host.createConnection(*morphPort(c,a[0],a[1]),*inputA)) throw std::runtime_error("Cannot connect origin morph signal");
+                    if(!b.empty() && !host.createConnection(*morphPort(c,b[0],b[1]),*inputB)) throw std::runtime_error("Cannot connect destination morph signal");
+                    if(!a.empty()) removeMorphCable(morphCable(c,a));
+                    if(!host.createConnection(*output,*plan.sink)) throw std::runtime_error("Cannot connect blended morph signal");
+                    blend->progress(0); // Publish resource bridges before evaluating backend readiness.
+                } catch(const std::exception& e) { throw std::runtime_error(morphLocation(edit.path,key,name)+": "+e.what()); }
+            }
+        }
+        for(auto& entry:created) if(auto* node=morphNode(*entry.first,entry.second)) {
+            const auto edit=std::find_if(edits.begin(),edits.end(),[&](const auto& e) { return e.container==entry.first; });
+            auto json=edit->target.at("nodes").at(entry.second).at("settings");
+            auto& model=node->getNodeModel();
+            model.presetRecallBeforeSettingParameters(json); node->loadParametersFromJson(json);
+            node->loadInspectorParametersFromJson(json); model.presetRecallAfterSettingParameters(json);
+            node->activateConnections(); node->presetHasLoaded();
+        }
+    }
+};
+
+MacroMixerSource::MorphSnapshot MacroMixerSource::Graph::captureMorphValues() const {
+    MorphSnapshot values;
+    captureMorphContainer(*this,*container,*macro,{},values);
+    return values;
+}
+void MacroMixerSource::Graph::prepareMorph(const MorphSnapshot& captured, const Graph* originGraph) {
+    morphStart.clear(); morphTarget.clear();
+    MorphSnapshot aligned;
+    if(originGraph) alignMorphValues(originGraph->liveMorphDefinition.is_null() ? originGraph->revision->sourceDefinition() : originGraph->liveMorphDefinition,
+        revision->sourceDefinition(),captured,{},{},aligned);
+    const auto& origin=originGraph ? aligned : captured;
+    const auto target = captureMorphValues();
+    for(const auto& entry : target) {
+        const auto start = origin.find(entry.first);
+        if(start == origin.end() || start->second.value.index() != entry.second.value.index()) continue;
+        if(start->second.value == entry.second.value) continue;
+        morphStart.emplace(entry.first,start->second); morphTarget.emplace(entry.first,entry.second);
+    }
+}
+bool MacroMixerSource::Graph::prepareMorphInPlace(Revision target,const MacroMixerMorphPolicies& policies) {
+    MorphSnapshot destination;
+    auto topology=std::make_shared<MacroMixerMorphTopology>();
+    topology->hostLease=host;
+    morphFallbackReason.clear();
+    try {
+        if(!target) throw std::runtime_error("No target Macro definition");
+        const auto& original=liveMorphDefinition.is_null() ? revision->sourceDefinition() : liveMorphDefinition;
+        topology->targetDefinition=alignMorphDefinition(original,target->sourceDefinition());
+        if(!readMorphTarget(*this,*container,*macro,original,topology->targetDefinition,nullptr,{},destination,topology->edits))
+            throw std::runtime_error("Incompatible live graph or saved configuration");
+        topology->prepare(*host,policies);
+    } catch(const std::exception& e) { morphFallbackReason=e.what(); return false; } // Staged edits roll back before fallback.
+    const auto start=captureMorphValues();
+    MorphSnapshot from,to;
+    for(const auto& entry:destination) {
+        const auto found=start.find(entry.first);
+        if(found!=start.end() && found->second.value.index()==entry.second.value.index() && found->second.value!=entry.second.value) {
+            from.emplace(entry.first,found->second); to.emplace(entry.first,entry.second);
+        }
+    }
+    morphStart=std::move(from); morphTarget=std::move(to); morphTopology=std::move(topology);
+    return true;
+}
+void MacroMixerSource::Graph::drawMorphConnections() {
+    if(morphTopology) morphTopology->draw();
+}
+bool MacroMixerSource::Graph::morphConnectionsReady() const {
+    return !morphTopology || morphTopology->ready();
+}
+std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revision target,const MacroMixerMorphPolicies& policies) const {
+    std::vector<MacroMixerMorphDetail> result;
+    try {
+        if(!target) throw std::runtime_error("No target Macro definition");
+        const auto& original=liveMorphDefinition.is_null() ? revision->sourceDefinition() : liveMorphDefinition;
+        const auto aligned=alignMorphDefinition(original,target->sourceDefinition());
+        MorphSnapshot values; std::vector<MorphContainerEdit> edits;
+        if(!readMorphTarget(*this,*container,*macro,original,aligned,nullptr,{},values,edits)) throw std::runtime_error("Incompatible live graph or saved configuration");
+        for(const auto& edit:edits) {
+            for(const auto& key:edit.added) result.push_back({"added",morphLocation(edit.path,key),"Starts when the morph begins"});
+            for(const auto& key:edit.removed) result.push_back({"removed",morphLocation(edit.path,key),"Runs until the morph completes"});
+            std::map<std::pair<std::string,std::string>,std::vector<std::string>> before,after;
+            for(const auto& edge:savedEdges(edit.original.at("connections"))) before[{edge[2],edge[3]}]=edge;
+            for(const auto& edge:savedEdges(edit.target.at("connections"))) after[{edge[2],edge[3]}]=edge;
+            auto inputs=before; for(const auto& item:after) inputs.emplace(item.first,item.second);
+            for(const auto& input:inputs) {
+                const auto& key=input.first.first; const auto& name=input.first.second;
+                const auto a=before.count(input.first)?before.at(input.first):std::vector<std::string>{};
+                const auto b=after.count(input.first)?after.at(input.first):std::vector<std::string>{};
+                if(a==b || !edit.original.at("nodes").contains(key) || !edit.target.at("nodes").contains(key)) continue;
+                const auto location=morphLocation(edit.path,key,name);
+                try {
+                    const auto plan=planMorphCable(*edit.container,edit.target,key,name,a,b,policies,true);
+                    const auto endpoint=[&plan](const std::vector<std::string>& edge) { return edge.empty()?std::string(plan.type=="ScBus"?"Silence":"Fixed value"):edge[0]+" / "+edge[1]; };
+                    result.push_back({"mix",location,endpoint(a)+" -> "+endpoint(b),plan.type,plan.policy.policy,plan.policy.options});
+                } catch(const std::exception& e) { result.push_back({"fallback",location,e.what()}); }
+            }
+        }
+        if(result.empty()) result.push_back({"live","Graph","Matching graph controls morph on the running nodes"});
+    } catch(const std::exception& e) { result.push_back({"fallback","Graph",e.what()}); }
+    return result;
+}
+void MacroMixerSource::Graph::cancelMorph() {
+    morphTopology.reset(); morphStart.clear(); morphTarget.clear();
+}
+void MacroMixerSource::Graph::applyMorph(float progress) {
+    // Resolve each path anew: assigning a control may rebuild ports or a nested
+    // Macro. Do not retain node/parameter pointers across listener callbacks.
+    for(const auto& entry : morphTarget) {
+        auto* p = findMorphParameter(*this,entry.first);
+        if(!p) continue;
+        const auto& start = morphStart.at(entry.first);
+        std::visit([&](const auto& target) {
+            using T = std::decay_t<decltype(target)>;
+            if(p->valueType() != typeid(T).name()) return;
+            auto value = morphValue(std::get<T>(start.value),target,progress,start.discrete || entry.second.discrete);
+            // Keep the underlying value alive even if its listener deletes the
+            // port or reloads its owning nested Macro during this assignment.
+            auto parameter = p->cast<T>().getParameter();
+            if(parameter.get() != value) parameter = value;
+        },entry.second.value);
+    }
+    if(morphTopology) morphTopology->progress(progress);
+    if(progress >= 1) {
+        if(morphTopology) {
+            morphTopology->commit(); liveMorphDefinition=std::move(morphTopology->targetDefinition);
+        }
+        morphTopology.reset(); morphStart.clear(); morphTarget.clear();
+    }
 }

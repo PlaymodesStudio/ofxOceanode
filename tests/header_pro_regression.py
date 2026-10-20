@@ -130,6 +130,9 @@ struct ofxOceanodeNodeModel {
     template<typename T> void addParameter(ofParameter<T> &p, int = 0) {
         parameters[p.name] = &p;
     }
+    template<typename T> void addOutputParameter(ofParameter<T> &p, int flags = 0) {
+        addParameter(p, flags);
+    }
     template<typename T> void addInspectorParameter(ofParameter<T> &p) {
         inspectorParameters[p.name] = &p;
     }

@@ -41,7 +41,9 @@ public:
         addParameter(maxSize.set("Max Size", 100, 1, INT_MAX));
         addParameter(output.set("Output", myBuffer.get()));
         
-        addInspectorParameter(lastFrameMs.set("Last Frame Ms",0,0,FLT_MAX));
+        lastFrameMs.set("Last Frame Ms",0,0,FLT_MAX);
+        lastFrameMs.setSerializable(false); // Runtime history measurement, not preset configuration.
+        addInspectorParameter(lastFrameMs);
         
         listeners.push(input.newListener([this](T1 &object){
             // Restoring parameters and reactivating connections can send an

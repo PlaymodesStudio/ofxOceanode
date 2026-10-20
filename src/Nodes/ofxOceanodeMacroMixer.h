@@ -8,6 +8,7 @@ class ofxOceanodeMacroMixer : public ofxOceanodeNodeModel {
 public:
     ofxOceanodeMacroMixer() : ofxOceanodeNodeModel("MacroMixer") {
         description = "Mix ordinary Macros through selected input/output Routers, with a mixing policy for each output type. "
+            "Enable Morph macros in the Inspector to morph matching unconnected controls inside the destination graph instead. "
             "Add Macro source folders and select Target, then Transition. Nested Macros, feedback, native nodes and clocks use ordinary Macro behavior. "
             "Analysis rejects external outputs recursively. Source folders must be available when activating or reloading.";
     }
@@ -28,17 +29,19 @@ public:
     bool setRouterContract(const MacroMixerContract& contract);
     bool loadRouterGroup(const std::string& path);
     bool saveRouterGroup(const std::string& path);
+    bool setMorphConnectionPolicy(const std::string& type,const std::string& policy,const ofJson& options = ofJson::object());
     bool importMacroFolder(const std::string& folder, bool refresh = false);
     bool removeImportedMacro(const std::string& id);
     bool moveImportedMacro(const std::string& id, size_t index);
     const MacroMixerRuntime* mixerRuntime() const { return runtime.get(); }
 private:
-    enum class ActionKind { Import, Refresh, RemoveMacro, MoveMacro, Routers, LoadRouters, SaveRouters, ClearPlayback };
+    enum class ActionKind { Import, Refresh, RemoveMacro, MoveMacro, Routers, LoadRouters, SaveRouters, ClearPlayback, MorphPolicy };
     struct Action {
         ActionKind kind;
         std::string text;
         size_t index = 0;
         MacroMixerContract contract;
+        MacroMixerMorphPolicy policy;
     };
     void installOutputs(const MacroMixerContract& contract);
     void drawRouters();
@@ -53,6 +56,7 @@ private:
     ofParameter<int> target;
     ofParameter<float> duration, biPow, progress;
     ofParameter<void> transition, finish;
+    ofParameter<bool> morphMacros;
     customGuiRegion routerEditor, macroEditor;
     std::map<std::string, std::shared_ptr<ofxOceanodeAbstractParameter>> outputs;
     std::map<std::string, std::array<char, 256>> routerDrafts;

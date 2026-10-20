@@ -21,18 +21,37 @@ public:
     const std::string& source() const { return sourcePath; }
     const MacroMixerContract& contract() const { return interface; }
     const std::vector<std::string>& notices() const { return importNotices; }
+    const ofJson& sourceDefinition() const { return definition; }
 private:
     friend class MacroMixerSource;
     friend class MacroMixerRuntime;
     std::string macroID, displayName, sourcePath;
     MacroMixerContract interface;
     std::vector<std::string> importNotices;
+    ofJson definition;
 };
+
+struct MacroMixerMorphPolicy { std::string policy; ofJson options = ofJson::object(); };
+using MacroMixerMorphPolicies = std::map<std::string, MacroMixerMorphPolicy>;
+struct MacroMixerMorphDetail {
+    std::string kind, location, message, type, policy;
+    ofJson options = ofJson::object();
+};
+struct MacroMixerMorphTopology;
 
 class MacroMixerSource {
 public:
     using Revision = std::shared_ptr<const MacroMixerRevision>;
     using Inputs = std::map<std::string, MacroMixerMixing::Value>;
+    struct MorphValue {
+        using Value = std::variant<float, int, bool, std::string, std::vector<float>, std::vector<int>, ofColor, ofFloatColor>;
+        Value value;
+        bool discrete = false;
+    };
+    // Alternating model/ID components, followed by the parameter name. Separate
+    // components avoid collisions with names containing slashes or underscores.
+    using MorphPath = std::vector<std::string>;
+    using MorphSnapshot = std::map<MorphPath, MorphValue>;
     struct Graph {
         // Host owns an ordinary Macro node; container exposes its child for the
         // existing clock traversal. The private registry carries resource checks
@@ -40,7 +59,7 @@ public:
         std::shared_ptr<ofxOceanodeContainer> host, container;
         ofxOceanodeNodeMacro* macro = nullptr;
         Revision revision;
-        std::string source, failure;
+        std::string source, failure, morphFallbackReason;
         bool usesTextures = false;
         ofxOceanodeAbstractParameter& parameter(const std::string& id) const;
         MacroMixerMixing::Value read(const std::string& id) const;
@@ -48,6 +67,21 @@ public:
         void validateOutputs() const;
         bool update();
         bool draw();
+        MorphSnapshot captureMorphValues() const;
+        void prepareMorph(const MorphSnapshot& origin, const Graph* originGraph = nullptr);
+        // Read saved controls and reconcile compatible native nodes. Changed
+        // connections mix live signals with registered router policies; added
+        // and removed nodes coexist until completion.
+        bool prepareMorphInPlace(Revision target, const MacroMixerMorphPolicies& policies = {});
+        std::vector<MacroMixerMorphDetail> inspectMorph(Revision target, const MacroMixerMorphPolicies& policies = {}) const;
+        void drawMorphConnections();
+        bool morphConnectionsReady() const;
+        void cancelMorph();
+        void applyMorph(float progress);
+    private:
+        MorphSnapshot morphStart, morphTarget;
+        ofJson liveMorphDefinition; // Saved target expressed in stable runtime node identities.
+        std::shared_ptr<MacroMixerMorphTopology> morphTopology;
     };
     // Analysis never constructs source nodes or prunes a user's graph.
     static Revision importFolder(ofxOceanodeContainer& parent, const std::string& folder,

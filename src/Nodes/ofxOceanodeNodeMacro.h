@@ -117,6 +117,9 @@ public:
     void saveCanvasUndoState(ofJson& json, const string& path);
     std::map<string, ofxOceanodeAbstractParameter*> getExposedRouterParameters() const;
 	void macroLoad(ofJson &json, string path);
+    // Recall a saved wrapper from its resolved graph folder. Local source
+    // folder names need not match the live node's ID during graph morphing.
+    void macroLoadFromFolder(ofJson& json, const std::string& folder);
 	
 	void loadBeforeConnections(ofJson &json) override;
 	void presetRecallBeforeSettingParameters(ofJson &json) override;
@@ -213,6 +216,7 @@ public:
 	}
 	
 private:
+    void macroLoadImpl(ofJson& json, const std::string& path, const std::string& localFolder);
 	// ─── Node management ──────────────────────────────────────────────────
 	void newNodeCreated(ofxOceanodeNode* &node);
 	void allNodesCreated();

@@ -387,5 +387,45 @@ Value Registry::mix(const std::string& type,const std::string& id,const Value& a
     // Endpoints bypass every policy (including resampling and threshold=0/1).
     Value result=t==0 ? a : t==1 ? b : p.mix(a,b,t,settings); validateValue(type,result); return result;
 }
+std::string portType(ofxOceanodeAbstractParameter& port) {
+    for(const auto& type:supportedTypes()) {
+        bool matches=false;
+        std::visit([&](const auto& zero) {
+            using T=std::decay_t<decltype(zero)>;
+            if constexpr(std::is_same_v<T,Object>) matches=registry().adapter(type).description==port.valueType();
+            else matches=port.valueType()==typeid(T).name();
+        },neutral(type));
+        if(matches) return type;
+    }
+    return "";
+}
+Value readPort(const std::string& type, ofxOceanodeAbstractParameter& port) {
+    return std::visit([&](const auto& zero)->Value {
+        using T=std::decay_t<decltype(zero)>;
+        if constexpr(std::is_same_v<T,Object>) return registry().adapter(type).read(port);
+        else return port.cast<T>().getParameter().get();
+    },neutral(type));
+}
+void writePort(const std::string& type, ofxOceanodeAbstractParameter& port, const Value& value, bool silent) {
+    std::visit([&](const auto& zero) {
+        using T=std::decay_t<decltype(zero)>;
+        if constexpr(std::is_same_v<T,Object>) registry().adapter(type).write(port,value);
+        else {
+            auto p=port.cast<T>().getParameter();
+            if(p.get()==std::get<T>(value)) return;
+            if(silent) p.setWithoutEventNotifications(std::get<T>(value)); else p=std::get<T>(value);
+        }
+    },neutral(type));
+}
+std::shared_ptr<ofxOceanodeAbstractParameter> makePort(const std::string& type, const std::string& name, const Value& initial) {
+    return std::visit([&](const auto& zero)->std::shared_ptr<ofxOceanodeAbstractParameter> {
+        using T=std::decay_t<decltype(zero)>;
+        if constexpr(std::is_same_v<T,Object>) return registry().adapter(type).makePort(name,initial);
+        else {
+            ofParameter<T> p; p.set(name,std::get<T>(initial));
+            auto port=std::make_shared<ofxOceanodeParameter<T>>(); port->bindParameter(p); return port;
+        }
+    },neutral(type));
+}
 Registry& registry() { static Registry instance; return instance; }
 }

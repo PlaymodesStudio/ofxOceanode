@@ -10,6 +10,7 @@ mixer.PRELUDE += r'''
 #include "textureInfo.h"
 #include "textureReader.h"
 #include "simpleEffect.h"
+#include "mixerAlpha.h"
 class OtherAddonTexture : public ofxOceanodeNodeModel {
     ofParameter<std::vector<ofTexture*>> input;
     ofParameter<ofTexture*> output;
@@ -44,16 +45,20 @@ static ofFloatColor pixel(ofTexture* texture,int x=0,int y=0) { assert(texture &
 static void rgba(ofTexture* texture,ofFloatColor expected) { const auto v=pixel(texture); for(int i=0;i<4;++i) near(v[i],expected[i]); }
 int main(int argc,char** argv) {
     assert(argc==3); namespace fs=std::filesystem; ofDisableDataPath();
-    CGLPixelFormatAttribute attributes[]={kCGLPFAOpenGLProfile,(CGLPixelFormatAttribute)kCGLOGLPVersion_3_2_Core,kCGLPFAAllowOfflineRenderers,(CGLPixelFormatAttribute)0};
+    CGLPixelFormatAttribute attributes[]={kCGLPFAAccelerated,kCGLPFAOpenGLProfile,(CGLPixelFormatAttribute)kCGLOGLPVersion_GL4_Core,kCGLPFAAllowOfflineRenderers,(CGLPixelFormatAttribute)0};
     CGLPixelFormatObj format=nullptr; GLint screens=0; CGLContextObj context=nullptr;
-    assert(CGLChoosePixelFormat(attributes,&format,&screens)==kCGLNoError && format);
+    bool accelerated=CGLChoosePixelFormat(attributes,&format,&screens)==kCGLNoError && format;
+    if(!accelerated) {
+        CGLPixelFormatAttribute offline[]={kCGLPFAOpenGLProfile,(CGLPixelFormatAttribute)kCGLOGLPVersion_GL4_Core,kCGLPFAAllowOfflineRenderers,(CGLPixelFormatAttribute)0};
+        assert(CGLChoosePixelFormat(offline,&format,&screens)==kCGLNoError && format);
+    }
     assert(CGLCreateContext(format,nullptr,&context)==kCGLNoError && context); CGLDestroyPixelFormat(format);
     assert(CGLSetCurrentContext(context)==kCGLNoError);
     glewExperimental=GL_TRUE; assert(glewInit()==GLEW_OK); while(glGetError()!=GL_NO_ERROR) {}
     auto window=std::make_shared<ofAppNoWindow>(); ofWindowSettings settings; settings.setSize(64,64); window->setup(settings);
     ofGetMainLoop()->setCurrentWindow(window);
-    auto renderer=std::make_shared<ofGLProgrammableRenderer>(window.get()); window->renderer()=renderer; renderer->setup(3,2); renderer->startRender();
-    std::cout<<"GL: "<<glGetString(GL_VERSION)<<"\n";
+    auto renderer=std::make_shared<ofGLProgrammableRenderer>(window.get()); window->renderer()=renderer; renderer->setup(4,1); renderer->startRender();
+    std::cout<<"GL: "<<glGetString(GL_VERSION)<<" / "<<glGetString(GL_RENDERER)<<std::endl;
     auto registry=std::make_shared<ofxOceanodeNodeRegistry>(); auto types=std::make_shared<ofxOceanodeTypesRegistry>();
     registry->registerModel<router<ofTexture*>>("Router","Texture",nullptr);
     registry->registerModel<router<int>>("Router","i",0,0,4096);
@@ -96,6 +101,24 @@ int main(int argc,char** argv) {
             {"Texture_Info_1",{{"Height",{{"Router_i_1",{{"Value",nullptr}}}}}}}});
     };
     const auto a=scratch+"/a",b=scratch+"/b"; source(a,false); source(b,true);
+    {
+        // Graph morphs bypass saved texture/number policies and render evolving
+        // internal controls, preserving a private texture across update/draw.
+        auto c=contract; c.routers[0].policy="fade_out"; c.routers[1].policy="switch"; c.routers[1].options={{"threshold",.9}};
+        MacroMixerRuntime runtime(parent); assert(runtime.setContract(c)&&runtime.importMacro(a)&&runtime.importMacro(b));
+        runtime.request(a,0,0,true); runtime.update(0); drawFrames(runtime); rgba(texture(runtime),{1,0,0,.25});
+        runtime.request(b,100,0,true); runtime.update(0); drawFrames(runtime); rgba(texture(runtime),{1,0,0,.25});
+        runtime.update(50); drawFrames(runtime); rgba(texture(runtime),{.5,0,.5,.5});
+        assert(texture(runtime)->getWidth()==24&&texture(runtime)->getHeight()==24);
+        assert(std::get<int>(runtime.outputValue("height"))==24);
+        assert(texture(runtime)!=std::get<ofTexture*>(runtime.destination()->read("image")));
+        auto saved=runtime.saveState(); MacroMixerRuntime copy(parent); assert(copy.restoreState(saved)); copy.update(0); drawFrames(copy);
+        rgba(texture(copy),{0,0,1,.75}); assert(texture(copy)!=texture(runtime));
+        const auto held=texture(runtime); runtime.finish(); runtime.update(60); assert(texture(runtime)==held);
+        rgba(held,{.5,0,.5,.5}); drawFrames(runtime); rgba(texture(runtime),{0,0,1,.75});
+        assert(texture(runtime)->getWidth()==16&&texture(runtime)->getHeight()==32);
+        runtime.request(a,100,0,false); runtime.update(70); runtime.update(120); drawFrames(runtime); rgba(texture(runtime),{0,0,0,0});
+    }
     {
         auto& mixing=MacroMixerMixing::registry(); assert(mixing.policy("Texture").id=="crossfade");
         ofFloatPixels ap,bp; ap.allocate(16,8,4); bp.allocate(32,16,4);
@@ -362,6 +385,71 @@ void main(){ vec4 c=texelFetch(tSource,ivec2(gl_FragCoord.xy),0); float g=gainTe
         auto& copy=inner(parent.getDynamicNodes().at("Macro").at(2)->getNodeModel()); auto& first=inner(original->getNodeModel());
         assert(copy.getParameter<ofTexture*>("Image")!=first.getParameter<ofTexture*>("Image"));
         assert(copy.mixerRuntime()->origin()->container!=first.mixerRuntime()->origin()->container); parent.clearContainer();
+    }
+    // Changed internal texture cables use the same private GPU policy renderers
+    // as output routers, while retaining the common native graph. Exercise a
+    // direct output sink and a processing node downstream of the changed cable.
+    registry->registerModel<mixerAlpha>("Textures");
+    if(!accelerated) std::cout<<"Hardware GL unavailable: Mixer Alpha uses its native single-layer path; Apple's software renderer aborts in the existing two-layer composite shader. Internal connection policy shaders still execute and their pixels are checked."<<std::endl;
+    for(bool downstream:{false,true}) {
+        auto saveCableSource=[&](const std::string& folder,bool target) {
+            ofxOceanodeContainer c(registry,types,transport); c.setCanvasID("TextureCable");
+            auto& red=c.createNode(registry->create("Color Texture"),1).getNodeModel();
+            red.getParameter<int>("Res X")=16; red.getParameter<int>("Res Y")=16; red.getParameter<ofFloatColor>("Color")=ofFloatColor(1,0,0,1);
+            auto& output=c.createNode(registry->create("Router Texture"),1).getNodeModel(); output.getParameter<std::string>("Name")="Image";
+            auto& number=c.createNode(registry->create("Router i"),1).getNodeModel(); number.getParameter<std::string>("Name")="Height";
+            if(downstream) c.createNode(registry->create("Texture Flip"),1);
+            if(target) {
+                auto& blue=c.createNode(registry->create("Color Texture"),2).getNodeModel();
+                blue.getParameter<int>("Res X")=16; blue.getParameter<int>("Res Y")=16; blue.getParameter<ofFloatColor>("Color")=ofFloatColor(0,0,1,1);
+                auto& mixer=c.createNode(registry->create("Mixer Alpha"),1).getNodeModel();
+                mixer.getParameter<int>("Width")=16; mixer.getParameter<int>("Height")=16;
+                if(!accelerated) mixer.getParameter<float>("Opac 2")=0;
+                assert(c.createConnectionFromInfo("Color_Texture_1","Output","Mixer_Alpha_1","In 1"));
+                assert(c.createConnectionFromInfo("Color_Texture_2","Output","Mixer_Alpha_1","In 0"));
+            }
+            assert(c.createConnectionFromInfo(target?"Mixer_Alpha_1":"Color_Texture_1","Output",downstream?"Texture_Flip_1":"Router_Texture_1",downstream?"Input":"Value"));
+            if(downstream) assert(c.createConnectionFromInfo("Texture_Flip_1","Output","Router_Texture_1","Value"));
+            assert(c.savePreset(folder));
+        };
+        const auto from=scratch+(downstream?"/texture-consumer-a":"/texture-cable-a"),to=scratch+(downstream?"/texture-consumer-b":"/texture-cable-b");
+        saveCableSource(from,false); saveCableSource(to,true);
+        MacroMixerRuntime r(parent); assert(r.setContract(contract)&&r.importMacro(from)&&r.importMacro(to));
+        const auto targetID=r.importedMacro(to)->id();
+        r.request(from,0,0,true); r.update(0); drawFrames(r); rgba(texture(r),{1,0,0,1}); const auto* graph=r.origin();
+        auto* common=graph->container->getDynamicNodes().at("Color Texture").at(1).get();
+        const auto report=r.sourceDetails(targetID);
+        assert(std::none_of(report.begin(),report.end(),[](const auto& d){return d.kind=="fallback";}));
+        assert(std::any_of(report.begin(),report.end(),[&](const auto& d){return d.kind=="mix"&&d.type=="Texture"&&d.policy=="crossfade"&&d.location.find(downstream?"Texture_Flip_1":"Router_Texture_1")!=std::string::npos;}));
+        r.request(to,1000,0,true); r.update(10); assert(r.morphingInPlace()&&r.destination()==graph); drawFrames(r); rgba(texture(r),{1,0,0,1});
+        assert(!r.setMorphPolicy("Texture","switch")); r.update(510); drawFrames(r); rgba(texture(r),{.5,0,.5,1});
+        auto& blue=graph->container->getDynamicNodes().at("Color Texture").at(2)->getNodeModel().getParameter<ofFloatColor>("Color");
+        blue=ofFloatColor(0,1,0,1); drawFrames(r); rgba(texture(r),{.5,.5,0,1}); blue=ofFloatColor(0,0,1,1); drawFrames(r);
+        auto* owned=texture(r); const auto held=pixel(owned); r.update(600); rgba(owned,held); // update never changes the owned GPU frame.
+        r.finish(); r.update(610); drawFrames(r); rgba(texture(r),{0,0,1,1}); assert(r.origin()==graph);
+        r.request(from,1000,0,true); r.update(620); r.update(1120); drawFrames(r); rgba(texture(r),{.5,0,.5,1});
+        r.finish(); r.update(1130); drawFrames(r); rgba(texture(r),{1,0,0,1});
+        assert(graph->container->getDynamicNodes().at("Color Texture").at(1).get()==common);
+        assert(!graph->container->getDynamicNodes().at("Mixer Alpha").count(1));
+        assert(r.setMorphPolicy("Texture","switch",{{"threshold",.8}}));
+        assert(!r.setMorphPolicy("Texture","switch",{{"threshold",2}}));
+        r.request(to,1000,0,true); r.update(1200); r.update(1700); drawFrames(r); rgba(texture(r),{1,0,0,1});
+        r.update(2100); drawFrames(r); rgba(texture(r),{0,0,1,1});
+        const auto saved=r.saveState(); assert(saved.at("morphPolicies").at("Texture").at("policy")=="switch");
+        MacroMixerRuntime copy(parent); assert(copy.restoreState(saved)); copy.update(0); drawFrames(copy); rgba(texture(copy),{0,0,1,1});
+        assert(copy.morphPolicies().at("Texture").options.at("threshold")==.8);
+        r.finish(); r.update(2200); drawFrames(r);
+        // Cancel after rendering a real temporary GPU surface; original native
+        // cables are restored before that surface and the staged nodes retire.
+        std::vector<MacroMixerDiagnostic> errors;
+        auto revision=MacroMixerSource::importFolder(parent,from,contract,errors); auto original=MacroMixerSource::instantiate(parent,revision,errors);
+        auto destination=MacroMixerSource::importFolder(parent,to,contract,errors); assert(original&&destination);
+        assert(original->prepareMorphInPlace(destination)); original->applyMorph(.5f);
+        for(int frame=0;frame<4;++frame) assert(original->draw());
+        rgba(std::get<ofTexture*>(original->read("image")),{.5,0,.5,1}); original->cancelMorph();
+        for(int frame=0;frame<4;++frame) assert(original->draw());
+        rgba(std::get<ofTexture*>(original->read("image")),{1,0,0,1});
+        assert(!original->container->getDynamicNodes().at("Mixer Alpha").count(1));
     }
     assert(glGetError()==GL_NO_ERROR); assert(liveGui==0); fs::current_path(cwd);
     std::cout<<"Texture GPU checks passed: Screen/Add/Multiply/Difference, Wipe, stable Noise Dissolve, FadeOut, exact RGBA/endpoints/size/HDR, options/persistence, numeric readback, generic addons, source refs, cables, independent clipboard/Macro buffers.\n";

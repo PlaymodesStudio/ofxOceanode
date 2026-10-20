@@ -3,6 +3,22 @@
 import macro_mixer_regression as mixer
 mixer.PRELUDE += '\n#include "MacroMixerFatline.h"\n#include "fatlineGenerator.h"\n'
 
+mixer.PRELUDE += r'''
+class MorphLineRelay : public ofxOceanodeNodeModel {
+    ofParameter<std::vector<ofxFatLine>> input,output;
+public:
+    MorphLineRelay():ofxOceanodeNodeModel("Line Relay") {}
+    void setup() override { addParameter(input.set("Input",{})); addOutputParameter(output.set("Output",{})); }
+    void update(ofEventArgs&) override {
+        auto lines=input.get();
+        for(auto& line:lines) {
+            auto colors=line.getColors(); for(size_t i=0;i<colors.size();++i) { auto color=colors[i]; for(int c=0;c<4;++c) color[c]*=.25f; line.updateColor(i,color); }
+            auto& mesh=line.getMesh(); for(size_t i=0;i<mesh.getNumColors();++i) { auto color=mesh.getColor(i); for(int c=0;c<4;++c) color[c]*=.25f; mesh.setColor(i,color); }
+        }
+        output=lines;
+    }
+};
+'''
 mixer.CASES=r'''
 using Lines=std::vector<ofxFatLine>;
 static void near(float a,float b) { if(!std::isfinite(a)||std::abs(a-b)>.0001f) {std::cerr<<a<<" != "<<b<<"\n"; std::abort();} }
@@ -140,6 +156,29 @@ int main(int argc,char** argv) {
         auto* original=parent.getDynamicNodes().at("Macro").at(1).get(); parent.saveClipboardModulesAndConnections({original},{0,0}); assert(parent.loadClipboardModulesAndConnections({40,40},false)); parent.update();
         auto& copy=static_cast<ofxOceanodeNodeMacro&>(parent.getDynamicNodes().at("Macro").at(2)->getNodeModel());
         assert(copy.getParameter<Lines>("MixedLines").get().size()==1); parent.clearContainer();
+    }
+    // Registered addon value policies also mix changed internal cables.
+    registry->registerModel<MorphLineRelay>("Test");
+    {
+        const auto target=scratch+"/internal-lines"; fs::copy(a,target,fs::copy_options::recursive);
+        auto modules=ofLoadJson(target+"/modules.json"); modules["Line Relay"]["01"]={0,0}; ofSaveJson(target+"/modules.json",modules);
+        write(target,"Line_Relay_1.json",ofJson::object());
+        auto cables=ofLoadJson(target+"/connections.json"); cables["Fat_Line_1"]["Output"].erase("Router_v_Fatline_1");
+        cables["Fat_Line_1"]["Output"]["Line_Relay_1"]["Input"]=nullptr;
+        cables["Line_Relay_1"]["Output"]["Router_v_Fatline_1"]["Value"]=nullptr; ofSaveJson(target+"/connections.json",cables);
+        MacroMixerRuntime r(parent); assert(r.setContract(contract)&&r.importMacro(a)&&r.importMacro(target));
+        r.request(a,0,0,true); r.update(0); const auto* graph=r.origin(); const auto initial=lines(r);
+        const auto details=r.sourceDetails(r.importedMacro(target)->id());
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="mix"&&d.type=="Fatline Vector"&&d.policy=="opacity";}));
+        assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback";}));
+        r.request(target,1000,0,true); r.update(10); assert(r.morphingInPlace()); r.update(510);
+        auto mixed=lines(r); assert(mixed.size()==2); opacity(mixed[0],initial[0],.5); opacity(mixed[1],initial[0],.125); // source geometry retained.
+        r.finish(); r.update(1010); assert(r.origin()==graph); assert(lines(r).size()==1);
+        r.request(a,1000,0,true); r.update(1100); assert(r.morphingInPlace()); r.finish(); r.update(2100);
+        assert(r.setMorphPolicy("Fatline Vector","switch",{{"threshold",.8}}));
+        r.request(target,1000,0,true); r.update(2200); r.update(2700);
+        mixed=lines(r); assert(mixed.size()==1); opacity(mixed[0],initial[0],1);
+        r.finish(); r.update(3200); assert(r.origin()==graph&&lines(r).size()==1);
     }
     assert(liveGui==0); fs::current_path(cwd); std::cout<<"Fatline mixer passed: opacity fades, whole-set Switch thresholds/endpoints/options/persistence, unequal shape counts, unchanged vertices/mesh/widths/source colors, empty sets, typed cables, source refs, clipboard and real Macro reload/copies.\n";
 }
