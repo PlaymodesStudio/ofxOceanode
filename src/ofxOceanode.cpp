@@ -7,6 +7,7 @@
 
 #include "ofxOceanode.h"
 #include "ofxOceanodeTheme.h"
+#include "ofxOceanodeMenu.h"
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeTimeController.h"
 #include "imgui_internal.h"
@@ -207,6 +208,8 @@ void ofxOceanode::update(){
     if(help) help->update();
     for(auto &item : configMenuItems)
         if(item.second.update) item.second.update();
+    for(auto &item : utilityMenuItems)
+        if(item.second.update) item.second.update();
 #ifdef OFXOCEANODE_USE_OSC
     receiveOsc();
 #endif
@@ -285,6 +288,8 @@ void ofxOceanode::draw(){
     }
 
     for(auto &item : configMenuItems)
+        if(item.second.draw) item.second.draw();
+    for(auto &item : utilityMenuItems)
         if(item.second.draw) item.second.draw();
 
     cycleDockedTabs();
@@ -654,18 +659,19 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             if(activeContainer == nullptr) activeContainer = container.get();
             if(activeCanvas == nullptr) activeCanvas = &canvas;
 
+            ofxOceanodeMenu::section("Selection");
             const bool hasSelection = activeContainer->getSelectedModules().size() > 1;
             if(ImGui::MenuItem("Portalize Selection", nullptr, false, hasSelection)){
                 activeCanvas->requestPortalizeSelection();
             }
-            ImGui::Separator();
             if(ImGui::MenuItem("Auto Layout Selection", nullptr, false, hasSelection)){
                 activeCanvas->requestAutoLayoutSelection();
             }
+            ofxOceanodeMenu::section("Canvas");
             if(ImGui::MenuItem("Auto Layout Canvas", nullptr, false, activeContainer->getAllModules().size() > 1)){
                 activeCanvas->requestAutoLayoutCanvas();
             }
-            ImGui::Separator();
+            ofxOceanodeMenu::section("Cleanup");
             if(ImGui::MenuItem("Review leftover node files", nullptr, false,
                                !activeContainerOwner->getPresetStoragePath().empty())){
                 oceanodePresetSave::CleanupReview::instance().request(activeContainerOwner);
@@ -683,133 +689,15 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 
         controls->drawMenus("Presets");
 		
-		if(beginTopLevelMenu("View"))
-		{
-		    auto& controllers = controls->getControllers();
-		    auto& visibility = controls->getControllersVisibility();
-		    
-		    // Refresh on open to retain visibility changes made in Window.
-		    static std::map<std::string, bool> pendingVisibility;
-		    static bool pendingInitialized = false;
-		    if(!pendingInitialized || ImGui::IsWindowAppearing()){
-		        pendingVisibility = visibility;
-		        pendingInitialized = true;
-		    }
-		    // Sync any new controllers added after init
-		    for(auto &c : controllers){
-		        const std::string& name = c->getControllerName();
-		        if(c->isMenuController()){
-		            // Discard window visibility entries saved before migration to a menu.
-		            pendingVisibility.erase(name);
-		            visibility.erase(name);
-		            continue;
-		        }
-		        if(pendingVisibility.find(name) == pendingVisibility.end()){
-		            pendingVisibility[name] = visibility.count(name) ? visibility.at(name) : true;
-		        }
-		    }
-		    
-		    // Iterate the sorted map so checkboxes appear alphabetically
-		    for(auto& kv : pendingVisibility){
-		        ImGui::Checkbox(kv.first.c_str(), &pendingVisibility[kv.first]);
-		    }
-		    
-		    ImGui::Separator();
-		    if(ImGui::BeginMenu("Custom GUIs")){
-		        struct PanelEntry {
-		            ofxOceanodeContainer* owner = nullptr;
-		            const CustomGuiPanelData* panel = nullptr;
-		            std::string canvasId;
-		        };
-
-		        const std::string activeCanvasId = ofxOceanodeShared::getActiveCanvasUniqueID().empty() ? "Canvas" : ofxOceanodeShared::getActiveCanvasUniqueID();
-		        ofxOceanodeContainer* activeContainer = container->getContainerForCanvasID(activeCanvasId);
-		        if(activeContainer == nullptr) activeContainer = container.get();
-
-		        std::vector<PanelEntry> panelEntries;
-		        std::function<void(ofxOceanodeContainer*, const std::string&)> collectPanels =
-		        [&](ofxOceanodeContainer* currentContainer, const std::string& currentCanvasId){
-		            if(currentContainer == nullptr) return;
-
-		            for(const auto& panel : currentContainer->getCustomGuiPanelsData()){
-		                panelEntries.push_back({currentContainer, &panel, currentCanvasId});
-		            }
-
-		            for(auto* node : currentContainer->getAllModules()){
-		                if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
-		                    auto macroContainer = macro->getContainer();
-		                    if(macroContainer != nullptr){
-		                        collectPanels(macroContainer.get(), macroContainer->getCanvasID());
-		                    }
-		                }
-		            }
-		        };
-
-		        collectPanels(activeContainer, activeContainer->getCanvasID());
-
-		        if(ImGui::MenuItem("New Custom GUI")){
-		            activeContainer->requestCreateCustomGui("", CustomGuiWidgetType::Slider, true);
-		        }
-		        ImGui::Separator();
-
-		        if(panelEntries.empty()){
-		            ImGui::TextDisabled("No Custom GUIs");
-		        }else{
-		            for(const auto& entry : panelEntries){
-		                std::string menuLabel = entry.panel->name;
-		                if(!entry.canvasId.empty() && entry.canvasId != "Canvas"){
-		                    menuLabel += " [" + entry.canvasId + "]";
-		                }
-
-		                if(ImGui::BeginMenu(menuLabel.c_str())){
-		                    if(ImGui::MenuItem("Open", nullptr, entry.panel->windowState.isOpen)){
-		                        entry.owner->openCustomGuiPanel(entry.panel->id, false);
-		                    }
-		                    if(ImGui::MenuItem("Edit")){
-		                        entry.owner->openCustomGuiPanel(entry.panel->id, true);
-		                    }
-		                    if(ImGui::MenuItem("Close", nullptr, false, entry.panel->windowState.isOpen)){
-		                        if(CustomGuiPanelData* panelData = entry.owner->getCustomGuiPanelData(entry.panel->id)){
-		                            panelData->windowState.isOpen = false;
-		                            entry.owner->markCustomGuisDirty();
-		                        }
-		                    }
-		                    ImGui::Separator();
-		                    if(ImGui::MenuItem("Delete")){
-		                        entry.owner->requestDeleteCustomGuiPanel(entry.panel->id);
-		                    }
-		                    ImGui::EndMenu();
-		                }
-		            }
-		        }
-		        ImGui::EndMenu();
-		    }
-		    ImGui::Separator();
-		    if(ImGui::Button("Apply")){
-		        visibility = pendingVisibility;
-		    }
-		    ImGui::SameLine();
-		    if(ImGui::Button("Reset")){
-		        for(auto& kv : pendingVisibility){
-		            pendingVisibility[kv.first] = true;
-		        }
-		    }
-		    ImGui::SameLine();
-		    if(ImGui::Button("Save")){
-		        visibility = pendingVisibility;
-		        saveViewConfig(pendingVisibility);
-		    }
-		    ImGui::EndMenu();
-		}
-
 		if(beginTopLevelMenu("Config"))
 		{
+            if(!configMenuItems.empty()) ofxOceanodeMenu::section("Extensions");
             for(auto &item : configMenuItems){
                 const bool enabled = !item.second.enabled || item.second.enabled();
                 if(ImGui::MenuItem(item.first.c_str(), nullptr, false, enabled) && item.second.selected)
                     item.second.selected();
             }
-            if(!configMenuItems.empty()) ImGui::Separator();
+            ofxOceanodeMenu::section("Rendering");
 			// Show actual running FPS (read-only) with color feedback
 			int currentFPS = (int)ofGetFrameRate();
 			
@@ -850,7 +738,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
 			ImGui::Checkbox("Show Mode", &showMode);
 			
-			ImGui::SeparatorText("GUI");
+			ofxOceanodeMenu::section("GUI");
 			ImGui::CheckboxFlags("Color Connections?", &configurationFlags, ofxOceanodeConfigurationFlags_ColorConnections);
 			ImGui::CheckboxFlags("Dashed / Dotted lines", &configurationFlags, ofxOceanodeConfigurationFlags_DashedDottedLines);
 			ofxOceanodeShared::setConfigurationFlags(configurationFlags);
@@ -894,7 +782,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			canvas.setNodeWidthText(tw);
 			canvas.setNodeWidthWidget(ww);
 			
-			ImGui::SeparatorText("LAYOUT");
+			ofxOceanodeMenu::section("LAYOUT");
 			bool layoutWithMacros = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
 			if(ImGui::Checkbox("GUI layout changes with macros", &layoutWithMacros)){
 				ofxOceanodeShared::setGuiLayoutChangesWithMacros(layoutWithMacros);
@@ -975,21 +863,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 				ImGui::EndMenu();
 			}
 
-			ImGui::Separator();
-			
-			if(ImGui::Button("Save Config")){
-				saveConfig();
-			}
-			ImGui::SameLine();
-			if(ImGui::Button("Load Config")){
-				loadConfig();
-			}
-			
-			ImGui::EndMenu();
-		}
-
-        if(beginTopLevelMenu("Theme"))
-        {
+            ofxOceanodeMenu::section("Theme");
             if(ImGui::MenuItem("Edit Theme", nullptr, &showThemeEditor)){}
             ImGui::Separator();
             if(!currentThemeName.empty()){
@@ -1024,7 +898,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
                 }
                 ImGui::EndMenu();
             }
-            if(ImGui::BeginMenu("Set as Default")){
+            if(ImGui::BeginMenu("Set default theme")){
                 ofDirectory dir(ofToDataPath("config/themes", true));
                 dir.allowExt("json");
                 dir.listDir();
@@ -1061,28 +935,45 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
                 pendingThemeFontChange = true;
                 currentThemeName = "OceanodeTheme (built-in)";
             }
-            ImGui::EndMenu();
-        }
+
+            ofxOceanodeMenu::section("Configuration");
+
+			if(ImGui::Button("Save Config")){
+				saveConfig();
+			}
+			ImGui::SameLine();
+			if(ImGui::Button("Load Config")){
+				loadConfig();
+			}
+
+			ImGui::EndMenu();
+		}
 
         if(beginTopLevelMenu("Window"))
         {
             help->drawWindowMenu(*controls);
-            ImGui::MenuItem("Theme Editor", nullptr, &showThemeEditor);
-            ImGui::MenuItem("User Manual", nullptr, &showManual);
-            ImGui::MenuItem("Metrics", nullptr, &show_app_metrics);
             ImGui::EndMenu();
         }
 
         if(beginTopLevelMenu("Help"))
         {
-            help->drawMenu();
-            ImGui::Separator();
-            ImGui::MenuItem("Show User Manual", "CMD+L", &showManual);
-            if(ImGui::MenuItem("Show Help", "CMD+H")){
+            ofxOceanodeMenu::section("Documentation");
+            ImGui::Checkbox("User Manual", &showManual);
+            ImGui::SameLine();
+            ImGui::TextDisabled("CMD+L");
+            if(ImGui::MenuItem("Quick tips", "CMD+H")){
                 showHelp = true;
             }
-            ImGui::Separator();
-            ImGui::MenuItem("Metrics", nullptr, &show_app_metrics);
+            help->drawMenu();
+            ImGui::Checkbox("Metrics", &show_app_metrics);
+            if(ImGui::MenuItem("Reload Macros")){
+                ofxOceanodeShared::updateMacrosStructure();
+            }
+            for(auto &item : utilityMenuItems){
+                const bool enabled = !item.second.enabled || item.second.enabled();
+                if(ImGui::MenuItem(item.first.c_str(), nullptr, false, enabled) && item.second.selected)
+                    item.second.selected();
+            }
             ImGui::EndMenu();
         }
         ImGui::EndMenuBar();

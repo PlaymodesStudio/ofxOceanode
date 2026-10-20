@@ -5,6 +5,7 @@
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeNodeGui.h"
 #include "ofxOceanodeShared.h"
+#include "ofxOceanodeMenu.h"
 #include <algorithm>
 #include <cctype>
 #include <sstream>
@@ -82,6 +83,7 @@ ofxOceanodeHelp::ofxOceanodeHelp(std::shared_ptr<ofxOceanodeContainer> container
 void ofxOceanodeHelp::update() { assistant.update(); }
 
 void ofxOceanodeHelp::drawMenu() {
+    ofxOceanodeMenu::section("Utilities");
     if(ImGui::MenuItem("Search nodes...")) { visible = true; requestedTab = 0; }
     if(ImGui::MenuItem("AI assistant...")) { visible = openAssistant = true; requestedTab = 1; }
 }
@@ -297,17 +299,28 @@ void ofxOceanodeHelp::draw() {
 void ofxOceanodeHelp::drawWindowMenu(ofxOceanodeControls& controls) {
     if(ImGui::MenuItem("Canvas"))
         if(auto* canvas = ofxOceanodeShared::getRootCanvas()) canvas->requestFocus();
-    ImGui::Separator();
-    ImGui::TextDisabled("Controllers");
+    ofxOceanodeMenu::section("Controllers");
     auto& visibility = controls.getControllersVisibility();
+    // Reopening Window starts with current state, including automatic Inspector changes.
+    if(ImGui::IsWindowAppearing()) pendingControllerVisibility = visibility;
     std::vector<std::string> names;
-    for(const auto& controller : controls.getControllers())
-        if(!controller->isMenuController()) names.push_back(controller->getControllerName());
+    for(const auto& controller : controls.getControllers()) {
+        const auto& name = controller->getControllerName();
+        if(controller->isMenuController()) {
+            visibility.erase(name);
+            pendingControllerVisibility.erase(name);
+            continue;
+        }
+        names.push_back(name);
+    }
     std::sort(names.begin(), names.end());
     for(const auto& name : names) {
         if(!visibility.count(name)) visibility[name] = true;
-        if(ImGui::MenuItem(name.c_str(), nullptr, &visibility[name]) && visibility[name]) ImGui::SetWindowFocus(name.c_str());
+        if(!pendingControllerVisibility.count(name)) pendingControllerVisibility[name] = visibility[name];
+        ImGui::Checkbox(name.c_str(), &pendingControllerVisibility[name]);
     }
+    if(ImGui::Button("Apply"))
+        for(const auto& name : names) visibility[name] = pendingControllerVisibility.at(name);
     struct Entry { std::string label; std::function<void()> draw; };
     std::vector<Entry> nodes, macros, panels;
     std::function<void(ofxOceanodeContainer*, const std::string&)> collect =
@@ -318,7 +331,7 @@ void ofxOceanodeHelp::drawWindowMenu(ofxOceanodeControls& controls) {
                 if(macro) {
                     macros.push_back({label, [macro,label](){
                         bool show = macro->isWindowVisible();
-                        if(ImGui::MenuItem(label.c_str(), nullptr, show)) macro->setWindowVisible(!show);
+                        if(ImGui::Checkbox(label.c_str(), &show)) macro->setWindowVisible(show);
                     }});
                     collect(macro->getContainer().get(), label + " / ");
                 }
@@ -331,7 +344,7 @@ void ofxOceanodeHelp::drawWindowMenu(ofxOceanodeControls& controls) {
                         const auto title = label + " / " + parameter->getName();
                         nodes.push_back({title, [toggle,title](){
                             bool show = toggle->get();
-                            if(ImGui::MenuItem(title.c_str(), nullptr, &show)) toggle->set(show);
+                            if(ImGui::Checkbox(title.c_str(), &show)) toggle->set(show);
                         }});
                     }
                 };
@@ -344,17 +357,22 @@ void ofxOceanodeHelp::drawWindowMenu(ofxOceanodeControls& controls) {
                     auto* data = owner->getCustomGuiPanelData(id);
                     if(!data) return;
                     bool show = data->windowState.isOpen;
-                    if(ImGui::MenuItem(label.c_str(), nullptr, &show)) {
+                    if(ImGui::Checkbox(label.c_str(), &show)) {
                         if(show) owner->openCustomGuiPanel(id);
                         else { data->windowState.isOpen = false; owner->markCustomGuisDirty(); }
+                    }
+                    ImGui::SameLine();
+                    if(ImGui::BeginMenu("Options")) {
+                        if(ImGui::MenuItem("Edit")) owner->openCustomGuiPanel(id, true);
+                        if(ImGui::MenuItem("Delete")) owner->requestDeleteCustomGuiPanel(id);
+                        ImGui::EndMenu();
                     }
                 }});
             }
         };
     collect(root.get(), "");
     auto section = [](const char* name, std::vector<Entry>& entries){
-        ImGui::Separator();
-        ImGui::TextDisabled("%s", name);
+        ofxOceanodeMenu::section(name);
         std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b){ return a.label < b.label; });
         if(entries.empty()) ImGui::TextDisabled("None in this patch");
         for(const auto& entry : entries) { ImGui::PushID(entry.label.c_str()); entry.draw(); ImGui::PopID(); }
@@ -362,7 +380,9 @@ void ofxOceanodeHelp::drawWindowMenu(ofxOceanodeControls& controls) {
     section("Nodes", nodes);
     section("Macros", macros);
     section("Custom GUIs", panels);
-    ImGui::Separator();
-    ImGui::TextDisabled("Utilities");
-    ImGui::MenuItem("Help", nullptr, &visible);
+    if(ImGui::MenuItem("New Custom GUI")) {
+        auto* owner = root->getContainerForCanvasID(ofxOceanodeShared::getActiveCanvasUniqueID());
+        if(!owner) owner = root.get();
+        owner->requestCreateCustomGui("", CustomGuiWidgetType::Slider, true);
+    }
 }
