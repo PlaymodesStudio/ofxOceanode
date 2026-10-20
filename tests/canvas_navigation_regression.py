@@ -96,7 +96,7 @@ struct ofxOceanodeShared {
     static void setActiveCanvasUniqueID(string s){active=s;}
     static void nodeSelectedInCanvas(ofxOceanodeNode* n){selected=n;}
     static int& getLayoutSwitchSuppressFrames(){return suppress;}
-    static bool getGuiLayoutChangesWithMacros(){return switchLayouts;}
+    static bool shouldSwitchCanvasLayout(){return switchLayouts;}
     static string& getActiveCanvasLayoutPath(){return layout;}
     static string& getPendingLayoutSavePath(){return save;}
     static string& getPendingLayoutLoadPath(){return load;}

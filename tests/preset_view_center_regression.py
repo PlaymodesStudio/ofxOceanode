@@ -48,6 +48,7 @@ struct ofxOceanodeShared {
 struct App {
     shared_ptr<ofxOceanodeContainer> container=make_shared<ofxOceanodeContainer>();
     ofxOceanodeCanvas canvas;bool presetCanvasCenterPending=false;
+    void loadWorkspaces(){}
     void loaded();void beforeGuiFrame();
 };
 PRODUCTION

@@ -169,7 +169,8 @@ public:
 		canvas.requestFocus();
 	}
 	bool isWindowVisible() const { return showWindow; }
-	void setWindowVisible(bool visible){
+	void setWindowVisible(bool visible, bool focus = true){
+        if(!focus) { showWindow = visible; return; }
 		if(visible) activateWindow();
 		else showWindow = false;
 	}

@@ -52,6 +52,8 @@ with `euclideanGenerator` as the class, and `"Generators"` as the category name.
 - **Help > Search nodes** searches registered nodes and their descriptions.
   **Help > AI assistant** answers questions or proposes a small patch through
   Requesty, using the same credentials as Formula and DynGen.
+- **Workspaces** saves, recalls, updates, renames and deletes named window
+  arrangements within each preset. See [Workspaces](docs/workspaces.md).
 - **Window** lists controllers, node windows, macro canvases and custom GUIs.
   See [Help and window menus](docs/help-and-windows.md) for setup and maintenance.
 

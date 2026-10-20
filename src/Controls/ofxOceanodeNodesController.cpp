@@ -56,7 +56,7 @@ bool naturalLess(const string& a, const string& b) {
 }
 
 void queueCanvasLayout(ofxOceanodeCanvas* canvas) {
-    if(!ofxOceanodeShared::getGuiLayoutChangesWithMacros()) return;
+    if(!ofxOceanodeShared::shouldSwitchCanvasLayout()) return;
     if(canvas->getLayoutIniPath().empty()) return;
     const string path = ofToDataPath(canvas->getLayoutIniPath());
     string& activePath = ofxOceanodeShared::getActiveCanvasLayoutPath();

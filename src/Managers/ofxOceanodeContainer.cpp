@@ -2820,7 +2820,7 @@ bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode)
     ofxOceanodeShared::nodeSelectedInCanvas(location.node);
     ofxOceanodeShared::getLayoutSwitchSuppressFrames() = 4;
 
-    if(ofxOceanodeShared::getGuiLayoutChangesWithMacros()){
+    if(ofxOceanodeShared::shouldSwitchCanvasLayout()){
         string newIniPath = ofToDataPath(location.canvas->getLayoutIniPath());
         string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
         if(!newIniPath.empty() && newIniPath != activeLayoutPath){

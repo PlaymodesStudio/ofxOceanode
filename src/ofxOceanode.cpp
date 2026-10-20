@@ -13,11 +13,13 @@
 #include "ofxOceanodeFloatingWindowDecor.h"
 #include "ofxOceanodeProportionalDocking.h"
 #include "ofxOceanodeHelp.h"
+#include "ofxOceanodeWindowVisibility.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "Controls/PresetFileCleanupReview.h"
 #include <algorithm>
 #include <climits>
 #include <cstring>
+#include <cstdio>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_SFNT_NAMES_H
@@ -98,6 +100,7 @@ void ofxOceanode::setup(){
         if(ofxOceanodeShared::getPresetLoadType() != ofxOceanodePresetLoadType_FullPreset){
             return; // Don't reload layout for clipboard paste / duplicate
         }
+        loadWorkspaces();
         resetPresetCanvasViews(container.get(), &canvas);
         // Menu selections can load a preset during draw; its layout is applied
         // before the next NewFrame, so re-arm centering once that has happened.
@@ -187,6 +190,7 @@ void ofxOceanode::setup(){
         
         canvas.setLayoutIniPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
         hasActivePreset = true;
+        saveWorkspaces();
     });
 
  ofxOceanodeShared::readMacros();
@@ -247,6 +251,11 @@ void ofxOceanode::draw(){
             pendingLoad.clear();
         }
     }
+    if(!pendingWorkspace.empty()){
+        const auto name = pendingWorkspace;
+        pendingWorkspace.clear();
+        recallWorkspace(name);
+    }
     if(presetCanvasCenterPending){
         resetPresetCanvasViews(container.get(), &canvas);
         presetCanvasCenterPending = false;
@@ -293,11 +302,13 @@ void ofxOceanode::draw(){
 }
 
 void ofxOceanode::loadGUILayoutFromDisk(const std::string& path){
+    applyGUILayout(ofBufferFromFile(path).getText());
+}
+
+void ofxOceanode::applyGUILayout(const std::string& data){
     proportionalDocking->reset();
     loadedGUILayoutLeftDockId = 0;
-
-    ofBuffer layoutBuffer = ofBufferFromFile(path);
-    loadedGUILayoutData = layoutBuffer.getText();
+    loadedGUILayoutData = data;
     std::string currentWindow;
     std::map<std::string, ImGuiID> windowDockIds;
     const std::string windowPrefix = "[Window][";
@@ -343,7 +354,7 @@ void ofxOceanode::loadGUILayoutFromDisk(const std::string& path){
         }
     }
 
-    ImGui::LoadIniSettingsFromDisk(path.c_str());
+    ImGui::LoadIniSettingsFromMemory(data.c_str(), data.size());
     // Docking IDs are local to this layout. Never reuse the previous layout's
     // default destinations while the new windows are being restored.
     ofxOceanodeShared::setLeftNodeID(0);
@@ -420,6 +431,225 @@ void ofxOceanode::reconcileMissingControllerWindows(){
     loadedGUILayoutLeftDockId = leftDockId;
     loadedGUILayoutData.clear();
     pendingControllerDockReconciliation = false;
+}
+
+namespace {
+// Use model identity, never a user-editable node label or a retained pointer.
+std::string workspaceNodeKey(ofxOceanodeNodeModel& model){
+    return ofJson::array({model.nodeName(), model.getNumIdentifier()}).dump();
+}
+void workspaceWindowToggles(ofParameterGroup& group, ofJson& state, bool restore){
+    for(auto& parameter : group){
+        if(!oceanodeWindowVisibility::isWindowToggle(parameter->getName())) continue;
+        ofParameter<bool>* toggle = nullptr;
+        if(auto* pin = dynamic_cast<ofxOceanodeParameter<bool>*>(parameter.get())) toggle = &pin->getParameter();
+        else toggle = dynamic_cast<ofParameter<bool>*>(parameter.get());
+        if(!toggle) continue;
+        const auto& name = parameter->getName();
+        if(!restore) state[name] = toggle->get();
+        else if(state.contains(name) && state[name].is_boolean()) toggle->set(state[name].get<bool>());
+    }
+}
+void workspaceWindows(ofxOceanodeContainer* owner, ofJson& state, bool restore){
+    if(!state.is_object()) return;
+    for(auto* node : owner->getAllModules()){
+        auto& model = node->getNodeModel();
+        const auto key = workspaceNodeKey(model);
+        if(restore && (!state.contains("nodes") || !state["nodes"].is_object() ||
+                       !state["nodes"].contains(key))) continue;
+        auto& saved = state["nodes"][key];
+        if(!restore) saved = ofJson::object();
+        if(!saved.is_object()) continue;
+        workspaceWindowToggles(node->getParameters(), saved["parameters"], restore);
+        workspaceWindowToggles(node->getInspectorParameters(), saved["inspector"], restore);
+        if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&model)){
+            if(!restore){
+                saved["open"] = macro->isWindowVisible();
+                saved["children"] = ofJson::object();
+            }else if(saved.contains("open") && saved["open"].is_boolean()){
+                // Restoring visibility must not force a canvas into a new dock.
+                macro->setWindowVisible(saved["open"].get<bool>(), false);
+            }
+            workspaceWindows(macro->getContainer().get(), saved["children"], restore);
+        }
+    }
+    for(const auto& panel : owner->getCustomGuiPanelsData()){
+        if(!restore) state["panels"][panel.id] = panel.windowState.isOpen;
+        else if(state.contains("panels") && state["panels"].is_object() &&
+                state["panels"].contains(panel.id) && state["panels"][panel.id].is_boolean()){
+            if(auto* data = owner->getCustomGuiPanelData(panel.id))
+                data->windowState.isOpen = state["panels"][panel.id].get<bool>();
+        }
+    }
+}
+}
+
+ofJson ofxOceanode::captureWorkspace(){
+    size_t size = 0;
+    const char* ini = ImGui::SaveIniSettingsToMemory(&size);
+    ofJson state = {{"layout", std::string(ini, size)},
+                    {"controllers", controls->getControllersVisibility()},
+                    {"windows", ofJson::object()}};
+    workspaceWindows(container.get(), state["windows"], false);
+    return state;
+}
+
+bool ofxOceanode::saveWorkspaces(){
+    if(workspaceReadFailed){
+        workspaceError = "Invalid workspaces.json left untouched. Fix or remove it, then reload the preset.";
+        return false;
+    }
+    const auto preset = ofxOceanodeShared::getCurrentPresetPath();
+    // An unsaved patch can have workspaces; its first Save writes them all.
+    if(preset.empty()) return true;
+    if(oceanodePresetSave::saveJson(preset + "/workspaces.json", workspaces.toJson())){
+        workspaceError.clear();
+        return true;
+    }
+    workspaceError = "Could not save workspaces.json. Check the preset folder is writable.";
+    return false;
+}
+
+void ofxOceanode::loadWorkspaces(){
+    pendingIniLoad.clear();
+    ofxOceanodeShared::getPendingLayoutSavePath().clear();
+    ofxOceanodeShared::getPendingLayoutLoadPath().clear();
+    workspaces = {};
+    pendingWorkspace.clear();
+    workspaceError.clear();
+    workspaceReadFailed = false;
+    workspacePopup = WorkspacePopup::None;
+    ofxOceanodeShared::getWorkspaceLayoutActive() = false;
+    const auto preset = ofxOceanodeShared::getCurrentPresetPath();
+    if(preset.empty()) return;
+    const auto file = ofToDataPath(preset + "/workspaces.json");
+    if(!ofFile(file).exists()) return;
+    try{
+        workspaces.fromJson(ofLoadJson(file));
+        pendingWorkspace = workspaces.active;
+    }catch(const std::exception& error){
+        workspaceReadFailed = true;
+        workspaceError = "Could not load workspaces: " + std::string(error.what());
+        ofLogError("Workspaces") << workspaceError;
+    }
+}
+
+void ofxOceanode::recallWorkspace(const std::string& name){
+    const auto found = workspaces.entries.find(name);
+    if(found == workspaces.entries.end()) return;
+    auto state = found->second;
+    // This is called before NewFrame. Drop canvas-layout requests from the
+    // previous frame so a macro's layout cannot overwrite the recalled one.
+    pendingIniLoad.clear();
+    ofxOceanodeShared::getPendingLayoutSavePath().clear();
+    ofxOceanodeShared::getPendingLayoutLoadPath().clear();
+    ofxOceanodeShared::getWorkspaceLayoutActive() = true;
+    ofxOceanodeShared::getActiveCanvasLayoutPath() = rootLayoutPath;
+    auto& visibility = controls->getControllersVisibility();
+    for(const auto& controller : controls->getControllers()){
+        const auto& key = controller->getControllerName();
+        if(!controller->isMenuController() && state["controllers"].contains(key) && state["controllers"][key].is_boolean())
+            visibility[key] = state["controllers"][key].get<bool>();
+    }
+    workspaceWindows(container.get(), state["windows"], true);
+    // Remove settings absent from this snapshot, including stale floating
+    // windows, before applying its docking tree and selected tabs.
+    ImGui::ClearIniSettings();
+    applyGUILayout(state["layout"].get<std::string>());
+    const bool changed = workspaces.active != name;
+    workspaces.active = name;
+    if(changed) saveWorkspaces();
+}
+
+void ofxOceanode::drawWorkspacesMenu(){
+    if(ImGui::MenuItem("Save current as...")){
+        workspaceName[0] = '\0';
+        workspaceTarget.clear();
+        workspaceError.clear();
+        workspacePopup = WorkspacePopup::Save;
+    }
+    const bool active = workspaces.entries.count(workspaces.active) != 0;
+    if(ImGui::MenuItem("Update current workspace", nullptr, false, active)){
+        auto previous = workspaces;
+        workspaces.entries.at(workspaces.active) = captureWorkspace();
+        if(!saveWorkspaces()) workspaces = std::move(previous);
+    }
+    if(ImGui::MenuItem("Rename current...", nullptr, false, active)){
+        workspaceTarget = workspaces.active;
+        std::snprintf(workspaceName, sizeof(workspaceName), "%s", workspaceTarget.c_str());
+        workspaceError.clear();
+        workspacePopup = WorkspacePopup::Rename;
+    }
+    if(ImGui::MenuItem("Delete current...", nullptr, false, active)){
+        workspaceTarget = workspaces.active;
+        workspaceError.clear();
+        workspacePopup = WorkspacePopup::Delete;
+    }
+    ImGui::Separator();
+    if(workspaces.entries.empty()) ImGui::TextDisabled("No workspaces in this preset");
+    ImGui::PushID("saved-workspaces");
+    for(const auto& entry : workspaces.entries){
+        if(ImGui::MenuItem(entry.first.c_str(), nullptr, entry.first == workspaces.active))
+            pendingWorkspace = entry.first;
+    }
+    ImGui::PopID();
+    if(ofxOceanodeShared::getCurrentPresetPath().empty()){
+        ImGui::Separator();
+        ImGui::TextDisabled("Save the preset to keep these workspaces.");
+    }
+    if(!workspaceError.empty()) ImGui::TextWrapped("%s", workspaceError.c_str());
+}
+
+void ofxOceanode::drawWorkspacePopups(){
+    if(workspacePopup != WorkspacePopup::None){
+        ImGui::OpenPopup(workspacePopup == WorkspacePopup::Save ? "Save Workspace" :
+                         workspacePopup == WorkspacePopup::Rename ? "Rename Workspace" : "Delete Workspace");
+        workspacePopup = WorkspacePopup::None;
+    }
+    for(const auto action : {WorkspacePopup::Save, WorkspacePopup::Rename, WorkspacePopup::Delete}){
+        const char* title = action == WorkspacePopup::Save ? "Save Workspace" :
+                            action == WorkspacePopup::Rename ? "Rename Workspace" : "Delete Workspace";
+        if(!ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) continue;
+        bool submit = false;
+        if(action == WorkspacePopup::Delete){
+            ImGui::Text("Delete workspace \"%s\"?", workspaceTarget.c_str());
+        }else{
+            ImGui::TextUnformatted("Workspace name:");
+            if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+            ImGui::SetNextItemWidth(300);
+            submit = ImGui::InputText("##workspaceName", workspaceName, sizeof(workspaceName), ImGuiInputTextFlags_EnterReturnsTrue);
+        }
+        if(!workspaceError.empty()) ImGui::TextWrapped("%s", workspaceError.c_str());
+        if(ImGui::Button(action == WorkspacePopup::Delete ? "Delete" : "Save") || submit){
+            auto previous = workspaces;
+            try{
+                const auto name = ofxOceanodeWorkspaces::cleanName(workspaceName);
+                if(action == WorkspacePopup::Save) workspaces.create(name, captureWorkspace());
+                else if(action == WorkspacePopup::Rename) workspaces.rename(workspaceTarget, name);
+                else workspaces.erase(workspaceTarget);
+                if(saveWorkspaces()){
+                    ofxOceanodeShared::getWorkspaceLayoutActive() = !workspaces.active.empty();
+                    if(action == WorkspacePopup::Save){
+                        // Named workspaces use one arrangement across all macro tabs.
+                        ofxOceanodeShared::getActiveCanvasLayoutPath() = rootLayoutPath;
+                        ofxOceanodeShared::getPendingLayoutSavePath().clear();
+                        ofxOceanodeShared::getPendingLayoutLoadPath().clear();
+                    }
+                    workspaceError.clear();
+                    ImGui::CloseCurrentPopup();
+                }else workspaces = std::move(previous);
+            }catch(const std::exception& error){
+                workspaces = std::move(previous);
+                workspaceError = error.what();
+            }
+        }
+        ImGui::SameLine();
+        if(ImGui::Button("Cancel")){
+            workspaceError.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
 }
 
 void ofxOceanode::exit(){
@@ -628,6 +858,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             return open;
         };
         controls->drawMenu("Presets");
+        if(beginTopLevelMenu("Workspaces")){
+            drawWorkspacesMenu();
+            ImGui::EndMenu();
+        }
 
         if(beginTopLevelMenu("Edit"))
         {
@@ -1092,6 +1326,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     // OpenPopup/BeginPopupModal calls below, so the DockSpace window is still
     // the active window context when the popups are registered.
 
+    drawWorkspacePopups();
     controls->drawPopups();
     oceanodePresetSave::CleanupReview::instance().draw();
     drawUnusedNodesWindow();

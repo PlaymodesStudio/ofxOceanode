@@ -18,6 +18,7 @@
 #include "ofxOceanodeScope.h"
 #include "ofxOceanodeTime.h"
 #include "MacroMixerMixing.h"
+#include "ofxOceanodeWorkspaces.h"
 
 //#include "ofxOceanodeAbstractTimeline.h"
 
@@ -247,6 +248,22 @@ private:
     void loadGUILayoutFromDisk(const std::string& path);
     ImGuiID resolveControllerDockID() const;
     void reconcileMissingControllerWindows();
+
+    void applyGUILayout(const std::string& data);
+    ofxOceanodeWorkspaces workspaces;
+    std::string pendingWorkspace;
+    std::string workspaceError;
+    bool workspaceReadFailed = false;
+    enum class WorkspacePopup { None, Save, Rename, Delete };
+    WorkspacePopup workspacePopup = WorkspacePopup::None;
+    std::string workspaceTarget;
+    char workspaceName[256] = {};
+    ofJson captureWorkspace();
+    void recallWorkspace(const std::string& name);
+    bool saveWorkspaces();
+    void loadWorkspaces();
+    void drawWorkspacesMenu();
+    void drawWorkspacePopups();
 
     // GUI layout management state
     bool openSaveLayoutPopup = false;

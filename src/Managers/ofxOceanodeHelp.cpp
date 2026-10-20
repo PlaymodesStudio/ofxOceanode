@@ -1,4 +1,5 @@
 #include "ofxOceanodeHelp.h"
+#include "ofxOceanodeWindowVisibility.h"
 #include "ofxOceanodeHelpPlan.h"
 #include "ofxOceanodeHelpPrompt.h"
 #include "ofxOceanodeNodeHelpCatalog.h"
@@ -46,14 +47,6 @@ std::string readableType(const std::string& type) {
     if(type == typeid(std::vector<float>).name()) return "float vector";
     if(type == typeid(std::vector<int>).name()) return "int vector";
     return type;
-}
-// Deliberately excludes display options such as Show Names, Grid and Clipping.
-bool isWindowToggle(const std::string& label) {
-    std::string key;
-    for(unsigned char c : label) if(std::isalnum(c)) key += static_cast<char>(std::tolower(c));
-    return key == "show" || key == "showwin" || key == "showwindow" ||
-        key == "showgui" || key == "showeditor" || key == "showsnapshot" ||
-        key == "showall" || key == "showsplit";
 }
 }
 
@@ -327,7 +320,7 @@ void ofxOceanodeHelp::drawWindowMenu(ofxOceanodeControls& controls) {
                         ofParameter<bool>* toggle = nullptr;
                         if(auto* pin = dynamic_cast<ofxOceanodeParameter<bool>*>(parameter.get())) toggle = &pin->getParameter();
                         else toggle = dynamic_cast<ofParameter<bool>*>(parameter.get());
-                        if(!toggle || !isWindowToggle(parameter->getName())) continue;
+                        if(!toggle || !oceanodeWindowVisibility::isWindowToggle(parameter->getName())) continue;
                         const auto title = label + " / " + parameter->getName();
                         nodes.push_back({title, [toggle,title](){
                             bool show = toggle->get();

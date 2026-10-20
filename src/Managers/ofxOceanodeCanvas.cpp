@@ -881,7 +881,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         }
         
         if(isActiveTab && !wasFocusedLastFrame && !layoutIniPath.empty()){
-            if(ofxOceanodeShared::getGuiLayoutChangesWithMacros()
+            if(ofxOceanodeShared::shouldSwitchCanvasLayout()
                && ofxOceanodeShared::getLayoutSwitchSuppressFrames() <= 0){
                 string newIniPath = ofToDataPath(layoutIniPath);
                 string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
@@ -3079,7 +3079,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                 target.canvas->setScrolling(-nodePos - nodeSize / 2.0f + center);
 
                                 // 5) Optional layout switching when the user has opted in
-                                if(ofxOceanodeShared::getGuiLayoutChangesWithMacros() &&
+                                if(ofxOceanodeShared::shouldSwitchCanvasLayout() &&
                                    !target.canvas->getLayoutIniPath().empty()){
                                     string newIniPath = ofToDataPath(target.canvas->getLayoutIniPath());
                                     string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
