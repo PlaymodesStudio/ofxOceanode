@@ -13,8 +13,7 @@
 #include "ofxOceanodeFloatingWindowDecor.h"
 #include "ofxOceanodeProportionalDocking.h"
 #include "ofxOceanodeHelp.h"
-#include "defaultNodes.h"
-#include "ofxOceanodeMacroMixer.h"
+#include "ofxOceanodeNodeMacro.h"
 #include "Controls/PresetFileCleanupReview.h"
 #include <algorithm>
 #include <climits>
@@ -49,121 +48,9 @@ ofxOceanode::ofxOceanode(){
     });
 #endif
     
-    //Register default types
-    registerBuiltInType<float>("f", 0.0f);
-    registerBuiltInType<int>("i", 0);
-    registerBuiltInType<bool>("b", false);
-    typesRegistry->registerType<void>("v");
-    nodeRegistry->registerModel<portalSelector<void>>("Portal", "v");
-    registerBuiltInType<string>("s", "");
-    registerBuiltInType<char>("c", ' ');
-    registerBuiltInType<vector<float>>("v_f", vector<float>(1, 0.0f));
-    registerBuiltInType<vector<int>>("v_i", vector<int>(1, 0));
-    registerBuiltInType<vector<string>>("v_s", vector<string>(1, ""));
-    registerBuiltInType<ofColor>("color", ofColor::black);
-    registerBuiltInType<ofFloatColor>("color_f", ofFloatColor::black);
-    registerBuiltInType<Timestamp>("timestamp", Timestamp());
-    
-    //Register default nodes
-    nodeRegistry->registerModel<oscillator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<chaoticOscillator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<phasor>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<lfoTrack>("Generators");
-#ifdef OFXOCEANODE_USE_MIDI
-    nodeRegistry->registerModel<midiClockNode>("Generators");
-#endif
-    nodeRegistry->registerModel<simpleNumberGenerator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<simpleNormalizedNumberGenerator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<counter>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<ramp>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<mapper>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<ranger>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<indexer>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<reindexer>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<smoother>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<switcher>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<curve>("Modifiers");
-	//nodeRegistry->registerModel<curve2>("Modifiers");
-    nodeRegistry->registerModel<ofxOceanodeNodeMacro>("MACRO");
-    nodeRegistry->registerModel<noise>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<randomGenerator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<customGuiSnapshots>("Custom GUI");
-    nodeRegistry->registerModel<beatTransport>("Timeline");
-    nodeRegistry->registerModel<presetLoadTrigger>("General");
-
-    nodeRegistry->registerModel<ofxOceanodeMacroMixer>("Experimental");
-
-    //Register default Routers
-    nodeRegistry->registerModel<router<vector<float>>>("Router", "v_f", 0, 0, 1);
-    nodeRegistry->registerModel<router<float>>("Router", "f", 0, 0, 1);
-    nodeRegistry->registerModel<router<vector<int>>>("Router", "v_i", 0, 0, 1);
-    nodeRegistry->registerModel<router<int>>("Router", "i", 0, 0, 1);
-    nodeRegistry->registerModel<router<string>>("Router", "s", "string");
-    nodeRegistry->registerModel<router<vector<string>>>("Router", "v_s", "string");
-    nodeRegistry->registerModel<routerDropdown>("Router");
-    nodeRegistry->registerModel<router<bool>>("Router", "b", false);
-    nodeRegistry->registerModel<router<void>>("Router", "v");
-    nodeRegistry->registerModel<router<char>>("Router", "c", ' ');
-    nodeRegistry->registerModel<router<ofColor>>("Router", "color", ofColor::black);
-    nodeRegistry->registerModel<router<ofFloatColor>>("Router", "color_f", ofFloatColor::black);
-    nodeRegistry->registerModel<router<Timestamp>>("Router", "timestamp", Timestamp());
-    
-    //Register default Portals
-    nodeRegistry->registerModel<portal<vector<float>>>("Portal", "v_f", 0, true);
-    nodeRegistry->registerModel<portal<float>>("Portal", "f", 0, true);
-    nodeRegistry->registerModel<portal<vector<int>>>("Portal", "v_i", 0, true);
-    nodeRegistry->registerModel<portal<int>>("Portal", "i", 0, true);
-    nodeRegistry->registerModel<portal<string>>("Portal", "s", "string");
-    nodeRegistry->registerModel<portal<bool>>("Portal", "b", false);
-    nodeRegistry->registerModel<portal<void>>("Portal", "v");
-    nodeRegistry->registerModel<portal<char>>("Portal", "c", ' ');
-    nodeRegistry->registerModel<portal<ofColor>>("Portal", "color", ofColor::black);
-    nodeRegistry->registerModel<portal<ofFloatColor>>("Portal", "color_f", ofFloatColor::black);
-    nodeRegistry->registerModel<portal<Timestamp>>("Router", "timestamp", Timestamp());
-    
-    //Register default BufferNodes
-    nodeRegistry->registerModel<bufferNode<vector<float>>>("Portal", "v_f", 0, true);
-    nodeRegistry->registerModel<bufferNode<float>>("Portal", "f", 0, true);
-    nodeRegistry->registerModel<bufferNode<vector<int>>>("Portal", "v_i", 0, true);
-    nodeRegistry->registerModel<bufferNode<int>>("Portal", "i", 0, true);
-    nodeRegistry->registerModel<bufferNode<string>>("Portal", "s", "string");
-    nodeRegistry->registerModel<bufferNode<bool>>("Portal", "b", false);
-    nodeRegistry->registerModel<bufferNode<char>>("Portal", "c", ' ');
-    nodeRegistry->registerModel<bufferNode<ofColor>>("Portal", "color", ofColor::black);
-    nodeRegistry->registerModel<bufferNode<ofFloatColor>>("Portal", "color_f", ofFloatColor::black);
-    
-    //Register defalut BufferHeaders
-    nodeRegistry->registerModel<bufferHeader<vector<float>>>("Portal", "v_f", vector<float>(1, 0), false);
-    nodeRegistry->registerModel<bufferHeader<float>>("Portal", "f", 0, true);
-    nodeRegistry->registerModel<bufferHeader<vector<int>>>("Portal", "v_i", vector<int>(1, 0), false);
-    nodeRegistry->registerModel<bufferHeader<int>>("Portal", "i", 0, true);
-    nodeRegistry->registerModel<bufferHeader<string>>("Portal", "s", "string");
-    nodeRegistry->registerModel<bufferHeader<bool>>("Portal", "b", false);
-    nodeRegistry->registerModel<bufferHeader<char>>("Portal", "c", ' ');
-    nodeRegistry->registerModel<bufferHeader<ofColor>>("Portal", "color", ofColor::black);
-    nodeRegistry->registerModel<bufferHeader<ofFloatColor>>("Portal", "color_f", ofFloatColor::black);
-
-    // HeaderPro uses an explicit offset mode; keep Header registered for saved patches.
-    nodeRegistry->registerModel<bufferHeaderPro<vector<float>>>("HeaderPro", "v_f", vector<float>(1, 0), false);
-    nodeRegistry->registerModel<bufferHeaderPro<float>>("HeaderPro", "f", 0, true);
-    nodeRegistry->registerModel<bufferHeaderPro<vector<int>>>("HeaderPro", "v_i", vector<int>(1, 0), false);
-    nodeRegistry->registerModel<bufferHeaderPro<int>>("HeaderPro", "i", 0, true);
-    nodeRegistry->registerModel<bufferHeaderPro<string>>("HeaderPro", "s", "string");
-    nodeRegistry->registerModel<bufferHeaderPro<bool>>("HeaderPro", "b", false);
-    nodeRegistry->registerModel<bufferHeaderPro<char>>("HeaderPro", "c", ' ');
-    nodeRegistry->registerModel<bufferHeaderPro<ofColor>>("HeaderPro", "color", ofColor::black);
-    nodeRegistry->registerModel<bufferHeaderPro<ofFloatColor>>("HeaderPro", "color_f", ofFloatColor::black);
-    
-    //Register default BufferTpes
-    registerType<buffer<float>*>("buffer_f");
-    registerType<buffer<int>*>("buffer_i");
-    registerType<buffer<bool>*>("buffer_b");
-    registerType<buffer<string>*>("buffer_s");
-    registerType<buffer<char>*>("buffer_c");
-    registerType<buffer<vector<float>>*>("buffer_v_f");
-    registerType<buffer<vector<int>>*>("buffer_v_i");
-    registerType<buffer<ofColor>*>("buffer_color");
-    registerType<buffer<ofFloatColor>*>("buffer_color_f");
+    registerDefaultTypes();      // ofxOceanodeDefaultTypes.cpp
+    registerDefaultNodes();      // ofxOceanodeDefaultNodes.cpp
+    registerDefaultRouting();    // ofxOceanodeDefaultRouting.cpp
 }
 
 ofxOceanode::~ofxOceanode(){

@@ -179,6 +179,9 @@ public:
 	void loadTheme(const std::string& name);
 
 private:
+    void registerDefaultTypes();      // ofxOceanodeDefaultTypes.cpp
+    void registerDefaultNodes();      // ofxOceanodeDefaultNodes.cpp
+    void registerDefaultRouting();    // ofxOceanodeDefaultRouting.cpp
     struct ConfigMenuItem {
         std::function<void()> selected, update, draw;
         std::function<bool()> enabled;

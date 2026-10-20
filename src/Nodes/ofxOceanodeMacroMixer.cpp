@@ -1,4 +1,5 @@
 #include "ofxOceanodeMacroMixer.h"
+#include "ofxOceanodeTimeline.h"
 #include "ofxOceanodeNodeRegistry.h"
 #include "imgui.h"
 #include <algorithm>

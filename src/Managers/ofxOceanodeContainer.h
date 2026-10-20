@@ -10,7 +10,7 @@
 #define ofxOceanodeContainer_h
 
 #include "ofxOceanodeTransport.h"
-#include "Timeline/ofxOceanodeTimeline.h"
+class ofxOceanodeTimelineManager;   // Timeline/ofxOceanodeTimeline.h: include it where the timeline is used
 #include "ofxOceanodeConnection.h"
 #include "ofxOceanodeNode.h"
 #include "CustomGui/ofxOceanodeCustomGuiLayout.h"

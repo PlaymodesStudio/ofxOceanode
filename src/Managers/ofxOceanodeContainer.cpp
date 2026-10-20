@@ -8,6 +8,7 @@
 
 
 #include "ofxOceanodeContainer.h"
+#include "ofxOceanodeTimeline.h"
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeTypesRegistry.h"
 #include "ofxOceanodeNodeModel.h"

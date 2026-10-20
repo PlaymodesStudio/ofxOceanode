@@ -6,6 +6,7 @@
 //
 
 #include "ofxOceanodeNodeGui.h"
+#include "ofxOceanodeTimeline.h"
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeContainer.h"

@@ -1,0 +1,18 @@
+//
+//  ofxOceanodePrefix.pch
+//
+//  Precompiled prefix header for apps built with ofxOceanode. It only saves
+//  compile time: every C++ file parses ofMain.h once from the precompiled
+//  copy instead of again from source. In an app's Project.xcconfig:
+//
+//    GCC_PREFIX_HEADER = $(OF_PATH)/addons/ofxOceanode/ofxOceanodePrefix.pch
+//    GCC_PRECOMPILE_PREFIX_HEADER = YES
+//
+//  Keep it to headers that rarely change: editing anything included here
+//  rebuilds every file. imgui.h stays out (ImGui's own sources must define
+//  IMGUI_DEFINE_MATH_OPERATORS before including it).
+//
+
+#ifdef __cplusplus
+#include "ofMain.h"
+#endif

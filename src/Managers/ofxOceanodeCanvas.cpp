@@ -7,6 +7,7 @@
 //
 
 #include "ofxOceanodeCanvas.h"
+#include "ofxOceanodeTimeline.h"
 #include <cmath>
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeContainer.h"

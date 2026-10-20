@@ -4,6 +4,7 @@
 //
 
 #include "lfoTrack.h"
+#include "ofxOceanodeTimeline.h"
 #include "ofxOceanodeContainer.h"
 
 void lfoTrack::setup() {

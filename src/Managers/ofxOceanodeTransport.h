@@ -2,6 +2,10 @@
 #define ofxOceanodeTransport_h
 
 #define OFX_OCEANODE_HAS_GLOBAL_TRANSPORT 1
+// This branch has the timeline (Timeline/ofxOceanodeTimeline.h). Addons test
+// this instead of __has_include on the timeline headers: a probed header is a
+// build dependency, so every file probing it rebuilt with each timeline edit.
+#define OFX_OCEANODE_HAS_TIMELINE 1
 
 #include <cstdint>
 #include <mutex>
