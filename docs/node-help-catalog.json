@@ -399,7 +399,7 @@
     "addon": "ofxEloiNodes"
   },
   "Buffer ": {
-    "description": "Stores a bounded history of Input values for a Header or HeaderPro of the same type. A new sample is recorded when Input changes while Rec is on.\n\nRec -> Enables recording.\nTimestamp -> If connected, supplies each sample's timestamp; otherwise the current wall clock time is used.\nMax Size -> Maximum number of stored samples. Older samples are discarded as new ones arrive.\nClear -> Empties the history.\nOutput -> The Buffer connection for a Header or HeaderPro; it is not the latest sample value.\nInspector: Last Frame Ms -> Available time span in milliseconds backward from the newest sample, updated when Input changes.",
+    "description": "Stores a bounded history of Input values for a Header or HeaderPro of the same type. A new sample is recorded when Input changes while Rec is on. Input changes during preset loading are not recorded, so temporary initialization values do not enter the history.\n\nRec -> Enables recording.\nTimestamp -> If connected, supplies each sample's timestamp; otherwise the current wall clock time is used.\nMax Size -> Maximum number of stored samples. Older samples are discarded as new ones arrive.\nClear -> Empties the history.\nOutput -> The Buffer connection for a Header or HeaderPro; it is not the latest sample value.\nInspector: Last Frame Ms -> Available time span in milliseconds backward from the newest sample, updated when Input changes.",
     "parameters": [
       "Input",
       "Rec",

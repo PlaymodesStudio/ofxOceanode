@@ -166,6 +166,72 @@ void expect(const vector<float> &actual, const vector<float> &wanted) {
         abort();
     }
 }
+template<typename T>
+void recorderStartupTest(const T &zero, const T &first, const T &second, bool connectedTimestamp) {
+    ofxOceanodeShared::loading = true;
+    bufferNode<T> recorder("test", 0.0f, true);
+    recorder.setup();
+    recorder.timestampConnected = connectedTimestamp;
+    auto *history = parameter<buffer<T>*>(recorder, "Output").get();
+    parameter<int>(recorder, "Max Size") = 1000;
+    auto feed = [&](const T &value, double ms){
+        Timestamp::nowMs = ms;
+        parameter<Timestamp>(recorder, "Timestamp") = Timestamp{ms};
+        parameter<T>(recorder, "Input") = value;
+    };
+    // Parameter recall and connection activation can send defaults and saved
+    // values in any order. None belongs to the new live recording.
+    feed(first, 0);
+    feed(zero, 1);
+    feed(second, 2);
+    feed(zero, 3);
+    assert(history->getSize() == 0);
+
+    bufferHeaderPro<T> reader("test", zero, false);
+    reader.setup();
+    parameter<buffer<T>*>(reader, "Buffer Input") = history;
+    parameter<int>(reader, "Copies") = 3;
+    parameter<int>(reader, "Offset Mode") = 1;
+    parameter<vector<float>>(reader, "Offset") = vector<float>{0, 5000, 10000};
+    *static_cast<ofParameter<bool>*>(reader.inspectorParameters.at("Fit Available History")) = true;
+    auto &output = parameter<vector<T>>(reader, "Output");
+    ofEventArgs args;
+    reader.update(args);
+    assert(output.get().empty());
+    ofxOceanodeShared::loading = false;
+    feed(first, 100);
+    assert(history->getSize() == 1);
+    assert(output.get() == vector<T>(3, first));
+    feed(second, 200);
+    assert(history->getSize() == 2);
+    assert(output.get().front() == second);
+    assert(output.get().back() == first); // The final read is real history, not startup zero.
+
+    // A subsequent preset load must not add temporary samples to a retained
+    // recorder either, or silently erase its existing history.
+    ofxOceanodeShared::loading = true;
+    feed(zero, 300);
+    feed(first, 301);
+    assert(history->getSize() == 2);
+    ofxOceanodeShared::loading = false;
+    feed(zero, 400); // A real runtime zero remains valid.
+    assert(history->getSize() == 3);
+    assert(history->getFrame(0, true).getObjectRef() == zero);
+    assert(output.get().front() == zero);
+    parameter<bool>(recorder, "Rec") = false;
+    feed(first, 500);
+    assert(history->getSize() == 3);
+    parameter<bool>(recorder, "Rec") = true;
+    feed(second, 600);
+    assert(history->getSize() == 4);
+
+    // An actual zero as the first runtime sample must not be discarded.
+    history->clear();
+    feed(zero, 700);
+    feed(first, 800);
+    assert(history->getSize() == 2);
+    assert(output.get().back() == zero);
+}
 void startupTests() {
     TestBuffer<float> growing;
     bufferHeaderPro<float> node("f", 0, true);
@@ -263,6 +329,10 @@ void startupTests() {
            vector<vector<float>>(3, {7, 14}));
 }
 int main() {
+    for(bool connectedTimestamp : {false, true}){
+        recorderStartupTest<float>(0, 0.6f, 0.7f, connectedTimestamp);
+        recorderStartupTest<vector<float>>({0, 0}, {0.6f, 0.4f}, {0.7f, 0.3f}, connectedTimestamp);
+    }
     startupTests();
     TestBuffer<float> history;
     history.addFrames({{10, {0}}, {20, {10}}, {30, {30}}, {40, {60}}});
@@ -391,7 +461,7 @@ def main():
             str(source), "-o", str(binary),
         ], check=True)
         subprocess.run([str(binary)], check=True)
-    print("Header regression passed: production Buffer lookup, fitted startup/growth, vectors, modes, overflow, and sample refresh.")
+    print("Header regression passed: preset-load recording, runtime zeros, production Buffer lookup, fitted startup/growth, vectors, modes, overflow, and sample refresh.")
 
 
 if __name__ == "__main__":
