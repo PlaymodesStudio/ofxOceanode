@@ -48,7 +48,8 @@ struct ofxOceanodeShared {
 struct App {
     shared_ptr<ofxOceanodeContainer> container=make_shared<ofxOceanodeContainer>();
     ofxOceanodeCanvas canvas;bool presetCanvasCenterPending=false;
-    void loadWorkspaces(){}
+    struct Layouts { void onPresetLoaded(){} } layoutStore;
+    Layouts* layouts=&layoutStore;
     void loaded();void beforeGuiFrame();
 };
 PRODUCTION
@@ -95,7 +96,7 @@ def main():
     callback_start=app.index('        if(ofxOceanodeShared::getPresetLoadType() !=')
     callback_end=app.index('        if(ofxOceanodeShared::getCurrentPresetPath().empty())',callback_start)
     draw=block(app,'void ofxOceanode::draw()')
-    assert draw.index('loadGUILayoutFromDisk(pendingIniLoad)') < draw.index('if(presetCanvasCenterPending)') < draw.index('gui.begin()')
+    assert draw.index('layouts->beforeFrame()') < draw.index('if(presetCanvasCenterPending)') < draw.index('gui.begin()')
     production=block(canvas,'void ofxOceanodeCanvas::resetViewToOrigin()')
     production+='\nvoid ofxOceanodeCanvas::center(){'+block(canvas,'if(centerOriginPending &&')+'}\n'
     production+=block(app,'void resetPresetCanvasViews(')

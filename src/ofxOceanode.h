@@ -18,7 +18,6 @@
 #include "ofxOceanodeScope.h"
 #include "ofxOceanodeTime.h"
 #include "MacroMixerMixing.h"
-#include "ofxOceanodeWorkspaces.h"
 
 //#include "ofxOceanodeAbstractTimeline.h"
 
@@ -33,6 +32,7 @@
 
 class ofxOceanodeProportionalDocking;
 class ofxOceanodeHelp;
+class ofxOceanodeLayoutManager;
 
 class ofxOceanode {
 public:
@@ -182,7 +182,7 @@ public:
 	void loadConfig();
 	void saveViewConfig(const std::map<std::string, bool>& visibilityMap);
 	void loadViewConfig();
-	void loadDefaultGUILayout();
+    void loadDefaultGUILayout(); // Existing host API, delegated to the layout manager.
 	void saveTheme(const std::string& name);
 	void loadTheme(const std::string& name);
 
@@ -238,12 +238,6 @@ private:
     
     ofEventListener presetLoadedListener;
     ofEventListener presetSavedListener;
-    bool hasActivePreset = false;
-    // The root canvas layout file of the preset loaded / saved last: after a
-    // Save As the active layout path still names it (the new folder's file
-    // does not exist yet)
-    string rootLayoutPath;
-    std::string pendingIniLoad; // empty means no pending load
     bool presetCanvasCenterPending = false;
 
     // Metadata for the most recently loaded ImGui layout. ImGui restores only
@@ -252,32 +246,11 @@ private:
     std::string loadedGUILayoutData;
     ImGuiID loadedGUILayoutLeftDockId = 0;
     bool pendingControllerDockReconciliation = false;
-    void loadGUILayoutFromDisk(const std::string& path);
     ImGuiID resolveControllerDockID() const;
     void reconcileMissingControllerWindows();
 
     void applyGUILayout(const std::string& data);
-    ofxOceanodeWorkspaces workspaces;
-    std::string pendingWorkspace;
-    std::string workspaceError;
-    bool workspaceReadFailed = false;
-    enum class WorkspacePopup { None, Save, Rename, Delete };
-    WorkspacePopup workspacePopup = WorkspacePopup::None;
-    std::string workspaceTarget;
-    char workspaceName[256] = {};
-    ofJson captureWorkspace();
-    void recallWorkspace(const std::string& name);
-    bool saveWorkspaces();
-    void loadWorkspaces();
-    void queueGlobalLayout(const std::string& path, const std::string& name);
-    void drawLayoutsMenu();
-    void drawWorkspacesMenu();
-    void drawWorkspacePopups();
-
-    // GUI layout management state
-    bool openSaveLayoutPopup = false;
-    std::string currentLayoutName;
-    char saveLayoutNameBuf[256] = {};
+    std::unique_ptr<ofxOceanodeLayoutManager> layouts;
 
     // Theme editor state
     bool showThemeEditor = false;

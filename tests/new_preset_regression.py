@@ -280,6 +280,7 @@ def main():
     presets = (ROOT / "src/Controls/ofxOceanodePresetsController.cpp").read_text()
     canvas = (ROOT / "src/Managers/ofxOceanodeCanvas.cpp").read_text()
     app = (ROOT / "src/ofxOceanode.cpp").read_text()
+    layouts = (ROOT / "src/Layouts/ofxOceanodeLayoutManager.h").read_text()
     guard = container[container.index("    thread_local unsigned int containerClearDepth"):
                       container.index("    struct ConnectionFailureInfo")]
     production = "namespace {\n" + guard + "}\n"
@@ -290,11 +291,14 @@ def main():
     production += block(canvas, "void ofxOceanodeCanvas::resetViewToOrigin()")
     production += block(canvas, "void ofxOceanodeCanvas::resetForNewPreset()")
     production += "void ofxOceanodeCanvas::center(){" + block(canvas, "if(centerOriginPending &&") + "}\n"
-    production += "void App::onLoaded(){" + block(app, "if(ofxOceanodeShared::getCurrentPresetPath().empty())") + "}\n"
+    manager_load = block(layouts, "void ofxOceanodeLayoutManager::onPresetLoaded()")
+    manager_new = block(manager_load, "if(ofxOceanodeShared::getCurrentPresetPath().empty())")
+    manager_new = manager_new.replace('callbacks.setRootCanvasPath(', 'canvas.setLayoutIniPath(').replace('return;', '')
+    production += "void App::onLoaded(){" + manager_new + block(app, "if(ofxOceanodeShared::getCurrentPresetPath().empty())") + "}\n"
     production += "void App::onSaved(string iniPath){auto& activeLayoutPath=ofxOceanodeShared::getActiveCanvasLayoutPath();"
-    production += app[app.index("const string previousRoot = rootLayoutPath;"):
-                      app.index("// Only save from ImGui state")]
-    production += block(app, "if(rootActive){") + "}\n"
+    production += layouts[layouts.index("const std::string previousRoot = rootLayoutPath;"):
+                          layouts.index("// Only save from ImGui state")]
+    production += block(layouts, "if(rootActive){") + "}\n"
     save_method = block(container, "bool ofxOceanodeContainer::savePreset(string presetFolderPath)")
     production += "void ofxOceanodeContainer::attachSavedScope(string presetFolderPath){const bool ownsGlobalScope=getCanvasID().empty() || getCanvasID()==\"Canvas\" || getCanvasID()==\"0\";"
     production += block(save_method, "if(ownsGlobalScope){") + "}\n"

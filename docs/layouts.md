@@ -1,8 +1,7 @@
 # Layouts
 
 The **Layouts** top menu brings together named **Preset layouts** and reusable
-**Global layouts**. The former Workspaces menu and Config layout actions now
-live here.
+**Global layouts**. Both scopes share one layout manager and the same docking mechanism.
 
 ## Preset layouts
 
@@ -23,8 +22,11 @@ currently on screen. Rearranging windows or saving the preset does not replace a
 snapshot: use Update to keep those changes in the named layout.
 
 The collection and last selected preset layout are saved inside the preset folder.
-Existing `workspaces.json` files remain supported and keep that filename so layouts
-saved before the menu rename continue to work. Changes are saved immediately for
+New saves use `preset_layouts.json` (schema version 2, with a `layouts` collection).
+The manager also reads the original `workspaces.json` (version 1) when the new file
+does not exist. Saving writes the new file and leaves the old file untouched;
+subsequent loads prefer the new file. Invalid current files are reported and never
+silently replaced with older data. Changes are saved immediately for
 an existing preset; an unsaved patch keeps them in memory until its first Save.
 Save As carries the collection into the new preset. **Set default preset layout**
 chooses which named layout opens whenever that preset is loaded. Switching layouts
@@ -56,3 +58,19 @@ Node window toggles use the same recognition as the Window menu (`Show`, `Show
 Win`, `Show Window`, `Show GUI`, `Show Editor`, `Show Snapshot`, `Show All`, `Show
 Split`). A window controlled only by private addon state or a differently named
 toggle retains its visibility; ImGui restores its saved docking when it opens.
+
+## Code organization
+
+All layout ownership lives in `src/Layouts/ofxOceanodeLayoutManager.h`: global and
+preset selection, defaults, persistence, Save As, canvas layout switching, deferred
+application, menus and dialogs. It is header-only so existing host projects do not
+need to register another compiled source file.
+
+`ofxOceanodePresetLayouts.h` is the manager's pure preset snapshot data structure,
+including naming, default tracking and schema compatibility.
+`ofxOceanodeLayoutWindowState.h` adapts node/controller visibility to snapshots.
+`ofxOceanode` supplies these adapters and the low-level ImGui docking restoration;
+it delegates layout lifecycle and UI to the manager.
+
+`tests/layouts_regression.py` covers both scopes, preset defaults, legacy migration,
+root/macro ownership, Save As, and repeated docking restoration using real ImGui.

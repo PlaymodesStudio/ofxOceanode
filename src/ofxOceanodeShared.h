@@ -449,10 +449,10 @@ public:
 		getInstance().changeLayoutOnMacros = b;
 	}
 
-    // A named workspace owns the whole preset's docking layout, across canvas tabs.
-    static bool& getWorkspaceLayoutActive(){ static bool active = false; return active; }
+    // A named preset layout owns the whole preset's docking layout, across canvas tabs.
+    static bool& getPresetLayoutActive(){ static bool active = false; return active; }
     static bool shouldSwitchCanvasLayout(){
-        return getGuiLayoutChangesWithMacros() && !getWorkspaceLayoutActive();
+        return getGuiLayoutChangesWithMacros() && !getPresetLayoutActive();
     }
 
 	// Suppress automatic layout switching for N frames (used by NodesController

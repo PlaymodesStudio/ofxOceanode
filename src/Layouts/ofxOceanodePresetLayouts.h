@@ -7,7 +7,7 @@
 
 // Preset-owned, explicit snapshots. Saving a preset never overwrites a named
 // snapshot; the user chooses Update when a new arrangement should replace it.
-class ofxOceanodeWorkspaces {
+class ofxOceanodePresetLayouts {
 public:
     using Json = nlohmann::json;
     std::map<std::string, Json> entries;
@@ -48,12 +48,16 @@ public:
         if(active == name) active.clear();
         if(defaultLayout == name) defaultLayout.clear();
     }
-    Json toJson() const { return {{"version", 1}, {"active", active}, {"default", defaultLayout}, {"workspaces", entries}}; }
+    Json toJson() const { return {{"version", 2}, {"active", active}, {"default", defaultLayout}, {"layouts", entries}}; }
     void fromJson(const Json& json){
-        ofxOceanodeWorkspaces loaded;
-        if(!json.is_object() || json.at("version") != 1 || !json.at("workspaces").is_object())
+        ofxOceanodePresetLayouts loaded;
+        if(!json.is_object()) throw std::runtime_error("Invalid preset layout file.");
+        const int version = json.at("version").get<int>();
+        // Read-only compatibility with the first preset-layout format.
+        const char* key = version == 1 ? "workspaces" : "layouts";
+        if((version != 1 && version != 2) || !json.at(key).is_object())
             throw std::runtime_error("Unsupported preset layout file.");
-        for(auto it = json.at("workspaces").begin(); it != json.at("workspaces").end(); ++it){
+        for(auto it = json.at(key).begin(); it != json.at(key).end(); ++it){
             const auto& snapshot = it.value();
             if(!validName(it.key()) || !snapshot.is_object() ||
                !snapshot.at("layout").is_string() || snapshot.at("layout").get<std::string>().empty() ||
