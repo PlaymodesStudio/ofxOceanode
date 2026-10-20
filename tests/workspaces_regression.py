@@ -104,13 +104,14 @@ struct ofxOceanode {
     shared_ptr<ofxOceanodeContainer> container=make_shared<ofxOceanodeContainer>();
     shared_ptr<Controls> controls=make_shared<Controls>();
     unique_ptr<Policy> proportionalDocking=make_unique<Policy>();
-    ofxOceanodeWorkspaces workspaces;string pendingIniLoad,rootLayoutPath="preset/ImGuiLayout.ini",loadedGUILayoutData;
+    ofxOceanodeWorkspaces workspaces;string currentLayoutName;string pendingIniLoad,rootLayoutPath="preset/ImGuiLayout.ini",loadedGUILayoutData;
     ImGuiID loadedGUILayoutLeftDockId=0;bool pendingControllerDockReconciliation=false;
     ofJson captureWorkspace();void recallWorkspace(const string&);void applyGUILayout(const string&);
     enum class WorkspacePopup {None,Save,Rename,Delete};
     WorkspacePopup workspacePopup=WorkspacePopup::None;
     string pendingWorkspace,workspaceError;bool workspaceReadFailed=false;
     bool saveWorkspaces();void loadWorkspaces();
+    void queueGlobalLayout(const string&, const string&);
 };
 PRODUCTION
 ImGuiID rootID,leftID,centerID;
@@ -178,9 +179,24 @@ int main(){
     app.container->nodes={&synth};app.container->panels.clear();app.recallWorkspace("Sound");settle();
     // Production preset-path save/load, first Save, Save As, missing files, New,
     // corrupt files and write errors. Named snapshots remain explicit.
+    auto snapshots=app.workspaces.entries;
+    app.pendingWorkspace="Laser";
+    ofxOceanodeShared::getPendingLayoutLoadPath()="old-macro.ini";
+    ofxOceanodeShared::getPendingLayoutSavePath()="old.ini";
+    app.queueGlobalLayout("config/guiLayouts/Studio.ini","Studio.ini");
+    assert(app.workspaces.entries==snapshots&&app.workspaces.active.empty());
+    assert(app.pendingWorkspace.empty()&&app.pendingIniLoad=="config/guiLayouts/Studio.ini");
+    assert(app.currentLayoutName=="Studio.ini"&&ofxOceanodeShared::shouldSwitchCanvasLayout());
+    assert(ofxOceanodeShared::getPendingLayoutLoadPath().empty()&&ofxOceanodeShared::getPendingLayoutSavePath().empty());
+    app.recallWorkspace("Sound");settle();
     auto original=app.workspaces.toJson();
     assert(app.saveWorkspaces());assert(!filesystem::exists("workspaces.json"));
     ofxOceanodeShared::preset="preset-A";assert(app.saveWorkspaces());
+    assert(ofLoadJson("preset-A/workspaces.json")==original);
+    app.queueGlobalLayout("config/guiLayouts/Studio.ini","Studio.ini");
+    auto globalSelection=ofLoadJson("preset-A/workspaces.json");
+    assert(globalSelection["active"]==""&&globalSelection["workspaces"]==original["workspaces"]);
+    app.recallWorkspace("Sound");settle();
     assert(ofLoadJson("preset-A/workspaces.json")==original);
     ofxOceanodeShared::preset="preset-B";assert(app.saveWorkspaces());
     app.workspaces.entries.at("Sound")=laser;assert(app.saveWorkspaces());
@@ -189,6 +205,32 @@ int main(){
     assert(app.workspaces.toJson()==original&&app.pendingWorkspace=="Sound");
     assert(!ofxOceanodeShared::getWorkspaceLayoutActive());
     assert(ofxOceanodeShared::shouldSwitchCanvasLayout());
+    // A preset default is independent from the last selection, including after
+    // saving, reopening, global-layout selection, rename, deletion and Save As.
+    ofxOceanodeShared::preset="preset-default";
+    app.workspaces.defaultLayout="Laser";
+    assert(app.workspaces.active=="Sound"&&app.saveWorkspaces());
+    app.loadWorkspaces();
+    assert(app.pendingWorkspace=="Laser"&&app.workspaces.active=="Sound");
+    app.recallWorkspace("Laser");settle();
+    app.recallWorkspace("Sound");settle();
+    assert(app.workspaces.defaultLayout=="Laser");
+    app.loadWorkspaces();assert(app.pendingWorkspace=="Laser");
+    app.queueGlobalLayout("Studio.ini","Studio.ini");
+    app.loadWorkspaces();assert(app.pendingWorkspace=="Laser"&&app.workspaces.active.empty());
+    app.workspaces.rename("Laser","Lasers");assert(app.workspaces.defaultLayout=="Lasers");
+    assert(app.saveWorkspaces());app.loadWorkspaces();assert(app.pendingWorkspace=="Lasers");
+    auto defaultSaveAs=app.workspaces;
+    assert(defaultSaveAs.defaultLayout=="Lasers");
+    app.recallWorkspace("Sound");settle();
+    app.workspaces.erase("Lasers");assert(app.workspaces.defaultLayout.empty());
+    assert(app.saveWorkspaces());app.loadWorkspaces();assert(app.pendingWorkspace=="Sound");
+    auto legacy=original;legacy.erase("default");
+    ofxOceanodeWorkspaces legacyLayouts;legacyLayouts.fromJson(legacy);
+    assert(legacyLayouts.defaultLayout.empty()&&legacyLayouts.layoutOnLoad()=="Sound");
+    auto missingDefault=original;missingDefault["default"]="Deleted layout";
+    legacyLayouts.fromJson(missingDefault);
+    assert(legacyLayouts.defaultLayout.empty()&&legacyLayouts.layoutOnLoad()=="Sound");
     ofxOceanodeShared::preset="old-preset-without-workspaces";app.loadWorkspaces();
     assert(app.workspaces.entries.empty()&&app.pendingWorkspace.empty());
     ofxOceanodeShared::preset="preset-A";app.loadWorkspaces();
@@ -218,7 +260,7 @@ int main(){
     ofxOceanodeWorkspaces empty;reopened=empty;assert(reopened.active.empty()&&reopened.entries.empty());
     for(int i=0;i<20;++i){app.recallWorkspace(i%2?"Sound":"Laser");settle();}
     ImGui::DestroyContext();
-    puts("PASS: real docking recall, nested window visibility, unaffected patch options, new/deleted nodes, queued layout cancellation, serialization, Save As isolation, rename/delete, duplicate/invalid names, corrupt files, repeated switching.");
+    puts("PASS: real docking recall, nested window visibility, unaffected patch options, new/deleted nodes, queued layout cancellation, global/preset layout switching, preset defaults and legacy fallback, serialization, Save As isolation, rename/delete, duplicate/invalid names, corrupt files, repeated switching.");
 }
 '''
 
@@ -229,7 +271,7 @@ def main():
         'std::string workspaceNodeKey(', 'void workspaceWindowToggles(', 'void workspaceWindows(',
         'ofJson ofxOceanode::captureWorkspace()', 'void ofxOceanode::applyGUILayout(',
         'void ofxOceanode::recallWorkspace(', 'bool ofxOceanode::saveWorkspaces()',
-        'void ofxOceanode::loadWorkspaces()'))
+        'void ofxOceanode::loadWorkspaces()', 'void ofxOceanode::queueGlobalLayout('))
     with tempfile.TemporaryDirectory(prefix='oceanode-workspaces-') as work:
         work = Path(work)
         (work / 'imconfig.h').write_text('// Standalone ImGui.\n')

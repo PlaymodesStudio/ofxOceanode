@@ -531,11 +531,11 @@ void ofxOceanode::loadWorkspaces(){
     if(!ofFile(file).exists()) return;
     try{
         workspaces.fromJson(ofLoadJson(file));
-        pendingWorkspace = workspaces.active;
+        pendingWorkspace = workspaces.layoutOnLoad();
     }catch(const std::exception& error){
         workspaceReadFailed = true;
-        workspaceError = "Could not load workspaces: " + std::string(error.what());
-        ofLogError("Workspaces") << workspaceError;
+        workspaceError = "Could not load preset layouts: " + std::string(error.what());
+        ofLogError("Layouts") << workspaceError;
     }
 }
 
@@ -566,32 +566,149 @@ void ofxOceanode::recallWorkspace(const std::string& name){
     if(changed) saveWorkspaces();
 }
 
+void ofxOceanode::queueGlobalLayout(const std::string& path, const std::string& name){
+    // Global layouts leave the named preset layout without replacing its snapshot.
+    if(!workspaces.active.empty()){
+        workspaces.active.clear();
+        saveWorkspaces();
+    }
+    ofxOceanodeShared::getWorkspaceLayoutActive() = false;
+    ofxOceanodeShared::getPendingLayoutSavePath().clear();
+    ofxOceanodeShared::getPendingLayoutLoadPath().clear();
+    ofxOceanodeShared::getActiveCanvasLayoutPath() = rootLayoutPath;
+    pendingWorkspace.clear();
+    pendingIniLoad = path;
+    currentLayoutName = name;
+}
+
+void ofxOceanode::drawLayoutsMenu(){
+    ofxOceanodeMenu::section("Preset layouts");
+    drawWorkspacesMenu();
+    ofxOceanodeMenu::section("Global layouts");
+    if(ImGui::BeginMenu("Load global layout")){
+        string layoutsDir = ofToDataPath("config/guiLayouts/", true);
+        ofDirectory dir(layoutsDir);
+        dir.allowExt("ini");
+        dir.listDir();
+        if(dir.size() == 0){
+            ImGui::BeginDisabled();
+            ImGui::MenuItem("(no layouts saved)");
+            ImGui::EndDisabled();
+        } else {
+            for(int i = 0; i < (int)dir.size(); i++){
+                string name = dir.getName(i);
+                bool isCurrent = workspaces.active.empty() && (name == currentLayoutName);
+                if(isCurrent) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::ActiveItemHighlight);
+                if(ImGui::MenuItem(name.c_str())){
+                    queueGlobalLayout(dir.getPath(i), name);
+                }
+                if(isCurrent) ImGui::PopStyleColor();
+            }
+        }
+        ImGui::EndMenu();
+    }
+
+    if(ImGui::MenuItem("Save global layout as...")){
+        memset(saveLayoutNameBuf, 0, sizeof(saveLayoutNameBuf));
+        string layoutName = currentLayoutName;
+        if(layoutName.size() >= 4 && layoutName.compare(layoutName.size() - 4, 4, ".ini") == 0){
+            layoutName.resize(layoutName.size() - 4);
+        }
+        strncpy(saveLayoutNameBuf, layoutName.c_str(), sizeof(saveLayoutNameBuf) - 1);
+        openSaveLayoutPopup = true;
+    }
+
+    if(ImGui::BeginMenu("Set default global layout")){
+        string layoutsDir = ofToDataPath("config/guiLayouts/", true);
+        ofDirectory dir(layoutsDir);
+        dir.allowExt("ini");
+        dir.listDir();
+
+        std::string currentDefault = "";
+        ofFile defaultConfig(ofToDataPath("config/config.json", true));
+        if(defaultConfig.exists()){
+            ofJson j = ofLoadJson(defaultConfig.path());
+            if(j.contains("defaultLayout")){
+                currentDefault = j["defaultLayout"].get<std::string>();
+            }
+        }
+
+        if(dir.size() == 0){
+            ImGui::BeginDisabled();
+            ImGui::MenuItem("(no layouts saved)");
+            ImGui::EndDisabled();
+        } else {
+            for(int i = 0; i < (int)dir.size(); i++){
+                string name = dir.getName(i);
+                bool isDefault = (name == currentDefault);
+                if(isDefault) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::ActiveItemHighlight);
+                if(ImGui::MenuItem(name.c_str())){
+                    string configPath = ofToDataPath("config/config.json", true);
+                    ofJson j;
+                    ofFile existingCfg(configPath);
+                    if(existingCfg.exists()) j = ofLoadJson(configPath);
+                    j["defaultLayout"] = name;
+                    string cfgDir = ofToDataPath("config/", true);
+                    ofDirectory cfgD(cfgDir);
+                    if(!cfgD.exists()) cfgD.create(true);
+                    ofSavePrettyJson(configPath, j);
+                }
+                if(isDefault) ImGui::PopStyleColor();
+            }
+        }
+        ImGui::EndMenu();
+    }
+
+    ofxOceanodeMenu::section("Canvas switching");
+    bool layoutWithMacros = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
+    if(ImGui::Checkbox("GUI layout changes with macros", &layoutWithMacros)){
+        ofxOceanodeShared::setGuiLayoutChangesWithMacros(layoutWithMacros);
+    }
+}
+
 void ofxOceanode::drawWorkspacesMenu(){
-    if(ImGui::MenuItem("Save current as...")){
+    if(ImGui::MenuItem("Save preset layout as...")){
         workspaceName[0] = '\0';
         workspaceTarget.clear();
         workspaceError.clear();
         workspacePopup = WorkspacePopup::Save;
     }
     const bool active = workspaces.entries.count(workspaces.active) != 0;
-    if(ImGui::MenuItem("Update current workspace", nullptr, false, active)){
+    if(ImGui::MenuItem("Update current preset layout", nullptr, false, active)){
         auto previous = workspaces;
         workspaces.entries.at(workspaces.active) = captureWorkspace();
         if(!saveWorkspaces()) workspaces = std::move(previous);
     }
-    if(ImGui::MenuItem("Rename current...", nullptr, false, active)){
+    if(ImGui::MenuItem("Rename preset layout...", nullptr, false, active)){
         workspaceTarget = workspaces.active;
         std::snprintf(workspaceName, sizeof(workspaceName), "%s", workspaceTarget.c_str());
         workspaceError.clear();
         workspacePopup = WorkspacePopup::Rename;
     }
-    if(ImGui::MenuItem("Delete current...", nullptr, false, active)){
+    if(ImGui::MenuItem("Delete preset layout...", nullptr, false, active)){
         workspaceTarget = workspaces.active;
         workspaceError.clear();
         workspacePopup = WorkspacePopup::Delete;
     }
+    if(ImGui::BeginMenu("Set default preset layout")){
+        auto setDefault = [this](const std::string& name){
+            const auto previous = workspaces.defaultLayout;
+            workspaces.defaultLayout = name;
+            if(!saveWorkspaces()) workspaces.defaultLayout = previous;
+        };
+        if(ImGui::MenuItem("Last selected layout", nullptr, workspaces.defaultLayout.empty()))
+            setDefault("");
+        ImGui::Separator();
+        ImGui::PushID("default-preset-layouts");
+        for(const auto& entry : workspaces.entries){
+            if(ImGui::MenuItem(entry.first.c_str(), nullptr, entry.first == workspaces.defaultLayout))
+                setDefault(entry.first);
+        }
+        ImGui::PopID();
+        ImGui::EndMenu();
+    }
     ImGui::Separator();
-    if(workspaces.entries.empty()) ImGui::TextDisabled("No workspaces in this preset");
+    if(workspaces.entries.empty()) ImGui::TextDisabled("No layouts in this preset");
     ImGui::PushID("saved-workspaces");
     for(const auto& entry : workspaces.entries){
         if(ImGui::MenuItem(entry.first.c_str(), nullptr, entry.first == workspaces.active))
@@ -600,26 +717,26 @@ void ofxOceanode::drawWorkspacesMenu(){
     ImGui::PopID();
     if(ofxOceanodeShared::getCurrentPresetPath().empty()){
         ImGui::Separator();
-        ImGui::TextDisabled("Save the preset to keep these workspaces.");
+        ImGui::TextDisabled("Save the preset to keep these layouts.");
     }
     if(!workspaceError.empty()) ImGui::TextWrapped("%s", workspaceError.c_str());
 }
 
 void ofxOceanode::drawWorkspacePopups(){
     if(workspacePopup != WorkspacePopup::None){
-        ImGui::OpenPopup(workspacePopup == WorkspacePopup::Save ? "Save Workspace" :
-                         workspacePopup == WorkspacePopup::Rename ? "Rename Workspace" : "Delete Workspace");
+        ImGui::OpenPopup(workspacePopup == WorkspacePopup::Save ? "Save Preset Layout" :
+                         workspacePopup == WorkspacePopup::Rename ? "Rename Preset Layout" : "Delete Preset Layout");
         workspacePopup = WorkspacePopup::None;
     }
     for(const auto action : {WorkspacePopup::Save, WorkspacePopup::Rename, WorkspacePopup::Delete}){
-        const char* title = action == WorkspacePopup::Save ? "Save Workspace" :
-                            action == WorkspacePopup::Rename ? "Rename Workspace" : "Delete Workspace";
+        const char* title = action == WorkspacePopup::Save ? "Save Preset Layout" :
+                            action == WorkspacePopup::Rename ? "Rename Preset Layout" : "Delete Preset Layout";
         if(!ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) continue;
         bool submit = false;
         if(action == WorkspacePopup::Delete){
-            ImGui::Text("Delete workspace \"%s\"?", workspaceTarget.c_str());
+            ImGui::Text("Delete preset layout \"%s\"?", workspaceTarget.c_str());
         }else{
-            ImGui::TextUnformatted("Workspace name:");
+            ImGui::TextUnformatted("Preset layout name:");
             if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
             ImGui::SetNextItemWidth(300);
             submit = ImGui::InputText("##workspaceName", workspaceName, sizeof(workspaceName), ImGuiInputTextFlags_EnterReturnsTrue);
@@ -863,8 +980,8 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             return open;
         };
         controls->drawMenu("Presets");
-        if(beginTopLevelMenu("Workspaces")){
-            drawWorkspacesMenu();
+        if(beginTopLevelMenu("Layouts")){
+            drawLayoutsMenu();
             ImGui::EndMenu();
         }
 
@@ -1016,87 +1133,6 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			canvas.setNodeWidthText(tw);
 			canvas.setNodeWidthWidget(ww);
 			
-			ofxOceanodeMenu::section("LAYOUT");
-			bool layoutWithMacros = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
-			if(ImGui::Checkbox("GUI layout changes with macros", &layoutWithMacros)){
-				ofxOceanodeShared::setGuiLayoutChangesWithMacros(layoutWithMacros);
-			}
-			
-			if(ImGui::BeginMenu("Load GUI layout")){
-				string layoutsDir = ofToDataPath("config/guiLayouts/", true);
-				ofDirectory dir(layoutsDir);
-				dir.allowExt("ini");
-				dir.listDir();
-				if(dir.size() == 0){
-					ImGui::BeginDisabled();
-					ImGui::MenuItem("(no layouts saved)");
-					ImGui::EndDisabled();
-				} else {
-					for(int i = 0; i < (int)dir.size(); i++){
-						string name = dir.getName(i);
-						bool isCurrent = (name == currentLayoutName);
-						if(isCurrent) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::ActiveItemHighlight);
-						if(ImGui::MenuItem(name.c_str())){
-							pendingIniLoad = dir.getPath(i);
-							currentLayoutName = name;
-						}
-						if(isCurrent) ImGui::PopStyleColor();
-					}
-				}
-				ImGui::EndMenu();
-			}
-
-			if(ImGui::MenuItem("Save current GUI layout")){
-				memset(saveLayoutNameBuf, 0, sizeof(saveLayoutNameBuf));
-				string layoutName = currentLayoutName;
-				if(layoutName.size() >= 4 && layoutName.compare(layoutName.size() - 4, 4, ".ini") == 0){
-					layoutName.resize(layoutName.size() - 4);
-				}
-				strncpy(saveLayoutNameBuf, layoutName.c_str(), sizeof(saveLayoutNameBuf) - 1);
-				openSaveLayoutPopup = true;
-			}
-
-			if(ImGui::BeginMenu("Set default layout")){
-				string layoutsDir = ofToDataPath("config/guiLayouts/", true);
-				ofDirectory dir(layoutsDir);
-				dir.allowExt("ini");
-				dir.listDir();
-				
-				std::string currentDefault = "";
-				ofFile defaultConfig(ofToDataPath("config/config.json", true));
-				if(defaultConfig.exists()){
-					ofJson j = ofLoadJson(defaultConfig.path());
-					if(j.contains("defaultLayout")){
-						currentDefault = j["defaultLayout"].get<std::string>();
-					}
-				}
-				
-				if(dir.size() == 0){
-					ImGui::BeginDisabled();
-					ImGui::MenuItem("(no layouts saved)");
-					ImGui::EndDisabled();
-				} else {
-					for(int i = 0; i < (int)dir.size(); i++){
-						string name = dir.getName(i);
-						bool isDefault = (name == currentDefault);
-						if(isDefault) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::ActiveItemHighlight);
-						if(ImGui::MenuItem(name.c_str())){
-							string configPath = ofToDataPath("config/config.json", true);
-							ofJson j;
-							ofFile existingCfg(configPath);
-							if(existingCfg.exists()) j = ofLoadJson(configPath);
-							j["defaultLayout"] = name;
-							string cfgDir = ofToDataPath("config/", true);
-							ofDirectory cfgD(cfgDir);
-							if(!cfgD.exists()) cfgD.create(true);
-							ofSavePrettyJson(configPath, j);
-						}
-						if(isDefault) ImGui::PopStyleColor();
-					}
-				}
-				ImGui::EndMenu();
-			}
-
             ofxOceanodeMenu::section("Theme");
             if(ImGui::MenuItem("Edit Theme", nullptr, &showThemeEditor)){}
             ImGui::Separator();
@@ -1228,7 +1264,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     }
     showHelpPopUp();
 
-    // --- Save GUI Layout Modal ---
+    // --- Save Global Layout Modal ---
     // --- Save Theme Modal ---
     if(openSaveThemePopup){
         ImGui::OpenPopup("Save Theme##modal");
@@ -1254,10 +1290,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     }
 
     if(openSaveLayoutPopup){
-        ImGui::OpenPopup("Save GUI Layout");
+        ImGui::OpenPopup("Save Global Layout");
         openSaveLayoutPopup = false;
     }
-    if(ImGui::BeginPopupModal("Save GUI Layout", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+    if(ImGui::BeginPopupModal("Save Global Layout", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
         ImGui::Text("Enter a name for the layout:");
         ImGui::InputText("##layoutname", saveLayoutNameBuf, sizeof(saveLayoutNameBuf));
         ImGui::Spacing();

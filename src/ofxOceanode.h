@@ -269,6 +269,8 @@ private:
     void recallWorkspace(const std::string& name);
     bool saveWorkspaces();
     void loadWorkspaces();
+    void queueGlobalLayout(const std::string& path, const std::string& name);
+    void drawLayoutsMenu();
     void drawWorkspacesMenu();
     void drawWorkspacePopups();
 
