@@ -150,9 +150,9 @@ def main():
         subprocess.run([os.environ.get("CXX", "clang++"), "-std=c++17", "-O1", "-g",
                         "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
                         "-I" + str(ROOT / "src"), "-I" + str(ROOT / "src/Managers"),
-                        "-I" + str(ROOT / "src/Timeline"), str(cpp),
+                        "-I" + str(ROOT / "src/Managers"), str(cpp),
                         str(ROOT / "src/Managers/ofxOceanodeTransport.cpp"),
-                        str(ROOT / "src/Timeline/ofxOceanodeScheduling.cpp"),
+                        str(ROOT / "src/Managers/ofxOceanodeScheduling.cpp"),
                         "-o", str(binary)], check=True)
         subprocess.run([str(binary)], check=True)
 

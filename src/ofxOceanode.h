@@ -139,6 +139,11 @@ public:
         return controls->get<T>();
     }
 
+    std::shared_ptr<ofxOceanodeContainer> getContainer() const { return container; }
+    void addController(std::shared_ptr<ofxOceanodeBaseController> controller) {
+        controls->getControllers().push_back(std::move(controller));
+    }
+
     void loadPreset(std::string presetPathRelativeToData); //call preset via path
     
     void loadPreset(std::string bank, std::string name); //call preset via bank and name

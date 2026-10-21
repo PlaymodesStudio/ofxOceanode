@@ -6,7 +6,7 @@ from pathlib import Path
 import os
 import subprocess
 import tempfile
-from timeline_regression import ROOT, of_root
+from of_environment import ROOT, of_root
 
 CASES = r'''
 #include "Managers/ofxOceanodeHelpPlan.h"

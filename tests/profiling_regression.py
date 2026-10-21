@@ -9,7 +9,7 @@ import os
 import subprocess
 import sys
 import tempfile
-from timeline_regression import ROOT, of_root
+from of_environment import ROOT, of_root
 from new_preset_regression import block
 
 PREFIX = r'''

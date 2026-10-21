@@ -8,7 +8,7 @@
 
 
 #include "ofxOceanodeContainer.h"
-#include "ofxOceanodeTimeline.h"
+#include "ofxOceanodeAutomationExtension.h"
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeTypesRegistry.h"
 #include "ofxOceanodeNodeModel.h"
@@ -119,9 +119,6 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
     if(transportOwner) midiClockSync = std::make_unique<ofxOceanodeMidiClock>();
 #endif
     if(transportOwner) transport = make_shared<ofxOceanodeTransport>();
-    // There is one timeline: the root's. Macro containers forward to it
-    // (see setTimelineHost / getTimelineManager).
-    if(transportOwner) timelineManager = std::make_unique<ofxOceanodeTimelineManager>(this);
     transformationMatrix = glm::mat4(1.0);
     bpm = transportOwner ? 120.0f : transport->getState().bpm;
     phase = 0;
@@ -208,7 +205,7 @@ void ofxOceanodeContainer::clearContainer(){
         ofxOceanodeScope::getInstance()->setScopeChangedCallback(nullptr);
         ofxOceanodeScope::getInstance()->clearScopedParameters();
     }
-    if(timelineManager != nullptr) timelineManager->clear();
+    if(automationExtension != nullptr) automationExtension->clear();
     
     // Silence every connection before deleting any of them. Restoring inputs
     // here can run node/macro callbacks against a partially dismantled graph.
@@ -288,11 +285,11 @@ void ofxOceanodeContainer::update(){
     // Timeline automation is an input to nodes. Apply it before their update
     // callbacks so node outputs observe the value in the same frame instead
     // of one frame later.
-    if(timelineManager != nullptr) timelineManager->beginParameterCache();
-    if(timelineManager != nullptr) timelineManager->evaluateAutomation();
-    if(timelineManager != nullptr) timelineManager->applyAutomation();
+    if(automationExtension != nullptr) automationExtension->beginParameterCache();
+    if(automationExtension != nullptr) automationExtension->evaluateAutomation();
+    if(automationExtension != nullptr) automationExtension->applyAutomation();
     // Node updates below may add or delete nodes (a preset load): stop caching.
-    if(timelineManager != nullptr) timelineManager->endParameterCache();
+    if(automationExtension != nullptr) automationExtension->endParameterCache();
 
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
@@ -313,7 +310,7 @@ void ofxOceanodeContainer::update(){
     // authoritative while nodes still receive it before their update. This
     // re-applies the values evaluateAutomation() already computed above
     // instead of re-scanning every track/clip/lane a second time.
-    if(timelineManager != nullptr) timelineManager->applyAutomation();
+    if(automationExtension != nullptr) automationExtension->applyAutomation();
 
     if(scopeSavePending && ofGetElapsedTimeMillis() >= pendingScopeSaveDeadlineMillis)
     {
@@ -577,7 +574,7 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     
     loadPreset_loadNodePreset(presetFolderPath);
 
-    if(timelineManager != nullptr) timelineManager->loadPreset(presetFolderPath);
+    if(automationExtension != nullptr) automationExtension->loadPreset(presetFolderPath);
 #ifdef OFXOCEANODE_USE_MIDI
     if(midiClockSync) {
         const ofJson syncJson = ofLoadJson(presetFolderPath + "/transportSync.json");
@@ -608,7 +605,7 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
 
     // The timeline's "Play on preset load": everything is in place, play from the start
     // (not in a macro's container, nor while an external clock drives the transport)
-    if(transportOwner && transport != nullptr && timelineManager != nullptr && timelineManager->getPlayOnPresetLoad()
+    if(transportOwner && transport != nullptr && automationExtension != nullptr && automationExtension->getPlayOnPresetLoad()
 #ifdef OFXOCEANODE_USE_MIDI
        && !isMidiClockSyncEnabled()
 #endif
@@ -1638,7 +1635,7 @@ bool ofxOceanodeContainer::savePreset(string presetFolderPath){
 	saveScope(presetFolderPath);
 	saveCustomGuis(presetFolderPath);
 	saveCustomGuiSnapshots(presetFolderPath);
-	if(timelineManager != nullptr) oceanodePresetSave::record(timelineManager->savePreset(presetFolderPath));
+	if(automationExtension != nullptr) oceanodePresetSave::record(automationExtension->savePreset(presetFolderPath));
     if(transportOwner){
         ofJson transportJson;
         transportJson["bpm"] = bpm;
@@ -2060,14 +2057,14 @@ void ofxOceanodeContainer::setBpm(float _bpm, bool retimeTimeline){
     if(transport != nullptr){
         transport->syncRealTime();
         stateBefore = transport->getState();
-        preserveTimelineTime = retimeTimeline && timelineManager != nullptr &&
+        preserveTimelineTime = retimeTimeline && automationExtension != nullptr &&
             !transport->hasExternalClock() &&
-            !timelineManager->isBpmAutomationEnabled() &&
-            timelineManager->getTimebase() == ofxOceanodeTimelineTimebase::Time &&
+            !automationExtension->isBpmAutomationEnabled() &&
+            automationExtension->preservesSecondsOnBpmChange() &&
             stateBefore.bpm > 0.0f && _bpm > 0.0f &&
             std::abs(stateBefore.bpm - _bpm) > 0.0001f;
         if(preserveTimelineTime)
-            timelineManager->retimeForBpmChange(stateBefore.bpm, _bpm);
+            automationExtension->retimeForBpmChange(stateBefore.bpm, _bpm);
     }
 
     bpm = _bpm;
@@ -2694,21 +2691,6 @@ bool isRootCanvasID(const std::string& canvasID){
 }
 }
 
-ofxOceanodeTimelineManager& ofxOceanodeContainer::getTimelineManager()
-{
-    if(timelineManager != nullptr) return *timelineManager;
-    if(timelineHost != nullptr) return timelineHost->getTimelineManager();
-    // A detached container (no host given): give it a timeline of its own
-    // rather than crash. Normal patches never get here.
-    timelineManager = std::make_unique<ofxOceanodeTimelineManager>(this);
-    return *timelineManager;
-}
-
-const ofxOceanodeTimelineManager& ofxOceanodeContainer::getTimelineManager() const
-{
-    return const_cast<ofxOceanodeContainer*>(this)->getTimelineManager();
-}
-
 std::string ofxOceanodeContainer::getTimelineParameterPath(ofxOceanodeAbstractParameter& parameter) const
 {
     auto* model = parameter.getNodeModel();
@@ -3331,11 +3313,7 @@ ofxOceanodeContainer::UnusedNodePlan ofxOceanodeContainer::findUnusedNodes(){
         }
     };
     collectBindings(root);
-    for(const auto& track : root->getTimelineManager().getTracks()){
-        for(const auto& binding : track.bindings){
-            if(auto* parameter = root->findTimelineParameter(binding.parameterPath)) published.insert(parameter);
-        }
-    }
+    if(auto* extension = root->getAutomationExtension()) extension->collectBoundParameters(published);
 
     std::unordered_map<ofxOceanodeNode*, vector<ofxOceanodeNode*>> neighbors;
     std::unordered_set<ofxOceanodeNode*> used;

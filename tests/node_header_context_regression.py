@@ -34,7 +34,8 @@ struct ofxOceanodeShared {
 struct OceanodeColors {inline static ImVec4 TransparentButton{0,0,0,0};};
 struct Container {
     struct Timeline {void requestNoteGroupSetup(int*){}} timeline;
-    auto& getTimelineManager(){return timeline;}
+    void drawNodeMenu(Model&){}
+    Container* getAutomationExtension(){return this;}
     vector<Node*> getSelectedModules(){vector<Node*> out;for(auto& n:nodes)if(n.gui.selected)out.push_back(&n);return out;}
 } containerStorage;
 auto* container=&containerStorage;
@@ -129,6 +130,8 @@ def main():
     source=(ROOT/'src/Nodes/ofxOceanodeNodeGui.cpp').read_text()
     canvas=(ROOT/'src/Managers/ofxOceanodeCanvas.cpp').read_text()
     header=block(source,'if (!isTransparent)')
+    # Header parameter widgets are covered separately; this fixture exercises selection.
+    header=header.replace(block(header,'for(int i = 0; i < getParameters().size(); ++i)'), '')
     header=header.replace('const float defaultContentWidth = nodeWidthText + nodeWidthWidget;',
                           'const float defaultContentWidth = nodeWidthText + nodeWidthWidget; titlePoints[node.index]=ImGui::GetCursorScreenPos()+ImVec2(4,ImGui::GetFrameHeight()*.5f);')
     header=header.replace('if (ImGui::Button("Cancel", ImVec2(120,0))) { ImGui::CloseCurrentPopup(); }',

@@ -1,5 +1,4 @@
 #include "ofxOceanodeMacroMixer.h"
-#include "ofxOceanodeTimeline.h"
 #include "ofxOceanodeNodeRegistry.h"
 #include "imgui.h"
 #include <algorithm>
@@ -268,13 +267,8 @@ void ofxOceanodeMacroMixer::installOutputs(const MacroMixerContract& contract) {
         if(std::none_of(contract.routers.begin(), contract.routers.end(), [&](const auto& r) { return r.id == it->first && matchesRouter(*it->second,r); })) {
             auto& parameter = *it->second;
             if(hostContainer && parameter.isTimelined()) {
-                auto& timeline = hostContainer->getTimelineManager();
-                const auto path = hostContainer->getTimelineParameterPath(parameter);
-                std::vector<std::pair<std::string,std::string>> bindings;
-                for(const auto& track : timeline.getTracks())
-                    for(const auto& binding : track.bindings)
-                        if(binding.parameterPath == path) bindings.emplace_back(track.id,binding.id);
-                for(const auto& binding : bindings) timeline.removeBinding(binding.first,binding.second);
+                if(auto* extension = hostContainer->getAutomationExtension())
+                    extension->removeParameterBindings(parameter);
             }
             if(hostContainer && hostContainer->customGuiContainsParameterAnywhere(parameter)) {
                 std::vector<std::string> panels;

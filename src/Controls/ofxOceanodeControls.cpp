@@ -14,7 +14,6 @@
 #include "ofxOceanodeHierarchyController.h"
 #include "ofxOceanodeLogController.h"
 #include "ofxOceanodeGlobalVariablesController.h"
-#include "ofxOceanodeTimelineController.h"
 #include "ofxOceanodeProfilingController.h"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -62,7 +61,6 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     auto logger = make_shared<ofxOceanodeLogController>();
     controllers.push_back(logger);
     controllers.push_back(make_shared<ofxOceanodeGlobalVariablesController>(container));
-    controllers.push_back(make_shared<ofxOceanodeTimelineController>(container));
     controllers.push_back(make_shared<ofxOceanodeProfilingController>(container, _canvas));
     
     ofSetLoggerChannel(logger);
@@ -148,17 +146,7 @@ void ofxOceanodeControls::draw(){
         controllerVisible[inspectorName] = showInspector;
     }
 
-    // Handles the "New Timeline Track" name dialog requested from a
-    // node's right-click menu on the canvas. Called unconditionally, every
-    // frame, regardless of whether the Timeline controller's own window is
-    // visible below -- that window can be toggled off, or just not the
-    // active docked tab, and the dialog still needs to show up (centered on
-    // the main canvas, not wherever the Timeline window is) the moment it's
-    // requested rather than whenever the user next happens to bring that
-    // window forward.
-    if(auto timelineController = get<ofxOceanodeTimelineController>()){
-        timelineController->drawPendingTrackPopup();
-    }
+    for(auto &c : controllers) c->drawBeforeWindows();
 
     for(auto &c : controllers){
         if(c->isMenuController()) continue;

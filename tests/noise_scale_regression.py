@@ -4,7 +4,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-from timeline_regression import ROOT, of_root
+from of_environment import ROOT, of_root
 
 
 SOURCE = r'''

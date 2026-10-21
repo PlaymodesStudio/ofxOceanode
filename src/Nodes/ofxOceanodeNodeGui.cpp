@@ -6,7 +6,6 @@
 //
 
 #include "ofxOceanodeNodeGui.h"
-#include "ofxOceanodeTimeline.h"
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeContainer.h"
@@ -190,7 +189,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
             string uniqueId = absParam.getName();
             const bool publishedInCustomGui = container.customGuiContainsParameterAnywhere(absParam);
             ofColor timelineTrackColor;
-            const bool publishedInTimeline = container.getTimelineManager().getParameterTrackColor(absParam, timelineTrackColor);
+            const bool publishedInTimeline = container.getAutomationExtension() && container.getAutomationExtension()->getParameterTrackColor(absParam, timelineTrackColor);
             if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) ImGui::BeginDisabled();
             ImGui::PushID(uniqueId.c_str());
             if(absParam.getFlags() & ofxOceanodeParameterFlags_NoGuiWidget){
@@ -920,76 +919,7 @@ void ofxOceanodeNodeGui::renderParameterPopup(ofxOceanodeAbstractParameter& absP
             }
         }
         ImGui::Separator();
-        if(container.getTimelineManager().isStepLaneCompatible(absParam)){
-            auto& timelineManager = container.getTimelineManager();
-            const std::string timelineParameterPath = container.getTimelineParameterPath(absParam);
-            struct BoundTimelineLocation {
-                std::string trackId;
-                std::string trackName;
-                std::string bindingId;
-            };
-            std::vector<BoundTimelineLocation> boundLocations;
-            for(const auto& timelineTrack : timelineManager.getTracks()){
-                for(const auto& binding : timelineTrack.bindings){
-                    if(binding.parameterPath == timelineParameterPath){
-                        boundLocations.push_back({timelineTrack.id, timelineTrack.name, binding.id});
-                    }
-                }
-            }
-
-            if(ImGui::BeginMenu("Add to Timeline Track")){
-                if(ImGui::Selectable("New Timeline Track")){
-                    const std::string trackId = timelineManager.createTrack();
-                    if(!timelineManager.addBinding(trackId, absParam).empty()) {
-                        // The timeline controller owns the modal so
-                        // the name is chosen before the track is
-                        // used in the rest of the UI.
-                        timelineManager.requestTrackRename(trackId, true);
-                    }
-                }
-                if(!timelineManager.getTracks().empty()){
-                    ImGui::Separator();
-                    for(const auto& timelineTrack : timelineManager.getTracks()){
-                        if(timelineTrack.isWaveTrack) continue;
-                        const bool alreadyBound = std::any_of(timelineTrack.bindings.begin(), timelineTrack.bindings.end(), [&](const auto& binding){
-                            return binding.parameterPath == timelineParameterPath;
-                        });
-                        if(ImGui::Selectable(timelineTrack.name.c_str(), alreadyBound, alreadyBound ? ImGuiSelectableFlags_Disabled : 0)){
-                            timelineManager.addBinding(timelineTrack.id, absParam);
-                        }
-                    }
-                }
-                ImGui::EndMenu();
-            }
-            {
-                // Pitch, gate and velocity as one piano-roll row; the
-                // timeline shows a dialog to pick the other two (or the
-                // whole instrument, when the node is one).
-                const std::string valueType = absParam.valueType();
-                ofxOceanodeTimelineInstrument instrument;
-                const bool isInstrument = absParam.getNodeModel() != nullptr &&
-                    absParam.getNodeModel()->getTimelineInstrument(instrument);
-                if((isInstrument || valueType == typeid(float).name() || valueType == typeid(int).name() ||
-                    valueType == typeid(bool).name() || valueType == typeid(std::vector<float>).name() ||
-                    valueType == typeid(std::vector<int>).name()) &&
-                   ImGui::Selectable("Add to Timeline as Piano Roll...")){
-                    timelineManager.requestNoteGroupSetup(&absParam);
-                }
-            }
-            if(boundLocations.size() == 1){
-                if(ImGui::Selectable("Remove from Timeline")){
-                    timelineManager.removeBinding(boundLocations.front().trackId,
-                                                  boundLocations.front().bindingId);
-                }
-            }else if(boundLocations.size() > 1 && ImGui::BeginMenu("Remove from Timeline")){
-                for(const auto& location : boundLocations){
-                    if(ImGui::MenuItem(location.trackName.c_str())){
-                        timelineManager.removeBinding(location.trackId, location.bindingId);
-                    }
-                }
-                ImGui::EndMenu();
-            }
-        }
+        if(auto* extension = container.getAutomationExtension()) extension->drawParameterMenu(absParam);
         ImGui::Separator();
         auto customTypes = container.getCompatibleCustomGuiWidgetTypes(absParam);
         bool anyRemoval = false;

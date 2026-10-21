@@ -4,7 +4,6 @@
 //
 
 #include "beatTransport.h"
-#include "ofxOceanodeTimeline.h"
 #include "ofxOceanodeContainer.h"
 
 #include <algorithm>
@@ -24,15 +23,12 @@ void beatTransport::update(ofEventArgs &) {
     playingOut = current.isPlaying ? 1 : 0;
 
     double beatsPerBar = 4.0;
-    bool loopEnabled = false;
-    double loopStart = 0.0;
-    double loopEnd = 0.0;
+    const bool loopEnabled = current.loopEnabled;
+    const double loopStart = current.loopStartBeat;
+    const double loopEnd = current.loopEndBeat;
     if(auto* container = getHostContainer()) {
-        const auto& timeline = container->getTimelineManager();
-        beatsPerBar = std::max(0.25, timeline.getBeatsPerBar());
-        loopEnabled = timeline.isLoopEnabled();
-        loopStart = timeline.getLoopStartBeat();
-        loopEnd = timeline.getLoopEndBeat();
+        if(auto* extension = container->getAutomationExtension())
+            beatsPerBar = std::max(0.25, extension->getBeatsPerBar());
     }
 
     const double nonNegativeBeat = std::max(0.0, current.beatPosition);
@@ -59,9 +55,5 @@ void beatTransport::update(ofEventArgs &) {
         resetOut.trigger();
     }
 
-    if(auto* container = getHostContainer()) {
-        if(container->getTimelineManager().didLoopWrapThisFrame()) {
-            loopResetOut.trigger();
-        }
-    }
+    if(current.loopCount != previous.loopCount) loopResetOut.trigger();
 }

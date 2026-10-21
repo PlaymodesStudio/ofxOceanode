@@ -20,6 +20,7 @@ public:
     
     virtual void draw() = 0;
     virtual void update(){};
+    virtual void drawBeforeWindows() {}
 
     // Menu controllers draw inside a top-level menu instead of a dockable window.
     // They remain registered and keep receiving updates when the menu is closed.

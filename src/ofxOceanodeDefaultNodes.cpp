@@ -15,7 +15,6 @@ void ofxOceanode::registerDefaultNodes(){
     nodeRegistry->registerModel<oscillator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
     nodeRegistry->registerModel<chaoticOscillator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
     nodeRegistry->registerModel<phasor>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<lfoTrack>("Generators");
 #ifdef OFXOCEANODE_USE_MIDI
     nodeRegistry->registerModel<midiClockNode>("Generators");
 #endif

@@ -7,7 +7,6 @@
 //
 
 #include "ofxOceanodeCanvas.h"
-#include "ofxOceanodeTimeline.h"
 #include <cmath>
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeContainer.h"
@@ -979,7 +978,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		if(auto transport = container->getTransport()) {
 			const auto transportState = transport->getState();
 			const bool externalClock = transport->hasExternalClock();
-			const bool bpmLocked = externalClock || container->getTimelineManager().isBpmAutomationEnabled();
+			const bool bpmLocked = externalClock || (container->getAutomationExtension() && container->getAutomationExtension()->isBpmAutomationEnabled());
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2,0));
 
 			ImGui::SameLine();
@@ -2185,18 +2184,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         ImGui::CloseCurrentPopup();
                     }
                 }
-                // An instrument (a synth that takes notes): a piano-roll row
-                // playing it, set up in the timeline's dialog.
-                ofxOceanodeTimelineInstrument instrument;
-                if(customGuiContextNode->getNodeModel().getTimelineInstrument(instrument) &&
-                   (instrument.gate != nullptr || instrument.pitch != nullptr)){
-                    ImGui::Separator();
-                    if(ImGui::Selectable("Add to Timeline as Instrument...")){
-                        container->getTimelineManager().requestNoteGroupSetup(
-                            instrument.gate != nullptr ? instrument.gate : instrument.pitch);
-                        ImGui::CloseCurrentPopup();
-                    }
-                }
+                if(auto* extension = container->getAutomationExtension())
+                    extension->drawNodeMenu(customGuiContextNode->getNodeModel());
             }
             ImGui::EndPopup();
         }

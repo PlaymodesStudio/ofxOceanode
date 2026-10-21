@@ -2,7 +2,7 @@
 """Syntax-check production C++ against sibling OF/addon headers on macOS.
 
 Checks all source files because the integration changes widely used headers.
-This does not link or launch a host application. See timeline_regression.py for
+This does not link or launch a host application. See of_environment.py for
 OCEANODE_TEST_OF_ROOT; optional builds also need ofxOceanodeMidi/ofxOceanodeOSC.
 """
 from pathlib import Path
@@ -12,12 +12,13 @@ import os
 import subprocess
 import tempfile
 
-from timeline_regression import ROOT, of_root
+from of_environment import ROOT, of_root
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--midi-osc", action="store_true")
+    parser.add_argument("--timeline", type=Path, help="Optional timeline addon directory")
     parser.add_argument("--jobs", type=int, default=3)
     args = parser.parse_args()
     of = of_root()
@@ -29,19 +30,23 @@ def main():
         base = of / "addons" / addon
         includes += [base / "src", *sorted({p.parent for p in (base / "src").rglob("*.h")})]
         includes += sorted({p.parent for p in (base / "libs").rglob("*.h")})
+    if args.timeline:
+        includes += [args.timeline / "src", *sorted({p.parent for p in (args.timeline / "src").rglob("*.h")})]
     flags = [os.environ.get("CXX", "clang++"), "-std=c++17", "-fsyntax-only", "-w",
              "-DOF_NO_FMOD", "-DGL_SILENCE_DEPRECATION"]
     if args.midi_osc:
         flags += ["-DOFXOCEANODE_USE_MIDI", "-DOFXOCEANODE_USE_OSC"]
     flags += ["-I" + str(p) for p in dict.fromkeys(includes)]
     sources = sorted((ROOT / "src").rglob("*.cpp"))
+    if args.timeline:
+        sources += sorted((args.timeline / "src").rglob("*.cpp"))
     with tempfile.TemporaryDirectory(prefix="oceanode-compile-") as logs:
         def check(path):
             result = subprocess.run(flags + [str(path)], text=True, capture_output=True)
             if result.returncode:
-                print("FAIL " + str(path.relative_to(ROOT)) + "\n" + result.stderr, flush=True)
+                print("FAIL " + os.path.relpath(path, ROOT) + "\n" + result.stderr, flush=True)
             else:
-                print("PASS " + str(path.relative_to(ROOT)), flush=True)
+                print("PASS " + os.path.relpath(path, ROOT), flush=True)
             (Path(logs) / path.name).write_text(result.stdout + result.stderr)
             return result.returncode
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:

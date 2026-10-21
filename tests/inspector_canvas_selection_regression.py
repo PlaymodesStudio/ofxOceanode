@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 
 from canvas_navigation_regression import ROOT, IMGUI, block
-from timeline_regression import of_root
+from of_environment import of_root
 
 
 FIXTURE = r'''
@@ -63,13 +63,11 @@ struct ofxOceanodeBaseController {
     virtual string getControllerName(){return "Inspector";}
     bool isMenuController(){return false;}
     void draw(){ImGui::TextUnformatted("Large Inspector");}
+    void drawBeforeWindows(){}
 };
 struct ofxOceanodeInspectorController:ofxOceanodeBaseController {
     ofxOceanodeNode* node=nullptr;
     bool hasAnySelectedNode(){return node && node->gui.selected;}
-};
-struct ofxOceanodeTimelineController:ofxOceanodeBaseController {
-    void drawPendingTrackPopup(){}
 };
 struct ofxOceanodeControls {
     vector<shared_ptr<ofxOceanodeBaseController>> controllers;

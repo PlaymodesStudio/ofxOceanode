@@ -10,7 +10,8 @@
 #define ofxOceanodeContainer_h
 
 #include "ofxOceanodeTransport.h"
-class ofxOceanodeTimelineManager;   // Timeline/ofxOceanodeTimeline.h: include it where the timeline is used
+#include "ofxOceanodeAutomationExtension.h"
+class ofxOceanodeTimelineManager; // Optional addon; compatibility accessor is defined there.
 #include "ofxOceanodeConnection.h"
 #include "ofxOceanodeNode.h"
 #include "CustomGui/ofxOceanodeCustomGuiLayout.h"
@@ -173,7 +174,7 @@ public:
     void setBpm(float _bpm, bool retimeTimeline = true);
     void resetPhase(bool notifyTransport = true);
     std::shared_ptr<ofxOceanodeTransport> getTransport() const { return transport; }
-    // The root container creates the shared transport (and the timeline).
+    // The root container creates the shared transport.
     bool isTransportOwner() const { return transportOwner; }
     ofxOceanodeTransportState getTransportState() const;
     ofxOceanodeFrameTransportState getFrameTransportState() const;
@@ -182,6 +183,17 @@ public:
     ofxOceanodeTimelineManager& getTimelineManager();
     const ofxOceanodeTimelineManager& getTimelineManager() const;
     void setTimelineHost(ofxOceanodeContainer* host){ timelineHost = host; }
+    ofxOceanodeContainer& getAutomationHost() {
+        return timelineHost ? timelineHost->getAutomationHost() : *this;
+    }
+    ofxOceanodeAutomationExtension* getAutomationExtension() const {
+        return timelineHost ? timelineHost->getAutomationExtension() : automationExtension.get();
+    }
+    void setAutomationExtension(std::unique_ptr<ofxOceanodeAutomationExtension> extension) {
+        if(timelineHost) { timelineHost->setAutomationExtension(std::move(extension)); return; }
+        automationExtension = std::move(extension);
+    }
+
     // Timeline binding paths name the canvas too ("Macro 1 / Macro 2::Node/param"),
     // so the root timeline can reach parameters inside macros. Root-level
     // parameters keep the plain "Node/param" form.
@@ -474,7 +486,7 @@ private:
     float phase;
     bool transportOwner = false;
     std::shared_ptr<ofxOceanodeTransport> transport;
-    std::unique_ptr<ofxOceanodeTimelineManager> timelineManager;
+    std::unique_ptr<ofxOceanodeAutomationExtension> automationExtension;
     ofxOceanodeContainer* timelineHost = nullptr;
     
 #ifdef OFXOCEANODE_USE_MIDI

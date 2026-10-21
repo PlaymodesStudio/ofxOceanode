@@ -32,13 +32,9 @@ private:
 class counter : public timeGenerator{
 public:
     counter() : timeGenerator("Counter"){
-#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
         description = "Counts elapsed time since Reset. With Sync To Transport enabled, "
                       "Out is the transport position in seconds and follows play, pause, "
                       "seek, loops and frame-stepped rendering.";
-#else
-        description = "Counts the elapsed time since Reset or the app started.";
-#endif
     }
     void setup() override{
         timeGenerator::setup();
@@ -48,20 +44,13 @@ public:
         addParameter(resetCounter.set("Reset"));
         addOutputParameter(output.set("Out", 0, 0, FLT_MAX));        
 
-#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
         addInspectorParameter(syncToTransport.set("Sync To Transport", false));
-#endif
 
         listeners.push(resetCounter.newListener([this](){
-#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
             if(!syncToTransport) {
                 rstCounter();
             }
-#else
-            rstCounter();
-#endif
         }));
-#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
         listeners.push(syncToTransport.newListener([this](bool &enabled){
             if(enabled) {
                 output = static_cast<float>(getFrameTransportState().current.seconds);
@@ -70,17 +59,12 @@ public:
                 phaseOffset = getTime() - static_cast<double>(output.get());
             }
         }));
-#endif
  
     }
     
     void resetPhase() override
     {
-#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
         if(resetWithPhaseReset && !syncToTransport)
-#else
-        if(resetWithPhaseReset)
-#endif
         {
             rstCounter();
         }
@@ -88,15 +72,11 @@ public:
 
     void update(ofEventArgs &a) override
     {
-#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
         if(syncToTransport) {
             output = static_cast<float>(getFrameTransportState().current.seconds);
         } else {
             output = static_cast<float>(getTime()-phaseOffset);
         }
-#else
-        output = static_cast<float>(getTime()-phaseOffset);
-#endif
     }
     
     void rstCounter()
@@ -111,9 +91,7 @@ private:
     ofParameter<float> output;
     ofParameter<bool> resetWithPhaseReset;
     ofParameter<void> resetCounter;
-#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
     ofParameter<bool> syncToTransport;
-#endif
     double phaseOffset;
         
         
@@ -123,13 +101,9 @@ private:
 class ramp : public timeGenerator {
 public:
     ramp() : timeGenerator("Ramp") {
-#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
         description = "Generates a linear ramp from 0 to 1 over a specified duration in milliseconds. "
                       "By default it runs independently of playback. With Sync To Transport enabled, "
                       "it follows transport play/pause and frame-stepped rendering.";
-#else
-        description = "Generates a linear ramp from 0 to 1 over a specified duration in milliseconds. The ramp starts when triggered and holds at 1 until reset by another trigger.";
-#endif
     }
 
     void setup() override {
@@ -143,9 +117,7 @@ public:
         addParameter(isRamping.set("IsRamping",false));
         addOutputParameter(isRampFinish.set("Finish",false));
         addParameter(enable.set("Enable", true));
-#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
         addInspectorParameter(syncToTransport.set("Sync To Transport", false));
-#endif
         rampStartTime = 0;
         isRamping = false;
         isRampFinish = false;
@@ -169,7 +141,6 @@ public:
         listeners.push(forceFinish.newListener([this](){
             finishRamp();
         }));
-#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
         listeners.push(syncToTransport.newListener([this](bool &){
             if(isRamping) {
                 // Keep the current value continuous when changing clock source.
@@ -177,7 +148,6 @@ public:
                     static_cast<double>(output.get()) * static_cast<double>(rampDurationMs.get()) / 1000.0;
             }
         }));
-#endif
     }
 
     void update(ofEventArgs &a) override {
@@ -197,13 +167,9 @@ public:
 
 private:
     double getRampTime() {
-#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
         return syncToTransport
             ? getFrameTransportState().current.seconds
             : getFrameGlobalTimeState().current.time;
-#else
-        return getTime();
-#endif
     }
 
     void startRamp() {
@@ -233,9 +199,7 @@ private:
     ofParameter<bool> isRampFinish;
     ofParameter<void> forceFinish;
     ofParameter<bool> enable;
-#ifdef OFX_OCEANODE_HAS_GLOBAL_TRANSPORT
     ofParameter<bool> syncToTransport;
-#endif
     
     double rampStartTime; // Time in seconds
     float lastTNum;

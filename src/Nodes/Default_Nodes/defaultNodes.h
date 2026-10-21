@@ -11,7 +11,6 @@
 #include "oscillator.h"
 #include "chaoticOscillator.h"
 #include "phasor.h"
-#include "lfoTrack.h"
 #ifdef OFXOCEANODE_USE_MIDI
 #include "midiClockNode.h"
 #endif

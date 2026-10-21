@@ -172,3 +172,17 @@ Build Status
 ------------
 Linux, macOS [![Build Status](https://travis-ci.org/PlaymodesStudio/ofxOceanode.svg?branch=master)](https://travis-ci.org/PlaymodesStudio/ofxOceanode)
 Windows [![Build status](https://ci.appveyor.com/api/projects/status/wwcmfntgs1l5858c/branch/master?svg=true)](https://ci.appveyor.com/project/eduardfrigola/ofxoceanode/branch/master)
+
+## Optional timeline addon
+
+Timeline editing, clips, piano roll and automation live in the sibling **ofxOceanodeTimeline** addon. Add it to your application's `addons.make`, regenerate the project, then attach it before loading presets:
+
+```cpp
+#include "ofxOceanodeTimeline.h"
+
+// In ofApp::setup():
+oceanode.setup();
+ofxOceanodeTimeline::setup(oceanode);
+```
+
+Core builds without the addon. The addon preserves existing `timeline.json` files, parameter paths and the `getTimelineManager()` API. Shared transport and backend scheduling interfaces remain in core. See `ofxOceanodeTimeline/README.md` for migration and verification instructions.

@@ -8,7 +8,7 @@ This does not verify the windowed host, audio devices or external hardware.
 """
 from pathlib import Path
 import concurrent.futures, os, subprocess, tempfile, contextlib, json
-from timeline_regression import ROOT, of_root
+from of_environment import ROOT, of_root
 from new_preset_regression import block
 
 PRELUDE = r'''
@@ -39,14 +39,7 @@ void ofxOceanodeScope::setScopeChangedCallback(ScopeChangedCallback) { ++scopeCa
 void ofxOceanodeScope::clearScopedParameters() { ++scopeCalls; }
 bool ofxOceanodeScope::removeParameter(ofxOceanodeAbstractParameter*) { assert(false); return false; }
 void ofxOceanodeContainer::flushPendingScopeSave() { assert(false); }
-ofxOceanodeTimelineManager::ofxOceanodeTimelineManager(ofxOceanodeContainer* owner):container(owner) {}
-void ofxOceanodeTimelineManager::clear() { assert(false); }
-void ofxOceanodeTimelineManager::beginParameterCache() { assert(false); }
-void ofxOceanodeTimelineManager::endParameterCache() { assert(false); }
-void ofxOceanodeTimelineManager::evaluateAutomation() { assert(false); }
-void ofxOceanodeTimelineManager::applyAutomation() { assert(false); }
 std::string ofxOceanodeContainer::getTimelineParameterPath(ofxOceanodeAbstractParameter&) const { assert(false); return {}; }
-bool ofxOceanodeTimelineManager::removeBinding(const std::string&, const std::string&) { assert(false); return false; }
 bool ofxOceanodeContainer::removeParameterFromCustomGui(const std::string&, ofxOceanodeAbstractParameter&) { assert(false); return false; }
 ofxOceanodeFrameTimeState ofxOceanodeNodeModel::getFrameGlobalTimeState() const { assert(false); return {}; }
 ofxOceanodeTimeState ofxOceanodeNodeModel::getGlobalTimeState() const { assert(false); return {}; }
@@ -70,9 +63,6 @@ void ofxOceanodeContainer::loadCustomGuiSnapshots(const std::string&) { assert(c
 void ofxOceanodeContainer::saveCustomGuiSnapshots(const std::string&) { assert(customGuiSnapshotBanks.empty()); }
 void ofxOceanodeContainer::rebuildCustomGuiPanels() { assert(customGuiPanels.empty()); }
 void ofxOceanodeContainer::scheduleScopeSave(const std::string&) { assert(false); }
-bool ofxOceanodeTimelineManager::loadPreset(const std::string&) { assert(false); return false; }
-bool ofxOceanodeTimelineManager::savePreset(const std::string&) const { assert(false); return false; }
-void ofxOceanodeTimelineManager::retimeForBpmChange(float,float) { assert(false); }
 '''
 
 def history_adapters():
@@ -140,7 +130,6 @@ def native_production():
         result += block(c, signature) + '\n'
 
     for signature in [
-        'ofxOceanodeTimelineManager& ofxOceanodeContainer::getTimelineManager()',
         'void ofxOceanodeContainer::activate()', 'void ofxOceanodeContainer::deactivate()',
         'bool ofxOceanodeContainer::loadPreset(', 'bool ofxOceanodeContainer::savePreset(',
         'void ofxOceanodeContainer::loadPreset_presetWillBeLoaded()',

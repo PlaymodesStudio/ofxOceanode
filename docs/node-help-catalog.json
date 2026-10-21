@@ -2762,8 +2762,8 @@
       "Reset",
       "Active"
     ],
-    "source": "Default_Nodes/Generators/lfoTrack.h",
-    "addon": "ofxOceanode"
+    "source": "Nodes/lfoTrack.h",
+    "addon": "ofxOceanodeTimeline"
   },
   "Laser Simulator": {
     "description": "Previews laser projection in a 3D scene with field of view, floor and camera controls.",

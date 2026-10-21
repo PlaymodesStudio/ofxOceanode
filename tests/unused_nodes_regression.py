@@ -70,7 +70,15 @@ struct Snapshot {map<string,int> parameterValues;};
 struct Bank {vector<Snapshot> snapshots;};
 struct Binding {string parameterPath;};
 struct Track {vector<Binding> bindings;};
-struct Timeline {vector<Track> tracks; const auto& getTracks(){return tracks;}};
+struct Timeline {
+    vector<Track> tracks;
+    unordered_map<string,ofxOceanodeAbstractParameter*>* paths=nullptr;
+    void collectBoundParameters(unordered_set<ofxOceanodeAbstractParameter*>& out) {
+        for(const auto& track:tracks)for(const auto& binding:track.bindings){
+            auto it=paths->find(binding.parameterPath);if(it!=paths->end())out.insert(it->second);
+        }
+    }
+};
 struct Comment {vector<ofxOceanodeNode*> nodes;};
 struct ofxOceanodeContainer {
     // PLAN
@@ -82,6 +90,7 @@ struct ofxOceanodeContainer {
     map<string,vector<int>> midiBindings,persistentMidiBindings;
     vector<Comment> comments;
     ofxOceanodeContainer* timelineHost=nullptr; Timeline timeline;
+    Timeline* getAutomationExtension(){timeline.paths=&paths;return &timeline;}
     uint64_t nodesRevision=0; int deletions=0;
     ~ofxOceanodeContainer(){connections.clear();}
     auto getAllModules(){vector<ofxOceanodeNode*> out;for(auto& n:nodes)out.push_back(n.get());return out;}
