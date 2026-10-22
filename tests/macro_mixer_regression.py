@@ -349,6 +349,9 @@ int main(int argc,char** argv) {
         assert(local.loadMacroSource(a));
         // Showing any instance opens the first one; only it can close the tab.
         assert(&second.windowInstance()==&first && &local.windowInstance()==&local);
+        // Only the first instance may save over the library Macro.
+        assert(first.canSaveDefinition() && !second.canSaveDefinition() && local.canSaveDefinition());
+        assert(first.sharesGlobalMacroWith(second) && !first.sharesGlobalMacroWith(local));
         second.setWindowVisible(true);
         assert(first.isWindowVisible() && !second.isWindowVisible() && second.isSharedWindowVisible());
         assert(second.isWindowShownByOtherInstance() && !first.isWindowShownByOtherInstance());

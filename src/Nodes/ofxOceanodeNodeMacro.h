@@ -197,6 +197,10 @@ public:
 	bool isWindowVisible() const { return showWindow; }
 	// True when this instance or another instance of its global Macro has the tab.
 	bool isSharedWindowVisible() const { return sharedWindowOwner() != nullptr; }
+	// Only the window instance of a global Macro may save its definition.
+	bool canSaveDefinition() { return &windowInstance() == this; }
+	// True when both Macros are instances of the same global Macro.
+	bool sharesGlobalMacroWith(const ofxOceanodeNodeMacro& other) const;
 	// True when the shared tab belongs to another instance, so this one can't close it.
 	bool isWindowShownByOtherInstance() const {
 		auto* owner = sharedWindowOwner();
@@ -238,7 +242,6 @@ private:
 	// Keeps the current contents as a local Macro, detached from the library.
 	bool detachLocalCopy();
 	bool usesLibraryMacro(const string& path) const;
-	bool sharesGlobalMacroWith(const ofxOceanodeNodeMacro& other) const;
 	const string& resolvedGlobalMacroPath() const;
 	// The instance whose tab shows this global Macro (this one, another, or none).
 	ofxOceanodeNodeMacro* sharedWindowOwner() const;

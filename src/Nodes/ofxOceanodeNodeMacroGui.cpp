@@ -154,14 +154,26 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 		guiState.loadSelectionName.clear();
 		guiState.saveError.clear();
 	}
+	// Only the instance shown in the shared tab can be edited, so only it saves:
+	// saving another instance would write its state over the library Macro.
+	const bool saveLocked = !canSaveDefinition();
+	const char* saveLockedReason = shownByOtherInstance
+		? "Another instance of this Macro is open in a tab. Save it from there."
+		: "Only the first instance of this Macro can be saved. Click Show to open it.";
 	ImGui::SameLine();
+	ImGui::BeginDisabled(saveLocked);
 	if(ImGui::Button("Save", ImVec2(saveText + padding, 0))){
 		guiState.saveError.clear();
 		if(presetManager.isLocal() && localName.get().empty()) openMacroSaveDialog(false);
 		else if(!reviewUnsavedChanges(false)) requestMacroSave();
 	}
+	ImGui::EndDisabled();
+	if(saveLocked && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", saveLockedReason);
 	ImGui::SameLine();
+	ImGui::BeginDisabled(saveLocked);
 	if(ImGui::Button("Save As", ImVec2(saveAsText + padding, 0))) openMacroSaveDialog(true);
+	ImGui::EndDisabled();
+	if(saveLocked && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", saveLockedReason);
 	ImGui::PopStyleVar(2);
 
 	renderMacroLoadDialog();
@@ -356,6 +368,8 @@ void ofxOceanodeNodeMacro::renderMacroDeleteDialog() {
 
 bool ofxOceanodeNodeMacro::reviewUnsavedChanges(bool forLoad, const string& loadPath, const string& loadName, bool loadIsPreset) {
 	if(presetManager.isLocal() || !parentContainer || isLoadingPreset || !presetManager.getNextPresetPath().empty()) return false;
+	// Other instances can't save (see canSaveDefinition), so there is nothing to offer.
+	if(!canSaveDefinition()) return false;
 	for(auto* node : parentContainer->getAllModules()){
 		if(&node->getNodeModel() != this) continue;
 		auto review = collectGlobalMacroSaveReview(*parentContainer, *node);
