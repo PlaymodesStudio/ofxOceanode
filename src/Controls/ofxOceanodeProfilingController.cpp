@@ -3,6 +3,7 @@
 #include "ofxOceanodeCanvas.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeShared.h"
+#include "ofxOceanodeGlDiagnostics.h"
 #include <algorithm>
 #include <functional>
 
@@ -103,6 +104,9 @@ bool ofxOceanodeProfilingController::locate(const std::shared_ptr<Record>& recor
 }
 
 void ofxOceanodeProfilingController::draw(){
+    ImGui::Checkbox("Trace OpenGL errors", &oceanodeGlDiagnostics::enabled());
+    if(oceanodeGlDiagnostics::enabled())
+        ImGui::TextWrapped("Logs node and macro paths after update/draw callbacks. Driver polling can affect frame times. Errors consumed inside an addon may still use that addon's own log.");
     const bool recording = session->isRecording();
     if(ImGui::Button(recording ? "Stop profiling" : "Profile!")){
         if(!recording) session->reset(pendingWindow);

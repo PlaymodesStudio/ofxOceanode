@@ -12,6 +12,7 @@
 #include "ofxOceanodeConnection.h"
 #include "ofxOceanodeNodeGui.h"
 #include "PresetSaveCleanup.h"
+#include "ofxOceanodeGlDiagnostics.h"
 
 ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){
     nodeModelListeners.push(nodeModel->deleteModule.newListener([this](){
@@ -34,18 +35,32 @@ void ofxOceanodeNode::setup(string additionalInfo){
 
 //TODO: remove event args
 void ofxOceanodeNode::update(ofEventArgs &e){
+    auto identity = [this](){
+        const auto& record = nodeModel->getProfilingRecord();
+        const auto path = record->identity ? record->identity().path : nodeModel->getParents();
+        return path + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier());
+    };
     {
+        oceanodeGlDiagnostics::Scope glErrors(identity, "update");
         oceanodeProfiling::Scope timing(nodeModel->getProfilingRecord(), oceanodeProfiling::Phase::Update);
         nodeModel->update(e);
     }
+    oceanodeGlDiagnostics::Scope glErrors(identity, "GUI update");
     nodeGui->update(e);
 }
 
 void ofxOceanodeNode::draw(ofEventArgs &e){
+    auto identity = [this](){
+        const auto& record = nodeModel->getProfilingRecord();
+        const auto path = record->identity ? record->identity().path : nodeModel->getParents();
+        return path + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier());
+    };
     {
+        oceanodeGlDiagnostics::Scope glErrors(identity, "draw");
         oceanodeProfiling::Scope timing(nodeModel->getProfilingRecord(), oceanodeProfiling::Phase::Draw);
         nodeModel->draw(e);
     }
+    oceanodeGlDiagnostics::Scope glErrors(identity, "GUI draw");
     nodeGui->draw(e);
 }
 
