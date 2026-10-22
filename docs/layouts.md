@@ -16,7 +16,9 @@ macros. It leaves signal values, connections, transport, and output settings alo
 New nodes or panels added after a snapshot keep their current visibility.
 
 Use **Update current preset layout** to replace the selected snapshot with your
-current arrangement. **Rename preset layout…** changes its name;
+current arrangement. **Overwrite preset layout** lists every saved name: pick one
+and confirm to replace that snapshot with your current arrangement and select it.
+**Rename preset layout…** changes its name;
 **Delete preset layout…** removes its saved snapshot and keeps the windows
 currently on screen. Rearranging windows or saving the preset does not replace a
 snapshot: use Update to keep those changes in the named layout.

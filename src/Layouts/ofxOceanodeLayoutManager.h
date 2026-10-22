@@ -38,9 +38,10 @@ private:
     std::string pendingPresetLayout;
     std::string layoutError;
     bool presetReadFailed = false;
-    enum class PresetLayoutPopup { None, Save, Rename, Delete };
+    enum class PresetLayoutPopup { None, Save, Overwrite, Rename, Delete };
     PresetLayoutPopup presetPopup = PresetLayoutPopup::None;
     std::string presetTarget;
+    static const char* presetLayoutPopupTitle(PresetLayoutPopup popup);
     char presetName[256] = {};
 
     // Global layouts retain the existing .ini files and startup preference.
@@ -287,6 +288,18 @@ inline void ofxOceanodeLayoutManager::drawPresetLayoutsMenu(){
         presetLayouts.entries.at(presetLayouts.active) = capturePresetLayout();
         if(!savePresetLayouts()) presetLayouts = std::move(previous);
     }
+    if(ImGui::BeginMenu("Overwrite preset layout", !presetLayouts.entries.empty())){
+        ImGui::PushID("overwrite-preset-layouts");
+        for(const auto& entry : presetLayouts.entries){
+            if(ImGui::MenuItem(entry.first.c_str(), nullptr, entry.first == presetLayouts.active)){
+                presetTarget = entry.first;
+                layoutError.clear();
+                presetPopup = PresetLayoutPopup::Overwrite;
+            }
+        }
+        ImGui::PopID();
+        ImGui::EndMenu();
+    }
     if(ImGui::MenuItem("Rename preset layout...", nullptr, false, active)){
         presetTarget = presetLayouts.active;
         std::snprintf(presetName, sizeof(presetName), "%s", presetTarget.c_str());
@@ -330,18 +343,28 @@ inline void ofxOceanodeLayoutManager::drawPresetLayoutsMenu(){
     if(!layoutError.empty()) ImGui::TextWrapped("%s", layoutError.c_str());
 }
 
+inline const char* ofxOceanodeLayoutManager::presetLayoutPopupTitle(PresetLayoutPopup popup){
+    switch(popup){
+        case PresetLayoutPopup::Save: return "Save Preset Layout";
+        case PresetLayoutPopup::Overwrite: return "Overwrite Preset Layout";
+        case PresetLayoutPopup::Rename: return "Rename Preset Layout";
+        default: return "Delete Preset Layout";
+    }
+}
+
 inline void ofxOceanodeLayoutManager::drawPresetLayoutPopup(){
     if(presetPopup != PresetLayoutPopup::None){
-        ImGui::OpenPopup(presetPopup == PresetLayoutPopup::Save ? "Save Preset Layout" :
-                         presetPopup == PresetLayoutPopup::Rename ? "Rename Preset Layout" : "Delete Preset Layout");
+        ImGui::OpenPopup(presetLayoutPopupTitle(presetPopup));
         presetPopup = PresetLayoutPopup::None;
     }
-    for(const auto action : {PresetLayoutPopup::Save, PresetLayoutPopup::Rename, PresetLayoutPopup::Delete}){
-        const char* title = action == PresetLayoutPopup::Save ? "Save Preset Layout" :
-                            action == PresetLayoutPopup::Rename ? "Rename Preset Layout" : "Delete Preset Layout";
+    for(const auto action : {PresetLayoutPopup::Save, PresetLayoutPopup::Overwrite, PresetLayoutPopup::Rename, PresetLayoutPopup::Delete}){
+        const char* title = presetLayoutPopupTitle(action);
+        const bool confirmOnly = action == PresetLayoutPopup::Overwrite || action == PresetLayoutPopup::Delete;
         if(!ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) continue;
         bool submit = false;
-        if(action == PresetLayoutPopup::Delete){
+        if(action == PresetLayoutPopup::Overwrite){
+            ImGui::Text("Overwrite preset layout \"%s\" with the current arrangement?", presetTarget.c_str());
+        }else if(action == PresetLayoutPopup::Delete){
             ImGui::Text("Delete preset layout \"%s\"?", presetTarget.c_str());
         }else{
             ImGui::TextUnformatted("Preset layout name:");
@@ -350,11 +373,14 @@ inline void ofxOceanodeLayoutManager::drawPresetLayoutPopup(){
             submit = ImGui::InputText("##presetName", presetName, sizeof(presetName), ImGuiInputTextFlags_EnterReturnsTrue);
         }
         if(!layoutError.empty()) ImGui::TextWrapped("%s", layoutError.c_str());
-        if(ImGui::Button(action == PresetLayoutPopup::Delete ? "Delete" : "Save") || submit){
+        const char* confirm = action == PresetLayoutPopup::Overwrite ? "Overwrite" :
+                              action == PresetLayoutPopup::Delete ? "Delete" : "Save";
+        if(ImGui::Button(confirm) || submit){
             auto previous = presetLayouts;
             try{
-                const auto name = ofxOceanodePresetLayouts::cleanName(presetName);
+                const auto name = confirmOnly ? presetTarget : ofxOceanodePresetLayouts::cleanName(presetName);
                 if(action == PresetLayoutPopup::Save) presetLayouts.create(name, capturePresetLayout());
+                else if(action == PresetLayoutPopup::Overwrite) presetLayouts.overwrite(name, capturePresetLayout());
                 else if(action == PresetLayoutPopup::Rename) presetLayouts.rename(presetTarget, name);
                 else presetLayouts.erase(presetTarget);
                 if(savePresetLayouts()){
