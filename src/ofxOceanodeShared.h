@@ -397,6 +397,10 @@ public:
 	static float getZoomLevel(){ return getInstance().zoomLevel; }
 	static void  setZoomLevel(float z){ getInstance().zoomLevel = z; }
 
+	// Below this zoom, node widgets, node names and comment text are hidden.
+	// Canvas zoom snaps to 5% steps, so 0.475 keeps 50% detailed and hides 45%.
+	static constexpr float MIN_DETAIL_ZOOM = 0.475f;
+
     // Active custom-region render context — set while a custom region is being
     // rendered inside a Custom GUI widget, so region implementations can opt
     // into using the widget's size without affecting their node-local drawing.
