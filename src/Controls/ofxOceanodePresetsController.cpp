@@ -768,6 +768,9 @@ std::string nodeLabel(ofxOceanodeNode& node){
     std::string label = model.nodeName() + " [" + ofToString(model.getNumIdentifier()) + "]";
     if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&model)){
         label += " " + (macro->isLocal() ? macro->getLocalMacroName() : macro->getCurrentMacroName());
+    }else if(auto* router = dynamic_cast<abstractRouter*>(&model)){
+        // Routers of one type differ only by the name they publish on the Macro.
+        label += " \"" + router->getNameParam().get() + "\"";
     }
     return label;
 }
@@ -776,6 +779,16 @@ std::string savedNodeKey(const std::string& type, const std::string& id){
     std::string name = type;
     ofStringReplace(name, " ", "_");
     return name + "_" + ofToString(ofToInt(id));
+}
+
+// Matches nodeLabel() for nodes that exist only in the saved folder.
+std::string savedNodeLabel(const std::string& savedFolder, const std::string& type, const std::string& id){
+    std::string label = type + " [" + ofToString(ofToInt(id)) + "]";
+    if(type.rfind("Router ", 0) == 0){
+        const ofJson name = field(readJson(savedFolder + "/" + savedNodeKey(type, id) + ".json"), "Name");
+        if(name.is_string()) label += " \"" + name.get<std::string>() + "\"";
+    }
+    return label;
 }
 
 ofJson nodePosition(ofxOceanodeNode& node){
@@ -984,7 +997,7 @@ void compareContainer(ofxOceanodeContainer& container, const std::string& savedF
             if(!type.value().is_object()) continue;
             for(auto id = type.value().begin(); id != type.value().end(); ++id){
                 if(liveNodes.count(savedNodeKey(type.key(), id.key())) == 0){
-                    changes.push_back({location, type.key() + " [" + ofToString(ofToInt(id.key())) + "]",
+                    changes.push_back({location, savedNodeLabel(savedFolder, type.key(), id.key()),
                                        "Node removed", "present", "(absent)"});
                 }
             }
