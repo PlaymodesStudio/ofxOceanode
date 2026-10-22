@@ -44,6 +44,9 @@ private:
     PopupRequest popupRequest = PopupRequest::None;
     char bankNameBuffer[256] = {};
     char presetNameBuffer[256] = {};
+    bool presetNameCursorPending = false;
+    // Save As starts from this name; New Preset keeps it.
+    string lastPresetName;
     int saveAsBank = 0;
     string deleteBankName;
     string deletePresetName;

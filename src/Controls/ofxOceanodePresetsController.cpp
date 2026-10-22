@@ -61,6 +61,17 @@ bool presetNameExists(const vector<string>& existingPresets, const string& reque
     return find(existingPresets.begin(), existingPresets.end(), sanitizePresetName(requestedName)) != existingPresets.end();
 }
 
+// Keyboard focus selects the whole field. Put the cursor after a prefilled
+// name instead, so typing extends it rather than replacing it.
+int moveCursorToEnd(ImGuiInputTextCallbackData* data){
+    bool& pending = *static_cast<bool*>(data->UserData);
+    if(pending){
+        data->CursorPos = data->SelectionStart = data->SelectionEnd = data->BufTextLen;
+        pending = false;
+    }
+    return 0;
+}
+
 bool sameChanges(const GlobalMacroSaveReview& a, const GlobalMacroSaveReview& b){
     if(a.changes.size() != b.changes.size()) return false;
     for(size_t i = 0; i < a.changes.size(); ++i){
@@ -215,7 +226,8 @@ void ofxOceanodePresetsController::drawPopups(){
         bankNameBuffer[0] = '\0';
         ImGui::OpenPopup("Add New Bank");
     }else if(popupRequest == PopupRequest::SaveAs){
-        presetNameBuffer[0] = '\0';
+        // Start from the last preset name so a new version only needs a suffix.
+        std::snprintf(presetNameBuffer, sizeof(presetNameBuffer), "%s", lastPresetName.c_str());
         saveAsBank = currentBank;
         ImGui::OpenPopup("Save Preset As");
     }else if(popupRequest == PopupRequest::Delete){
@@ -252,9 +264,14 @@ void ofxOceanodePresetsController::drawPopups(){
     }
 
     if(ImGui::BeginPopupModal("Save Preset As", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
-        if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+        if(ImGui::IsWindowAppearing()){
+            ImGui::SetKeyboardFocusHere();
+            presetNameCursorPending = true;
+        }
         ImGui::PushItemWidth(ImGui::GetFontSize() * 22.0f);
-        const bool enter = ImGui::InputText("Preset Name", presetNameBuffer, sizeof(presetNameBuffer), ImGuiInputTextFlags_EnterReturnsTrue);
+        const bool enter = ImGui::InputText("Preset Name", presetNameBuffer, sizeof(presetNameBuffer),
+                                            ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackAlways,
+                                            moveCursorToEnd, &presetNameCursorPending);
         auto vector_getter = [](void* vec, int idx, const char** out_text){
             auto& values = *static_cast<vector<string>*>(vec);
             if(idx < 0 || idx >= static_cast<int>(values.size())) return false;
@@ -420,7 +437,8 @@ void ofxOceanodePresetsController::loadPreset(string name, string bank){
 	ofxOceanodeShared::setCurrentPresetPath(myPath);
 	ofxOceanodeShared::setCurrentBankName(bank);
 	ofxOceanodeShared::setCurrentPresetName(name);
-    
+    lastPresetName = name;
+
 	container->loadPreset(myPath);
 
 	ofxOceanodeShared::finishedLoadingPreset();
@@ -650,6 +668,7 @@ void ofxOceanodePresetsController::finishSavePreset(){
     auto bankPosition = std::find(banks.begin(), banks.end(), request.bank);
     if(bankPosition != banks.end()) currentBank = std::distance(banks.begin(), bankPosition);
     currentPreset[request.bank] = request.name;
+    lastPresetName = request.name;
     ofxOceanodeShared::presetWasSaved();
 
     if(!request.reviews.empty()){
