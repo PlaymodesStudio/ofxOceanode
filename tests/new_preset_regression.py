@@ -137,27 +137,27 @@ struct ofxOceanodeCanvas {
     vector<int> nodesDrawingOrder{1},pendingPortalAlignments{1},keyboardSlots{1},commentToSlot{1},filteredSearchResults{1};
     vector<bool> commentCheckboxStates{true};
     bool centerOriginPending=false,recenterCanvas=true,focused=false;
-    string layoutIniPath="OldPreset/ImGuiLayout.ini";
-    void setLayoutIniPath(string s){layoutIniPath=s;} string getUniqueID(){return "Canvas";}
+    string getUniqueID(){return "Canvas";}
     void requestFocus(){focused=true;}
     void resetForNewPreset(); void resetViewToOrigin(); void center();
 };
 struct ofxOceanodeShared {
-    inline static string path="SavedPreset",bank="Bank",name="Saved",active="Macro",savePath="Macro.ini",loadPath="Macro.ini",layoutPath="Macro.ini";
+    inline static string path="SavedPreset",bank="Bank",name="Saved",active="Macro";
     inline static bool loading=false; inline static function<void()> loaded;
     static void startedLoadingPreset(){assert(!loading); loading=true;}
     static void finishedLoadingPreset(){assert(loading); loading=false; loaded();}
     static void nodeSelectedInCanvas(ofxOceanodeNode* p){assert(!p);}
     static void setCurrentPresetPath(string s){path=s;} static string getCurrentPresetPath(){return path;}
     static void setCurrentBankName(string s){bank=s;} static void setCurrentPresetName(string s){name=s;}
-    static string& getPendingLayoutSavePath(){return savePath;} static string& getPendingLayoutLoadPath(){return loadPath;}
-    static string& getActiveCanvasLayoutPath(){return layoutPath;} static void setActiveCanvasUniqueID(string s){active=s;}
-    static auto& getLayoutContentCache(){static map<string,string> cache;return cache;}
+    static void setActiveCanvasUniqueID(string s){active=s;}
     static void updateMacrosStructure(){}
 };
+string ofToDataPath(string path){return path;}
+struct ofFile {ofFile(string){} bool exists(){return false;}};
 struct App {
-    ofxOceanodeCanvas canvas; string pendingIniLoad="OldPreset.ini",rootLayoutPath="OldPreset.ini"; bool hasActivePreset=true;
-    void onLoaded(); void onSaved(string iniPath);
+    ofxOceanodeCanvas canvas; string pendingIniLoad="OldPreset.ini"; bool hasActivePreset=true;
+    void onLoaded(); void onLayoutLoaded(); void onSaved(); void saveCurrentPresetLayout();
+    void readPresetLayouts(){pendingIniLoad.clear();} void savePresetLayouts(){}
 };
 namespace ImGui {
 vector<string> items; bool clickNew=true;
@@ -228,8 +228,7 @@ int main(){
     assert(presets.loads==0 && presets.loadPresetInNextUpdate==0);
     assert(presets.banks==vector<string>{"Bank"} && presets.bankPresets["Bank"]==vector<string>({"Saved","Other"}));
     assert(ofxOceanodeShared::path.empty() && ofxOceanodeShared::name.empty() && ofxOceanodeShared::bank.empty());
-    assert(ofxOceanodeShared::savePath.empty() && ofxOceanodeShared::loadPath.empty() && ofxOceanodeShared::layoutPath.empty());
-    assert(!app.hasActivePreset && app.pendingIniLoad.empty() && app.canvas.layoutIniPath.empty());
+    assert(!app.hasActivePreset && app.pendingIniLoad.empty());
     assert(ofxOceanodeShared::active=="Canvas" && app.canvas.focused);
     assert(!app.canvas.pendingCenterNode && !app.canvas.tempSourceParameter && !app.canvas.customGuiContextNode);
     assert(app.canvas.inspectorSelectionClick.nodeID.empty());
@@ -263,9 +262,9 @@ int main(){
     ofxOceanodeContainer macro; macro.id="Macro"; macro.attachSavedScope("MacroPreset");
     ofxOceanodeScope::getInstance()->callback();
     assert(c.pendingScopeSavePath=="FreshPreset" && macro.pendingScopeSavePath.empty());
-    app.onSaved("FreshPreset/ImGuiLayout.ini");
+    ofxOceanodeShared::path="FreshPreset";app.onSaved();
     assert(ImGui::savedLayoutPath=="FreshPreset/ImGuiLayout.ini");
-    assert(ofxOceanodeShared::layoutPath==ImGui::savedLayoutPath);
+    assert(app.hasActivePreset);
     // Repeated New is harmless; freshly created ownership can be cleared again.
     presets.newPresetRequested=true; presets.update(); assert(destroyedNodes==6);
     c.destroyNodeListeners.count=1; populate(c); presets.newPresetRequested=true; presets.update();
@@ -292,13 +291,11 @@ def main():
     production += block(canvas, "void ofxOceanodeCanvas::resetForNewPreset()")
     production += "void ofxOceanodeCanvas::center(){" + block(canvas, "if(centerOriginPending &&") + "}\n"
     manager_load = block(layouts, "void ofxOceanodeLayoutManager::onPresetLoaded()")
-    manager_new = block(manager_load, "if(ofxOceanodeShared::getCurrentPresetPath().empty())")
-    manager_new = manager_new.replace('callbacks.setRootCanvasPath(', 'canvas.setLayoutIniPath(').replace('return;', '')
-    production += "void App::onLoaded(){" + manager_new + block(app, "if(ofxOceanodeShared::getCurrentPresetPath().empty())") + "}\n"
-    production += "void App::onSaved(string iniPath){auto& activeLayoutPath=ofxOceanodeShared::getActiveCanvasLayoutPath();"
-    production += layouts[layouts.index("const std::string previousRoot = rootLayoutPath;"):
-                          layouts.index("// Only save from ImGui state")]
-    production += block(layouts, "if(rootActive){") + "}\n"
+    production += manager_load.replace('ofxOceanodeLayoutManager::onPresetLoaded()', 'App::onLayoutLoaded()')
+    production += 'void App::onLoaded(){onLayoutLoaded();'
+    production += block(app, "if(ofxOceanodeShared::getCurrentPresetPath().empty())") + "}\n"
+    production += block(layouts, "void ofxOceanodeLayoutManager::onPresetSaved()").replace('ofxOceanodeLayoutManager::onPresetSaved()', 'App::onSaved()')
+    production += block(layouts, "void ofxOceanodeLayoutManager::saveCurrentPresetLayout()").replace('ofxOceanodeLayoutManager::', 'App::')
     save_method = block(container, "bool ofxOceanodeContainer::savePreset(string presetFolderPath)")
     production += "void ofxOceanodeContainer::attachSavedScope(string presetFolderPath){const bool ownsGlobalScope=getCanvasID().empty() || getCanvasID()==\"Canvas\" || getCanvasID()==\"0\";"
     production += block(save_method, "if(ownsGlobalScope){") + "}\n"

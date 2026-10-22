@@ -56,6 +56,10 @@ struct WindowState {bool isOpen=false;};
 struct Panel {string id;WindowState windowState;};
 struct ofxOceanodeContainer {
     vector<ofxOceanodeNode*> nodes; vector<Panel> panels;
+    bool scopeSavePending=false; string pendingScopeSavePath,lastScopeSave;
+    unsigned long long pendingScopeSaveDeadlineMillis=0;
+    void saveScope(const string& path){lastScopeSave=path;}
+    void flushPendingScopeSave();
     auto getAllModules(){return nodes;} auto& getCustomGuiPanelsData(){return panels;}
     Panel* getCustomGuiPanelData(string id){for(auto& p:panels)if(p.id==id)return &p;return nullptr;}
 };
@@ -75,13 +79,6 @@ struct Controls {
 struct ofxOceanodeShared {
     inline static string preset;
     static string getCurrentPresetPath(){return preset;}
-    static string& getPendingLayoutSavePath(){static string s;return s;}
-    static string& getPendingLayoutLoadPath(){static string s;return s;}
-    static string& getActiveCanvasLayoutPath(){static string s;return s;}
-    static bool& getPresetLayoutActive(){static bool b=false;return b;}
-    static bool getGuiLayoutChangesWithMacros(){return true;}
-    LAYOUT_SWITCH_POLICY
-    static auto& getLayoutContentCache(){static map<string,string> cache;return cache;}
     static void setLeftNodeID(ImGuiID){} static void setCentralNodeID(ImGuiID){}
 };
 struct Policy {void reset(){}};
@@ -121,7 +118,7 @@ struct ofxOceanodeLayoutManager {
     shared_ptr<ofxOceanodeContainer> container=make_shared<ofxOceanodeContainer>();
     shared_ptr<Controls> controls=make_shared<Controls>();
     unique_ptr<Policy> proportionalDocking=make_unique<Policy>();
-    ofxOceanodePresetLayouts presetLayouts;string globalLayoutName;string pendingIniLoad,rootLayoutPath="preset/ImGuiLayout.ini",loadedGUILayoutData;
+    ofxOceanodePresetLayouts presetLayouts;string globalLayoutName;string pendingIniLoad,loadedGUILayoutData;
     ImGuiID loadedGUILayoutLeftDockId=0;bool pendingControllerDockReconciliation=false;
     ofJson capturePresetLayout();void recallPresetLayout(const string&);void applyGUILayout(const string&);
     enum class PresetLayoutPopup {None,Save,Rename,Delete};
@@ -129,19 +126,16 @@ struct ofxOceanodeLayoutManager {
     string pendingPresetLayout,layoutError;bool presetReadFailed=false;
     bool savePresetLayouts();void readPresetLayouts();
     void queueGlobalLayout(const string&, const string&);
-    void onPresetLoaded();void onPresetSaved();void beforeFrame();void saveActiveCanvasLayout();void loadDefaultGlobalLayout();
+    void onPresetLoaded();void onPresetSaved();void beforeFrame();void saveCurrentPresetLayout();void loadDefaultGlobalLayout();
     bool hasActivePreset=false;
-    string rootCanvasPath;
     struct Callbacks {
         function<ofJson()> captureWindows;
         function<void(const ofJson&)> restoreWindows;
         function<void(const string&)> applyDocking;
-        function<void(const string&)> setRootCanvasPath;
     } callbacks{
         [this](){return oceanodeLayouts::captureWindows(container.get(),*controls);},
         [this](const ofJson& state){oceanodeLayouts::restoreWindows(container.get(),*controls,state);},
-        [this](const string& data){applyGUILayout(data);},
-        [this](const string& path){rootCanvasPath=path;}
+        [this](const string& data){applyGUILayout(data);}
     };
 };
 PRODUCTION
@@ -190,19 +184,14 @@ int main(){
     // New graph members must retain their visibility; labels cannot control identity.
     auto newShow=make_shared<ofParameter<bool>>("Show",true);newNode.model->number=2;
     newNode.parameters={newShow};app.container->nodes.push_back(&newNode);
-    ofxOceanodeShared::getPendingLayoutLoadPath()="old-macro.ini";
-    ofxOceanodeShared::getPendingLayoutSavePath()="old.ini";
     app.pendingIniLoad="old-preset.ini";
     app.recallPresetLayout("Sound");settle();
+    assert(app.pendingIniLoad.empty());
     assert(show->parameter.get()&&innerShow->get()&&macro->visible);
     assert(!showNames->get()&&newShow->get()&&macro->forcedDock==0);
     assert(app.controls->visibility["Timeline"]&&app.container->panels[0].windowState.isOpen);
     assert(macro->child->panels[0].windowState.isOpen);
     assert(ImGui::FindWindowByName("Mixer")->DockId==soundDock);
-    assert(ofxOceanodeShared::getPendingLayoutLoadPath().empty()&&ofxOceanodeShared::getPendingLayoutSavePath().empty());
-    assert(app.pendingIniLoad.empty()&&ofxOceanodeShared::getPresetLayoutActive());
-    assert(!ofxOceanodeShared::shouldSwitchCanvasLayout());
-    assert(ofxOceanodeShared::getActiveCanvasLayoutPath()==app.rootLayoutPath);
     app.recallPresetLayout("Laser");settle();
     assert(!show->parameter.get()&&!innerShow->get()&&!macro->visible&&!app.controls->visibility["Timeline"]);
     assert(!app.container->panels[0].windowState.isOpen&&!macro->child->panels[0].windowState.isOpen);
@@ -212,13 +201,10 @@ int main(){
     // corrupt files and write errors. Named snapshots remain explicit.
     auto snapshots=app.presetLayouts.entries;
     app.pendingPresetLayout="Laser";
-    ofxOceanodeShared::getPendingLayoutLoadPath()="old-macro.ini";
-    ofxOceanodeShared::getPendingLayoutSavePath()="old.ini";
     app.queueGlobalLayout("config/guiLayouts/Studio.ini","Studio.ini");
     assert(app.presetLayouts.entries==snapshots&&app.presetLayouts.active.empty());
     assert(app.pendingPresetLayout.empty()&&app.pendingIniLoad=="config/guiLayouts/Studio.ini");
-    assert(app.globalLayoutName=="Studio.ini"&&ofxOceanodeShared::shouldSwitchCanvasLayout());
-    assert(ofxOceanodeShared::getPendingLayoutLoadPath().empty()&&ofxOceanodeShared::getPendingLayoutSavePath().empty());
+    assert(app.globalLayoutName=="Studio.ini");
     app.recallPresetLayout("Sound");settle();
     auto original=app.presetLayouts.toJson();
     assert(app.savePresetLayouts());assert(!filesystem::exists("preset_layouts.json"));
@@ -234,8 +220,6 @@ int main(){
     assert(ofLoadJson("preset-A/preset_layouts.json")==original);
     ofxOceanodeShared::preset="preset-A";app.readPresetLayouts();
     assert(app.presetLayouts.toJson()==original&&app.pendingPresetLayout=="Sound");
-    assert(!ofxOceanodeShared::getPresetLayoutActive());
-    assert(ofxOceanodeShared::shouldSwitchCanvasLayout());
     // A preset default is independent from the last selection, including after
     // saving, reopening, global-layout selection, rename, deletion and Save As.
     ofxOceanodeShared::preset="preset-default";
@@ -300,27 +284,35 @@ int main(){
     app.onPresetLoaded();assert(app.presetReadFailed&&app.presetLayouts.entries.empty());
     assert(!app.savePresetLayouts()); // never overwrite corruption or silently load the older file
     ofxOceanodeShared::preset="";app.onPresetLoaded();
-    assert(!app.hasActivePreset&&app.pendingIniLoad.empty()&&app.rootLayoutPath.empty()&&app.rootCanvasPath.empty());
-    assert(app.presetLayouts.entries.empty()&&!ofxOceanodeShared::getPresetLayoutActive());
-    // Root/macro layout ownership, Save As, frame-boundary application and global default.
+    assert(!app.hasActivePreset&&app.pendingIniLoad.empty()&&app.presetLayouts.entries.empty());
+    // One layout per preset, legacy macro files ignored, Save As and global default.
     ofxOceanodeShared::preset="life-root";filesystem::create_directories("life-root");app.onPresetLoaded();
     app.presetLayouts.create("Default",sound);app.presetLayouts.defaultLayout="Default";
     app.onPresetSaved();auto savedRoot=ofBufferFromFile("life-root/ImGuiLayout.ini").getText();
-    assert(!savedRoot.empty()&&app.hasActivePreset&&app.rootCanvasPath=="life-root/ImGuiLayout.ini");
+    assert(!savedRoot.empty()&&app.hasActivePreset);
     filesystem::create_directories("life-root/Macro_1");
     ofstream("life-root/Macro_1/ImGuiLayout.ini")<<laser["layout"].get<string>();
-    ofxOceanodeShared::getPendingLayoutSavePath()=app.rootLayoutPath;
-    ofxOceanodeShared::getPendingLayoutLoadPath()="life-root/Macro_1/ImGuiLayout.ini";
-    ofxOceanodeShared::getActiveCanvasLayoutPath()="life-root/Macro_1/ImGuiLayout.ini";
     app.beforeFrame();settle();app.onPresetSaved();
     assert(ofBufferFromFile("life-root/ImGuiLayout.ini").getText()==savedRoot);
+    assert(ofBufferFromFile("life-root/Macro_1/ImGuiLayout.ini").getText()==laser["layout"].get<string>());
+    frame(true,true);settle();
+    app.container->scopeSavePending=true;app.container->pendingScopeSavePath="life-root";
+    app.container->pendingScopeSaveDeadlineMillis=450;
+    app.container->flushPendingScopeSave();
+    assert(app.container->lastScopeSave=="life-root"&&!app.container->scopeSavePending);
+    assert(app.container->pendingScopeSavePath.empty()&&app.container->pendingScopeSaveDeadlineMillis==0);
+    assert(ofBufferFromFile("life-root/ImGuiLayout.ini").getText()!=savedRoot);
+    assert(ofBufferFromFile("life-root/Macro_1/ImGuiLayout.ini").getText()==laser["layout"].get<string>());
+    app.onPresetSaved();
+    auto currentLayout=ofBufferFromFile("life-root/ImGuiLayout.ini").getText();
+    assert(currentLayout!=savedRoot);
     filesystem::create_directories("life-save-as");ofxOceanodeShared::preset="life-save-as";app.onPresetSaved();
-    assert(ofBufferFromFile("life-save-as/ImGuiLayout.ini").getText()==savedRoot);
+    assert(ofBufferFromFile("life-save-as/ImGuiLayout.ini").getText()==currentLayout);
+    assert(!filesystem::exists("life-save-as/Macro_1/ImGuiLayout.ini"));
     assert(ofLoadJson("life-save-as/preset_layouts.json")["default"]=="Default");
     app.onPresetLoaded();assert(app.pendingPresetLayout=="Default");app.beforeFrame();settle();
     assert(app.presetLayouts.active=="Default"&&app.pendingIniLoad.empty());
-    assert(ofxOceanodeShared::getActiveCanvasLayoutPath()==app.rootLayoutPath);
-    app.saveActiveCanvasLayout();
+    app.saveCurrentPresetLayout();
     filesystem::create_directories("config/guiLayouts");
     ofstream("config/guiLayouts/Startup.ini")<<laser["layout"].get<string>();
     ofstream("config/config.json")<<ofJson({{"defaultLayout","Startup.ini"}}).dump();
@@ -333,7 +325,7 @@ int main(){
     ofxOceanodePresetLayouts empty;reopened=empty;assert(reopened.active.empty()&&reopened.entries.empty());
     for(int i=0;i<20;++i){app.recallPresetLayout(i%2?"Sound":"Laser");settle();}
     ImGui::DestroyContext();
-    puts("PASS: real docking recall, nested window visibility, unaffected patch options, new/deleted nodes, queued layout cancellation, global/preset layout switching, preset defaults, legacy migration, frame boundaries, root/macro ownership, global startup default, serialization, Save As isolation, rename/delete, duplicate/invalid names, corrupt files, repeated switching.");
+    puts("PASS: real docking recall, nested window visibility, unaffected patch options, new/deleted nodes, pending layout cancellation, global/preset layout switching, preset defaults, legacy migration, frame boundaries, shared preset/Scope persistence, global startup default, serialization, Save As isolation, rename/delete, duplicate/invalid names, corrupt files, repeated switching.");
 }
 '''
 
@@ -342,20 +334,20 @@ def main():
     source = (ROOT / 'src/Layouts/ofxOceanodeLayoutManager.h').read_text()
     windows = (ROOT / 'src/Layouts/ofxOceanodeLayoutWindowState.h').read_text()
     production = windows[windows.index('namespace oceanodeLayouts {'):]
+    production += block((ROOT / 'src/Managers/ofxOceanodeContainer.cpp').read_text(), 'void ofxOceanodeContainer::flushPendingScopeSave()')
     production += block((ROOT / 'src/ofxOceanode.cpp').read_text(), 'void ofxOceanode::applyGUILayout(').replace('ofxOceanode::', 'ofxOceanodeLayoutManager::')
     production += '\n'.join(block(source, signature) for signature in (
         'ofJson ofxOceanodeLayoutManager::capturePresetLayout()',
         'void ofxOceanodeLayoutManager::recallPresetLayout(', 'bool ofxOceanodeLayoutManager::savePresetLayouts()',
         'void ofxOceanodeLayoutManager::readPresetLayouts()', 'void ofxOceanodeLayoutManager::queueGlobalLayout(',
         'void ofxOceanodeLayoutManager::onPresetLoaded()', 'void ofxOceanodeLayoutManager::onPresetSaved()',
-        'void ofxOceanodeLayoutManager::beforeFrame()', 'void ofxOceanodeLayoutManager::saveActiveCanvasLayout()',
+        'void ofxOceanodeLayoutManager::beforeFrame()', 'void ofxOceanodeLayoutManager::saveCurrentPresetLayout()',
         'void ofxOceanodeLayoutManager::loadDefaultGlobalLayout()'))
     with tempfile.TemporaryDirectory(prefix='oceanode-presetLayouts-') as work:
         work = Path(work)
         (work / 'imconfig.h').write_text('// Standalone ImGui.\n')
         cpp = work / 'test.cpp'
-        policy = block((ROOT / 'src/ofxOceanodeShared.h').read_text(), 'static bool shouldSwitchCanvasLayout()')
-        cpp.write_text(FIXTURE.replace('PRODUCTION', production).replace('LAYOUT_SWITCH_POLICY', policy))
+        cpp.write_text(FIXTURE.replace('PRODUCTION', production))
         binary = work / 'test'
         subprocess.run([os.environ.get('CXX', 'clang++'), '-std=c++17', '-O0', '-g',
                         '-fsanitize=address,undefined', '-I', str(IMGUI), '-I', str(work),

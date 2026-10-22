@@ -861,8 +861,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             centerCanvasAfterAutoLayoutRequested = false;
         }
 
-        // Detect canvas tab activation — consistent check for both active-canvas-ID
-        // and layout switching. Uses dock tab selection when available to avoid
+        // Detect canvas tab activation for active-canvas tracking.
+        // Use dock tab selection when available to avoid
         // the RootAndChildWindows false-positive with shared dock hosts.
         bool isActiveTab = false;
         ImGuiWindow* win = ImGui::GetCurrentWindow();
@@ -879,23 +879,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             ofxOceanodeShared::setActiveCanvasUniqueID(uniqueID);
         }
         
-        if(isActiveTab && !wasFocusedLastFrame && !layoutIniPath.empty()){
-            if(ofxOceanodeShared::shouldSwitchCanvasLayout()
-               && ofxOceanodeShared::getLayoutSwitchSuppressFrames() <= 0){
-                string newIniPath = ofToDataPath(layoutIniPath);
-                string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
-                
-                // Only switch if we're actually changing to a different layout
-                if(newIniPath != activeLayoutPath){
-                    // Queue: save current layout to previous canvas, load this canvas's layout
-                    ofxOceanodeShared::getPendingLayoutSavePath() = activeLayoutPath;
-                    ofxOceanodeShared::getPendingLayoutLoadPath() = newIniPath;
-                    // Update active path immediately so subsequent focus changes in the same frame don't re-trigger
-                    activeLayoutPath = newIniPath;
-                }
-            }
-        }
-        wasFocusedLastFrame = isActiveTab;
         handleParentNavigation();
         ImGui::SameLine();
         ImGui::BeginGroup();
@@ -3095,20 +3078,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                 glm::vec2 center   = target.canvas->getContentRegionSize() / (2.0f * zoom);
                                 target.canvas->setScrolling(-nodePos - nodeSize / 2.0f + center);
 
-                                // 5) Optional layout switching when the user has opted in
-                                if(ofxOceanodeShared::shouldSwitchCanvasLayout() &&
-                                   !target.canvas->getLayoutIniPath().empty()){
-                                    string newIniPath = ofToDataPath(target.canvas->getLayoutIniPath());
-                                    string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
-                                    if(!newIniPath.empty() && newIniPath != activeLayoutPath){
-                                        ofxOceanodeShared::getPendingLayoutSavePath() = activeLayoutPath;
-                                        ofxOceanodeShared::getPendingLayoutLoadPath() = newIniPath;
-                                        activeLayoutPath = newIniPath;
-                                    }
-                                }
                             }
 
-                            // 6) Notify the NodesController (and any other listeners) so
+                            // 5) Notify the NodesController (and any other listeners) so
                             //    the tree view highlights the new node and scrolls to it.
                             //    This MUST be called every jump — that's the fix for the
                             //    "highlight does not follow Alt+Arrow" bug.

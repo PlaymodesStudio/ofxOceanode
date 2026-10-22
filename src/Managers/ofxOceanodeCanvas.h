@@ -81,10 +81,6 @@ public:
     // appears as a tab rather than a floating window.
     void forceDockWindow(){ forceDockOnNextShow = true; };
     
-    // Per-canvas ImGui layout path (for layout switching on tab activation)
-    void setLayoutIniPath(const string& path){ layoutIniPath = path; }
-    const string& getLayoutIniPath() const { return layoutIniPath; }
-    
 	// node dimensions
 	int getNodeWidth(){return NODE_WIDTH_TEXT+NODE_WIDTH_WIDGET;};
 	void setNodeWidth(int ww, int tw){NODE_WIDTH_WIDGET=ww;NODE_WIDTH_TEXT=tw;};
@@ -225,10 +221,6 @@ private:
     int pendingCenterFrames = 0;
     bool centerOriginPending = false;
     
-    // Per-canvas layout switching
-    string layoutIniPath;
-    bool wasFocusedLastFrame = false;
-	
 	// Pre-cached fonts for zoom levels (static: shared across all canvas instances via ImGui's single font atlas)
 	static ImFont* zoomFonts[9];
 	static ImFont* zoomFontsBold[9];

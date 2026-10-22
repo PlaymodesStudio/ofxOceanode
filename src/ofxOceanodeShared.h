@@ -432,52 +432,6 @@ public:
 
 	inline static ofEvent<string> activeCanvasUniqueIDChangedEvent;
 
-	// Active canvas layout path — tracks which canvas's ImGui layout file is currently loaded
-	static string& getActiveCanvasLayoutPath(){
-		static string s;
-		return s;
-	}
-
-	// Pending layout save (save current ImGui state to this path before loading new one)
-	static string& getPendingLayoutSavePath(){
-		static string s;
-		return s;
-	}
-
-	// Pending layout load (load from this path at frame boundary)
-	static string& getPendingLayoutLoadPath(){
-		static string s;
-		return s;
-	}
-
-	// GUI layout changes with canvas — when true, switching canvas tabs triggers layout switching
-	static bool& getGuiLayoutChangesWithMacros(){
-		return getInstance().changeLayoutOnMacros;
-	}
-	static void setGuiLayoutChangesWithMacros(bool b){
-		getInstance().changeLayoutOnMacros = b;
-	}
-
-    // A named preset layout owns the whole preset's docking layout, across canvas tabs.
-    static bool& getPresetLayoutActive(){ static bool active = false; return active; }
-    static bool shouldSwitchCanvasLayout(){
-        return getGuiLayoutChangesWithMacros() && !getPresetLayoutActive();
-    }
-
-	// Suppress automatic layout switching for N frames (used by NodesController
-	// when programmatically switching canvases to prevent the rising-edge
-	// detection from undoing the switch via LoadIniSettingsFromDisk)
-	static int& getLayoutSwitchSuppressFrames(){
-		static int frames = 0;
-		return frames;
-	}
-
-	// Cache for layout contents — used to preserve layouts across folder recreations
-	static std::map<string, string>& getLayoutContentCache(){
-		static std::map<string, string> cache;
-		return cache;
-	}
-
 	// Node selected in canvas — fired whenever a single node is clicked/selected
 	// in any canvas (main or macro). Subscribers receive the pointer to the node
 	// that became selected (nullptr means deselect-all with no new selection).
@@ -581,9 +535,6 @@ private:
 	// Active canvas tracking
 	string activeCanvasUniqueID = "";
 	
-	// Change layout on macros
-	bool changeLayoutOnMacros = false;
-
 	// Root references for whole-patch traversal
 	ofxOceanodeContainer* rootContainer = nullptr;
 	ofxOceanodeCanvas* rootCanvas = nullptr;

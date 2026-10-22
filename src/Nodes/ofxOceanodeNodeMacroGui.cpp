@@ -589,7 +589,6 @@ void ofxOceanodeNodeMacro::renderMacroSaveDialog() {
 						presetManager.setCurrentMacroPath(path);
 						ofxOceanodeShared::updateMacrosStructure();
 						presetManager.updateCategoryFromPath(path);
-						loadMacroLayout(path);
 						markMacroReferenceUserEdited();
 						ofxOceanodeShared::snapshotUpdated(path);
 						ofxOceanodeShared::macroUpdated(path);

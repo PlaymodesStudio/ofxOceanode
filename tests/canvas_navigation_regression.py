@@ -58,14 +58,14 @@ struct ofxOceanodeNode {
     Model& getNodeModel(){return *model;} Gui& getNodeGui(){return gui;}
 };
 struct ofxOceanodeCanvas {
-    string uniqueID,parentID,layoutIniPath;
+    string uniqueID,parentID;
     bool focusPending=false,onTop=false,isFirstDraw=false;
     glm::vec2 contentRegionSize{800,600},scrolling;
     float zoomLevel=1;
     ofxOceanodeNode* pendingCenterNode=nullptr; int pendingCenterFrames=0;
     void requestFocus(){focusPending=true;} void bringOnTop(){onTop=true;}
     void requestCenterOnNode(ofxOceanodeNode* n,int frames){pendingCenterNode=n;pendingCenterFrames=max(0,frames);}
-    string getUniqueID(){return uniqueID;} const string& getLayoutIniPath(){return layoutIniPath;}
+    string getUniqueID(){return uniqueID;}
     float getZoomLevel(){return zoomLevel;} glm::vec2 getContentRegionSize(){return contentRegionSize;}
     void setScrolling(glm::vec2 s){scrolling=s;}
     void handleParentNavigation(); void center();
@@ -90,16 +90,10 @@ struct ofxOceanodeShared {
     inline static ofxOceanodeContainer* root=nullptr;
     inline static ofxOceanodeCanvas* canvas=nullptr;
     inline static ofxOceanodeNode* selected=nullptr;
-    inline static string active,layout,save,load;
-    inline static int suppress=0; inline static bool switchLayouts=false;
+    inline static string active;
     static auto getRootContainer(){return root;} static auto getRootCanvas(){return canvas;}
     static void setActiveCanvasUniqueID(string s){active=s;}
     static void nodeSelectedInCanvas(ofxOceanodeNode* n){selected=n;}
-    static int& getLayoutSwitchSuppressFrames(){return suppress;}
-    static bool shouldSwitchCanvasLayout(){return switchLayouts;}
-    static string& getActiveCanvasLayoutPath(){return layout;}
-    static string& getPendingLayoutSavePath(){return save;}
-    static string& getPendingLayoutLoadPath(){return load;}
 };
 string ofToDataPath(string path){return path;}
 '''
@@ -154,11 +148,11 @@ int main(){
     unsigned char* pixels;int width,height;io.Fonts->GetTexDataAsRGBA32(&pixels,&width,&height);
     dock=ImHashStr("NavigationDock");
     ofxOceanodeContainer root;ofxOceanodeCanvas rootCanvas;
-    rootCanvas.uniqueID="Canvas";rootCanvas.zoomLevel=2;rootCanvas.layoutIniPath="Root.ini";
+    rootCanvas.uniqueID="Canvas";rootCanvas.zoomLevel=2;
     ofxOceanodeShared::root=&root;ofxOceanodeShared::canvas=&rootCanvas;
     auto* outerNode=add(root,1);auto* outer=macro(outerNode);
     outer->canvas.uniqueID="Macro 1";outer->canvas.parentID="Canvas";
-    outer->canvas.zoomLevel=.5f;outer->canvas.layoutIniPath="Outer.ini";
+    outer->canvas.zoomLevel=.5f;
     auto* innerNode=add(*outer->container,1);auto* inner=macro(innerNode);
     inner->canvas.uniqueID="Macro 1 / Macro 1";inner->canvas.parentID="Macro 1";
     auto* siblingNode=add(root,2);auto* sibling=macro(siblingNode);
@@ -184,11 +178,9 @@ int main(){
 
     // A new press returns to the root, selecting only the containing macro.
     siblingNode->gui.selected=true;focus(outer->canvas);
-    ofxOceanodeShared::switchLayouts=true;ofxOceanodeShared::layout="Outer.ini";
     press(order);frame(order);
     assert(ofxOceanodeShared::selected==outerNode && outerNode->gui.selected && !siblingNode->gui.selected);
-    assert(ofxOceanodeShared::active=="Canvas" && ofxOceanodeShared::load=="Root.ini");
-    assert(ofxOceanodeShared::save=="Outer.ini" && ofxOceanodeShared::suppress==4);
+    assert(ofxOceanodeShared::active=="Canvas");
     assert(abs(rootCanvas.scrolling.x+210)<.001 && abs(rootCanvas.scrolling.y-320)<.001);
     release(order);focus(rootCanvas);press(order);
     assert(ofxOceanodeShared::selected==outerNode);release(order);

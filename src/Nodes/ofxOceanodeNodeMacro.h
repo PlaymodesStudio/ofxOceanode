@@ -214,9 +214,6 @@ private:
 	void setupPresetControl();
 	void initializeSnapshotSystem();
 
-	// ─── ImGui layout persistence (per-macro) ────────────────────────────
-	void saveMacroLayout(const string& folderPath);
-	void loadMacroLayout(const string& folderPath);
 	bool saveGlobalDescription(const string& folderPath) const;
 	void loadGlobalDescription(const string& folderPath);
 	bool saveLocalDefinition();

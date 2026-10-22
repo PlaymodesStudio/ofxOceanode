@@ -36,8 +36,9 @@ that behavior until you choose a default. Renaming a default layout preserves it
 selection; deleting it returns to the last selected layout. New starts an empty
 collection. The global startup default remains independent.
 
-A named preset layout spans all canvas tabs, so focusing a macro does not replace
-it with the macro's individual layout.
+The GUI arrangement spans all canvas tabs. Focusing or navigating into a macro
+keeps the current layout. Preset saves and exit store it in the preset's root
+`ImGuiLayout.ini`; macros do not load or save individual GUI layouts.
 
 ## Global layouts
 
@@ -51,9 +52,6 @@ Loading a global layout deselects the active preset layout, keeping all saved
 preset snapshots available. To include a global arrangement in the preset, load
 it, adjust window visibility, and choose **Save preset layout as…**.
 
-The **GUI layout changes with macros** preference is also in Layouts. It applies
-when no named preset layout is active, including after loading a global layout.
-
 Node window toggles use the same recognition as the Window menu (`Show`, `Show
 Win`, `Show Window`, `Show GUI`, `Show Editor`, `Show Snapshot`, `Show All`, `Show
 Split`). A window controlled only by private addon state or a differently named
@@ -62,7 +60,7 @@ toggle retains its visibility; ImGui restores its saved docking when it opens.
 ## Code organization
 
 All layout ownership lives in `src/Layouts/ofxOceanodeLayoutManager.h`: global and
-preset selection, defaults, persistence, Save As, canvas layout switching, deferred
+preset selection, defaults, persistence, Save As, deferred
 application, menus and dialogs. It is header-only so existing host projects do not
 need to register another compiled source file.
 
@@ -73,4 +71,4 @@ including naming, default tracking and schema compatibility.
 it delegates layout lifecycle and UI to the manager.
 
 `tests/layouts_regression.py` covers both scopes, preset defaults, legacy migration,
-root/macro ownership, Save As, and repeated docking restoration using real ImGui.
+shared layout persistence, Save As, and repeated docking restoration using real ImGui.

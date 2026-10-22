@@ -57,7 +57,6 @@ int main(int argc, char** argv) {
     assert(macro.isLocal() && macro.getCurrentMacroPath().empty());
     assert(macro.getLocalMacroName() == "Whole_Preset");
     assert(macro.getContainer()->getAllModules().size() == 1 && value(macro) == .25f);
-    assert(macro.getCanvas()->getLayoutIniPath().find("Presets/Bank") == string::npos);
     macro.getContainer()->getAllModules().front()->getNodeModel().getParameter<float>("Value") = .6f;
     macro.localName = "Local %s";
     macro.macroDescription = "Description 100%";
@@ -70,6 +69,7 @@ int main(int argc, char** argv) {
     assert(saved.at("Local_Name") == "Local %s");
     assert(saved.at("Description") == "Description 100%");
     assert(saved.at("LocalPreset") == true);
+    assert(!fs::exists("SavedParent/Macro_1/ImGuiLayout.ini"));
     assert(ofLoadJson("SavedParent/Macro_1/description.json").at("Description") == "Description 100%");
     assert(ofLoadJson("Presets/Bank/01--Whole_Preset/Number_1.json").at("Value") == "0.25");
     assert(!fs::exists("Presets/Bank/01--Whole_Preset/Macro_1.json"));
@@ -118,6 +118,7 @@ int main(int argc, char** argv) {
     assert(copy.saveLibraryDefinition("Macros/NewDefinition"));
     assert(copy.isLocal());
     assert(fs::exists("Macros/NewDefinition/modules.json"));
+    assert(!fs::exists("Macros/NewDefinition/ImGuiLayout.ini"));
     assert(ofLoadJson("Macros/NewDefinition/description.json").at("Description") == "Description 100%");
     // Canvas nodes share a window: test distant origins and long names, not
     // just a node drawn at the window padding. Width must equal the default.

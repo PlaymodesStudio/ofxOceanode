@@ -86,8 +86,7 @@ void ofxOceanode::setup(){
     layouts = std::make_unique<ofxOceanodeLayoutManager>(ofxOceanodeLayoutManager::Callbacks{
         [this](){ return oceanodeLayouts::captureWindows(container.get(), *controls); },
         [this](const ofJson& state){ oceanodeLayouts::restoreWindows(container.get(), *controls, state); },
-        [this](const std::string& data){ applyGUILayout(data); },
-        [this](const std::string& path){ canvas.setLayoutIniPath(path); }
+        [this](const std::string& data){ applyGUILayout(data); }
     });
     layouts->loadDefaultGlobalLayout();
     // Auto-load default theme if pointer file exists
@@ -338,7 +337,7 @@ void ofxOceanode::reconcileMissingControllerWindows(){
 }
 
 void ofxOceanode::exit(){
-    layouts->saveActiveCanvasLayout();
+    layouts->saveCurrentPresetLayout();
     oceanodeTime->shutdown(container);
     container->clearContainer();
 }
@@ -998,7 +997,7 @@ void ofxOceanode::saveConfig(){
 	config["autoInspectorShowHide"] = ofxOceanodeShared::getAutoInspectorShowHide();
 	config["selectionCentersCanvas"] = ofxOceanodeShared::getSelectionCentersCanvas();
 	config["connectionWidth"] = ofxOceanodeShared::getConnectionWidth();
-	config["guiLayoutChangesWithMacros"] = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
+
 	if(auto tc = controls->get<ofxOceanodeTimeController>()) config["spaceTogglesPlay"] = tc->getSpaceTogglesPlay();
 	
 	   // Create config directory if it doesn't exist
@@ -1084,9 +1083,6 @@ void ofxOceanode::loadConfig(){
 	}
 	ofxOceanodeShared::setSelectionCentersCanvas(config.value("selectionCentersCanvas", false));
 	ofxOceanodeShared::setConnectionWidth(config.value("connectionWidth", 3.0f));
-	if(config.contains("guiLayoutChangesWithMacros")){
-		ofxOceanodeShared::setGuiLayoutChangesWithMacros(config["guiLayoutChangesWithMacros"].get<bool>());
-	}
 	if(config.contains("spaceTogglesPlay")){
 		if(auto tc = controls->get<ofxOceanodeTimeController>()) tc->setSpaceTogglesPlay(config["spaceTogglesPlay"].get<bool>());
 	}

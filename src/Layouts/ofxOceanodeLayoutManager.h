@@ -19,7 +19,6 @@ public:
         std::function<ofJson()> captureWindows;
         std::function<void(const ofJson&)> restoreWindows;
         std::function<void(const std::string&)> applyDocking;
-        std::function<void(const std::string&)> setRootCanvasPath;
     };
     explicit ofxOceanodeLayoutManager(Callbacks adapters): callbacks(std::move(adapters)) {}
 
@@ -27,7 +26,7 @@ public:
     void onPresetSaved();
     void loadDefaultGlobalLayout();
     void beforeFrame(); // Call before ImGui::NewFrame.
-    void saveActiveCanvasLayout();
+    void saveCurrentPresetLayout();
     void drawMenu();
     void drawPopups(){ drawPresetLayoutPopup(); drawGlobalLayoutPopup(); }
 
@@ -49,9 +48,8 @@ private:
     std::string globalLayoutName;
     char globalName[256] = {};
 
-    // Own the current canvas layout and requests applied before NewFrame.
+    // Preset persistence and layout requests applied before NewFrame.
     bool hasActivePreset = false;
-    std::string rootLayoutPath;
     std::string pendingIniLoad;
 
     ofJson capturePresetLayout();
@@ -68,88 +66,15 @@ private:
 
 inline void ofxOceanodeLayoutManager::onPresetLoaded(){
     readPresetLayouts();
-    if(ofxOceanodeShared::getCurrentPresetPath().empty()){
-        pendingIniLoad.clear();
-        ofxOceanodeShared::getPendingLayoutSavePath().clear();
-        ofxOceanodeShared::getPendingLayoutLoadPath().clear();
-        ofxOceanodeShared::getActiveCanvasLayoutPath().clear();
-        callbacks.setRootCanvasPath("");
-        rootLayoutPath.clear();
-        hasActivePreset = false;
-        return;
-    }
-    std::string iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
-    if(ofFile(iniPath).exists()){
-        pendingIniLoad = iniPath;   // defer — will be applied before next NewFrame
-        // Cache the content for preservation during future saves
-        ofBuffer buf = ofBufferFromFile(iniPath);
-        ofxOceanodeShared::getLayoutContentCache()[iniPath] = buf.getText();
-    }
-    // Set main canvas layout path
-    callbacks.setRootCanvasPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
-    ofxOceanodeShared::getActiveCanvasLayoutPath() = iniPath;
-    rootLayoutPath = iniPath;
-    hasActivePreset = true;
+    hasActivePreset = !ofxOceanodeShared::getCurrentPresetPath().empty();
+    if(!hasActivePreset) return;
+    const auto iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
+    if(ofFile(iniPath).exists()) pendingIniLoad = iniPath;
 }
 
 inline void ofxOceanodeLayoutManager::onPresetSaved(){
-    std::string iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
-    std::string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
-    // Save As: the preset's path is the new folder now, but the active
-    // layout path still names the root layout of the preset saved / loaded
-    // before. That is still the root canvas (not a macro's).
-    const std::string previousRoot = rootLayoutPath;
-    const bool rootActive = activeLayoutPath.empty() || activeLayoutPath == iniPath ||
-                            (!previousRoot.empty() && activeLayoutPath == previousRoot);
-    rootLayoutPath = iniPath;
-
-    // Only save from ImGui state if the root canvas is active
-    // (activeLayoutPath matches the preset's layout path).
-    if(rootActive){
-        activeLayoutPath = iniPath;
-        ImGui::SaveIniSettingsToDisk(iniPath.c_str());
-        // Update cache
-        size_t sz = 0;
-        const char* d = ImGui::SaveIniSettingsToMemory(&sz);
-        if(d && sz > 0) ofxOceanodeShared::getLayoutContentCache()[iniPath] = std::string(d, sz);
-    }
-    // If a macro is active, save ImGui state to the macro's active path instead.
-    // IMPORTANT: Read the root layout from disk FIRST — ImGui's in-memory state
-    // currently holds the macro layout (loaded when the user focused the macro canvas),
-    // and SaveIniSettingsToDisk writes that macro layout wherever we tell it.
-    // The root layout file on disk is still correct (container->savePreset() never
-    // touches ImGuiLayout.ini), so we snapshot it before any ImGui write, then
-    // put it back afterwards to guarantee it isn't lost.
-    else if(!activeLayoutPath.empty()){
-        // Snapshot the root layout file from disk before any ImGui write.
-        // Save As: the new folder has none yet, take the previous preset's.
-        std::string rootLayoutContent;
-        if(ofFile(iniPath).exists()){
-            ofBuffer buf = ofBufferFromFile(iniPath);
-            rootLayoutContent = buf.getText();
-        }else if(!previousRoot.empty()){
-            auto& cache = ofxOceanodeShared::getLayoutContentCache();
-            auto cached = cache.find(previousRoot);
-            if(cached != cache.end() && !cached->second.empty()) rootLayoutContent = cached->second;
-            else if(ofFile(previousRoot).exists()) rootLayoutContent = ofBufferFromFile(previousRoot).getText();
-        }
-
-        // Save ImGui state (which is the macro's layout) to the macro's path
-        ImGui::SaveIniSettingsToDisk(activeLayoutPath.c_str());
-
-        // Restore the root layout from the disk snapshot we took above
-        if(!rootLayoutContent.empty()){
-            ofBuffer buf;
-            buf.set(rootLayoutContent.c_str(), rootLayoutContent.size());
-            ofBufferToFile(iniPath, buf);
-            // Also update the in-memory cache to keep it in sync
-            ofxOceanodeShared::getLayoutContentCache()[iniPath] = rootLayoutContent;
-            ofLogNotice("ofxOceanode") << "Preserved root layout at " << iniPath;
-        }
-    }
-
-    callbacks.setRootCanvasPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
-    hasActivePreset = true;
+    hasActivePreset = !ofxOceanodeShared::getCurrentPresetPath().empty();
+    saveCurrentPresetLayout();
     savePresetLayouts();
 }
 
@@ -158,31 +83,6 @@ inline void ofxOceanodeLayoutManager::beforeFrame(){
         callbacks.applyDocking(ofBufferFromFile(pendingIniLoad).getText());
         pendingIniLoad.clear();
     }
-    // Deferred canvas layout switching (save previous, load new)
-    {
-        std::string& pendingSave = ofxOceanodeShared::getPendingLayoutSavePath();
-        std::string& pendingLoad = ofxOceanodeShared::getPendingLayoutLoadPath();
-
-        if(!pendingLoad.empty()){
-            // Save current ImGui state to the previous canvas's file
-            if(!pendingSave.empty()){
-                ImGui::SaveIniSettingsToDisk(pendingSave.c_str());
-                // Cache the saved content in memory for preservation during preset save
-                size_t iniSize = 0;
-                const char* iniData = ImGui::SaveIniSettingsToMemory(&iniSize);
-                if(iniData && iniSize > 0){
-                    ofxOceanodeShared::getLayoutContentCache()[pendingSave] = std::string(iniData, iniSize);
-                }
-                pendingSave.clear();
-            }
-
-            // Load the new canvas's layout
-            if(ofFile(pendingLoad).exists()){
-                callbacks.applyDocking(ofBufferFromFile(pendingLoad).getText());
-            }
-            pendingLoad.clear();
-        }
-    }
     if(!pendingPresetLayout.empty()){
         const auto name = pendingPresetLayout;
         pendingPresetLayout.clear();
@@ -190,21 +90,11 @@ inline void ofxOceanodeLayoutManager::beforeFrame(){
     }
 }
 
-inline void ofxOceanodeLayoutManager::saveActiveCanvasLayout(){
-    if(hasActivePreset){
-        std::string iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
-        std::string& activeLayout = ofxOceanodeShared::getActiveCanvasLayoutPath();
-
-        // Save ImGui state to the currently active canvas layout path.
-        // If root is active, activeLayout == iniPath so root gets saved.
-        // If a macro is active, save to the macro's path — the root layout
-        // on disk is already correct from the last focus-change save.
-        if(!activeLayout.empty()){
-            ImGui::SaveIniSettingsToDisk(activeLayout.c_str());
-        } else {
-            // Fallback: no active layout tracked, save to root preset path
-            ImGui::SaveIniSettingsToDisk(iniPath.c_str());
-        }
+inline void ofxOceanodeLayoutManager::saveCurrentPresetLayout(){
+    const auto preset = ofxOceanodeShared::getCurrentPresetPath();
+    if(hasActivePreset && !preset.empty()){
+        const auto iniPath = ofToDataPath(preset + "/ImGuiLayout.ini");
+        ImGui::SaveIniSettingsToDisk(iniPath.c_str());
     }
 }
 
@@ -236,14 +126,11 @@ inline bool ofxOceanodeLayoutManager::savePresetLayouts(){
 
 inline void ofxOceanodeLayoutManager::readPresetLayouts(){
     pendingIniLoad.clear();
-    ofxOceanodeShared::getPendingLayoutSavePath().clear();
-    ofxOceanodeShared::getPendingLayoutLoadPath().clear();
     presetLayouts = {};
     pendingPresetLayout.clear();
     layoutError.clear();
     presetReadFailed = false;
     presetPopup = PresetLayoutPopup::None;
-    ofxOceanodeShared::getPresetLayoutActive() = false;
     const auto preset = ofxOceanodeShared::getCurrentPresetPath();
     if(preset.empty()) return;
     auto file = ofToDataPath(preset + "/preset_layouts.json");
@@ -265,13 +152,8 @@ inline void ofxOceanodeLayoutManager::recallPresetLayout(const std::string& name
     const auto found = presetLayouts.entries.find(name);
     if(found == presetLayouts.entries.end()) return;
     auto state = found->second;
-    // This is called before NewFrame. Drop canvas-layout requests from the
-    // previous frame so a macro's layout cannot overwrite the recalled one.
+    // Apply before NewFrame and replace any older pending layout load.
     pendingIniLoad.clear();
-    ofxOceanodeShared::getPendingLayoutSavePath().clear();
-    ofxOceanodeShared::getPendingLayoutLoadPath().clear();
-    ofxOceanodeShared::getPresetLayoutActive() = true;
-    ofxOceanodeShared::getActiveCanvasLayoutPath() = rootLayoutPath;
     callbacks.restoreWindows(state);
     // Remove settings absent from this snapshot, including stale floating
     // windows, before applying its docking tree and selected tabs.
@@ -290,10 +172,6 @@ inline void ofxOceanodeLayoutManager::queueGlobalLayout(const std::string& path,
         presetLayouts.active.clear();
         savePresetLayouts();
     }
-    ofxOceanodeShared::getPresetLayoutActive() = false;
-    ofxOceanodeShared::getPendingLayoutSavePath().clear();
-    ofxOceanodeShared::getPendingLayoutLoadPath().clear();
-    ofxOceanodeShared::getActiveCanvasLayoutPath() = rootLayoutPath;
     pendingPresetLayout.clear();
     pendingIniLoad = path;
     globalLayoutName = name;
@@ -394,12 +272,6 @@ inline void ofxOceanodeLayoutManager::drawMenu(){
         }
         ImGui::EndMenu();
     }
-
-    ofxOceanodeMenu::section("Canvas switching");
-    bool layoutWithMacros = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
-    if(ImGui::Checkbox("GUI layout changes with macros", &layoutWithMacros)){
-        ofxOceanodeShared::setGuiLayoutChangesWithMacros(layoutWithMacros);
-    }
 }
 
 inline void ofxOceanodeLayoutManager::drawPresetLayoutsMenu(){
@@ -486,13 +358,6 @@ inline void ofxOceanodeLayoutManager::drawPresetLayoutPopup(){
                 else if(action == PresetLayoutPopup::Rename) presetLayouts.rename(presetTarget, name);
                 else presetLayouts.erase(presetTarget);
                 if(savePresetLayouts()){
-                    ofxOceanodeShared::getPresetLayoutActive() = !presetLayouts.active.empty();
-                    if(action == PresetLayoutPopup::Save){
-                        // Named preset layouts use one arrangement across all macro tabs.
-                        ofxOceanodeShared::getActiveCanvasLayoutPath() = rootLayoutPath;
-                        ofxOceanodeShared::getPendingLayoutSavePath().clear();
-                        ofxOceanodeShared::getPendingLayoutLoadPath().clear();
-                    }
                     layoutError.clear();
                     ImGui::CloseCurrentPopup();
                 }else presetLayouts = std::move(previous);
