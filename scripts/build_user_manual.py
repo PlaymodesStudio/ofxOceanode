@@ -20,7 +20,7 @@ from reportlab.graphics.shapes import Drawing, Rect, Line, Circle, String, PolyL
 from reportlab.graphics import renderSVG
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'output/pdf/oceanode-user-manual.pdf'
+OUT = ROOT / 'docs/oceanode-user-manual.pdf'
 ASSETS = ROOT / 'docs/assets/oceanode-manual'
 INK = colors.HexColor('#163339')
 TEAL = colors.HexColor('#087F86')
