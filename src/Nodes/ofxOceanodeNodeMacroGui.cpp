@@ -785,6 +785,26 @@ void ofxOceanodeNodeMacro::syncParameterGroupToSortOrder() {
 	parameterGroupChanged.notify(this);
 }
 
+// Renames or recolors a separator. Its parameter is renamed in place, so the
+// node shows the change immediately and keeps its position in the group.
+void ofxOceanodeNodeMacro::setSortSeparator(int index, const string& label, const ofColor& color) {
+	auto parameterName = [](const string& name, const ofColor& c){
+		return "SEPARATOR:|" + name + "|" + ofToString((int)c.r) + "," + ofToString((int)c.g) + "," +
+			ofToString((int)c.b) + "," + ofToString((int)c.a);
+	};
+	auto& entry = sortOrder.getOrder()[index];
+	const string oldName = parameterName(getSortSeparatorLabel(entry), getSortSeparatorColor(entry));
+	const string newName = parameterName(label, color);
+	if(newName == oldName) return;
+	for(int j = 0; j < getParameterGroup().size(); j++){
+		if(getParameterGroup().get(j).getName() == oldName){
+			getParameterGroup().get(j).setName(newName);
+			break;
+		}
+	}
+	entry = makeSortSeparatorEntry(label, color);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // renderRouterSortInterface — router sort order inspector with drag-drop,
 // separators, rename (moved from main .cpp)
@@ -802,8 +822,27 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 	ImGui::TextDisabled("Drag to reorder, double-click to rename.");
 	ImGui::Spacing();
 
-	const float sepDeleteMargin = 40.0f * zoomLevel;
-	
+	// Separator rows end with a color swatch and a delete ("x") button.
+	const float swatchSize = ImGui::GetTextLineHeight();
+	const float sepDeleteMargin = 40.0f * zoomLevel + swatchSize + ImGui::GetStyle().ItemSpacing.x;
+	// The swatch opens a picker that recolors the separator while dragging.
+	auto separatorColorButton = [&](int index){
+		const ofColor current = getSortSeparatorColor(sortOrder.getOrder()[index]);
+		ImVec4 color(current.r / 255.f, current.g / 255.f, current.b / 255.f, current.a / 255.f);
+		if(ImGui::ColorButton("##sepColor", color, ImGuiColorEditFlags_AlphaPreviewHalf | ImGuiColorEditFlags_NoDragDrop,
+		                      ImVec2(swatchSize, swatchSize)))
+			ImGui::OpenPopup("##sepColorPicker");
+		if(ImGui::BeginPopup("##sepColorPicker")){
+			if(ImGui::ColorPicker4("##picker", &color.x, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf)){
+				// Round: truncating would lower unchanged channels on every drag frame.
+				auto channel = [](float value){ return std::round(ofClamp(value, 0.f, 1.f) * 255.f); };
+				setSortSeparator(index, getSortSeparatorLabel(sortOrder.getOrder()[index]),
+					ofColor(channel(color.x), channel(color.y), channel(color.z), channel(color.w)));
+			}
+			ImGui::EndPopup();
+		}
+	};
+
 	int moveFrom = -1, moveTo = -1;
 	// Disable drag-and-drop while a rename is in progress so the InputText
 	// doesn't accidentally get cancelled by an unintended drag gesture.
@@ -837,36 +876,14 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 				ImGui::SetKeyboardFocusHere();
 				guiState.routerSortEditNeedsFocus = false;
 			}
-			ImGui::SetNextItemWidth(isSep ? -sepDeleteMargin : -1.0f); // leave room for x button on seps
+			ImGui::SetNextItemWidth(isSep ? -sepDeleteMargin : -1.0f); // leave room for the separator buttons
 			bool confirmed = ImGui::InputText("##rename", guiState.routerSortEditBuf, sizeof(guiState.routerSortEditBuf),
 				ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
 
 			if(confirmed){
 				string newName(guiState.routerSortEditBuf);
 				if(isSep){
-					// Separator rename: update the parameter name in the group and
-					// replace the sort-order entry with the new label.
-					if(!newName.empty()){
-						string oldLabel  = getSortSeparatorLabel(sortOrder.getOrder()[i]);
-						ofColor sepColor = getSortSeparatorColor(sortOrder.getOrder()[i]);
-						if(newName != oldLabel){
-							string oldParamName = "SEPARATOR:|" + oldLabel + "|" +
-								ofToString((int)sepColor.r) + "," + ofToString((int)sepColor.g) + "," +
-								ofToString((int)sepColor.b) + "," + ofToString((int)sepColor.a);
-							string newParamName = "SEPARATOR:|" + newName + "|" +
-								ofToString((int)sepColor.r) + "," + ofToString((int)sepColor.g) + "," +
-								ofToString((int)sepColor.b) + "," + ofToString((int)sepColor.a);
-							// Update the parameter name in-place so the visual divider
-							// reflects the new label immediately (no need to reload).
-							for(int j = 0; j < getParameterGroup().size(); j++){
-								if(getParameterGroup().get(j).getName() == oldParamName){
-									getParameterGroup().get(j).setName(newParamName);
-									break;
-								}
-							}
-							sortOrder.getOrder()[i] = makeSortSeparatorEntry(newName, sepColor);
-						}
-					}
+					if(!newName.empty()) setSortSeparator(i, newName, getSortSeparatorColor(sortOrder.getOrder()[i]));
 				} else {
 					// Router rename: set the abstractRouter's nameParam; the existing
 					// rename listener cascades the update to sortOrder.getOrder(), routerManager,
@@ -885,8 +902,10 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 				guiState.routerSortEditingIndex = -1;
 			}
 
-			// Delete button shown inline even while editing a separator
+			// Color and delete buttons shown inline even while editing a separator
 			if(isSep){
+				ImGui::SameLine();
+				separatorColorButton(i);
 				ImGui::SameLine();
 				if(ImGui::SmallButton("x")){
 					string sepLabel = getSortSeparatorLabel(sortOrder.getOrder()[i]);
@@ -903,10 +922,10 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 			if(isUnknown) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 			if(isSep)     ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::SelectedNodeText);
 
-			// For separators, constrain the selectable to leave 40 px for the
-			// delete ("x") button (same margin as the InputText in edit mode).
-			// ImVec2(0,0) would fill the entire available width, pushing the
-			// SameLine button outside the clip rect and making it unclickable.
+			// For separators, constrain the selectable to leave room for the
+			// color and delete ("x") buttons (same margin as the InputText in edit
+			// mode). ImVec2(0,0) would fill the entire available width, pushing the
+			// SameLine buttons outside the clip rect and making them unclickable.
 			float selWidth = isSep
 				? max(0.0f, ImGui::GetContentRegionAvail().x - sepDeleteMargin)
 				: 0.0f;
@@ -1013,8 +1032,10 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 				}
 			}
 
-			// Delete button for separators (shown in normal display mode too)
+			// Color and delete buttons for separators (shown in normal display mode too)
 			if(isSep){
+				ImGui::SameLine();
+				separatorColorButton(i);
 				ImGui::SameLine();
 				if(ImGui::SmallButton("x")){
 					string sepLabel = getSortSeparatorLabel(sortOrder.getOrder()[i]);

@@ -216,6 +216,7 @@ private:
 	void renderSnapshotMatrix();
 	void renderInspectorInterface();
 	void renderRouterSortInterface();
+	void setSortSeparator(int index, const std::string& label, const ofColor& color);
 	void syncParameterGroupToSortOrder();
 
 	// ─── Router sort-order inline helpers (delegate to sortOrder) ─────────

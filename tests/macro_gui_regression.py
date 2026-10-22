@@ -267,6 +267,27 @@ int main(int argc, char** argv) {
     ImGui::ActivateItemByID(ImHashStr("Load", 0, loadPopup->ID)); frame();
     copy.update(event); frame();
     assert(!copy.isLocal() && copy.getCurrentMacroName() == "A" && value(copy) == .7f);
+    // Separator recolor and rename keep the parameter, renamed in place.
+    {
+        auto separators = [&]() {
+            vector<string> names;
+            for(int i = 0; i < (int)macro.getParameterGroup().size(); i++) {
+                const string name = macro.getParameterGroup().get(i).getName();
+                if(name.rfind("SEPARATOR:|", 0) == 0) names.push_back(name);
+            }
+            return names;
+        };
+        const ofColor original(10, 20, 30, 255), recolored(200, 100, 50, 128);
+        macro.addSeparator("Group", original);
+        macro.sortOrder.getOrder().push_back(macro.makeSortSeparatorEntry("Group", original));
+        const int index = macro.sortOrder.getOrder().size() - 1;
+        macro.setSortSeparator(index, "Group", recolored);
+        assert(separators() == vector<string>({"SEPARATOR:|Group|200,100,50,128"}));
+        assert(macro.getSortSeparatorColor(macro.sortOrder.getOrder()[index]) == recolored);
+        macro.setSortSeparator(index, "Renamed", recolored);
+        assert(separators() == vector<string>({"SEPARATOR:|Renamed|200,100,50,128"}));
+        assert(macro.getSortSeparatorLabel(macro.sortOrder.getOrder()[index]) == "Renamed");
+    }
     // Real container history must retain unsaved local AND library macro graphs.
     {
         ofxOceanodeContainer history(registry, types, transport); history.setCanvasID("History");
@@ -305,7 +326,7 @@ int main(int argc, char** argv) {
     macro.presetManager.updateCategoryFromPath("Macros/Missing/A");
     macro.presetManager.loadMacroInsideCategory(0);
     assert(macro.presetManager.getNextPresetPath().empty());
-    std::cout << "Macro GUI regression passed: local import/save/recall, library save, four index input types, default width at canvas offsets/zooms, Load/Save modal trees and nested folder creation.\n";
+    std::cout << "Macro GUI regression passed: local import/save/recall, library save, four index input types, default width at canvas offsets/zooms, Load/Save modal trees, nested folder creation and separator recolor.\n";
 }
 '''
 
@@ -325,7 +346,8 @@ def main():
                           'void ofxOceanodeNodeMacro::renderMacroLoadDialog()',
                           'void ofxOceanodeNodeMacro::renderMacroSaveDialog()',
                           'void ofxOceanodeNodeMacro::renderMacroSaveLibraryTree()',
-                          'bool ofxOceanodeNodeMacro::createMacroLibraryFolder(']:
+                          'bool ofxOceanodeNodeMacro::createMacroLibraryFolder(',
+                          'void ofxOceanodeNodeMacro::setSortSeparator(']:
             native.SUPPORT += block(gui, signature) + '\n'
         # The root save/load adapters omit UI services; retain storage ownership.
         native.SUPPORT = native.SUPPORT.replace('void ofxOceanodeContainer::saveCustomGuis(const std::string&) {',
