@@ -13,7 +13,9 @@ installed.
 | SuperCollider NRT recording and rendering | ofxOceanodeSuperCollider + core transport | None |
 | Timeline clips, lanes, wave tracks and parameter publishing UI | ofxOceanodeTimeline | Explicit addon build capability |
 
-`ofxOceanodeTimeline/addon_config.mk` exports `OFX_OCEANODE_HAS_TIMELINE=1`.
+`ofxOceanodeTimeline/addon_config.mk` exports `OFX_OCEANODE_HAS_TIMELINE` as an
+`ADDON_DEFINES` entry (Xcode `GCC_PREPROCESSOR_DEFINITIONS`). Not `ADDON_CFLAGS`:
+those land in Xcode's `OTHER_CFLAGS`, which C++ files never see.
 SuperCollider derives `OFXOCEANODESC_HAS_TIMELINE` from that flag. It no longer
 probes timeline headers: a header on an include path does not establish that
 the addon is linked. Projects must regenerate after changing `addons.make`.
