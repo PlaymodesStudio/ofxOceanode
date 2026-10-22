@@ -67,20 +67,20 @@ void MacroSnapshotSystem::storeSnapshot(int slot,
 void MacroSnapshotSystem::clearSnapshot(int slot) {
 	auto it = snapshots.find(slot);
 	if(it != snapshots.end()) {
-		ofLogNotice("SnapshotSync") << "Clearing snapshot slot: " << slot;
+		ofLogVerbose("SnapshotSync") << "Clearing snapshot slot: " << slot;
 		snapshots.erase(it);
 		if(currentSlot == slot) {
 			currentSlot = -1;
 		}
-		ofLogNotice("SnapshotSync") << "Snapshot " << slot << " cleared";
+		ofLogVerbose("SnapshotSync") << "Snapshot " << slot << " cleared";
 	}
 }
 
 void MacroSnapshotSystem::clearAll() {
-	ofLogNotice("SnapshotSync") << "Clearing all snapshots";
+	ofLogVerbose("SnapshotSync") << "Clearing all snapshots";
 	snapshots.clear();
 	currentSlot = -1;
-	ofLogNotice("SnapshotSync") << "All snapshots cleared";
+	ofLogVerbose("SnapshotSync") << "All snapshots cleared";
 }
 
 void MacroSnapshotSystem::renameSnapshot(int slot, const std::string& newName) {
@@ -98,20 +98,20 @@ void MacroSnapshotSystem::save(bool isLocal, const std::string& macroPath,
                                 const std::string& presetPath,
                                 const std::string& nodeName, int numIdentifier)
 {
-	ofLogNotice("SnapshotSync") << "save called, snapshot count: " << snapshots.size();
+	ofLogVerbose("SnapshotSync") << "save called, snapshot count: " << snapshots.size();
 
 	// For global macros
 	if(!isLocal && !macroPath.empty()) {
 		string filename = ofFilePath::removeTrailingSlash(macroPath) + "/snapshots.json";
-		ofLogNotice("SnapshotSync") << "Global macro snapshot file: " << filename;
+		ofLogVerbose("SnapshotSync") << "Global macro snapshot file: " << filename;
 
 		if(snapshots.empty()) {
 			// Delete the snapshots file if no snapshots exist
 			if(ofFile::doesFileExist(filename)) {
 				oceanodePresetSave::record(ofFile::removeFile(filename));
-				ofLogNotice("SnapshotSync") << "Deleted empty snapshots file: " << filename;
+				ofLogVerbose("SnapshotSync") << "Deleted empty snapshots file: " << filename;
 			} else {
-				ofLogNotice("SnapshotSync") << "No snapshots file to delete";
+				ofLogVerbose("SnapshotSync") << "No snapshots file to delete";
 			}
 		} else {
 			// Create JSON with snapshots and save
@@ -126,7 +126,7 @@ void MacroSnapshotSystem::save(bool isLocal, const std::string& macroPath,
 			}
 
 			oceanodePresetSave::saveJson(filename, snapshotsJson);
-			ofLogNotice("SnapshotSync") << "Saved " << snapshots.size() << " snapshots to: " << filename;
+			ofLogVerbose("SnapshotSync") << "Saved " << snapshots.size() << " snapshots to: " << filename;
 		}
 
 		// Broadcast update regardless of whether we saved or deleted
@@ -147,15 +147,15 @@ void MacroSnapshotSystem::save(bool isLocal, const std::string& macroPath,
 		}
 
 		string snapshotsFilePath = localPath + "/snapshots.json";
-		ofLogNotice("SnapshotSync") << "Local macro snapshot file: " << snapshotsFilePath;
+		ofLogVerbose("SnapshotSync") << "Local macro snapshot file: " << snapshotsFilePath;
 
 		if(snapshots.empty()) {
 			// Delete the snapshots file if no snapshots exist
 			if(ofFile::doesFileExist(snapshotsFilePath)) {
 				oceanodePresetSave::record(ofFile::removeFile(snapshotsFilePath));
-				ofLogNotice("SnapshotSync") << "Deleted empty local snapshots file: " << snapshotsFilePath;
+				ofLogVerbose("SnapshotSync") << "Deleted empty local snapshots file: " << snapshotsFilePath;
 			} else {
-				ofLogNotice("SnapshotSync") << "No local snapshots file to delete";
+				ofLogVerbose("SnapshotSync") << "No local snapshots file to delete";
 			}
 		} else {
 			// Create JSON with snapshots and save
@@ -171,7 +171,7 @@ void MacroSnapshotSystem::save(bool isLocal, const std::string& macroPath,
 			}
 
 			oceanodePresetSave::saveJson(snapshotsFilePath, snapshotsJson);
-			ofLogNotice("SnapshotSync") << "Saved " << snapshots.size() << " local snapshots to: " << snapshotsFilePath;
+			ofLogVerbose("SnapshotSync") << "Saved " << snapshots.size() << " local snapshots to: " << snapshotsFilePath;
 		}
 	}
 }
@@ -185,7 +185,7 @@ void MacroSnapshotSystem::loadFromPath(const std::string& path) {
 		snapshotsFile = ofFilePath::removeTrailingSlash(path) + "/snapshots.json";
 	}
 
-	ofLogNotice("SnapshotSync") << "Loading snapshots from: " << snapshotsFile;
+	ofLogVerbose("SnapshotSync") << "Loading snapshots from: " << snapshotsFile;
 
 	if(ofFile::doesFileExist(snapshotsFile)) {
 		try {
@@ -197,7 +197,7 @@ void MacroSnapshotSystem::loadFromPath(const std::string& path) {
 				loadSnapshotFromJson(snapshot, item.value());
 				snapshots[slot] = snapshot;
 			}
-			ofLogNotice("SnapshotSync") << "Loaded " << snapshots.size() << " snapshots";
+			ofLogVerbose("SnapshotSync") << "Loaded " << snapshots.size() << " snapshots";
 
 			lastHash = calculateHash();
 
@@ -205,7 +205,7 @@ void MacroSnapshotSystem::loadFromPath(const std::string& path) {
 			ofLogError("Macro") << "Error loading snapshots: " << e.what();
 		}
 	} else {
-		ofLogWarning("SnapshotSync") << "Snapshots file does not exist: " << snapshotsFile;
+		ofLogVerbose("SnapshotSync") << "Snapshots file does not exist: " << snapshotsFile;
 	}
 }
 
@@ -221,7 +221,7 @@ void MacroSnapshotSystem::loadFromJson(const ofJson& json) {
 
 void MacroSnapshotSystem::syncFromDisk(const std::string& macroPath) {
 	if(!macroPath.empty()) {
-		ofLogNotice("SnapshotSync") << "Manual sync requested for: " << macroPath;
+		ofLogVerbose("SnapshotSync") << "Manual sync requested for: " << macroPath;
 		loadFromPath(macroPath);
 	}
 }
