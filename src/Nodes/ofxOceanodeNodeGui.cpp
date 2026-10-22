@@ -130,7 +130,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 					ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
 						position, ImGui::GetColorU32(ImGuiCol_Text), titleSuffix.c_str(), nullptr, 0.0f, &clip);
 					ImGui::Dummy(ImVec2(std::min(textSize.x, availableWidth), textSize.y));
-					if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", titleSuffix.c_str());
+					if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", node.getNodeModel().getNodeTitleTooltip().c_str());
 				}
 			}
 		}

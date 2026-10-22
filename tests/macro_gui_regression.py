@@ -267,6 +267,8 @@ int main(int argc, char** argv) {
     ImGui::ActivateItemByID(ImHashStr("Load", 0, loadPopup->ID)); frame();
     copy.update(event); frame();
     assert(!copy.isLocal() && copy.getCurrentMacroName() == "A" && value(copy) == .7f);
+    // The header tooltip shows the library folder; the header itself shows only the name.
+    assert(copy.getNodeTitleSuffix() == "A" && copy.getNodeTitleTooltip() == "Folder/A");
     // Save lists unsaved library edits and writes only after confirmation.
     auto* controls = ImGui::FindWindowByName("Save dialog test"); assert(controls);
     const auto controlsID = ImHashStr("Preset Control Gui", 0, controls->ID);
@@ -336,6 +338,7 @@ int main(int argc, char** argv) {
     copy.update(event); frame();
     assert(!fs::exists("Macros/Folder/InUse") && fs::exists("Macros/Folder/A/modules.json"));
     assert(copy.isLocal() && copy.getLocalMacroName() == "InUse" && value(copy) == .3f);
+    assert(copy.getNodeTitleTooltip() == "InUse");
     pressSave("Cancel");
     // Only Macro definitions inside the library can be deleted.
     assert(!copy.deleteLibraryMacro("Presets/Bank/01--Whole_Preset") && fs::exists("Presets/Bank/01--Whole_Preset"));

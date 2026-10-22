@@ -92,6 +92,13 @@ public:
 	std::string getNodeTitleSuffix() const override {
 		return presetManager.isLocal() ? localName.get() : presetManager.getCurrentMacro();
 	}
+	// Library Macros also show their folder inside Macros/, e.g. "Effects/Blur".
+	std::string getNodeTitleTooltip() const override {
+		if(presetManager.isLocal()) return localName.get();
+		std::string path;
+		for(const auto& folder : presetManager.getCurrentCategory()) path += folder + "/";
+		return path + presetManager.getCurrentMacro();
+	}
 	
 	// ─── Lifecycle ────────────────────────────────────────────────────────
 	void setup(){setup("");};

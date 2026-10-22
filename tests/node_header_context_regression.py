@@ -20,7 +20,7 @@ FIXTURE=r'''
 using namespace std;
 constexpr int ofxOceanodeNodeModelFlags_TransparentNode=1<<3;
 struct ofxOceanodeTimelineInstrument {int* gate=nullptr;int* pitch=nullptr;};
-struct Model {virtual ~Model()=default;int getFlags(){return 0;} string getNodeTitleSuffix(){return "Macro Name";}bool getTimelineInstrument(ofxOceanodeTimelineInstrument&){return false;}};
+struct Model {virtual ~Model()=default;int getFlags(){return 0;} string getNodeTitleSuffix(){return "Macro Name";}string getNodeTitleTooltip(){return "Folder/Macro Name";}bool getTimelineInstrument(ofxOceanodeTimelineInstrument&){return false;}};
 struct ofxOceanodeNodeMacro : Model {bool isActive(){return true;}};
 struct Gui {bool selected=false,expanded=true,headerControlHovered=false;bool isHeaderControlHovered(){return headerControlHovered;}bool getSelected(){return selected;}void setSelected(bool v){selected=v;}};
 struct Group {string getEscapedName(){return "Node_1";}};
