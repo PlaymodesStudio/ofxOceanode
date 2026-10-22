@@ -1,1017 +1,2224 @@
-// !$*UTF8*$!
 {
-	archiveVersion = 1;
-	classes = {
-	};
-	objectVersion = 46;
-	objects = {
-
-/* Begin PBXBuildFile section */
-		026CF24E227F5DFC3C392E27 /* ofxOceanodePresetsController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C27DB6A973A67BE0BF855933 /* ofxOceanodePresetsController.cpp */; };
-		101D2DB773940813A5C898CD /* ofxAubioPitch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 93CAC8A94359FD331BAD8CFA /* ofxAubioPitch.cpp */; };
-		102C0035698294FDB36E6899 /* ofxOceanodeTypesRegistry.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 60A6750E6D5A48E6B4B69C0A /* ofxOceanodeTypesRegistry.cpp */; };
-		124BB55C818D1F89450ED005 /* localPresetController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D9EC5C75C9CA92B4EFB78CFF /* localPresetController.cpp */; };
-		3FEEA065BA0076AF45FC4B11 /* aubio.framework in CopyFiles */ = {isa = PBXBuildFile; fileRef = E7A202274966715C9B679ABC /* aubio.framework */; };
-		47608E29666CD58C20E53408 /* mapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D623E907C25C25D1AB411052 /* mapper.cpp */; };
-		479DCA850DD8BB469A777AD4 /* ofxAubioBeat.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A96B8F6D2ECF14F9304EBD6C /* ofxAubioBeat.cpp */; };
-		4838368B3C8561AD76D56D69 /* ranger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 959F4777E3902536DC81AC0A /* ranger.cpp */; };
-		4A277DA746402C76CE307770 /* ofxDatGuiComponent.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5D13EE4C64902574D9153447 /* ofxDatGuiComponent.cpp */; };
-		4B0881C0E4F3D037FA83C3E3 /* ofxOceanodeNodeModelLocalPreset.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8AC0F166599AAFFA99CD14EF /* ofxOceanodeNodeModelLocalPreset.cpp */; };
-		4C3192DB1EAE1CFF29580749 /* oscillatorBank.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BE59ACA8A0510B61FD8647C6 /* oscillatorBank.cpp */; };
-		4C8024D8DD46223D43C514C0 /* ofxOceanodeNode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 63A44DC38599839305F1F4D3 /* ofxOceanodeNode.cpp */; };
-		4F63EFF3BAACF2B19051E336 /* ofxOceanodeNodeModel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 18902594A5884CA5CA6D3D9D /* ofxOceanodeNodeModel.cpp */; };
-		5769B6A6D79188D3D351933E /* ofxOceanodeContainer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5E65A0C39A6FDCA2888DDAF8 /* ofxOceanodeContainer.cpp */; };
-		646DF4D56CE728133610A7F6 /* ofxSmartFont.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A403D3D25D08FC7AF3B871D4 /* ofxSmartFont.cpp */; };
-		67383740F5CC47ED5F955A76 /* ofxAubioMelBands.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 776A1553D592FD9AA388C543 /* ofxAubioMelBands.cpp */; };
-		717BCDD6091D90F262DC7860 /* ofxOceanodeBPMController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8150F1936B064445E99AF76 /* ofxOceanodeBPMController.cpp */; };
-		7416EB8AFDAB615D36EC3137 /* phasor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C1A96A2891A3C36C7DCA0F7 /* phasor.cpp */; };
-		7B5743F2E77F2D5AD9B436F0 /* ofxOceanodeBaseController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 90D557700F1EECB9E9F8AEB9 /* ofxOceanodeBaseController.cpp */; };
-		7B8EE5B7F57088CD23B7934D /* ofxOceanodeControls.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C3AD3B4C116407604DCFB986 /* ofxOceanodeControls.cpp */; };
-		7CC1A4D669C6C1B3786CD384 /* ofxOceanodeNodeModelExternalWindow.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 03E42CA654A61594B6D8167F /* ofxOceanodeNodeModelExternalWindow.cpp */; };
-		7D1BDAF165E138FD17F18949 /* aubio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E7A202274966715C9B679ABC /* aubio.framework */; };
-		842D4B1559D16CD55B1CF6DD /* oscillator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0BE6AC32AE0E7C44E14DFE2F /* oscillator.cpp */; };
-		8EB5677652296BACF3A1C184 /* ofxOceanodeNodeGui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 170083BFE7EEC5851D5DF9E6 /* ofxOceanodeNodeGui.cpp */; };
-		9150F94721FE0E44D16DA0CC /* baseOscillator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F44449692EA3A4B7FBABCF29 /* baseOscillator.cpp */; };
-		9C7B8B4D99CDFC508E76CC3A /* ofxAubioOnset.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8A90A4B17BBB4CB627CA22C4 /* ofxAubioOnset.cpp */; };
-		9F68E133237B1ABE009A6605 /* ofxOceanodeNodeMacro.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9F68E132237B1ABE009A6605 /* ofxOceanodeNodeMacro.cpp */; };
-		9FC5571F21AC704A009468E2 /* switcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9FC5571D21AC704A009468E2 /* switcher.cpp */; };
-		B7559FEE382DBA7FB094D5E7 /* ofxOceanodeNodeRegistry.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F15C9896F6A32FCA280CD4B5 /* ofxOceanodeNodeRegistry.cpp */; };
-		BDE21E02C646BD31BEC13891 /* smoother.cpp in Sources */ = {isa = PBXBuildFile; fileRef = EA0730CA1A73FC90DCF8C770 /* smoother.cpp */; };
-		BE7DAF3CB982C2BD0FE44648 /* ofxDatGui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DD8F81F7AAB5BA396231DD4C /* ofxDatGui.cpp */; };
-		BFBE6AEF801BA1F820867405 /* basePhasor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0538E73A948F5367828D0596 /* basePhasor.cpp */; };
-		C1EEF98E795AFB7BB33F94B1 /* ofxOceanodeConnectionGraphics.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 76AFF92A62D8AF4E498DB5C3 /* ofxOceanodeConnectionGraphics.cpp */; };
-		C60077973A257D8F44947E2E /* ofxAubioBlock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 737C0C27DB7B0C9484DCEBAE /* ofxAubioBlock.cpp */; };
-		C6A203560BFBDA04C5746210 /* ofxOceanodeConnection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7C9B84BA3AF325F3D843633B /* ofxOceanodeConnection.cpp */; };
-		D925621F7F6146497318658A /* baseIndexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 645C793F85B56EF720B10C7F /* baseIndexer.cpp */; };
-		E1E0C08A53EAFC4A088F5BDC /* reindexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3D3CE3C79225FEEDD92A410A /* reindexer.cpp */; };
-		E4328149138ABC9F0047C5CB /* openFrameworksDebug.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E4328148138ABC890047C5CB /* openFrameworksDebug.a */; };
-		E4B69E200A3A1BDC003C02F2 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E4B69E1D0A3A1BDC003C02F2 /* main.cpp */; };
-		E4B69E210A3A1BDC003C02F2 /* ofApp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E4B69E1E0A3A1BDC003C02F2 /* ofApp.cpp */; };
-		FE7602E65C7BA676951A37FB /* ofxOceanodeCanvas.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 69F09B1450CB3FF08A87D2FF /* ofxOceanodeCanvas.cpp */; };
-/* End PBXBuildFile section */
-
-/* Begin PBXContainerItemProxy section */
-		E4328147138ABC890047C5CB /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = E4328143138ABC890047C5CB /* openFrameworksLib.xcodeproj */;
-			proxyType = 2;
-			remoteGlobalIDString = E4B27C1510CBEB8E00536013;
-			remoteInfo = openFrameworks;
-		};
-		E4EEB9AB138B136A00A80321 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = E4328143138ABC890047C5CB /* openFrameworksLib.xcodeproj */;
-			proxyType = 1;
-			remoteGlobalIDString = E4B27C1410CBEB8E00536013;
-			remoteInfo = openFrameworks;
-		};
-/* End PBXContainerItemProxy section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		E4C2427710CC5ABF004149E2 /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				3FEEA065BA0076AF45FC4B11 /* aubio.framework in CopyFiles */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
-
-/* Begin PBXFileReference section */
-		027F095A0217A890F2B21761 /* ofxOceanodeNodeModelLocalPreset.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNodeModelLocalPreset.h; path = ../../../addons/ofxOceanode/src/Nodes/Base_Nodes/ofxOceanodeNodeModelLocalPreset.h; sourceTree = SOURCE_ROOT; };
-		03E42CA654A61594B6D8167F /* ofxOceanodeNodeModelExternalWindow.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeNodeModelExternalWindow.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Base_Nodes/ofxOceanodeNodeModelExternalWindow.cpp; sourceTree = SOURCE_ROOT; };
-		0538E73A948F5367828D0596 /* basePhasor.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = basePhasor.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/basePhasor.cpp; sourceTree = SOURCE_ROOT; };
-		06F3C8FC2DD28E0B985BADB0 /* ranger.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ranger.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/ranger.h; sourceTree = SOURCE_ROOT; };
-		0795F21A2022A202F628BE94 /* ofxDatGuiColorPicker.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiColorPicker.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiColorPicker.h; sourceTree = SOURCE_ROOT; };
-		0984191B2003C1E86CF4C57A /* ofxAubioOnset.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxAubioOnset.h; path = ../../../addons/ofxAubio/src/ofxAubioOnset.h; sourceTree = SOURCE_ROOT; };
-		0BE6AC32AE0E7C44E14DFE2F /* oscillator.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = oscillator.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillator.cpp; sourceTree = SOURCE_ROOT; };
-		0EA01AA404A74EE4BF1F46AD /* ofxDatGuiTheme.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiTheme.h; path = ../../../addons/ofxDatGui_PM/src/themes/ofxDatGuiTheme.h; sourceTree = SOURCE_ROOT; };
-		11021811865108C49AED9E1E /* ofxDatGuiScrollView.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiScrollView.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiScrollView.h; sourceTree = SOURCE_ROOT; };
-		125FC7DF81918DE565891A92 /* reindexer.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = reindexer.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/reindexer.h; sourceTree = SOURCE_ROOT; };
-		149298D896FDA631EE81BEB9 /* ofxDatGuiSlider.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiSlider.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiSlider.h; sourceTree = SOURCE_ROOT; };
-		169D713735D46DFA03D4EBEB /* ofxDatGuiConstants.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiConstants.h; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiConstants.h; sourceTree = SOURCE_ROOT; };
-		16D50E04676F5AF6D586DD9B /* ofxOceanodeNodeModelExternalWindow.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNodeModelExternalWindow.h; path = ../../../addons/ofxOceanode/src/Nodes/Base_Nodes/ofxOceanodeNodeModelExternalWindow.h; sourceTree = SOURCE_ROOT; };
-		170083BFE7EEC5851D5DF9E6 /* ofxOceanodeNodeGui.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeNodeGui.cpp; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeGui.cpp; sourceTree = SOURCE_ROOT; };
-		18902594A5884CA5CA6D3D9D /* ofxOceanodeNodeModel.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeNodeModel.cpp; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeModel.cpp; sourceTree = SOURCE_ROOT; };
-		238BB8FC8860C7A7012B2E27 /* ofxAubioMelBands.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxAubioMelBands.h; path = ../../../addons/ofxAubio/src/ofxAubioMelBands.h; sourceTree = SOURCE_ROOT; };
-		29030CD02944F06F1DAC3E49 /* ofxDatGuiTextInput.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiTextInput.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiTextInput.h; sourceTree = SOURCE_ROOT; };
-		3795AFB8EAAD641D6CA88D4A /* ofxOceanodeTypesRegistry.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeTypesRegistry.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeTypesRegistry.h; sourceTree = SOURCE_ROOT; };
-		3B2B1469CBE279200D558FAB /* mapper.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = mapper.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/mapper.h; sourceTree = SOURCE_ROOT; };
-		3B6AFA97F893CE28547CFCDC /* ofxAubio.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxAubio.h; path = ../../../addons/ofxAubio/src/ofxAubio.h; sourceTree = SOURCE_ROOT; };
-		3C2190A2D726C8DCEF074E3C /* oscillatorBank.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = oscillatorBank.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillatorBank.h; sourceTree = SOURCE_ROOT; };
-		3D3CE3C79225FEEDD92A410A /* reindexer.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = reindexer.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/reindexer.cpp; sourceTree = SOURCE_ROOT; };
-		3F15C4313830F7C3C28E1FAE /* ofxDatGuiTextInputField.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiTextInputField.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiTextInputField.h; sourceTree = SOURCE_ROOT; };
-		407D7F7B6D3EDF97638DF661 /* ofxDatGuiEvents.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiEvents.h; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiEvents.h; sourceTree = SOURCE_ROOT; };
-		46ADAF0F6560879BAE3D1C61 /* ofxOceanodeBaseController.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeBaseController.h; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeBaseController.h; sourceTree = SOURCE_ROOT; };
-		4A76FE1EC14329064FDB60C7 /* ofxOceanodeNodeRegistry.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNodeRegistry.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeNodeRegistry.h; sourceTree = SOURCE_ROOT; };
-		4B17A983E507AB0B3F71A2D6 /* ofxAubioBlock.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxAubioBlock.h; path = ../../../addons/ofxAubio/src/ofxAubioBlock.h; sourceTree = SOURCE_ROOT; };
-		4D832D586223B608C5420D29 /* ofxDatGui.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGui.h; path = ../../../addons/ofxDatGui_PM/src/ofxDatGui.h; sourceTree = SOURCE_ROOT; };
-		542B8A9AF130D0C5A3086539 /* ofxOceanodeConnectionGraphics.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeConnectionGraphics.h; path = ../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnectionGraphics.h; sourceTree = SOURCE_ROOT; };
-		56FB03D9F622C9350A0AB8BC /* ofxOceanodePresetsController.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodePresetsController.h; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodePresetsController.h; sourceTree = SOURCE_ROOT; };
-		5D13EE4C64902574D9153447 /* ofxDatGuiComponent.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxDatGuiComponent.cpp; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiComponent.cpp; sourceTree = SOURCE_ROOT; };
-		5E65A0C39A6FDCA2888DDAF8 /* ofxOceanodeContainer.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeContainer.cpp; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeContainer.cpp; sourceTree = SOURCE_ROOT; };
-		60A061F8C47B5624AE6C450E /* defaultNodes.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = defaultNodes.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/defaultNodes.h; sourceTree = SOURCE_ROOT; };
-		60A6750E6D5A48E6B4B69C0A /* ofxOceanodeTypesRegistry.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeTypesRegistry.cpp; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeTypesRegistry.cpp; sourceTree = SOURCE_ROOT; };
-		63A44DC38599839305F1F4D3 /* ofxOceanodeNode.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeNode.cpp; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNode.cpp; sourceTree = SOURCE_ROOT; };
-		645C793F85B56EF720B10C7F /* baseIndexer.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = baseIndexer.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/baseIndexer.cpp; sourceTree = SOURCE_ROOT; };
-		656EE12F1A05CB4841731C77 /* ofxOceanodeConnection.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeConnection.h; path = ../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnection.h; sourceTree = SOURCE_ROOT; };
-		698855D874920D7A53525854 /* ofxDatGuiGroups.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiGroups.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiGroups.h; sourceTree = SOURCE_ROOT; };
-		69F09B1450CB3FF08A87D2FF /* ofxOceanodeCanvas.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeCanvas.cpp; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeCanvas.cpp; sourceTree = SOURCE_ROOT; };
-		737C0C27DB7B0C9484DCEBAE /* ofxAubioBlock.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxAubioBlock.cpp; path = ../../../addons/ofxAubio/src/ofxAubioBlock.cpp; sourceTree = SOURCE_ROOT; };
-		76AFF92A62D8AF4E498DB5C3 /* ofxOceanodeConnectionGraphics.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeConnectionGraphics.cpp; path = ../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnectionGraphics.cpp; sourceTree = SOURCE_ROOT; };
-		771877A40D55CB5D6C1969C4 /* ofxDatGuiButton.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiButton.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiButton.h; sourceTree = SOURCE_ROOT; };
-		776A1553D592FD9AA388C543 /* ofxAubioMelBands.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxAubioMelBands.cpp; path = ../../../addons/ofxAubio/src/ofxAubioMelBands.cpp; sourceTree = SOURCE_ROOT; };
-		7839463FADC4E27D1C66C5FB /* ofxOceanodeNode.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNode.h; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNode.h; sourceTree = SOURCE_ROOT; };
-		7C9B84BA3AF325F3D843633B /* ofxOceanodeConnection.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeConnection.cpp; path = ../../../addons/ofxOceanode/src/Connections/ofxOceanodeConnection.cpp; sourceTree = SOURCE_ROOT; };
-		85CA43E90443167538D06F3C /* baseIndexer.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = baseIndexer.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/baseIndexer.h; sourceTree = SOURCE_ROOT; };
-		86F00AF8B1543076FA133A82 /* ofxOceanode.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanode.h; path = ../../../addons/ofxOceanode/src/ofxOceanode.h; sourceTree = SOURCE_ROOT; };
-		8A90A4B17BBB4CB627CA22C4 /* ofxAubioOnset.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxAubioOnset.cpp; path = ../../../addons/ofxAubio/src/ofxAubioOnset.cpp; sourceTree = SOURCE_ROOT; };
-		8AC0F166599AAFFA99CD14EF /* ofxOceanodeNodeModelLocalPreset.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeNodeModelLocalPreset.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Base_Nodes/ofxOceanodeNodeModelLocalPreset.cpp; sourceTree = SOURCE_ROOT; };
-		8E922B504254FF844AF5505A /* ofxDatGuiIntObject.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiIntObject.h; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiIntObject.h; sourceTree = SOURCE_ROOT; };
-		90D557700F1EECB9E9F8AEB9 /* ofxOceanodeBaseController.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeBaseController.cpp; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeBaseController.cpp; sourceTree = SOURCE_ROOT; };
-		92007C97134ED347908EA736 /* ofxDatGuiMatrix.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiMatrix.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiMatrix.h; sourceTree = SOURCE_ROOT; };
-		93CAC8A94359FD331BAD8CFA /* ofxAubioPitch.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxAubioPitch.cpp; path = ../../../addons/ofxAubio/src/ofxAubioPitch.cpp; sourceTree = SOURCE_ROOT; };
-		94ED70588667CA0E144E436E /* baseOscillator.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = baseOscillator.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/baseOscillator.h; sourceTree = SOURCE_ROOT; };
-		959F4777E3902536DC81AC0A /* ranger.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ranger.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/ranger.cpp; sourceTree = SOURCE_ROOT; };
-		96D838AC4E4260B0ABA07D05 /* oscillator.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = oscillator.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillator.h; sourceTree = SOURCE_ROOT; };
-		9C1A96A2891A3C36C7DCA0F7 /* phasor.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = phasor.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/phasor.cpp; sourceTree = SOURCE_ROOT; };
-		9D2C29B96659EBB7A0C5672F /* ofxAubioPitch.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxAubioPitch.h; path = ../../../addons/ofxAubio/src/ofxAubioPitch.h; sourceTree = SOURCE_ROOT; };
-		9E034FA57FE251AC33904E82 /* ofxDatGuiThemes.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiThemes.h; path = ../../../addons/ofxDatGui_PM/src/themes/ofxDatGuiThemes.h; sourceTree = SOURCE_ROOT; };
-		9F68E131237B1ABE009A6605 /* ofxOceanodeNodeMacro.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ofxOceanodeNodeMacro.h; path = ../src/Nodes/ofxOceanodeNodeMacro.h; sourceTree = "<group>"; };
-		9F68E132237B1ABE009A6605 /* ofxOceanodeNodeMacro.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ofxOceanodeNodeMacro.cpp; path = ../src/Nodes/ofxOceanodeNodeMacro.cpp; sourceTree = "<group>"; };
-		9FC5571D21AC704A009468E2 /* switcher.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = switcher.cpp; path = ../src/Nodes/Default_Nodes/Modifiers/switcher.cpp; sourceTree = "<group>"; };
-		9FC5571E21AC704A009468E2 /* switcher.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = switcher.h; path = ../src/Nodes/Default_Nodes/Modifiers/switcher.h; sourceTree = "<group>"; };
-		A13853A1B21F20177F44EE37 /* ofxDatGuiLabel.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiLabel.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiLabel.h; sourceTree = SOURCE_ROOT; };
-		A403D3D25D08FC7AF3B871D4 /* ofxSmartFont.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxSmartFont.cpp; path = ../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont/ofxSmartFont.cpp; sourceTree = SOURCE_ROOT; };
-		A534F08B38B5C43917E2A9E4 /* ofxDatGuiComponent.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiComponent.h; path = ../../../addons/ofxDatGui_PM/src/core/ofxDatGuiComponent.h; sourceTree = SOURCE_ROOT; };
-		A7B61DF7F41316374CEEE8CA /* ofxDatGuiTimeGraph.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiTimeGraph.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiTimeGraph.h; sourceTree = SOURCE_ROOT; };
-		A8150F1936B064445E99AF76 /* ofxOceanodeBPMController.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeBPMController.cpp; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeBPMController.cpp; sourceTree = SOURCE_ROOT; };
-		A96B8F6D2ECF14F9304EBD6C /* ofxAubioBeat.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxAubioBeat.cpp; path = ../../../addons/ofxAubio/src/ofxAubioBeat.cpp; sourceTree = SOURCE_ROOT; };
-		B11DB438E2A6EBD360F8BA50 /* ofxDatGuiFRM.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiFRM.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiFRM.h; sourceTree = SOURCE_ROOT; };
-		B7B623A02730497FBCEA4FF2 /* ofxDatGuiControls.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGuiControls.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGuiControls.h; sourceTree = SOURCE_ROOT; };
-		BE59ACA8A0510B61FD8647C6 /* oscillatorBank.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = oscillatorBank.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/oscillatorBank.cpp; sourceTree = SOURCE_ROOT; };
-		BFA88189469A37E0B53C6773 /* ofxOceanodeCanvas.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeCanvas.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeCanvas.h; sourceTree = SOURCE_ROOT; };
-		C1A3EDCC30D80C890BF10EC5 /* localPresetController.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = localPresetController.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers/localPresetController.h; sourceTree = SOURCE_ROOT; };
-		C27DB6A973A67BE0BF855933 /* ofxOceanodePresetsController.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodePresetsController.cpp; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodePresetsController.cpp; sourceTree = SOURCE_ROOT; };
-		C2BBB5BA515C82003E0EEB5E /* ofxDatGui2dPad.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxDatGui2dPad.h; path = ../../../addons/ofxDatGui_PM/src/components/ofxDatGui2dPad.h; sourceTree = SOURCE_ROOT; };
-		C3AD3B4C116407604DCFB986 /* ofxOceanodeControls.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeControls.cpp; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeControls.cpp; sourceTree = SOURCE_ROOT; };
-		C76BA1A770D742397939F7A7 /* basePhasor.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = basePhasor.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/basePhasor.h; sourceTree = SOURCE_ROOT; };
-		CA4B325D2EC75988A7F9E2CB /* ofxOceanodeControls.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeControls.h; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeControls.h; sourceTree = SOURCE_ROOT; };
-		D11A82FE9732DAF8F599F2AB /* ofxOceanodeNodeGui.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNodeGui.h; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeGui.h; sourceTree = SOURCE_ROOT; };
-		D623E907C25C25D1AB411052 /* mapper.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = mapper.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/mapper.cpp; sourceTree = SOURCE_ROOT; };
-		D9EC5C75C9CA92B4EFB78CFF /* localPresetController.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = localPresetController.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers/localPresetController.cpp; sourceTree = SOURCE_ROOT; };
-		DCC77D1E228088A526604E34 /* smoother.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = smoother.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/smoother.h; sourceTree = SOURCE_ROOT; };
-		DD8F81F7AAB5BA396231DD4C /* ofxDatGui.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxDatGui.cpp; path = ../../../addons/ofxDatGui_PM/src/ofxDatGui.cpp; sourceTree = SOURCE_ROOT; };
-		E187B9F0640B673635B5ECDF /* phasor.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = phasor.h; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators/phasor.h; sourceTree = SOURCE_ROOT; };
-		E4328143138ABC890047C5CB /* openFrameworksLib.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = openFrameworksLib.xcodeproj; path = ../../../libs/openFrameworksCompiled/project/osx/openFrameworksLib.xcodeproj; sourceTree = SOURCE_ROOT; };
-		E4B69B5B0A3A1756003C02F2 /* example_bpm_detectionDebug.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = example_bpm_detectionDebug.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E4B69E1D0A3A1BDC003C02F2 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = main.cpp; path = src/main.cpp; sourceTree = SOURCE_ROOT; };
-		E4B69E1E0A3A1BDC003C02F2 /* ofApp.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofApp.cpp; path = src/ofApp.cpp; sourceTree = SOURCE_ROOT; };
-		E4B69E1F0A3A1BDC003C02F2 /* ofApp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ofApp.h; path = src/ofApp.h; sourceTree = SOURCE_ROOT; };
-		E4B6FCAD0C3E899E008CF71C /* openFrameworks-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "openFrameworks-Info.plist"; sourceTree = "<group>"; };
-		E4EB691F138AFCF100A09F29 /* CoreOF.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = CoreOF.xcconfig; path = ../../../libs/openFrameworksCompiled/project/osx/CoreOF.xcconfig; sourceTree = SOURCE_ROOT; };
-		E4EB6923138AFD0F00A09F29 /* Project.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Project.xcconfig; sourceTree = "<group>"; };
-		E4F53B46D587F378DA43DF57 /* ofxOceanodeBPMController.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeBPMController.h; path = ../../../addons/ofxOceanode/src/Controls/ofxOceanodeBPMController.h; sourceTree = SOURCE_ROOT; };
-		E6C687AA79F145165EF64E4B /* ofxAubioBeat.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxAubioBeat.h; path = ../../../addons/ofxAubio/src/ofxAubioBeat.h; sourceTree = SOURCE_ROOT; };
-		E7A202274966715C9B679ABC /* aubio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = aubio.framework; path = ../../../addons/ofxAubio/libs/aubio/aubio.framework; sourceTree = "<group>"; };
-		EA0730CA1A73FC90DCF8C770 /* smoother.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = smoother.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers/smoother.cpp; sourceTree = SOURCE_ROOT; };
-		EDEAD1332CEFCB6171498ADE /* ofxOceanodeNodeModel.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeNodeModel.h; path = ../../../addons/ofxOceanode/src/Nodes/ofxOceanodeNodeModel.h; sourceTree = SOURCE_ROOT; };
-		EFC799641CF7089DDBF2094B /* ofxSmartFont.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxSmartFont.h; path = ../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont/ofxSmartFont.h; sourceTree = SOURCE_ROOT; };
-		F15C9896F6A32FCA280CD4B5 /* ofxOceanodeNodeRegistry.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ofxOceanodeNodeRegistry.cpp; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeNodeRegistry.cpp; sourceTree = SOURCE_ROOT; };
-		F44449692EA3A4B7FBABCF29 /* baseOscillator.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = baseOscillator.cpp; path = ../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base/baseOscillator.cpp; sourceTree = SOURCE_ROOT; };
-		FC8E873E04A65764668D30AB /* ofxOceanodeContainer.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ofxOceanodeContainer.h; path = ../../../addons/ofxOceanode/src/Managers/ofxOceanodeContainer.h; sourceTree = SOURCE_ROOT; };
-/* End PBXFileReference section */
-
-/* Begin PBXFrameworksBuildPhase section */
-		E4B69B590A3A1756003C02F2 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				E4328149138ABC9F0047C5CB /* openFrameworksDebug.a in Frameworks */,
-				7D1BDAF165E138FD17F18949 /* aubio.framework in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXFrameworksBuildPhase section */
-
-/* Begin PBXGroup section */
-		073338B688F3688C43AC3846 /* aubio */ = {
-			isa = PBXGroup;
-			children = (
-				E7A202274966715C9B679ABC /* aubio.framework */,
-			);
-			name = aubio;
-			sourceTree = "<group>";
-		};
-		1611DA528262F51B8A4FBD22 /* Base_Nodes */ = {
-			isa = PBXGroup;
-			children = (
-				03E42CA654A61594B6D8167F /* ofxOceanodeNodeModelExternalWindow.cpp */,
-				16D50E04676F5AF6D586DD9B /* ofxOceanodeNodeModelExternalWindow.h */,
-				8AC0F166599AAFFA99CD14EF /* ofxOceanodeNodeModelLocalPreset.cpp */,
-				027F095A0217A890F2B21761 /* ofxOceanodeNodeModelLocalPreset.h */,
-			);
-			name = Base_Nodes;
-			sourceTree = "<group>";
-		};
-		1D570521A53950659A74DE26 /* components */ = {
-			isa = PBXGroup;
-			children = (
-				C2BBB5BA515C82003E0EEB5E /* ofxDatGui2dPad.h */,
-				771877A40D55CB5D6C1969C4 /* ofxDatGuiButton.h */,
-				0795F21A2022A202F628BE94 /* ofxDatGuiColorPicker.h */,
-				B7B623A02730497FBCEA4FF2 /* ofxDatGuiControls.h */,
-				B11DB438E2A6EBD360F8BA50 /* ofxDatGuiFRM.h */,
-				698855D874920D7A53525854 /* ofxDatGuiGroups.h */,
-				A13853A1B21F20177F44EE37 /* ofxDatGuiLabel.h */,
-				92007C97134ED347908EA736 /* ofxDatGuiMatrix.h */,
-				11021811865108C49AED9E1E /* ofxDatGuiScrollView.h */,
-				149298D896FDA631EE81BEB9 /* ofxDatGuiSlider.h */,
-				29030CD02944F06F1DAC3E49 /* ofxDatGuiTextInput.h */,
-				3F15C4313830F7C3C28E1FAE /* ofxDatGuiTextInputField.h */,
-				A7B61DF7F41316374CEEE8CA /* ofxDatGuiTimeGraph.h */,
-			);
-			name = components;
-			sourceTree = "<group>";
-		};
-		280462C1CECEF18AAECE92DE /* src */ = {
-			isa = PBXGroup;
-			children = (
-				3B6AFA97F893CE28547CFCDC /* ofxAubio.h */,
-				A96B8F6D2ECF14F9304EBD6C /* ofxAubioBeat.cpp */,
-				E6C687AA79F145165EF64E4B /* ofxAubioBeat.h */,
-				737C0C27DB7B0C9484DCEBAE /* ofxAubioBlock.cpp */,
-				4B17A983E507AB0B3F71A2D6 /* ofxAubioBlock.h */,
-				776A1553D592FD9AA388C543 /* ofxAubioMelBands.cpp */,
-				238BB8FC8860C7A7012B2E27 /* ofxAubioMelBands.h */,
-				8A90A4B17BBB4CB627CA22C4 /* ofxAubioOnset.cpp */,
-				0984191B2003C1E86CF4C57A /* ofxAubioOnset.h */,
-				93CAC8A94359FD331BAD8CFA /* ofxAubioPitch.cpp */,
-				9D2C29B96659EBB7A0C5672F /* ofxAubioPitch.h */,
-			);
-			name = src;
-			sourceTree = "<group>";
-		};
-		49829C6AAEB884DF8A116E1D /* libs */ = {
-			isa = PBXGroup;
-			children = (
-				D334E5DEE84D3F52FE9065DE /* ofxSmartFont */,
-			);
-			name = libs;
-			sourceTree = "<group>";
-		};
-		4A0C0B233C38AF6788F3CE7D /* Default_Nodes */ = {
-			isa = PBXGroup;
-			children = (
-				7122898CC63A863AD1DC1535 /* Base */,
-				550B846BFF2680933EE8B745 /* Controllers */,
-				60A061F8C47B5624AE6C450E /* defaultNodes.h */,
-				86C08C13FA71904D23256B02 /* Generators */,
-				C9E0C4F6A9698E8F0EF5E14C /* Modifiers */,
-			);
-			name = Default_Nodes;
-			sourceTree = "<group>";
-		};
-		550B846BFF2680933EE8B745 /* Controllers */ = {
-			isa = PBXGroup;
-			children = (
-				D9EC5C75C9CA92B4EFB78CFF /* localPresetController.cpp */,
-				C1A3EDCC30D80C890BF10EC5 /* localPresetController.h */,
-			);
-			name = Controllers;
-			sourceTree = "<group>";
-		};
-		643EB880A9E14DEF1DCC1AB4 /* ofxOceanode */ = {
-			isa = PBXGroup;
-			children = (
-				9BF163AD5F824DF0AD945222 /* src */,
-			);
-			name = ofxOceanode;
-			sourceTree = "<group>";
-		};
-		6948EE371B920CB800B5AC1A /* local_addons */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			name = local_addons;
-			sourceTree = "<group>";
-		};
-		6B8A921B73CC6BADD2D0E3A3 /* Nodes */ = {
-			isa = PBXGroup;
-			children = (
-				1611DA528262F51B8A4FBD22 /* Base_Nodes */,
-				4A0C0B233C38AF6788F3CE7D /* Default_Nodes */,
-				63A44DC38599839305F1F4D3 /* ofxOceanodeNode.cpp */,
-				7839463FADC4E27D1C66C5FB /* ofxOceanodeNode.h */,
-				170083BFE7EEC5851D5DF9E6 /* ofxOceanodeNodeGui.cpp */,
-				D11A82FE9732DAF8F599F2AB /* ofxOceanodeNodeGui.h */,
-				9F68E132237B1ABE009A6605 /* ofxOceanodeNodeMacro.cpp */,
-				9F68E131237B1ABE009A6605 /* ofxOceanodeNodeMacro.h */,
-				18902594A5884CA5CA6D3D9D /* ofxOceanodeNodeModel.cpp */,
-				EDEAD1332CEFCB6171498ADE /* ofxOceanodeNodeModel.h */,
-			);
-			name = Nodes;
-			sourceTree = "<group>";
-		};
-		7122898CC63A863AD1DC1535 /* Base */ = {
-			isa = PBXGroup;
-			children = (
-				645C793F85B56EF720B10C7F /* baseIndexer.cpp */,
-				85CA43E90443167538D06F3C /* baseIndexer.h */,
-				F44449692EA3A4B7FBABCF29 /* baseOscillator.cpp */,
-				94ED70588667CA0E144E436E /* baseOscillator.h */,
-				0538E73A948F5367828D0596 /* basePhasor.cpp */,
-				C76BA1A770D742397939F7A7 /* basePhasor.h */,
-			);
-			name = Base;
-			sourceTree = "<group>";
-		};
-		86C08C13FA71904D23256B02 /* Generators */ = {
-			isa = PBXGroup;
-			children = (
-				0BE6AC32AE0E7C44E14DFE2F /* oscillator.cpp */,
-				96D838AC4E4260B0ABA07D05 /* oscillator.h */,
-				BE59ACA8A0510B61FD8647C6 /* oscillatorBank.cpp */,
-				3C2190A2D726C8DCEF074E3C /* oscillatorBank.h */,
-				9C1A96A2891A3C36C7DCA0F7 /* phasor.cpp */,
-				E187B9F0640B673635B5ECDF /* phasor.h */,
-			);
-			name = Generators;
-			sourceTree = "<group>";
-		};
-		93621CC75EED5D310C6ADC19 /* ofxAubio */ = {
-			isa = PBXGroup;
-			children = (
-				280462C1CECEF18AAECE92DE /* src */,
-				E2B359629BE73A7AB76D224B /* libs */,
-			);
-			name = ofxAubio;
-			sourceTree = "<group>";
-		};
-		957575D61FEE61F5BA89C5CF /* Controls */ = {
-			isa = PBXGroup;
-			children = (
-				90D557700F1EECB9E9F8AEB9 /* ofxOceanodeBaseController.cpp */,
-				46ADAF0F6560879BAE3D1C61 /* ofxOceanodeBaseController.h */,
-				A8150F1936B064445E99AF76 /* ofxOceanodeBPMController.cpp */,
-				E4F53B46D587F378DA43DF57 /* ofxOceanodeBPMController.h */,
-				C3AD3B4C116407604DCFB986 /* ofxOceanodeControls.cpp */,
-				CA4B325D2EC75988A7F9E2CB /* ofxOceanodeControls.h */,
-				C27DB6A973A67BE0BF855933 /* ofxOceanodePresetsController.cpp */,
-				56FB03D9F622C9350A0AB8BC /* ofxOceanodePresetsController.h */,
-			);
-			name = Controls;
-			sourceTree = "<group>";
-		};
-		9BBF10547B078BE7A527677B /* Connections */ = {
-			isa = PBXGroup;
-			children = (
-				7C9B84BA3AF325F3D843633B /* ofxOceanodeConnection.cpp */,
-				656EE12F1A05CB4841731C77 /* ofxOceanodeConnection.h */,
-				76AFF92A62D8AF4E498DB5C3 /* ofxOceanodeConnectionGraphics.cpp */,
-				542B8A9AF130D0C5A3086539 /* ofxOceanodeConnectionGraphics.h */,
-			);
-			name = Connections;
-			sourceTree = "<group>";
-		};
-		9BF163AD5F824DF0AD945222 /* src */ = {
-			isa = PBXGroup;
-			children = (
-				9BBF10547B078BE7A527677B /* Connections */,
-				957575D61FEE61F5BA89C5CF /* Controls */,
-				F345CC31328F66B89F4BB079 /* Managers */,
-				6B8A921B73CC6BADD2D0E3A3 /* Nodes */,
-				86F00AF8B1543076FA133A82 /* ofxOceanode.h */,
-			);
-			name = src;
-			sourceTree = "<group>";
-		};
-		BB4B014C10F69532006C3DED /* addons */ = {
-			isa = PBXGroup;
-			children = (
-				93621CC75EED5D310C6ADC19 /* ofxAubio */,
-				E99400E5E21DFD21A45E2E82 /* ofxDatGui_PM */,
-				643EB880A9E14DEF1DCC1AB4 /* ofxOceanode */,
-			);
-			name = addons;
-			sourceTree = "<group>";
-		};
-		C9E0C4F6A9698E8F0EF5E14C /* Modifiers */ = {
-			isa = PBXGroup;
-			children = (
-				9FC5571D21AC704A009468E2 /* switcher.cpp */,
-				9FC5571E21AC704A009468E2 /* switcher.h */,
-				D623E907C25C25D1AB411052 /* mapper.cpp */,
-				3B2B1469CBE279200D558FAB /* mapper.h */,
-				959F4777E3902536DC81AC0A /* ranger.cpp */,
-				06F3C8FC2DD28E0B985BADB0 /* ranger.h */,
-				3D3CE3C79225FEEDD92A410A /* reindexer.cpp */,
-				125FC7DF81918DE565891A92 /* reindexer.h */,
-				EA0730CA1A73FC90DCF8C770 /* smoother.cpp */,
-				DCC77D1E228088A526604E34 /* smoother.h */,
-			);
-			name = Modifiers;
-			sourceTree = "<group>";
-		};
-		D334E5DEE84D3F52FE9065DE /* ofxSmartFont */ = {
-			isa = PBXGroup;
-			children = (
-				A403D3D25D08FC7AF3B871D4 /* ofxSmartFont.cpp */,
-				EFC799641CF7089DDBF2094B /* ofxSmartFont.h */,
-			);
-			name = ofxSmartFont;
-			sourceTree = "<group>";
-		};
-		D9757BE1A5DFAE64198FF989 /* themes */ = {
-			isa = PBXGroup;
-			children = (
-				0EA01AA404A74EE4BF1F46AD /* ofxDatGuiTheme.h */,
-				9E034FA57FE251AC33904E82 /* ofxDatGuiThemes.h */,
-			);
-			name = themes;
-			sourceTree = "<group>";
-		};
-		E2B359629BE73A7AB76D224B /* libs */ = {
-			isa = PBXGroup;
-			children = (
-				073338B688F3688C43AC3846 /* aubio */,
-			);
-			name = libs;
-			sourceTree = "<group>";
-		};
-		E4328144138ABC890047C5CB /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				E4328148138ABC890047C5CB /* openFrameworksDebug.a */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		E4B69B4A0A3A1720003C02F2 = {
-			isa = PBXGroup;
-			children = (
-				E4B6FCAD0C3E899E008CF71C /* openFrameworks-Info.plist */,
-				E4EB6923138AFD0F00A09F29 /* Project.xcconfig */,
-				E4B69E1C0A3A1BDC003C02F2 /* src */,
-				E4EEC9E9138DF44700A80321 /* openFrameworks */,
-				BB4B014C10F69532006C3DED /* addons */,
-				6948EE371B920CB800B5AC1A /* local_addons */,
-				E4B69B5B0A3A1756003C02F2 /* example_bpm_detectionDebug.app */,
-			);
-			sourceTree = "<group>";
-		};
-		E4B69E1C0A3A1BDC003C02F2 /* src */ = {
-			isa = PBXGroup;
-			children = (
-				E4B69E1D0A3A1BDC003C02F2 /* main.cpp */,
-				E4B69E1E0A3A1BDC003C02F2 /* ofApp.cpp */,
-				E4B69E1F0A3A1BDC003C02F2 /* ofApp.h */,
-			);
-			path = src;
-			sourceTree = SOURCE_ROOT;
-		};
-		E4EEC9E9138DF44700A80321 /* openFrameworks */ = {
-			isa = PBXGroup;
-			children = (
-				E4EB691F138AFCF100A09F29 /* CoreOF.xcconfig */,
-				E4328143138ABC890047C5CB /* openFrameworksLib.xcodeproj */,
-			);
-			name = openFrameworks;
-			sourceTree = "<group>";
-		};
-		E99400E5E21DFD21A45E2E82 /* ofxDatGui_PM */ = {
-			isa = PBXGroup;
-			children = (
-				FE3CA1F8648010DBA2401722 /* src */,
-			);
-			name = ofxDatGui_PM;
-			sourceTree = "<group>";
-		};
-		EB0606B779510751DDA16A81 /* core */ = {
-			isa = PBXGroup;
-			children = (
-				5D13EE4C64902574D9153447 /* ofxDatGuiComponent.cpp */,
-				A534F08B38B5C43917E2A9E4 /* ofxDatGuiComponent.h */,
-				169D713735D46DFA03D4EBEB /* ofxDatGuiConstants.h */,
-				407D7F7B6D3EDF97638DF661 /* ofxDatGuiEvents.h */,
-				8E922B504254FF844AF5505A /* ofxDatGuiIntObject.h */,
-			);
-			name = core;
-			sourceTree = "<group>";
-		};
-		F345CC31328F66B89F4BB079 /* Managers */ = {
-			isa = PBXGroup;
-			children = (
-				69F09B1450CB3FF08A87D2FF /* ofxOceanodeCanvas.cpp */,
-				BFA88189469A37E0B53C6773 /* ofxOceanodeCanvas.h */,
-				5E65A0C39A6FDCA2888DDAF8 /* ofxOceanodeContainer.cpp */,
-				FC8E873E04A65764668D30AB /* ofxOceanodeContainer.h */,
-				F15C9896F6A32FCA280CD4B5 /* ofxOceanodeNodeRegistry.cpp */,
-				4A76FE1EC14329064FDB60C7 /* ofxOceanodeNodeRegistry.h */,
-				60A6750E6D5A48E6B4B69C0A /* ofxOceanodeTypesRegistry.cpp */,
-				3795AFB8EAAD641D6CA88D4A /* ofxOceanodeTypesRegistry.h */,
-			);
-			name = Managers;
-			sourceTree = "<group>";
-		};
-		FE3CA1F8648010DBA2401722 /* src */ = {
-			isa = PBXGroup;
-			children = (
-				1D570521A53950659A74DE26 /* components */,
-				EB0606B779510751DDA16A81 /* core */,
-				49829C6AAEB884DF8A116E1D /* libs */,
-				DD8F81F7AAB5BA396231DD4C /* ofxDatGui.cpp */,
-				4D832D586223B608C5420D29 /* ofxDatGui.h */,
-				D9757BE1A5DFAE64198FF989 /* themes */,
-			);
-			name = src;
-			sourceTree = "<group>";
-		};
-/* End PBXGroup section */
-
-/* Begin PBXNativeTarget section */
-		E4B69B5A0A3A1756003C02F2 /* example_bpm_detection */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = E4B69B5F0A3A1757003C02F2 /* Build configuration list for PBXNativeTarget "example_bpm_detection" */;
-			buildPhases = (
-				E4B69B580A3A1756003C02F2 /* Sources */,
-				E4B69B590A3A1756003C02F2 /* Frameworks */,
-				E4B6FFFD0C3F9AB9008CF71C /* ShellScript */,
-				E4C2427710CC5ABF004149E2 /* CopyFiles */,
-				8466F1851C04CA0E00918B1C /* ShellScript */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				E4EEB9AC138B136A00A80321 /* PBXTargetDependency */,
-			);
-			name = example_bpm_detection;
-			productName = myOFApp;
-			productReference = E4B69B5B0A3A1756003C02F2 /* example_bpm_detectionDebug.app */;
-			productType = "com.apple.product-type.application";
-		};
-/* End PBXNativeTarget section */
-
-/* Begin PBXProject section */
-		E4B69B4C0A3A1720003C02F2 /* Project object */ = {
-			isa = PBXProject;
-			attributes = {
-				LastUpgradeCheck = 0600;
-			};
-			buildConfigurationList = E4B69B4D0A3A1720003C02F2 /* Build configuration list for PBXProject "example_bpm_detection" */;
-			compatibilityVersion = "Xcode 3.2";
-			developmentRegion = English;
-			hasScannedForEncodings = 0;
-			knownRegions = (
-				English,
-				Japanese,
-				French,
-				German,
-			);
-			mainGroup = E4B69B4A0A3A1720003C02F2;
-			productRefGroup = E4B69B4A0A3A1720003C02F2;
-			projectDirPath = "";
-			projectReferences = (
-				{
-					ProductGroup = E4328144138ABC890047C5CB /* Products */;
-					ProjectRef = E4328143138ABC890047C5CB /* openFrameworksLib.xcodeproj */;
-				},
-			);
-			projectRoot = "";
-			targets = (
-				E4B69B5A0A3A1756003C02F2 /* example_bpm_detection */,
-			);
-		};
-/* End PBXProject section */
-
-/* Begin PBXReferenceProxy section */
-		E4328148138ABC890047C5CB /* openFrameworksDebug.a */ = {
-			isa = PBXReferenceProxy;
-			fileType = archive.ar;
-			path = openFrameworksDebug.a;
-			remoteRef = E4328147138ABC890047C5CB /* PBXContainerItemProxy */;
-			sourceTree = BUILT_PRODUCTS_DIR;
-		};
-/* End PBXReferenceProxy section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		8466F1851C04CA0E00918B1C /* ShellScript */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 12;
-			files = (
-			);
-			inputPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "echo \"$GCC_PREPROCESSOR_DEFINITIONS\";\nAPPSTORE=`expr \"$GCC_PREPROCESSOR_DEFINITIONS\" : \".*APPSTORE=\\([0-9]*\\)\"`\nif [ -z \"$APPSTORE\" ] ; then\necho \"Note: Not copying bin/data to App Package or doing App Code signing. Use AppStore target for AppStore distribution\";\nelse\n# Copy bin/data into App/Resources\nrsync -avz --exclude='.DS_Store' \"${SRCROOT}/bin/data/\" \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/data/\"\n\n# ---- Code Sign App Package ----\n\n# WARNING: You may have to run Clean in Xcode after changing CODE_SIGN_IDENTITY!\n\n# Verify that $CODE_SIGN_IDENTITY is set\nif [ -z \"${CODE_SIGN_IDENTITY}\" ] ; then\necho \"CODE_SIGN_IDENTITY needs to be set for framework code-signing\"\nexit 0\nfi\n\nif [ -z \"${CODE_SIGN_ENTITLEMENTS}\" ] ; then\necho \"CODE_SIGN_ENTITLEMENTS needs to be set for framework code-signing!\"\n\nif [ \"${CONFIGURATION}\" = \"Release\" ] ; then\nexit 1\nelse\n# Code-signing is optional for non-release builds.\nexit 0\nfi\nfi\n\nITEMS=\"\"\n\nFRAMEWORKS_DIR=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\necho \"$FRAMEWORKS_DIR\"\nif [ -d \"$FRAMEWORKS_DIR\" ] ; then\nFRAMEWORKS=$(find \"${FRAMEWORKS_DIR}\" -depth -type d -name \"*.framework\" -or -name \"*.dylib\" -or -name \"*.bundle\" | sed -e \"s/\\(.*framework\\)/\\1\\/Versions\\/A\\//\")\nRESULT=$?\nif [[ $RESULT != 0 ]] ; then\nexit 1\nfi\n\nITEMS=\"${FRAMEWORKS}\"\nfi\n\nLOGINITEMS_DIR=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LoginItems/\"\nif [ -d \"$LOGINITEMS_DIR\" ] ; then\nLOGINITEMS=$(find \"${LOGINITEMS_DIR}\" -depth -type d -name \"*.app\")\nRESULT=$?\nif [[ $RESULT != 0 ]] ; then\nexit 1\nfi\n\nITEMS=\"${ITEMS}\"$'\\n'\"${LOGINITEMS}\"\nfi\n\n# Prefer the expanded name, if available.\nCODE_SIGN_IDENTITY_FOR_ITEMS=\"${EXPANDED_CODE_SIGN_IDENTITY_NAME}\"\nif [ \"${CODE_SIGN_IDENTITY_FOR_ITEMS}\" = \"\" ] ; then\n# Fall back to old behavior.\nCODE_SIGN_IDENTITY_FOR_ITEMS=\"${CODE_SIGN_IDENTITY}\"\nfi\n\necho \"Identity:\"\necho \"${CODE_SIGN_IDENTITY_FOR_ITEMS}\"\n\necho \"Entitlements:\"\necho \"${CODE_SIGN_ENTITLEMENTS}\"\n\necho \"Found:\"\necho \"${ITEMS}\"\n\n# Change the Internal Field Separator (IFS) so that spaces in paths will not cause problems below.\nSAVED_IFS=$IFS\nIFS=$(echo -en \"\\n\\b\")\n\n# Loop through all items.\nfor ITEM in $ITEMS;\ndo\necho \"Signing '${ITEM}'\"\ncodesign --force --verbose --sign \"${CODE_SIGN_IDENTITY_FOR_ITEMS}\" --entitlements \"${CODE_SIGN_ENTITLEMENTS}\" \"${ITEM}\"\nRESULT=$?\nif [[ $RESULT != 0 ]] ; then\necho \"Failed to sign '${ITEM}'.\"\nIFS=$SAVED_IFS\nexit 1\nfi\ndone\n\n# Restore $IFS.\nIFS=$SAVED_IFS\n\nfi\n";
-		};
-		E4B6FFFD0C3F9AB9008CF71C /* ShellScript */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Resources/\"\n# Copy default icon file into App/Resources\nrsync -aved \"$ICON_FILE\" \"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Resources/\"\n# Copy libfmod and change install directory for fmod to run\nrsync -aved \"$OF_PATH/libs/fmodex/lib/osx/libfmodex.dylib\" \"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Frameworks/\";\ninstall_name_tool -change @executable_path/libfmodex.dylib @executable_path/../Frameworks/libfmodex.dylib \"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/MacOS/$PRODUCT_NAME\";\n\necho \"$GCC_PREPROCESSOR_DEFINITIONS\";\n";
-		};
-/* End PBXShellScriptBuildPhase section */
-
-/* Begin PBXSourcesBuildPhase section */
-		E4B69B580A3A1756003C02F2 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				E4B69E200A3A1BDC003C02F2 /* main.cpp in Sources */,
-				E4B69E210A3A1BDC003C02F2 /* ofApp.cpp in Sources */,
-				479DCA850DD8BB469A777AD4 /* ofxAubioBeat.cpp in Sources */,
-				C60077973A257D8F44947E2E /* ofxAubioBlock.cpp in Sources */,
-				67383740F5CC47ED5F955A76 /* ofxAubioMelBands.cpp in Sources */,
-				9C7B8B4D99CDFC508E76CC3A /* ofxAubioOnset.cpp in Sources */,
-				101D2DB773940813A5C898CD /* ofxAubioPitch.cpp in Sources */,
-				4A277DA746402C76CE307770 /* ofxDatGuiComponent.cpp in Sources */,
-				646DF4D56CE728133610A7F6 /* ofxSmartFont.cpp in Sources */,
-				BE7DAF3CB982C2BD0FE44648 /* ofxDatGui.cpp in Sources */,
-				C6A203560BFBDA04C5746210 /* ofxOceanodeConnection.cpp in Sources */,
-				C1EEF98E795AFB7BB33F94B1 /* ofxOceanodeConnectionGraphics.cpp in Sources */,
-				7B5743F2E77F2D5AD9B436F0 /* ofxOceanodeBaseController.cpp in Sources */,
-				717BCDD6091D90F262DC7860 /* ofxOceanodeBPMController.cpp in Sources */,
-				7B8EE5B7F57088CD23B7934D /* ofxOceanodeControls.cpp in Sources */,
-				026CF24E227F5DFC3C392E27 /* ofxOceanodePresetsController.cpp in Sources */,
-				FE7602E65C7BA676951A37FB /* ofxOceanodeCanvas.cpp in Sources */,
-				5769B6A6D79188D3D351933E /* ofxOceanodeContainer.cpp in Sources */,
-				B7559FEE382DBA7FB094D5E7 /* ofxOceanodeNodeRegistry.cpp in Sources */,
-				102C0035698294FDB36E6899 /* ofxOceanodeTypesRegistry.cpp in Sources */,
-				9FC5571F21AC704A009468E2 /* switcher.cpp in Sources */,
-				7CC1A4D669C6C1B3786CD384 /* ofxOceanodeNodeModelExternalWindow.cpp in Sources */,
-				9F68E133237B1ABE009A6605 /* ofxOceanodeNodeMacro.cpp in Sources */,
-				4B0881C0E4F3D037FA83C3E3 /* ofxOceanodeNodeModelLocalPreset.cpp in Sources */,
-				D925621F7F6146497318658A /* baseIndexer.cpp in Sources */,
-				9150F94721FE0E44D16DA0CC /* baseOscillator.cpp in Sources */,
-				BFBE6AEF801BA1F820867405 /* basePhasor.cpp in Sources */,
-				124BB55C818D1F89450ED005 /* localPresetController.cpp in Sources */,
-				842D4B1559D16CD55B1CF6DD /* oscillator.cpp in Sources */,
-				4C3192DB1EAE1CFF29580749 /* oscillatorBank.cpp in Sources */,
-				7416EB8AFDAB615D36EC3137 /* phasor.cpp in Sources */,
-				47608E29666CD58C20E53408 /* mapper.cpp in Sources */,
-				4838368B3C8561AD76D56D69 /* ranger.cpp in Sources */,
-				E1E0C08A53EAFC4A088F5BDC /* reindexer.cpp in Sources */,
-				BDE21E02C646BD31BEC13891 /* smoother.cpp in Sources */,
-				4C8024D8DD46223D43C514C0 /* ofxOceanodeNode.cpp in Sources */,
-				8EB5677652296BACF3A1C184 /* ofxOceanodeNodeGui.cpp in Sources */,
-				4F63EFF3BAACF2B19051E336 /* ofxOceanodeNodeModel.cpp in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXSourcesBuildPhase section */
-
-/* Begin PBXTargetDependency section */
-		E4EEB9AC138B136A00A80321 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = openFrameworks;
-			targetProxy = E4EEB9AB138B136A00A80321 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
-
-/* Begin XCBuildConfiguration section */
-		99FA3DBB1C7456C400CFA0EE /* AppStore */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = E4EB6923138AFD0F00A09F29 /* Project.xcconfig */;
-			buildSettings = {
-				CONFIGURATION_BUILD_DIR = "$(SRCROOT)/bin/";
-				COPY_PHASE_STRIP = YES;
-				DEAD_CODE_STRIPPING = YES;
-				GCC_AUTO_VECTORIZATION = YES;
-				GCC_ENABLE_SSE3_EXTENSIONS = YES;
-				GCC_ENABLE_SUPPLEMENTAL_SSE3_INSTRUCTIONS = YES;
-				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
-				GCC_OPTIMIZATION_LEVEL = 3;
-				"GCC_PREPROCESSOR_DEFINITIONS[arch=*]" = "DISTRIBUTION=1";
-				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
-				GCC_UNROLL_LOOPS = YES;
-				GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS = YES;
-				GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO = NO;
-				GCC_WARN_ALLOW_INCOMPLETE_PROTOCOL = NO;
-				GCC_WARN_UNINITIALIZED_AUTOS = NO;
-				GCC_WARN_UNUSED_VALUE = NO;
-				GCC_WARN_UNUSED_VARIABLE = NO;
-				HEADER_SEARCH_PATHS = (
+	"_OFProjectGeneratorVersion": "0.103.0",
+	"archiveVersion": "1",
+	"classes": {},
+	"objectVersion": "54",
+	"objects": {
+		"01517FAC-F886-4825-A084-5D236FBD0BB0": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "portalSelector.h",
+			"sourceTree": "<group>"
+		},
+		"01F6B8BD-A441-4CF6-B9E8-0B3DCE2EF34E": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeControls.h",
+			"sourceTree": "<group>"
+		},
+		"02290F01-C700-4971-BE8E-F22F00E312F0": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeProfilingController.h",
+			"sourceTree": "<group>"
+		},
+		"056F0B0D-1F26-4EA1-A570-265981F9B517": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeDefaultNodes.cpp",
+			"sourceTree": "<group>"
+		},
+		"05BFF01E-874F-4E9D-9A6D-BA4F176A90E6": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "PresetFileCleanupReview.h",
+			"sourceTree": "<group>"
+		},
+		"07EE7A51-5F90-4BB3-8A4B-BAC20177AD04": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeHelpPrompt.h",
+			"sourceTree": "<group>"
+		},
+		"07F6D1A7-F2D4-4A6C-B6A7-092183D22F75": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeCustomGuiSignalWidgets.cpp",
+			"sourceTree": "<group>"
+		},
+		"08A4286B-CFA1-4559-B511-10AE098B7E6E": {
+			"fileRef": "FC087D26-2FA9-43C4-BE2A-7708DA6E843D",
+			"isa": "PBXBuildFile"
+		},
+		"0933F6A6-07CD-4637-85F8-442241460E13": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodePresetsController.cpp",
+			"sourceTree": "<group>"
+		},
+		"0BCB2CD0-A0D4-4A86-8681-AA26A0DB65C5": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeConnectionDrawing.h",
+			"sourceTree": "<group>"
+		},
+		"0D1D1046-8EDF-42FA-8182-E642610F5C1E": {
+			"fileRef": "3677E57E-A630-4493-83F3-2442856FABE6",
+			"isa": "PBXBuildFile"
+		},
+		"0E0F2BA9-7A73-48D2-9EFB-DB0490F5E475": {
+			"fileRef": "4EADAFD2-706E-4E59-BA82-4CE7AEF9D771",
+			"isa": "PBXBuildFile"
+		},
+		"0EAC36AD-9C10-4A6F-908D-3FA4A0966E04": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeColors.h",
+			"sourceTree": "<group>"
+		},
+		"0EB42ADB-896F-497D-9B1C-DE01EC0BDA75": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeCustomGuiValueWidgets.h",
+			"sourceTree": "<group>"
+		},
+		"0ED60EB9-8E22-4EBA-B382-D5E6445C3462": {
+			"children": [
+				"46480A6A-D088-4EF4-9529-0BE5D1227E8F"
+			],
+			"isa": "PBXGroup",
+			"name": "ofxOceanode",
+			"path": "ofxOceanode",
+			"sourceTree": "<group>"
+		},
+		"13B5A67F-AFEA-4589-AC18-3DF6CDB8EBCF": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ranger.cpp",
+			"sourceTree": "<group>"
+		},
+		"13BA7580-8FC7-4459-833C-10ED39DDD358": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "curve2.h",
+			"sourceTree": "<group>"
+		},
+		"13E28123-22A9-4089-A62B-D581DB51D990": {
+			"fileRef": "458BBF12-0C00-423E-BF45-DE60E9850475",
+			"isa": "PBXBuildFile"
+		},
+		"13FD5F2D-6453-437E-BB0F-5C4C0EB79195": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "MacroRouterValueDispatch.h",
+			"sourceTree": "<group>"
+		},
+		"14191E5F-3842-4FE6-BE08-4473F0E63645": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeHelpPlan.h",
+			"sourceTree": "<group>"
+		},
+		"14B81EB6-502E-4986-8E58-22CF3D08D5C4": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeCustomGuiWidgets.cpp",
+			"sourceTree": "<group>"
+		},
+		"15687240-D336-4FD4-A5C6-2FC0118BFD73": {
+			"children": [
+				"CA814EF0-CB06-4321-A003-6175AAEB017B",
+				"C15E57ED-6D87-4877-9EF3-95ACB2EBF605",
+				"461391CD-E85C-4F70-8E17-DE30059F8B26",
+				"C1C4B84E-E8F4-4433-BF1E-76D3CF2ADB3A",
+				"95616B51-D909-4C99-BBD1-DD13E95B3F8F",
+				"9951F687-0DC0-46C6-91F6-49CDB7D4D555",
+				"7116FC97-113F-4FE2-B6C9-DA54F12D8B7D",
+				"6CE24B98-D610-4658-B2EC-0624A83CD262",
+				"860C5D1A-792C-49DA-9E94-47EFBF8A617B",
+				"1DBA8014-863B-4780-88D5-1FC823B4B827"
+			],
+			"isa": "PBXGroup",
+			"name": "Base",
+			"path": "Base",
+			"sourceTree": "<group>"
+		},
+		"15F5B1D8-0FBA-4B74-9B7B-254A4D8A67B8": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "reindexer.cpp",
+			"sourceTree": "<group>"
+		},
+		"1638B488-CF44-40DC-AADB-1475AEF0DC69": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "curve.cpp",
+			"sourceTree": "<group>"
+		},
+		"176E79E8-23C9-4B1C-9A98-F4970339338D": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "randomGenerator.h",
+			"sourceTree": "<group>"
+		},
+		"1815285D-E342-4A83-9C23-698E9AA03072": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeNodeHelpCatalog.h",
+			"sourceTree": "<group>"
+		},
+		"190387C9-34C8-4024-9360-284944AB9FB7": {
+			"fileRef": "63308BE4-E738-4D35-9FFC-EC36C90F4085",
+			"isa": "PBXBuildFile"
+		},
+		"191CD6FA2847E21E0085CBB6": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "text.plist.entitlements",
+			"path": "of.entitlements",
+			"sourceTree": "<group>"
+		},
+		"191EF70929D778A400F35F26": {
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "folder",
+			"name": "openFrameworks",
+			"path": "../../../libs/openFrameworks",
+			"sourceTree": "SOURCE_ROOT"
+		},
+		"19B789C429E5AB4A0082E9B8": {
+			"alwaysOutOfDate": "1",
+			"buildActionMask": "2147483647",
+			"files": [],
+			"inputFileListPaths": [],
+			"inputPaths": [],
+			"isa": "PBXShellScriptBuildPhase",
+			"outputFileListPaths": [],
+			"outputPaths": [],
+			"runOnlyForDeploymentPostprocessing": "0",
+			"shellPath": "/bin/sh",
+			"shellScript": "\"$OF_PATH/scripts/osx/xcode_project.sh\"\n",
+			"showEnvVarsInLog": "0"
+		},
+		"1A67891F-2B7B-44C1-A1F7-431E1C3F2DF2": {
+			"fileRef": "903D1EB2-7741-4372-8DD9-9B9CD70D8556",
+			"isa": "PBXBuildFile"
+		},
+		"1C502DD6-4A93-467E-A7E0-DEBCE5582F0E": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "PresetSaveCleanup.h",
+			"sourceTree": "<group>"
+		},
+		"1CB26EA2-3271-4875-A9FC-377F2E9CBA4C": {
+			"fileRef": "460060EB-4E7F-4630-A5EA-6A443B40CA7A",
+			"isa": "PBXBuildFile"
+		},
+		"1CFCEEF2-23D1-45BE-9856-94F4BB64B73A": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeTimeController.h",
+			"sourceTree": "<group>"
+		},
+		"1D49FFAC-6180-4C2B-A852-DC2A426065EE": {
+			"fileRef": "C1E3FDF9-091A-4AD3-9106-3854D28AFBF3",
+			"isa": "PBXBuildFile"
+		},
+		"1DBA8014-863B-4780-88D5-1FC823B4B827": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "baseRandomGenerator.h",
+			"sourceTree": "<group>"
+		},
+		"20AE70CD-2EB6-48D4-B46A-EC90FCD8B5B0": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "customGuiSnapshots.h",
+			"sourceTree": "<group>"
+		},
+		"21539A29-7C88-4683-ABE2-D1556E667B26": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodePresetsController.h",
+			"sourceTree": "<group>"
+		},
+		"22CB9B86-CFE5-4DE1-A998-0CB08F43C30F": {
+			"fileRef": "1638B488-CF44-40DC-AADB-1475AEF0DC69",
+			"isa": "PBXBuildFile"
+		},
+		"2454786B-5B69-44F8-8628-445E80C6FDC6": {
+			"fileRef": "CFC3C094-BBD7-47BF-AF23-DCF6FC000287",
+			"isa": "PBXBuildFile"
+		},
+		"250FA3D5-3B77-4E9B-A999-2A2926561ADD": {
+			"children": [
+				"37B7CFD1-F1D6-4D99-956B-C29EBF965803",
+				"6256BFCD-12DD-4B61-8F81-9D9454A841A3"
+			],
+			"isa": "PBXGroup",
+			"name": "Base_Nodes",
+			"path": "Base_Nodes",
+			"sourceTree": "<group>"
+		},
+		"263E1B25-94F1-4C28-8026-0EBEEED5C751": {
+			"fileRef": "95616B51-D909-4C99-BBD1-DD13E95B3F8F",
+			"isa": "PBXBuildFile"
+		},
+		"26BAD6F8-7F35-4EAF-8636-3AA10CEEE9F4": {
+			"fileRef": "A4B54F1F-9723-4DEA-88C3-07B5C1156CCC",
+			"isa": "PBXBuildFile"
+		},
+		"288A8B0E-196C-4495-83D6-7CD1086B7724": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeParameter.h",
+			"sourceTree": "<group>"
+		},
+		"2CC28B8E-218D-40A1-86D9-39ADBE7822B7": {
+			"fileRef": "E998B536-4103-4DE2-BE8A-4EA297A65934",
+			"isa": "PBXBuildFile"
+		},
+		"2CF6297A-C493-4451-8ABF-853FEB3AD3BA": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeTheme.h",
+			"sourceTree": "<group>"
+		},
+		"2D0F5207-43D2-483C-943B-61DAADA1F71B": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeAIAssistant.h",
+			"sourceTree": "<group>"
+		},
+		"2D56447A-A7B3-4144-9E15-43DAD4E753FC": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeDefaultTypes.cpp",
+			"sourceTree": "<group>"
+		},
+		"2D7C6C90-1D97-4C81-938F-E938067E09FB": {
+			"fileRef": "616C5372-DA87-4DCA-86A2-5471C39A062C",
+			"isa": "PBXBuildFile"
+		},
+		"2D84536D-B4B3-44C9-9529-BF5AFAF983C8": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeNodeMacro.h",
+			"sourceTree": "<group>"
+		},
+		"2E024AC9-D2D4-462E-83E9-69C43E18A69C": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeProfilingController.cpp",
+			"sourceTree": "<group>"
+		},
+		"2E075DA5-3429-4F65-AF84-F6343E35C599": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeMacroMixer.cpp",
+			"sourceTree": "<group>"
+		},
+		"2F9BB099-EAA2-47F1-850F-DB6774E92CD6": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "MacroPresetManager.h",
+			"sourceTree": "<group>"
+		},
+		"2FD3DD6A-9E9E-4D48-B668-969D3C7751A6": {
+			"children": [
+				"83B0C080-93C6-4A69-86A1-4AF294A1B8B8",
+				"F6807223-69B0-4747-BB38-6B3F401363D4",
+				"75AF44EB-771D-42AC-8138-14D6046454B8",
+				"4F26F421-549F-4A4B-A5AB-0172A499A4A2",
+				"730BC5EA-82F7-4A11-A91B-033C1C1C2032"
+			],
+			"isa": "PBXGroup",
+			"name": "Buffer",
+			"path": "Buffer",
+			"sourceTree": "<group>"
+		},
+		"3095F2DF-E84D-4323-896A-72870B72C34A": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeNodeModel.h",
+			"sourceTree": "<group>"
+		},
+		"30BBA1A2-1228-42F3-B872-2D087B6DA644": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeLogController.h",
+			"sourceTree": "<group>"
+		},
+		"3254AF80-1346-468F-8529-1D8F045D0153": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeConnection.h",
+			"sourceTree": "<group>"
+		},
+		"3270F09A-8CD9-444E-B790-43B6A308A7D7": {
+			"fileRef": "BAA0DDA0-8232-43B6-9A3A-DB2B4F3D1072",
+			"isa": "PBXBuildFile"
+		},
+		"339C314D-8478-4264-B94D-217FC2E7E450": {
+			"fileRef": "0933F6A6-07CD-4637-85F8-442241460E13",
+			"isa": "PBXBuildFile"
+		},
+		"339F3BBF-94ED-44C0-90CD-DB1E86D2C13E": {
+			"fileRef": "37B7CFD1-F1D6-4D99-956B-C29EBF965803",
+			"isa": "PBXBuildFile"
+		},
+		"33FDF38E-1ED8-4409-8E8C-816233AB170C": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeCanvas.cpp",
+			"sourceTree": "<group>"
+		},
+		"3412C0C8-DABF-48EC-AAA7-000CA989551A": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeHierarchyController.h",
+			"sourceTree": "<group>"
+		},
+		"35246642-AC92-43A6-9A1F-7BDB98F64C4E": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "mapper.h",
+			"sourceTree": "<group>"
+		},
+		"35370FE8-DC88-4C0F-BCD8-7229F991CEC3": {
+			"children": [
+				"D2B937D7-9F24-4F59-A8C8-F709CDC996AB",
+				"AF9A31E2-1DBE-4D1E-A8C2-85A45D448349",
+				"9276805E-7DBB-47A7-A3B4-121E9AE8F2FE",
+				"FB350E7A-E197-4B41-9A46-D6AC29C05A4F",
+				"DA63B9F8-6958-44A2-884A-FB636F9F24FA",
+				"D6E8C83D-A7EC-44E0-B62F-1443D88AA1CB",
+				"68E8933C-7AB5-47C5-9ECC-CDE8CAA26716",
+				"8197DE9B-E3BA-4A05-A818-D3128F5AA15B",
+				"14B81EB6-502E-4986-8E58-22CF3D08D5C4",
+				"5303598C-37E2-49E8-A000-C3BF3344E4C5"
+			],
+			"isa": "PBXGroup",
+			"name": "CustomGui",
+			"path": "CustomGui",
+			"sourceTree": "<group>"
+		},
+		"3677E57E-A630-4493-83F3-2442856FABE6": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "smoother.cpp",
+			"sourceTree": "<group>"
+		},
+		"37A85C60-7EC8-488F-867E-7CC791772306": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "presetLoadTrigger.h",
+			"sourceTree": "<group>"
+		},
+		"37B7CFD1-F1D6-4D99-956B-C29EBF965803": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeNodeModelExternalWindow.cpp",
+			"sourceTree": "<group>"
+		},
+		"37D45ECE-D09D-45AA-A1BA-BD03558DD4AA": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "MacroMorphEngine.cpp",
+			"sourceTree": "<group>"
+		},
+		"37FF7098-75CD-47CF-8E35-BA6DA8A234C6": {
+			"fileRef": "46E9EFC2-9B70-47E7-A05F-326D48558531",
+			"isa": "PBXBuildFile"
+		},
+		"3A02B5D0-CE82-4D90-BA3C-8860BF049F0B": {
+			"fileRef": "A9732814-DF9E-4F45-8908-05BA56614758",
+			"isa": "PBXBuildFile"
+		},
+		"3C22A81A-6600-4679-8B65-CE13BE7210A2": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanode.cpp",
+			"sourceTree": "<group>"
+		},
+		"3C537F7F-410D-4B24-AE4A-4C029EC60F64": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "GlobalMacroSaveReview.h",
+			"sourceTree": "<group>"
+		},
+		"3E0066D9-D6EE-4257-BF5B-7D863BA136A3": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeContainer.cpp",
+			"sourceTree": "<group>"
+		},
+		"3ECA79D8-ACC4-4527-8103-BC58448EF397": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeNodesController.h",
+			"sourceTree": "<group>"
+		},
+		"3F69BAE3-8B80-4F6A-B922-12837C2C3930": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "portal.cpp",
+			"sourceTree": "<group>"
+		},
+		"403C04BF-F03C-419E-94ED-0F38A55DC666": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "router.h",
+			"sourceTree": "<group>"
+		},
+		"405C68D2-F6D6-44DE-8F39-87C022452D15": {
+			"fileRef": "E746D4EC-86FF-401D-9293-AD714F4BF887",
+			"isa": "PBXBuildFile"
+		},
+		"40927E3A-CD92-41E8-85CC-685392F001ED": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeGlobalVariablesController.cpp",
+			"sourceTree": "<group>"
+		},
+		"4188EE0C-5BB3-4B52-86DA-CDC699F5F26E": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "globalVariables.h",
+			"sourceTree": "<group>"
+		},
+		"446E2805-E891-4A2F-8284-D522D4AC52CC": {
+			"fileRef": "6FBE2FEA-8A2F-4A77-BEC6-965717B13A77",
+			"isa": "PBXBuildFile"
+		},
+		"458BBF12-0C00-423E-BF45-DE60E9850475": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeNodeMacro.cpp",
+			"sourceTree": "<group>"
+		},
+		"460060EB-4E7F-4630-A5EA-6A443B40CA7A": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeConnection.cpp",
+			"sourceTree": "<group>"
+		},
+		"461391CD-E85C-4F70-8E17-DE30059F8B26": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "baseIndexer.cpp",
+			"sourceTree": "<group>"
+		},
+		"46480A6A-D088-4EF4-9529-0BE5D1227E8F": {
+			"children": [
+				"D63C16C5-C606-4096-88DF-59735E14A3EE",
+				"D95B6EB9-8299-4982-A665-4EAA12479C5A",
+				"35370FE8-DC88-4C0F-BCD8-7229F991CEC3",
+				"572B4C29-910D-4879-AF02-A8FCF0C09531",
+				"799B0A2A-B1EA-462C-A25B-9B174DC6FC26",
+				"DE1B1656-E921-439A-9C38-AB8A093D29F7",
+				"3C22A81A-6600-4679-8B65-CE13BE7210A2",
+				"9A9B6B17-953B-4DC3-B025-0CBAD91242E0",
+				"2D0F5207-43D2-483C-943B-61DAADA1F71B",
+				"0EAC36AD-9C10-4A6F-908D-3FA4A0966E04",
+				"056F0B0D-1F26-4EA1-A570-265981F9B517",
+				"8F1FA028-DDE0-45B7-A1DD-BC221BC5E283",
+				"2D56447A-A7B3-4144-9E15-43DAD4E753FC",
+				"B7927355-3224-48F7-A3E9-584BCE97B14D",
+				"567DDC9B-6208-4392-800C-C9880AF2CAF2",
+				"1815285D-E342-4A83-9C23-698E9AA03072",
+				"6BB90C65-EC9A-4BE4-85F9-E6609DF11281",
+				"288A8B0E-196C-4495-83D6-7CD1086B7724",
+				"C8D2FAF1-E6E1-41B9-AF50-DB11442711BD",
+				"9C09C225-715E-414B-A227-10000FE65CD1",
+				"EAFC726E-F4F2-4810-BDB8-2438058BF45F",
+				"2CF6297A-C493-4451-8ABF-853FEB3AD3BA",
+				"A9732814-DF9E-4F45-8908-05BA56614758",
+				"5F9FB225-D492-4580-88E8-E5EB88C00CA0"
+			],
+			"isa": "PBXGroup",
+			"name": "src",
+			"path": "src",
+			"sourceTree": "<group>"
+		},
+		"46E9EFC2-9B70-47E7-A05F-326D48558531": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "MacroRouterSortOrder.cpp",
+			"sourceTree": "<group>"
+		},
+		"46EC05C2-0D08-467D-A587-4B670EF2E3A9": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeInspectorController.cpp",
+			"sourceTree": "<group>"
+		},
+		"4AB530EF-FC80-4C4C-ABF1-8DF9E2E5DBF0": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "folder",
+			"name": "data",
+			"path": "bin/data",
+			"sourceTree": "SOURCE_ROOT"
+		},
+		"4B0577D5-F6C0-4C4F-9C0B-3C4003846B13": {
+			"fileRef": "2E075DA5-3429-4F65-AF84-F6343E35C599",
+			"isa": "PBXBuildFile"
+		},
+		"4C2C3BDD-947E-4A7B-913F-8627EA02A5A2": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeCustomGuiStaticWidgets.cpp",
+			"sourceTree": "<group>"
+		},
+		"4E51ED84-DBC4-4042-A0DD-98F7908CDDAE": {
+			"fileRef": "46EC05C2-0D08-467D-A587-4B670EF2E3A9",
+			"isa": "PBXBuildFile"
+		},
+		"4EADAFD2-706E-4E59-BA82-4CE7AEF9D771": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "beatTransport.cpp",
+			"sourceTree": "<group>"
+		},
+		"4F1C0543-405A-43F0-9B4C-DEC7B87D873A": {
+			"fileRef": "6E0CF0B9-4FBA-48FD-B527-0F8E849571D5",
+			"isa": "PBXBuildFile"
+		},
+		"4F26F421-549F-4A4B-A5AB-0172A499A4A2": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "bufferNode.h",
+			"sourceTree": "<group>"
+		},
+		"5115C600-E7B6-4590-88D9-A922547AA7C2": {
+			"fileRef": "5141E21D-7C51-4D2D-AF59-FAA7AB40204D",
+			"isa": "PBXBuildFile"
+		},
+		"5141E21D-7C51-4D2D-AF59-FAA7AB40204D": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeControls.cpp",
+			"sourceTree": "<group>"
+		},
+		"5303598C-37E2-49E8-A000-C3BF3344E4C5": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeCustomGuiWidgets.h",
+			"sourceTree": "<group>"
+		},
+		"567DDC9B-6208-4392-800C-C9880AF2CAF2": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeFloatingWindowDecor.h",
+			"sourceTree": "<group>"
+		},
+		"567E067D-F957-489B-B498-93BA4919907C": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "noise.h",
+			"sourceTree": "<group>"
+		},
+		"5703D377-AB43-42AB-BA27-E4A98034B89B": {
+			"fileRef": "917050C4-30EC-4121-9670-CA65ACC4F7FA",
+			"isa": "PBXBuildFile"
+		},
+		"572B4C29-910D-4879-AF02-A8FCF0C09531": {
+			"children": [
+				"1C502DD6-4A93-467E-A7E0-DEBCE5582F0E",
+				"8FFDD1DF-48B0-4F01-A8DF-32318D2FC24A",
+				"33FDF38E-1ED8-4409-8E8C-816233AB170C",
+				"A28C79BB-4B8A-4E5B-9E7A-AAA0FB298559",
+				"0BCB2CD0-A0D4-4A86-8681-AA26A0DB65C5",
+				"3E0066D9-D6EE-4257-BF5B-7D863BA136A3",
+				"87AC0E98-DB17-493A-B44D-D4747168BC74",
+				"B67EF8D3-000C-4839-930B-5497622C2989",
+				"C2C213F1-FA80-41B4-82CC-E85AA00A6C5F",
+				"14191E5F-3842-4FE6-BE08-4473F0E63645",
+				"07EE7A51-5F90-4BB3-8A4B-BAC20177AD04",
+				"9CE14394-34C0-4249-AAD7-1A66724735B0",
+				"90A6B555-3170-41FB-BCFE-AAEC710BCE9E",
+				"AF7D6277-B162-42CE-8C9B-F61B19E26776",
+				"E746D4EC-86FF-401D-9293-AD714F4BF887",
+				"63E3F223-AE40-405F-9E56-338A881B9E9D",
+				"6E0CF0B9-4FBA-48FD-B527-0F8E849571D5",
+				"5A5E2356-2077-4A7D-9102-15CCF701C51E",
+				"FFD2A5A3-B574-448D-8814-47AFB21CEF79",
+				"D6B80398-25A4-4F32-B225-D4CE12EF73FE",
+				"FEF2D0A4-3ED1-4718-86C0-357B475175B0",
+				"874A209F-4D5D-495A-A4A5-DD9B4F9D126E",
+				"3A00F333-CA25-5BA1-A651-725DDCCCBFBB",
+				"59A16691-B316-4E4B-960A-0AFFC717447A",
+				"C03E3397-0C96-4BA3-AB78-13DBA97A12CD"
+			],
+			"isa": "PBXGroup",
+			"name": "Managers",
+			"path": "Managers",
+			"sourceTree": "<group>"
+		},
+		"57E01272-BF35-4814-87D0-5C30EA99B413": {
+			"children": [
+				"15687240-D336-4FD4-A5C6-2FC0118BFD73",
+				"2FD3DD6A-9E9E-4D48-B668-969D3C7751A6",
+				"B67EC6FE-3B2F-4D56-B208-06A76ECA682B",
+				"96C5B0C9-4697-4A63-B5EE-38B301353432",
+				"4EADAFD2-706E-4E59-BA82-4CE7AEF9D771",
+				"8366DFF1-2BAA-4F02-97FB-13C83FF1E230",
+				"87340F19-4323-4C80-A425-5AB622E1FB73",
+				"4188EE0C-5BB3-4B52-86DA-CDC699F5F26E",
+				"3F69BAE3-8B80-4F6A-B922-12837C2C3930",
+				"58228FA4-6680-41DA-9B0C-437E08607AA4",
+				"01517FAC-F886-4825-A084-5D236FBD0BB0",
+				"37A85C60-7EC8-488F-867E-7CC791772306",
+				"403C04BF-F03C-419E-94ED-0F38A55DC666"
+			],
+			"isa": "PBXGroup",
+			"name": "Default_Nodes",
+			"path": "Default_Nodes",
+			"sourceTree": "<group>"
+		},
+		"58228FA4-6680-41DA-9B0C-437E08607AA4": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "portal.h",
+			"sourceTree": "<group>"
+		},
+		"5890726A-91DA-4611-8D55-41E919E5BEAD": {
+			"fileRef": "AEED5CF8-0322-4D5B-B649-46B3472DEDAD",
+			"isa": "PBXBuildFile"
+		},
+		"58C658AC-4946-475A-A1F6-41CEBF6F07DE": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "switcher.h",
+			"sourceTree": "<group>"
+		},
+		"59A16691-B316-4E4B-960A-0AFFC717447A": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeScheduling.cpp",
+			"sourceTree": "<group>"
+		},
+		"59C1D481-4C91-42B3-BEEA-7C70479A0C2A": {
+			"fileRef": "9CE14394-34C0-4249-AAD7-1A66724735B0",
+			"isa": "PBXBuildFile"
+		},
+		"5A5E2356-2077-4A7D-9102-15CCF701C51E": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeScope.h",
+			"sourceTree": "<group>"
+		},
+		"5F9FB225-D492-4580-88E8-E5EB88C00CA0": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeTime.h",
+			"sourceTree": "<group>"
+		},
+		"605A22AE-F169-4D95-BB49-4004F1871670": {
+			"fileRef": "7E75492A-DA1E-47E7-911C-89FCB61FE2A0",
+			"isa": "PBXBuildFile"
+		},
+		"616C5372-DA87-4DCA-86A2-5471C39A062C": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeNodeMacroGui.cpp",
+			"sourceTree": "<group>"
+		},
+		"6174F08B-0DCA-401D-9907-119D709C18A8": {
+			"fileRef": "14B81EB6-502E-4986-8E58-22CF3D08D5C4",
+			"isa": "PBXBuildFile"
+		},
+		"61843081-A595-4AD5-83E3-80EE9BDB988E": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeHierarchyController.cpp",
+			"sourceTree": "<group>"
+		},
+		"6256BFCD-12DD-4B61-8F81-9D9454A841A3": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeNodeModelExternalWindow.h",
+			"sourceTree": "<group>"
+		},
+		"63308BE4-E738-4D35-9FFC-EC36C90F4085": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "MacroPresetManager.cpp",
+			"sourceTree": "<group>"
+		},
+		"63E3F223-AE40-405F-9E56-338A881B9E9D": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeNodeRegistry.h",
+			"sourceTree": "<group>"
+		},
+		"6768EC25-0593-4D79-B69A-7C0AB6BB5A52": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeBaseController.cpp",
+			"sourceTree": "<group>"
+		},
+		"679D0388-6204-4827-A317-A8300167B9D5": {
+			"fileRef": "B90CB97A-7DB1-46A1-9C6C-767C35CC05E0",
+			"isa": "PBXBuildFile"
+		},
+		"68E8933C-7AB5-47C5-9ECC-CDE8CAA26716": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeCustomGuiWidgetRegistry.cpp",
+			"sourceTree": "<group>"
+		},
+		"69897EDE-2A01-4045-A673-DC4C9B46ED69": {
+			"fileRef": "6CF63917-F7F8-42A5-9EB2-3AADCCA8D6E9",
+			"isa": "PBXBuildFile"
+		},
+		"6A40A523-A4EA-40E6-B235-ED752ABA30CA": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "MacroMixerRuntime.h",
+			"sourceTree": "<group>"
+		},
+		"6BB90C65-EC9A-4BE4-85F9-E6609DF11281": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeParameter.cpp",
+			"sourceTree": "<group>"
+		},
+		"6CE24B98-D610-4658-B2EC-0624A83CD262": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "basePhasor.h",
+			"sourceTree": "<group>"
+		},
+		"6CF63917-F7F8-42A5-9EB2-3AADCCA8D6E9": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "chaoticOscillator.cpp",
+			"sourceTree": "<group>"
+		},
+		"6E0CF0B9-4FBA-48FD-B527-0F8E849571D5": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeScope.cpp",
+			"sourceTree": "<group>"
+		},
+		"6FBE2FEA-8A2F-4A77-BEC6-965717B13A77": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "curve2.cpp",
+			"sourceTree": "<group>"
+		},
+		"704E57C2-3794-4428-AF9F-FA3AAF72C4E7": {
+			"fileRef": "13B5A67F-AFEA-4589-AC18-3DF6CDB8EBCF",
+			"isa": "PBXBuildFile"
+		},
+		"7116FC97-113F-4FE2-B6C9-DA54F12D8B7D": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "basePhasor.cpp",
+			"sourceTree": "<group>"
+		},
+		"713D13B7-7AA4-449B-BFDC-B810D54978B3": {
+			"fileRef": "E31FE6AC-3561-4D24-8CF5-DCE81EE3A894",
+			"isa": "PBXBuildFile"
+		},
+		"730BC5EA-82F7-4A11-A91B-033C1C1C2032": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "frame.h",
+			"sourceTree": "<group>"
+		},
+		"7347CA34-7DBA-4171-BE5D-273B50E8DA21": {
+			"fileRef": "7116FC97-113F-4FE2-B6C9-DA54F12D8B7D",
+			"isa": "PBXBuildFile"
+		},
+		"742A55A1-D198-4CC4-ADE9-02D2C3AD6EE1": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "indexer.h",
+			"sourceTree": "<group>"
+		},
+		"75AF44EB-771D-42AC-8138-14D6046454B8": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "bufferHeaderPro.h",
+			"sourceTree": "<group>"
+		},
+		"76AFA165-124E-4C32-BB44-3D9EBC1E2FCF": {
+			"fileRef": "33FDF38E-1ED8-4409-8E8C-816233AB170C",
+			"isa": "PBXBuildFile"
+		},
+		"775DB0A8-0499-496E-90DC-F451484BF9EE": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "smoother.h",
+			"sourceTree": "<group>"
+		},
+		"78015103-F4FA-4D74-8243-C6C099800E04": {
+			"fileRef": "C007C802-C422-4FEC-8FD6-311DBAA4C704",
+			"isa": "PBXBuildFile"
+		},
+		"799B0A2A-B1EA-462C-A25B-9B174DC6FC26": {
+			"children": [
+				"250FA3D5-3B77-4E9B-A999-2A2926561ADD",
+				"57E01272-BF35-4814-87D0-5C30EA99B413",
+				"B034C33B-656E-4A6A-A3D3-4BABB6578387",
+				"C1E3FDF9-091A-4AD3-9106-3854D28AFBF3",
+				"DE05A652-3571-4FD7-80B9-3BB7680E76B7",
+				"7B8DBB13-EAAE-4F26-A7F6-357994B40DDC",
+				"6A40A523-A4EA-40E6-B235-ED752ABA30CA",
+				"932F059B-5157-4847-886F-8DCB23386D2F",
+				"9D11658D-5720-4A2C-9BF7-323662FA6DFF",
+				"37D45ECE-D09D-45AA-A1BA-BD03558DD4AA",
+				"7A8120B8-11E2-40DC-B175-8A8D051DEB68",
+				"63308BE4-E738-4D35-9FFC-EC36C90F4085",
+				"2F9BB099-EAA2-47F1-850F-DB6774E92CD6",
+				"A4B54F1F-9723-4DEA-88C3-07B5C1156CCC",
+				"DF3CA52A-B6E5-4312-92C2-FD4115671966",
+				"46E9EFC2-9B70-47E7-A05F-326D48558531",
+				"B697E013-B384-4709-B5D5-6B4512EBE6D6",
+				"E998B536-4103-4DE2-BE8A-4EA297A65934",
+				"13FD5F2D-6453-437E-BB0F-5C4C0EB79195",
+				"E3091FB4-B849-42DF-8BFE-3908C1278A3B",
+				"97830C2B-267F-4EA6-A537-9FE08EC5411A",
+				"F1BFF592-97FC-43B9-B3FC-A8592AFAF228",
+				"20AE70CD-2EB6-48D4-B46A-EC90FCD8B5B0",
+				"2E075DA5-3429-4F65-AF84-F6343E35C599",
+				"BAAC145E-E3A5-4194-97E3-5857ABB839D7",
+				"903D1EB2-7741-4372-8DD9-9B9CD70D8556",
+				"F188D124-7CD2-4D77-92DF-C07F30AB78C7",
+				"C007C802-C422-4FEC-8FD6-311DBAA4C704",
+				"99A977ED-816D-4C6A-A414-07C2B29A6E5E",
+				"458BBF12-0C00-423E-BF45-DE60E9850475",
+				"2D84536D-B4B3-44C9-9529-BF5AFAF983C8",
+				"616C5372-DA87-4DCA-86A2-5471C39A062C",
+				"E31FE6AC-3561-4D24-8CF5-DCE81EE3A894",
+				"3095F2DF-E84D-4323-896A-72870B72C34A"
+			],
+			"isa": "PBXGroup",
+			"name": "Nodes",
+			"path": "Nodes",
+			"sourceTree": "<group>"
+		},
+		"7A8120B8-11E2-40DC-B175-8A8D051DEB68": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "MacroMorphEngine.h",
+			"sourceTree": "<group>"
+		},
+		"7B8DBB13-EAAE-4F26-A7F6-357994B40DDC": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "MacroMixerRuntime.cpp",
+			"sourceTree": "<group>"
+		},
+		"7C1B7CC6-CDC8-4E86-9D15-05404F19ED94": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "reindexer.h",
+			"sourceTree": "<group>"
+		},
+		"7DB5B5E8-8134-4DF5-ADD0-2D32129BC6D7": {
+			"fileRef": "932F059B-5157-4847-886F-8DCB23386D2F",
+			"isa": "PBXBuildFile"
+		},
+		"7DC54F22-B6C2-4B29-A895-9FC5E5803836": {
+			"fileRef": "F1BFF592-97FC-43B9-B3FC-A8592AFAF228",
+			"isa": "PBXBuildFile"
+		},
+		"7E75492A-DA1E-47E7-911C-89FCB61FE2A0": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "oscillator.cpp",
+			"sourceTree": "<group>"
+		},
+		"7F311E60-AB4D-4E87-A644-6EF7F66FBBD7": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "oscillator.h",
+			"sourceTree": "<group>"
+		},
+		"8197DE9B-E3BA-4A05-A818-D3128F5AA15B": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeCustomGuiWidgetRegistry.h",
+			"sourceTree": "<group>"
+		},
+		"81C9D8D8-C390-4DE2-BA06-9C847961C67F": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeNodesController.cpp",
+			"sourceTree": "<group>"
+		},
+		"83416500-7A94-497A-848C-40CD8DC811CE": {
+			"fileRef": "E3091FB4-B849-42DF-8BFE-3908C1278A3B",
+			"isa": "PBXBuildFile"
+		},
+		"8366DFF1-2BAA-4F02-97FB-13C83FF1E230": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "beatTransport.h",
+			"sourceTree": "<group>"
+		},
+		"83B0C080-93C6-4A69-86A1-4AF294A1B8B8": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "buffer.h",
+			"sourceTree": "<group>"
+		},
+		"84A493E4-97D0-40F3-B8CD-4387B4DC8C14": {
+			"fileRef": "FFD2A5A3-B574-448D-8814-47AFB21CEF79",
+			"isa": "PBXBuildFile"
+		},
+		"84DBCD94-3B3B-4052-9405-3B6D8AA71543": {
+			"fileRef": "6BB90C65-EC9A-4BE4-85F9-E6609DF11281",
+			"isa": "PBXBuildFile"
+		},
+		"860C5D1A-792C-49DA-9E94-47EFBF8A617B": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "baseRandomGenerator.cpp",
+			"sourceTree": "<group>"
+		},
+		"86B75708-49FD-4D9C-82E1-D37EE6C25786": {
+			"fileRef": "3F69BAE3-8B80-4F6A-B922-12837C2C3930",
+			"isa": "PBXBuildFile"
+		},
+		"87340F19-4323-4C80-A425-5AB622E1FB73": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "defaultNodes.h",
+			"sourceTree": "<group>"
+		},
+		"874A209F-4D5D-495A-A4A5-DD9B4F9D126E": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeTypesRegistry.h",
+			"sourceTree": "<group>"
+		},
+		"87AC0E98-DB17-493A-B44D-D4747168BC74": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeContainer.h",
+			"sourceTree": "<group>"
+		},
+		"87CAC4E3-D926-48F3-8FF9-392E9650D7B0": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeProfilingController.cpp",
+			"sourceTree": "<group>"
+		},
+		"8992D6D1-2D04-4755-B28A-BD8B85124973": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeGlobalVariablesController.h",
+			"sourceTree": "<group>"
+		},
+		"8AE1F0F1-F91A-4BD1-A568-9F3F5FC8FF7B": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeTimeController.cpp",
+			"sourceTree": "<group>"
+		},
+		"8B0687A6-EF52-4083-845A-139586CBFB31": {
+			"fileRef": "68E8933C-7AB5-47C5-9ECC-CDE8CAA26716",
+			"isa": "PBXBuildFile"
+		},
+		"8E9A7A27-F7B5-4B70-9FD0-031D3EF7102C": {
+			"fileRef": "056F0B0D-1F26-4EA1-A570-265981F9B517",
+			"isa": "PBXBuildFile"
+		},
+		"8F1FA028-DDE0-45B7-A1DD-BC221BC5E283": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeDefaultRouting.cpp",
+			"sourceTree": "<group>"
+		},
+		"8FE77C24-FEFE-4C07-8103-BF7FFC7B3388": {
+			"fileRef": "81C9D8D8-C390-4DE2-BA06-9C847961C67F",
+			"isa": "PBXBuildFile"
+		},
+		"8FFDD1DF-48B0-4F01-A8DF-32318D2FC24A": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeAutoLayout.h",
+			"sourceTree": "<group>"
+		},
+		"903D1EB2-7741-4372-8DD9-9B9CD70D8556": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeNode.cpp",
+			"sourceTree": "<group>"
+		},
+		"90A6B555-3170-41FB-BCFE-AAEC710BCE9E": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeMidiClock.h",
+			"sourceTree": "<group>"
+		},
+		"917050C4-30EC-4121-9670-CA65ACC4F7FA": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeCustomGuiValueWidgets.cpp",
+			"sourceTree": "<group>"
+		},
+		"91E223F0-CCC4-479C-945B-A863B49651D1": {
+			"fileRef": "6768EC25-0593-4D79-B69A-7C0AB6BB5A52",
+			"isa": "PBXBuildFile"
+		},
+		"9276805E-7DBB-47A7-A3B4-121E9AE8F2FE": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeCustomGuiBuiltinWidgets.h",
+			"sourceTree": "<group>"
+		},
+		"932F059B-5157-4847-886F-8DCB23386D2F": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "MacroMixerSource.cpp",
+			"sourceTree": "<group>"
+		},
+		"93C374B5-9AC9-44F8-9BFA-C1C1D84260F8": {
+			"fileRef": "860C5D1A-792C-49DA-9E94-47EFBF8A617B",
+			"isa": "PBXBuildFile"
+		},
+		"95616B51-D909-4C99-BBD1-DD13E95B3F8F": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "baseOscillator.cpp",
+			"sourceTree": "<group>"
+		},
+		"96AAFE8A-47AD-4225-8038-F3E674300262": {
+			"fileRef": "15F5B1D8-0FBA-4B74-9B7B-254A4D8A67B8",
+			"isa": "PBXBuildFile"
+		},
+		"96C5B0C9-4697-4A63-B5EE-38B301353432": {
+			"children": [
+				"1638B488-CF44-40DC-AADB-1475AEF0DC69",
+				"FC6CDEAF-E6BD-4F9F-B31A-32ABAD8E0730",
+				"6FBE2FEA-8A2F-4A77-BEC6-965717B13A77",
+				"13BA7580-8FC7-4459-833C-10ED39DDD358",
+				"AEED5CF8-0322-4D5B-B649-46B3472DEDAD",
+				"35246642-AC92-43A6-9A1F-7BDB98F64C4E",
+				"13B5A67F-AFEA-4589-AC18-3DF6CDB8EBCF",
+				"A9CC7439-6934-4DE5-9D65-30B5BC3FFECF",
+				"15F5B1D8-0FBA-4B74-9B7B-254A4D8A67B8",
+				"7C1B7CC6-CDC8-4E86-9D15-05404F19ED94",
+				"3677E57E-A630-4493-83F3-2442856FABE6",
+				"775DB0A8-0499-496E-90DC-F451484BF9EE",
+				"FC087D26-2FA9-43C4-BE2A-7708DA6E843D",
+				"58C658AC-4946-475A-A1F6-41CEBF6F07DE"
+			],
+			"isa": "PBXGroup",
+			"name": "Modifiers",
+			"path": "Modifiers",
+			"sourceTree": "<group>"
+		},
+		"9717FD7D-F145-47B4-A0F9-D3AC073DE36E": {
+			"fileRef": "DA63B9F8-6958-44A2-884A-FB636F9F24FA",
+			"isa": "PBXBuildFile"
+		},
+		"973F563B-D364-48CB-83BB-9A183687BF6F": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeInspectorController.h",
+			"sourceTree": "<group>"
+		},
+		"97830C2B-267F-4EA6-A537-9FE08EC5411A": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "MacroSnapshotSystem.h",
+			"sourceTree": "<group>"
+		},
+		"9951F687-0DC0-46C6-91F6-49CDB7D4D555": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "baseOscillator.h",
+			"sourceTree": "<group>"
+		},
+		"99A977ED-816D-4C6A-A414-07C2B29A6E5E": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeNodeGui.h",
+			"sourceTree": "<group>"
+		},
+		"9A9B6B17-953B-4DC3-B025-0CBAD91242E0": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanode.h",
+			"sourceTree": "<group>"
+		},
+		"9B25CE5B-E8F8-44A9-AD24-83757C85C820": {
+			"fileRef": "2E024AC9-D2D4-462E-83E9-69C43E18A69C",
+			"isa": "PBXBuildFile"
+		},
+		"9C09C225-715E-414B-A227-10000FE65CD1": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeRequesty.h",
+			"sourceTree": "<group>"
+		},
+		"9C6EE0C9-46F9-4CA0-A8EA-0013C737DEC1": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeCustomGuiWidgetHelpers.h",
+			"sourceTree": "<group>"
+		},
+		"9CE14394-34C0-4249-AAD7-1A66724735B0": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeMidiClock.cpp",
+			"sourceTree": "<group>"
+		},
+		"9D11658D-5720-4A2C-9BF7-323662FA6DFF": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "MacroMixerSource.h",
+			"sourceTree": "<group>"
+		},
+		"9D127A16-4479-45F7-A4C2-0587A189084E": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeMiniMapController.h",
+			"sourceTree": "<group>"
+		},
+		"9D61F1F0-C9EA-4A7A-BF84-A9811D344FD0": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeCustomGuiArrayWidgets.h",
+			"sourceTree": "<group>"
+		},
+		"A28C79BB-4B8A-4E5B-9E7A-AAA0FB298559": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeCanvas.h",
+			"sourceTree": "<group>"
+		},
+		"A4B54F1F-9723-4DEA-88C3-07B5C1156CCC": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "MacroRouterManager.cpp",
+			"sourceTree": "<group>"
+		},
+		"A70C996C-2891-4C6E-98B4-7404D21A02AF": {
+			"fileRef": "61843081-A595-4AD5-83E3-80EE9BDB988E",
+			"isa": "PBXBuildFile"
+		},
+		"A912B475-C114-4435-A21D-2A56EC161280": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeProfiler.h",
+			"sourceTree": "<group>"
+		},
+		"A958233A-566D-4BC2-A228-E471E36310AA": {
+			"fileRef": "461391CD-E85C-4F70-8E17-DE30059F8B26",
+			"isa": "PBXBuildFile"
+		},
+		"A9732814-DF9E-4F45-8908-05BA56614758": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeTime.cpp",
+			"sourceTree": "<group>"
+		},
+		"A9CC7439-6934-4DE5-9D65-30B5BC3FFECF": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ranger.h",
+			"sourceTree": "<group>"
+		},
+		"AA174DB5-F4D9-4E25-AD9A-94D9F0BEE1D9": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "phasor.cpp",
+			"sourceTree": "<group>"
+		},
+		"AEED5CF8-0322-4D5B-B649-46B3472DEDAD": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "mapper.cpp",
+			"sourceTree": "<group>"
+		},
+		"AF7D6277-B162-42CE-8C9B-F61B19E26776": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeMidiClockCore.h",
+			"sourceTree": "<group>"
+		},
+		"AF9A31E2-1DBE-4D1E-A8C2-85A45D448349": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeCustomGuiBuiltinWidgets.cpp",
+			"sourceTree": "<group>"
+		},
+		"B034C33B-656E-4A6A-A3D3-4BABB6578387": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "MacroDialogAppearance.h",
+			"sourceTree": "<group>"
+		},
+		"B2A64C3F-F49B-4D4F-B432-A3A99B3E4EC6": {
+			"fileRef": "FEF2D0A4-3ED1-4718-86C0-357B475175B0",
+			"isa": "PBXBuildFile"
+		},
+		"B67EC6FE-3B2F-4D56-B208-06A76ECA682B": {
+			"children": [
+				"6CF63917-F7F8-42A5-9EB2-3AADCCA8D6E9",
+				"CADAB6F9-5861-4566-85D0-4824005CD8B7",
+				"BAA0DDA0-8232-43B6-9A3A-DB2B4F3D1072",
+				"742A55A1-D198-4CC4-ADE9-02D2C3AD6EE1",
+				"B90CB97A-7DB1-46A1-9C6C-767C35CC05E0",
+				"C27CBC89-32C7-4DBC-8D25-F00F0DEC2FED",
+				"567E067D-F957-489B-B498-93BA4919907C",
+				"7E75492A-DA1E-47E7-911C-89FCB61FE2A0",
+				"7F311E60-AB4D-4E87-A644-6EF7F66FBBD7",
+				"AA174DB5-F4D9-4E25-AD9A-94D9F0BEE1D9",
+				"CCA6816B-A3E0-41F1-A315-1355FFF7AEC8",
+				"CFC3C094-BBD7-47BF-AF23-DCF6FC000287",
+				"176E79E8-23C9-4B1C-9A98-F4970339338D"
+			],
+			"isa": "PBXGroup",
+			"name": "Generators",
+			"path": "Generators",
+			"sourceTree": "<group>"
+		},
+		"B67EF8D3-000C-4839-930B-5497622C2989": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeHelp.cpp",
+			"sourceTree": "<group>"
+		},
+		"B697E013-B384-4709-B5D5-6B4512EBE6D6": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "MacroRouterSortOrder.h",
+			"sourceTree": "<group>"
+		},
+		"B7927355-3224-48F7-A3E9-584BCE97B14D": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeDeterministicRandom.h",
+			"sourceTree": "<group>"
+		},
+		"B8675AEF-6FA4-43EC-91B5-6CE482C423F0": {
+			"fileRef": "87CAC4E3-D926-48F3-8FF9-392E9650D7B0",
+			"isa": "PBXBuildFile"
+		},
+		"B8ABC508-89FD-4895-BD7F-4ECD20A439A3": {
+			"fileRef": "8F1FA028-DDE0-45B7-A1DD-BC221BC5E283",
+			"isa": "PBXBuildFile"
+		},
+		"B90CB97A-7DB1-46A1-9C6C-767C35CC05E0": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "midiClockNode.cpp",
+			"sourceTree": "<group>"
+		},
+		"B96C72F8-8B23-4E20-88C7-0CAC8C4A4971": {
+			"fileRef": "40927E3A-CD92-41E8-85CC-685392F001ED",
+			"isa": "PBXBuildFile"
+		},
+		"B97ABECF-A65D-4D28-96F8-208E5C72FB7C": {
+			"fileRef": "2D56447A-A7B3-4144-9E15-43DAD4E753FC",
+			"isa": "PBXBuildFile"
+		},
+		"BAA0DDA0-8232-43B6-9A3A-DB2B4F3D1072": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "indexer.cpp",
+			"sourceTree": "<group>"
+		},
+		"BAAC145E-E3A5-4194-97E3-5857ABB839D7": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeMacroMixer.h",
+			"sourceTree": "<group>"
+		},
+		"BB4B014C10F69532006C3DED": {
+			"children": [
+				"0ED60EB9-8E22-4EBA-B382-D5E6445C3462"
+			],
+			"isa": "PBXGroup",
+			"name": "addons",
+			"path": "../../../addons",
+			"sourceTree": "SOURCE_ROOT"
+		},
+		"BCF26C39-8696-4B12-9AEB-68E8A1FB6E5A": {
+			"fileRef": "C2077EFA-6E8E-46CD-B927-0DAC8952512A",
+			"isa": "PBXBuildFile"
+		},
+		"C007C802-C422-4FEC-8FD6-311DBAA4C704": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeNodeGui.cpp",
+			"sourceTree": "<group>"
+		},
+		"C03E3397-0C96-4BA3-AB78-13DBA97A12CD": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeScheduling.h",
+			"sourceTree": "<group>"
+		},
+		"C15E57ED-6D87-4877-9EF3-95ACB2EBF605": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "baseChaoticOscillator.h",
+			"sourceTree": "<group>"
+		},
+		"C1C4B84E-E8F4-4433-BF1E-76D3CF2ADB3A": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "baseIndexer.h",
+			"sourceTree": "<group>"
+		},
+		"C1E3FDF9-091A-4AD3-9106-3854D28AFBF3": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "MacroMixerMixing.cpp",
+			"sourceTree": "<group>"
+		},
+		"C2077EFA-6E8E-46CD-B927-0DAC8952512A": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeMiniMapController.cpp",
+			"sourceTree": "<group>"
+		},
+		"C27CBC89-32C7-4DBC-8D25-F00F0DEC2FED": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "midiClockNode.h",
+			"sourceTree": "<group>"
+		},
+		"C2C213F1-FA80-41B4-82CC-E85AA00A6C5F": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeHelp.h",
+			"sourceTree": "<group>"
+		},
+		"C5CDC99B-EDDE-48F3-922E-2B25D39C8106": {
+			"fileRef": "37D45ECE-D09D-45AA-A1BA-BD03558DD4AA",
+			"isa": "PBXBuildFile"
+		},
+		"C8B23684-1B12-4135-ABB4-EBE34F6420D2": {
+			"fileRef": "3E0066D9-D6EE-4257-BF5B-7D863BA136A3",
+			"isa": "PBXBuildFile"
+		},
+		"C8D2FAF1-E6E1-41B9-AF50-DB11442711BD": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeProportionalDocking.h",
+			"sourceTree": "<group>"
+		},
+		"C9B95555-3ED3-48E4-894B-84ED08DC2D46": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeCustomGuiStaticWidgets.h",
+			"sourceTree": "<group>"
+		},
+		"CA814EF0-CB06-4321-A003-6175AAEB017B": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "baseChaoticOscillator.cpp",
+			"sourceTree": "<group>"
+		},
+		"CADAB6F9-5861-4566-85D0-4824005CD8B7": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "chaoticOscillator.h",
+			"sourceTree": "<group>"
+		},
+		"CCA6816B-A3E0-41F1-A315-1355FFF7AEC8": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "phasor.h",
+			"sourceTree": "<group>"
+		},
+		"CFC3C094-BBD7-47BF-AF23-DCF6FC000287": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "randomGenerator.cpp",
+			"sourceTree": "<group>"
+		},
+		"CFCBCFE6-1371-4B51-BC3F-AB22D0E0E2F3": {
+			"fileRef": "AF9A31E2-1DBE-4D1E-A8C2-85A45D448349",
+			"isa": "PBXBuildFile"
+		},
+		"D2A7CEB5-1DD5-4F99-A872-5A2CD506AB7A": {
+			"fileRef": "07F6D1A7-F2D4-4A6C-B6A7-092183D22F75",
+			"isa": "PBXBuildFile"
+		},
+		"D2B937D7-9F24-4F59-A8C8-F709CDC996AB": {
+			"children": [
+				"FE1436BF-5FF8-478F-9F65-61DDBE76DC0C",
+				"9D61F1F0-C9EA-4A7A-BF84-A9811D344FD0",
+				"07F6D1A7-F2D4-4A6C-B6A7-092183D22F75",
+				"D5D967CF-AEE7-4933-B0C5-6F9F9F9E2311",
+				"4C2C3BDD-947E-4A7B-913F-8627EA02A5A2",
+				"C9B95555-3ED3-48E4-894B-84ED08DC2D46",
+				"917050C4-30EC-4121-9670-CA65ACC4F7FA",
+				"0EB42ADB-896F-497D-9B1C-DE01EC0BDA75",
+				"9C6EE0C9-46F9-4CA0-A8EA-0013C737DEC1"
+			],
+			"isa": "PBXGroup",
+			"name": "Widgets",
+			"path": "Widgets",
+			"sourceTree": "<group>"
+		},
+		"D5D967CF-AEE7-4933-B0C5-6F9F9F9E2311": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeCustomGuiSignalWidgets.h",
+			"sourceTree": "<group>"
+		},
+		"D5F37F12-4AA1-48CB-8C3C-3F37290581E2": {
+			"fileRef": "7B8DBB13-EAAE-4F26-A7F6-357994B40DDC",
+			"isa": "PBXBuildFile"
+		},
+		"D63C16C5-C606-4096-88DF-59735E14A3EE": {
+			"children": [
+				"460060EB-4E7F-4630-A5EA-6A443B40CA7A",
+				"3254AF80-1346-468F-8529-1D8F045D0153"
+			],
+			"isa": "PBXGroup",
+			"name": "Connections",
+			"path": "Connections",
+			"sourceTree": "<group>"
+		},
+		"D6B80398-25A4-4F32-B225-D4CE12EF73FE": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeTransport.h",
+			"sourceTree": "<group>"
+		},
+		"D6E8C83D-A7EC-44E0-B62F-1443D88AA1CB": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeCustomGuiPanel.h",
+			"sourceTree": "<group>"
+		},
+		"D95B6EB9-8299-4982-A665-4EAA12479C5A": {
+			"children": [
+				"3C537F7F-410D-4B24-AE4A-4C029EC60F64",
+				"05BFF01E-874F-4E9D-9A6D-BA4F176A90E6",
+				"6768EC25-0593-4D79-B69A-7C0AB6BB5A52",
+				"DF90C969-BEFF-4AFD-8E90-F1022D6647E2",
+				"5141E21D-7C51-4D2D-AF59-FAA7AB40204D",
+				"01F6B8BD-A441-4CF6-B9E8-0B3DCE2EF34E",
+				"40927E3A-CD92-41E8-85CC-685392F001ED",
+				"8992D6D1-2D04-4755-B28A-BD8B85124973",
+				"61843081-A595-4AD5-83E3-80EE9BDB988E",
+				"3412C0C8-DABF-48EC-AAA7-000CA989551A",
+				"46EC05C2-0D08-467D-A587-4B670EF2E3A9",
+				"973F563B-D364-48CB-83BB-9A183687BF6F",
+				"30BBA1A2-1228-42F3-B872-2D087B6DA644",
+				"C2077EFA-6E8E-46CD-B927-0DAC8952512A",
+				"9D127A16-4479-45F7-A4C2-0587A189084E",
+				"81C9D8D8-C390-4DE2-BA06-9C847961C67F",
+				"3ECA79D8-ACC4-4527-8103-BC58448EF397",
+				"0933F6A6-07CD-4637-85F8-442241460E13",
+				"21539A29-7C88-4683-ABE2-D1556E667B26",
+				"87CAC4E3-D926-48F3-8FF9-392E9650D7B0",
+				"2E024AC9-D2D4-462E-83E9-69C43E18A69C",
+				"02290F01-C700-4971-BE8E-F22F00E312F0",
+				"8AE1F0F1-F91A-4BD1-A568-9F3F5FC8FF7B",
+				"1CFCEEF2-23D1-45BE-9856-94F4BB64B73A"
+			],
+			"isa": "PBXGroup",
+			"name": "Controls",
+			"path": "Controls",
+			"sourceTree": "<group>"
+		},
+		"D961CB80-4C35-4051-B062-948A383239DE": {
+			"fileRef": "4C2C3BDD-947E-4A7B-913F-8627EA02A5A2",
+			"isa": "PBXBuildFile"
+		},
+		"DA63B9F8-6958-44A2-884A-FB636F9F24FA": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeCustomGuiPanel.cpp",
+			"sourceTree": "<group>"
+		},
+		"DE05A652-3571-4FD7-80B9-3BB7680E76B7": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "MacroMixerMixing.h",
+			"sourceTree": "<group>"
+		},
+		"DE1B1656-E921-439A-9C38-AB8A093D29F7": {
+			"children": [
+				"F41FA80A-C654-4381-AEFA-1E577821B68F",
+				"A912B475-C114-4435-A21D-2A56EC161280"
+			],
+			"isa": "PBXGroup",
+			"name": "Profiling",
+			"path": "Profiling",
+			"sourceTree": "<group>"
+		},
+		"DF3CA52A-B6E5-4312-92C2-FD4115671966": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "MacroRouterManager.h",
+			"sourceTree": "<group>"
+		},
+		"DF90C969-BEFF-4AFD-8E90-F1022D6647E2": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeBaseController.h",
+			"sourceTree": "<group>"
+		},
+		"E3091FB4-B849-42DF-8BFE-3908C1278A3B": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "MacroSnapshotSystem.cpp",
+			"sourceTree": "<group>"
+		},
+		"E31FE6AC-3561-4D24-8CF5-DCE81EE3A894": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeNodeModel.cpp",
+			"sourceTree": "<group>"
+		},
+		"E42962A92163ECCD00A6A9E2": {
+			"alwaysOutOfDate": "1",
+			"buildActionMask": "2147483647",
+			"files": [],
+			"inputPaths": [],
+			"isa": "PBXShellScriptBuildPhase",
+			"name": "Run Script \u2014 Compile OF",
+			"outputPaths": [],
+			"runOnlyForDeploymentPostprocessing": "0",
+			"shellPath": "/bin/sh",
+			"shellScript": "$OF_CORE_BUILD_COMMAND\n",
+			"showEnvVarsInLog": "0"
+		},
+		"E483A580-7B25-4846-AF0C-9255D6F17C58": {
+			"fileRef": "3C22A81A-6600-4679-8B65-CE13BE7210A2",
+			"isa": "PBXBuildFile"
+		},
+		"E4A5B60F29BAAAE400C2D356": {
+			"buildActionMask": "2147483647",
+			"dstPath": "",
+			"dstSubfolderSpec": "6",
+			"files": [],
+			"isa": "PBXCopyFilesBuildPhase",
+			"runOnlyForDeploymentPostprocessing": "0"
+		},
+		"E4B69B4A0A3A1720003C02F2": {
+			"children": [
+				"191CD6FA2847E21E0085CBB6",
+				"E4B6FCAD0C3E899E008CF71C",
+				"E4EB6923138AFD0F00A09F29",
+				"E4B69E1C0A3A1BDC003C02F2",
+				"191EF70929D778A400F35F26",
+				"BB4B014C10F69532006C3DED",
+				"E4B69B5B0A3A1756003C02F2",
+				"4AB530EF-FC80-4C4C-ABF1-8DF9E2E5DBF0"
+			],
+			"isa": "PBXGroup",
+			"sourceTree": "<group>"
+		},
+		"E4B69B4C0A3A1720003C02F2": {
+			"attributes": {
+				"BuildIndependentTargetsInParallel": "YES",
+				"LastUpgradeCheck": "1540"
+			},
+			"buildConfigurationList": "E4B69B4D0A3A1720003C02F2",
+			"compatibilityVersion": "Xcode 3.2",
+			"developmentRegion": "en",
+			"hasScannedForEncodings": "0",
+			"isa": "PBXProject",
+			"knownRegions": [
+				"en",
+				"Base"
+			],
+			"mainGroup": "E4B69B4A0A3A1720003C02F2",
+			"productRefGroup": "E4B69B4A0A3A1720003C02F2",
+			"projectDirPath": "",
+			"projectRoot": "",
+			"targets": [
+				"E4B69B5A0A3A1756003C02F2"
+			]
+		},
+		"E4B69B4D0A3A1720003C02F2": {
+			"buildConfigurations": [
+				"E4B69B4E0A3A1720003C02F2",
+				"E4B69B4F0A3A1720003C02F2"
+			],
+			"defaultConfigurationIsVisible": "0",
+			"defaultConfigurationName": "Release",
+			"isa": "XCConfigurationList"
+		},
+		"E4B69B4E0A3A1720003C02F2": {
+			"baseConfigurationReference": "E4EB6923138AFD0F00A09F29",
+			"buildSettings": {
+				"CODE_SIGN_ENTITLEMENTS": "of.entitlements",
+				"COPY_PHASE_STRIP": "NO",
+				"ENABLE_TESTABILITY": "YES",
+				"GCC_OPTIMIZATION_LEVEL": "0",
+				"GCC_WARN_UNUSED_VARIABLE": "NO",
+				"HEADER_SEARCH_PATHS": [
 					"$(OF_CORE_HEADERS)",
-					src,
-					../../../addons/ofxAubio/libs,
-					../../../addons/ofxAubio/libs/aubio,
-					../../../addons/ofxAubio/src,
-					../../../addons/ofxDatGui_PM/src,
-					../../../addons/ofxDatGui_PM/src/components,
-					../../../addons/ofxDatGui_PM/src/core,
-					../../../addons/ofxDatGui_PM/src/libs,
-					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
-					../../../addons/ofxDatGui_PM/src/themes,
-					../../../addons/ofxOceanode/src,
-					../../../addons/ofxOceanode/src/Connections,
-					../../../addons/ofxOceanode/src/Controls,
-					../../../addons/ofxOceanode/src/Managers,
-					../../../addons/ofxOceanode/src/Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers,
-				);
-				MACOSX_DEPLOYMENT_TARGET = 10.9;
-				OTHER_CPLUSPLUSFLAGS = (
-					"-D__MACOSX_CORE__",
-					"-mtune=native",
-				);
-				SDKROOT = macosx;
-			};
-			name = AppStore;
-		};
-		99FA3DBC1C7456C400CFA0EE /* AppStore */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = E4EB6923138AFD0F00A09F29 /* Project.xcconfig */;
-			buildSettings = {
-				COMBINE_HIDPI_IMAGES = YES;
-				COPY_PHASE_STRIP = YES;
-				FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					../../../addons/ofxAubio/libs/aubio/,
-				);
-				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
-				GCC_MODEL_TUNING = NONE;
-				GCC_PREPROCESSOR_DEFINITIONS = OFXOCEANODE_USE_BPM_DETECTION;
-				"GCC_PREPROCESSOR_DEFINITIONS[arch=*]" = "APPSTORE=1";
-				HEADER_SEARCH_PATHS = (
+					"src"
+				],
+				"OTHER_CPLUSPLUSFLAGS": "-D__MACOSX_CORE__"
+			},
+			"isa": "XCBuildConfiguration",
+			"name": "Debug"
+		},
+		"E4B69B4F0A3A1720003C02F2": {
+			"baseConfigurationReference": "E4EB6923138AFD0F00A09F29",
+			"buildSettings": {
+				"CODE_SIGN_ENTITLEMENTS": "of.entitlements",
+				"COPY_PHASE_STRIP": "YES",
+				"GCC_OPTIMIZATION_LEVEL": "3",
+				"GCC_UNROLL_LOOPS": "YES",
+				"HEADER_SEARCH_PATHS": [
 					"$(OF_CORE_HEADERS)",
-					src,
-					../../../addons/ofxAubio/libs,
-					../../../addons/ofxAubio/libs/aubio,
-					../../../addons/ofxAubio/src,
-					../../../addons/ofxDatGui_PM/src,
-					../../../addons/ofxDatGui_PM/src/components,
-					../../../addons/ofxDatGui_PM/src/core,
-					../../../addons/ofxDatGui_PM/src/libs,
-					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
-					../../../addons/ofxDatGui_PM/src/themes,
-					../../../addons/ofxOceanode/src,
-					../../../addons/ofxOceanode/src/Connections,
-					../../../addons/ofxOceanode/src/Controls,
-					../../../addons/ofxOceanode/src/Managers,
-					../../../addons/ofxOceanode/src/Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers,
-				);
-				ICON = "$(ICON_NAME_RELEASE)";
-				ICON_FILE = "$(ICON_FILE_PATH)$(ICON)";
-				INFOPLIST_FILE = "openFrameworks-Info.plist";
-				INSTALL_PATH = /Applications;
-				LIBRARY_SEARCH_PATHS = "$(inherited)";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				WRAPPER_EXTENSION = app;
-				baseConfigurationReference = E4EB6923138AFD0F00A09F29;
-			};
-			name = AppStore;
-		};
-		E4B69B4E0A3A1720003C02F2 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = E4EB6923138AFD0F00A09F29 /* Project.xcconfig */;
-			buildSettings = {
-				CONFIGURATION_BUILD_DIR = "$(SRCROOT)/bin/";
-				COPY_PHASE_STRIP = NO;
-				DEAD_CODE_STRIPPING = YES;
-				GCC_AUTO_VECTORIZATION = YES;
-				GCC_ENABLE_SSE3_EXTENSIONS = YES;
-				GCC_ENABLE_SUPPLEMENTAL_SSE3_INSTRUCTIONS = YES;
-				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
-				GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS = YES;
-				GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO = NO;
-				GCC_WARN_ALLOW_INCOMPLETE_PROTOCOL = NO;
-				GCC_WARN_UNINITIALIZED_AUTOS = NO;
-				GCC_WARN_UNUSED_VALUE = NO;
-				GCC_WARN_UNUSED_VARIABLE = NO;
-				HEADER_SEARCH_PATHS = (
+					"src"
+				],
+				"OTHER_CPLUSPLUSFLAGS": "-D__MACOSX_CORE__"
+			},
+			"isa": "XCBuildConfiguration",
+			"name": "Release"
+		},
+		"E4B69B580A3A1756003C02F2": {
+			"buildActionMask": "2147483647",
+			"files": [
+				"E4B69E200A3A1BDC003C02F2",
+				"E4B69E210A3A1BDC003C02F2",
+				"1CB26EA2-3271-4875-A9FC-377F2E9CBA4C",
+				"91E223F0-CCC4-479C-945B-A863B49651D1",
+				"5115C600-E7B6-4590-88D9-A922547AA7C2",
+				"B96C72F8-8B23-4E20-88C7-0CAC8C4A4971",
+				"A70C996C-2891-4C6E-98B4-7404D21A02AF",
+				"4E51ED84-DBC4-4042-A0DD-98F7908CDDAE",
+				"BCF26C39-8696-4B12-9AEB-68E8A1FB6E5A",
+				"8FE77C24-FEFE-4C07-8103-BF7FFC7B3388",
+				"339C314D-8478-4264-B94D-217FC2E7E450",
+				"B8675AEF-6FA4-43EC-91B5-6CE482C423F0",
+				"9B25CE5B-E8F8-44A9-AD24-83757C85C820",
+				"F088D204-DC0C-4DBE-8D14-A3F03B767359",
+				"F8A233EF-58C4-4F8C-8B23-17950B9936A2",
+				"D2A7CEB5-1DD5-4F99-A872-5A2CD506AB7A",
+				"D961CB80-4C35-4051-B062-948A383239DE",
+				"5703D377-AB43-42AB-BA27-E4A98034B89B",
+				"CFCBCFE6-1371-4B51-BC3F-AB22D0E0E2F3",
+				"9717FD7D-F145-47B4-A0F9-D3AC073DE36E",
+				"8B0687A6-EF52-4083-845A-139586CBFB31",
+				"6174F08B-0DCA-401D-9907-119D709C18A8",
+				"76AFA165-124E-4C32-BB44-3D9EBC1E2FCF",
+				"C8B23684-1B12-4135-ABB4-EBE34F6420D2",
+				"F248B0C2-6B59-40E8-9B9D-E6E64C92B044",
+				"59C1D481-4C91-42B3-BEEA-7C70479A0C2A",
+				"405C68D2-F6D6-44DE-8F39-87C022452D15",
+				"4F1C0543-405A-43F0-9B4C-DEC7B87D873A",
+				"84A493E4-97D0-40F3-B8CD-4387B4DC8C14",
+				"B2A64C3F-F49B-4D4F-B432-A3A99B3E4EC6",
+				"339F3BBF-94ED-44C0-90CD-DB1E86D2C13E",
+				"E74C1E04-2E84-4616-83B7-11EA2884FEEE",
+				"A958233A-566D-4BC2-A228-E471E36310AA",
+				"263E1B25-94F1-4C28-8026-0EBEEED5C751",
+				"7347CA34-7DBA-4171-BE5D-273B50E8DA21",
+				"93C374B5-9AC9-44F8-9BFA-C1C1D84260F8",
+				"69897EDE-2A01-4045-A673-DC4C9B46ED69",
+				"3270F09A-8CD9-444E-B790-43B6A308A7D7",
+				"679D0388-6204-4827-A317-A8300167B9D5",
+				"605A22AE-F169-4D95-BB49-4004F1871670",
+				"FA60445E-762B-4889-ABAA-1080C99FA5C0",
+				"2454786B-5B69-44F8-8628-445E80C6FDC6",
+				"22CB9B86-CFE5-4DE1-A998-0CB08F43C30F",
+				"446E2805-E891-4A2F-8284-D522D4AC52CC",
+				"5890726A-91DA-4611-8D55-41E919E5BEAD",
+				"704E57C2-3794-4428-AF9F-FA3AAF72C4E7",
+				"96AAFE8A-47AD-4225-8038-F3E674300262",
+				"0D1D1046-8EDF-42FA-8182-E642610F5C1E",
+				"08A4286B-CFA1-4559-B511-10AE098B7E6E",
+				"0E0F2BA9-7A73-48D2-9EFB-DB0490F5E475",
+				"86B75708-49FD-4D9C-82E1-D37EE6C25786",
+				"1D49FFAC-6180-4C2B-A852-DC2A426065EE",
+				"D5F37F12-4AA1-48CB-8C3C-3F37290581E2",
+				"7DB5B5E8-8134-4DF5-ADD0-2D32129BC6D7",
+				"C5CDC99B-EDDE-48F3-922E-2B25D39C8106",
+				"190387C9-34C8-4024-9360-284944AB9FB7",
+				"26BAD6F8-7F35-4EAF-8636-3AA10CEEE9F4",
+				"37FF7098-75CD-47CF-8E35-BA6DA8A234C6",
+				"2CC28B8E-218D-40A1-86D9-39ADBE7822B7",
+				"83416500-7A94-497A-848C-40CD8DC811CE",
+				"7DC54F22-B6C2-4B29-A895-9FC5E5803836",
+				"4B0577D5-F6C0-4C4F-9C0B-3C4003846B13",
+				"1A67891F-2B7B-44C1-A1F7-431E1C3F2DF2",
+				"78015103-F4FA-4D74-8243-C6C099800E04",
+				"13E28123-22A9-4089-A62B-D581DB51D990",
+				"2D7C6C90-1D97-4C81-938F-E938067E09FB",
+				"713D13B7-7AA4-449B-BFDC-B810D54978B3",
+				"F1A2BDA1-6866-4F18-B362-6B148DD27297",
+				"E483A580-7B25-4846-AF0C-9255D6F17C58",
+				"8E9A7A27-F7B5-4B70-9FD0-031D3EF7102C",
+				"B8ABC508-89FD-4895-BD7F-4ECD20A439A3",
+				"B97ABECF-A65D-4D28-96F8-208E5C72FB7C",
+				"84DBCD94-3B3B-4052-9405-3B6D8AA71543",
+				"3A02B5D0-CE82-4D90-BA3C-8860BF049F0B"
+			],
+			"isa": "PBXSourcesBuildPhase",
+			"runOnlyForDeploymentPostprocessing": "0"
+		},
+		"E4B69B590A3A1756003C02F2": {
+			"buildActionMask": "2147483647",
+			"files": [],
+			"isa": "PBXFrameworksBuildPhase",
+			"runOnlyForDeploymentPostprocessing": "0"
+		},
+		"E4B69B5A0A3A1756003C02F2": {
+			"buildConfigurationList": "E4B69B5F0A3A1757003C02F2",
+			"buildPhases": [
+				"E42962A92163ECCD00A6A9E2",
+				"E4B69B580A3A1756003C02F2",
+				"E4B69B590A3A1756003C02F2",
+				"E4C2427710CC5ABF004149E2",
+				"E4A5B60F29BAAAE400C2D356",
+				"19B789C429E5AB4A0082E9B8"
+			],
+			"buildRules": [],
+			"dependencies": [],
+			"isa": "PBXNativeTarget",
+			"name": "example_bpm_detection",
+			"productName": "myOFApp",
+			"productReference": "E4B69B5B0A3A1756003C02F2",
+			"productType": "com.apple.product-type.application"
+		},
+		"E4B69B5B0A3A1756003C02F2": {
+			"explicitFileType": "wrapper.application",
+			"includeInIndex": "0",
+			"isa": "PBXFileReference",
+			"path": "example_bpm_detectionDebug.app",
+			"sourceTree": "BUILT_PRODUCTS_DIR"
+		},
+		"E4B69B5F0A3A1757003C02F2": {
+			"buildConfigurations": [
+				"E4B69B600A3A1757003C02F2",
+				"E4B69B610A3A1757003C02F2"
+			],
+			"defaultConfigurationIsVisible": "0",
+			"defaultConfigurationName": "Release",
+			"isa": "XCConfigurationList"
+		},
+		"E4B69B600A3A1757003C02F2": {
+			"baseConfigurationReference": "E4EB6923138AFD0F00A09F29",
+			"buildSettings": {
+				"ARCHS": "$(ARCHS_STANDARD)",
+				"COPY_PHASE_STRIP": "NO",
+				"FRAMEWORK_SEARCH_PATHS": "$(inherited)",
+				"GCC_DYNAMIC_NO_PIC": "NO",
+				"HEADER_SEARCH_PATHS": [
 					"$(OF_CORE_HEADERS)",
-					src,
-					../../../addons/ofxAubio/libs,
-					../../../addons/ofxAubio/libs/aubio,
-					../../../addons/ofxAubio/src,
-					../../../addons/ofxDatGui_PM/src,
-					../../../addons/ofxDatGui_PM/src/components,
-					../../../addons/ofxDatGui_PM/src/core,
-					../../../addons/ofxDatGui_PM/src/libs,
-					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
-					../../../addons/ofxDatGui_PM/src/themes,
-					../../../addons/ofxOceanode/src,
-					../../../addons/ofxOceanode/src/Connections,
-					../../../addons/ofxOceanode/src/Controls,
-					../../../addons/ofxOceanode/src/Managers,
-					../../../addons/ofxOceanode/src/Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers,
-				);
-				MACOSX_DEPLOYMENT_TARGET = 10.9;
-				ONLY_ACTIVE_ARCH = YES;
-				OTHER_CPLUSPLUSFLAGS = (
-					"-D__MACOSX_CORE__",
-					"-mtune=native",
-				);
-				SDKROOT = macosx;
-			};
-			name = Debug;
-		};
-		E4B69B4F0A3A1720003C02F2 /* Release */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = E4EB6923138AFD0F00A09F29 /* Project.xcconfig */;
-			buildSettings = {
-				CONFIGURATION_BUILD_DIR = "$(SRCROOT)/bin/";
-				COPY_PHASE_STRIP = YES;
-				DEAD_CODE_STRIPPING = YES;
-				GCC_AUTO_VECTORIZATION = YES;
-				GCC_ENABLE_SSE3_EXTENSIONS = YES;
-				GCC_ENABLE_SUPPLEMENTAL_SSE3_INSTRUCTIONS = YES;
-				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
-				GCC_OPTIMIZATION_LEVEL = 3;
-				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
-				GCC_UNROLL_LOOPS = YES;
-				GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS = YES;
-				GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO = NO;
-				GCC_WARN_ALLOW_INCOMPLETE_PROTOCOL = NO;
-				GCC_WARN_UNINITIALIZED_AUTOS = NO;
-				GCC_WARN_UNUSED_VALUE = NO;
-				GCC_WARN_UNUSED_VARIABLE = NO;
-				HEADER_SEARCH_PATHS = (
+					"src",
+					"src",
+					"../src",
+					"../src/Connections",
+					"../src/Controls",
+					"../src/CustomGui",
+					"../src/CustomGui/Widgets",
+					"../src/Managers",
+					"../src/Nodes",
+					"../src/Nodes/Base_Nodes",
+					"../src/Nodes/Default_Nodes",
+					"../src/Nodes/Default_Nodes/Base",
+					"../src/Nodes/Default_Nodes/Buffer",
+					"../src/Nodes/Default_Nodes/Generators",
+					"../src/Nodes/Default_Nodes/Modifiers",
+					"../src/Profiling"
+				],
+				"LIBRARY_SEARCH_PATHS": "$(inherited)",
+				"OTHER_LDFLAGS": [
+					"$(OF_CORE_LIBS)",
+					"$(OF_CORE_FRAMEWORKS)",
+					"$(LIB_OF_DEBUG)"
+				]
+			},
+			"isa": "XCBuildConfiguration",
+			"name": "Debug"
+		},
+		"E4B69B610A3A1757003C02F2": {
+			"baseConfigurationReference": "E4EB6923138AFD0F00A09F29",
+			"buildSettings": {
+				"ARCHS": "$(ARCHS_STANDARD)",
+				"COPY_PHASE_STRIP": "YES",
+				"FRAMEWORK_SEARCH_PATHS": "$(inherited)",
+				"HEADER_SEARCH_PATHS": [
 					"$(OF_CORE_HEADERS)",
-					src,
-					../../../addons/ofxAubio/libs,
-					../../../addons/ofxAubio/libs/aubio,
-					../../../addons/ofxAubio/src,
-					../../../addons/ofxDatGui_PM/src,
-					../../../addons/ofxDatGui_PM/src/components,
-					../../../addons/ofxDatGui_PM/src/core,
-					../../../addons/ofxDatGui_PM/src/libs,
-					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
-					../../../addons/ofxDatGui_PM/src/themes,
-					../../../addons/ofxOceanode/src,
-					../../../addons/ofxOceanode/src/Connections,
-					../../../addons/ofxOceanode/src/Controls,
-					../../../addons/ofxOceanode/src/Managers,
-					../../../addons/ofxOceanode/src/Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers,
-				);
-				MACOSX_DEPLOYMENT_TARGET = 10.9;
-				OTHER_CPLUSPLUSFLAGS = (
-					"-D__MACOSX_CORE__",
-					"-mtune=native",
-				);
-				SDKROOT = macosx;
-			};
-			name = Release;
-		};
-		E4B69B600A3A1757003C02F2 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = E4EB6923138AFD0F00A09F29 /* Project.xcconfig */;
-			buildSettings = {
-				COMBINE_HIDPI_IMAGES = YES;
-				COPY_PHASE_STRIP = NO;
-				FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					../../../addons/ofxAubio/libs/aubio/,
-				);
-				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
-				GCC_MODEL_TUNING = NONE;
-				GCC_PREPROCESSOR_DEFINITIONS = OFXOCEANODE_USE_BPM_DETECTION;
-				HEADER_SEARCH_PATHS = (
-					"$(OF_CORE_HEADERS)",
-					src,
-					../../../addons/ofxAubio/libs,
-					../../../addons/ofxAubio/libs/aubio,
-					../../../addons/ofxAubio/src,
-					../../../addons/ofxDatGui_PM/src,
-					../../../addons/ofxDatGui_PM/src/components,
-					../../../addons/ofxDatGui_PM/src/core,
-					../../../addons/ofxDatGui_PM/src/libs,
-					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
-					../../../addons/ofxDatGui_PM/src/themes,
-					../../../addons/ofxOceanode/src,
-					../../../addons/ofxOceanode/src/Connections,
-					../../../addons/ofxOceanode/src/Controls,
-					../../../addons/ofxOceanode/src/Managers,
-					../../../addons/ofxOceanode/src/Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers,
-				);
-				ICON = "$(ICON_NAME_DEBUG)";
-				ICON_FILE = "$(ICON_FILE_PATH)$(ICON)";
-				INFOPLIST_FILE = "openFrameworks-Info.plist";
-				INSTALL_PATH = /Applications;
-				LIBRARY_SEARCH_PATHS = "$(inherited)";
-				PRODUCT_NAME = "$(TARGET_NAME)Debug";
-				WRAPPER_EXTENSION = app;
-			};
-			name = Debug;
-		};
-		E4B69B610A3A1757003C02F2 /* Release */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = E4EB6923138AFD0F00A09F29 /* Project.xcconfig */;
-			buildSettings = {
-				COMBINE_HIDPI_IMAGES = YES;
-				COPY_PHASE_STRIP = YES;
-				FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					../../../addons/ofxAubio/libs/aubio/,
-				);
-				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
-				GCC_MODEL_TUNING = NONE;
-				GCC_PREPROCESSOR_DEFINITIONS = OFXOCEANODE_USE_BPM_DETECTION;
-				HEADER_SEARCH_PATHS = (
-					"$(OF_CORE_HEADERS)",
-					src,
-					../../../addons/ofxAubio/libs,
-					../../../addons/ofxAubio/libs/aubio,
-					../../../addons/ofxAubio/src,
-					../../../addons/ofxDatGui_PM/src,
-					../../../addons/ofxDatGui_PM/src/components,
-					../../../addons/ofxDatGui_PM/src/core,
-					../../../addons/ofxDatGui_PM/src/libs,
-					../../../addons/ofxDatGui_PM/src/libs/ofxSmartFont,
-					../../../addons/ofxDatGui_PM/src/themes,
-					../../../addons/ofxOceanode/src,
-					../../../addons/ofxOceanode/src/Connections,
-					../../../addons/ofxOceanode/src/Controls,
-					../../../addons/ofxOceanode/src/Managers,
-					../../../addons/ofxOceanode/src/Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Base_Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Base,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Controllers,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Generators,
-					../../../addons/ofxOceanode/src/Nodes/Default_Nodes/Modifiers,
-				);
-				ICON = "$(ICON_NAME_RELEASE)";
-				ICON_FILE = "$(ICON_FILE_PATH)$(ICON)";
-				INFOPLIST_FILE = "openFrameworks-Info.plist";
-				INSTALL_PATH = /Applications;
-				LIBRARY_SEARCH_PATHS = "$(inherited)";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				WRAPPER_EXTENSION = app;
-				baseConfigurationReference = E4EB6923138AFD0F00A09F29;
-			};
-			name = Release;
-		};
-/* End XCBuildConfiguration section */
-
-/* Begin XCConfigurationList section */
-		E4B69B4D0A3A1720003C02F2 /* Build configuration list for PBXProject "example_bpm_detection" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				E4B69B4E0A3A1720003C02F2 /* Debug */,
-				E4B69B4F0A3A1720003C02F2 /* Release */,
-				99FA3DBB1C7456C400CFA0EE /* AppStore */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		E4B69B5F0A3A1757003C02F2 /* Build configuration list for PBXNativeTarget "example_bpm_detection" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				E4B69B600A3A1757003C02F2 /* Debug */,
-				E4B69B610A3A1757003C02F2 /* Release */,
-				99FA3DBC1C7456C400CFA0EE /* AppStore */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-/* End XCConfigurationList section */
-	};
-	rootObject = E4B69B4C0A3A1720003C02F2 /* Project object */;
+					"src",
+					"src",
+					"../src",
+					"../src/Connections",
+					"../src/Controls",
+					"../src/CustomGui",
+					"../src/CustomGui/Widgets",
+					"../src/Managers",
+					"../src/Nodes",
+					"../src/Nodes/Base_Nodes",
+					"../src/Nodes/Default_Nodes",
+					"../src/Nodes/Default_Nodes/Base",
+					"../src/Nodes/Default_Nodes/Buffer",
+					"../src/Nodes/Default_Nodes/Generators",
+					"../src/Nodes/Default_Nodes/Modifiers",
+					"../src/Profiling"
+				],
+				"LIBRARY_SEARCH_PATHS": "$(inherited)",
+				"OTHER_LDFLAGS": [
+					"$(OF_CORE_LIBS)",
+					"$(OF_CORE_FRAMEWORKS)",
+					"$(LIB_OF_RELEASE)"
+				],
+				"baseConfigurationReference": "E4EB6923138AFD0F00A09F29"
+			},
+			"isa": "XCBuildConfiguration",
+			"name": "Release"
+		},
+		"E4B69E1C0A3A1BDC003C02F2": {
+			"children": [
+				"E4B69E1D0A3A1BDC003C02F2",
+				"E4B69E1E0A3A1BDC003C02F2",
+				"E4B69E1F0A3A1BDC003C02F2"
+			],
+			"isa": "PBXGroup",
+			"path": "src",
+			"sourceTree": "SOURCE_ROOT"
+		},
+		"E4B69E1D0A3A1BDC003C02F2": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "main.cpp",
+			"path": "src/main.cpp",
+			"sourceTree": "SOURCE_ROOT"
+		},
+		"E4B69E1E0A3A1BDC003C02F2": {
+			"explicitFileType": "sourcecode.cpp.cpp",
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"name": "ofApp.cpp",
+			"path": "src/ofApp.cpp",
+			"sourceTree": "SOURCE_ROOT"
+		},
+		"E4B69E1F0A3A1BDC003C02F2": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.c.h",
+			"name": "ofApp.h",
+			"path": "src/ofApp.h",
+			"sourceTree": "SOURCE_ROOT"
+		},
+		"E4B69E200A3A1BDC003C02F2": {
+			"fileRef": "E4B69E1D0A3A1BDC003C02F2",
+			"isa": "PBXBuildFile"
+		},
+		"E4B69E210A3A1BDC003C02F2": {
+			"fileRef": "E4B69E1E0A3A1BDC003C02F2",
+			"isa": "PBXBuildFile"
+		},
+		"E4B6FCAD0C3E899E008CF71C": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "text.plist.xml",
+			"path": "openFrameworks-Info.plist",
+			"sourceTree": "<group>"
+		},
+		"E4C2427710CC5ABF004149E2": {
+			"buildActionMask": "2147483647",
+			"dstPath": "",
+			"dstSubfolderSpec": "10",
+			"files": [],
+			"isa": "PBXCopyFilesBuildPhase",
+			"runOnlyForDeploymentPostprocessing": "0"
+		},
+		"E4EB6923138AFD0F00A09F29": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "text.xcconfig",
+			"path": "Project.xcconfig",
+			"sourceTree": "<group>"
+		},
+		"E746D4EC-86FF-401D-9293-AD714F4BF887": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeNodeRegistry.cpp",
+			"sourceTree": "<group>"
+		},
+		"E74C1E04-2E84-4616-83B7-11EA2884FEEE": {
+			"fileRef": "CA814EF0-CB06-4321-A003-6175AAEB017B",
+			"isa": "PBXBuildFile"
+		},
+		"E998B536-4103-4DE2-BE8A-4EA297A65934": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "MacroRouterValueDispatch.cpp",
+			"sourceTree": "<group>"
+		},
+		"EAFC726E-F4F2-4810-BDB8-2438058BF45F": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeShared.h",
+			"sourceTree": "<group>"
+		},
+		"F088D204-DC0C-4DBE-8D14-A3F03B767359": {
+			"fileRef": "8AE1F0F1-F91A-4BD1-A568-9F3F5FC8FF7B",
+			"isa": "PBXBuildFile"
+		},
+		"F188D124-7CD2-4D77-92DF-C07F30AB78C7": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeNode.h",
+			"sourceTree": "<group>"
+		},
+		"F1A2BDA1-6866-4F18-B362-6B148DD27297": {
+			"fileRef": "59A16691-B316-4E4B-960A-0AFFC717447A",
+			"isa": "PBXBuildFile"
+		},
+		"F1BFF592-97FC-43B9-B3FC-A8592AFAF228": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "customGuiSnapshots.cpp",
+			"sourceTree": "<group>"
+		},
+		"F248B0C2-6B59-40E8-9B9D-E6E64C92B044": {
+			"fileRef": "B67EF8D3-000C-4839-930B-5497622C2989",
+			"isa": "PBXBuildFile"
+		},
+		"F41FA80A-C654-4381-AEFA-1E577821B68F": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeParameterProfiling.h",
+			"sourceTree": "<group>"
+		},
+		"F6807223-69B0-4747-BB38-6B3F401363D4": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "bufferHeader.h",
+			"sourceTree": "<group>"
+		},
+		"F8A233EF-58C4-4F8C-8B23-17950B9936A2": {
+			"fileRef": "FE1436BF-5FF8-478F-9F65-61DDBE76DC0C",
+			"isa": "PBXBuildFile"
+		},
+		"FA60445E-762B-4889-ABAA-1080C99FA5C0": {
+			"fileRef": "AA174DB5-F4D9-4E25-AD9A-94D9F0BEE1D9",
+			"isa": "PBXBuildFile"
+		},
+		"FB350E7A-E197-4B41-9A46-D6AC29C05A4F": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeCustomGuiLayout.h",
+			"sourceTree": "<group>"
+		},
+		"FC087D26-2FA9-43C4-BE2A-7708DA6E843D": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "switcher.cpp",
+			"sourceTree": "<group>"
+		},
+		"FC6CDEAF-E6BD-4F9F-B31A-32ABAD8E0730": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "curve.h",
+			"sourceTree": "<group>"
+		},
+		"FE1436BF-5FF8-478F-9F65-61DDBE76DC0C": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeCustomGuiArrayWidgets.cpp",
+			"sourceTree": "<group>"
+		},
+		"FEF2D0A4-3ED1-4718-86C0-357B475175B0": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeTypesRegistry.cpp",
+			"sourceTree": "<group>"
+		},
+		"FFD2A5A3-B574-448D-8814-47AFB21CEF79": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.cpp",
+			"name": "ofxOceanodeTransport.cpp",
+			"sourceTree": "<group>"
+		},
+		"3A00F333-CA25-5BA1-A651-725DDCCCBFBB": {
+			"fileEncoding": "4",
+			"isa": "PBXFileReference",
+			"lastKnownFileType": "sourcecode.cpp.h",
+			"name": "ofxOceanodeAutomationExtension.h",
+			"sourceTree": "<group>"
+		}
+	},
+	"rootObject": "E4B69B4C0A3A1720003C02F2"
 }
