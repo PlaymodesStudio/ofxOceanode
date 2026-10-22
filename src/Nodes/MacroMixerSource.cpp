@@ -2,6 +2,7 @@
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeShared.h"
 #include "router.h"
+#include <algorithm>
 #include <atomic>
 #include <filesystem>
 #include <fstream>
@@ -41,8 +42,21 @@ fs::path globalMacro(const ofJson& json, const fs::path& file) {
     require(found != category->macros.end(), file.string(), "Global Macro is unavailable: " + name);
     return found->second;
 }
+struct Analysis {
+    const MacroMixerExclusions* excluded = nullptr;
+    // All blocked nodes are collected, so each can be kept out before retrying.
+    std::vector<MacroMixerDiagnostic> blocked;
+    std::vector<std::string> keptOut;
+    bool skips(const fs::path& folder, const std::string& key) const {
+        return excluded && excluded->count({folder.string(),key});
+    }
+    void throwBlocked() const {
+        if(!blocked.empty()) throw Failure(blocked.front().file + "/modules.json", blocked.front().message);
+    }
+};
 void analyse(ofxOceanodeNodeRegistry& registry, const fs::path& path,
-             const MacroMixerContract* contract, std::set<fs::path>& ancestors, ofJson* definition = nullptr) {
+             const MacroMixerContract* contract, std::set<fs::path>& ancestors, Analysis& analysis,
+             ofJson* definition = nullptr) {
     const auto folder = fs::canonical(path);
     require(ancestors.size() < 64 && ancestors.insert(folder).second, folder.string(),
         "Recursive Macro file dependency (feedback cables inside a Macro are supported)");
@@ -53,11 +67,10 @@ void analyse(ofxOceanodeNodeRegistry& registry, const fs::path& path,
     require(modules.is_object(), folder.string(), "Expected a Macro modules object");
     struct Router { std::string key, model; };
     std::map<std::string, std::vector<Router>> routers;
-    std::set<std::string> keys;
+    std::set<std::string> keys, skipped;
     for(auto model = modules.begin(); model != modules.end(); ++model) {
         const auto reason = MacroMixerSource::resourceBlocker(registry, model.key());
-        require(reason.empty(), (folder / "modules.json").string(), reason);
-        registry.checkCanCreate(model.key());
+        if(reason.empty()) registry.checkCanCreate(model.key());
         require(registry.getRegisteredModels().count(model.key()), folder.string(), "Unregistered node: " + model.key());
         require(model.value().is_object(), folder.string(), "Expected Macro node identifiers");
         for(auto node = model.value().begin(); node != model.value().end(); ++node) {
@@ -68,6 +81,17 @@ void analyse(ofxOceanodeNodeRegistry& registry, const fs::path& path,
                 folder.string(), "Macro must contain saved local nodes, with positions");
             const auto key = escaped(model.key()) + "_" + std::to_string(id);
             require(keys.insert(key).second, folder.string(), "Duplicate node identifier");
+            if(analysis.skips(folder,key)) {
+                skipped.insert(key);
+                analysis.keptOut.push_back("Kept out of the graph: " + model.key() + " " + std::to_string(id) + " (" + folder.string() + ")");
+                continue;
+            }
+            if(!reason.empty()) {
+                // A global Macro used twice reaches the same saved node twice.
+                if(std::none_of(analysis.blocked.begin(),analysis.blocked.end(),[&](const auto& b) { return b.file == folder.string() && b.node == key; }))
+                    analysis.blocked.push_back({folder.string(), reason, key, model.key()});
+                continue;
+            }
             const auto file = folder / (key + ".json");
             const auto data = read(file);
             require(data.is_object(), file.string(), "Expected node settings object");
@@ -79,7 +103,7 @@ void analyse(ofxOceanodeNodeRegistry& registry, const fs::path& path,
             }
             if(model.key() == "Macro") {
                 const auto nested = data.value("LocalPreset", true) ? folder / key : globalMacro(data,file);
-                analyse(registry, nested, nullptr, ancestors, entry ? &(*entry)["graph"] : nullptr);
+                analyse(registry, nested, nullptr, ancestors, analysis, entry ? &(*entry)["graph"] : nullptr);
             }
         }
     }
@@ -87,20 +111,23 @@ void analyse(ofxOceanodeNodeRegistry& registry, const fs::path& path,
     // parameter types, dynamic ports, event propagation and feedback behavior.
     auto cables = read(folder / "connections.json");
     if(cables.is_null()) cables=ofJson::object();
-    if(definition) (*definition)["connections"] = cables;
     require(cables.is_object(), folder.string(), "Expected Macro connections object");
     std::set<std::pair<std::string,std::string>> driven;
+    auto kept = ofJson::object(); // Native loading leaves kept-out nodes' cables out too.
     for(auto from = cables.begin(); from != cables.end(); ++from) {
         require(keys.count(from.key()) && from.value().is_object(), folder.string(), "Unknown cable source: " + from.key());
         for(auto out = from.value().begin(); out != from.value().end(); ++out) {
             require(out.value().is_object(), folder.string(), "Invalid cable outputs");
             for(auto to = out.value().begin(); to != out.value().end(); ++to) {
                 require(keys.count(to.key()) && to.value().is_object(), folder.string(), "Unknown cable destination: " + to.key());
+                if(skipped.count(from.key()) || skipped.count(to.key())) continue;
+                kept[from.key()][out.key()][to.key()] = to.value();
                 for(auto in = to.value().begin(); in != to.value().end(); ++in)
                     require(driven.insert({to.key(),in.key()}).second, folder.string(), "Multiple sources for one input");
             }
         }
     }
+    if(definition) (*definition)["connections"] = skipped.empty() ? cables : kept;
     if(contract) for(const auto& selected : contract->routers) {
         auto found = routers.find(selected.name);
         require(found != routers.end() && found->second.size() == 1, folder.string(),
@@ -136,7 +163,7 @@ std::string MacroMixerSource::resourceBlocker(ofxOceanodeNodeRegistry& registry,
 }
 MacroMixerSource::Revision MacroMixerSource::importFolder(ofxOceanodeContainer& parent,
     const std::string& folder, const MacroMixerContract& contract,
-    std::vector<MacroMixerDiagnostic>& errors, const std::string& existingID) {
+    std::vector<MacroMixerDiagnostic>& errors, const std::string& existingID, const MacroMixerExclusions* excluded) {
     errors.clear();
     try {
         require(!folder.empty(), folder, "Choose a Macro folder");
@@ -152,7 +179,9 @@ MacroMixerSource::Revision MacroMixerSource::importFolder(ofxOceanodeContainer& 
         const auto source = fs::canonical(folder);
         std::set<fs::path> ancestors;
         ofJson definition;
-        analyse(*parent.getRegistry(), source, &contract, ancestors, &definition);
+        Analysis analysis{excluded};
+        analyse(*parent.getRegistry(), source, &contract, ancestors, analysis, &definition);
+        if(!analysis.blocked.empty()) { errors = analysis.blocked; return nullptr; }
         static std::atomic<uint64_t> sequence{0};
         auto revision = std::make_shared<MacroMixerRevision>();
         revision->macroID = existingID.empty() ? "macro-" + std::to_string(ofGetSystemTimeMicros()) + "-" + std::to_string(++sequence) : existingID;
@@ -163,17 +192,19 @@ MacroMixerSource::Revision MacroMixerSource::importFolder(ofxOceanodeContainer& 
             "Only selected routers participate in mixing; additional routers retain their native behavior.",
             "External outputs are rejected recursively. Analysis and Refresh never execute source nodes.",
             "Each activation reads the Macro source. Save/clipboard store references; source folders must remain available."};
+        revision->importNotices.insert(revision->importNotices.end(),analysis.keptOut.begin(),analysis.keptOut.end());
         return revision;
     } catch(const std::exception& e) { report(errors,e,folder); return nullptr; }
 }
 
 std::unique_ptr<MacroMixerSource::Graph> MacroMixerSource::instantiate(ofxOceanodeContainer& parent,
-    Revision revision, std::vector<MacroMixerDiagnostic>& errors, const Inputs& inputs) {
+    Revision revision, std::vector<MacroMixerDiagnostic>& errors, const Inputs& inputs,
+    std::shared_ptr<const MacroMixerExclusions> excluded) {
     errors.clear();
     try {
         require(bool(revision),"Macro","No Macro selected");
         // Recheck current files and registrations before native loading.
-        revision = importFolder(parent,revision->source(),revision->contract(),errors,revision->id());
+        revision = importFolder(parent,revision->source(),revision->contract(),errors,revision->id(),excluded.get());
         if(!revision) return nullptr;
         auto graph = std::make_unique<Graph>(); graph->revision = revision; graph->source = revision->source();
         auto upstream = parent.getRegistry();
@@ -183,10 +214,17 @@ std::unique_ptr<MacroMixerSource::Graph> MacroMixerSource::instantiate(ofxOceano
             const auto reason = MacroMixerSource::resourceBlocker(*upstream,model);
             if(!reason.empty()) throw std::runtime_error(reason);
         });
-        registry->setFolderLoadGuard([upstream](const std::string& folder) {
+        registry->setFolderLoadGuard([upstream,excluded](const std::string& folder) {
             upstream->checkFolderLoad(folder);
             std::set<fs::path> ancestors;
-            analyse(*upstream,folder,nullptr,ancestors);
+            Analysis analysis{excluded.get()};
+            analyse(*upstream,folder,nullptr,ancestors,analysis);
+            analysis.throwBlocked();
+        });
+        if(excluded) registry->setNodeLoadFilter([excluded](const std::string& folder, const std::string& node) {
+            std::error_code error;
+            const auto path = fs::canonical(folder,error);
+            return excluded->count({error ? folder : path.string(),node}) != 0;
         });
         graph->host = std::make_shared<ofxOceanodeContainer>(registry,parent.getTypesRegistry(),parent.getTransport());
         static std::atomic<uint64_t> hosts{0};

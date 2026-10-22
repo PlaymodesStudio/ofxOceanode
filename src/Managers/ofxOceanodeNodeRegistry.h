@@ -155,12 +155,17 @@ public:
     void checkCanCreate(const std::string& model) const { if(creationGuard) creationGuard(model); }
     void setFolderLoadGuard(std::function<void(const std::string&)> guard) { folderLoadGuard = std::move(guard); }
     void checkFolderLoad(const std::string& path) const { if(folderLoadGuard) folderLoadGuard(path); }
+    // A copied registry can also leave chosen saved nodes, and their cables,
+    // out of native folder loads. Receives the folder and saved node key.
+    void setNodeLoadFilter(std::function<bool(const std::string&, const std::string&)> filter) { nodeLoadFilter = std::move(filter); }
+    bool skipsNodeLoad(const std::string& folder, const std::string& node) const { return nodeLoadFilter && nodeLoadFilter(folder, node); }
     const std::unordered_map<string, string>& getModelDescriptions() const { return modelDescriptions; }
     void setModelDescription(const string& name, const string& description) {
         if(!description.empty() && registeredModelCreators.count(name)) modelDescriptions[name] = description;
     }
 private:
     std::function<void(const std::string&)> creationGuard, folderLoadGuard;
+    std::function<bool(const std::string&, const std::string&)> nodeLoadFilter;
     std::unordered_map<std::string, std::string> macroMixerBlockers;
     template<typename T>
     static auto argumentDescription(const T& value, int) -> decltype(std::string(value.description)) {

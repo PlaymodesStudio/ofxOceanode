@@ -12,6 +12,7 @@ public:
             "Add Macro source folders and select Target, then Transition. Nested Macros, feedback, native nodes and clocks use ordinary Macro behavior. "
             "Analysis rejects external outputs recursively. Source folders must be available when activating or reloading.";
     }
+    ~ofxOceanodeMacroMixer();
     void setup() override;
     bool drawInspectorParameter(ofAbstractParameter& parameter) override;
     void update(ofEventArgs&) override;
@@ -34,14 +35,19 @@ public:
     bool removeImportedMacro(const std::string& id);
     bool moveImportedMacro(const std::string& id, size_t index);
     const MacroMixerRuntime* mixerRuntime() const { return runtime.get(); }
+    // Asks, one node at a time, whether to keep each blocked node out of the
+    // graph. Drawn by the host with the other application-level dialogs.
+    static void drawPendingBlockedNodeDialog();
 private:
-    enum class ActionKind { Import, Refresh, RemoveMacro, MoveMacro, Routers, LoadRouters, SaveRouters, ClearPlayback, MorphPolicy };
+    enum class ActionKind { Import, Refresh, RemoveMacro, MoveMacro, Routers, LoadRouters, SaveRouters, ClearPlayback, MorphPolicy,
+        KeepOut, CancelBlocked, RestoreNode };
     struct Action {
         ActionKind kind;
         std::string text;
         size_t index = 0;
         MacroMixerContract contract;
         MacroMixerMorphPolicy policy;
+        std::string node;
     };
     void installOutputs(const MacroMixerContract& contract);
     void drawRouters();
@@ -65,6 +71,7 @@ private:
     int newRouterType = 0, newRouterDirection = 1;
     std::string selectedID, inspectorError;
     std::deque<Action> actions;
+    MacroMixerExclusions answeredBlocked; // Answered in the dialog, applied on update.
     bool recallPrepared = false, recallValid = false;
     std::string recalledSelection;
     std::unique_ptr<MacroMixerRuntime> runtime;

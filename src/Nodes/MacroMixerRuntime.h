@@ -59,6 +59,15 @@ public:
     float progress() const { return mixedProgress; }
     std::string status() const;
     const std::vector<Diagnostic>& diagnostics() const { return errors; }
+    // Nodes declaring macroMixerBlocker() stop an import or activation. Each one
+    // can be kept out of this mixer's graphs; once every blocked node has been
+    // kept out, the failed import or activation (including a morph) is retried.
+    const std::vector<Diagnostic>& blockedNodes() const { return blocked; }
+    bool keepOutOfGraph(const std::string& folder, const std::string& node);
+    void cancelBlocked();
+    const MacroMixerExclusions& keptOutNodes() const { return *keptOut; }
+    // Running graphs keep the node out until their next activation.
+    bool restoreKeptOutNode(const std::string& folder, const std::string& node);
     const Graph* origin() const { return current.get(); }
     const Graph* destination() const { return next.get(); }
     bool morphing() const { return next && nextMorph; }
@@ -67,6 +76,7 @@ public:
 
 private:
     void updateWithClock(const std::function<double()>& clock);
+    void noteBlocked(const std::string& folder, bool refresh);
     struct Request { std::string folder; Revision revision; float durationMs, biPow; bool morph = false; };
     ofxOceanodeContainer& parent;
     std::shared_ptr<Graph> current, next;
@@ -84,6 +94,12 @@ private:
     std::map<std::string,Renderer> renderers;
     std::map<std::string,Renderer> processors;
     std::vector<Diagnostic> errors;
+    // Shared with live graph registries, so native reloads see later choices.
+    std::shared_ptr<MacroMixerExclusions> keptOut = std::make_shared<MacroMixerExclusions>();
+    std::vector<Diagnostic> blocked;
+    std::unique_ptr<Request> blockedRequest;
+    std::string blockedImport;
+    bool blockedRefresh = false;
     bool finishRequested = false;
     bool preparing = false;
     bool currentMorph = false, nextMorph = false;

@@ -41,6 +41,26 @@ nodes. Put final hardware/network outputs after MacroMixer. Input nodes and whol
 categories are not banned. Addons with other external outputs should declare the
 capability on their models.
 
+### Keeping blocked nodes out of the graph
+
+Analysis reports every blocked node in the source, including nested Macros. When
+an import, Refresh, Transition (ordinary or Morph macros) or a preset recall
+stops on blocked nodes, a modal asks about each one in turn, for example:
+ILDA Debugger 3, its Macro folder and the reason. **Keep out of graph** leaves that saved node out
+of this MacroMixer's graphs; **Keep all N out** answers the remaining ones and
+**Cancel load** leaves the load stopped, with the running graph intact. Once every
+blocked node has been kept out, the stopped import or activation is retried.
+
+A kept-out node is identified by its canonical folder and saved node key
+(`ILDA_Debugger_3`). Analysis, morph definitions and native folder loads
+(including nested and global Macros and live-morph additions) skip the node and
+every cable to or from it. The source folder is not modified. The choices are
+saved in `MacroMixerState` as `keptOutNodes`; older states have none and ask
+again. **Macros > Kept out of graph** lists them; **Restore** includes a node
+again from the next activation, and you are asked about it again while it still
+blocks the mix. The dialog is drawn by `ofxOceanode` with the other
+application-level dialogs and waits for any other open popup to close first.
+
 ## Morph macros
 
 Enable **Morph macros** in the Inspector to interpolate graph controls instead
@@ -243,7 +263,10 @@ branches listed in `macro-mixer-migration-audit.md`.
   construction, private registry guards, transitions, missing sources, save/load,
   outer cable restoration, router group file round-trips/validation,
   automatic router/Macro removal cleanup and independent
-  clipboard instances.
+  clipboard instances. Blocked nodes are reported individually; kept-out nodes
+  and their cables are absent from definitions, activation and native reloads,
+  the choices persist, a blocked activation resumes once every node is
+  answered, and Cancel/Restore behave as described above.
 - `python3 tests/macro_mixer_numeric_policies_regression.py`: numeric/Boolean
   policy rounding, endpoints, unequal vector sizes and option validation.
 - `python3 tests/macro_mixer_morph_regression.py`: native nonlinear graph

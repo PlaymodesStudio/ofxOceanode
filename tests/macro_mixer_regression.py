@@ -102,6 +102,7 @@ def production():
     for sig in ['ofColor colorFromString(', 'ofxOceanodeNodeModel::ofxOceanodeNodeModel(',
                 'string ofxOceanodeNodeModel::getDescription()',
                 'void ofxOceanodeNodeModel::setNumIdentifier(', 'void ofxOceanodeNodeModel::setContainer(',
+                'string ofxOceanodeNodeModel::getParents()',
                 'void ofxOceanodeNodeModel::deserializeParameter(',
                 'ofxOceanodeFrameTransportState ofxOceanodeNodeModel::getFrameTransportState()']:
         result+=block(m,sig)+'\n'
@@ -311,6 +312,46 @@ int main(int argc,char** argv) {
         auto nestedModules=ofLoadJson(nested+"/Macro_1/modules.json");nestedModules["External Endpoint"]["01"]={0,0};write(nested+"/Macro_1/modules.json",nestedModules);
         write(nested+"/Macro_1/External_Endpoint_1.json",ofJson::object());
         assert(!mixer.importMacro(nested,true) && blockedSetups==0);
+    }
+    // Every blocked node is reported. Keeping each one out of the graph lets the
+    // import, activation and native reloads continue without creating it or
+    // its cables; the choices persist, and a blocked activation resumes.
+    {
+        const auto blockedSource=scratch+"/blocked";saveSource(blockedSource,.35);
+        auto blockedModules=ofLoadJson(blockedSource+"/modules.json");
+        blockedModules["External Endpoint"]["01"]={0,0};blockedModules["External Endpoint"]["02"]={0,0};
+        write(blockedSource+"/modules.json",blockedModules);
+        write(blockedSource+"/External_Endpoint_1.json",ofJson::object());write(blockedSource+"/External_Endpoint_2.json",ofJson::object());
+        auto cables=ofLoadJson(blockedSource+"/connections.json");if(!cables.is_object())cables=ofJson::object();
+        cables["Router_f_1"]["Value"]["External_Endpoint_1"]["Value"]=ofJson::object();write(blockedSource+"/connections.json",cables);
+        const auto canonical=fs::canonical(blockedSource).string();
+        MacroMixerRuntime mixer(parent);
+        assert(!mixer.importMacro(blockedSource) && blockedSetups==0);
+        const auto& blocked=mixer.blockedNodes();
+        assert(blocked.size()==2 && blocked[0].file==canonical && blocked[0].node=="External_Endpoint_1");
+        assert(blocked[0].model=="External Endpoint" && blocked[0].message=="Test hardware output" && blocked[1].node=="External_Endpoint_2");
+        assert(mixer.keepOutOfGraph(canonical,"External_Endpoint_1") && !mixer.importedMacro(blockedSource) && mixer.blockedNodes().size()==1);
+        assert(mixer.keepOutOfGraph(canonical,"External_Endpoint_2") && mixer.blockedNodes().empty());
+        auto revision=mixer.importedMacro(blockedSource);assert(revision);
+        assert(revision->sourceDefinition().at("nodes").size()==2);
+        assert(revision->sourceDefinition().at("connections").dump().find("External_Endpoint")==std::string::npos);
+        mixer.request(blockedSource,0,0);mixer.update(0);near(mixer.value(),.35);
+        assert(mixer.origin()->container->getAllModules().size()==2 && blockedSetups==0);
+        assert(mixer.origin()->container->loadPreset(canonical));
+        assert(mixer.origin()->container->getAllModules().size()==2 && blockedSetups==0);
+        const auto saved=mixer.saveState();assert(saved.at("keptOutNodes").size()==2);
+        MacroMixerRuntime restored(parent);assert(restored.restoreState(saved));restored.update(0);near(restored.value(),.35);
+        assert(restored.keptOutNodes()==mixer.keptOutNodes() && blockedSetups==0);
+        auto older=saved;older.erase("keptOutNodes");
+        MacroMixerRuntime asking(parent);assert(asking.restoreState(older));asking.update(0);
+        assert(!asking.origin() && asking.blockedNodes().size()==2);
+        assert(asking.keepOutOfGraph(canonical,"External_Endpoint_1"));asking.update(1);assert(!asking.origin());
+        assert(asking.keepOutOfGraph(canonical,"External_Endpoint_2"));asking.update(2);
+        assert(asking.origin() && blockedSetups==0);near(asking.value(),.35);
+        // Restoring a node asks again; cancelling keeps the running graph.
+        assert(mixer.restoreKeptOutNode(canonical,"External_Endpoint_2"));
+        assert(!mixer.importMacro(blockedSource,true) && mixer.blockedNodes().size()==1);
+        mixer.cancelBlocked();assert(mixer.blockedNodes().empty());mixer.update(10);near(mixer.value(),.35);
     }
     // Global references use the real library resolver; live edits are checked
     // before the native global-Macro update callback can alter running nodes.

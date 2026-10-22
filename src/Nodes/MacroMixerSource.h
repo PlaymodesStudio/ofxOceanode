@@ -2,8 +2,14 @@
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "MacroMixerMixing.h"
+#include <set>
 
-struct MacroMixerDiagnostic { std::string file, message; };
+// A nonempty node names a saved node whose macroMixerBlocker() stops the load;
+// file is then its canonical folder. Such nodes can be kept out of the graph.
+struct MacroMixerDiagnostic { std::string file, message, node, model; };
+// Saved nodes left out of every graph a MacroMixer analyses or loads, as
+// canonical folder and saved node key (for example "ILDA_Debugger_3").
+using MacroMixerExclusions = std::set<std::pair<std::string, std::string>>;
 struct MacroMixerContract {
     struct Router {
         std::string id, name, type = "Float", policy;
@@ -83,11 +89,15 @@ public:
         ofJson liveMorphDefinition; // Saved target expressed in stable runtime node identities.
         std::shared_ptr<MacroMixerMorphTopology> morphTopology;
     };
-    // Analysis never constructs source nodes or prunes a user's graph.
+    // Analysis never constructs source nodes or prunes a user's graph. Every
+    // blocked node is reported; excluded nodes and their cables are left out.
     static Revision importFolder(ofxOceanodeContainer& parent, const std::string& folder,
         const MacroMixerContract& contract, std::vector<MacroMixerDiagnostic>& errors,
-        const std::string& existingID = "");
+        const std::string& existingID = "", const MacroMixerExclusions* excluded = nullptr);
+    // The graph's registry keeps reading the shared exclusions, so later
+    // native reloads and live morphs leave the same nodes out.
     static std::unique_ptr<Graph> instantiate(ofxOceanodeContainer& parent, Revision revision,
-        std::vector<MacroMixerDiagnostic>& errors, const Inputs& inputs = {});
+        std::vector<MacroMixerDiagnostic>& errors, const Inputs& inputs = {},
+        std::shared_ptr<const MacroMixerExclusions> excluded = nullptr);
     static std::string resourceBlocker(ofxOceanodeNodeRegistry& registry, const std::string& model);
 };

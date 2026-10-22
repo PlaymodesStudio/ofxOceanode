@@ -15,6 +15,7 @@
 #include "ofxOceanodeProportionalDocking.h"
 #include "ofxOceanodeHelp.h"
 #include "ofxOceanodeNodeMacro.h"
+#include "ofxOceanodeMacroMixer.h"
 #include "Layouts/ofxOceanodeLayoutManager.h"
 #include "Layouts/ofxOceanodeLayoutWindowState.h"
 #include "Controls/PresetFileCleanupReview.h"
@@ -855,6 +856,7 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     // persistent DockSpace window so OpenPopup and BeginPopupModal use the
     // same stable ImGui ID stack on every frame.
     ofxOceanodeContainer::drawPendingConnectionErrorDialog();
+    ofxOceanodeMacroMixer::drawPendingBlockedNodeDialog();
 
     ImGui::End(); // End DockSpace window — must come after all popup code above
 }

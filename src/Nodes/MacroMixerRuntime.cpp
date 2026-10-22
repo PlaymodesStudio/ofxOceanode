@@ -148,12 +148,13 @@ const std::vector<MacroMixerMorphDetail>& MacroMixerRuntime::sourceDetails(const
     else if(inPlaceTarget || next) result.push_back({"live","Graph","Preview is available after the current transition"});
     else {
         auto target=macro(id); std::vector<Diagnostic> diagnostics;
-        if(target) target=MacroMixerSource::importFolder(parent,target->source(),interface,diagnostics,id);
+        if(target) target=MacroMixerSource::importFolder(parent,target->source(),interface,diagnostics,id,keptOut.get());
         if(target) {
             result=current->inspectMorph(target,connectionPolicies);
             result.insert(result.begin(),{"context",target->name(),"From "+current->revision->name()+" to "+target->name()});
         }
-        else for(const auto& error:diagnostics) result.push_back({"fallback",error.file,error.message});
+        else for(const auto& error:diagnostics) result.push_back({"fallback",error.node.empty() ? error.file : error.file+" / "+error.node,
+            error.node.empty() ? error.message : error.message+" Transition asks whether to keep it out of the graph."});
     }
     return sourceDetailCache.emplace(id,std::move(result)).first->second;
 }
@@ -198,13 +199,45 @@ bool MacroMixerRuntime::importMacro(const std::string& folder, bool refresh) {
     if(previous && !refresh) { errors.clear(); return true; }
     if(!previous && order.size() >= 128) { errors = {{folder,"Maximum 128 imported macros"}}; return false; }
     preparing = true;
-    auto revision = MacroMixerSource::importFolder(parent,folder,interface,errors,previous ? previous->id() : "");
+    auto revision = MacroMixerSource::importFolder(parent,folder,interface,errors,previous ? previous->id() : "",keptOut.get());
     preparing = false;
-    if(!revision) return false;
+    if(!revision) { noteBlocked(folder,refresh); return false; }
     sourceDetailCache.clear(); transitionDetails.clear();
     imports[sourceKey(folder)] = revision;
     if(!previous) order.push_back(revision->id());
     return true;
+}
+
+void MacroMixerRuntime::noteBlocked(const std::string& folder, bool refresh) {
+    std::vector<Diagnostic> nodes;
+    for(const auto& error:errors) if(!error.node.empty()) nodes.push_back(error);
+    if(nodes.empty()) return;
+    blocked=std::move(nodes); blockedRequest.reset();
+    blockedImport=folder; blockedRefresh=refresh;
+}
+bool MacroMixerRuntime::keepOutOfGraph(const std::string& folder, const std::string& node) {
+    if(folder.empty() || node.empty()) return false;
+    keptOut->insert({folder,node});
+    blocked.erase(std::remove_if(blocked.begin(),blocked.end(),[&](const auto& b) { return b.file==folder && b.node==node; }),blocked.end());
+    sourceDetailCache.clear();
+    if(!blocked.empty()) return true;
+    errors.clear();
+    if(blockedRequest) {
+        // Keep a newer request; otherwise retry the blocked activation on update.
+        if(!pending) pending=std::move(blockedRequest);
+        blockedRequest.reset(); blockedImport.clear();
+        return true;
+    }
+    if(blockedImport.empty()) return true;
+    const auto folderToImport=std::move(blockedImport); blockedImport.clear();
+    return importMacro(folderToImport,blockedRefresh);
+}
+void MacroMixerRuntime::cancelBlocked() {
+    blocked.clear(); blockedRequest.reset(); blockedImport.clear();
+}
+bool MacroMixerRuntime::restoreKeptOutNode(const std::string& folder, const std::string& node) {
+    if(!keptOut->erase({folder,node})) return false;
+    sourceDetailCache.clear(); return true;
 }
 
 ofJson MacroMixerRuntime::saveState() const {
@@ -215,11 +248,14 @@ ofJson MacroMixerRuntime::saveState() const {
     for(const auto& revision : macros()) entries.push_back({{"id", revision->id()},
         {"name", revision->name()}, {"source", revision->source()}});
     for(const auto& item:connectionPolicies) policies[item.first]={{"policy",item.second.policy},{"options",item.second.options}};
+    auto keptOutNodes=ofJson::array();
+    for(const auto& node:*keptOut) keptOutNodes.push_back({{"folder",node.first},{"node",node.second}});
     const auto playback = inPlaceTarget ? inPlaceTarget : next ? next->revision : current ? current->revision
         : pending ? pending->revision : nullptr;
     return {{"version", 1}, {"routers", routers}, {"macros", entries}, {"inputs",inputs}, {"morphPolicies",policies},
         {"playback", playback ? ofJson(playback->id()) : ofJson(nullptr)},
-        {"morph", next ? nextMorph : current ? currentMorph : pending ? pending->morph : false}};
+        {"morph", next ? nextMorph : current ? currentMorph : pending ? pending->morph : false},
+        {"keptOutNodes", keptOutNodes}};
 }
 
 bool MacroMixerRuntime::restoreState(const ofJson& saved) {
@@ -283,6 +319,16 @@ bool MacroMixerRuntime::restoreState(const ofJson& saved) {
             staged.imports.emplace(reference->source(), reference);
             staged.order.push_back(reference->id());
         }
+        MacroMixerExclusions keptOutNodes; // Older states have none.
+        if(saved.contains("keptOutNodes")) {
+            const auto& nodes=saved.at("keptOutNodes");
+            require(nodes.is_array() && nodes.size()<=4096,"Invalid saved kept-out nodes");
+            for(const auto& node:nodes) {
+                const auto folder=node.at("folder").get<std::string>(), key=node.at("node").get<std::string>();
+                require(std::filesystem::path(folder).is_absolute() && !key.empty(),"Invalid saved kept-out node");
+                keptOutNodes.insert({folder,key});
+            }
+        }
         const auto& playback = saved.at("playback");
         if(!playback.is_null()) {
             const auto id = playback.get<std::string>();
@@ -296,6 +342,7 @@ bool MacroMixerRuntime::restoreState(const ofJson& saved) {
         connectionPolicies=std::move(staged.connectionPolicies);
         imports = std::move(staged.imports); order = std::move(staged.order);
         pending = std::move(staged.pending);
+        *keptOut = std::move(keptOutNodes);
         return true;
     } catch(const std::exception& e) {
         errors = {{"MacroMixer", e.what()}}; return false;
@@ -349,6 +396,10 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
         // or invalid folder fails this request and leaves the origin running.
         Revision revision;
         if(importMacro(request->folder, true)) revision = importedMacro(request->folder);
+        else if(!blocked.empty() && blockedImport==request->folder) {
+            // Retried once every blocked node has been kept out of the graph.
+            blockedRequest=std::move(request); blockedImport.clear();
+        }
         if(revision) {
             preparing = true;
             const auto morphStart = request->morph && current ? current->captureMorphValues() : MacroMixerSource::MorphSnapshot{};
@@ -365,7 +416,7 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
                     details.push_back({"fallback","Graph",current->morphFallbackReason});
                 for(auto& detail:details) if(detail.kind=="mix") { detail.kind="skipped"; detail.message="Connection mix skipped because the whole graph needs fallback. "+detail.message; }
             }
-            std::shared_ptr<Graph> candidate = reuse ? current : MacroMixerSource::instantiate(parent, revision, errors, inputValues);
+            std::shared_ptr<Graph> candidate = reuse ? current : MacroMixerSource::instantiate(parent, revision, errors, inputValues, keptOut);
             preparing = false;
             if(candidate) {
                 if(!current) {
@@ -533,6 +584,7 @@ void MacroMixerRuntime::clear() {
     }
     processors.clear();
     pending.reset(); next.reset(); current.reset(); inPlaceTarget.reset(); errors.clear();
+    cancelBlocked();
     sourceDetailCache.clear(); transitionDetails.clear();
     finishRequested = false; lastValue = 0; mixedProgress = 0;
     currentMorph = false; nextMorph = false;
@@ -552,6 +604,7 @@ std::string MacroMixerRuntime::status() const {
     else if(morphing()) label = "Morphing destination graph: " + (current && !current->morphFallbackReason.empty()
         ? current->morphFallbackReason : "incompatible structure or configuration");
     if(pending) label += " (request queued)";
+    if(!blocked.empty()) label += " (" + std::to_string(blocked.size()) + " blocked node(s) await a decision)";
     if(!errors.empty()) label += ": " + errors.front().file + ": " + errors.front().message;
     return label;
 }
