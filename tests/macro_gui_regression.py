@@ -267,6 +267,42 @@ int main(int argc, char** argv) {
     ImGui::ActivateItemByID(ImHashStr("Load", 0, loadPopup->ID)); frame();
     copy.update(event); frame();
     assert(!copy.isLocal() && copy.getCurrentMacroName() == "A" && value(copy) == .7f);
+    // Delete confirms inside the Load dialog; Escape cancels only the confirmation.
+    auto selectSource = [&](const string& path, const char* name) {
+        copy.guiState.openLoadPopup = true; copy.guiState.loadSelectionPath.clear(); frame(); frame();
+        ImGui::ActivateItemByID(ImHashStr(name, 0, ImHashStr(path.c_str(), 0, folderID))); frame();
+        assert(copy.guiState.loadSelectionPath == path);
+    };
+    saveSource("Macros/Folder/ToDelete", .1f); ofxOceanodeShared::updateMacrosStructure();
+    selectSource("Macros/Folder/ToDelete", "ToDelete");
+    ImGui::ActivateItemByID(ImHashStr("Delete", 0, loadPopup->ID)); frame(); frame();
+    auto* deletePopup = ImGui::FindWindowByName("Delete Macro?"); assert(deletePopup && deletePopup->Active);
+    assert(!copy.guiState.deleteKeepsLocalCopy);
+    io.AddKeyEvent(ImGuiKey_Escape, true); frame(); io.AddKeyEvent(ImGuiKey_Escape, false); frame();
+    assert(!deletePopup->Active && loadPopup->Active && fs::exists("Macros/Folder/ToDelete"));
+    ImGui::ActivateItemByID(ImHashStr("Delete", 0, loadPopup->ID)); frame(); frame();
+    assert(deletePopup->Active);
+    ImGui::ActivateItemByID(ImHashStr("Delete", 0, deletePopup->ID)); frame();
+    assert(bool(copy.pendingGuiAction)); copy.update(event); frame();
+    assert(!fs::exists("Macros/Folder/ToDelete") && copy.guiState.loadSelectionPath.empty());
+    assert(loadPopup->Active && !copy.isLocal() && copy.getCurrentMacroName() == "A");
+    ImGui::ActivateItemByID(ImHashStr("Cancel", 0, loadPopup->ID)); frame();
+    // Deleting the library Macro this node uses keeps its contents as a local Macro.
+    saveSource("Macros/Folder/InUse", .3f); ofxOceanodeShared::updateMacrosStructure();
+    copy.presetManager.setNextPresetPath("Macros/Folder/InUse"); copy.update(event);
+    assert(!copy.isLocal() && value(copy) == .3f);
+    copy.openMacroSaveDialog(true); frame(); frame();
+    assert(copy.presetManager.getSaveAsTempCategory() == std::deque<string>({"Folder"}));
+    pressSave("Delete"); frame();
+    assert(copy.guiState.deleteKeepsLocalCopy && deletePopup->Active);
+    ImGui::ActivateItemByID(ImHashStr("Delete", 0, deletePopup->ID)); frame();
+    copy.update(event); frame();
+    assert(!fs::exists("Macros/Folder/InUse") && fs::exists("Macros/Folder/A/modules.json"));
+    assert(copy.isLocal() && copy.getLocalMacroName() == "InUse" && value(copy) == .3f);
+    pressSave("Cancel");
+    // Only Macro definitions inside the library can be deleted.
+    assert(!copy.deleteLibraryMacro("Presets/Bank/01--Whole_Preset") && fs::exists("Presets/Bank/01--Whole_Preset"));
+    assert(!copy.deleteLibraryMacro("Macros/Folder") && fs::exists("Macros/Folder/A"));
     // Separator recolor and rename keep the parameter, renamed in place.
     {
         auto separators = [&]() {
@@ -326,7 +362,7 @@ int main(int argc, char** argv) {
     macro.presetManager.updateCategoryFromPath("Macros/Missing/A");
     macro.presetManager.loadMacroInsideCategory(0);
     assert(macro.presetManager.getNextPresetPath().empty());
-    std::cout << "Macro GUI regression passed: local import/save/recall, library save, four index input types, default width at canvas offsets/zooms, Load/Save modal trees, nested folder creation and separator recolor.\n";
+    std::cout << "Macro GUI regression passed: local import/save/recall, library save, four index input types, default width at canvas offsets/zooms, Load/Save modal trees, nested folder creation, confirmed library deletion and separator recolor.\n";
 }
 '''
 
@@ -344,6 +380,8 @@ def main():
                           'void ofxOceanodeNodeMacro::openMacroSaveDialog(',
                           'void ofxOceanodeNodeMacro::renderPresetControlGui()',
                           'void ofxOceanodeNodeMacro::renderMacroLoadDialog()',
+                          'void ofxOceanodeNodeMacro::openMacroDeleteDialog(',
+                          'void ofxOceanodeNodeMacro::renderMacroDeleteDialog()',
                           'void ofxOceanodeNodeMacro::renderMacroSaveDialog()',
                           'void ofxOceanodeNodeMacro::renderMacroSaveLibraryTree()',
                           'bool ofxOceanodeNodeMacro::createMacroLibraryFolder(',

@@ -395,7 +395,7 @@ A **Portal** routes a named value without drawing a long cable through the whole
 
 Portals save space, but they hide part of the path a value takes. Use clear names and check scope when two unrelated parts of a project seem to affect each other. A missing cable does not mean a value has no source.
 
-Macros can be local to a patch or saved as reusable resources. Read save prompts carefully when shared macros have changed, because other presets may use them too. Macro snapshots recall stored states inside a macro; they are different from loading an entire preset.
+Macros can be local to a patch or saved as reusable resources. Read save prompts carefully when shared macros have changed, because other presets may use them too. The **Load** and **Save As** dialogs can delete a macro from the library after you confirm. Macro snapshots recall stored states inside a macro; they are different from loading an entire preset.
 
 > A good macro has a clear purpose and a small number of controls that make sense from outside it.
 

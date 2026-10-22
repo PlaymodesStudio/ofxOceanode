@@ -94,16 +94,7 @@ bool ofxOceanodeNodeMacro::drawNodeParameter(ofxOceanodeAbstractParameter& param
 			}
 		}else{
 			pendingGuiAction = [this](){
-				const string path = getLocalWorkingDirectory() + "/Detached";
-				if(!saveLibraryDefinition(path)){
-					guiState.saveError = "Could not make a local copy.";
-					return;
-				}
-				localName = presetManager.getCurrentMacro();
-				presetManager.setLocal(true);
-				presetManager.setPresetPath(path);
-				loadMacroLayout(path);
-				markMacroReferenceUserEdited();
+				if(!detachLocalCopy()) guiState.saveError = "Could not make a local copy.";
 			};
 		}
 	}
@@ -316,7 +307,48 @@ void ofxOceanodeNodeMacro::renderMacroLoadDialog() {
 		ImGui::CloseCurrentPopup();
 	}
 	ImGui::SameLine();
-	if(ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+	// Escape belongs to the delete confirmation while it is open.
+	const bool confirmingDelete = ImGui::IsPopupOpen("Delete Macro?");
+	if(ImGui::Button("Cancel") || (!confirmingDelete && ImGui::IsKeyPressed(ImGuiKey_Escape))) ImGui::CloseCurrentPopup();
+	ImGui::SameLine();
+	ImGui::BeginDisabled(guiState.loadSelectionPath.empty() || guiState.loadSelectionIsPreset || bool(pendingGuiAction));
+	if(ImGui::Button("Delete")) openMacroDeleteDialog(guiState.loadSelectionPath, guiState.loadSelectionName);
+	ImGui::EndDisabled();
+	if(guiState.loadSelectionIsPreset && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+		ImGui::SetTooltip("Presets are deleted from the Presets menu.");
+	renderMacroDeleteDialog();
+	ImGui::EndPopup();
+}
+
+void ofxOceanodeNodeMacro::openMacroDeleteDialog(const string& path, const string& name) {
+	guiState.deleteMacroPath = path;
+	guiState.deleteMacroName = name;
+	guiState.deleteKeepsLocalCopy = usesLibraryMacro(path);
+	guiState.openDeletePopup = true;
+}
+
+// Rendered inside the Load and Save dialogs, so it opens as their child modal.
+void ofxOceanodeNodeMacro::renderMacroDeleteDialog() {
+	if(guiState.openDeletePopup){
+		ImGui::OpenPopup("Delete Macro?");
+		guiState.openDeletePopup = false;
+	}
+	MacroDialogAppearance::Style appearance;
+	if(!ImGui::BeginPopupModal("Delete Macro?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+	ImGui::Text("Macro: %s", guiState.deleteMacroName.c_str());
+	ImGui::TextDisabled("%s", guiState.deleteMacroPath.c_str());
+	ImGui::Separator();
+	ImGui::TextUnformatted("The Macro folder is permanently deleted from the library.");
+	ImGui::TextUnformatted("Presets that use this Macro will no longer find it.");
+	if(guiState.deleteKeepsLocalCopy) ImGui::TextUnformatted("This node keeps its contents as a local Macro.");
+	ImGui::Separator();
+	if(ImGui::Button("Delete", ImVec2(120, 0))){
+		const string path = guiState.deleteMacroPath;
+		pendingGuiAction = [this, path](){ deleteLibraryMacro(path); };
+		ImGui::CloseCurrentPopup();
+	}
+	ImGui::SameLine();
+	if(ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 	ImGui::EndPopup();
 }
 
@@ -521,6 +553,29 @@ void ofxOceanodeNodeMacro::renderMacroSaveDialog() {
 		ImGui::CloseCurrentPopup();
 	}
 	ImGui::EndDisabled();
+	if(guiState.saveToLibrary){
+		// Offer Delete for the existing library Macro this name would overwrite.
+		string name = ofTrim(string(guiState.saveName));
+		ofStringReplace(name, " ", "_");
+		auto category = ofxOceanodeShared::getMacroDirectoryStructure();
+		for(const auto& folder : presetManager.getSaveAsTempCategory()){
+			if(!category) break;
+			const auto child = std::find_if(category->categories.begin(), category->categories.end(),
+				[&](const shared_ptr<macroCategory>& c){ return c->name == folder; });
+			category = child == category->categories.end() ? nullptr : *child;
+		}
+		if(category){
+			for(const auto& macro : category->macros){
+				if(macro.first != name) continue;
+				ImGui::SameLine();
+				ImGui::BeginDisabled(bool(pendingGuiAction) || guiState.creatingSaveFolder);
+				if(ImGui::Button("Delete")) openMacroDeleteDialog(macro.second, macro.first);
+				ImGui::EndDisabled();
+				break;
+			}
+		}
+	}
+	renderMacroDeleteDialog();
 	ImGui::EndPopup();
 }
 

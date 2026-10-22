@@ -65,6 +65,11 @@ struct MacroGuiState {
 	std::string saveError;
 	std::string hoverMacroPath;
 	std::string hoverMacroDescription;
+	// Library Macro deletion, confirmed from the Load and Save As dialogs.
+	bool openDeletePopup = false;
+	bool deleteKeepsLocalCopy = false;
+	std::string deleteMacroPath;
+	std::string deleteMacroName;
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -202,6 +207,10 @@ private:
 	bool saveLocalDefinition();
 	bool saveLibraryDefinition(const string& path);
 	bool importPresetContents(const string& path);
+	// Keeps the current contents as a local Macro, detached from the library.
+	bool detachLocalCopy();
+	bool usesLibraryMacro(const string& path) const;
+	bool deleteLibraryMacro(const string& path);
 	const string& getLocalWorkingDirectory();
 
 	// ─── GUI rendering (implemented in ofxOceanodeNodeMacroGui.cpp) ──────
@@ -211,6 +220,8 @@ private:
 	void renderMacroSaveDialog();
 	void renderMacroSaveLibraryTree();
 	bool createMacroLibraryFolder(const string& name);
+	void openMacroDeleteDialog(const string& path, const string& name);
+	void renderMacroDeleteDialog();
 	void renderPresetNamingGui();
 	void renderMinimizedView(ImVec2 size);
 	void renderSnapshotMatrix();

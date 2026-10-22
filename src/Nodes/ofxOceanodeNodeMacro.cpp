@@ -21,6 +21,14 @@ namespace {
         CanvasUndoSnapshotScope(){ ++canvasUndoSnapshotDepth; }
         ~CanvasUndoSnapshotScope(){ --canvasUndoSnapshotDepth; }
     };
+
+    // Library paths arrive relative, absolute or with "..": compare them resolved.
+    std::filesystem::path resolvedMacroPath(const string& path){
+        const std::filesystem::path absolute = ofToDataPath(path, true);
+        std::error_code error;
+        const auto resolved = std::filesystem::weakly_canonical(absolute, error);
+        return error ? absolute.lexically_normal() : resolved;
+    }
 }
 
 // ─── Constructor ─────────────────────────────────────────────────────────────
@@ -861,6 +869,54 @@ bool ofxOceanodeNodeMacro::importPresetContents(const string& path){
 	presetManager.getCurrentCategory().clear();
 	presetManager.setCurrentCategoryMacro(nullptr);
 	markMacroReferenceUserEdited();
+	return true;
+}
+
+bool ofxOceanodeNodeMacro::detachLocalCopy(){
+	const string path = getLocalWorkingDirectory() + "/Detached";
+	if(!saveLibraryDefinition(path)) return false;
+	localName = presetManager.getCurrentMacro();
+	presetManager.setLocal(true);
+	presetManager.setPresetPath(path);
+	loadMacroLayout(path);
+	markMacroReferenceUserEdited();
+	return true;
+}
+
+bool ofxOceanodeNodeMacro::usesLibraryMacro(const string& path) const{
+	return !presetManager.isLocal() && !presetManager.getCurrentMacroPath().empty() &&
+	       resolvedMacroPath(presetManager.getCurrentMacroPath()) == resolvedMacroPath(path);
+}
+
+bool ofxOceanodeNodeMacro::deleteLibraryMacro(const string& path){
+	namespace fs = std::filesystem;
+	const fs::path target = resolvedMacroPath(path);
+	const fs::path relative = target.lexically_relative(resolvedMacroPath("Macros"));
+	// remove_all is unrecoverable: accept only a Macro definition inside the library.
+	if(relative.empty() || *relative.begin() == ".." || *relative.begin() == "." ||
+	   !fs::exists(target / "modules.json")){
+		guiState.saveError = "Only Macros in the library can be deleted.";
+		return false;
+	}
+	// Other instances keep their loaded contents; this one must not keep
+	// pointing at a folder that no longer exists.
+	if(usesLibraryMacro(path) && !detachLocalCopy()){
+		guiState.saveError = "Could not keep a local copy, so the Macro was not deleted.";
+		return false;
+	}
+	std::error_code error;
+	fs::remove_all(target, error);
+	ofxOceanodeShared::updateMacrosStructure();
+	if(resolvedMacroPath(guiState.loadSelectionPath) == target){
+		guiState.loadSelectionPath.clear();
+		guiState.loadSelectionName.clear();
+	}
+	guiState.hoverMacroPath.clear();
+	guiState.confirmOverwrite = false;
+	if(error){
+		guiState.saveError = "Could not delete Macro: " + error.message();
+		return false;
+	}
 	return true;
 }
 
