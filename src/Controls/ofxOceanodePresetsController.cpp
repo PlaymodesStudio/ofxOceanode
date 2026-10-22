@@ -483,6 +483,38 @@ void ofxOceanodePresetsController::beginSavePreset(string name, string bank, boo
     else popupRequest = PopupRequest::ReviewSave;
 }
 
+void drawGlobalMacroSaveChanges(const GlobalMacroSaveReview& review, float width){
+    // Size short reviews to their content and keep longer lists scrollable.
+    const float maxHeight = std::min(ImGui::GetTextLineHeightWithSpacing() * 18.0f,
+                                     ImGui::GetIO().DisplaySize.y * 0.45f);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(width, maxHeight));
+    ImGui::BeginChild("Changes", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY);
+    for(size_t changeIndex = 0; changeIndex < review.changes.size(); ++changeIndex){
+        const auto& change = review.changes[changeIndex];
+        ImGui::PushID(static_cast<int>(changeIndex));
+        if(changeIndex > 0) ImGui::Spacing();
+        std::string changeTitle = review.name + " / ";
+        if(change.location != review.instancePath){
+            const std::string prefix = review.instancePath + " > ";
+            changeTitle += (change.location.rfind(prefix, 0) == 0
+                            ? change.location.substr(prefix.size()) : change.location) + " / ";
+        }
+        changeTitle += change.item;
+        drawReviewChangeTitle(changeTitle, change.kind == GlobalMacroSaveChange::Kind::MacroReplacement
+                                          ? "Macro replacement" : change.field);
+        if(change.field == "Node added" || change.field == "Connection added"){
+            ImGui::NewLine();
+        }else{
+            ImGui::Indent();
+            drawReviewLabelValue("Old:", change.saved);
+            drawReviewLabelValue("New:", change.current);
+            ImGui::Unindent();
+        }
+        ImGui::PopID();
+    }
+    ImGui::EndChild();
+}
+
 void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
     const float reviewWidth = std::min(920.0f, ImGui::GetIO().DisplaySize.x * 0.85f);
     ImGui::SetNextWindowSizeConstraints(ImVec2(reviewWidth, 0.0f),
@@ -519,35 +551,7 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
     if(samePathAlreadySelected) ImGui::TextWrapped("Another instance has already been chosen to save this global macro.");
 
     ImGui::Separator();
-    // Size short reviews to their content and keep longer lists scrollable.
-    const float maxHeight = std::min(ImGui::GetTextLineHeightWithSpacing() * 18.0f,
-                                     ImGui::GetIO().DisplaySize.y * 0.45f);
-    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(reviewWidth, maxHeight));
-    ImGui::BeginChild("Changes", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY);
-    for(size_t changeIndex = 0; changeIndex < review.changes.size(); ++changeIndex){
-        const auto& change = review.changes[changeIndex];
-        ImGui::PushID(static_cast<int>(changeIndex));
-        if(changeIndex > 0) ImGui::Spacing();
-        std::string changeTitle = review.name + " / ";
-        if(change.location != review.instancePath){
-            const std::string prefix = review.instancePath + " > ";
-            changeTitle += (change.location.rfind(prefix, 0) == 0
-                            ? change.location.substr(prefix.size()) : change.location) + " / ";
-        }
-        changeTitle += change.item;
-        drawReviewChangeTitle(changeTitle, change.kind == GlobalMacroSaveChange::Kind::MacroReplacement
-                                          ? "Macro replacement" : change.field);
-        if(change.field == "Node added" || change.field == "Connection added"){
-            ImGui::NewLine();
-        }else{
-            ImGui::Indent();
-            drawReviewLabelValue("Old:", change.saved);
-            drawReviewLabelValue("New:", change.current);
-            ImGui::Unindent();
-        }
-        ImGui::PopID();
-    }
-    ImGui::EndChild();
+    drawGlobalMacroSaveChanges(review, reviewWidth);
 
     if(request.writing){
         if(ImGui::Button("Retry macro save")){
@@ -1051,6 +1055,28 @@ void compareContainer(ofxOceanodeContainer& container, const std::string& savedF
 #endif
 }
 
+// Nested global macros are separate definitions; they get their own review.
+GlobalMacroSaveReview reviewGlobalMacro(ofxOceanodeContainer& owner, ofxOceanodeNode& node,
+                                        ofxOceanodeNodeMacro& macro, const std::string& instancePath){
+    GlobalMacroSaveReview review;
+    review.instance = &macro;
+    review.name = macro.getCurrentMacroName();
+    review.globalPath = canonicalMacroPath(macro.getCurrentMacroPath());
+    review.instancePath = instancePath;
+    compareContainer(*macro.getContainer(), review.globalPath, instancePath, review.changes);
+    const ofJson savedSort = readJson(review.globalPath + "/router_sort_order.json");
+    const ofJson currentSort = macro.getRouterSortOrder();
+    const ofJson oldOrder = field(savedSort, "RouterSortOrder");
+    if(macro.wasRouterOrderUserEdited() && !(oldOrder.is_null() && currentSort.empty()))
+        addChange(review.changes, instancePath, "Macro interface", "Router order", oldOrder, currentSort);
+    const ofJson savedDescription = readJson(review.globalPath + "/description.json");
+    const ofJson currentDescription = macro.getMacroDescription();
+    if(owner.wasValueUserEdited(node, "Description", currentDescription, true))
+        addChange(review.changes, instancePath, "Macro info", "Description",
+                  field(savedDescription, "Description"), currentDescription);
+    return review;
+}
+
 void visitMacros(ofxOceanodeContainer& container, const std::string& breadcrumb,
                  std::set<ofxOceanodeNodeMacro*>& visited,
                  std::vector<GlobalMacroSaveReview>& reviews){
@@ -1059,22 +1085,7 @@ void visitMacros(ofxOceanodeContainer& container, const std::string& breadcrumb,
         if(macro == nullptr || !visited.insert(macro).second) continue;
         const std::string instancePath = breadcrumb + " > " + nodeLabel(*node);
         if(!macro->isLocal() && !macro->getCurrentMacroPath().empty()){
-            GlobalMacroSaveReview review;
-            review.instance = macro;
-            review.name = macro->getCurrentMacroName();
-            review.globalPath = canonicalMacroPath(macro->getCurrentMacroPath());
-            review.instancePath = instancePath;
-            compareContainer(*macro->getContainer(), review.globalPath, instancePath, review.changes);
-            const ofJson savedSort = readJson(review.globalPath + "/router_sort_order.json");
-            const ofJson currentSort = macro->getRouterSortOrder();
-            const ofJson oldOrder = field(savedSort, "RouterSortOrder");
-            if(macro->wasRouterOrderUserEdited() && !(oldOrder.is_null() && currentSort.empty()))
-                addChange(review.changes, instancePath, "Macro interface", "Router order", oldOrder, currentSort);
-            const ofJson savedDescription = readJson(review.globalPath + "/description.json");
-            const ofJson currentDescription = macro->getMacroDescription();
-            if(container.wasValueUserEdited(*node, "Description", currentDescription, true))
-                addChange(review.changes, instancePath, "Macro info", "Description",
-                          field(savedDescription, "Description"), currentDescription);
+            auto review = reviewGlobalMacro(container, *node, *macro, instancePath);
             if(!review.changes.empty()) reviews.push_back(std::move(review));
         }
         visitMacros(*macro->getContainer(), instancePath, visited, reviews);
@@ -1082,6 +1093,12 @@ void visitMacros(ofxOceanodeContainer& container, const std::string& breadcrumb,
 }
 
 } // namespace
+
+GlobalMacroSaveReview collectGlobalMacroSaveReview(ofxOceanodeContainer& owner, ofxOceanodeNode& node){
+    auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node.getNodeModel());
+    if(macro == nullptr || macro->isLocal() || macro->getCurrentMacroPath().empty()) return {};
+    return reviewGlobalMacro(owner, node, *macro, nodeLabel(node));
+}
 
 std::vector<GlobalMacroSaveReview> collectGlobalMacroSaveReviews(ofxOceanodeContainer& root){
     std::vector<GlobalMacroSaveReview> reviews;

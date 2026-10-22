@@ -920,6 +920,24 @@ bool ofxOceanodeNodeMacro::deleteLibraryMacro(const string& path){
 	return true;
 }
 
+void ofxOceanodeNodeMacro::requestMacroLoad(const string& path, bool isPreset){
+	if(isPreset){
+		pendingGuiAction = [this, path](){
+			if(!importPresetContents(path)) guiState.saveError = "Could not import preset.";
+		};
+	}else{
+		presetManager.setNextPresetPath(path);
+		pendingMacroReferenceUserEdited = true;
+	}
+}
+
+void ofxOceanodeNodeMacro::requestMacroSave(){
+	pendingGuiAction = [this](){
+		if(!(presetManager.isLocal() ? saveLocalDefinition() : saveGlobalDefinition()))
+			guiState.saveError = "Could not save Macro contents.";
+	};
+}
+
 bool ofxOceanodeNodeMacro::saveGlobalDescription(const string& folderPath) const{
 	ofJson json;
 	json["Description"] = macroDescription.get();

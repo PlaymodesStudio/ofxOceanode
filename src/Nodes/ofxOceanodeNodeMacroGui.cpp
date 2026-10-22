@@ -149,10 +149,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 	if(ImGui::Button("Save", ImVec2(saveText + padding, 0))){
 		guiState.saveError.clear();
 		if(presetManager.isLocal() && localName.get().empty()) openMacroSaveDialog(false);
-		else pendingGuiAction = [this](){
-			if(!(presetManager.isLocal() ? saveLocalDefinition() : saveGlobalDefinition()))
-				guiState.saveError = "Could not save Macro contents.";
-		};
+		else if(!reviewUnsavedChanges(false)) requestMacroSave();
 	}
 	ImGui::SameLine();
 	if(ImGui::Button("Save As", ImVec2(saveAsText + padding, 0))) openMacroSaveDialog(true);
@@ -160,6 +157,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 
 	renderMacroLoadDialog();
 	renderMacroSaveDialog();
+	renderMacroUnsavedChangesDialog();
 	if(!guiState.saveError.empty() && !ImGui::IsPopupOpen("Save Macro")){
 		ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width);
 		ImGui::TextUnformatted(guiState.saveError.c_str());
@@ -296,14 +294,9 @@ void ofxOceanodeNodeMacro::renderMacroLoadDialog() {
 	ImGui::EndDisabled();
 	if(!guiState.loadSelectionPath.empty() && (load || activateSelection)){
 		const string path = guiState.loadSelectionPath;
-		if(guiState.loadSelectionIsPreset){
-			pendingGuiAction = [this, path](){
-				if(!importPresetContents(path)) guiState.saveError = "Could not import preset.";
-			};
-		}else{
-			presetManager.setNextPresetPath(path);
-			pendingMacroReferenceUserEdited = true;
-		}
+		const bool isPreset = guiState.loadSelectionIsPreset;
+		// Loading replaces the contents: offer to save unsaved library edits first.
+		if(!reviewUnsavedChanges(true, path, guiState.loadSelectionName, isPreset)) requestMacroLoad(path, isPreset);
 		ImGui::CloseCurrentPopup();
 	}
 	ImGui::SameLine();
@@ -349,6 +342,69 @@ void ofxOceanodeNodeMacro::renderMacroDeleteDialog() {
 	}
 	ImGui::SameLine();
 	if(ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+	ImGui::EndPopup();
+}
+
+bool ofxOceanodeNodeMacro::reviewUnsavedChanges(bool forLoad, const string& loadPath, const string& loadName, bool loadIsPreset) {
+	if(presetManager.isLocal() || !parentContainer || isLoadingPreset || !presetManager.getNextPresetPath().empty()) return false;
+	for(auto* node : parentContainer->getAllModules()){
+		if(&node->getNodeModel() != this) continue;
+		auto review = collectGlobalMacroSaveReview(*parentContainer, *node);
+		if(review.changes.empty()) return false;
+		guiState.unsavedReview = std::move(review);
+		guiState.unsavedForLoad = forLoad;
+		guiState.unsavedLoadPath = loadPath;
+		guiState.unsavedLoadName = loadName;
+		guiState.unsavedLoadIsPreset = loadIsPreset;
+		guiState.openUnsavedPopup = true;
+		return true;
+	}
+	return false;
+}
+
+void ofxOceanodeNodeMacro::renderMacroUnsavedChangesDialog() {
+	if(guiState.openUnsavedPopup){
+		ImGui::OpenPopup("Unsaved Macro Changes");
+		guiState.openUnsavedPopup = false;
+	}
+	const ImVec2 display = ImGui::GetIO().DisplaySize;
+	const float width = std::min(720.f, display.x * .85f);
+	ImGui::SetNextWindowSizeConstraints(ImVec2(width, 0), ImVec2(width, display.y * .85f));
+	MacroDialogAppearance::Style appearance;
+	if(!ImGui::BeginPopupModal("Unsaved Macro Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+	const auto& review = guiState.unsavedReview;
+	if(guiState.unsavedForLoad){
+		ImGui::TextWrapped("Macro \"%s\" has changes that are not saved to the library. Loading \"%s\" replaces them.",
+			review.name.c_str(), guiState.unsavedLoadName.c_str());
+	}else{
+		ImGui::TextWrapped("Save these changes to library Macro \"%s\"? Every preset that uses it will load them.",
+			review.name.c_str());
+	}
+	ImGui::TextDisabled("%s", review.globalPath.c_str());
+	ImGui::Separator();
+	drawGlobalMacroSaveChanges(review, width);
+	ImGui::Separator();
+	if(guiState.unsavedForLoad){
+		const string path = guiState.unsavedLoadPath;
+		const bool isPreset = guiState.unsavedLoadIsPreset;
+		if(ImGui::Button("Save and Load")){
+			pendingGuiAction = [this, path, isPreset](){
+				if(saveGlobalDefinition()) requestMacroLoad(path, isPreset);
+				else guiState.saveError = "Could not save Macro contents, so nothing was loaded.";
+			};
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if(ImGui::Button("Load Without Saving")){
+			requestMacroLoad(path, isPreset);
+			ImGui::CloseCurrentPopup();
+		}
+	}else if(ImGui::Button("Save")){
+		requestMacroSave();
+		ImGui::CloseCurrentPopup();
+	}
+	ImGui::SameLine();
+	if(ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 	ImGui::EndPopup();
 }
 

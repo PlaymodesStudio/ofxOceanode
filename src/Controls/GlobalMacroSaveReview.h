@@ -4,6 +4,7 @@
 #include <vector>
 
 class ofxOceanodeContainer;
+class ofxOceanodeNode;
 class ofxOceanodeNodeMacro;
 
 struct GlobalMacroSaveChange {
@@ -30,3 +31,10 @@ struct GlobalMacroSaveReview {
 
 // Reads the global macro folders but never writes to them.
 std::vector<GlobalMacroSaveReview> collectGlobalMacroSaveReviews(ofxOceanodeContainer& root);
+
+// Compares one global Macro node, owned by `owner`, with its library folder.
+// A local Macro returns no changes; nested global Macros are not included.
+GlobalMacroSaveReview collectGlobalMacroSaveReview(ofxOceanodeContainer& owner, ofxOceanodeNode& node);
+
+// Draws the review's change list inside the current ImGui window.
+void drawGlobalMacroSaveChanges(const GlobalMacroSaveReview& review, float width);

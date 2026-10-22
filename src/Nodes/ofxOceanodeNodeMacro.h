@@ -23,6 +23,7 @@
 #include "MacroMorphEngine.h"
 #include "MacroRouterManager.h"
 #include "MacroPresetManager.h"
+#include "GlobalMacroSaveReview.h"
 
 #ifdef OFXOCEANODE_USE_OSC
 class ofxOscMessage;
@@ -70,6 +71,13 @@ struct MacroGuiState {
 	bool deleteKeepsLocalCopy = false;
 	std::string deleteMacroPath;
 	std::string deleteMacroName;
+	// Unsaved library edits, reviewed before Save, or before Load replaces them.
+	bool openUnsavedPopup = false;
+	bool unsavedForLoad = false;
+	bool unsavedLoadIsPreset = false;
+	std::string unsavedLoadPath;
+	std::string unsavedLoadName;
+	GlobalMacroSaveReview unsavedReview;
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -211,6 +219,9 @@ private:
 	bool detachLocalCopy();
 	bool usesLibraryMacro(const string& path) const;
 	bool deleteLibraryMacro(const string& path);
+	// Deferred to update(), outside the ImGui pass.
+	void requestMacroLoad(const string& path, bool isPreset);
+	void requestMacroSave();
 	const string& getLocalWorkingDirectory();
 
 	// ─── GUI rendering (implemented in ofxOceanodeNodeMacroGui.cpp) ──────
@@ -222,6 +233,8 @@ private:
 	bool createMacroLibraryFolder(const string& name);
 	void openMacroDeleteDialog(const string& path, const string& name);
 	void renderMacroDeleteDialog();
+	bool reviewUnsavedChanges(bool forLoad, const string& loadPath = "", const string& loadName = "", bool loadIsPreset = false);
+	void renderMacroUnsavedChangesDialog();
 	void renderPresetNamingGui();
 	void renderMinimizedView(ImVec2 size);
 	void renderSnapshotMatrix();
