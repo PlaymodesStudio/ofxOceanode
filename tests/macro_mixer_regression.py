@@ -324,13 +324,50 @@ int main(int argc,char** argv) {
         auto* child=dynamic_cast<ofxOceanodeNodeMacro*>(&mixer.origin()->container->getDynamicNodes().at("Macro").at(1)->getNodeModel());
         assert(child && child->getContainer()->getAllModules().size()==3);
         std::string path=ofxOceanodeShared::getMacroDirectoryStructure()->categories.front()->macros.front().second;
+        // Saving a global definition updates the graph but keeps each
+        // instance's own exposed values.
+        child->getParameter<float>("Value")=.7;
         auto controls=ofLoadJson(library+"/Router_f_1.json");controls["Value"]=.9;write(library+"/Router_f_1.json",controls);
-        ofxOceanodeShared::getMacroUpdatedEvent().notify(path);near(child->getParameter<float>("Value"),.9);
+        ofxOceanodeShared::getMacroUpdatedEvent().notify(path);near(child->getParameter<float>("Value"),.7);
         auto edited=ofLoadJson(library+"/modules.json");edited["External Endpoint"]["01"]={0,0};write(library+"/modules.json",edited);
         write(library+"/External_Endpoint_1.json",ofJson::object());
         ofxOceanodeShared::getMacroUpdatedEvent().notify(path);
-        assert(child->getContainer()->getAllModules().size()==3 && blockedSetups==0);near(child->getParameter<float>("Value"),.9);
+        assert(child->getContainer()->getAllModules().size()==3 && blockedSetups==0);near(child->getParameter<float>("Value"),.7);
         mixer.update(10);near(mixer.value(),.55);assert(!mixer.importMacro(global,true));
+    }
+    // Instances of one global Macro share a single canvas tab; local Macros keep their own.
+    {
+        // The library definition now holds the External Endpoint added above.
+        const int blockedBefore=blockedSetups;
+        auto globalInstance=[&](int id)->ofxOceanodeNodeMacro& {
+            auto& macro=static_cast<ofxOceanodeNodeMacro&>(parent.createNode(std::make_unique<ofxOceanodeNodeMacro>(),id).getNodeModel());
+            ofJson reference={{"LocalPreset",false},{"CategoryStruct",ofJson::array({"group"})},{"Macro","source"}};
+            macro.macroLoad(reference,scratch);assert(!macro.isLocal());return macro;
+        };
+        auto& first=globalInstance(1); auto& second=globalInstance(2);
+        auto& local=static_cast<ofxOceanodeNodeMacro&>(parent.createNode(std::make_unique<ofxOceanodeNodeMacro>(),3).getNodeModel());
+        assert(local.loadMacroSource(a));
+        // Showing any instance opens the first one; only it can close the tab.
+        assert(&second.windowInstance()==&first && &local.windowInstance()==&local);
+        // Only the first instance may save over the library Macro.
+        assert(first.canSaveDefinition() && !second.canSaveDefinition() && local.canSaveDefinition());
+        assert(first.sharesGlobalMacroWith(second) && !first.sharesGlobalMacroWith(local));
+        second.setWindowVisible(true);
+        assert(first.isWindowVisible() && !second.isWindowVisible() && second.isSharedWindowVisible());
+        assert(second.isWindowShownByOtherInstance() && !first.isWindowShownByOtherInstance());
+        assert(!local.isSharedWindowVisible());
+        second.activateWindow(); assert(first.isWindowVisible() && !second.isWindowVisible());
+        local.setWindowVisible(true); assert(local.isWindowVisible() && first.isWindowVisible());
+        // Navigation into the second instance lands on the matching node of the first.
+        auto& firstNodes=first.getContainer()->getParameterGroupNodesMap();
+        auto& secondNodes=second.getContainer()->getParameterGroupNodesMap();
+        assert(!secondNodes.empty());
+        const auto target=second.windowTargetFor(secondNodes.begin()->second);
+        assert(target.macro==&first && target.node==firstNodes.at(secondNodes.begin()->first));
+        assert(first.windowTargetFor(firstNodes.begin()->second).node==firstNodes.begin()->second);
+        first.setWindowVisible(false);
+        assert(!first.isSharedWindowVisible() && !second.isSharedWindowVisible() && local.isWindowVisible());
+        parent.clearContainer(); blockedSetups=blockedBefore;
     }
     const auto cycle=scratch+"/cycle";saveSource(cycle,.5);
     auto cyclicModules=ofLoadJson(cycle+"/modules.json");cyclicModules["Macro"]["01"]={0,0};write(cycle+"/modules.json",cyclicModules);

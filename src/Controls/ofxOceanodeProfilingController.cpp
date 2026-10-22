@@ -93,6 +93,19 @@ bool ofxOceanodeProfilingController::locate(const std::shared_ptr<Record>& recor
     };
     find(container.get(), canvas, nullptr);
     if(!found) return false; // Deleted nodes and private MacroMixer graphs.
+    if(owner){
+        // Instances of a global Macro share one tab: go to the matching node there.
+        const auto shown = owner->windowTargetFor(found);
+        owner = shown.macro;
+        host = owner->getContainer().get();
+        targetCanvas = owner->getCanvas();
+        if(!shown.node){
+            owner->activateWindow();
+            ofxOceanodeShared::setActiveCanvasUniqueID(targetCanvas->getUniqueID());
+            return true;
+        }
+        found = shown.node;
+    }
     if(owner) owner->activateWindow();
     else { targetCanvas->requestFocus(); targetCanvas->bringOnTop(); }
     ofxOceanodeShared::setActiveCanvasUniqueID(targetCanvas->getUniqueID());

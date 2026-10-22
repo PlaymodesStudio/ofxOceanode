@@ -225,8 +225,21 @@ bool ofxOceanodeNodesController::findNode(ofxOceanodeNode* target,
     return false;
 }
 
-void ofxOceanodeNodesController::navigateTo(const NavigableNode& target)
+void ofxOceanodeNodesController::navigateTo(const NavigableNode& requested)
 {
+    NavigableNode target = requested;
+    if(target.macro) {
+        // Instances of a global Macro share one tab: go to the matching node there.
+        const auto shown = target.macro->windowTargetFor(target.node);
+        target.macro = shown.macro;
+        target.canvas = shown.macro->getCanvas();
+        if(!shown.node) {
+            shown.macro->activateWindow();
+            ofxOceanodeShared::setActiveCanvasUniqueID(target.canvas->getUniqueID());
+            return;
+        }
+        target.node = shown.node;
+    }
     selectedNode = target.node;
     auto host = target.macro ? target.macro->getContainer() : container;
     for(auto& pair : host->getParameterGroupNodesMap()) pair.second->getNodeGui().setSelected(false);
@@ -309,7 +322,7 @@ void ofxOceanodeNodesController::drawRow(VisibleRow& row, int rowIndex)
     if(entry.macro) {
         if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0) && !ImGui::IsItemToggledOpen()) {
             entry.macro->activateWindow();
-            ofxOceanodeShared::setActiveCanvasUniqueID(entry.macro->getCanvas()->getUniqueID());
+            ofxOceanodeShared::setActiveCanvasUniqueID(entry.macro->windowInstance().getCanvas()->getUniqueID());
             ofxOceanodeShared::nodeSelectedInCanvas(nullptr);
             refocusNodesDelay = 4;
             pendingScrollNode = nullptr;

@@ -1084,7 +1084,8 @@ void visitMacros(ofxOceanodeContainer& container, const std::string& breadcrumb,
         auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel());
         if(macro == nullptr || !visited.insert(macro).second) continue;
         const std::string instancePath = breadcrumb + " > " + nodeLabel(*node);
-        if(!macro->isLocal() && !macro->getCurrentMacroPath().empty()){
+        // Only the instance shown in the shared tab may save its global Macro.
+        if(!macro->isLocal() && !macro->getCurrentMacroPath().empty() && macro->canSaveDefinition()){
             auto review = reviewGlobalMacro(container, *node, *macro, instancePath);
             if(!review.changes.empty()) reviews.push_back(std::move(review));
         }

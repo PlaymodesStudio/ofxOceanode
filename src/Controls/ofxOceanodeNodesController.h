@@ -77,7 +77,7 @@ private:
     bool findNode(ofxOceanodeNode* target, const shared_ptr<ofxOceanodeContainer>& host,
                   ofxOceanodeCanvas* hostCanvas, ofxOceanodeNodeMacro* hostMacro,
                   NavigableNode& location);
-    void navigateTo(const NavigableNode& target);
+    void navigateTo(const NavigableNode& requested);
     void drawRow(VisibleRow& row, int rowIndex);
 
     std::unordered_map<ofxOceanodeContainer*, CachedContainer> nodeCaches;

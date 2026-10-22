@@ -2928,7 +2928,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         container->endCanvasEdit();
 
     // ──────────────────────────────────────────────────────────────────────
-    // Alt+Left/Right: cycle through matching portal instances across the whole patch.
+    // Alt+Left/Right: cycle through matching portal instances across the whole patch,
+    // or through the instances of the selected global Macro.
     //
     // This handler is intentionally placed OUTSIDE the per-window Begin/End block
     // and gated to run only for the ROOT canvas (parentID == "") so that:
@@ -2958,6 +2959,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 // so we never assume it is in `this` canvas.
                 struct PortalLocation {
                     abstractPortal*       portal      = nullptr;
+                    ofxOceanodeNodeMacro* globalMacro = nullptr; // set instead of portal
                     ofxOceanodeNode*      node        = nullptr;
                     ofxOceanodeCanvas*    canvas      = nullptr;
                     ofxOceanodeNodeMacro* macro       = nullptr; // null for root
@@ -2965,19 +2967,23 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 
                 std::function<void(ofxOceanodeContainer*, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*, PortalLocation&)> findSelectedPortal =
                 [&](ofxOceanodeContainer* c, ofxOceanodeCanvas* cv, ofxOceanodeNodeMacro* m, PortalLocation& out){
-                    if(out.portal != nullptr) return;
+                    if(out.node != nullptr) return;
                     for(auto* node : c->getAllModules()){
-                        if(out.portal != nullptr) return;
+                        if(out.node != nullptr) return;
+                        auto* nestedMacro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel());
                         if(node->getNodeGui().getSelected()){
-                            if(auto* p = dynamic_cast<abstractPortal*>(&node->getNodeModel())){
-                                out.portal = p;
-                                out.node   = node;
-                                out.canvas = cv;
-                                out.macro  = m;
+                            auto* p = dynamic_cast<abstractPortal*>(&node->getNodeModel());
+                            if(p != nullptr || (nestedMacro != nullptr && !nestedMacro->isLocal())){
+                                out.portal      = p;
+                                out.globalMacro = p ? nullptr : nestedMacro;
+                                out.node        = node;
+                                out.canvas      = cv;
+                                out.macro       = m;
                                 return;
                             }
                         }
-                        if(auto* nestedMacro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
+                        // Other instances of a global Macro are never shown in a tab.
+                        if(nestedMacro != nullptr && &nestedMacro->windowInstance() == nestedMacro){
                             findSelectedPortal(nestedMacro->getContainer().get(), nestedMacro->getCanvas(), nestedMacro, out);
                         }
                     }
@@ -2986,7 +2992,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 PortalLocation selected;
                 findSelectedPortal(rootContainer, rootCanvas, nullptr, selected);
 
-                if(selected.portal != nullptr && selected.node != nullptr){
+                if(selected.node != nullptr){
                     struct PortalMatch {
                         ofxOceanodeNode*      node;
                         ofxOceanodeCanvas*    canvas;
@@ -2998,13 +3004,22 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     std::function<void(ofxOceanodeContainer*, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*)> collectMatches =
                     [&](ofxOceanodeContainer* c, ofxOceanodeCanvas* cv, ofxOceanodeNodeMacro* mm){
                         for(auto* node : c->getAllModules()){
-                            if(auto* p = dynamic_cast<abstractPortal*>(&node->getNodeModel())){
-                                if(p->isMatching(selected.portal)){
-                                    matches.push_back({node, cv, mm, node->getNodeGui().getPosition().x});
-                                }
+                            auto* nestedMacro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel());
+                            bool matching = false;
+                            if(selected.portal != nullptr){
+                                auto* p = dynamic_cast<abstractPortal*>(&node->getNodeModel());
+                                matching = p != nullptr && p->isMatching(selected.portal);
+                            }else if(nestedMacro != nullptr){
+                                matching = nestedMacro == selected.globalMacro ||
+                                           selected.globalMacro->sharesGlobalMacroWith(*nestedMacro);
                             }
-                            if(auto* nestedMacro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
-                                collectMatches(nestedMacro->getContainer().get(), nestedMacro->getCanvas(), nestedMacro);
+                            if(matching){
+                                matches.push_back({node, cv, mm, node->getNodeGui().getPosition().x});
+                            }
+                            if(nestedMacro != nullptr){
+                                // Other instances of a global Macro are never shown in a tab.
+                                if(&nestedMacro->windowInstance() == nestedMacro)
+                                    collectMatches(nestedMacro->getContainer().get(), nestedMacro->getCanvas(), nestedMacro);
                             }
                         }
                     };

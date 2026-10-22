@@ -442,7 +442,7 @@ void ofxOceanodeHierarchyController::draw()
             if (entries[i].macroNode != nullptr) {
                 // Open the macro's own interior canvas
                 entries[i].macroNode->activateWindow();
-                ofxOceanodeShared::setActiveCanvasUniqueID(entries[i].canvas->getUniqueID());
+                ofxOceanodeShared::setActiveCanvasUniqueID(entries[i].macroNode->windowInstance().getCanvas()->getUniqueID());
             } else {
                 // Root canvas: just focus it
                 entries[i].canvas->requestFocus();
@@ -476,29 +476,37 @@ void ofxOceanodeHierarchyController::draw()
 
             // Execute the original single-click logic
             if (entries[i].macroNode != nullptr && entries[i].hostCanvas != nullptr) {
+                auto* hostCanvas = entries[i].hostCanvas;
+                auto* hostContainer = entries[i].hostContainer;
+                auto* nodeWrapper = entries[i].nodeWrapper;
                 // Navigate to the parent canvas where this macro node lives
                 if (entries[i].hostMacro != nullptr) {
-                    entries[i].hostMacro->activateWindow();
+                    // Instances of a global Macro share one tab: use the matching node there.
+                    const auto shown = entries[i].hostMacro->windowTargetFor(nodeWrapper);
+                    hostCanvas = shown.macro->getCanvas();
+                    hostContainer = shown.macro->getContainer().get();
+                    nodeWrapper = shown.node;
+                    shown.macro->activateWindow();
                 } else {
-                    entries[i].hostCanvas->requestFocus();
-                    entries[i].hostCanvas->bringOnTop();
+                    hostCanvas->requestFocus();
+                    hostCanvas->bringOnTop();
                 }
-                ofxOceanodeShared::setActiveCanvasUniqueID(entries[i].hostCanvas->getUniqueID());
+                ofxOceanodeShared::setActiveCanvasUniqueID(hostCanvas->getUniqueID());
 
                 // Select the macro node in the host canvas (deselect all others)
-                if (entries[i].nodeWrapper != nullptr) {
-                    for (auto& pair : entries[i].hostContainer->getParameterGroupNodesMap()) {
+                if (nodeWrapper != nullptr) {
+                    for (auto& pair : hostContainer->getParameterGroupNodesMap()) {
                         pair.second->getNodeGui().setSelected(false);
                     }
-                    entries[i].nodeWrapper->getNodeGui().setSelected(true);
+                    nodeWrapper->getNodeGui().setSelected(true);
 
                     // Notify shared system so NodesController/Inspector can react
-                    ofxOceanodeShared::nodeSelectedInCanvas(entries[i].nodeWrapper);
+                    ofxOceanodeShared::nodeSelectedInCanvas(nodeWrapper);
 
                     // Defer centering to next frame so canvas layout is valid
                     pendingCenter = true;
-                    pendingCenterNode = entries[i].nodeWrapper;
-                    pendingCenterCanvas = entries[i].hostCanvas;
+                    pendingCenterNode = nodeWrapper;
+                    pendingCenterCanvas = hostCanvas;
                 }
             } else {
                 // Root canvas: just focus it

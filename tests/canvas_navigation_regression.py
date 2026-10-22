@@ -85,6 +85,9 @@ struct ofxOceanodeNodeMacro:Model {
     ofxOceanodeCanvas canvas; int activations=0; bool visible=true;
     auto getContainer(){return container;} auto getCanvas(){return &canvas;}
     void activateWindow(){visible=true;++activations;canvas.requestFocus();}
+    struct WindowTarget {ofxOceanodeNodeMacro* macro; ofxOceanodeNode* node;};
+    ofxOceanodeNodeMacro& windowInstance(){return *this;}
+    WindowTarget windowTargetFor(ofxOceanodeNode* node){return {this,node};}
 };
 struct ofxOceanodeShared {
     inline static ofxOceanodeContainer* root=nullptr;

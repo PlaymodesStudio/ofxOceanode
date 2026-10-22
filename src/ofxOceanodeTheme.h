@@ -17,6 +17,8 @@ public:
     void setup() override{
         ImGuiStyle* style = &ImGui::GetStyle();
         ImVec4* colors = style->Colors;
+        // Hide the docking-menu/collapse icon and reclaim its title-bar space.
+        style->WindowMenuButtonPosition = ImGuiDir_None;
         // Wider gap between docked windows; painted with OceanodeColors::DockGutter.
         style->DockingSeparatorSize = 4.0f;
         

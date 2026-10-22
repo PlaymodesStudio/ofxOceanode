@@ -1,6 +1,7 @@
 #pragma once
 
 #include "imgui_internal.h"
+#include "ofxOceanodeDockCollapse.h"
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -11,9 +12,26 @@
 // see the proportional layout in the same frame. No dock topology is changed.
 class ofxOceanodeProportionalDocking {
 public:
-    void reset() { splits.clear(); activeID = 0; lastFrame = -1; }
+    void reset() { resetDrag(); dockCollapse.reset(); }
+
+    void drawDockCollapseHandles() { dockCollapse.drawHandles(); }
 
     void dockSpace(ImGuiID id, ImVec2 size, ImGuiDockNodeFlags flags) {
+        const ImVec2 available = ImGui::GetContentRegionAvail();
+        ImVec2 resolved(std::floor(size.x), std::floor(size.y));
+        if(resolved.x <= 0) resolved.x = std::max(available.x + resolved.x, 4.0f);
+        if(resolved.y <= 0) resolved.y = std::max(available.y + resolved.y, 4.0f);
+        dockCollapse.prepare(id, ImGui::GetCursorScreenPos(), resolved, flags,
+            findActiveSplitter(ImGui::DockBuilderGetNode(id)));
+        proportionalDockSpace(id, size, flags);
+        dockCollapse.finish();
+    }
+
+private:
+    ofxOceanodeDockCollapse dockCollapse;
+    void resetDrag() { splits.clear(); activeID = 0; lastFrame = -1; }
+
+    void proportionalDockSpace(ImGuiID id, ImVec2 size, ImGuiDockNodeFlags flags) {
         ImGuiContext& g = *GImGui;
         ImGuiDockNode* root = ImGui::DockBuilderGetNode(id);
         ImGuiDockNode* active = findActiveSplitter(root);
@@ -33,7 +51,7 @@ public:
             && root->Pos.x == ImGui::GetCursorScreenPos().x
             && root->Pos.y == ImGui::GetCursorScreenPos().y;
         if(!canResize) {
-            reset();
+            resetDrag();
             ImGui::DockSpace(id, size, flags);
             return;
         }

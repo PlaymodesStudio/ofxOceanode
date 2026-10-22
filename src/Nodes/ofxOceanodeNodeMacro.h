@@ -183,16 +183,33 @@ public:
 		}
 	}
 	
-	void activateWindow(){
-		showWindow = true;
-		canvas.forceDockWindow();
-		canvas.requestFocus();
-	}
+	// Instances of the same global Macro share one tab, which always shows the
+	// window instance: the one whose tab is open, else the first one in the patch.
+	ofxOceanodeNodeMacro& windowInstance();
+	// Where a node inside this Macro is shown: the window instance and its
+	// matching node (nullptr when the open graph no longer has that node).
+	struct WindowTarget { ofxOceanodeNodeMacro* macro; ofxOceanodeNode* node; };
+	WindowTarget windowTargetFor(ofxOceanodeNode* node);
+	// Opens and focuses the window instance's tab.
+	void activateWindow();
+	void hideSharedWindow();
+	// This instance's own tab, as saved in layouts.
 	bool isWindowVisible() const { return showWindow; }
+	// True when this instance or another instance of its global Macro has the tab.
+	bool isSharedWindowVisible() const { return sharedWindowOwner() != nullptr; }
+	// Only the window instance of a global Macro may save its definition.
+	bool canSaveDefinition() { return &windowInstance() == this; }
+	// True when both Macros are instances of the same global Macro.
+	bool sharesGlobalMacroWith(const ofxOceanodeNodeMacro& other) const;
+	// True when the shared tab belongs to another instance, so this one can't close it.
+	bool isWindowShownByOtherInstance() const {
+		auto* owner = sharedWindowOwner();
+		return owner != nullptr && owner != this;
+	}
 	void setWindowVisible(bool visible, bool focus = true){
         if(!focus) { showWindow = visible; return; }
 		if(visible) activateWindow();
-		else showWindow = false;
+		else hideSharedWindow();
 	}
 	
 private:
@@ -205,6 +222,9 @@ private:
 	void changeRouterType(const std::string& routerName, const std::string& newTypeName);
 	void storeRouterSnapshot(int slot);
 	void loadRouterSnapshot(int slot);
+	// Per-instance input router values, kept when a global definition reloads.
+	std::map<std::string, RouterSnapshot> captureInputRouterValues();
+	void restoreInputRouterValues(const std::map<std::string, RouterSnapshot>& values);
 	void updateMacroDirectoryStructure();
 	
 	// ─── Initialization helpers (called from setup) ───────────────────────
@@ -222,6 +242,10 @@ private:
 	// Keeps the current contents as a local Macro, detached from the library.
 	bool detachLocalCopy();
 	bool usesLibraryMacro(const string& path) const;
+	const string& resolvedGlobalMacroPath() const;
+	// The instance whose tab shows this global Macro (this one, another, or none).
+	ofxOceanodeNodeMacro* sharedWindowOwner() const;
+	int drawnSharedInstanceCount() const;
 	bool deleteLibraryMacro(const string& path);
 	// Deferred to update(), outside the ImGui pass.
 	void requestMacroLoad(const string& path, bool isPreset);
@@ -309,6 +333,11 @@ private:
 	
 	// ─── Basic state ──────────────────────────────────────────────────────
 	bool showWindow;
+	// ImGui frames, used to pick one tab per global Macro and count instances.
+	int lastDrawnFrame = -1;
+	int lastWindowDrawnFrame = -1;
+	mutable string resolvedPathSource;
+	mutable string resolvedPathCache;
 	bool lastActiveState;
 	bool isLoadingPreset;
 	string canvasParentID;
