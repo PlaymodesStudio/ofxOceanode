@@ -37,6 +37,17 @@ Quick tips) and Utilities (Search nodes, AI assistant, Metrics, Reload Macros an
 such as Textures' Update Effects). Each action appears once. Theme Editor is
 available in Config's Theme section.
 
+While the Theme Editor is open, hold Alt and hover any GUI element to find its
+color. A tooltip lists the colors drawn under the cursor, topmost first, and the
+editor selects the topmost theme color, switches to its tab (ImGui Colors or
+Oceanode Colors), scrolls to it and outlines it. The last lookup stays listed at
+the top of the editor; click a name there to choose another candidate when
+several colors share a value. The lookup reads ImGui's rendered draw data after
+gui.draw() (src/ofxOceanodeThemeColorPicker.h): it skips user images and the
+Theme Editor itself, and matches by RGB with "(other alpha)" when only alpha
+differs, for example disabled widgets. Colors not owned by the theme, such as
+node colors, appear as hex values.
+
 Presets starts with the current Bank and Preset status, then New Preset, New Bank,
 Save Preset, Save Preset As and Delete Preset, followed by the LOAD PRESET section.
 

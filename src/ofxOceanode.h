@@ -23,6 +23,7 @@
 
 #include "ofxImGui.h"
 #include "imgui.h"
+#include "ofxOceanodeThemeColorPicker.h"
 #include "router.h"
 #include "portal.h"
 #include "Nodes/Default_Nodes/portalSelector.h"
@@ -262,6 +263,18 @@ private:
     bool showThemeColorSearch = false;
     char themeColorSearch[128] = "";
     void drawThemeEditorWindow();
+    // Alt+hover lookup: while the editor is open, holding Alt over any GUI
+    // element selects the theme colour that drew it (see ofxOceanodeThemeColorPicker.h).
+    std::vector<ofxOceanodeThemeColorPicker::Layer> themeColorPickLayers; // last non-empty lookup, topmost first
+    int themeColorPickFrame = -1;
+    const ImDrawList* themeColorPickTooltipDrawList = nullptr;
+    bool themeEditorHovered = false;
+    ofxOceanodeThemeColorPicker::Match themeSelectedColor;
+    bool themeColorRevealPending = false; // switch tab and scroll to themeSelectedColor
+    void selectThemeColor(const ofxOceanodeThemeColorPicker::Match& match);
+    void pickThemeColorUnderMouse();
+    void drawThemeColorPickTooltip();
+    void drawThemeColorPickLayers(bool selectable);
     struct ThemeFontFamily {
         std::string name;
         std::string regularPath;
