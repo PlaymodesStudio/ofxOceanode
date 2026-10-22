@@ -323,8 +323,10 @@ void ofxOceanodeHelp::drawWindowMenu(ofxOceanodeControls& controls) {
                 const auto label = path + node->getParameters().getName();
                 if(macro) {
                     macros.push_back({label, [macro,label](){
-                        bool show = macro->isWindowVisible();
+                        bool show = macro->isSharedWindowVisible();
+                        ImGui::BeginDisabled(macro->isWindowShownByOtherInstance());
                         if(ImGui::Checkbox(label.c_str(), &show)) macro->setWindowVisible(show);
+                        ImGui::EndDisabled();
                     }});
                     collect(macro->getContainer().get(), label + " / ");
                 }

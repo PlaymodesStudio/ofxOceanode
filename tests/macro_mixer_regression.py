@@ -335,6 +335,37 @@ int main(int argc,char** argv) {
         assert(child->getContainer()->getAllModules().size()==3 && blockedSetups==0);near(child->getParameter<float>("Value"),.7);
         mixer.update(10);near(mixer.value(),.55);assert(!mixer.importMacro(global,true));
     }
+    // Instances of one global Macro share a single canvas tab; local Macros keep their own.
+    {
+        // The library definition now holds the External Endpoint added above.
+        const int blockedBefore=blockedSetups;
+        auto globalInstance=[&](int id)->ofxOceanodeNodeMacro& {
+            auto& macro=static_cast<ofxOceanodeNodeMacro&>(parent.createNode(std::make_unique<ofxOceanodeNodeMacro>(),id).getNodeModel());
+            ofJson reference={{"LocalPreset",false},{"CategoryStruct",ofJson::array({"group"})},{"Macro","source"}};
+            macro.macroLoad(reference,scratch);assert(!macro.isLocal());return macro;
+        };
+        auto& first=globalInstance(1); auto& second=globalInstance(2);
+        auto& local=static_cast<ofxOceanodeNodeMacro&>(parent.createNode(std::make_unique<ofxOceanodeNodeMacro>(),3).getNodeModel());
+        assert(local.loadMacroSource(a));
+        // Showing any instance opens the first one; only it can close the tab.
+        assert(&second.windowInstance()==&first && &local.windowInstance()==&local);
+        second.setWindowVisible(true);
+        assert(first.isWindowVisible() && !second.isWindowVisible() && second.isSharedWindowVisible());
+        assert(second.isWindowShownByOtherInstance() && !first.isWindowShownByOtherInstance());
+        assert(!local.isSharedWindowVisible());
+        second.activateWindow(); assert(first.isWindowVisible() && !second.isWindowVisible());
+        local.setWindowVisible(true); assert(local.isWindowVisible() && first.isWindowVisible());
+        // Navigation into the second instance lands on the matching node of the first.
+        auto& firstNodes=first.getContainer()->getParameterGroupNodesMap();
+        auto& secondNodes=second.getContainer()->getParameterGroupNodesMap();
+        assert(!secondNodes.empty());
+        const auto target=second.windowTargetFor(secondNodes.begin()->second);
+        assert(target.macro==&first && target.node==firstNodes.at(secondNodes.begin()->first));
+        assert(first.windowTargetFor(firstNodes.begin()->second).node==firstNodes.begin()->second);
+        first.setWindowVisible(false);
+        assert(!first.isSharedWindowVisible() && !second.isSharedWindowVisible() && local.isWindowVisible());
+        parent.clearContainer(); blockedSetups=blockedBefore;
+    }
     const auto cycle=scratch+"/cycle";saveSource(cycle,.5);
     auto cyclicModules=ofLoadJson(cycle+"/modules.json");cyclicModules["Macro"]["01"]={0,0};write(cycle+"/modules.json",cyclicModules);
     write(cycle+"/Macro_1.json",{{"LocalPreset",true}});fs::create_directory_symlink(cycle,cycle+"/Macro_1");

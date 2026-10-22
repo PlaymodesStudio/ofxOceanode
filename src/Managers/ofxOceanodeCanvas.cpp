@@ -3004,7 +3004,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                 }
                             }
                             if(auto* nestedMacro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())){
-                                collectMatches(nestedMacro->getContainer().get(), nestedMacro->getCanvas(), nestedMacro);
+                                // Other instances of a global Macro are never shown in a tab.
+                                if(&nestedMacro->windowInstance() == nestedMacro)
+                                    collectMatches(nestedMacro->getContainer().get(), nestedMacro->getCanvas(), nestedMacro);
                             }
                         }
                     };

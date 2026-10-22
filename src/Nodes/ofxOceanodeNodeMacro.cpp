@@ -13,6 +13,7 @@
 #include <sstream>
 #include <filesystem>
 #include <stdexcept>
+#include <algorithm>
 #include "PresetSaveCleanup.h"
 
 namespace {
@@ -28,6 +29,16 @@ namespace {
         std::error_code error;
         const auto resolved = std::filesystem::weakly_canonical(absolute, error);
         return error ? absolute.lexically_normal() : resolved;
+    }
+
+    // Every live Macro, so instances of one global Macro can share a tab.
+    std::vector<ofxOceanodeNodeMacro*>& liveMacros(){
+        static std::vector<ofxOceanodeNodeMacro*> macros;
+        return macros;
+    }
+
+    int imguiFrame(){
+        return ImGui::GetCurrentContext() ? ImGui::GetFrameCount() : -1;
     }
 }
 
@@ -48,6 +59,7 @@ ofxOceanodeNodeMacro::ofxOceanodeNodeMacro() : ofxOceanodeNodeModel("Macro"){
 	
 	// Add minimized view update callback (body in ofxOceanodeNodeMacroGui.cpp)
 	minimizedViewCallback = [this](ImVec2 size) { renderMinimizedView(size); };
+	liveMacros().push_back(this);
 }
 
 void ofxOceanodeNodeMacro::markMacroReferenceUserEdited(){
@@ -70,6 +82,8 @@ void ofxOceanodeNodeMacro::clearUserEditMarkers(){
 }
 
 ofxOceanodeNodeMacro::~ofxOceanodeNodeMacro(){
+	auto& macros = liveMacros();
+	macros.erase(std::remove(macros.begin(), macros.end(), this), macros.end());
 	if(!localWorkingDirectory.empty()){
 		std::error_code error;
 		std::filesystem::remove_all(localWorkingDirectory, error);
@@ -159,8 +173,25 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 }
 
 void ofxOceanodeNodeMacro::draw(ofEventArgs &a){
+	const int frame = imguiFrame();
+	lastDrawnFrame = frame;
+	if(showWindow && frame >= 0){
+		// Layout restores can open several instances of one global Macro:
+		// the first one drawn this frame keeps the tab.
+		for(auto* other : liveMacros()){
+			if(other != this && other->showWindow && other->lastWindowDrawnFrame == frame &&
+			   sharesGlobalMacroWith(*other)){
+				showWindow = false;
+				break;
+			}
+		}
+	}
 	if(showWindow){
-		canvas.draw(&showWindow, color, presetManager.isLocal() ? localName.get() : presetManager.getCurrentMacro());
+		lastWindowDrawnFrame = frame;
+		string title = presetManager.isLocal() ? localName.get() : presetManager.getCurrentMacro();
+		const int instances = drawnSharedInstanceCount();
+		if(instances > 1) title += " [" + ofToString(instances) + "x]";
+		canvas.draw(&showWindow, color, title);
 	}
 	if(active){
 		container->draw();
@@ -881,6 +912,77 @@ bool ofxOceanodeNodeMacro::detachLocalCopy(){
 bool ofxOceanodeNodeMacro::usesLibraryMacro(const string& path) const{
 	return !presetManager.isLocal() && !presetManager.getCurrentMacroPath().empty() &&
 	       resolvedMacroPath(presetManager.getCurrentMacroPath()) == resolvedMacroPath(path);
+}
+
+bool ofxOceanodeNodeMacro::sharesGlobalMacroWith(const ofxOceanodeNodeMacro& other) const{
+	if(presetManager.isLocal() || other.presetManager.isLocal()) return false;
+	const string& path = resolvedGlobalMacroPath();
+	return !path.empty() && path == other.resolvedGlobalMacroPath();
+}
+
+const string& ofxOceanodeNodeMacro::resolvedGlobalMacroPath() const{
+	// Checked every frame by each Macro GUI: resolve only when the path changes.
+	const string& path = presetManager.getCurrentMacroPath();
+	if(path != resolvedPathSource){
+		resolvedPathSource = path;
+		resolvedPathCache = path.empty() ? "" : resolvedMacroPath(path).string();
+	}
+	return resolvedPathCache;
+}
+
+ofxOceanodeNodeMacro* ofxOceanodeNodeMacro::sharedWindowOwner() const{
+	if(showWindow) return const_cast<ofxOceanodeNodeMacro*>(this);
+	for(auto* other : liveMacros()){
+		if(other != this && other->showWindow && sharesGlobalMacroWith(*other)) return other;
+	}
+	return nullptr;
+}
+
+int ofxOceanodeNodeMacro::drawnSharedInstanceCount() const{
+	// Hidden Macros (Macro Mixer sources, undo captures) are never drawn.
+	int count = 1;
+	for(auto* other : liveMacros()){
+		if(other != this && other->lastDrawnFrame >= lastDrawnFrame - 1 && sharesGlobalMacroWith(*other)) count++;
+	}
+	return count;
+}
+
+ofxOceanodeNodeMacro& ofxOceanodeNodeMacro::windowInstance(){
+	if(auto* owner = sharedWindowOwner()) return *owner;
+	// liveMacros() is in creation order. Skip instances that weren't drawn last
+	// frame (Macro Mixer sources, undo captures, Macros inside inactive nodes).
+	const int frame = imguiFrame();
+	for(auto* other : liveMacros()){
+		if(other == this) break;
+		if(other->lastDrawnFrame >= frame - 1 && sharesGlobalMacroWith(*other)) return *other;
+	}
+	return *this;
+}
+
+ofxOceanodeNodeMacro::WindowTarget ofxOceanodeNodeMacro::windowTargetFor(ofxOceanodeNode* node){
+	auto& window = windowInstance();
+	if(&window == this) return {this, node};
+	// Both instances load the same definition, so nodes share their ids.
+	for(const auto& item : container->getParameterGroupNodesMap()){
+		if(item.second != node) continue;
+		const auto& shown = window.container->getParameterGroupNodesMap();
+		const auto match = shown.find(item.first);
+		return {&window, match == shown.end() ? nullptr : match->second};
+	}
+	return {&window, nullptr};
+}
+
+void ofxOceanodeNodeMacro::activateWindow(){
+	auto& window = windowInstance();
+	window.showWindow = true;
+	window.canvas.forceDockWindow();
+	window.canvas.requestFocus();
+}
+
+void ofxOceanodeNodeMacro::hideSharedWindow(){
+	for(auto* other : liveMacros()){
+		if(other == this || sharesGlobalMacroWith(*other)) other->showWindow = false;
+	}
 }
 
 bool ofxOceanodeNodeMacro::deleteLibraryMacro(const string& path){

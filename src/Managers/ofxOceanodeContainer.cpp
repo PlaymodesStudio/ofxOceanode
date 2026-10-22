@@ -2773,6 +2773,18 @@ bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode)
     findNode(rootContainer, rootCanvas, nullptr);
     if(location.node == nullptr || location.canvas == nullptr || location.container == nullptr) return false;
 
+    if(location.macro != nullptr){
+        // Instances of a global Macro share one tab: go to the matching node there.
+        const auto shown = location.macro->windowTargetFor(location.node);
+        location.macro = shown.macro;
+        location.container = shown.macro->getContainer().get();
+        if(shown.node == nullptr){
+            shown.macro->activateWindow();
+            return true;
+        }
+        location.node = shown.node;
+    }
+
     for(auto& pair : location.container->getParameterGroupNodesMap()){
         pair.second->getNodeGui().setSelected(false);
     }

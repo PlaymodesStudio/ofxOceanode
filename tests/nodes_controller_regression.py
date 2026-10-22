@@ -105,6 +105,9 @@ struct ofxOceanodeNodeMacro:ofxOceanodeNodeModel {
     string getCurrentMacroName(){return macroName;}
     auto getContainer(){return container;} auto getCanvas(){return &canvas;}
     int activations=0; void activateWindow(){++activations;}
+    struct WindowTarget {ofxOceanodeNodeMacro* macro; ofxOceanodeNode* node;};
+    ofxOceanodeNodeMacro& windowInstance(){return *this;}
+    WindowTarget windowTargetFor(ofxOceanodeNode* node){return {this,node};}
 };
 struct abstractPortal:ofxOceanodeNodeModel {
     string portalName; string getName(){return portalName;}

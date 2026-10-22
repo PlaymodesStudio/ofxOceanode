@@ -129,9 +129,18 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 	const float width = (ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget()) * zoom;
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.f * zoom, ImGui::GetStyle().ItemSpacing.y));
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * zoom, ImGui::GetStyle().FramePadding.y));
-	const bool previousShow = showWindow;
-	ImGui::Checkbox("Show?", &showWindow);
-	if(showWindow && !previousShow){ canvas.forceDockWindow(); canvas.requestFocus(); }
+	// One tab per global Macro: it always opens the first instance, and only
+	// the instance whose tab is open can close it.
+	bool show = isSharedWindowVisible();
+	const bool shownByOtherInstance = isWindowShownByOtherInstance();
+	ImGui::BeginDisabled(shownByOtherInstance);
+	if(ImGui::Checkbox("Show?", &show)){
+		if(show) activateWindow();
+		else hideSharedWindow();
+	}
+	ImGui::EndDisabled();
+	if(shownByOtherInstance && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+		ImGui::SetTooltip("Open in the tab of another instance of this Macro");
 	const float showWidth = ImGui::GetItemRectSize().x;
 	const float gap = ImGui::GetStyle().ItemSpacing.x;
 	const float loadText = ImGui::CalcTextSize("Load").x;
