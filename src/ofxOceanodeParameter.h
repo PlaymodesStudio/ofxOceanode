@@ -75,7 +75,6 @@ class ofxOceanodeAbstractParameter : public ofAbstractParameter{
 public:
 	ofxOceanodeAbstractParameter(){
 		flags = 0;
-        inConnection = nullptr;
         hasScope = false;
         hasTimeline = false;
 	};
@@ -113,16 +112,32 @@ public:
 	ofxOceanodeParameterFlags getFlags(){return flags;};
 	void setFlags(ofxOceanodeParameterFlags f){flags = f;};
     
-    bool hasInConnection(){return inConnection != nullptr;};
-    ofxOceanodeAbstractConnection* getInConnection(){return inConnection;};
+    bool hasInConnection(){return !inConnections.empty();};
+    ofxOceanodeAbstractConnection* getInConnection(){return inConnections.empty() ? nullptr : inConnections.back();};
+    const std::vector<ofxOceanodeAbstractConnection*>& getInConnections() const {return inConnections;}
+
+    // Opt-in by custom value type. Ordinary numeric/texture ports keep their
+    // existing single-input behavior; the SC addon registers only ScBus.
+    using InputCombiner = std::function<void(ofxOceanodeAbstractParameter&,
+        const std::vector<ofxOceanodeAbstractParameter*>&, std::shared_ptr<void>&)>;
+    static void registerInputCombiner(const std::string& type, InputCombiner combine){
+        inputCombiners()[type] = std::move(combine);
+    }
+    bool allowsMultipleInputs() const {return inputCombiners().count(valueType()) != 0;}
+    bool acceptsMultipleInputFrom(const ofxOceanodeAbstractParameter& source) const {
+        return allowsMultipleInputs() && source.valueType() == valueType();
+    }
+    bool refreshCombinedInput();
     
     bool hasOutConnections(){return outConnections.size() != 0;};
     std::vector<ofxOceanodeAbstractConnection*> getOutConnections(){return outConnections;};
     
-    void setInConnection(ofxOceanodeAbstractConnection* c){inConnection = c;};
+    void setInConnection(ofxOceanodeAbstractConnection* c){inConnections.push_back(c);};
     void addOutConnection(ofxOceanodeAbstractConnection* c){outConnections.push_back(c);};
     
-    void removeInConnection(ofxOceanodeAbstractConnection* c){if(inConnection == c) inConnection = nullptr;};
+    void removeInConnection(ofxOceanodeAbstractConnection* c){
+        inConnections.erase(std::remove(inConnections.begin(), inConnections.end(), c), inConnections.end());
+    };
     void removeOutConnection(ofxOceanodeAbstractConnection* c){outConnections.erase(std::remove(outConnections.begin(), outConnections.end(), c));};
     
     void removeAllConnections();
@@ -149,6 +164,16 @@ public:
         // A type this parameter cannot take goes on to what it feeds; the
         // connection is only made if one of those takes it.
         if(forwardTargets){
+            // Portals can feed another portal in the same matching group, and
+            // routers can form loops. Stop only the current cyclic branch so
+            // other branches (including shared downstream sinks) still run.
+            static thread_local std::vector<const ofxOceanodeAbstractParameter*> forwardingPath;
+            if(std::find(forwardingPath.begin(), forwardingPath.end(), this) != forwardingPath.end()) return false;
+            forwardingPath.push_back(this);
+            struct ForwardingPathScope {
+                std::vector<const ofxOceanodeAbstractParameter*>& path;
+                ~ForwardingPathScope(){path.pop_back();}
+            } forwardingScope{forwardingPath};
             bool accepted = false;
             for(auto* target : forwardTargets()) accepted |= target->receiveParameter(p);
             if(accepted) forwardedSource = p;
@@ -192,7 +217,12 @@ protected:
 	virtual const void* getInternalObject() const = 0;
 	
 private:
-    ofxOceanodeAbstractConnection* inConnection;
+    static std::map<std::string, InputCombiner>& inputCombiners(){
+        static std::map<std::string, InputCombiner> combiners;
+        return combiners;
+    }
+    std::shared_ptr<void> combinedInputState;
+    std::vector<ofxOceanodeAbstractConnection*> inConnections;
     std::vector<ofxOceanodeAbstractConnection*> outConnections;
 	ofxOceanodeParameterFlags flags;
     bool hasScope, hasTimeline;

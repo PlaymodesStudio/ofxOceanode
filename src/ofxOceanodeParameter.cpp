@@ -18,7 +18,7 @@ void ofxOceanodeAbstractParameter::setNodeModel(ofxOceanodeNodeModel* model){
 }
 
 void ofxOceanodeAbstractParameter::removeAllConnections(){
-    if(inConnection != nullptr) inConnection->deleteSelf();
+    while(hasInConnection()) getInConnection()->deleteSelf();
     while(outConnections.size() != 0) outConnections.front()->deleteSelf();
     
     if(hasScope) ofxOceanodeScope::getInstance()->removeParameter(this);
@@ -30,4 +30,15 @@ void ofxOceanodeAbstractParameter::forwardToOutConnections(){
         for(auto* connection : outConnections) sinks.push_back(&connection->getSinkParameter());
         return sinks;
     });
+}
+
+bool ofxOceanodeAbstractParameter::refreshCombinedInput(){
+    const auto combine = inputCombiners().find(valueType());
+    if(combine == inputCombiners().end()) return false;
+    std::vector<ofxOceanodeAbstractParameter*> sources;
+    for(auto* connection : inConnections){
+        if(connection->getActive()) sources.push_back(&connection->getSourceParameter());
+    }
+    combine->second(*this, sources, combinedInputState);
+    return true;
 }
