@@ -1621,7 +1621,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                 }else if(ImGui::IsMouseClicked(0)){
                                     nodeGui.setSelected(false); //Deselect node if we are making connections
                                     isCreatingConnection = true;
-                                    if(param->hasInConnection()){ //Parmaeter has sink connected
+                                    if(param->hasInConnection() && !param->allowsMultipleInputs()){ // Single-input cable rewiring
                                         auto inConnection = param->getInConnection();
                                         tempSourceParameter = &inConnection->getSourceParameter();
                                         if(!ImGui::GetIO().KeyAlt){
@@ -1655,7 +1655,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                             }
                                             else{
                                                 //Remove previous connection connected to that parameter.
-                                                if(param->hasInConnection()){
+                                                if(param->hasInConnection() && !param->acceptsMultipleInputFrom(*tempSourceParameter)){
                                                     param->getInConnection()->deleteSelf();
                                                 }
                                                 container->createConnection(*tempSourceParameter, *param);
@@ -2625,7 +2625,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             for (auto &absParam : nodePair.second->getParameters()){
                 auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
                 auto connections = param->getOutConnections();
-                if(param->getInConnection() != nullptr) connections.push_back(param->getInConnection());
+                for(auto* incoming : param->getInConnections()) connections.push_back(incoming);
                 for(auto connection : connections){
                     if(drawnConnections.insert(connection).second){
                         auto& sourceParameter = connection->getSourceParameter();

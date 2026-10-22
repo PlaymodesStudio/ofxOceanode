@@ -3333,7 +3333,7 @@ ofxOceanodeContainer::UnusedNodePlan ofxOceanodeContainer::findUnusedNodes(){
                 protect(node, "MIDI binding: " + parameter->getName());
 #endif
             auto links = parameter->getOutConnections();
-            if(parameter->getInConnection()) links.push_back(parameter->getInConnection());
+            for(auto* incoming : parameter->getInConnections()) links.push_back(incoming);
             for(auto* link : links){
                 nodeConnections[node].insert(link);
                 auto* source = link->getSourceParameter().getNodeModel();
@@ -3695,6 +3695,10 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
 }
 
 ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active){
+    if(sink.acceptsMultipleInputFrom(source)){
+        for(auto* existing : sink.getInConnections())
+            if(&existing->getSourceParameter() == &source) return existing;
+    }
     ofxOceanodeAbstractConnection* connection = nullptr;
     if(source.valueType() == typeid(float).name()){
         if(sink.valueType() == typeid(int).name()){

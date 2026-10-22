@@ -22,6 +22,7 @@ ostream& operator<<(ostream& s,const ofColor& c){return s<<c.r;}
 ostream& operator<<(ostream& s,const ofFloatColor& c){return s<<c.r;}
 struct QuietLog {template<class T> QuietLog& operator<<(const T&){return *this;}};
 QuietLog ofLogNotice(const string&){return {};}
+QuietLog ofLogVerbose(const string&){return {};}
 QuietLog ofLogError(const string&){return {};}
 int ofToInt(const string& s){return stoi(s);}
 // The production snapshot hash also calls ofToString(size_t).
@@ -32,7 +33,7 @@ struct ofFilePath {
 };
 struct ofFile {
     static bool doesFileExist(const string& p){return filesystem::exists(p);}
-    static void removeFile(const string& p){filesystem::remove(p);}
+    static bool removeFile(const string& p){return filesystem::remove(p);}
 };
 struct ofDirectory {
     static void createDirectory(const string& p,bool,bool){filesystem::create_directories(p);}
@@ -42,6 +43,12 @@ struct ofxOceanodeShared {static void snapshotUpdated(const string&){++broadcast
 ofJson ofLoadJson(const string& path){ifstream f(path);ofJson j;f>>j;return j;}
 void ofSavePrettyJson(const string& path,const ofJson& j){
     written=j;ofstream f(path);assert(f);f<<j.dump(4);assert(f);
+}
+namespace oceanodePresetSave {
+bool saveJson(const string& path,const ofJson& j){
+    filesystem::create_directories(filesystem::path(path).parent_path());
+    ofSavePrettyJson(path,j);return true;
+}
 }
 struct abstractRouter : Model {
     bool excluded=false;
@@ -150,6 +157,11 @@ def main():
         "ParameterGroup& getParameters(){return group;} Model& getNodeModel(){return *nodeModel;}")
     node_fixture = node_fixture.replace(
         "void ofSavePrettyJson(const string&,const ofJson& j){written=j;}", "")
+    # Snapshot persistence must use the filesystem adapter, not the clipboard's
+    # in-memory-only saveJson stub.
+    node_fixture = node_fixture.replace(
+        "bool saveJson(const string&,const ofJson& j){written=j;return true;}",
+        "bool saveJson(const string&,const ofJson&);")
     macro_header = (ROOT / "src/Nodes/ofxOceanodeNodeMacro.h").read_text()
     router_info = macro_header[macro_header.index("struct RouterInfo {"):]
     router_info = router_info[:router_info.index("};") + 2]

@@ -216,7 +216,7 @@ int main(){
     app.recallPresetLayout("Sound");settle();
     assert(ofLoadJson("preset-A/preset_layouts.json")==original);
     ofxOceanodeShared::preset="preset-B";assert(app.savePresetLayouts());
-    app.presetLayouts.entries.at("Sound")=laser;assert(app.savePresetLayouts());
+    app.presetLayouts.overwrite("Sound",laser);assert(app.presetLayouts.active=="Sound"&&app.savePresetLayouts());
     assert(ofLoadJson("preset-A/preset_layouts.json")==original);
     ofxOceanodeShared::preset="preset-A";app.readPresetLayouts();
     assert(app.presetLayouts.toJson()==original&&app.pendingPresetLayout=="Sound");

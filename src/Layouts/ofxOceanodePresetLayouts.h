@@ -34,6 +34,10 @@ public:
         entries.emplace(name, std::move(snapshot));
         active = name;
     }
+    void overwrite(const std::string& name, Json snapshot){
+        entries.at(name) = std::move(snapshot);
+        active = name;
+    }
     void rename(const std::string& from, const std::string& to){
         if(from == to) return;
         if(!validName(to)) throw std::runtime_error("Enter a name (1-255 bytes, without ## or line breaks).");

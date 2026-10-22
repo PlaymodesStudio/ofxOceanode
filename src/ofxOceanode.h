@@ -226,7 +226,8 @@ private:
     
     ofxImGui::Gui gui;
     std::unique_ptr<ofxOceanodeProportionalDocking> proportionalDocking;
-    void showManualWindow(bool *b);
+    static std::string userManualPath();
+    static void openWithDefaultApp(const std::string& path);
     void showHelpPopUp();
     bool showMode;
 	bool snapToGrid;

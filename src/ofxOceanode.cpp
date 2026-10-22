@@ -22,6 +22,11 @@
 #include <climits>
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+#ifdef TARGET_WIN32
+#include <shellapi.h>
+#endif
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_SFNT_NAMES_H
@@ -516,11 +521,9 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         //TODO: Show assert, we need docking
         //ShowDockingDisabledMessage();
     }
-    static bool showManual = false;
     bool showHelp = false;
     static bool show_app_metrics = false;
     if (show_app_metrics){ImGui::ShowMetricsWindow(&show_app_metrics);}
-    if (showManual) showManualWindow(&showManual);
 	
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f, 6.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12.0f, 6.0f));
@@ -786,9 +789,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         if(beginTopLevelMenu("Help"))
         {
             ofxOceanodeMenu::section("Documentation");
-            ImGui::Checkbox("User Manual", &showManual);
-            ImGui::SameLine();
-            ImGui::TextDisabled("CMD+L");
+            const std::string manual = userManualPath();
+            if(ImGui::MenuItem("User Manual (PDF)", nullptr, false, !manual.empty())){
+                openWithDefaultApp(manual);
+            }
             if(ImGui::MenuItem("Quick tips", "CMD+H")){
                 showHelp = true;
             }
@@ -855,41 +859,39 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
     ImGui::End(); // End DockSpace window — must come after all popup code above
 }
 
-void ofxOceanode::showManualWindow(bool *b)
-{
-    ImGui::Begin("Show User Manual");
-    ImGui::Button("This is a user manual !");
-    ImGui::Text("Framerate is %f", ofGetFrameRate());
-//
-//    ofImage*  i = new ofImage();
-//    i->allocate(270,70,OF_IMAGE_COLOR);
-//    i->setUseTexture(true);
-//    i->load("./../../../ofxaddons_thumbnail.png");
-//    i->setUseTexture(true);
-//    i->update();
-//
-//    if(i->isAllocated())
-//    {
-//        ImTextureID MtextureID = (ImTextureID*)(intptr_t) i->getTexture().texData.textureID;
-//        glm::vec2 size;
-//        size.x = 270;
-//        size.y = 70;//(tempCast.get()->getWidth() / tempCast.get()->getHeight()) * size.x;
-//        ImGui::Image(MtextureID, size, ImVec2(0,0), ImVec2(1,1), ImColor(255,255,255,255), ImColor(0,0,0,0));
-//
-//
-////        ofTexture* t = &i->getTexture();
-////        ImGui::Image(MtextureID,size);
-////        ImDrawList* draw_list = ImGui::GetWindowDrawList();
-////
-////        void ImDrawList::AddImage(ImTextureID user_texture_id, const ImVec2& p_min, const ImVec2& p_max, const ImVec2& uv_min, const ImVec2& uv_max, ImU32 col)
-////        draw_list->PushTextureID(MtextureID);
-////        draw_list->AddImage(MtextureID, ImVec2(0,0), ImVec2(100,100),ImVec2(0,0), ImVec2(1,1), ImColor(255,255,255,255));
-////        draw_list->PopTextureID();
-//    }
- 
+// The PDF user manual (scripts/build_user_manual.py). A copy in the app's data
+// folder wins, so a distributed app can ship it; otherwise the addon's docs/,
+// found from where this file was compiled. Empty when there is neither.
+std::string ofxOceanode::userManualPath(){
+    const std::string name = "oceanode-user-manual.pdf";
+    const std::string inData = ofToDataPath(name, true);
+    if(ofFile::doesFileExist(inData, false)) return inData;
+    std::filesystem::path source(__FILE__);
+    // Makefile builds compile with paths relative to the project (bin/data/../..)
+    if(source.is_relative()) source = std::filesystem::path(ofToDataPath("", true)) / ".." / ".." / source;
+    std::error_code error;
+    const auto inAddon = std::filesystem::weakly_canonical(source.parent_path().parent_path() / "docs" / name, error);
+    return !error && std::filesystem::exists(inAddon, error) ? inAddon.string() : "";
+}
 
-    ImGui::End();
-        
+// Opens a file with the system's default application for its type
+// (ofLaunchBrowser only takes http and https URLs).
+void ofxOceanode::openWithDefaultApp(const std::string& path){
+#ifdef TARGET_WIN32
+    ShellExecuteA(nullptr, "open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+#else
+#ifdef TARGET_OSX
+    std::string command = "open ";
+#else
+    std::string command = "xdg-open ";
+#endif
+    command += "'";
+    for(char c : path) command += c == '\'' ? std::string("'\\''") : std::string(1, c);
+    command += "'";
+    if(std::system(command.c_str()) != 0){
+        ofLogError("ofxOceanode") << "Couldn't open " << path;
+    }
+#endif
 }
 
 

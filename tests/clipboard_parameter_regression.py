@@ -87,6 +87,8 @@ struct ofxOceanodeAbstractParameter : ofAbstractParameter {
     ofxOceanodeAbstractParameter* getForwardedSource(){return nullptr;}
     void setInConnection(ofxOceanodeAbstractConnection* c){in=c;}
     bool hasInConnection(){return in!=nullptr;}
+    bool allowsMultipleInputs() const {return false;}
+    bool refreshCombinedInput(){return false;}
     auto getInConnection(){return in;}
     void removeInConnection(ofxOceanodeAbstractConnection* c){if(in==c) in=nullptr;}
     void addOutConnection(ofxOceanodeAbstractConnection* c){out.push_back(c);}
@@ -134,6 +136,7 @@ string ofToString(int n){return to_string(n);}
 namespace oceanodePresetSave {
 struct Scope { bool finish(){return true;} };
 bool saveJson(const string&,const ofJson& j){written=j;return true;}
+void record(bool success){assert(success);}
 }
 struct ofxOceanodeNode {
     ParameterGroup group; Model model; Gui gui;

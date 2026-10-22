@@ -1440,7 +1440,6 @@ void ofxOceanodeNodeMacro::storeRouterSnapshot(int slot) {
 
 void ofxOceanodeNodeMacro::syncSnapshotsFromDisk() {
 	if(!presetManager.isLocal() && !presetManager.getCurrentMacroPath().empty()) {
-		ofLogNotice("SnapshotSync") << "Manual sync requested for: " << presetManager.getCurrentMacroPath();
 		snapshotSystem.syncFromDisk(presetManager.getCurrentMacroPath());
 		if(!snapshotSystem.isEmpty()) {
 			showSnapshotMatrix = true;

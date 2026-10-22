@@ -27,12 +27,14 @@ public:
         if(restoreOnDestruction && sourceParameter->getForwardedSource()) sinkParameter->disconnectedParameter();
         sourceParameter->removeOutConnection(this);
         sinkParameter->removeInConnection(this);
+        if(restoreOnDestruction) sinkParameter->refreshCombinedInput();
     };
     
     bool getActive() const { return active; }
 
     void setActive(bool a){
         active = a;
+        if(sinkParameter->refreshCombinedInput()) return;
         if(active)
         {
             if(dynamic_cast<ofxOceanodeParameter<void>*>(sourceParameter)==nullptr) passValueFunc();
@@ -164,7 +166,7 @@ public:
     }
     ~ofxOceanodeConnection(){
         parameterEventListener.unsubscribe();
-        if(restoreOnDestruction) restoreValue();
+        if(restoreOnDestruction && !ofxOceanodeAbstractConnection::sinkParameter->allowsMultipleInputs()) restoreValue();
     };
 
     bool serializeBeforeConnectionValue(ofJson &json) const override {
@@ -173,7 +175,7 @@ public:
     
 private:
     void passValueFunc(){
-        if(active){
+        if(active && !ofxOceanodeAbstractConnection::sinkParameter->refreshCombinedInput()){
             sinkParameter = sourceParameter;
         }
     }
