@@ -205,6 +205,9 @@ private:
 	void changeRouterType(const std::string& routerName, const std::string& newTypeName);
 	void storeRouterSnapshot(int slot);
 	void loadRouterSnapshot(int slot);
+	// Per-instance input router values, kept when a global definition reloads.
+	std::map<std::string, RouterSnapshot> captureInputRouterValues();
+	void restoreInputRouterValues(const std::map<std::string, RouterSnapshot>& values);
 	void updateMacroDirectoryStructure();
 	
 	// ─── Initialization helpers (called from setup) ───────────────────────

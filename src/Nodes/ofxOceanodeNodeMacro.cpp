@@ -379,8 +379,12 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 				if(ofFile::doesFileExist(sortOrderFile)) sortJson = ofLoadJson(sortOrderFile);
 				loadRouterSortFromJson(sortJson);
 			}
+			// The saved definition carries the saving instance's router values;
+			// keep this instance's exposed values across the reload.
+			const auto instanceValues = captureInputRouterValues();
 //			if(clearContainerOnLoad) container->clearContainer();
 			container->loadPreset(presetManager.getCurrentMacroPath());
+			restoreInputRouterValues(instanceValues);
 
 			loadGlobalDescription(presetManager.getCurrentMacroPath());
 		}
@@ -1281,6 +1285,44 @@ void ofxOceanodeNodeMacro::loadRouterSnapshot(int slot) {
 	snapshotSystem.setCurrentSlot(slot);
 }
 
+
+std::map<std::string, RouterSnapshot> ofxOceanodeNodeMacro::captureInputRouterValues(){
+	std::map<std::string, RouterSnapshot> values;
+	routerManager.updateAllConnections(container.get());
+	for(auto& routerPair : routerManager.getRouterNodes()){
+		auto& router = routerPair.second;
+		if(!router.isInput) continue;
+		auto& params = router.node->getParameters();
+		if(!params.contains("Value")) continue;
+		auto valueParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get("Value"));
+		if(!valueParam) continue;
+		try {
+			values[router.routerName] = MacroRouterValueDispatch::captureValue(valueParam);
+		} catch(const std::exception& e) {
+			ofLogError("Macro") << "Error capturing router value: " << e.what();
+		}
+	}
+	return values;
+}
+
+void ofxOceanodeNodeMacro::restoreInputRouterValues(const std::map<std::string, RouterSnapshot>& values){
+	routerManager.updateAllConnections(container.get());
+	for(auto& routerPair : routerManager.getRouterNodes()){
+		auto& router = routerPair.second;
+		if(!router.isInput) continue;
+		auto valueIt = values.find(router.routerName);
+		if(valueIt == values.end()) continue; // New router: keep the saved default
+		auto& params = router.node->getParameters();
+		if(!params.contains("Value")) continue;
+		auto valueParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get("Value"));
+		if(!valueParam || valueParam->valueType() != valueIt->second.type) continue;
+		try {
+			MacroRouterValueDispatch::applyValue(valueParam, valueIt->second);
+		} catch(const std::exception& e) {
+			ofLogError("Macro") << "Error restoring router value: " << e.what();
+		}
+	}
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Snapshot methods — delegated to snapshotSystem

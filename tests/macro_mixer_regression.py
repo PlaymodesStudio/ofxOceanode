@@ -324,12 +324,15 @@ int main(int argc,char** argv) {
         auto* child=dynamic_cast<ofxOceanodeNodeMacro*>(&mixer.origin()->container->getDynamicNodes().at("Macro").at(1)->getNodeModel());
         assert(child && child->getContainer()->getAllModules().size()==3);
         std::string path=ofxOceanodeShared::getMacroDirectoryStructure()->categories.front()->macros.front().second;
+        // Saving a global definition updates the graph but keeps each
+        // instance's own exposed values.
+        child->getParameter<float>("Value")=.7;
         auto controls=ofLoadJson(library+"/Router_f_1.json");controls["Value"]=.9;write(library+"/Router_f_1.json",controls);
-        ofxOceanodeShared::getMacroUpdatedEvent().notify(path);near(child->getParameter<float>("Value"),.9);
+        ofxOceanodeShared::getMacroUpdatedEvent().notify(path);near(child->getParameter<float>("Value"),.7);
         auto edited=ofLoadJson(library+"/modules.json");edited["External Endpoint"]["01"]={0,0};write(library+"/modules.json",edited);
         write(library+"/External_Endpoint_1.json",ofJson::object());
         ofxOceanodeShared::getMacroUpdatedEvent().notify(path);
-        assert(child->getContainer()->getAllModules().size()==3 && blockedSetups==0);near(child->getParameter<float>("Value"),.9);
+        assert(child->getContainer()->getAllModules().size()==3 && blockedSetups==0);near(child->getParameter<float>("Value"),.7);
         mixer.update(10);near(mixer.value(),.55);assert(!mixer.importMacro(global,true));
     }
     const auto cycle=scratch+"/cycle";saveSource(cycle,.5);
