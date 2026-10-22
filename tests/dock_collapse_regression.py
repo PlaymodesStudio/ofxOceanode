@@ -16,9 +16,17 @@ CASES = r'''
 ofxOceanodeProportionalDocking policy;
 ImGuiID rootID, panes[7], farLeft, nearLeft, farRight, nearRight, topSplit, bottomSplit;
 bool build=true, grouped=false, showAll=true;
+bool showOverlay=false, overlayAfterHandles=false, overlayClicked=false;
+ImVec2 overlayPos;
 const char* names[]={"Outer left", "Inner left", "Canvas", "Inner right", "Outer right", "Top", "Bottom"};
 ImGuiDockNode* node(ImGuiID id) { auto* n=ImGui::DockBuilderGetNode(id); assert(n); return n; }
 void near(float a,float b,float tolerance=1.1f) { if(std::abs(a-b)>tolerance) { std::fprintf(stderr,"expected %f, got %f\n",b,a); std::abort(); } }
+void drawOverlay() {
+    ImGui::SetNextWindowPos(overlayPos); ImGui::SetNextWindowSize(ImVec2(160,120));
+    ImGui::Begin("Floating overlay",nullptr,ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoSavedSettings);
+    overlayClicked |= ImGui::InvisibleButton("Overlay content",ImGui::GetContentRegionAvail());
+    ImGui::End();
+}
 void frame() {
     ImGui::NewFrame();
     ImGui::SetNextWindowPos(ImVec2(0,0)); ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
@@ -54,7 +62,10 @@ void frame() {
     policy.dockSpace(rootID,ImVec2(0,0),ImGuiDockNodeFlags_None);
     ImGui::End();
     for(int i=0;i<7;++i) if(showAll || i!=0) { ImGui::Begin(names[i]); ImGui::TextUnformatted(names[i]); ImGui::End(); }
-    policy.drawDockCollapseHandles(); ImGui::Render();
+    if(showOverlay && !overlayAfterHandles) drawOverlay();
+    policy.drawDockCollapseHandles();
+    if(showOverlay && overlayAfterHandles) drawOverlay();
+    ImGui::Render();
 }
 void idle(int count=5) { for(int i=0;i<count;++i) frame(); }
 ImGuiWindow* handle(ImGuiID id) {
@@ -108,12 +119,38 @@ void checkHandles(ImGuiDockNode* n) {
 float width(int i) { return node(panes[i])->Size.x; }
 float height(int i) { return node(panes[i])->Size.y; }
 void restoreLayout() { policy.reset();build=true;showAll=true;idle(); }
+void checkOcclusion(ImGuiID id,bool submitAfter) {
+    auto* arrow=handle(id);
+    ImVec2 center(arrow->Pos.x+arrow->Size.x*0.5f,arrow->Pos.y+arrow->Size.y*0.5f);
+    overlayPos=ImVec2(center.x-80,center.y-60);
+    showOverlay=true;overlayAfterHandles=submitAfter;overlayClicked=false;idle();
+    auto* overlay=ImGui::FindWindowByName("Floating overlay");assert(overlay && overlay->Active);
+    assert(ImGui::IsWindowAbove(overlay,arrow));
+    // Verify actual render order as well as ImGui's window order.
+    int arrowOrder=-1,overlayOrder=-1,index=0;
+    for(auto* list:ImGui::GetDrawData()->CmdLists) {
+        if(list==arrow->DrawList) arrowOrder=index;
+        if(list==overlay->DrawList) overlayOrder=index;
+        ++index;
+    }
+    assert(arrowOrder>=0 && overlayOrder>arrowOrder);
+    float first=node(id)->ChildNodes[0]->Size[node(id)->SplitAxis];
+    auto& io=ImGui::GetIO();io.AddMousePosEvent(center.x,center.y);idle(2);
+    assert(GImGui->HoveredWindow==overlay);
+    io.AddMouseButtonEvent(0,true);frame();io.AddMouseButtonEvent(0,false);frame();idle();
+    assert(overlayClicked);near(node(id)->ChildNodes[0]->Size[node(id)->SplitAxis],first);
+    showOverlay=false;idle();
+    // Once uncovered, the same arrow remains clickable.
+    click(id);click(id);near(node(id)->ChildNodes[0]->Size[node(id)->SplitAxis],first);
+}
 int main() {
     ImGui::CreateContext();auto& io=ImGui::GetIO();io.ConfigFlags|=ImGuiConfigFlags_DockingEnable;
     io.IniFilename=nullptr;io.DisplaySize=ImVec2(1600,1000);io.DeltaTime=1.0f/60;
     ImGui::GetStyle().DockingSeparatorSize=4;ImGui::GetStyle().WindowRounding=0;
     unsigned char* pixels;int w,h;io.Fonts->GetTexDataAsRGBA32(&pixels,&w,&h);
     ofxOceanodeFloatingWindowDecor::install();idle();checkHandles(node(rootID));
+    checkOcclusion(nearLeft,false);checkOcclusion(bottomSplit,false);
+    checkOcclusion(nearLeft,true);checkOcclusion(bottomSplit,true);
     const float minX=ImGui::GetStyle().WindowMinSize.x, minY=ImGui::GetFrameHeight();
     for(int variant=0;variant<2;++variant) {
         grouped=variant;restoreLayout();
@@ -159,7 +196,7 @@ int main() {
     node(panes[6])->SetLocalFlags(node(panes[6])->LocalFlags|ImGuiDockNodeFlags_HiddenTabBar);idle();
     click(bottomSplit);near(height(6),minY);assert(!(node(panes[6])->VisibleWindow->Flags&ImGuiWindowFlags_NoTitleBar));
     click(bottomSplit);assert(node(panes[6])->IsHiddenTabBar());
-    std::printf("PASS: enlarged centred shadow-free handles, all four directions, both left-dock topologies, preserved neighbours, nested/independent folds, restore, save/load, mouse/native drag, host resize, topology changes, disabled splits and hidden tabs.\n");
+    std::printf("PASS: floating-window render/input occlusion, enlarged centred shadow-free handles, all four directions, both left-dock topologies, preserved neighbours, nested/independent folds, restore, save/load, mouse/native drag, host resize, topology changes, disabled splits and hidden tabs.\n");
     ImGui::DestroyContext();
 }
 '''

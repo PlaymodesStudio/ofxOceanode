@@ -272,6 +272,23 @@ private:
         if(eligible(n)) drawHandle(n, root);
         drawTree(n->ChildNodes[0], root); drawTree(n->ChildNodes[1], root);
     }
+    static void placeAboveDockTree(ImGuiWindow* handle, ImGuiWindow* host) {
+        // The handle is a separate input window so it can straddle the gutter.
+        // Keep it immediately above its dock tree, below the next independent
+        // window, instead of promoting it over every floating window each frame.
+        auto* dockRoot = host->RootWindowDockTree;
+        bool aboveDockRoot = false;
+        for(auto* window : GImGui->Windows) {
+            if(window == dockRoot) { aboveDockRoot = true; continue; }
+            if(aboveDockRoot && window != handle && !(window->Flags & ImGuiWindowFlags_ChildWindow)
+                && window->RootWindowDockTree != dockRoot) {
+                ImGui::BringWindowToDisplayBehind(handle, window);
+                return;
+            }
+        }
+        // There are no independent windows above the dock tree in this case.
+        ImGui::BringWindowToDisplayFront(handle);
+    }
     void drawHandle(ImGuiDockNode* n, ImGuiDockNode* root) {
         const int axis = n->SplitAxis, cross = axis ^ 1, side = direction(n, root);
         std::vector<ImGuiID> targets; collectTargets(root, n, side, targets);
@@ -295,7 +312,7 @@ private:
             | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav
             | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoBringToFrontOnFocus);
         ImGui::PopStyleVar(4);
-        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+        placeAboveDockTree(ImGui::GetCurrentWindow(), n->HostWindow);
         const bool clicked = ImGui::InvisibleButton("##Fold", size, ImGuiButtonFlags_NoNavFocus | ImGuiButtonFlags_NoFocus);
         const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
         if(ImGui::IsItemActivated()) { dragging = n->ID; dragged = false; dragFirstSize = n->ChildNodes[0]->Size[axis]; }
