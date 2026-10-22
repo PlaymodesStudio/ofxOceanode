@@ -710,6 +710,7 @@ void initializeFFTWidget(CustomGuiWidget& widget, ofxOceanodeAbstractParameter& 
 {
     widget.spanW = 3;
     widget.spanH = 2;
+    widget.config["vertical"] = false;
     widget.config["logScale"] = true;
     widget.config["dbScale"] = true;
     widget.config["dbFloor"] = -80.0f;
@@ -836,48 +837,56 @@ void drawVUMeterDisplay(const std::vector<float>& levels, const ImVec2& itemSize
 }
 
 void drawSpectrumDisplay(ImDrawList* drawList, const ImVec2& min, const ImVec2& max, const std::vector<float>& magnitudes,
-                         bool useLog, bool useDb, float floorVal, bool lineMode)
+                         bool useLog, bool useDb, float floorVal, bool lineMode, bool vertical)
 {
-    const float labelH = 14.0f;
-    const float specH = std::max(1.0f, (max.y - min.y) - labelH);
-    const float xS = min.x;
+    // Keep labels upright while rotating the frequency and magnitude axes.
+    const float labelSize = vertical ? 28.0f : 14.0f;
+    const float xS = vertical ? std::min(max.x - 1.0f, min.x + labelSize) : min.x;
     const float yS = min.y;
     const float xE = max.x;
-    const float yE = yS + specH;
-    const float yLabelTop = yE + 1.0f;
+    const float yE = vertical ? max.y : std::max(min.y + 1.0f, max.y - labelSize);
     const float width = std::max(1.0f, xE - xS);
+    const float height = std::max(1.0f, yE - yS);
+    const float frequencyLength = vertical ? height : width;
     const float nyquist = kScBusFftSampleRate * 0.5f;
     const float logRatio = std::log(kScBusFftFreqMax / kScBusFftFreqMin);
 
-    drawList->PushClipRect(ImVec2(xS, yS), ImVec2(xE, max.y), true);
+    auto point = [&](float frequency, float magnitude){
+        return vertical ? ImVec2(xS + width * magnitude, yE - height * frequency)
+                        : ImVec2(xS + width * frequency, yE - height * magnitude);
+    };
+
+    drawList->PushClipRect(min, max, true);
+    drawList->AddRectFilled(min, max, IM_COL32(8, 10, 16, 255));
     drawList->AddRectFilled(ImVec2(xS, yS), ImVec2(xE, yE), IM_COL32(10, 12, 18, 255));
-    drawList->AddRectFilled(ImVec2(xS, yE), ImVec2(xE, max.y), IM_COL32(8, 10, 16, 255));
-    drawList->AddRect(ImVec2(xS, yS), ImVec2(xE, max.y), IM_COL32(60, 60, 80, 255));
 
     static const float gridFreqs[] = {50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000};
     static const char* gridLabels[] = {"50", "100", "200", "500", "1k", "2k", "5k", "10k", "20k"};
     for(int g = 0; g < 9; g++){
         if(gridFreqs[g] > kScBusFftFreqMax) break;
-        float gx = useLog
-            ? xS + width * (std::log(gridFreqs[g] / kScBusFftFreqMin) / logRatio)
-            : xS + width * (gridFreqs[g] / nyquist);
-        drawList->AddLine(ImVec2(gx, yS), ImVec2(gx, yE), IM_COL32(35, 35, 50, 200));
-        drawList->AddText(ImVec2(gx + 2.0f, yLabelTop), IM_COL32(90, 90, 110, 210), gridLabels[g]);
+        const float frequency = useLog
+            ? std::log(gridFreqs[g] / kScBusFftFreqMin) / logRatio
+            : gridFreqs[g] / nyquist;
+        drawList->AddLine(point(frequency, 0.0f), point(frequency, 1.0f), IM_COL32(35, 35, 50, 200));
+        const ImVec2 labelPos = vertical
+            ? ImVec2(min.x + 2.0f, ofClamp(point(frequency, 0.0f).y - ImGui::GetTextLineHeight() * 0.5f,
+                                          min.y, std::max(min.y, max.y - ImGui::GetTextLineHeight())))
+            : ImVec2(point(frequency, 0.0f).x + 2.0f, yE + 1.0f);
+        drawList->AddText(labelPos, IM_COL32(90, 90, 110, 210), gridLabels[g]);
     }
 
-    auto bandToX = [&](float b){
+    auto bandPosition = [&](float b){
         const float t = magnitudes.empty() ? 0.0f : b / (float)magnitudes.size();
-        if(useLog) return xS + width * t;
-        const float fc = kScBusFftFreqMin * std::pow(kScBusFftFreqMax / kScBusFftFreqMin, t);
-        return xS + width * (fc / nyquist);
+        if(useLog) return t;
+        return kScBusFftFreqMin * std::pow(kScBusFftFreqMax / kScBusFftFreqMin, t) / nyquist;
     };
 
-    auto magToY = [&](float mag){
+    auto magnitudePosition = [&](float mag){
         if(useDb){
             const float db = 20.0f * std::log10(std::max(mag, 1e-12f));
-            return yE - specH * ofClamp((db - floorVal) / (-floorVal), 0.0f, 1.0f);
+            return ofClamp((db - floorVal) / (-floorVal), 0.0f, 1.0f);
         }
-        return yE - specH * ofClamp(mag, 0.0f, 1.0f);
+        return ofClamp(mag, 0.0f, 1.0f);
     };
 
     auto bandColor = [&](int b, int alpha){
@@ -887,28 +896,21 @@ void drawSpectrumDisplay(ImDrawList* drawList, const ImVec2& min, const ImVec2& 
 
     if(lineMode){
         for(int b = 0; b < (int)magnitudes.size() - 1; b++){
-            float x1 = bandToX(b + 0.5f), x2 = bandToX(b + 1.5f);
-            float y1 = magToY(magnitudes[b]), y2 = magToY(magnitudes[b + 1]);
-            drawList->AddQuadFilled(ImVec2(x1, y1), ImVec2(x2, y2), ImVec2(x2, yE), ImVec2(x1, yE), IM_COL32(60, 180, 220, 40));
-            drawList->AddLine(ImVec2(x1, y1), ImVec2(x2, y2), bandColor(b, 230), 1.5f);
+            const float f1 = bandPosition(b + 0.5f), f2 = bandPosition(b + 1.5f);
+            const ImVec2 p1 = point(f1, magnitudePosition(magnitudes[b]));
+            const ImVec2 p2 = point(f2, magnitudePosition(magnitudes[b + 1]));
+            drawList->AddQuadFilled(p1, p2, point(f2, 0.0f), point(f1, 0.0f), IM_COL32(60, 180, 220, 40));
+            drawList->AddLine(p1, p2, bandColor(b, 230), 1.5f);
         }
     }else{
         for(int b = 0; b < (int)magnitudes.size(); b++){
-            const float t1 = (float)b / (float)magnitudes.size();
-            const float t2 = (float)(b + 1) / (float)magnitudes.size();
-            float x1, x2;
-            if(useLog){
-                x1 = xS + width * t1;
-                x2 = xS + width * t2;
-            }else{
-                const float fc1 = kScBusFftFreqMin * std::pow(kScBusFftFreqMax / kScBusFftFreqMin, t1);
-                const float fc2 = kScBusFftFreqMin * std::pow(kScBusFftFreqMax / kScBusFftFreqMin, t2);
-                x1 = xS + width * (fc1 / nyquist);
-                x2 = xS + width * (fc2 / nyquist);
-            }
-            if(x2 <= x1 + 0.3f) continue;
-            const float barTop = magToY(magnitudes[b]);
-            drawList->AddRectFilled(ImVec2(x1, barTop), ImVec2(x2 - 0.5f, yE), bandColor(b, 210));
+            const float f1 = bandPosition(b), f2 = bandPosition(b + 1);
+            if((f2 - f1) * frequencyLength <= 0.3f) continue;
+            const float end = f2 - std::min(0.5f / frequencyLength, (f2 - f1) * 0.5f);
+            const float magnitude = magnitudePosition(magnitudes[b]);
+            const ImVec2 p1 = vertical ? point(end, 0.0f) : point(f1, magnitude);
+            const ImVec2 p2 = vertical ? point(f1, magnitude) : point(end, 0.0f);
+            drawList->AddRectFilled(p1, p2, bandColor(b, 210));
         }
     }
 
@@ -1137,7 +1139,8 @@ bool renderFFTWidget(CustomGuiWidgetRenderContext& context, CustomGuiWidget& wid
                         widget.config.value("logScale", true),
                         widget.config.value("dbScale", true),
                         widget.config.value("dbFloor", -80.0f),
-                        widget.config.value("lineMode", false));
+                        widget.config.value("lineMode", false),
+                        widget.config.value("vertical", false));
     ImGui::EndGroup();
     return true;
 }
@@ -1197,14 +1200,20 @@ void drawFFTProperties(CustomGuiWidgetPropertiesContext& context, CustomGuiWidge
 #endif
     }
 
+    bool vertical = widget.config.value("vertical", false);
+    if(ImGui::Checkbox("Vertical", &vertical)){
+        widget.config["vertical"] = vertical;
+        context.container.markCustomGuisDirty();
+    }
+
     bool logScale = widget.config.value("logScale", true);
-    if(ImGui::Checkbox("Log X", &logScale)){
+    if(ImGui::Checkbox(vertical ? "Log Y" : "Log X", &logScale)){
         widget.config["logScale"] = logScale;
         context.container.markCustomGuisDirty();
     }
 
     bool dbScale = widget.config.value("dbScale", true);
-    if(ImGui::Checkbox("dB Y", &dbScale)){
+    if(ImGui::Checkbox(vertical ? "dB X" : "dB Y", &dbScale)){
         widget.config["dbScale"] = dbScale;
         context.container.markCustomGuisDirty();
     }
