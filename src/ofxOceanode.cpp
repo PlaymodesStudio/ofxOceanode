@@ -644,6 +644,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			ImGui::CheckboxFlags("Color Connections?", &configurationFlags, ofxOceanodeConfigurationFlags_ColorConnections);
 			ImGui::CheckboxFlags("Dashed / Dotted lines", &configurationFlags, ofxOceanodeConfigurationFlags_DashedDottedLines);
 			ofxOceanodeShared::setConfigurationFlags(configurationFlags);
+			float connectionWidth = ofxOceanodeShared::getConnectionWidth();
+			if(ImGui::SliderFloat("Connection Width", &connectionWidth, 1.0f, 8.0f, "%.1f")){
+				ofxOceanodeShared::setConnectionWidth(connectionWidth);
+			}
 			bool autoInspector = ofxOceanodeShared::getAutoInspectorShowHide();
 			if(ImGui::Checkbox("Inspector auto show/hide", &autoInspector)){
 				ofxOceanodeShared::setAutoInspectorShowHide(autoInspector);
@@ -990,6 +994,7 @@ void ofxOceanode::saveConfig(){
 	config["snapToGrid"] = canvas.getSnapToGrid();
 	config["autoInspectorShowHide"] = ofxOceanodeShared::getAutoInspectorShowHide();
 	config["selectionCentersCanvas"] = ofxOceanodeShared::getSelectionCentersCanvas();
+	config["connectionWidth"] = ofxOceanodeShared::getConnectionWidth();
 	config["guiLayoutChangesWithMacros"] = ofxOceanodeShared::getGuiLayoutChangesWithMacros();
 	if(auto tc = controls->get<ofxOceanodeTimeController>()) config["spaceTogglesPlay"] = tc->getSpaceTogglesPlay();
 	
@@ -1075,6 +1080,7 @@ void ofxOceanode::loadConfig(){
 		ofxOceanodeShared::setAutoInspectorShowHide(config["autoInspectorShowHide"].get<bool>());
 	}
 	ofxOceanodeShared::setSelectionCentersCanvas(config.value("selectionCentersCanvas", false));
+	ofxOceanodeShared::setConnectionWidth(config.value("connectionWidth", 3.0f));
 	if(config.contains("guiLayoutChangesWithMacros")){
 		ofxOceanodeShared::setGuiLayoutChangesWithMacros(config["guiLayoutChangesWithMacros"].get<bool>());
 	}

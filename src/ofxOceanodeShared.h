@@ -338,6 +338,15 @@ public:
 		return getInstance().autoInspectorShowHide;
 	}
 
+	// Base screen-space width of patch connection wires (Config > GUI > Connection Width).
+	static void setConnectionWidth(float w){
+		getInstance().connectionWidth = ofClamp(w, 1.0f, 8.0f);
+	}
+
+	static float getConnectionWidth(){
+		return getInstance().connectionWidth;
+	}
+
 	static void setSelectionCentersCanvas(bool b){
 		getInstance().selectionCentersCanvas = b;
 	}
@@ -566,6 +575,7 @@ private:
 	// Auto Inspector show/hide
 	bool autoInspectorShowHide = true;
 	bool selectionCentersCanvas = false;
+	float connectionWidth = 3.0f;
 	bool inspectorFocusRequested = false;
 
 	// Active canvas tracking

@@ -1580,14 +1580,35 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 //            ImU32 node_bg_color = /*(node_hovered_in_list == node->ID || node_hovered_in_scene == node->ID || (node_hovered_in_list == -1 && node_selected == node->ID)) ? IM_COL32(75, 75, 75, 255) :*/ IM_COL32(40, 40, 40, 255);
                 ImU32 node_bg_color = OceanodeColors::U32(OceanodeColors::NodeBg);
                 
-                ImU32 node_hd_color = (isSelectedOrSelecting) ? IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,160) : IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,64);
+                const int nodeHeaderAlpha = 64;
+                ImU32 node_hd_color = (isSelectedOrSelecting) ? IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,160) : IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,nodeHeaderAlpha);
                 
 				// Check if this node should be rendered transparently
 				bool isTransparent = (node->getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
 
+				// Macros draw their header and port bullets in the header color, made
+				// opaque by blending it over the default node background so it looks the same
+				// on top of their tinted body.
+				bool isMacro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel()) != nullptr;
+				ImU32 node_bullet_color = OceanodeColors::U32(OceanodeColors::ConnectionBullet);
+				ImU32 node_body_color = node_bg_color;
+				if(isMacro){
+					ImVec4 bg = ImGui::ColorConvertU32ToFloat4(node_bg_color);
+					auto headerOverBackground = [&](ImVec4 hd, float brightness){
+						return ImGui::GetColorU32(ImVec4((bg.x + (hd.x - bg.x) * hd.w) * brightness,
+														 (bg.y + (hd.y - bg.y) * hd.w) * brightness,
+														 (bg.z + (hd.z - bg.z) * hd.w) * brightness, 1.0f));
+					};
+					node_hd_color = headerOverBackground(ImGui::ColorConvertU32ToFloat4(node_hd_color), 1.0f);
+					node_bullet_color = node_hd_color;
+					// The body is the unselected header color, 25% darker.
+					node_body_color = headerOverBackground(ImGui::ColorConvertU32ToFloat4(
+						IM_COL32(node->getColor().r, node->getColor().g, node->getColor().b, nodeHeaderAlpha)), 0.75f);
+				}
+
 				if (!isTransparent) {
 					//if(nodeGui.getExpanded()){
-						draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
+						draw_list->AddRectFilled(node_rect_min, node_rect_max, node_body_color, 4.0f);
 					//}
 					draw_list->AddRectFilled(node_rect_min, node_rect_header, node_hd_color, 4.0f);
 				}
@@ -1606,7 +1627,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                             auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
                             auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
-                            draw_list->AddCircleFilled(bulletPosition, bulletSize, OceanodeColors::U32(OceanodeColors::ConnectionBullet));
+                            draw_list->AddCircleFilled(bulletPosition, bulletSize, node_bullet_color);
                             if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
                                 connectionIsDoable = true;
                                 if(ImGui::IsMouseClicked(1) && param->hasInConnection()){
@@ -1670,7 +1691,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                             auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
                             auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
-                            draw_list->AddCircleFilled(bulletPosition, bulletSize, OceanodeColors::U32(OceanodeColors::ConnectionBullet));
+                            draw_list->AddCircleFilled(bulletPosition, bulletSize, node_bullet_color);
                             if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
                                 if(ImGui::IsMouseClicked(1) && hasPortalizableConnections(param.get())){
                                     portalizeSourceParameter = param.get();
@@ -2589,6 +2610,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         const ImU32 connectionLineColor = darkCanvas
             ? OceanodeColors::U32(OceanodeColors::ConnectionLineDark)
             : OceanodeColors::U32(OceanodeColors::ConnectionLineLight);
+        const float connectionWidth = ofxOceanodeShared::getConnectionWidth();
+        // A selected node's wires are drawn wider so they stand out.
+        constexpr float selectedConnectionExtraWidth = 0.5f;
         constexpr float nodeAttachmentTension = 1.5f;
         oceanodeConnectionDrawing::Renderer connectionRenderer(draw_list);
         using ConnectionStyle = oceanodeConnectionDrawing::Style;
@@ -2636,14 +2660,16 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         ImU32 lineColor = connectionLineColor;
                         if((colorConnections || selectedConnection) && sourceGui){
                             // Both incoming and outgoing wires inherit their origin node's color.
-                            ImVec4 sourceColor(sourceGui->getColor(), 0.5f);
+                            // With colored connections on, a selected node's wires are highlighted at full alpha.
+                            ImVec4 sourceColor(sourceGui->getColor(), (colorConnections && selectedConnection) ? 1.0f : 0.5f);
                             sourceColor.x *= 0.5f;
                             sourceColor.y *= 0.5f;
                             sourceColor.z *= 0.5f;
                             lineColor = OceanodeColors::U32(sourceColor);
                         }
                         connectionRenderer.bezier(p1, p1 + nodeControlPoint, p2 - nodeControlPoint, p2,
-                                                  lineColor, connectionWidth,
+                                                  lineColor,
+                                                  selectedConnection ? connectionWidth + selectedConnectionExtraWidth : connectionWidth,
                                                   connectionStyle(&sourceParameter, &sinkParameter),
                                                   zoomLevel);
                     }
