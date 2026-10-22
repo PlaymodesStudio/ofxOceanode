@@ -190,13 +190,6 @@ void ofxOceanodePresetsController::draw(){
     const bool hasBank = currentBank >= 0 && currentBank < static_cast<int>(banks.size());
     const string bankName = hasBank ? banks[currentBank] : "";
     const string presetName = hasBank ? currentPreset[bankName] : "";
-    ImGui::TextUnformatted("Bank:");
-    ImGui::SameLine();
-    ImGui::TextColored(bankTextColor, "%s", hasBank ? bankName.c_str() : "-");
-    ImGui::TextUnformatted("Preset:");
-    ImGui::SameLine();
-    ImGui::TextColored(presetItemTextColor, "%s", presetName.empty() ? "-" : presetName.c_str());
-    ImGui::Separator();
 
     if(ImGui::MenuItem("New Preset")){
         // Tear down outside the ImGui draw pass, after the menu has closed.
@@ -326,6 +319,16 @@ void ofxOceanodePresetsController::drawPopups(){
 
 void ofxOceanodePresetsController::drawPresetList(){
     ofxOceanodeMenu::section("Load Preset");
+    const bool hasBank = currentBank >= 0 && currentBank < static_cast<int>(banks.size());
+    const string bankName = hasBank ? banks[currentBank] : "";
+    const string presetName = hasBank ? currentPreset[bankName] : "";
+    ImGui::TextUnformatted("Bank:");
+    ImGui::SameLine();
+    ImGui::TextColored(bankTextColor, "%s", hasBank ? bankName.c_str() : "-");
+    ImGui::TextUnformatted("Preset:");
+    ImGui::SameLine();
+    ImGui::TextColored(presetItemTextColor, "%s", presetName.empty() ? "-" : presetName.c_str());
+    ImGui::Spacing();
     // The menu grows with the expanded banks. ImGui limits oversized popup
     // menus to the viewport and gives the menu itself a scrollbar.
     ImGui::PushStyleColor(ImGuiCol_Text, presetItemTextColor);
