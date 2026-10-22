@@ -70,7 +70,6 @@ struct ofxOceanodeCanvas {
     glm::vec2 scrolling; int focusRequests=0;
     void setScrolling(glm::vec2 value){scrolling=value;} void requestFocus(){++focusRequests;} void bringOnTop(){}
     int getUniqueID(){return 1;}
-    string getLayoutIniPath(){return {};}
 };
 struct ofxOceanodeNodeModel {
     virtual ~ofxOceanodeNodeModel()=default;
@@ -116,12 +115,7 @@ struct ofxOceanodeBaseController {ofxOceanodeBaseController(string){} virtual ~o
 struct ofxOceanodeShared {
     static NodeEvent& getNodeSelectedInCanvasEvent(){static NodeEvent e;return e;}
     static void nodeSelectedInCanvas(ofxOceanodeNode* n){auto& e=getNodeSelectedInCanvasEvent();if(e.callback)e.callback(n);}
-    static int& getLayoutSwitchSuppressFrames(){static int n=0;return n;}
     static void setActiveCanvasUniqueID(int){}
-    static bool shouldSwitchCanvasLayout(){return false;}
-    static string& getActiveCanvasLayoutPath(){static string s;return s;}
-    static string& getPendingLayoutSavePath(){static string s;return s;}
-    static string& getPendingLayoutLoadPath(){static string s;return s;}
 };
 struct OceanodeColors {
     inline static ImVec4 SelectedNodeText={1,.55,0,1}, ZebraEven={1,1,1,.031}, ZebraOdd={0,0,0,.031}, SearchMatchHighlight={1,.863,0,.176};

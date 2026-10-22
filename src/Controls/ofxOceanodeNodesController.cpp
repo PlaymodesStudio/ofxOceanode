@@ -55,17 +55,6 @@ bool naturalLess(const string& a, const string& b) {
     return a.size() < b.size();
 }
 
-void queueCanvasLayout(ofxOceanodeCanvas* canvas) {
-    if(!ofxOceanodeShared::shouldSwitchCanvasLayout()) return;
-    if(canvas->getLayoutIniPath().empty()) return;
-    const string path = ofToDataPath(canvas->getLayoutIniPath());
-    string& activePath = ofxOceanodeShared::getActiveCanvasLayoutPath();
-    if(!path.empty() && path != activePath) {
-        ofxOceanodeShared::getPendingLayoutSavePath() = activePath;
-        ofxOceanodeShared::getPendingLayoutLoadPath() = path;
-        activePath = path;
-    }
-}
 }
 
 ofxOceanodeNodesController::ofxOceanodeNodesController(shared_ptr<ofxOceanodeContainer> _container,
@@ -256,8 +245,6 @@ void ofxOceanodeNodesController::navigateTo(const NavigableNode& target)
     pendingScrollNode = target.node;
     scrollPendingFrames = target.macro ? 2 : 1;
     refocusNodesDelay = target.macro ? 4 : 2;
-    ofxOceanodeShared::getLayoutSwitchSuppressFrames() = 4;
-    queueCanvasLayout(target.canvas);
 }
 
 void ofxOceanodeNodesController::drawRow(VisibleRow& row, int rowIndex)
@@ -325,8 +312,6 @@ void ofxOceanodeNodesController::drawRow(VisibleRow& row, int rowIndex)
             ofxOceanodeShared::setActiveCanvasUniqueID(entry.macro->getCanvas()->getUniqueID());
             ofxOceanodeShared::nodeSelectedInCanvas(nullptr);
             refocusNodesDelay = 4;
-            ofxOceanodeShared::getLayoutSwitchSuppressFrames() = 4;
-            queueCanvasLayout(entry.macro->getCanvas());
             pendingScrollNode = nullptr;
             scrollPendingFrames = 0;
         } else if(ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
@@ -341,8 +326,6 @@ void ofxOceanodeNodesController::drawRow(VisibleRow& row, int rowIndex)
 void ofxOceanodeNodesController::draw()
 {
     if(refocusNodesDelay > 0 && --refocusNodesDelay == 0) ImGui::SetWindowFocus("Nodes");
-    if(ofxOceanodeShared::getLayoutSwitchSuppressFrames() > 0)
-        --ofxOceanodeShared::getLayoutSwitchSuppressFrames();
 
     if(scrollPendingFrames > 0 && --scrollPendingFrames == 0) {
         // Validate against the live graph before dereferencing deferred raw pointers.

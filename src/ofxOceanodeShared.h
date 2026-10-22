@@ -338,6 +338,15 @@ public:
 		return getInstance().autoInspectorShowHide;
 	}
 
+	// Base screen-space width of patch connection wires (Config > GUI > Connection Width).
+	static void setConnectionWidth(float w){
+		getInstance().connectionWidth = ofClamp(w, 1.0f, 8.0f);
+	}
+
+	static float getConnectionWidth(){
+		return getInstance().connectionWidth;
+	}
+
 	static void setSelectionCentersCanvas(bool b){
 		getInstance().selectionCentersCanvas = b;
 	}
@@ -388,6 +397,10 @@ public:
 	static float getZoomLevel(){ return getInstance().zoomLevel; }
 	static void  setZoomLevel(float z){ getInstance().zoomLevel = z; }
 
+	// Below this zoom, node widgets, node names and comment text are hidden.
+	// Canvas zoom snaps to 5% steps, so 0.475 keeps 50% detailed and hides 45%.
+	static constexpr float MIN_DETAIL_ZOOM = 0.475f;
+
     // Active custom-region render context — set while a custom region is being
     // rendered inside a Custom GUI widget, so region implementations can opt
     // into using the widget's size without affecting their node-local drawing.
@@ -422,52 +435,6 @@ public:
 	}
 
 	inline static ofEvent<string> activeCanvasUniqueIDChangedEvent;
-
-	// Active canvas layout path — tracks which canvas's ImGui layout file is currently loaded
-	static string& getActiveCanvasLayoutPath(){
-		static string s;
-		return s;
-	}
-
-	// Pending layout save (save current ImGui state to this path before loading new one)
-	static string& getPendingLayoutSavePath(){
-		static string s;
-		return s;
-	}
-
-	// Pending layout load (load from this path at frame boundary)
-	static string& getPendingLayoutLoadPath(){
-		static string s;
-		return s;
-	}
-
-	// GUI layout changes with canvas — when true, switching canvas tabs triggers layout switching
-	static bool& getGuiLayoutChangesWithMacros(){
-		return getInstance().changeLayoutOnMacros;
-	}
-	static void setGuiLayoutChangesWithMacros(bool b){
-		getInstance().changeLayoutOnMacros = b;
-	}
-
-    // A named preset layout owns the whole preset's docking layout, across canvas tabs.
-    static bool& getPresetLayoutActive(){ static bool active = false; return active; }
-    static bool shouldSwitchCanvasLayout(){
-        return getGuiLayoutChangesWithMacros() && !getPresetLayoutActive();
-    }
-
-	// Suppress automatic layout switching for N frames (used by NodesController
-	// when programmatically switching canvases to prevent the rising-edge
-	// detection from undoing the switch via LoadIniSettingsFromDisk)
-	static int& getLayoutSwitchSuppressFrames(){
-		static int frames = 0;
-		return frames;
-	}
-
-	// Cache for layout contents — used to preserve layouts across folder recreations
-	static std::map<string, string>& getLayoutContentCache(){
-		static std::map<string, string> cache;
-		return cache;
-	}
 
 	// Node selected in canvas — fired whenever a single node is clicked/selected
 	// in any canvas (main or macro). Subscribers receive the pointer to the node
@@ -566,14 +533,12 @@ private:
 	// Auto Inspector show/hide
 	bool autoInspectorShowHide = true;
 	bool selectionCentersCanvas = false;
+	float connectionWidth = 3.0f;
 	bool inspectorFocusRequested = false;
 
 	// Active canvas tracking
 	string activeCanvasUniqueID = "";
 	
-	// Change layout on macros
-	bool changeLayoutOnMacros = false;
-
 	// Root references for whole-patch traversal
 	ofxOceanodeContainer* rootContainer = nullptr;
 	ofxOceanodeCanvas* rootCanvas = nullptr;

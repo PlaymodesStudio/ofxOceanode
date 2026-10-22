@@ -83,7 +83,7 @@ int main(){
     auto* candidate=add(*root,1);auto* outer=dynamic_cast<ofxOceanodeNodeMacro*>(&add(*root,2,true)->getNodeModel());
     auto* inner=dynamic_cast<ofxOceanodeNodeMacro*>(&add(*outer->container,3,true)->getNodeModel());
     auto* nested=add(*inner->container,4);auto* protectedNode=add(*inner->container,5);
-    inner->canvas.uniqueID="Nested Macro";inner->canvas.layoutIniPath="nested.ini";inner->canvas.zoomLevel=.5f;
+    inner->canvas.uniqueID="Nested Macro";inner->canvas.zoomLevel=.5f;
     outer->visible=inner->visible=false;
     ofxOceanodeShared::root=root.get();ofxOceanodeShared::canvas=&rootView;views={&rootView};
     root->plan.groups={{"1"}};app.open(root);idle();
@@ -101,10 +101,9 @@ int main(){
     assert(inner->visible&&inner->activations==1&&ofxOceanodeShared::selected==nested);
     assert(ofxOceanodeShared::active==inner->canvas.uniqueID&&app.showUnusedNodesWindow);
     views={&inner->canvas};idle();centered(inner->canvas,nested);
-    ofxOceanodeShared::switchLayouts=true;ofxOceanodeShared::layout="root.ini";
     click(rowPoints.at("5"));
     assert(protectedNode->gui.selected&&!nested->gui.selected&&app.unusedNodesSelectedNode=="5");
-    assert(ofxOceanodeShared::load=="nested.ini");centered(inner->canvas,protectedNode);
+    centered(inner->canvas,protectedNode);
 
     // Graph changes must not navigate to replacement nodes with the same name.
     inner->container->nodes.erase(4);add(*inner->container,4);++inner->container->revision;
@@ -126,7 +125,7 @@ int main(){
     assert(app.showUnusedNodesWindow);click(buttonPoints.at("Remove"));assert(app.showUnusedNodesWindow);
     click(buttonPoints.at("Close"));assert(!app.showUnusedNodesWindow);
     ImGui::DestroyContext();
-    puts("Cleanup review passed: non-modal interaction, root/nested/protected navigation, zoom, layout switching, stale/replaced nodes, refresh, usage revalidation and expired canvases.");
+    puts("Cleanup review passed: non-modal interaction, root/nested/protected navigation, zoom, stale/replaced nodes, refresh, usage revalidation and expired canvases.");
 }
 '''
 

@@ -94,16 +94,7 @@ bool ofxOceanodeNodeMacro::drawNodeParameter(ofxOceanodeAbstractParameter& param
 			}
 		}else{
 			pendingGuiAction = [this](){
-				const string path = getLocalWorkingDirectory() + "/Detached";
-				if(!saveLibraryDefinition(path)){
-					guiState.saveError = "Could not make a local copy.";
-					return;
-				}
-				localName = presetManager.getCurrentMacro();
-				presetManager.setLocal(true);
-				presetManager.setPresetPath(path);
-				loadMacroLayout(path);
-				markMacroReferenceUserEdited();
+				if(!detachLocalCopy()) guiState.saveError = "Could not make a local copy.";
 			};
 		}
 	}
@@ -158,10 +149,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 	if(ImGui::Button("Save", ImVec2(saveText + padding, 0))){
 		guiState.saveError.clear();
 		if(presetManager.isLocal() && localName.get().empty()) openMacroSaveDialog(false);
-		else pendingGuiAction = [this](){
-			if(!(presetManager.isLocal() ? saveLocalDefinition() : saveGlobalDefinition()))
-				guiState.saveError = "Could not save Macro contents.";
-		};
+		else if(!reviewUnsavedChanges(false)) requestMacroSave();
 	}
 	ImGui::SameLine();
 	if(ImGui::Button("Save As", ImVec2(saveAsText + padding, 0))) openMacroSaveDialog(true);
@@ -169,6 +157,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 
 	renderMacroLoadDialog();
 	renderMacroSaveDialog();
+	renderMacroUnsavedChangesDialog();
 	if(!guiState.saveError.empty() && !ImGui::IsPopupOpen("Save Macro")){
 		ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width);
 		ImGui::TextUnformatted(guiState.saveError.c_str());
@@ -305,14 +294,113 @@ void ofxOceanodeNodeMacro::renderMacroLoadDialog() {
 	ImGui::EndDisabled();
 	if(!guiState.loadSelectionPath.empty() && (load || activateSelection)){
 		const string path = guiState.loadSelectionPath;
-		if(guiState.loadSelectionIsPreset){
-			pendingGuiAction = [this, path](){
-				if(!importPresetContents(path)) guiState.saveError = "Could not import preset.";
+		const bool isPreset = guiState.loadSelectionIsPreset;
+		// Loading replaces the contents: offer to save unsaved library edits first.
+		if(!reviewUnsavedChanges(true, path, guiState.loadSelectionName, isPreset)) requestMacroLoad(path, isPreset);
+		ImGui::CloseCurrentPopup();
+	}
+	ImGui::SameLine();
+	// Escape belongs to the delete confirmation while it is open.
+	const bool confirmingDelete = ImGui::IsPopupOpen("Delete Macro?");
+	if(ImGui::Button("Cancel") || (!confirmingDelete && ImGui::IsKeyPressed(ImGuiKey_Escape))) ImGui::CloseCurrentPopup();
+	ImGui::SameLine();
+	ImGui::BeginDisabled(guiState.loadSelectionPath.empty() || guiState.loadSelectionIsPreset || bool(pendingGuiAction));
+	if(ImGui::Button("Delete")) openMacroDeleteDialog(guiState.loadSelectionPath, guiState.loadSelectionName);
+	ImGui::EndDisabled();
+	if(guiState.loadSelectionIsPreset && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+		ImGui::SetTooltip("Presets are deleted from the Presets menu.");
+	renderMacroDeleteDialog();
+	ImGui::EndPopup();
+}
+
+void ofxOceanodeNodeMacro::openMacroDeleteDialog(const string& path, const string& name) {
+	guiState.deleteMacroPath = path;
+	guiState.deleteMacroName = name;
+	guiState.deleteKeepsLocalCopy = usesLibraryMacro(path);
+	guiState.openDeletePopup = true;
+}
+
+// Rendered inside the Load and Save dialogs, so it opens as their child modal.
+void ofxOceanodeNodeMacro::renderMacroDeleteDialog() {
+	if(guiState.openDeletePopup){
+		ImGui::OpenPopup("Delete Macro?");
+		guiState.openDeletePopup = false;
+	}
+	MacroDialogAppearance::Style appearance;
+	if(!ImGui::BeginPopupModal("Delete Macro?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+	ImGui::Text("Macro: %s", guiState.deleteMacroName.c_str());
+	ImGui::TextDisabled("%s", guiState.deleteMacroPath.c_str());
+	ImGui::Separator();
+	ImGui::TextUnformatted("The Macro folder is permanently deleted from the library.");
+	ImGui::TextUnformatted("Presets that use this Macro will no longer find it.");
+	if(guiState.deleteKeepsLocalCopy) ImGui::TextUnformatted("This node keeps its contents as a local Macro.");
+	ImGui::Separator();
+	if(ImGui::Button("Delete", ImVec2(120, 0))){
+		const string path = guiState.deleteMacroPath;
+		pendingGuiAction = [this, path](){ deleteLibraryMacro(path); };
+		ImGui::CloseCurrentPopup();
+	}
+	ImGui::SameLine();
+	if(ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+	ImGui::EndPopup();
+}
+
+bool ofxOceanodeNodeMacro::reviewUnsavedChanges(bool forLoad, const string& loadPath, const string& loadName, bool loadIsPreset) {
+	if(presetManager.isLocal() || !parentContainer || isLoadingPreset || !presetManager.getNextPresetPath().empty()) return false;
+	for(auto* node : parentContainer->getAllModules()){
+		if(&node->getNodeModel() != this) continue;
+		auto review = collectGlobalMacroSaveReview(*parentContainer, *node);
+		if(review.changes.empty()) return false;
+		guiState.unsavedReview = std::move(review);
+		guiState.unsavedForLoad = forLoad;
+		guiState.unsavedLoadPath = loadPath;
+		guiState.unsavedLoadName = loadName;
+		guiState.unsavedLoadIsPreset = loadIsPreset;
+		guiState.openUnsavedPopup = true;
+		return true;
+	}
+	return false;
+}
+
+void ofxOceanodeNodeMacro::renderMacroUnsavedChangesDialog() {
+	if(guiState.openUnsavedPopup){
+		ImGui::OpenPopup("Unsaved Macro Changes");
+		guiState.openUnsavedPopup = false;
+	}
+	const ImVec2 display = ImGui::GetIO().DisplaySize;
+	const float width = std::min(720.f, display.x * .85f);
+	ImGui::SetNextWindowSizeConstraints(ImVec2(width, 0), ImVec2(width, display.y * .85f));
+	MacroDialogAppearance::Style appearance;
+	if(!ImGui::BeginPopupModal("Unsaved Macro Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+	const auto& review = guiState.unsavedReview;
+	if(guiState.unsavedForLoad){
+		ImGui::TextWrapped("Macro \"%s\" has changes that are not saved to the library. Loading \"%s\" replaces them.",
+			review.name.c_str(), guiState.unsavedLoadName.c_str());
+	}else{
+		ImGui::TextWrapped("Save these changes to library Macro \"%s\"? Every preset that uses it will load them.",
+			review.name.c_str());
+	}
+	ImGui::TextDisabled("%s", review.globalPath.c_str());
+	ImGui::Separator();
+	drawGlobalMacroSaveChanges(review, width);
+	ImGui::Separator();
+	if(guiState.unsavedForLoad){
+		const string path = guiState.unsavedLoadPath;
+		const bool isPreset = guiState.unsavedLoadIsPreset;
+		if(ImGui::Button("Save and Load")){
+			pendingGuiAction = [this, path, isPreset](){
+				if(saveGlobalDefinition()) requestMacroLoad(path, isPreset);
+				else guiState.saveError = "Could not save Macro contents, so nothing was loaded.";
 			};
-		}else{
-			presetManager.setNextPresetPath(path);
-			pendingMacroReferenceUserEdited = true;
+			ImGui::CloseCurrentPopup();
 		}
+		ImGui::SameLine();
+		if(ImGui::Button("Load Without Saving")){
+			requestMacroLoad(path, isPreset);
+			ImGui::CloseCurrentPopup();
+		}
+	}else if(ImGui::Button("Save")){
+		requestMacroSave();
 		ImGui::CloseCurrentPopup();
 	}
 	ImGui::SameLine();
@@ -501,7 +589,6 @@ void ofxOceanodeNodeMacro::renderMacroSaveDialog() {
 						presetManager.setCurrentMacroPath(path);
 						ofxOceanodeShared::updateMacrosStructure();
 						presetManager.updateCategoryFromPath(path);
-						loadMacroLayout(path);
 						markMacroReferenceUserEdited();
 						ofxOceanodeShared::snapshotUpdated(path);
 						ofxOceanodeShared::macroUpdated(path);
@@ -521,6 +608,29 @@ void ofxOceanodeNodeMacro::renderMacroSaveDialog() {
 		ImGui::CloseCurrentPopup();
 	}
 	ImGui::EndDisabled();
+	if(guiState.saveToLibrary){
+		// Offer Delete for the existing library Macro this name would overwrite.
+		string name = ofTrim(string(guiState.saveName));
+		ofStringReplace(name, " ", "_");
+		auto category = ofxOceanodeShared::getMacroDirectoryStructure();
+		for(const auto& folder : presetManager.getSaveAsTempCategory()){
+			if(!category) break;
+			const auto child = std::find_if(category->categories.begin(), category->categories.end(),
+				[&](const shared_ptr<macroCategory>& c){ return c->name == folder; });
+			category = child == category->categories.end() ? nullptr : *child;
+		}
+		if(category){
+			for(const auto& macro : category->macros){
+				if(macro.first != name) continue;
+				ImGui::SameLine();
+				ImGui::BeginDisabled(bool(pendingGuiAction) || guiState.creatingSaveFolder);
+				if(ImGui::Button("Delete")) openMacroDeleteDialog(macro.second, macro.first);
+				ImGui::EndDisabled();
+				break;
+			}
+		}
+	}
+	renderMacroDeleteDialog();
 	ImGui::EndPopup();
 }
 
@@ -785,6 +895,26 @@ void ofxOceanodeNodeMacro::syncParameterGroupToSortOrder() {
 	parameterGroupChanged.notify(this);
 }
 
+// Renames or recolors a separator. Its parameter is renamed in place, so the
+// node shows the change immediately and keeps its position in the group.
+void ofxOceanodeNodeMacro::setSortSeparator(int index, const string& label, const ofColor& color) {
+	auto parameterName = [](const string& name, const ofColor& c){
+		return "SEPARATOR:|" + name + "|" + ofToString((int)c.r) + "," + ofToString((int)c.g) + "," +
+			ofToString((int)c.b) + "," + ofToString((int)c.a);
+	};
+	auto& entry = sortOrder.getOrder()[index];
+	const string oldName = parameterName(getSortSeparatorLabel(entry), getSortSeparatorColor(entry));
+	const string newName = parameterName(label, color);
+	if(newName == oldName) return;
+	for(int j = 0; j < getParameterGroup().size(); j++){
+		if(getParameterGroup().get(j).getName() == oldName){
+			getParameterGroup().get(j).setName(newName);
+			break;
+		}
+	}
+	entry = makeSortSeparatorEntry(label, color);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // renderRouterSortInterface — router sort order inspector with drag-drop,
 // separators, rename (moved from main .cpp)
@@ -802,8 +932,27 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 	ImGui::TextDisabled("Drag to reorder, double-click to rename.");
 	ImGui::Spacing();
 
-	const float sepDeleteMargin = 40.0f * zoomLevel;
-	
+	// Separator rows end with a color swatch and a delete ("x") button.
+	const float swatchSize = ImGui::GetTextLineHeight();
+	const float sepDeleteMargin = 40.0f * zoomLevel + swatchSize + ImGui::GetStyle().ItemSpacing.x;
+	// The swatch opens a picker that recolors the separator while dragging.
+	auto separatorColorButton = [&](int index){
+		const ofColor current = getSortSeparatorColor(sortOrder.getOrder()[index]);
+		ImVec4 color(current.r / 255.f, current.g / 255.f, current.b / 255.f, current.a / 255.f);
+		if(ImGui::ColorButton("##sepColor", color, ImGuiColorEditFlags_AlphaPreviewHalf | ImGuiColorEditFlags_NoDragDrop,
+		                      ImVec2(swatchSize, swatchSize)))
+			ImGui::OpenPopup("##sepColorPicker");
+		if(ImGui::BeginPopup("##sepColorPicker")){
+			if(ImGui::ColorPicker4("##picker", &color.x, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf)){
+				// Round: truncating would lower unchanged channels on every drag frame.
+				auto channel = [](float value){ return std::round(ofClamp(value, 0.f, 1.f) * 255.f); };
+				setSortSeparator(index, getSortSeparatorLabel(sortOrder.getOrder()[index]),
+					ofColor(channel(color.x), channel(color.y), channel(color.z), channel(color.w)));
+			}
+			ImGui::EndPopup();
+		}
+	};
+
 	int moveFrom = -1, moveTo = -1;
 	// Disable drag-and-drop while a rename is in progress so the InputText
 	// doesn't accidentally get cancelled by an unintended drag gesture.
@@ -837,36 +986,14 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 				ImGui::SetKeyboardFocusHere();
 				guiState.routerSortEditNeedsFocus = false;
 			}
-			ImGui::SetNextItemWidth(isSep ? -sepDeleteMargin : -1.0f); // leave room for x button on seps
+			ImGui::SetNextItemWidth(isSep ? -sepDeleteMargin : -1.0f); // leave room for the separator buttons
 			bool confirmed = ImGui::InputText("##rename", guiState.routerSortEditBuf, sizeof(guiState.routerSortEditBuf),
 				ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
 
 			if(confirmed){
 				string newName(guiState.routerSortEditBuf);
 				if(isSep){
-					// Separator rename: update the parameter name in the group and
-					// replace the sort-order entry with the new label.
-					if(!newName.empty()){
-						string oldLabel  = getSortSeparatorLabel(sortOrder.getOrder()[i]);
-						ofColor sepColor = getSortSeparatorColor(sortOrder.getOrder()[i]);
-						if(newName != oldLabel){
-							string oldParamName = "SEPARATOR:|" + oldLabel + "|" +
-								ofToString((int)sepColor.r) + "," + ofToString((int)sepColor.g) + "," +
-								ofToString((int)sepColor.b) + "," + ofToString((int)sepColor.a);
-							string newParamName = "SEPARATOR:|" + newName + "|" +
-								ofToString((int)sepColor.r) + "," + ofToString((int)sepColor.g) + "," +
-								ofToString((int)sepColor.b) + "," + ofToString((int)sepColor.a);
-							// Update the parameter name in-place so the visual divider
-							// reflects the new label immediately (no need to reload).
-							for(int j = 0; j < getParameterGroup().size(); j++){
-								if(getParameterGroup().get(j).getName() == oldParamName){
-									getParameterGroup().get(j).setName(newParamName);
-									break;
-								}
-							}
-							sortOrder.getOrder()[i] = makeSortSeparatorEntry(newName, sepColor);
-						}
-					}
+					if(!newName.empty()) setSortSeparator(i, newName, getSortSeparatorColor(sortOrder.getOrder()[i]));
 				} else {
 					// Router rename: set the abstractRouter's nameParam; the existing
 					// rename listener cascades the update to sortOrder.getOrder(), routerManager,
@@ -885,8 +1012,10 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 				guiState.routerSortEditingIndex = -1;
 			}
 
-			// Delete button shown inline even while editing a separator
+			// Color and delete buttons shown inline even while editing a separator
 			if(isSep){
+				ImGui::SameLine();
+				separatorColorButton(i);
 				ImGui::SameLine();
 				if(ImGui::SmallButton("x")){
 					string sepLabel = getSortSeparatorLabel(sortOrder.getOrder()[i]);
@@ -903,10 +1032,10 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 			if(isUnknown) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 			if(isSep)     ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::SelectedNodeText);
 
-			// For separators, constrain the selectable to leave 40 px for the
-			// delete ("x") button (same margin as the InputText in edit mode).
-			// ImVec2(0,0) would fill the entire available width, pushing the
-			// SameLine button outside the clip rect and making it unclickable.
+			// For separators, constrain the selectable to leave room for the
+			// color and delete ("x") buttons (same margin as the InputText in edit
+			// mode). ImVec2(0,0) would fill the entire available width, pushing the
+			// SameLine buttons outside the clip rect and making them unclickable.
 			float selWidth = isSep
 				? max(0.0f, ImGui::GetContentRegionAvail().x - sepDeleteMargin)
 				: 0.0f;
@@ -1013,8 +1142,10 @@ void ofxOceanodeNodeMacro::renderRouterSortInterface() {
 				}
 			}
 
-			// Delete button for separators (shown in normal display mode too)
+			// Color and delete buttons for separators (shown in normal display mode too)
 			if(isSep){
+				ImGui::SameLine();
+				separatorColorButton(i);
 				ImGui::SameLine();
 				if(ImGui::SmallButton("x")){
 					string sepLabel = getSortSeparatorLabel(sortOrder.getOrder()[i]);

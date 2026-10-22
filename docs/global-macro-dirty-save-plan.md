@@ -208,6 +208,16 @@ that a single parameter can be saved independently.
 The final result should say which global macros were saved and which were
 skipped, while making clear whether the preset itself saved successfully.
 
+### The Macro node's own Save and Load
+
+A global Macro node's **Save** button runs the same comparison for that one
+instance, without its nested global macros. With no changes it saves at once;
+otherwise it lists them and asks before overwriting the library folder.
+**Load** replaces the contents, so it first lists unsaved changes and offers
+**Save and Load**, **Load Without Saving** or **Cancel**. Selecting a macro
+through the node's index input loads it without asking. Local macros have no
+library baseline and do not prompt.
+
 ## Current-code constraints
 
 - `ofxOceanodeContainer::savePreset()` writes `modules.json`,

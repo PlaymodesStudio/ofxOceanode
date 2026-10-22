@@ -72,6 +72,8 @@ public:
     virtual bool drawNodeParameter(ofxOceanodeAbstractParameter&, float, float){ return false; }
     // Optional display text beside the node title; does not change its identity.
     virtual std::string getNodeTitleSuffix() const { return {}; }
+    // Hover text for the title suffix, which may add detail the header has no room for.
+    virtual std::string getNodeTitleTooltip() const { return getNodeTitleSuffix(); }
     
     //get parameterGroup
     ofParameterGroup &getParameterGroup(){return parameters;};

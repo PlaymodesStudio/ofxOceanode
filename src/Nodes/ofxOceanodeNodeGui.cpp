@@ -43,7 +43,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
     oceanodeProfiling::Scope timing(node.getNodeModel().getProfilingRecord(), oceanodeProfiling::Phase::Gui);
     headerControlHovered = false;
     string moduleName = getParameters().getName();
-    const bool renderGui = (zoomLevel > 0.5f) ||
+    const bool renderGui = (zoomLevel > ofxOceanodeShared::MIN_DETAIL_ZOOM) ||
         (node.getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_KeepGuiVisibleAtLowZoom);
 	
 	bool isTransparent = (node.getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
@@ -100,8 +100,8 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         }
 
 		const float defaultContentWidth = nodeWidthText + nodeWidthWidget;
-		// Don't draw node name text below 50% zoom
-		if(zoomLevel > 0.5f){
+		// Don't draw node name text at 45% zoom or below
+		if(zoomLevel > ofxOceanodeShared::MIN_DETAIL_ZOOM){
 			ImFont* boldFont = ofxOceanodeShared::getCurrentBoldFont();
 			if(boldFont) ImGui::PushFont(boldFont);
             const ImVec2 titlePosition = ImGui::GetCursorScreenPos();
@@ -130,7 +130,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 					ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
 						position, ImGui::GetColorU32(ImGuiCol_Text), titleSuffix.c_str(), nullptr, 0.0f, &clip);
 					ImGui::Dummy(ImVec2(std::min(textSize.x, availableWidth), textSize.y));
-					if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", titleSuffix.c_str());
+					if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", node.getNodeModel().getNodeTitleTooltip().c_str());
 				}
 			}
 		}
@@ -697,7 +697,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         }
         
         } else {
-            // Ordinary nodes at zoom ≤ 0.5f: reserve their cached layout without widgets.
+            // Ordinary nodes at zoom ≤ 45%: reserve their cached layout without widgets.
             if(cachedContentHeight > 0.0f){
                 ImGui::Dummy(ImVec2(nodeWidthText + nodeWidthWidget, cachedContentHeight * zoomLevel));
                 // Distribute pin Y positions evenly across the dummy area so connections

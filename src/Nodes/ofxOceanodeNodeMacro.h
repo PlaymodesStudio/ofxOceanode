@@ -23,6 +23,7 @@
 #include "MacroMorphEngine.h"
 #include "MacroRouterManager.h"
 #include "MacroPresetManager.h"
+#include "GlobalMacroSaveReview.h"
 
 #ifdef OFXOCEANODE_USE_OSC
 class ofxOscMessage;
@@ -65,6 +66,18 @@ struct MacroGuiState {
 	std::string saveError;
 	std::string hoverMacroPath;
 	std::string hoverMacroDescription;
+	// Library Macro deletion, confirmed from the Load and Save As dialogs.
+	bool openDeletePopup = false;
+	bool deleteKeepsLocalCopy = false;
+	std::string deleteMacroPath;
+	std::string deleteMacroName;
+	// Unsaved library edits, reviewed before Save, or before Load replaces them.
+	bool openUnsavedPopup = false;
+	bool unsavedForLoad = false;
+	bool unsavedLoadIsPreset = false;
+	std::string unsavedLoadPath;
+	std::string unsavedLoadName;
+	GlobalMacroSaveReview unsavedReview;
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -78,6 +91,13 @@ public:
 	bool drawNodeParameter(ofxOceanodeAbstractParameter& parameter, float labelWidth, float widgetWidth) override;
 	std::string getNodeTitleSuffix() const override {
 		return presetManager.isLocal() ? localName.get() : presetManager.getCurrentMacro();
+	}
+	// Library Macros also show their folder inside Macros/, e.g. "Effects/Blur".
+	std::string getNodeTitleTooltip() const override {
+		if(presetManager.isLocal()) return localName.get();
+		std::string path;
+		for(const auto& folder : presetManager.getCurrentCategory()) path += folder + "/";
+		return path + presetManager.getCurrentMacro();
 	}
 	
 	// ─── Lifecycle ────────────────────────────────────────────────────────
@@ -194,14 +214,18 @@ private:
 	void setupPresetControl();
 	void initializeSnapshotSystem();
 
-	// ─── ImGui layout persistence (per-macro) ────────────────────────────
-	void saveMacroLayout(const string& folderPath);
-	void loadMacroLayout(const string& folderPath);
 	bool saveGlobalDescription(const string& folderPath) const;
 	void loadGlobalDescription(const string& folderPath);
 	bool saveLocalDefinition();
 	bool saveLibraryDefinition(const string& path);
 	bool importPresetContents(const string& path);
+	// Keeps the current contents as a local Macro, detached from the library.
+	bool detachLocalCopy();
+	bool usesLibraryMacro(const string& path) const;
+	bool deleteLibraryMacro(const string& path);
+	// Deferred to update(), outside the ImGui pass.
+	void requestMacroLoad(const string& path, bool isPreset);
+	void requestMacroSave();
 	const string& getLocalWorkingDirectory();
 
 	// ─── GUI rendering (implemented in ofxOceanodeNodeMacroGui.cpp) ──────
@@ -211,11 +235,16 @@ private:
 	void renderMacroSaveDialog();
 	void renderMacroSaveLibraryTree();
 	bool createMacroLibraryFolder(const string& name);
+	void openMacroDeleteDialog(const string& path, const string& name);
+	void renderMacroDeleteDialog();
+	bool reviewUnsavedChanges(bool forLoad, const string& loadPath = "", const string& loadName = "", bool loadIsPreset = false);
+	void renderMacroUnsavedChangesDialog();
 	void renderPresetNamingGui();
 	void renderMinimizedView(ImVec2 size);
 	void renderSnapshotMatrix();
 	void renderInspectorInterface();
 	void renderRouterSortInterface();
+	void setSortSeparator(int index, const std::string& label, const ofColor& color);
 	void syncParameterGroupToSortOrder();
 
 	// ─── Router sort-order inline helpers (delegate to sortOrder) ─────────

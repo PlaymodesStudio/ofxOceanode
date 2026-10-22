@@ -861,8 +861,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             centerCanvasAfterAutoLayoutRequested = false;
         }
 
-        // Detect canvas tab activation — consistent check for both active-canvas-ID
-        // and layout switching. Uses dock tab selection when available to avoid
+        // Detect canvas tab activation for active-canvas tracking.
+        // Use dock tab selection when available to avoid
         // the RootAndChildWindows false-positive with shared dock hosts.
         bool isActiveTab = false;
         ImGuiWindow* win = ImGui::GetCurrentWindow();
@@ -879,23 +879,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             ofxOceanodeShared::setActiveCanvasUniqueID(uniqueID);
         }
         
-        if(isActiveTab && !wasFocusedLastFrame && !layoutIniPath.empty()){
-            if(ofxOceanodeShared::shouldSwitchCanvasLayout()
-               && ofxOceanodeShared::getLayoutSwitchSuppressFrames() <= 0){
-                string newIniPath = ofToDataPath(layoutIniPath);
-                string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
-                
-                // Only switch if we're actually changing to a different layout
-                if(newIniPath != activeLayoutPath){
-                    // Queue: save current layout to previous canvas, load this canvas's layout
-                    ofxOceanodeShared::getPendingLayoutSavePath() = activeLayoutPath;
-                    ofxOceanodeShared::getPendingLayoutLoadPath() = newIniPath;
-                    // Update active path immediately so subsequent focus changes in the same frame don't re-trigger
-                    activeLayoutPath = newIniPath;
-                }
-            }
-        }
-        wasFocusedLastFrame = isActiveTab;
         handleParentNavigation();
         ImGui::SameLine();
         ImGui::BeginGroup();
@@ -1580,14 +1563,35 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 //            ImU32 node_bg_color = /*(node_hovered_in_list == node->ID || node_hovered_in_scene == node->ID || (node_hovered_in_list == -1 && node_selected == node->ID)) ? IM_COL32(75, 75, 75, 255) :*/ IM_COL32(40, 40, 40, 255);
                 ImU32 node_bg_color = OceanodeColors::U32(OceanodeColors::NodeBg);
                 
-                ImU32 node_hd_color = (isSelectedOrSelecting) ? IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,160) : IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,64);
+                const int nodeHeaderAlpha = 64;
+                ImU32 node_hd_color = (isSelectedOrSelecting) ? IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,160) : IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,nodeHeaderAlpha);
                 
 				// Check if this node should be rendered transparently
 				bool isTransparent = (node->getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
 
+				// Macros draw their header and port bullets in the header color, made
+				// opaque by blending it over the default node background so it looks the same
+				// on top of their tinted body.
+				bool isMacro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel()) != nullptr;
+				ImU32 node_bullet_color = OceanodeColors::U32(OceanodeColors::ConnectionBullet);
+				ImU32 node_body_color = node_bg_color;
+				if(isMacro){
+					ImVec4 bg = ImGui::ColorConvertU32ToFloat4(node_bg_color);
+					auto headerOverBackground = [&](ImVec4 hd, float brightness){
+						return ImGui::GetColorU32(ImVec4((bg.x + (hd.x - bg.x) * hd.w) * brightness,
+														 (bg.y + (hd.y - bg.y) * hd.w) * brightness,
+														 (bg.z + (hd.z - bg.z) * hd.w) * brightness, 1.0f));
+					};
+					node_hd_color = headerOverBackground(ImGui::ColorConvertU32ToFloat4(node_hd_color), 1.0f);
+					node_bullet_color = node_hd_color;
+					// The body is the unselected header color, 25% darker.
+					node_body_color = headerOverBackground(ImGui::ColorConvertU32ToFloat4(
+						IM_COL32(node->getColor().r, node->getColor().g, node->getColor().b, nodeHeaderAlpha)), 0.75f);
+				}
+
 				if (!isTransparent) {
 					//if(nodeGui.getExpanded()){
-						draw_list->AddRectFilled(node_rect_min, node_rect_max, node_bg_color, 4.0f);
+						draw_list->AddRectFilled(node_rect_min, node_rect_max, node_body_color, 4.0f);
 					//}
 					draw_list->AddRectFilled(node_rect_min, node_rect_header, node_hd_color, 4.0f);
 				}
@@ -1606,7 +1610,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                             auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
                             auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
-                            draw_list->AddCircleFilled(bulletPosition, bulletSize, OceanodeColors::U32(OceanodeColors::ConnectionBullet));
+                            draw_list->AddCircleFilled(bulletPosition, bulletSize, node_bullet_color);
                             if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
                                 connectionIsDoable = true;
                                 if(ImGui::IsMouseClicked(1) && param->hasInConnection()){
@@ -1670,7 +1674,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                             auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
                             auto bulletSize = ofMap(mouseToBulletDistance, 0, NODE_BULLET_GROW_DIST, NODE_BULLET_MAX_SIZE, NODE_BULLET_MIN_SIZE, true);
-                            draw_list->AddCircleFilled(bulletPosition, bulletSize, OceanodeColors::U32(OceanodeColors::ConnectionBullet));
+                            draw_list->AddCircleFilled(bulletPosition, bulletSize, node_bullet_color);
                             if(mouseToBulletDistance < NODE_BULLET_MAX_SIZE && !ImGui::IsPopupOpen("New Node") && connectionCanBeInteracted){
                                 if(ImGui::IsMouseClicked(1) && hasPortalizableConnections(param.get())){
                                     portalizeSourceParameter = param.get();
@@ -1822,10 +1826,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             glm::vec2 screenSize = c.size * zoomLevel;
             float headerH = 15.0f * zoomLevel;
             draw_list->AddRectFilled(currentPosition, currentPosition + glm::vec2(screenSize.x, headerH), IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 255));
-            // Don't draw comment text below 50% zoom
-			// Don't draw node name text below 50% zoom
+            // Don't draw comment text at 45% zoom or below
 
-            if(zoomLevel > 0.5f){
+            if(zoomLevel > ofxOceanodeShared::MIN_DETAIL_ZOOM){
                 ImFont* commentFont = zoomFontsBold[getCeilingFontIndex()];
                 float commentFontSize = ZOOM_FONT_SIZES[3] * zoomLevel;  // base font size scaled by zoom
                 if(commentFont) {
@@ -2589,6 +2592,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         const ImU32 connectionLineColor = darkCanvas
             ? OceanodeColors::U32(OceanodeColors::ConnectionLineDark)
             : OceanodeColors::U32(OceanodeColors::ConnectionLineLight);
+        const float connectionWidth = ofxOceanodeShared::getConnectionWidth();
+        // A selected node's wires are drawn wider so they stand out.
+        constexpr float selectedConnectionExtraWidth = 0.5f;
         constexpr float nodeAttachmentTension = 1.5f;
         oceanodeConnectionDrawing::Renderer connectionRenderer(draw_list);
         using ConnectionStyle = oceanodeConnectionDrawing::Style;
@@ -2636,14 +2642,16 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         ImU32 lineColor = connectionLineColor;
                         if((colorConnections || selectedConnection) && sourceGui){
                             // Both incoming and outgoing wires inherit their origin node's color.
-                            ImVec4 sourceColor(sourceGui->getColor(), 0.5f);
+                            // With colored connections on, a selected node's wires are highlighted at full alpha.
+                            ImVec4 sourceColor(sourceGui->getColor(), (colorConnections && selectedConnection) ? 1.0f : 0.5f);
                             sourceColor.x *= 0.5f;
                             sourceColor.y *= 0.5f;
                             sourceColor.z *= 0.5f;
                             lineColor = OceanodeColors::U32(sourceColor);
                         }
                         connectionRenderer.bezier(p1, p1 + nodeControlPoint, p2 - nodeControlPoint, p2,
-                                                  lineColor, connectionWidth,
+                                                  lineColor,
+                                                  selectedConnection ? connectionWidth + selectedConnectionExtraWidth : connectionWidth,
                                                   connectionStyle(&sourceParameter, &sinkParameter),
                                                   zoomLevel);
                     }
@@ -3069,20 +3077,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                 glm::vec2 center   = target.canvas->getContentRegionSize() / (2.0f * zoom);
                                 target.canvas->setScrolling(-nodePos - nodeSize / 2.0f + center);
 
-                                // 5) Optional layout switching when the user has opted in
-                                if(ofxOceanodeShared::shouldSwitchCanvasLayout() &&
-                                   !target.canvas->getLayoutIniPath().empty()){
-                                    string newIniPath = ofToDataPath(target.canvas->getLayoutIniPath());
-                                    string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
-                                    if(!newIniPath.empty() && newIniPath != activeLayoutPath){
-                                        ofxOceanodeShared::getPendingLayoutSavePath() = activeLayoutPath;
-                                        ofxOceanodeShared::getPendingLayoutLoadPath() = newIniPath;
-                                        activeLayoutPath = newIniPath;
-                                    }
-                                }
                             }
 
-                            // 6) Notify the NodesController (and any other listeners) so
+                            // 5) Notify the NodesController (and any other listeners) so
                             //    the tree view highlights the new node and scrolls to it.
                             //    This MUST be called every jump — that's the fix for the
                             //    "highlight does not follow Alt+Arrow" bug.

@@ -57,7 +57,6 @@ int main(int argc, char** argv) {
     assert(macro.isLocal() && macro.getCurrentMacroPath().empty());
     assert(macro.getLocalMacroName() == "Whole_Preset");
     assert(macro.getContainer()->getAllModules().size() == 1 && value(macro) == .25f);
-    assert(macro.getCanvas()->getLayoutIniPath().find("Presets/Bank") == string::npos);
     macro.getContainer()->getAllModules().front()->getNodeModel().getParameter<float>("Value") = .6f;
     macro.localName = "Local %s";
     macro.macroDescription = "Description 100%";
@@ -70,6 +69,7 @@ int main(int argc, char** argv) {
     assert(saved.at("Local_Name") == "Local %s");
     assert(saved.at("Description") == "Description 100%");
     assert(saved.at("LocalPreset") == true);
+    assert(!fs::exists("SavedParent/Macro_1/ImGuiLayout.ini"));
     assert(ofLoadJson("SavedParent/Macro_1/description.json").at("Description") == "Description 100%");
     assert(ofLoadJson("Presets/Bank/01--Whole_Preset/Number_1.json").at("Value") == "0.25");
     assert(!fs::exists("Presets/Bank/01--Whole_Preset/Macro_1.json"));
@@ -118,6 +118,7 @@ int main(int argc, char** argv) {
     assert(copy.saveLibraryDefinition("Macros/NewDefinition"));
     assert(copy.isLocal());
     assert(fs::exists("Macros/NewDefinition/modules.json"));
+    assert(!fs::exists("Macros/NewDefinition/ImGuiLayout.ini"));
     assert(ofLoadJson("Macros/NewDefinition/description.json").at("Description") == "Description 100%");
     // Canvas nodes share a window: test distant origins and long names, not
     // just a node drawn at the window padding. Width must equal the default.
@@ -267,6 +268,103 @@ int main(int argc, char** argv) {
     ImGui::ActivateItemByID(ImHashStr("Load", 0, loadPopup->ID)); frame();
     copy.update(event); frame();
     assert(!copy.isLocal() && copy.getCurrentMacroName() == "A" && value(copy) == .7f);
+    // The header tooltip shows the library folder; the header itself shows only the name.
+    assert(copy.getNodeTitleSuffix() == "A" && copy.getNodeTitleTooltip() == "Folder/A");
+    // Save lists unsaved library edits and writes only after confirmation.
+    auto* controls = ImGui::FindWindowByName("Save dialog test"); assert(controls);
+    const auto controlsID = ImHashStr("Preset Control Gui", 0, controls->ID);
+    auto pressUnsaved = [&](const char* label) {
+        auto* popup = ImGui::FindWindowByName("Unsaved Macro Changes"); assert(popup && popup->Active);
+        ImGui::ActivateItemByID(ImHashStr(label, 0, popup->ID)); frame();
+    };
+    auto setValue = [&](float number) {
+        copy.getContainer()->getAllModules().front()->getNodeModel().getParameter<float>("Value") = number;
+    };
+    auto selectSource = [&](const string& path, const char* name) {
+        copy.guiState.openLoadPopup = true; copy.guiState.loadSelectionPath.clear(); frame(); frame();
+        ImGui::ActivateItemByID(ImHashStr(name, 0, ImHashStr(path.c_str(), 0, folderID))); frame();
+        assert(copy.guiState.loadSelectionPath == path);
+    };
+    reviewForTest.instance = &copy; reviewForTest.name = "A";
+    reviewForTest.changes = {{"Macro [1] A", "Number [1]", "Value", "0.7", "0.75"}};
+    setValue(.75f);
+    ImGui::ActivateItemByID(ImHashStr("Save", 0, controlsID)); frame(); frame();
+    assert(!copy.pendingGuiAction && !copy.guiState.unsavedForLoad);
+    assert(copy.guiState.unsavedReview.changes.size() == 1);
+    pressUnsaved("Save"); assert(bool(copy.pendingGuiAction));
+    copy.update(event); frame();
+    assert(ofLoadJson("Macros/Folder/A/Number_1.json").at("Value") == "0.75");
+    // Loading another source offers to save first; skipping leaves the library as it was.
+    setValue(.9f);
+    selectSource("Macros/Folder/B", "B");
+    ImGui::ActivateItemByID(ImHashStr("Load", 0, loadPopup->ID)); frame(); frame();
+    assert(copy.guiState.unsavedForLoad && copy.guiState.unsavedLoadPath == "Macros/Folder/B");
+    assert(copy.presetManager.getNextPresetPath().empty() && !copy.pendingGuiAction);
+    pressUnsaved("Load Without Saving"); copy.update(event); frame();
+    assert(copy.getCurrentMacroName() == "B" && value(copy) == .8f);
+    assert(ofLoadJson("Macros/Folder/A/Number_1.json").at("Value") == "0.75");
+    // Save and Load writes the current library Macro, then loads the selection.
+    setValue(.95f); reviewForTest.name = "B";
+    selectSource("Macros/Folder/A", "A");
+    ImGui::ActivateItemByID(ImHashStr("Load", 0, loadPopup->ID)); frame(); frame();
+    pressUnsaved("Save and Load"); assert(bool(copy.pendingGuiAction));
+    copy.update(event); frame();
+    assert(ofLoadJson("Macros/Folder/B/Number_1.json").at("Value") == "0.95");
+    assert(copy.getCurrentMacroName() == "A" && value(copy) == .75f);
+    reviewForTest = {};
+    // Delete confirms inside the Load dialog; Escape cancels only the confirmation.
+    saveSource("Macros/Folder/ToDelete", .1f); ofxOceanodeShared::updateMacrosStructure();
+    selectSource("Macros/Folder/ToDelete", "ToDelete");
+    ImGui::ActivateItemByID(ImHashStr("Delete", 0, loadPopup->ID)); frame(); frame();
+    auto* deletePopup = ImGui::FindWindowByName("Delete Macro?"); assert(deletePopup && deletePopup->Active);
+    assert(!copy.guiState.deleteKeepsLocalCopy);
+    io.AddKeyEvent(ImGuiKey_Escape, true); frame(); io.AddKeyEvent(ImGuiKey_Escape, false); frame();
+    assert(!deletePopup->Active && loadPopup->Active && fs::exists("Macros/Folder/ToDelete"));
+    ImGui::ActivateItemByID(ImHashStr("Delete", 0, loadPopup->ID)); frame(); frame();
+    assert(deletePopup->Active);
+    ImGui::ActivateItemByID(ImHashStr("Delete", 0, deletePopup->ID)); frame();
+    assert(bool(copy.pendingGuiAction)); copy.update(event); frame();
+    assert(!fs::exists("Macros/Folder/ToDelete") && copy.guiState.loadSelectionPath.empty());
+    assert(loadPopup->Active && !copy.isLocal() && copy.getCurrentMacroName() == "A");
+    ImGui::ActivateItemByID(ImHashStr("Cancel", 0, loadPopup->ID)); frame();
+    // Deleting the library Macro this node uses keeps its contents as a local Macro.
+    saveSource("Macros/Folder/InUse", .3f); ofxOceanodeShared::updateMacrosStructure();
+    copy.presetManager.setNextPresetPath("Macros/Folder/InUse"); copy.update(event);
+    assert(!copy.isLocal() && value(copy) == .3f);
+    copy.openMacroSaveDialog(true); frame(); frame();
+    assert(copy.presetManager.getSaveAsTempCategory() == std::deque<string>({"Folder"}));
+    pressSave("Delete"); frame();
+    assert(copy.guiState.deleteKeepsLocalCopy && deletePopup->Active);
+    ImGui::ActivateItemByID(ImHashStr("Delete", 0, deletePopup->ID)); frame();
+    copy.update(event); frame();
+    assert(!fs::exists("Macros/Folder/InUse") && fs::exists("Macros/Folder/A/modules.json"));
+    assert(copy.isLocal() && copy.getLocalMacroName() == "InUse" && value(copy) == .3f);
+    assert(copy.getNodeTitleTooltip() == "InUse");
+    pressSave("Cancel");
+    // Only Macro definitions inside the library can be deleted.
+    assert(!copy.deleteLibraryMacro("Presets/Bank/01--Whole_Preset") && fs::exists("Presets/Bank/01--Whole_Preset"));
+    assert(!copy.deleteLibraryMacro("Macros/Folder") && fs::exists("Macros/Folder/A"));
+    // Separator recolor and rename keep the parameter, renamed in place.
+    {
+        auto separators = [&]() {
+            vector<string> names;
+            for(int i = 0; i < (int)macro.getParameterGroup().size(); i++) {
+                const string name = macro.getParameterGroup().get(i).getName();
+                if(name.rfind("SEPARATOR:|", 0) == 0) names.push_back(name);
+            }
+            return names;
+        };
+        const ofColor original(10, 20, 30, 255), recolored(200, 100, 50, 128);
+        macro.addSeparator("Group", original);
+        macro.sortOrder.getOrder().push_back(macro.makeSortSeparatorEntry("Group", original));
+        const int index = macro.sortOrder.getOrder().size() - 1;
+        macro.setSortSeparator(index, "Group", recolored);
+        assert(separators() == vector<string>({"SEPARATOR:|Group|200,100,50,128"}));
+        assert(macro.getSortSeparatorColor(macro.sortOrder.getOrder()[index]) == recolored);
+        macro.setSortSeparator(index, "Renamed", recolored);
+        assert(separators() == vector<string>({"SEPARATOR:|Renamed|200,100,50,128"}));
+        assert(macro.getSortSeparatorLabel(macro.sortOrder.getOrder()[index]) == "Renamed");
+    }
     // Real container history must retain unsaved local AND library macro graphs.
     {
         ofxOceanodeContainer history(registry, types, transport); history.setCanvasID("History");
@@ -305,7 +403,7 @@ int main(int argc, char** argv) {
     macro.presetManager.updateCategoryFromPath("Macros/Missing/A");
     macro.presetManager.loadMacroInsideCategory(0);
     assert(macro.presetManager.getNextPresetPath().empty());
-    std::cout << "Macro GUI regression passed: local import/save/recall, library save, four index input types, default width at canvas offsets/zooms, Load/Save modal trees and nested folder creation.\n";
+    std::cout << "Macro GUI regression passed: local import/save/recall, library save, four index input types, default width at canvas offsets/zooms, Load/Save modal trees, nested folder creation, unsaved-change review on Save/Load, confirmed library deletion and separator recolor.\n";
 }
 '''
 
@@ -323,10 +421,23 @@ def main():
                           'void ofxOceanodeNodeMacro::openMacroSaveDialog(',
                           'void ofxOceanodeNodeMacro::renderPresetControlGui()',
                           'void ofxOceanodeNodeMacro::renderMacroLoadDialog()',
+                          'void ofxOceanodeNodeMacro::openMacroDeleteDialog(',
+                          'void ofxOceanodeNodeMacro::renderMacroDeleteDialog()',
+                          'bool ofxOceanodeNodeMacro::reviewUnsavedChanges(',
+                          'void ofxOceanodeNodeMacro::renderMacroUnsavedChangesDialog()',
                           'void ofxOceanodeNodeMacro::renderMacroSaveDialog()',
                           'void ofxOceanodeNodeMacro::renderMacroSaveLibraryTree()',
-                          'bool ofxOceanodeNodeMacro::createMacroLibraryFolder(']:
+                          'bool ofxOceanodeNodeMacro::createMacroLibraryFolder(',
+                          'void ofxOceanodeNodeMacro::setSortSeparator(']:
             native.SUPPORT += block(gui, signature) + '\n'
+        # The library comparison lives with the Presets controller; cases choose its result.
+        native.SUPPORT += r'''
+GlobalMacroSaveReview reviewForTest;
+GlobalMacroSaveReview collectGlobalMacroSaveReview(ofxOceanodeContainer&, ofxOceanodeNode& node) {
+    return &node.getNodeModel() == reviewForTest.instance ? reviewForTest : GlobalMacroSaveReview{};
+}
+void drawGlobalMacroSaveChanges(const GlobalMacroSaveReview&, float) {}
+'''
         # The root save/load adapters omit UI services; retain storage ownership.
         native.SUPPORT = native.SUPPORT.replace('void ofxOceanodeContainer::saveCustomGuis(const std::string&) {',
             'void ofxOceanodeContainer::saveCustomGuis(const std::string& path) { customGuiStoragePath = path;')

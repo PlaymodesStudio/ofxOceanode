@@ -992,19 +992,8 @@ void ofxOceanodeContainer::flushPendingScopeSave()
     // in the same debounced transaction, but never from Scope::draw().
     if(ImGui::GetCurrentContext() != nullptr)
     {
-        std::string layoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
-        if(layoutPath.empty())
-        {
-            layoutPath = ofToDataPath(presetPath + "/ImGuiLayout.ini");
-        }
-
+        const std::string layoutPath = ofToDataPath(presetPath + "/ImGuiLayout.ini");
         ImGui::SaveIniSettingsToDisk(layoutPath.c_str());
-        size_t iniSize = 0;
-        const char* iniData = ImGui::SaveIniSettingsToMemory(&iniSize);
-        if(iniData != nullptr && iniSize > 0)
-        {
-            ofxOceanodeShared::getLayoutContentCache()[layoutPath] = std::string(iniData, iniSize);
-        }
     }
 }
 
@@ -2800,18 +2789,6 @@ bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode)
     location.canvas->bringOnTop();
     ofxOceanodeShared::setActiveCanvasUniqueID(location.canvas->getUniqueID());
     ofxOceanodeShared::nodeSelectedInCanvas(location.node);
-    ofxOceanodeShared::getLayoutSwitchSuppressFrames() = 4;
-
-    if(ofxOceanodeShared::shouldSwitchCanvasLayout()){
-        string newIniPath = ofToDataPath(location.canvas->getLayoutIniPath());
-        string& activeLayoutPath = ofxOceanodeShared::getActiveCanvasLayoutPath();
-        if(!newIniPath.empty() && newIniPath != activeLayoutPath){
-            ofxOceanodeShared::getPendingLayoutSavePath() = activeLayoutPath;
-            ofxOceanodeShared::getPendingLayoutLoadPath() = newIniPath;
-            activeLayoutPath = newIniPath;
-        }
-    }
-
     location.canvas->requestCenterOnNode(location.node,
                                          location.macro != nullptr ? 2 : 1);
     return true;
