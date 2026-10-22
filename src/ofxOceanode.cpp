@@ -198,6 +198,7 @@ void ofxOceanode::draw(){
         if(item.second.draw) item.second.draw();
 
     cycleDockedTabs();
+    proportionalDocking->drawDockCollapseHandles();
     gui.end();
     gui.draw();
     // Needs this frame's rendered draw data, which is valid until the next NewFrame.
