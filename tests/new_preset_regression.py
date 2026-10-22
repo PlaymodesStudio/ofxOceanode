@@ -78,7 +78,7 @@ struct ofxOceanodeContainer {
     Listeners destroyConnectionListeners,destroyNodeListeners,midiUnregisterlisteners,midiSenderListeners;
     map<string,vector<shared_ptr<MidiBinding>>> midiBindings,persistentMidiBindings;
     map<string,MidiInput> midiIns;
-    unique_ptr<Timeline> timelineManager;
+    unique_ptr<Timeline> automationExtension;
     vector<int> customGuiPanels{1},customGuiPanelsData{1},customGuiSnapshotBanks{1},comments{1};
     map<int,int> customGuiPanelParameterIndex{{1,1}},customGuiPublishedParameterIndex{{1,1}},userEditedValues{{1,1}};
     string customGuiStoragePath="SavedPreset",pendingCustomGuiName="Old",pendingDeletedCustomGuiPanelId="Old",pendingCustomGuiParameterPath="Old";
@@ -186,14 +186,14 @@ struct ofxOceanodePresetsController {
 
 CASES = r'''
 static void populate(ofxOceanodeContainer& c,int depth=2){
-    c.timelineManager=make_unique<Timeline>();
+    c.automationExtension=make_unique<Timeline>();
     for(bool persistent:{false,true}){
         auto n=make_shared<ofxOceanodeNode>(&c,persistent);
         const string key=persistent?"Persistent":"Dynamic";
         (persistent?c.persistentNodes:c.dynamicNodes)[key][1]=n;
         c.parameterGroupNodesMap[key]=n.get();
         ofxOceanodeScope::getInstance()->parameters.push_back(&n->parameter);
-        c.timelineManager->parameters.push_back(&n->parameter);
+        c.automationExtension->parameters.push_back(&n->parameter);
 #ifdef OFXOCEANODE_USE_MIDI
         auto binding=make_shared<MidiBinding>(); binding->parameter=&n->parameter;
         binding->registered=&c.midiIns["Port"].registered;
