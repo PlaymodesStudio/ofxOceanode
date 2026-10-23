@@ -30,8 +30,9 @@ public:
     int syncSequence=100000;
     int requestSync() {int id=++syncSequence;syncs.push_back(id);return id;}
     void acknowledge() {auto pending=std::move(syncs);syncs.clear();for(int id:pending) {ofxOscMessage m;m.setAddress("/synced");m.addIntArg(id);newFeedbackMessage.notify(m);}}
-    bool isNRTCapturing() const {return false;}
-    bool isNRTCaptureOnly() const {return false;}
+    bool nrtCapturing=false,nrtCaptureOnly=false;
+    bool isNRTCapturing() const {return nrtCapturing;}
+    bool isNRTCaptureOnly() const {return nrtCaptureOnly;}
     std::vector<std::string> messages;
     void setBLatency(bool b) { latency=b; }
     void sendMsg(ofxOscMessage& m) { messages.push_back(m.getAddress()); }

@@ -53,7 +53,7 @@ def production():
 mixer.native_production=production
 mixer.CASES=r'''
 static void recompute(serverManager& m,ofxSCServer& s) {m.recomputeGraph();s.acknowledge();}
-static void near(double a,double b) {assert(std::isfinite(a)&&std::abs(a-b)<.0001);}
+static void near(double a,double b) {if(!std::isfinite(a)||std::abs(a-b)>=.0001) {std::cerr<<a<<" != "<<b<<"\n";std::abort();}}
 static nodePort bus(const MacroMixerRuntime& r) {return MacroMixerMixing::object<nodePort>(r.outputValue("audio"));}
 static int bridgeID(ofxSCServer& s) {for(auto& n:s.synths) if(n.second.name=="oceanodeMacroMixer2") return n.first;return -1;}
 static ofxOceanodeMacroMixer& innerMixer(ofxOceanodeNodeMacro& macro) {
@@ -83,6 +83,133 @@ int main(int argc,char** argv) {
         write(dir,"connections.json",{{"SC_Mixer_Test_Tone_1",{{"Out",{{"SC_Mixer_Test_Effect_1",{{"In",nullptr}}}}}}},{"SC_Mixer_Test_Effect_1",{{"Out",{{"Router_ScBus_1",{{"Value",nullptr}}}}}}}});
     }
     MacroMixerContract c;c.routers={{"audio","Audio","ScBus"}};
+    {
+        // Morph internal SC controls; the bridge is an identity adapter with
+        // destination-only sources, preserving graph leases and server sync.
+        auto& output=parent.createNode(registry->create("SC Output"),1).getNodeModel();
+        MacroMixerRuntime r(parent); auto contract=c; contract.routers[0].policy="fade_out";
+        assert(r.setContract(contract)&&r.importMacro(a)&&r.importMacro(b));
+        r.request(a,0,0,true); r.update(0); output.getParameter<nodePort>("In")=bus(r); recompute(m1,s1); r.update(1);
+        auto* bridge=bus(r).getNodeRef(); assert(bridge&&bridgeID(s1)>0);
+        const auto* liveGraph=r.origin(); const int liveNodes=TestTone::live;
+        r.request(b,1000,0,true); r.update(10); output.getParameter<nodePort>("In")=bus(r);
+        assert(r.morphingInPlace()&&r.origin()==liveGraph&&r.destination()==liveGraph&&TestTone::live==liveNodes);
+        auto& frequency=r.destination()->container->getDynamicNodes().at("SC Mixer Test Tone").at(1)->getNodeModel().getParameter<float>("Freq");
+        near(frequency,220); r.update(510); near(frequency,440);
+        int id=bridgeID(s1); assert(id>0); near(s1.synths.at(id).controls.at("gainA"),0); near(s1.synths.at(id).controls.at("gainB"),1);
+        assert(bus(r).getNodeRef()==bridge); r.draw(); assert(bus(r).getNodeRef()==bridge);
+        auto port=MacroMixerMixing::object<nodePort>(r.destination()->read("audio"));
+        auto effect=static_cast<TestEffect*>(port.getNodeRef());
+        auto& tone=static_cast<TestTone&>(r.destination()->container->getDynamicNodes().at("SC Mixer Test Tone").at(1)->getNodeModel());
+        assert(effect->inputBus.at(&s1)==tone.getOutputBusIndex(&s1,0));
+        r.finish(); r.update(520); assert(!r.transitioning()&&r.origin()==liveGraph); near(frequency,660);
+        r.request(a,1000,0,true); r.update(530); r.finish(); r.update(540); assert(!r.transitioning()); near(frequency,220);
+        // Changed ScBus wiring blends on the live graph and waits for backend
+        // acknowledgement, including a Finish requested during preparation.
+        const auto extra=scratch+"/extra"; fs::copy(b,extra,fs::copy_options::recursive);
+        auto modules=ofLoadJson(extra+"/modules.json"); modules["SC Mixer Test Tone"]["02"]={0,0}; ofSaveJson(extra+"/modules.json",modules);
+        write(extra,"SC_Mixer_Test_Tone_2.json",{{"Freq",330}});
+        auto cables=ofLoadJson(extra+"/connections.json"); cables.erase("SC_Mixer_Test_Effect_1");
+        // Change the model driving the selected resource port. Renaming a
+        // same-type tone in the same role is now an in-place match instead.
+        cables["SC_Mixer_Test_Tone_2"]["Out"]["Router_ScBus_1"]["Value"]=nullptr;
+        ofSaveJson(extra+"/connections.json",cables);
+        assert(r.importMacro(extra)); r.request(extra,1000,0,true); r.update(550); r.finish(); r.update(560);
+        assert(r.morphingInPlace()&&r.origin()==liveGraph&&r.progress()==0);
+        output.getParameter<nodePort>("In")=bus(r); recompute(m1,s1); r.update(561); r.update(562);
+        // Final native rewire is another server handoff; temporary bridges and
+        // the native source graph stay alive until it has been acknowledged.
+        recompute(m1,s1); r.update(563); r.update(564); assert(!r.transitioning());
+        r.request(a,100,0,false); r.update(570); output.getParameter<nodePort>("In")=bus(r); recompute(m1,s1); r.update(580); r.update(620);
+        id=bridgeID(s1); near(s1.synths.at(id).controls.at("gainA"),0); near(s1.synths.at(id).controls.at("gainB"),0);
+        r.clear(); output.getParameter<nodePort>("In")=nodePort(); recompute(m1,s1);
+    }
+    parent.clearContainer(); recompute(m1,s1); assert(TestTone::live==0&&ofxSCSynth::live==0);
+    const auto routed=scratch+"/routed",silent=scratch+"/silent";
+    fs::copy(b,routed,fs::copy_options::recursive); fs::copy(b,silent,fs::copy_options::recursive);
+    auto routedModules=ofLoadJson(routed+"/modules.json"); routedModules["SC Mixer Test Effect"]["02"]={0,0}; ofSaveJson(routed+"/modules.json",routedModules);
+    write(routed,"SC_Mixer_Test_Effect_2.json",{{"Freq",330}});
+    write(routed,"connections.json",{{"SC_Mixer_Test_Tone_1",{{"Out",{{"SC_Mixer_Test_Effect_2",{{"In",nullptr}}}}}}},
+        {"SC_Mixer_Test_Effect_2",{{"Out",{{"SC_Mixer_Test_Effect_1",{{"In",nullptr}}}}}}},
+        {"SC_Mixer_Test_Effect_1",{{"Out",{{"Router_ScBus_1",{{"Value",nullptr}}}}}}}});
+    write(silent,"connections.json",{{"SC_Mixer_Test_Effect_1",{{"Out",{{"Router_ScBus_1",{{"Value",nullptr}}}}}}}});
+    for(const auto& spec:std::vector<std::pair<std::string,std::pair<float,float>>>{{"linear",{.5,.5}},{"equal_power",{std::sqrt(.5f),std::sqrt(.5f)}},{"switch",{0,1}},{"fade_out",{0,0}}}) {
+        auto& output=parent.createNode(registry->create("SC Output"),1).getNodeModel();
+        MacroMixerRuntime r(parent); assert(r.setContract(c)&&r.setMorphPolicy("ScBus",spec.first,{{"smoothing_ms",5}}));
+        assert(r.importMacro(a)&&r.importMacro(routed)&&r.importMacro(silent));
+        r.request(a,0,0,true);r.update(0);output.getParameter<nodePort>("In")=bus(r);recompute(m1,s1);r.update(1);
+        const auto* graph=r.origin();
+        auto& tone=static_cast<TestTone&>(graph->container->getDynamicNodes().at("SC Mixer Test Tone").at(1)->getNodeModel());
+        auto& effect=static_cast<TestEffect&>(graph->container->getDynamicNodes().at("SC Mixer Test Effect").at(1)->getNodeModel());
+        const int toneID=tone.getLastSynthID(&s1),effectID=effect.getLastSynthID(&s1),toneBus=tone.getOutputBusIndex(&s1,0),effectBus=effect.getOutputBusIndex(&s1,0);
+        const auto& details=r.sourceDetails(r.importedMacro(routed)->id());
+        assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback";}));
+        assert(std::any_of(details.begin(),details.end(),[&](const auto& d){return d.kind=="mix"&&d.type=="ScBus"&&d.policy==spec.first&&d.options["smoothing_ms"]==5;}));
+        r.request(routed,1000,0,true);r.update(10); assert(r.morphingInPlace()&&r.origin()==graph);
+        auto* internal=effect.getParameter<nodePort>("In").get().getNodeRef(); assert(internal&&internal!=&tone);
+        synthdefsLoading=true;recompute(m1,s1);r.update(100);assert(r.progress()==0);near(tone.getParameter<float>("Freq"),220);
+        synthdefsLoading=false;m1.recomputeGraph();r.update(200);assert(r.progress()==0);
+        assert(tone.getLastSynthID(&s1)==toneID&&effect.getLastSynthID(&s1)==effectID);
+        s1.acknowledge();r.update(210);r.update(710);near(r.progress(),.5);near(tone.getParameter<float>("Freq"),440);
+        const int internalID=internal->getLastSynthID(&s1);assert(internalID>0);
+        near(s1.synths.at(internalID).controls.at("gainA"),spec.second.first);near(s1.synths.at(internalID).controls.at("gainB"),spec.second.second);
+        near(s1.synths.at(internalID).controls.at("smoothing"),.005);
+        assert(tone.getOutputBusIndex(&s1,0)==toneBus&&effect.getOutputBusIndex(&s1,0)==effectBus);
+        assert(effect.inputBus.at(&s1)==internal->getOutputBusIndex(&s1,0));
+        r.finish();r.update(720);recompute(m1,s1);r.update(721);r.update(722);assert(!r.transitioning()&&r.origin()==graph);
+        assert(tone.getLastSynthID(&s1)==toneID&&effect.getLastSynthID(&s1)==effectID);
+        // Removing a source erases it from the native graph at completion but
+        // retains its C++ owner and private bridge through the final /synced.
+        r.request(a,1000,0,true);r.update(800);recompute(m1,s1);r.update(801);r.finish();r.update(802);
+        assert(!graph->container->getDynamicNodes().count("SC Mixer Test Effect")||graph->container->getDynamicNodes().at("SC Mixer Test Effect").size()==1);
+        assert(TestTone::live==3);m1.recomputeGraph();assert(TestTone::live==3);s1.acknowledge();r.update(803);r.update(804);assert(TestTone::live==2);
+        assert(tone.getLastSynthID(&s1)==toneID&&effect.getLastSynthID(&s1)==effectID);
+        // An uncabled ScBus input is silence; it uses the same configured policy.
+        const auto& silentDetails=r.sourceDetails(r.importedMacro(silent)->id());
+        assert(std::any_of(silentDetails.begin(),silentDetails.end(),[](const auto& d){return d.kind=="mix"&&d.type=="ScBus"&&d.message.find("Silence")!=std::string::npos;}));
+        r.request(silent,100,0,true);r.update(900);assert(r.morphingInPlace());recompute(m1,s1);r.update(901);r.finish();r.update(902);
+        recompute(m1,s1);r.update(903);r.update(904);assert(!effect.getParameter<nodePort>("In").get().getNodeRef());
+        const int capacity=s1.busLimit;s1.busLimit=int(s1.buses.size());
+        r.request(routed,1000,0,true);r.update(950);assert(r.morphingInPlace());m1.recomputeGraph();r.update(951);
+        assert(!r.transitioning()&&!r.diagnostics().empty()&&r.origin()==graph);
+        assert(!effect.getParameter<nodePort>("In").get().getNodeRef());
+        assert(effect.getLastSynthID(&s1)==effectID);s1.busLimit=capacity;recompute(m1,s1);r.update(952);
+        // Cancel/Clear before the new route is acknowledged. No freed native
+        // references may remain in the server manager or the private bridge.
+        r.request(routed,1000,0,true);r.update(1000);assert(r.morphingInPlace());m1.recomputeGraph();
+        r.clear();output.getParameter<nodePort>("In")=nodePort();s1.acknowledge();assert(TestTone::live>0);recompute(m1,s1);assert(TestTone::live==0);
+        parent.clearContainer();recompute(m1,s1);assert(ofxSCSynth::live==0);
+    }
+    {
+        auto& output1=parent.createNode(registry->create("SC Output"),1).getNodeModel();
+        auto& output2=parent.createNode(registry->create("SC Output"),2).getNodeModel();output2.getParameter<int>("Server")=1;
+        MacroMixerRuntime r(parent);assert(r.setContract(c)&&r.importMacro(a)&&r.importMacro(routed));
+        r.request(a,0,0,true);r.update(0);output1.getParameter<nodePort>("In")=bus(r);output2.getParameter<nodePort>("In")=bus(r);
+        recompute(m1,s1);recompute(m2,s2);r.update(1);
+        r.request(routed,1000,0,true);r.update(10);assert(r.morphingInPlace());
+        recompute(m1,s1);r.update(20);assert(r.progress()==0);
+        m2.recomputeGraph();r.update(30);assert(r.progress()==0);s2.acknowledge();r.update(40);r.finish();r.update(41);
+        recompute(m1,s1);recompute(m2,s2);r.update(42);r.update(43);assert(!r.transitioning());
+        r.request(a,1000,0,true);r.update(100);recompute(m1,s1);recompute(m2,s2);r.update(101);r.finish();r.update(102);
+        assert(TestTone::live==3);recompute(m1,s1);assert(TestTone::live==3);recompute(m2,s2);assert(TestTone::live==2);
+        r.clear();output1.getParameter<nodePort>("In")=nodePort();output2.getParameter<nodePort>("In")=nodePort();
+        recompute(m1,s1);recompute(m2,s2);parent.clearContainer();recompute(m1,s1);recompute(m2,s2);assert(TestTone::live==0&&ofxSCSynth::live==0);
+    }
+    {
+        // A stale /synced must not release a newer retirement, including when
+        // all external Outputs have been removed. Offline capture has no reply.
+        auto first=std::make_shared<int>(1),second=std::make_shared<int>(2);
+        std::weak_ptr<int> firstWeak=first,secondWeak=second;
+        const auto firstTicket=m1.requestMixerRouting(first);first.reset();m1.recomputeGraph();
+        const auto secondTicket=m1.requestMixerRouting(second);second.reset();s1.acknowledge();
+        assert(firstWeak.expired()&&!secondWeak.expired()&&m1.mixerRoutingReady(firstTicket)&&!m1.mixerRoutingReady(secondTicket));
+        recompute(m1,s1);assert(secondWeak.expired()&&m1.mixerRoutingReady(secondTicket));
+        s1.nrtCapturing=s1.nrtCaptureOnly=true;
+        auto offline=std::make_shared<int>(3);std::weak_ptr<int> offlineWeak=offline;
+        const auto offlineTicket=m1.requestMixerRouting(offline);offline.reset();m1.recomputeGraph();
+        assert(offlineWeak.expired()&&m1.mixerRoutingReady(offlineTicket)&&s1.syncs.empty());
+        s1.nrtCapturing=s1.nrtCaptureOnly=false;
+    }
     // Policy coefficients/options use the actual private processor, separate from the NRT DSP test.
     for(const auto& spec:std::vector<std::pair<std::string,std::pair<float,float>>>{{"linear",{.5,.5}},{"equal_power",{std::sqrt(.5f),std::sqrt(.5f)}},{"switch",{0,1}},{"fade_out",{0,0}}}) {
         const auto& policy=MacroMixerMixing::registry().policy("ScBus",spec.first);

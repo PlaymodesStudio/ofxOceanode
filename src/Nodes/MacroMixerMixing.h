@@ -40,6 +40,11 @@ template<> inline const char* typeName<ofTexture*>() { return "Texture"; }
 const std::vector<std::string>& supportedTypes();
 std::string routerModel(const std::string& type);
 Value neutral(const std::string& type);
+// Reuse router type adapters for temporary internal connection mixers.
+std::string portType(ofxOceanodeAbstractParameter& port);
+Value readPort(const std::string& type, ofxOceanodeAbstractParameter& port);
+void writePort(const std::string& type, ofxOceanodeAbstractParameter& port, const Value& value, bool silent = false);
+std::shared_ptr<ofxOceanodeAbstractParameter> makePort(const std::string& type, const std::string& name, const Value& initial);
 // GPU inputs are borrowed live values. Persistence records null, never addresses/pixels.
 ofJson toJson(const Value& value);
 void drawIsolated(const std::function<void()>& draw);
@@ -81,6 +86,9 @@ struct Policy {
     std::function<Function()> createProcessor;
     // Resource backends may need one graph-rebuild acknowledgement before fading.
     std::function<bool(const Value&)> ready;
+    // After native wiring changes, retain temporary processors and their source
+    // nodes until the backend acknowledges the replacement routing.
+    std::function<void(const Value&,std::shared_ptr<void>)> retire;
 };
 class Registry {
 public:

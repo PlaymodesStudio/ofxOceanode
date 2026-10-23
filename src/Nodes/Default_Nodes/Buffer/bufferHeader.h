@@ -28,15 +28,15 @@ public:
         addParameter(bufferInput.set("Buffer Input", nullptr));
         addParameter(numCopies.set("Copies", 1, 1, INT_MAX));
         addParameter(offset.set("Offset", {1000.0/60.0}, {0.0}, {FLT_MAX}));
-        addParameter(overflow.set("Overflow",false));
+        addOutputParameter(overflow.set("Overflow",false));
         
         if(minmax){
-            addParameter(output.set("Output", std::vector<T1>(1, val),
+            addOutputParameter(output.set("Output", std::vector<T1>(1, val),
                 std::vector<T1>(1, std::numeric_limits<T1>::lowest()),
                 std::vector<T1>(1, std::numeric_limits<T1>::max())),
                          ofxOceanodeParameterFlags_DisplayMinimized);
         }else{
-            addParameter(output.set("Output", std::vector<T1>(1, val)),
+            addOutputParameter(output.set("Output", std::vector<T1>(1, val)),
                          ofxOceanodeParameterFlags_DisplayMinimized);
         }
         

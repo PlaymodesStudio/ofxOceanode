@@ -10,6 +10,7 @@
 
 #include "ofxOceanodeBaseController.h"
 #include "GlobalMacroSaveReview.h"
+#include <deque>
 #include <memory>
 
 class ofxOceanodePresetsController: public ofxOceanodeBaseController{
@@ -50,6 +51,9 @@ private:
     int saveAsBank = 0;
     string deleteBankName;
     string deletePresetName;
+    // Save As writes the macro to a new library folder and points that
+    // instance at it, leaving the original folder and other instances alone.
+    enum class MacroSaveChoice { Skip, Save, SaveAs };
     struct PendingSave {
         string name;
         string bank;
@@ -59,11 +63,23 @@ private:
         size_t nextWriteIndex = 0;
         string warning;
         vector<GlobalMacroSaveReview> reviews;
-        vector<bool> saveChoices;
+        vector<MacroSaveChoice> saveChoices;
+        vector<string> saveAsPaths;
         vector<string> savedMacros;
+        vector<string> savedAsMacros;
         vector<string> skippedMacros;
+        // Save As form for the macro under review.
+        bool editingSaveAs = false;
+        bool saveAsFocusPending = false;
+        bool saveAsCursorPending = false;
+        bool revealSaveAsFolder = false;
+        char saveAsName[256] = {};
+        std::deque<string> saveAsFolder;
+        string saveAsError;
     };
     std::unique_ptr<PendingSave> pendingSave;
+    // Returns true once a new macro name and folder are confirmed.
+    bool drawGlobalMacroSaveAsForm(PendingSave& request, const GlobalMacroSaveReview& review);
     string saveResultText;
 
     bool newPresetCreated;

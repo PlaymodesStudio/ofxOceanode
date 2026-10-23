@@ -1,5 +1,6 @@
 #include "ofxOceanodeMacroMixer.h"
 #include "ofxOceanodeNodeRegistry.h"
+#include "MacroDialogAppearance.h"
 #include "imgui.h"
 #include <algorithm>
 #include <cfloat>
@@ -13,6 +14,7 @@
 #endif
 
 namespace {
+std::vector<ofxOceanodeMacroMixer*> liveMixers;
 constexpr auto transient = ofxOceanodeParameterFlags_DisableSavePreset | ofxOceanodeParameterFlags_DisableSaveProject;
 constexpr auto routerGroupFormat = "ofxOceanodeMacroMixer.routergroup";
 #if defined(TARGET_OSX)
@@ -80,7 +82,7 @@ bool matchesRouter(ofxOceanodeAbstractParameter& parameter,const MacroMixerContr
 }
 bool validOutputNames(const MacroMixerContract& contract, std::string& error) {
     const std::set<std::string> reserved{"Target", "Duration_Ms", "Bi_Pow", "Transition", "Finish_Transition", "Progress", "Status",
-        "Output_Routers", "Routers", "Macros", "MacroMixerState"};
+        "Output_Routers", "Routers", "Macros", "MacroMixerState", "Morph_macros"};
     std::set<std::string> names;
     for(const auto& router : contract.routers) {
         const auto name = escapedName(router.name);
@@ -93,9 +95,99 @@ bool validOutputNames(const MacroMixerContract& contract, std::string& error) {
     return true;
 }
 
+void drawMixOptions(const std::string& type,const ofJson& options,const std::function<void(const ofJson&)>& apply) {
+    for(auto option=options.begin();option!=options.end();++option) {
+        ImGui::PushID(option.key().c_str());
+        auto value=option.value(); bool changed=false;
+        const auto label=option.key()=="size" ? "Length (0 = larger)" : option.key()=="threshold" ? "Threshold"
+            : type=="Texture" && option.key()=="strength" ? "Blend strength"
+            : type=="Texture" && option.key()=="angle" ? "Direction (degrees)"
+            : type=="Texture" && option.key()=="softness" ? "Edge softness"
+            : type=="Texture" && option.key()=="cells" ? "Noise cells"
+            : type=="Texture" && option.key()=="seed" ? "Noise seed"
+            : type=="ScBus" && option.key()=="channels" ? "Channels"
+            : type=="ScBus" && option.key()=="smoothing_ms" ? "Gain smoothing (ms)" : option.key().c_str();
+        if(value.is_boolean()) { bool v=value.get<bool>(); changed=ImGui::Checkbox(label,&v); value=v; }
+        else if(value.is_number()) {
+            ImGui::TextUnformatted(label); ImGui::SetNextItemWidth(-1);
+            if(value.is_number_integer()) { int v=value.get<int>(); changed=ImGui::InputInt("##option",&v); value=v; }
+            else { float v=value.get<float>(); changed=ImGui::InputFloat("##option",&v,.01f,.1f); value=v; }
+        }
+        if(changed) { auto edit=options; edit[option.key()]=value; apply(edit); }
+        ImGui::PopID();
+    }
+}
+
+}
+
+ofxOceanodeMacroMixer::~ofxOceanodeMacroMixer() {
+    liveMixers.erase(std::remove(liveMixers.begin(),liveMixers.end(),this),liveMixers.end());
+}
+
+void ofxOceanodeMacroMixer::drawPendingBlockedNodeDialog() {
+    constexpr const char* popupId = "Node blocks MacroMixer##ofxOceanodeMacroMixerBlocked";
+    ofxOceanodeMacroMixer* owner = nullptr;
+    std::vector<const MacroMixerDiagnostic*> waiting;
+    for(auto* mixer : liveMixers) {
+        if(!mixer->runtime) continue;
+        for(const auto& node : mixer->runtime->blockedNodes())
+            if(!mixer->answeredBlocked.count({node.file,node.node})) waiting.push_back(&node);
+        if(!waiting.empty()) { owner = mixer; break; }
+    }
+    if(!owner) {
+        if(ImGui::IsPopupOpen(popupId) && ImGui::BeginPopupModal(popupId)) { ImGui::CloseCurrentPopup(); ImGui::EndPopup(); }
+        return;
+    }
+    if(!ImGui::IsPopupOpen(popupId)) {
+        // Wait for other dialogs, such as connection errors from the same load.
+        if(ImGui::IsPopupOpen("",ImGuiPopupFlags_AnyPopupId)) return;
+        ImGui::OpenPopup(popupId);
+    }
+    MacroDialogAppearance::Style style;
+    const float em = ImGui::GetFontSize();
+    ImGui::SetNextWindowSizeConstraints(ImVec2(36*em,0),ImVec2(36*em,FLT_MAX));
+    if(!ImGui::BeginPopupModal(popupId,nullptr,ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) return;
+    const auto& node = *waiting.front();
+    const auto answer = [&](const MacroMixerDiagnostic& blocked, ActionKind kind) {
+        owner->answeredBlocked.insert({blocked.file,blocked.node});
+        owner->actions.push_back({kind,blocked.file,0,{},{},blocked.node});
+    };
+    ImGui::TextUnformatted("A node prevents MacroMixer from loading this Macro");
+    ImGui::Separator();
+    ImGui::TextDisabled("NODE");
+    ImGui::TextWrapped("%s %s",node.model.c_str(),node.node.substr(node.node.rfind('_')+1).c_str());
+    ImGui::TextDisabled("MACRO FOLDER");
+    ImGui::TextWrapped("%s",node.file.c_str());
+    ImGui::TextDisabled("REASON");
+    ImGui::TextWrapped("%s",node.message.c_str());
+    ImGui::Spacing();
+    ImGui::TextWrapped("Keep this node out of the MacroMixer graph so the load can continue? "
+        "It is not created inside MacroMixer and its cables there are left out. "
+        "The Macro folder is not changed; the choice is saved with this MacroMixer.");
+    if(waiting.size() > 1) ImGui::TextDisabled("%zu blocked nodes remain, including this one.",waiting.size());
+    ImGui::Spacing();
+    if(ImGui::Button("Keep out of graph")) {
+        answer(node,ActionKind::KeepOut);
+        if(waiting.size() == 1) ImGui::CloseCurrentPopup();
+    }
+    if(waiting.size() > 1) {
+        ImGui::SameLine();
+        if(ImGui::Button(("Keep all " + std::to_string(waiting.size()) + " out").c_str())) {
+            for(const auto* blocked : waiting) answer(*blocked,ActionKind::KeepOut);
+            ImGui::CloseCurrentPopup();
+        }
+    }
+    ImGui::SameLine();
+    if(ImGui::Button("Cancel load")) {
+        for(const auto* blocked : waiting) owner->answeredBlocked.insert({blocked->file,blocked->node});
+        owner->actions.push_back({ActionKind::CancelBlocked,""});
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
 }
 
 void ofxOceanodeMacroMixer::setup() {
+    addInspectorParameter(morphMacros.set("Morph macros", false));
     routerEditor.set("Routers", [this] { drawRouters(); });
     macroEditor.set("Macros", [this] { drawMacros(); });
     routerEditor.setSerializable(false); macroEditor.setSerializable(false);
@@ -110,6 +202,7 @@ void ofxOceanodeMacroMixer::setup() {
     if(hostContainer) {
         runtime = std::make_unique<MacroMixerRuntime>(*hostContainer);
         MacroMixerContract empty; empty.routers.clear(); runtime->setContract(empty);
+        if(std::find(liveMixers.begin(),liveMixers.end(),this) == liveMixers.end()) liveMixers.push_back(this);
     }
     listeners.push(target.newListener([this](int& index) {
         if(!runtime) return;
@@ -119,7 +212,7 @@ void ofxOceanodeMacroMixer::setup() {
     listeners.push(transition.newListener([this] {
         if(!runtime || !getActive()) return;
         inspectorError.clear();
-        runtime->requestMacro(selectedID, duration, biPow);
+        runtime->requestMacro(selectedID, duration, biPow, morphMacros);
     }));
     listeners.push(finish.newListener([this] { if(runtime && getActive()) runtime->finish(); }));
 }
@@ -128,7 +221,8 @@ void ofxOceanodeMacroMixer::setBpm(float bpm) {
     if(!runtime) return;
     // The owning container already applied the global tempo. Forward the
     // ordinary node notification to both live graphs without writing transport.
-    for(const auto* graph : {runtime->origin(),runtime->destination()}) if(graph)
+    const auto* destination=runtime->destination()==runtime->origin() ? nullptr : runtime->destination();
+    for(const auto* graph : {runtime->origin(),destination}) if(graph)
         for(auto* node : graph->container->getAllModules()) node->setBpm(bpm);
 }
 
@@ -136,7 +230,8 @@ void ofxOceanodeMacroMixer::resetPhase() {
     if(!runtime) return;
     // The root owns the transport reset/generation. Child clocks receive only
     // the normal phase-reset notification, once per live graph.
-    for(const auto* graph : {runtime->origin(),runtime->destination()}) if(graph)
+    const auto* destination=runtime->destination()==runtime->origin() ? nullptr : runtime->destination();
+    for(const auto* graph : {runtime->origin(),destination}) if(graph)
         for(auto* node : graph->container->getAllModules()) node->resetPhase();
 }
 
@@ -188,6 +283,12 @@ bool ofxOceanodeMacroMixer::setRouterContract(const MacroMixerContract& contract
             std::snprintf(routerDrafts[router.id].data(),256,"%s",router.name.c_str());
     }
     installOutputs(contract);
+    inspectorError.clear(); return true;
+}
+
+bool ofxOceanodeMacroMixer::setMorphConnectionPolicy(const std::string& type,const std::string& policy,const ofJson& options) {
+    if(!runtime) return false;
+    if(!runtime->setMorphPolicy(type,policy,options)) { reportFailure(); return false; }
     inspectorError.clear(); return true;
 }
 
@@ -365,6 +466,7 @@ bool ofxOceanodeMacroMixer::drawInspectorParameter(ofAbstractParameter& paramete
 void ofxOceanodeMacroMixer::drawRouters() {
     if(!runtime) return;
     ImGui::SeparatorText("Routers");
+    if(morphMacros) ImGui::TextWrapped("Morph macros: matching node types and connection roles keep live buffers and clocks even when IDs differ. Changed control cables blend live signals; added/removed nodes coexist until completion. Changed texture cables use GPU mixing. Source details show connection policies and reasons for destination-graph fallback. Router output mix policies are bypassed. Mode changes apply on the next Transition.");
     const auto contract=runtime->contract();
     auto types=MacroMixerMixing::supportedTypes();
     types.erase(std::remove_if(types.begin(),types.end(),[&](const auto& type) {
@@ -440,26 +542,10 @@ void ofxOceanodeMacroMixer::drawRouters() {
                     ImGui::EndCombo();
                 }
                 if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s",selected.label.c_str());
-                for(auto option=router.options.begin();option!=router.options.end();++option) {
-                    ImGui::PushID(option.key().c_str());
-                    auto value=option.value(); bool changed=false;
-                    const auto label=option.key()=="size" ? "Length (0 = larger)" : option.key()=="threshold" ? "Threshold"
-                        : router.type=="Texture" && option.key()=="strength" ? "Blend strength"
-                        : router.type=="Texture" && option.key()=="angle" ? "Direction (degrees)"
-                        : router.type=="Texture" && option.key()=="softness" ? "Edge softness"
-                        : router.type=="Texture" && option.key()=="cells" ? "Noise cells"
-                        : router.type=="Texture" && option.key()=="seed" ? "Noise seed"
-                        : router.type=="ScBus" && option.key()=="channels" ? "Channels"
-                        : router.type=="ScBus" && option.key()=="smoothing_ms" ? "Gain smoothing (ms)" : option.key().c_str();
-                    if(value.is_boolean()) { bool v=value.get<bool>(); changed=ImGui::Checkbox(label,&v); value=v; }
-                    else if(value.is_number()) {
-                        ImGui::TextUnformatted(label); ImGui::SetNextItemWidth(-1);
-                        if(value.is_number_integer()) { int v=value.get<int>(); changed=ImGui::InputInt("##option",&v); value=v; }
-                        else { float v=value.get<float>(); changed=ImGui::InputFloat("##option",&v,.01f,.1f); value=v; }
-                    }
-                    if(changed) { auto edit=contract; edit.routers[i].options[option.key()]=value; actions.push_back({ActionKind::Routers,"",0,std::move(edit)}); }
-                    ImGui::PopID();
-                }
+                drawMixOptions(router.type,router.options,[&](const ofJson& options) {
+                    auto edit=contract; edit.routers[i].options=options;
+                    actions.push_back({ActionKind::Routers,"",0,std::move(edit)});
+                });
             } else ImGui::TextDisabled("-");
             ImGui::TableSetColumnIndex(4);
             ImGui::BeginDisabled(!pending);
@@ -566,9 +652,57 @@ void ofxOceanodeMacroMixer::drawMacros() {
         if(ImGui::TreeNode("Source")) {
             ImGui::TextWrapped("%s", macro->source().c_str());
             for(const auto& notice : macro->notices()) ImGui::TextWrapped("%s", notice.c_str());
+            if(morphMacros || runtime->morphMode()) {
+                ImGui::SeparatorText(runtime->hasTransitionDetails(macro->id()) ? "Last requested morph" : "Morph from running source");
+                std::set<std::string> editedTypes;
+                const auto details=runtime->sourceDetails(macro->id());
+                for(size_t n=0;n<details.size();++n) {
+                    const auto& detail=details[n]; ImGui::PushID(int(n));
+                    const auto kind=detail.kind=="context" ? "Transition" : detail.kind=="fallback" ? "Graph fallback" : detail.kind=="mix" ? "Connection mix"
+                        : detail.kind=="added" ? "Added node" : detail.kind=="removed" ? "Removed node"
+                        : detail.kind=="skipped" ? "Skipped connection mix" : "Live graph";
+                    ImGui::TextWrapped("%s: %s",kind,detail.location.c_str());
+                    ImGui::TextWrapped("%s",detail.message.c_str());
+                    if(detail.kind=="mix" && detail.type.empty()) ImGui::TextDisabled("Native control interpolation");
+                    if(detail.kind=="mix" && !detail.type.empty()) {
+                        const auto& selected=MacroMixerMixing::registry().policy(detail.type,detail.policy);
+                        ImGui::TextWrapped("%s: %s",detail.type.c_str(),selected.label.c_str());
+                        if(editedTypes.insert(detail.type).second) {
+                            ImGui::TextWrapped("Policy for changed %s connections (next transition)",detail.type.c_str());
+                            auto settings=MacroMixerMorphPolicy{selected.id,detail.options};
+                            const auto configured=runtime->morphPolicies().find(detail.type);
+                            if(configured!=runtime->morphPolicies().end()) settings=configured->second;
+                            const auto& choice=MacroMixerMixing::registry().policy(detail.type,settings.policy);
+                            ImGui::BeginDisabled(fading); ImGui::SetNextItemWidth(-1);
+                            if(ImGui::BeginCombo("##connectionPolicy",choice.label.c_str())) {
+                                for(const auto& policy:MacroMixerMixing::registry().policies(detail.type)) if(ImGui::Selectable(policy.label.c_str(),policy.id==choice.id))
+                                    actions.push_back({ActionKind::MorphPolicy,detail.type,0,{}, {policy.id,ofJson::object()}});
+                                ImGui::EndCombo();
+                            }
+                            drawMixOptions(detail.type,settings.options,[&](const ofJson& options) {
+                                actions.push_back({ActionKind::MorphPolicy,detail.type,0,{}, {choice.id,options}});
+                            });
+                            ImGui::EndDisabled();
+                        }
+                    }
+                    ImGui::PopID();
+                }
+            }
             ImGui::TreePop();
         }
         ImGui::PopID();
+    }
+    const auto& keptOut = runtime->keptOutNodes();
+    if(!keptOut.empty() && ImGui::TreeNode("##keptOut","Kept out of graph (%zu)",keptOut.size())) {
+        for(const auto& node : keptOut) {
+            ImGui::PushID((node.first + "/" + node.second).c_str());
+            ImGui::TextWrapped("%s", node.second.c_str());
+            ImGui::TextDisabled("%s", node.first.c_str());
+            if(ImGui::SmallButton("Restore")) actions.push_back({ActionKind::RestoreNode,node.first,0,{},{},node.second});
+            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Load this node again from the next activation. While it blocks MacroMixer, you are asked again.");
+            ImGui::PopID();
+        }
+        ImGui::TreePop();
     }
     if(ImGui::Button("Clear Playback")) actions.push_back({ActionKind::ClearPlayback, ""});
     if(ImGui::IsItemHovered()) ImGui::SetTooltip("Release running graphs and reset router values. Imported macros remain in the list.");
@@ -619,7 +753,14 @@ void ofxOceanodeMacroMixer::update(ofEventArgs&) {
             case ActionKind::Routers: if(setRouterContract(action.contract) && !action.text.empty()) newRouterName.fill(0); break;
             case ActionKind::LoadRouters: chooseRouterGroup(false); break;
             case ActionKind::SaveRouters: chooseRouterGroup(true); break;
+            case ActionKind::MorphPolicy: setMorphConnectionPolicy(action.text,action.policy.policy,action.policy.options); break;
             case ActionKind::ClearPlayback: runtime->clear(); inspectorError.clear(); break;
+            case ActionKind::KeepOut:
+                answeredBlocked.erase({action.text,action.node});
+                if(runtime->keepOutOfGraph(action.text,action.node)) inspectorError.clear(); else reportFailure();
+                syncSelector(); break;
+            case ActionKind::CancelBlocked: runtime->cancelBlocked(); answeredBlocked.clear(); break;
+            case ActionKind::RestoreNode: runtime->restoreKeptOutNode(action.text,action.node); break;
         }
     }
     if(syncInputs()) runtime->update();
@@ -627,6 +768,7 @@ void ofxOceanodeMacroMixer::update(ofEventArgs&) {
 }
 void ofxOceanodeMacroMixer::deactivate() {
     actions.clear();
+    answeredBlocked.clear();
     if(runtime) runtime->clear();
     inspectorError.clear(); publish();
     state = "Empty (deactivated; graphs released)";
@@ -646,6 +788,7 @@ void ofxOceanodeMacroMixer::presetSave(ofJson& json) {
 void ofxOceanodeMacroMixer::loadBeforeConnections(ofJson& json) {
     recallPrepared = true; recallValid = false;
     actions.clear(); recalledSelection.clear();
+    if(!json.contains(morphMacros.getEscapedName())) morphMacros = false;
     if(!runtime) return;
     if(!json.contains("MacroMixerState")) return;
     try {
@@ -688,6 +831,7 @@ void ofxOceanodeMacroMixer::loadBeforeConnections(ofJson& json) {
             } else ++it;
         }
         runtime = std::move(candidate);
+        answeredBlocked.clear();
         routerDrafts.clear(); installOutputs(runtime->contract());
         for(const auto& input:runtime->inputs()) {
             auto& p=*outputs.at(input.first);

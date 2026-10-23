@@ -62,6 +62,21 @@ CORE = r'''
         assert(ofLoadJson(path+"/modules.json").at("CustomGui Snapshots")==modules.at("CustomGui Snapshots"));
         assert(ofLoadJson(path+"/connections.json")==cables);
     }
+    // Explicit exclusions take precedence over unavailable-addon preservation.
+    registry->setNodeLoadFilter([](const string&,const string& key){return key=="CustomGui_Snapshots_1";});
+    ofxOceanodeContainer filteredUnknown(registry,types,transport);filteredUnknown.setCanvasID("Offline");
+    assert(filteredUnknown.loadPreset("Original") && filteredUnknown.savePreset("FilteredUnknown"));
+    const auto filteredModules=ofLoadJson("FilteredUnknown/modules.json");
+    assert(!filteredModules.contains("CustomGui Snapshots") || filteredModules.at("CustomGui Snapshots").empty());
+    assert(ofLoadJson("FilteredUnknown/connections.json").empty());
+    assert(!fs::exists("FilteredUnknown/CustomGui_Snapshots_1.json"));
+    registry->setNodeLoadFilter([](const string&,const string& key){return key=="Gui_Probe_1";});
+    ofxOceanodeContainer filteredSource(registry,types,transport);filteredSource.setCanvasID("Offline");
+    assert(filteredSource.loadPreset("Original") && filteredSource.savePreset("FilteredSource"));
+    assert(filteredSource.getAllModules().empty());
+    assert(ofLoadJson("FilteredSource/modules.json").at("CustomGui Snapshots")==modules.at("CustomGui Snapshots"));
+    assert(ofLoadJson("FilteredSource/connections.json").empty());
+    registry->setNodeLoadFilter({});
     // A different preset cannot inherit the previous preset's opaque documents.
     ofxOceanodeContainer blank(registry,types,transport);blank.setCanvasID("Offline");assert(blank.savePreset("Blank"));
     assert(offline.loadPreset("Blank") && offline.savePreset("BlankCopy"));

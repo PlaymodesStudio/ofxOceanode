@@ -95,6 +95,75 @@ vector<GlobalMacroSaveReview> collapseEquivalentReviews(vector<GlobalMacroSaveRe
     }
     return uniqueReviews;
 }
+
+bool sameReviews(const vector<GlobalMacroSaveReview>& a, const vector<GlobalMacroSaveReview>& b){
+    if(a.size() != b.size()) return false;
+    for(size_t i = 0; i < a.size(); ++i){
+        if(a[i].instance != b[i].instance || a[i].globalPath != b[i].globalPath ||
+           a[i].instancePath != b[i].instancePath || a[i].alsoUsedAt != b[i].alsoUsedAt ||
+           !sameChanges(a[i], b[i])) return false;
+    }
+    return true;
+}
+
+bool validMacroName(const string& name){
+    return !name.empty() && name != "." && name != ".." && name.back() != '.' &&
+           name.find_first_of("/\\:*?\"<>|") == string::npos &&
+           std::none_of(name.begin(), name.end(), [](unsigned char c){ return c < 32; });
+}
+
+string macroLibraryPath(const std::deque<string>& folders, const string& name){
+    string path = ofToDataPath("Macros", true);
+    for(const auto& folder : folders) path += "/" + folder;
+    return path + "/" + name;
+}
+
+string macroLibraryLabel(const string& path){
+    const string root = ofToDataPath("Macros", true);
+    return path.rfind(root, 0) == 0 ? "Macros" + path.substr(root.size()) : path;
+}
+
+bool macroLibraryPathExists(const string& path){
+    std::error_code error;
+    return std::filesystem::exists(path, error);
+}
+
+// The library folders that hold a global macro, relative to Macros/.
+std::deque<string> macroLibraryFolders(const string& macroPath){
+    namespace fs = std::filesystem;
+    std::error_code error;
+    const fs::path root = fs::weakly_canonical(ofToDataPath("Macros", true), error);
+    const fs::path relative = fs::path(macroPath).parent_path().lexically_relative(root);
+    std::deque<string> folders;
+    if(relative.empty() || *relative.begin() == "..") return folders;
+    for(const auto& part : relative){
+        if(part != ".") folders.push_back(part.string());
+    }
+    return folders;
+}
+
+// Folders only: Save As always creates a new macro and never replaces one.
+void drawMacroLibraryFolders(const shared_ptr<macroCategory>& category, const std::deque<string>& folders,
+                             std::deque<string>& selected, bool reveal){
+    if(!category) return;
+    const bool isSelected = folders == selected;
+    const bool isAncestor = folders.size() <= selected.size() &&
+                            std::equal(folders.begin(), folders.end(), selected.begin());
+    if(reveal && isAncestor) ImGui::SetNextItemOpen(true);
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+    if(isSelected) flags |= ImGuiTreeNodeFlags_Selected;
+    if(category->categories.empty()) flags |= ImGuiTreeNodeFlags_Leaf;
+    const bool open = ImGui::TreeNodeEx(folders.empty() ? "Macros (root)" : category->name.c_str(), flags);
+    if(ImGui::IsItemClicked() || ImGui::IsItemActivated()) selected = folders;
+    if(isSelected && reveal) ImGui::SetScrollHereY(0.5f);
+    if(!open) return;
+    for(const auto& child : category->categories){
+        auto nested = folders;
+        nested.push_back(child->name);
+        drawMacroLibraryFolders(child, nested, selected, reveal);
+    }
+    ImGui::TreePop();
+}
 }
 
 ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("Presets"){
@@ -477,7 +546,8 @@ void ofxOceanodePresetsController::beginSavePreset(string name, string bank, boo
     request->bank = std::move(bank);
     request->createNew = createNew;
     request->reviews = collapseEquivalentReviews(collectGlobalMacroSaveReviews(*container));
-    request->saveChoices.resize(request->reviews.size(), false);
+    request->saveChoices.resize(request->reviews.size(), MacroSaveChoice::Skip);
+    request->saveAsPaths.resize(request->reviews.size());
     pendingSave = std::move(request);
     if(pendingSave->reviews.empty()) finishSavePreset();
     else popupRequest = PopupRequest::ReviewSave;
@@ -545,7 +615,7 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
     for(size_t i = 0; i < request.reviews.size(); ++i){
         if(i == request.reviewIndex || request.reviews[i].globalPath != review.globalPath) continue;
         if(!sameChanges(request.reviews[i], review)) conflictingInstances = true;
-        if(i < request.reviewIndex && request.saveChoices[i]) samePathAlreadySelected = true;
+        if(i < request.reviewIndex && request.saveChoices[i] == MacroSaveChoice::Save) samePathAlreadySelected = true;
     }
     if(conflictingInstances) ImGui::TextWrapped("Other instances of this macro have different edits. Choose only one instance to save as the global macro.");
     if(samePathAlreadySelected) ImGui::TextWrapped("Another instance has already been chosen to save this global macro.");
@@ -562,8 +632,10 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
         }
         ImGui::SameLine();
         if(ImGui::Button("Stop saving")){
+            const bool savingAs = request.saveChoices[request.reviewIndex] == MacroSaveChoice::SaveAs;
             saveResultText = "Preset was not saved. A global macro save failed and may have changed files in " +
-                             review.globalPath + ".";
+                             (savingAs ? macroLibraryLabel(request.saveAsPaths[request.reviewIndex]) : review.globalPath) + ".";
+            for(const auto& name : request.savedAsMacros) saveResultText += "\nSaved as new before failure: " + name;
             for(const auto& name : request.savedMacros) saveResultText += "\nSaved before failure: " + name;
             pendingSave.reset();
             ImGui::CloseCurrentPopup();
@@ -573,18 +645,50 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
         return;
     }
 
-    ImGui::BeginDisabled(samePathAlreadySelected);
-    const bool saveMacro = ImGui::Button("Save this macro");
-    ImGui::EndDisabled();
-    ImGui::SameLine();
-    const bool skipMacro = ImGui::Button("Skip this macro");
-    ImGui::SameLine();
-    const bool cancel = ImGui::Button("Cancel preset save") || ImGui::IsKeyPressed(ImGuiKey_Escape);
-    if(cancel){
-        pendingSave.reset();
-        ImGui::CloseCurrentPopup();
-    }else if(saveMacro || skipMacro){
-        request.saveChoices[request.reviewIndex] = saveMacro;
+    bool decided = false;
+    if(request.editingSaveAs){
+        decided = drawGlobalMacroSaveAsForm(request, review);
+    }else{
+        ImGui::BeginDisabled(samePathAlreadySelected);
+        const bool saveMacro = ImGui::Button("Save this macro");
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if(ImGui::Button("Save as new macro...")){
+            ofxOceanodeShared::updateMacrosStructure();
+            request.editingSaveAs = true;
+            request.saveAsFocusPending = true;
+            request.revealSaveAsFolder = true;
+            request.saveAsError.clear();
+            request.saveAsFolder = macroLibraryFolders(review.globalPath);
+            // Suggest a free name next to the original macro.
+            string suggestion;
+            for(int n = 2; suggestion.empty() || macroLibraryPathExists(macroLibraryPath(request.saveAsFolder, suggestion)); ++n)
+                suggestion = review.name + "_" + ofToString(n);
+            std::snprintf(request.saveAsName, sizeof(request.saveAsName), "%s", suggestion.c_str());
+        }
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Save this instance as a new global macro and use it here.\n%s and its other instances stay unchanged.", review.name.c_str());
+        ImGui::SameLine();
+        const bool skipMacro = ImGui::Button("Skip this macro");
+        ImGui::SameLine();
+        const bool cancel = ImGui::Button("Cancel preset save") || ImGui::IsKeyPressed(ImGuiKey_Escape);
+        if(cancel){
+            // A re-review can follow macros already saved as new ones.
+            if(!request.savedAsMacros.empty()){
+                saveResultText = "Preset was not saved.";
+                for(const auto& name : request.savedAsMacros) saveResultText += "\nAlready saved as new global macro: " + name;
+                popupRequest = PopupRequest::SaveResult;
+            }
+            pendingSave.reset();
+            ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+            return;
+        }
+        if(saveMacro || skipMacro){
+            request.saveChoices[request.reviewIndex] = saveMacro ? MacroSaveChoice::Save : MacroSaveChoice::Skip;
+            decided = true;
+        }
+    }
+    if(decided){
         request.reviewIndex++;
         request.warning.clear();
         if(request.reviewIndex == request.reviews.size()){
@@ -595,36 +699,120 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
     ImGui::EndPopup();
 }
 
+bool ofxOceanodePresetsController::drawGlobalMacroSaveAsForm(PendingSave& request, const GlobalMacroSaveReview& review){
+    ImGui::Separator();
+    drawReviewText("Save as new macro", ImGuiCol_Text, true);
+    drawReviewText("Writes this instance to a new global macro and uses it here instead of " + review.name +
+                   ". " + review.name + " and its other instances stay unchanged.", ImGuiCol_TextDisabled);
+    const float formWidth = 380.0f;
+    ImGui::TextUnformatted("Name");
+    ImGui::SetNextItemWidth(formWidth);
+    if(request.saveAsFocusPending){
+        ImGui::SetKeyboardFocusHere();
+        request.saveAsFocusPending = false;
+        request.saveAsCursorPending = true;
+    }
+    const bool enter = ImGui::InputText("##Save As Name", request.saveAsName, sizeof(request.saveAsName),
+                                        ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackAlways,
+                                        moveCursorToEnd, &request.saveAsCursorPending);
+    if(ImGui::IsItemEdited()) request.saveAsError.clear();
+    ImGui::TextUnformatted("Folder");
+    ImGui::BeginChild("Save As Folders", ImVec2(formWidth, ImGui::GetTextLineHeightWithSpacing() * 10.0f), ImGuiChildFlags_Borders);
+    const auto previousFolder = request.saveAsFolder;
+    drawMacroLibraryFolders(ofxOceanodeShared::getMacroDirectoryStructure(), {}, request.saveAsFolder, request.revealSaveAsFolder);
+    if(request.saveAsFolder != previousFolder) request.saveAsError.clear();
+    request.revealSaveAsFolder = false;
+    ImGui::EndChild();
+
+    string name = ofTrim(string(request.saveAsName));
+    ofStringReplace(name, " ", "_");
+    const string path = macroLibraryPath(request.saveAsFolder, name.empty() ? "..." : name);
+    drawReviewLabelValue("New macro:", macroLibraryLabel(path));
+    if(!request.saveAsError.empty()) ImGui::TextWrapped("%s", request.saveAsError.c_str());
+
+    const bool confirm = ImGui::Button("Save as new macro") || enter;
+    ImGui::SameLine();
+    if(ImGui::Button("Back") || ImGui::IsKeyPressed(ImGuiKey_Escape, false)){
+        request.editingSaveAs = false;
+        request.saveAsError.clear();
+        return false;
+    }
+    if(!confirm) return false;
+
+    if(!validMacroName(name)){
+        request.saveAsError = "Enter a valid name. It can't contain / \\ : * ? \" < > | or end with a period.";
+        return false;
+    }
+    if(macroLibraryPathExists(path)){
+        request.saveAsError = "A macro or folder with this name already exists here. Choose another name.";
+        return false;
+    }
+    for(size_t i = 0; i < request.reviews.size(); ++i){
+        if(i != request.reviewIndex && request.saveChoices[i] == MacroSaveChoice::SaveAs && request.saveAsPaths[i] == path){
+            request.saveAsError = "Another macro in this review is already being saved with this name.";
+            return false;
+        }
+    }
+    request.saveChoices[request.reviewIndex] = MacroSaveChoice::SaveAs;
+    request.saveAsPaths[request.reviewIndex] = path;
+    request.editingSaveAs = false;
+    request.saveAsError.clear();
+    return true;
+}
+
 void ofxOceanodePresetsController::finishSavePreset(){
     if(!pendingSave) return;
     auto& request = *pendingSave;
+    // Returns false when nothing is left to review, so saving can continue.
+    auto restartReview = [&](vector<GlobalMacroSaveReview> reviews, const string& warning){
+        request.reviews = std::move(reviews);
+        request.saveChoices.assign(request.reviews.size(), MacroSaveChoice::Skip);
+        request.saveAsPaths.assign(request.reviews.size(), "");
+        request.reviewIndex = 0;
+        request.nextWriteIndex = 0;
+        request.writing = false;
+        request.editingSaveAs = false;
+        request.warning = warning;
+        if(request.reviews.empty()) return false;
+        popupRequest = PopupRequest::ReviewSave;
+        return true;
+    };
     if(!request.writing && !request.reviews.empty()){
-        const auto currentReviews = collapseEquivalentReviews(collectGlobalMacroSaveReviews(*container));
-        bool stale = currentReviews.size() != request.reviews.size();
-        if(!stale){
-            for(size_t i = 0; i < currentReviews.size(); ++i){
-                const auto& current = currentReviews[i];
-                const auto& reviewed = request.reviews[i];
-                if(current.instance != reviewed.instance || current.globalPath != reviewed.globalPath ||
-                   current.instancePath != reviewed.instancePath || current.alsoUsedAt != reviewed.alsoUsedAt ||
-                   !sameChanges(current, reviewed)) stale = true;
-            }
-        }
-        if(stale){
-            request.warning = "The macro changed during review. Please review the updated changes.";
-            request.reviews = currentReviews;
-            request.saveChoices.assign(request.reviews.size(), false);
-            request.reviewIndex = 0;
-            if(request.reviews.empty()){
-                finishSavePreset();
-                return;
-            }
-            popupRequest = PopupRequest::ReviewSave;
-            return;
-        }
+        auto currentReviews = collapseEquivalentReviews(collectGlobalMacroSaveReviews(*container));
+        if(!sameReviews(currentReviews, request.reviews) &&
+           restartReview(std::move(currentReviews), "The macro changed during review. Please review the updated changes.")) return;
     }
 
     request.writing = true;
+
+    // Save As runs first: the new reference belongs to an enclosing global
+    // macro, which must then be saved with it.
+    bool replacedMacro = false;
+    for(size_t i = 0; i < request.reviews.size();){
+        if(request.saveChoices[i] != MacroSaveChoice::SaveAs){
+            ++i;
+            continue;
+        }
+        const auto& review = request.reviews[i];
+        const string& path = request.saveAsPaths[i];
+        if(!review.instance->saveGlobalDefinitionAs(path, false)){
+            request.warning = "Could not save this macro as a new global macro. Retry, or stop without saving the preset. The new macro folder may have been partly written.";
+            request.reviewIndex = i;
+            popupRequest = PopupRequest::ReviewSave;
+            return;
+        }
+        request.savedAsMacros.push_back(review.name + " -> " + macroLibraryLabel(path));
+        request.reviews.erase(request.reviews.begin() + i);
+        request.saveChoices.erase(request.saveChoices.begin() + i);
+        request.saveAsPaths.erase(request.saveAsPaths.begin() + i);
+        replacedMacro = true;
+    }
+    if(replacedMacro){
+        auto currentReviews = collapseEquivalentReviews(collectGlobalMacroSaveReviews(*container));
+        if(!sameReviews(currentReviews, request.reviews) &&
+           restartReview(std::move(currentReviews), "Saving as a new macro changed the global macro that contains it. Please review the updated changes.")) return;
+        request.writing = true;
+    }
 
     const size_t presetIndex = request.createNew
         ? bankPresets[request.bank].size()
@@ -635,7 +823,7 @@ void ofxOceanodePresetsController::finishSavePreset(){
 
     for(size_t i = request.nextWriteIndex; i < request.reviews.size(); ++i){
         auto& review = request.reviews[i];
-        if(!request.saveChoices[i]){
+        if(request.saveChoices[i] != MacroSaveChoice::Save){
             request.skippedMacros.push_back(review.name);
             request.nextWriteIndex = i + 1;
             continue;
@@ -663,6 +851,7 @@ void ofxOceanodePresetsController::finishSavePreset(){
         ofxOceanodeShared::setCurrentPresetName(previousName);
         saveResultText = "Could not finish saving preset: " + request.bank + " / " + request.name +
                          "\nSome files may have been written. Obsolete node files were retained unless the graph save completed. See the log for details.";
+        for(const auto& macro : request.savedAsMacros) saveResultText += "\nGlobal macro already saved as new: " + macro;
         for(const auto& macro : request.savedMacros) saveResultText += "\nGlobal macro already saved: " + macro;
         pendingSave.reset();
         popupRequest = PopupRequest::SaveResult;
@@ -678,11 +867,14 @@ void ofxOceanodePresetsController::finishSavePreset(){
     lastPresetName = request.name;
     ofxOceanodeShared::presetWasSaved();
 
-    if(!request.reviews.empty()){
+    if(!request.reviews.empty() || !request.savedAsMacros.empty()){
         saveResultText = "Preset saved: " + request.bank + " / " + request.name + "\n";
-        saveResultText += "Global macros saved: " + ofToString(request.savedMacros.size()) +
-                          "\nGlobal macros skipped: " + ofToString(request.skippedMacros.size());
+        saveResultText += "Global macros saved: " + ofToString(request.savedMacros.size());
+        if(!request.savedAsMacros.empty())
+            saveResultText += "\nGlobal macros saved as new: " + ofToString(request.savedAsMacros.size());
+        saveResultText += "\nGlobal macros skipped: " + ofToString(request.skippedMacros.size());
         for(const auto& name : request.savedMacros) saveResultText += "\n  Saved: " + name;
+        for(const auto& name : request.savedAsMacros) saveResultText += "\n  Saved as new: " + name;
         for(const auto& name : request.skippedMacros) saveResultText += "\n  Skipped: " + name;
         popupRequest = PopupRequest::SaveResult;
     }

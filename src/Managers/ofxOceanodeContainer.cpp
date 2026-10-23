@@ -58,6 +58,39 @@ namespace {
 
     std::deque<ConnectionErrorDialogData> pendingConnectionErrorDialogs;
 
+    // Registry filters (MacroMixer kept-out nodes) remove saved nodes before a
+    // folder load. Their cables go too, so they never report connection errors.
+    std::string savedNodeKey(std::string model, const std::string& identifier){
+        ofStringReplace(model, " ", "_");
+        return model + "_" + ofToString(ofToInt(identifier));
+    }
+
+    void removeSkippedNodes(const ofxOceanodeNodeRegistry& registry, const std::string& folder, ofJson& modules){
+        if(!modules.is_object()) return;
+        for(auto model = modules.begin(); model != modules.end(); ++model){
+            if(!model.value().is_object()) continue;
+            for(auto node = model.value().begin(); node != model.value().end();){
+                if(registry.skipsNodeLoad(folder, savedNodeKey(model.key(), node.key()))) node = model.value().erase(node);
+                else ++node;
+            }
+        }
+    }
+
+    void removeSkippedConnections(const ofxOceanodeNodeRegistry& registry, const std::string& folder, ofJson& connections){
+        if(!connections.is_object()) return;
+        for(auto source = connections.begin(); source != connections.end();){
+            if(registry.skipsNodeLoad(folder, source.key())){ source = connections.erase(source); continue; }
+            if(source.value().is_object()) for(auto& outputs : source.value()){
+                if(!outputs.is_object()) continue;
+                for(auto sink = outputs.begin(); sink != outputs.end();){
+                    if(registry.skipsNodeLoad(folder, sink.key())) sink = outputs.erase(sink);
+                    else ++sink;
+                }
+            }
+            ++source;
+        }
+    }
+
     void drawConnectionErrorDialogContents()
     {
         if(pendingConnectionErrorDialogs.empty()) return;
@@ -932,6 +965,7 @@ void ofxOceanodeContainer::loadPreset_loadNodes(string presetFolderPath){
     }
 
     ofJson json = ofLoadJson(modulesPath);
+    removeSkippedNodes(*registry, presetFolderPath, json);
     unavailableModules = unavailableConnections = ofJson();
     unavailableNodeFiles.clear(); unavailableNodeKeys.clear();
     if(json.is_object()) for(auto model = json.begin(); model != json.end(); ++model) {
@@ -1080,6 +1114,7 @@ void ofxOceanodeContainer::loadPreset_loadBeforeConnections(string presetFolderP
 
 void ofxOceanodeContainer::loadPreset_loadConnections(string presetFolderPath){
     ofJson json = ofLoadJson(presetFolderPath + "/connections.json");
+    removeSkippedConnections(*registry, presetFolderPath, json);
     // Cables touching unavailable addon nodes cannot run, but must survive a save.
     // Leave failures between available nodes on the normal diagnostic path.
     unavailableConnections = ofJson();

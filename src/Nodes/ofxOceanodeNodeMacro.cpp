@@ -861,6 +861,18 @@ bool ofxOceanodeNodeMacro::saveGlobalDefinition(bool notifyOtherInstances){
 	return true;
 }
 
+bool ofxOceanodeNodeMacro::saveGlobalDefinitionAs(const string& path, bool notifyOtherInstances){
+	if(!saveLibraryDefinition(path)) return false;
+	presetManager.setLocal(false);
+	presetManager.setCurrentMacroPath(path);
+	ofxOceanodeShared::updateMacrosStructure();
+	presetManager.updateCategoryFromPath(path);
+	markMacroReferenceUserEdited();
+	ofxOceanodeShared::snapshotUpdated(path);
+	if(notifyOtherInstances) ofxOceanodeShared::macroUpdated(path);
+	return true;
+}
+
 bool ofxOceanodeNodeMacro::saveLocalDefinition(){
 	if(!presetManager.isLocal() || isLoadingPreset || !presetManager.getNextPresetPath().empty()) return false;
 	// Save just this node and its embedded graph, including Inspector metadata.
@@ -1113,6 +1125,14 @@ void ofxOceanodeNodeMacro::macroSave(ofJson &json, string path){
 }
 
 void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
+    macroLoadImpl(json,path,"");
+}
+
+void ofxOceanodeNodeMacro::macroLoadFromFolder(ofJson& json, const std::string& folder){
+    macroLoadImpl(json,ofFilePath::getEnclosingDirectory(folder),folder);
+}
+
+void ofxOceanodeNodeMacro::macroLoadImpl(ofJson& json, const std::string& path, const std::string& localFolder){
 	presetManager.clearNextPresetPath();
 	pendingMacroReferenceUserEdited = false;
 //	if(json.count(clearContainerOnLoad.getEscapedName()) == 0){
@@ -1142,7 +1162,7 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 			// Load it before container->loadPreset() so allNodesCreated() can use it.
 			loadRouterSortFromJson(json);
 
-			string localPath = path + "/" + nodeName() + "_" + ofToString(getNumIdentifier());
+			string localPath = localFolder.empty() ? path + "/" + nodeName() + "_" + ofToString(getNumIdentifier()) : localFolder;
 			presetManager.setInnerPresetLoadingPath(localPath);
 			container->loadPreset(localPath);
 			presetManager.setInnerPresetLoadingPath("");
@@ -1226,7 +1246,7 @@ void ofxOceanodeNodeMacro::macroLoad(ofJson &json, string path){
 		ofLog() << "Cannot get local preset";
 		presetManager.setLocal(true);
 
-		string localPath = path + "/" + nodeName() + "_" + ofToString(getNumIdentifier());
+		string localPath = localFolder.empty() ? path + "/" + nodeName() + "_" + ofToString(getNumIdentifier()) : localFolder;
 		presetManager.setInnerPresetLoadingPath(localPath);
 		container->loadPreset(localPath);
 		presetManager.setInnerPresetLoadingPath("");

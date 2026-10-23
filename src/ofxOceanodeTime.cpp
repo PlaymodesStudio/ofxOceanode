@@ -177,9 +177,10 @@ void ofxOceanodeTime::update(){
             }
             else if(auto* mixer = dynamic_cast<ofxOceanodeMacroMixer*>(model)){
                 // Only live graphs participate. Validation captures and pending
-                // requests own no running clocks. Both sides advance in a fade.
+                // requests own no running clocks. Both sides advance in an
+                // output fade; a graph morph advances only its destination.
                 if(const auto* runtime = mixer->mixerRuntime()) {
-                    if(const auto* graph = runtime->origin()) getPhasorsFromContainer(graph->container.get());
+                    if(!runtime->morphing()) if(const auto* graph = runtime->origin()) getPhasorsFromContainer(graph->container.get());
                     if(const auto* graph = runtime->destination()) getPhasorsFromContainer(graph->container.get());
                 }
             }
