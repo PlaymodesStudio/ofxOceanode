@@ -248,6 +248,26 @@ the selected router list after validation, retaining matching local ports and
 cables. Existing interface restrictions still apply when Macros are imported;
 invalid or incompatible files leave the current list intact.
 
+Loading a preset or pasting a MacroMixer reads every source folder (analysis
+only, no nodes are created) before playback starts. A source that fails shows
+its reason as its **State** in orange; it never stops the others or opens the blocked-node
+dialog, which still appears when a Transition activates that source.
+
+The **Mixer Status** text output summarises the node in about 28 characters,
+for a narrow display: what runs, then how many sources passed their last check.
+
+| Mixer Status | Meaning |
+|---|---|
+| `No sources` | No Macro folders added |
+| `Idle \| 5/5 ok` | Nothing running |
+| `Run 3 Bloobs_9 \| 5/5 ok` | Source 3 is running (long names end in `~`) |
+| `Mix 3>4 62% \| 5/5 ok` / `Morph 3>4 62% \| …` | Transition from source 3 to 4 |
+| `Run 3 Bloobs_9 \| 4/5 ok` | One source failed its check; see its State |
+| `Blocked, see dialog \| …` | A blocked node needs an answer |
+| `Error, see Status \| …` | The inspector Status has the details |
+
+Indices match the inspector's source list.
+
 Save/clipboard stores `MacroMixerState` version 1: router definitions, policies,
 inputs, ordered Macro source references, selection, destination and optional
 `morphPolicies` settings per connection type, both mixer-wide and on each Macro

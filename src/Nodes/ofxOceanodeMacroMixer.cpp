@@ -82,7 +82,7 @@ bool matchesRouter(ofxOceanodeAbstractParameter& parameter,const MacroMixerContr
         && bool(parameter.getFlags() & ofxOceanodeParameterFlags_DisableInConnection)==(router.direction=="Output");
 }
 bool validOutputNames(const MacroMixerContract& contract, std::string& error) {
-    const std::set<std::string> reserved{"Target", "Duration_Ms", "Bi_Pow", "Transition", "Finish_Transition", "Progress", "Status",
+    const std::set<std::string> reserved{"Target", "Duration_Ms", "Bi_Pow", "Transition", "Finish_Transition", "Progress", "Status", "Mixer_Status",
         "Output_Routers", "Routers", "Macros", "MacroMixerState", "Morph_macros"};
     std::set<std::string> names;
     for(const auto& router : contract.routers) {
@@ -201,6 +201,7 @@ void ofxOceanodeMacroMixer::setup() {
     addParameter(transition.set("Transition"));
     addParameter(finish.set("Finish Transition"));
     addOutputParameter(progress.set("Progress", 0, 0, 1), transient);
+    addOutputParameter(summary.set("Mixer Status", "No sources"), transient);
     if(hostContainer) {
         runtime = std::make_unique<MacroMixerRuntime>(*hostContainer);
         MacroMixerContract empty; empty.routers.clear(); runtime->setContract(empty);
@@ -389,7 +390,7 @@ void ofxOceanodeMacroMixer::installOutputs(const MacroMixerContract& contract) {
             it = outputs.erase(it);
         } else ++it;
     }
-    std::vector<std::string> order{"Target", "Duration Ms", "Bi Pow", "Transition", "Finish Transition", "Progress"};
+    std::vector<std::string> order{"Target", "Duration Ms", "Bi Pow", "Transition", "Finish Transition", "Progress", "Mixer Status"};
     for(const auto& router : contract.routers) {
         auto found = outputs.find(router.id);
         if(found == outputs.end()) {
@@ -696,8 +697,10 @@ void ofxOceanodeMacroMixer::drawSource(const MacroMixerRevision& macro, bool fad
     if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", source.c_str());
     std::error_code missing;
     const bool available = fs::exists(fs::path(source) / "modules.json", missing);
-    ImGui::TextDisabled("State: %s", !available ? "Missing (folder or modules.json unavailable)"
-        : macro.analysed() ? "Checked" : "Not checked yet (Refresh or Transition checks it)");
+    const auto problem = runtime->sourceProblem(macro.id());
+    if(!available) ImGui::TextColored(ImVec4(1,.7f,.3f,1), "State: Missing (folder or modules.json unavailable)");
+    else if(!problem.empty()) ImGui::TextColored(ImVec4(1,.7f,.3f,1), "State: %s", problem.c_str());
+    else ImGui::TextDisabled("State: %s", macro.analysed() ? "Checked" : "Not checked yet (Refresh or Transition checks it)");
 
     // Nodes the last analysis left out, plus kept-out nodes inside this folder
     // when it has not been read since a preset was restored.
@@ -827,6 +830,37 @@ void ofxOceanodeMacroMixer::publish() {
         if(auto entry = runtime->macro(runtime->queuedID())) state = state.get() + " | Queued: " + entry->name();
     }
     if(!inspectorError.empty()) state = state.get() + "\n" + inspectorError;
+    const auto text = shortStatus();
+    if(summary.get() != text) summary = text;
+}
+std::string ofxOceanodeMacroMixer::shortStatus() const {
+    if(!runtime) return "No host";
+    const auto entries = runtime->macros();
+    if(entries.empty()) return "No sources";
+    const auto index = [&](const std::string& id) {
+        for(size_t i = 0; i < entries.size(); ++i) if(entries[i]->id() == id) return std::to_string(i);
+        return std::string("?");
+    };
+    const auto passed = std::count_if(entries.begin(), entries.end(), [&](const auto& e) {
+        return e->analysed() && runtime->sourceProblem(e->id()).empty();
+    });
+    const auto sources = " | " + std::to_string(passed) + "/" + std::to_string(entries.size()) + " ok";
+    std::string activity;
+    if(!runtime->blockedNodes().empty()) activity = "Blocked, see dialog";
+    else if(!inspectorError.empty() || !runtime->diagnostics().empty()) activity = "Error, see Status";
+    else if(runtime->transitioning())
+        activity = std::string(runtime->morphing() ? "Morph " : "Mix ") + index(runtime->currentID()) + ">"
+            + index(runtime->destinationID()) + " " + std::to_string(int(runtime->progress() * 100)) + "%";
+    else if(auto running = runtime->macro(runtime->currentID())) {
+        activity = "Run " + index(running->id());
+        constexpr size_t width = 28;
+        const auto room = width > activity.size() + 1 + sources.size() ? width - activity.size() - 1 - sources.size() : 0;
+        auto name = running->name();
+        if(name.size() > room) name = room > 2 ? name.substr(0, room - 1) + "~" : "";
+        if(!name.empty()) activity += " " + name;
+    }
+    else activity = "Idle";
+    return activity + sources;
 }
 
 void ofxOceanodeMacroMixer::update(ofEventArgs&) {
@@ -899,6 +933,8 @@ void ofxOceanodeMacroMixer::loadBeforeConnections(ofJson& json) {
             throw std::runtime_error("Invalid saved selection");
         const auto& contract = candidate->contract();
         if(!validOutputNames(contract, inspectorError)) return;
+        // Read every source before playback starts on the next update.
+        candidate->checkSources();
         // The container reuses nodes with the same model/ID across macros.
         // Keep matching wrappers; changed outputs release old cables before the
         // parent loads its saved cable table. Non-cable UI references need their

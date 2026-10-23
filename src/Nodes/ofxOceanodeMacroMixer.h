@@ -64,8 +64,10 @@ private:
     void publish();
     bool syncInputs();
     void reportFailure();
+    // About 28 characters, for the Mixer Status output.
+    std::string shortStatus() const;
     std::string routerEditBlocker(const std::string& id) const;
-    ofParameter<std::string> state;
+    ofParameter<std::string> state, summary;
     ofParameter<int> target;
     ofParameter<float> duration, biPow, progress;
     ofParameter<void> transition, finish;

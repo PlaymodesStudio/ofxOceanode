@@ -54,11 +54,35 @@ bool MacroMixerRuntime::removeMacro(const std::string& id) {
         const auto removedID = it->second->id();
         if(removedID == currentID() || removedID == destinationID() || removedID == queuedID()) clear();
         order.erase(std::remove(order.begin(), order.end(), removedID), order.end());
-        sourcePolicies.erase(removedID);
+        sourcePolicies.erase(removedID); problems.erase(removedID);
         imports.erase(it);
         errors.clear(); return true;
     }
     errors = {{"macro", "Unknown Macro ID"}}; return false;
+}
+size_t MacroMixerRuntime::checkSources() {
+    size_t passed = 0;
+    const auto saved = errors;
+    for(const auto& id : order) {
+        auto entry = std::find_if(imports.begin(), imports.end(), [&](const auto& e) { return e.second->id() == id; });
+        if(entry == imports.end()) continue;
+        auto revision = MacroMixerSource::importFolder(parent, entry->second->source(), interface, errors, id, keptOut.get());
+        if(revision) { entry->second = revision; ++passed; }
+        noteProblem(id);
+    }
+    errors = saved; sourceDetailCache.clear();
+    return passed;
+}
+void MacroMixerRuntime::noteProblem(const std::string& id) {
+    // Records the diagnostics of the import just made for this source.
+    if(errors.empty()) { problems.erase(id); return; }
+    const auto blockedCount = std::count_if(errors.begin(), errors.end(), [](const auto& e) { return !e.node.empty(); });
+    problems[id] = blockedCount ? std::to_string(blockedCount) + " blocked node(s); Transition asks whether to keep them out"
+        : errors.front().message;
+}
+std::string MacroMixerRuntime::sourceProblem(const std::string& id) const {
+    const auto found = problems.find(id);
+    return found == problems.end() ? "" : found->second;
 }
 bool MacroMixerRuntime::moveMacro(const std::string& id, size_t index) {
     auto found = std::find(order.begin(), order.end(), id);
@@ -227,6 +251,7 @@ bool MacroMixerRuntime::importMacro(const std::string& folder, bool refresh) {
     preparing = true;
     auto revision = MacroMixerSource::importFolder(parent,folder,interface,errors,previous ? previous->id() : "",keptOut.get());
     preparing = false;
+    if(previous) noteProblem(previous->id());
     if(!revision) { noteBlocked(folder,refresh); return false; }
     sourceDetailCache.clear(); transitionDetails.clear();
     imports[sourceKey(folder)] = revision;
@@ -381,7 +406,7 @@ bool MacroMixerRuntime::restoreState(const ofJson& saved) {
         interface = std::move(staged.interface);
         inputValues=std::move(staged.inputValues);
         connectionPolicies=std::move(staged.connectionPolicies);
-        sourcePolicies=std::move(staged.sourcePolicies);
+        sourcePolicies=std::move(staged.sourcePolicies); problems.clear();
         imports = std::move(staged.imports); order = std::move(staged.order);
         pending = std::move(staged.pending);
         *keptOut = std::move(keptOutNodes);

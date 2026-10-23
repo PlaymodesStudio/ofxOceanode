@@ -23,6 +23,12 @@ public:
     std::vector<Revision> macros() const;
     // Removing an entry used by playback also releases the running/queued graphs.
     bool removeMacro(const std::string& id);
+    // Reads and validates every source without constructing nodes, as after
+    // loading a preset. Returns how many passed; failures stay per source and
+    // never raise the blocked-node dialog.
+    size_t checkSources();
+    // Why the last read of this source failed; empty when it passed.
+    std::string sourceProblem(const std::string& id) const;
     bool moveMacro(const std::string& id, size_t index);
     bool setContract(const MacroMixerContract& contract);
     const MacroMixerContract& contract() const { return interface; }
@@ -97,6 +103,8 @@ private:
     Inputs inputValues;
     MacroMixerMorphPolicies connectionPolicies;
     std::map<std::string, MacroMixerMorphPolicies> sourcePolicies; // By Macro ID.
+    std::map<std::string, std::string> problems; // By Macro ID.
+    void noteProblem(const std::string& id);
     mutable std::map<std::string,std::vector<MacroMixerMorphDetail>> sourceDetailCache;
     std::map<std::string,std::vector<MacroMixerMorphDetail>> transitionDetails;
     struct Renderer { std::string policy; MacroMixerMixing::Policy::Function function; };
