@@ -31,6 +31,9 @@ public:
     bool loadRouterGroup(const std::string& path);
     bool saveRouterGroup(const std::string& path);
     bool setMorphConnectionPolicy(const std::string& type,const std::string& policy,const ofJson& options = ofJson::object());
+    // Overrides the mixer default for transitions into one source; an empty
+    // policy returns that type to the mixer default.
+    bool setSourceMorphPolicy(const std::string& id,const std::string& type,const std::string& policy,const ofJson& options = ofJson::object());
     bool importMacroFolder(const std::string& folder, bool refresh = false);
     bool removeImportedMacro(const std::string& id);
     bool moveImportedMacro(const std::string& id, size_t index);
@@ -53,6 +56,10 @@ private:
     void drawRouters();
     void chooseRouterGroup(bool save);
     void drawMacros();
+    void drawSourceHeader(const std::string& title, const std::string& badges, bool running);
+    void drawSource(const MacroMixerRevision& macro, bool fading);
+    // An empty ID edits the mixer default.
+    void drawMorphPolicies(const std::string& id, bool fading);
     void syncSelector();
     void publish();
     bool syncInputs();

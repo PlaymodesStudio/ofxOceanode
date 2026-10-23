@@ -54,6 +54,7 @@ bool MacroMixerRuntime::removeMacro(const std::string& id) {
         const auto removedID = it->second->id();
         if(removedID == currentID() || removedID == destinationID() || removedID == queuedID()) clear();
         order.erase(std::remove(order.begin(), order.end(), removedID), order.end());
+        sourcePolicies.erase(removedID);
         imports.erase(it);
         errors.clear(); return true;
     }
@@ -138,6 +139,31 @@ bool MacroMixerRuntime::setMorphPolicy(const std::string& type,const std::string
         sourceDetailCache.clear(); errors.clear(); return true;
     } catch(const std::exception& e) { errors={{"Morph connections",e.what()}}; return false; }
 }
+bool MacroMixerRuntime::setSourceMorphPolicy(const std::string& id,const std::string& type,const std::string& policyID,const ofJson& options) {
+    if(next) { errors={{"Morph connections","Finish the transition before editing connection policies"}}; return false; }
+    if(!macro(id)) { errors={{"Morph connections","Unknown Macro ID"}}; return false; }
+    try {
+        const auto& policy=MacroMixerMixing::registry().policy(type,policyID);
+        sourcePolicies[id][type]={policy.id,policy.options(options)};
+        sourceDetailCache.clear(); errors.clear(); return true;
+    } catch(const std::exception& e) { errors={{"Morph connections",e.what()}}; return false; }
+}
+bool MacroMixerRuntime::clearSourceMorphPolicy(const std::string& id,const std::string& type) {
+    if(next) { errors={{"Morph connections","Finish the transition before editing connection policies"}}; return false; }
+    const auto found=sourcePolicies.find(id);
+    if(found!=sourcePolicies.end() && found->second.erase(type) && found->second.empty()) sourcePolicies.erase(found);
+    sourceDetailCache.clear(); errors.clear(); return true;
+}
+const MacroMixerMorphPolicies& MacroMixerRuntime::sourceMorphPolicies(const std::string& id) const {
+    static const MacroMixerMorphPolicies none;
+    const auto found=sourcePolicies.find(id);
+    return found==sourcePolicies.end() ? none : found->second;
+}
+MacroMixerMorphPolicies MacroMixerRuntime::morphPoliciesInto(const std::string& id) const {
+    auto result=connectionPolicies;
+    for(const auto& item:sourceMorphPolicies(id)) result[item.first]=item.second;
+    return result;
+}
 const std::vector<MacroMixerMorphDetail>& MacroMixerRuntime::sourceDetails(const std::string& id) const {
     const auto recorded=transitionDetails.find(id);
     if(recorded!=transitionDetails.end()) return recorded->second;
@@ -150,7 +176,7 @@ const std::vector<MacroMixerMorphDetail>& MacroMixerRuntime::sourceDetails(const
         auto target=macro(id); std::vector<Diagnostic> diagnostics;
         if(target) target=MacroMixerSource::importFolder(parent,target->source(),interface,diagnostics,id,keptOut.get());
         if(target) {
-            result=current->inspectMorph(target,connectionPolicies);
+            result=current->inspectMorph(target,morphPoliciesInto(id));
             result.insert(result.begin(),{"context",target->name(),"From "+current->revision->name()+" to "+target->name()});
         }
         else for(const auto& error:diagnostics) result.push_back({"fallback",error.node.empty() ? error.file : error.file+" / "+error.node,
@@ -241,13 +267,21 @@ bool MacroMixerRuntime::restoreKeptOutNode(const std::string& folder, const std:
 }
 
 ofJson MacroMixerRuntime::saveState() const {
-    ofJson routers = ofJson::array(), entries = ofJson::array(), inputs=ofJson::object(), policies=ofJson::object();
+    const auto policiesJson=[](const MacroMixerMorphPolicies& items) {
+        auto result=ofJson::object();
+        for(const auto& item:items) result[item.first]={{"policy",item.second.policy},{"options",item.second.options}};
+        return result;
+    };
+    ofJson routers = ofJson::array(), entries = ofJson::array(), inputs=ofJson::object(), policies=policiesJson(connectionPolicies);
     for(const auto& r : interface.routers)
         routers.push_back({{"id", r.id}, {"name", r.name}, {"type", r.type}, {"policy",r.policy}, {"options",r.options}, {"direction",r.direction}});
     for(const auto& item:inputValues) inputs[item.first]=MacroMixerMixing::toJson(item.second);
-    for(const auto& revision : macros()) entries.push_back({{"id", revision->id()},
-        {"name", revision->name()}, {"source", revision->source()}});
-    for(const auto& item:connectionPolicies) policies[item.first]={{"policy",item.second.policy},{"options",item.second.options}};
+    for(const auto& revision : macros()) {
+        ofJson entry{{"id", revision->id()}, {"name", revision->name()}, {"source", revision->source()}};
+        const auto& own=sourceMorphPolicies(revision->id());
+        if(!own.empty()) entry["morphPolicies"]=policiesJson(own);
+        entries.push_back(std::move(entry));
+    }
     auto keptOutNodes=ofJson::array();
     for(const auto& node:*keptOut) keptOutNodes.push_back({{"folder",node.first},{"node",node.second}});
     const auto playback = inPlaceTarget ? inPlaceTarget : next ? next->revision : current ? current->revision
@@ -314,10 +348,17 @@ bool MacroMixerRuntime::restoreState(const ofJson& saved) {
             require(!path.empty() && std::filesystem::path(path).is_absolute(), "Missing or non-absolute source folder");
             reference->sourcePath = sourceKey(path);
             reference->interface = contract;
-            reference->importNotices = {"Folder reference. Activation reads and validates the original source; no graph is embedded."};
             require(!staged.macro(reference->id()) && !staged.imports.count(reference->source()), "Duplicate saved Macro ID or source");
             staged.imports.emplace(reference->source(), reference);
             staged.order.push_back(reference->id());
+            if(entry.contains("morphPolicies")) { // Older states have none.
+                const auto& policies=entry.at("morphPolicies");
+                require(policies.is_object() && policies.size()<=128,"Invalid saved source morph policies");
+                for(auto item=policies.begin();item!=policies.end();++item)
+                    if(!staged.setSourceMorphPolicy(reference->id(),item.key(),item.value().at("policy").get<std::string>(),item.value().at("options"))) {
+                        errors=staged.diagnostics(); return false;
+                    }
+            }
         }
         MacroMixerExclusions keptOutNodes; // Older states have none.
         if(saved.contains("keptOutNodes")) {
@@ -340,6 +381,7 @@ bool MacroMixerRuntime::restoreState(const ofJson& saved) {
         interface = std::move(staged.interface);
         inputValues=std::move(staged.inputValues);
         connectionPolicies=std::move(staged.connectionPolicies);
+        sourcePolicies=std::move(staged.sourcePolicies);
         imports = std::move(staged.imports); order = std::move(staged.order);
         pending = std::move(staged.pending);
         *keptOut = std::move(keptOutNodes);
@@ -405,11 +447,11 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
             const auto morphStart = request->morph && current ? current->captureMorphValues() : MacroMixerSource::MorphSnapshot{};
             sourceDetailCache.clear();
             if(request->morph && current) {
-                auto details=current->inspectMorph(revision,connectionPolicies);
+                auto details=current->inspectMorph(revision,morphPoliciesInto(revision->id()));
                 details.insert(details.begin(),{"context",revision->name(),"From "+current->revision->name()+" to "+revision->name()});
                 transitionDetails[revision->id()]=std::move(details);
             }
-            const bool reuse=request->morph && current && current->prepareMorphInPlace(revision,connectionPolicies);
+            const bool reuse=request->morph && current && current->prepareMorphInPlace(revision,morphPoliciesInto(revision->id()));
             if(request->morph && current && !reuse) {
                 auto& details=transitionDetails[revision->id()];
                 if(std::none_of(details.begin(),details.end(),[](const auto& d) {return d.kind=="fallback";}))

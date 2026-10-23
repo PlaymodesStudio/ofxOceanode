@@ -46,7 +46,7 @@ struct Analysis {
     const MacroMixerExclusions* excluded = nullptr;
     // All blocked nodes are collected, so each can be kept out before retrying.
     std::vector<MacroMixerDiagnostic> blocked;
-    std::vector<std::string> keptOut;
+    MacroMixerExclusions keptOut;
     bool skips(const fs::path& folder, const std::string& key) const {
         return excluded && excluded->count({folder.string(),key});
     }
@@ -83,7 +83,7 @@ void analyse(ofxOceanodeNodeRegistry& registry, const fs::path& path,
             require(keys.insert(key).second, folder.string(), "Duplicate node identifier");
             if(analysis.skips(folder,key)) {
                 skipped.insert(key);
-                analysis.keptOut.push_back("Kept out of the graph: " + model.key() + " " + std::to_string(id) + " (" + MacroMixerSource::displayPath(folder.string()) + ")");
+                analysis.keptOut.insert({folder.string(),key});
                 continue;
             }
             if(!reason.empty()) {
@@ -201,11 +201,8 @@ MacroMixerSource::Revision MacroMixerSource::importFolder(ofxOceanodeContainer& 
         revision->displayName = source.filename().string(); revision->sourcePath = source.string();
         revision->interface = contract;
         revision->definition = std::move(definition);
-        revision->importNotices = {"Runs as an ordinary Macro, including nested Macros, native connections and clocks.",
-            "Only selected routers participate in mixing; additional routers retain their native behavior.",
-            "External outputs are rejected recursively. Analysis and Refresh never execute source nodes.",
-            "Each activation reads the Macro source. Save/clipboard store references; source folders must remain available."};
-        revision->importNotices.insert(revision->importNotices.end(),analysis.keptOut.begin(),analysis.keptOut.end());
+        revision->keptOutNodes = std::move(analysis.keptOut);
+        revision->wasAnalysed = true;
         return revision;
     } catch(const std::exception& e) { report(errors,e,folder); return nullptr; }
 }
@@ -787,7 +784,7 @@ std::string morphLocation(const MorphPath& prefix,const std::string& node,const 
     for(size_t i=0;i+1<prefix.size();i+=2) result+=prefix[i]+" "+prefix[i+1]+" / ";
     result+=node; if(!port.empty()) result+=" / "+port; return result;
 }
-MacroMixerMorphPolicy morphPolicy(const std::string& type,const MacroMixerMorphPolicies& policies,bool discrete=false) {
+MacroMixerMorphPolicy resolveMorphPolicy(const std::string& type,const MacroMixerMorphPolicies& policies,bool discrete=false) {
     const auto found=policies.find(type);
     const auto& policy=MacroMixerMixing::registry().policy(type,found!=policies.end() ? found->second.policy : discrete ? "switch" : type=="Texture" ? "crossfade" : "");
     return {policy.id,policy.options(found==policies.end() ? ofJson::object() : found->second.options)};
@@ -811,7 +808,7 @@ MorphCablePlan planMorphCable(ofxOceanodeContainer& c,const ofJson& target,const
     auto prototype=captureMorph(*sink);
     if(!prototype && plan.type.empty()) throw std::runtime_error("Changed cable uses an unsupported control type");
     if(!plan.type.empty()) {
-        plan.policy=morphPolicy(plan.type,policies,prototype && prototype->discrete);
+        plan.policy=resolveMorphPolicy(plan.type,policies,prototype && prototype->discrete);
         const auto& policy=MacroMixerMixing::registry().policy(plan.type,plan.policy.policy);
         if(policy.createProcessor && (!policy.ready || !policy.retire))
             throw std::runtime_error("Changed "+plan.type+" connection policy lacks backend readiness/retirement support");
@@ -1225,4 +1222,7 @@ void MacroMixerSource::Graph::applyMorph(float progress) {
         }
         morphTopology.reset(); morphStart.clear(); morphTarget.clear();
     }
+}
+MacroMixerMorphPolicy MacroMixerSource::connectionPolicy(const std::string& type,const MacroMixerMorphPolicies& policies,bool discrete) {
+    return resolveMorphPolicy(type,policies,discrete);
 }

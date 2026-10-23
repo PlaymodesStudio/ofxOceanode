@@ -26,15 +26,19 @@ public:
     const std::string& name() const { return displayName; }
     const std::string& source() const { return sourcePath; }
     const MacroMixerContract& contract() const { return interface; }
-    const std::vector<std::string>& notices() const { return importNotices; }
+    // Kept-out nodes the last analysis skipped, as canonical folder and node key.
+    const MacroMixerExclusions& keptOut() const { return keptOutNodes; }
+    // False for references restored from a preset until they are next read.
+    bool analysed() const { return wasAnalysed; }
     const ofJson& sourceDefinition() const { return definition; }
 private:
     friend class MacroMixerSource;
     friend class MacroMixerRuntime;
     std::string macroID, displayName, sourcePath;
     MacroMixerContract interface;
-    std::vector<std::string> importNotices;
+    MacroMixerExclusions keptOutNodes;
     ofJson definition;
+    bool wasAnalysed = false;
 };
 
 struct MacroMixerMorphPolicy { std::string policy; ofJson options = ofJson::object(); };
@@ -100,6 +104,9 @@ public:
         std::vector<MacroMixerDiagnostic>& errors, const Inputs& inputs = {},
         std::shared_ptr<const MacroMixerExclusions> excluded = nullptr);
     static std::string resourceBlocker(ofxOceanodeNodeRegistry& registry, const std::string& model);
+    // Policy a changed connection of this type uses, given configured policies.
+    // Discrete controls default to Switch and textures to Crossfade.
+    static MacroMixerMorphPolicy connectionPolicy(const std::string& type, const MacroMixerMorphPolicies& policies, bool discrete = false);
     // Display only: shortens a source path to start at the data folder
     // (data/Presets/...). Paths outside it are returned unchanged.
     static std::string displayPath(const std::string& path);

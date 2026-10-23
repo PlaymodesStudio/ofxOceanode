@@ -27,8 +27,16 @@ public:
     bool setContract(const MacroMixerContract& contract);
     const MacroMixerContract& contract() const { return interface; }
     bool setInputs(const Inputs& values);
+    // Policies for changed connections in a live-graph morph. setMorphPolicy
+    // edits the mixer-wide default. A source's own policies apply to
+    // transitions into that source and override the default per type.
     bool setMorphPolicy(const std::string& type, const std::string& policy, const ofJson& options = ofJson::object());
     const MacroMixerMorphPolicies& morphPolicies() const { return connectionPolicies; }
+    bool setSourceMorphPolicy(const std::string& id, const std::string& type, const std::string& policy, const ofJson& options = ofJson::object());
+    bool clearSourceMorphPolicy(const std::string& id, const std::string& type);
+    const MacroMixerMorphPolicies& sourceMorphPolicies(const std::string& id) const;
+    // The default with the source's own policies applied over it.
+    MacroMixerMorphPolicies morphPoliciesInto(const std::string& id) const;
     const std::vector<MacroMixerMorphDetail>& sourceDetails(const std::string& id) const;
     bool hasTransitionDetails(const std::string& id) const { return transitionDetails.count(id)!=0; }
     const Inputs& inputs() const { return inputValues; }
@@ -88,6 +96,7 @@ private:
     std::map<std::string, MacroMixerMixing::Value> mixedValues;
     Inputs inputValues;
     MacroMixerMorphPolicies connectionPolicies;
+    std::map<std::string, MacroMixerMorphPolicies> sourcePolicies; // By Macro ID.
     mutable std::map<std::string,std::vector<MacroMixerMorphDetail>> sourceDetailCache;
     std::map<std::string,std::vector<MacroMixerMorphDetail>> transitionDetails;
     struct Renderer { std::string policy; MacroMixerMixing::Policy::Function function; };

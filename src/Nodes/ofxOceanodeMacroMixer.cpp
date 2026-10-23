@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cfloat>
 #include <cstdio>
+#include <filesystem>
 #include <set>
 #if defined(TARGET_OSX)
 #include <objc/message.h>
@@ -292,6 +293,12 @@ bool ofxOceanodeMacroMixer::setMorphConnectionPolicy(const std::string& type,con
     if(!runtime->setMorphPolicy(type,policy,options)) { reportFailure(); return false; }
     inspectorError.clear(); return true;
 }
+bool ofxOceanodeMacroMixer::setSourceMorphPolicy(const std::string& id,const std::string& type,const std::string& policy,const ofJson& options) {
+    if(!runtime) return false;
+    const bool applied=policy.empty() ? runtime->clearSourceMorphPolicy(id,type) : runtime->setSourceMorphPolicy(id,type,policy,options);
+    if(!applied) { reportFailure(); return false; }
+    inspectorError.clear(); return true;
+}
 
 bool ofxOceanodeMacroMixer::saveRouterGroup(const std::string& path) {
     if(!runtime) return false;
@@ -467,7 +474,7 @@ bool ofxOceanodeMacroMixer::drawInspectorParameter(ofAbstractParameter& paramete
 void ofxOceanodeMacroMixer::drawRouters() {
     if(!runtime) return;
     ImGui::SeparatorText("Routers");
-    if(morphMacros) ImGui::TextWrapped("Morph macros: matching node types and connection roles keep live buffers and clocks even when IDs differ. Changed control cables blend live signals; added/removed nodes coexist until completion. Changed texture cables use GPU mixing. Source details show connection policies and reasons for destination-graph fallback. Router output mix policies are bypassed. Mode changes apply on the next Transition.");
+    if(morphMacros) ImGui::TextWrapped("Morph macros: matching node types and connection roles keep live buffers and clocks even when IDs differ. Changed control cables blend live signals; added/removed nodes coexist until completion. Changed texture cables use GPU mixing. Each source's Source section shows the morph into it and its connection policies. Router output mix policies are bypassed. Mode changes apply on the next Transition.");
     const auto contract=runtime->contract();
     auto types=MacroMixerMixing::supportedTypes();
     types.erase(std::remove_if(types.begin(),types.end(),[&](const auto& type) {
@@ -628,18 +635,21 @@ void ofxOceanodeMacroMixer::drawMacros() {
         }
     }
     ImGui::EndDisabled();
+    if((morphMacros || runtime->morphMode()) && ImGui::TreeNode("Morph policies (mixer default)")) {
+        ImGui::TextWrapped("How changed connections blend in a morph. Each source can override them for transitions into it.");
+        drawMorphPolicies("", fading);
+        ImGui::TreePop();
+    }
     const auto entries = runtime->macros();
     for(size_t i = 0; i < entries.size(); ++i) {
         const auto& macro = entries[i];
         ImGui::PushID(macro->id().c_str());
-        ImGui::Separator();
-        ImGui::TextWrapped("%zu: %s", i, macro->name().c_str());
+        ImGui::Spacing(); ImGui::Spacing();
         std::string badges;
-        if(macro->id() == runtime->currentID()) badges += "Running  ";
-        if(macro->id() == runtime->destinationID()) badges += "Destination  ";
-        if(macro->id() == runtime->queuedID()) badges += "Queued  ";
-        if(macro->id() == selectedID) badges += "Selected";
-        if(!badges.empty()) ImGui::TextWrapped("%s", badges.c_str());
+        for(const auto& badge : {std::make_pair(runtime->currentID(), "Running"), std::make_pair(runtime->destinationID(), "Destination"),
+                                 std::make_pair(runtime->queuedID(), "Queued"), std::make_pair(selectedID, "Selected")})
+            if(macro->id() == badge.first) badges += (badges.empty() ? "" : ", ") + std::string(badge.second);
+        drawSourceHeader(std::to_string(i) + ": " + macro->name(), badges, macro->id() == runtime->currentID());
         if(ImGui::SmallButton("Select")) target = int(i);
         ImGui::SameLine(); ImGui::BeginDisabled(fading);
         if(ImGui::SmallButton("Refresh")) actions.push_back({ActionKind::Refresh, macro->source()});
@@ -651,64 +661,139 @@ void ofxOceanodeMacroMixer::drawMacros() {
         if(ImGui::SmallButton("-")) actions.push_back({ActionKind::RemoveMacro, macro->id()});
         if(ImGui::IsItemHovered()) ImGui::SetTooltip("Remove Macro; clears playback if it is running, a destination or queued.");
         if(ImGui::TreeNode("Source")) {
-            ImGui::TextWrapped("%s", MacroMixerSource::displayPath(macro->source()).c_str());
-            if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", macro->source().c_str());
-            for(const auto& notice : macro->notices()) ImGui::TextWrapped("%s", notice.c_str());
-            if(morphMacros || runtime->morphMode()) {
-                ImGui::SeparatorText(runtime->hasTransitionDetails(macro->id()) ? "Last requested morph" : "Morph from running source");
-                std::set<std::string> editedTypes;
-                const auto details=runtime->sourceDetails(macro->id());
-                for(size_t n=0;n<details.size();++n) {
-                    const auto& detail=details[n]; ImGui::PushID(int(n));
-                    const auto kind=detail.kind=="context" ? "Transition" : detail.kind=="fallback" ? "Graph fallback" : detail.kind=="mix" ? "Connection mix"
-                        : detail.kind=="added" ? "Added node" : detail.kind=="removed" ? "Removed node"
-                        : detail.kind=="skipped" ? "Skipped connection mix" : "Live graph";
-                    ImGui::TextWrapped("%s: %s",kind,detail.location.c_str());
-                    ImGui::TextWrapped("%s",detail.message.c_str());
-                    if(detail.kind=="mix" && detail.type.empty()) ImGui::TextDisabled("Native control interpolation");
-                    if(detail.kind=="mix" && !detail.type.empty()) {
-                        const auto& selected=MacroMixerMixing::registry().policy(detail.type,detail.policy);
-                        ImGui::TextWrapped("%s: %s",detail.type.c_str(),selected.label.c_str());
-                        if(editedTypes.insert(detail.type).second) {
-                            ImGui::TextWrapped("Policy for changed %s connections (next transition)",detail.type.c_str());
-                            auto settings=MacroMixerMorphPolicy{selected.id,detail.options};
-                            const auto configured=runtime->morphPolicies().find(detail.type);
-                            if(configured!=runtime->morphPolicies().end()) settings=configured->second;
-                            const auto& choice=MacroMixerMixing::registry().policy(detail.type,settings.policy);
-                            ImGui::BeginDisabled(fading); ImGui::SetNextItemWidth(-1);
-                            if(ImGui::BeginCombo("##connectionPolicy",choice.label.c_str())) {
-                                for(const auto& policy:MacroMixerMixing::registry().policies(detail.type)) if(ImGui::Selectable(policy.label.c_str(),policy.id==choice.id))
-                                    actions.push_back({ActionKind::MorphPolicy,detail.type,0,{}, {policy.id,ofJson::object()}});
-                                ImGui::EndCombo();
-                            }
-                            drawMixOptions(detail.type,settings.options,[&](const ofJson& options) {
-                                actions.push_back({ActionKind::MorphPolicy,detail.type,0,{}, {choice.id,options}});
-                            });
-                            ImGui::EndDisabled();
-                        }
-                    }
-                    ImGui::PopID();
-                }
-            }
+            drawSource(*macro, fading);
             ImGui::TreePop();
         }
         ImGui::PopID();
     }
-    const auto& keptOut = runtime->keptOutNodes();
-    if(!keptOut.empty() && ImGui::TreeNode("##keptOut","Kept out of graph (%zu)",keptOut.size())) {
-        for(const auto& node : keptOut) {
-            ImGui::PushID((node.first + "/" + node.second).c_str());
-            ImGui::TextWrapped("%s", node.second.c_str());
-            ImGui::TextDisabled("%s", MacroMixerSource::displayPath(node.first).c_str());
-            if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", node.first.c_str());
-            if(ImGui::SmallButton("Restore")) actions.push_back({ActionKind::RestoreNode,node.first,0,{},{},node.second});
-            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Load this node again from the next activation. While it blocks MacroMixer, you are asked again.");
+    ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
+    if(ImGui::Button("Clear Playback")) actions.push_back({ActionKind::ClearPlayback, ""});
+    if(ImGui::IsItemHovered()) ImGui::SetTooltip("Release running graphs and reset router values. Imported macros remain in the list.");
+}
+
+void ofxOceanodeMacroMixer::drawSourceHeader(const std::string& title, const std::string& badges, bool running) {
+    // A bar in the node color, like parameter separators; the running source is stronger.
+    const auto color = ofFloatColor(getColor());
+    const auto& style = ImGui::GetStyle();
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetContentRegionAvail().x, height = ImGui::GetFrameHeight();
+    auto* drawList = ImGui::GetWindowDrawList();
+    drawList->AddRectFilled(start, ImVec2(start.x + width, start.y + height),
+        ImGui::ColorConvertFloat4ToU32(ImVec4(color.r, color.g, color.b, running ? .4f : .15f)));
+    drawList->AddRectFilled(start, ImVec2(start.x + ImGui::GetFontSize() * .25f, start.y + height),
+        ImGui::ColorConvertFloat4ToU32(ImVec4(color.r, color.g, color.b, 1)));
+    ImGui::SetCursorScreenPos(ImVec2(start.x + ImGui::GetFontSize() * .6f, start.y + style.FramePadding.y));
+    ImGui::TextUnformatted(title.c_str());
+    if(!badges.empty()) { ImGui::SameLine(); ImGui::TextDisabled("%s", badges.c_str()); }
+    ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + height + style.ItemSpacing.y));
+    ImGui::Dummy(ImVec2(0, 0));
+}
+
+void ofxOceanodeMacroMixer::drawSource(const MacroMixerRevision& macro, bool fading) {
+    namespace fs = std::filesystem;
+    const auto& source = macro.source();
+    ImGui::TextWrapped("%s", MacroMixerSource::displayPath(source).c_str());
+    if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", source.c_str());
+    std::error_code missing;
+    const bool available = fs::exists(fs::path(source) / "modules.json", missing);
+    ImGui::TextDisabled("State: %s", !available ? "Missing (folder or modules.json unavailable)"
+        : macro.analysed() ? "Checked" : "Not checked yet (Refresh or Transition checks it)");
+
+    // Nodes the last analysis left out, plus kept-out nodes inside this folder
+    // when it has not been read since a preset was restored.
+    std::vector<std::pair<std::string, std::string>> keptOut;
+    for(const auto& node : runtime->keptOutNodes()) {
+        const auto relative = fs::path(node.first).lexically_relative(source);
+        const bool inside = !relative.empty() && *relative.begin() != "..";
+        if(macro.keptOut().count(node) || inside) keptOut.push_back(node);
+    }
+    if(!keptOut.empty()) {
+        ImGui::Spacing();
+        if(ImGui::TreeNode("##keptOut", "Kept out (%zu)", keptOut.size())) {
+            for(const auto& node : keptOut) {
+                ImGui::PushID((node.first + "/" + node.second).c_str());
+                auto name = node.second; std::replace(name.begin(), name.end(), '_', ' ');
+                ImGui::AlignTextToFramePadding(); ImGui::TextUnformatted(name.c_str());
+                ImGui::SameLine();
+                if(ImGui::SmallButton("Restore")) actions.push_back({ActionKind::RestoreNode, node.first, 0, {}, {}, node.second});
+                if(ImGui::IsItemHovered()) ImGui::SetTooltip("Load this node again from the next activation. While it blocks MacroMixer, you are asked again.");
+                if(node.first != source) {
+                    ImGui::TextDisabled("%s", MacroMixerSource::displayPath(node.first).c_str());
+                    if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", node.first.c_str());
+                }
+                ImGui::PopID();
+            }
+            ImGui::TreePop();
+        }
+    }
+    if(!morphMacros && !runtime->morphMode()) return;
+
+    ImGui::Spacing();
+    if(ImGui::TreeNode("Morph details")) {
+        const auto& details = runtime->sourceDetails(macro.id());
+        for(size_t n = 0; n < details.size(); ++n) {
+            const auto& detail = details[n];
+            ImGui::PushID(int(n));
+            if(detail.kind == "context") {
+                ImGui::TextWrapped("%s (%s)", detail.message.c_str(), runtime->hasTransitionDetails(macro.id()) ? "last transition" : "preview");
+                ImGui::PopID(); continue;
+            }
+            const auto kind = detail.kind == "fallback" ? "Graph fallback" : detail.kind == "mix" ? "Connection mix"
+                : detail.kind == "added" ? "Added node" : detail.kind == "removed" ? "Removed node"
+                : detail.kind == "skipped" ? "Skipped connection mix" : "Live graph";
+            ImGui::Spacing();
+            ImGui::TextWrapped("%s: %s", kind, detail.location.c_str());
+            ImGui::TextDisabled("%s", detail.message.c_str());
+            if(detail.kind == "mix") {
+                if(detail.type.empty()) ImGui::TextDisabled("Native control interpolation");
+                else ImGui::TextDisabled("%s: %s", detail.type.c_str(), MacroMixerMixing::registry().policy(detail.type, detail.policy).label.c_str());
+            }
             ImGui::PopID();
         }
         ImGui::TreePop();
     }
-    if(ImGui::Button("Clear Playback")) actions.push_back({ActionKind::ClearPlayback, ""});
-    if(ImGui::IsItemHovered()) ImGui::SetTooltip("Release running graphs and reset router values. Imported macros remain in the list.");
+    ImGui::Spacing();
+    const auto own = runtime->sourceMorphPolicies(macro.id()).size();
+    if(ImGui::TreeNode("##policies", own ? "Morph policies into this source (%zu set)" : "Morph policies into this source (mixer default)", own)) {
+        drawMorphPolicies(macro.id(), fading);
+        ImGui::TreePop();
+    }
+}
+
+void ofxOceanodeMacroMixer::drawMorphPolicies(const std::string& id, bool fading) {
+    const auto& defaults = runtime->morphPolicies();
+    const auto& own = runtime->sourceMorphPolicies(id);
+    ImGui::BeginDisabled(fading);
+    for(const auto& type : MacroMixerMixing::supportedTypes()) {
+        const auto policies = MacroMixerMixing::registry().policies(type);
+        if(policies.empty()) continue;
+        ImGui::PushID(type.c_str());
+        ImGui::Spacing();
+        const auto inherited = MacroMixerSource::connectionPolicy(type, defaults);
+        const auto& inheritedLabel = MacroMixerMixing::registry().policy(type, inherited.policy).label;
+        const auto set = id.empty() ? defaults.find(type) : own.find(type);
+        const bool overridden = set != (id.empty() ? defaults.end() : own.end());
+        const auto current = overridden ? set->second : inherited;
+        const auto apply = [&](const std::string& policy, const ofJson& options) {
+            actions.push_back({ActionKind::MorphPolicy, type, 0, {}, {policy, options}, id});
+        };
+        ImGui::AlignTextToFramePadding(); ImGui::TextUnformatted(type.c_str());
+        ImGui::SameLine(ImGui::GetFontSize() * 8); ImGui::SetNextItemWidth(-1);
+        const auto preview = overridden || id.empty() ? MacroMixerMixing::registry().policy(type, current.policy).label : "Mixer default (" + inheritedLabel + ")";
+        if(ImGui::BeginCombo("##policy", preview.c_str())) {
+            if(!id.empty() && ImGui::Selectable(("Mixer default (" + inheritedLabel + ")").c_str(), !overridden)) apply("", ofJson::object());
+            for(const auto& policy : policies)
+                if(ImGui::Selectable(policy.label.c_str(), overridden && policy.id == current.policy)) apply(policy.id, ofJson::object());
+            ImGui::EndCombo();
+        }
+        if(overridden || id.empty()) {
+            ImGui::Indent(ImGui::GetFontSize() * 8);
+            drawMixOptions(type, current.options, [&](const ofJson& options) { apply(current.policy, options); });
+            ImGui::Unindent(ImGui::GetFontSize() * 8);
+        }
+        ImGui::PopID();
+    }
+    ImGui::EndDisabled();
 }
 
 bool ofxOceanodeMacroMixer::syncInputs() {
@@ -756,7 +841,10 @@ void ofxOceanodeMacroMixer::update(ofEventArgs&) {
             case ActionKind::Routers: if(setRouterContract(action.contract) && !action.text.empty()) newRouterName.fill(0); break;
             case ActionKind::LoadRouters: chooseRouterGroup(false); break;
             case ActionKind::SaveRouters: chooseRouterGroup(true); break;
-            case ActionKind::MorphPolicy: setMorphConnectionPolicy(action.text,action.policy.policy,action.policy.options); break;
+            case ActionKind::MorphPolicy:
+                if(action.node.empty()) setMorphConnectionPolicy(action.text,action.policy.policy,action.policy.options);
+                else setSourceMorphPolicy(action.node,action.text,action.policy.policy,action.policy.options);
+                break;
             case ActionKind::ClearPlayback: runtime->clear(); inspectorError.clear(); break;
             case ActionKind::KeepOut:
                 answeredBlocked.erase({action.text,action.node});

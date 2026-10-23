@@ -643,8 +643,25 @@ int main(int argc,char** argv) {
         auto invalid=saved; invalid["morphPolicies"]["Float"]["policy"]="unavailable";
         const auto* retained=copy.origin(); assert(!copy.restoreState(invalid)&&copy.origin()==retained);
         auto legacy=saved; legacy.erase("morphPolicies"); assert(copy.restoreState(legacy)); assert(copy.morphPolicies().empty());
+        // A source's own policy overrides the mixer default only for transitions into it.
+        assert(r.setMorphPolicy("Float","linear")&&r.setSourceMorphPolicy(destination,"Float","switch",{{"threshold",.8}}));
+        const auto other=r.importedMacro(b)->id();
+        assert(r.sourceMorphPolicies(other).empty()&&r.morphPoliciesInto(other).at("Float").policy=="linear");
+        assert(r.morphPoliciesInto(destination).at("Float").options.at("threshold")==.8);
+        details=r.sourceDetails(destination);
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="mix"&&d.type=="Float"&&d.policy=="switch"&&d.options.at("threshold")==.8;}));
+        assert(!r.setSourceMorphPolicy("missing","Float","switch")&&!r.setSourceMorphPolicy(destination,"Float","missing"));
+        assert(r.sourceMorphPolicies(destination).at("Float").policy=="switch");
+        const auto withSource=r.saveState(); assert(copy.restoreState(withSource));
+        assert(copy.sourceMorphPolicies(destination).at("Float").options.at("threshold")==.8&&copy.sourceMorphPolicies(other).empty());
+        auto invalidSource=withSource;
+        for(auto& entry:invalidSource.at("macros")) if(entry.at("id")==destination) entry["morphPolicies"]["Float"]["policy"]="unavailable";
+        assert(!copy.restoreState(invalidSource)&&copy.sourceMorphPolicies(destination).at("Float").policy=="switch");
+        assert(copy.restoreState(legacy)&&copy.sourceMorphPolicies(destination).empty());
+        assert(copy.restoreState(withSource)&&copy.clearSourceMorphPolicy(destination,"Float")&&copy.sourceMorphPolicies(destination).empty());
+        assert(copy.setSourceMorphPolicy(destination,"Float","switch")&&copy.removeMacro(destination)&&copy.sourceMorphPolicies(destination).empty());
         r.request(nestedTargets[0],1000,0,true); r.update(10); assert(r.morphingInPlace());
-        assert(!r.setMorphPolicy("Float","linear"));
+        assert(!r.setMorphPolicy("Float","linear")&&!r.setSourceMorphPolicy(destination,"Float","linear")&&!r.clearSourceMorphPolicy(destination,"Float"));
         auto& extra=static_cast<ofxOceanodeNodeMacro&>(original->container->getDynamicNodes().at("Macro").at(2)->getNodeModel());
         auto& clock=static_cast<phasor&>(extra.getContainer()->getDynamicNodes().at("Phasor").at(1)->getNodeModel()); clock.getBasePhasor()->setPhasor({.75f});
         r.update(510); near(probe(original).x,2); // Switch leaves the origin fixed value until its configured threshold.
@@ -690,12 +707,17 @@ int main(int argc,char** argv) {
         auto* context=ImGui::CreateContext(); auto& io=ImGui::GetIO(); io.IniFilename=nullptr; io.DisplaySize={1200,2400}; io.DeltaTime=1.f/60;
         unsigned char* pixels; int w,h; io.Fonts->GetTexDataAsRGBA32(&pixels,&w,&h);
         ImGui::NewFrame(); ImGui::SetNextWindowSize({1100,2300}); ImGui::Begin("MacroMixer Source details");
-        for(auto& source:m.mixerRuntime()->macros()) { ImGui::PushID(source->id().c_str()); ImGui::GetStateStorage()->SetInt(ImGui::GetID("Source"),1); ImGui::PopID(); }
+        for(auto& source:m.mixerRuntime()->macros()) {
+            ImGui::PushID(source->id().c_str()); ImGui::GetStateStorage()->SetInt(ImGui::GetID("Source"),1);
+            ImGui::PushID("Source"); for(const char* tree:{"Morph details","##policies"}) ImGui::GetStateStorage()->SetInt(ImGui::GetID(tree),1);
+            ImGui::PopID(); ImGui::PopID();
+        }
         const auto log=scratch+"/source-ui.txt"; ImGui::LogToFile(5,log.c_str());
         m.getInspectorParameter<std::function<void()>>("Macros").get()(); ImGui::LogFinish();
         ImGui::End(); ImGui::Render(); ImGui::DestroyContext(context);
         const auto text=ofBufferFromFile(log).getText();
-        assert(text.find("Connection mix")!=std::string::npos&&text.find("Policy for changed Float connections")!=std::string::npos);
+        assert(text.find("Connection mix")!=std::string::npos&&text.find("Morph policies into this source")!=std::string::npos);
+        assert(text.find("Mixer default (Linear)")!=std::string::npos&&text.find("State: Checked")!=std::string::npos);
         assert(text.find("Graph fallback")!=std::string::npos&&text.find("Configuration")!=std::string::npos);
         parent.clearContainer();
     }

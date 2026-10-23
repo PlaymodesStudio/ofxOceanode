@@ -56,8 +56,8 @@ A kept-out node is identified by its canonical folder and saved node key
 (including nested and global Macros and live-morph additions) skip the node and
 every cable to or from it. The source folder is not modified. The choices are
 saved in `MacroMixerState` as `keptOutNodes`; older states have none and ask
-again. **Macros > Kept out of graph** lists them; **Restore** includes a node
-again from the next activation, and you are asked about it again while it still
+again. Each source's **Source > Kept out** lists its kept-out nodes, including
+those in nested Macros; **Restore** includes a node again from the next activation, and you are asked about it again while it still
 blocks the mix. The dialog is drawn by `ofxOceanode` with the other
 application-level dialogs and waits for any other open popup to close first.
 
@@ -97,18 +97,34 @@ Switch, Screen, Add, Multiply, Difference, Wipe, Noise Dissolve and FadeOut.
 Rendering runs only during draw. Internal processing follows native frame order;
 a downstream draw-driven node can observe the mixed image on the following frame.
 
-Expand **Macros > Source** for a read-only preview from the running graph into
-that source. It lists added/removed nodes, the receiving node/parameter and both
-endpoints of every changed connection, the selected policy, and any reason for
-whole-graph fallback. The last requested transition's details remain visible after
-completion, including mixes skipped because another incompatibility forced fallback.
+Each source has a header bar in the node color (stronger while it runs) with
+its badges. **Macros > Source** has the same layout for every source. Paths
+start at the data folder; hover for the full path.
+
+- The source folder.
+- **State**: *Checked* (read since it was added or refreshed), *Not checked yet*
+  (restored from a preset or clipboard; Refresh or Transition reads it) or
+  *Missing*.
+- **Kept out**: the source's kept-out nodes, each with **Restore** (only when there are any).
+- **Morph details** (Morph macros on): the morph from the running graph into this
+  source, as a *preview* or the *last transition* once one was requested. It lists
+  added/removed nodes, the receiving node/parameter and both endpoints of every
+  changed connection with its policy, and every fallback reason, including mixes
+  skipped because another incompatibility forced fallback.
+- **Morph policies into this source**, described below.
+
 Previewing does not construct nodes or alter the running graph. Refresh rereads
 edited source files.
 
-Source details provide a **Policy for changed [type] connections** selector and
-the same option controls as the Routers section. These choices apply per signal
-type throughout this MacroMixer, independently of its output-router policies;
-they are saved with the mixer, and edits affect the next transition. Float,
+Changed connections blend with a policy per signal type, with the same option
+controls as the Routers section. **Macros > Morph policies (mixer default)** sets
+the default for every source. Each source's **Morph policies into this source**
+can override it per type for transitions *into* that source; *Mixer default*
+returns a type to the default. A transition A → B uses B's policies, so every
+transition into B behaves the same and B → A uses A's. Without a configured
+policy, textures use Crossfade and Boolean/dropdown controls Switch. These
+policies are independent of the output-router policies, are saved with the
+mixer, and edits affect the next transition. Float,
 Integer, their vector types, Boolean, Texture and registered value types with a
 mixing definition reuse the existing policy implementations. Strings/colors without a registered adapter
 retain native control interpolation. Changed **ScBus** connections use private
@@ -234,8 +250,9 @@ invalid or incompatible files leave the current list intact.
 
 Save/clipboard stores `MacroMixerState` version 1: router definitions, policies,
 inputs, ordered Macro source references, selection, destination and optional
-`morphPolicies` settings per connection type. Older v1 states default to the type's
-usual policy (Texture Crossfade). Reload creates
+`morphPolicies` settings per connection type, both mixer-wide and on each Macro
+entry. Older v1 states default to the type's usual policy (Texture Crossfade) and
+have no per-source policies. Reload creates
 ports before external cables and starts a fresh native destination instance.
 Resource input addresses are never saved; reconnect them after reload.
 Save during a fade restores its destination. Each activation reads the source
@@ -288,8 +305,9 @@ branches listed in `macro-mixer-migration-audit.md`.
   connected live outputs, native destruction, cancellation, failed preparation,
   alias collisions and repeated transitions. Different live sources driving an
   unsaved numeric sink are also covered. Source previews, retained fallback
-  details, shared registry policy selection/options, rejected edits during fades,
-  transactional policy validation and old/new preset persistence are checked.
+  details, shared registry policy selection/options, per-source policy overrides
+  driving a transition, rejected edits during fades, transactional policy
+  validation and old/new preset persistence are checked.
 - `python3 tests/macro_mixer_fatline_regression.py`: production Fatline adapters,
   opacity, Switch, native graphs, changed internal Fatline connections using the
   registered opacity/Switch policies, persistence and Macro embedding/copying.
