@@ -278,17 +278,35 @@ int main(int argc,char** argv) {
         r.clear();out.getParameter<nodePort>("In")=nodePort();recompute(m1,s1);assert(tone.getLastSynthID(&s1)==outsideID);
     }
     {
-        // A morph that cannot reuse the running graph (here an unknown saved
-        // setting) keeps both graphs running and crossfades the ScBus output
-        // with the router policy, instead of switching to the new graph.
+        // An unknown saved setting on one SC node replaces only that node: the
+        // rest of the graph morphs in place and the old and new tones blend at
+        // the effect input through a private ScBus bridge.
         const auto configured=scratch+"/configured"; fs::copy(b,configured,fs::copy_options::recursive);
         write(configured,"SC_Mixer_Test_Tone_1.json",{{"Freq",660},{"Custom",1}});
         MacroMixerRuntime r(parent);assert(r.setContract(c)&&r.importMacro(a)&&r.importMacro(configured));
         r.request(a,0,0,true);r.update(0);out.getParameter<nodePort>("In")=bus(r);recompute(m1,s1);
         const auto* origin=r.origin();const int originLive=TestTone::live;
+        const auto details=r.sourceDetails(r.importedMacro(configured)->id());
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"&&d.location=="SC_Mixer_Test_Tone_1"&&d.message.find("(Custom)")!=std::string::npos;}));
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="mix"&&d.location=="SC_Mixer_Test_Effect_1 / In"&&d.type=="ScBus";}));
+        r.request(configured,100,0,true);r.update(10);out.getParameter<nodePort>("In")=bus(r);
+        assert(r.morphingInPlace()&&r.origin()==origin&&TestTone::live==originLive+1);
+        recompute(m1,s1);r.update(20);r.update(21);r.finish();r.update(22);
+        recompute(m1,s1);r.update(23);r.update(24);assert(!r.transitioning()&&r.origin()==origin);
+        const auto& tones=origin->container->getDynamicNodes().at("SC Mixer Test Tone");assert(tones.size()==1&&!tones.count(1));
+        r.clear();out.getParameter<nodePort>("In")=nodePort();recompute(m1,s1);
+    }
+    {
+        // A Router setting cannot be split off: both graphs keep running and
+        // the ScBus output crossfades with the router policy instead.
+        const auto configured=scratch+"/configured-router"; fs::copy(b,configured,fs::copy_options::recursive);
+        write(configured,"Router_ScBus_1.json",{{"Name","Audio"},{"Exclude_From_Snapshots",true}});
+        MacroMixerRuntime r(parent);assert(r.setContract(c)&&r.importMacro(a)&&r.importMacro(configured));
+        r.request(a,0,0,true);r.update(0);out.getParameter<nodePort>("In")=bus(r);recompute(m1,s1);
+        const auto* origin=r.origin();const int originLive=TestTone::live;
         r.request(configured,100,0,true);r.update(10);out.getParameter<nodePort>("In")=bus(r);
         assert(r.morphFallback()&&r.origin()==origin&&r.destination()!=origin&&TestTone::live>originLive);
-        assert(r.status().find("saved configuration differs (Custom)")!=std::string::npos);
+        assert(r.status().find("saved configuration differs (Exclude_From_Snapshots)")!=std::string::npos);
         recompute(m1,s1);r.update(20);assert(r.progress()==0); // Timing starts once the server acknowledged the routing.
         r.update(70);int id=bridgeID(s1);assert(id>0);
         near(s1.synths.at(id).controls.at("gainA"),.5);near(s1.synths.at(id).controls.at("gainB"),.5);

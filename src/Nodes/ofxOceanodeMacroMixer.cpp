@@ -743,6 +743,7 @@ void ofxOceanodeMacroMixer::drawSource(const MacroMixerRevision& macro, bool fad
             }
             const auto kind = detail.kind == "fallback" ? "Graph fallback" : detail.kind == "mix" ? "Connection mix"
                 : detail.kind == "added" ? "Added node" : detail.kind == "removed" ? "Removed node"
+                : detail.kind == "replaced" ? "Replaced node"
                 : detail.kind == "skipped" ? "Skipped connection mix" : "Live graph";
             ImGui::Spacing();
             ImGui::TextWrapped("%s: %s", kind, detail.location.c_str());

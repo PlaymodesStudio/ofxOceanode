@@ -94,8 +94,10 @@ int main(int argc,char** argv) {
         ofxOceanodeContainer c(registry,types,transport); c.setCanvasID("MorphSource");
         auto& out=floating(c); out.getParameter<std::string>("Name")="Value";
         auto& input=floating(c,2); input.getParameter<std::string>("Name")="Input"; input.getParameter<float>("Value")=target?42:11;
+        // Router bounds define the Macro interface and cannot be split off,
+        // so these sources exercise the whole-graph fallback crossfade.
+        input.getParameter<float>("Max")=target?101:100;
         auto& p=static_cast<MorphProbe&>(c.createNode(std::make_unique<MorphProbe>(),1).getNodeModel());
-        p.configuration=target?1:0; // Deliberately incompatible Inspector config exercises fresh-graph fallback.
         p.x=target?6:2; p.count=target?10:0; p.mode=target?3:0; p.gate=target; p.label=target?"b":"a";
         p.floats=target?std::vector<float>{4,6}:std::vector<float>{0,2}; p.ints=target?std::vector<int>{4,6}:std::vector<int>{0,2};
         p.unequal=target?std::vector<float>{3,4}:std::vector<float>{1};
@@ -186,6 +188,7 @@ int main(int argc,char** argv) {
     // preserve that live instance and interpolate its controls.
     {
         const auto different=scratch+"/different"; fs::copy(b,different,fs::copy_options::recursive);
+        auto bounds=ofLoadJson(different+"/Router_f_2.json"); bounds["Max"]=ofLoadJson(a+"/Router_f_2.json").at("Max"); ofSaveJson(different+"/Router_f_2.json",bounds);
         auto cables=ofLoadJson(different+"/connections.json"); cables.erase("Morph_Probe_1");
         cables["Morph_Probe_3"]["Output"]["Router_f_1"]["Value"]=true; ofSaveJson(different+"/connections.json",cables);
         MacroMixerRuntime runtime(parent); assert(runtime.importMacro(a)&&runtime.importMacro(different));
@@ -280,10 +283,20 @@ int main(int argc,char** argv) {
         r.finish(); r.update(520); assert(r.origin()==original&&!r.destination()&&r.currentID()==bID&&!r.morphingInPlace()); near(level,6); near(r.value(),36); assert(history->getSize()==5);
         r.request(liveA,1000,0,true); r.update(530); assert(r.morphingInPlace()&&r.origin()==original&&morphSetups==setups+1); // Only the explicit copy constructed a probe.
         r.finish(); r.update(540); near(level,2); near(r.value(),4); assert(history->getSize()==6);
-        // Inspector/unknown native configuration changes require normal native loading.
+        // An Inspector/unknown native configuration change replaces only that
+        // node: it is loaded natively next to the retiring one, while the rest
+        // of the graph (including the Buffer feeding it) keeps morphing in place.
         const auto changed=scratch+"/changed-config"; fs::copy(liveB,changed,fs::copy_options::recursive);
         auto json=ofLoadJson(changed+"/Macro_1/HeaderPro_f_1.json"); json["Calculate_On_Update"]="0"; ofSaveJson(changed+"/Macro_1/HeaderPro_f_1.json",json);
-        assert(r.importMacro(changed)); r.request(changed,1000,0,true); r.update(550); assert(r.morphing()&&!r.morphingInPlace()&&r.destination()!=original);
+        assert(r.importMacro(changed)); const auto changedID=r.importedMacro(changed)->id();
+        const auto details=r.sourceDetails(changedID);
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"&&d.location=="Macro 1 / HeaderPro_f_1"&&d.message.find("Calculate_On_Update")!=std::string::npos;}));
+        assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback"||d.kind=="added"||d.kind=="removed";}));
+        r.request(changed,1000,0,true); r.update(550); assert(r.morphingInPlace()&&r.origin()==original&&r.destination()==original);
+        assert(child->getDynamicNodes().at("HeaderPro f").size()==2&&child->getDynamicNodes().at("Buffer f").size()==1);
+        r.finish(); r.update(560); assert(!r.transitioning()&&r.origin()==original&&r.currentID()==changedID);
+        const auto& headers=child->getDynamicNodes().at("HeaderPro f"); assert(headers.size()==1&&!headers.count(1));
+        assert(child->getDynamicNodes().at("Buffer f").at(1)->getNodeModel().getParameter<buffer<float>*>("Output").get()==history);
     }
     // Added/removed live modulation: Phasor -> Oscillator -> Ranger -> Macro
     // input. Both directions retain the common nested Buffer and clock. The
@@ -428,13 +441,13 @@ int main(int argc,char** argv) {
         assert(copiedChild->getDynamicNodes().at("Buffer f").count(21));
         r.request(liveA,1000,0,true); r.update(530); assert(r.morphingInPlace()&&r.destination()==original); r.finish(); r.update(540); near(p.x,2);
         r.request(renamed,1000,0,true); r.update(550); assert(r.morphingInPlace()); r.finish(); r.update(560);
-        // Configuration changes still need native loading. Role-based capture
+        // Router configuration changes still need native loading. Role-based capture
         // also maps current values into the renamed destination's native IDs.
         const auto incompatible=scratch+"/renamed-config"; fs::copy(renamed,incompatible,fs::copy_options::recursive);
-        auto settings=ofLoadJson(incompatible+"/Morph_Probe_11.json"); settings["Configuration"]="1"; ofSaveJson(incompatible+"/Morph_Probe_11.json",settings);
+        auto settings=ofLoadJson(incompatible+"/Router_f_11.json"); settings["Max"]="101"; ofSaveJson(incompatible+"/Router_f_11.json",settings);
         assert(r.importMacro(incompatible)); r.request(liveA,0,0,true); r.update(570); near(p.x,2);
         r.request(incompatible,1000,0,true); r.update(580); assert(!r.morphingInPlace()&&r.morphing());
-        near(probe(r.destination(),11).x,2); assert(r.status().find("Configuration")!=std::string::npos);
+        near(probe(r.destination(),11).x,2); assert(r.status().find("saved configuration differs (Max)")!=std::string::npos);
         r.update(1080); near(probe(r.destination(),11).x,4);
     }
     // A graph can reuse existing IDs for different roles. Match the two probe
@@ -678,14 +691,29 @@ int main(int argc,char** argv) {
         assert(std::any_of(r.sourceDetails(destination).begin(),r.sourceDetails(destination).end(),[](const auto& d){return d.kind=="mix"&&d.policy=="switch";}));
         assert(r.setMorphPolicy("Float","linear")); assert(r.hasTransitionDetails(destination));
         assert(std::any_of(r.sourceDetails(destination).begin(),r.sourceDetails(destination).end(),[](const auto& d){return d.kind=="mix"&&d.policy=="switch";}));
+        // A probe Configuration change replaces only that probe. Its inputs
+        // reach the new instance and its output blends into the Value router.
         const auto changed=scratch+"/policy-config"; fs::copy(nestedTargets[0],changed,fs::copy_options::recursive);
         auto config=ofLoadJson(changed+"/Morph_Probe_1.json"); config["Configuration"]=1; ofSaveJson(changed+"/Morph_Probe_1.json",config);
-        assert(r.importMacro(changed)); const auto failing=r.importedMacro(changed)->id();
+        assert(r.importMacro(changed)); const auto replacing=r.importedMacro(changed)->id();
+        details=r.sourceDetails(replacing);
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"&&d.location=="Morph_Probe_1"&&d.message.find("Configuration")!=std::string::npos;}));
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="mix"&&d.location=="Router_f_1 / Value"&&d.type=="Float";}));
+        assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback";}));
+        r.request(changed,1000,0,true); r.update(1100); assert(r.morphingInPlace()&&r.origin()==original);
+        assert(original->container->getDynamicNodes().at("Morph Probe").size()==2);
+        r.finish(); r.update(1110); r.update(1111); assert(!r.transitioning()&&r.origin()==original&&r.currentID()==replacing);
+        const auto& probes=original->container->getDynamicNodes().at("Morph Probe"); assert(probes.size()==1&&!probes.count(1));
+        assert(static_cast<MorphProbe&>(probes.begin()->second->getNodeModel()).configuration==1);
+        // A Router configuration change cannot be split off: whole-graph fallback.
+        const auto routerChanged=scratch+"/policy-router"; fs::copy(nestedTargets[0],routerChanged,fs::copy_options::recursive);
+        auto bounds=ofLoadJson(routerChanged+"/Router_f_1.json"); bounds["Max"]="101"; ofSaveJson(routerChanged+"/Router_f_1.json",bounds);
+        assert(r.importMacro(routerChanged)); const auto failing=r.importedMacro(routerChanged)->id();
         details=r.sourceDetails(failing);
-        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback"&&d.message.find("Configuration")!=std::string::npos;}));
-        r.request(changed,1000,0,true); r.update(1100); assert(r.morphing()&&!r.morphingInPlace());
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback"&&d.message.find("(Max)")!=std::string::npos;}));
+        r.request(routerChanged,1000,0,true); r.update(1200); assert(r.morphing()&&!r.morphingInPlace());
         details=r.sourceDetails(failing);
-        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback"&&d.message.find("Morph_Probe_1")!=std::string::npos;}));
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback"&&d.message.find("Router_f_1")!=std::string::npos;}));
     }
     // Inspector flag persists through presets/clipboard and old sessions default to off.
     {
@@ -710,6 +738,7 @@ int main(int argc,char** argv) {
         auto& node=parent.createNode(std::make_unique<ofxOceanodeMacroMixer>(),1);
         auto& m=static_cast<ofxOceanodeMacroMixer&>(node.getNodeModel());
         assert(m.setRouterContract({})&&m.importMacroFolder(plainNested)&&m.importMacroFolder(nestedTargets[0])&&m.importMacroFolder(scratch+"/policy-config"));
+        assert(m.importMacroFolder(scratch+"/policy-router"));
         m.getInspectorParameter<bool>("Morph macros")=true; m.getParameter<float>("Duration Ms")=0;
         m.getParameter<void>("Transition").trigger(); parent.update();
         auto* context=ImGui::CreateContext(); auto& io=ImGui::GetIO(); io.IniFilename=nullptr; io.DisplaySize={1200,2400}; io.DeltaTime=1.f/60;
@@ -726,7 +755,8 @@ int main(int argc,char** argv) {
         const auto text=ofBufferFromFile(log).getText();
         assert(text.find("Connection mix")!=std::string::npos&&text.find("Morph policies into this source")!=std::string::npos);
         assert(text.find("Mixer default (Linear)")!=std::string::npos&&text.find("State: Checked")!=std::string::npos);
-        assert(text.find("Graph fallback")!=std::string::npos&&text.find("Configuration")!=std::string::npos);
+        assert(text.find("Replaced node")!=std::string::npos&&text.find("Configuration")!=std::string::npos);
+        assert(text.find("Graph fallback")!=std::string::npos&&text.find("(Max)")!=std::string::npos);
         parent.clearContainer();
     }
     assert(triggers==0 && liveGui==0);

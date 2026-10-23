@@ -568,10 +568,29 @@ MorphMatches matchMorphNodes(const ofJson& original, const ofJson& target) {
     return matches;
 }
 
-ofJson alignMorphDefinition(const ofJson& original, const ofJson& target, size_t depth=0) {
+// A matched node whose saved configuration cannot morph. Only that node is
+// replaced: the running instance retires and the saved one is added, so the
+// rest of the graph still morphs in place.
+struct MorphNodeMismatch : std::runtime_error {
+    MorphPath prefix; std::string key, reason;
+    MorphNodeMismatch(const std::string& location,const std::string& reason,MorphPath prefix,std::string key)
+        : std::runtime_error(location+": "+reason),prefix(std::move(prefix)),key(std::move(key)),reason(reason) {}
+};
+struct MorphSplit { std::string reason, replacement; };
+using MorphSplits = std::map<std::pair<MorphPath,std::string>,MorphSplit>; // (container path, running key)
+
+ofJson alignMorphDefinition(const ofJson& original, const ofJson& target, size_t depth=0,
+                            MorphSplits* splits=nullptr, const MorphPath& prefix={}) {
     if(depth>=64) throw std::runtime_error("Macro matching nesting limit");
     auto matches=matchMorphNodes(original,target);
     const auto& before=original.at("nodes"); const auto& after=target.at("nodes");
+    // Split nodes keep their role in matching above, so their neighbours still
+    // pair up; only the pair itself becomes a removal and an addition.
+    std::map<std::string,std::string> replaced; // target key -> running key
+    if(splits) for(auto it=matches.begin();it!=matches.end();) {
+        if(!splits->count({prefix,it->second})) { ++it; continue; }
+        replaced.emplace(it->first,it->second); it=matches.erase(it);
+    }
     std::set<std::string> occupied;
     for(auto it=before.begin();it!=before.end();++it) occupied.insert(it.key());
     for(const auto& match:matches) occupied.insert(match.second);
@@ -586,12 +605,16 @@ ofJson alignMorphDefinition(const ofJson& original, const ofJson& target, size_t
         }
         occupied.insert(key); matches.emplace(it.key(),key);
     }
+    for(const auto& node:replaced) splits->at({prefix,node.second}).replacement=matches.at(node.first);
     auto result=target; result["nodes"]=ofJson::object(); result["connections"]=ofJson::object();
     for(auto it=after.begin();it!=after.end();++it) {
         const auto& key=matches.at(it.key()); auto entry=it.value();
         entry["id"]=std::stoi(key.substr(key.rfind('_')+1));
-        if(before.contains(key) && before.at(key).contains("graph") && entry.contains("graph"))
-            entry["graph"]=alignMorphDefinition(before.at(key).at("graph"),entry.at("graph"),depth+1);
+        if(before.contains(key) && before.at(key).contains("graph") && entry.contains("graph")) {
+            auto path=prefix; path.push_back(before.at(key).at("model").get<std::string>());
+            path.push_back(std::to_string(before.at(key).at("id").get<int>()));
+            entry["graph"]=alignMorphDefinition(before.at(key).at("graph"),entry.at("graph"),depth+1,splits,path);
+        }
         result["nodes"][key]=std::move(entry);
     }
     const auto& cables=target.at("connections");
@@ -701,8 +724,13 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
             std::set<std::string> fields;
             for(auto it=oldConfig.begin();it!=oldConfig.end();++it) fields.insert(it.key());
             for(auto it=newConfig.begin();it!=newConfig.end();++it) fields.insert(it.key());
-            for(const auto& field:fields) if(!oldConfig.contains(field) || !newConfig.contains(field) || oldConfig.at(field)!=newConfig.at(field))
-                throw std::runtime_error(morphLocation(prefix,key)+": saved configuration differs ("+field+")");
+            for(const auto& field:fields) if(!oldConfig.contains(field) || !newConfig.contains(field) || oldConfig.at(field)!=newConfig.at(field)) {
+                const auto reason="saved configuration differs ("+field+")";
+                // Routers and Portals publish interfaces and shared services;
+                // they cannot run twice, so the whole graph falls back.
+                if(morphStageable(a)) throw MorphNodeMismatch(morphLocation(prefix,key),reason,prefix,key);
+                throw std::runtime_error(morphLocation(prefix,key)+": "+reason);
+            }
         }
         if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model)) {
             if(!a.contains("graph") || !b.contains("graph") || !macro->getContainer()) return false;
@@ -728,6 +756,23 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
         }
     }
     return true;
+}
+// Aligns the target with the running graph and reads its controls. Each node
+// whose configuration cannot morph is split off and the reading repeated.
+ofJson readSplitMorphTarget(const MacroMixerSource::Graph& graph,const ofJson& original,const ofJson& target,
+                            MacroMixerSource::MorphSnapshot& values,std::vector<MorphContainerEdit>& edits,MorphSplits& splits) {
+    for(;;) {
+        auto aligned=alignMorphDefinition(original,target,0,&splits);
+        values.clear(); edits.clear();
+        try {
+            if(!readMorphTarget(graph,*graph.container,*graph.macro,original,aligned,nullptr,{},values,edits))
+                throw std::runtime_error("Incompatible live graph or saved configuration");
+            return aligned;
+        } catch(const MorphNodeMismatch& mismatch) {
+            // Each node is split once; a repeat means the split did not apply.
+            if(!splits.emplace(std::make_pair(mismatch.prefix,mismatch.key),MorphSplit{mismatch.reason,""}).second) throw;
+        }
+    }
 }
 }
 
@@ -1141,9 +1186,8 @@ bool MacroMixerSource::Graph::prepareMorphInPlace(Revision target,const MacroMix
     try {
         if(!target) throw std::runtime_error("No target Macro definition");
         const auto& original=liveMorphDefinition.is_null() ? revision->sourceDefinition() : liveMorphDefinition;
-        topology->targetDefinition=alignMorphDefinition(original,target->sourceDefinition());
-        if(!readMorphTarget(*this,*container,*macro,original,topology->targetDefinition,nullptr,{},destination,topology->edits))
-            throw std::runtime_error("Incompatible live graph or saved configuration");
+        MorphSplits splits;
+        topology->targetDefinition=readSplitMorphTarget(*this,original,target->sourceDefinition(),destination,topology->edits,splits);
         topology->prepare(*host,policies);
     } catch(const std::exception& e) { morphFallbackReason=e.what(); return false; } // Staged edits roll back before fallback.
     const auto start=captureMorphValues();
@@ -1168,12 +1212,18 @@ std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revisio
     try {
         if(!target) throw std::runtime_error("No target Macro definition");
         const auto& original=liveMorphDefinition.is_null() ? revision->sourceDefinition() : liveMorphDefinition;
-        const auto aligned=alignMorphDefinition(original,target->sourceDefinition());
-        MorphSnapshot values; std::vector<MorphContainerEdit> edits;
-        if(!readMorphTarget(*this,*container,*macro,original,aligned,nullptr,{},values,edits)) throw std::runtime_error("Incompatible live graph or saved configuration");
+        MorphSnapshot values; std::vector<MorphContainerEdit> edits; MorphSplits splits;
+        readSplitMorphTarget(*this,original,target->sourceDefinition(),values,edits,splits);
         for(const auto& edit:edits) {
-            for(const auto& key:edit.added) result.push_back({"added",morphLocation(edit.path,key),"Starts when the morph begins"});
-            for(const auto& key:edit.removed) result.push_back({"removed",morphLocation(edit.path,key),"Runs until the morph completes"});
+            std::set<std::string> replacements;
+            for(const auto& split:splits) if(split.first.first==edit.path) replacements.insert(split.second.replacement);
+            for(const auto& key:edit.added) if(!replacements.count(key)) result.push_back({"added",morphLocation(edit.path,key),"Starts when the morph begins"});
+            for(const auto& key:edit.removed) {
+                const auto split=splits.find({edit.path,key});
+                if(split==splits.end()) result.push_back({"removed",morphLocation(edit.path,key),"Runs until the morph completes"});
+                else result.push_back({"replaced",morphLocation(edit.path,key),"The "+split->second.reason+", so it cannot morph. "
+                    "The running node retires at completion, the saved one starts now and their connections blend."});
+            }
             std::map<std::pair<std::string,std::string>,std::vector<std::string>> before,after;
             for(const auto& edge:savedEdges(edit.original.at("connections"))) before[{edge[2],edge[3]}]=edge;
             for(const auto& edge:savedEdges(edit.target.at("connections"))) after[{edge[2],edge[3]}]=edge;

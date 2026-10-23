@@ -108,7 +108,7 @@ start at the data folder; hover for the full path.
 - **Kept out**: the source's kept-out nodes, each with **Restore** (only when there are any).
 - **Morph details** (Morph macros on): the morph from the running graph into this
   source, as a *preview* or the *last transition* once one was requested. It lists
-  added/removed nodes, the receiving node/parameter and both endpoints of every
+  added/removed/replaced nodes, the receiving node/parameter and both endpoints of every
   changed connection with its policy, and every fallback reason, including mixes
   skipped because another incompatibility forced fallback.
 - **Morph policies into this source**, described below.
@@ -144,6 +144,17 @@ other node do. Empty nested Macros saved by the native saver are also accepted.
 Existing native update order still applies: a node that calculates during update
 can observe an upstream node's value on the following frame.
 
+A node whose saved configuration cannot morph (changed Inspector settings,
+Macro lifecycle/reference settings or unknown custom-save data, such as a
+SuperCollider node's own sound block) is replaced on its own. The running
+instance keeps going and retires at completion; the saved one is loaded
+natively next to it with its incoming cables, and every cable leaving it
+blends where it arrives with the source's **Morph policies into this source**
+for that type (a ScBus cable through a private SC bridge). The rest of the
+graph keeps morphing in place. Morph details lists it as **Replaced node**
+with the differing setting. If a blend is impossible (for example a cable
+into a trigger or Portal), the whole graph falls back as described next.
+
 When the running graph cannot be reused, the morph falls back to a crossfade.
 A fresh destination Macro is loaded next to the running one and both keep
 running. The destination's matching controls start at the captured current
@@ -154,8 +165,8 @@ by opacity, ScBus outputs mix through the private SC bridge, textures use their
 texture policy. Status shows the specific reason and Mixer Status shows
 `Xfade`. The current implementation falls back for:
 
-- Changed Inspector settings, Macro lifecycle/reference settings, router
-  names/bounds or unknown custom-save configuration requiring native recall.
+- Changed Router or Portal settings (names, bounds, Inspector settings). These
+  publish the Macro interface or a shared service and cannot run twice.
 - Unmatched Router/Portal additions or removals in an existing container. These
   require reconciliation of the existing published interface or shared service;
   routers inside a whole newly added Macro load through its native lifecycle.
@@ -329,7 +340,9 @@ branches listed in `macro-mixer-migration-audit.md`.
   covers renamed IDs across nested Macro/Router/Buffer/Header nodes, swapped
   same-type roles, repeated clock-role changes, unsaved Phase continuity,
   save/restore and fallback value capture across renamed paths. Fallbacks keep
-  the origin running and crossfade outputs with the router policy. Whole local,
+  the origin running and crossfade outputs with the router policy. A changed
+  node configuration replaces only that node (nested HeaderPro, a probe with
+  blended output) while Router changes still fall back. Whole local,
   global and empty nested Macro additions/removals cover incoming controls,
   connected live outputs, native destruction, cancellation, failed preparation,
   alias collisions and repeated transitions. Different live sources driving an
@@ -357,9 +370,10 @@ branches listed in `macro-mixer-migration-audit.md`.
   internal ScBus routing with all four policies, silence endpoints, stable common
   synths/buses, SynthDef and routing readiness, allocation rollback, cancellation,
   stale acknowledgements, two-server retirement, offline-capture cleanup,
-  return to ordinary output mixing and the fallback crossfade of a morph that
-  cannot reuse the running graph. It needs the SuperCollider addon's
-  `Experimental_MacroMixer` branch.
+  return to ordinary output mixing, replacing a single SC node whose saved
+  settings differ, and the fallback crossfade of a morph that cannot reuse the
+  running graph. It needs a SuperCollider addon with the MacroMixer routing
+  fences (`serverManager::requestMixerRouting`).
 - `python3 tests/macro_mixer_sc_audio_regression.py`: actual offline SuperCollider
   render of the renamed SynthDefs, without opening an audio device.
 
