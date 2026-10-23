@@ -601,20 +601,11 @@ void ofxOceanodeNodeMacro::renderMacroSaveDialog() {
 					const string oldName = localName.get();
 					macroDescription = description;
 					if(!toLibrary) localName = name;
-					if(!(toLibrary ? saveLibraryDefinition(path) : saveLocalDefinition())){
+					if(!(toLibrary ? saveGlobalDefinitionAs(path) : saveLocalDefinition())){
 						macroDescription = oldDescription;
 						localName = oldName;
 						guiState.saveError = "Could not save Macro contents.";
 						return;
-					}
-					if(toLibrary){
-						presetManager.setLocal(false);
-						presetManager.setCurrentMacroPath(path);
-						ofxOceanodeShared::updateMacrosStructure();
-						presetManager.updateCategoryFromPath(path);
-						markMacroReferenceUserEdited();
-						ofxOceanodeShared::snapshotUpdated(path);
-						ofxOceanodeShared::macroUpdated(path);
 					}
 					guiState.closeSavePopup = true;
 				};

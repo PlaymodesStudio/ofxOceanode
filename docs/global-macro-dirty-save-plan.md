@@ -171,7 +171,7 @@ Used at: Canvas > Local Wrapper [Macro 3] > Image_Treatment [Macro 7]
   Embedded local macro: Mask [Macro 2]
     Gate [Node 1] > Enabled               false -> true
 
-              Save this macro   Skip this macro   Cancel preset save
+  Save this macro   Save as new macro...   Skip this macro   Cancel preset save
 ```
 
 **Agreed decision:** the user reviews **each change**, then explicitly
@@ -180,6 +180,21 @@ confirmation covers every listed change for that macro. Change rows are
 informational; they do not have individual Save/Skip controls. The current
 macro save operation writes a complete definition, so the UI must not imply
 that a single parameter can be saved independently.
+
+**Save as new macro...** opens a name field and a library folder tree,
+starting next to the original with a free suggested name such as `Blur_2`.
+The name must be new: Save As never overwrites an existing macro or folder.
+Confirming it writes the reviewed instance's contents to the new folder and
+points that instance at it, as the Macro node's own Save As does. The
+original folder and the other instances of the original macro are left
+alone. Like the other choices, nothing is written until every macro has been
+decided.
+
+Save As writes run before the ordinary macro saves. If the instance sits
+inside another global macro, its new reference is an edit of that enclosing
+macro, so the review restarts with the updated changes and the user decides
+again whether to save it. Macros already saved as new are listed in the
+result, including when the save is later cancelled or fails.
 
 ### Flow and exceptional cases
 

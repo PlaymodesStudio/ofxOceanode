@@ -164,6 +164,9 @@ public:
 	string getLocalMacroName() const { return localName.get(); }
 	string getMacroDescription() const { return macroDescription.get(); }
 	bool saveGlobalDefinition(bool notifyOtherInstances = true);
+	// Writes the current contents to a new library folder and makes this
+	// instance use it. Other instances keep the Macro they had.
+	bool saveGlobalDefinitionAs(const string& path, bool notifyOtherInstances = true);
 
 	bool isActive() const {
 		return active.get();

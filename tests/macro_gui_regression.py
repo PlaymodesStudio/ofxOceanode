@@ -114,6 +114,14 @@ int main(int argc, char** argv) {
     assert(macro.saveGlobalDefinition());
     assert(instance.snapshotSystem.hasSnapshot(0));
     assert(value(instance) == .7f && instance.getMacroDescription() == "Updated library description");
+    // Preset-review Save As moves only this instance to the new definition.
+    assert(instance.saveGlobalDefinitionAs("Macros/SavedAs/A_2", false));
+    assert(!instance.isLocal() && instance.getCurrentMacroPath() == "Macros/SavedAs/A_2");
+    assert(instance.getCurrentMacroName() == "A_2" && instance.getCurrentMacroCategory() == std::deque<string>{"SavedAs"});
+    assert(instance.wasMacroReferenceUserEdited() && !instance.sharesGlobalMacroWith(macro));
+    assert(fs::exists("Macros/SavedAs/A_2/modules.json") && macro.getCurrentMacroPath() == "Macros/Folder/A");
+    instance.presetManager.setNextPresetPath("Macros/Folder/A"); instance.update(event);
+    fs::remove_all("Macros/SavedAs"); ofxOceanodeShared::updateMacrosStructure();
     // Save As writes the full definition without prematurely changing identity.
     assert(copy.saveLibraryDefinition("Macros/NewDefinition"));
     assert(copy.isLocal());

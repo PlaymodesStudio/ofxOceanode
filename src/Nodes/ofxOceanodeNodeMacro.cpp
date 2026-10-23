@@ -861,6 +861,18 @@ bool ofxOceanodeNodeMacro::saveGlobalDefinition(bool notifyOtherInstances){
 	return true;
 }
 
+bool ofxOceanodeNodeMacro::saveGlobalDefinitionAs(const string& path, bool notifyOtherInstances){
+	if(!saveLibraryDefinition(path)) return false;
+	presetManager.setLocal(false);
+	presetManager.setCurrentMacroPath(path);
+	ofxOceanodeShared::updateMacrosStructure();
+	presetManager.updateCategoryFromPath(path);
+	markMacroReferenceUserEdited();
+	ofxOceanodeShared::snapshotUpdated(path);
+	if(notifyOtherInstances) ofxOceanodeShared::macroUpdated(path);
+	return true;
+}
+
 bool ofxOceanodeNodeMacro::saveLocalDefinition(){
 	if(!presetManager.isLocal() || isLoadingPreset || !presetManager.getNextPresetPath().empty()) return false;
 	// Save just this node and its embedded graph, including Inspector metadata.
