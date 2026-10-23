@@ -144,9 +144,15 @@ other node do. Empty nested Macros saved by the native saver are also accepted.
 Existing native update order still applies: a node that calculates during update
 can observe an upstream node's value on the following frame.
 
-The destination-graph fallback loads a fresh Macro, starts matching controls at
-captured current values, and runs that graph throughout the transition. Status
-shows the specific reason. The current implementation falls back for:
+When the running graph cannot be reused, the morph falls back to a crossfade.
+A fresh destination Macro is loaded next to the running one and both keep
+running. The destination's matching controls start at the captured current
+values and morph to their saved values, while every selected Output router
+crossfades from the running graph to the destination with its own **Mix
+policy** (the Routers table), over the same Duration and Bi Pow. Fatlines fade
+by opacity, ScBus outputs mix through the private SC bridge, textures use their
+texture policy. Status shows the specific reason and Mixer Status shows
+`Xfade`. The current implementation falls back for:
 
 - Changed Inspector settings, Macro lifecycle/reference settings, router
   names/bounds or unknown custom-save configuration requiring native recall.
@@ -164,10 +170,13 @@ shows the specific reason. The current implementation falls back for:
   compatibility data, or an unsuccessful staged node/cable preparation.
 
 Changing a node's saved ID alone does not cause fallback. The fallback's
-buffers and clocks are fresh, and destination wiring takes effect immediately;
-this path cannot preserve the continuity of a snapshot on one graph.
+buffers and clocks are fresh and destination wiring applies inside the new
+graph from its first frame; the output crossfade hides that start instead of
+preserving the continuity of a snapshot on one graph. Running two graphs costs
+what ordinary mixing costs, including shared Portal state.
 
-Selected router outputs pass through without output interpolation. Textures get
+While a graph morphs in place, selected router outputs pass through without
+output interpolation. Textures get
 a private identity copy so no borrowed texture becomes invalid between update
 and draw. Resource processors such as the SC audio bridge remain identity
 adapters to preserve graph leases and backend readiness. Matching live graphs
@@ -200,13 +209,10 @@ vectors with different lengths switch at halfway through the eased progress.
 Non-finite controls are skipped. Unmatched destination controls retain their own
 values. Changed cable blending supports these same control types, with native
 scalar/vector conversions; registered types use their selected connection policy.
-Triggers and unsupported resource signals require the fallback.
-For that fallback, source-only nodes do not participate in destination execution
-and destination wiring takes effect immediately.
+Triggers and unsupported resource signals require the fallback crossfade.
 
-For the destination-graph fallback, the origin is retained for failure recovery
-but receives no native update/draw or ordinary clock traversal. On completion,
-the destination keeps its live state. In a compatible live graph, completion
+During the fallback crossfade the origin keeps its native update/draw and is
+released on completion; the destination keeps its live state. In a compatible live graph, completion
 reconciles temporary nodes/cables and changes its source reference; common nodes
 are never replaced. Missing/invalid sources preserve existing playback. Saving
 during a morph restores a fresh destination, as with ordinary output mixing;
@@ -261,7 +267,9 @@ for a narrow display: what runs, then how many sources passed their last check.
 | `No sources` | No Macro folders added |
 | `Idle \| 5/5 ok` | Nothing running |
 | `Run 3 Bloobs_9 \| 5/5 ok` | Source 3 is running (long names end in `~`) |
-| `Mix 3>4 62% \| 5/5 ok` / `Morph 3>4 62% \| …` | Transition from source 3 to 4 |
+| `Mix 3>4 62% \| 5/5 ok` | Ordinary transition from source 3 to 4 |
+| `Morph 3>4 62% \| …` | Morph on the running graph |
+| `Xfade 3>4 62% \| …` | Morph fell back: both graphs run and outputs crossfade |
 | `Run 3 Bloobs_9 \| 4/5 ok` | One source failed its check; see its State |
 | `Blocked, see dialog \| …` | A blocked node needs an answer |
 | `Error, see Status \| …` | The inspector Status has the details |
@@ -320,7 +328,8 @@ branches listed in `macro-mixer-migration-audit.md`.
   Portal values, calculated output flags and configuration fallback. It also
   covers renamed IDs across nested Macro/Router/Buffer/Header nodes, swapped
   same-type roles, repeated clock-role changes, unsaved Phase continuity,
-  save/restore and fallback value capture across renamed paths. Whole local,
+  save/restore and fallback value capture across renamed paths. Fallbacks keep
+  the origin running and crossfade outputs with the router policy. Whole local,
   global and empty nested Macro additions/removals cover incoming controls,
   connected live outputs, native destruction, cancellation, failed preparation,
   alias collisions and repeated transitions. Different live sources driving an
@@ -347,8 +356,10 @@ branches listed in `macro-mixer-migration-audit.md`.
   Includes control morphing, destination-only output bridge gains, changed
   internal ScBus routing with all four policies, silence endpoints, stable common
   synths/buses, SynthDef and routing readiness, allocation rollback, cancellation,
-  stale acknowledgements, two-server retirement, offline-capture cleanup and
-  return to ordinary output mixing.
+  stale acknowledgements, two-server retirement, offline-capture cleanup,
+  return to ordinary output mixing and the fallback crossfade of a morph that
+  cannot reuse the running graph. It needs the SuperCollider addon's
+  `Experimental_MacroMixer` branch.
 - `python3 tests/macro_mixer_sc_audio_regression.py`: actual offline SuperCollider
   render of the renamed SynthDefs, without opening an audio device.
 

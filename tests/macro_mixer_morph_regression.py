@@ -122,20 +122,26 @@ int main(int argc,char** argv) {
         runtime.update(1); near(runtime.value(),16);
         const auto* origin=runtime.origin(); const int originUpdates=probe(origin).updates;
         runtime.request(b,1000,0,true); runtime.update(10);
-        assert(runtime.morphing()&&runtime.morphMode()); near(runtime.value(),16); near(probe(runtime.destination()).x,4);
-        assert(probe(origin).updates==originUpdates); assert(!runtime.destination()->container->getDynamicNodes().at("Morph Probe").count(2));
+        // The Configuration change forces a second graph. Its controls still
+        // morph, the origin keeps running and outputs follow the router policy
+        // (Switch at .9 here), instead of jumping to the destination.
+        const auto destinationValue=[&] { return std::get<float>(runtime.destination()->read("value")); };
+        assert(runtime.morphing()&&runtime.morphMode()&&runtime.morphFallback()&&!runtime.outputsBypassed());
+        near(runtime.value(),16); near(probe(runtime.destination()).x,4);
+        assert(probe(origin).updates>originUpdates); assert(!runtime.destination()->container->getDynamicNodes().at("Morph Probe").count(2));
         near(probe(runtime.destination(),3).x,9); near(probe(runtime.destination()).driven,11);
-        runtime.update(260); near(runtime.value(),20.25); assert(probe(runtime.destination()).mode==0);
-        runtime.update(510); near(runtime.value(),25); // Graph evaluates 5*5, not a blend of 16 and 36.
+        runtime.update(260); near(runtime.value(),16); near(destinationValue(),20.25); assert(probe(runtime.destination()).mode==0);
+        runtime.update(510); near(runtime.value(),16); near(destinationValue(),25); // Graph evaluates 5*5, not a blend of 16 and 36.
         auto& p=probe(runtime.destination()); near(p.x,5); assert(p.count==5 && p.mode==3 && p.gate && p.label.get()=="b");
         assert(p.floats.get()==std::vector<float>({2,4}) && p.ints.get()==std::vector<int>({2,4}));
         assert(p.unequal.get()==std::vector<float>({3,4})); assert(p.color.get()==ofColor(50,70,90,110)); near(p.tint.get().r,.5);
         near(p.transientValue,17); near(p.readOnly,19); near(p.driven,26.5f);
-        runtime.draw(); near(runtime.value(),25); assert(probe(origin).draws==0 && p.draws==1);
+        runtime.draw(); near(runtime.value(),16); assert(probe(origin).draws==1 && p.draws==1);
         assert(runtime.destination()->parameter("value").getName()=="Value");
         const auto saved=runtime.saveState(); assert(saved.at("morph")==true && saved.at("playback")==runtime.destinationID());
         MacroMixerRuntime copy(parent); assert(copy.restoreState(saved)); copy.update(0); near(copy.value(),36); assert(copy.morphMode());
         auto legacy=saved; legacy.erase("morph"); assert(copy.restoreState(legacy)); copy.update(0); assert(!copy.morphMode());
+        runtime.update(960); near(runtime.value(),34.81f); assert(runtime.morphFallback()); // Past the Switch threshold.
         runtime.finish(); runtime.update(520); near(runtime.value(),36); assert(!runtime.morphing()&&!runtime.destination()&&runtime.morphMode());
         // Mode belongs to the request; a normal request queued during a morph keeps ordinary policies.
         runtime.request(a,1000,0,true); runtime.update(530); runtime.request(b,1000,0,false);
@@ -172,7 +178,8 @@ int main(int argc,char** argv) {
     {
         MacroMixerRuntime runtime(parent); assert(runtime.importMacro(a)&&runtime.importMacro(b));
         runtime.request(a,0,0,true); runtime.update(0); runtime.request(b,1000,.7f,true); runtime.update(10); runtime.update(260);
-        const float expected=2+4*MacroMixerRuntime::shape(.25f,.7f); near(probe(runtime.destination()).x,expected); near(runtime.value(),expected*expected);
+        const float eased=MacroMixerRuntime::shape(.25f,.7f), expected=2+4*eased; near(probe(runtime.destination()).x,expected);
+        near(runtime.value(),4+eased*(expected*expected-4)); // Linear router crossfade from the running origin (2*2).
         runtime.finish(); runtime.update(270); runtime.request(a,0,0,true); runtime.update(280); near(runtime.value(),4); assert(!runtime.transitioning());
     }
     // A different saved ID on the output path identifies the same model role;
@@ -191,7 +198,8 @@ int main(int argc,char** argv) {
         runtime.request(a,0,0,true); runtime.update(0); runtime.request(b,1000,0,true); runtime.update(10); runtime.update(510);
         auto& p=probe(runtime.destination()); p.removeParameter("Gate"); p.removeParameter("Floats");
         ofParameter<int> replacement; p.addParameter(replacement.set("Floats",123));
-        runtime.update(610); near(replacement,123); near(runtime.value(),4.4f*4.4f); assert(runtime.diagnostics().empty());
+        runtime.update(610); near(replacement,123); near(std::get<float>(runtime.destination()->read("value")),4.4f*4.4f);
+        near(runtime.value(),4+.6f*(4.4f*4.4f-4)); assert(runtime.diagnostics().empty());
         runtime.finish(); runtime.update(620); near(runtime.value(),36); near(replacement,123);
     }
     // Same-graph morphs keep native Buffer histories, HeaderPro readers,

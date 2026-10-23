@@ -87,6 +87,12 @@ public:
     bool morphing() const { return next && nextMorph; }
     bool morphingInPlace() const { return bool(inPlaceTarget); }
     bool morphMode() const { return next ? nextMorph : currentMorph; }
+    // A morph that cannot reuse the running graph loads the destination as a
+    // second graph. Both keep running and their router outputs crossfade with
+    // each router's mix policy, while the destination's controls still morph.
+    bool morphFallback() const { return next && nextMorph && !inPlaceTarget; }
+    // Router outputs pass through unmixed while one graph morphs in place.
+    bool outputsBypassed() const { return morphMode() && !morphFallback(); }
 
 private:
     void updateWithClock(const std::function<double()>& clock);

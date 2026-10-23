@@ -481,7 +481,7 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
                 auto& details=transitionDetails[revision->id()];
                 if(std::none_of(details.begin(),details.end(),[](const auto& d) {return d.kind=="fallback";}))
                     details.push_back({"fallback","Graph",current->morphFallbackReason});
-                for(auto& detail:details) if(detail.kind=="mix") { detail.kind="skipped"; detail.message="Connection mix skipped because the whole graph needs fallback. "+detail.message; }
+                for(auto& detail:details) if(detail.kind=="mix") { detail.kind="skipped"; detail.message="Connection mix skipped: the router outputs crossfade instead. "+detail.message; }
             }
             std::shared_ptr<Graph> candidate = reuse ? current : MacroMixerSource::instantiate(parent, revision, errors, inputValues, keptOut);
             preparing = false;
@@ -520,7 +520,7 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
             errors={{"morph",e.what()}}; next->cancelMorph(); next.reset(); inPlaceTarget.reset(); finishRequested=false; return;
         }
     }
-    const bool originValid = !current || morphing() || (current->setInputs(inputValues,false) && current->update());
+    const bool originValid = !current || morphingInPlace() || (current->setInputs(inputValues,false) && current->update());
     const bool destinationValid = !next || (next->setInputs(inputValues,false) && next->update());
     if(!originValid || !destinationValid) {
         errors = {{"runtime", !originValid ? current->failure : next->failure}};
@@ -540,8 +540,8 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
                     continue;
                 }
                 const auto& policy=MacroMixerMixing::registry().policy(router.type,router.policy);
-                const auto graph=morphing() ? next : current;
-                if(morphMode() && !policy.createProcessor) {
+                const auto graph=current;
+                if(outputsBypassed() && !policy.createProcessor) {
                     auto value = graph->read(router.id);
                     MacroMixerMixing::Registry::validate(router.type,value);
                     if(auto* object=std::get_if<MacroMixerMixing::Object>(&value)) object->owner=graph;
@@ -559,7 +559,7 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
                     // Resource bridges retain graph leases and backend readiness.
                     // A graph morph feeds only the destination at the identity
                     // endpoint; no router-output interpolation takes place.
-                    auto result=processor.function(a,b,morphMode() ? 1.f : progress,policy.options(router.options));
+                    auto result=processor.function(a,b,outputsBypassed() ? 1.f : progress,policy.options(router.options));
                     MacroMixerMixing::Registry::validate(router.type,result);
                     if(policy.ready) resourcesReady=policy.ready(result) && resourcesReady;
                     staged[router.id]=std::move(result);
@@ -594,14 +594,13 @@ void MacroMixerRuntime::draw() {
     const bool textures=current->usesTextures || (next && next->usesTextures);
     try {
         const auto drawFrame=[&] {
-            if(!morphing() && (!current->setInputs(inputValues) || !current->draw())) throw std::runtime_error(current->failure);
+            if(!morphingInPlace() && (!current->setInputs(inputValues) || !current->draw())) throw std::runtime_error(current->failure);
             if(next && (!next->setInputs(inputValues) || !next->draw())) throw std::runtime_error(next->failure);
             for(const auto& r:interface.routers) if(r.direction=="Output") {
-                const auto graph=morphing() ? next : current;
-                const auto a=graph->read(r.id), b=next ? next->read(r.id) : a;
+                const auto a=current->read(r.id), b=next ? next->read(r.id) : a;
                 if(r.type!="Texture") {
                     if(MacroMixerMixing::registry().policy(r.type,r.policy).createProcessor) continue;
-                    if(morphMode()) {
+                    if(outputsBypassed()) {
                         auto value=b;
                         MacroMixerMixing::Registry::validate(r.type,value);
                         if(auto* object=std::get_if<MacroMixerMixing::Object>(&value)) object->owner=next ? next : current;
@@ -613,11 +612,11 @@ void MacroMixerRuntime::draw() {
                 }
                 // A private identity copy keeps texture outputs alive between
                 // update/draw and bypasses all saved blend/strength options.
-                const auto& policy=MacroMixerMixing::registry().policy(r.type,morphMode() ? "crossfade" : r.policy);
-                const auto rendererID=morphMode() ? "morph-copy" : policy.id;
+                const auto& policy=MacroMixerMixing::registry().policy(r.type,outputsBypassed() ? "crossfade" : r.policy);
+                const auto rendererID=outputsBypassed() ? "morph-copy" : policy.id;
                 auto& renderer=renderers[r.id];
                 const auto evaluate=[&](const MacroMixerMixing::Policy::Function& function) {
-                    auto result=function(a,b,morphMode() ? 1.f : next?mixedProgress:1.f,policy.options(morphMode() ? ofJson::object() : r.options));
+                    auto result=function(a,b,outputsBypassed() ? 1.f : next?mixedProgress:1.f,policy.options(outputsBypassed() ? ofJson::object() : r.options));
                     MacroMixerMixing::Registry::validate(r.type,result);
                     return result;
                 };
@@ -668,7 +667,7 @@ std::string MacroMixerRuntime::status() const {
         case State::Transitioning: label = "Transitioning"; break;
     }
     if(morphingInPlace()) label = "Morphing live graph";
-    else if(morphing()) label = "Morphing destination graph: " + (current && !current->morphFallbackReason.empty()
+    else if(morphing()) label = "Crossfading router outputs; graph morph fell back: " + (current && !current->morphFallbackReason.empty()
         ? current->morphFallbackReason : "incompatible structure or configuration");
     if(pending) label += " (request queued)";
     if(!blocked.empty()) label += " (" + std::to_string(blocked.size()) + " blocked node(s) await a decision)";

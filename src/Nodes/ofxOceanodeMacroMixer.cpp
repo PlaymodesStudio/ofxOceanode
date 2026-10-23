@@ -475,7 +475,7 @@ bool ofxOceanodeMacroMixer::drawInspectorParameter(ofAbstractParameter& paramete
 void ofxOceanodeMacroMixer::drawRouters() {
     if(!runtime) return;
     ImGui::SeparatorText("Routers");
-    if(morphMacros) ImGui::TextWrapped("Morph macros: matching node types and connection roles keep live buffers and clocks even when IDs differ. Changed control cables blend live signals; added/removed nodes coexist until completion. Changed texture cables use GPU mixing. Each source's Source section shows the morph into it and its connection policies. Router output mix policies are bypassed. Mode changes apply on the next Transition.");
+    if(morphMacros) ImGui::TextWrapped("Morph macros: matching node types and connection roles keep live buffers and clocks even when IDs differ. Changed control cables blend live signals; added/removed nodes coexist until completion. Changed texture cables use GPU mixing. Each source's Source section shows the morph into it and its connection policies. Router mix policies apply only when a morph cannot reuse the running graph; both graphs then run and their outputs crossfade. Mode changes apply on the next Transition.");
     const auto contract=runtime->contract();
     auto types=MacroMixerMixing::supportedTypes();
     types.erase(std::remove_if(types.begin(),types.end(),[&](const auto& type) {
@@ -849,7 +849,7 @@ std::string ofxOceanodeMacroMixer::shortStatus() const {
     if(!runtime->blockedNodes().empty()) activity = "Blocked, see dialog";
     else if(!inspectorError.empty() || !runtime->diagnostics().empty()) activity = "Error, see Status";
     else if(runtime->transitioning())
-        activity = std::string(runtime->morphing() ? "Morph " : "Mix ") + index(runtime->currentID()) + ">"
+        activity = std::string(runtime->morphFallback() ? "Xfade " : runtime->morphing() ? "Morph " : "Mix ") + index(runtime->currentID()) + ">"
             + index(runtime->destinationID()) + " " + std::to_string(int(runtime->progress() * 100)) + "%";
     else if(auto running = runtime->macro(runtime->currentID())) {
         activity = "Run " + index(running->id());
