@@ -2194,7 +2194,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         }
         ImGui::PopStyleColor();
         ImGui::PopStyleVar();
-        container->drawCustomGuiCreationModal();
+        if(auto* extension = container->getCustomGuiExtension()) extension->drawCreationModal();
 
         // Open context menu
         if (!open_context_menu && !ImGui::IsAnyItemHovered() && ImGui::IsWindowHovered() && ImGui::IsMouseClicked(1))
@@ -2551,9 +2551,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 			}
             
             ImGui::Separator();
-            if(ImGui::Selectable("Add Custom GUI")){
-                container->requestCreateCustomGui("", CustomGuiWidgetType::Slider, true);
-            }
+            if(auto* extension = container->getCustomGuiExtension()) extension->drawCanvasMenu();
             
             ImGui::EndPopup();
         }

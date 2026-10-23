@@ -60,7 +60,14 @@ struct ofxOceanodeContainer {
     unsigned long long pendingScopeSaveDeadlineMillis=0;
     void saveScope(const string& path){lastScopeSave=path;}
     void flushPendingScopeSave();
-    auto getAllModules(){return nodes;} auto& getCustomGuiPanelsData(){return panels;}
+    auto getAllModules(){return nodes;}
+    auto* getCustomGuiExtension(){return this;}
+    void windowState(ofJson& state,bool restore){
+        for(auto& p:panels){
+            if(!restore)state["panels"][p.id]=p.windowState.isOpen;
+            else if(state.contains("panels")&&state["panels"].contains(p.id))p.windowState.isOpen=state["panels"][p.id].get<bool>();
+        }
+    }
     Panel* getCustomGuiPanelData(string id){for(auto& p:panels)if(p.id==id)return &p;return nullptr;}
 };
 struct ofxOceanodeNodeMacro:ofxOceanodeNodeModel {

@@ -11,6 +11,8 @@
 
 #include "ofxOceanodeNodeModel.h"
 #include <type_traits>
+#include "ofxOceanodeCustomGuiExtension.h"
+class ofxOceanodeContainer;
 #include "ofxOceanodeNodeHelpCatalog.h"
 
 // Registration metadata uses a distinct type so legacy integer/bool constructor
@@ -32,6 +34,7 @@ constexpr ofxOceanodeNodeRegistrationFlags operator&(ofxOceanodeNodeRegistration
 
 class ofxOceanodeNodeRegistry{
 public:
+    std::function<std::unique_ptr<ofxOceanodeCustomGuiExtension>(ofxOceanodeContainer&)> customGuiFactory;
     using registryItemPtr             = std::unique_ptr<ofxOceanodeNodeModel>;
     using registryItemCloner          = std::function<registryItemPtr()>;
     using registeredModelsMap         = std::unordered_map<string, registryItemCloner>;

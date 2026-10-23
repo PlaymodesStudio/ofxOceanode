@@ -91,10 +91,17 @@ struct ofxOceanodeContainer {
     vector<Comment> comments;
     ofxOceanodeContainer* timelineHost=nullptr; Timeline timeline;
     Timeline* getAutomationExtension(){timeline.paths=&paths;return &timeline;}
+    auto* getCustomGuiExtension(){return this;}
+    void collectBoundParameters(unordered_set<ofxOceanodeAbstractParameter*>& out){
+        for(const auto& p:customGuiPanelsData)for(const auto& w:p.layout.widgets)
+            if(auto* target=findCustomGuiParameter(w.parameterRef.parameterPath))out.insert(target);
+        for(const auto& b:customGuiSnapshotBanks)for(const auto& s:b.snapshots)for(const auto& v:s.parameterValues)
+            if(auto* target=findCustomGuiParameter(v.first))out.insert(target);
+    }
     uint64_t nodesRevision=0; int deletions=0;
     ~ofxOceanodeContainer(){connections.clear();}
     auto getAllModules(){vector<ofxOceanodeNode*> out;for(auto& n:nodes)out.push_back(n.get());return out;}
-    auto findCustomGuiParameter(const string& p){auto i=paths.find(p);return i==paths.end()?nullptr:i->second;}
+    ofxOceanodeAbstractParameter* findCustomGuiParameter(const string& p){auto i=paths.find(p);return i==paths.end()?nullptr:i->second;}
     auto findTimelineParameter(const string& p){return findCustomGuiParameter(p);}
     auto& getTimelineManager(){return timeline;}
     UnusedNodePlan findUnusedNodes(); bool removeUnusedNodes(const UnusedNodePlan& plan);

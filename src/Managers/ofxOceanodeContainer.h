@@ -14,7 +14,7 @@
 class ofxOceanodeTimelineManager; // Optional addon; compatibility accessor is defined there.
 #include "ofxOceanodeConnection.h"
 #include "ofxOceanodeNode.h"
-#include "CustomGui/ofxOceanodeCustomGuiLayout.h"
+#include "ofxOceanodeCustomGuiExtension.h"
 #include "ofxOceanodeNodeGui.h"
 #include <cstdint>
 #include <functional>
@@ -25,7 +25,6 @@ class ofxOceanodeNodeModel;
 class ofxOceanodeNodeRegistry;
 class ofxOceanodeTypesRegistry;
 class ofxOceanodeNodeMacro;
-class ofxOceanodeCustomGuiPanel;
 class abstractPortal;
 
 
@@ -73,6 +72,8 @@ public:
     ofxOceanodeContainer(std::shared_ptr<ofxOceanodeNodeRegistry> _registry = nullptr, std::shared_ptr<ofxOceanodeTypesRegistry> _typesRegistry = nullptr, std::shared_ptr<ofxOceanodeTransport> _transport = nullptr);
     ~ofxOceanodeContainer();
     
+    ofxOceanodeCustomGuiExtension* getCustomGuiExtension() const { return customGuiExtension.get(); }
+    void setCustomGuiExtension(std::unique_ptr<ofxOceanodeCustomGuiExtension> extension) { customGuiExtension = std::move(extension); }
     void clearContainer();
     // True throughout graph deletion, including nested macro containers.
     // Addons must not traverse/rebuild graphs while their nodes are disappearing.
@@ -136,7 +137,7 @@ public:
     
     bool loadPreset(string presetFolderPath);
     bool savePreset(string presetFolderPath);
-    const std::string& getPresetStoragePath() const { return customGuiStoragePath; }
+    const std::string& getPresetStoragePath() const { return presetStoragePath; }
     
     void loadPreset_presetWillBeLoaded();
     void loadPreset_loadNodes(string presetFolderPath);
@@ -160,15 +161,6 @@ public:
     
     void saveScope(const std::string& presetPath);
     void loadScope(const std::string& presetPath);
-    void saveCustomGuis(const std::string& presetPath);
-    void loadCustomGuis(const std::string& presetPath);
-    void saveCustomGuis();
-    void markCustomGuisDirty();
-    void saveCustomGuiSnapshots(const std::string& presetPath);
-    void loadCustomGuiSnapshots(const std::string& presetPath);
-    void saveCustomGuiSnapshots();
-    void markCustomGuiSnapshotsDirty();
-    
     // retimeTimeline=false sets the tempo as-is (preset load: the saved
     // timeline already matches the saved tempo).
     void setBpm(float _bpm, bool retimeTimeline = true);
@@ -270,47 +262,13 @@ public:
     std::uint64_t getNodesRevision() const { return nodesRevision; }
     ofxOceanodeNodeGui* getGuiFromModel(ofxOceanodeNodeModel* model);
 
-    const std::vector<CustomGuiPanelData>& getCustomGuiPanelsData() const { return customGuiPanelsData; }
-    CustomGuiPanelData* getCustomGuiPanelData(const std::string& panelId);
-    const CustomGuiPanelData* getCustomGuiPanelData(const std::string& panelId) const;
-    CustomGuiPanelData& createCustomGuiPanel(const std::string& requestedName = "");
-    bool deleteCustomGuiPanel(const std::string& panelId);
-    void requestDeleteCustomGuiPanel(const std::string& panelId);
-    void openCustomGuiPanel(const std::string& panelId, bool designMode = false);
-    bool renameCustomGuiPanel(const std::string& panelId, const std::string& requestedName);
-    bool customGuiPanelHasSnapshotEligibleParameters(const std::string& panelId) const;
-    bool addParameterToCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter, CustomGuiWidgetType type);
-    bool canAddParameterToCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter,
-                                  CustomGuiWidgetType type, int ignoredWidgetIndex = -1) const;
-    bool removeParameterFromCustomGui(const std::string& panelId, ofxOceanodeAbstractParameter& parameter);
-    void resizeCustomGuiParameterVector(ofxOceanodeAbstractParameter& parameter, int size);
-    void inheritCustomGuiVectorSize(CustomGuiWidget& widget) const;
-    void restoreCustomGuiVectorSize(const CustomGuiWidget& removedWidget);
-    bool customGuiContainsParameter(const std::string& panelId, ofxOceanodeAbstractParameter& parameter) const;
+    ofxOceanodeAbstractParameter* findParameter(const std::string& parameterPath) const;
     bool customGuiContainsParameterAnywhere(ofxOceanodeAbstractParameter& parameter) const;
-    std::vector<CustomGuiWidgetType> getCompatibleCustomGuiWidgetTypes(ofxOceanodeAbstractParameter& parameter) const;
-    CustomGuiWidgetType getDefaultCustomGuiWidgetType(ofxOceanodeAbstractParameter& parameter) const;
-    std::string getCustomGuiParameterPath(ofxOceanodeAbstractParameter& parameter) const;
-    ofxOceanodeAbstractParameter* findCustomGuiParameter(const std::string& parameterPath) const;
     ofxOceanodeNode* getNodeFromParameter(ofxOceanodeAbstractParameter& param);
     bool showNodeInCanvas(ofxOceanodeNode& node);
     bool showParameterInCanvas(ofxOceanodeAbstractParameter& parameter);
     ofxOceanodeContainer* getContainerForCanvasID(const std::string& canvasID);
     const ofxOceanodeContainer* getContainerForCanvasID(const std::string& canvasID) const;
-    CustomGuiSnapshotBank* getCustomGuiSnapshotBank(const std::string& panelId);
-    const CustomGuiSnapshotBank* getCustomGuiSnapshotBank(const std::string& panelId) const;
-    std::string createCustomGuiSnapshot(const std::string& panelId, const std::string& requestedName = "");
-    bool updateCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId);
-    bool recallCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId);
-    bool renameCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId, const std::string& requestedName);
-    bool deleteCustomGuiSnapshot(const std::string& panelId, const std::string& snapshotId);
-    CustomGuiSnapshotData* getCustomGuiSnapshotBySlot(const std::string& panelId, int slot);
-    const CustomGuiSnapshotData* getCustomGuiSnapshotBySlot(const std::string& panelId, int slot) const;
-    std::string storeCustomGuiSnapshotToSlot(const std::string& panelId, int slot, const std::string& requestedName = "");
-    bool recallCustomGuiSnapshotSlot(const std::string& panelId, int slot);
-    void requestCreateCustomGui(const std::string& parameterPath = "", CustomGuiWidgetType type = CustomGuiWidgetType::Slider, bool openInEdit = true);
-    void drawCustomGuiCreationModal();
-    
     bool copySelectedModulesWithConnections();
     bool cutSelectedModulesWithConnections();
     bool pasteModulesAndConnectionsInPosition(glm::vec2 position, bool allowOutsideInputs);
@@ -375,22 +333,8 @@ private:
     };
 	
     ParsedParameterPath parseParameterPath(const std::string& path);
-    void invalidateCustomGuiMembershipIndex();
-    void invalidateCustomGuiParameterPathCache();
     void scheduleScopeSave(const std::string& presetPath);
     void flushPendingScopeSave();
-    void rebuildCustomGuiMembershipIndexIfNeeded() const;
-    void rebuildCustomGuiPanels();
-    void pruneCustomGuiParameters();
-    std::string getCustomGuiFilePath(const std::string& presetPath) const;
-    std::string getCustomGuiSnapshotsFilePath(const std::string& presetPath) const;
-    std::string makeUniqueCustomGuiName(const std::string& baseName = "Custom GUI") const;
-    std::string makeCustomGuiId() const;
-    std::string makeCustomGuiSnapshotId() const;
-    std::string makeUniqueCustomGuiSnapshotName(const CustomGuiSnapshotBank& bank, const std::string& baseName = "Snapshot") const;
-    CustomGuiSnapshotBank* getOrCreateCustomGuiSnapshotBank(const std::string& panelId);
-    int getNextAvailableCustomGuiSnapshotSlot(const CustomGuiSnapshotBank& bank) const;
-    
     struct CanvasNodeSnapshot {
         ofJson values;
         ofJson midi;
@@ -426,9 +370,6 @@ private:
     ofJson captureCanvasAuxiliary() const;
     void restoreCanvasAuxiliary(const ofJson& target, const ofJson& opposite);
     void rollbackMacroCanvasEdit();
-    void migrateCanvasPanelsTo(ofxOceanodeContainer& target, const std::map<string, string>& nodeNames,
-                               std::vector<CustomGuiPanelData>* stagedPanels = nullptr,
-                               std::vector<CustomGuiSnapshotBank>* stagedBanks = nullptr);
     struct MacroCanvasEditScope {
         ofxOceanodeContainer& owner;
         bool standalone, success = false;
@@ -451,27 +392,18 @@ private:
     
     std::unordered_map<string, ofxOceanodeNode*> parameterGroupNodesMap; //Maps nodes to parameterGroup.getName() reference, used in canvas
 
-    std::vector<CustomGuiPanelData> customGuiPanelsData;
-    std::vector<std::unique_ptr<ofxOceanodeCustomGuiPanel>> customGuiPanels;
-    std::vector<CustomGuiSnapshotBank> customGuiSnapshotBanks;
-    mutable std::unordered_map<const ofxOceanodeAbstractParameter*, std::string> customGuiParameterPathCache;
-    mutable std::unordered_map<std::string, std::unordered_set<std::string>> customGuiPanelParameterIndex;
-    mutable std::unordered_set<std::string> customGuiPublishedParameterIndex;
-    mutable bool customGuiMembershipIndexDirty = true;
-    std::string customGuiStoragePath;
-    bool customGuisDirty = false;
-    bool customGuiParametersNeedPruning = false;
+    std::unique_ptr<ofxOceanodeCustomGuiExtension> customGuiExtension;
+    std::string presetStoragePath;
     std::unordered_map<std::string, ofJson> userEditedValues;
-    bool customGuiSnapshotsDirty = false;
     std::string pendingScopeSavePath;
     std::uint64_t pendingScopeSaveDeadlineMillis = 0;
     bool scopeSavePending = false;
-    bool customGuiCreateModalOpen = false;
-    std::string pendingCustomGuiName = "Custom GUI";
-    std::string pendingDeletedCustomGuiPanelId;
-    std::string pendingCustomGuiParameterPath;
-    CustomGuiWidgetType pendingCustomGuiWidgetType = CustomGuiWidgetType::Slider;
-    bool pendingCustomGuiOpenInEdit = true;
+    // Opaque addon documents survive load/save, including Save As, without the addon.
+    std::map<std::string, std::string> unavailableCustomGuiFiles;
+    // Missing addon nodes remain opaque, with their saved cables and parameters.
+    ofJson unavailableModules, unavailableConnections;
+    std::map<std::string, std::string> unavailableNodeFiles;
+    std::unordered_set<std::string> unavailableNodeKeys;
 
     vector<unique_ptr<ofxOceanodeAbstractConnection>> connections;
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;

@@ -22,7 +22,6 @@ PRELUDE = r'''
 #include "ofxOceanodeShared.h"
 #include "ofAppNoWindow.h"
 #include "ofMainLoop.h"
-#include "CustomGui/ofxOceanodeCustomGuiPanel.h"
 #include "router.h"
 #include "phasor.h"
 #include <atomic>
@@ -40,7 +39,6 @@ void ofxOceanodeScope::clearScopedParameters() { ++scopeCalls; }
 bool ofxOceanodeScope::removeParameter(ofxOceanodeAbstractParameter*) { assert(false); return false; }
 void ofxOceanodeContainer::flushPendingScopeSave() { assert(false); }
 std::string ofxOceanodeContainer::getTimelineParameterPath(ofxOceanodeAbstractParameter&) const { assert(false); return {}; }
-bool ofxOceanodeContainer::removeParameterFromCustomGui(const std::string&, ofxOceanodeAbstractParameter&) { assert(false); return false; }
 ofxOceanodeFrameTimeState ofxOceanodeNodeModel::getFrameGlobalTimeState() const { assert(false); return {}; }
 ofxOceanodeTimeState ofxOceanodeNodeModel::getGlobalTimeState() const { assert(false); return {}; }
 '''
@@ -57,11 +55,6 @@ void ofxOceanodeNodeMacro::renderInspectorInterface() { assert(false); }
 void ofxOceanodeNodeMacro::renderRouterSortInterface() { assert(false); }
 void ofxOceanodeContainer::loadScope(const std::string&) {}
 void ofxOceanodeContainer::saveScope(const std::string&) {}
-void ofxOceanodeContainer::loadCustomGuis(const std::string&) { assert(customGuiPanels.empty()); }
-void ofxOceanodeContainer::saveCustomGuis(const std::string&) { assert(customGuiPanels.empty()); }
-void ofxOceanodeContainer::loadCustomGuiSnapshots(const std::string&) { assert(customGuiSnapshotBanks.empty()); }
-void ofxOceanodeContainer::saveCustomGuiSnapshots(const std::string&) { assert(customGuiSnapshotBanks.empty()); }
-void ofxOceanodeContainer::rebuildCustomGuiPanels() { assert(customGuiPanels.empty()); }
 void ofxOceanodeContainer::scheduleScopeSave(const std::string&) { assert(false); }
 '''
 
@@ -78,8 +71,6 @@ def production():
     guard=c[c.index('    thread_local unsigned int containerClearDepth'):c.index('    struct ConnectionFailureInfo')]
     result=PRELUDE+'\nnamespace {\n'+guard+'}\n'
     for sig in ['ofxOceanodeContainer::ofxOceanodeContainer(', 'ofxOceanodeContainer::~ofxOceanodeContainer()',
-                'void ofxOceanodeContainer::invalidateCustomGuiMembershipIndex()',
-                'void ofxOceanodeContainer::invalidateCustomGuiParameterPathCache()',
                 'bool ofxOceanodeContainer::isClearingContainers()',
                 'void ofxOceanodeContainer::clearContainer()', 'void ofxOceanodeContainer::update()',
                 'ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr',
@@ -100,7 +91,7 @@ def production():
     m=(ROOT/'src/Nodes/ofxOceanodeNodeModel.cpp').read_text()
     result+=m[m.index('template<typename T>\nstatic bool oceanodeJsonToVector'):m.index('void ofxOceanodeNodeModel::deserializeParameter(')]+'\n'
     for sig in ['ofColor colorFromString(', 'ofxOceanodeNodeModel::ofxOceanodeNodeModel(',
-                'string ofxOceanodeNodeModel::getDescription()',
+                'string ofxOceanodeNodeModel::getDescription()', 'string ofxOceanodeNodeModel::getParents()',
                 'void ofxOceanodeNodeModel::setNumIdentifier(', 'void ofxOceanodeNodeModel::setContainer(',
                 'void ofxOceanodeNodeModel::deserializeParameter(',
                 'ofxOceanodeFrameTransportState ofxOceanodeNodeModel::getFrameTransportState()']:
@@ -121,12 +112,7 @@ def native_production():
     declarations=c[c.index('    struct ConnectionFailureInfo'):c.index('    void drawConnectionErrorDialogContents')]
     result+='namespace {\n'+declarations+'}\n'
     result += c[c.index('ofxOceanodeContainer::CanvasNodeSnapshot::~CanvasNodeSnapshot()'):]
-    for signature in ['CustomGuiPanelData* ofxOceanodeContainer::getCustomGuiPanelData(',
-                      'void ofxOceanodeContainer::markCustomGuisDirty()',
-                      'void ofxOceanodeContainer::markCustomGuiSnapshotsDirty()',
-                      'std::string ofxOceanodeContainer::makeCustomGuiId()',
-                      'std::string ofxOceanodeContainer::makeUniqueCustomGuiName(',
-                      'vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules()']:
+    for signature in ['vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules()']:
         result += block(c, signature) + '\n'
 
     for signature in [

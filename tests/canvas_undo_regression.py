@@ -144,6 +144,15 @@ struct ofxOceanodeContainer {
     void rebuildCustomGuiPanels(){} void markCustomGuiSnapshotsDirty(){}
     CustomGuiPanelData* getCustomGuiPanelData(string id){for(auto& p:customGuiPanelsData)if(p.id==id)return &p;return nullptr;}
     void markCustomGuisDirty(){}
+    struct GuiExtension {
+        ofxOceanodeContainer& owner;
+        explicit GuiExtension(ofxOceanodeContainer& o):owner(o){}
+        ofJson captureState() const;
+        void restoreState(const ofJson&,const ofJson&);
+        ofJson captureNodeBindings(const string&) const;
+        void restoreNodeBindings(const ofJson&);
+    };
+    unique_ptr<GuiExtension> customGuiExtension=make_unique<GuiExtension>(*this);
     bool rejectCable=false;
     ~ofxOceanodeContainer(){connections.clear();nodes.clear();}
     static bool isClearingContainers(){return false;}
@@ -184,6 +193,34 @@ void ofxOceanodeAbstractConnection::deleteSelf(){
 template<class T> string ofToString(T x){return to_string(x);}
 uint64_t ofGetSystemTimeMicros(){return chrono::duration_cast<chrono::microseconds>(chrono::system_clock::now().time_since_epoch()).count();}
 auto& ofLogWarning(const string&){return cerr;}auto& ofLogError(const string&){return cerr;}
+'''
+
+FIXTURE += r'''
+
+ofJson ofxOceanodeContainer::GuiExtension::captureState() const {
+    return {{"panels",customGuiPanelsToJson(owner.customGuiPanelsData)}, {"snapshots",customGuiSnapshotBanksToJson(owner.customGuiSnapshotBanks)}};
+}
+void ofxOceanodeContainer::GuiExtension::restoreState(const ofJson& target,const ofJson& opposite) {
+    if(target.is_null()||opposite.is_null())return;
+    auto merge=[](ofJson current,const ofJson& wanted,const ofJson& previous,const string& key){
+        map<string,ofJson> a,b;for(const auto& x:wanted)a[x.at(key).get<string>()]=x;for(const auto& x:previous)b[x.at(key).get<string>()]=x;
+        set<string> changed;for(const auto& x:a)if(!b.count(x.first)||b.at(x.first)!=x.second)changed.insert(x.first);for(const auto& x:b)if(!a.count(x.first))changed.insert(x.first);
+        ofJson result=ofJson::array();for(const auto& x:current)if(!changed.count(x.at(key).get<string>()))result.push_back(x);
+        for(size_t i=0;i<wanted.size();++i)if(changed.count(wanted[i].at(key).get<string>()))result.insert(result.begin()+min(i,result.size()),wanted[i]);return result;
+    };
+    auto current=captureState();
+    owner.customGuiPanelsData=customGuiPanelsFromJson({{"panels",merge(current["panels"]["panels"],target["panels"]["panels"],opposite["panels"]["panels"],"id")}});
+    owner.customGuiSnapshotBanks=customGuiSnapshotBanksFromJson({{"banks",merge(current["snapshots"]["banks"],target["snapshots"]["banks"],opposite["snapshots"]["banks"],"customGuiId")}});
+}
+ofJson ofxOceanodeContainer::GuiExtension::captureNodeBindings(const string& prefix) const {
+    ofJson result=ofJson::array();for(const auto& p:owner.customGuiPanelsData)for(size_t i=0;i<p.layout.widgets.size();++i){const auto& w=p.layout.widgets[i];if(w.parameterRef.parameterPath.compare(0,prefix.size(),prefix)==0)result.push_back({{"panel",p.id},{"index",i},{"widget",customGuiWidgetToJson(w)}});}return result;
+}
+void ofxOceanodeContainer::GuiExtension::restoreNodeBindings(const ofJson& bindings) {
+    for(const auto& saved:bindings){auto* p=owner.getCustomGuiPanelData(saved["panel"].get<string>());if(!p)continue;const auto w=customGuiWidgetFromJson(saved["widget"]);auto& ws=p->layout.widgets;
+        if(none_of(ws.begin(),ws.end(),[&](const CustomGuiWidget& x){return x.parameterRef.parameterPath==w.parameterRef.parameterPath && (x.type==CustomGuiWidgetType::Scope)==(w.type==CustomGuiWidgetType::Scope);}))ws.insert(ws.begin()+min(saved["index"].get<size_t>(),ws.size()),w);
+    }
+}
+
 '''
 
 CASES = r'''
@@ -298,7 +335,10 @@ def main():
     header = (ROOT / "src/Managers/ofxOceanodeContainer.h").read_text()
     types = header[header.index("    struct CanvasNodeSnapshot {"):header.index("    //NodeModel;")]
     source = (ROOT / "src/Managers/ofxOceanodeContainer.cpp").read_text()
-    functions = source[source.index("ofxOceanodeContainer::CanvasNodeSnapshot::~CanvasNodeSnapshot()") :source.index("void ofxOceanodeContainer::migrateCanvasPanelsTo(")]
+    functions = source[source.index("ofxOceanodeContainer::CanvasNodeSnapshot::~CanvasNodeSnapshot()") :source.index("bool ofxOceanodeContainer::extractSelectedMacro()")]
+    for signature in ['ofJson ofxOceanodeContainer::captureCanvasAuxiliary() const',
+                      'void ofxOceanodeContainer::restoreCanvasAuxiliary(']:
+        functions += '\n' + block(source, signature)
     fixture = FIXTURE.replace("    // HISTORY_TYPES", types)
     canvas = (ROOT / "src/Managers/ofxOceanodeCanvas.cpp").read_text()
     shortcut = canvas[canvas.index("const bool historyShortcut"):canvas.index("auto prepareNewNodeModal")]

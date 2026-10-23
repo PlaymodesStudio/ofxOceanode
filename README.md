@@ -54,7 +54,9 @@ with `euclideanGenerator` as the class, and `"Generators"` as the category name.
   Requesty, using the same credentials as Formula and DynGen.
 - **Layouts** manages named preset layouts and reusable global layouts. Preset
   layouts include window visibility. See [Layouts](docs/layouts.md).
-- **Window** lists controllers, node windows, macro canvases and custom GUIs.
+- **Custom GUIs** are provided by the optional `ofxOceanodeCustomGui` addon.
+  See [setup and migration](docs/custom-gui-addon.md).
+- **Window** lists controllers, node windows, macro canvases and attached custom GUIs.
   See [Help and window menus](docs/help-and-windows.md) for setup and maintenance.
 
 - In a Macro canvas, press **Cmd+Up Arrow** (**Ctrl+Up Arrow** on Windows/Linux)

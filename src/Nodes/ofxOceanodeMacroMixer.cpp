@@ -271,9 +271,7 @@ void ofxOceanodeMacroMixer::installOutputs(const MacroMixerContract& contract) {
                     extension->removeParameterBindings(parameter);
             }
             if(hostContainer && hostContainer->customGuiContainsParameterAnywhere(parameter)) {
-                std::vector<std::string> panels;
-                for(const auto& panel : hostContainer->getCustomGuiPanelsData()) panels.push_back(panel.id);
-                for(const auto& panel : panels) hostContainer->removeParameterFromCustomGui(panel,parameter);
+                if(auto* extension = hostContainer->getCustomGuiExtension()) extension->removeParameterBindings(parameter);
             }
             parameter.removeAllConnections();
             removeParameter(it->second->getName());

@@ -439,8 +439,6 @@ GlobalMacroSaveReview collectGlobalMacroSaveReview(ofxOceanodeContainer&, ofxOce
 void drawGlobalMacroSaveChanges(const GlobalMacroSaveReview&, float) {}
 '''
         # The root save/load adapters omit UI services; retain storage ownership.
-        native.SUPPORT = native.SUPPORT.replace('void ofxOceanodeContainer::saveCustomGuis(const std::string&) {',
-            'void ofxOceanodeContainer::saveCustomGuis(const std::string& path) { customGuiStoragePath = path;')
         native.CASES = CASES
         native.main()
 

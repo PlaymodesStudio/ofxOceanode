@@ -36,6 +36,7 @@ FIXTURE = r'''
 #include <unordered_map>
 #include <vector>
 using namespace std;
+using ofJson = int;
 struct ofxOceanodeContainer;
 struct ofxOceanodeNode;
 int destroyedNodes=0, notifiedNodes=0, destroyedBindings=0, destroyedConnections=0;
@@ -79,11 +80,14 @@ struct ofxOceanodeContainer {
     map<string,vector<shared_ptr<MidiBinding>>> midiBindings,persistentMidiBindings;
     map<string,MidiInput> midiIns;
     unique_ptr<Timeline> automationExtension;
-    vector<int> customGuiPanels{1},customGuiPanelsData{1},customGuiSnapshotBanks{1},comments{1};
-    map<int,int> customGuiPanelParameterIndex{{1,1}},customGuiPublishedParameterIndex{{1,1}},userEditedValues{{1,1}};
-    string customGuiStoragePath="SavedPreset",pendingCustomGuiName="Old",pendingDeletedCustomGuiPanelId="Old",pendingCustomGuiParameterPath="Old";
-    bool customGuisDirty=true,customGuiSnapshotsDirty=true,customGuiParametersNeedPruning=true,customGuiCreateModalOpen=true;
-    bool scopeSavePending=true,clockEnabled=true,pathCacheCleared=false,membershipDirty=false;
+    struct Gui { bool cleared=false; void clear(){cleared=true;} };
+    unique_ptr<Gui> customGuiExtension=make_unique<Gui>();
+    vector<int> comments{1}; map<int,int> userEditedValues{{1,1}};
+    map<string,string> unavailableCustomGuiFiles,unavailableNodeFiles;
+    map<string,int> unavailableNodeKeys;
+    int unavailableModules=0,unavailableConnections=0;
+    string presetStoragePath="SavedPreset";
+    bool scopeSavePending=true,clockEnabled=true;
     unsigned nodesRevision=0;
     string id="Canvas";
     string pendingScopeSavePath;
@@ -95,8 +99,6 @@ struct ofxOceanodeContainer {
     void flushPendingScopeSave(){
         if(scopeSavePending){for(auto* p:ofxOceanodeScope::getInstance()->parameters) assert(p->scoped); ++scopeSaves; scopeSavePending=false;}
     }
-    void invalidateCustomGuiParameterPathCache(){pathCacheCleared=true;}
-    void invalidateCustomGuiMembershipIndex(){membershipDirty=true;}
     void setMidiClockSyncEnabled(bool enabled){clockEnabled=enabled;}
     void scheduleScopeSave(string path){pendingScopeSavePath=path;}
     void resetPhase(){assert(parameterGroupNodesMap.empty()); ++resets;}
@@ -218,9 +220,9 @@ int main(){
     assert(destroyedBindings==6 && !c.clockEnabled && c.midiIns["Port"].registered.empty());
 #endif
     assert(c.dynamicNodes.empty() && c.persistentNodes.empty() && c.parameterGroupNodesMap.empty());
-    assert(c.customGuiPanels.empty() && c.customGuiPanelsData.empty() && c.customGuiSnapshotBanks.empty());
-    assert(c.comments.empty() && c.userEditedValues.empty() && c.customGuiStoragePath.empty());
-    assert(c.pathCacheCleared && c.membershipDirty && !c.customGuiCreateModalOpen && !c.customGuisDirty && !c.customGuiSnapshotsDirty);
+    assert(c.customGuiExtension && c.customGuiExtension->cleared);
+    assert(c.comments.empty() && c.userEditedValues.empty() && c.presetStoragePath.empty());
+    assert(c.unavailableCustomGuiFiles.empty() && c.unavailableNodeFiles.empty());
     assert(!c.destroyNodeListeners.count && !c.destroyConnectionListeners.count);
     assert(c.scopeSaves==1 && !ofxOceanodeScope::getInstance()->callback && ofxOceanodeScope::getInstance()->parameters.empty());
     assert(!ofxOceanodeContainer::isClearingContainers() && !ofxOceanodeShared::loading);

@@ -18,6 +18,7 @@ from of_environment import ROOT, of_root
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--midi-osc", action="store_true")
+    parser.add_argument("--custom-gui", type=Path, help="Optional Custom GUI addon directory")
     parser.add_argument("--timeline", type=Path, help="Optional timeline addon directory")
     parser.add_argument("--jobs", type=int, default=3)
     args = parser.parse_args()
@@ -30,16 +31,18 @@ def main():
         base = of / "addons" / addon
         includes += [base / "src", *sorted({p.parent for p in (base / "src").rglob("*.h")})]
         includes += sorted({p.parent for p in (base / "libs").rglob("*.h")})
-    if args.timeline:
-        includes += [args.timeline / "src", *sorted({p.parent for p in (args.timeline / "src").rglob("*.h")})]
+    for addon in (args.timeline, args.custom_gui):
+        if addon:
+            includes += [addon / "src", *sorted({p.parent for p in (addon / "src").rglob("*.h")})]
     flags = [os.environ.get("CXX", "clang++"), "-std=c++17", "-fsyntax-only", "-w",
              "-DOF_NO_FMOD", "-DGL_SILENCE_DEPRECATION"]
     if args.midi_osc:
         flags += ["-DOFXOCEANODE_USE_MIDI", "-DOFXOCEANODE_USE_OSC"]
     flags += ["-I" + str(p) for p in dict.fromkeys(includes)]
     sources = sorted((ROOT / "src").rglob("*.cpp"))
-    if args.timeline:
-        sources += sorted((args.timeline / "src").rglob("*.cpp"))
+    for addon in (args.timeline, args.custom_gui):
+        if addon:
+            sources += sorted((addon / "src").rglob("*.cpp"))
     with tempfile.TemporaryDirectory(prefix="oceanode-compile-") as logs:
         def check(path):
             result = subprocess.run(flags + [str(path)], text=True, capture_output=True)

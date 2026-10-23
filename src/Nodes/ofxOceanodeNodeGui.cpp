@@ -921,78 +921,7 @@ void ofxOceanodeNodeGui::renderParameterPopup(ofxOceanodeAbstractParameter& absP
         ImGui::Separator();
         if(auto* extension = container.getAutomationExtension()) extension->drawParameterMenu(absParam);
         ImGui::Separator();
-        auto customTypes = container.getCompatibleCustomGuiWidgetTypes(absParam);
-        bool anyRemoval = false;
-        for(const auto& panel : container.getCustomGuiPanelsData()){
-            if(container.customGuiContainsParameter(panel.id, absParam)){
-                anyRemoval = true;
-                break;
-            }
-        }
-
-        if(!customTypes.empty() && ImGui::BeginMenu("Add to Custom GUI")){
-            CustomGuiWidgetType defaultType = container.getDefaultCustomGuiWidgetType(absParam);
-            const std::string parameterPath = container.getCustomGuiParameterPath(absParam);
-
-            if(container.getCustomGuiPanelsData().empty()){
-                if(ImGui::BeginMenu("New Custom GUI")){
-                    for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
-                        CustomGuiWidgetType widgetType = customTypes[widgetIndex];
-                        std::string label = customGuiWidgetTypeToString(widgetType);
-                        if(widgetType == defaultType) label += " (default)";
-                        if(ImGui::Selectable(label.c_str())){
-                            container.requestCreateCustomGui(parameterPath, widgetType, true);
-                        }
-                    }
-                    ImGui::EndMenu();
-                }
-            }else{
-                if(ImGui::BeginMenu("New Custom GUI")){
-                    for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
-                        CustomGuiWidgetType widgetType = customTypes[widgetIndex];
-                        std::string label = customGuiWidgetTypeToString(widgetType);
-                        if(widgetType == defaultType) label += " (default)";
-                        if(ImGui::Selectable(label.c_str())){
-                            container.requestCreateCustomGui(parameterPath, widgetType, true);
-                        }
-                    }
-                    ImGui::EndMenu();
-                }
-
-                ImGui::Separator();
-                for(const auto& panel : container.getCustomGuiPanelsData()){
-                    if(ImGui::BeginMenu(panel.name.c_str())){
-                        for(size_t widgetIndex = 0; widgetIndex < customTypes.size(); widgetIndex++){
-                            CustomGuiWidgetType widgetType = customTypes[widgetIndex];
-                            const bool canAdd = container.canAddParameterToCustomGui(panel.id, absParam, widgetType);
-                            std::string label = customGuiWidgetTypeToString(widgetType);
-                            if(widgetType == defaultType) label += " (default)";
-                            if(!canAdd) label += " (already added)";
-                            if(ImGui::Selectable(label.c_str(), false, canAdd ? 0 : ImGuiSelectableFlags_Disabled)){
-                                container.addParameterToCustomGui(panel.id, absParam, widgetType);
-                                container.openCustomGuiPanel(panel.id, true);
-                            }
-                        }
-                        ImGui::EndMenu();
-                    }
-                }
-
-            }
-            ImGui::EndMenu();
-        }
-        if(anyRemoval && ImGui::BeginMenu("Remove from Custom GUI")){
-            for(const auto& panel : container.getCustomGuiPanelsData()){
-                const std::string path = container.getCustomGuiParameterPath(absParam);
-                const auto count = std::count_if(panel.layout.widgets.begin(), panel.layout.widgets.end(), [&](const CustomGuiWidget& widget){
-                    return widget.parameterRef.parameterPath == path;
-                });
-                const std::string label = panel.name + (count > 1 ? " (all widgets)" : "");
-                if(ImGui::Selectable(label.c_str(), false, count > 0 ? 0 : ImGuiSelectableFlags_Disabled)){
-                    container.removeParameterFromCustomGui(panel.id, absParam);
-                }
-            }
-            ImGui::EndMenu();
-        }
+        if(auto* extension = container.getCustomGuiExtension()) extension->drawParameterMenu(absParam);
 #ifdef OFXOCEANODE_USE_MIDI
         ImGui::Separator();
         if(ImGui::Selectable("Bind MIDI")){

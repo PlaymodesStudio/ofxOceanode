@@ -188,7 +188,5 @@ if __name__ == "__main__":
         native.PRELUDE += '#include "Controls/PresetFileCleanupReview.h"\n'
         source = (native.ROOT / "src/Managers/ofxOceanodeContainer.cpp").read_text()
         native.SUPPORT += block(source, 'bool ofxOceanodeContainer::savePersistent(') + '\n'
-        native.SUPPORT = native.SUPPORT.replace('void ofxOceanodeContainer::saveCustomGuis(const std::string&) {',
-            'void ofxOceanodeContainer::saveCustomGuis(const std::string& path) { customGuiStoragePath = path;')
         native.CASES = CASES
         native.main()

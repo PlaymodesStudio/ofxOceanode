@@ -33,7 +33,6 @@ void ofxOceanode::registerDefaultNodes(){
     nodeRegistry->registerModel<ofxOceanodeNodeMacro>("MACRO");
     nodeRegistry->registerModel<noise>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
     nodeRegistry->registerModel<randomGenerator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<customGuiSnapshots>("Custom GUI");
     nodeRegistry->registerModel<beatTransport>("Timeline");
     nodeRegistry->registerModel<presetLoadTrigger>("General");
 

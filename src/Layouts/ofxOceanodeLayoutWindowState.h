@@ -45,14 +45,7 @@ inline void windows(ofxOceanodeContainer* owner, ofJson& state, bool restore){
             windows(macro->getContainer().get(), saved["children"], restore);
         }
     }
-    for(const auto& panel : owner->getCustomGuiPanelsData()){
-        if(!restore) state["panels"][panel.id] = panel.windowState.isOpen;
-        else if(state.contains("panels") && state["panels"].is_object() &&
-                state["panels"].contains(panel.id) && state["panels"][panel.id].is_boolean()){
-            if(auto* data = owner->getCustomGuiPanelData(panel.id))
-                data->windowState.isOpen = state["panels"][panel.id].get<bool>();
-        }
-    }
+    if(auto* extension = owner->getCustomGuiExtension()) extension->windowState(state, restore);
 }
 
 inline ofJson captureWindows(ofxOceanodeContainer* container, ofxOceanodeControls& controls){

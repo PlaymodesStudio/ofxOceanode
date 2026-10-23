@@ -268,19 +268,35 @@ def main():
         access.parent.mkdir(parents=True, exist_ok=True)
         access.write_text((native.ROOT / "src/Managers/ofxOceanodeContainer.h").read_text().replace("private:", "public:"))
         native.PRELUDE = '#include "' + str(access) + '"\n' + native.PRELUDE
-        # Preserve logical GUI/snapshot data through real macro folder snapshots.
-        native.SUPPORT = native.SUPPORT.replace(
-            'void ofxOceanodeContainer::loadCustomGuis(const std::string&) { assert(customGuiPanels.empty()); }',
-            'void ofxOceanodeContainer::loadCustomGuis(const std::string& path) { if(std::filesystem::exists(path+"/custom_guis.json")) customGuiPanelsData=customGuiPanelsFromJson(ofLoadJson(path+"/custom_guis.json")); }')
-        native.SUPPORT = native.SUPPORT.replace(
-            'void ofxOceanodeContainer::saveCustomGuis(const std::string&) { assert(customGuiPanels.empty()); }',
-            'void ofxOceanodeContainer::saveCustomGuis(const std::string& path) { assert(ofSaveJson(path+"/custom_guis.json",customGuiPanelsToJson(customGuiPanelsData))); }')
-        native.SUPPORT = native.SUPPORT.replace(
-            'void ofxOceanodeContainer::loadCustomGuiSnapshots(const std::string&) { assert(customGuiSnapshotBanks.empty()); }',
-            'void ofxOceanodeContainer::loadCustomGuiSnapshots(const std::string& path) { if(std::filesystem::exists(path+"/custom_gui_snapshots.json")) customGuiSnapshotBanks=customGuiSnapshotBanksFromJson(ofLoadJson(path+"/custom_gui_snapshots.json")); }')
-        native.SUPPORT = native.SUPPORT.replace(
-            'void ofxOceanodeContainer::saveCustomGuiSnapshots(const std::string&) { assert(customGuiSnapshotBanks.empty()); }',
-            'void ofxOceanodeContainer::saveCustomGuiSnapshots(const std::string& path) { assert(ofSaveJson(path+"/custom_gui_snapshots.json",customGuiSnapshotBanksToJson(customGuiSnapshotBanks))); }')
+        extra_sources, extra_includes = [], []
+        cases = CASES
+        if "--with-custom-gui" in __import__("sys").argv:
+            from custom_gui_test_support import enable_custom_gui
+            extra_sources, extra_includes = enable_custom_gui(native, graph_helpers=False)
+            cases = cases.replace('c.customGuiPanelsData', 'ofxOceanodeCustomGui::get(c).getCustomGuiPanelsData()')
+            cases = cases.replace('child->customGuiPanelsData', 'ofxOceanodeCustomGui::get(*child).getCustomGuiPanelsData()')
+            cases = cases.replace('c.customGuiSnapshotBanks', 'customGuiSnapshotBanksFromJson(ofxOceanodeCustomGui::get(c).snapshotsForReview())')
+            start = cases.index('    ofxOceanodeCustomGui::get(c).getCustomGuiPanelsData()={a,b};')
+            end = cases.index('\n}\nint main', start)
+            cases = cases[:start] + r'''
+    ofxOceanodeCustomGui::attach(c);
+    std::vector<CustomGuiPanelData> panels{a,b};
+    std::vector<CustomGuiSnapshotBank> banks;
+    for(const auto& p:panels){
+        CustomGuiSnapshotBank bank;bank.customGuiId=p.id;bank.customGuiName=p.name;
+        CustomGuiSnapshotData snapshot;snapshot.id="s";snapshot.name="Saved";
+        for(const auto& w:p.layout.widgets)snapshot.parameterValues[w.parameterRef.parameterPath]={"float",.15f};
+        bank.snapshots.push_back(snapshot);banks.push_back(bank);
+    }
+    auto& gui = ofxOceanodeCustomGui::get(c);
+    gui.restoreState({{"panels",customGuiPanelsToJson(panels)},{"snapshots",customGuiSnapshotBanksToJson(banks)}},gui.captureState());
+''' + cases[end:]
+        else:
+            for signature in ['static void verifyPublications(', 'static void addPanels(']:
+                body = block(cases, signature)
+                cases = cases.replace(body, body[:body.index('{')+1] + '}')
+            cases = cases.replace('GUI/snapshot migration', 'optional GUI absent')
+            cases = '\n'.join(line for line in cases.split('\n') if 'customGuiPanelsData.size()' not in line and 'static CustomGuiWidget widget(' not in line)
         base_production = native.native_production
 
         def production():
@@ -305,8 +321,8 @@ def main():
             return result
 
         native.native_production = production
-        native.CASES = CASES
-        native.main()
+        native.CASES = cases
+        native.main(extra_sources, extra_includes)
 
 
 if __name__ == "__main__":

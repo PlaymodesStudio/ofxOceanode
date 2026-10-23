@@ -314,7 +314,7 @@ void ofxOceanodeHelp::drawWindowMenu(ofxOceanodeControls& controls) {
     }
     if(ImGui::Button("Apply"))
         for(const auto& name : names) visibility[name] = pendingControllerVisibility.at(name);
-    struct Entry { std::string label; std::function<void()> draw; };
+    using Entry = ofxOceanodeCustomGuiExtension::WindowEntry;
     std::vector<Entry> nodes, macros, panels;
     std::function<void(ofxOceanodeContainer*, const std::string&)> collect =
         [&](ofxOceanodeContainer* owner, const std::string& path){
@@ -346,23 +346,9 @@ void ofxOceanodeHelp::drawWindowMenu(ofxOceanodeControls& controls) {
                 addToggles(node->getParameters());
                 addToggles(node->getInspectorParameters());
             }
-            for(const auto& panel : owner->getCustomGuiPanelsData()) {
-                const auto id = panel.id, label = path + panel.name;
-                panels.push_back({label, [owner,id,label](){
-                    auto* data = owner->getCustomGuiPanelData(id);
-                    if(!data) return;
-                    bool show = data->windowState.isOpen;
-                    if(ImGui::Checkbox(label.c_str(), &show)) {
-                        if(show) owner->openCustomGuiPanel(id);
-                        else { data->windowState.isOpen = false; owner->markCustomGuisDirty(); }
-                    }
-                    ImGui::SameLine();
-                    if(ImGui::BeginMenu("Options")) {
-                        if(ImGui::MenuItem("Edit")) owner->openCustomGuiPanel(id, true);
-                        if(ImGui::MenuItem("Delete")) owner->requestDeleteCustomGuiPanel(id);
-                        ImGui::EndMenu();
-                    }
-                }});
+            if(auto* extension = owner->getCustomGuiExtension()) {
+                auto entries = extension->windowEntries(path);
+                panels.insert(panels.end(), entries.begin(), entries.end());
             }
         };
     collect(root.get(), "");
@@ -374,10 +360,10 @@ void ofxOceanodeHelp::drawWindowMenu(ofxOceanodeControls& controls) {
     };
     section("Nodes", nodes);
     section("Macros", macros);
-    section("Custom GUIs", panels);
-    if(ImGui::MenuItem("New Custom GUI")) {
+    if(root->getCustomGuiExtension()) section("Custom GUIs", panels);
+    if(root->getCustomGuiExtension() && ImGui::MenuItem("New Custom GUI")) {
         auto* owner = root->getContainerForCanvasID(ofxOceanodeShared::getActiveCanvasUniqueID());
         if(!owner) owner = root.get();
-        owner->requestCreateCustomGui("", CustomGuiWidgetType::Slider, true);
+        if(auto* extension = owner->getCustomGuiExtension()) extension->requestCreate();
     }
 }
