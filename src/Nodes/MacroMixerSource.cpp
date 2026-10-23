@@ -322,6 +322,8 @@ bool morphEditable(ofxOceanodeNodeModel& model, ofxOceanodeAbstractParameter& p,
     // the shared Portal service. Writing saved values here would feed them back
     // into their senders and compete with the graph's actual controls.
     if(model.nodeName().rfind("Portal ",0)==0) return false;
+    const auto hint=model.morphHint(p);
+    if(hint==ofxOceanodeNodeModel::MorphHint::Skip || hint==ofxOceanodeNodeModel::MorphHint::Structural) return false;
     // OF reports numeric vectors as non-serializable; the native Oceanode
     // preset saver explicitly handles them, so use that same exception here.
     const bool numericVector=p.valueType()==typeid(std::vector<float>).name() || p.valueType()==typeid(std::vector<int>).name();
@@ -387,6 +389,7 @@ void captureMorphContainer(const MacroMixerSource::Graph& graph, ofxOceanodeCont
             auto* p = dynamic_cast<ofxOceanodeAbstractParameter*>(&parameters.get(i));
             if(!p || !morphEditable(model,*p,owner,graph,prefix.empty())) continue;
             if(auto value = captureMorph(*p)) {
+                value->discrete |= model.morphHint(*p)==ofxOceanodeNodeModel::MorphHint::Switch;
                 auto key = path; key.push_back(p->getName()); values.emplace(std::move(key),std::move(*value));
             }
         }
@@ -650,6 +653,10 @@ struct MorphContainerEdit {
     ofJson original, target;
     std::vector<std::string> added, removed;
     MorphPath path;
+    // Matched nodes that blend their own saved state; changed: it differs
+    // between the two saved patches.
+    struct NodeMorph { std::string key; bool changed; };
+    std::vector<NodeMorph> nodeMorphs;
 };
 // A whole nested Macro can be staged through native recall and retired as one
 // unit. Edits to existing published interfaces/shared Portal services still need
@@ -676,7 +683,7 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
         for(const auto& edge:all) if(expected.count(edge)!=actual.count(edge))
             throw std::runtime_error(morphLocation(prefix,edge[2],edge[3])+": live cable differs ("+edge[0]+" / "+edge[1]+")");
     }
-    MorphContainerEdit edit{&container,original,target,{},{},prefix};
+    MorphContainerEdit edit{&container,original,target,{},{},prefix,{}};
     for(auto it=before.begin();it!=before.end();++it) if(!after.contains(it.key())) {
         if(!morphStageable(it.value())) throw std::runtime_error("Unmatched interface/service node removed: "+it.key());
         edit.removed.push_back(it.key());
@@ -686,6 +693,7 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
         edit.added.push_back(it.key());
     }
     edits.push_back(std::move(edit));
+    const size_t editIndex=edits.size()-1; // Nested Macros append their own edits.
     for(auto* node:nodes) {
         auto& model=node->getNodeModel(); const auto key=morphNodeKey(model);
         if(!before.contains(key)) return false;
@@ -711,6 +719,7 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
             } else if(auto* parameter=dynamic_cast<ofxOceanodeAbstractParameter*>(&p)) {
                 if(!parameter->hasInConnection() && !(parameter->getFlags()&ofxOceanodeParameterFlags_DisableInConnection)
                    && !captureMorph(*parameter)) continue; // Unsupported control/configuration.
+                if(!parameter->hasInConnection() && model.morphHint(*parameter)==ofxOceanodeNodeModel::MorphHint::Structural) continue;
             }
             oldConfig.erase(p.getEscapedName()); newConfig.erase(p.getEscapedName());
         }
@@ -720,6 +729,14 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
             oldConfig.erase(inspector->getEscapedName()); newConfig.erase(inspector->getEscapedName());
         }
         oldConfig.erase("expanded"); newConfig.erase("expanded");
+        // Saved state the node blends itself, and saved keys without sound.
+        const auto morphKeys=model.morphKeys();
+        for(const auto& name:morphKeys.ignored) { oldConfig.erase(name); newConfig.erase(name); }
+        bool blendedChanged=false;
+        for(const auto& name:morphKeys.blended) {
+            blendedChanged|=oldConfig.value(name,ofJson())!=newConfig.value(name,ofJson());
+            oldConfig.erase(name); newConfig.erase(name);
+        }
         if(oldConfig!=newConfig) {
             std::set<std::string> fields;
             for(auto it=oldConfig.begin();it!=oldConfig.end();++it) fields.insert(it.key());
@@ -731,6 +748,14 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
                 if(morphStageable(a)) throw MorphNodeMismatch(morphLocation(prefix,key),reason,prefix,key);
                 throw std::runtime_error(morphLocation(prefix,key)+": "+reason);
             }
+        }
+        if(!morphKeys.blended.empty()) {
+            std::string reason;
+            if(!model.morphCheck(b.at("settings"),reason)) {
+                if(morphStageable(a)) throw MorphNodeMismatch(morphLocation(prefix,key),reason,prefix,key);
+                throw std::runtime_error(morphLocation(prefix,key)+": "+reason);
+            }
+            edits[editIndex].nodeMorphs.push_back({key,blendedChanged});
         }
         if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model)) {
             if(!a.contains("graph") || !b.contains("graph") || !macro->getContainer()) return false;
@@ -750,6 +775,7 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
             }
             if(!saved->contains(name) || saved->at(name).is_null()) continue;
             if(auto prototype=captureMorph(*p)) {
+                prototype->discrete|=model.morphHint(*p)==ofxOceanodeNodeModel::MorphHint::Switch;
                 auto control=path; control.push_back(p->getName());
                 values.emplace(std::move(control),savedMorphValue(*prototype,saved->at(name)));
             }
@@ -1037,6 +1063,14 @@ struct MacroMixerMorphTopology {
     std::vector<Signal> signals;
     std::vector<std::pair<ofxOceanodeContainer*,std::string>> created;
     std::vector<std::pair<ofxOceanodeContainer*,std::vector<std::string>>> newCables;
+    // Nodes blending their own saved state, once morphBegin accepted.
+    std::vector<std::pair<ofxOceanodeContainer*,std::string>> nodeMorphs;
+    // Resolved on each use: a listener may rebuild a node's ports meanwhile.
+    void endNodeMorphs(bool completed) {
+        for(auto it=nodeMorphs.rbegin();it!=nodeMorphs.rend();++it)
+            if(auto* node=morphNode(*it->first,it->second)) node->getNodeModel().morphEnd(completed);
+        nodeMorphs.clear();
+    }
     ofJson targetDefinition;
     std::shared_ptr<ofxOceanodeContainer> hostLease;
     bool complete=false;
@@ -1055,6 +1089,7 @@ struct MacroMixerMorphTopology {
     }
     ~MacroMixerMorphTopology() { if(!complete) { try { rollback(); } catch(...) {} } }
     void rollback() {
+        endNodeMorphs(false);
         auto lease=retirementLease();
         for(auto& signal:signals) signal.blend->disconnect();
         for(auto& cable:newCables) removeMorphCable(morphCable(*cable.first,cable.second));
@@ -1076,9 +1111,14 @@ struct MacroMixerMorphTopology {
         complete=true;
     }
     bool ready() const { for(auto& signal:signals) if(!signal.blend->ready()) return false; return true; }
-    void progress(float t) { for(auto& signal:signals) signal.blend->progress(t); }
+    void progress(float t) {
+        for(auto& signal:signals) signal.blend->progress(t);
+        for(const auto& entry:nodeMorphs)
+            if(auto* node=morphNode(*entry.first,entry.second)) node->getNodeModel().morphApply(t,t>=.5f);
+    }
     void draw() { for(auto& signal:signals) signal.blend->draw(); }
     void commit() {
+        endNodeMorphs(true);
         auto lease=retirementLease();
         for(auto& signal:signals) signal.blend->disconnect();
         for(auto& signal:signals) {
@@ -1156,6 +1196,13 @@ struct MacroMixerMorphTopology {
             node->loadInspectorParametersFromJson(json); model.presetRecallAfterSettingParameters(json);
             node->activateConnections(); node->presetHasLoaded();
         }
+        for(auto& edit:edits) for(const auto& entry:edit.nodeMorphs) {
+            auto* node=morphNode(*edit.container,entry.key);
+            std::string reason="node is unavailable";
+            if(!node || !node->getNodeModel().morphBegin(edit.target.at("nodes").at(entry.key).at("settings"),reason))
+                throw std::runtime_error(morphLocation(edit.path,entry.key)+": "+reason);
+            nodeMorphs.emplace_back(edit.container,entry.key);
+        }
     }
 };
 
@@ -1218,6 +1265,8 @@ std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revisio
             std::set<std::string> replacements;
             for(const auto& split:splits) if(split.first.first==edit.path) replacements.insert(split.second.replacement);
             for(const auto& key:edit.added) if(!replacements.count(key)) result.push_back({"added",morphLocation(edit.path,key),"Starts when the morph begins"});
+            for(const auto& entry:edit.nodeMorphs) if(entry.changed) result.push_back({"node",morphLocation(edit.path,entry.key),
+                "Blends its own saved state on the running node"});
             for(const auto& key:edit.removed) {
                 const auto split=splits.find({edit.path,key});
                 if(split==splits.end()) result.push_back({"removed",morphLocation(edit.path,key),"Runs until the morph completes"});

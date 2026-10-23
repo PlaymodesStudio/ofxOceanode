@@ -142,7 +142,7 @@ def native_production():
     result+=block(canvas,'void ofxOceanodeCanvas::setup(')+'\n'
     return result
 
-def main(extra_sources=(), extra_includes=()):
+def main(extra_sources=(), extra_includes=(), std='c++17'):
     of=of_root(); libdir=of/'libs/openFrameworksCompiled/lib/macos'
     includes=[*extra_includes, ROOT/'src', *sorted({p.parent for p in (ROOT/'src').rglob('*.h')})]
     includes+=sorted({p.parent for p in (of/'libs/openFrameworks').rglob('*.h')})
@@ -173,7 +173,7 @@ def main(extra_sources=(), extra_includes=()):
         sources = list(dict.fromkeys(sources))
         # Compile the production Inspector along with the native Macro runtime.
         imgui=of/'addons/ofxImGui/libs/imgui/src'
-        flags=[os.environ.get('CXX','clang++'),'-std=c++17','-O0','-g','-w','-fsanitize=address,undefined','-fno-omit-frame-pointer','-DOF_NO_FMOD',
+        flags=[os.environ.get('CXX','clang++'),'-std='+std,'-O0','-g','-w','-fsanitize=address,undefined','-fno-omit-frame-pointer','-DOF_NO_FMOD',
                *['-I'+str(p) for p in includes]]
         units=[cpp,*[ROOT/s for s in sources],
                *[imgui/s for s in ('imgui.cpp','imgui_draw.cpp','imgui_tables.cpp','imgui_widgets.cpp')],

@@ -60,6 +60,25 @@ public:
     // this declaration recursively and rejects the Macro before constructing it.
     // Ordinary Macro loading does not apply this restriction.
     virtual std::string macroMixerBlocker() const { return {}; }
+    // MacroMixer morphs between saved patches. By default it interpolates the
+    // parameter group and treats any other differing saved key as a
+    // configuration change, which replaces the node. A node that blends its
+    // own saved state names those keys (blended), names saved keys that never
+    // affect the sound (ignored), and implements morphCheck/Begin/Apply/End.
+    struct MorphKeys { std::vector<std::string> blended, ignored; };
+    // Interpolate: the default. Switch: jumps half way. Skip: the node drives
+    // it (or it is not sound). Structural: a different value replaces the node.
+    enum class MorphHint { Interpolate, Switch, Skip, Structural };
+    virtual MorphKeys morphKeys() const { return {}; }
+    virtual MorphHint morphHint(const ofxOceanodeAbstractParameter&) const { return MorphHint::Interpolate; }
+    // Whether the node can blend into these saved settings, without side effects.
+    virtual bool morphCheck(const ofJson& target, std::string& reason) const { return true; }
+    // Captures the current state as the start. Called once, before morphApply.
+    virtual bool morphBegin(const ofJson& target, std::string& reason) { reason = "Node does not morph its saved state"; return false; }
+    // t from 0 (start) to 1 (target); switched: discrete values take the target's.
+    virtual void morphApply(float t, bool switched) {}
+    // completed: the target was reached; otherwise restore the start.
+    virtual void morphEnd(bool completed) {}
     // Opt in only for models whose work is represented by cables and host
     // parameter bindings. Unknown models and external effects stay alive.
     virtual bool canRemoveWhenUnused() const { return unusedCleanupSafe; }

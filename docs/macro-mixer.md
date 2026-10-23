@@ -155,6 +155,38 @@ graph keeps morphing in place. Morph details lists it as **Replaced node**
 with the differing setting. If a blend is impossible (for example a cable
 into a trigger or Portal), the whole graph falls back as described next.
 
+### Nodes that blend their own saved state
+
+Many nodes keep their sound outside the parameter group, in their own saved
+block (SuperCollider nodes such as SC polyComb). They can opt in through
+`ofxOceanodeNodeModel`; nodes that don't keep today's behaviour.
+
+- `morphKeys()`: `blended` saved keys the node blends itself, and `ignored`
+  saved keys without sound (view sizes, tabs, browser folders). Neither counts
+  as a configuration change.
+- `morphHint(parameter)` for parameters in the group: `Interpolate` (default),
+  `Switch` (jumps half way), `Skip` (the node drives it, or it is not sound) or
+  `Structural` (a different saved value replaces the node, for example a voice
+  or channel count).
+- `morphCheck(target, reason)`: whether the node can blend into those saved
+  settings, without side effects. A refusal replaces just that node, with the
+  reason in Morph details.
+- `morphBegin(target)` captures the node's current state as the start;
+  `morphApply(t, switched)` runs every frame with the eased progress and
+  `switched` from half way; `morphEnd(completed)` either keeps the target or,
+  on cancellation, restores the start.
+
+MacroMixer owns the timing (Duration, Bi Pow, Finish, cancellation); the node
+owns how its values blend. Morph details lists such a node as **Node morph**.
+
+SC polyComb blends its `polyComb*` block (every window control, the
+modulation matrix, LFO/envelope/Ext counts and modulated controls' bases)
+with its existing snapshot morph: numbers glide (times, rates and frequencies
+in log), modes switch half way, its own Snapshot/Morph/Ext controls are left
+alone, and published controls are blended with the rest of the sound. Voices
+and Channels are Structural, so a change there replaces the polyComb. Show is
+skipped.
+
 When the running graph cannot be reused, the morph falls back to a crossfade.
 A fresh destination Macro is loaded next to the running one and both keep
 running. The destination's matching controls start at the captured current
@@ -342,7 +374,9 @@ branches listed in `macro-mixer-migration-audit.md`.
   save/restore and fallback value capture across renamed paths. Fallbacks keep
   the origin running and crossfade outputs with the router policy. A changed
   node configuration replaces only that node (nested HeaderPro, a probe with
-  blended output) while Router changes still fall back. Whole local,
+  blended output) while Router changes still fall back. A mock node that blends
+  its own hidden state covers the node morph hooks: ignored keys, Skip, Switch
+  and Structural hints, a refused check and cancellation. Whole local,
   global and empty nested Macro additions/removals cover incoming controls,
   connected live outputs, native destruction, cancellation, failed preparation,
   alias collisions and repeated transitions. Different live sources driving an
@@ -374,6 +408,11 @@ branches listed in `macro-mixer-migration-audit.md`.
   settings differ, and the fallback crossfade of a morph that cannot reuse the
   running graph. It needs a SuperCollider addon with the MacroMixer routing
   fences (`serverManager::requestMixerRouting`).
+- `python3 tests/macro_mixer_polycomb_regression.py`: production SC polyComb,
+  without a server, morphing its hidden sound on the running node: linear and
+  log glides, a mode switching half way, Snapshot kept, cancellation and a
+  Voices change replacing the node. Needs the SuperCollider, ofxSuperCollider
+  and ofxOsc addons; builds as C++20.
 - `python3 tests/macro_mixer_sc_audio_regression.py`: actual offline SuperCollider
   render of the renamed SynthDefs, without opening an audio device.
 

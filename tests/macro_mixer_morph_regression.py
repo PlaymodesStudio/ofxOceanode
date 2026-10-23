@@ -55,6 +55,39 @@ public:
     ofParameter<float> phase;
     void setup() override { addParameter(phase.set("Phase",0,0,1),ofxOceanodeParameterFlags_DisableSavePreset); }
 };
+// Keeps its sound outside the parameter group, as SuperCollider nodes do, and
+// blends it itself through the node morph hooks.
+static int blobBegins=0, blobEnds=0, blobCancels=0;
+class MorphBlob : public ofxOceanodeNodeModel {
+public:
+    MorphBlob():ofxOceanodeNodeModel("Morph Blob") {}
+    float level=0; int mode=0; bool locked=false;
+    ofParameter<int> voices; ofParameter<float> skipped,toggle,output;
+    ofJson from,to;
+    void setup() override {
+        addParameter(voices.set("Voices",1,1,8)); addParameter(skipped.set("Skipped",0,0,10));
+        addParameter(toggle.set("Toggle",0,0,10)); addOutputParameter(output.set("Output",0,-1000,1000));
+    }
+    void update(ofEventArgs&) override { output=level+mode*10; }
+    ofJson state() const { return {{"level",level},{"mode",mode},{"locked",locked}}; }
+    void load(const ofJson& j) { level=j.value("level",0.f); mode=j.value("mode",0); locked=j.value("locked",false); }
+    void presetSave(ofJson& j) override { j["blob"]=state(); j["view"]=level; }
+    void presetRecallAfterSettingParameters(ofJson& j) override { if(j.contains("blob")) load(j["blob"]); }
+    MorphKeys morphKeys() const override { return {{"blob"},{"view"}}; }
+    MorphHint morphHint(const ofxOceanodeAbstractParameter& p) const override {
+        return p.getName()=="Voices" ? MorphHint::Structural : p.getName()=="Skipped" ? MorphHint::Skip
+             : p.getName()=="Toggle" ? MorphHint::Switch : MorphHint::Interpolate;
+    }
+    bool morphCheck(const ofJson& target,std::string& reason) const override {
+        if(target.contains("blob") && target.at("blob").value("locked",false)) { reason="locked blob"; return false; }
+        return true;
+    }
+    bool morphBegin(const ofJson& target,std::string&) override { from=state(); to=target.value("blob",state()); ++blobBegins; return true; }
+    void morphApply(float t,bool switched) override {
+        level=ofLerp(from.value("level",0.f),to.value("level",0.f),t); mode=(switched?to:from).value("mode",0);
+    }
+    void morphEnd(bool completed) override { if(!completed) load(from); ++(completed?blobEnds:blobCancels); }
+};
 class SharedPortalProbe : public ofxOceanodeNodeModel {
 public:
     ofParameter<float> value;
@@ -86,7 +119,7 @@ int main(int argc,char** argv) {
     registry->registerModel<bufferHeaderPro<float>>("Buffer","f",0.f);
     registry->registerModel<oscillator>("Generators"); registry->registerModel<ranger>("Modifiers");
     registry->registerModel<phasor>("Clock"); registry->registerModel<SharedPortalProbe>("Test");
-    registry->registerModel<MorphPhaseSink>("Test"); registry->registerModel<MorphProbe>("Test"); registry->registerModel<ofxOceanodeNodeMacro>("Macro");
+    registry->registerModel<MorphPhaseSink>("Test"); registry->registerModel<MorphProbe>("Test"); registry->registerModel<MorphBlob>("Test"); registry->registerModel<ofxOceanodeNodeMacro>("Macro");
     registry->registerModel<ofxOceanodeMacroMixer>("Macro");
     auto transport=std::make_shared<ofxOceanodeTransport>();
     ofxOceanodeContainer parent(registry,types,transport); parent.setCanvasID("MorphTest");
@@ -731,6 +764,54 @@ int main(int argc,char** argv) {
         assert(copy.mixerRuntime()->origin()->container!=loaded.mixerRuntime()->origin()->container);
         ofJson old; loaded.presetSave(old); old["MacroMixerState"].erase("morph"); loaded.loadBeforeConnections(old); assert(!loaded.getInspectorParameter<bool>("Morph macros"));
         parent.clearContainer();
+    }
+    // A node that keeps its sound outside the parameter group blends it on the
+    // running node. Its hints keep Structural values and Skip controls out of
+    // the morph, and ignored keys never count as a configuration change.
+    {
+        auto saveBlob=[&](const std::string& folder,float level,int mode,int voices,float skipped,float toggle,bool locked=false) {
+            ofxOceanodeContainer c(registry,types,transport); c.setCanvasID("BlobSource");
+            auto& out=floating(c); out.getParameter<std::string>("Name")="Value";
+            auto& blob=static_cast<MorphBlob&>(c.createNode(std::make_unique<MorphBlob>(),1).getNodeModel());
+            blob.level=level; blob.mode=mode; blob.locked=locked; blob.voices=voices; blob.skipped=skipped; blob.toggle=toggle;
+            assert(c.createConnectionFromInfo("Morph_Blob_1","Output","Router_f_1","Value"));
+            c.savePreset(folder);
+        };
+        const auto blobA=scratch+"/blob-a",blobB=scratch+"/blob-b",blobVoices=scratch+"/blob-voices",blobLocked=scratch+"/blob-locked";
+        saveBlob(blobA,2,0,1,1,1); saveBlob(blobB,6,3,1,9,9); saveBlob(blobVoices,6,3,4,9,9); saveBlob(blobLocked,6,3,1,9,9,true);
+        MacroMixerRuntime r(parent); assert(r.importMacro(blobA)&&r.importMacro(blobB));
+        r.request(blobA,0,0,true); r.update(0); const auto* original=r.origin();
+        auto blob=[&]() -> MorphBlob& { return static_cast<MorphBlob&>(original->container->getDynamicNodes().at("Morph Blob").begin()->second->getNodeModel()); };
+        near(blob().level,2);
+        auto details=r.sourceDetails(r.importedMacro(blobB)->id());
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="node"&&d.location=="Morph_Blob_1";}));
+        assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback"||d.kind=="replaced";}));
+        const int begins=blobBegins,ends=blobEnds;
+        r.request(blobB,1000,0,true); r.update(10); assert(r.morphingInPlace()&&r.origin()==original&&blobBegins==begins+1);
+        r.update(260); near(blob().level,3); assert(blob().mode==0); near(blob().toggle,1); near(blob().skipped,1);
+        r.update(760); near(blob().level,5); assert(blob().mode==3); near(blob().toggle,9); near(blob().skipped,1);
+        r.finish(); r.update(770); assert(!r.transitioning()&&r.origin()==original&&blobEnds==ends+1);
+        near(blob().level,6); assert(blob().mode==3); near(blob().skipped,1); // Skip: the node's own business.
+        r.update(780); near(r.value(),36);
+        // Cancelling restores the node's own start state.
+        const int cancels=blobCancels;
+        r.request(blobA,1000,0,true); r.update(790); r.update(1040); near(blob().level,5);
+        const_cast<MacroMixerSource::Graph*>(r.destination())->cancelMorph();
+        assert(blobCancels==cancels+1); near(blob().level,6); assert(blob().mode==3);
+        r.clear();
+        // A Structural parameter or a refused morphCheck replaces only that node.
+        MacroMixerRuntime s(parent); assert(s.importMacro(blobA)&&s.importMacro(blobVoices)&&s.importMacro(blobLocked));
+        s.request(blobA,0,0,true); s.update(0); const auto* graph=s.origin();
+        details=s.sourceDetails(s.importedMacro(blobVoices)->id());
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"&&d.location=="Morph_Blob_1"&&d.message.find("(Voices)")!=std::string::npos;}));
+        details=s.sourceDetails(s.importedMacro(blobLocked)->id());
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"&&d.message.find("locked blob")!=std::string::npos;}));
+        s.request(blobVoices,1000,0,true); s.update(10); assert(s.morphingInPlace()&&s.origin()==graph);
+        assert(graph->container->getDynamicNodes().at("Morph Blob").size()==2);
+        s.finish(); s.update(20); s.update(21); assert(!s.transitioning());
+        const auto& blobs=graph->container->getDynamicNodes().at("Morph Blob"); assert(blobs.size()==1&&!blobs.count(1));
+        assert(static_cast<MorphBlob&>(blobs.begin()->second->getNodeModel()).voices==4);
+        s.clear();
     }
     // Render the production Source section in an ImGui frame. Its visible text
     // includes both actionable fallback details and connection policy controls.
