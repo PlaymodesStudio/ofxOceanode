@@ -79,12 +79,45 @@ void click(ImGuiID id) {
     io.AddMouseButtonEvent(0,true); frame(); assert(GImGui->ActiveIdWindow==w);
     io.AddMouseButtonEvent(0,false); frame(); idle();
 }
+void jitterClick(ImGuiID id,float along,float across) {
+    auto* n=node(id);int axis=n->SplitAxis;
+    auto* w=handle(id);ImVec2 p(w->Pos.x+w->Size.x*0.5f,w->Pos.y+w->Size.y*0.5f);
+    float before=n->ChildNodes[0]->Size[axis];
+    auto& io=ImGui::GetIO();io.AddMousePosEvent(p.x,p.y);idle(2);
+    io.AddMouseButtonEvent(0,true);frame();assert(GImGui->ActiveIdWindow==w);
+    p[axis]+=along;p[axis^1]+=across;io.AddMousePosEvent(p.x,p.y);idle(2);
+    // Hand tremor must never resize or discard the expanded-size snapshot.
+    near(n->ChildNodes[0]->Size[axis],before,0.01f);
+    io.AddMouseButtonEvent(0,false);frame();idle();
+}
+void checkDragThreshold(ImGuiID id) {
+    auto* n=node(id);int axis=n->SplitAxis;auto* w=handle(id);
+    ImVec2 start(w->Pos.x+w->Size.x*0.5f,w->Pos.y+w->Size.y*0.5f);
+    auto& io=ImGui::GetIO();io.AddMousePosEvent(start.x,start.y);idle(2);
+    float first=n->ChildNodes[0]->Size[axis];
+    io.AddMouseButtonEvent(0,true);frame();
+    for(float delta:{11.0f,13.0f,24.0f,14.0f}) {
+        ImVec2 p=start;p[axis]+=delta;io.AddMousePosEvent(p.x,p.y);idle(2);
+        near(n->ChildNodes[0]->Size[axis],first+std::max(0.0f,delta-12.0f),0.01f);
+    }
+    io.AddMouseButtonEvent(0,false);frame();idle();
+    near(n->ChildNodes[0]->Size[axis],first+2.0f,0.01f);
+    // Movement delivered only with the release must still be classified as drag.
+    w=handle(id);start=ImVec2(w->Pos.x+w->Size.x*0.5f,w->Pos.y+w->Size.y*0.5f);
+    io.AddMousePosEvent(start.x,start.y);idle(2);first=n->ChildNodes[0]->Size[axis];
+    io.AddMouseButtonEvent(0,true);frame();
+    bool trickle=io.ConfigInputTrickleEventQueue;io.ConfigInputTrickleEventQueue=false;
+    start[axis]+=25.0f;io.AddMousePosEvent(start.x,start.y);io.AddMouseButtonEvent(0,false);frame();idle();
+    io.ConfigInputTrickleEventQueue=trickle;
+    near(n->ChildNodes[0]->Size[axis],first+13.0f,0.01f);
+}
 void drag(ImGuiID id,float delta,bool native=false) {
     auto* n=node(id); const int axis=n->SplitAxis,cross=axis^1;
     auto* w=handle(id); ImVec2 p(w->Pos.x+w->Size.x*0.5f,w->Pos.y+w->Size.y*0.5f);
     if(native) p[cross]=n->Pos[cross]+n->Size[cross]*0.25f;
     auto& io=ImGui::GetIO(); io.AddMousePosEvent(p.x,p.y);idle(2);
-    io.AddMouseButtonEvent(0,true);frame();p[axis]+=delta;io.AddMousePosEvent(p.x,p.y);idle(2);
+    // Handle dragging consumes the first 12 pixels as a click-tolerance zone.
+    io.AddMouseButtonEvent(0,true);frame();p[axis]+=delta+(native ? 0.0f : std::copysign(12.0f,delta));io.AddMousePosEvent(p.x,p.y);idle(2);
     io.AddMouseButtonEvent(0,false);frame();idle();
 }
 void checkGeometry(ImGuiDockNode* n) {
@@ -119,6 +152,24 @@ void checkHandles(ImGuiDockNode* n) {
 float width(int i) { return node(panes[i])->Size.x; }
 float height(int i) { return node(panes[i])->Size.y; }
 void restoreLayout() { policy.reset();build=true;showAll=true;idle(); }
+void checkThemeColors(ImGuiID id) {
+    auto hasColor=[&](ImU32 color) {
+        for(const auto& vertex:handle(id)->DrawList->VtxBuffer) if(vertex.col==color) return true;
+        return false;
+    };
+    auto& io=ImGui::GetIO();auto& style=ImGui::GetStyle();
+    const ImVec4 oldHover=style.Colors[ImGuiCol_ButtonHovered],oldActive=style.Colors[ImGuiCol_ButtonActive];
+    style.Colors[ImGuiCol_ButtonHovered]=ImVec4(0.8f,0.1f,0.6f,1);
+    style.Colors[ImGuiCol_ButtonActive]=ImVec4(0.2f,0.9f,0.1f,1);
+    io.AddMousePosEvent(-100,-100);idle(2);
+    assert(hasColor(ImGui::GetColorU32(ImVec4(0.25f,0.25f,0.25f,1))));
+    auto* w=handle(id);io.AddMousePosEvent(w->Pos.x+w->Size.x*0.5f,w->Pos.y+w->Size.y*0.5f);idle(2);
+    assert(hasColor(ImGui::GetColorU32(ImGuiCol_ButtonHovered)));
+    assert(hasColor(ImGui::GetColorU32(ImGuiCol_Text)));
+    io.AddMouseButtonEvent(0,true);frame();assert(hasColor(ImGui::GetColorU32(ImGuiCol_ButtonActive)));
+    io.AddMouseButtonEvent(0,false);frame();idle();click(id);
+    style.Colors[ImGuiCol_ButtonHovered]=oldHover;style.Colors[ImGuiCol_ButtonActive]=oldActive;
+}
 void checkOcclusion(ImGuiID id,bool submitAfter) {
     auto* arrow=handle(id);
     ImVec2 center(arrow->Pos.x+arrow->Size.x*0.5f,arrow->Pos.y+arrow->Size.y*0.5f);
@@ -149,9 +200,24 @@ int main() {
     ImGui::GetStyle().DockingSeparatorSize=4;ImGui::GetStyle().WindowRounding=0;
     unsigned char* pixels;int w,h;io.Fonts->GetTexDataAsRGBA32(&pixels,&w,&h);
     ofxOceanodeFloatingWindowDecor::install();idle();checkHandles(node(rootID));
+    checkThemeColors(nearLeft);checkThemeColors(bottomSplit);
     checkOcclusion(nearLeft,false);checkOcclusion(bottomSplit,false);
     checkOcclusion(nearLeft,true);checkOcclusion(bottomSplit,true);
     const float minX=ImGui::GetStyle().WindowMinSize.x, minY=ImGui::GetFrameHeight();
+    const float globalThreshold=io.MouseDragThreshold;
+    io.MouseDragThreshold=0.1f; // Handle clicks must tolerate a sensitive global drag setting.
+    const ImVec2 tremors[]={ImVec2(1,0),ImVec2(5,0),ImVec2(8,0),ImVec2(0,8),ImVec2(5,8)};
+    for(const auto& tremor:tremors) {
+        float left=width(0),inner=width(1),bottomHeight=height(6);
+        jitterClick(nearLeft,tremor.x,tremor.y);near(width(0),minX);near(width(1),minX);
+        jitterClick(nearLeft,tremor.x,tremor.y);near(width(0),left);near(width(1),inner);
+        jitterClick(bottomSplit,tremor.x,tremor.y);near(height(6),minY);
+        jitterClick(bottomSplit,tremor.x,tremor.y);near(height(6),bottomHeight);
+    }
+    // Moving well outside the handle along its line still cancels a click.
+    float left=width(0);jitterClick(nearLeft,0,60);near(width(0),left);
+    io.MouseDragThreshold=globalThreshold;
+    checkDragThreshold(nearLeft);checkDragThreshold(bottomSplit);
     for(int variant=0;variant<2;++variant) {
         grouped=variant;restoreLayout();
         float a=width(0),b=width(1),canvas=width(2),right=width(3);
@@ -196,7 +262,7 @@ int main() {
     node(panes[6])->SetLocalFlags(node(panes[6])->LocalFlags|ImGuiDockNodeFlags_HiddenTabBar);idle();
     click(bottomSplit);near(height(6),minY);assert(!(node(panes[6])->VisibleWindow->Flags&ImGuiWindowFlags_NoTitleBar));
     click(bottomSplit);assert(node(panes[6])->IsHiddenTabBar());
-    std::printf("PASS: floating-window render/input occlusion, enlarged centred shadow-free handles, all four directions, both left-dock topologies, preserved neighbours, nested/independent folds, restore, save/load, mouse/native drag, host resize, topology changes, disabled splits and hidden tabs.\n");
+    std::printf("PASS: click tremor/release tolerance, axis-only drag threshold, smooth drag start and quick release, floating-window render/input occlusion, shadow-free handles, all four directions, both left-dock topologies, preserved neighbours, nested/independent folds, restore, save/load, mouse/native drag, host resize, topology changes, disabled splits and hidden tabs.\n");
     ImGui::DestroyContext();
 }
 '''

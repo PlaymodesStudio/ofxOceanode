@@ -15,45 +15,7 @@
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeColors.h"
-
-// Preserve the current split proportions only along axes whose available size
-// changed. SizeRef is an allocation hint, not necessarily the visible size
-// (especially beside the central node). Never reallocate stacked rows just
-// because their shared width changed.
-static void RescaleDockNodeProportional(ImGuiDockNode* node, ImVec2 oldSize, ImVec2 newSize)
-{
-    if(node == NULL || !node->IsSplitNode()) return;
-
-    ImGuiDockNode* c0 = node->ChildNodes[0];
-    ImGuiDockNode* c1 = node->ChildNodes[1];
-    ImVec2 size0 = newSize;
-    ImVec2 size1 = newSize;
-    if(c0->IsVisible && c1->IsVisible)
-    {
-        const ImGuiAxis axis = static_cast<ImGuiAxis>(node->SplitAxis);
-        size0[axis] = c0->Size[axis];
-        size1[axis] = c1->Size[axis];
-        const float total = size0[axis] + size1[axis];
-        if(oldSize[axis] != newSize[axis] && total > 0.0f)
-        {
-            // Exclude the separator and use the same pixel rounding/minimum
-            // allocation as ImGui, so nested splits receive their actual next
-            // content size rather than the parent's unpartitioned SizeRef.
-            const float available = std::max(0.0f,
-                newSize[axis] - ImGui::GetStyle().DockingSeparatorSize);
-            const float minimum = ImTrunc(std::min(available,
-                ImGui::GetStyle().WindowMinSize[axis] * 2.0f) * 0.5f);
-            size0[axis] = std::max(minimum, std::min(available - minimum,
-                ImTrunc(available * (size0[axis] / total) + 0.5f)));
-            size1[axis] = available - size0[axis];
-            c0->SizeRef[axis] = size0[axis];
-            c1->SizeRef[axis] = size1[axis];
-        }
-    }
-
-    if(c0->IsVisible) RescaleDockNodeProportional(c0, c0->Size, size0);
-    if(c1->IsVisible) RescaleDockNodeProportional(c1, c1->Size, size1);
-}
+#include "ofxOceanodeScopeProportions.h"
 
 static std::string BuildScopeWindowName(const ofxOceanodeScopeItem& item)
 {
@@ -499,19 +461,12 @@ void ofxOceanodeScope::draw(){
 
     const ImVec2 currentPos = ImGui::GetWindowPos();
     const ImVec2 currentSize = ImGui::GetWindowSize();
-    // Resize the existing tree before ImGui calculates this frame's layout.
-    // Use content dimensions, excluding the outer container's title/padding.
-    if(lastWindowConfig.hasConfig
-        && (currentSize.x != lastWindowConfig.width || currentSize.y != lastWindowConfig.height))
-    {
-        ImGuiDockNode* root = ImGui::DockBuilderGetNode(dockspace_id);
-        if(root != NULL)
-        {
-            const ImVec2 available = ImGui::GetContentRegionAvail();
-            RescaleDockNodeProportional(root, root->Size,
-                ImVec2(std::max(available.x, 4.0f), std::max(available.y, 4.0f)));
-        }
-    }
+    // Observe user layout edits every frame, but retain the desired ratios when
+    // minimum sizes clamp the internal dock tree during a host collapse.
+    if(!dockProportions) dockProportions = std::make_shared<ofxOceanodeScopeProportions>();
+    const ImVec2 available = ImGui::GetContentRegionAvail();
+    dockProportions->prepare(ImGui::DockBuilderGetNode(dockspace_id),
+        ImVec2(std::max(available.x, 4.0f), std::max(available.y, 4.0f)));
     lastWindowConfig.hasConfig = true;
     lastWindowConfig.posX = currentPos.x;
     lastWindowConfig.posY = currentPos.y;
@@ -519,6 +474,7 @@ void ofxOceanodeScope::draw(){
     lastWindowConfig.height = currentSize.y;
 
     ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None, &window_class);
+    dockProportions->finish();
     ImGui::End();
 
     for(int i = 0; i < scopedParameters.size(); i++)
@@ -695,6 +651,7 @@ void ofxOceanodeScope::clearScopedParameters() {
     scopedParameterSet.clear();
     pendingDockWindows.clear();
     lastCentralScopeWindowID = 0;
+    dockProportions.reset();
     dockMaintenancePending = true;
     lastSettledDockLayoutSignature = 0;
 }

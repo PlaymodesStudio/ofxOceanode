@@ -106,7 +106,7 @@ private:
     AxisState axes[2];
     Request pending;
     ImGuiID rootID = 0, dragging = 0;
-    float dragFirstSize = 0;
+    float dragFirstSize = 0, dragThresholdOffset = 0;
     bool dragged = false, enabled = false;
     int frame = -1;
     ImGuiDockNodeFlags dockFlags = 0;
@@ -315,27 +315,52 @@ private:
         placeAboveDockTree(ImGui::GetCurrentWindow(), n->HostWindow);
         const bool clicked = ImGui::InvisibleButton("##Fold", size, ImGuiButtonFlags_NoNavFocus | ImGuiButtonFlags_NoFocus);
         const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
-        if(ImGui::IsItemActivated()) { dragging = n->ID; dragged = false; dragFirstSize = n->ChildNodes[0]->Size[axis]; }
-        if(active && dragging == n->ID && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-            dragged = true; pending.id = n->ID; pending.toggle = false;
-            pending.firstSize = dragFirstSize + ImGui::GetMouseDragDelta(ImGuiMouseButton_Left)[axis];
-            pending.signature.clear(); signature(root, pending.signature);
+        if(ImGui::IsItemActivated()) {
+            dragging = n->ID; dragged = false; dragThresholdOffset = 0;
+            dragFirstSize = n->ChildNodes[0]->Size[axis];
         }
-        if(clicked && !dragged) { pending.id = n->ID; pending.toggle = true; pending.signature.clear(); signature(root, pending.signature); }
+        const float dragThreshold = std::max(12.0f, ImGui::GetIO().MouseDragThreshold);
+        const bool released = ImGui::IsItemDeactivated() && ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+        if(dragging == n->ID && (active || released)) {
+            // Only movement along the resize axis starts a drag. Read the raw
+            // delta even on release, so a quick intentional drag cannot toggle.
+            const float delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left, 0.0f)[axis];
+            if(!dragged && std::abs(delta) > dragThreshold) {
+                dragged = true;
+                dragThresholdOffset = std::copysign(dragThreshold, delta);
+            }
+            if(dragged) {
+                pending.id = n->ID; pending.toggle = false;
+                // Consume the dead zone instead of jumping when dragging starts.
+                pending.firstSize = dragFirstSize + delta - dragThresholdOffset;
+                pending.signature.clear(); signature(root, pending.signature);
+            } else if(released && (clicked || ImGui::IsMouseHoveringRect(
+                ImVec2(pos.x - dragThreshold, pos.y - dragThreshold),
+                ImVec2(pos.x + size.x + dragThreshold, pos.y + size.y + dragThreshold), false))) {
+                // Small tremors may leave the thin hit rectangle. Keep the click
+                // while allowing a deliberate move away from the arrow to cancel.
+                pending.id = n->ID; pending.toggle = true;
+                pending.signature.clear(); signature(root, pending.signature);
+            }
+        }
         if(ImGui::IsItemDeactivated()) dragging = 0;
-        if(hovered || active) ImGui::SetMouseCursor(axis == ImGuiAxis_X ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
+        if(active && dragged) ImGui::SetMouseCursor(axis == ImGuiAxis_X ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
+        else if(hovered || active) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
         auto* draw = ImGui::GetWindowDrawList();
         // A small black backing and a filled triangle, clipped to the enlarged
         // hit area. The floating-window shadow and border remain disabled.
         draw->PushClipRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), true);
-        draw->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(0, 0, 0, 255), 2.0f);
+        const ImU32 background = active ? ImGui::GetColorU32(ImGuiCol_ButtonActive)
+            : hovered ? ImGui::GetColorU32(ImGuiCol_ButtonHovered) : IM_COL32(0, 0, 0, 255);
+        draw->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), background, 2.0f);
         ImVec2 tip(pos.x + size.x * 0.5f, pos.y + size.y * 0.5f), a = tip, b = tip;
         const float sign = (side == 0 ? -1.0f : 1.0f) * (collapsed ? -1.0f : 1.0f);
         const float radius = size[axis] * 0.32f;
         tip[axis] += sign * radius; a[axis] -= sign * radius; b[axis] -= sign * radius;
         a[cross] -= std::min(size[cross] * 0.3f, size[axis] * 0.7f);
         b[cross] += std::min(size[cross] * 0.3f, size[axis] * 0.7f);
-        draw->AddTriangleFilled(tip, a, b, ImGui::GetColorU32(active ? ImGuiCol_SeparatorActive : hovered ? ImGuiCol_SeparatorHovered : ImGuiCol_Text));
+        draw->AddTriangleFilled(tip, a, b, hovered || active ? ImGui::GetColorU32(ImGuiCol_Text)
+            : ImGui::GetColorU32(ImVec4(0.25f, 0.25f, 0.25f, 1.0f)));
         draw->PopClipRect();
         if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal) && !active) {
             const char* edge = axis == ImGuiAxis_X ? (side == 0 ? "left" : "right") : (side == 0 ? "top" : "bottom");

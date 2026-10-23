@@ -21,6 +21,7 @@
 
 class ofxOceanodeAbstractParameter;
 class ofxOceanodeContainer;
+class ofxOceanodeScopeProportions;
 class ImVec2;
 
 using ofxOceanodeScopeDrawFunc = std::function<void(ofxOceanodeAbstractParameter*, ImVec2)>;
@@ -133,7 +134,10 @@ public:
     using ScopeChangedCallback = std::function<void()>;
     void setScopeChangedCallback(ScopeChangedCallback callback);
     // Flag to suppress dock-tree rebuilds while loading a preset
-    void setLoadingFromPreset(bool loading) { isLoadingFromPreset = loading; }
+    void setLoadingFromPreset(bool loading) {
+        if(loading) dockProportions.reset();
+        isLoadingFromPreset = loading;
+    }
 
 private:
     struct PendingDockWindow {
@@ -157,6 +161,7 @@ private:
     
     ofxOceanodeScopeWindowConfig windowConfig;
     ofxOceanodeScopeWindowConfig lastWindowConfig;
+    std::shared_ptr<ofxOceanodeScopeProportions> dockProportions;
     ScopeChangedCallback scopeChangedCallback;
     void notifyScopeChanged();
     unsigned int lastCentralScopeWindowID = 0;

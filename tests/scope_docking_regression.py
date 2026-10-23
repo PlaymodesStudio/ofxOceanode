@@ -17,6 +17,9 @@ FIXTURE_PREFIX = r'''
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "ofxOceanodeProportionalDocking.h"
+#include "ofxOceanodeScopeProportions.h"
+#include <memory>
 #include <algorithm>
 #include <functional>
 #include <string>
@@ -32,6 +35,7 @@ public:
     struct Pending {std::string windowName; size_t scopeCountAtAdd;};
     std::vector<Pending> pendingDockWindows;
     Config windowConfig, lastWindowConfig;
+    std::shared_ptr<ofxOceanodeScopeProportions> dockProportions;
     bool dockMaintenancePending=true;
     unsigned long long lastSettledDockLayoutSignature=0;
     bool isLoadingFromPreset=false;
@@ -49,7 +53,8 @@ ofxOceanodeScope* ofxOceanodeScope::instance=nullptr;
 FIXTURE_TESTS = r'''
 static ImGuiDockNode* queuedTarget = nullptr;
 static std::function<void()> beforeDraw;
-static void frame(ofxOceanodeScope& s) {ImGui::NewFrame(); if(beforeDraw) beforeDraw(); s.draw(); ImGui::Render();}
+static std::function<void()> afterDraw;
+static void frame(ofxOceanodeScope& s) {ImGui::NewFrame(); if(beforeDraw) beforeDraw(); s.draw(); if(afterDraw) afterDraw(); ImGui::Render();}
 static void checkSettled(ofxOceanodeScope& s) {
     assert(!s.dockMaintenancePending);
     auto* root=ImGui::DockBuilderGetNode(s.lastDockspace);
@@ -194,8 +199,60 @@ int main(){
     for(auto& item:s.scopedParameters)
         assert(ImGui::FindWindowByName(item.windowName.c_str())->Size.x==scopeWidth);
     idle(s);
-    beforeDraw=nullptr;
-    printf("PASS: 100 width-only resizes, 100 real lateral splitter moves with three docked scopes, proportional height resize, idle stability, outside release, held drag, multiple floats, grouped tabs, queued drops, 400 rearrangements, saved layout, resize, central removal.\n");
+    // Reproduce the main bottom-dock collapse with exactly two scoped rows.
+    s.scopedParameters.resize(2);
+    ImGui::DockBuilderRemoveNodeChildNodes(s.lastDockspace);
+    for(size_t i=0;i<s.scopedParameters.size();++i)
+        DockScopeWindowAtBottom(s.scopedParameters[i].windowName,s.lastDockspace,i+1);
+    ImGui::DockBuilderFinish(s.lastDockspace);
+    ofxOceanodeProportionalDocking applicationDocking;
+    buildOuter=true;
+    beforeDraw=[&](){
+        ImGui::SetNextWindowPos(ImVec2(0,0));ImGui::SetNextWindowSize(io.DisplaySize);
+        ImGui::Begin("Application",nullptr,ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoDocking|ImGuiWindowFlags_NoBringToFrontOnFocus);
+        if(buildOuter) {
+            ImGui::DockBuilderRemoveNode(outerID);
+            ImGui::DockBuilderAddNode(outerID,ImGuiDockNodeFlags_DockSpace);
+            ImGui::DockBuilderSetNodeSize(outerID,ImGui::GetContentRegionAvail());
+            ImGuiID scopesID,otherID;
+            ImGui::DockBuilderSplitNode(outerID,ImGuiDir_Down,0.33f,&scopesID,&otherID);
+            ImGui::DockBuilderDockWindow("Scopes",scopesID);ImGui::DockBuilderDockWindow("Other",otherID);
+            ImGui::DockBuilderFinish(outerID);buildOuter=false;
+        }
+        applicationDocking.dockSpace(outerID,ImVec2(0,0),ImGuiDockNodeFlags_None);
+        ImGui::End();ImGui::Begin("Other");ImGui::End();
+    };
+    afterDraw=[&](){applicationDocking.drawDockCollapseHandles();};
+    idle(s,10);
+    auto clickFold=[&](){
+        char name[80];ImFormatString(name,IM_ARRAYSIZE(name),"##OceanodeDockCollapse_%08X_%08X",outerID,outerID);
+        auto* handle=ImGui::FindWindowByName(name);assert(handle && handle->Active);
+        io.AddMousePosEvent(handle->Pos.x+handle->Size.x*0.5f,handle->Pos.y+handle->Size.y*0.5f);frame(s);frame(s);
+        io.AddMouseButtonEvent(0,true);frame(s);io.AddMouseButtonEvent(0,false);idle(s);
+    };
+    for(float ratio:{0.5f,0.3f,0.7f}) {
+        auto* split=ImGui::DockBuilderGetNode(s.lastDockspace);assert(split->SplitAxis==ImGuiAxis_Y);
+        float available=split->Size.y-ImGui::GetStyle().DockingSeparatorSize;
+        split->ChildNodes[0]->SizeRef.y=std::floor(available*ratio);
+        split->ChildNodes[1]->SizeRef.y=available-split->ChildNodes[0]->SizeRef.y;
+        idle(s);
+        float firstHeight=split->ChildNodes[0]->Size.y,secondHeight=split->ChildNodes[1]->Size.y;
+        for(int cycle=0;cycle<15;++cycle) {
+            clickFold();assert(ImGui::FindWindowByName("Scopes")->Size.y<40);
+            idle(s,10);clickFold();
+            assert(std::abs(split->ChildNodes[0]->Size.y-firstHeight)<=1.0f);
+            assert(std::abs(split->ChildNodes[1]->Size.y-secondHeight)<=1.0f);
+        }
+        // Saving while folded must retain the expanded proportions on reload.
+        clickFold();std::string foldedIni=ImGui::SaveIniSettingsToMemory();
+        s.dockProportions.reset();applicationDocking.reset();
+        ImGui::LoadIniSettingsFromMemory(foldedIni.c_str(),foldedIni.size());idle(s,10);
+        split=ImGui::DockBuilderGetNode(s.lastDockspace);
+        assert(std::abs(split->ChildNodes[0]->Size.y-firstHeight)<=1.0f);
+        assert(std::abs(split->ChildNodes[1]->Size.y-secondHeight)<=1.0f);
+    }
+    afterDraw=nullptr;beforeDraw=nullptr;
+    printf("PASS: 45 bottom-dock fold/restore cycles at 50/50, 30/70 and 70/30, folded save/load, 100 width-only resizes, 100 real lateral splitter moves, proportional height resize, idle stability, outside release, held drag, grouped tabs, queued drops, 400 rearrangements, saved layout, resize, central removal.\n");
     ImGui::DestroyContext();
 }
 '''
@@ -203,7 +260,7 @@ int main(){
 
 def main():
     source = (ROOT / "src/Managers/ofxOceanodeScope.cpp").read_text()
-    helpers = source[source.index("static void RescaleDockNodeProportional"):
+    helpers = source[source.index("static std::string BuildScopeWindowName"):
                      source.index("void ofxOceanodeScope::addScopeRenderer")]
     start = helpers.index("static std::string BuildScopeWindowName")
     end = helpers.index("static ImGuiWindow* FindScopeWindowToFillCentralNode", start)
@@ -222,7 +279,7 @@ def main():
         cpp.write_text(FIXTURE_PREFIX + helpers + draw + FIXTURE_TESTS)
         binary = work / "regressions"
         subprocess.run([os.environ.get("CXX", "clang++"), "-std=c++17", "-O0", "-g",
-                        "-fsanitize=address,undefined", "-I", str(IMGUI), "-I", str(work),
+                        "-fsanitize=address,undefined", "-I", str(IMGUI), "-I", str(work), "-I", str(ROOT / "src"),
                         str(cpp), *[str(IMGUI / name) for name in
                                     ("imgui.cpp", "imgui_draw.cpp", "imgui_tables.cpp", "imgui_widgets.cpp")],
                         "-o", str(binary)], check=True)
