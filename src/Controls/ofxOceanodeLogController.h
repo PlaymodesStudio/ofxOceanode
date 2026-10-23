@@ -10,6 +10,7 @@
 
 #include "ofxOceanodeBaseController.h"
 #include "imgui.h"
+#include <vector>
 
 #define MAX_MESSAGES 10000
 
@@ -39,8 +40,32 @@ public:
         // 3. Clear button — also resets scroll intent so auto-scroll resumes
         if(ImGui::Button("[Clear]")){
             messagesBuffer.clear();
+            selectingText = false;
+            selectionBuffer.clear();
             userIsAtBottom = true;
             trimmedFromFront = 0;  // nothing to compensate after a clear
+        }
+
+        ImGui::SameLine();
+        if(ImGui::Button("Copy all")){
+            const std::string text = getLogText();
+            ImGui::SetClipboardText(text.c_str());
+        }
+        ImGui::SameLine();
+        if(ImGui::Checkbox("Select text", &selectingText) && selectingText){
+            // Keep a stable snapshot so incoming messages and buffer trimming
+            // cannot move the text underneath an active selection.
+            const std::string text = getLogText();
+            selectionBuffer.assign(text.begin(), text.end());
+            selectionBuffer.push_back('\0');
+        }
+
+        if(selectingText){
+            ImGui::TextDisabled("Snapshot paused. Drag to select; use your copy shortcut.");
+            ImGui::InputTextMultiline("##LogSelection", selectionBuffer.data(),
+                                      selectionBuffer.size(), ImGui::GetContentRegionAvail(),
+                                      ImGuiInputTextFlags_ReadOnly);
+            return;
         }
         
         // 4. Scrollable child region
@@ -131,8 +156,19 @@ public:
     }
     
 private:
+    std::string getLogText() const{
+        std::string text;
+        for(const auto &message : messagesBuffer){
+            text += message;
+            text += '\n';
+        }
+        return text;
+    }
+
     deque<string>  messagesBuffer;
     bool userIsAtBottom;   // true = auto-scroll is active (user is at the bottom)
+    bool selectingText = false;
+    std::vector<char> selectionBuffer;
     
     ofThreadChannel<string> messageChannel;
 };
