@@ -12,6 +12,7 @@
 #include "ofxOceanodeTimeController.h"
 #include "imgui_internal.h"
 #include "ofxOceanodeFloatingWindowDecor.h"
+#include "ofxOceanodeClipboard.h"
 #include "ofxOceanodeProportionalDocking.h"
 #include "ofxOceanodeHelp.h"
 #include "ofxOceanodeNodeMacro.h"
@@ -87,6 +88,7 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Mapper_1/Min_Input");
     OceanodeTheme* oceanodeTheme = new OceanodeTheme();
     gui.setup(oceanodeTheme, false, ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable, false);
+    ofxOceanodeClipboard::install();
     ofxOceanodeFloatingWindowDecor::install();   // border + shadow on undocked windows and popups
     refreshThemeFonts();
     layouts = std::make_unique<ofxOceanodeLayoutManager>(ofxOceanodeLayoutManager::Callbacks{
