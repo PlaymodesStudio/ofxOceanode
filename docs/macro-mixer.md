@@ -201,7 +201,11 @@ sessions default to ordinary mixing.
 
 Built-ins retain Float, Float Vector, Integer, Integer Vector, Boolean and Texture
 policies, including vector resampling, whole-value Switch, and the existing GPU
-transition modes. `registerType<T>(name, defaultValue, MacroMixerMixing::Definition<T>)`
+transition modes. The default vector policy, Index / zero fill, blends index by
+index; a 1-value vector counts as that value at every index, as nodes read it, so
+a change to or from a single value approaches it smoothly instead of fading the
+other indices to zero and snapping at completion. Only missing indices of longer
+vectors are filled with zero. `registerType<T>(name, defaultValue, MacroMixerMixing::Definition<T>)`
 adds a custom value adapter and default policy at the existing type registration.
 Additional policies use `MacroMixerMixing::registry()`; nodes need no extra list.
 

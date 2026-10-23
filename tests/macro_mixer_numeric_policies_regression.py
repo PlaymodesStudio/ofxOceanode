@@ -33,6 +33,21 @@ int main(int argc,char** argv) {
     assert(vector("index_zero",{INT_MIN},{INT_MAX},.5)==Vec({-1}));
     assert(vector("resample",{INT_MIN},{INT_MAX},.5,{{"size",3}})==Vec(3,-1));
     assert(vector("index_zero",Vec(4096,INT_MAX),Vec(4096,INT_MAX),.5)==Vec(4096,INT_MAX));
+    // A 1-value vector is a constant at every index, in either direction, so
+    // values approach a 1-value target instead of fading to zero and snapping.
+    assert(vector("index_zero",{10},{2,4,6},.5)==Vec({6,7,8}));
+    assert(vector("index_zero",{2,4,6},{10},.5)==Vec({6,7,8}));
+    assert(vector("index_zero",Vec(24,0),{100},.99)==Vec(24,99));
+    assert(vector("index_zero",{},{4,6},.5)==Vec({2,3}) && vector("index_zero",{4,6},{},.5)==Vec({2,3}));
+    auto floats=[&](std::vector<float> a,std::vector<float> b,float t) {
+        return std::get<std::vector<float>>(policies.mix("Float Vector","index_zero",a,b,t));
+    };
+    assert(floats({0,.5f,1},{1},.5)==std::vector<float>({.5f,.75f,1}));
+    assert(floats({1},{0,.5f,1},.5)==std::vector<float>({.5f,.75f,1}));
+    for(float value:floats(std::vector<float>(24,0),{1},.999f)) assert(value>.998f);
+    assert(floats(std::vector<float>(24,0),{1},1)==std::vector<float>({1}));
+    assert(floats({},{1,.5f},.5)==std::vector<float>({.5f,.25f}));
+    assert(policies.policy("Float Vector").id=="index_zero");
     assert(std::get<int>(policies.mix("Integer","switch",2,10,.25,{{"threshold",.25}}))==10);
     auto gate=[&](bool a,bool b,float t,double threshold=.5) {
         return std::get<bool>(policies.mix("Boolean","switch",a,b,t,{{"threshold",threshold}}));
