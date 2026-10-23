@@ -646,6 +646,12 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
 			ImGui::CheckboxFlags("Disable Full Render", &configurationFlags, ofxOceanodeConfigurationFlags_DisableRenderAll);
 			ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
 			ImGui::Checkbox("Show Mode", &showMode);
+            const int precision = ofxOceanodeShared::getColorTexturePrecision();
+            int texturePrecision = precision == 16 ? 1 : precision == 8 ? 2 : 0;
+            if(ImGui::Combo("Color texture precision", &texturePrecision, "RGBA32F\0RGBA16F\0RGBA8\0")){
+                ofxOceanodeShared::setColorTexturePrecision(texturePrecision == 1 ? 16 : texturePrecision == 2 ? 8 : 32);
+            }
+            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Shared by compatible color nodes. Applied on their next render; history is reset.\nOscillators and numerical/index textures keep their precision.\n16F reduces precision; 8-bit clamps to [0,1]. Save Config to keep this choice.");
 			
 			ofxOceanodeMenu::section("GUI");
 			ImGui::CheckboxFlags("Color Connections?", &configurationFlags, ofxOceanodeConfigurationFlags_ColorConnections);
@@ -993,6 +999,7 @@ void ofxOceanode::saveConfig(){
     
     // Save Show Mode
     config["showMode"] = showMode;
+    config["colorTexturePrecision"] = ofxOceanodeShared::getColorTexturePrecision();
     
     // Save canvas settings
     config["nodeTextWidth"] = canvas.getNodeWidthText();
@@ -1059,6 +1066,8 @@ void ofxOceanode::loadConfig(){
         ofxOceanodeShared::setConfigurationFlags(config["configurationFlags"].get<ofxOceanodeConfigurationFlags>());
     }
     
+    ofxOceanodeShared::setColorTexturePrecision(config.value("colorTexturePrecision", 32));
+
     // Load Show Mode
     if(config.contains("showMode")){
         showMode = config["showMode"].get<bool>();

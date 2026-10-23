@@ -1,3 +1,4 @@
+#include "ofxOceanodeShared.h"
 #include "MacroMixerMixing.h"
 #include <cmath>
 #include <algorithm>
@@ -153,9 +154,9 @@ public:
                 && shader.setupShaderFromSource(GL_FRAGMENT_SHADER,fragment),"Texture mixer requires an OpenGL 3.2 programmable renderer");
             shader.bindDefaults(); require(shader.linkProgram(),"Texture mixer shader link failed");
         }
-        if(!fbo.isAllocated() || fbo.getWidth()!=w || fbo.getHeight()!=h) {
+        if(!fbo.isAllocated() || fbo.getWidth()!=w || fbo.getHeight()!=h || fbo.getTexture().getTextureData().glInternalFormat!=ofxOceanodeShared::getColorTextureInternalFormat()) {
             ofFbo::Settings settings; settings.width=w; settings.height=h;
-            settings.internalformat=GL_RGBA32F; settings.textureTarget=GL_TEXTURE_2D;
+            settings.internalformat=ofxOceanodeShared::getColorTextureInternalFormat(); settings.textureTarget=GL_TEXTURE_2D;
             settings.useDepth=false; settings.useStencil=false; settings.numSamples=0;
             settings.minFilter=GL_LINEAR; settings.maxFilter=GL_LINEAR;
             fbo.allocate(settings); require(fbo.isAllocated(),"Texture mixer allocation failed");
