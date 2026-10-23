@@ -100,4 +100,7 @@ public:
         std::vector<MacroMixerDiagnostic>& errors, const Inputs& inputs = {},
         std::shared_ptr<const MacroMixerExclusions> excluded = nullptr);
     static std::string resourceBlocker(ofxOceanodeNodeRegistry& registry, const std::string& model);
+    // Display only: shortens a source path to start at the data folder
+    // (data/Presets/...). Paths outside it are returned unchanged.
+    static std::string displayPath(const std::string& path);
 };

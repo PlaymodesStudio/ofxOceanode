@@ -157,7 +157,8 @@ void ofxOceanodeMacroMixer::drawPendingBlockedNodeDialog() {
     ImGui::TextDisabled("NODE");
     ImGui::TextWrapped("%s %s",node.model.c_str(),node.node.substr(node.node.rfind('_')+1).c_str());
     ImGui::TextDisabled("MACRO FOLDER");
-    ImGui::TextWrapped("%s",node.file.c_str());
+    ImGui::TextWrapped("%s",MacroMixerSource::displayPath(node.file).c_str());
+    if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s",node.file.c_str());
     ImGui::TextDisabled("REASON");
     ImGui::TextWrapped("%s",node.message.c_str());
     ImGui::Spacing();
@@ -240,7 +241,7 @@ void ofxOceanodeMacroMixer::reportFailure() {
     if(!runtime) { inspectorError = "No host container"; return; }
     for(const auto& error : runtime->diagnostics()) {
         if(!inspectorError.empty()) inspectorError += "\n";
-        inspectorError += error.file + ": " + error.message;
+        inspectorError += MacroMixerSource::displayPath(error.file) + ": " + error.message;
     }
 }
 
@@ -623,7 +624,7 @@ void ofxOceanodeMacroMixer::drawMacros() {
         auto result = ofSystemLoadDialog("Choose Macro Folder", true);
         if(result.bSuccess) {
             actions.push_back({ActionKind::Import, result.getPath()});
-            state = "Preparing: " + result.getPath();
+            state = "Preparing: " + MacroMixerSource::displayPath(result.getPath());
         }
     }
     ImGui::EndDisabled();
@@ -650,7 +651,8 @@ void ofxOceanodeMacroMixer::drawMacros() {
         if(ImGui::SmallButton("-")) actions.push_back({ActionKind::RemoveMacro, macro->id()});
         if(ImGui::IsItemHovered()) ImGui::SetTooltip("Remove Macro; clears playback if it is running, a destination or queued.");
         if(ImGui::TreeNode("Source")) {
-            ImGui::TextWrapped("%s", macro->source().c_str());
+            ImGui::TextWrapped("%s", MacroMixerSource::displayPath(macro->source()).c_str());
+            if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", macro->source().c_str());
             for(const auto& notice : macro->notices()) ImGui::TextWrapped("%s", notice.c_str());
             if(morphMacros || runtime->morphMode()) {
                 ImGui::SeparatorText(runtime->hasTransitionDetails(macro->id()) ? "Last requested morph" : "Morph from running source");
@@ -697,7 +699,8 @@ void ofxOceanodeMacroMixer::drawMacros() {
         for(const auto& node : keptOut) {
             ImGui::PushID((node.first + "/" + node.second).c_str());
             ImGui::TextWrapped("%s", node.second.c_str());
-            ImGui::TextDisabled("%s", node.first.c_str());
+            ImGui::TextDisabled("%s", MacroMixerSource::displayPath(node.first).c_str());
+            if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", node.first.c_str());
             if(ImGui::SmallButton("Restore")) actions.push_back({ActionKind::RestoreNode,node.first,0,{},{},node.second});
             if(ImGui::IsItemHovered()) ImGui::SetTooltip("Load this node again from the next activation. While it blocks MacroMixer, you are asked again.");
             ImGui::PopID();

@@ -83,7 +83,7 @@ void analyse(ofxOceanodeNodeRegistry& registry, const fs::path& path,
             require(keys.insert(key).second, folder.string(), "Duplicate node identifier");
             if(analysis.skips(folder,key)) {
                 skipped.insert(key);
-                analysis.keptOut.push_back("Kept out of the graph: " + model.key() + " " + std::to_string(id) + " (" + folder.string() + ")");
+                analysis.keptOut.push_back("Kept out of the graph: " + model.key() + " " + std::to_string(id) + " (" + MacroMixerSource::displayPath(folder.string()) + ")");
                 continue;
             }
             if(!reason.empty()) {
@@ -160,6 +160,19 @@ std::string MacroMixerSource::resourceBlocker(ofxOceanodeNodeRegistry& registry,
     if(externalOutputs.count(model) || model.rfind("OSC Sender ",0) == 0)
         return "Keep external outputs outside MacroMixer: " + model;
     return {};
+}
+std::string MacroMixerSource::displayPath(const std::string& path) {
+    const auto full = fs::path(path).lexically_normal();
+    if(!full.is_absolute()) return path;
+    auto root = fs::path(ofToDataPath("", true)).lexically_normal();
+    if(!root.has_filename()) root = root.parent_path();
+    const auto relative = full.lexically_relative(root);
+    if(!relative.empty() && *relative.begin() != "..") return (root.filename() / relative).lexically_normal().generic_string();
+    // Canonical sources may resolve links the data root does not; fall back to
+    // the last "data" component.
+    fs::path shown;
+    for(const auto& part : full) shown = part == "data" ? fs::path(part) : shown.empty() ? shown : shown / part;
+    return shown.empty() ? path : shown.generic_string();
 }
 MacroMixerSource::Revision MacroMixerSource::importFolder(ofxOceanodeContainer& parent,
     const std::string& folder, const MacroMixerContract& contract,
