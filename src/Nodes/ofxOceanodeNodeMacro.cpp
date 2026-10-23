@@ -442,7 +442,7 @@ void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 		auto paramRef = dynamic_pointer_cast<ofParameter<int>>(dropdownRouter->getValue().newReference());
 		auto param = make_shared<ofParameter<int>>();
 		param->set(dropdownRouter->getNameParam().get(), paramRef->get(), 0,
-		           max(0, (int)dropdownRouter->getCurrentOptions().size() - 1));
+		           dropdownRouter->getValue().getMax());
 
 		deleteListeners.push(paramRef->newListener([paramRef, param](int &val){ param->set(paramRef->get()); }));
 		deleteListeners.push(param->newListener([paramRef, param](int &val){ paramRef->set(param->get()); }));
@@ -458,29 +458,19 @@ void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 
 		auto addedAbstract = addParameter(*newCreatedParam.get());
 
-		// Set initial dropdown options on the macro pin
-		auto opts = dropdownRouter->getCurrentOptions();
-		if(!opts.empty()){
-			addedAbstract->cast<int>().setDropdownOptions(opts);
-		}
-
-		// Watch the options parameter on the router node for changes, keep macro pin in sync
-		auto& routerParams = node->getParameters();
-		if(routerParams.contains("Options")){
-			auto& optionsAbstract = routerParams.get("Options");
-			auto* optionsOceaParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&optionsAbstract);
-			if(optionsOceaParam && optionsOceaParam->valueType() == typeid(vector<string>).name()){
-				// Capture shared_ptr to keep addedAbstract alive in lambda
-				routerManager.getDropdownListeners()[paramName + "_opts"] =
-					optionsOceaParam->cast<vector<string>>().getParameter().newListener(
-						[addedAbstract, param](vector<string> &newOpts){
-							addedAbstract->cast<int>().setDropdownOptions(newOpts);
-							param->setMax(max(0, (int)newOpts.size() - 1));
-							if(param->get() >= (int)newOpts.size()) param->set(0);
-						}
-					);
-			}
-		}
+		// The macro pin and router Value are the same metadata endpoint across
+		// a canvas boundary. Discovery follows both sides, including nested macros.
+		auto& routerValue = dynamic_cast<ofxOceanodeParameter<int>&>(node->getParameters().get("Value"));
+		addedAbstract->setDropdownRelay(true);
+		addedAbstract->linkDropdownPeer(routerValue);
+		auto syncDropdown = [addedAbstract, param, &routerValue](){
+		    param->setMin(routerValue.getParameter().getMin());
+		    param->setMax(routerValue.getParameter().getMax());
+		    addedAbstract->cast<int>().setDropdownOptions(routerValue.getDropdownOptions());
+		};
+		syncDropdown();
+		routerManager.getDropdownListeners()[paramName + "_opts"] =
+		    routerValue.dropdownOptionsChanged.newListener(syncDropdown);
 
 		ofParameter<string> nameParamFromRouter = static_cast<abstractRouter*>(&node->getNodeModel())->getNameParam();
 		nameParamFromRouter = paramName;

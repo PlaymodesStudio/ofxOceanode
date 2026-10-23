@@ -78,7 +78,21 @@ public:
         hasScope = false;
         hasTimeline = false;
 	};
-    virtual ~ofxOceanodeAbstractParameter(){};
+    virtual ~ofxOceanodeAbstractParameter();
+
+    // Only routers and their macro pins relay dropdown metadata. Ordinary
+    // parameters are boundaries, so discovery never crosses a processing node.
+    virtual std::vector<std::string> getDropdownOptions(){return {};}
+    void setDropdownRelay(bool relay){
+        if(dropdownRelay != relay){ dropdownRelay = relay; touchDropdownGraph(); }
+    }
+    void setDropdownSourceAvailable(bool available){
+        if(dropdownSourceAvailable != available){ dropdownSourceAvailable = available; touchDropdownGraph(); }
+    }
+    void linkDropdownPeer(ofxOceanodeAbstractParameter& peer);
+    std::vector<ofxOceanodeAbstractParameter*> getConnectedDropdownSources();
+    static uint64_t getDropdownGraphRevision(){return dropdownGraphRevision();}
+    static void touchDropdownGraph(){++dropdownGraphRevision();}
 	
 	virtual std::string getName() const = 0;
 	virtual bool setName(const std::string & name) = 0;
@@ -132,13 +146,14 @@ public:
     bool hasOutConnections(){return outConnections.size() != 0;};
     std::vector<ofxOceanodeAbstractConnection*> getOutConnections(){return outConnections;};
     
-    void setInConnection(ofxOceanodeAbstractConnection* c){inConnections.push_back(c);};
-    void addOutConnection(ofxOceanodeAbstractConnection* c){outConnections.push_back(c);};
+    void setInConnection(ofxOceanodeAbstractConnection* c){inConnections.push_back(c); touchDropdownGraph();};
+    void addOutConnection(ofxOceanodeAbstractConnection* c){outConnections.push_back(c); touchDropdownGraph();};
     
     void removeInConnection(ofxOceanodeAbstractConnection* c){
         inConnections.erase(std::remove(inConnections.begin(), inConnections.end(), c), inConnections.end());
+        touchDropdownGraph();
     };
-    void removeOutConnection(ofxOceanodeAbstractConnection* c){outConnections.erase(std::remove(outConnections.begin(), outConnections.end(), c));};
+    void removeOutConnection(ofxOceanodeAbstractConnection* c){outConnections.erase(std::remove(outConnections.begin(), outConnections.end(), c)); touchDropdownGraph();};
     
     void removeAllConnections();
     
@@ -217,6 +232,10 @@ protected:
 	virtual const void* getInternalObject() const = 0;
 	
 private:
+    static uint64_t& dropdownGraphRevision(){static uint64_t revision = 1; return revision;}
+    bool dropdownRelay = false;
+    bool dropdownSourceAvailable = true;
+    std::vector<ofxOceanodeAbstractParameter*> dropdownPeers;
     static std::map<std::string, InputCombiner>& inputCombiners(){
         static std::map<std::string, InputCombiner> combiners;
         return combiners;
@@ -283,8 +302,14 @@ public:
     void setDefaultValue(ParameterType v){defaultValue = v;};
 	ParameterType getDefaultValue(){return defaultValue;};
 	
-	void setDropdownOptions(std::vector<std::string> op){dropdownOptions = op;};
-	std::vector<std::string> getDropdownOptions(){return dropdownOptions;};
+	void setDropdownOptions(std::vector<std::string> op){
+        if(dropdownOptions == op) return;
+        dropdownOptions = std::move(op);
+        touchDropdownGraph();
+        dropdownOptionsChanged.notify();
+    };
+	std::vector<std::string> getDropdownOptions() override {return dropdownOptions;};
+    ofEvent<void> dropdownOptionsChanged;
 	
     void registerDragFunctions(){
         normalDrag = [](ofParameter<ParameterType> &p, int drag){};
