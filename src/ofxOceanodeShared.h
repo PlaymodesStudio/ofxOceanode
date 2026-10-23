@@ -262,6 +262,20 @@ public:
         return getInstance().presetLoadType;
     }
     
+    // Color render targets opt in to this policy. Numerical/index textures and
+    // oscillators retain their explicit formats. Default preserves existing output.
+    static int getColorTexturePrecision(){ return getInstance().colorTexturePrecision; }
+    static void setColorTexturePrecision(int precision){
+        getInstance().colorTexturePrecision = precision == 16 || precision == 8 ? precision : 32;
+    }
+    static int getColorTextureInternalFormat(){
+        switch(getColorTexturePrecision()){
+            case 16: return GL_RGBA16F;
+            case 8: return GL_RGBA8;
+            default: return GL_RGBA32F;
+        }
+    }
+
     static int getConfigurationFlags(){
         return getInstance().configurationFlags;
     }
@@ -500,6 +514,7 @@ private:
 	std::uint64_t portalListRevision = 0;
 	ofEvent<abstractPortal*> portalWillBeRemovedEvent;
     
+    int colorTexturePrecision = 32;
     ofxOceanodeConfigurationFlags configurationFlags = ofxOceanodeConfigurationFlags_None;
 	
 	// Node dimensions

@@ -10,6 +10,7 @@
 
 #include "ofxOceanodeBaseController.h"
 #include "imgui.h"
+#include "ofxOceanodeClipboard.h"
 #include <vector>
 
 #define MAX_MESSAGES 10000
@@ -47,12 +48,18 @@ public:
         }
 
         ImGui::SameLine();
-        if(ImGui::Button("Copy all")){
+        const auto &io = ImGui::GetIO();
+        const bool copyLiveLog = !selectingText && !io.KeyAlt &&
+            (io.KeyCtrl || io.KeySuper) &&
+            ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+            ImGui::IsKeyPressed(ImGuiKey_C, false);
+        if(ImGui::Button("Copy all") || copyLiveLog){
             const std::string text = getLogText();
-            ImGui::SetClipboardText(text.c_str());
+            copyStatus = ofxOceanodeClipboard::setText(text) ? "Copied to system clipboard" : "Clipboard copy failed";
         }
         ImGui::SameLine();
-        if(ImGui::Checkbox("Select text", &selectingText) && selectingText){
+        const bool beginSelection = ImGui::Checkbox("Select text", &selectingText) && selectingText;
+        if(beginSelection){
             // Keep a stable snapshot so incoming messages and buffer trimming
             // cannot move the text underneath an active selection.
             const std::string text = getLogText();
@@ -60,8 +67,11 @@ public:
             selectionBuffer.push_back('\0');
         }
 
+        if(!copyStatus.empty()) ImGui::TextDisabled("%s", copyStatus.c_str());
+
         if(selectingText){
             ImGui::TextDisabled("Snapshot paused. Drag to select; use your copy shortcut.");
+            if(beginSelection) ImGui::SetKeyboardFocusHere();
             ImGui::InputTextMultiline("##LogSelection", selectionBuffer.data(),
                                       selectionBuffer.size(), ImGui::GetContentRegionAvail(),
                                       ImGuiInputTextFlags_ReadOnly);
@@ -159,7 +169,7 @@ private:
     std::string getLogText() const{
         std::string text;
         for(const auto &message : messagesBuffer){
-            text += message;
+            text += ofxOceanodeClipboard::validText(message);
             text += '\n';
         }
         return text;
@@ -169,6 +179,7 @@ private:
     bool userIsAtBottom;   // true = auto-scroll is active (user is at the bottom)
     bool selectingText = false;
     std::vector<char> selectionBuffer;
+    std::string copyStatus;
     
     ofThreadChannel<string> messageChannel;
 };
