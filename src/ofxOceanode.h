@@ -31,7 +31,7 @@
 #include "bufferHeader.h"
 #include "bufferHeaderPro.h"
 
-class ofxOceanodeProportionalDocking;
+class ofxOceanodeWindowManager;
 class ofxOceanodeHelp;
 class ofxOceanodeLayoutManager;
 
@@ -176,13 +176,12 @@ public:
     // from their title bar (or by holding SHIFT if io.ConfigDockingWithShift is set).
     // DockSpace() is only useful to construct to a central location for your application.
     void ShowExampleAppDockSpace(bool* p_open);
-    void cycleDockedTabs();
     
     void disableRenderAll();
     void disableRenderHistograms();
     
-    void setShowMode(bool b){showMode = b;}
-    void toggleShowMode(){showMode = !showMode;}
+    void setShowMode(bool b);
+    void toggleShowMode();
 	
 	void saveConfig();
 	void loadConfig();
@@ -225,15 +224,13 @@ private:
 //    vector<ofxOceanodeAbstractTimeline> timelines;
     
     ofxImGui::Gui gui;
-    std::unique_ptr<ofxOceanodeProportionalDocking> proportionalDocking;
+    std::unique_ptr<ofxOceanodeWindowManager> windows;
     static std::string userManualPath();
     static void openWithDefaultApp(const std::string& path);
     void showHelpPopUp();
-    bool showMode;
 	bool snapToGrid;
     std::map<std::string, bool> savedViewConfig;
 
-    void drawShowModeWindow();
     
     ofParameter<int> oscReceiverPort;
 #ifdef OFXOCEANODE_USE_OSC
@@ -247,16 +244,6 @@ private:
     ofEventListener presetSavedListener;
     bool presetCanvasCenterPending = false;
 
-    // Metadata for the most recently loaded ImGui layout. ImGui restores only
-    // windows present in the .ini file, so controllers introduced after the
-    // layout was saved dock beside Nodes (legacy layouts also work).
-    std::string loadedGUILayoutData;
-    ImGuiID loadedGUILayoutLeftDockId = 0;
-    bool pendingControllerDockReconciliation = false;
-    ImGuiID resolveControllerDockID() const;
-    void reconcileMissingControllerWindows();
-
-    void applyGUILayout(const std::string& data);
     std::unique_ptr<ofxOceanodeLayoutManager> layouts;
 
     // Theme editor state

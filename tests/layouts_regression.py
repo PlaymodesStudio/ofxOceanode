@@ -16,7 +16,6 @@ JSON = ROOT.parents[1] / 'libs/json/include'
 
 FIXTURE = r'''
 #include "Layouts/ofxOceanodePresetLayouts.h"
-#include "ofxOceanodeWindowVisibility.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include <cassert>
@@ -39,7 +38,10 @@ template<class T> struct ofxOceanodeParameter:Abstract {
     ofxOceanodeParameter(string n,T v):parameter(n,v){name=n;}
     ofParameter<T>& getParameter(){return parameter;}
 };
-using ofParameterGroup = vector<shared_ptr<Abstract>>;
+struct ofParameterGroup:vector<shared_ptr<Abstract>> {
+    using vector<shared_ptr<Abstract>>::vector;using vector<shared_ptr<Abstract>>::operator=;
+    string getName(){return "";}
+};
 struct ofxOceanodeContainer;
 struct ofxOceanodeNodeModel {
     virtual ~ofxOceanodeNodeModel()=default;
@@ -124,17 +126,20 @@ namespace oceanodePresetSave {
     }
 }
 using ofxOceanodeControls=Controls;
-namespace oceanodeLayouts {
-    ofJson captureWindows(ofxOceanodeContainer*,ofxOceanodeControls&);
-    void restoreWindows(ofxOceanodeContainer*,ofxOceanodeControls&,ofJson);
-}
+// Production window state and ini application from WindowManager.cpp.
+struct ofxOceanodeWindowManager {
+    shared_ptr<ofxOceanodeContainer>& root; shared_ptr<Controls>& controls;
+    unique_ptr<Policy> proportionalDocking=make_unique<Policy>();
+    string loadedGUILayoutData;ImGuiID loadedGUILayoutLeftDockId=0;bool pendingControllerDockReconciliation=false;
+    ofJson captureView();void restoreView(const ofJson&);void applyIni(const string&);
+    static bool isWindowToggle(const string&);
+};
 struct ofxOceanodeLayoutManager {
     shared_ptr<ofxOceanodeContainer> container=make_shared<ofxOceanodeContainer>();
     shared_ptr<Controls> controls=make_shared<Controls>();
-    unique_ptr<Policy> proportionalDocking=make_unique<Policy>();
-    ofxOceanodePresetLayouts presetLayouts;string globalLayoutName;string pendingIniLoad,loadedGUILayoutData;
-    ImGuiID loadedGUILayoutLeftDockId=0;bool pendingControllerDockReconciliation=false;
-    ofJson capturePresetLayout();void recallPresetLayout(const string&);void applyGUILayout(const string&);
+    ofxOceanodeWindowManager windows{container,controls};
+    ofxOceanodePresetLayouts presetLayouts;string globalLayoutName;string pendingIniLoad;
+    ofJson capturePresetLayout();void recallPresetLayout(const string&);
     enum class PresetLayoutPopup {None,Save,Rename,Delete};
     PresetLayoutPopup presetPopup=PresetLayoutPopup::None;
     string pendingPresetLayout,layoutError;bool presetReadFailed=false;
@@ -148,9 +153,9 @@ struct ofxOceanodeLayoutManager {
         function<void(const ofJson&)> restoreWindows;
         function<void(const string&)> applyDocking;
     } callbacks{
-        [this](){return oceanodeLayouts::captureWindows(container.get(),*controls);},
-        [this](const ofJson& state){oceanodeLayouts::restoreWindows(container.get(),*controls,state);},
-        [this](const string& data){applyGUILayout(data);}
+        [this](){return windows.captureView();},
+        [this](const ofJson& state){windows.restoreView(state);},
+        [this](const string& data){windows.applyIni(data);}
     };
 };
 PRODUCTION
@@ -349,7 +354,7 @@ int main(){
     app.container->nodes.push_back(&persistent);
     app.onPresetSaved();
     assert(ofLoadJson("view-hidden/view.json")["controllers"]["Timeline"]==false);
-    assert(!ofLoadJson("view-hidden/view.json")["windows"]["nodes"].contains(oceanodeLayouts::nodeKey(*persistent.model)));
+    assert(!ofLoadJson("view-hidden/view.json")["windows"]["nodes"].contains(nodeKey(*persistent.model)));
     // Fresh manager/controls simulate restarting with Timeline visible by default.
     ofxOceanodeLayoutManager restarted;
     restarted.container=app.container;
@@ -364,8 +369,8 @@ int main(){
     assert(!ofxOceanodeScope::getInstance()->isVisible()&&persistentShow->get());
     // Even a legacy named layout must not restore deprecated persistent nodes.
     auto withPersistent=sound;
-    withPersistent["windows"]["nodes"][oceanodeLayouts::nodeKey(*persistent.model)]["parameters"]["Show"]=false;
-    oceanodeLayouts::restoreWindows(restarted.container.get(),*restarted.controls,withPersistent);
+    withPersistent["windows"]["nodes"][nodeKey(*persistent.model)]["parameters"]["Show"]=false;
+    restarted.windows.restoreView(withPersistent);
     assert(persistentShow->get());
     // Save As captures the current visible state, independently of the original.
     ofxOceanodeShared::preset="view-shown";filesystem::create_directories("view-shown");
@@ -420,10 +425,12 @@ int main(){
 
 def main():
     source = (ROOT / 'src/Layouts/ofxOceanodeLayoutManager.h').read_text()
-    windows = (ROOT / 'src/Layouts/ofxOceanodeLayoutWindowState.h').read_text()
-    production = windows[windows.index('namespace oceanodeLayouts {'):]
+    windows = (ROOT / 'src/Gui/ofxOceanodeWindowManager.cpp').read_text()
+    production = windows[windows.index('namespace {'):windows.index('ofxOceanodeWindowManager::ofxOceanodeWindowManager()')]
+    production += '\n'.join(block(windows, signature) for signature in (
+        'bool ofxOceanodeWindowManager::isWindowToggle(', 'void ofxOceanodeWindowManager::applyIni(',
+        'ofJson ofxOceanodeWindowManager::captureView()', 'void ofxOceanodeWindowManager::restoreView('))
     production += block((ROOT / 'src/Managers/ofxOceanodeContainer.cpp').read_text(), 'void ofxOceanodeContainer::flushPendingScopeSave()')
-    production += block((ROOT / 'src/ofxOceanode.cpp').read_text(), 'void ofxOceanode::applyGUILayout(').replace('ofxOceanode::', 'ofxOceanodeLayoutManager::')
     production += '\n'.join(block(source, signature) for signature in (
         'ofJson ofxOceanodeLayoutManager::capturePresetLayout()',
         'void ofxOceanodeLayoutManager::recallPresetLayout(', 'bool ofxOceanodeLayoutManager::savePresetLayouts()',

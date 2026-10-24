@@ -12,7 +12,6 @@ public:
     void update();
     void draw();
     void drawMenu();
-    void drawWindowMenu(ofxOceanodeControls& controls);
 private:
     std::shared_ptr<ofxOceanodeContainer> root;
     ofxOceanodeAIAssistant assistant;
