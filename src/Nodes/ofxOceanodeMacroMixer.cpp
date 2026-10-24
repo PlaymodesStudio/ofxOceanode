@@ -732,8 +732,19 @@ void ofxOceanodeMacroMixer::drawSource(const MacroMixerRevision& macro, bool fad
     if(!morphMacros && !runtime->morphMode()) return;
 
     ImGui::Spacing();
-    if(ImGui::TreeNode("Morph details")) {
-        const auto& details = runtime->sourceDetails(macro.id());
+    // Red: the whole graph cannot morph and falls back to the router crossfade.
+    // Orange: one node cannot morph and is replaced, crossfading on its cables.
+    static const ImVec4 graphFallback(1.0f, .38f, .32f, 1.0f), nodeFallback(1.0f, .62f, .22f, 1.0f);
+    const auto colorOf = [](const std::string& kind) -> const ImVec4* {
+        return kind == "fallback" || kind == "skipped" ? &graphFallback : kind == "replaced" ? &nodeFallback : nullptr;
+    };
+    const auto& details = runtime->sourceDetails(macro.id());
+    const ImVec4* worst = nullptr;
+    for(const auto& detail : details) if(const auto* color = colorOf(detail.kind)) if(!worst || color == &graphFallback) worst = color;
+    if(worst) ImGui::PushStyleColor(ImGuiCol_Text, *worst);
+    const bool open = ImGui::TreeNode("Morph details");
+    if(worst) ImGui::PopStyleColor();
+    if(open) {
         for(size_t n = 0; n < details.size(); ++n) {
             const auto& detail = details[n];
             ImGui::PushID(int(n));
@@ -746,8 +757,15 @@ void ofxOceanodeMacroMixer::drawSource(const MacroMixerRevision& macro, bool fad
                 : detail.kind == "replaced" ? "Replaced node" : detail.kind == "node" ? "Node morph"
                 : detail.kind == "skipped" ? "Skipped connection mix" : "Live graph";
             ImGui::Spacing();
-            ImGui::TextWrapped("%s: %s", kind, detail.location.c_str());
-            ImGui::TextDisabled("%s", detail.message.c_str());
+            if(const auto* color = colorOf(detail.kind)) {
+                ImGui::PushStyleColor(ImGuiCol_Text, *color);
+                ImGui::TextWrapped("%s: %s", kind, detail.location.c_str());
+                ImGui::TextWrapped("%s", detail.message.c_str());
+                ImGui::PopStyleColor();
+            } else {
+                ImGui::TextWrapped("%s: %s", kind, detail.location.c_str());
+                ImGui::TextDisabled("%s", detail.message.c_str());
+            }
             if(detail.kind == "mix") {
                 if(detail.type.empty()) ImGui::TextDisabled("Native control interpolation");
                 else ImGui::TextDisabled("%s: %s", detail.type.c_str(), MacroMixerMixing::registry().policy(detail.type, detail.policy).label.c_str());
