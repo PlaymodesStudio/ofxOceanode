@@ -88,6 +88,7 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Mapper_1/Min_Input");
     OceanodeTheme* oceanodeTheme = new OceanodeTheme();
     gui.setup(oceanodeTheme, false, ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable, false);
+    proportionalDocking->installSettings();
     ofxOceanodeClipboard::install();
     ofxOceanodeFloatingWindowDecor::install();   // border + shadow on undocked windows and popups
     refreshThemeFonts();

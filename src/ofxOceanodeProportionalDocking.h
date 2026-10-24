@@ -12,11 +12,13 @@
 // see the proportional layout in the same frame. No dock topology is changed.
 class ofxOceanodeProportionalDocking {
 public:
+    void installSettings() { dockCollapse.installSettings(); }
     void reset() { resetDrag(); dockCollapse.reset(); }
 
     void drawDockCollapseHandles() { dockCollapse.drawHandles(); }
 
     void dockSpace(ImGuiID id, ImVec2 size, ImGuiDockNodeFlags flags) {
+        installSettings();
         const ImVec2 available = ImGui::GetContentRegionAvail();
         ImVec2 resolved(std::floor(size.x), std::floor(size.y));
         if(resolved.x <= 0) resolved.x = std::max(available.x + resolved.x, 4.0f);

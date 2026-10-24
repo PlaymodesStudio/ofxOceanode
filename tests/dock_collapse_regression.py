@@ -15,7 +15,7 @@ CASES = r'''
 
 ofxOceanodeProportionalDocking policy;
 ImGuiID rootID, panes[7], farLeft, nearLeft, farRight, nearRight, topSplit, bottomSplit;
-bool build=true, grouped=false, showAll=true;
+bool build=true, grouped=false, showAll=true, showBottom=true;
 bool showOverlay=false, overlayAfterHandles=false, overlayClicked=false;
 ImVec2 overlayPos;
 const char* names[]={"Outer left", "Inner left", "Canvas", "Inner right", "Outer right", "Top", "Bottom"};
@@ -61,7 +61,7 @@ void frame() {
     }
     policy.dockSpace(rootID,ImVec2(0,0),ImGuiDockNodeFlags_None);
     ImGui::End();
-    for(int i=0;i<7;++i) if(showAll || i!=0) { ImGui::Begin(names[i]); ImGui::TextUnformatted(names[i]); ImGui::End(); }
+    for(int i=0;i<7;++i) if((showAll || i!=0) && (showBottom || i!=6)) { ImGui::Begin(names[i]); ImGui::TextUnformatted(names[i]); ImGui::End(); }
     if(showOverlay && !overlayAfterHandles) drawOverlay();
     policy.drawDockCollapseHandles();
     if(showOverlay && overlayAfterHandles) drawOverlay();
@@ -194,12 +194,16 @@ void checkOcclusion(ImGuiID id,bool submitAfter) {
     // Once uncovered, the same arrow remains clickable.
     click(id);click(id);near(node(id)->ChildNodes[0]->Size[node(id)->SplitAxis],first);
 }
-int main() {
+void createContext() {
     ImGui::CreateContext();auto& io=ImGui::GetIO();io.ConfigFlags|=ImGuiConfigFlags_DockingEnable;
     io.IniFilename=nullptr;io.DisplaySize=ImVec2(1600,1000);io.DeltaTime=1.0f/60;
     ImGui::GetStyle().DockingSeparatorSize=4;ImGui::GetStyle().WindowRounding=0;
     unsigned char* pixels;int w,h;io.Fonts->GetTexDataAsRGBA32(&pixels,&w,&h);
-    ofxOceanodeFloatingWindowDecor::install();idle();checkHandles(node(rootID));
+    ofxOceanodeFloatingWindowDecor::install();
+    policy.installSettings();
+}
+int main() {
+    createContext();auto& io=ImGui::GetIO();idle();checkHandles(node(rootID));
     checkThemeColors(nearLeft);checkThemeColors(bottomSplit);
     checkOcclusion(nearLeft,false);checkOcclusion(bottomSplit,false);
     checkOcclusion(nearLeft,true);checkOcclusion(bottomSplit,true);
@@ -242,9 +246,11 @@ int main() {
     click(topSplit);near(height(5),top);near(height(6),minY);
     click(nearRight);near(width(3),r1);near(width(4),r0);
     click(bottomSplit);near(height(6),bottom);checkGeometry(node(rootID));
-    // Folded saves preserve expanded sizes on both axes.
+    // Folded saves restore folds on both axes AND retain their expanded sizes.
     click(nearLeft);click(bottomSplit);std::string ini=ImGui::SaveIniSettingsToMemory();
     policy.reset();ImGui::LoadIniSettingsFromMemory(ini.c_str(),ini.size());idle();
+    near(width(0),minX);near(width(1),minX);near(height(6),minY);
+    click(nearLeft);click(bottomSplit);
     near(width(0),l0);near(width(1),l1);near(height(6),bottom);
     // Drag each orientation and retain ordinary native splitter interaction.
     float first=node(nearLeft)->ChildNodes[0]->Size.x;drag(nearLeft,45);near(node(nearLeft)->ChildNodes[0]->Size.x,first+45);
@@ -262,7 +268,48 @@ int main() {
     node(panes[6])->SetLocalFlags(node(panes[6])->LocalFlags|ImGuiDockNodeFlags_HiddenTabBar);idle();
     click(bottomSplit);near(height(6),minY);assert(!(node(panes[6])->VisibleWindow->Flags&ImGuiWindowFlags_NoTitleBar));
     click(bottomSplit);assert(node(panes[6])->IsHiddenTabBar());
-    std::printf("PASS: click tremor/release tolerance, axis-only drag threshold, smooth drag start and quick release, floating-window render/input occlusion, shadow-free handles, all four directions, both left-dock topologies, preserved neighbours, nested/independent folds, restore, save/load, mouse/native drag, host resize, topology changes, disabled splits and hidden tabs.\n");
+    // Reload into a new context (application restart), with a late node window.
+    restoreLayout();
+    const float savedLeft=width(0),savedInner=width(1),savedBottom=height(6);
+    const std::string expandedIni=ImGui::SaveIniSettingsToMemory();
+    click(nearLeft);click(bottomSplit);
+    const std::string foldedIni=ImGui::SaveIniSettingsToMemory();
+    assert(foldedIni.find("[OceanodeDockCollapse][State]")!=std::string::npos);
+    ImGui::DestroyContext();createContext();showBottom=false;
+    ImGui::LoadIniSettingsFromMemory(foldedIni.c_str(),foldedIni.size());idle(15);
+    // Saving while windows are still loading must retain pending folds.
+    const std::string pendingIni=ImGui::SaveIniSettingsToMemory();
+    assert(pendingIni.find("[OceanodeDockCollapse][State]")!=std::string::npos);
+    showBottom=true;idle(15);
+    near(width(0),minX);near(width(1),minX);near(height(6),minY);
+    click(nearLeft);click(bottomSplit);
+    near(width(0),savedLeft);near(width(1),savedInner);near(height(6),savedBottom);
+    // Loading an expanded/legacy ini clears the previous layout's folds.
+    ImGui::LoadIniSettingsFromMemory(foldedIni.c_str(),foldedIni.size());idle(10);
+    near(height(6),minY);
+    ImGui::LoadIniSettingsFromMemory(expandedIni.c_str(),expandedIni.size());idle(10);
+    near(width(0),savedLeft);near(width(1),savedInner);near(height(6),savedBottom);
+    assert(std::string(ImGui::SaveIniSettingsToMemory()).find("[OceanodeDockCollapse]")==std::string::npos);
+    // A second ini load replaces deferred folds before a late window appears.
+    showBottom=false;idle();
+    ImGui::LoadIniSettingsFromMemory(foldedIni.c_str(),foldedIni.size());idle();
+    ImGui::LoadIniSettingsFromMemory(expandedIni.c_str(),expandedIni.size());showBottom=true;idle(10);
+    near(height(6),savedBottom);
+    // Independent axes survive repeated saves/loads; reopening retains dimensions.
+    for(int repeat=0;repeat<3;++repeat) {
+        click(nearLeft);click(bottomSplit);
+        std::string saved=ImGui::SaveIniSettingsToMemory();
+        ImGui::LoadIniSettingsFromMemory(saved.c_str(),saved.size());idle(10);
+        near(width(0),minX);near(height(6),minY);
+        click(nearLeft);click(bottomSplit);
+        near(width(0),savedLeft);near(width(1),savedInner);near(height(6),savedBottom);
+    }
+    std::printf("PASS: click tremor/release tolerance, axis-only drag threshold, smooth drag start and quick release, floating-window render/input occlusion, shadow-free handles, all four directions, both left-dock topologies, preserved neighbours, nested/independent folds, restore, save/load/restart, late windows, pending-save preservation, layout replacement, handler lifetime, mouse/native drag, host resize, topology changes, disabled splits and hidden tabs.\n");
+    ImGui::DestroyContext();
+    // Removing a policy before its context must also remove its callbacks.
+    ImGui::CreateContext();ImGui::GetIO().IniFilename=nullptr;
+    { ofxOceanodeProportionalDocking temporary;temporary.installSettings(); }
+    assert(ImGui::FindSettingsHandler("OceanodeDockCollapse")==nullptr);
     ImGui::DestroyContext();
 }
 '''

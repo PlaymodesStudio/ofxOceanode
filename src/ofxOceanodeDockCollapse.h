@@ -3,15 +3,66 @@
 #include "imgui_internal.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstring>
 #include <vector>
 
 // Fold existing dock regions toward the edge away from the central canvas.
 // Expanded references are kept separate from rendered geometry, so independent
-// folds compose and layout saves retain the usable, expanded arrangement.
+// folds compose. The ini stores both expanded sizes and the folded regions.
 class ofxOceanodeDockCollapse {
 public:
+    ofxOceanodeDockCollapse() = default;
+    ofxOceanodeDockCollapse(const ofxOceanodeDockCollapse&) = delete;
+    ofxOceanodeDockCollapse& operator=(const ofxOceanodeDockCollapse&) = delete;
+    ~ofxOceanodeDockCollapse() {
+        if(!settingsContext) return;
+        auto* previous = ImGui::GetCurrentContext();
+        ImGui::SetCurrentContext(settingsContext);
+        ImGui::RemoveSettingsHandler("OceanodeDockCollapse");
+        ImGui::RemoveContextHook(settingsContext, shutdownHook);
+        ImGui::SetCurrentContext(previous);
+    }
+
+    // Install before any ini load, including the startup/global layout.
+    void installSettings() {
+        if(settingsContext == GImGui) return;
+        IM_ASSERT(!settingsContext && GImGui);
+        settingsContext = GImGui;
+        ImGuiSettingsHandler handler;
+        handler.TypeName = "OceanodeDockCollapse";
+        handler.TypeHash = ImHashStr(handler.TypeName);
+        handler.UserData = this;
+        handler.ClearAllFn = handler.ReadInitFn = [](ImGuiContext*, ImGuiSettingsHandler* h) {
+            static_cast<ofxOceanodeDockCollapse*>(h->UserData)->reset();
+        };
+        handler.ReadOpenFn = [](ImGuiContext* ctx, ImGuiSettingsHandler* h, const char* name) -> void* {
+            auto* self = static_cast<ofxOceanodeDockCollapse*>(h->UserData);
+            if(std::strcmp(name, "State") != 0) return nullptr;
+            self->restoreAfterFrame = ctx->FrameCount + 2;
+            return self;
+        };
+        handler.ReadLineFn = [](ImGuiContext*, ImGuiSettingsHandler*, void* entry, const char* line) {
+            static_cast<ofxOceanodeDockCollapse*>(entry)->readSetting(line);
+        };
+        handler.WriteAllFn = [](ImGuiContext*, ImGuiSettingsHandler* h, ImGuiTextBuffer* out) {
+            static_cast<ofxOceanodeDockCollapse*>(h->UserData)->writeSettings(*out);
+        };
+        ImGui::AddSettingsHandler(&handler);
+        ImGuiContextHook hook;
+        hook.Type = ImGuiContextHookType_Shutdown;
+        hook.UserData = this;
+        hook.Callback = [](ImGuiContext*, ImGuiContextHook* h) {
+            auto* self = static_cast<ofxOceanodeDockCollapse*>(h->UserData);
+            self->settingsContext = nullptr;
+            self->reset();
+        };
+        shutdownHook = ImGui::AddContextHook(settingsContext, &hook);
+    }
+
     void reset() {
         axes[0] = AxisState(); axes[1] = AxisState(); pending = Request();
+        restore = SavedState(); restoreAfterFrame = 0;
         rootID = dragging = 0; enabled = false; frame = -1;
     }
 
@@ -29,6 +80,8 @@ public:
             }
         }
         if(!enabled) { pending = Request(); return; }
+        if(pending.id || activeSplitter) restore = SavedState(); // User interaction takes priority.
+        tryRestore(root);
         if(pending.id) {
             auto* n = ImGui::DockBuilderGetNode(pending.id);
             if(matches(root, pending.signature) && eligible(n)) {
@@ -53,6 +106,7 @@ public:
                                 }), fold.targets.end());
                             state.folds.erase(std::remove_if(state.folds.begin(), state.folds.end(), [](const Fold& f) { return f.targets.empty(); }), state.folds.end());
                         } else state.folds.push_back({n->ID, std::move(targets)});
+                        ImGui::MarkIniSettingsDirty();
                     }
                 }
             }
@@ -103,6 +157,13 @@ private:
     struct Fold { ImGuiID id; std::vector<ImGuiID> targets; };
     struct AxisState { std::vector<Layout> layout; std::vector<Fold> folds; std::vector<ImGuiID> signature; };
     struct Request { ImGuiID id = 0; bool toggle = false; float firstSize = 0; std::vector<ImGuiID> signature; };
+    struct SavedFold { int axis; ImGuiID split, target; };
+    struct SavedWindow { ImGuiID window, dock; };
+    struct SavedState { ImGuiID root = 0; std::vector<SavedFold> folds; std::vector<SavedWindow> windows; };
+    SavedState restore;
+    int restoreAfterFrame = 0;
+    ImGuiContext* settingsContext = nullptr;
+    ImGuiID shutdownHook = 0;
     AxisState axes[2];
     Request pending;
     ImGuiID rootID = 0, dragging = 0;
@@ -110,6 +171,61 @@ private:
     bool dragged = false, enabled = false;
     int frame = -1;
     ImGuiDockNodeFlags dockFlags = 0;
+
+    void readSetting(const char* line) {
+        unsigned int a, b; int axis;
+        if(std::sscanf(line, "Root=%x", &a) == 1) restore.root = a;
+        else if(std::sscanf(line, "Window=%x,%x", &a, &b) == 2) restore.windows.push_back({a, b});
+        else if(std::sscanf(line, "Fold=%d,%x,%x", &axis, &a, &b) == 3 && axis >= 0 && axis < 2)
+            restore.folds.push_back({axis, a, b});
+    }
+    static void saveWindows(ImGuiDockNode* n, std::vector<SavedWindow>& out) {
+        if(!n->IsVisible) return;
+        for(auto* w : n->Windows) if(w->Active || w->WasActive) out.push_back({w->ID, n->ID});
+        if(n->IsSplitNode()) { saveWindows(n->ChildNodes[0], out); saveWindows(n->ChildNodes[1], out); }
+    }
+    void writeSettings(ImGuiTextBuffer& out) const {
+        SavedState saved = restore;
+        if(saved.folds.empty()) {
+            auto* root = ImGui::DockBuilderGetNode(rootID);
+            if(!root) return;
+            saved.root = rootID;
+            for(int axis = 0; axis < 2; ++axis) if(matches(root, axes[axis].signature))
+                for(const auto& fold : axes[axis].folds)
+                    for(auto target : fold.targets) saved.folds.push_back({axis, fold.id, target});
+            saveWindows(root, saved.windows);
+        }
+        if(saved.folds.empty()) return;
+        out.appendf("[OceanodeDockCollapse][State]\nRoot=%08X\n", saved.root);
+        for(const auto& w : saved.windows) out.appendf("Window=%08X,%08X\n", w.window, w.dock);
+        for(const auto& f : saved.folds) out.appendf("Fold=%d,%08X,%08X\n", f.axis, f.split, f.target);
+        out.append("\n");
+    }
+    void tryRestore(ImGuiDockNode* root) {
+        if(restore.folds.empty() || restore.root != rootID || frame <= restoreAfterFrame) return;
+        // Ini loads precede window visibility restoration and node creation.
+        // Wait for those windows to have actually submitted in their saved docks.
+        for(const auto& saved : restore.windows) {
+            auto* w = ImGui::FindWindowByID(saved.window);
+            if(!w || !w->WasActive || !w->DockNode || w->DockNode->ID != saved.dock) return;
+        }
+        for(const auto& f : restore.folds) {
+            auto* split = ImGui::DockBuilderGetNode(f.split);
+            auto* target = ImGui::DockBuilderGetNode(f.target);
+            if(!split || !target) return;
+            if(ImGui::DockNodeGetRootNode(split) != root || ImGui::DockNodeGetRootNode(target) != root
+                || split->SplitAxis != f.axis || target->IsSplitNode() || target->IsCentralNode()) {
+                restore = SavedState(); return;
+            }
+            if(!eligible(split) || !target->IsVisible) return;
+        }
+        for(const auto& f : restore.folds) {
+            auto& state = axes[f.axis];
+            if(state.layout.empty()) { capture(root, f.axis, state.layout); signature(root, state.signature); }
+            state.folds.push_back({f.split, {f.target}});
+        }
+        restore = SavedState();
+    }
 
     static bool central(ImGuiDockNode* n) {
         return n->IsCentralNode() || (n->IsSplitNode() && (central(n->ChildNodes[0]) || central(n->ChildNodes[1])));

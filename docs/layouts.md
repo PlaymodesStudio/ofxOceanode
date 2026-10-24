@@ -44,6 +44,12 @@ The GUI arrangement spans all canvas tabs. Focusing or navigating into a macro
 keeps the current layout. Preset saves and exit store it in the preset's root
 `ImGuiLayout.ini`; macros do not load or save individual GUI layouts.
 
+Divider-arrow folds are saved with the layout, along with the expanded sizes.
+Loading restores the folds once the saved windows have joined their docks;
+clicking an arrow again recovers the expanded size. This works for ordinary
+preset saves, named preset layouts, and global layouts. Older layouts lack fold
+metadata: collapse the desired regions and save again to remember their folds.
+
 Every **Save Preset** also captures the current Window-menu visibility in the
 preset's `view.json`, independently of named snapshots. Loading applies the named
 default's arrangement first, then the visibility from the last preset save.

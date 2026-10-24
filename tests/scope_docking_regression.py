@@ -251,10 +251,12 @@ int main(){
             assert(std::abs(split->ChildNodes[0]->Size.y-firstHeight)<=1.0f);
             assert(std::abs(split->ChildNodes[1]->Size.y-secondHeight)<=1.0f);
         }
-        // Saving while folded must retain the expanded proportions on reload.
+        // Reload folded, then reopen with the original internal proportions.
         clickFold();std::string foldedIni=ImGui::SaveIniSettingsToMemory();
         s.dockProportions.reset();applicationDocking.reset();
         ImGui::LoadIniSettingsFromMemory(foldedIni.c_str(),foldedIni.size());idle(s,10);
+        assert(ImGui::FindWindowByName("Scopes")->Size.y<40);
+        clickFold();
         split=ImGui::DockBuilderGetNode(s.lastDockspace);
         assert(std::abs(split->ChildNodes[0]->Size.y-firstHeight)<=1.0f);
         assert(std::abs(split->ChildNodes[1]->Size.y-secondHeight)<=1.0f);
