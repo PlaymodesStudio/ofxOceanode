@@ -18,6 +18,7 @@
 #include "ofxOceanodeMacroMixer.h"
 #include "ofxOceanodeLayouts.h"
 #include "ofxOceanodeThemeManager.h"
+#include "ofxOceanodeAppConfig.h"
 #include "Controls/PresetFileCleanupReview.h"
 #include <algorithm>
 #include <climits>
@@ -42,6 +43,7 @@ void resetPresetCanvasViews(ofxOceanodeContainer* current, ofxOceanodeCanvas* cu
 
 ofxOceanode::ofxOceanode(){
     windows = std::make_unique<ofxOceanodeWindowManager>();
+    appConfig = std::make_unique<ofxOceanodeAppConfig>();
     theme = std::make_unique<ofxOceanodeThemeManager>();
     nodeRegistry = make_shared<ofxOceanodeNodeRegistry>();
     typesRegistry = ofxOceanodeTypesRegistry::getInstance();
@@ -107,17 +109,10 @@ void ofxOceanode::setup(){
         layouts->onPresetSaved();
     });
 
- ofxOceanodeShared::readMacros();
-    // Load and apply saved view preferences now that controls is initialized
-    // and openFrameworks data path is fully set up
-    loadViewConfig();
-    if(!savedViewConfig.empty()){
-        auto& visibility = controls->getControllersVisibility();
-        for(auto& kv : savedViewConfig){
-            visibility[kv.first] = kv.second;
-        }
-    }
+    ofxOceanodeShared::readMacros();
     oceanodeTime->setup(container, controls->get<ofxOceanodeTimeController>());
+    // Last: config.json also applies spaceTogglesPlay to the Time controller.
+    appConfig->setup(canvas, *controls, *windows);
 }
 
 void ofxOceanode::update(){
@@ -147,8 +142,30 @@ void ofxOceanode::draw(){
     ImGuiStyle& style = ImGui::GetStyle();
     style.Colors[ImGuiCol_PopupBg] = style.Colors[ImGuiCol_WindowBg];
     windows->beginHostWindow();
-    bool showDocker = true;
-    ShowExampleAppDockSpace(&showDocker);
+    drawMenuBar();
+    // NOTE: windows->endHostWindow() follows all popup OpenPopup/BeginPopupModal
+    // calls below, so the DockSpace window is still the active window context
+    // when the popups are registered.
+
+    layouts->drawPopups();
+    controls->drawPopups();
+    oceanodePresetSave::CleanupReview::instance().draw();
+    drawUnusedNodesWindow();
+    help->draw();
+
+    if(openQuickTips){
+        ImGui::OpenPopup("Here are some tips:");
+        openQuickTips = false;
+    }
+    showHelpPopUp();
+
+    theme->drawPopups();
+
+    // Connection errors are queued while presets load. Render them from the
+    // persistent DockSpace window so OpenPopup and BeginPopupModal use the
+    // same stable ImGui ID stack on every frame.
+    ofxOceanodeContainer::drawPendingConnectionErrorDialog();
+    ofxOceanodeMacroMixer::drawPendingBlockedNodeDialog();
     windows->endHostWindow();
     if(windows->isShowMode()){
         windows->drawShowModeWindow();
@@ -263,15 +280,11 @@ void ofxOceanode::drawUnusedNodesWindow(){
     ImGui::End();
 }
 
-void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
-{
-    // The host window and its DockSpace are open (windows->beginHostWindow());
-    // the menu bar and popups below are registered inside it.
-    bool showHelp = false;
-    static bool show_app_metrics = false;
-    if (show_app_metrics){ImGui::ShowMetricsWindow(&show_app_metrics);}
-	
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f, 6.0f));
+// The host window's menu bar. Each owner draws its own menu or section.
+void ofxOceanode::drawMenuBar(){
+    if(showMetrics) ImGui::ShowMetricsWindow(&showMetrics);
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f, 6.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12.0f, 6.0f));
     if (ImGui::BeginMenuBar())
     {
@@ -351,112 +364,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
                 if(ImGui::MenuItem(item.first.c_str(), nullptr, false, enabled) && item.second.selected)
                     item.second.selected();
             }
-            ofxOceanodeMenu::section("Rendering");
-			// Show actual running FPS (read-only) with color feedback
-			int currentFPS = (int)ofGetFrameRate();
-			
-			// Calculate percentage difference from desired FPS
-			float fpsDiff = abs(currentFPS - desiredFPS) / (float)desiredFPS * 100.0f;
-			
-			// Set colors based on difference
-			ImVec4 sliderColor;
-			if(fpsDiff <= 5.0f) {
-				sliderColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); // Green
-			} else if(fpsDiff <= 15.0f) {
-				sliderColor = ImVec4(1.0f, 0.6f, 0.0f, 1.0f); // Orange
-			} else {
-				sliderColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); // Red
-			}
-			
-			// Push the color styles for the slider
-			ImGui::PushStyleColor(ImGuiCol_SliderGrab, sliderColor);
-			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(sliderColor.x*0.3f, sliderColor.y*0.3f, sliderColor.z*0.3f, 1.0f));
-			
-			// Draw the disabled FPS slider
-			ImGui::BeginDisabled();
-			ImGui::SliderInt("FPS", &currentFPS, 0, 240);
-			ImGui::EndDisabled();
-			
-			// Pop the color styles
-			ImGui::PopStyleColor(2);
-			
-			// Editable Desired FPS slider
-			if(ImGui::SliderInt("Desired FPS", &desiredFPS, 1, 240)){
-				ofSetFrameRate(desiredFPS);
-			}
-			
-			bool b = false;
-			if(ImGui::Checkbox("V Sync", &b)){ofSetVerticalSync(b);};
-			ofxOceanodeConfigurationFlags configurationFlags = ofxOceanodeShared::getConfigurationFlags();
-			ImGui::CheckboxFlags("Disable Full Render", &configurationFlags, ofxOceanodeConfigurationFlags_DisableRenderAll);
-			ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
-			ImGui::Checkbox("Show Mode", &windows->showModeRef());
-            const int precision = ofxOceanodeShared::getColorTexturePrecision();
-            int texturePrecision = precision == 16 ? 1 : precision == 8 ? 2 : 0;
-            if(ImGui::Combo("Color texture precision", &texturePrecision, "RGBA32F\0RGBA16F\0RGBA8\0")){
-                ofxOceanodeShared::setColorTexturePrecision(texturePrecision == 1 ? 16 : texturePrecision == 2 ? 8 : 32);
-            }
-            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Shared by compatible color nodes. Applied on their next render; history is reset.\nOscillators and numerical/index textures keep their precision.\n16F reduces precision; 8-bit clamps to [0,1]. Save Config to keep this choice.");
-			
-			ofxOceanodeMenu::section("GUI");
-			ImGui::CheckboxFlags("Color Connections?", &configurationFlags, ofxOceanodeConfigurationFlags_ColorConnections);
-			ImGui::CheckboxFlags("Dashed / Dotted lines", &configurationFlags, ofxOceanodeConfigurationFlags_DashedDottedLines);
-			ofxOceanodeShared::setConfigurationFlags(configurationFlags);
-			float connectionWidth = ofxOceanodeShared::getConnectionWidth();
-			if(ImGui::SliderFloat("Connection Width", &connectionWidth, 1.0f, 8.0f, "%.1f")){
-				ofxOceanodeShared::setConnectionWidth(connectionWidth);
-			}
-			bool autoInspector = ofxOceanodeShared::getAutoInspectorShowHide();
-			if(ImGui::Checkbox("Inspector auto show/hide", &autoInspector)){
-				ofxOceanodeShared::setAutoInspectorShowHide(autoInspector);
-			}
-			bool selectionCentersCanvas = ofxOceanodeShared::getSelectionCentersCanvas();
-			if(ImGui::Checkbox("Selection centers canvas", &selectionCentersCanvas)){
-				ofxOceanodeShared::setSelectionCentersCanvas(selectionCentersCanvas);
-			}
-			bool snap = canvas.getSnapToGrid();
-			if(ImGui::Checkbox("Snap To Grid",&snap))
-			{
-				canvas.setSnapToGrid(snap);
-				ofxOceanodeShared::setSnapToGrid(snap);
-			}
-			
-			// Canvas zoom control
-			float zoomLevel = canvas.getZoomLevel() * 100.0f;
-			if(ImGui::SliderFloat("Canvas Zoom", &zoomLevel, 25.0f, 400.0f, "%.0f%%")) {
-				canvas.setZoomLevel(zoomLevel / 100.0f);
-			}
-			ImGui::SameLine();
-			if(ImGui::Button("Reset##zoom")) {
-				canvas.setZoomLevel(1.0f);
-			}
-			
-			int tw = canvas.getNodeWidthText();
-			int ww = canvas.getNodeWidthWidget();
-			int gd = canvas.getGridDivisions();
-			
-			if(ImGui::SliderInt("Node Text Width", &tw, 32, 128)) canvas.updateGridSize();
-			if(ImGui::SliderInt("Node Widget Width", &ww, 64, 256)) canvas.updateGridSize();
-			if(ImGui::SliderInt("Grid Divs",&gd,0,16))
-			{
-				canvas.setGridDivisions(gd);
-				canvas.updateGridSize();
-				ofxOceanodeShared::setSnapGridDiv(gd);
-			}
-			canvas.setNodeWidthText(tw);
-			canvas.setNodeWidthWidget(ww);
-			
+            appConfig->drawMenuSections();
             theme->drawMenuSection();
 
-            ofxOceanodeMenu::section("Configuration");
-
-			if(ImGui::Button("Save Config")){
-				saveConfig();
-			}
-			ImGui::SameLine();
-			if(ImGui::Button("Load Config")){
-				loadConfig();
-			}
+            appConfig->drawConfigButtons();
 
 			ImGui::EndMenu();
 		}
@@ -475,10 +386,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
                 openWithDefaultApp(manual);
             }
             if(ImGui::MenuItem("Quick tips", "CMD+H")){
-                showHelp = true;
+                openQuickTips = true;
             }
             help->drawMenu();
-            ImGui::Checkbox("Metrics", &show_app_metrics);
+            ImGui::Checkbox("Metrics", &showMetrics);
             if(ImGui::MenuItem("Reload Macros")){
                 ofxOceanodeShared::updateMacrosStructure();
             }
@@ -492,28 +403,6 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         ImGui::EndMenuBar();
     }
     ImGui::PopStyleVar(2);
-    // NOTE: windows->endHostWindow() follows all popup OpenPopup/BeginPopupModal
-    // calls below, so the DockSpace window is still the active window context
-    // when the popups are registered.
-
-    layouts->drawPopups();
-    controls->drawPopups();
-    oceanodePresetSave::CleanupReview::instance().draw();
-    drawUnusedNodesWindow();
-    help->draw();
-
-    if(showHelp){
-        ImGui::OpenPopup("Here are some tips:");
-    }
-    showHelpPopUp();
-
-    theme->drawPopups();
-
-    // Connection errors are queued while presets load. Render them from the
-    // persistent DockSpace window so OpenPopup and BeginPopupModal use the
-    // same stable ImGui ID stack on every frame.
-    ofxOceanodeContainer::drawPendingConnectionErrorDialog();
-    ofxOceanodeMacroMixer::drawPendingBlockedNodeDialog();
 }
 
 // The PDF user manual (scripts/build_user_manual.py). A copy in the app's data
@@ -605,175 +494,10 @@ void ofxOceanode::loadPreset(std::string bank, std::string name){ //call preset 
     container->loadPresetEvent.notify(toSendPair);
 }
 
-void ofxOceanode::setShowMode(bool b){
-    windows->setShowMode(b);
-}
-
-void ofxOceanode::toggleShowMode(){
-    windows->setShowMode(!windows->isShowMode());
-}
-
-void ofxOceanode::saveTheme(const std::string& name){
-    theme->save(name);
-}
-
-void ofxOceanode::loadTheme(const std::string& name){
-    theme->load(name);
-}
-
 void ofxOceanode::disableRenderAll(){
     ofxOceanodeShared::setConfigurationFlags(ofxOceanodeShared::getConfigurationFlags() | ofxOceanodeConfigurationFlags_DisableRenderAll);
 }
 
 void ofxOceanode::disableRenderHistograms(){
     ofxOceanodeShared::setConfigurationFlags(ofxOceanodeShared::getConfigurationFlags() | ofxOceanodeConfigurationFlags_DisableRenderAll);
-}
-
-void ofxOceanode::saveConfig(){
-    ofJson config;
-    
-    // Save Desired FPS
-    config["desiredFPS"] = desiredFPS;
-    
-    // Save V Sync (we can't query current state, so we'll save false as default)
-    config["vsync"] = false;
-    
-    // Save configuration flags
-    config["configurationFlags"] = ofxOceanodeShared::getConfigurationFlags();
-    
-    // Save Show Mode
-    config["showMode"] = windows->isShowMode();
-    config["colorTexturePrecision"] = ofxOceanodeShared::getColorTexturePrecision();
-    
-    // Save canvas settings
-    config["nodeTextWidth"] = canvas.getNodeWidthText();
-    config["nodeWidgetWidth"] = canvas.getNodeWidthWidget();
-    config["gridDivisions"] = canvas.getGridDivisions();
-	config["snapToGrid"] = canvas.getSnapToGrid();
-	config["autoInspectorShowHide"] = ofxOceanodeShared::getAutoInspectorShowHide();
-	config["selectionCentersCanvas"] = ofxOceanodeShared::getSelectionCentersCanvas();
-	config["connectionWidth"] = ofxOceanodeShared::getConnectionWidth();
-
-	if(auto tc = controls->get<ofxOceanodeTimeController>()) config["spaceTogglesPlay"] = tc->getSpaceTogglesPlay();
-	
-	   // Create config directory if it doesn't exist
-	   string configDir = ofToDataPath("config", true);
-	   ofDirectory dir(configDir);
-	   if(!dir.exists()){
-	       dir.create(true);
-	   }
-	   
-	   // Preserve defaultLayout if already set in the existing config
-	   string configPath = ofToDataPath("config/config.json", true);
-	   ofFile existingFile(configPath);
-	   if(existingFile.exists()){
-	       ofJson existing = ofLoadJson(configPath);
-	       if(existing.contains("defaultLayout")){
-	           config["defaultLayout"] = existing["defaultLayout"];
-	       }
-	   }
-	   
-	   // Save to file
-	   ofSavePrettyJson(configPath, config);
-}
-
-void ofxOceanode::loadConfig(){
-    string configPath = ofToDataPath("config/config.json", true);
-    
-    // Check if config file exists
-    ofFile configFile(configPath);
-    if(!configFile.exists()){
-        return; // Use defaults if file doesn't exist
-    }
-    
-    // Load JSON
-    ofJson config = ofLoadJson(configPath);
-    
-    // Load Desired FPS (with backward compatibility for old "fps" key)
-    if(config.contains("desiredFPS")){
-        desiredFPS = config["desiredFPS"].get<int>();
-        ofSetFrameRate(desiredFPS);
-    }
-    else if(config.contains("fps")){
-        // Backward compatibility: load old "fps" key
-        desiredFPS = static_cast<int>(config["fps"].get<float>());
-        ofSetFrameRate(desiredFPS);
-    }
-    
-    // Load V Sync
-    if(config.contains("vsync")){
-        ofSetVerticalSync(config["vsync"].get<bool>());
-    }
-    
-    // Load configuration flags
-    if(config.contains("configurationFlags")){
-        ofxOceanodeShared::setConfigurationFlags(config["configurationFlags"].get<ofxOceanodeConfigurationFlags>());
-    }
-    
-    ofxOceanodeShared::setColorTexturePrecision(config.value("colorTexturePrecision", 32));
-
-    // Load Show Mode
-    if(config.contains("showMode")){
-        windows->setShowMode(config["showMode"].get<bool>());
-    }
-    
-    // Load canvas settings
-    if(config.contains("nodeTextWidth")){
-        canvas.setNodeWidthText(config["nodeTextWidth"].get<int>());
-    }
-    
-    if(config.contains("nodeWidgetWidth")){
-        canvas.setNodeWidthWidget(config["nodeWidgetWidth"].get<int>());
-    }
-	if(config.contains("snapToGrid")){
-		bool b = config["snapToGrid"].get<bool>();
-		canvas.setSnapToGrid(b);
-		ofxOceanodeShared::setSnapToGrid(b);
-	}
-	if(config.contains("gridDivisions")){
-		int i = config["gridDivisions"].get<int>();
-		canvas.setGridDivisions(i);
-		canvas.updateGridSize();
-		ofxOceanodeShared::setSnapGridDiv(i);
-	}
-	if(config.contains("autoInspectorShowHide")){
-		ofxOceanodeShared::setAutoInspectorShowHide(config["autoInspectorShowHide"].get<bool>());
-	}
-	ofxOceanodeShared::setSelectionCentersCanvas(config.value("selectionCentersCanvas", false));
-	ofxOceanodeShared::setConnectionWidth(config.value("connectionWidth", 3.0f));
-	if(config.contains("spaceTogglesPlay")){
-		if(auto tc = controls->get<ofxOceanodeTimeController>()) tc->setSpaceTogglesPlay(config["spaceTogglesPlay"].get<bool>());
-	}
-}
-
-void ofxOceanode::saveViewConfig(const std::map<std::string, bool>& visibilityMap){
-    ofJson viewConfig;
-    for(auto& kv : visibilityMap){
-        viewConfig[kv.first] = kv.second;
-    }
-    
-    // Create config directory if it doesn't exist
-    string configDir = ofToDataPath("config", true);
-    ofDirectory dir(configDir);
-    if(!dir.exists()){
-        dir.create(true);
-    }
-    
-    string viewConfigPath = ofToDataPath("config/view.json", true);
-    ofSavePrettyJson(viewConfigPath, viewConfig);
-}
-
-void ofxOceanode::loadViewConfig(){
-    string viewConfigPath = ofToDataPath("config/view.json", true);
-    
-    ofFile viewConfigFile(viewConfigPath);
-    if(!viewConfigFile.exists()){
-        return; // No saved view config, use defaults
-    }
-    
-    ofJson viewConfig = ofLoadJson(viewConfigPath);
-    savedViewConfig.clear();
-    for(auto it = viewConfig.begin(); it != viewConfig.end(); ++it){
-        savedViewConfig[it.key()] = it.value().get<bool>();
-    }
 }

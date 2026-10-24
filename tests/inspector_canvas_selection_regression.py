@@ -314,7 +314,10 @@ int main(){
     ofxOceanodeShared::setSelectionCentersCanvas(true);saveSelectionSetting(config);
     ofxOceanodeShared::setSelectionCentersCanvas(false);loadSelectionSetting(config);
     assert(ofxOceanodeShared::getSelectionCentersCanvas());
+    // A missing key leaves the current setting unchanged.
     config.erase("selectionCentersCanvas");loadSelectionSetting(config);
+    assert(ofxOceanodeShared::getSelectionCentersCanvas());
+    ofxOceanodeShared::setSelectionCentersCanvas(false);loadSelectionSetting(config);
     assert(!ofxOceanodeShared::getSelectionCentersCanvas());
     for(bool macro:{false,true})for(float zoom:{.25f,1.f,2.f})
     for(float width:{80.f,320.f,900.f})for(float height:{60.f,600.f,1600.f}){
@@ -334,7 +337,7 @@ def main():
     header = (ROOT / "src/Managers/ofxOceanodeCanvas.h").read_text()
     controls = (ROOT / "src/Controls/ofxOceanodeControls.cpp").read_text()
     shared = (ROOT / "src/ofxOceanodeShared.h").read_text()
-    app = (ROOT / "src/ofxOceanode.cpp").read_text()
+    app = (ROOT / "src/Gui/ofxOceanodeAppConfig.cpp").read_text()
     state = block(header, "struct InspectorSelectionClick") + " inspectorSelectionClick;"
     setting = next(line.strip() for line in shared.splitlines()
                    if line.strip().startswith("bool selectionCentersCanvas ="))
@@ -342,8 +345,9 @@ def main():
     setting += block(shared, "static bool getSelectionCentersCanvas(")
     save = next(line.strip() for line in app.splitlines()
                 if line.strip().startswith('config["selectionCentersCanvas"] ='))
-    load = next(line.strip() for line in app.splitlines()
-                if line.strip().startswith('ofxOceanodeShared::setSelectionCentersCanvas(config.value('))
+    lines = [line.strip() for line in app.splitlines()]
+    condition = lines.index('if(config.contains("selectionCentersCanvas"))')
+    load = lines[condition] + lines[condition + 1]
     config_methods = ("void saveSelectionSetting(ofJson& config){" + save + "}\n" +
                       "void loadSelectionSetting(ofJson& config){" + load + "}\n")
     with tempfile.TemporaryDirectory(prefix="oceanode-inspector-selection-") as directory:
