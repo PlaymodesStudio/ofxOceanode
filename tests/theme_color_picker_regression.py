@@ -151,7 +151,7 @@ int main() {
 
 def check_wiring():
     source = (ROOT / "src/ofxOceanode.cpp").read_text()
-    draw = source[source.index("void ofxOceanode::draw(){"):source.index("void ofxOceanode::loadDefaultGUILayout()")]
+    draw = source[source.index("void ofxOceanode::draw(){"):source.index("void ofxOceanode::exit(){")]
     # The lookup reads rendered draw data, so it must follow gui.draw().
     assert draw.index("gui.draw();") < draw.index("pickThemeColorUnderMouse();")
     assert "drawThemeColorPickTooltip();" in draw

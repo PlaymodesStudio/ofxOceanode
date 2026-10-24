@@ -237,6 +237,11 @@ public:
     static ofEvent<void>& getPresetWasSavedEvent(){
         return getInstance().presetWasSavedEvent;
     }
+
+    // Payload: the preset path whose docking should be stored (Layouts owns the file).
+    static ofEvent<const std::string>& getDockingSaveRequestEvent(){
+        return getInstance().dockingSaveRequestEvent;
+    }
     
     static void startedLoadingPreset(ofxOceanodePresetLoadType loadType = ofxOceanodePresetLoadType_FullPreset){
         getInstance().presetLoadType = loadType;
@@ -506,6 +511,7 @@ private:
 	   ofEvent<void> presetWillBeLoadedEvent;
 	   ofEvent<void> presetHasLoadedEvent;
 	   ofEvent<void> presetWasSavedEvent;
+	   ofEvent<const std::string> dockingSaveRequestEvent;
 	string currentPresetName = "";
 	string currentPresetPath = "";
 	string currentBankName = "";

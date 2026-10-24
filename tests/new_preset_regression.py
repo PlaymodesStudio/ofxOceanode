@@ -36,7 +36,8 @@ FIXTURE = r'''
 #include <unordered_map>
 #include <vector>
 using namespace std;
-using ofJson = int;
+#include <nlohmann/json.hpp>
+using ofJson = nlohmann::json;
 struct ofxOceanodeContainer;
 struct ofxOceanodeNode;
 int destroyedNodes=0, notifiedNodes=0, destroyedBindings=0, destroyedConnections=0;
@@ -85,12 +86,16 @@ struct ofxOceanodeContainer {
     vector<int> comments{1}; map<int,int> userEditedValues{{1,1}};
     map<string,string> unavailableCustomGuiFiles,unavailableNodeFiles;
     map<string,int> unavailableNodeKeys;
-    int unavailableModules=0,unavailableConnections=0;
+    ofJson unavailableModules=0,unavailableConnections=0;
     string presetStoragePath="SavedPreset";
     bool scopeSavePending=true,clockEnabled=true;
     unsigned nodesRevision=0;
     string id="Canvas";
     string pendingScopeSavePath;
+    unsigned long long pendingScopeSaveDeadlineMillis=0;
+    vector<string> savedScopes;
+    void saveScope(const string& path){savedScopes.push_back(path);}
+    void flushProductionScopeSave();
     map<string,int> canvasLiveNodes{{"Old",1}};
     void clearCanvasHistory(){}
     int resets=0,scopeSaves=0;
@@ -153,19 +158,31 @@ struct ofxOceanodeShared {
     static void setCurrentBankName(string s){bank=s;} static void setCurrentPresetName(string s){name=s;}
     static void setActiveCanvasUniqueID(string s){active=s;}
     static void updateMacrosStructure(){}
+    struct DockingSaveEvent {vector<string> fired; void notify(const string& path){fired.push_back(path);}};
+    static DockingSaveEvent& getDockingSaveRequestEvent(){static DockingSaveEvent event; return event;}
 };
 string ofToDataPath(string path){return path;}
 struct ofFile {ofFile(string){} bool exists(){return false;}};
+ofJson ofLoadJson(const string&){return {};}
+bool validView(const ofJson&){return true;}
+struct Logger {template<class T> Logger& operator<<(const T&){return *this;}};
+Logger ofLogError(const string&){return {};}
+struct ofxOceanodePresetLayouts {
+    int entries=0;
+    void fromJson(const ofJson&){} string layoutOnLoad() const {return "";}
+};
 struct App {
-    ofxOceanodeCanvas canvas; string pendingIniLoad="OldPreset.ini"; bool hasActivePreset=true;
-    void onLoaded(); void onLayoutLoaded(); void onSaved(); void saveCurrentPresetLayout();
-    void readPresetLayouts(){pendingIniLoad.clear();} void savePresetLayouts(){}
+    ofxOceanodeCanvas canvas;
+    string pendingIni="OldPreset ini",pendingSnapshot="Old",layoutError="Old";
+    ofJson pendingView=ofJson::object(),savedView=ofJson::object();
+    ofxOceanodePresetLayouts collection{1}; bool readFailed=true;
+    enum class PresetLayoutPopup {None,Save}; PresetLayoutPopup presetPopup=PresetLayoutPopup::Save;
+    struct Windows {int captures=0; ofJson captureView(){++captures; return ofJson::object({{"controllers",ofJson::object()}});}} windows;
+    int writes=0; bool writeLayoutFile(){++writes; return true;}
+    void onLoaded(); void onLayoutLoaded(); void onSaved(); void saveDocking(const string&);
 };
 namespace ImGui {
 vector<string> items; bool clickNew=true;
-string savedLayoutPath;
-void SaveIniSettingsToDisk(const char* path){savedLayoutPath=path;}
-const char* SaveIniSettingsToMemory(size_t* size){*size=6;return "Layout";}
 bool MenuItem(const char* name,const char* =nullptr,bool=false,bool=true){items.push_back(name);return string(name)=="New Preset" && exchange(clickNew,false);}
 void Separator(){} void TextUnformatted(const char*){} void SameLine(){}
 template<class... Args> void TextColored(Args...){}
@@ -230,7 +247,8 @@ int main(){
     assert(presets.loads==0 && presets.loadPresetInNextUpdate==0);
     assert(presets.banks==vector<string>{"Bank"} && presets.bankPresets["Bank"]==vector<string>({"Saved","Other"}));
     assert(ofxOceanodeShared::path.empty() && ofxOceanodeShared::name.empty() && ofxOceanodeShared::bank.empty());
-    assert(!app.hasActivePreset && app.pendingIniLoad.empty());
+    assert(app.pendingIni.empty() && app.pendingSnapshot.empty() && app.pendingView.is_null() && app.savedView.is_null());
+    assert(!app.readFailed && app.layoutError.empty() && app.collection.entries==0);
     assert(ofxOceanodeShared::active=="Canvas" && app.canvas.focused);
     assert(!app.canvas.pendingCenterNode && !app.canvas.tempSourceParameter && !app.canvas.customGuiContextNode);
     assert(app.canvas.inspectorSelectionClick.nodeID.empty());
@@ -265,8 +283,13 @@ int main(){
     ofxOceanodeScope::getInstance()->callback();
     assert(c.pendingScopeSavePath=="FreshPreset" && macro.pendingScopeSavePath.empty());
     ofxOceanodeShared::path="FreshPreset";app.onSaved();
-    assert(ImGui::savedLayoutPath=="FreshPreset/ImGuiLayout.ini");
-    assert(app.hasActivePreset);
+    assert(app.windows.captures==1 && app.writes==1 && app.savedView.contains("controllers"));
+    // The debounced scope autosave asks Layouts to store the fresh preset's docking.
+    c.scopeSavePending=true; c.flushProductionScopeSave();
+    assert(c.savedScopes==vector<string>{"FreshPreset"} && c.pendingScopeSavePath.empty() && !c.scopeSavePending);
+    assert(ofxOceanodeShared::getDockingSaveRequestEvent().fired==vector<string>{"FreshPreset"});
+    app.saveDocking("OtherPreset"); assert(app.writes==1);
+    app.saveDocking("FreshPreset"); assert(app.writes==2);
     // Repeated New is harmless; freshly created ownership can be cleared again.
     presets.newPresetRequested=true; presets.update(); assert(destroyedNodes==6);
     c.destroyNodeListeners.count=1; populate(c); presets.newPresetRequested=true; presets.update();
@@ -281,7 +304,7 @@ def main():
     presets = (ROOT / "src/Controls/ofxOceanodePresetsController.cpp").read_text()
     canvas = (ROOT / "src/Managers/ofxOceanodeCanvas.cpp").read_text()
     app = (ROOT / "src/ofxOceanode.cpp").read_text()
-    layouts = (ROOT / "src/Layouts/ofxOceanodeLayoutManager.h").read_text()
+    layouts = (ROOT / "src/Gui/ofxOceanodeLayouts.cpp").read_text()
     guard = container[container.index("    thread_local unsigned int containerClearDepth"):
                       container.index("    struct ConnectionFailureInfo")]
     production = "namespace {\n" + guard + "}\n"
@@ -292,12 +315,14 @@ def main():
     production += block(canvas, "void ofxOceanodeCanvas::resetViewToOrigin()")
     production += block(canvas, "void ofxOceanodeCanvas::resetForNewPreset()")
     production += "void ofxOceanodeCanvas::center(){" + block(canvas, "if(centerOriginPending &&") + "}\n"
-    manager_load = block(layouts, "void ofxOceanodeLayoutManager::onPresetLoaded()")
-    production += manager_load.replace('ofxOceanodeLayoutManager::onPresetLoaded()', 'App::onLayoutLoaded()')
+    manager_load = block(layouts, "void ofxOceanodeLayouts::onPresetLoaded()")
+    production += manager_load.replace('ofxOceanodeLayouts::onPresetLoaded()', 'App::onLayoutLoaded()')
     production += 'void App::onLoaded(){onLayoutLoaded();'
     production += block(app, "if(ofxOceanodeShared::getCurrentPresetPath().empty())") + "}\n"
-    production += block(layouts, "void ofxOceanodeLayoutManager::onPresetSaved()").replace('ofxOceanodeLayoutManager::onPresetSaved()', 'App::onSaved()')
-    production += block(layouts, "void ofxOceanodeLayoutManager::saveCurrentPresetLayout()").replace('ofxOceanodeLayoutManager::', 'App::')
+    production += block(layouts, "void ofxOceanodeLayouts::onPresetSaved()").replace('ofxOceanodeLayouts::onPresetSaved()', 'App::onSaved()')
+    production += block(layouts, "void ofxOceanodeLayouts::saveDocking(").replace('ofxOceanodeLayouts::', 'App::')
+    production += block(container, "void ofxOceanodeContainer::flushPendingScopeSave()").replace(
+        'ofxOceanodeContainer::flushPendingScopeSave()', 'ofxOceanodeContainer::flushProductionScopeSave()')
     save_method = block(container, "bool ofxOceanodeContainer::savePreset(string presetFolderPath)")
     production += "void ofxOceanodeContainer::attachSavedScope(string presetFolderPath){const bool ownsGlobalScope=getCanvasID().empty() || getCanvasID()==\"Canvas\" || getCanvasID()==\"0\";"
     production += block(save_method, "if(ownsGlobalScope){") + "}\n"
@@ -307,7 +332,7 @@ def main():
         for midi in (False, True):
             binary = Path(tmp) / ("midi" if midi else "default")
             flags = ["-DOFXOCEANODE_USE_MIDI"] if midi else []
-            subprocess.run([os.environ.get("CXX", "clang++"), "-std=c++17", "-g",
+            subprocess.run([os.environ.get("CXX", "clang++"), "-std=c++17", "-g", "-I", str(ROOT.parents[1] / "libs/json/include"),
                             "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
                             *flags, str(source), "-o", str(binary)], check=True)
             subprocess.run([str(binary)], check=True)

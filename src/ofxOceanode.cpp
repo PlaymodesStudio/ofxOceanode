@@ -17,7 +17,7 @@
 #include "ofxOceanodeHelp.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeMacroMixer.h"
-#include "Layouts/ofxOceanodeLayoutManager.h"
+#include "ofxOceanodeLayouts.h"
 #include "Controls/PresetFileCleanupReview.h"
 #include <algorithm>
 #include <climits>
@@ -89,12 +89,8 @@ void ofxOceanode::setup(){
     windows->installImGuiHandlers();
     ofxOceanodeClipboard::install();
     refreshThemeFonts();
-    layouts = std::make_unique<ofxOceanodeLayoutManager>(ofxOceanodeLayoutManager::Callbacks{
-        [this](){ return windows->captureView(); },
-        [this](const ofJson& state){ windows->restoreView(state); },
-        [this](const std::string& data){ windows->applyIni(data); }
-    });
-    layouts->loadDefaultGlobalLayout();
+    layouts = std::make_unique<ofxOceanodeLayouts>(*windows);
+    layouts->setup();
     // Auto-load default theme if pointer file exists
     {
         std::string defaultThemeFile = ofToDataPath("config/themes/defaultTheme", true);
@@ -203,12 +199,8 @@ void ofxOceanode::draw(){
     pickThemeColorUnderMouse();
 }
 
-void ofxOceanode::loadDefaultGUILayout(){
-    if(layouts) layouts->loadDefaultGlobalLayout();
-}
-
 void ofxOceanode::exit(){
-    layouts->saveCurrentPresetLayout();
+    layouts->saveDocking(ofxOceanodeShared::getCurrentPresetPath());
     oceanodeTime->shutdown(container);
     container->clearContainer();
 }

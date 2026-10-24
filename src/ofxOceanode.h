@@ -33,7 +33,7 @@
 
 class ofxOceanodeWindowManager;
 class ofxOceanodeHelp;
-class ofxOceanodeLayoutManager;
+class ofxOceanodeLayouts;
 
 class ofxOceanode {
 public:
@@ -187,7 +187,6 @@ public:
 	void loadConfig();
 	void saveViewConfig(const std::map<std::string, bool>& visibilityMap);
 	void loadViewConfig();
-    void loadDefaultGUILayout(); // Existing host API, delegated to the layout manager.
 	void saveTheme(const std::string& name);
 	void loadTheme(const std::string& name);
 
@@ -244,7 +243,7 @@ private:
     ofEventListener presetSavedListener;
     bool presetCanvasCenterPending = false;
 
-    std::unique_ptr<ofxOceanodeLayoutManager> layouts;
+    std::unique_ptr<ofxOceanodeLayouts> layouts;
 
     // Theme editor state
     bool showThemeEditor = false;
