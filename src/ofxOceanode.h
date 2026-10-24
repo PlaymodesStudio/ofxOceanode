@@ -23,7 +23,7 @@
 
 #include "ofxImGui.h"
 #include "imgui.h"
-#include "ofxOceanodeThemeColorPicker.h"
+#include "ofxOceanodeColors.h"
 #include "router.h"
 #include "portal.h"
 #include "Nodes/Default_Nodes/portalSelector.h"
@@ -34,6 +34,7 @@
 class ofxOceanodeWindowManager;
 class ofxOceanodeHelp;
 class ofxOceanodeLayouts;
+class ofxOceanodeThemeManager;
 
 class ofxOceanode {
 public:
@@ -244,40 +245,7 @@ private:
     bool presetCanvasCenterPending = false;
 
     std::unique_ptr<ofxOceanodeLayouts> layouts;
-
-    // Theme editor state
-    bool showThemeEditor = false;
-    bool showThemeColorSearch = false;
-    char themeColorSearch[128] = "";
-    void drawThemeEditorWindow();
-    // Alt+hover lookup: while the editor is open, holding Alt over any GUI
-    // element selects the theme colour that drew it (see ofxOceanodeThemeColorPicker.h).
-    std::vector<ofxOceanodeThemeColorPicker::Layer> themeColorPickLayers; // last non-empty lookup, topmost first
-    int themeColorPickFrame = -1;
-    const ImDrawList* themeColorPickTooltipDrawList = nullptr;
-    bool themeEditorHovered = false;
-    ofxOceanodeThemeColorPicker::Match themeSelectedColor;
-    bool themeColorRevealPending = false; // switch tab and scroll to themeSelectedColor
-    void selectThemeColor(const ofxOceanodeThemeColorPicker::Match& match);
-    void pickThemeColorUnderMouse();
-    void drawThemeColorPickTooltip();
-    void drawThemeColorPickLayers(bool selectable);
-    struct ThemeFontFamily {
-        std::string name;
-        std::string regularPath;
-        std::string boldPath;
-    };
-    std::vector<ThemeFontFamily> themeFontFamilies;
-    std::string themeFontFamily; // Empty selects the built-in JetBrains Mono pair.
-    std::string themeFontWarning;
-    bool pendingThemeFontChange = true;
-    void refreshThemeFonts();
-    void applyThemeFont();
-
-    // Theme save/load state
-    std::string currentThemeName;
-    bool openSaveThemePopup = false;
-    char themeNameBuf[128] = {};
+    std::unique_ptr<ofxOceanodeThemeManager> theme;
 };
 
 #endif /* ofxOceanode_h */
