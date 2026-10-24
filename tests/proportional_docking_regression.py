@@ -196,7 +196,8 @@ def main():
         binary = work / "regressions"
         subprocess.run([os.environ.get("CXX", "clang++"), "-std=c++17", "-O0", "-g",
                         "-fsanitize=address,undefined", "-I", str(IMGUI), "-I", str(work),
-                        "-I", str(ROOT / "src"), str(cpp),
+                        "-I", str(ROOT / "src"), "-I", str(ROOT / "src/Gui"), str(cpp),
+                        *[str(ROOT / "src/Gui" / name) for name in ("ofxOceanodeProportionalDocking.cpp", "ofxOceanodeDockCollapse.cpp", "ofxOceanodeFloatingWindowDecor.cpp")],
                         *[str(IMGUI / name) for name in
                           ("imgui.cpp", "imgui_draw.cpp", "imgui_tables.cpp", "imgui_widgets.cpp")],
                         "-o", str(binary)], check=True)

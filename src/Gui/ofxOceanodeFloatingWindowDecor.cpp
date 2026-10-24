@@ -1,32 +1,9 @@
 //
-//  ofxOceanodeFloatingWindowDecor.h
+//  ofxOceanodeFloatingWindowDecor.cpp
 //  ofxOceanode
 //
-//  Border + drop shadow for floating (undocked) ImGui windows, menu dropdowns
-//  and popups, so surfaces hovering over the canvas stand out.
-//
-//  Installed once with install() after the ImGui context exists. An
-//  EndFramePre context hook runs after every window of the frame has been
-//  submitted (Oceanode panels, node windows...), finds the floating window
-//  trees — a standalone top-level window, or the host of a floating dock node
-//  holding several docked windows — and draws, in the draw list of the tree's
-//  last-rendered content window (before any nested popup/menu):
-//    • a soft shadow outside the window rectangle (so it covers what is
-//      behind the window but stays under windows in front of it)
-//    • an outline on the window edge
-//  Each popup, including child submenus and modals, is decorated separately
-//  in its own viewport. Docked windows, the fullscreen dockspace host (including
-//  the menu bar), ordinary child windows and tooltips are left alone, as are
-//  ordinary floating windows living in their own OS viewport.
-//
-//  Colours: OceanodeColors::FloatingWindowBorder / FloatingWindowShadow
-//  (Theme Editor, saved with themes). Sizes: the variables below.
-//
 
-#ifndef ofxOceanodeFloatingWindowDecor_h
-#define ofxOceanodeFloatingWindowDecor_h
-
-#include "imgui.h"
+#include "ofxOceanodeFloatingWindowDecor.h"
 #include "imgui_internal.h"
 #include "ofxOceanodeColors.h"
 #include <cmath>
@@ -34,19 +11,19 @@
 
 namespace ofxOceanodeFloatingWindowDecor {
 
-inline bool  Enabled         = true;
-inline float BorderThickness = 1.0f;   // px (scaled by FontGlobalScale-independent pixels)
-inline float ShadowSize      = 34.0f;  // px the shadow extends beyond the window
-inline int   ShadowSteps     = 34;     // rings used to fake the blur
+bool  Enabled         = true;
+float BorderThickness = 1.0f;
+float ShadowSize      = 34.0f;
+int   ShadowSteps     = 34;
 
 namespace detail {
 
-inline bool isVisible(const ImGuiWindow* w) { return w && w->Active && !w->Hidden; }
+bool isVisible(const ImGuiWindow* w) { return w && w->Active && !w->Hidden; }
 
 // Last content window rendered for this surface, including docked windows.
 // Popup children are separate surfaces: putting a parent's decoration in a
 // submenu's draw list would paint the parent's shadow/border over that submenu.
-inline ImGuiWindow* lastRendered(ImGuiWindow* w) {
+ImGuiWindow* lastRendered(ImGuiWindow* w) {
     for(int i = w->DC.ChildWindows.Size - 1; i >= 0; i--) {
         ImGuiWindow* c = w->DC.ChildWindows[i];
         if(isVisible(c) && !(c->Flags & (ImGuiWindowFlags_Popup | ImGuiWindowFlags_Tooltip)))
@@ -55,14 +32,14 @@ inline ImGuiWindow* lastRendered(ImGuiWindow* w) {
     return w;
 }
 
-inline bool isPopupSurface(const ImGuiWindow* w) {
+bool isPopupSurface(const ImGuiWindow* w) {
     // Submenus can also have ChildWindow set; do not apply the floating-root
     // exclusions to them. Popup covers menus, context menus, combos and modals.
     return isVisible(w) && (w->Flags & ImGuiWindowFlags_Popup) &&
            !(w->Flags & ImGuiWindowFlags_Tooltip) && w->Viewport;
 }
 
-inline bool isFloatingRoot(const ImGuiWindow* w, const ImGuiViewport* mainVp) {
+bool isFloatingRoot(const ImGuiWindow* w, const ImGuiViewport* mainVp) {
     if(!isVisible(w)) return false;
     const ImGuiWindowFlags excluded = ImGuiWindowFlags_ChildWindow | ImGuiWindowFlags_Tooltip |
                                       ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoBringToFrontOnFocus;
@@ -73,7 +50,7 @@ inline bool isFloatingRoot(const ImGuiWindow* w, const ImGuiViewport* mainVp) {
     return true;
 }
 
-inline void decorate(ImGuiWindow* root, const ImGuiViewport* vp) {
+void decorate(ImGuiWindow* root, const ImGuiViewport* vp) {
     ImGuiWindow* target = lastRendered(root);
     ImDrawList*  dl     = target->DrawList;
     const ImVec2 mn = root->Pos;
@@ -108,7 +85,7 @@ inline void decorate(ImGuiWindow* root, const ImGuiViewport* vp) {
     dl->PopClipRect();
 }
 
-inline void onEndFramePre(ImGuiContext* ctx, ImGuiContextHook*) {
+void onEndFramePre(ImGuiContext* ctx, ImGuiContextHook*) {
     if(!Enabled) return;
     ImGuiContext& g = *ctx;
     const ImGuiViewport* mainVp = ImGui::GetMainViewport();
@@ -121,8 +98,7 @@ inline void onEndFramePre(ImGuiContext* ctx, ImGuiContextHook*) {
 
 } // namespace detail
 
-// Call once, after the ImGui context has been created (idempotent per context)
-inline void install(ImGuiContext* ctx = ImGui::GetCurrentContext()) {
+void install(ImGuiContext* ctx) {
     if(!ctx) return;
     static ImGuiContext* installedOn = nullptr;
     if(installedOn == ctx) return;
@@ -134,5 +110,3 @@ inline void install(ImGuiContext* ctx = ImGui::GetCurrentContext()) {
 }
 
 } // namespace ofxOceanodeFloatingWindowDecor
-
-#endif /* ofxOceanodeFloatingWindowDecor_h */
