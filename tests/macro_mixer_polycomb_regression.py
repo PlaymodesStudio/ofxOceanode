@@ -36,25 +36,25 @@ int main(int argc,char** argv) {
     {
         ofxOceanodeContainer c(registry,types,transport); c.setCanvasID("PolyCombSource");
         auto& out=floating(c); out.getParameter<std::string>("Name")="Value";
-        c.createNode(registry->create("SC polyComb"),1);
+        c.createNode(registry->create("SC polycombBox"),1);
         assert(c.savePreset(a));
     }
-    auto source=ofLoadJson(a+"/SC_polyComb_1.json"); auto& sound=source["polyComb"];
+    auto source=ofLoadJson(a+"/SC_polycombBox_1.json"); auto& sound=source["polyComb"];
     assert(sound.contains("Cutoff")&&sound.contains("Echo_Model")&&sound.contains("Snapshot")&&sound.contains("Reverb_Decay"));
     sound["Cutoff"]={80.f}; sound["Echo_Model"]=0; sound["Snapshot"]=1; sound["Reverb_Decay"]=1.f;
-    ofSaveJson(a+"/SC_polyComb_1.json",source);
+    ofSaveJson(a+"/SC_polycombBox_1.json",source);
     fs::copy(a,b,fs::copy_options::recursive); fs::copy(a,voices,fs::copy_options::recursive);
     auto target=source; target["polyComb"]["Cutoff"]={100.f}; target["polyComb"]["Echo_Model"]=1; target["polyComb"]["Snapshot"]=3; target["polyComb"]["Reverb_Decay"]=4.f;
-    ofSaveJson(b+"/SC_polyComb_1.json",target);
-    auto moreVoices=source; moreVoices["Voices"]=8; ofSaveJson(voices+"/SC_polyComb_1.json",moreVoices);
+    ofSaveJson(b+"/SC_polycombBox_1.json",target);
+    auto moreVoices=source; moreVoices["Voices"]=8; ofSaveJson(voices+"/SC_polycombBox_1.json",moreVoices);
 
     MacroMixerRuntime r(parent); assert(r.importMacro(a)&&r.importMacro(b)&&r.importMacro(voices));
     r.request(a,0,0,true); r.update(0); const auto* graph=r.origin(); assert(graph);
-    auto polyComb=[&]() -> ofxOceanodeNodeModel& { return graph->container->getDynamicNodes().at("SC polyComb").begin()->second->getNodeModel(); };
+    auto polyComb=[&]() -> ofxOceanodeNodeModel& { return graph->container->getDynamicNodes().at("SC polycombBox").begin()->second->getNodeModel(); };
     auto value=[&](const char* key) { return saved(polyComb()).at("polyComb").at(key); };
     near(value("Cutoff")[0].get<float>(),80); assert(value("Echo_Model")==0);
     auto details=r.sourceDetails(r.importedMacro(b)->id());
-    assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="node"&&d.location=="SC_polyComb_1";}));
+    assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="node"&&d.location=="SC_polycombBox_1";}));
     assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback"||d.kind=="replaced";}));
     r.request(b,1000,0,true); r.update(10); assert(r.morphingInPlace()&&r.origin()==graph);
     r.update(260); near(value("Cutoff")[0].get<float>(),85); assert(value("Echo_Model")==0);
@@ -73,7 +73,7 @@ int main(int argc,char** argv) {
     MacroMixerRuntime s(parent); assert(s.importMacro(a)&&s.importMacro(voices));
     s.request(a,0,0,true); s.update(0);
     details=s.sourceDetails(s.importedMacro(voices)->id());
-    assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"&&d.location=="SC_polyComb_1"&&d.message.find("(Voices)")!=std::string::npos;}));
+    assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"&&d.location=="SC_polycombBox_1"&&d.message.find("(Voices)")!=std::string::npos;}));
     s.clear();
     std::cout<<"polyComb node morph passed: hidden sound glides (log for decay), modes switch half way, Snapshot kept, cancellation restores, Voices replaces.\n";
 }

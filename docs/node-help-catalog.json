@@ -6647,7 +6647,7 @@
     "source": "nodes/scAnalogBox.cpp",
     "addon": "ofxOceanodeSuperCollider"
   },
-  "SC polyComb": {
+  "SC polycombBox": {
     "description": "Polyphonic comb-resonator synth. Gate takes Oceanode values and audio-rate gates together. Oscillators with FM, filters, comb, ring mod, sine shaper, envelopes, LFOs and a modulation matrix, spread over the speakers, then EQ, echo and reverb. Built from small synths: only the parts in use run. Show opens the editor; right-click a control there to publish it.",
     "parameters": [
       "Show",

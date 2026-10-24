@@ -158,7 +158,7 @@ into a trigger or Portal), the whole graph falls back as described next.
 ### Nodes that blend their own saved state
 
 Many nodes keep their sound outside the parameter group, in their own saved
-block (SuperCollider nodes such as SC polyComb). They can opt in through
+block (SuperCollider nodes such as SC polycombBox). They can opt in through
 `ofxOceanodeNodeModel`; nodes that don't keep today's behaviour.
 
 - `morphKeys()`: `blended` saved keys the node blends itself, and `ignored`
@@ -179,12 +179,12 @@ block (SuperCollider nodes such as SC polyComb). They can opt in through
 MacroMixer owns the timing (Duration, Bi Pow, Finish, cancellation); the node
 owns how its values blend. Morph details lists such a node as **Node morph**.
 
-SC polyComb blends its `polyComb*` block (every window control, the
+SC polycombBox blends its `polyComb*` block (every window control, the
 modulation matrix, LFO/envelope/Ext counts and modulated controls' bases)
 with its existing snapshot morph: numbers glide (times, rates and frequencies
 in log), modes switch half way, its own Snapshot/Morph/Ext controls are left
 alone, and published controls are blended with the rest of the sound. Voices
-and Channels are Structural, so a change there replaces the polyComb. Show is
+and Channels are Structural, so a change there replaces the polycombBox. Show is
 skipped.
 
 When the running graph cannot be reused, the morph falls back to a crossfade.
@@ -408,7 +408,7 @@ branches listed in `macro-mixer-migration-audit.md`.
   settings differ, and the fallback crossfade of a morph that cannot reuse the
   running graph. It needs a SuperCollider addon with the MacroMixer routing
   fences (`serverManager::requestMixerRouting`).
-- `python3 tests/macro_mixer_polycomb_regression.py`: production SC polyComb,
+- `python3 tests/macro_mixer_polycomb_regression.py`: production SC polycombBox,
   without a server, morphing its hidden sound on the running node: linear and
   log glides, a mode switching half way, Snapshot kept, cancellation and a
   Voices change replacing the node. Needs the SuperCollider, ofxSuperCollider
