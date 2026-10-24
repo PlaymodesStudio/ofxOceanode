@@ -263,6 +263,21 @@ public:
         return getInstance().presetLoading;
     }
 
+    // A native graph load that is not a full preset load (a MacroMixer source):
+    // nodes see isPresetLoading() and skip recall-time side effects, such as a
+    // synth's saved Snapshot number recalling that snapshot over the saved
+    // sound. No will/has-loaded events are sent, so app-level listeners (SC
+    // server graphs, layouts) are left alone. Restores the previous state.
+    class ScopedNestedPresetLoad{
+    public:
+        ScopedNestedPresetLoad() : previous(getInstance().presetLoading) { getInstance().presetLoading = true; }
+        ~ScopedNestedPresetLoad(){ getInstance().presetLoading = previous; }
+        ScopedNestedPresetLoad(const ScopedNestedPresetLoad&) = delete;
+        ScopedNestedPresetLoad& operator=(const ScopedNestedPresetLoad&) = delete;
+    private:
+        bool previous;
+    };
+
     static ofxOceanodePresetLoadType getPresetLoadType(){
         return getInstance().presetLoadType;
     }

@@ -197,11 +197,16 @@ def main(extra_sources=(), extra_includes=(), std='c++17'):
 
 
 CASES = r'''static void near(float a,float b) { assert(std::abs(a-b)<.00001f); }
-static int probes=0, blockedSetups=0;
+static int probes=0, blockedSetups=0, probeRecalls=0, probeRecallsWhileLoading=0;
 class UnrestrictedProbe : public ofxOceanodeNodeModel {
 public:
     UnrestrictedProbe():ofxOceanodeNodeModel("Unrestricted Probe") { ++probes; }
     void setup() override { addParameter(value.set("Value",.3f,0,1)); }
+    // Nodes skip recall-time side effects while a preset loads (a synth's
+    // saved Snapshot number must not recall that snapshot over its sound).
+    void presetRecallAfterSettingParameters(ofJson&) override {
+        ++probeRecalls; if(ofxOceanodeShared::isPresetLoading()) ++probeRecallsWhileLoading;
+    }
     ofParameter<float> value;
 };
 class ExternalEndpoint : public ofxOceanodeNodeModel {
@@ -379,7 +384,12 @@ int main(int argc,char** argv) {
         };
         auto& first=globalInstance(1); auto& second=globalInstance(2);
         auto& local=static_cast<ofxOceanodeNodeMacro&>(parent.createNode(std::make_unique<ofxOceanodeNodeMacro>(),3).getNodeModel());
+        const int recallsBefore=probeRecalls, loadingBefore=probeRecallsWhileLoading;
+        assert(!ofxOceanodeShared::isPresetLoading());
         assert(local.loadMacroSource(a));
+        // A source load is a preset recall for its nodes, without app-level preset events.
+        assert(probeRecalls>recallsBefore && probeRecallsWhileLoading-loadingBefore==probeRecalls-recallsBefore);
+        assert(!ofxOceanodeShared::isPresetLoading());
         // Showing any instance opens the first one; only it can close the tab.
         assert(&second.windowInstance()==&first && &local.windowInstance()==&local);
         // Only the first instance may save over the library Macro.

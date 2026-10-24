@@ -591,7 +591,12 @@ bool ofxOceanodeNodeMacro::loadMacroSource(const std::string& folder) {
     ofJson sort;
     if(ofFile::doesFileExist(folder + "/router_sort_order.json")) sort = ofLoadJson(folder + "/router_sort_order.json");
     loadRouterSortFromJson(sort);
-    if(!container->loadPreset(folder)) return false;
+    {
+        // Loaded outside a full preset load (MacroMixer activation): nodes
+        // still treat their recalled values as a preset recall.
+        ofxOceanodeShared::ScopedNestedPresetLoad nestedLoad;
+        if(!container->loadPreset(folder)) return false;
+    }
     snapshotSystem.loadFromPath(folder);
     showSnapshotMatrix = !snapshotSystem.isEmpty();
     loadGlobalDescription(folder);
