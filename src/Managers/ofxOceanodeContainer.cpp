@@ -29,6 +29,7 @@
 #ifdef OFXOCEANODE_USE_MIDI
 #include "ofxOceanodeMidiClock.h"
 #include "ofxOceanodeMidiBinding.h"
+#include "ofxOceanodeMidiKeyboardBinding.h"
 #include "ofxMidiIn.h"
 #include "ofxMidiOut.h"
 #endif
@@ -1239,20 +1240,20 @@ void ofxOceanodeContainer::loadPreset_midiBindings(string presetFolderPath){
         for (ofJson::iterator parameter = module.value().begin(); parameter != module.value().end(); ++parameter) {
             if(parameter->is_array()){ //New MultiMidi Method (Setp 19)
                 for(int i = 0; i < parameter->size(); i++){
-                    auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), false, i);
+                    auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), false, i, (*parameter)[i].value("Keyboard", false));
                     if(midiBinding != nullptr){
                         midiBinding->loadPreset(json[module.key()][parameter.key()][i]);
                     }
                 }
             }else if(parameter.value().find("0") != parameter.value().end()){ //Old MultiMidi Method (August 19)
                 for (ofJson::iterator binding = parameter.value().begin(); binding != parameter.value().end(); ++binding) {
-                    auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), false, ofToInt(binding.key()));
+                    auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), false, ofToInt(binding.key()), binding.value().value("Keyboard", false));
                     if(midiBinding != nullptr){
                         midiBinding->loadPreset(json[module.key()][parameter.key()][binding.key()]);
                     }
                 }
             }else{
-                auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key());
+                auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), false, -1, parameter.value().value("Keyboard", false));
                 if(midiBinding != nullptr){
                     midiBinding->loadPreset(json[module.key()][parameter.key()]);
                 }
@@ -1791,20 +1792,20 @@ void ofxOceanodeContainer::loadPersistent(){
         for (ofJson::iterator parameter = module.value().begin(); parameter != module.value().end(); ++parameter) {
             if(parameter->is_array()){ //New MultiMidi Method (Setp 19)
                 for(int i = 0; i < parameter->size(); i++){
-                    auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), true, i);
+                    auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), true, i, (*parameter)[i].value("Keyboard", false));
                     if(midiBinding != nullptr){
                         midiBinding->loadPreset(json[module.key()][parameter.key()][i]);
                     }
                 }
             }else if(parameter.value().find("0") != parameter.value().end()){ //Old MultiMidi Method (August 19)
                 for (ofJson::iterator binding = parameter.value().begin(); binding != parameter.value().end(); ++binding) {
-                    auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), true, ofToInt(binding.key()));
+                    auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), true, ofToInt(binding.key()), binding.value().value("Keyboard", false));
                     if(midiBinding != nullptr){
                         midiBinding->loadPreset(json[module.key()][parameter.key()][binding.key()]);
                     }
                 }
             }else{
-                auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), true);
+                auto midiBinding = createMidiBindingFromInfo(module.key(), parameter.key(), true, -1, parameter.value().value("Keyboard", false));
                 if(midiBinding != nullptr){
                     midiBinding->loadPreset(json[module.key()][parameter.key()]);
                 }
@@ -2581,7 +2582,7 @@ void ofxOceanodeContainer::setIsListeningMidi(bool b){
     }
 }
 
-shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBinding(ofxOceanodeAbstractParameter &p, bool isPersistent, int _id){
+shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBinding(ofxOceanodeAbstractParameter &p, bool isPersistent, int _id, bool keyboard){
     string name = p.getGroupHierarchyNames()[0] + "-|-" + p.getEscapedName();
     
     if(_id == -1){
@@ -2589,7 +2590,20 @@ shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBindi
     }
     
     shared_ptr<ofxOceanodeAbstractMidiBinding> midiBinding = nullptr;
-    if(p.valueType() == typeid(float).name()){
+    if(keyboard){
+        auto* model = p.getNodeModel();
+        ofxOceanodeTimelineInstrument instrument;
+        if(!model || !model->getMidiKeyboardInstrument(instrument, true) || !ofxOceanodeMidiKeyboardBinding::supports(instrument)) return nullptr;
+        const auto nodeKey = model->getParameterGroup().getEscapedName();
+        midiBinding = std::make_shared<ofxOceanodeMidiKeyboardBinding>([this, nodeKey, model](){
+            ofxOceanodeTimelineInstrument current;
+            auto node = parameterGroupNodesMap.find(nodeKey);
+            if(node != parameterGroupNodesMap.end() && &node->second->getNodeModel() == model)
+                node->second->getNodeModel().getMidiKeyboardInstrument(current);
+            return current;
+        }, name);
+    }
+    else if(p.valueType() == typeid(float).name()){
         midiBinding = make_unique<ofxOceanodeMidiBinding<float>>(p.cast<float>().getParameter(), _id);
     }
     else if(p.valueType() == typeid(int).name()){
@@ -2620,6 +2634,47 @@ shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBindi
         return midiBinding;
     }
     return nullptr;
+}
+
+void ofxOceanodeContainer::drawMidiKeyboardMenu(ofxOceanodeNodeModel& model){
+    ofxOceanodeTimelineInstrument instrument;
+    const auto nodeKey = model.getParameterGroup().getEscapedName();
+    auto isThisKeyboard = [&](const auto& entry){
+        return entry.first.substr(0, entry.first.find("-|-")) == nodeKey;
+    };
+    bool bound = false;
+    for(auto* bindings : {&midiBindings, &persistentMidiBindings})
+        for(auto& entry : *bindings) if(isThisKeyboard(entry))
+            for(auto& binding : entry.second) if(dynamic_cast<ofxOceanodeMidiKeyboardBinding*>(binding.get())) bound = true;
+    if(!bound && !model.getMidiKeyboardInstrument(instrument)) return;
+    ImGui::Separator();
+    if(bound){
+        if(ImGui::Selectable("Unbind MIDI Keyboard (Pitch / Gate)")){
+            for(auto* bindings : {&midiBindings, &persistentMidiBindings}){
+                for(auto entry = bindings->begin(); entry != bindings->end();){
+                    if(isThisKeyboard(*entry)){
+                        auto& list = entry->second;
+                        list.erase(std::remove_if(list.begin(), list.end(), [&](const auto& binding){
+                            auto* keyboard = dynamic_cast<ofxOceanodeMidiKeyboardBinding*>(binding.get());
+                            if(!keyboard) return false;
+                            for(auto& input : midiIns) input.second.removeListener(binding.get());
+                            keyboard->release();
+                            return true;
+                        }), list.end());
+                        if(list.empty()) { entry = bindings->erase(entry); continue; }
+                    }
+                    ++entry;
+                }
+            }
+        }
+    }else if(ImGui::Selectable("Bind MIDI Keyboard (Pitch / Gate)")){
+        if(model.getMidiKeyboardInstrument(instrument, true) && ofxOceanodeMidiKeyboardBinding::supports(instrument)){
+            auto node = parameterGroupNodesMap.find(nodeKey);
+            createMidiBinding(*(instrument.pitch ? instrument.pitch : instrument.gate),
+                node != parameterGroupNodesMap.end() && node->second->getIsPersistent(), -1, true);
+        }
+    }
+    if(ImGui::IsItemHovered()) ImGui::SetTooltip("Play a note to learn the MIDI device and channel. Binds the instrument's note inputs together.");
 }
 
 bool ofxOceanodeContainer::removeLastMidiBinding(ofxOceanodeAbstractParameter &p){
@@ -2663,7 +2718,7 @@ void ofxOceanodeContainer::midiBindingBound(const void * sender, string &portNam
     }
 }
 
-shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBindingFromInfo(string module, string parameter, bool isPersistent, int _id){
+shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBindingFromInfo(string module, string parameter, bool isPersistent, int _id, bool keyboard){
     auto &collection = !isPersistent ? dynamicNodes : persistentNodes;
     string moduleId = ofSplitString(module, "_").back();
     module.erase(module.rfind(moduleId)-1);
@@ -2671,7 +2726,7 @@ shared_ptr<ofxOceanodeAbstractMidiBinding> ofxOceanodeContainer::createMidiBindi
     if(collection.count(module) != 0){
         if(collection[module].count(ofToInt(moduleId))){
             if(collection[module][ofToInt(moduleId)]->getParameters().contains(parameter)){
-                return createMidiBinding(static_cast<ofxOceanodeAbstractParameter&>(collection[module][ofToInt(moduleId)]->getParameters().get(parameter)), isPersistent, _id);
+                return createMidiBinding(static_cast<ofxOceanodeAbstractParameter&>(collection[module][ofToInt(moduleId)]->getParameters().get(parameter)), isPersistent, _id, keyboard);
             }
         }
     }
@@ -3098,7 +3153,7 @@ ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
             if(saved != pendingCanvasEdit->snapshots.end()){
                 for(const auto& midi : saved->second->midi){
                     auto binding = macroContainer->createMidiBindingFromInfo(moved->getParameters().getEscapedName(),
-                        midi["parameter"].get<string>(), false, midi["id"].get<int>());
+                        midi["parameter"].get<string>(), false, midi["id"].get<int>(), midi["binding"].value("Keyboard", false));
                     if(binding){ auto json = midi["binding"]; binding->loadPreset(json); }
                 }
             }
@@ -4013,7 +4068,7 @@ bool ofxOceanodeContainer::replayCanvasEdit(CanvasEdit& edit, bool backwards){
 #ifdef OFXOCEANODE_USE_MIDI
         for(const auto& saved : snapshot->midi){
             auto binding = createMidiBindingFromInfo(key, saved["parameter"].get<string>(),
-                saved["persistent"].get<bool>(), saved["id"].get<int>());
+                saved["persistent"].get<bool>(), saved["id"].get<int>(), saved["binding"].value("Keyboard", false));
             if(binding){ auto json = saved["binding"]; binding->loadPreset(json); }
         }
 #endif

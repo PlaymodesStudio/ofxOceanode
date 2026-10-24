@@ -2187,6 +2187,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         ImGui::CloseCurrentPopup();
                     }
                 }
+#ifdef OFXOCEANODE_USE_MIDI
+                container->drawMidiKeyboardMenu(customGuiContextNode->getNodeModel());
+#endif
                 if(auto* extension = container->getAutomationExtension())
                     extension->drawNodeMenu(customGuiContextNode->getNodeModel());
             }

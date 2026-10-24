@@ -141,6 +141,11 @@ public:
     // whole. Asked when a piano roll is set up and on every timeline update
     // (voice count, kit), so keep it cheap.
     virtual bool getTimelineInstrument(ofxOceanodeTimelineInstrument&) { return false; }
+    // Query without changing the node; bind=true may publish its note inputs.
+    // Reuse the same instrument/voice metadata for a hardware MIDI keyboard.
+    virtual bool getMidiKeyboardInstrument(ofxOceanodeTimelineInstrument& out, bool bind = false) {
+        return getTimelineInstrument(out);
+    }
     
     virtual void deactivate(){};
     virtual void activate(){};
