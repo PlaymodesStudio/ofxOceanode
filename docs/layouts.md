@@ -12,7 +12,9 @@ that menu to recall it.
 Each snapshot stores docking splits and sizes, window positions, tab order and
 selected tabs, controller visibility, node window toggles offered by the Window
 menu, macro canvas visibility, and Custom GUI visibility, including inside nested
-macros. It leaves signal values, connections, transport, and output settings alone.
+macros, plus the Scopes window's visibility. It leaves signal values, connections,
+transport, and output settings alone. Deprecated persistent-node windows and
+utility dialogs (Help, Theme Editor, confirmations) are excluded.
 New nodes or panels added after a snapshot keep their current visibility.
 
 Use **Update current preset layout** to replace the selected snapshot with your
@@ -41,6 +43,13 @@ collection. The global startup default remains independent.
 The GUI arrangement spans all canvas tabs. Focusing or navigating into a macro
 keeps the current layout. Preset saves and exit store it in the preset's root
 `ImGuiLayout.ini`; macros do not load or save individual GUI layouts.
+
+Every **Save Preset** also captures the current Window-menu visibility in the
+preset's `view.json`, independently of named snapshots. Loading applies the named
+default's arrangement first, then the visibility from the last preset save.
+Explicitly recalling a named layout afterward still restores that snapshot's
+visibility. Save As carries the current visibility into the new preset. Exiting
+does not overwrite the visibility from the last explicit preset save.
 
 ## Global layouts
 

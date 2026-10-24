@@ -4,6 +4,7 @@
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeControls.h"
 #include "ofxOceanodeNodeMacro.h"
+#include "ofxOceanodeScope.h"
 
 namespace oceanodeLayouts {
 // Use model identity, never a user-editable node label or a retained pointer.
@@ -25,6 +26,9 @@ inline void windowToggles(ofParameterGroup& group, ofJson& state, bool restore){
 inline void windows(ofxOceanodeContainer* owner, ofJson& state, bool restore){
     if(!state.is_object()) return;
     for(auto* node : owner->getAllModules()){
+        // The deprecated persistent-node feature stays outside preset views,
+        // including windows inside a persistent Macro.
+        if(node->getIsPersistent()) continue;
         auto& model = node->getNodeModel();
         const auto key = nodeKey(model);
         if(restore && (!state.contains("nodes") || !state["nodes"].is_object() ||
@@ -49,8 +53,18 @@ inline void windows(ofxOceanodeContainer* owner, ofJson& state, bool restore){
 }
 
 inline ofJson captureWindows(ofxOceanodeContainer* container, ofxOceanodeControls& controls){
-    ofJson state = {{"controllers", controls.getControllersVisibility()}, {"windows", ofJson::object()}};
+    ofJson state = {{"controllers", ofJson::object()}, {"windows", ofJson::object()}};
+    const auto& visibility = controls.getControllersVisibility();
+    for(const auto& controller : controls.getControllers()){
+        if(controller->isMenuController()) continue;
+        const auto& name = controller->getControllerName();
+        const auto found = visibility.find(name);
+        // Optional addon controllers can be drawn before the View menu has
+        // initialized their entry. Match Controls::draw's visible default.
+        state["controllers"][name] = found == visibility.end() || found->second;
+    }
     windows(container, state["windows"], false);
+    state["scopes"] = ofxOceanodeScope::getInstance()->isVisible();
     return state;
 }
 inline void restoreWindows(ofxOceanodeContainer* container, ofxOceanodeControls& controls, ofJson state){
@@ -61,5 +75,7 @@ inline void restoreWindows(ofxOceanodeContainer* container, ofxOceanodeControls&
             visibility[key] = state["controllers"][key].get<bool>();
     }
     windows(container, state["windows"], true);
+    if(state.contains("scopes") && state["scopes"].is_boolean())
+        ofxOceanodeScope::getInstance()->setVisible(state["scopes"].get<bool>());
 }
 } // namespace oceanodeLayouts

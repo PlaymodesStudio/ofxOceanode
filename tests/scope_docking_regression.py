@@ -31,6 +31,7 @@ struct ofxOceanodeScopeItem { std::string windowName; void* parameter=nullptr; }
 struct Config { bool hasConfig=false; float posX=40,posY=40,width=800,height=600; };
 class ofxOceanodeScope {
 public:
+    bool visible=true;
     std::vector<ofxOceanodeScopeItem> scopedParameters;
     struct Pending {std::string windowName; size_t scopeCountAtAdd;};
     std::vector<Pending> pendingDockWindows;
@@ -73,6 +74,13 @@ int main(){
     int notifications=s.notifications;
     auto initialSignature=s.lastSettledDockLayoutSignature;
     idle(s,20);assert(s.notifications==notifications);assert(initialSignature==s.lastSettledDockLayoutSignature);
+    // Window > Scopes hides the renderer without unscoping or saving deletions.
+    const auto scopeCount=s.scopedParameters.size();
+    s.visible=false;frame(s);frame(s);
+    assert(!ImGui::FindWindowByName("Scopes")->Active);
+    assert(s.scopedParameters.size()==scopeCount&&s.notifications==notifications);
+    s.visible=true;idle(s);
+    assert(ImGui::FindWindowByName("Scopes")->Active&&s.scopedParameters.size()==scopeCount);
     // Moving only the side wall must never move the stacked row dividers.
     // Repeat small moves too: including separator space in the resize ratios
     // used to accumulate vertical drift on every width-only resize frame.

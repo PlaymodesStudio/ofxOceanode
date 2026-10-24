@@ -47,12 +47,19 @@ struct ofxOceanodeNodeModel {
     string nodeName(){return name;}int getNumIdentifier(){return number;}
 };
 struct ofxOceanodeNode {
+    bool persistent=false;
+    bool getIsPersistent(){return persistent;}
     shared_ptr<ofxOceanodeNodeModel> model=make_shared<ofxOceanodeNodeModel>();
     ofParameterGroup parameters,inspector;
     auto& getNodeModel(){return *model;}
     auto& getParameters(){return parameters;}auto& getInspectorParameters(){return inspector;}
 };
 struct WindowState {bool isOpen=false;};
+struct ofxOceanodeScope {
+    bool visible=true;
+    static ofxOceanodeScope* getInstance(){static ofxOceanodeScope s;return &s;}
+    bool isVisible(){return visible;} void setVisible(bool v){visible=v;}
+};
 struct Panel {string id;WindowState windowState;};
 struct ofxOceanodeContainer {
     vector<ofxOceanodeNode*> nodes; vector<Panel> panels;
@@ -135,6 +142,7 @@ struct ofxOceanodeLayoutManager {
     void queueGlobalLayout(const string&, const string&);
     void onPresetLoaded();void onPresetSaved();void beforeFrame();void saveCurrentPresetLayout();void loadDefaultGlobalLayout();
     bool hasActivePreset=false;
+    ofJson pendingPresetView;
     struct Callbacks {
         function<ofJson()> captureWindows;
         function<void(const ofJson&)> restoreWindows;
@@ -325,6 +333,79 @@ int main(){
     ofstream("config/config.json")<<ofJson({{"defaultLayout","Startup.ini"}}).dump();
     app.loadDefaultGlobalLayout();assert(app.pendingIniLoad=="config/guiLayouts/Startup.ini");
     app.beforeFrame();settle();assert(app.pendingIniLoad.empty());
+    // A normal preset save must persist View toggles without a named layout.
+    // Missing optional controller entries are visible, just like Controls::draw.
+    app.controls->visibility.erase("Timeline");
+    assert(app.capturePresetLayout()["controllers"]["Timeline"]==true);
+    ofxOceanodeShared::preset="view-hidden";
+    filesystem::create_directories("view-hidden");app.onPresetLoaded();
+    app.controls->visibility["Timeline"]=false;
+    app.container->nodes={&synth,&macroNode};app.container->panels={{"root",{false}}};
+    show->parameter.set(false);innerShow->set(false);macro->visible=false;
+    macro->child->panels[0].windowState.isOpen=false;
+    ofxOceanodeScope::getInstance()->setVisible(false);
+    ofxOceanodeNode persistent; persistent.persistent=true;persistent.model->number=99;
+    auto persistentShow=make_shared<ofParameter<bool>>("Show",false);persistent.parameters={persistentShow};
+    app.container->nodes.push_back(&persistent);
+    app.onPresetSaved();
+    assert(ofLoadJson("view-hidden/view.json")["controllers"]["Timeline"]==false);
+    assert(!ofLoadJson("view-hidden/view.json")["windows"]["nodes"].contains(oceanodeLayouts::nodeKey(*persistent.model)));
+    // Fresh manager/controls simulate restarting with Timeline visible by default.
+    ofxOceanodeLayoutManager restarted;
+    restarted.container=app.container;
+    show->parameter.set(true);innerShow->set(true);macro->visible=true;persistentShow->set(true);
+    restarted.container->panels[0].windowState.isOpen=true;macro->child->panels[0].windowState.isOpen=true;
+    ofxOceanodeScope::getInstance()->setVisible(true);
+    assert(restarted.controls->visibility["Timeline"]);
+    restarted.onPresetLoaded();restarted.beforeFrame();settle();
+    assert(!restarted.controls->visibility["Timeline"]);
+    assert(!show->parameter.get()&&!innerShow->get()&&!macro->visible);
+    assert(!restarted.container->panels[0].windowState.isOpen&&!macro->child->panels[0].windowState.isOpen);
+    assert(!ofxOceanodeScope::getInstance()->isVisible()&&persistentShow->get());
+    // Even a legacy named layout must not restore deprecated persistent nodes.
+    auto withPersistent=sound;
+    withPersistent["windows"]["nodes"][oceanodeLayouts::nodeKey(*persistent.model)]["parameters"]["Show"]=false;
+    oceanodeLayouts::restoreWindows(restarted.container.get(),*restarted.controls,withPersistent);
+    assert(persistentShow->get());
+    // Save As captures the current visible state, independently of the original.
+    ofxOceanodeShared::preset="view-shown";filesystem::create_directories("view-shown");
+    restarted.controls->visibility.erase("Timeline");restarted.onPresetSaved();
+    assert(ofLoadJson("view-shown/view.json")["controllers"]["Timeline"]==true);
+    ofxOceanodeShared::preset="view-hidden";restarted.onPresetLoaded();restarted.beforeFrame();
+    assert(!restarted.controls->visibility["Timeline"]);
+    ofxOceanodeShared::preset="view-shown";restarted.onPresetLoaded();restarted.beforeFrame();
+    assert(restarted.controls->visibility["Timeline"]);
+    // An older default snapshot must not undo View changes saved with the preset.
+    restarted.presetLayouts.create("Visible",sound);restarted.presetLayouts.defaultLayout="Visible";
+    show->parameter.set(false);innerShow->set(false);macro->visible=false;
+    restarted.container->panels[0].windowState.isOpen=false;macro->child->panels[0].windowState.isOpen=false;
+    ofxOceanodeScope::getInstance()->setVisible(false);
+    restarted.controls->visibility["Timeline"]=false;restarted.onPresetSaved();
+    restarted.controls->visibility["Timeline"]=true;
+    restarted.onPresetLoaded();restarted.beforeFrame();settle();
+    assert(!restarted.controls->visibility["Timeline"]);
+    assert(restarted.presetLayouts.entries.at("Visible")==sound);
+    assert(!show->parameter.get()&&!innerShow->get()&&!macro->visible);
+    assert(!restarted.container->panels[0].windowState.isOpen&&!macro->child->panels[0].windowState.isOpen);
+    assert(!ofxOceanodeScope::getInstance()->isVisible());
+    restarted.recallPresetLayout("Visible");assert(restarted.controls->visibility["Timeline"]);
+    assert(show->parameter.get()&&innerShow->get()&&macro->visible);
+    assert(restarted.container->panels[0].windowState.isOpen&&macro->child->panels[0].windowState.isOpen);
+    assert(ofxOceanodeScope::getInstance()->isVisible());
+    // Legacy/malformed view files retain current visibility, and a second load
+    // (including New) cancels a pending visibility restore from the first.
+    ofxOceanodeShared::preset="view-hidden";restarted.onPresetLoaded();
+    ofxOceanodeShared::preset="view-legacy";restarted.onPresetLoaded();restarted.beforeFrame();
+    assert(restarted.controls->visibility["Timeline"]);
+    filesystem::create_directories("view-invalid");
+    for(const string invalid : {string("{broken"), string("{\"version\":1,\"controllers\":false}")}){
+        ofstream("view-invalid/view.json")<<invalid;
+        ofxOceanodeShared::preset="view-invalid";restarted.onPresetLoaded();restarted.beforeFrame();
+        assert(restarted.controls->visibility["Timeline"]);
+    }
+    ofxOceanodeShared::preset="view-hidden";restarted.onPresetLoaded();
+    ofxOceanodeShared::preset="";restarted.onPresetLoaded();restarted.beforeFrame();
+    assert(restarted.controls->visibility["Timeline"]);
     app.presetLayouts.fromJson(original);
     // Save As is a separate serialized copy, with no shared mutable snapshots.
     auto savedAs=reopened;savedAs.entries.at("Audio")=laser;assert(reopened.entries.at("Audio")==sound);

@@ -8,7 +8,7 @@
 #include "ofxOceanodeNodeModelExternalWindow.h"
 
 ofxOceanodeNodeModelExternalWindow::ofxOceanodeNodeModelExternalWindow(string name)  : ofxOceanodeNodeModel(name){
-	addParameter(showWindow.set("Show.Win", false), ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisableOutConnection | ofxOceanodeParameterFlags_DisableSavePreset);
+	addParameter(showWindow.set("Show.Win", false), ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisableOutConnection);
     addParameter(fullscreenWindow.set("Fullscr.", false), ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisableOutConnection | ofxOceanodeParameterFlags_DisableSavePreset);
     windowListenerEvents.push(showWindow.newListener(this, &ofxOceanodeNodeModelExternalWindow::showExternalWindow));
     windowListenerEvents.push(fullscreenWindow.newListener([this](bool &b){
@@ -71,7 +71,12 @@ void ofxOceanodeNodeModelExternalWindow::showExternalWindow(bool &b){
         externalWindow->setVerticalSync(true);
         windowListenerEvents.push(externalWindow->events().draw.newListener(this, &ofxOceanodeNodeModelExternalWindow::drawInExternalWindow));
         windowListenerEvents.push(externalWindow->events().update.newListener(this, &ofxOceanodeNodeModelExternalWindow::updateForExternalWindow));
-        windowListenerEvents.push(externalWindow->events().exit.newListener(this, &ofxOceanodeNodeModelExternalWindow::closeExternalWindow));
+        const std::weak_ptr<ofAppBaseWindow> openedWindow = externalWindow;
+        windowListenerEvents.push(externalWindow->events().exit.newListener([this, openedWindow](ofEventArgs& e){
+            // A hidden window can finish closing after another has opened.
+            if(auto closingWindow = openedWindow.lock())
+                if(externalWindow == closingWindow) closeExternalWindow(e);
+        }));
         windowListenerEvents.push(externalWindow->events().keyPressed.newListener(this, &ofxOceanodeNodeModelExternalWindow::keyPressed));
         windowListenerEvents.push(externalWindow->events().keyReleased.newListener(this, &ofxOceanodeNodeModelExternalWindow::keyReleased));
         windowListenerEvents.push(externalWindow->events().mouseMoved.newListener(this, &ofxOceanodeNodeModelExternalWindow::mouseMoved));
@@ -86,6 +91,8 @@ void ofxOceanodeNodeModelExternalWindow::showExternalWindow(bool &b){
         setupForExternalWindow();
     }
     else if(!b && externalWindow != nullptr){
+        externalWindowRect.setPosition(glm::vec3(externalWindow->getWindowPosition(), 0));
+        externalWindowRect.setSize(externalWindow->getWidth(), externalWindow->getHeight());
         externalWindow->setWindowShouldClose();
         externalWindow = nullptr;
     }
@@ -98,6 +105,7 @@ void ofxOceanodeNodeModelExternalWindow::windowResizedOwnEvent(ofResizeEventArgs
 }
 
 void ofxOceanodeNodeModelExternalWindow::closeExternalWindow(ofEventArgs &e){
+    if(!externalWindow) return;
     externalWindowRect.setPosition(glm::vec3(externalWindow->getWindowPosition(), 0));
     externalWindowRect.setSize(externalWindow->getWidth(), externalWindow->getHeight());
     showWindow = false;
@@ -111,6 +119,9 @@ void ofxOceanodeNodeModelExternalWindow::presetSave(ofJson &json){
 }
 
 void ofxOceanodeNodeModelExternalWindow::presetRecallBeforeSettingParameters(ofJson &json){
+    // Wrapped OF booleans may serialize as "0"/"1" strings. The normal
+    // parameter loader handles conversion; only absence means legacy default.
+    hasSavedWindowVisibility = json.contains(showWindow.getEscapedName());
     if(saveStateOnPreset){
         if(json.count("ExtWindowRect") == 1){
             auto infoVec = json["ExtWindowRect"];

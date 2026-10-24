@@ -73,6 +73,7 @@ struct ofxOceanodeControls {
     vector<shared_ptr<ofxOceanodeBaseController>> controllers;
     map<string,bool> controllerVisible{{"Inspector",true}};
     ImGuiID inspectorPreviousTabID=0,inspectorPreviousDockID=0;
+    bool inspectorWasVisible=false;
     template<class T> shared_ptr<T> get(){
         for(auto& c:controllers) if(auto out=dynamic_pointer_cast<T>(c))return out;
         return nullptr;
@@ -194,14 +195,14 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
     io.AddMouseButtonEvent(button,true);capture=true;frame();
     idle(drag?20:2);
     near(canvas.scrolling,oldScroll); // Never jump while a button is held.
-    assert(!controls.controllerVisible["Inspector"]);
+    assert(!controls.inspectorWasVisible);assert(controls.controllerVisible["Inspector"]);
     glm::vec2 movement=drag?glm::vec2(90,-65):glm::vec2(0);
     node.gui.position+=movement;
     clearHistory();
     io.AddMouseButtonEvent(button,false);frame();
     near(canvas.scrolling,oldScroll); // Release must finish before docking changes.
     idle(4);
-    assert(controls.controllerVisible["Inspector"]);
+    assert(controls.inspectorWasVisible);assert(controls.controllerVisible["Inspector"]);
     if(layout<2)assert(glm::distance(canvas.contentRegionSize,oldSize)>100);
     if(centers)checkCentered(canvas,node.gui);
     else near(canvas.scrolling,oldScroll);
@@ -241,7 +242,7 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
 
     // Reopening an existing Inspector must also wait for its dock to return.
     secondNode.gui.selected=false;
-    idle(6);assert(!controls.controllerVisible["Inspector"]);
+    idle(6);assert(!controls.inspectorWasVisible);assert(controls.controllerVisible["Inspector"]);
     const auto reopenSize=canvas.contentRegionSize;
     inspector->node=&node;
     const auto reopenMouse=canvas.canvasOrigin+reopenSize*glm::vec2(.7f,.6f);
@@ -282,7 +283,30 @@ static void scenario(bool macroFirst,float zoom,int layout,int button,float node
     assert(canvas.inspectorSelectionClick.nodeID.empty());
     ImGui::DestroyContext();
 }
+void visibilityChoices(){
+    ImGui::CreateContext();auto& io=ImGui::GetIO();io.IniFilename=nullptr;
+    io.DisplaySize={800,600};io.DeltaTime=1.f/60;
+    unsigned char* pixels;int w,h;io.Fonts->GetTexDataAsRGBA32(&pixels,&w,&h);
+    ofxOceanodeShared::left=0;
+    ofxOceanodeNode node;
+    auto inspector=make_shared<ofxOceanodeInspectorController>();inspector->node=&node;
+    ofxOceanodeControls controls;controls.controllers.push_back(inspector);
+    for(bool automatic:{false,true})for(bool selected:{false,true})for(bool enabled:{true,false}){
+        ofxOceanodeShared::automatic=automatic;node.gui.selected=selected;
+        controls.controllerVisible["Inspector"]=enabled;
+        ofxOceanodeShared::focus=true;
+        for(int i=0;i<3;++i){ImGui::NewFrame();controls.draw();ImGui::Render();}
+        const bool expected=enabled&&(!automatic||selected);
+        assert(controls.controllerVisible["Inspector"]==enabled);
+        assert(controls.inspectorWasVisible==expected);
+        auto* window=ImGui::FindWindowByName("Inspector");
+        assert(window&&window->Active==expected);
+        if(!enabled)assert(!ofxOceanodeShared::focus);
+    }
+    ImGui::DestroyContext();
+}
 int main(){
+    visibilityChoices();
     // Use production defaults, accessors, and JSON save/load statements.
     assert(!ofxOceanodeShared::getSelectionCentersCanvas());
     ofJson config=ofJson::object();saveSelectionSetting(config);

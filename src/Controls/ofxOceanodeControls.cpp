@@ -89,11 +89,13 @@ void ofxOceanodeControls::draw(){
     bool focusInspectorWindow = false;
     if(inspector){
         inspectorName = inspector->getControllerName();
-        const bool wasVisible = controllerVisible[inspectorName];
+        const bool wasVisible = inspectorWasVisible;
+        const auto visibility = controllerVisible.find(inspectorName);
+        const bool enabled = visibility == controllerVisible.end() || visibility->second;
         const bool autoShowHide = ofxOceanodeShared::getAutoInspectorShowHide();
         const bool hasSelection = inspector->hasAnySelectedNode();
-        bool showInspector = !autoShowHide || hasSelection;
-        if(!hasSelection)
+        bool showInspector = enabled && (!autoShowHide || hasSelection);
+        if(!hasSelection || !enabled)
             ofxOceanodeShared::consumeInspectorFocusRequest();
 
         // The canvas processes mouse release later in this frame. Keep its dock
@@ -107,7 +109,7 @@ void ofxOceanodeControls::draw(){
 
         // Restore the tab that was active before the Inspector took focus when
         // selection ends, whether the Inspector will hide or remain open.
-        if(!hasSelection && inspectorPreviousTabID != 0){
+        if((!hasSelection || !enabled) && inspectorPreviousTabID != 0){
             ImGuiWindow* window = ImGui::FindWindowByName(inspectorName.c_str());
             ImGuiDockNode* dock = window ? window->DockNode : nullptr;
             if(dock && dock->ID == inspectorPreviousDockID && dock->TabBar &&
@@ -143,7 +145,7 @@ void ofxOceanodeControls::draw(){
                 inspectorPreviousTabID = 0;
             }
         }
-        controllerVisible[inspectorName] = showInspector;
+        inspectorWasVisible = showInspector;
     }
 
     for(auto &c : controllers) c->drawBeforeWindows();
@@ -154,6 +156,7 @@ void ofxOceanodeControls::draw(){
         // Determine visibility
         auto it = controllerVisible.find(c->getControllerName());
         bool isVisible = (it == controllerVisible.end()) || it->second;
+        if(c->getControllerName() == inspectorName) isVisible = inspectorWasVisible;
 
         // When a controller is hidden, skip Begin/End entirely so the window
         // truly disappears from the tab bar.

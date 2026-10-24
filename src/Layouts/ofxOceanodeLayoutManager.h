@@ -52,6 +52,7 @@ private:
     // Preset persistence and layout requests applied before NewFrame.
     bool hasActivePreset = false;
     std::string pendingIniLoad;
+    ofJson pendingPresetView;
 
     ofJson capturePresetLayout();
     void recallPresetLayout(const std::string& name);
@@ -66,17 +67,38 @@ private:
 // Preset lifecycle and frame-boundary application.
 
 inline void ofxOceanodeLayoutManager::onPresetLoaded(){
+    pendingPresetView = nullptr;
     readPresetLayouts();
     hasActivePreset = !ofxOceanodeShared::getCurrentPresetPath().empty();
     if(!hasActivePreset) return;
     const auto iniPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/ImGuiLayout.ini");
     if(ofFile(iniPath).exists()) pendingIniLoad = iniPath;
+    const auto viewPath = ofToDataPath(ofxOceanodeShared::getCurrentPresetPath() + "/view.json");
+    if(ofFile(viewPath).exists()){
+        try{
+            const auto view = ofLoadJson(viewPath);
+            if(view.at("version").get<int>() != 1 || !view.at("controllers").is_object())
+                throw std::runtime_error("Invalid preset view file.");
+            if(view.contains("windows") && !view.at("windows").is_object())
+                throw std::runtime_error("Invalid preset window state.");
+            pendingPresetView = view;
+        }catch(const std::exception& error){
+            ofLogError("Layouts") << "Could not load " << viewPath << ": " << error.what();
+        }
+    }
 }
 
 inline void ofxOceanodeLayoutManager::onPresetSaved(){
     hasActivePreset = !ofxOceanodeShared::getCurrentPresetPath().empty();
     saveCurrentPresetLayout();
     savePresetLayouts();
+    if(hasActivePreset){
+        ofJson view = callbacks.captureWindows();
+        view["version"] = 1;
+        const auto path = ofxOceanodeShared::getCurrentPresetPath() + "/view.json";
+        if(!oceanodePresetSave::saveJson(path, view))
+            ofLogError("Layouts") << "Could not save " << path;
+    }
 }
 
 inline void ofxOceanodeLayoutManager::beforeFrame(){
@@ -88,6 +110,12 @@ inline void ofxOceanodeLayoutManager::beforeFrame(){
         const auto name = pendingPresetLayout;
         pendingPresetLayout.clear();
         recallPresetLayout(name);
+    }
+    if(!pendingPresetView.is_null()){
+        // The View state at preset save wins over an older named snapshot.
+        // Explicitly recalling that snapshot later still restores its toggles.
+        callbacks.restoreWindows(pendingPresetView);
+        pendingPresetView = nullptr;
     }
 }
 

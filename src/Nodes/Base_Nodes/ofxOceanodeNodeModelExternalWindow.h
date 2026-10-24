@@ -55,6 +55,7 @@ protected:
     ofParameter<bool>           fullscreenWindow;
     
     bool saveStateOnPreset;
+    bool hasSavedWindowVisibility = false;
 };
 
 #endif /* ofxOceanodeNodeModelExternalWindow_h */

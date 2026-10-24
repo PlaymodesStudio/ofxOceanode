@@ -107,6 +107,7 @@ ADDON = r'''
     assert(gui.recallCustomGuiSnapshotSlot(panelId,3));
     assert(node.getNodeModel().getParameter<float>("Value").get()==.2f);
     root.createNodeFromName("CustomGui Snapshots",1);
+    gui.getCustomGuiPanelData(panelId)->windowState.isOpen=false;
     assert(root.savePreset("WithGui"));
     // Fresh registry: even a binary linked with the addon has no GUI until attached.
     auto bareRegistry=make_shared<ofxOceanodeNodeRegistry>();bareRegistry->registerModel<GuiProbe>("Test");bareRegistry->registerModel<ofxOceanodeNodeMacro>("Macro");
@@ -117,6 +118,12 @@ ADDON = r'''
     assert(restored.loadPreset("WithoutGui"));
     auto& copy=ofxOceanodeCustomGui::get(restored);
     assert(copy.getCustomGuiPanelsData().size()==1 && copy.getCustomGuiPanelData(panelId));
+    assert(!copy.getCustomGuiPanelData(panelId)->windowState.isOpen);
+    auto legacyPanel=customGuiPanelDataToJson(*copy.getCustomGuiPanelData(panelId));
+    legacyPanel["windowState"].erase("isOpen");
+    assert(customGuiPanelDataFromJson(legacyPanel).windowState.isOpen);
+    legacyPanel.erase("windowState");
+    assert(customGuiPanelDataFromJson(legacyPanel).windowState.isOpen);
     assert(copy.getCustomGuiSnapshotBySlot(panelId,3));
     assert(restored.getDynamicNodes().at("CustomGui Snapshots").size()==1);
     auto* restoredNode=restored.getDynamicNodes().at("Gui Probe").at(1).get();

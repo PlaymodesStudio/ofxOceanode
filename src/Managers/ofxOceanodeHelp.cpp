@@ -7,6 +7,7 @@
 #include "ofxOceanodeNodeGui.h"
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeMenu.h"
+#include "ofxOceanodeScope.h"
 #include <algorithm>
 #include <cctype>
 #include <sstream>
@@ -292,16 +293,18 @@ void ofxOceanodeHelp::draw() {
 void ofxOceanodeHelp::drawWindowMenu(ofxOceanodeControls& controls) {
     if(ImGui::MenuItem("Canvas"))
         if(auto* canvas = ofxOceanodeShared::getRootCanvas()) canvas->requestFocus();
+    bool scopesVisible = ofxOceanodeScope::getInstance()->isVisible();
+    if(ImGui::Checkbox("Scopes", &scopesVisible))
+        ofxOceanodeScope::getInstance()->setVisible(scopesVisible);
+    if(ImGui::IsItemHovered()) ImGui::SetTooltip("Show or hide Scopes without removing scoped parameters.");
+    ImGui::TextDisabled("Visibility is saved with the preset.");
     ofxOceanodeMenu::section("Controllers");
     auto& visibility = controls.getControllersVisibility();
-    // Reopening Window starts with current state, including automatic Inspector changes.
-    if(ImGui::IsWindowAppearing()) pendingControllerVisibility = visibility;
     std::vector<std::string> names;
     for(const auto& controller : controls.getControllers()) {
         const auto& name = controller->getControllerName();
         if(controller->isMenuController()) {
             visibility.erase(name);
-            pendingControllerVisibility.erase(name);
             continue;
         }
         names.push_back(name);
@@ -309,11 +312,10 @@ void ofxOceanodeHelp::drawWindowMenu(ofxOceanodeControls& controls) {
     std::sort(names.begin(), names.end());
     for(const auto& name : names) {
         if(!visibility.count(name)) visibility[name] = true;
-        if(!pendingControllerVisibility.count(name)) pendingControllerVisibility[name] = visibility[name];
-        ImGui::Checkbox(name.c_str(), &pendingControllerVisibility[name]);
+        ImGui::Checkbox(name.c_str(), &visibility[name]);
+        if(name == "Inspector" && ImGui::IsItemHovered())
+            ImGui::SetTooltip("Unchecked: always hidden. When enabled, automatic show/hide still follows node selection.");
     }
-    if(ImGui::Button("Apply"))
-        for(const auto& name : names) visibility[name] = pendingControllerVisibility.at(name);
     using Entry = ofxOceanodeCustomGuiExtension::WindowEntry;
     std::vector<Entry> nodes, macros, panels;
     std::function<void(ofxOceanodeContainer*, const std::string&)> collect =

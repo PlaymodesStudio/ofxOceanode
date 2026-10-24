@@ -17,10 +17,13 @@ throwaway model. Catalog keys ending in a space describe dynamic type families.
 
 Window lists controllers, node Show toggles, macro canvases and custom GUIs.
 Canvas focuses the root canvas.
-Visibility checkboxes appear to the left of every window name. Controller
-selections take effect together with Apply at the end of the Controllers section;
-the other sections update immediately and keep the menu open. Reopening Window
-discards unapplied controller selections. Window replaces the former View menu.
+Visibility checkboxes appear to the left of every window name and take effect
+immediately, keeping the menu open. There is no Apply step. Window replaces the
+former View menu. Save Preset (or Save Preset As) stores these choices; loading
+that preset restores them, including after restarting the app.
+Scopes can be hidden without removing its scoped parameters. An unchecked
+Inspector stays hidden; when checked, Config's automatic show/hide option can
+still hide it while no node is selected. Automatic hiding does not uncheck it.
 Custom GUIs includes New Custom GUI for the active canvas and an Options menu
 beside each panel for Edit and Delete.
 It includes nodes inside nested macros and uses their canvas path to distinguish
@@ -29,6 +32,15 @@ Show Snapshot?, Show All and Show Split are discovered in normal and Inspector
 parameters. Display options such as Show Names and Show Clipping are excluded.
 Macros use an explicit canvas visibility API. External OS windows using Show.Win
 also appear. Custom GUIs and controllers use their existing visibility state.
+
+The preset's `view.json` stores controller, Scopes, node, Macro and Custom GUI
+visibility, including nested canvases. It is applied after an automatically
+recalled named layout, so an older layout cannot undo the saved choices.
+Explicitly selecting a named layout still applies its visibility. Save the preset
+afterward to keep those choices. Older presets without visibility data retain
+their previous loading behavior until saved again.
+Help, Theme Editor, confirmations and other utility dialogs are excluded, as is
+the deprecated persistent-node feature. Canvas is a focus action, not a toggle.
 
 Config includes Rendering, GUI, Layout and Theme sections. Theme contains the
 editor, theme Save/Load, default selection and built-in reset; there is no

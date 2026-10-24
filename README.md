@@ -56,7 +56,8 @@ with `euclideanGenerator` as the class, and `"Generators"` as the category name.
   layouts include window visibility. See [Layouts](docs/layouts.md).
 - **Custom GUIs** are provided by the optional `ofxOceanodeCustomGui` addon.
   See [setup and migration](docs/custom-gui-addon.md).
-- **Window** lists controllers, node windows, macro canvases and attached custom GUIs.
+- **Window** lists controllers, Scopes, node windows, macro canvases and attached custom GUIs.
+  Checkboxes apply immediately; saving a preset stores their visibility for reload.
   See [Help and window menus](docs/help-and-windows.md) for setup and maintenance.
 
 - In a Macro canvas, press **Cmd+Up Arrow** (**Ctrl+Up Arrow** on Windows/Linux)

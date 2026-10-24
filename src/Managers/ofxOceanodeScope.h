@@ -109,6 +109,8 @@ public:
     
     void setup();
     void draw();
+    bool isVisible() const { return visible; }
+    void setVisible(bool show) { visible = show; }
     
     bool addParameter(
         ofxOceanodeAbstractParameter* p,
@@ -140,6 +142,7 @@ public:
     }
 
 private:
+    bool visible = true;
     struct PendingDockWindow {
         std::string windowName;
         size_t scopeCountAtAdd = 1;

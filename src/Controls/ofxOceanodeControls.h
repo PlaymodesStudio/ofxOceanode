@@ -58,6 +58,8 @@ private:
     ofEventListeners listeners;
     vector<shared_ptr<ofxOceanodeBaseController>> controllers;
     std::map<std::string, bool> controllerVisible;
+    // controllerVisible stores the user's choice, never automatic UI state.
+    bool inspectorWasVisible = false;
     ImGuiID inspectorPreviousTabID = 0;
     ImGuiID inspectorPreviousDockID = 0;
 };

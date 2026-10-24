@@ -359,7 +359,7 @@ void ofxOceanodeScope::setup(){
 }
 
 void ofxOceanodeScope::draw(){
-    if(scopedParameters.empty()) return;
+    if(!visible || scopedParameters.empty()) return;
 
     // Restored scopes must not dismiss the menu used to load their preset.
     const ImGuiWindowFlags focusFlags = ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel)
