@@ -1,5 +1,4 @@
 #include "ofxOceanodeHelp.h"
-#include "ofxOceanodeWindowVisibility.h"
 #include "ofxOceanodeHelpPlan.h"
 #include "ofxOceanodeHelpPrompt.h"
 #include "ofxOceanodeNodeHelpCatalog.h"
@@ -288,84 +287,4 @@ void ofxOceanodeHelp::draw() {
     ImGui::End();
     // SetSelected is only needed for the frame in which a menu item opens Help.
     requestedTab = -1;
-}
-
-void ofxOceanodeHelp::drawWindowMenu(ofxOceanodeControls& controls) {
-    if(ImGui::MenuItem("Canvas"))
-        if(auto* canvas = ofxOceanodeShared::getRootCanvas()) canvas->requestFocus();
-    bool scopesVisible = ofxOceanodeScope::getInstance()->isVisible();
-    if(ImGui::Checkbox("Scopes", &scopesVisible))
-        ofxOceanodeScope::getInstance()->setVisible(scopesVisible);
-    if(ImGui::IsItemHovered()) ImGui::SetTooltip("Show or hide Scopes without removing scoped parameters.");
-    ImGui::TextDisabled("Visibility is saved with the preset.");
-    ofxOceanodeMenu::section("Controllers");
-    auto& visibility = controls.getControllersVisibility();
-    std::vector<std::string> names;
-    for(const auto& controller : controls.getControllers()) {
-        const auto& name = controller->getControllerName();
-        if(controller->isMenuController()) {
-            visibility.erase(name);
-            continue;
-        }
-        names.push_back(name);
-    }
-    std::sort(names.begin(), names.end());
-    for(const auto& name : names) {
-        if(!visibility.count(name)) visibility[name] = true;
-        ImGui::Checkbox(name.c_str(), &visibility[name]);
-        if(name == "Inspector" && ImGui::IsItemHovered())
-            ImGui::SetTooltip("Unchecked: always hidden. When enabled, automatic show/hide still follows node selection.");
-    }
-    using Entry = ofxOceanodeCustomGuiExtension::WindowEntry;
-    std::vector<Entry> nodes, macros, panels;
-    std::function<void(ofxOceanodeContainer*, const std::string&)> collect =
-        [&](ofxOceanodeContainer* owner, const std::string& path){
-            for(auto* node : owner->getAllModules()) {
-                auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel());
-                const auto label = path + node->getParameters().getName();
-                if(macro) {
-                    macros.push_back({label, [macro,label](){
-                        bool show = macro->isSharedWindowVisible();
-                        ImGui::BeginDisabled(macro->isWindowShownByOtherInstance());
-                        if(ImGui::Checkbox(label.c_str(), &show)) macro->setWindowVisible(show);
-                        ImGui::EndDisabled();
-                    }});
-                    collect(macro->getContainer().get(), label + " / ");
-                }
-                auto addToggles = [&](ofParameterGroup& group){
-                    for(auto& parameter : group) {
-                        ofParameter<bool>* toggle = nullptr;
-                        if(auto* pin = dynamic_cast<ofxOceanodeParameter<bool>*>(parameter.get())) toggle = &pin->getParameter();
-                        else toggle = dynamic_cast<ofParameter<bool>*>(parameter.get());
-                        if(!toggle || !oceanodeWindowVisibility::isWindowToggle(parameter->getName())) continue;
-                        const auto title = label + " / " + parameter->getName();
-                        nodes.push_back({title, [toggle,title](){
-                            bool show = toggle->get();
-                            if(ImGui::Checkbox(title.c_str(), &show)) toggle->set(show);
-                        }});
-                    }
-                };
-                addToggles(node->getParameters());
-                addToggles(node->getInspectorParameters());
-            }
-            if(auto* extension = owner->getCustomGuiExtension()) {
-                auto entries = extension->windowEntries(path);
-                panels.insert(panels.end(), entries.begin(), entries.end());
-            }
-        };
-    collect(root.get(), "");
-    auto section = [](const char* name, std::vector<Entry>& entries){
-        ofxOceanodeMenu::section(name);
-        std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b){ return a.label < b.label; });
-        if(entries.empty()) ImGui::TextDisabled("None in this patch");
-        for(const auto& entry : entries) { ImGui::PushID(entry.label.c_str()); entry.draw(); ImGui::PopID(); }
-    };
-    section("Nodes", nodes);
-    section("Macros", macros);
-    if(root->getCustomGuiExtension()) section("Custom GUIs", panels);
-    if(root->getCustomGuiExtension() && ImGui::MenuItem("New Custom GUI")) {
-        auto* owner = root->getContainerForCanvasID(ofxOceanodeShared::getActiveCanvasUniqueID());
-        if(!owner) owner = root.get();
-        if(auto* extension = owner->getCustomGuiExtension()) extension->requestCreate();
-    }
 }

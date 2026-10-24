@@ -16,11 +16,15 @@ also retain a supplied spec's public description field without constructing a
 throwaway model. Catalog keys ending in a space describe dynamic type families.
 
 Window lists controllers, node Show toggles, macro canvases and custom GUIs.
+It is drawn and owned by ofxOceanodeWindowManager (src/Gui/), which also
+captures and restores this visibility for Layouts; Help no longer draws it.
 Canvas focuses the root canvas.
 Visibility checkboxes appear to the left of every window name and take effect
 immediately, keeping the menu open. There is no Apply step. Window replaces the
 former View menu. Save Preset (or Save Preset As) stores these choices; loading
-that preset restores them, including after restarting the app.
+that preset restores them, including after restarting the app. Preset and global
+layouts (the Layouts menu, after Window) store them too; the default global
+layout sets which windows are shown at startup.
 Scopes can be hidden without removing its scoped parameters. An unchecked
 Inspector stays hidden; when checked, Config's automatic show/hide option can
 still hide it while no node is selected. Automatic hiding does not uncheck it.
@@ -33,16 +37,19 @@ parameters. Display options such as Show Names and Show Clipping are excluded.
 Macros use an explicit canvas visibility API. External OS windows using Show.Win
 also appear. Custom GUIs and controllers use their existing visibility state.
 
-The preset's `view.json` stores controller, Scopes, node, Macro and Custom GUI
-visibility, including nested canvases. It is applied after an automatically
+The preset's `layout.json` (`current.view`) stores controller, Scopes, node,
+Macro and Custom GUI visibility, including nested canvases. It is applied after an automatically
 recalled named layout, so an older layout cannot undo the saved choices.
 Explicitly selecting a named layout still applies its visibility. Save the preset
-afterward to keep those choices. Older presets without visibility data retain
-their previous loading behavior until saved again.
+afterward to keep those choices. Presets without visibility data keep the
+current visibility until saved again.
 Help, Theme Editor, confirmations and other utility dialogs are excluded, as is
 the deprecated persistent-node feature. Canvas is a focus action, not a toggle.
 
-Config includes Rendering, GUI, Layout and Theme sections. Theme contains the
+Config includes Extensions, Rendering, Editor, Theme and Configuration sections.
+Rendering, Editor and Configuration (Save Config / Load Config) belong to
+ofxOceanodeAppConfig and config/config.json; Theme belongs to
+ofxOceanodeThemeManager. Theme contains the
 editor, theme Save/Load, default selection and built-in reset; there is no
 separate Theme top menu. Help has two sections: Documentation (User Manual and
 Quick tips) and Utilities (Search nodes, AI assistant, Metrics, Reload Macros and addon actions
@@ -55,7 +62,8 @@ editor selects the topmost theme color, switches to its tab (ImGui Colors or
 Oceanode Colors), scrolls to it and outlines it. The last lookup stays listed at
 the top of the editor; click a name there to choose another candidate when
 several colors share a value. The lookup reads ImGui's rendered draw data after
-gui.draw() (src/ofxOceanodeThemeColorPicker.h): it skips user images and the
+gui.draw() (src/Gui/ofxOceanodeThemeColorPicker.h, called by
+ofxOceanodeThemeManager::afterRender): it skips user images and the
 Theme Editor itself, and matches by RGB with "(other alpha)" when only alpha
 differs, for example disabled widgets. Colors not owned by the theme, such as
 node colors, appear as hex values.

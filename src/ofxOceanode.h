@@ -23,7 +23,7 @@
 
 #include "ofxImGui.h"
 #include "imgui.h"
-#include "ofxOceanodeThemeColorPicker.h"
+#include "ofxOceanodeColors.h"
 #include "router.h"
 #include "portal.h"
 #include "Nodes/Default_Nodes/portalSelector.h"
@@ -31,9 +31,11 @@
 #include "bufferHeader.h"
 #include "bufferHeaderPro.h"
 
-class ofxOceanodeProportionalDocking;
+class ofxOceanodeWindowManager;
 class ofxOceanodeHelp;
-class ofxOceanodeLayoutManager;
+class ofxOceanodeLayouts;
+class ofxOceanodeThemeManager;
+class ofxOceanodeAppConfig;
 
 class ofxOceanode {
 public:
@@ -165,32 +167,8 @@ public:
         oceanodeTime->togglePlay();
     }
     
-    //TODO: Clean
-    // From imgui_demo.cpp
-    //-----------------------------------------------------------------------------
-    // [SECTION] Example App: Docking, DockSpace / ShowExampleAppDockSpace()
-    //-----------------------------------------------------------------------------
-    
-    // Demonstrate using DockSpace() to create an explicit docking node within an existing window.
-    // Note that you already dock windows into each others _without_ a DockSpace() by just moving windows
-    // from their title bar (or by holding SHIFT if io.ConfigDockingWithShift is set).
-    // DockSpace() is only useful to construct to a central location for your application.
-    void ShowExampleAppDockSpace(bool* p_open);
-    void cycleDockedTabs();
-    
     void disableRenderAll();
     void disableRenderHistograms();
-    
-    void setShowMode(bool b){showMode = b;}
-    void toggleShowMode(){showMode = !showMode;}
-	
-	void saveConfig();
-	void loadConfig();
-	void saveViewConfig(const std::map<std::string, bool>& visibilityMap);
-	void loadViewConfig();
-    void loadDefaultGUILayout(); // Existing host API, delegated to the layout manager.
-	void saveTheme(const std::string& name);
-	void loadTheme(const std::string& name);
 
 private:
     void registerDefaultTypes();      // ofxOceanodeDefaultTypes.cpp
@@ -218,22 +196,19 @@ private:
     ofxOceanodeScope* scope;
     
     ofxOceanodeTime* oceanodeTime;
-	
-	int desiredFPS = 60;
 
     
 //    vector<ofxOceanodeAbstractTimeline> timelines;
     
     ofxImGui::Gui gui;
-    std::unique_ptr<ofxOceanodeProportionalDocking> proportionalDocking;
+    std::unique_ptr<ofxOceanodeWindowManager> windows;
     static std::string userManualPath();
     static void openWithDefaultApp(const std::string& path);
     void showHelpPopUp();
-    bool showMode;
-	bool snapToGrid;
-    std::map<std::string, bool> savedViewConfig;
+    void drawMenuBar();
+    bool showMetrics = false;
+    bool openQuickTips = false;
 
-    void drawShowModeWindow();
     
     ofParameter<int> oscReceiverPort;
 #ifdef OFXOCEANODE_USE_OSC
@@ -247,51 +222,9 @@ private:
     ofEventListener presetSavedListener;
     bool presetCanvasCenterPending = false;
 
-    // Metadata for the most recently loaded ImGui layout. ImGui restores only
-    // windows present in the .ini file, so controllers introduced after the
-    // layout was saved dock beside Nodes (legacy layouts also work).
-    std::string loadedGUILayoutData;
-    ImGuiID loadedGUILayoutLeftDockId = 0;
-    bool pendingControllerDockReconciliation = false;
-    ImGuiID resolveControllerDockID() const;
-    void reconcileMissingControllerWindows();
-
-    void applyGUILayout(const std::string& data);
-    std::unique_ptr<ofxOceanodeLayoutManager> layouts;
-
-    // Theme editor state
-    bool showThemeEditor = false;
-    bool showThemeColorSearch = false;
-    char themeColorSearch[128] = "";
-    void drawThemeEditorWindow();
-    // Alt+hover lookup: while the editor is open, holding Alt over any GUI
-    // element selects the theme colour that drew it (see ofxOceanodeThemeColorPicker.h).
-    std::vector<ofxOceanodeThemeColorPicker::Layer> themeColorPickLayers; // last non-empty lookup, topmost first
-    int themeColorPickFrame = -1;
-    const ImDrawList* themeColorPickTooltipDrawList = nullptr;
-    bool themeEditorHovered = false;
-    ofxOceanodeThemeColorPicker::Match themeSelectedColor;
-    bool themeColorRevealPending = false; // switch tab and scroll to themeSelectedColor
-    void selectThemeColor(const ofxOceanodeThemeColorPicker::Match& match);
-    void pickThemeColorUnderMouse();
-    void drawThemeColorPickTooltip();
-    void drawThemeColorPickLayers(bool selectable);
-    struct ThemeFontFamily {
-        std::string name;
-        std::string regularPath;
-        std::string boldPath;
-    };
-    std::vector<ThemeFontFamily> themeFontFamilies;
-    std::string themeFontFamily; // Empty selects the built-in JetBrains Mono pair.
-    std::string themeFontWarning;
-    bool pendingThemeFontChange = true;
-    void refreshThemeFonts();
-    void applyThemeFont();
-
-    // Theme save/load state
-    std::string currentThemeName;
-    bool openSaveThemePopup = false;
-    char themeNameBuf[128] = {};
+    std::unique_ptr<ofxOceanodeLayouts> layouts;
+    std::unique_ptr<ofxOceanodeThemeManager> theme;
+    std::unique_ptr<ofxOceanodeAppConfig> appConfig;
 };
 
 #endif /* ofxOceanode_h */

@@ -150,12 +150,17 @@ int main() {
 
 
 def check_wiring():
-    source = (ROOT / "src/ofxOceanode.cpp").read_text()
-    draw = source[source.index("void ofxOceanode::draw(){"):source.index("void ofxOceanode::loadDefaultGUILayout()")]
+    app = (ROOT / "src/ofxOceanode.cpp").read_text()
+    draw = app[app.index("void ofxOceanode::draw(){"):app.index("void ofxOceanode::exit(){")]
     # The lookup reads rendered draw data, so it must follow gui.draw().
-    assert draw.index("gui.draw();") < draw.index("pickThemeColorUnderMouse();")
-    assert "drawThemeColorPickTooltip();" in draw
-    pick = source[source.index("void ofxOceanode::pickThemeColorUnderMouse(){"):]
+    assert draw.index("gui.draw();") < draw.index("theme->afterRender();")
+    assert draw.index("theme->drawWindows();") < draw.index("gui.end();")
+    source = (ROOT / "src/Gui/ofxOceanodeThemeManager.cpp").read_text()
+    after = source[source.index("void ofxOceanodeThemeManager::afterRender(){"):]
+    assert "pickThemeColorUnderMouse();" in after[:after.index("\n}\n")]
+    windows = source[source.index("void ofxOceanodeThemeManager::drawWindows(){"):]
+    assert "drawThemeColorPickTooltip();" in windows[:windows.index("\n}\n")]
+    pick = source[source.index("void ofxOceanodeThemeManager::pickThemeColorUnderMouse(){"):]
     pick = pick[:pick.index("\n}\n")]
     for needle in ("showThemeEditor", "io.KeyAlt", "themeEditorHovered", "themeColorPickTooltipDrawList"):
         assert needle in pick, needle
@@ -171,7 +176,8 @@ def main():
         binary = work / "regressions"
         subprocess.run([os.environ.get("CXX", "clang++"), "-std=c++17", "-O0", "-g",
                         "-fsanitize=address,undefined", "-I", str(IMGUI), "-I", str(work),
-                        "-I", str(ROOT / "src"), str(cpp),
+                        "-I", str(ROOT / "src"), "-I", str(ROOT / "src/Gui"), str(cpp),
+                        str(ROOT / "src/Gui/ofxOceanodeThemeColorPicker.cpp"),
                         *[str(IMGUI / name) for name in
                           ("imgui.cpp", "imgui_draw.cpp", "imgui_tables.cpp", "imgui_widgets.cpp")],
                         "-o", str(binary)], check=True)

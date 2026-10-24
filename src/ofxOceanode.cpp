@@ -11,14 +11,14 @@
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeTimeController.h"
 #include "imgui_internal.h"
-#include "ofxOceanodeFloatingWindowDecor.h"
 #include "ofxOceanodeClipboard.h"
-#include "ofxOceanodeProportionalDocking.h"
+#include "ofxOceanodeWindowManager.h"
 #include "ofxOceanodeHelp.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeMacroMixer.h"
-#include "Layouts/ofxOceanodeLayoutManager.h"
-#include "Layouts/ofxOceanodeLayoutWindowState.h"
+#include "ofxOceanodeLayouts.h"
+#include "ofxOceanodeThemeManager.h"
+#include "ofxOceanodeAppConfig.h"
 #include "Controls/PresetFileCleanupReview.h"
 #include <algorithm>
 #include <climits>
@@ -29,10 +29,6 @@
 #ifdef TARGET_WIN32
 #include <shellapi.h>
 #endif
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#include FT_SFNT_NAMES_H
-#include FT_TRUETYPE_TABLES_H
 
 namespace {
 void resetPresetCanvasViews(ofxOceanodeContainer* current, ofxOceanodeCanvas* currentCanvas){
@@ -46,13 +42,13 @@ void resetPresetCanvasViews(ofxOceanodeContainer* current, ofxOceanodeCanvas* cu
 }
 
 ofxOceanode::ofxOceanode(){
-    proportionalDocking = std::make_unique<ofxOceanodeProportionalDocking>();
+    windows = std::make_unique<ofxOceanodeWindowManager>();
+    appConfig = std::make_unique<ofxOceanodeAppConfig>();
+    theme = std::make_unique<ofxOceanodeThemeManager>();
     nodeRegistry = make_shared<ofxOceanodeNodeRegistry>();
     typesRegistry = ofxOceanodeTypesRegistry::getInstance();
     scope = ofxOceanodeScope::getInstance();
     oceanodeTime = ofxOceanodeTime::getInstance();
-    showMode = false;
-    
 #ifdef OFXOCEANODE_USE_OSC
     receiverPortChanged = oscReceiverPort.newListener([this](int &i){
         oscReceiver.setup(oscReceiverPort);
@@ -88,30 +84,12 @@ void ofxOceanode::setup(){
     //        timelines.emplace_back("Mapper_1/Min_Input");
     OceanodeTheme* oceanodeTheme = new OceanodeTheme();
     gui.setup(oceanodeTheme, false, ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable, false);
-    proportionalDocking->installSettings();
+    windows->setup(container, *controls);
+    windows->installImGuiHandlers();
     ofxOceanodeClipboard::install();
-    ofxOceanodeFloatingWindowDecor::install();   // border + shadow on undocked windows and popups
-    refreshThemeFonts();
-    layouts = std::make_unique<ofxOceanodeLayoutManager>(ofxOceanodeLayoutManager::Callbacks{
-        [this](){ return oceanodeLayouts::captureWindows(container.get(), *controls); },
-        [this](const ofJson& state){ oceanodeLayouts::restoreWindows(container.get(), *controls, state); },
-        [this](const std::string& data){ applyGUILayout(data); }
-    });
-    layouts->loadDefaultGlobalLayout();
-    // Auto-load default theme if pointer file exists
-    {
-        std::string defaultThemeFile = ofToDataPath("config/themes/defaultTheme", true);
-        if(ofFile(defaultThemeFile).exists()){
-            ofJson defaultJson = ofLoadJson(defaultThemeFile);
-            std::string themeName = defaultJson.value("theme", "");
-            if(!themeName.empty()){
-                loadTheme(themeName);
-            }
-        }
-    }
-
-    applyThemeFont();
-
+    theme->setup(canvas);
+    layouts = std::make_unique<ofxOceanodeLayouts>(*windows);
+    layouts->setup();
     presetLoadedListener = ofxOceanodeShared::getPresetHasLoadedEvent().newListener([this](){
         if(ofxOceanodeShared::getPresetLoadType() != ofxOceanodePresetLoadType_FullPreset){
             return; // Don't reload layout for clipboard paste / duplicate
@@ -131,17 +109,10 @@ void ofxOceanode::setup(){
         layouts->onPresetSaved();
     });
 
- ofxOceanodeShared::readMacros();
-    // Load and apply saved view preferences now that controls is initialized
-    // and openFrameworks data path is fully set up
-    loadViewConfig();
-    if(!savedViewConfig.empty()){
-        auto& visibility = controls->getControllersVisibility();
-        for(auto& kv : savedViewConfig){
-            visibility[kv.first] = kv.second;
-        }
-    }
+    ofxOceanodeShared::readMacros();
     oceanodeTime->setup(container, controls->get<ofxOceanodeTimeController>());
+    // Last: config.json also applies spaceTogglesPlay to the Time controller.
+    appConfig->setup(canvas, *controls, *windows);
 }
 
 void ofxOceanode::update(){
@@ -160,8 +131,7 @@ void ofxOceanode::update(){
 }
 
 void ofxOceanode::draw(){
-    // Font atlas changes must happen before NewFrame, after the last frame rendered.
-    applyThemeFont();
+    theme->beforeFrame();
     layouts->beforeFrame();
     if(presetCanvasCenterPending){
         resetPresetCanvasViews(container.get(), &canvas);
@@ -171,19 +141,34 @@ void ofxOceanode::draw(){
     // ImGui uses PopupBg for menus and modals; derive it from WindowBg each frame.
     ImGuiStyle& style = ImGui::GetStyle();
     style.Colors[ImGuiCol_PopupBg] = style.Colors[ImGuiCol_WindowBg];
-    // DockBuilder operations are expected before the DockSpace is submitted.
-    // This only affects registered controllers absent from the loaded file;
-    // windows with an explicit saved DockId remain untouched.
-    reconcileMissingControllerWindows();
-    bool showDocker = true;
-    ShowExampleAppDockSpace(&showDocker);
-    // Refresh references every frame, including after preset/layout loads and
-    // manual docking. This only updates IDs; it never rearranges saved windows.
-    ofxOceanodeShared::setLeftNodeID(resolveControllerDockID());
-    ImGuiDockNode* centralNode = ImGui::DockBuilderGetCentralNode(ofxOceanodeShared::getDockspaceID());
-    ofxOceanodeShared::setCentralNodeID(centralNode ? centralNode->ID : 0);
-    if(showMode){
-        drawShowModeWindow();
+    windows->beginHostWindow();
+    drawMenuBar();
+    // NOTE: windows->endHostWindow() follows all popup OpenPopup/BeginPopupModal
+    // calls below, so the DockSpace window is still the active window context
+    // when the popups are registered.
+
+    layouts->drawPopups();
+    controls->drawPopups();
+    oceanodePresetSave::CleanupReview::instance().draw();
+    drawUnusedNodesWindow();
+    help->draw();
+
+    if(openQuickTips){
+        ImGui::OpenPopup("Here are some tips:");
+        openQuickTips = false;
+    }
+    showHelpPopUp();
+
+    theme->drawPopups();
+
+    // Connection errors are queued while presets load. Render them from the
+    // persistent DockSpace window so OpenPopup and BeginPopupModal use the
+    // same stable ImGui ID stack on every frame.
+    ofxOceanodeContainer::drawPendingConnectionErrorDialog();
+    ofxOceanodeMacroMixer::drawPendingBlockedNodeDialog();
+    windows->endHostWindow();
+    if(windows->isShowMode()){
+        windows->drawShowModeWindow();
 		container->draw();
     }else{
         scope->draw();
@@ -195,159 +180,21 @@ void ofxOceanode::draw(){
     //            t.draw();
     //        }
     
-    // Draw theme editor window if open
-    if(showThemeEditor){
-        drawThemeEditorWindow();
-        drawThemeColorPickTooltip();
-    }
+    theme->drawWindows();
 
     for(auto &item : configMenuItems)
         if(item.second.draw) item.second.draw();
     for(auto &item : utilityMenuItems)
         if(item.second.draw) item.second.draw();
 
-    cycleDockedTabs();
-    proportionalDocking->drawDockCollapseHandles();
+    windows->endFrame();
     gui.end();
     gui.draw();
-    // Needs this frame's rendered draw data, which is valid until the next NewFrame.
-    pickThemeColorUnderMouse();
-}
-
-void ofxOceanode::loadDefaultGUILayout(){
-    if(layouts) layouts->loadDefaultGlobalLayout();
-}
-
-void ofxOceanode::applyGUILayout(const std::string& data){
-    proportionalDocking->reset();
-    loadedGUILayoutLeftDockId = 0;
-    loadedGUILayoutData = data;
-    std::string currentWindow;
-    std::map<std::string, ImGuiID> windowDockIds;
-    const std::string windowPrefix = "[Window][";
-
-    for(std::string line : ofSplitString(loadedGUILayoutData, "\n", false, false)){
-        line = ofTrim(line);
-
-        if(line.rfind(windowPrefix, 0) == 0 && line.size() > windowPrefix.size() && line.back() == ']'){
-            currentWindow = line.substr(windowPrefix.size(), line.size() - windowPrefix.size() - 1);
-            continue;
-        }
-
-        if(line.rfind("DockId=", 0) == 0){
-            std::string dockIdText = line.substr(7);
-            size_t comma = dockIdText.find(',');
-            if(comma != std::string::npos) dockIdText.erase(comma);
-
-            try{
-                windowDockIds[currentWindow] = static_cast<ImGuiID>(std::stoul(dockIdText, nullptr, 0));
-            }catch(const std::exception&){
-                // Ignore malformed docking metadata and try another controller.
-            }
-        }
-    }
-
-    // Nodes is the primary reference. MiniMap and Presets are compatibility
-    // fallbacks for older layouts without a docked Nodes entry.
-    for(const char* anchorName : {"Nodes", "MiniMap", "Presets"}){
-        auto anchor = windowDockIds.find(anchorName);
-        if(anchor != windowDockIds.end() && anchor->second != 0){
-            loadedGUILayoutLeftDockId = anchor->second;
-            break;
-        }
-    }
-    if(loadedGUILayoutLeftDockId == 0){
-        for(const auto& controller : controls->getControllers()){
-            if(controller->isMenuController()) continue;
-            auto dock = windowDockIds.find(controller->getControllerName());
-            if(dock != windowDockIds.end() && dock->second != 0){
-                loadedGUILayoutLeftDockId = dock->second;
-                break;
-            }
-        }
-    }
-
-    ImGui::LoadIniSettingsFromMemory(data.c_str(), data.size());
-    // Docking IDs are local to this layout. Never reuse the previous layout's
-    // default destinations while the new windows are being restored.
-    ofxOceanodeShared::setLeftNodeID(0);
-    ofxOceanodeShared::setCentralNodeID(0);
-    pendingControllerDockReconciliation = true;
-}
-
-ImGuiID ofxOceanode::resolveControllerDockID() const{
-    const ImGuiID dockspaceID = ofxOceanodeShared::getDockspaceID();
-    auto usableDockID = [dockspaceID](ImGuiID id) -> ImGuiID {
-        ImGuiDockNode* node = id ? ImGui::DockBuilderGetNode(id) : nullptr;
-        if(!node || node->IsSplitNode()) return 0;
-        // A floating dock group or a nested Scope dockspace is not the main
-        // controller pane, even if it happens to reuse an old numeric ID.
-        if(dockspaceID && ImGui::DockNodeGetRootNode(node)->ID != dockspaceID) return 0;
-        return id;
-    };
-    auto windowDockID = [&](const char* name) -> ImGuiID {
-        if(ImGuiWindow* window = ImGui::FindWindowByName(name)){
-            if(ImGuiID id = usableDockID(window->DockId)) return id;
-        }
-        // Hidden controllers may have saved settings without a live window.
-        if(ImGuiWindowSettings* settings = ImGui::FindWindowSettingsByID(ImHashStr(name))){
-            return usableDockID(settings->DockId);
-        }
-        return 0;
-    };
-
-    // During restoration the saved anchor takes precedence over windows that
-    // have not yet been submitted. Afterwards, follow Nodes when it is moved.
-    if(pendingControllerDockReconciliation){
-        if(ImGuiID id = usableDockID(loadedGUILayoutLeftDockId)) return id;
-    }
-    if(ImGuiID id = windowDockID("Nodes")) return id;
-    if(ImGuiID id = windowDockID("MiniMap")) return id;
-    for(const auto& controller : controls->getControllers()){
-        if(controller->isMenuController()) continue;
-        if(ImGuiID id = windowDockID(controller->getControllerName().c_str())) return id;
-    }
-    return usableDockID(ofxOceanodeShared::getLeftNodeID());
-}
-
-void ofxOceanode::reconcileMissingControllerWindows(){
-    if(!pendingControllerDockReconciliation) return;
-
-    const ImGuiID leftDockId = resolveControllerDockID();
-
-    // The DockSpace/anchor may not exist on the first frame of a layout without
-    // docking data. Leave the request pending and retry next frame.
-    if(leftDockId == 0 || ImGui::DockBuilderGetNode(leftDockId) == nullptr) return;
-
-    ofxOceanodeShared::setLeftNodeID(leftDockId);
-
-    auto layoutLines = ofSplitString(loadedGUILayoutData, "\n", false, false);
-    for(std::string& line : layoutLines) line = ofTrim(line);
-
-    for(const auto& controller : controls->getControllers()){
-        if(controller->isMenuController()) continue;
-        const std::string windowName = controller->getControllerName();
-        const std::string windowHeader = "[Window][" + windowName + "]";
-        bool windowWasSaved = false;
-        for(const std::string& line : layoutLines){
-            if(line == windowHeader){
-                windowWasSaved = true;
-                break;
-            }
-        }
-
-        if(!windowWasSaved){
-            ImGui::DockBuilderDockWindow(windowName.c_str(), leftDockId);
-        }
-    }
-
-    loadedGUILayoutLeftDockId = leftDockId;
-    loadedGUILayoutData.clear();
-    pendingControllerDockReconciliation = false;
+    theme->afterRender();
 }
 
 void ofxOceanode::exit(){
-    layouts->saveCurrentPresetLayout();
+    layouts->saveDocking(ofxOceanodeShared::getCurrentPresetPath());
     oceanodeTime->shutdown(container);
     container->clearContainer();
 }
@@ -433,103 +280,11 @@ void ofxOceanode::drawUnusedNodesWindow(){
     ImGui::End();
 }
 
-// Tab / Shift+Tab: the next / previous tab of the dock area holding the
-// focused window. Not while typing or using a widget, in a popup, or with
-// Ctrl / Cmd / Alt held (Ctrl+Tab is ImGui's own window switcher).
-void ofxOceanode::cycleDockedTabs(){
-    ImGuiIO& io = ImGui::GetIO();
-    if(!ImGui::IsKeyPressed(ImGuiKey_Tab, false)) return;
-    if(io.KeyCtrl || io.KeySuper || io.KeyAlt) return;
-    if(io.WantTextInput || ImGui::IsAnyItemActive() || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return;
-    ImGuiWindow* window = GImGui->NavWindow;
-    if(window == nullptr) return;
-    window = window->RootWindow;             // a child window: the window holding it
-    ImGuiDockNode* node = window->DockNode;
-    if(node == nullptr || node->TabBar == nullptr || node->TabBar->Tabs.Size < 2) return;
-    ImGuiTabBar* bar = node->TabBar;
-    const int count = bar->Tabs.Size;
-    int current = -1;
-    for(int i = 0; i < count; i++) if(bar->Tabs[i].Window == window) current = i;
-    if(current < 0) return;
-    // the next one with a window (skips tabs being closed)
-    for(int step = 1; step < count; step++){
-        const int i = ((current + (io.KeyShift ? -step : step)) % count + count) % count;
-        ImGuiWindow* next = bar->Tabs[i].Window;
-        if(next == nullptr) continue;
-        bar->NextSelectedTabId = next->TabId;
-        ImGui::FocusWindow(next);
-        return;
-    }
-}
+// The host window's menu bar. Each owner draws its own menu or section.
+void ofxOceanode::drawMenuBar(){
+    if(showMetrics) ImGui::ShowMetricsWindow(&showMetrics);
 
-void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
-{
-    static bool opt_fullscreen_persistant = true;
-    bool opt_fullscreen = opt_fullscreen_persistant;
-    static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
-    
-    // We are using the ImGuiWindowFlags_NoDocking flag to make the parent window not dockable into,
-    // because it would be confusing to have two docking targets within each others.
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
-    if (opt_fullscreen)
-    {
-        ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(viewport->WorkPos);
-        ImGui::SetNextWindowSize(viewport->WorkSize);
-        ImGui::SetNextWindowViewport(viewport->ID);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-        window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-        window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
-    }
-    
-    // When using ImGuiDockNodeFlags_PassthruCentralNode, DockSpace() will render our background
-    // and handle the pass-thru hole, so we ask Begin() to not render a background.
-    if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode)
-        window_flags |= ImGuiWindowFlags_NoBackground;
-    
-    // Important: note that we proceed even if Begin() returns false (aka window is collapsed).
-    // This is because we want to keep our DockSpace() active. If a DockSpace() is inactive,
-    // all active windows docked into it will lose their parent and become undocked.
-    // We cannot preserve the docking relationship between an active window and an inactive docking, otherwise
-    // any change of dockspace/settings would lead to windows being stuck in limbo and never being visible.
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-    ImGui::Begin("DockSpace", p_open, window_flags);
-    ImGui::PopStyleVar();
-    
-    if (opt_fullscreen)
-        ImGui::PopStyleVar(2);
-    
-    // DockSpace
-    ImGuiIO& io = ImGui::GetIO();
-    if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
-    {
-        ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
-        // ImGui paints idle dock splitters with WindowBg; override it so the
-        // gaps between docked windows read as a distinct gutter. Docked windows
-        // draw their own backgrounds later, after the pop.
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, OceanodeColors::DockGutter);
-        proportionalDocking->dockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
-        ImGui::PopStyleColor();
-        ofxOceanodeShared::setDockspaceID(dockspace_id);
-        if(!ImGui::DockBuilderGetNode(dockspace_id)->IsSplitNode()){ //We dont have a split node;
-            ImGuiID centralNode_id;
-            ImGuiID leftNode_id;
-            ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Left, 0.2, &leftNode_id, &centralNode_id);
-            ofxOceanodeShared::setCentralNodeID(centralNode_id);
-            ofxOceanodeShared::setLeftNodeID(leftNode_id);
-        }
-    }
-    else
-    {
-        //TODO: Show assert, we need docking
-        //ShowDockingDisabledMessage();
-    }
-    bool showHelp = false;
-    static bool show_app_metrics = false;
-    if (show_app_metrics){ImGui::ShowMetricsWindow(&show_app_metrics);}
-	
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f, 6.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f, 6.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12.0f, 6.0f));
     if (ImGui::BeginMenuBar())
     {
@@ -541,10 +296,6 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
             return open;
         };
         controls->drawMenu("Presets");
-        if(beginTopLevelMenu("Layouts")){
-            layouts->drawMenu();
-            ImGui::EndMenu();
-        }
 
         if(beginTopLevelMenu("Edit"))
         {
@@ -609,190 +360,22 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
                 if(ImGui::MenuItem(item.first.c_str(), nullptr, false, enabled) && item.second.selected)
                     item.second.selected();
             }
-            ofxOceanodeMenu::section("Rendering");
-			// Show actual running FPS (read-only) with color feedback
-			int currentFPS = (int)ofGetFrameRate();
-			
-			// Calculate percentage difference from desired FPS
-			float fpsDiff = abs(currentFPS - desiredFPS) / (float)desiredFPS * 100.0f;
-			
-			// Set colors based on difference
-			ImVec4 sliderColor;
-			if(fpsDiff <= 5.0f) {
-				sliderColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); // Green
-			} else if(fpsDiff <= 15.0f) {
-				sliderColor = ImVec4(1.0f, 0.6f, 0.0f, 1.0f); // Orange
-			} else {
-				sliderColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); // Red
-			}
-			
-			// Push the color styles for the slider
-			ImGui::PushStyleColor(ImGuiCol_SliderGrab, sliderColor);
-			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(sliderColor.x*0.3f, sliderColor.y*0.3f, sliderColor.z*0.3f, 1.0f));
-			
-			// Draw the disabled FPS slider
-			ImGui::BeginDisabled();
-			ImGui::SliderInt("FPS", &currentFPS, 0, 240);
-			ImGui::EndDisabled();
-			
-			// Pop the color styles
-			ImGui::PopStyleColor(2);
-			
-			// Editable Desired FPS slider
-			if(ImGui::SliderInt("Desired FPS", &desiredFPS, 1, 240)){
-				ofSetFrameRate(desiredFPS);
-			}
-			
-			bool b = false;
-			if(ImGui::Checkbox("V Sync", &b)){ofSetVerticalSync(b);};
-			ofxOceanodeConfigurationFlags configurationFlags = ofxOceanodeShared::getConfigurationFlags();
-			ImGui::CheckboxFlags("Disable Full Render", &configurationFlags, ofxOceanodeConfigurationFlags_DisableRenderAll);
-			ImGui::CheckboxFlags("Disable Histograms", &configurationFlags, ofxOceanodeConfigurationFlags_DisableHistograms);
-			ImGui::Checkbox("Show Mode", &showMode);
-            const int precision = ofxOceanodeShared::getColorTexturePrecision();
-            int texturePrecision = precision == 16 ? 1 : precision == 8 ? 2 : 0;
-            if(ImGui::Combo("Color texture precision", &texturePrecision, "RGBA32F\0RGBA16F\0RGBA8\0")){
-                ofxOceanodeShared::setColorTexturePrecision(texturePrecision == 1 ? 16 : texturePrecision == 2 ? 8 : 32);
-            }
-            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Shared by compatible color nodes. Applied on their next render; history is reset.\nOscillators and numerical/index textures keep their precision.\n16F reduces precision; 8-bit clamps to [0,1]. Save Config to keep this choice.");
-			
-			ofxOceanodeMenu::section("GUI");
-			ImGui::CheckboxFlags("Color Connections?", &configurationFlags, ofxOceanodeConfigurationFlags_ColorConnections);
-			ImGui::CheckboxFlags("Dashed / Dotted lines", &configurationFlags, ofxOceanodeConfigurationFlags_DashedDottedLines);
-			ofxOceanodeShared::setConfigurationFlags(configurationFlags);
-			float connectionWidth = ofxOceanodeShared::getConnectionWidth();
-			if(ImGui::SliderFloat("Connection Width", &connectionWidth, 1.0f, 8.0f, "%.1f")){
-				ofxOceanodeShared::setConnectionWidth(connectionWidth);
-			}
-			bool autoInspector = ofxOceanodeShared::getAutoInspectorShowHide();
-			if(ImGui::Checkbox("Inspector auto show/hide", &autoInspector)){
-				ofxOceanodeShared::setAutoInspectorShowHide(autoInspector);
-			}
-			bool selectionCentersCanvas = ofxOceanodeShared::getSelectionCentersCanvas();
-			if(ImGui::Checkbox("Selection centers canvas", &selectionCentersCanvas)){
-				ofxOceanodeShared::setSelectionCentersCanvas(selectionCentersCanvas);
-			}
-			bool snap = canvas.getSnapToGrid();
-			if(ImGui::Checkbox("Snap To Grid",&snap))
-			{
-				canvas.setSnapToGrid(snap);
-				ofxOceanodeShared::setSnapToGrid(snap);
-			}
-			
-			// Canvas zoom control
-			float zoomLevel = canvas.getZoomLevel() * 100.0f;
-			if(ImGui::SliderFloat("Canvas Zoom", &zoomLevel, 25.0f, 400.0f, "%.0f%%")) {
-				canvas.setZoomLevel(zoomLevel / 100.0f);
-			}
-			ImGui::SameLine();
-			if(ImGui::Button("Reset##zoom")) {
-				canvas.setZoomLevel(1.0f);
-			}
-			
-			int tw = canvas.getNodeWidthText();
-			int ww = canvas.getNodeWidthWidget();
-			int gd = canvas.getGridDivisions();
-			
-			if(ImGui::SliderInt("Node Text Width", &tw, 32, 128)) canvas.updateGridSize();
-			if(ImGui::SliderInt("Node Widget Width", &ww, 64, 256)) canvas.updateGridSize();
-			if(ImGui::SliderInt("Grid Divs",&gd,0,16))
-			{
-				canvas.setGridDivisions(gd);
-				canvas.updateGridSize();
-				ofxOceanodeShared::setSnapGridDiv(gd);
-			}
-			canvas.setNodeWidthText(tw);
-			canvas.setNodeWidthWidget(ww);
-			
-            ofxOceanodeMenu::section("Theme");
-            if(ImGui::MenuItem("Edit Theme", nullptr, &showThemeEditor)){}
-            ImGui::Separator();
-            if(!currentThemeName.empty()){
-                ImGui::TextDisabled("Current: %s", currentThemeName.c_str());
-                ImGui::Separator();
-            }
-            if(ImGui::MenuItem("Save Theme...")){
-                memset(themeNameBuf, 0, sizeof(themeNameBuf));
-                if(!currentThemeName.empty()){
-                    strncpy(themeNameBuf, currentThemeName.c_str(), sizeof(themeNameBuf) - 1);
-                }
-                openSaveThemePopup = true;
-            }
-            if(ImGui::BeginMenu("Load Theme...")){
-                ofDirectory themeDir(ofToDataPath("config/themes", true));
-                themeDir.allowExt("json");
-                themeDir.listDir();
-                if(themeDir.size() == 0){
-                    ImGui::BeginDisabled();
-                    ImGui::MenuItem("(no themes saved)");
-                    ImGui::EndDisabled();
-                } else {
-                    for(int i = 0; i < (int)themeDir.size(); i++){
-                        std::string name = themeDir.getFile(i).getBaseName();
-                        bool isCurrent = (name == currentThemeName);
-                        if(isCurrent) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::ActiveItemHighlight);
-                        if(ImGui::MenuItem(name.c_str())){
-                            loadTheme(name);
-                        }
-                        if(isCurrent) ImGui::PopStyleColor();
-                    }
-                }
-                ImGui::EndMenu();
-            }
-            if(ImGui::BeginMenu("Set default theme")){
-                ofDirectory dir(ofToDataPath("config/themes", true));
-                dir.allowExt("json");
-                dir.listDir();
+            appConfig->drawMenuSections();
+            theme->drawMenuSection();
 
-                std::string currentDefault = "";
-                ofFile defaultFile(ofToDataPath("config/themes/defaultTheme", true));
-                if(defaultFile.exists()){
-                    ofJson dj = ofLoadJson(ofToDataPath("config/themes/defaultTheme", true));
-                    currentDefault = dj.value("theme", "");
-                }
-
-                if(dir.size() == 0){
-                    ImGui::TextDisabled("No themes saved yet");
-                }
-                for(int i = 0; i < (int)dir.size(); i++){
-                    std::string name = dir.getFile(i).getBaseName();
-                    bool isDefault = (name == currentDefault);
-                    if(isDefault) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::ActiveItemHighlight);
-                    if(ImGui::MenuItem(name.c_str())){
-                        ofDirectory::createDirectory(ofToDataPath("config/themes", true), true, true);
-                        ofJson defaultJson;
-                        defaultJson["theme"] = name;
-                        ofSaveJson(ofToDataPath("config/themes/defaultTheme", true), defaultJson);
-                    }
-                    if(isDefault) ImGui::PopStyleColor();
-                }
-                ImGui::EndMenu();
-            }
-            ImGui::Separator();
-            if(ImGui::MenuItem("Reset to Built-in Theme")){
-                OceanodeTheme base;
-                base.setup();
-                themeFontFamily.clear();
-                pendingThemeFontChange = true;
-                currentThemeName = "OceanodeTheme (built-in)";
-            }
-
-            ofxOceanodeMenu::section("Configuration");
-
-			if(ImGui::Button("Save Config")){
-				saveConfig();
-			}
-			ImGui::SameLine();
-			if(ImGui::Button("Load Config")){
-				loadConfig();
-			}
+            appConfig->drawConfigButtons();
 
 			ImGui::EndMenu();
 		}
 
         if(beginTopLevelMenu("Window"))
         {
-            help->drawWindowMenu(*controls);
+            windows->drawWindowMenu();
+            ImGui::EndMenu();
+        }
+
+        if(beginTopLevelMenu("Layouts")){
+            layouts->drawMenu();
             ImGui::EndMenu();
         }
 
@@ -804,10 +387,10 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
                 openWithDefaultApp(manual);
             }
             if(ImGui::MenuItem("Quick tips", "CMD+H")){
-                showHelp = true;
+                openQuickTips = true;
             }
             help->drawMenu();
-            ImGui::Checkbox("Metrics", &show_app_metrics);
+            ImGui::Checkbox("Metrics", &showMetrics);
             if(ImGui::MenuItem("Reload Macros")){
                 ofxOceanodeShared::updateMacrosStructure();
             }
@@ -821,53 +404,6 @@ void ofxOceanode::ShowExampleAppDockSpace(bool* p_open)
         ImGui::EndMenuBar();
     }
     ImGui::PopStyleVar(2);
-    // NOTE: ImGui::End() is intentionally deferred until AFTER all popup
-    // OpenPopup/BeginPopupModal calls below, so the DockSpace window is still
-    // the active window context when the popups are registered.
-
-    layouts->drawPopups();
-    controls->drawPopups();
-    oceanodePresetSave::CleanupReview::instance().draw();
-    drawUnusedNodesWindow();
-    help->draw();
-
-    if(showHelp){
-        ImGui::OpenPopup("Here are some tips:");
-    }
-    showHelpPopUp();
-
-    // --- Save Global Layout Modal ---
-    // --- Save Theme Modal ---
-    if(openSaveThemePopup){
-        ImGui::OpenPopup("Save Theme##modal");
-        openSaveThemePopup = false;
-    }
-    if(ImGui::BeginPopupModal("Save Theme##modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
-        ImGui::Text("Enter a name for the theme:");
-        ImGui::SetNextItemWidth(260);
-        ImGui::InputText("##themename", themeNameBuf, sizeof(themeNameBuf));
-        ImGui::Spacing();
-        bool canSave = (strlen(themeNameBuf) > 0);
-        if(!canSave) ImGui::BeginDisabled();
-        if(ImGui::Button("Save", ImVec2(120, 0))){
-            saveTheme(std::string(themeNameBuf));
-            ImGui::CloseCurrentPopup();
-        }
-        if(!canSave) ImGui::EndDisabled();
-        ImGui::SameLine();
-        if(ImGui::Button("Cancel", ImVec2(120, 0))){
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-
-    // Connection errors are queued while presets load. Render them from the
-    // persistent DockSpace window so OpenPopup and BeginPopupModal use the
-    // same stable ImGui ID stack on every frame.
-    ofxOceanodeContainer::drawPendingConnectionErrorDialog();
-    ofxOceanodeMacroMixer::drawPendingBlockedNodeDialog();
-
-    ImGui::End(); // End DockSpace window — must come after all popup code above
 }
 
 // The PDF user manual (scripts/build_user_manual.py). A copy in the app's data
@@ -938,27 +474,6 @@ void ofxOceanode::showHelpPopUp()
     }
 }
 
-void ofxOceanode::drawShowModeWindow(){
-    float fps = ofGetFrameRate();
-    if(fps>=60.0) ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 200, 0, 255));
-    else if((fps>=50)&&(fps<60)) ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(150, 200, 0, 255));
-    else if((fps>=30)&&(fps<50)) ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(255, 100, 0, 255));
-    else ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(220, 0, 0, 255));
-    
-    if(ImGui::Begin("#FPS")){
-        std::string text = ofToString(fps);
-        auto windowWidth = ImGui::GetWindowSize().x;
-        auto windowHeight = ImGui::GetWindowSize().y;
-        auto textWidth   = ImGui::CalcTextSize(text.c_str()).x;
-
-        ImGui::SetCursorPosX((windowWidth - textWidth) * 0.5f);
-        ImGui::SetCursorPosY(windowHeight * 0.5f);
-        ImGui::Text("%s", text.c_str());
-    }
-    ImGui::End();
-    ImGui::PopStyleColor();
-}
-
 #ifdef OFXOCEANODE_USE_OSC
 void ofxOceanode::receiveOsc(){
     while(oscReceiver.hasWaitingMessages()){
@@ -986,588 +501,4 @@ void ofxOceanode::disableRenderAll(){
 
 void ofxOceanode::disableRenderHistograms(){
     ofxOceanodeShared::setConfigurationFlags(ofxOceanodeShared::getConfigurationFlags() | ofxOceanodeConfigurationFlags_DisableRenderAll);
-}
-
-void ofxOceanode::saveConfig(){
-    ofJson config;
-    
-    // Save Desired FPS
-    config["desiredFPS"] = desiredFPS;
-    
-    // Save V Sync (we can't query current state, so we'll save false as default)
-    config["vsync"] = false;
-    
-    // Save configuration flags
-    config["configurationFlags"] = ofxOceanodeShared::getConfigurationFlags();
-    
-    // Save Show Mode
-    config["showMode"] = showMode;
-    config["colorTexturePrecision"] = ofxOceanodeShared::getColorTexturePrecision();
-    
-    // Save canvas settings
-    config["nodeTextWidth"] = canvas.getNodeWidthText();
-    config["nodeWidgetWidth"] = canvas.getNodeWidthWidget();
-    config["gridDivisions"] = canvas.getGridDivisions();
-	config["snapToGrid"] = canvas.getSnapToGrid();
-	config["autoInspectorShowHide"] = ofxOceanodeShared::getAutoInspectorShowHide();
-	config["selectionCentersCanvas"] = ofxOceanodeShared::getSelectionCentersCanvas();
-	config["connectionWidth"] = ofxOceanodeShared::getConnectionWidth();
-
-	if(auto tc = controls->get<ofxOceanodeTimeController>()) config["spaceTogglesPlay"] = tc->getSpaceTogglesPlay();
-	
-	   // Create config directory if it doesn't exist
-	   string configDir = ofToDataPath("config", true);
-	   ofDirectory dir(configDir);
-	   if(!dir.exists()){
-	       dir.create(true);
-	   }
-	   
-	   // Preserve defaultLayout if already set in the existing config
-	   string configPath = ofToDataPath("config/config.json", true);
-	   ofFile existingFile(configPath);
-	   if(existingFile.exists()){
-	       ofJson existing = ofLoadJson(configPath);
-	       if(existing.contains("defaultLayout")){
-	           config["defaultLayout"] = existing["defaultLayout"];
-	       }
-	   }
-	   
-	   // Save to file
-	   ofSavePrettyJson(configPath, config);
-}
-
-void ofxOceanode::loadConfig(){
-    string configPath = ofToDataPath("config/config.json", true);
-    
-    // Check if config file exists
-    ofFile configFile(configPath);
-    if(!configFile.exists()){
-        return; // Use defaults if file doesn't exist
-    }
-    
-    // Load JSON
-    ofJson config = ofLoadJson(configPath);
-    
-    // Load Desired FPS (with backward compatibility for old "fps" key)
-    if(config.contains("desiredFPS")){
-        desiredFPS = config["desiredFPS"].get<int>();
-        ofSetFrameRate(desiredFPS);
-    }
-    else if(config.contains("fps")){
-        // Backward compatibility: load old "fps" key
-        desiredFPS = static_cast<int>(config["fps"].get<float>());
-        ofSetFrameRate(desiredFPS);
-    }
-    
-    // Load V Sync
-    if(config.contains("vsync")){
-        ofSetVerticalSync(config["vsync"].get<bool>());
-    }
-    
-    // Load configuration flags
-    if(config.contains("configurationFlags")){
-        ofxOceanodeShared::setConfigurationFlags(config["configurationFlags"].get<ofxOceanodeConfigurationFlags>());
-    }
-    
-    ofxOceanodeShared::setColorTexturePrecision(config.value("colorTexturePrecision", 32));
-
-    // Load Show Mode
-    if(config.contains("showMode")){
-        showMode = config["showMode"].get<bool>();
-    }
-    
-    // Load canvas settings
-    if(config.contains("nodeTextWidth")){
-        canvas.setNodeWidthText(config["nodeTextWidth"].get<int>());
-    }
-    
-    if(config.contains("nodeWidgetWidth")){
-        canvas.setNodeWidthWidget(config["nodeWidgetWidth"].get<int>());
-    }
-	if(config.contains("snapToGrid")){
-		bool b = config["snapToGrid"].get<bool>();
-		canvas.setSnapToGrid(b);
-		ofxOceanodeShared::setSnapToGrid(b);
-	}
-	if(config.contains("gridDivisions")){
-		int i = config["gridDivisions"].get<int>();
-		canvas.setGridDivisions(i);
-		canvas.updateGridSize();
-		ofxOceanodeShared::setSnapGridDiv(i);
-	}
-	if(config.contains("autoInspectorShowHide")){
-		ofxOceanodeShared::setAutoInspectorShowHide(config["autoInspectorShowHide"].get<bool>());
-	}
-	ofxOceanodeShared::setSelectionCentersCanvas(config.value("selectionCentersCanvas", false));
-	ofxOceanodeShared::setConnectionWidth(config.value("connectionWidth", 3.0f));
-	if(config.contains("spaceTogglesPlay")){
-		if(auto tc = controls->get<ofxOceanodeTimeController>()) tc->setSpaceTogglesPlay(config["spaceTogglesPlay"].get<bool>());
-	}
-}
-
-void ofxOceanode::saveViewConfig(const std::map<std::string, bool>& visibilityMap){
-    ofJson viewConfig;
-    for(auto& kv : visibilityMap){
-        viewConfig[kv.first] = kv.second;
-    }
-    
-    // Create config directory if it doesn't exist
-    string configDir = ofToDataPath("config", true);
-    ofDirectory dir(configDir);
-    if(!dir.exists()){
-        dir.create(true);
-    }
-    
-    string viewConfigPath = ofToDataPath("config/view.json", true);
-    ofSavePrettyJson(viewConfigPath, viewConfig);
-}
-
-void ofxOceanode::loadViewConfig(){
-    string viewConfigPath = ofToDataPath("config/view.json", true);
-    
-    ofFile viewConfigFile(viewConfigPath);
-    if(!viewConfigFile.exists()){
-        return; // No saved view config, use defaults
-    }
-    
-    ofJson viewConfig = ofLoadJson(viewConfigPath);
-    savedViewConfig.clear();
-    for(auto it = viewConfig.begin(); it != viewConfig.end(); ++it){
-        savedViewConfig[it.key()] = it.value().get<bool>();
-    }
-}
-
-
-namespace {
-// Prefer the typographic family (name ID 16): legacy family names often
-// split Medium/Light/etc. into separate families. Windows names are UTF-16BE.
-std::string themeFontFamilyName(FT_Face face){
-    for(FT_UInt i = 0; i < FT_Get_Sfnt_Name_Count(face); ++i){
-        FT_SfntName name;
-        if(FT_Get_Sfnt_Name(face, i, &name) != 0 || name.name_id != 16) continue;
-        if(name.platform_id != 0 && !(name.platform_id == 3 && (name.encoding_id == 1 || name.encoding_id == 10))) continue;
-        std::string result;
-        for(FT_UInt j = 0; j + 1 < name.string_len; j += 2){
-            uint32_t cp = (uint32_t(name.string[j]) << 8) | name.string[j + 1];
-            if(cp >= 0xD800 && cp <= 0xDBFF && j + 3 < name.string_len){
-                const uint32_t low = (uint32_t(name.string[j + 2]) << 8) | name.string[j + 3];
-                if(low >= 0xDC00 && low <= 0xDFFF){
-                    cp = 0x10000 + ((cp - 0xD800) << 10) + low - 0xDC00;
-                    j += 2;
-                }
-            }
-            if(cp != 0 && !(cp >= 0xD800 && cp <= 0xDFFF)) ofUTF8Append(result, cp);
-        }
-        if(!result.empty()) return result;
-    }
-    return face->family_name ? face->family_name : "";
-}
-}
-
-void ofxOceanode::refreshThemeFonts(){
-    themeFontFamilies.clear();
-    FT_Library library = nullptr;
-    if(FT_Init_FreeType(&library) != 0){
-        themeFontWarning = "Could not read the font folder.";
-        return;
-    }
-    struct Candidate {
-        ThemeFontFamily family;
-        int regularScore = INT_MAX;
-        int boldScore = INT_MAX;
-    };
-    std::map<std::string, Candidate> families;
-    std::function<void(const std::string&)> scan = [&](const std::string& relativeDir){
-        ofDirectory dir(ofToDataPath(relativeDir, true));
-        if(!dir.exists()) return;
-        dir.listDir();
-        dir.sort();
-        for(const auto& file : dir.getFiles()){
-            // Avoid recursion loops through linked directories.
-            if(file.isLink()) continue;
-            const std::string path = relativeDir + "/" + file.getFileName();
-            if(file.isDirectory()){
-                scan(path);
-                continue;
-            }
-            const std::string ext = ofToLower(file.getExtension());
-            if(ext != "ttf" && ext != "otf") continue;
-            FT_Face face = nullptr;
-            if(FT_New_Face(library, ofToDataPath(path, true).c_str(), 0, &face) != 0) continue;
-            const std::string familyName = themeFontFamilyName(face);
-            if(FT_IS_SCALABLE(face) && !familyName.empty()){
-                auto& candidate = families[familyName];
-                candidate.family.name = familyName;
-                const auto* os2 = static_cast<const TT_OS2*>(FT_Get_Sfnt_Table(face, ft_sfnt_os2));
-                const int weight = os2 && os2->usWeightClass ? os2->usWeightClass
-                    : ((face->style_flags & FT_STYLE_FLAG_BOLD) ? 700 : 400);
-                const bool italic = (face->style_flags & FT_STYLE_FLAG_ITALIC) != 0;
-                // Prefer upright static faces. Variable fonts can still supply
-                // their default instance when no static equivalent is present.
-                const int penalty = (italic ? 2000 : 0) + (FT_HAS_MULTIPLE_MASTERS(face) ? 1000 : 0);
-                const int regularScore = penalty + std::abs(weight - 400);
-                if(regularScore < candidate.regularScore){
-                    candidate.regularScore = regularScore;
-                    candidate.family.regularPath = path;
-                }
-                const int boldScore = penalty + std::abs(weight - 700);
-                if(!italic && weight >= 600 && boldScore < candidate.boldScore){
-                    candidate.boldScore = boldScore;
-                    candidate.family.boldPath = path;
-                }
-            }
-            FT_Done_Face(face);
-        }
-    };
-    scan("config/font");
-    FT_Done_FreeType(library);
-    for(const auto& entry : families) themeFontFamilies.push_back(entry.second.family);
-    pendingThemeFontChange = true;
-}
-
-void ofxOceanode::applyThemeFont(){
-    if(!pendingThemeFontChange) return;
-    pendingThemeFontChange = false;
-    themeFontWarning.clear();
-    if(!themeFontFamily.empty()){
-        for(const auto& family : themeFontFamilies){
-            if(family.name == themeFontFamily && ofFile(ofToDataPath(family.regularPath, true)).exists()){
-                canvas.setupFonts(family.regularPath, family.boldPath);
-                return;
-            }
-        }
-        themeFontWarning = "Font family '" + themeFontFamily + "' is unavailable. Using the built-in default.";
-        ofLogWarning("ofxOceanode") << themeFontWarning;
-    }
-    canvas.setupFonts();
-}
-
-void ofxOceanode::saveTheme(const std::string& name){
-    ofDirectory::createDirectory(ofToDataPath("config/themes", true), true, true);
-    ofJson j;
-    j["fontFamily"] = themeFontFamily;
-    ImVec4* colors = ImGui::GetStyle().Colors;
-    colors[ImGuiCol_PopupBg] = colors[ImGuiCol_WindowBg];
-    for(int i = 0; i < ImGuiCol_COUNT; i++){
-        string colorName = ImGui::GetStyleColorName(i);
-        j["colors"][colorName] = { colors[i].x, colors[i].y, colors[i].z, colors[i].w };
-    }
-    // Save custom Oceanode semantic colours
-    for(auto& f : OceanodeColors::getFields()){
-        j["oceanodeColors"][f.name] = { f.ptr->x, f.ptr->y, f.ptr->z, f.ptr->w };
-    }
-    string path = ofToDataPath("config/themes/" + name + ".json", true);
-    ofSavePrettyJson(path, j);
-    currentThemeName = name;
-    ofLogNotice("ofxOceanode") << "Theme saved to " << path;
-}
-
-void ofxOceanode::loadTheme(const std::string& name){
-    string path = ofToDataPath("config/themes/" + name + ".json", true);
-    ofFile f(path);
-    if(!f.exists()){
-        ofLogWarning("ofxOceanode") << "Theme file not found: " << path;
-        return;
-    }
-    ofJson j = ofLoadJson(path);
-    if(!j.contains("colors")) return;
-
-    // Reset to OceanodeTheme baseline before applying JSON overrides
-    OceanodeTheme base;
-    base.setup();
-    themeFontFamily = j.contains("fontFamily") && j["fontFamily"].is_string()
-        ? j["fontFamily"].get<std::string>() : "";
-    pendingThemeFontChange = true;
-
-    ImVec4* colors = ImGui::GetStyle().Colors;
-    for(int i = 0; i < ImGuiCol_COUNT; i++){
-        string colorName = ImGui::GetStyleColorName(i);
-        if(j["colors"].contains(colorName)){
-            auto& arr = j["colors"][colorName];
-            if(arr.is_array() && arr.size() == 4){
-                colors[i] = ImVec4(arr[0].get<float>(), arr[1].get<float>(),
-                                   arr[2].get<float>(), arr[3].get<float>());
-            }
-        }
-    }
-    // Old themes may contain a separate PopupBg; WindowBg now controls both.
-    colors[ImGuiCol_PopupBg] = colors[ImGuiCol_WindowBg];
-    // Load custom Oceanode semantic colours (optional: gracefully absent in old theme files)
-    if(j.contains("oceanodeColors")){
-        for(auto& field : OceanodeColors::getFields()){
-            if(j["oceanodeColors"].contains(field.name)){
-                auto& arr = j["oceanodeColors"][field.name];
-                if(arr.is_array() && arr.size() == 4){
-                    *field.ptr = ImVec4(arr[0].get<float>(), arr[1].get<float>(),
-                                       arr[2].get<float>(), arr[3].get<float>());
-                }
-            }
-        }
-    }
-    currentThemeName = name;
-    ofLogNotice("ofxOceanode") << "Theme loaded from " << path;
-}
-
-void ofxOceanode::drawThemeEditorWindow(){
-    std::string editorTitle = "Theme Editor";
-    if(!currentThemeName.empty()) editorTitle += " — " + currentThemeName;
-    editorTitle += "###ThemeEditorWindow";
-
-    ImGui::SetNextWindowSize(ImVec2(480, 620), ImGuiCond_FirstUseEver);
-    const bool editorVisible = ImGui::Begin(editorTitle.c_str(), &showThemeEditor);
-    themeEditorHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows |
-                                                ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
-    if(editorVisible){
-        ImGuiStyle& style = ImGui::GetStyle();
-        ImVec4* colors = style.Colors;
-        bool colorFilterChanged = false;
-
-        if(currentThemeName.empty()){
-            ImGui::TextDisabled("OceanodeTheme (built-in)");
-        } else {
-            ImGui::TextDisabled("Current theme: %s", currentThemeName.c_str());
-        }
-        ImGui::Spacing();
-
-        if(ImGui::Button("Reset to Default")){
-            OceanodeTheme defaultTheme;
-            defaultTheme.setup();
-            themeFontFamily.clear();
-            pendingThemeFontChange = true;
-            currentThemeName = "OceanodeTheme (built-in)";
-        }
-
-        ImGui::SameLine();
-        bool focusColorSearch = false;
-        if(ImGui::Button("[?]")){
-            showThemeColorSearch = !showThemeColorSearch;
-            focusColorSearch = showThemeColorSearch;
-            if(!showThemeColorSearch) themeColorSearch[0] = '\0';
-            colorFilterChanged = true;
-        }
-        if(ImGui::IsItemHovered()) ImGui::SetTooltip("Filter color names in both color tabs");
-        if(showThemeColorSearch){
-            const float clearWidth = ImGui::CalcTextSize("Clear").x + style.FramePadding.x * 2.0f;
-            ImGui::SetNextItemWidth(std::max(40.0f, ImGui::GetContentRegionAvail().x - clearWidth - style.ItemSpacing.x));
-            if(focusColorSearch) ImGui::SetKeyboardFocusHere();
-            colorFilterChanged |= ImGui::InputTextWithHint("##theme_color_search", "Filter color names...",
-                                                          themeColorSearch, sizeof(themeColorSearch));
-            ImGui::SameLine();
-            if(ImGui::Button("Clear")){
-                themeColorSearch[0] = '\0';
-                colorFilterChanged = true;
-            }
-        }
-
-        ImGui::TextDisabled("Hold Alt and hover any element to find its color.");
-        if(!themeColorPickLayers.empty()) drawThemeColorPickLayers(true);
-
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        // Rows of the colour picked with Alt+hover (or from the list above).
-        auto beginPickedRow = [&](){
-            const ImVec2 min = ImGui::GetCursorScreenPos();
-            const ImVec2 max(min.x + ImGui::GetContentRegionAvail().x, min.y + ImGui::GetFrameHeight());
-            ImVec4 fill = OceanodeColors::SelectedBorder;
-            fill.w *= 0.25f;
-            ImGui::GetWindowDrawList()->AddRectFilled(min, max, OceanodeColors::U32(fill), style.FrameRounding);
-            ImGui::GetWindowDrawList()->AddRect(min, max, OceanodeColors::U32(OceanodeColors::SelectedBorder), style.FrameRounding);
-        };
-        auto endPickedRow = [&](){
-            if(!themeColorRevealPending) return;
-            ImGui::SetScrollHereY(0.5f);
-            themeColorRevealPending = false;
-        };
-        auto tabFlags = [&](bool oceanode){
-            return themeColorRevealPending && themeSelectedColor.oceanode == oceanode ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
-        };
-
-        if(ImGui::BeginTabBar("##themeditor_tabs")){
-
-            if(ImGui::BeginTabItem("ImGui Colors", nullptr, tabFlags(false))){
-                ImGui::TextDisabled("WindowBg also controls popup and modal backgrounds.");
-                std::vector<int> colorIndices;
-                for(int i = 0; i < ImGuiCol_COUNT; i++){
-                    if(i != ImGuiCol_PopupBg) colorIndices.push_back(i);
-                }
-                std::sort(colorIndices.begin(), colorIndices.end(), [](int a, int b){
-                    return strcmp(ImGui::GetStyleColorName(a), ImGui::GetStyleColorName(b)) < 0;
-                });
-
-                ImGui::BeginChild("##colorscroll_imgui", ImVec2(0, 0), false);
-                if(colorFilterChanged || ImGui::IsWindowAppearing()) ImGui::SetScrollY(0.0f);
-                int visibleColors = 0;
-                for(int idx : colorIndices){
-                    const char* colorName = ImGui::GetStyleColorName(idx);
-                    if(themeColorSearch[0] && ImStristr(colorName, nullptr, themeColorSearch, nullptr) == nullptr) continue;
-                    ++visibleColors;
-                    const bool picked = !themeSelectedColor.oceanode && themeSelectedColor.name == colorName;
-                    if(picked) beginPickedRow();
-                    ImGui::PushID(idx);
-                    if(ImGui::ColorEdit4(colorName, (float*)&colors[idx],
-                                       ImGuiColorEditFlags_AlphaBar |
-                                       ImGuiColorEditFlags_AlphaPreviewHalf) && idx == ImGuiCol_WindowBg){
-                        colors[ImGuiCol_PopupBg] = colors[ImGuiCol_WindowBg];
-                    }
-                    ImGui::PopID();
-                    if(picked) endPickedRow();
-                }
-                if(visibleColors == 0) ImGui::TextDisabled("No matching colors.");
-                if(!themeSelectedColor.oceanode) themeColorRevealPending = false; // not listed
-                ImGui::EndChild();
-                ImGui::EndTabItem();
-            }
-
-            if(ImGui::BeginTabItem("Oceanode Colors", nullptr, tabFlags(true))){
-                ImGui::BeginChild("##colorscroll_oc", ImVec2(0, 0), false);
-                if(colorFilterChanged || ImGui::IsWindowAppearing()) ImGui::SetScrollY(0.0f);
-                // Shared window/popup decoration sizes (colours: OC_FloatingWindow* below)
-                if(themeColorSearch[0] == '\0'){
-                    ImGui::Checkbox("Floating window / popup border and shadow", &ofxOceanodeFloatingWindowDecor::Enabled);
-                    ImGui::SliderFloat("Window / popup border thickness", &ofxOceanodeFloatingWindowDecor::BorderThickness, 0.0f, 4.0f, "%.1f px");
-                    ImGui::SliderFloat("Window / popup shadow size", &ofxOceanodeFloatingWindowDecor::ShadowSize, 0.0f, 40.0f, "%.0f px");
-                    ImGui::Separator();
-                }
-                auto fields = OceanodeColors::getFields();
-                std::sort(fields.begin(), fields.end(), [](const OceanodeColors::ColorField& a, const OceanodeColors::ColorField& b){
-                    return strcmp(a.name, b.name) < 0;
-                });
-                int visibleColors = 0;
-                for(int i = 0; i < (int)fields.size(); i++){
-                    if(themeColorSearch[0] && ImStristr(fields[i].name, nullptr, themeColorSearch, nullptr) == nullptr) continue;
-                    ++visibleColors;
-                    const bool picked = themeSelectedColor.oceanode && themeSelectedColor.name == fields[i].name;
-                    if(picked) beginPickedRow();
-                    ImGui::PushID(i + ImGuiCol_COUNT);
-                    ImGui::ColorEdit4(fields[i].name, (float*)fields[i].ptr,
-                                      ImGuiColorEditFlags_AlphaBar |
-                                      ImGuiColorEditFlags_AlphaPreviewHalf);
-                    ImGui::PopID();
-                    if(picked) endPickedRow();
-                }
-                if(visibleColors == 0) ImGui::TextDisabled("No matching colors.");
-                if(themeSelectedColor.oceanode) themeColorRevealPending = false; // not listed
-                ImGui::EndChild();
-                ImGui::EndTabItem();
-            }
-
-            if(ImGui::BeginTabItem("Font")){
-                ImGui::TextUnformatted("Default font family");
-                ImGui::TextDisabled("Fonts from bin/data/config/font (including subfolders)");
-                if(ImGui::Button("Refresh font list")) refreshThemeFonts();
-                ImGui::TextWrapped("Choose a family to preview it throughout the app. Use Theme > Save Theme to keep your choice.");
-                if(!themeFontWarning.empty()) ImGui::TextWrapped("%s", themeFontWarning.c_str());
-                ImGui::Separator();
-                ImGui::BeginChild("##fontfamilies", ImVec2(0, 0), false);
-                if(ImGui::Selectable("Built-in default (JetBrains Mono)", themeFontFamily.empty())){
-                    themeFontFamily.clear();
-                    pendingThemeFontChange = true;
-                }
-                for(const auto& family : themeFontFamilies){
-                    ImGui::PushID(family.name.c_str());
-                    if(ImGui::Selectable(family.name.c_str(), themeFontFamily == family.name)){
-                        themeFontFamily = family.name;
-                        pendingThemeFontChange = true;
-                    }
-                    if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", family.regularPath.c_str());
-                    ImGui::PopID();
-                }
-                if(themeFontFamilies.empty()){
-                    ImGui::TextWrapped("No usable fonts found. Add .ttf or .otf files to bin/data/config/font, then refresh the list.");
-                }
-                ImGui::EndChild();
-                ImGui::EndTabItem();
-            }
-
-            ImGui::EndTabBar();
-        }
-    }
-    ImGui::End();
-}
-
-void ofxOceanode::selectThemeColor(const ofxOceanodeThemeColorPicker::Match& match){
-    themeSelectedColor = match;
-    themeColorRevealPending = true;
-    if(themeColorSearch[0] && ImStristr(match.name.c_str(), nullptr, themeColorSearch, nullptr) == nullptr){
-        themeColorSearch[0] = '\0';
-    }
-}
-
-void ofxOceanode::pickThemeColorUnderMouse(){
-    const ImGuiIO& io = ImGui::GetIO();
-    if(!showThemeEditor || !io.KeyAlt || themeEditorHovered || !ImGui::IsMousePosValid()) return;
-    ImGuiContext& g = *GImGui;
-    ImGuiViewport* viewport = g.MouseViewport ? g.MouseViewport : ImGui::GetMainViewport();
-    auto layers = ofxOceanodeThemeColorPicker::pick(viewport ? viewport->DrawData : nullptr, io.MousePos,
-                                                    themeColorPickTooltipDrawList);
-    if(layers.empty()) return;
-    themeColorPickLayers = std::move(layers);
-    themeColorPickFrame = ImGui::GetFrameCount();
-    // Select the topmost colour that belongs to the theme.
-    for(const auto& layer : themeColorPickLayers){
-        if(layer.matches.empty()) continue;
-        if(!(layer.matches.front() == themeSelectedColor)) selectThemeColor(layer.matches.front());
-        break;
-    }
-}
-
-void ofxOceanode::drawThemeColorPickTooltip(){
-    themeColorPickTooltipDrawList = nullptr;
-    if(!ImGui::GetIO().KeyAlt || themeColorPickLayers.empty() ||
-       themeColorPickFrame != ImGui::GetFrameCount() - 1) return;
-    if(!ImGui::BeginTooltip()) return;
-    // The lookup must not find its own tooltip.
-    themeColorPickTooltipDrawList = ImGui::GetWindowDrawList();
-    ImGui::TextDisabled("Theme colors under the cursor, top first");
-    drawThemeColorPickLayers(false);
-    ImGui::EndTooltip();
-}
-
-void ofxOceanode::drawThemeColorPickLayers(bool selectable){
-    const ImGuiStyle& style = ImGui::GetStyle();
-    const float swatchSize = selectable ? ImGui::GetFrameHeight() : ImGui::GetTextLineHeight();
-    for(int i = 0; i < (int)themeColorPickLayers.size(); i++){
-        const auto& layer = themeColorPickLayers[i];
-        ImGui::PushID(i);
-        const float rowStart = ImGui::GetCursorPosX();
-        const float rowRight = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
-        ImGui::ColorButton("##swatch", ImGui::ColorConvertU32ToFloat4(layer.color),
-                           ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_AlphaPreviewHalf,
-                           ImVec2(swatchSize, swatchSize));
-        if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", ofxOceanodeThemeColorPicker::hex(layer.color).c_str());
-        if(layer.matches.empty()){
-            ImGui::SameLine();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextDisabled("%s  not a theme color", ofxOceanodeThemeColorPicker::hex(layer.color).c_str());
-        }
-        for(int m = 0; m < (int)layer.matches.size(); m++){
-            const auto& match = layer.matches[m];
-            const bool selected = match == themeSelectedColor;
-            const ImVec2 size = ImGui::CalcTextSize(match.name.c_str());
-            ImGui::SameLine();
-            if(selectable && ImGui::GetCursorScreenPos().x + size.x > rowRight){
-                ImGui::NewLine();
-                ImGui::SetCursorPosX(rowStart + swatchSize + style.ItemSpacing.x);
-            }
-            if(selectable){
-                ImGui::PushID(m);
-                ImGui::AlignTextToFramePadding();
-                if(ImGui::Selectable(match.name.c_str(), selected, ImGuiSelectableFlags_None, ImVec2(size.x, 0))){
-                    selectThemeColor(match);
-                }
-                if(ImGui::IsItemHovered()) ImGui::SetTooltip(match.oceanode ? "Oceanode Colors" : "ImGui Colors");
-                ImGui::PopID();
-            }else if(selected){
-                ImGui::TextColored(OceanodeColors::SelectedNodeText, "%s", match.name.c_str());
-            }else{
-                ImGui::TextUnformatted(match.name.c_str());
-            }
-        }
-        if(!layer.exactAlpha){
-            ImGui::SameLine();
-            ImGui::TextDisabled("(other alpha)");
-        }
-        ImGui::PopID();
-    }
 }

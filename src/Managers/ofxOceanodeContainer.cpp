@@ -739,13 +739,9 @@ void ofxOceanodeContainer::flushPendingScopeSave()
     pendingScopeSaveDeadlineMillis = 0;
     saveScope(presetPath);
 
-    // The real divider proportions live in ImGuiLayout.ini. Save that state
-    // in the same debounced transaction, but never from Scope::draw().
-    if(ImGui::GetCurrentContext() != nullptr)
-    {
-        const std::string layoutPath = ofToDataPath(presetPath + "/ImGuiLayout.ini");
-        ImGui::SaveIniSettingsToDisk(layoutPath.c_str());
-    }
+    // The real divider proportions live in the preset's layout.json. Request
+    // that save in the same debounced transaction, but never from Scope::draw().
+    ofxOceanodeShared::getDockingSaveRequestEvent().notify(presetPath);
 }
 
 void ofxOceanodeContainer::loadScope(const std::string& presetPath) {
