@@ -296,10 +296,6 @@ void ofxOceanode::drawMenuBar(){
             return open;
         };
         controls->drawMenu("Presets");
-        if(beginTopLevelMenu("Layouts")){
-            layouts->drawMenu();
-            ImGui::EndMenu();
-        }
 
         if(beginTopLevelMenu("Edit"))
         {
@@ -375,6 +371,11 @@ void ofxOceanode::drawMenuBar(){
         if(beginTopLevelMenu("Window"))
         {
             windows->drawWindowMenu();
+            ImGui::EndMenu();
+        }
+
+        if(beginTopLevelMenu("Layouts")){
+            layouts->drawMenu();
             ImGui::EndMenu();
         }
 

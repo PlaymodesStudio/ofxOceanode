@@ -12,7 +12,9 @@ Preset folders (any directory under <data>/Presets/ holding ImGuiLayout.ini,
 view.json, preset_layouts.json or workspaces.json) become <preset>/layout.json.
 In <data>/config/: config.json becomes version 2 (defaultLayout moves to
 guiLayouts.json), themes/defaultTheme becomes themes.json and view.json is
-removed. Python 3 standard library only. Exit code 0 on success, 1 on any error;
+removed. Each global layout guiLayouts/<name>.ini becomes guiLayouts/<name>.json
+({version, ini, view}); the default one takes its controller visibility from the
+old view.json when that file is still present. Python 3 standard library only. Exit code 0 on success, 1 on any error;
 a unit (one preset folder, or the config folder) with an error is left untouched.
 """
 import argparse
@@ -148,7 +150,7 @@ def plan_config(data):
             if default_layout:
                 name = default_layout if isinstance(default_layout, str) else ""
                 name = name[:-4] if name.endswith(".ini") else name
-                if not name or not (config_dir / "guiLayouts" / f"{name}.ini").exists():
+                if not name or not any((config_dir / "guiLayouts" / f"{name}{ext}").exists() for ext in (".ini", ".json")):
                     unit.notes.append(f"default layout {default_layout!r} not found, default cleared")
                     name = ""
                 guiLayouts = config_dir / "guiLayouts.json"
@@ -181,6 +183,58 @@ def plan_config(data):
         unit.notes.append("global view config dropped; per-preset visibility is in layout.json")
     if not unit.writes and not unit.deletes:
         return None
+    return unit
+
+
+def valid_global_name(name):
+    return valid_name(name) and not any(c in name for c in "/\\:")
+
+
+def default_global_layout(config_dir):
+    """The default global layout name, from either config format."""
+    config_path, gui_layouts = config_dir / "config.json", config_dir / "guiLayouts.json"
+    if config_path.exists():
+        config = read_json(config_path)
+        if isinstance(config, dict) and config.get("version") != 2 and isinstance(config.get("defaultLayout"), str):
+            name = config["defaultLayout"]
+            return name[:-4] if name.endswith(".ini") else name
+    if gui_layouts.exists():
+        layouts = read_json(gui_layouts)
+        if isinstance(layouts, dict) and isinstance(layouts.get("default"), str):
+            return layouts["default"]
+    return ""
+
+
+def plan_global_layouts(data):
+    folder = data / "config" / "guiLayouts"
+    if not folder.is_dir():
+        return None
+    old = sorted(p for p in folder.glob("*.ini") if p.is_file())
+    if not old:
+        return None
+    unit = Unit("config/guiLayouts")
+    default = default_global_layout(data / "config")
+    view_path = data / "config" / "view.json"
+    startup_view = None
+    if view_path.exists():
+        visibility = read_json(view_path)
+        if not isinstance(visibility, dict) or not all(isinstance(v, bool) for v in visibility.values()):
+            raise MigrationError("view.json: expected an object of controller names to booleans")
+        startup_view = {"controllers": visibility, "windows": {}}
+    for ini in old:
+        name, target = ini.stem, ini.with_suffix(".json")
+        if not valid_global_name(name):
+            raise MigrationError(f"{ini.name}: invalid layout name")
+        if target.exists():
+            raise MigrationError(f"{target.name} already exists next to {ini.name}")
+        text = read_text(ini)
+        if not text:
+            raise MigrationError(f"{ini.name}: empty layout")
+        view = startup_view if name == default else None
+        unit.writes[target] = dump({"version": 1, "ini": text, "view": view})
+        unit.deletes.append(ini)
+        if view is not None:
+            unit.notes.append(f"{name}: startup controller visibility from view.json")
     return unit
 
 
@@ -220,6 +274,7 @@ def main(argv=None):
     lines, changes, errors = [], [], 0
     counts = {"migrated": 0, "skipped": 0, "error": 0}
     planners = [(str(folder.relative_to(data)), lambda f=folder: plan_preset(data, f)) for folder in preset_folders(data)]
+    planners.append(("config/guiLayouts", lambda: plan_global_layouts(data)))
     planners.append(("config", lambda: plan_config(data)))
     for name, planner in planners:
         try:

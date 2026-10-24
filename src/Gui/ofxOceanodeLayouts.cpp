@@ -102,11 +102,20 @@ void ofxOceanodeLayouts::setup(){
         return;
     }
     globalDefault = config.value("default", std::string());
-    if(globalDefault.empty()) return;
-    const auto iniPath = ofToDataPath(globalLayoutsFolder + globalDefault + ".ini", true);
-    if(!ofFile(iniPath).exists()) return;
     // Applied by beforeFrame(), once the ImGui context is fully active.
-    pendingIni = ofBufferFromFile(iniPath).getText();
+    queueDefaultGlobalLayout();
+}
+
+// The startup arrangement: at launch and for every New preset.
+void ofxOceanodeLayouts::queueDefaultGlobalLayout(){
+    if(globalDefault.empty()) return;
+    ofJson layout;
+    if(!readGlobalLayout(globalDefault, layout, globalError)){
+        ofLogError("Layouts") << globalError;
+        return;
+    }
+    pendingIni = layout.at("ini").get<std::string>();
+    pendingView = layout.at("view");
     globalLayoutName = globalDefault;
 }
 
@@ -120,7 +129,11 @@ void ofxOceanodeLayouts::onPresetLoaded(){
     readFailed = false;
     presetPopup = PresetLayoutPopup::None;
     const auto preset = ofxOceanodeShared::getCurrentPresetPath();
-    if(preset.empty()) return;
+    if(preset.empty()){
+        // New preset: start from the default global layout.
+        queueDefaultGlobalLayout();
+        return;
+    }
     const auto file = ofToDataPath(preset + "/layout.json");
     if(!ofFile(file).exists()) return;
     try{
@@ -220,14 +233,39 @@ bool ofxOceanodeLayouts::validGlobalName(const std::string& name){
     return ofxOceanodePresetLayouts::validName(name) && name.find_first_of("/\\:") == std::string::npos;
 }
 
+// A global layout is {"version": 1, "ini": <non-empty ImGui ini text>, "view": View | null}.
+bool ofxOceanodeLayouts::readGlobalLayout(const std::string& name, ofJson& layout, std::string& error){
+    const auto path = ofToDataPath(globalLayoutsFolder + name + ".json", true);
+    if(!ofFile(path).exists()){
+        error = "Global layout not found: " + path;
+        return false;
+    }
+    layout = ofLoadJson(path);
+    if(!layout.is_object() || layout.value("version", 0) != 1 ||
+       !layout.contains("ini") || !layout.at("ini").is_string() || layout.at("ini").get<std::string>().empty() ||
+       (layout.contains("view") && !layout.at("view").is_null() && !validView(layout.at("view")))){
+        error = "Invalid global layout: " + path;
+        return false;
+    }
+    if(!layout.contains("view")) layout["view"] = nullptr;
+    error.clear();
+    return true;
+}
+
 void ofxOceanodeLayouts::queueGlobalLayout(const std::string& name){
+    ofJson layout;
+    if(!readGlobalLayout(name, layout, globalError)){
+        ofLogError("Layouts") << globalError;
+        return;
+    }
     // Global layouts leave the named preset layout without replacing its snapshot.
     if(!collection.active.empty()){
         collection.active.clear();
         writeLayoutFile();
     }
     pendingSnapshot.clear();
-    pendingIni = ofBufferFromFile(ofToDataPath(globalLayoutsFolder + name + ".ini", true)).getText();
+    pendingIni = layout.at("ini").get<std::string>();
+    pendingView = layout.at("view");
     globalLayoutName = name;
 }
 
@@ -245,7 +283,7 @@ void ofxOceanodeLayouts::drawMenu(){
     drawPresetLayoutsMenu();
     ofxOceanodeMenu::section("Global layouts");
     ofDirectory dir(ofToDataPath(globalLayoutsFolder, true));
-    dir.allowExt("ini");
+    dir.allowExt("json");
     if(dir.exists()) dir.listDir();
     if(ImGui::BeginMenu("Load global layout")){
         if(dir.size() == 0){
@@ -263,6 +301,7 @@ void ofxOceanodeLayouts::drawMenu(){
         }
         ImGui::EndMenu();
     }
+    if(!globalError.empty() && !openSaveGlobalLayoutPopup) ImGui::TextWrapped("%s", globalError.c_str());
 
     if(ImGui::MenuItem("Save global layout as...")){
         std::snprintf(globalName, sizeof(globalName), "%s", globalLayoutName.c_str());
@@ -434,9 +473,8 @@ void ofxOceanodeLayouts::drawGlobalLayoutPopup(){
                 globalError = "Enter a name (1-255 bytes, without ##, line breaks, /, \\ or :).";
             }else{
                 ofDirectory::createDirectory(ofToDataPath(globalLayoutsFolder, true), true, true);
-                const auto ini = windows.captureIni();
-                ofBuffer buffer(ini.data(), ini.size());
-                if(ofBufferToFile(ofToDataPath(globalLayoutsFolder + name + ".ini", true), buffer)){
+                const ofJson layout = {{"version", 1}, {"ini", windows.captureIni()}, {"view", windows.captureView()}};
+                if(ofSavePrettyJson(ofToDataPath(globalLayoutsFolder + name + ".json", true), layout)){
                     globalLayoutName = name;
                     globalError.clear();
                     ImGui::CloseCurrentPopup();

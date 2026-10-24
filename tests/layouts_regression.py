@@ -196,11 +196,11 @@ int main(){
     // corrupt files and write errors. Named snapshots remain explicit.
     auto snapshots=collection.entries;
     filesystem::create_directories("config/guiLayouts");
-    ofBufferToFile("config/guiLayouts/Studio.ini",ofBuffer(laserIni.data(),laserIni.size()));
+    ofSavePrettyJson("config/guiLayouts/Studio.json",{{"version",1},{"ini",laserIni},{"view",laser["view"]}});
     layouts.pendingSnapshot="Laser";
     layouts.queueGlobalLayout("Studio");
     assert(collection.entries==snapshots&&collection.active.empty());
-    assert(layouts.pendingSnapshot.empty()&&layouts.pendingIni==laserIni);
+    assert(layouts.pendingSnapshot.empty()&&layouts.pendingIni==laserIni&&layouts.pendingView==laser["view"]);
     assert(layouts.globalLayoutName=="Studio");
     layouts.recallPresetLayout("Sound");settle();
     auto original=collection.toJson();
@@ -330,15 +330,46 @@ int main(){
     layouts.onPresetLoaded();assert(layouts.pendingSnapshot=="Default");layouts.beforeFrame();settle();
     assert(collection.active=="Default"&&layouts.pendingIni.empty());
     layouts.saveDocking("life-save-as");assert(ofLoadJson("life-save-as/layout.json")["active"]=="Default");
-    // Global layouts: names without .ini, a separate default file and the startup default.
+    // Global layouts: {version, ini, view} files named without extension in menus,
+    // a separate default file, and the startup default with its window visibility.
     ofSavePrettyJson("config/guiLayouts.json",{{"version",1},{"default","Startup"}});
     {
         App fresh;fresh.layouts.setup();
-        assert(fresh.layouts.pendingIni.empty()&&fresh.layouts.globalDefault=="Startup"); // Startup.ini is missing
-        ofBufferToFile("config/guiLayouts/Startup.ini",ofBuffer(laserIni.data(),laserIni.size()));
+        assert(fresh.layouts.pendingIni.empty()&&fresh.layouts.globalDefault=="Startup"); // Startup.json is missing
+        assert(!fresh.layouts.globalError.empty());
+        ofSavePrettyJson("config/guiLayouts/Startup.json",{{"version",1},{"ini",laserIni},{"view",laser["view"]}});
         App restartedWithDefault;restartedWithDefault.layouts.setup();
         assert(restartedWithDefault.layouts.pendingIni==laserIni&&restartedWithDefault.layouts.globalLayoutName=="Startup");
+        assert(restartedWithDefault.controls.visibility["Timeline"]);
         restartedWithDefault.layouts.beforeFrame();settle();assert(restartedWithDefault.layouts.pendingIni.empty());
+        assert(!restartedWithDefault.controls.visibility["Timeline"]&&restartedWithDefault.layouts.pendingView.is_null());
+        // New preset starts again from the default global layout, docking and visibility.
+        restartedWithDefault.controls.visibility["Timeline"]=true;
+        ofxOceanodeShared::preset="";restartedWithDefault.layouts.onPresetLoaded();
+        assert(restartedWithDefault.layouts.pendingIni==laserIni&&restartedWithDefault.layouts.pendingView==laser["view"]);
+        restartedWithDefault.layouts.beforeFrame();settle();
+        assert(!restartedWithDefault.controls.visibility["Timeline"]);
+        // A preset with its own layout file wins over the default.
+        ofxOceanodeShared::preset="preset-A";restartedWithDefault.layouts.onPresetLoaded();
+        assert(restartedWithDefault.layouts.pendingIni!=laserIni&&restartedWithDefault.layouts.pendingView.is_null());
+        ofxOceanodeShared::preset="";
+        // A docking-only layout leaves visibility alone; invalid and old .ini files are not loaded.
+        ofSavePrettyJson("config/guiLayouts/Docking.json",{{"version",1},{"ini",laserIni}});
+        restartedWithDefault.layouts.queueGlobalLayout("Docking");
+        assert(restartedWithDefault.layouts.pendingIni==laserIni&&restartedWithDefault.layouts.pendingView.is_null());
+        restartedWithDefault.layouts.beforeFrame();
+        for(const string invalid:{string("{broken"),ofJson({{"version",2},{"ini",laserIni}}).dump(),
+                                  ofJson({{"version",1},{"ini",""}}).dump(),
+                                  ofJson({{"version",1},{"ini",laserIni},{"view",{{"controllers",false}}}}).dump()}){
+            ofstream("config/guiLayouts/Broken.json")<<invalid;
+            restartedWithDefault.layouts.queueGlobalLayout("Broken");
+            assert(!restartedWithDefault.layouts.globalError.empty()&&restartedWithDefault.layouts.pendingIni.empty());
+            assert(restartedWithDefault.layouts.globalLayoutName=="Docking");
+        }
+        ofBufferToFile("config/guiLayouts/Legacy.ini",ofBuffer(laserIni.data(),laserIni.size()));
+        restartedWithDefault.layouts.queueGlobalLayout("Legacy");assert(restartedWithDefault.layouts.pendingIni.empty());
+        restartedWithDefault.layouts.queueGlobalLayout("Startup");assert(restartedWithDefault.layouts.globalError.empty());
+        restartedWithDefault.layouts.beforeFrame();
         ofSavePrettyJson("config/guiLayouts.json",{{"default","Startup"}});
         App unversioned;unversioned.layouts.setup();assert(unversioned.layouts.pendingIni.empty()&&unversioned.layouts.globalDefault.empty());
         restartedWithDefault.layouts.setGlobalDefault("Studio");

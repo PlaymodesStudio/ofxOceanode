@@ -29,13 +29,15 @@ public:
     void fromJson(const Json& json);  // throws on an invalid collection, leaving this unchanged
 };
 
-// Owns global layouts (config/guiLayouts/*.ini, config/guiLayouts.json) and the
-// preset's layout.json: current docking and visibility plus named snapshots.
+// Owns global layouts (config/guiLayouts/<name>.json, config/guiLayouts.json) and
+// the preset's layout.json: current docking and visibility plus named snapshots.
+// Every layout, global or preset, stores both docking (ini) and visibility (view).
 class ofxOceanodeLayouts {
 public:
     explicit ofxOceanodeLayouts(ofxOceanodeWindowManager& windows);
     void setup();                          // loads config/guiLayouts.json and queues the default global layout
-    void onPresetLoaded();                 // reads <preset>/layout.json, queues application
+    void onPresetLoaded();                 // reads <preset>/layout.json, queues application;
+                                           // New (no preset path) queues the default global layout
     void onPresetSaved();                  // writes the whole layout.json, current.view = live view
     void saveDocking(const std::string& presetPath); // writes layout.json with live ini, keeps current.view
     void beforeFrame();                    // applies queued ini / snapshot / view (before ImGui::NewFrame)
@@ -63,18 +65,21 @@ private:
     char presetName[256] = {};
     static const char* presetLayoutPopupTitle(PresetLayoutPopup popup);
 
-    // Global layouts: config/guiLayouts/<name>.ini, default in config/guiLayouts.json.
+    // Global layouts: config/guiLayouts/<name>.json ({version, ini, view}),
+    // default in config/guiLayouts.json.
     std::string globalLayoutName;
     std::string globalDefault;
     bool openSaveGlobalLayoutPopup = false;
     char globalName[256] = {};
     std::string globalError;
     static bool validGlobalName(const std::string& name);
+    static bool readGlobalLayout(const std::string& name, ofJson& layout, std::string& error);
 
     ofJson capturePresetLayout();
     void recallPresetLayout(const std::string& name);
     bool writeLayoutFile();
     void queueGlobalLayout(const std::string& name);
+    void queueDefaultGlobalLayout();
     void setGlobalDefault(const std::string& name);
     void drawPresetLayoutsMenu();
     void drawPresetLayoutPopup();

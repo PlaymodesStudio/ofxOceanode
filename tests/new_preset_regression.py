@@ -179,6 +179,7 @@ struct App {
     enum class PresetLayoutPopup {None,Save}; PresetLayoutPopup presetPopup=PresetLayoutPopup::Save;
     struct Windows {int captures=0; ofJson captureView(){++captures; return ofJson::object({{"controllers",ofJson::object()}});}} windows;
     int writes=0; bool writeLayoutFile(){++writes; return true;}
+    int defaultLayoutQueued=0; void queueDefaultGlobalLayout(){++defaultLayoutQueued;}
     void onLoaded(); void onLayoutLoaded(); void onSaved(); void saveDocking(const string&);
 };
 namespace ImGui {
@@ -249,6 +250,7 @@ int main(){
     assert(ofxOceanodeShared::path.empty() && ofxOceanodeShared::name.empty() && ofxOceanodeShared::bank.empty());
     assert(app.pendingIni.empty() && app.pendingSnapshot.empty() && app.pendingView.is_null() && app.savedView.is_null());
     assert(!app.readFailed && app.layoutError.empty() && app.collection.entries==0);
+    assert(app.defaultLayoutQueued==1); // New starts from the default global layout
     assert(ofxOceanodeShared::active=="Canvas" && app.canvas.focused);
     assert(!app.canvas.pendingCenterNode && !app.canvas.tempSourceParameter && !app.canvas.customGuiContextNode);
     assert(app.canvas.inspectorSelectionClick.nodeID.empty());

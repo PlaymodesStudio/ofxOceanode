@@ -22,7 +22,9 @@ Canvas focuses the root canvas.
 Visibility checkboxes appear to the left of every window name and take effect
 immediately, keeping the menu open. There is no Apply step. Window replaces the
 former View menu. Save Preset (or Save Preset As) stores these choices; loading
-that preset restores them, including after restarting the app.
+that preset restores them, including after restarting the app. Preset and global
+layouts (the Layouts menu, after Window) store them too; the default global
+layout sets which windows are shown at startup.
 Scopes can be hidden without removing its scoped parameters. An unchecked
 Inspector stays hidden; when checked, Config's automatic show/hide option can
 still hide it while no node is selected. Automatic hiding does not uncheck it.

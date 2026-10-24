@@ -437,7 +437,7 @@ void ofxOceanodeWindowManager::drawWindowMenu(){
     if(ImGui::Checkbox("Scopes", &scopesVisible))
         ofxOceanodeScope::getInstance()->setVisible(scopesVisible);
     if(ImGui::IsItemHovered()) ImGui::SetTooltip("Show or hide Scopes without removing scoped parameters.");
-    ImGui::TextDisabled("Visibility is saved with the preset.");
+    ImGui::TextDisabled("Visibility is saved with the preset and with layouts.");
     ofxOceanodeMenu::section("Controllers");
     auto& visibility = controls->getControllersVisibility();
     std::vector<std::string> names;

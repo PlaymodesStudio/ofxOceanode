@@ -1,7 +1,8 @@
 # Layouts
 
-The **Layouts** top menu brings together named **Preset layouts** and reusable
-**Global layouts**. Both scopes use the same docking mechanism.
+The **Layouts** top menu, just after **Window**, brings together named **Preset
+layouts** and reusable **Global layouts**. Every layout stores both the docking
+arrangement and which windows are shown (the Window menu's choices).
 
 ## Preset layouts
 
@@ -52,10 +53,17 @@ docking but does not overwrite the visibility from the last explicit preset save
 ## Global layouts
 
 **Load global layout**, **Save global layout as…**, and **Set default global
-layout** keep reusable arrangements outside any preset. Menus show their names
-without the `.ini` extension. Names cannot contain `/`, `\` or `:`. These
-layouts store docking and window geometry; preset layouts also capture window
-visibility.
+layout** keep reusable arrangements outside any preset. Like preset layouts, a
+global layout stores docking and window geometry together with the Window menu's
+visibility: controllers, Scopes, node windows, Macro canvases and Custom GUIs.
+Menus show layout names without an extension; names cannot contain `/`, `\` or `:`.
+
+The default global layout is applied when Oceanode starts, before any preset is
+loaded, and again by **Presets → New Preset**, so it decides which controllers are
+shown at startup and in every new patch. To choose them,
+arrange and show/hide the windows, choose **Save global layout as…**, then select
+it in **Set default global layout**. Loading a preset afterwards applies that
+preset's own layout and visibility.
 
 Loading a global layout deselects the active preset layout, keeping all saved
 preset snapshots available. To include a global arrangement in the preset, load
@@ -74,7 +82,7 @@ All paths are relative to the data folder. Each JSON file has an integer
 | File | Owner | Contents |
 |---|---|---|
 | `<preset>/layout.json` | Layouts | `current` (`ini`: the ImGui docking text, `view`: visibility from the last preset save, or null), `layouts` (named snapshots, each `{ini, view}`), `active`, `default` |
-| `config/guiLayouts/<name>.ini` | Layouts | One global layout |
+| `config/guiLayouts/<name>.json` | Layouts | One global layout: `{version, ini, view}`; `view` may be null (docking only) |
 | `config/guiLayouts.json` | Layouts | `{version, default}`: the global startup layout |
 | `config/themes/<name>.json` | ThemeManager | One theme: `fontFamily`, `colors`, `oceanodeColors` |
 | `config/themes.json` | ThemeManager | `{version, default}`: the theme loaded at startup |
@@ -94,11 +102,15 @@ apps do not call a load function. Canvas Zoom is not saved.
 - Config is loaded automatically in `setup()`; hosts no longer call `loadConfig()`.
 - The V Sync checkbox shows and saves the real state.
 - The Config section "GUI" is now "Editor".
-- Global layout names are shown without `.ini`.
-- `config/view.json` no longer exists. Startup visibility comes from the preset that loads.
+- Global layouts are `config/guiLayouts/<name>.json` files that also store window
+  visibility; menus show their names without an extension.
+- `config/view.json` no longer exists. Startup visibility comes from the default
+  global layout, then from the preset that loads.
+- The Layouts menu sits after Window.
 - Old files (`ImGuiLayout.ini`, `view.json`, `preset_layouts.json`, `workspaces.json`,
-  `config/themes/defaultTheme`, `defaultLayout` and `fps` in `config.json`) are not read
-  at runtime. Convert a data folder once with:
+  `config/guiLayouts/*.ini`, `config/themes/defaultTheme`, `defaultLayout` and `fps`
+  in `config.json`) are not read at runtime. The migration gives the default global
+  layout the controller visibility of the old `config/view.json` when it is present. Convert a data folder once with:
 
   ```bash
   python3 scripts/migrate_gui_files.py --data <path/to/bin/data>
@@ -122,7 +134,7 @@ no file has two writers.
   node windows serves both the menu and captured views. It reads and writes no
   files.
 - `ofxOceanodeLayouts` owns preset and global layouts: `layout.json`,
-  `config/guiLayouts/`, `config/guiLayouts.json`, the Layouts menu and its dialogs.
+  `config/guiLayouts/*.json`, `config/guiLayouts.json`, the Layouts menu and its dialogs.
   `ofxOceanodePresetLayouts` in the same header is the named-snapshot collection.
   It calls WindowManager to apply or capture docking and visibility. The
   Container requests docking saves through

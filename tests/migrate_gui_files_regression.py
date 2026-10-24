@@ -3,7 +3,8 @@
 
 Covers a preset with all four old files, one with only ImGuiLayout.ini, a
 workspaces.json v1 collection, an already migrated preset, a malformed view.json
-and a config folder with defaultLayout, fps, view.json and defaultTheme. Checks
+and a config folder with defaultLayout, fps, view.json, defaultTheme and two
+global .ini layouts (the default one takes view.json's controller visibility). Checks
 that the dry run changes nothing, --apply writes the exact new JSON and a backup,
 and a second --apply is a no-op.
 """
@@ -66,7 +67,8 @@ def main():
         config = data / "config"
         write(config / "config.json", {"fps": 59.9, "defaultLayout": "init_4.ini", "vsync": True, "legacy": 1})
         write(config / "guiLayouts/init_4.ini", INI)
-        write(config / "view.json", {"Nodes": True})
+        write(config / "guiLayouts/Studio.ini", INI + "\n")
+        write(config / "view.json", {"Nodes": True, "MIDI": False})
         write(config / "themes/defaultTheme", {"theme": "dark"})
         write(config / "themes/dark.json", {"colors": {}})
         write(config / "font/readme.txt", "fonts")
@@ -79,7 +81,8 @@ def main():
         assert "error     Presets/Bank/5--Broken" in dry.stdout, dry.stdout
         assert "skipped   Presets/Bank/4--Done" in dry.stdout and "WARNING old files remain: ImGuiLayout.ini" in dry.stdout
         assert "global view config dropped; per-preset visibility is in layout.json" in dry.stdout
-        assert "Summary: 4 migrated, 1 skipped, 1 error(s)" in dry.stdout, dry.stdout
+        assert "init_4: startup controller visibility from view.json" in dry.stdout, dry.stdout
+        assert "Summary: 5 migrated, 1 skipped, 1 error(s)" in dry.stdout, dry.stdout
 
         applied = run(data, "--apply")
         assert applied.returncode == 1, applied.stdout + applied.stderr
@@ -103,7 +106,10 @@ def main():
         assert load(config / "guiLayouts.json") == {"version": 1, "default": "init_4"}
         assert load(config / "themes.json") == {"version": 1, "default": "dark"}
         assert not (config / "view.json").exists() and not (config / "themes/defaultTheme").exists()
-        assert (config / "guiLayouts/init_4.ini").exists() and (config / "themes/dark.json").exists()
+        assert load(config / "guiLayouts/init_4.json") == {
+            "version": 1, "ini": INI, "view": {"controllers": {"Nodes": True, "MIDI": False}, "windows": {}}}
+        assert load(config / "guiLayouts/Studio.json") == {"version": 1, "ini": INI + "\n", "view": None}
+        assert not list((config / "guiLayouts").glob("*.ini")) and (config / "themes/dark.json").exists()
         assert (config / "font/readme.txt").exists()
         # Every changed or deleted file is backed up beside data/, keeping relative paths.
         backups = list(work.glob("gui_migration_backup_*"))
@@ -112,7 +118,8 @@ def main():
         for relative in ("Presets/Bank/1--Full/ImGuiLayout.ini", "Presets/Bank/1--Full/view.json",
                          "Presets/Bank/1--Full/preset_layouts.json", "Presets/Bank/1--Full/workspaces.json",
                          "Presets/Bank/3--Legacy/workspaces.json", "config/config.json",
-                         "config/view.json", "config/themes/defaultTheme"):
+                         "config/view.json", "config/themes/defaultTheme",
+                         "config/guiLayouts/init_4.ini", "config/guiLayouts/Studio.ini"):
             assert (backup / relative).is_file(), relative
         assert before["data/config/config.json"] == hashlib.sha256((backup / "config/config.json").read_bytes()).hexdigest()
         assert not (backup / "Presets/Bank/4--Done").exists() and not (backup / "Presets/Bank/5--Broken").exists()
