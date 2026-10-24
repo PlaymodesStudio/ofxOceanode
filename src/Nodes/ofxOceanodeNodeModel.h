@@ -65,6 +65,8 @@ public:
     // configuration change, which replaces the node. A node that blends its
     // own saved state names those keys (blended), names saved keys that never
     // affect the sound (ignored), and implements morphCheck/Begin/Apply/End.
+    // Blended keys may include registered parameters: the node owns their
+    // interpolation too, so MacroMixer never writes them a second time.
     struct MorphKeys { std::vector<std::string> blended, ignored; };
     // Interpolate: the default. Switch: jumps half way. Skip: the node drives
     // it (or it is not sound). Structural: a different value replaces the node.

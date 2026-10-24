@@ -322,6 +322,10 @@ bool morphEditable(ofxOceanodeNodeModel& model, ofxOceanodeAbstractParameter& p,
     // the shared Portal service. Writing saved values here would feed them back
     // into their senders and compete with the graph's actual controls.
     if(model.nodeName().rfind("Portal ",0)==0) return false;
+    // A saved key owned by the node's sound morph must never also receive
+    // generic parameter interpolation, even when it has a published port.
+    const auto keys=model.morphKeys();
+    if(std::find(keys.blended.begin(),keys.blended.end(),p.getEscapedName())!=keys.blended.end()) return false;
     const auto hint=model.morphHint(p);
     if(hint==ofxOceanodeNodeModel::MorphHint::Skip || hint==ofxOceanodeNodeModel::MorphHint::Structural) return false;
     // OF reports numeric vectors as non-serializable; the native Oceanode
@@ -701,10 +705,14 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
         const auto& a=before.at(key); const auto& b=after.at(key);
         if(a.at("model")!=b.at("model") || a.at("id")!=b.at("id")) return false;
         auto oldConfig=a.at("settings"), newConfig=b.at("settings");
+        const auto morphKeys=model.morphKeys();
         auto path=prefix; path.push_back(model.nodeName()); path.push_back(std::to_string(model.getNumIdentifier()));
         auto& params=model.getParameterGroup();
         for(int i=0;i<params.size();++i) {
             auto& p=params.get(i);
+            // Retain node-owned registered keys for the saved-state comparison
+            // below. Otherwise a count-only change disappears from the report.
+            if(std::find(morphKeys.blended.begin(),morphKeys.blended.end(),p.getEscapedName())!=morphKeys.blended.end()) continue;
             // Router names and bounds define the Macro's interface. Inspectors
             // and unknown custom-save data also remain compatibility checks.
             if(dynamic_cast<abstractRouter*>(&model) && p.getName()!="Value") continue;
@@ -730,7 +738,6 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
         }
         oldConfig.erase("expanded"); newConfig.erase("expanded");
         // Saved state the node blends itself, and saved keys without sound.
-        const auto morphKeys=model.morphKeys();
         for(const auto& name:morphKeys.ignored) { oldConfig.erase(name); newConfig.erase(name); }
         bool blendedChanged=false;
         for(const auto& name:morphKeys.blended) {
