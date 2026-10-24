@@ -229,9 +229,10 @@ public:
     void setMidiClockSyncPort(const std::string& port);
 
     void setIsListeningMidi(bool b);
-    shared_ptr<ofxOceanodeAbstractMidiBinding> createMidiBinding(ofxOceanodeAbstractParameter &p, bool isPersistent = false, int _id = -1);
+    shared_ptr<ofxOceanodeAbstractMidiBinding> createMidiBinding(ofxOceanodeAbstractParameter &p, bool isPersistent = false, int _id = -1, bool keyboard = false);
     bool removeLastMidiBinding(ofxOceanodeAbstractParameter &p);
-    shared_ptr<ofxOceanodeAbstractMidiBinding> createMidiBindingFromInfo(string module, string parameter, bool isPersistent = false, int _id = -1);
+    void drawMidiKeyboardMenu(ofxOceanodeNodeModel& model);
+    shared_ptr<ofxOceanodeAbstractMidiBinding> createMidiBindingFromInfo(string module, string parameter, bool isPersistent = false, int _id = -1, bool keyboard = false);
     vector<string> getMidiDevices(){return midiInPortList;};
     void addNewMidiMessageListener(ofxMidiListener* listener);
     
