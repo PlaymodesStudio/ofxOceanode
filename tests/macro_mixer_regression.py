@@ -264,6 +264,13 @@ int main(int argc,char** argv) {
         const auto saved=mixer.saveState(); assert(saved.at("macros").size()==2 && saved.at("version")==1);
         assert(saved.at("playback")==mixer.destinationID());
         MacroMixerRuntime restored(parent); assert(restored.restoreState(saved)); restored.update(0); near(restored.value(),.8);
+        // Sources inside the data root are saved relative to it and resolved on load.
+        ofEnableDataPath(); ofSetDataPathRoot(scratch+"/");
+        const auto relative=mixer.saveState();
+        assert(relative.at("macros")[0].at("source")=="a" && relative.at("macros")[1].at("source")=="b");
+        MacroMixerRuntime reloaded(parent); assert(reloaded.restoreState(relative)); reloaded.update(0); near(reloaded.value(),.8);
+        assert(reloaded.macros()[0]->source()==mixer.macros()[0]->source());
+        ofDisableDataPath();
         mixer.update(1010); near(mixer.value(),.8); assert(!mixer.destination() && mixer.origin()!=origin);
         const auto* running=mixer.origin();
         // Router mismatch and direct/nested external output fail without running it.

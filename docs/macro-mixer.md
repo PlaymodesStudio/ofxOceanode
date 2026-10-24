@@ -323,7 +323,10 @@ Save/clipboard stores `MacroMixerState` version 1: router definitions, policies,
 inputs, ordered Macro source references, selection, destination and optional
 `morphPolicies` settings per connection type, both mixer-wide and on each Macro
 entry. Older v1 states default to the type's usual policy (Texture Crossfade) and
-have no per-source policies. Reload creates
+have no per-source policies. Source folders and kept-out node folders inside the
+data folder are saved relative to it (`Presets/BLOOBS_MACAU/12--Bloobs_9`) and
+resolved against the current data folder on load; folders outside it stay
+absolute, and older absolute paths still load. Reload creates
 ports before external cables and starts a fresh native destination instance.
 Resource input addresses are never saved; reconnect them after reload.
 Save during a fade restores its destination. Each activation reads the source

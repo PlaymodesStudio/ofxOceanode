@@ -9,6 +9,23 @@ std::string sourceKey(const std::string& folder) {
     if(folder.empty()) return folder;
     return std::filesystem::weakly_canonical(std::filesystem::absolute(folder)).string();
 }
+// Folders inside the data root are saved relative to it, so presets survive a
+// moved data folder. Sources are canonical, so the canonical root is tried too.
+std::string savedFolder(const std::string& folder) {
+    namespace fs = std::filesystem;
+    auto root = fs::path(ofToDataPath("", true)).lexically_normal();
+    if(!root.has_filename()) root = root.parent_path();
+    if(!root.is_absolute()) return folder;
+    for(const auto& base : {root, fs::weakly_canonical(root)}) {
+        const auto relative = fs::path(folder).lexically_normal().lexically_relative(base);
+        if(!relative.empty() && relative != "." && *relative.begin() != "..") return relative.generic_string();
+    }
+    return folder;
+}
+std::string loadedFolder(const std::string& saved) {
+    if(saved.empty() || std::filesystem::path(saved).is_absolute()) return saved;
+    return sourceKey(ofToDataPath(saved, true));
+}
 MacroMixerMixing::Value inputFromJson(const std::string& type,const ofJson& json) {
     return std::visit([&](const auto& zero)->MacroMixerMixing::Value {
         using T=std::decay_t<decltype(zero)>;
@@ -302,13 +319,13 @@ ofJson MacroMixerRuntime::saveState() const {
         routers.push_back({{"id", r.id}, {"name", r.name}, {"type", r.type}, {"policy",r.policy}, {"options",r.options}, {"direction",r.direction}});
     for(const auto& item:inputValues) inputs[item.first]=MacroMixerMixing::toJson(item.second);
     for(const auto& revision : macros()) {
-        ofJson entry{{"id", revision->id()}, {"name", revision->name()}, {"source", revision->source()}};
+        ofJson entry{{"id", revision->id()}, {"name", revision->name()}, {"source", savedFolder(revision->source())}};
         const auto& own=sourceMorphPolicies(revision->id());
         if(!own.empty()) entry["morphPolicies"]=policiesJson(own);
         entries.push_back(std::move(entry));
     }
     auto keptOutNodes=ofJson::array();
-    for(const auto& node:*keptOut) keptOutNodes.push_back({{"folder",node.first},{"node",node.second}});
+    for(const auto& node:*keptOut) keptOutNodes.push_back({{"folder",savedFolder(node.first)},{"node",node.second}});
     const auto playback = inPlaceTarget ? inPlaceTarget : next ? next->revision : current ? current->revision
         : pending ? pending->revision : nullptr;
     return {{"version", 1}, {"routers", routers}, {"macros", entries}, {"inputs",inputs}, {"morphPolicies",policies},
@@ -368,9 +385,9 @@ bool MacroMixerRuntime::restoreState(const ofJson& saved) {
             auto reference = std::shared_ptr<MacroMixerRevision>(new MacroMixerRevision);
             reference->macroID = entry.at("id").get<std::string>();
             reference->displayName = entry.at("name").get<std::string>();
-            const auto path = entry.at("source").get<std::string>();
+            const auto path = loadedFolder(entry.at("source").get<std::string>());
             require(!reference->macroID.empty() && !reference->displayName.empty(), "Missing Macro ID or name");
-            require(!path.empty() && std::filesystem::path(path).is_absolute(), "Missing or non-absolute source folder");
+            require(!path.empty(), "Missing source folder");
             reference->sourcePath = sourceKey(path);
             reference->interface = contract;
             require(!staged.macro(reference->id()) && !staged.imports.count(reference->source()), "Duplicate saved Macro ID or source");
@@ -390,8 +407,8 @@ bool MacroMixerRuntime::restoreState(const ofJson& saved) {
             const auto& nodes=saved.at("keptOutNodes");
             require(nodes.is_array() && nodes.size()<=4096,"Invalid saved kept-out nodes");
             for(const auto& node:nodes) {
-                const auto folder=node.at("folder").get<std::string>(), key=node.at("node").get<std::string>();
-                require(std::filesystem::path(folder).is_absolute() && !key.empty(),"Invalid saved kept-out node");
+                const auto folder=loadedFolder(node.at("folder").get<std::string>()), key=node.at("node").get<std::string>();
+                require(!folder.empty() && !key.empty(),"Invalid saved kept-out node");
                 keptOutNodes.insert({folder,key});
             }
         }
