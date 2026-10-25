@@ -3,7 +3,14 @@ Help and window menus
 
 Window > Node Pool (Cmd+N on macOS, Ctrl+N elsewhere) opens a floating
 browser with Nodes and Macros tabs. Each tab has its own search and selection,
-a scrollable category list on the left, and a description on the right. Node
+a scrollable category list on the left, and a description on the right.
+Choose All categories or a specific category, then search Keywords (all fields),
+Name, Description, or Parameter names (nodes only). Keywords search names,
+categories, descriptions and parameter hints. Space-separated terms must all
+match, ignoring case. The category and text filters combine; the result count
+shows how many items match. Clear resets both filters and the search scope.
+Each tab keeps its own filters. Macro descriptions are cached until Help >
+Reload Macros refreshes the library. Node
 details show the actual canvas node GUI, including widgets, inlets and outlets,
 scaled to fit the preview area. The preview is read-only. Macro descriptions
 come from the library's description.json. Selecting an item sets up one private

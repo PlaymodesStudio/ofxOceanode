@@ -85,7 +85,12 @@ void ofxOceanodeNodePool::drawTab(bool macro) {
             for(const auto& item : category->macros)
                 entries.push_back({item.first, path.empty() ? "Uncategorized" : path, item.second});
         };
-        collect(ofxOceanodeShared::getMacroDirectoryStructure(), "");
+        const auto tree = ofxOceanodeShared::getMacroDirectoryStructure();
+        if(macroTree.lock() != tree) {
+            macroDescriptions.clear();
+            macroTree = tree;
+        }
+        collect(tree, "");
     } else {
         for(const auto& item : registry.getRegisteredModelsCategoryAssociation())
             entries.push_back({item.first, item.second.empty() ? "Uncategorized" : item.second, ""});
@@ -97,18 +102,61 @@ void ofxOceanodeNodePool::drawTab(bool macro) {
     if(focusRequested) ImGui::SetKeyboardFocusHere();
     ImGui::InputTextWithHint("##search", macro ? "Search macros..." : "Search nodes...", tab.search, sizeof(tab.search));
     const float width = ImGui::GetContentRegionAvail().x;
+    const float clearWidth = ImGui::CalcTextSize("Clear").x + ImGui::GetStyle().FramePadding.x * 2;
+    const float filterWidth = (width - clearWidth - ImGui::GetStyle().ItemSpacing.x * 2) * 0.5f;
+    std::vector<std::string> categories;
+    for(const auto& entry : entries)
+        if(categories.empty() || categories.back() != entry.category) categories.push_back(entry.category);
+    if(!tab.category.empty() && std::find(categories.begin(), categories.end(), tab.category) == categories.end())
+        tab.category.clear();
+    ImGui::SetNextItemWidth(filterWidth);
+    if(ImGui::BeginCombo("##category", tab.category.empty() ? "All categories" : tab.category.c_str())) {
+        if(ImGui::Selectable("All categories", tab.category.empty())) tab.category.clear();
+        for(const auto& category : categories)
+            if(ImGui::Selectable(category.c_str(), category == tab.category)) tab.category = category;
+        ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    const char* scopes[] = {"Keywords (all fields)", "Name", "Description", "Parameter names"};
+    ImGui::SetNextItemWidth(filterWidth);
+    if(ImGui::BeginCombo("##searchIn", scopes[tab.searchIn])) {
+        for(int i = 0; i < (macro ? 3 : 4); ++i)
+            if(ImGui::Selectable(scopes[i], tab.searchIn == i)) tab.searchIn = i;
+        ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    if(ImGui::Button("Clear")) {
+        tab.search[0] = '\0';
+        tab.category.clear();
+        tab.searchIn = 0;
+    }
+    std::vector<const Entry*> filtered;
+    for(const auto& entry : entries) {
+        if(!tab.category.empty() && entry.category != tab.category) continue;
+        std::string searchable;
+        if(tab.search[0]) {
+            if(tab.searchIn == 0 || tab.searchIn == 1) searchable += entry.name + " ";
+            if(tab.searchIn == 0) searchable += entry.category + " ";
+            if(tab.searchIn == 0 || tab.searchIn == 2)
+                searchable += (macro ? descriptionForMacro(entry.path) : descriptionFor(registry, entry.name)) + " ";
+            if(!macro && (tab.searchIn == 0 || tab.searchIn == 3)) {
+                const auto* hint = ofxOceanodeNodeHelpEntry(entry.name);
+                if(hint && hint->contains("parameters"))
+                    for(const auto& parameter : (*hint)["parameters"])
+                        if(parameter.is_string()) searchable += parameter.get<std::string>() + " ";
+            }
+        }
+        if(matches(searchable, tab.search)) filtered.push_back(&entry);
+    }
+    ImGui::TextDisabled("%d / %d %s", static_cast<int>(filtered.size()), static_cast<int>(entries.size()), macro ? "macros" : "nodes");
     const float listWidth = std::min(300.0f, width * 0.36f);
     const Entry* selected = nullptr;
-    for(const auto& entry : entries)
-        if((macro ? entry.path : entry.name) == tab.selected) { selected = &entry; break; }
+    for(const auto* entry : filtered)
+        if((macro ? entry->path : entry->name) == tab.selected) { selected = entry; break; }
     if(ImGui::BeginChild("##categories", ImVec2(listWidth, 0), true)) {
         std::string category;
-        int count = 0;
-        for(const auto& entry : entries) {
-            std::string searchable = entry.name + " " + entry.category;
-            if(!macro) searchable += " " + descriptionFor(registry, entry.name);
-            if(!matches(searchable, tab.search)) continue;
-            ++count;
+        for(const auto* item : filtered) {
+            const auto& entry = *item;
             if(category != entry.category) {
                 category = entry.category;
                 ImGui::Spacing();
@@ -124,7 +172,7 @@ void ofxOceanodeNodePool::drawTab(bool macro) {
             }
             ImGui::PopID();
         }
-        if(count == 0) ImGui::TextWrapped(macro ? "No macros found." : "No nodes found.");
+        if(filtered.empty()) ImGui::TextWrapped("No matches. Change the search or clear the filters.");
     }
     ImGui::EndChild();
     ImGui::SameLine();
@@ -144,21 +192,7 @@ void ofxOceanodeNodePool::drawTab(bool macro) {
             ImGui::TextDisabled("%s", selected->category.c_str());
             ImGui::Spacing();
             std::string description;
-            if(macro) {
-                if(descriptionPath != selected->path) {
-                    descriptionPath = selected->path;
-                    macroDescription.clear();
-                    const auto file = selected->path + "/description.json";
-                    if(ofFile::doesFileExist(file)) {
-                        try {
-                            const auto json = ofLoadJson(file);
-                            if(json.is_object() && json.contains("Description") && json["Description"].is_string())
-                                macroDescription = json["Description"].get<std::string>();
-                        } catch(const std::exception&) {}
-                    }
-                }
-                description = macroDescription;
-            } else description = descriptionFor(registry, selected->name);
+            description = macro ? descriptionForMacro(selected->path) : descriptionFor(registry, selected->name);
             const char* text = description.empty() ? "No description available." : description.c_str();
             const auto space = ImGui::GetContentRegionAvail();
             const float textHeight = ImGui::CalcTextSize(text, nullptr, false, std::max(1.0f, space.x - 16)).y;
@@ -282,4 +316,20 @@ void ofxOceanodeNodePool::drawPreview(const Entry& entry, bool macro) {
             rootCanvas->drawNodePreview(*previewNode);
         ImGui::EndChild();
     }
+}
+
+std::string ofxOceanodeNodePool::descriptionForMacro(const std::string& path) {
+    const auto cached = macroDescriptions.find(path);
+    if(cached != macroDescriptions.end()) return cached->second;
+    std::string description;
+    const auto file = path + "/description.json";
+    if(ofFile::doesFileExist(file)) {
+        try {
+            const auto json = ofLoadJson(file);
+            if(json.is_object() && json.contains("Description") && json["Description"].is_string())
+                description = json["Description"].get<std::string>();
+        } catch(const std::exception&) {}
+    }
+    macroDescriptions[path] = description;
+    return description;
 }

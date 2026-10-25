@@ -15,13 +15,17 @@ private:
     };
     struct Tab {
         char search[256] = {};
-        std::string selected;
+        std::string selected, category;
+        int searchIn = 0; // all fields, name, description, parameter names
     };
     std::shared_ptr<ofxOceanodeContainer> root;
     ofxOceanodeCanvas* rootCanvas;
     bool visible = false, focusRequested = false;
     Tab nodes, macros;
-    std::string error, macroDescription, descriptionPath;
+    std::string error;
+    std::weak_ptr<macroCategory> macroTree;
+    std::map<std::string, std::string> macroDescriptions;
+    std::string descriptionForMacro(const std::string& path);
     std::shared_ptr<ofxOceanodeContainer> previewOwner;
     ofxOceanodeNode* previewNode = nullptr;
     std::string previewKey, previewError;
