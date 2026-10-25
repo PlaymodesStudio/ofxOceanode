@@ -7,6 +7,7 @@
 
 #include "ofxOceanode.h"
 #include "ofxOceanodeTheme.h"
+#include "ofxOceanodeColors.h"
 #include "ofxOceanodeMenu.h"
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeTimeController.h"
@@ -406,6 +407,16 @@ void ofxOceanode::drawMenuBar(){
             }
             ImGui::EndMenu();
         }
+        const float fps = ofGetFrameRate();
+        const std::string fpsText = ofToString(static_cast<int>(fps)) + " fps";
+        const float fpsWidth = ImGui::CalcTextSize(fpsText.c_str()).x;
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+                             std::max(0.0f, ImGui::GetContentRegionAvail().x - fpsWidth));
+        const ImVec4 fpsColor = fps >= 60.0f ? OceanodeColors::FpsGood
+                             : fps > 30.0f ? OceanodeColors::FpsWarning
+                                           : OceanodeColors::FpsBad;
+        ImGui::TextColored(fpsColor, "%s", fpsText.c_str());
+
         ImGui::EndMenuBar();
     }
     ImGui::PopStyleVar(2);

@@ -891,16 +891,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         // CANVAS POSITION
         ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::CanvasInfoText);
         ImGui::Text("[%d,%d]",int(scrolling.x - (ImGui::GetContentRegionAvail().x / (2.0f * zoomLevel))), int( scrolling.y - (ImGui::GetContentRegionAvail().y / (2.0f * zoomLevel)))+8);
-        ImGui::SameLine();
 		ImGui::PopStyleColor();
-		
-		// FPS
-        float fps = ofGetFrameRate();
-        if(fps>=60.0) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::FpsGood);
-        else if(fps>30.0) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::FpsWarning);
-        else ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::FpsBad);
-        ImGui::Text("%d fps",int(fps));
-        ImGui::PopStyleColor();
         
 		// [S]NAP
 		// Push appropriate text color for [S] button based on snap_to_grid state
