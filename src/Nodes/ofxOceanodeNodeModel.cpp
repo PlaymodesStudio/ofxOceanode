@@ -203,6 +203,17 @@ void ofxOceanodeNodeModel::addInspectorSeparator(string name, ofColor color){
     inspectorParameters.add(separator);
 }
 
+void ofxOceanodeNodeModel::addInspectorSeparator(string name, ofColor labelColor, ofColor backgroundColor){
+    ofParameter<std::function<void()>> separator;
+    // Format: "SEPARATOR:|label|r,g,b,a|r,g,b,a", the last being the background.
+    const auto rgba = [](const ofColor& c){
+        return ofToString((int)c.r) + "," + ofToString((int)c.g) + "," + ofToString((int)c.b) + "," + ofToString((int)c.a);
+    };
+    separator.setName("SEPARATOR:|" + name + "|" + rgba(labelColor) + "|" + rgba(backgroundColor));
+    separator.set([](){});
+    inspectorParameters.add(separator);
+}
+
 void ofxOceanodeNodeModel::removeSeparator(string _name)
 {
 	// Build the separator pattern to search for

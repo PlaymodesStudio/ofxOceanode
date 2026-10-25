@@ -134,7 +134,8 @@ def native_production():
     model=(ROOT/'src/Nodes/ofxOceanodeNodeModel.cpp').read_text()
     for signature in ['shared_ptr<ofxOceanodeAbstractParameter> ofxOceanodeNodeModel::addParameter(',
                       'void ofxOceanodeNodeModel::addSeparator(',
-                      'void ofxOceanodeNodeModel::addInspectorSeparator(']:
+                      'void ofxOceanodeNodeModel::addInspectorSeparator(',
+                      'void ofxOceanodeNodeModel::addInspectorSeparator(string name, ofColor labelColor']:
         result+=block(model,signature)+'\n'
     gui=(ROOT/'src/Nodes/ofxOceanodeNodeMacroGui.cpp').read_text()
     result+=block(gui,'void ofxOceanodeNodeMacro::syncParameterGroupToSortOrder()')+'\n'
