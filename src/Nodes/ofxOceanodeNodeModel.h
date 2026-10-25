@@ -244,6 +244,8 @@ public:
 
 	// SEPARATORS FOR THE INSPECTOR GUI
 	void addInspectorSeparator(string name = "", ofColor color = ofColor(200, 200, 200, 255));
+	// Label on a solid bar: labelColor text over an opaque background.
+	void addInspectorSeparator(string name, ofColor labelColor, ofColor backgroundColor);
 	
     template<typename ParameterType>
     ofParameter<ParameterType>& getParameter(string name){

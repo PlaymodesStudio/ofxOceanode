@@ -177,19 +177,27 @@ void ofxOceanodeInspectorController::draw(){
                     vector<string> parts = ofSplitString(uniqueId, "|");
                     string label = parts.size() > 1 ? parts[1] : "";
                     ofColor color(200, 200, 200, 255); // default
+                    const auto parseColor = [](const string& text, ofColor& result){
+                        vector<string> colorParts = ofSplitString(text, ",");
+                        if(colorParts.size() < 4) return false;
+                        result.set(ofToInt(colorParts[0]), ofToInt(colorParts[1]), ofToInt(colorParts[2]), ofToInt(colorParts[3]));
+                        return true;
+                    };
+                    if(parts.size() > 2) parseColor(parts[2], color);
+                    ofColor background;
                     
-                    if(parts.size() > 2){
-                        vector<string> colorParts = ofSplitString(parts[2], ",");
-                        if(colorParts.size() >= 4){
-                            color.r = ofToInt(colorParts[0]);
-                            color.g = ofToInt(colorParts[1]);
-                            color.b = ofToInt(colorParts[2]);
-                            color.a = ofToInt(colorParts[3]);
-                        }
+                    if(parts.size() > 3 && parseColor(parts[3], background)){
+                        // Label on an opaque bar in its own background colour.
+                        const auto& padding = ImGui::GetStyle().FramePadding;
+                        const ImVec2 p = ImGui::GetCursorScreenPos();
+                        const ImVec2 size(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeight() + padding.y * 2);
+                        auto* drawList = ImGui::GetWindowDrawList();
+                        drawList->AddRectFilled(p, ImVec2(p.x + size.x, p.y + size.y), IM_COL32(background.r, background.g, background.b, background.a));
+                        drawList->AddText(ImVec2(p.x + padding.x, p.y + padding.y), IM_COL32(color.r, color.g, color.b, color.a), label.c_str());
+                        ImGui::Dummy(size);
                     }
-                    
                     // Render separator with label and background highlight
-                    if(!label.empty()){
+                    else if(!label.empty()){
                         ImVec2 p = ImGui::GetCursorScreenPos();
                         float w = ImGui::GetContentRegionAvail().x;
                         

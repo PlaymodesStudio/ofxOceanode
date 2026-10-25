@@ -287,6 +287,8 @@ int main(int argc,char** argv) {
         auto json=ofLoadJson(folder+"/Macro_1/Router_f_1.json"); json["Value"]=999.f; ofSaveJson(folder+"/Macro_1/Router_f_1.json",json);
         // Old presets can still contain this now-transient Inspector readout.
         json=ofLoadJson(folder+"/Macro_1/Buffer_f_1.json"); json["Last_Frame_Ms"]=target?"1234":"9876"; ofSaveJson(folder+"/Macro_1/Buffer_f_1.json",json);
+        // A nested Macro's colour is cosmetic and must not stop the live graph being reused.
+        json=ofLoadJson(folder+"/Macro_1.json"); assert(json.contains("Color")); json["Color"]=target?"0, 2, 255, 255":"158, 54, 0, 255"; ofSaveJson(folder+"/Macro_1.json",json);
     };
     saveLive(liveA,false); saveLive(liveB,true);
     {
@@ -628,6 +630,18 @@ int main(int argc,char** argv) {
         // Repeated loading/retirement keeps the common graph and aliases valid.
         r.request(nestedTargets[kind-1],1000,0,true); r.update(1050); assert(r.morphingInPlace()); r.finish(); r.update(1060);
     }
+    // A library Macro's Local Name is unused, so a different saved one keeps the
+    // running Macro; a local Macro's Local Name is its title and still replaces it.
+    for(int kind=1;kind<=2;++kind) {
+        const auto renamed=scratch+"/nested-renamed-"+std::to_string(kind); fs::copy(nestedTargets[kind-1],renamed,fs::copy_options::recursive);
+        auto json=ofLoadJson(renamed+"/Macro_2.json"); assert(json.contains("Local_Name")); json["Local_Name"]="Leftover"; ofSaveJson(renamed+"/Macro_2.json",json);
+        MacroMixerRuntime r(parent); assert(r.importMacro(nestedTargets[kind-1])&&r.importMacro(renamed));
+        r.request(nestedTargets[kind-1],0,0,true); r.update(0);
+        const auto details=r.sourceDetails(r.importedMacro(renamed)->id());
+        const bool replaced=std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"&&d.message.find("Local_Name")!=std::string::npos;});
+        assert(replaced==(kind==1));
+        assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback";}));
+    }
     // Rollback cleans a fully loaded nested graph and all boundary cables.
     {
         std::vector<MacroMixerDiagnostic> errors;
@@ -751,18 +765,26 @@ int main(int argc,char** argv) {
     // Inspector flag persists through presets/clipboard and old sessions default to off.
     {
         auto& m=static_cast<ofxOceanodeMacroMixer&>(parent.createNode(std::make_unique<ofxOceanodeMacroMixer>(),1).getNodeModel());
-        assert(!m.getInspectorParameter<bool>("Morph macros")); m.getInspectorParameter<bool>("Morph macros")=true;
+        assert(m.getParameter<int>("Mode")==0); m.getParameter<int>("Mode")=1;
         MacroMixerContract collision; collision.routers[0].name="Morph macros"; assert(!m.setRouterContract(collision));
+        collision.routers[0].name="Mode"; assert(!m.setRouterContract(collision));
         assert(m.setRouterContract({})&&m.importMacroFolder(a)&&m.importMacroFolder(b));
         assert(m.setMorphConnectionPolicy("Float","switch",{{"threshold",.7}}));
-        m.getParameter<float>("Duration Ms")=0; m.getParameter<void>("Transition").trigger(); parent.update(); assert(m.mixerRuntime()->morphMode());
+        m.getParameter<float>("Duration_ms")=0; m.getParameter<void>("Start!").trigger(); parent.update(); assert(m.mixerRuntime()->morphMode());
         parent.savePreset(scratch+"/session"); parent.clearContainer(); assert(parent.loadPreset(scratch+"/session")); parent.update();
-        auto& loaded=static_cast<ofxOceanodeMacroMixer&>(parent.getDynamicNodes().at("MacroMixer").at(1)->getNodeModel()); assert(loaded.getInspectorParameter<bool>("Morph macros"));
+        auto& loaded=static_cast<ofxOceanodeMacroMixer&>(parent.getDynamicNodes().at("MacroMixer").at(1)->getNodeModel()); assert(loaded.getParameter<int>("Mode")==1);
         assert(loaded.mixerRuntime()->morphPolicies().at("Float").options.at("threshold")==.7);
         parent.saveClipboardModulesAndConnections({parent.getDynamicNodes().at("MacroMixer").at(1).get()},{0,0}); assert(parent.loadClipboardModulesAndConnections({10,10},false)); parent.update();
-        auto& copy=static_cast<ofxOceanodeMacroMixer&>(parent.getDynamicNodes().at("MacroMixer").at(2)->getNodeModel()); assert(copy.getInspectorParameter<bool>("Morph macros"));
+        auto& copy=static_cast<ofxOceanodeMacroMixer&>(parent.getDynamicNodes().at("MacroMixer").at(2)->getNodeModel()); assert(copy.getParameter<int>("Mode")==1);
         assert(copy.mixerRuntime()->origin()->container!=loaded.mixerRuntime()->origin()->container);
-        ofJson old; loaded.presetSave(old); old["MacroMixerState"].erase("morph"); loaded.loadBeforeConnections(old); assert(!loaded.getInspectorParameter<bool>("Morph macros"));
+        ofJson old; loaded.presetSave(old); old["MacroMixerState"].erase("morph"); loaded.loadBeforeConnections(old); assert(loaded.getParameter<int>("Mode")==0);
+        parent.clearContainer();
+        // Older presets saved the Inspector checkbox and "Duration Ms".
+        auto json=ofLoadJson(scratch+"/session/MacroMixer_1.json"); assert(json.contains("Mode")&&json.contains("Duration_ms"));
+        json.erase("Mode"); json.erase("Duration_ms"); json["Morph_macros"]="1"; json["Duration_Ms"]="250"; ofSaveJson(scratch+"/session/MacroMixer_1.json",json);
+        assert(parent.loadPreset(scratch+"/session")); parent.update();
+        auto& legacy=static_cast<ofxOceanodeMacroMixer&>(parent.getDynamicNodes().at("MacroMixer").at(1)->getNodeModel());
+        assert(legacy.getParameter<int>("Mode")==1); near(legacy.getParameter<float>("Duration_ms"),250);
         parent.clearContainer();
     }
     // A node that keeps its sound outside the parameter group blends it on the
@@ -820,24 +842,28 @@ int main(int argc,char** argv) {
         auto& m=static_cast<ofxOceanodeMacroMixer&>(node.getNodeModel());
         assert(m.setRouterContract({})&&m.importMacroFolder(plainNested)&&m.importMacroFolder(nestedTargets[0])&&m.importMacroFolder(scratch+"/policy-config"));
         assert(m.importMacroFolder(scratch+"/policy-router"));
-        m.getInspectorParameter<bool>("Morph macros")=true; m.getParameter<float>("Duration Ms")=0;
-        m.getParameter<void>("Transition").trigger(); parent.update();
+        m.getParameter<int>("Mode")=1; m.getParameter<float>("Duration_ms")=0;
+        m.getParameter<void>("Start!").trigger(); parent.update();
         auto* context=ImGui::CreateContext(); auto& io=ImGui::GetIO(); io.IniFilename=nullptr; io.DisplaySize={1200,2400}; io.DeltaTime=1.f/60;
         unsigned char* pixels; int w,h; io.Fonts->GetTexDataAsRGBA32(&pixels,&w,&h);
         ImGui::NewFrame(); ImGui::SetNextWindowSize({1100,2300}); ImGui::Begin("MacroMixer Source details");
         for(auto& source:m.mixerRuntime()->macros()) {
-            ImGui::PushID(source->id().c_str()); ImGui::GetStateStorage()->SetInt(ImGui::GetID("Source"),1);
-            ImGui::PushID("Source"); for(const char* tree:{"Morph details","##policies"}) ImGui::GetStateStorage()->SetInt(ImGui::GetID(tree),1);
+            ImGui::PushID(source->id().c_str()); ImGui::GetStateStorage()->SetInt(ImGui::GetID("##source"),1);
+            ImGui::PushID("##source"); for(const char* tree:{"Details","##policies"}) ImGui::GetStateStorage()->SetInt(ImGui::GetID(tree),1);
             ImGui::PopID(); ImGui::PopID();
         }
         const auto log=scratch+"/source-ui.txt"; ImGui::LogToFile(5,log.c_str());
         m.getInspectorParameter<std::function<void()>>("Macros").get()(); ImGui::LogFinish();
         ImGui::End(); ImGui::Render(); ImGui::DestroyContext(context);
         const auto text=ofBufferFromFile(log).getText();
-        assert(text.find("Connection mix")!=std::string::npos&&text.find("Morph policies into this source")!=std::string::npos);
-        assert(text.find("Mixer default (Linear)")!=std::string::npos&&text.find("State: Checked")!=std::string::npos);
+        assert(text.find("Connection mix")!=std::string::npos&&text.find("Mix/Morph Policies")!=std::string::npos);
+        assert(text.find("Default (Linear)")!=std::string::npos&&text.find("State:")==std::string::npos);
         assert(text.find("Replaced node")!=std::string::npos&&text.find("Configuration")!=std::string::npos);
         assert(text.find("Graph fallback")!=std::string::npos&&text.find("(Max)")!=std::string::npos);
+        // Status names the worst fallback of a morph into Target.
+        const auto status=[&](int target) { m.getParameter<int>("Target")=target; parent.update(); return m.getParameter<std::string>("Status").get(); };
+        assert(status(2)=="Node fall"&&status(3)=="Macro fall"&&status(0)=="Ok");
+        m.getParameter<int>("Mode")=0; assert(status(3)=="Ok");
         parent.clearContainer();
     }
     assert(triggers==0 && liveGui==0);

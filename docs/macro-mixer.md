@@ -2,9 +2,16 @@
 
 MacroMixer normally runs two ordinary Macro instances and mixes their selected Routers.
 It is registered under **Experimental → MacroMixer**. Declare router names, types
-and Input/Output roles in its Inspector; add Macro source folders; choose Target
-and trigger Transition. Duration Ms, Bi Pow and Finish Transition control a fade.
-Each output has its own type-specific policy and options.
+and Input/Output roles in its Inspector; add Macro source folders; choose Mode
+(Mix or Morph) and Target and press **Start!**. Duration_ms, Bi Pow and **Stop!**
+(finish now) control a fade, and Progress shows it. Each output has its own
+type-specific policy and options.
+
+The node shows Mode, Target, Progress, Duration_ms, Bi Pow, Start!, Stop! and
+Status, then a **Routers** separator above the router ports. The Inspector has
+four sections: **ROUTERS** (the router table with **Load Routers** and **Save
+Routers**), **MIX/MORPH POLICIES** (**Default Mix/Morph policies**), **MACROS**
+(**+ Add Folder**, **Clear Playback** and the sources) and **STATUS**.
 
 A source is the folder containing a saved Macro's `modules.json`,
 `connections.json` and node settings. A library Macro folder or a saved local
@@ -44,7 +51,7 @@ capability on their models.
 ### Keeping blocked nodes out of the graph
 
 Analysis reports every blocked node in the source, including nested Macros. When
-an import, Refresh, Transition (ordinary or Morph macros) or a preset recall
+an import, Refresh, Start! (Mix or Morph) or a preset recall
 stops on blocked nodes, a modal asks about each one in turn, for example:
 ILDA Debugger 3, its Macro folder and the reason. **Keep out of graph** leaves that saved node out
 of this MacroMixer's graphs; **Keep all N out** answers the remaining ones and
@@ -56,18 +63,19 @@ A kept-out node is identified by its canonical folder and saved node key
 (including nested and global Macros and live-morph additions) skip the node and
 every cable to or from it. The source folder is not modified. The choices are
 saved in `MacroMixerState` as `keptOutNodes`; older states have none and ask
-again. Each source's **Source > Kept out** lists its kept-out nodes, including
+again. Each source's **Kept out** lists its kept-out nodes, including
 those in nested Macros; **Restore** includes a node again from the next activation, and you are asked about it again while it still
 blocks the mix. The dialog is drawn by `ofxOceanode` with the other
 application-level dialogs and waits for any other open popup to close first.
 
-## Morph macros
+## Morph mode
 
-Enable **Morph macros** in the Inspector to interpolate graph controls instead
-of mixing the two graphs' router outputs. It defaults
-to off and is saved with the node. The mode is captured when Transition is
-triggered; toggling it during playback affects the next requested transition.
-Duration Ms, Bi Pow, Progress and Finish Transition retain their normal meaning
+Set **Mode** to **Morph** to interpolate graph controls instead of mixing the
+two graphs' router outputs. It defaults to Mix and is saved with the node; older
+presets' Inspector checkbox "Morph macros" and "Duration Ms" load into Mode and
+Duration_ms. The mode is captured when Start! is pressed; changing it during
+playback affects the next requested transition.
+Duration_ms, Bi Pow, Progress and Stop! retain their normal meaning
 (Bi Pow zero uses the existing MacroMixer linear curve).
 
 When node types/connection roles and saved non-control configuration match, the
@@ -97,29 +105,29 @@ Switch, Screen, Add, Multiply, Difference, Wipe, Noise Dissolve and FadeOut.
 Rendering runs only during draw. Internal processing follows native frame order;
 a downstream draw-driven node can observe the mixed image on the following frame.
 
-Each source has a header bar in the node color (stronger while it runs) with
-its badges. **Macros > Source** has the same layout for every source. Paths
-start at the data folder; hover for the full path.
+Each source has a collapsible header in the node color (stronger while it
+runs) with its index, name and badges in green, and refresh (circular arrow),
+move up/down and **-** (remove) on the right. Choose the source with Target. Expanded, every source has the same layout.
+Paths start at the data folder; hover for the full path.
 
-- The source folder.
-- **State**: *Checked* (read since it was added or refreshed), *Not checked yet*
-  (restored from a preset or clipboard; Refresh or Transition reads it) or
-  *Missing*.
-- **Kept out**: the source's kept-out nodes, each with **Restore** (only when there are any).
-- **Morph details** (Morph macros on): the morph from the running graph into this
-  source, as a *preview* or the *last transition* once one was requested. It lists
+- The source folder, followed by its problem in orange when it is missing or
+  failed its last check.
+- **Mix/Morph Policies**: the policies into this source, described below.
+- **Details** (Mode Morph): the morph from the running graph into this
+  source, as a *preview* or the *last transition* once one was requested. Its
+  title is orange when a node is replaced and red when the graph falls back. It lists
   added/removed/replaced nodes, the receiving node/parameter and both endpoints of every
   changed connection with its policy, and every fallback reason, including mixes
   skipped because another incompatibility forced fallback.
-- **Morph policies into this source**, described below.
+- **Kept out**: the source's kept-out nodes, each with **Restore** (only when there are any).
 
 Previewing does not construct nodes or alter the running graph. Refresh rereads
 edited source files.
 
 Changed connections blend with a policy per signal type, with the same option
-controls as the Routers section. **Macros > Morph policies (mixer default)** sets
-the default for every source. Each source's **Morph policies into this source**
-can override it per type for transitions *into* that source; *Mixer default*
+controls as the Routers section. **Default Mix/Morph policies** sets
+the default for every source. Each source's **Mix/Morph Policies**
+can override it per type for transitions *into* that source; *Default*
 returns a type to the default. A transition A → B uses B's policies, so every
 transition into B behaves the same and B → A uses A's. Without a configured
 policy, textures use Crossfade and Boolean/dropdown controls Switch. These
@@ -151,9 +159,15 @@ instance keeps going and retires at completion; the saved one is loaded
 natively next to it with its incoming cables, and every cable leaving it
 blends where it arrives with the source's **Morph policies into this source**
 for that type (a ScBus cable through a private SC bridge). The rest of the
-graph keeps morphing in place. Morph details lists it as **Replaced node**
+graph keeps morphing in place. Details lists it as **Replaced node**
 with the differing setting. If a blend is impossible (for example a cable
 into a trigger or Portal), the whole graph falls back as described next.
+
+A Macro's **Color** is cosmetic: a different saved colour in a nested Macro is
+not a configuration change and never makes a morph replace the Macro or fall
+back. The running Macro keeps its colour. A library Macro takes its title
+from the library, so its saved **Local Name** is ignored the same way; a local
+Macro's Local Name is its title and is still compared.
 
 ### Nodes that blend their own saved state
 
@@ -170,14 +184,14 @@ block (SuperCollider nodes such as SC polycombBox). They can opt in through
   or channel count).
 - `morphCheck(target, reason)`: whether the node can blend into those saved
   settings, without side effects. A refusal replaces just that node, with the
-  reason in Morph details.
+  reason in Details.
 - `morphBegin(target)` captures the node's current state as the start;
   `morphApply(t, switched)` runs every frame with the eased progress and
   `switched` from half way; `morphEnd(completed)` either keeps the target or,
   on cancellation, restores the start.
 
 MacroMixer owns the timing (Duration, Bi Pow, Finish, cancellation); the node
-owns how its values blend. Morph details lists such a node as **Node morph**.
+owns how its values blend. Details lists such a node as **Node morph**.
 
 SC polycombBox blends its `polyComb*` block (every window control, the
 modulation matrix, LFO/envelope/Ext counts and modulated controls' bases)
@@ -194,8 +208,8 @@ values and morph to their saved values, while every selected Output router
 crossfades from the running graph to the destination with its own **Mix
 policy** (the Routers table), over the same Duration and Bi Pow. Fatlines fade
 by opacity, ScBus outputs mix through the private SC bridge, textures use their
-texture policy. Status shows the specific reason and Mixer Status shows
-`Xfade`. The current implementation falls back for:
+texture policy. The Inspector STATUS shows the specific reason and the Status
+output shows `Macro fall`. The current implementation falls back for:
 
 - Changed Router or Portal settings (names, bounds, Inspector settings). These
   publish the Macro interface or a shared service and cannot run twice.
@@ -289,7 +303,7 @@ and can be rebuilt with `synthdefs/macromixer/build.scd`.
 
 ## Persistence and editing
 
-The **Load** and **Save** buttons below Routers open file dialogs in
+The **Load Routers** and **Save Routers** buttons below the router table open file dialogs in
 `data/routergroups` (created if needed). Router group JSON files store the ordered
 router IDs, names, types, Input/Output roles, mixing policies and policy options.
 They do not include Macro folders, playback or current input values. Load replaces
@@ -299,25 +313,23 @@ invalid or incompatible files leave the current list intact.
 
 Loading a preset or pasting a MacroMixer reads every source folder (analysis
 only, no nodes are created) before playback starts. A source that fails shows
-its reason as its **State** in orange; it never stops the others or opens the blocked-node
-dialog, which still appears when a Transition activates that source.
+its reason in orange under its folder; it never stops the others or opens the blocked-node
+dialog, which still appears when Start! activates that source.
 
-The **Mixer Status** text output summarises the node in about 28 characters,
-for a narrow display: what runs, then how many sources passed their last check.
+The **Status** text output is one short, coloured word. During a morph it
+describes that morph; otherwise, in Morph mode, the next morph into Target.
 
-| Mixer Status | Meaning |
-|---|---|
-| `No sources` | No Macro folders added |
-| `Idle \| 5/5 ok` | Nothing running |
-| `Run 3 Bloobs_9 \| 5/5 ok` | Source 3 is running (long names end in `~`) |
-| `Mix 3>4 62% \| 5/5 ok` | Ordinary transition from source 3 to 4 |
-| `Morph 3>4 62% \| …` | Morph on the running graph |
-| `Xfade 3>4 62% \| …` | Morph fell back: both graphs run and outputs crossfade |
-| `Run 3 Bloobs_9 \| 4/5 ok` | One source failed its check; see its State |
-| `Blocked, see dialog \| …` | A blocked node needs an answer |
-| `Error, see Status \| …` | The inspector Status has the details |
+| Status | Colour | Meaning |
+|---|---|---|
+| `Ok` | green | Nothing falls back, or Mode is Mix |
+| `Node fall` | orange | A node is replaced (see the source's Details) |
+| `Macro fall` | red | The whole graph falls back to the output crossfade |
+| `Error` / `Blocked` | red | An error, a failing Target, or a blocked node waiting in the dialog |
+| `No sources` | grey | No Macro folders added |
 
-Indices match the inspector's source list.
+The Inspector **STATUS** section starts with the same word, then the full text:
+what runs, the destination and queue, how many sources passed their last check,
+and any error.
 
 Save/clipboard stores `MacroMixerState` version 1: router definitions, policies,
 inputs, ordered Macro source references, selection, destination and optional
@@ -342,7 +354,7 @@ destination or is queued automatically clears playback before removing its list
 entry. Other imported Macros and their source folders remain available.
 
 Top-level source instances are loaded as local in-memory Macros. They do not
-subscribe to global library replacements; use Refresh/Transition to apply edits.
+subscribe to global library replacements; use Refresh/Start! to apply edits.
 Nested global Macros retain ordinary library behavior. Native loading and resets
 retain ordinary Macro transport semantics. Shared-service behavior and the cost
 of running both Macros must be considered when designing a source.

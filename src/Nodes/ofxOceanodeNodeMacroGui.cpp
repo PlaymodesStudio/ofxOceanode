@@ -201,7 +201,7 @@ void ofxOceanodeNodeMacro::renderMacroLoadDialog() {
 	if(!ImGui::BeginPopupModal("Load Macro Contents", nullptr, ImGuiWindowFlags_NoResize)) return;
 
 	bool activateSelection = false;
-	ImGui::BeginChild("Sources", ImVec2(0, -2.f * ImGui::GetFrameHeightWithSpacing()), false);
+	ImGui::BeginChild("Sources", ImVec2(0, -3.f * ImGui::GetFrameHeightWithSpacing()), false);
 	{
 		MacroDialogAppearance::Rows rows;
 		auto selectSource = [&](const string& path, const string& name, bool isPreset){
@@ -310,6 +310,13 @@ void ofxOceanodeNodeMacro::renderMacroLoadDialog() {
 	ImGui::Separator();
 	if(guiState.loadSelectionName.empty()) ImGui::TextDisabled("Select a Preset or Macro");
 	else ImGui::TextColored(OceanodeColors::SelectedNodeText, "%s", guiState.loadSelectionName.c_str());
+	ImGui::Checkbox("Reuse connections", &guiState.loadReuseConnections);
+	if(ImGui::IsItemHovered())
+		ImGui::SetTooltip("Reconnect this node's cables to the parameters with the same names.");
+	ImGui::SameLine();
+	ImGui::Checkbox("Keep values", &guiState.loadKeepValues);
+	if(ImGui::IsItemHovered())
+		ImGui::SetTooltip("Keep this node's input values on the parameters with the same names and types.");
 	ImGui::BeginDisabled(guiState.loadSelectionPath.empty());
 	const bool load = ImGui::Button("Load");
 	ImGui::EndDisabled();

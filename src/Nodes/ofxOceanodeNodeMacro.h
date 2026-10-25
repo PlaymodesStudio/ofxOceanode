@@ -16,6 +16,7 @@
 #include "ofxOceanode.h"
 #include "ofxOceanodeShared.h"
 #include "router.h"
+#include <optional>
 
 #include "MacroRouterSortOrder.h"
 #include "MacroRouterValueDispatch.h"
@@ -54,6 +55,9 @@ struct MacroGuiState {
 	bool loadSelectionIsPreset = false;
 	std::string loadSelectionPath;
 	std::string loadSelectionName;
+	// Carry the old contents' cables and input values over to the loaded ones.
+	bool loadReuseConnections = true;
+	bool loadKeepValues = false;
 	bool openSavePopup = false;
 	bool closeSavePopup = false;
 	bool saveToLibrary = false;
@@ -88,6 +92,13 @@ class ofxOceanodeNodeMacro : public ofxOceanodeNodeModel{
 public:
 	ofxOceanodeNodeMacro();
 	~ofxOceanodeNodeMacro();
+	// The node colour is cosmetic: a different saved colour must not stop a
+	// MacroMixer morph from reusing the running Macro. A library Macro's title
+	// comes from the library, so its Local Name is unused and cosmetic too.
+	MorphKeys morphKeys() const override {
+		if(presetManager.isLocal()) return {{}, {"Color"}};
+		return {{}, {"Color", "Local_Name"}};
+	}
 	bool drawNodeParameter(ofxOceanodeAbstractParameter& parameter, float labelWidth, float widgetWidth) override;
 	std::string getNodeTitleSuffix() const override {
 		return presetManager.isLocal() ? localName.get() : presetManager.getCurrentMacro();
@@ -232,6 +243,23 @@ private:
 	// Per-instance input router values, kept when a global definition reloads.
 	std::map<std::string, RouterSnapshot> captureInputRouterValues();
 	void restoreInputRouterValues(const std::map<std::string, RouterSnapshot>& values);
+	// What a Load from the dialog keeps from the old contents, matched by pin
+	// name. Captured when the load is requested, applied once it has loaded.
+	struct LoadCarryOver {
+		struct Cable { std::string sourceNode, sourceParameter, sinkNode, sinkParameter; };
+		std::string path;
+		bool reuseConnections = false;
+		bool keepValues = false;
+		std::vector<Cable> cables;
+		std::map<std::string, RouterSnapshot> values;
+		// Removed router pins keep their outer cables until applied.
+		std::vector<std::shared_ptr<ofxOceanodeAbstractParameter>> pins;
+	};
+	std::optional<LoadCarryOver> pendingLoadCarryOver;
+	void captureLoadCarryOver(const std::string& path);
+	// Empties the contents before a dialog load, so no router keeps an old pin.
+	void clearContentsForLoad(const std::string& path);
+	void applyLoadCarryOver(const std::string& path);
 	void updateMacroDirectoryStructure();
 	
 	// ─── Initialization helpers (called from setup) ───────────────────────
