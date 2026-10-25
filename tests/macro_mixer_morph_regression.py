@@ -287,6 +287,8 @@ int main(int argc,char** argv) {
         auto json=ofLoadJson(folder+"/Macro_1/Router_f_1.json"); json["Value"]=999.f; ofSaveJson(folder+"/Macro_1/Router_f_1.json",json);
         // Old presets can still contain this now-transient Inspector readout.
         json=ofLoadJson(folder+"/Macro_1/Buffer_f_1.json"); json["Last_Frame_Ms"]=target?"1234":"9876"; ofSaveJson(folder+"/Macro_1/Buffer_f_1.json",json);
+        // A nested Macro's colour is cosmetic and must not stop the live graph being reused.
+        json=ofLoadJson(folder+"/Macro_1.json"); assert(json.contains("Color")); json["Color"]=target?"0, 2, 255, 255":"158, 54, 0, 255"; ofSaveJson(folder+"/Macro_1.json",json);
     };
     saveLive(liveA,false); saveLive(liveB,true);
     {

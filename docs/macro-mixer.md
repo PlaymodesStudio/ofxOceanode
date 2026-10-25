@@ -155,6 +155,10 @@ graph keeps morphing in place. Morph details lists it as **Replaced node**
 with the differing setting. If a blend is impossible (for example a cable
 into a trigger or Portal), the whole graph falls back as described next.
 
+A Macro's **Color** is cosmetic: a different saved colour in a nested Macro is
+not a configuration change and never makes a morph replace the Macro or fall
+back. The running Macro keeps its colour.
+
 ### Nodes that blend their own saved state
 
 Many nodes keep their sound outside the parameter group, in their own saved

@@ -88,6 +88,9 @@ class ofxOceanodeNodeMacro : public ofxOceanodeNodeModel{
 public:
 	ofxOceanodeNodeMacro();
 	~ofxOceanodeNodeMacro();
+	// The node colour is cosmetic: a different saved colour must not stop a
+	// MacroMixer morph from reusing the running Macro.
+	MorphKeys morphKeys() const override { return {{}, {"Color"}}; }
 	bool drawNodeParameter(ofxOceanodeAbstractParameter& parameter, float labelWidth, float widgetWidth) override;
 	std::string getNodeTitleSuffix() const override {
 		return presetManager.isLocal() ? localName.get() : presetManager.getCurrentMacro();
