@@ -1,6 +1,19 @@
 Help and window menus
 ====================
 
+Window > Node Pool (Cmd+N on macOS, Ctrl+N elsewhere) opens a floating
+browser with Nodes and Macros tabs. Each tab has its own search and selection,
+a scrollable category list on the left, and a description on the right. Node
+details include a parameter preview when catalog hints are available; these
+hints do not claim live inlet/outlet directions. Macro descriptions come from
+the library's description.json. Browsing never constructs or runs a node.
+Add creates the selected item in the active canvas (including macro canvases),
+selects it and brings it into view. The destination is shown above Add. Repeated
+adds are offset so their headers remain reachable, and grid snapping is honored.
+Adding participates in canvas undo/redo. The pool stays open for further adds;
+close it with its title-bar close button. It is a utility dialog, excluded from
+saved layout visibility like Help and Theme Editor.
+
 Help > Search nodes opens the dockable node reference. Space-separated keywords
 must all match, case insensitively, across a node's name, category, description
 and parameter hints. Only models registered in the running application appear.

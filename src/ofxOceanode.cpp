@@ -14,6 +14,7 @@
 #include "ofxOceanodeClipboard.h"
 #include "ofxOceanodeWindowManager.h"
 #include "ofxOceanodeHelp.h"
+#include "ofxOceanodeNodePool.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeMacroMixer.h"
 #include "ofxOceanodeLayouts.h"
@@ -78,6 +79,7 @@ void ofxOceanode::setup(){
     //controls = make_unique<ofxOceanodeControls>(container);
     controls = make_unique<ofxOceanodeControls>(container,&canvas, oscReceiverPort);
     help = make_unique<ofxOceanodeHelp>(container);
+    nodePool = make_unique<ofxOceanodeNodePool>(container, &canvas);
     //        timelines.emplace_back("Phasor_1/Beats_Div");
     //        timelines.emplace_back("Oscillator_1/Pow");
     //        timelines.emplace_back("Indexer_1/NumWaves");
@@ -152,6 +154,7 @@ void ofxOceanode::draw(){
     oceanodePresetSave::CleanupReview::instance().draw();
     drawUnusedNodesWindow();
     help->draw();
+    nodePool->draw();
 
     if(openQuickTips){
         ImGui::OpenPopup("Here are some tips:");
@@ -370,6 +373,8 @@ void ofxOceanode::drawMenuBar(){
 
         if(beginTopLevelMenu("Window"))
         {
+            nodePool->drawMenu();
+            ImGui::Separator();
             windows->drawWindowMenu();
             ImGui::EndMenu();
         }
