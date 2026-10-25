@@ -115,6 +115,7 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 			ofLogWarning("Macro") << "Cannot load selected macro: " << targetPath;
 			presetManager.clearNextPresetPath();
 			pendingMacroReferenceUserEdited = false;
+			pendingLoadCarryOver.reset();
 			return;
 		}
 		// Clear snapshots when changing presets to avoid data persistence
@@ -135,6 +136,7 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 		}
 
 		//if(clearContainerOnLoad) container->clearContainer();
+		clearContentsForLoad(targetPath);
 		presetManager.setInnerPresetLoadingPath(targetPath);
 		const bool loaded = container->loadPreset(targetPath);
 		presetManager.setInnerPresetLoadingPath("");
@@ -145,6 +147,7 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 				presetManager.clearNextPresetPath();
 				pendingMacroReferenceUserEdited = false;
 			}
+			pendingLoadCarryOver.reset();
 			return;
 		}
 
@@ -164,6 +167,7 @@ void ofxOceanodeNodeMacro::update(ofEventArgs &a){
 
 		loadGlobalDescription(targetPath);
 		isLoadingPreset = false;
+		applyLoadCarryOver(targetPath);
 	}
 	if(active){
 		container->update();
@@ -1025,13 +1029,108 @@ bool ofxOceanodeNodeMacro::deleteLibraryMacro(const string& path){
 }
 
 void ofxOceanodeNodeMacro::requestMacroLoad(const string& path, bool isPreset){
+	captureLoadCarryOver(path);
 	if(isPreset){
 		pendingGuiAction = [this, path](){
-			if(!importPresetContents(path)) guiState.saveError = "Could not import preset.";
+			if(ofFile::doesFileExist(path + "/modules.json")) clearContentsForLoad(path);
+			if(importPresetContents(path)) applyLoadCarryOver(path);
+			else {
+				pendingLoadCarryOver.reset();
+				guiState.saveError = "Could not import preset.";
+			}
 		};
 	}else{
 		presetManager.setNextPresetPath(path);
 		pendingMacroReferenceUserEdited = true;
+	}
+}
+
+void ofxOceanodeNodeMacro::captureLoadCarryOver(const string& path){
+	LoadCarryOver carry;
+	carry.path = path;
+	carry.reuseConnections = guiState.loadReuseConnections;
+	carry.keepValues = guiState.loadKeepValues;
+	if(carry.keepValues) carry.values = captureInputRouterValues();
+	std::set<ofxOceanodeAbstractConnection*> seen;
+	for(auto& rawParameter : getParameterGroup()){
+		auto pin = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(rawParameter);
+		if(pin == nullptr) continue;
+		carry.pins.push_back(pin);
+		if(!carry.reuseConnections) continue;
+		auto connections = pin->getOutConnections();
+		connections.insert(connections.end(), pin->getInConnections().begin(), pin->getInConnections().end());
+		for(auto* connection : connections){
+			if(!seen.insert(connection).second) continue;
+			auto& source = connection->getSourceParameter();
+			auto& sink = connection->getSinkParameter();
+			carry.cables.push_back({source.getGroupHierarchyNames()[0], source.getName(),
+			                        sink.getGroupHierarchyNames()[0], sink.getName()});
+		}
+	}
+	pendingLoadCarryOver = std::move(carry);
+}
+
+void ofxOceanodeNodeMacro::clearContentsForLoad(const string& path){
+	// Kept routers would be renamed one by one, and a name another kept router
+	// still uses is refused. Starting empty gives every pin its saved name.
+	if(pendingLoadCarryOver && pendingLoadCarryOver->path == path) container->clearContainer();
+}
+
+void ofxOceanodeNodeMacro::applyLoadCarryOver(const string& path){
+	if(!pendingLoadCarryOver) return;
+	const LoadCarryOver carry = std::move(*pendingLoadCarryOver);
+	pendingLoadCarryOver.reset();
+	if(carry.path != path) return;
+	// Removed routers stay in the router list until it is rebuilt.
+	routerManager.updateAllConnections(container.get());
+	// Values first, so reconnected inputs end on their upstream value.
+	if(carry.keepValues) restoreInputRouterValues(carry.values);
+	if(parentContainer == nullptr) return;
+
+	// Drop the old cables, except those that still match by pin name when
+	// connections are reused, then connect the rest by name.
+	auto sameCable = [](const LoadCarryOver::Cable& a, const LoadCarryOver::Cable& b){
+		return a.sourceNode == b.sourceNode && a.sourceParameter == b.sourceParameter &&
+		       a.sinkNode == b.sinkNode && a.sinkParameter == b.sinkParameter;
+	};
+	std::vector<LoadCarryOver::Cable> missing;
+	if(carry.reuseConnections) missing = carry.cables;
+	std::set<ofxOceanodeAbstractParameter*> livePins, oldPins;
+	std::set<ofxOceanodeAbstractConnection*> current;
+	auto collect = [&](ofxOceanodeAbstractParameter& pin){
+		for(auto* connection : pin.getOutConnections()) current.insert(connection);
+		for(auto* connection : pin.getInConnections()) current.insert(connection);
+	};
+	for(auto& rawParameter : getParameterGroup()){
+		auto pin = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(rawParameter);
+		if(pin == nullptr) continue;
+		livePins.insert(pin.get());
+		collect(*pin);
+	}
+	for(auto& pin : carry.pins){
+		oldPins.insert(pin.get());
+		collect(*pin);
+	}
+	auto isRemovedPin = [&](ofxOceanodeAbstractParameter& parameter){
+		return oldPins.count(&parameter) != 0 && livePins.count(&parameter) == 0;
+	};
+	for(auto* connection : current){
+		auto& source = connection->getSourceParameter();
+		auto& sink = connection->getSinkParameter();
+		const LoadCarryOver::Cable cable{source.getGroupHierarchyNames()[0], source.getName(),
+		                                 sink.getGroupHierarchyNames()[0], sink.getName()};
+		auto match = std::find_if(missing.begin(), missing.end(), [&](const LoadCarryOver::Cable& old){ return sameCable(old, cable); });
+		if(match == missing.end() || isRemovedPin(source) || isRemovedPin(sink)) connection->deleteSelf();
+		else missing.erase(match);
+	}
+	const auto& nodes = parentContainer->getParameterGroupNodesMap();
+	for(const auto& cable : missing){
+		// A sink that already took another cable keeps it, as when connecting by hand.
+		auto sinkNode = nodes.find(cable.sinkNode);
+		if(sinkNode == nodes.end() || !sinkNode->second->getParameters().contains(cable.sinkParameter)) continue;
+		auto& sink = static_cast<ofxOceanodeAbstractParameter&>(sinkNode->second->getParameters().get(cable.sinkParameter));
+		if(sink.hasInConnection() && !sink.allowsMultipleInputs()) continue;
+		parentContainer->createConnectionFromInfo(cable.sourceNode, cable.sourceParameter, cable.sinkNode, cable.sinkParameter);
 	}
 }
 
