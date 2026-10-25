@@ -334,9 +334,9 @@ int main(int argc,char** argv) {
     {
         // Real node persistence, external ScBus cables and independent clipboard copies.
         auto& n=parent.createNode(std::make_unique<ofxOceanodeMacroMixer>(),1);auto& mix=static_cast<ofxOceanodeMacroMixer&>(n.getNodeModel());
-        c.routers[0].policy="equal_power";assert(mix.setRouterContract(c));assert(mix.importMacroFolder(a));mix.getParameter<float>("Duration Ms")=0;
+        c.routers[0].policy="equal_power";assert(mix.setRouterContract(c));assert(mix.importMacroFolder(a));mix.getParameter<float>("Duration_ms")=0;
         auto& output=parent.createNode(registry->create("SC Output"),1);assert(parent.createConnectionFromInfo("MacroMixer_1","Audio","SC_Output_1","In"));
-        mix.getParameter<void>("Transition").trigger();parent.update();recompute(m1,s1);parent.update();
+        mix.getParameter<void>("Start!").trigger();parent.update();recompute(m1,s1);parent.update();
         const auto folder=scratch+"/saved";n.savePreset(folder);const auto original=mix.getParameter<nodePort>("Audio").get().getNodeRef();assert(original);
         parent.saveClipboardModulesAndConnections({&n,&output},{0,0});assert(parent.loadClipboardModulesAndConnections({40,40},false));parent.update();recompute(m1,s1);parent.update();
         auto& clone=static_cast<ofxOceanodeMacroMixer&>(parent.getDynamicNodes().at("MacroMixer").at(2)->getNodeModel());
@@ -354,11 +354,11 @@ int main(int argc,char** argv) {
         auto& n=parent.createNode(std::make_unique<ofxOceanodeNodeMacro>(),1);
         auto& macro=static_cast<ofxOceanodeNodeMacro&>(n.getNodeModel());auto child=macro.getContainer();
         auto& mix=static_cast<ofxOceanodeMacroMixer&>(child->createNode(std::make_unique<ofxOceanodeMacroMixer>(),1).getNodeModel());
-        assert(mix.setRouterContract(c)&&mix.importMacroFolder(a));mix.getParameter<float>("Duration Ms")=0;
+        assert(mix.setRouterContract(c)&&mix.importMacroFolder(a));mix.getParameter<float>("Duration_ms")=0;
         auto& router=child->createNode(registry->create("Router ScBus"),1).getNodeModel();router.getParameter<std::string>("Name")="Mixed";
         assert(child->createConnectionFromInfo("MacroMixer_1","Audio","Router_ScBus_1","Value"));
         parent.createNode(registry->create("SC Output"),1);assert(parent.createConnectionFromInfo("Macro_1","Mixed","SC_Output_1","In"));
-        mix.getParameter<void>("Transition").trigger();parent.update();recompute(m1,s1);parent.update();
+        mix.getParameter<void>("Start!").trigger();parent.update();recompute(m1,s1);parent.update();
         auto* original=macro.getParameter<nodePort>("Mixed").get().getNodeRef();assert(original&&original->getLastSynthID(&s1)>0);
         parent.saveClipboardModulesAndConnections({&n,parent.getDynamicNodes().at("SC Output").at(1).get()},{0,0});
         assert(parent.loadClipboardModulesAndConnections({30,30},false));parent.update();recompute(m1,s1);parent.update();

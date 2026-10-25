@@ -127,7 +127,7 @@ int main(int argc,char** argv) {
         auto& n=parent.createNode(std::make_unique<ofxOceanodeMacroMixer>(),1); auto& mix=static_cast<ofxOceanodeMacroMixer&>(n.getNodeModel()); assert(mix.setRouterContract(contract));
         auto& sink=parent.createNode(registry->create("Router v_Fatline"),9);
         assert(parent.createConnectionFromInfo("MacroMixer_1","Lines","Router_v_Fatline_9","Value")); assert(mix.importMacroFolder(a));
-        mix.getParameter<float>("Duration Ms")=0; mix.getParameter<void>("Transition").trigger(); parent.update();
+        mix.getParameter<float>("Duration_ms")=0; mix.getParameter<void>("Start!").trigger(); parent.update();
         auto baseline=sink.getNodeModel().getParameter<Lines>("Value").get(); assert(baseline.size()==1);
         const auto folder=scratch+"/saved"; n.savePreset(folder);
         parent.saveClipboardModulesAndConnections({&n,&sink},{0,0}); assert(parent.loadClipboardModulesAndConnections({40,40},false)); parent.update();
@@ -142,8 +142,8 @@ int main(int argc,char** argv) {
         assert(fed.setRouterContract(inputs)); auto& scalar=parent.createNode(registry->create("Router Fatline"),8).getNodeModel();
         scalar.getParameter<ofxFatLine>("Value")=baseline[0];
         assert(parent.createConnectionFromInfo("Router_Fatline_8","Value","MacroMixer_1","Feed"));
-        assert(fed.importMacroFolder(scratch+"/feed")); fed.getParameter<float>("Duration Ms")=0;
-        fed.getParameter<void>("Transition").trigger(); parent.update(); assert(fed.getParameter<Lines>("Lines").get().size()==1);
+        assert(fed.importMacroFolder(scratch+"/feed")); fed.getParameter<float>("Duration_ms")=0;
+        fed.getParameter<void>("Start!").trigger(); parent.update(); assert(fed.getParameter<Lines>("Lines").get().size()==1);
         opacity(fed.getParameter<Lines>("Lines").get()[0],baseline[0],1); parent.clearContainer();
     }
     {
@@ -151,7 +151,7 @@ int main(int argc,char** argv) {
         auto& n=child->createNode(std::make_unique<ofxOceanodeMacroMixer>(),1); auto& mix=static_cast<ofxOceanodeMacroMixer&>(n.getNodeModel()); assert(mix.setRouterContract(contract));
         auto& route=child->createNode(registry->create("Router v_Fatline"),1).getNodeModel(); route.getParameter<std::string>("Name")="MixedLines";
         assert(child->createConnectionFromInfo("MacroMixer_1","Lines","Router_v_Fatline_1","Value")); assert(mix.importMacroFolder(a));
-        mix.getParameter<float>("Duration Ms")=0; mix.getParameter<void>("Transition").trigger(); parent.update(); assert(macro.getParameter<Lines>("MixedLines").get().size()==1);
+        mix.getParameter<float>("Duration_ms")=0; mix.getParameter<void>("Start!").trigger(); parent.update(); assert(macro.getParameter<Lines>("MixedLines").get().size()==1);
         const auto folder=scratch+"/macro"; parent.savePreset(folder); child.reset(); parent.clearContainer(); assert(parent.loadPreset(folder)); parent.update();
         auto* original=parent.getDynamicNodes().at("Macro").at(1).get(); parent.saveClipboardModulesAndConnections({original},{0,0}); assert(parent.loadClipboardModulesAndConnections({40,40},false)); parent.update();
         auto& copy=static_cast<ofxOceanodeNodeMacro&>(parent.getDynamicNodes().at("Macro").at(2)->getNodeModel());

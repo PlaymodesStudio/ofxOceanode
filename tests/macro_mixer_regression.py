@@ -466,7 +466,7 @@ int main(int argc,char** argv) {
         auto& m=static_cast<ofxOceanodeMacroMixer&>(parent.createNode(std::make_unique<ofxOceanodeMacroMixer>(),1).getNodeModel());
         MacroMixerContract c; c.routers.push_back({"input","Unselected","Float","",ofJson::object(),"Input"});
         assert(m.setRouterContract(c) && m.importMacroFolder(a));
-        m.getParameter<float>("Duration Ms")=0; m.getParameter<void>("Transition").trigger(); parent.update();
+        m.getParameter<float>("Duration_ms")=0; m.getParameter<void>("Start!").trigger(); parent.update();
         auto& source=floating(parent,7); auto& sink=floating(parent,8); floating(parent,9);
         assert(parent.createConnectionFromInfo("Router_f_7","Value","MacroMixer_1","Unselected"));
         assert(parent.createConnectionFromInfo("MacroMixer_1","Value","Router_f_8","Value"));
@@ -496,7 +496,7 @@ int main(int argc,char** argv) {
     {
         auto& m=static_cast<ofxOceanodeMacroMixer&>(parent.createNode(std::make_unique<ofxOceanodeMacroMixer>(),1).getNodeModel());
         assert(m.setRouterContract({}));assert(m.importMacroFolder(a));assert(m.importMacroFolder(b));
-        m.getParameter<float>("Duration Ms")=0;m.getParameter<void>("Transition").trigger();parent.update();
+        m.getParameter<float>("Duration_ms")=0;m.getParameter<void>("Start!").trigger();parent.update();
         auto& out=floating(parent,8);out.getParameter<std::string>("Name")="Outer";
         assert(parent.createConnectionFromInfo("MacroMixer_1","Value","Router_f_8","Value"));near(out.getParameter<float>("Value"),.2);
         parent.savePreset(scratch+"/session");parent.clearContainer();assert(parent.loadPreset(scratch+"/session"));parent.update();
@@ -504,7 +504,7 @@ int main(int argc,char** argv) {
         assert(loaded.mixerRuntime()->origin());near(loaded.getParameter<float>("Value"),.2);assert(parent.getAllConnections().size()==1);
         // Loading a preset reads every source before playback starts.
         for(const auto& source:loaded.mixerRuntime()->macros()) assert(source->analysed()&&loaded.mixerRuntime()->sourceProblem(source->id()).empty());
-        assert(loaded.getParameter<std::string>("Mixer Status").get()=="Run 0 a | 2/2 ok");
+        assert(loaded.getParameter<std::string>("Status").get()=="Ok");
         {
             const auto session=scratch+"/offline-session"; parent.savePreset(session); parent.clearContainer();
             fs::rename(b,b+"-offline"); assert(parent.loadPreset(session)); parent.update();
@@ -512,21 +512,21 @@ int main(int argc,char** argv) {
             const auto& sources=offline.mixerRuntime()->macros();
             assert(sources.size()==2&&offline.mixerRuntime()->sourceProblem(sources[0]->id()).empty());
             assert(!sources[1]->analysed()&&!offline.mixerRuntime()->sourceProblem(sources[1]->id()).empty());
-            assert(offline.mixerRuntime()->origin()&&offline.getParameter<std::string>("Mixer Status").get()=="Run 0 a | 1/2 ok");
+            assert(offline.mixerRuntime()->origin()&&offline.getParameter<std::string>("Status").get()=="Ok");
             parent.clearContainer(); fs::rename(b+"-offline",b); assert(parent.loadPreset(session)); parent.update();
         }
         auto& reloaded=static_cast<ofxOceanodeMacroMixer&>(parent.getDynamicNodes().at("MacroMixer").at(1)->getNodeModel());
-        assert(reloaded.getParameter<std::string>("Mixer Status").get()=="Run 0 a | 2/2 ok");
-        reloaded.getParameter<int>("Target")=1; reloaded.getParameter<float>("Duration Ms")=1e6; reloaded.getParameter<void>("Transition").trigger(); parent.update();
-        assert(reloaded.getParameter<std::string>("Mixer Status").get().rfind("Mix 0>1 ",0)==0);
-        reloaded.getParameter<void>("Finish Transition").trigger(); parent.update();
-        assert(reloaded.getParameter<std::string>("Mixer Status").get()=="Run 1 b | 2/2 ok");
-        reloaded.getParameter<int>("Target")=0; reloaded.getParameter<float>("Duration Ms")=0; reloaded.getParameter<void>("Transition").trigger(); parent.update();
+        assert(reloaded.getParameter<std::string>("Status").get()=="Ok");
+        reloaded.getParameter<int>("Target")=1; reloaded.getParameter<float>("Duration_ms")=1e6; reloaded.getParameter<void>("Start!").trigger(); parent.update();
+        assert(reloaded.getParameter<std::string>("Status").get()=="Ok");
+        reloaded.getParameter<void>("Stop!").trigger(); parent.update();
+        assert(reloaded.getParameter<std::string>("Status").get()=="Ok");
+        reloaded.getParameter<int>("Target")=0; reloaded.getParameter<float>("Duration_ms")=0; reloaded.getParameter<void>("Start!").trigger(); parent.update();
         parent.saveClipboardModulesAndConnections({parent.getDynamicNodes().at("MacroMixer").at(1).get()},{0,0});
         assert(parent.loadClipboardModulesAndConnections({10,10},false));parent.update();
         auto& copy=static_cast<ofxOceanodeMacroMixer&>(parent.getDynamicNodes().at("MacroMixer").at(2)->getNodeModel());
         assert(copy.mixerRuntime()->origin()->container!=reloaded.mixerRuntime()->origin()->container);
-        copy.getParameter<int>("Target")=1;copy.getParameter<void>("Transition").trigger();parent.update();near(copy.getParameter<float>("Value"),.8);near(reloaded.getParameter<float>("Value"),.2);
+        copy.getParameter<int>("Target")=1;copy.getParameter<void>("Start!").trigger();parent.update();near(copy.getParameter<float>("Value"),.8);near(reloaded.getParameter<float>("Value"),.2);
         const auto groupPath=scratch+"/playing-group.json";
         assert(reloaded.saveRouterGroup(groupPath));
         auto group=ofLoadJson(groupPath); group["routers"][0]["id"]="another-mixer-id"; write(groupPath,group);

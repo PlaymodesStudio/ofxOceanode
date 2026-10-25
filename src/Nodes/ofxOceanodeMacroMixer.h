@@ -8,13 +8,14 @@ class ofxOceanodeMacroMixer : public ofxOceanodeNodeModel {
 public:
     ofxOceanodeMacroMixer() : ofxOceanodeNodeModel("MacroMixer") {
         description = "Mix ordinary Macros through selected input/output Routers, with a mixing policy for each output type. "
-            "Enable Morph macros in the Inspector to morph matching unconnected controls inside the destination graph instead. "
-            "Add Macro source folders and select Target, then Transition. Nested Macros, feedback, native nodes and clocks use ordinary Macro behavior. "
+            "Set Mode to Morph to morph matching unconnected controls inside the destination graph instead. "
+            "Add Macro source folders and select Target, then Start!. Nested Macros, feedback, native nodes and clocks use ordinary Macro behavior. "
             "Analysis rejects external outputs recursively. Source folders must be available when activating or reloading.";
     }
     ~ofxOceanodeMacroMixer();
     void setup() override;
     bool drawInspectorParameter(ofAbstractParameter& parameter) override;
+    bool drawNodeParameter(ofxOceanodeAbstractParameter& parameter, float labelWidth, float widgetWidth) override;
     void update(ofEventArgs&) override;
     void draw(ofEventArgs&) override;
     void setBpm(float bpm) override;
@@ -41,6 +42,8 @@ public:
     // Asks, one node at a time, whether to keep each blocked node out of the
     // graph. Drawn by the host with the other application-level dialogs.
     static void drawPendingBlockedNodeDialog();
+    // Ok, or the worst fallback of the running/next transition, for the Status output.
+    enum class Health { Neutral, Ok, NodeFallback, GraphFallback, Error };
 private:
     enum class ActionKind { Import, Refresh, RemoveMacro, MoveMacro, Routers, LoadRouters, SaveRouters, ClearPlayback, MorphPolicy,
         KeepOut, CancelBlocked, RestoreNode };
@@ -56,7 +59,9 @@ private:
     void drawRouters();
     void chooseRouterGroup(bool save);
     void drawMacros();
-    void drawSourceHeader(const std::string& title, const std::string& badges, bool running);
+    void drawDefaultPolicies();
+    // A collapsible bar in the node color with the source's buttons on the right.
+    bool drawSourceHeader(const MacroMixerRevision& macro, size_t index, size_t count, bool fading);
     void drawSource(const MacroMixerRevision& macro, bool fading);
     // An empty ID edits the mixer default.
     void drawMorphPolicies(const std::string& id, bool fading);
@@ -64,15 +69,15 @@ private:
     void publish();
     bool syncInputs();
     void reportFailure();
-    // About 28 characters, for the Mixer Status output.
+    Health health() const;
     std::string shortStatus() const;
     std::string routerEditBlocker(const std::string& id) const;
     ofParameter<std::string> state, summary;
     ofParameter<int> target;
     ofParameter<float> duration, biPow, progress;
     ofParameter<void> transition, finish;
-    ofParameter<bool> morphMacros;
-    customGuiRegion routerEditor, macroEditor;
+    ofParameter<int> mode; // 0 Mix, 1 Morph.
+    customGuiRegion routerEditor, policyEditor, macroEditor;
     std::map<std::string, std::shared_ptr<ofxOceanodeAbstractParameter>> outputs;
     std::map<std::string, std::array<char, 256>> routerDrafts;
     std::array<char, 256> newRouterName{};

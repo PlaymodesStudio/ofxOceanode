@@ -354,7 +354,7 @@ void main(){ vec4 c=texelFetch(tSource,ivec2(gl_FragCoord.xy),0); float g=gainTe
         auto& mix=static_cast<ofxOceanodeMacroMixer&>(node.getNodeModel()); assert(mix.setRouterContract(contract));
         auto& sink=parent.createNode(registry->create("Router Texture"),9);
         assert(parent.createConnectionFromInfo("MacroMixer_1","Image","Router_Texture_9","Value"));
-        assert(mix.importMacroFolder(a)); mix.getParameter<float>("Duration Ms")=0; mix.getParameter<void>("Transition").trigger(); parent.update(); drawFrames(parent);
+        assert(mix.importMacroFolder(a)); mix.getParameter<float>("Duration_ms")=0; mix.getParameter<void>("Start!").trigger(); parent.update(); drawFrames(parent);
         rgba(sink.getNodeModel().getParameter<ofTexture*>("Value"),{1,0,0,.25});
         const auto folder=scratch+"/saved-node"; fs::create_directory(folder); node.savePreset(folder);
         parent.saveClipboardModulesAndConnections({&node,&sink},{0,0}); assert(parent.loadClipboardModulesAndConnections({40,40},false)); parent.update(); drawFrames(parent);
@@ -374,7 +374,7 @@ void main(){ vec4 c=texelFetch(tSource,ivec2(gl_FragCoord.xy),0); float g=gainTe
         assert(mix.setRouterContract(contract));
         auto& route=child->createNode(registry->create("Router Texture"),1).getNodeModel(); route.getParameter<std::string>("Name")="MixedImage";
         assert(child->createConnectionFromInfo("MacroMixer_1","Image","Router_Texture_1","Value"));
-        assert(mix.importMacroFolder(a)); mix.getParameter<float>("Duration Ms")=0; mix.getParameter<void>("Transition").trigger();
+        assert(mix.importMacroFolder(a)); mix.getParameter<float>("Duration_ms")=0; mix.getParameter<void>("Start!").trigger();
         parent.update(); drawFrames(parent); rgba(mix.getParameter<ofTexture*>("Image"),{1,0,0,.25}); rgba(m.getParameter<ofTexture*>("MixedImage"),{1,0,0,.25});
         const auto folder=scratch+"/macro"; parent.savePreset(folder); child.reset(); parent.clearContainer(); assert(parent.loadPreset(folder)); parent.update(); drawFrames(parent);
         auto inner=[](ofxOceanodeNodeModel& model)->ofxOceanodeMacroMixer& {
