@@ -630,6 +630,18 @@ int main(int argc,char** argv) {
         // Repeated loading/retirement keeps the common graph and aliases valid.
         r.request(nestedTargets[kind-1],1000,0,true); r.update(1050); assert(r.morphingInPlace()); r.finish(); r.update(1060);
     }
+    // A library Macro's Local Name is unused, so a different saved one keeps the
+    // running Macro; a local Macro's Local Name is its title and still replaces it.
+    for(int kind=1;kind<=2;++kind) {
+        const auto renamed=scratch+"/nested-renamed-"+std::to_string(kind); fs::copy(nestedTargets[kind-1],renamed,fs::copy_options::recursive);
+        auto json=ofLoadJson(renamed+"/Macro_2.json"); assert(json.contains("Local_Name")); json["Local_Name"]="Leftover"; ofSaveJson(renamed+"/Macro_2.json",json);
+        MacroMixerRuntime r(parent); assert(r.importMacro(nestedTargets[kind-1])&&r.importMacro(renamed));
+        r.request(nestedTargets[kind-1],0,0,true); r.update(0);
+        const auto details=r.sourceDetails(r.importedMacro(renamed)->id());
+        const bool replaced=std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"&&d.message.find("Local_Name")!=std::string::npos;});
+        assert(replaced==(kind==1));
+        assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback";}));
+    }
     // Rollback cleans a fully loaded nested graph and all boundary cables.
     {
         std::vector<MacroMixerDiagnostic> errors;

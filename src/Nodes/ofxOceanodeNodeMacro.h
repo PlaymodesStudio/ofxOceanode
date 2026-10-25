@@ -93,8 +93,12 @@ public:
 	ofxOceanodeNodeMacro();
 	~ofxOceanodeNodeMacro();
 	// The node colour is cosmetic: a different saved colour must not stop a
-	// MacroMixer morph from reusing the running Macro.
-	MorphKeys morphKeys() const override { return {{}, {"Color"}}; }
+	// MacroMixer morph from reusing the running Macro. A library Macro's title
+	// comes from the library, so its Local Name is unused and cosmetic too.
+	MorphKeys morphKeys() const override {
+		if(presetManager.isLocal()) return {{}, {"Color"}};
+		return {{}, {"Color", "Local_Name"}};
+	}
 	bool drawNodeParameter(ofxOceanodeAbstractParameter& parameter, float labelWidth, float widgetWidth) override;
 	std::string getNodeTitleSuffix() const override {
 		return presetManager.isLocal() ? localName.get() : presetManager.getCurrentMacro();

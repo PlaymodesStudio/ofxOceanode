@@ -157,7 +157,9 @@ into a trigger or Portal), the whole graph falls back as described next.
 
 A Macro's **Color** is cosmetic: a different saved colour in a nested Macro is
 not a configuration change and never makes a morph replace the Macro or fall
-back. The running Macro keeps its colour.
+back. The running Macro keeps its colour. A library Macro takes its title
+from the library, so its saved **Local Name** is ignored the same way; a local
+Macro's Local Name is its title and is still compared.
 
 ### Nodes that blend their own saved state
 
