@@ -3,7 +3,7 @@
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeCanvas.h"
 
-// A metadata-only browser: browsing never creates or sets up live models.
+// Browser with a private, paused node instance for the canvas preview.
 class ofxOceanodeNodePool {
 public:
     ofxOceanodeNodePool(std::shared_ptr<ofxOceanodeContainer> root, ofxOceanodeCanvas* canvas);
@@ -22,6 +22,11 @@ private:
     bool visible = false, focusRequested = false;
     Tab nodes, macros;
     std::string error, macroDescription, descriptionPath;
+    std::shared_ptr<ofxOceanodeContainer> previewOwner;
+    ofxOceanodeNode* previewNode = nullptr;
+    std::string previewKey, previewError;
+    void resetPreview();
+    void drawPreview(const Entry& entry, bool macro);
     void open();
     void drawTab(bool macro);
     void add(const Entry& entry, bool macro);

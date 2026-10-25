@@ -4,9 +4,12 @@ Help and window menus
 Window > Node Pool (Cmd+N on macOS, Ctrl+N elsewhere) opens a floating
 browser with Nodes and Macros tabs. Each tab has its own search and selection,
 a scrollable category list on the left, and a description on the right. Node
-details include a parameter preview when catalog hints are available; these
-hints do not claim live inlet/outlet directions. Macro descriptions come from
-the library's description.json. Browsing never constructs or runs a node.
+details show the actual canvas node GUI, including widgets, inlets and outlets,
+scaled to fit the preview area. The preview is read-only. Macro descriptions
+come from the library's description.json. Selecting an item sets up one private
+preview instance, separate from the patch,
+and pauses it. It receives no update or model draw calls. Switching selection
+or closing the pool releases it.
 Add creates the selected item in the active canvas (including macro canvases),
 selects it and brings it into view. The destination is shown above Add. Repeated
 adds are offset so their headers remain reachable, and grid snapping is honored.

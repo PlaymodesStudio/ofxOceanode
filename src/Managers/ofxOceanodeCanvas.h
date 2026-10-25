@@ -30,6 +30,9 @@ public:
     void setup(string _uid = "Canvas", string _pid = "");
     void update(){};
     void draw(bool *open = NULL, ofColor color = ofColor(255, 255, 255, 40), string title = "");
+    // Draw the actual node at full detail, then scale its geometry to fit.
+    // Call inside an otherwise empty ImGui child with NoInputs.
+    void drawNodePreview(ofxOceanodeNode& node);
     void resetForNewPreset();
     void resetViewToOrigin();
     

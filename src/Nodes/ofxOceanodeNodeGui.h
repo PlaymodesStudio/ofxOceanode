@@ -28,6 +28,9 @@ public:
     
     bool constructGui(float nodeWidthText, float nodeWidthWidget, float zoomLevel = 1.0f);
     
+    // Shared canvas/Node Pool decoration; returns the port bullet color.
+    unsigned int drawFrame(glm::vec2 minimum, glm::vec2 maximum, float zoomLevel, bool selected);
+
     void setPosition(glm::vec2 position);
     void setSize(glm::vec2 size);
     

@@ -7,6 +7,8 @@
 #include <cfloat>
 #include <functional>
 #include <sstream>
+#include <stdexcept>
+#include "ofxOceanodeTransport.h"
 
 namespace {
 bool matches(const std::string& text, const char* query) {
@@ -53,7 +55,7 @@ void ofxOceanodeNodePool::draw() {
     const bool command = io.KeyCtrl && !io.KeySuper;
 #endif
     if(command && !io.KeyShift && !io.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_N, false)) open();
-    if(!visible) return;
+    if(!visible) { resetPreview(); return; }
     ImGui::SetNextWindowSize(ImVec2(780, 540), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSizeConstraints(ImVec2(560, 320), ImVec2(FLT_MAX, FLT_MAX));
     if(focusRequested) ImGui::SetNextWindowFocus();
@@ -67,6 +69,7 @@ void ofxOceanodeNodePool::draw() {
     }
     ImGui::End();
     focusRequested = false;
+    if(!visible) resetPreview();
 }
 
 void ofxOceanodeNodePool::drawTab(bool macro) {
@@ -156,24 +159,19 @@ void ofxOceanodeNodePool::drawTab(bool macro) {
                 }
                 description = macroDescription;
             } else description = descriptionFor(registry, selected->name);
-            ImGui::TextWrapped("%s", description.empty() ? "No description available." : description.c_str());
-            if(!macro) {
-                const auto* hint = ofxOceanodeNodeHelpEntry(selected->name);
-                if(hint && hint->contains("parameters") && !(*hint)["parameters"].empty()) {
-                    ImGui::Spacing();
-                    ImGui::TextDisabled("Parameter preview");
-                    // Catalog names are hints, not live port direction/type metadata.
-                    // Do not instantiate resource-owning models to draw a preview.
-                    if(ImGui::BeginChild("##preview", ImVec2(0, 0), true)) {
-                        ImGui::TextWrapped("%s", selected->name.c_str());
-                        ImGui::Separator();
-                        for(const auto& parameter : (*hint)["parameters"])
-                            if(parameter.is_string()) ImGui::BulletText("%s", parameter.get<std::string>().c_str());
-                    }
-                    ImGui::EndChild();
-                }
-            }
-        } else ImGui::TextWrapped("Select an item to read its description and add it to the canvas.");
+            const char* text = description.empty() ? "No description available." : description.c_str();
+            const auto space = ImGui::GetContentRegionAvail();
+            const float textHeight = ImGui::CalcTextSize(text, nullptr, false, std::max(1.0f, space.x - 16)).y;
+            const float descriptionHeight = std::max(1.0f, std::min(textHeight + 8, space.y * 0.28f));
+            if(ImGui::BeginChild("##description", ImVec2(0, descriptionHeight)))
+                ImGui::TextWrapped("%s", text);
+            ImGui::EndChild();
+            ImGui::Spacing();
+            drawPreview(*selected, macro);
+        } else {
+            resetPreview();
+            ImGui::TextWrapped("Select an item to read its description and add it to the canvas.");
+        }
     }
     ImGui::EndChild();
 }
@@ -233,4 +231,55 @@ void ofxOceanodeNodePool::add(const Entry& entry, bool macro) {
         error = std::string("Could not add: ") + exception.what();
     }
     owner->endCanvasEdit();
+}
+
+void ofxOceanodeNodePool::resetPreview() {
+    previewNode = nullptr;
+    previewOwner.reset();
+    previewKey.clear();
+    previewError.clear();
+}
+
+void ofxOceanodeNodePool::drawPreview(const Entry& entry, bool macro) {
+    const auto key = (macro ? "macro:" + entry.path : "node:" + entry.name);
+    if(previewKey != key) {
+        resetPreview();
+        previewKey = key;
+        try {
+            // Keep graph membership, IDs, history and metadata separate from the
+            // patch. A preview is set up once, but never updated or model-drawn.
+            auto registry = std::make_shared<ofxOceanodeNodeRegistry>(*root->getRegistry());
+            registry->customGuiFactory = {};
+            previewOwner = std::make_shared<ofxOceanodeContainer>(registry, root->getTypesRegistry(),
+                std::make_shared<ofxOceanodeTransport>());
+            previewOwner->setCanvasID("Node Pool Preview");
+            auto model = registry->create(macro ? "Macro" : entry.name);
+            if(!model) throw std::runtime_error("Node is no longer available.");
+            previewNode = &previewOwner->createNode(std::move(model), macro ? entry.path : "");
+            std::function<void(ofxOceanodeContainer&)> pause = [&](ofxOceanodeContainer& owner) {
+                for(auto* node : owner.getAllModules()) {
+                    node->setActive(false);
+                    if(auto* nested = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
+                        nested->setWindowVisible(false, false);
+                        pause(*nested->getContainer());
+                    }
+                }
+            };
+            pause(*previewOwner);
+        } catch(const std::exception& exception) {
+            previewNode = nullptr;
+            previewOwner.reset();
+            previewError = std::string("Preview unavailable: ") + exception.what();
+        }
+    }
+    if(!previewError.empty()) ImGui::TextWrapped("%s", previewError.c_str());
+    if(previewNode) {
+        // NoInputs keeps the actual widgets visually unchanged while preventing
+        // edits, node deletion, external-window toggles and parameter popups.
+        if(ImGui::BeginChild("##nodePreview", ImVec2(0, 0), false,
+                ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoScrollbar |
+                ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground))
+            rootCanvas->drawNodePreview(*previewNode);
+        ImGui::EndChild();
+    }
 }

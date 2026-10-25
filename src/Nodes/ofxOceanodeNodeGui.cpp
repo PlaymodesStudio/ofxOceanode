@@ -14,6 +14,7 @@
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeScope.h"
 #include "ofxOceanodeTime.h"
+#include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeColors.h"
 #include <algorithm>
 
@@ -952,4 +953,45 @@ void ofxOceanodeNodeGui::renderParameterPopup(ofxOceanodeAbstractParameter& absP
     ImGui::PopStyleColor(2);
     ImGui::PopStyleVar();
 
+}
+
+unsigned int ofxOceanodeNodeGui::drawFrame(glm::vec2 minimum, glm::vec2 maximum, float zoomLevel, bool selected){
+    auto* draw_list = ImGui::GetWindowDrawList();
+    const ImVec2 node_rect_min(minimum.x, minimum.y);
+    const ImVec2 node_rect_max(maximum.x, maximum.y);
+    const ImVec2 node_rect_header(maximum.x, minimum.y + 29.0f * zoomLevel);
+    ImU32 node_bg_color = OceanodeColors::U32(OceanodeColors::NodeBg);
+
+    const int nodeHeaderAlpha = 64;
+    ImU32 node_hd_color = (selected) ? IM_COL32(node.getColor().r,node.getColor().g,node.getColor().b,160) : IM_COL32(node.getColor().r,node.getColor().g,node.getColor().b,nodeHeaderAlpha);
+
+    // Check if this node should be rendered transparently
+    bool isTransparent = (node.getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
+
+    // Macros draw their header and port bullets in the header color, made
+    // opaque by blending it over the default node background so it looks the same
+    // on top of their tinted body.
+    bool isMacro = dynamic_cast<ofxOceanodeNodeMacro*>(&node.getNodeModel()) != nullptr;
+    ImU32 node_bullet_color = OceanodeColors::U32(OceanodeColors::ConnectionBullet);
+    ImU32 node_body_color = node_bg_color;
+    if(isMacro){
+        ImVec4 bg = ImGui::ColorConvertU32ToFloat4(node_bg_color);
+        auto headerOverBackground = [&](ImVec4 hd, float brightness){
+            return ImGui::GetColorU32(ImVec4((bg.x + (hd.x - bg.x) * hd.w) * brightness,
+                     (bg.y + (hd.y - bg.y) * hd.w) * brightness,
+                     (bg.z + (hd.z - bg.z) * hd.w) * brightness, 1.0f));
+        };
+        node_hd_color = headerOverBackground(ImGui::ColorConvertU32ToFloat4(node_hd_color), 1.0f);
+        node_bullet_color = node_hd_color;
+        // The body is the unselected header color, 25% darker.
+        node_body_color = headerOverBackground(ImGui::ColorConvertU32ToFloat4(
+            IM_COL32(node.getColor().r, node.getColor().g, node.getColor().b, nodeHeaderAlpha)), 0.75f);
+    }
+
+    if (!isTransparent) {
+        draw_list->AddRectFilled(node_rect_min, node_rect_max, node_body_color, 4.0f);
+        draw_list->AddRectFilled(node_rect_min, node_rect_header, node_hd_color, 4.0f);
+    }
+
+    return node_bullet_color;
 }
