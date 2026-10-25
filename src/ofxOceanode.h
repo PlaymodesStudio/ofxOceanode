@@ -33,6 +33,7 @@
 
 class ofxOceanodeWindowManager;
 class ofxOceanodeHelp;
+class ofxOceanodeNodePool;
 class ofxOceanodeLayouts;
 class ofxOceanodeThemeManager;
 class ofxOceanodeAppConfig;
@@ -190,6 +191,7 @@ private:
     bool unusedNodesPlanChanged = false;
     unique_ptr<ofxOceanodeControls> controls;
     unique_ptr<ofxOceanodeHelp> help;
+    unique_ptr<ofxOceanodeNodePool> nodePool;
     
     shared_ptr<ofxOceanodeNodeRegistry> nodeRegistry;
     shared_ptr<ofxOceanodeTypesRegistry> typesRegistry;

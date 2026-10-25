@@ -1561,43 +1561,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 bool isSelectedOrSelecting = nodeGui.getSelected() || (isSelecting && getIsSelectedByRect(nodeGui.getRectangle()));
                 
                 //            ImU32 node_bg_color = /*(node_hovered_in_list == node->ID || node_hovered_in_scene == node->ID || (node_hovered_in_list == -1 && node_selected == node->ID)) ? IM_COL32(75, 75, 75, 255) :*/ IM_COL32(40, 40, 40, 255);
-                ImU32 node_bg_color = OceanodeColors::U32(OceanodeColors::NodeBg);
-                
-                const int nodeHeaderAlpha = 64;
-                ImU32 node_hd_color = (isSelectedOrSelecting) ? IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,160) : IM_COL32(node->getColor().r,node->getColor().g,node->getColor().b,nodeHeaderAlpha);
-                
-				// Check if this node should be rendered transparently
-				bool isTransparent = (node->getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
+                ImU32 node_bullet_color = nodeGui.drawFrame(node_rect_min, node_rect_max, zoomLevel, isSelectedOrSelecting);
 
-				// Macros draw their header and port bullets in the header color, made
-				// opaque by blending it over the default node background so it looks the same
-				// on top of their tinted body.
-				bool isMacro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel()) != nullptr;
-				ImU32 node_bullet_color = OceanodeColors::U32(OceanodeColors::ConnectionBullet);
-				ImU32 node_body_color = node_bg_color;
-				if(isMacro){
-					ImVec4 bg = ImGui::ColorConvertU32ToFloat4(node_bg_color);
-					auto headerOverBackground = [&](ImVec4 hd, float brightness){
-						return ImGui::GetColorU32(ImVec4((bg.x + (hd.x - bg.x) * hd.w) * brightness,
-														 (bg.y + (hd.y - bg.y) * hd.w) * brightness,
-														 (bg.z + (hd.z - bg.z) * hd.w) * brightness, 1.0f));
-					};
-					node_hd_color = headerOverBackground(ImGui::ColorConvertU32ToFloat4(node_hd_color), 1.0f);
-					node_bullet_color = node_hd_color;
-					// The body is the unselected header color, 25% darker.
-					node_body_color = headerOverBackground(ImGui::ColorConvertU32ToFloat4(
-						IM_COL32(node->getColor().r, node->getColor().g, node->getColor().b, nodeHeaderAlpha)), 0.75f);
-				}
-
-				if (!isTransparent) {
-					//if(nodeGui.getExpanded()){
-						draw_list->AddRectFilled(node_rect_min, node_rect_max, node_body_color, 4.0f);
-					//}
-					draw_list->AddRectFilled(node_rect_min, node_rect_header, node_hd_color, 4.0f);
-				}
-                
-                //draw_list->AddRect(node_rect_min, node_rect_max, IM_COL32(0, 0, 0, 255), 4.0f);
-                
                 { // Header parameter pins remain interactive when collapsed.
                     float NODE_BULLET_MIN_SIZE = 3.0f * zoomLevel;
                     float NODE_BULLET_MAX_SIZE = 10.0f * zoomLevel;
@@ -3194,4 +3159,80 @@ void ofxOceanodeCanvas::selectAllNodes(){
     for(auto &c: container->getComments()){
         c.selected = true;
     }
+}
+
+void ofxOceanodeCanvas::drawNodePreview(ofxOceanodeNode& node){
+    auto& nodeGui = node.getNodeGui();
+    auto* window = ImGui::GetCurrentWindow();
+    auto* draw = ImGui::GetWindowDrawList();
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const ImVec2 available = ImGui::GetContentRegionAvail();
+    if(available.x <= 0 || available.y <= 0) return;
+    const ImRect savedClip = window->ClipRect;
+    // Submit every widget at canvas scale 1 before fitting it. Scaling after
+    // layout preserves full detail, including custom GUI and small text.
+    window->ClipRect = ImRect(origin, ImVec2(origin.x + 100000, origin.y + 100000));
+    draw->PushClipRect(window->ClipRect.Min, window->ClipRect.Max, false);
+    const int firstVertex = draw->VtxBuffer.Size;
+    const float previousZoom = ofxOceanodeShared::getZoomLevel();
+    auto* previousBold = ofxOceanodeShared::getCurrentBoldFont();
+    ofxOceanodeShared::setZoomLevel(1.0f);
+    ofxOceanodeShared::setCurrentBoldFont(zoomFontsBold[3]);
+    if(zoomFonts[3]) ImGui::PushFont(zoomFonts[3]);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 4));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+    ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize, 12.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 14.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, std::max(0.0f, (16.0f - ImGui::GetFontSize()) / 2)));
+    draw->ChannelsSplit(2);
+    draw->ChannelsSetCurrent(1);
+    ImGui::SetCursorScreenPos(ImVec2(origin.x + NODE_WINDOW_PADDING.x, origin.y + NODE_WINDOW_PADDING.y));
+    nodeGui.constructGui(NODE_WIDTH_TEXT, NODE_WIDTH_WIDGET, 1.0f);
+    const ImVec2 itemSize = ImGui::GetItemRectSize();
+    const glm::vec2 size(itemSize.x + 2 * NODE_WINDOW_PADDING.x, itemSize.y + 2 * NODE_WINDOW_PADDING.y);
+    nodeGui.setSize(size);
+    draw->ChannelsSetCurrent(0);
+    const auto bulletColor = nodeGui.drawFrame(glm::vec2(origin.x, origin.y), glm::vec2(origin.x, origin.y) + size, 1.0f, false);
+    for(auto& parameter : node.getParameters()){
+        auto* pin = dynamic_cast<ofxOceanodeAbstractParameter*>(parameter.get());
+        if(!pin || !nodeGui.hasConnectionPosition(*pin)) continue;
+        if(!(pin->getFlags() & ofxOceanodeParameterFlags_DisableInConnection)){
+            const auto pos = nodeGui.getSinkConnectionPositionFromParameter(*pin) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
+            draw->AddCircleFilled(ImVec2(pos.x, pos.y), 3.0f, bulletColor);
+        }
+        if(!(pin->getFlags() & ofxOceanodeParameterFlags_DisableOutConnection)){
+            const auto pos = nodeGui.getSourceConnectionPositionFromParameter(*pin) + glm::vec2(NODE_WINDOW_PADDING.x, 0);
+            draw->AddCircleFilled(ImVec2(pos.x, pos.y), 3.0f, bulletColor);
+        }
+    }
+    draw->ChannelsMerge();
+    ImGui::PopStyleVar(5);
+    if(zoomFonts[3]) ImGui::PopFont();
+    ofxOceanodeShared::setCurrentBoldFont(previousBold);
+    ofxOceanodeShared::setZoomLevel(previousZoom);
+    window->ClipRect = savedClip;
+    draw->PopClipRect();
+    const float margin = 8.0f;
+    const float scale = std::max(0.001f, std::min(1.0f,
+        std::min((available.x - 2 * margin) / std::max(1.0f, size.x),
+                 (available.y - 2 * margin) / std::max(1.0f, size.y))));
+    const ImVec2 destination(origin.x + (available.x - size.x * scale) * 0.5f,
+                             origin.y + (available.y - size.y * scale) * 0.5f);
+    for(int i = firstVertex; i < draw->VtxBuffer.Size; ++i){
+        auto& vertex = draw->VtxBuffer[i];
+        vertex.pos = ImVec2(destination.x + (vertex.pos.x - origin.x) * scale,
+                            destination.y + (vertex.pos.y - origin.y) * scale);
+    }
+    // This child contains only the preview. Preserve custom widget clip regions,
+    // transform them along with the vertices, and clip to the visible child.
+    for(auto& command : draw->CmdBuffer){
+        if(command.ElemCount == 0) continue;
+        auto& clip = command.ClipRect;
+        clip = ImVec4(std::max(savedClip.Min.x, destination.x + (clip.x - origin.x) * scale),
+                      std::max(savedClip.Min.y, destination.y + (clip.y - origin.y) * scale),
+                      std::min(savedClip.Max.x, destination.x + (clip.z - origin.x) * scale),
+                      std::min(savedClip.Max.y, destination.y + (clip.w - origin.y) * scale));
+    }
+    ImGui::SetCursorScreenPos(origin);
+    ImGui::Dummy(ImVec2(available.x, available.y));
 }
