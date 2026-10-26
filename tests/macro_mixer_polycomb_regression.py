@@ -2,6 +2,7 @@
 """MacroMixer morphs scPolyComb's own saved sound on the running node through the
 node morph hooks. Production scPolyComb, no SuperCollider server."""
 import macro_mixer_regression as mixer
+from of_environment import addon_source
 
 SC=mixer.ROOT.parent/'ofxOceanodeSuperCollider'
 SUPERCOLLIDER=mixer.ROOT.parent/'ofxSuperCollider'
@@ -193,7 +194,7 @@ int main(int argc,char** argv) {
 
 if __name__ == "__main__":
     sources=[str(mixer.ROOT/'src/Managers/ofxOceanodeScheduling.cpp')]
-    sources+=[str(SC/'src'/name) for name in ('scNode.cpp','serverManager.cpp','scTimelineMenu.cpp',
+    sources+=[str(addon_source(SC,name)) for name in ('scNode.cpp','serverManager.cpp','scTimelineMenu.cpp',
              'nodes/scPolyComb.cpp','nodes/scModulation.cpp')]
     sources+=[str(p) for p in sorted((SUPERCOLLIDER/'src').glob('*.cpp'))]
     sources+=[str(p) for p in sorted((OSC/'src').glob('*.cpp'))]

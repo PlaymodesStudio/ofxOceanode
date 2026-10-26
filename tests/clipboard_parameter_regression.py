@@ -275,6 +275,7 @@ def main():
         folder = Path(tmp)
         (folder / "ofMain.h").write_text(FIXTURE)
         (folder / "ofxOceanodeParameter.h").write_text('#pragma once\n#include "ofMain.h"\n')
+        (folder / "ofxOceanodeScheduling.h").write_text('#pragma once\nnamespace ofxOceanodeScheduling { inline bool isScheduledSendActive(){ return false; } }\n')
         cpp = folder / "regression.cpp"
         cpp.write_text('#include "ofxOceanodeConnection.h"\n' + NODE_FIXTURE + functions + CASES)
         binary = folder / "regression"

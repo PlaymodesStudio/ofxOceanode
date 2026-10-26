@@ -160,7 +160,8 @@ def main(extra_sources=(), extra_includes=(), std='c++17'):
         sources=['src/Nodes/MacroMixerMixing.cpp','src/Nodes/MacroMixerSource.cpp','src/Nodes/MacroMixerRuntime.cpp','src/Nodes/ofxOceanodeMacroMixer.cpp',
                  'src/Nodes/ofxOceanodeNode.cpp','src/ofxOceanodeParameter.cpp',
                  'src/Managers/ofxOceanodeTypesRegistry.cpp',
-                 'src/Managers/ofxOceanodeTransport.cpp']
+                 'src/Managers/ofxOceanodeTransport.cpp',
+                 'src/Managers/ofxOceanodeScheduling.cpp']
         sources += [f'src/Nodes/Default_Nodes/{part}/{name}.cpp' for part,name in (
             ('Modifiers','mapper'),('Modifiers','ranger'),('Modifiers','reindexer'),
             ('Modifiers','smoother'),('Modifiers','switcher'),('Generators','indexer'),
@@ -171,7 +172,8 @@ def main(extra_sources=(), extra_includes=(), std='c++17'):
             'MacroSnapshotSystem','MacroMorphEngine','MacroRouterSortOrder','MacroRouterValueDispatch')]
         sources += [str(of/'libs/openFrameworks/utils/ofUtils.cpp')]
         sources += list(extra_sources)
-        sources = list(dict.fromkeys(sources))
+        # Callers may pass a core source again as an absolute path; compile it once.
+        sources = list(dict.fromkeys(str((ROOT/s).resolve()) for s in sources))
         # Compile the production Inspector along with the native Macro runtime.
         imgui=of/'addons/ofxImGui/libs/imgui/src'
         flags=[os.environ.get('CXX','clang++'),'-std='+std,'-O0','-g','-w','-fsanitize=address,undefined','-fno-omit-frame-pointer','-DOF_NO_FMOD',

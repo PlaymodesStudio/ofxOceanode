@@ -90,6 +90,7 @@ def main():
         work = Path(temp)
         # Catalog generation only needs OF's JSON alias, independent of its GUI runtime.
         (work / 'ofMain.h').write_text('#pragma once\n#include <nlohmann/json.hpp>\nusing ofJson = nlohmann::json;\nusing namespace std;\n')
+        (work / 'ofJson.h').write_text('#pragma once\n#include "ofMain.h"\n')
         (work / 'ofxOceanodeNodeModel.h').write_text('#pragma once\n#include "ofMain.h"\n'
             'class ofxOceanodeNodeModel { public: virtual ~ofxOceanodeNodeModel() = default; '
             'virtual string macroMixerBlocker() const { return {}; } string nodeName() { return "SC Imported"; } string getDescription() { return "Node description"; } };\n')

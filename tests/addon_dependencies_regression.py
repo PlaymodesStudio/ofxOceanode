@@ -12,7 +12,7 @@ import concurrent.futures
 import os
 import subprocess
 import tempfile
-from of_environment import ROOT, of_root
+from of_environment import ROOT, of_root, addon_source, addon_include_dirs
 
 SC_UNITS = [
     'scNode.cpp', 'scSynthdef.cpp', 'scTimelineMenu.cpp',
@@ -21,7 +21,7 @@ SC_UNITS = [
     'ofxOceanodeSuperColliderNodesUtils.cpp',
     'nodes/scBeatRepeatPro.cpp', 'nodes/scGrainBoxPoly.cpp',
     'nodes/scMetroBox.cpp', 'nodes/scMixerPro.cpp',
-    'nodes/scPolyphonicArpeggiator.cpp', 'nodes/scRhythmBox.cpp',
+    'nodes/scRhythmBox.cpp',
     'nodes/scSampleBox.cpp',
 ]
 OBJECT_UNITS = {'scTimelineMenu.cpp', 'nodes/scMetroBox.cpp',
@@ -99,7 +99,7 @@ def main():
         for enabled in (0, 1):
             binary = temp / f'scheduling-{enabled}'
             subprocess.run(flags + [f'-DOFX_OCEANODE_HAS_TIMELINE={enabled}',
-                           '-fsanitize=address,undefined', '-I' + str(sc / 'src'),
+                           '-fsanitize=address,undefined', *['-I' + str(p) for p in addon_include_dirs(sc)],
                            '-I' + str(ROOT / 'src/Managers'), str(source),
                            str(ROOT / 'src/Managers/ofxOceanodeScheduling.cpp'),
                            '-o', str(binary)], check=True)
@@ -109,11 +109,11 @@ def main():
         for enabled in (0, 1):
             mode = ['-DOFX_OCEANODE_HAS_TIMELINE=1', *exposed] if enabled else []
             for unit in SC_UNITS:
-                jobs.append((f'SC timeline={enabled} {unit}', sc / 'src' / unit,
+                jobs.append((f'SC timeline={enabled} {unit}', addon_source(sc, unit),
                              mode, not enabled and unit in OBJECT_UNITS))
         for unit in SANTI_UNITS:
-            jobs.append((f'Santi core-only {unit}', addons / 'ofxSantiNodes/src' / unit, [], False))
-        jobs.append(('Collection core-only', addons / 'ofxOceanodeCollection/src/ofxOceanodeCollection.cpp', [], False))
+            jobs.append((f'Santi core-only {unit}', addon_source(addons / 'ofxSantiNodes', unit), [], False))
+        jobs.append(('Collection core-only', addon_source(addons / 'ofxOceanodeCollection', 'ofxOceanodeCollection.cpp'), [], False))
         def check(item):
             index, (label, path, mode, object_check) = item
             obj = temp / f'{index}.o'

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """SCBus graph lifetime/routing with production traversal/manager/Output and captured server commands; no audio device."""
 import macro_mixer_regression as mixer
+from of_environment import addon_source, addon_include_dirs
 mixer.PRELUDE += r'''
 #include "SCFake.h"
 #include "scNode.h"
@@ -39,7 +40,7 @@ BASE=mixer.native_production
 
 def production():
     result=BASE()+'\nstd::map<ofxSCServer*,int> serverManager::serverSampleRates;\n'
-    source=(mixer.ROOT.parent/'ofxOceanodeSuperCollider/src/serverManager.cpp').read_text()
+    source=addon_source(mixer.ROOT.parent/'ofxOceanodeSuperCollider','serverManager.cpp').read_text()
     for signature in ['serverManager::serverManager()', 'serverManager::~serverManager()',
         'void serverManager::addOutput(', 'void serverManager::removeOutput(',
         'void serverManager::setVolume(', 'void serverManager::setDelay(',
@@ -374,5 +375,5 @@ int main(int argc,char** argv) {
 }
 '''
 if __name__=='__main__':
-    mixer.main(extra_includes=[mixer.ROOT/'tests/support/macro_mixer_sc',mixer.ROOT.parent/'ofxOceanodeSuperCollider/src',mixer.ROOT.parent/'ofxOsc/src',mixer.ROOT.parent/'ofxOsc/libs/oscpack/src'],
-        extra_sources=[str(mixer.ROOT.parent/'ofxOsc/src/ofxOscMessage.cpp')]+[str(mixer.ROOT.parent/'ofxOceanodeSuperCollider/src'/name) for name in ('scNode.cpp','scOutput.cpp','MacroMixerSCBus.cpp')])
+    mixer.main(extra_includes=[mixer.ROOT/'tests/support/macro_mixer_sc',*addon_include_dirs(mixer.ROOT.parent/'ofxOceanodeSuperCollider'),mixer.ROOT.parent/'ofxOsc/src',mixer.ROOT.parent/'ofxOsc/libs/oscpack/src'],
+        extra_sources=[str(mixer.ROOT.parent/'ofxOsc/src/ofxOscMessage.cpp')]+[str(addon_source(mixer.ROOT.parent/'ofxOceanodeSuperCollider',name)) for name in ('scNode.cpp','scOutput.cpp','MacroMixerSCBus.cpp')])

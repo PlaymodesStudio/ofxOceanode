@@ -39,6 +39,7 @@ struct ofxOceanodeAbstractParameter : Abstract {
     string getName(){return "Value";} string getEscapedName(){return "Value";}
     vector<string> getGroupHierarchyNames(){return {nodeName};}
     auto getOutConnections(){return outgoing;} auto getInConnection(){return incoming;}
+    vector<ofxOceanodeAbstractConnection*> getInConnections(){return incoming ? vector<ofxOceanodeAbstractConnection*>{incoming} : vector<ofxOceanodeAbstractConnection*>{};}
 };
 struct Parameters : vector<shared_ptr<Abstract>> {string name; string getEscapedName(){return name;}};
 struct ofxOceanodeNodeModel {

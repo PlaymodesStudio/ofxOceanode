@@ -170,6 +170,7 @@ def main():
         (folder / "ofMain.h").write_text(FIXTURE)
         (folder / "ofJson.h").write_text('#pragma once\n#include "ofMain.h"\n')
         (folder / "ofxOceanodeParameter.h").write_text('#pragma once\n#include "ofMain.h"\n')
+        (folder / "ofxOceanodeScheduling.h").write_text('#pragma once\nnamespace ofxOceanodeScheduling { inline bool isScheduledSendActive(){ return false; } }\n')
         cpp = folder / "regression.cpp"
         cpp.write_text('#include "ofxOceanodeConnection.h"\n'
                        '#include "MacroSnapshotSystem.h"\n'

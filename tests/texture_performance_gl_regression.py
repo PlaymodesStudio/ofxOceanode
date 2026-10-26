@@ -9,7 +9,7 @@ import os
 # checks, but disable container annotations across that mixed library boundary.
 os.environ.setdefault("ASAN_OPTIONS", "detect_container_overflow=0")
 import indexer_texture_gl_regression as fixture
-from of_environment import of_root
+from of_environment import of_root, first_existing
 
 native = fixture.native
 native.PRELUDE += r'''
@@ -172,6 +172,6 @@ native.CASES = native.CASES[:native.CASES.index('    auto& model =')]+r'''
 if __name__ == '__main__':
     of = of_root()
     textures = of / 'addons/ofxOceanodeTextures'
-    lightnet = of / 'apps/Playmodes/Lightnet/src'
+    lightnet = first_existing(of / 'apps/Playmodes/Lightnet/src', of / 'apps/SIGNES/Lightnet/src')
     native.main(extra_sources=[str(lightnet/'textureRegionMapper.cpp')],
                 extra_includes=[textures/'src',textures/'src/shaders',lightnet])

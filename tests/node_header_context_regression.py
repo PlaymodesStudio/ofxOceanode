@@ -28,6 +28,7 @@ struct Node {int index=0;Model model;Gui gui;Group group;auto& getNodeModel(){re
 Node nodes[2];
 int notifications=0,inspectorAnchors=0;
 struct ofxOceanodeShared {
+    static constexpr float MIN_DETAIL_ZOOM = 0.475f;
     static ImFont* getCurrentBoldFont(){return nullptr;}
     static void nodeSelectedInCanvas(Node*){++notifications;}
 };

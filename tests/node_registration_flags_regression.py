@@ -9,6 +9,7 @@ import os
 import subprocess
 import tempfile
 from new_preset_regression import block
+from of_environment import of_root
 ROOT=Path(__file__).resolve().parents[1]
 MODEL=r'''
 #pragma once
@@ -114,10 +115,11 @@ def main():
         'ofxOceanodeNodeRegistry::registeredModelsCategoryMap const &ofxOceanodeNodeRegistry::getRegisteredModelsCategoryAssociation()'))
     with tempfile.TemporaryDirectory(prefix='oceanode-registration-') as directory:
         work=Path(directory);(work/'ofxOceanodeNodeModel.h').write_text(MODEL)
+        (work/'ofJson.h').write_text('#pragma once\n#include <nlohmann/json.hpp>\nusing ofJson = nlohmann::json;\n')
         (work/'ofxOceanodeNodeHelpCatalog.h').write_text('#pragma once\ninline std::string ofxOceanodeNodeHelpDescription(const std::string&){return {};}\n')
         cpp=work/'test.cpp';cpp.write_text(CASES.replace('REGISTRATION_WRAPPERS',facade[a:b]).replace('PRODUCTION_METHODS',production));binary=work/'test'
         subprocess.run([os.environ.get('CXX','clang++'),'-std=c++17','-O1','-g',
                         '-fsanitize=address,undefined','-fno-omit-frame-pointer',
-                        '-I',str(work),'-I',str(ROOT/'src/Managers'),str(cpp),'-o',str(binary)],check=True)
+                        '-I',str(work),'-I',str(ROOT/'src/Managers'),'-I',str(of_root()/'libs/json/include'),str(cpp),'-o',str(binary)],check=True)
         subprocess.run([str(binary)],check=True)
 if __name__=='__main__':main()
