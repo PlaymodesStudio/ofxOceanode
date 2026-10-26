@@ -211,10 +211,21 @@ public:
 	
 	template<typename ParameterType>
 	shared_ptr<ofxOceanodeParameter<ParameterType>> addOutputParameter(ofParameter<ParameterType>& p, ofxOceanodeParameterFlags flags = 0){
-		auto oceaParam = addParameter(p, flags | ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisplayMinimized);
+		auto oceaParam = addParameter(p, flags | outputParameterFlags);
 		return oceaParam;
 	}
-    
+
+    template<typename ParameterType>
+    shared_ptr<ofxOceanodeParameter<ParameterType>> addOutputParameter(std::shared_ptr<ofParameter<ParameterType>> p, ofxOceanodeParameterFlags flags = 0){
+        return addParameter(p, flags | outputParameterFlags);
+    }
+
+    // Dropdown whose selection the node writes; same overloads as addParameterDropdown.
+    template<typename ParameterType>
+    auto addOutputParameterDropdown(ofParameter<ParameterType> &dropdownSelector, string name, int defaultPos, vector<string> options, ofxOceanodeParameterFlags flags = 0){
+        return addParameterDropdown(dropdownSelector, name, defaultPos, options, flags | outputParameterFlags);
+    }
+
     shared_ptr<ofxOceanodeParameter<int>> addParameterDropdown(ofParameter<int> &dropdownSelector, string name, int defaultPos, vector<string> options, ofxOceanodeParameterFlags flags = 0){
         dropdownSelector.set(name, defaultPos, 0, options.size()-1);
 		auto op = addParameter(dropdownSelector, flags);
@@ -307,6 +318,9 @@ public:
     }
     
 protected:
+    static constexpr ofxOceanodeParameterFlags outputParameterFlags =
+        ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisplayMinimized | ofxOceanodeParameterFlags_Output;
+
     ofColor color;
 	string canvasID;
     string description;
