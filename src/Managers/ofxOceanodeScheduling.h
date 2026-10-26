@@ -73,6 +73,23 @@ private:
     bool previous;
 };
 
+// A backend may apply a scheduled value to its parameter ahead of the value's
+// instant, so that the node's own listener sends it (stamped). Graph
+// connections must not pass that future value on while it is applied:
+// downstream nodes receive it on the frame the playhead reaches it, like
+// every other timeline value.
+bool isScheduledSendActive();
+
+class ScopedScheduledSend {
+public:
+    ScopedScheduledSend();
+    ~ScopedScheduledSend();
+    ScopedScheduledSend(const ScopedScheduledSend&) = delete;
+    ScopedScheduledSend& operator=(const ScopedScheduledSend&) = delete;
+private:
+    bool previous;
+};
+
 }
 
 #endif /* ofxOceanodeScheduling_h */

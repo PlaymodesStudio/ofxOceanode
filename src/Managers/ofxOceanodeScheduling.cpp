@@ -23,6 +23,7 @@ std::map<const ofxOceanodeAbstractParameter*, TargetEntry>& registry() {
 // Per-thread: the timeline applies automation on the main thread, but a
 // backend could send from its own.
 thread_local bool backendSendSuppressed = false;
+thread_local bool scheduledSendActive = false;
 }
 
 namespace ofxOceanodeScheduling {
@@ -86,6 +87,18 @@ ScopedBackendSuppression::ScopedBackendSuppression(bool _active)
 
 ScopedBackendSuppression::~ScopedBackendSuppression() {
     if(active) backendSendSuppressed = previous;
+}
+
+bool isScheduledSendActive() {
+    return scheduledSendActive;
+}
+
+ScopedScheduledSend::ScopedScheduledSend() : previous(scheduledSendActive) {
+    scheduledSendActive = true;
+}
+
+ScopedScheduledSend::~ScopedScheduledSend() {
+    scheduledSendActive = previous;
 }
 
 }
