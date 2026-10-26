@@ -114,7 +114,7 @@ public:
         addParameter(forceFinish.set("Force Fin"));
         addParameter(rampDurationMs.set("Ms", 1000, 0, FLT_MAX));
         addOutputParameter(output.set("Out", 0, 0, 1));
-        addParameter(isRamping.set("IsRamping",false));
+        addOutputParameter(isRamping.set("IsRamping",false));
         addOutputParameter(isRampFinish.set("Finish",false));
         addParameter(enable.set("Enable", true));
         addInspectorParameter(syncToTransport.set("Sync To Transport", false));
