@@ -141,6 +141,15 @@ public:
     // whole. Asked when a piano roll is set up and on every timeline update
     // (voice count, kit), so keep it cheap.
     virtual bool getTimelineInstrument(ofxOceanodeTimelineInstrument&) { return false; }
+    // Optional native/dockable editor navigation, shared by timeline and other UIs.
+    // Existing SC nodes expose these title/toggle methods through scNode.
+    virtual std::string getWindowTitle() { return {}; }
+    virtual ofParameter<bool>* getWindowToggle() { return nullptr; }
+    virtual bool canShowNodeWindow() { return getWindowToggle() != nullptr && !getWindowTitle().empty(); }
+    virtual void showNodeWindow() {
+        if(auto* toggle = getWindowToggle()) toggle->set(true);
+    }
+
     // Query without changing the node; bind=true may publish its note inputs.
     // Reuse the same instrument/voice metadata for a hardware MIDI keyboard.
     virtual bool getMidiKeyboardInstrument(ofxOceanodeTimelineInstrument& out, bool bind = false) {
