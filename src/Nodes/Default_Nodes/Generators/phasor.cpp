@@ -56,7 +56,7 @@ void phasor::setup(){
     addParameter(beatsDiv_Param.set("Div", {2}, {1}, {512}));
     addParameter(beatsMult_Param.set("Mult", {1}, {0}, {512}));
     addParameter(initPhase_Param.set("Init Ph", {0}, {0}, {1}));
-    addParameter(resetPhase_Param.set("Reset"));
+    addInputAndOutputParameter(resetPhase_Param.set("Reset"));
     addParameter(loop_Param.set("Loop", true));
     addOutputParameter(phasorMonitor.set("Phase", {0}, {0}, {1}));
     
