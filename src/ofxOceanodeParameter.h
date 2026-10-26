@@ -124,7 +124,11 @@ public:
     virtual ofEvent<std::string>& nameChangedEvent() = 0;
 	
 	ofxOceanodeParameterFlags getFlags(){return flags;};
-	void setFlags(ofxOceanodeParameterFlags f){flags = f;};
+	void setFlags(ofxOceanodeParameterFlags f){
+        flags = f;
+        if(profilingHook) profilingHook->configurePublication(
+            !(f & ofxOceanodeParameterFlags_DisableOutConnection), !(f & ofxOceanodeParameterFlags_DisableInConnection));
+    };
     
     bool hasInConnection(){return !inConnections.empty();};
     ofxOceanodeAbstractConnection* getInConnection(){return inConnections.empty() ? nullptr : inConnections.back();};
@@ -289,13 +293,15 @@ public:
 		if(parameter == nullptr){
 			parameter = std::make_shared<ofParameter<ParameterType>>(p);
 			defaultValue = p;
-			profilingHook = oceanodeProfiling::ParameterHook::bind(*parameter);
+			profilingHook = oceanodeProfiling::ParameterHook::bind(*parameter, true);
+            setFlags(getFlags());
 		}
 	}
     void bindParameter(std::shared_ptr<ofParameter<ParameterType>> &p){
         parameter = p;
         defaultValue = p.get()->get();
-        profilingHook = oceanodeProfiling::ParameterHook::bind(*parameter);
+        profilingHook = oceanodeProfiling::ParameterHook::bind(*parameter, true);
+        setFlags(getFlags());
     }
 	ofParameter<ParameterType> & getParameter(){return *parameter;}
     
@@ -368,12 +374,13 @@ public:
 	//Custom
 	void bindParameter(ofParameter<void> &p){
 		parameter = std::make_shared<ofParameter<void>>(p);
-		profilingHook = oceanodeProfiling::ParameterHook::bind(*parameter);
+		profilingHook = oceanodeProfiling::ParameterHook::bind(*parameter, true);
+        setFlags(getFlags());
 	}
 	ofParameter<void> & getParameter(){return *parameter;}
 	
-	ofxOceanodeParameterFlags getFlags();
-	void setFlags(ofxOceanodeParameterFlags f){flags = f;};
+	ofxOceanodeParameterFlags getFlags(){ return ofxOceanodeAbstractParameter::getFlags(); };
+	void setFlags(ofxOceanodeParameterFlags f){ ofxOceanodeAbstractParameter::setFlags(f); };
 	
 protected:
 	const ofParameterGroup getFirstParent() const { return parameter->getFirstParent();}
@@ -383,7 +390,6 @@ protected:
 	
 private:
 	std::shared_ptr<ofParameter<void>> parameter;
-	ofxOceanodeParameterFlags flags = 0;
 };
 
 #include "ofxOceanodeParameter.inl"

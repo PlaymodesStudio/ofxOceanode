@@ -47,6 +47,25 @@ struct Sample {
 
 class Session;
 struct Record;
+struct PublicationSample {
+    std::uint64_t count = 0, segment = 0;
+    std::int64_t firstNs = 0, lastNs = 0;
+};
+
+struct Publication {
+    std::weak_ptr<Record> owner;
+    std::function<std::string()> name;
+    bool outputCapable = true, bidirectional = true;
+    PublicationSample pending;
+    std::vector<PublicationSample> history;
+};
+
+struct PublicationStats {
+    std::uint64_t count = 0;
+    double perFrame = 0, perSecond = -1, intervalMs = -1;
+};
+
+struct Record;
 struct ListenerBinding {
     std::weak_ptr<Record> owner;
     virtual ~ListenerBinding() = default;
@@ -58,6 +77,7 @@ struct Record {
     std::atomic<bool> enabled{false};
     bool registered = false;
     std::vector<std::weak_ptr<ListenerBinding>> bindings;
+    std::vector<std::weak_ptr<Publication>> publications;
     Sample pending;
     Sample total;
     std::vector<Sample> history;
@@ -80,6 +100,14 @@ struct Record {
         double result = 0;
         for(const auto& sample : history) result = std::max(result, sample.selfNs());
         return result;
+    }
+    template<class Fn> void forEachPublication(Fn fn) {
+        publications.erase(std::remove_if(publications.begin(), publications.end(), [&](const std::weak_ptr<Publication>& weak){
+            auto publication = weak.lock();
+            if(!publication || publication->owner.lock().get() != this) return true;
+            fn(*publication);
+            return false;
+        }), publications.end());
     }
 };
 
@@ -116,6 +144,7 @@ public:
         record->total = {};
         record->history.clear();
         if(recording) record->history.resize(window);
+        record->forEachPublication([this](Publication& publication){ resetPublication(publication); });
         record->setEnabled(recording);
         records.push_back(record);
     }
@@ -126,6 +155,40 @@ public:
     std::size_t windowFrames() const { return window; }
     std::uint64_t incompleteSpans() const { return incomplete; }
     std::uint64_t scopeEpoch() const { return epoch; }
+    double sampledSeconds() const { return durationNs / 1e9; }
+
+    void preparePublication(Publication& publication) {
+        if(recording && publication.outputCapable && publication.history.size() != window)
+            publication.history.assign(window, {});
+    }
+
+    PublicationStats publicationStats(const Publication& publication) const {
+        PublicationStats stats;
+        std::uint64_t intervals = 0, previousSegment = 0;
+        std::int64_t previousNs = 0;
+        double intervalSumNs = 0;
+        bool previous = false;
+        // Walk the ring in timestamp order; idle frames still contribute to
+        // the rate denominator, and discarded frames break interval continuity.
+        for(std::size_t i = 0; i < publication.history.size(); ++i){
+            const auto& sample = publication.history[(cursor + i) % publication.history.size()];
+            if(!sample.count) continue;
+            stats.count += sample.count;
+            intervalSumNs += sample.lastNs - sample.firstNs;
+            intervals += sample.count - 1;
+            if(previous && sample.segment == previousSegment){
+                intervalSumNs += sample.firstNs - previousNs;
+                ++intervals;
+            }
+            previous = true;
+            previousNs = sample.lastNs;
+            previousSegment = sample.segment;
+        }
+        if(sampleFrames()) stats.perFrame = static_cast<double>(stats.count) / sampleFrames();
+        if(durationNs > 0) stats.perSecond = stats.count * 1e9 / durationNs;
+        if(intervals) stats.intervalMs = intervalSumNs / intervals / 1e6;
+        return stats;
+    }
     std::vector<std::shared_ptr<Record>> liveRecords() {
         std::vector<std::shared_ptr<Record>> result;
         forEachRecord([](Record&){});
@@ -142,7 +205,11 @@ public:
         if(enabled) stack.reserve(128);
         frameOpen = false;
         frameInvalid = false;
-        forEachRecord([enabled](Record& record){ record.pending = {}; record.setEnabled(enabled); });
+        forEachRecord([enabled](Record& record){
+            record.pending = {};
+            record.forEachPublication([](Publication& publication){ publication.pending = {}; });
+            record.setEnabled(enabled);
+        });
         if(enabled) reset();
     }
 
@@ -155,10 +222,14 @@ public:
         incomplete = 0;
         frameOpen = false;
         frameInvalid = false;
+        durationNs = 0;
+        durations.assign(recording ? window : 0, 0);
+        ++publicationSegment;
         forEachRecord([this](Record& record){
             record.pending = {};
             record.total = {};
             record.history.assign(recording ? window : 0, {});
+            record.forEachPublication([this](Publication& publication){ resetPublication(publication); });
         });
     }
 
@@ -166,6 +237,7 @@ public:
     // and GUI events belong to that same frame; Macro containers never call it.
     void nextFrame() {
         if(!recording) return;
+        const auto boundaryNs = clock();
         const bool balanced = stack.empty();
         discardOpenSpans();
         if(frameOpen && balanced && !frameInvalid){
@@ -175,12 +247,25 @@ public:
                 record.total.add(record.pending);
                 record.history[cursor] = record.pending;
                 record.pending = {};
+                record.forEachPublication([this](Publication& publication){
+                    preparePublication(publication);
+                    if(!publication.history.empty()) publication.history[cursor] = publication.pending;
+                    publication.pending = {};
+                });
             });
+            durationNs -= durations[cursor];
+            durations[cursor] = std::max<std::int64_t>(0, boundaryNs - frameStartNs);
+            durationNs += durations[cursor];
             cursor = (cursor + 1) % window;
             ++frames;
         }else{
-            forEachRecord([](Record& record){ record.pending = {}; });
+            forEachRecord([](Record& record){
+                record.pending = {};
+                record.forEachPublication([](Publication& publication){ publication.pending = {}; });
+            });
+            ++publicationSegment;
         }
+        frameStartNs = boundaryNs;
         frameOpen = true;
         frameInvalid = false;
         ++epoch;
@@ -219,7 +304,22 @@ public:
         if(!stack.empty()) stack.back().childrenNs += elapsed;
     }
 
+    void publish(Publication& publication, std::uint64_t token) {
+        if(!publication.outputCapable || !token || stack.empty() || stack.back().token != token) return;
+        // Reuse the existing listener-entry timestamp; publication counting
+        // introduces no additional per-notification clock reads.
+        const auto timestamp = stack.back().start;
+        auto& sample = publication.pending;
+        if(!sample.count) { sample.firstNs = timestamp; sample.segment = publicationSegment; }
+        sample.lastNs = timestamp;
+        ++sample.count;
+    }
+
 private:
+    void resetPublication(Publication& publication) {
+        publication.pending = {};
+        publication.history.assign(recording && publication.outputCapable ? window : 0, {});
+    }
     struct Entry {
         std::shared_ptr<Record> record;
         Phase phase;
@@ -254,6 +354,10 @@ private:
     std::uint64_t incomplete = 0;
     std::uint64_t epoch = 0;
     std::size_t nextPrune = 64;
+    std::vector<std::int64_t> durations;
+    std::int64_t frameStartNs = 0;
+    double durationNs = 0;
+    std::uint64_t publicationSegment = 0;
 };
 
 class Scope {
@@ -281,6 +385,9 @@ public:
         token = 0;
     }
     bool isCurrent() const { return session && token && epoch == session->scopeEpoch(); }
+    void publish(Publication& publication) {
+        if(isCurrent()) session->publish(publication, token);
+    }
 private:
     std::shared_ptr<Session> session;
     std::uint64_t token = 0;

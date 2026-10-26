@@ -24,6 +24,33 @@ still have captured results, but cannot be located on a visible canvas.
 | Peak self ms/frame | Highest per-frame self time within the averaging window. |
 | Update / Draw / Listeners / GUI ms | Average exclusive time in each category. These sum to self time. |
 | Calls/frame | Timed lifecycle, GUI, parameter and group notification scopes per frame. Not the number of value changes or calculations. |
+| Out events/frame | Average emitted notifications from output-capable pins per sampled frame. The node row sums its pins. |
+| Out events/s | Notifications divided by the actual elapsed duration of the retained frames; follows the real FPS. |
+| Out interval ms | Mean spacing between publications of one pin. `--` means fewer than two comparable publications, or multiple active pins on a node row. |
+
+Expand a node with its arrow to see each output pin's publication metrics.
+For a pin publishing once per frame at 60 FPS, expect approximately **1/frame,
+60/s, and 16.67 ms**. With two such pins, the node totals are **2/frame and
+120/s**; expand it to read the separate **16.67 ms** intervals. These intervals
+describe publication frequency; the CPU timing columns describe processing cost.
+
+Output-capable means a registered node parameter with an enabled output pin,
+including disconnected pins. Dedicated outputs are marked **Output pin**.
+Bidirectional pins are marked **I/O pin** and also count notifications caused by
+incoming values or UI edits. Input-only pins, Inspector parameters, custom GUI
+regions without output pins, and group notifications do not add publication
+events. Each local parameter notification counts once, regardless of cable
+fanout. Assigning the same value again counts if OF emits a notification;
+assignments with events disabled do not. Void output triggers are included.
+
+Publication samples use the same completed-frame window and stop/freeze controls
+as CPU measurements. Idle frames reduce events/s and events/frame. Intervals use
+the actual timestamps of consecutive observed publications within the window;
+at least two are needed, and discarded frames break interval continuity. Short
+bursts can have a near-zero interval even when the overall events/s is low.
+Texture/audio content changing in place without a parameter notification is
+not a publication here; these are Oceanode message rates, not GPU frame rates
+or audio sample rates.
 
 Idle frames count toward averages. A frame starts at the root Oceanode update;
 its draw and subsequent GUI events are committed at the next root update.
@@ -75,6 +102,10 @@ nested accounting, rolling idle frames and peaks, wrapper-copy lifetime,
 recursive group events, void triggers, custom receive callbacks, ignored worker
 notifications, consumed-event recovery, session reassignment, capture buttons,
 frozen snapshots, sorting, filtering and a narrow controller window.
+Publication coverage includes 60 Hz and 30 Hz signals, idle-window eviction,
+same-value assignments, multiple pins/fanout, bursts, missing intervals,
+direction flags, void triggers, discarded frames, worker exclusion, copied
+wrappers, node totals, expanded rows and frozen rates.
 
 `python3 tests/profiling_regression.py --native` reuses the native Macro fixture
 to exercise production node creation, lifecycle dispatch, typed/type-erased

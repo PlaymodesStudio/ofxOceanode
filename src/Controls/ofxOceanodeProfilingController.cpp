@@ -6,6 +6,7 @@
 #include "ofxOceanodeGlDiagnostics.h"
 #include <algorithm>
 #include <functional>
+#include <unordered_set>
 
 using namespace oceanodeProfiling;
 
@@ -25,6 +26,8 @@ void ofxOceanodeProfilingController::update(){
 }
 
 void ofxOceanodeProfilingController::refresh(){
+    std::unordered_set<const Record*> expanded;
+    for(const auto& row : rows) if(row.expanded) if(auto record = row.record.lock()) expanded.insert(record.get());
     rows.clear();
     measuredMs = 0;
     displayedFrames = session->sampleFrames();
@@ -36,10 +39,26 @@ void ofxOceanodeProfilingController::refresh(){
         row.name = identity.name;
         row.path = identity.path;
         row.total = record->total;
+        row.expanded = expanded.count(record.get()) != 0;
         row.selfMs = row.total.selfNs() / denominator / 1e6;
         row.inclusiveMs = row.total.inclusiveNs() / denominator / 1e6;
         row.peakMs = record->peakSelfNs() / 1e6;
         for(const auto& phase : row.total.phases) row.callsPerFrame += phase.calls / denominator;
+        std::uint64_t publications = 0;
+        unsigned activeOutputs = 0;
+        record->forEachPublication([&](Publication& publication){
+            if(!publication.outputCapable) return;
+            OutputRow output{publication.name(), publication.bidirectional, session->publicationStats(publication)};
+            publications += output.stats.count;
+            if(output.stats.count){ ++activeOutputs; row.outputIntervalMs = output.stats.intervalMs; }
+            row.outputs.push_back(std::move(output));
+        });
+        std::sort(row.outputs.begin(), row.outputs.end(), [](const OutputRow& a, const OutputRow& b){ return a.name < b.name; });
+        row.outputsPerFrame = publications / denominator;
+        if(session->sampledSeconds() > 0) row.outputsPerSecond = publications / session->sampledSeconds();
+        // Never present the spacing between different output pins as a node's
+        // publication interval. It would make a three-output 60 Hz node 180 Hz.
+        if(activeOutputs != 1) row.outputIntervalMs = -1;
         measuredMs += row.selfMs;
         rows.push_back(std::move(row));
     }
@@ -60,7 +79,10 @@ void ofxOceanodeProfilingController::sortRows(const ImGuiTableSortSpecs* specs){
                 if(column == 4) return row.inclusiveMs;
                 if(column == 5) return row.peakMs;
                 if(column >= 6 && column <= 9) return row.total.phases[column - 6].selfNs;
-                return row.callsPerFrame;
+                if(column == 10) return row.callsPerFrame;
+                if(column == 11) return row.outputsPerFrame;
+                if(column == 12) return row.outputsPerSecond;
+                return row.outputIntervalMs;
             };
             const double left = value(a), right = value(b);
             if(left != right) return ascending ? left < right : left > right;
@@ -145,6 +167,7 @@ void ofxOceanodeProfilingController::draw(){
         filter.Build();
     ImGui::Text("Measured nodes: %.3f ms/frame | %zu sampled frames", measuredMs, displayedFrames);
     ImGui::TextWrapped("Self excludes nested nodes. Inclusive includes downstream work. Share is a percentage of measured node time. All times include CPU GUI work.");
+    ImGui::TextWrapped("Output counts sum output-capable pins. Expand a node for each pin's rate and interval. I/O pins can also forward incoming values; unchanged-value notifications count.");
     if(session->incompleteSpans()) ImGui::TextWrapped("%llu incomplete timing scopes; affected frames were discarded.",
         static_cast<unsigned long long>(session->incompleteSpans()));
     if(locateFailed) ImGui::TextWrapped("This node is no longer on a visible canvas, or belongs to a private MacroMixer graph.");
@@ -155,7 +178,7 @@ void ofxOceanodeProfilingController::draw(){
     const auto flags = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
         ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
     std::shared_ptr<Record> clicked;
-    if(ImGui::BeginTable("##cpu_profile", 11, flags, ImVec2(0, std::max(120.0f, ImGui::GetContentRegionAvail().y)))){
+    if(ImGui::BeginTable("##cpu_profile", 14, flags, ImVec2(0, std::max(120.0f, ImGui::GetContentRegionAvail().y)))){
         ImGui::TableSetupScrollFreeze(1, 1);
         ImGui::TableSetupColumn("Node", ImGuiTableColumnFlags_WidthFixed, 180);
         ImGui::TableSetupColumn("Canvas / Macro path", ImGuiTableColumnFlags_WidthFixed, 200);
@@ -168,6 +191,9 @@ void ofxOceanodeProfilingController::draw(){
         ImGui::TableSetupColumn("Listeners ms", ImGuiTableColumnFlags_WidthFixed, 110);
         ImGui::TableSetupColumn("GUI ms", ImGuiTableColumnFlags_WidthFixed, 95);
         ImGui::TableSetupColumn("Calls/frame", ImGuiTableColumnFlags_WidthFixed, 100);
+        ImGui::TableSetupColumn("Out events/frame", ImGuiTableColumnFlags_WidthFixed, 130);
+        ImGui::TableSetupColumn("Out events/s", ImGuiTableColumnFlags_WidthFixed, 110);
+        ImGui::TableSetupColumn("Out interval ms", ImGuiTableColumnFlags_WidthFixed, 125);
         ImGui::TableHeadersRow();
         auto* specs = ImGui::TableGetSortSpecs();
         if(needsSort || (specs && specs->SpecsDirty)){
@@ -175,16 +201,44 @@ void ofxOceanodeProfilingController::draw(){
             if(specs) specs->SpecsDirty = false;
         }
         ImGuiListClipper clipper;
-        std::vector<const Row*> visible;
-        for(const auto& row : rows)
-            if(filter.PassFilter((row.name + " " + row.path).c_str())) visible.push_back(&row);
+        struct VisibleRow { Row* node; const OutputRow* output; };
+        std::vector<VisibleRow> visible;
+        for(auto& row : rows) if(filter.PassFilter((row.name + " " + row.path).c_str())){
+            visible.push_back({&row, nullptr});
+            if(row.expanded) for(const auto& output : row.outputs) visible.push_back({&row, &output});
+        }
+        auto metric = [](int column, double value, int decimals){
+            ImGui::TableSetColumnIndex(column);
+            if(value < 0) ImGui::TextUnformatted("--");
+            else ImGui::Text("%.*f", decimals, value);
+        };
         clipper.Begin(static_cast<int>(visible.size()));
         while(clipper.Step()) for(int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i){
-            const auto& row = *visible[i];
+            auto& row = *visible[i].node;
             ImGui::PushID(i);
-            ImGui::TableNextRow();
+            // Expanded pin rows have the same height as node rows for clipping.
+            ImGui::TableNextRow(0, ImGui::GetFrameHeight());
             ImGui::TableSetColumnIndex(0);
-            if(ImGui::Selectable(row.name.c_str(), false, ImGuiSelectableFlags_SpanAllColumns)){
+            if(const auto* output = visible[i].output){
+                ImGui::Indent(ImGui::GetFrameHeight());
+                ImGui::TextUnformatted(output->name.c_str());
+                ImGui::Unindent(ImGui::GetFrameHeight());
+                if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s\n%s\nOne emitted parameter notification is one publication, regardless of cable count. Intervals need at least two observed publications.", output->name.c_str(), output->bidirectional ? "I/O pin: includes forwarding received values." : "Output-only pin.");
+                ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(output->bidirectional ? "I/O pin" : "Output pin");
+                metric(11, output->stats.perFrame, 2);
+                metric(12, output->stats.perSecond, 2);
+                metric(13, output->stats.intervalMs, 3);
+                ImGui::PopID();
+                continue;
+            }
+            if(!row.outputs.empty()){
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, 0));
+                const bool toggle = ImGui::ArrowButton("##outputs", row.expanded ? ImGuiDir_Down : ImGuiDir_Right);
+                ImGui::PopStyleVar();
+                if(toggle) row.expanded = !row.expanded;
+                ImGui::SameLine();
+            }
+            if(ImGui::Selectable(row.name.c_str())){
                 clicked = row.record.lock();
                 if(!clicked) locateFailed = true;
             }
@@ -199,6 +253,10 @@ void ofxOceanodeProfilingController::draw(){
                 ImGui::Text("%.3f", row.total.phases[phase].selfNs / std::max<std::size_t>(1, displayedFrames) / 1e6);
             }
             ImGui::TableSetColumnIndex(10); ImGui::Text("%.1f", row.callsPerFrame);
+            metric(11, row.outputsPerFrame, 2);
+            metric(12, row.outputsPerSecond, 2);
+            metric(13, row.outputIntervalMs, 3);
+            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Mean interval between notifications of the single active output pin. With multiple active pins, expand the node to inspect each interval. -- means unavailable.");
             ImGui::PopID();
         }
         ImGui::EndTable();

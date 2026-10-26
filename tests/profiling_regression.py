@@ -15,11 +15,13 @@ from new_preset_regression import block
 PREFIX = r'''
 #include "ofMain.h"
 #include "ofxOceanodeParameter.h"
+#include "ofxOceanodeGlDiagnostics.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include <cassert>
 #include <iostream>
 #include <thread>
+#include <unordered_set>
 // Expose snapshots to assert their preservation after graph changes.
 #define private public
 #include "Controls/ofxOceanodeProfilingController.h"
@@ -36,11 +38,13 @@ bool ofxOceanodeProfilingController::locate(const std::shared_ptr<Record>&) { re
 void ofxOceanodeAbstractParameter::removeAllConnections() {
     assert(!hasInConnection() && !hasOutConnections() && !isScoped());
 }
+ofxOceanodeAbstractParameter::~ofxOceanodeAbstractParameter() = default;
 template<class T> struct Parameter : ofxOceanodeParameter<T> {
     void setRecord(const std::shared_ptr<Record>& record) {
         this->profilingRecord = record;
         this->profilingHook->setRecord(record);
     }
+    auto publication() const { return this->profilingHook->publication; }
 };
 static std::int64_t ticks = 0;
 static int clockReads = 0;
@@ -60,7 +64,108 @@ static void equal(double actual, double expected) {
 '''
 
 CASES = r'''
+static void publicationChecks() {
+    constexpr int frameNs = 16666667;
+    auto session = std::make_shared<Session>(now);
+    auto record = makeRecord(session, "Publications");
+    ofParameter<int> first("First", 0), second("Second", 0), input("Input", 0);
+    Parameter<int> a, b, in;
+    a.bindParameter(first); a.setFlags(ofxOceanodeParameterFlags_DisableInConnection); a.setRecord(record);
+    b.bindParameter(second); b.setFlags(ofxOceanodeParameterFlags_DisableInConnection); b.setRecord(record);
+    in.bindParameter(input); in.setFlags(ofxOceanodeParameterFlags_DisableOutConnection); in.setRecord(record);
+    ofParameterGroup group; group.add(first);
+    auto groupHook = ParameterHook::bindGroup(group); groupHook->setRecord(record);
+    // Multiple receivers and group events do not multiply publications.
+    int receiver1 = 0, receiver2 = 0;
+    auto l1 = first.newListener([&](int& v){receiver1 = v;});
+    auto l2 = first.newListener([&](int& v){receiver2 = v;});
+    assert(first.getNumListeners() == 2 && a.publication()->history.empty());
+    const int offReads = clockReads; first = 7; session->nextFrame(); assert(clockReads == offReads);
+    session->reset(60); session->setRecording(true); session->nextFrame();
+    for(int i=0; i<60; ++i){
+        first = 7; second = 7; input = 7; // Same value still emits a notification.
+        advance(frameNs); session->nextFrame();
+    }
+    auto stats = session->publicationStats(*a.publication());
+    assert(stats.count == 60 && receiver1 == 7 && receiver2 == 7);
+    equal(stats.perFrame, 1); equal(stats.perSecond, 1e9 / frameNs); equal(stats.intervalMs, frameNs / 1e6);
+    assert(session->publicationStats(*b.publication()).count == 60);
+    assert(session->publicationStats(*in.publication()).count == 0);
+    {
+        auto root = std::make_shared<ofxOceanodeContainer>(); root->session = session;
+        ofxOceanodeCanvas canvas; ofxOceanodeProfilingController panel(root, &canvas);
+        panel.refresh(); assert(panel.rows.size() == 1 && panel.rows[0].outputs.size() == 2);
+        equal(panel.rows[0].outputsPerFrame, 2);
+        equal(panel.rows[0].outputsPerSecond, 2e9 / frameNs);
+        assert(panel.rows[0].outputIntervalMs < 0); // Two independent output pins.
+        equal(panel.rows[0].outputs[0].stats.intervalMs, frameNs / 1e6);
+        equal(panel.rows[0].outputs[1].stats.perSecond, 1e9 / frameNs);
+        // This scope owns the controller, so restore capture after its destructor.
+    }
+    // The controller destructor stopped capture; start a new 60-frame window.
+    session->setRecording(true); session->nextFrame();
+    for(int i=0; i<60; ++i){advance(frameNs); session->nextFrame();}
+    stats = session->publicationStats(*a.publication());
+    assert(stats.count == 0 && stats.intervalMs < 0); equal(stats.perSecond, 0);
+    // Idle frames stay in the denominator; each alternate frame is 30 Hz.
+    session->reset(); session->nextFrame();
+    for(int i=0; i<60; ++i){ if(i%2 == 0) first = 7; advance(frameNs); session->nextFrame(); }
+    stats = session->publicationStats(*a.publication());
+    equal(stats.perFrame, .5); equal(stats.perSecond, 1e9 / frameNs / 2); equal(stats.intervalMs, 2 * frameNs / 1e6);
+    session->reset(); session->nextFrame();
+    for(int i=0; i<30; ++i){first = 7; advance(2 * frameNs); session->nextFrame();}
+    stats = session->publicationStats(*a.publication());
+    equal(stats.perFrame, 1); equal(stats.perSecond, 1e9 / frameNs / 2); equal(stats.intervalMs, 2 * frameNs / 1e6);
+    // Bursts in the same frame, zero-time intervals, and shared wrapper copies.
+    session->reset(3); session->nextFrame();
+    auto copy = a.newReference(); first = 7; first = 7;
+    advance(frameNs); session->nextFrame();
+    stats = session->publicationStats(*a.publication());
+    assert(stats.count == 2); equal(stats.intervalMs, 0); equal(stats.perFrame, 2);
+    // Void pins share the same base direction flags and publication machinery.
+    ofParameter<void> trigger("Trigger"); Parameter<void> v;
+    v.bindParameter(trigger); v.setFlags(ofxOceanodeParameterFlags_DisableInConnection); v.setRecord(record);
+    assert(v.getFlags() == static_cast<ofxOceanodeAbstractParameter&>(v).getFlags());
+    trigger.trigger(); advance(5000000); trigger.trigger(); advance(frameNs); session->nextFrame();
+    auto triggerStats = session->publicationStats(*v.publication());
+    assert(triggerStats.count == 2); equal(triggerStats.intervalMs, 5);
+    a.setFlags(ofxOceanodeParameterFlags_DisableOutConnection);
+    first = 8; assert(a.publication()->pending.count == 0);
+    a.setFlags(ofxOceanodeParameterFlags_DisableInConnection);
+    first = 9; assert(a.publication()->pending.count == 1);
+    // A discarded frame breaks the interval chain, not the whole capture.
+    session->reset(10); session->nextFrame(); first = 1; advance(frameNs); session->nextFrame();
+    auto consume = first.newListener([](int&)->bool{return true;}, -100);
+    first = 2; advance(frameNs); session->nextFrame(); consume.reset();
+    first = 3; advance(frameNs); session->nextFrame();
+    stats = session->publicationStats(*a.publication());
+    assert(stats.count == 2 && stats.intervalMs < 0);
+    first = 4; advance(frameNs); session->nextFrame();
+    equal(session->publicationStats(*a.publication()).intervalMs, frameNs / 1e6);
+    auto otherOwner = makeRecord(session, "Other owner");
+    a.setRecord(otherOwner); first = 8;
+    a.setRecord(record); first = 9; advance(frameNs); session->nextFrame();
+    assert(session->publicationStats(*a.publication()).count == 1);
+    unsigned registered = 0; record->forEachPublication([&](Publication&){++registered;});
+    assert(registered == 4);
+    unsigned oldOwner = 0; otherOwner->forEachPublication([&](Publication&){++oldOwner;}); assert(oldOwner == 0);
+    // Worker notifications and stopped captures never change the counters.
+    const auto beforeWorker = a.publication()->pending.count;
+    const int workerReads = clockReads;
+    std::thread worker([&](){first = 5;}); worker.join();
+    assert(clockReads == workerReads && a.publication()->pending.count == beforeWorker);
+    session->setRecording(false); stats = session->publicationStats(*a.publication());
+    const int stoppedReads = clockReads; first = 6; advance(frameNs); session->nextFrame();
+    assert(clockReads == stoppedReads && session->publicationStats(*a.publication()).count == stats.count);
+    equal(session->publicationStats(*a.publication()).perSecond, stats.perSecond);
+    session->setRecording(true); session->nextFrame(); advance(frameNs); session->nextFrame();
+    assert(session->publicationStats(*a.publication()).count == 0);
+    session->setRecording(false);
+    ticks = 0; clockReads = 0;
+}
+
 int main() {
+    publicationChecks();
     auto session = std::make_shared<Session>(now);
     auto a = makeRecord(session, "A"), b = makeRecord(session, "B"), c = makeRecord(session, "C");
     ofParameter<int> source("Source", 0), input("Input", 0), output("Output", 0), sink("Sink", 0);
@@ -169,6 +274,7 @@ int main() {
     // Production ImGui controller: Profile! / Stop, sorting, filtering, narrow
     // window clipping and frozen snapshots after metadata/node changes.
     ImGui::CreateContext();
+    oceanodeGlDiagnostics::enabled() = false;
     auto& io = ImGui::GetIO(); io.IniFilename = nullptr;
     io.DisplaySize = {1600, 900}; io.DeltaTime = 1.0f/60;
     unsigned char* pixels; int width, height; io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
@@ -178,7 +284,8 @@ int main() {
     float panelWidth = 1500;
     auto frame = [&](){
         ImGui::NewFrame(); ImGui::SetNextWindowPos({0,0}); ImGui::SetNextWindowSize({panelWidth,600});
-        ImGui::Begin("Profiling"); button = ImGui::GetCursorScreenPos(); button.x += 10; button.y += 10;
+        ImGui::Begin("Profiling"); button = ImGui::GetCursorScreenPos(); button.x += 10;
+        button.y += ImGui::GetFrameHeightWithSpacing() + 10; // GL trace checkbox precedes Profile!.
         panel.draw(); ImGui::End(); ImGui::Render();
         for(const auto* list : ImGui::GetDrawData()->CmdLists) for(const auto& v : list->VtxBuffer)
             assert(std::isfinite(v.pos.x) && std::isfinite(v.pos.y));
@@ -197,16 +304,21 @@ int main() {
     session->nextFrame(); panel.nextRefresh = 0; panel.update(); frame();
     assert(panel.displayedFrames == 1 && panel.rows.size() == 3);
     assert(panel.rows.front().name == "B");
+    for(auto& row : panel.rows) row.expanded = true;
+    frame(); // Expanded output rows use the same clipper height as node rows.
     click(); assert(!session->isRecording());
     const auto panelTotal = panel.measuredMs; const auto savedName = panel.rows.front().name;
     b->identity = [](){return Record::Identity{"Renamed", "Changed path"};};
     for(int i=0; i<10; ++i){ source = i + 50; session->nextFrame(); panel.update(); }
     equal(panel.measuredMs, panelTotal); assert(panel.rows.front().name == savedName);
+    assert(!panel.rows.front().outputs.empty());
+    const auto savedRate = panel.rows.front().outputs.front().stats.perSecond;
     panelWidth = 280; frame();
     panel.filter.InputBuf[0] = 'Z'; panel.filter.InputBuf[1] = 0; panel.filter.Build(); frame();
     assert(!session->isRecording());
+    equal(panel.rows.front().outputs.front().stats.perSecond, savedRate);
     ImGui::DestroyContext();
-    std::cout << "Profiling regression passed: off-by-default/no listeners or clocks, nested self/inclusive, rolling samples, copy lifetime, groups/reentry, triggers, custom receive, workers, consumed-event recovery, session moves, capture buttons, frozen results and ImGui layout.\n";
+    std::cout << "Profiling regression passed: disabled capture, nested CPU accounting, output publication rates/intervals, idle frames, bursts, direction flags, copies/fanout, workers, discarded frames, owner moves, capture buttons, frozen results and expanded ImGui rows.\n";
 }
 '''
 
@@ -250,6 +362,7 @@ public:
     ProfileProbe() : ofxOceanodeNodeModel("Profile Probe") {
         addParameter(input.set("Input", 0.f));
         addOutputParameter(output.set("Output", 0.f));
+        addOutputParameter(trigger.set("Trigger"));
         addInspectorParameter(option.set("Option", 0.f));
         listeners.push(input.newListener([this](float&){ work(); }));
         listeners.push(option.newListener([this](float&){ work(); }));
@@ -260,10 +373,11 @@ public:
         addParameter(erased);
         listeners.push(extra.newListener([this](float&){work();}));
     }
-    void update(ofEventArgs&) override { work(); output = ++updates; }
+    void update(ofEventArgs&) override { work(); output = ++updates; trigger.trigger(); }
     void draw(ofEventArgs&) override { work(); }
     static void work() { volatile int value = 0; for(int i=0; i<1000; ++i) value += i; }
     ofParameter<float> input, output, option, extra;
+    ofParameter<void> trigger;
     ofEventListeners listeners;
     int updates = 0;
 };
@@ -298,6 +412,17 @@ int main(int argc, char** argv) {
         assert(record->total.phases[static_cast<unsigned>(Phase::Draw)].calls == 1);
         assert(record->total.phases[static_cast<unsigned>(Phase::Parameters)].calls > 0);
         assert(record->total.selfNs() > 0 && record->total.inclusiveNs() >= record->total.selfNs());
+        bool outputSeen = false, triggerSeen = false;
+        record->forEachPublication([&](Publication& publication){
+            assert(publication.name() != "Option"); // Inspector timing is not output publication.
+            if(publication.name() == "Output" || publication.name() == "Trigger"){
+                assert(publication.outputCapable && !publication.bidirectional);
+                assert(session->publicationStats(publication).count == 1);
+                outputSeen |= publication.name() == "Output";
+                triggerSeen |= publication.name() == "Trigger";
+            }
+        });
+        assert(outputSeen && triggerSeen);
     }
     // Nodes created while recording, including nested Macro children, join the
     // same session immediately. Persistent nodes above are covered as well.

@@ -11,11 +11,19 @@ public:
     void update() override;
 
 private:
+    struct OutputRow {
+        std::string name;
+        bool bidirectional = false;
+        oceanodeProfiling::PublicationStats stats;
+    };
     struct Row {
         std::weak_ptr<oceanodeProfiling::Record> record;
         std::string name, path;
         oceanodeProfiling::Sample total;
         double peakMs = 0, selfMs = 0, inclusiveMs = 0, callsPerFrame = 0;
+        double outputsPerFrame = 0, outputsPerSecond = -1, outputIntervalMs = -1;
+        bool expanded = false;
+        std::vector<OutputRow> outputs;
     };
     void refresh();
     bool locate(const std::shared_ptr<oceanodeProfiling::Record>& record);
