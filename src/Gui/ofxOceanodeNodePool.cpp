@@ -6,17 +6,12 @@
 #include <algorithm>
 #include <cfloat>
 #include <functional>
-#include <sstream>
 #include <stdexcept>
 #include "ofxOceanodeTransport.h"
 
 namespace {
 bool matches(const std::string& text, const char* query) {
-    const auto lower = ofToLower(text);
-    std::istringstream words(ofToLower(std::string(query)));
-    std::string word;
-    while(words >> word) if(lower.find(word) == std::string::npos) return false;
-    return true;
+    return ofToLower(text).find(ofToLower(std::string(query))) != std::string::npos;
 }
 std::string descriptionFor(ofxOceanodeNodeRegistry& registry, const std::string& name) {
     const auto& descriptions = registry.getModelDescriptions();
@@ -103,7 +98,7 @@ void ofxOceanodeNodePool::drawTab(bool macro) {
     ImGui::InputTextWithHint("##search", macro ? "Search macros..." : "Search nodes...", tab.search, sizeof(tab.search));
     const float width = ImGui::GetContentRegionAvail().x;
     const float clearWidth = ImGui::CalcTextSize("Clear").x + ImGui::GetStyle().FramePadding.x * 2;
-    const float filterWidth = (width - clearWidth - ImGui::GetStyle().ItemSpacing.x * 2) * 0.5f;
+    const float filterWidth = width - clearWidth - ImGui::GetStyle().ItemSpacing.x;
     std::vector<std::string> categories;
     for(const auto& entry : entries)
         if(categories.empty() || categories.back() != entry.category) categories.push_back(entry.category);
@@ -117,36 +112,39 @@ void ofxOceanodeNodePool::drawTab(bool macro) {
         ImGui::EndCombo();
     }
     ImGui::SameLine();
-    const char* scopes[] = {"Keywords (all fields)", "Name", "Description", "Parameter names"};
-    ImGui::SetNextItemWidth(filterWidth);
-    if(ImGui::BeginCombo("##searchIn", scopes[tab.searchIn])) {
-        for(int i = 0; i < (macro ? 3 : 4); ++i)
-            if(ImGui::Selectable(scopes[i], tab.searchIn == i)) tab.searchIn = i;
-        ImGui::EndCombo();
-    }
-    ImGui::SameLine();
     if(ImGui::Button("Clear")) {
         tab.search[0] = '\0';
         tab.category.clear();
-        tab.searchIn = 0;
+        tab.searchName = true;
+        tab.searchDescription = false;
+        tab.searchParameters = false;
+    }
+    ImGui::TextUnformatted("Search in:");
+    ImGui::SameLine();
+    ImGui::Checkbox("Name", &tab.searchName);
+    ImGui::SameLine();
+    ImGui::Checkbox("Description", &tab.searchDescription);
+    if(!macro) {
+        ImGui::SameLine();
+        ImGui::Checkbox("Parameter names", &tab.searchParameters);
     }
     std::vector<const Entry*> filtered;
     for(const auto& entry : entries) {
         if(!tab.category.empty() && entry.category != tab.category) continue;
-        std::string searchable;
-        if(tab.search[0]) {
-            if(tab.searchIn == 0 || tab.searchIn == 1) searchable += entry.name + " ";
-            if(tab.searchIn == 0) searchable += entry.category + " ";
-            if(tab.searchIn == 0 || tab.searchIn == 2)
-                searchable += (macro ? descriptionForMacro(entry.path) : descriptionFor(registry, entry.name)) + " ";
-            if(!macro && (tab.searchIn == 0 || tab.searchIn == 3)) {
-                const auto* hint = ofxOceanodeNodeHelpEntry(entry.name);
-                if(hint && hint->contains("parameters"))
-                    for(const auto& parameter : (*hint)["parameters"])
-                        if(parameter.is_string()) searchable += parameter.get<std::string>() + " ";
-            }
+        bool matched = !tab.search[0];
+        if(!matched && tab.searchName) matched = matches(entry.name, tab.search);
+        if(!matched && tab.searchDescription)
+            matched = matches(macro ? descriptionForMacro(entry.path) : descriptionFor(registry, entry.name), tab.search);
+        if(!matched && !macro && tab.searchParameters) {
+            const auto* hint = ofxOceanodeNodeHelpEntry(entry.name);
+            if(hint && hint->contains("parameters"))
+                for(const auto& parameter : (*hint)["parameters"])
+                    if(parameter.is_string() && matches(parameter.get<std::string>(), tab.search)) {
+                        matched = true;
+                        break;
+                    }
         }
-        if(matches(searchable, tab.search)) filtered.push_back(&entry);
+        if(matched) filtered.push_back(&entry);
     }
     ImGui::TextDisabled("%d / %d %s", static_cast<int>(filtered.size()), static_cast<int>(entries.size()), macro ? "macros" : "nodes");
     const float listWidth = std::min(300.0f, width * 0.36f);
@@ -154,24 +152,62 @@ void ofxOceanodeNodePool::drawTab(bool macro) {
     for(const auto* entry : filtered)
         if((macro ? entry->path : entry->name) == tab.selected) { selected = entry; break; }
     if(ImGui::BeginChild("##categories", ImVec2(listWidth, 0), true)) {
-        std::string category;
-        for(const auto* item : filtered) {
-            const auto& entry = *item;
-            if(category != entry.category) {
-                category = entry.category;
-                ImGui::Spacing();
-                ImGui::TextDisabled("%s", category.c_str());
-                ImGui::Separator();
-            }
-            const auto& key = macro ? entry.path : entry.name;
-            ImGui::PushID(key.c_str());
-            if(ImGui::Selectable(entry.name.c_str(), key == tab.selected)) {
-                tab.selected = key;
-                selected = &entry;
-                error.clear();
-            }
-            ImGui::PopID();
+        const bool expandAll = ImGui::Button("Expand all");
+        ImGui::SameLine();
+        const bool collapseAll = ImGui::Button("Collapse all");
+        ImGui::Separator();
+        // Keep browsing expansion state separate from the branches opened by search.
+        const std::string treeFilter = std::string(tab.search) + "\n" + tab.category +
+            (tab.searchName ? "1" : "0") + (tab.searchDescription ? "1" : "0") +
+            (tab.searchParameters ? "1" : "0");
+        const bool revealMatches = tab.search[0] && treeFilter != tab.categoryTreeFilter;
+        tab.categoryTreeFilter = treeFilter;
+        struct CategoryTree {
+            std::map<std::string, CategoryTree> children;
+            std::vector<const Entry*> items;
+        } tree;
+        for(const auto* entry : filtered) {
+            auto* branch = &tree;
+            for(const auto& part : ofSplitString(entry->category, "/", true, true))
+                branch = &branch->children[part];
+            branch->items.push_back(entry);
         }
+        ImGui::PushID(tab.search[0] ? "searchTree" : "browseTree");
+        std::function<void(const CategoryTree&)> closeBranches;
+        closeBranches = [&](const CategoryTree& branch) {
+            for(const auto& child : branch.children) {
+                ImGui::GetStateStorage()->SetInt(ImGui::GetID(child.first.c_str()), 0);
+                ImGui::PushID(child.first.c_str());
+                closeBranches(child.second);
+                ImGui::PopID();
+            }
+        };
+        if(collapseAll) closeBranches(tree);
+        std::function<void(const CategoryTree&)> drawCategory;
+        drawCategory = [&](const CategoryTree& branch) {
+            for(const auto& child : branch.children) {
+                if(expandAll || (revealMatches && !collapseAll))
+                    ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+                const auto flags = ImGuiTreeNodeFlags_SpanAvailWidth;
+                const bool open = ImGui::TreeNodeEx(child.first.c_str(), flags);
+                if(open) {
+                    drawCategory(child.second);
+                    ImGui::TreePop();
+                }
+            }
+            for(const auto* entry : branch.items) {
+                const auto& key = macro ? entry->path : entry->name;
+                ImGui::PushID(key.c_str());
+                if(ImGui::Selectable(entry->name.c_str(), key == tab.selected)) {
+                    tab.selected = key;
+                    selected = entry;
+                    error.clear();
+                }
+                ImGui::PopID();
+            }
+        };
+        drawCategory(tree);
+        ImGui::PopID();
         if(filtered.empty()) ImGui::TextWrapped("No matches. Change the search or clear the filters.");
     }
     ImGui::EndChild();

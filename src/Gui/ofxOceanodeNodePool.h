@@ -16,7 +16,10 @@ private:
     struct Tab {
         char search[256] = {};
         std::string selected, category;
-        int searchIn = 0; // all fields, name, description, parameter names
+        std::string categoryTreeFilter;
+        bool searchName = true;
+        bool searchDescription = false;
+        bool searchParameters = false;
     };
     std::shared_ptr<ofxOceanodeContainer> root;
     ofxOceanodeCanvas* rootCanvas;
