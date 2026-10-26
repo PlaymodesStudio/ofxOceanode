@@ -209,6 +209,30 @@ public:
         return dynamic_pointer_cast<ofxOceanodeParameter<ParameterType>>(*(parameters.end()-1));
     }
 	
+    // Pin roles: who writes the pin. An input keeps both ports, so its value
+    // can be passed on, and is never written by the node (same as addParameter).
+    template<typename ParameterType>
+    shared_ptr<ofxOceanodeParameter<ParameterType>> addInputParameter(ofParameter<ParameterType>& p, ofxOceanodeParameterFlags flags = 0){
+        return addParameter(p, flags);
+    }
+
+    template<typename ParameterType>
+    shared_ptr<ofxOceanodeParameter<ParameterType>> addInputParameter(std::shared_ptr<ofParameter<ParameterType>> p, ofxOceanodeParameterFlags flags = 0){
+        return addParameter(p, flags);
+    }
+
+    // An input the node also writes for downstream nodes (Phasor fires Reset at
+    // each cycle). Both ports; held back like an output by Process on update?.
+    template<typename ParameterType>
+    shared_ptr<ofxOceanodeParameter<ParameterType>> addInputAndOutputParameter(ofParameter<ParameterType>& p, ofxOceanodeParameterFlags flags = 0){
+        return addParameter(p, flags | ofxOceanodeParameterFlags_Output);
+    }
+
+    template<typename ParameterType>
+    shared_ptr<ofxOceanodeParameter<ParameterType>> addInputAndOutputParameter(std::shared_ptr<ofParameter<ParameterType>> p, ofxOceanodeParameterFlags flags = 0){
+        return addParameter(p, flags | ofxOceanodeParameterFlags_Output);
+    }
+
 	template<typename ParameterType>
 	shared_ptr<ofxOceanodeParameter<ParameterType>> addOutputParameter(ofParameter<ParameterType>& p, ofxOceanodeParameterFlags flags = 0){
 		auto oceaParam = addParameter(p, flags | outputParameterFlags);
@@ -220,7 +244,17 @@ public:
         return addParameter(p, flags | outputParameterFlags);
     }
 
-    // Dropdown whose selection the node writes; same overloads as addParameterDropdown.
+    // Dropdown variants of the pin roles; same overloads as addParameterDropdown.
+    template<typename ParameterType>
+    auto addInputParameterDropdown(ofParameter<ParameterType> &dropdownSelector, string name, int defaultPos, vector<string> options, ofxOceanodeParameterFlags flags = 0){
+        return addParameterDropdown(dropdownSelector, name, defaultPos, options, flags);
+    }
+
+    template<typename ParameterType>
+    auto addInputAndOutputParameterDropdown(ofParameter<ParameterType> &dropdownSelector, string name, int defaultPos, vector<string> options, ofxOceanodeParameterFlags flags = 0){
+        return addParameterDropdown(dropdownSelector, name, defaultPos, options, flags | ofxOceanodeParameterFlags_Output);
+    }
+
     template<typename ParameterType>
     auto addOutputParameterDropdown(ofParameter<ParameterType> &dropdownSelector, string name, int defaultPos, vector<string> options, ofxOceanodeParameterFlags flags = 0){
         return addParameterDropdown(dropdownSelector, name, defaultPos, options, flags | outputParameterFlags);
