@@ -17,7 +17,7 @@ testNode::testNode(shared_ptr<testController> tController) : controller(tControl
     addParameter(textParam.set("testInput", "adfas"));
     addParameter(labelParam.set("testLabel", ' '));
     auto colorRef = addParameter(colorParam.set("Color", ofColor::red, ofColor::white, ofColor::black));
-    addParameter(intModParam.set("Custom", nullptr));
+    addInputAndOutputParameter(intModParam.set("Custom", nullptr));
     
     addInspectorParameter(inspectorColor.set("Node Color", ofColor::purple));
     

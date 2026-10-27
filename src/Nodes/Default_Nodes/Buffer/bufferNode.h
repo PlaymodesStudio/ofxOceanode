@@ -39,7 +39,7 @@ public:
 
         addParameter(timestamp.set("Timestamp", Timestamp()));
         addParameter(maxSize.set("Max Size", 100, 1, INT_MAX));
-        addParameter(output.set("Output", myBuffer.get()));
+        addOutputParameter(output.set("Output", myBuffer.get()));
         
         lastFrameMs.set("Last Frame Ms",0,0,FLT_MAX);
         lastFrameMs.setSerializable(false); // Runtime history measurement, not preset configuration.
@@ -123,7 +123,7 @@ public:
         addParameter(rec.set("Rec", true));
         addParameter(timestamp.set("Timestamp", Timestamp()));
         addParameter(maxSize.set("Max Size", 100, 1, INT_MAX));
-        addParameter(output.set("Output", myBuffer.get()));
+        addOutputParameter(output.set("Output", myBuffer.get()));
         
         listeners.push(input.newListener([this](std::vector<T> &object){
             if(!ofxOceanodeShared::isPresetLoading() && checkFunction(object) && rec){

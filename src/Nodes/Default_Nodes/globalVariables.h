@@ -32,7 +32,7 @@ public:
     
     void addFloatParameter(std::shared_ptr<ofParameter<float>> &p){
         auto createdParam = floatParameters.emplace_back(new ofParameter<float>(p->getName(), p->get(), p->getMin(), p->getMax()));
-        addParameter(createdParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
+        addOutputParameter(createdParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
         listeners.push(p->newListener([this, createdParam](float &f){
             createdParam->set(f);
         }));
@@ -40,7 +40,7 @@ public:
 
     void addIntParameter(std::shared_ptr<ofParameter<int>> &p){
         auto createdParam = intParameters.emplace_back(new ofParameter<int>(p->getName(), p->get(), p->getMin(), p->getMax()));
-        addParameter(createdParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
+        addOutputParameter(createdParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
         listeners.push(p->newListener([this, createdParam](int &i){
             createdParam->set(i);
         }));
@@ -48,7 +48,7 @@ public:
 
     void addBoolParameter(std::shared_ptr<ofParameter<bool>> &p){
         auto createdParam = boolParameters.emplace_back(new ofParameter<bool>(p->getName(), p->get(), p->getMin(), p->getMax()));
-        addParameter(createdParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
+        addOutputParameter(createdParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
         listeners.push(p->newListener([this, createdParam](bool &b){
             createdParam->set(b);
         }));
@@ -57,7 +57,7 @@ public:
 
     void addStringParameter(std::shared_ptr<ofParameter<string>> &p){
         auto createdParam = stringParameters.emplace_back(new ofParameter<string>(p->getName(), p->get(), p->getMin(), p->getMax()));
-        addParameter(createdParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
+        addOutputParameter(createdParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
         listeners.push(p->newListener([this, createdParam](string &s){
             createdParam->set(s);
         }));
@@ -66,7 +66,7 @@ public:
 
     void addOfColorParameter(std::shared_ptr<ofParameter<ofColor>> &p){
         auto createdParam = colorParameters.emplace_back(new ofParameter<ofColor>(p->getName(), p->get(), p->getMin(), p->getMax()));
-        addParameter(createdParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
+        addOutputParameter(createdParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
         listeners.push(p->newListener([this, createdParam](ofColor &c){
             createdParam->set(c);
         }));
@@ -74,7 +74,7 @@ public:
 
     void addOfFloatColorParameter(std::shared_ptr<ofParameter<ofFloatColor>> &p){
         auto createdParam = fcolorParameters.emplace_back(new ofParameter<ofFloatColor>(p->getName(), p->get(), p->getMin(), p->getMax()));
-        addParameter(createdParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
+        addOutputParameter(createdParam, ofxOceanodeParameterFlags_ReadOnly | ofxOceanodeParameterFlags_DisableSavePreset);
         listeners.push(p->newListener([this, createdParam](ofFloatColor &fc){
             createdParam->set(fc);
         }));    }

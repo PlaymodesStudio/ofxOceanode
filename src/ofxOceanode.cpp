@@ -116,6 +116,10 @@ void ofxOceanode::setup(){
     oceanodeTime->setup(container, controls->get<ofxOceanodeTimeController>());
     // Last: config.json also applies spaceTogglesPlay to the Time controller.
     appConfig->setup(canvas, *controls, *windows);
+#ifdef TARGET_OSX
+    // Retain the host window identity even when output windows become current.
+    titleWindow = std::dynamic_pointer_cast<ofAppGLFWWindow>(ofGetMainLoop()->getCurrentWindow());
+#endif
 }
 
 void ofxOceanode::update(){
@@ -131,6 +135,24 @@ void ofxOceanode::update(){
     oceanodeTime->update();
     container->update();
     controls->update();
+#ifdef TARGET_OSX
+    if(auto window = titleWindow.lock()){
+        const std::string currentTitle = window->getSettings().title;
+        if(!windowTitleCaptured){
+            // Hosts may set their title after Oceanode's setup, before the first update.
+            originalWindowTitle = currentTitle;
+            windowTitleCaptured = true;
+        }
+        std::string title = originalWindowTitle;
+        const std::string presetName = ofxOceanodeShared::getCurrentPresetName();
+        if(!presetName.empty()){
+            if(!title.empty()) title += " — ";
+            title += presetName;
+        }
+        // Avoid asking macOS to redraw the title when its text has not changed.
+        if(title != currentTitle) window->setWindowTitle(title);
+    }
+#endif
 }
 
 void ofxOceanode::draw(){
@@ -292,6 +314,12 @@ void ofxOceanode::drawMenuBar(){
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12.0f, 6.0f));
     if (ImGui::BeginMenuBar())
     {
+        const float fps = ofGetFrameRate();
+        const ImVec4 fpsColor = fps >= 60.0f ? OceanodeColors::FpsGood
+                             : fps > 30.0f ? OceanodeColors::FpsWarning
+                                           : OceanodeColors::FpsBad;
+        ImGui::TextColored(fpsColor, "[ %d ]", static_cast<int>(fps));
+
         auto beginTopLevelMenu = [](const char* label){
             const ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing.x * 1.5f, spacing.y));
@@ -407,16 +435,6 @@ void ofxOceanode::drawMenuBar(){
             }
             ImGui::EndMenu();
         }
-        const float fps = ofGetFrameRate();
-        const std::string fpsText = ofToString(static_cast<int>(fps)) + " fps";
-        const float fpsWidth = ImGui::CalcTextSize(fpsText.c_str()).x;
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
-                             std::max(0.0f, ImGui::GetContentRegionAvail().x - fpsWidth));
-        const ImVec4 fpsColor = fps >= 60.0f ? OceanodeColors::FpsGood
-                             : fps > 30.0f ? OceanodeColors::FpsWarning
-                                           : OceanodeColors::FpsBad;
-        ImGui::TextColored(fpsColor, "%s", fpsText.c_str());
-
         ImGui::EndMenuBar();
     }
     ImGui::PopStyleVar(2);

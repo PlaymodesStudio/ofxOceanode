@@ -64,7 +64,8 @@ enum ofxOceanodeParameterFlags_
     ofxOceanodeParameterFlags_ScopeKeepAspectRatio  = 1 << 5,   // Scope Parameter keeps Aspect Ratio
     ofxOceanodeParameterFlags_ReadOnly              = 1 << 6,   // Parameter cannot be interacted
     ofxOceanodeParameterFlags_NoGuiWidget           = 1 << 7,   // Parameter hidden from node GUI (pin still exists)
-    ofxOceanodeParameterFlags_HeaderToggle          = 1 << 8    // Boolean checkbox in the node header, with ordinary pins
+    ofxOceanodeParameterFlags_HeaderToggle          = 1 << 8,   // Boolean checkbox in the node header, with ordinary pins
+    ofxOceanodeParameterFlags_Output                = 1 << 9    // Pin is written by the node; keeps its inlet unless DisableInConnection is set
 //	ofxOceanodeParameterFlags_CollapsingHeader    = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_NoAutoOpenOnLog// Callback on pressing TAB (for completion handling)
 };
 
@@ -124,6 +125,12 @@ public:
     virtual ofEvent<std::string>& nameChangedEvent() = 0;
 	
 	ofxOceanodeParameterFlags getFlags(){return flags;};
+    // A pin the node writes: flagged Output, or an outlet without an inlet.
+    static constexpr bool isNodeOutputFlags(ofxOceanodeParameterFlags f){
+        if(f & ofxOceanodeParameterFlags_Output) return true;
+        return (f & ofxOceanodeParameterFlags_DisableInConnection) && !(f & ofxOceanodeParameterFlags_DisableOutConnection);
+    }
+    bool isNodeOutput(){return isNodeOutputFlags(getFlags());}
 	void setFlags(ofxOceanodeParameterFlags f){
         flags = f;
         if(profilingHook) profilingHook->configurePublication(
