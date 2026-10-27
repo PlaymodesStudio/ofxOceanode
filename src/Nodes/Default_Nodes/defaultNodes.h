@@ -28,5 +28,6 @@
 #include "portal.h"
 #include "beatTransport.h"
 #include "presetLoadTrigger.h"
+#include "globalPitch.h"
 
 #endif /* defaultNodes_h */

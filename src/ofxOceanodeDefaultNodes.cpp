@@ -35,6 +35,7 @@ void ofxOceanode::registerDefaultNodes(){
     nodeRegistry->registerModel<randomGenerator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
     nodeRegistry->registerModel<beatTransport>("Timeline");
     nodeRegistry->registerModel<presetLoadTrigger>("General");
+    nodeRegistry->registerModel<globalPitch>("General");
 
     nodeRegistry->registerModel<ofxOceanodeMacroMixer>("Experimental");
 }
