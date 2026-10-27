@@ -20,6 +20,10 @@ class ofxOceanodeNode {
 public:
     ofxOceanodeNode(std::unique_ptr<ofxOceanodeNodeModel> && _nodeModel);
     ~ofxOceanodeNode();
+
+    // Changes whenever a node is created or destroyed in any container, so
+    // per-frame scans of the whole graph can run only after a change.
+    static std::uint64_t graphGeneration();
     
 	void setup(string additionalInfo);
     void update(ofEventArgs &e);

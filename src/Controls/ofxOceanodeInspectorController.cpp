@@ -30,21 +30,9 @@ std::vector<std::string> ofxOceanodeInspectorController::getInspectorDropdownOpt
 }
 
 bool ofxOceanodeInspectorController::hasAnySelectedNode(){
-    vector<pair<string, ofxOceanodeNode*>> nodes(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
-    std::function<bool(vector<pair<string, ofxOceanodeNode*>>)> checkSelected = [&checkSelected](vector<pair<string, ofxOceanodeNode*>> nodes) -> bool {
-        for(auto &nodePair : nodes){
-            if(nodePair.second->getNodeGui().getSelected()){
-                return true;
-            }
-            if(ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&nodePair.second->getNodeModel())){
-                if(checkSelected(vector<pair<string, ofxOceanodeNode*>>(m->getContainer()->getParameterGroupNodesMap().begin(), m->getContainer()->getParameterGroupNodesMap().end()))){
-                    return true;
-                }
-            }
-        }
-        return false;
-    };
-    return checkSelected(nodes);
+    // Selection is counted as it changes; rebuilding node lists recursively
+    // with dynamic_casts every frame was costing a twelfth of each frame.
+    return ofxOceanodeNodeGui::selectedCount() > 0;
 }
 
 void ofxOceanodeInspectorController::draw(){

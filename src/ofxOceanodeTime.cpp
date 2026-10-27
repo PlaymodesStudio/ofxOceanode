@@ -7,6 +7,7 @@
 
 #include "ofxOceanodeTime.h"
 #include "ofxOceanodeContainer.h"
+#include "ofxOceanodeNode.h"
 #include "phasor.h"
 #include "ofxOceanodeTimeController.h"
 #include "ofxOceanodeNodeMacro.h"
@@ -147,6 +148,7 @@ void ofxOceanodeTime::shutdown(const std::shared_ptr<ofxOceanodeContainer>& owne
     newNodeInMacroListener.unsubscribeAll();
     listeners.unsubscribeAll();
     phasorsInThread2.clear();
+    graphScan = GraphScan{};
     vector<shared_ptr<basePhasor>> queuedPhasors;
     while(phasorChannel2.tryReceive(queuedPhasors)) queuedPhasors.clear();
     checkNodeModel = nullptr;
@@ -156,38 +158,63 @@ void ofxOceanodeTime::shutdown(const std::shared_ptr<ofxOceanodeContainer>& owne
     container.reset();
 }
 
-void ofxOceanodeTime::update(){
-    bool forceFrameMode = false;
-    vector<shared_ptr<basePhasor>> phasors;
-    vector<timeGenerator*> timeGenerators;
-    std::function<void(ofxOceanodeContainer*)> getPhasorsFromContainer = [this, &phasors, &getPhasorsFromContainer, &timeGenerators, &forceFrameMode](ofxOceanodeContainer* c){
+void ofxOceanodeTime::rescanGraphIfChanged(){
+    // Walking every node with dynamic_casts cost a tenth of each frame in large
+    // patches. Nodes only appear or vanish through ofxOceanodeNode, and a
+    // MacroMixer only changes which graphs take part when a morph starts or ends.
+    const std::uint64_t generation = ofxOceanodeNode::graphGeneration();
+    bool rescan = !graphScan.valid || graphScan.generation != generation;
+    if(!rescan){
+        for(const auto& mixer : graphScan.mixers){
+            const auto* runtime = mixer.first->mixerRuntime();
+            const bool morphing = runtime != nullptr && runtime->morphing();
+            if(morphing != mixer.second){ rescan = true; break; }
+        }
+    }
+    if(!rescan) return;
+    graphScan.phasors.clear();
+    graphScan.timeGenerators.clear();
+    graphScan.mixers.clear();
+    graphScan.forceFrameMode = false;
+    std::function<void(ofxOceanodeContainer*)> getPhasorsFromContainer = [this, &getPhasorsFromContainer](ofxOceanodeContainer* c){
         for(auto &n : c->getAllModules()){
             ofxOceanodeNodeModel *model = &n->getNodeModel();
             if(model->getFlags() & ofxOceanodeNodeModelFlags_ForceFrameMode){
-                forceFrameMode = true;
+                graphScan.forceFrameMode = true;
             }
-            if(dynamic_cast<phasor*>(model) != nullptr){
-                phasors.push_back(dynamic_cast<phasor*>(model)->getBasePhasor());
+            if(auto* p = dynamic_cast<phasor*>(model)){
+                graphScan.phasors.push_back(p->getBasePhasor());
             }
-            else if(dynamic_cast<timeGenerator*>(model) != nullptr){
-                timeGenerators.push_back(dynamic_cast<timeGenerator*>(model));
+            else if(auto* generator = dynamic_cast<timeGenerator*>(model)){
+                graphScan.timeGenerators.push_back(generator);
             }
-            else if(dynamic_cast<ofxOceanodeNodeMacro*>(model) != nullptr){
-                getPhasorsFromContainer(dynamic_cast<ofxOceanodeNodeMacro*>(model)->getContainer().get());
+            else if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(model)){
+                getPhasorsFromContainer(macro->getContainer().get());
             }
             else if(auto* mixer = dynamic_cast<ofxOceanodeMacroMixer*>(model)){
                 // Only live graphs participate. Validation captures and pending
                 // requests own no running clocks. Both sides advance in an
                 // output fade; a graph morph advances only its destination.
-                if(const auto* runtime = mixer->mixerRuntime()) {
-                    if(!runtime->morphing()) if(const auto* graph = runtime->origin()) getPhasorsFromContainer(graph->container.get());
+                const auto* runtime = mixer->mixerRuntime();
+                const bool morphing = runtime != nullptr && runtime->morphing();
+                graphScan.mixers.emplace_back(mixer, morphing);
+                if(runtime) {
+                    if(!morphing) if(const auto* graph = runtime->origin()) getPhasorsFromContainer(graph->container.get());
                     if(const auto* graph = runtime->destination()) getPhasorsFromContainer(graph->container.get());
                 }
             }
         }
     };
-    
     getPhasorsFromContainer(container.get());
+    graphScan.generation = generation;
+    graphScan.valid = true;
+}
+
+void ofxOceanodeTime::update(){
+    rescanGraphIfChanged();
+    const bool forceFrameMode = graphScan.forceFrameMode;
+    const auto& phasors = graphScan.phasors;
+    const auto& timeGenerators = graphScan.timeGenerators;
     vector<shared_ptr<basePhasor>> oldPhasors;
     while(phasorChannel2.tryReceive(oldPhasors));
     phasorChannel2.send(phasors);

@@ -32,7 +32,7 @@ ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOcea
 }
 
 ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
-    
+    if(selected) --selectedCount();
 }
 
 ofColor ofxOceanodeNodeGui::getColor(){

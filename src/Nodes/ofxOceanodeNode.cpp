@@ -7,6 +7,8 @@
 //
 
 #include "ofxOceanodeNode.h"
+#include <atomic>
+#include <cstdint>
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeConnection.h"
@@ -14,13 +16,23 @@
 #include "PresetSaveCleanup.h"
 #include "ofxOceanodeGlDiagnostics.h"
 
+namespace {
+std::atomic<std::uint64_t> graphGenerationCounter{0};
+}
+
+std::uint64_t ofxOceanodeNode::graphGeneration(){
+    return graphGenerationCounter.load(std::memory_order_relaxed);
+}
+
 ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){
+    graphGenerationCounter.fetch_add(1, std::memory_order_relaxed);
     nodeModelListeners.push(nodeModel->deleteModule.newListener([this](){
         deleteSelf();
     }));
 }
 
 ofxOceanodeNode::~ofxOceanodeNode(){
+    graphGenerationCounter.fetch_add(1, std::memory_order_relaxed);
     for(auto &p : getParameters()) dynamic_pointer_cast<ofxOceanodeAbstractParameter>(p)->removeAllConnections();
 }
 

@@ -47,7 +47,14 @@ public:
     void setExpanded(bool e){expanded = e;};
     
     
-    void setSelected(bool b){selected = b;};
+    void setSelected(bool b){
+        if(b == selected) return;
+        selected = b;
+        selectedCount() += b ? 1 : -1;
+    }
+    // Selected node GUIs across every container, so the Inspector can tell
+    // whether anything is selected without walking the graph each frame.
+    static int& selectedCount(){ static int count = 0; return count; }
     bool getSelected(){return selected;};
     bool isHeaderControlHovered() const { return headerControlHovered; }
     

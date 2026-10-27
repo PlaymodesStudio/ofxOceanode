@@ -22,6 +22,7 @@ class ofxOceanodeNode;
 class basePhasor;
 class timeGenerator;
 class ofxOceanodeTimeController;
+class ofxOceanodeMacroMixer;
 
 struct ofxOceanodeTimeState {
     double time = 0.0;
@@ -190,6 +191,18 @@ private:
     
     ofTime startTime;
     
+    // Phasors, time generators and frame-mode flag found in the graph. Rebuilt
+    // only when a node is created or destroyed or a MacroMixer morph state changes.
+    struct GraphScan {
+        bool valid = false;
+        std::uint64_t generation = 0;
+        bool forceFrameMode = false;
+        vector<std::shared_ptr<basePhasor>> phasors;
+        vector<timeGenerator*> timeGenerators;
+        vector<std::pair<ofxOceanodeMacroMixer*, bool>> mixers; // morphing state when scanned
+    } graphScan;
+    void rescanGraphIfChanged();
+
     vector<std::shared_ptr<basePhasor>> phasorsInThread2;
     ofThreadChannel<vector<std::shared_ptr<basePhasor>>> phasorChannel2;
     
