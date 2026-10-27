@@ -204,6 +204,11 @@ private:
     
     ofxImGui::Gui gui;
     std::unique_ptr<ofxOceanodeWindowManager> windows;
+#ifdef TARGET_OSX
+    std::weak_ptr<ofAppGLFWWindow> titleWindow;
+    std::string originalWindowTitle;
+    bool windowTitleCaptured = false;
+#endif
     static std::string userManualPath();
     static void openWithDefaultApp(const std::string& path);
     void showHelpPopUp();
