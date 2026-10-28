@@ -213,9 +213,15 @@ output shows `Macro fall`. The current implementation falls back for:
 
 - Changed Router or Portal settings (names, bounds, Inspector settings). These
   publish the Macro interface or a shared service and cannot run twice.
-- Unmatched Router/Portal additions or removals in an existing container. These
-  require reconciliation of the existing published interface or shared service;
-  routers inside a whole newly added Macro load through its native lifecycle.
+- Unmatched Router additions or removals in an existing container. These
+  require reconciliation of the existing published interface; routers inside a
+  whole newly added Macro load through its native lifecycle.
+- An added Portal whose bus is live: a running Portal of the same type, Name
+  and scope (Local in the same canvas, or global). Loading it would publish its
+  saved value to that bus at once. Other unmatched Portals morph in place like
+  any node: a removed Portal runs until completion (the bus keeps its last
+  value), and an added one starts with the morph on its own bus, its cables
+  blending where they arrive.
 - Genuinely changed cables into read-only/calculated or snapshot-excluded
   controls, Portal services, or resource types without an internal
   connection mixing adapter/backend handoff (such as audio buses and buffer
@@ -422,6 +428,9 @@ branches listed in `macro-mixer-migration-audit.md`.
   with shared and distinct beats, Mute), outer Input triggers reaching both
   graphs once, the node publishing each event once across update/draw, and
   in-place morphs of a changed void cable without fallback.
+- `python3 tests/macro_mixer_portal_morph_regression.py`: unmatched Portals
+  (removed, and added on a free bus) morph in place with their cables blending;
+  an added Portal joining a live bus falls back with its reason.
 - `python3 tests/macro_mixer_numeric_policies_regression.py`: numeric/Boolean
   policy rounding, endpoints, unequal vector sizes and option validation.
 - `python3 tests/macro_mixer_morph_regression.py`: native nonlinear graph

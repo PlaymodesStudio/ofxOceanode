@@ -159,6 +159,7 @@ def main(extra_sources=(), extra_includes=(), std='c++17'):
         cpp=tmp/'regression.cpp'; cpp.write_text(native_production()+CASES)
         sources=['src/Nodes/MacroMixerMixing.cpp','src/Nodes/MacroMixerSource.cpp','src/Nodes/MacroMixerRuntime.cpp','src/Nodes/ofxOceanodeMacroMixer.cpp',
                  'src/Nodes/ofxOceanodeNode.cpp','src/ofxOceanodeParameter.cpp',
+                 'src/Nodes/Default_Nodes/portal.cpp',
                  'src/Managers/ofxOceanodeTypesRegistry.cpp',
                  'src/Managers/ofxOceanodeTransport.cpp',
                  'src/Managers/ofxOceanodeScheduling.cpp']

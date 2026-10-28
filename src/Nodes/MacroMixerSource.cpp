@@ -689,6 +689,20 @@ bool morphStageable(const ofJson& entry) {
     const auto model=entry.at("model").get<std::string>();
     return model.rfind("Router ",0)!=0 && model.rfind("Portal ",0)!=0;
 }
+bool morphPortal(const ofJson& entry) { return entry.at("model").get<std::string>().rfind("Portal ",0)==0; }
+// An unmatched Portal runs until completion or starts with the morph like any
+// node, unless it would join a live bus: loading it publishes its saved value
+// to the running patch's matching Portals at once.
+bool morphPortalBusFree(ofxOceanodeContainer& container,const ofJson& entry) {
+    const auto& settings=entry.at("settings");
+    const auto local=settings.value("Local",ofJson(true));
+    const bool isLocal=local.is_string() ? local.get<std::string>()!="0" && local.get<std::string>()!="false" : local!=ofJson(false);
+    const auto name=settings.contains("Name") && settings.at("Name").is_string() ? settings.at("Name").get<std::string>() : entry.at("model").get<std::string>().substr(7);
+    for(auto* portal:ofxOceanodeShared::getPortalsNamed(name))
+        if(portal->nodeName()==entry.at("model").get<std::string>() && portal->isLocal()==isLocal
+           && (!isLocal || portal->getParents()==container.getCanvasID())) return false;
+    return true;
+}
 
 bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer& container,
                      ofxOceanodeNodeMacro& owner, const ofJson& original, const ofJson& target,
@@ -709,11 +723,13 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
     }
     MorphContainerEdit edit{&container,original,target,{},{},prefix,{}};
     for(auto it=before.begin();it!=before.end();++it) if(!after.contains(it.key())) {
-        if(!morphStageable(it.value())) throw std::runtime_error("Unmatched interface/service node removed: "+it.key());
+        if(!morphStageable(it.value()) && !morphPortal(it.value())) throw std::runtime_error("Unmatched interface node removed: "+it.key());
         edit.removed.push_back(it.key());
     }
     for(auto it=after.begin();it!=after.end();++it) if(!before.contains(it.key())) {
-        if(!morphStageable(it.value())) throw std::runtime_error("Unmatched interface/service node added: "+it.key());
+        if(morphPortal(it.value())) {
+            if(!morphPortalBusFree(container,it.value())) throw std::runtime_error("Added Portal joins a live Portal bus: "+it.key());
+        } else if(!morphStageable(it.value())) throw std::runtime_error("Unmatched interface node added: "+it.key());
         edit.added.push_back(it.key());
     }
     edits.push_back(std::move(edit));
