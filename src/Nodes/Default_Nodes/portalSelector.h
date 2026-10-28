@@ -26,6 +26,9 @@ public:
         removedListener.unsubscribe();
     }
 
+    // The portal this selector currently reads, or null.
+    abstractPortal* getSelectedPortal() const { return selectedPortal; }
+
     void setup() override {
         addParameterDropdown(selectedPortalIndex, "Portal", 0, {"No Compatible Portals"});
         addInspectorParameter(selectedPortalName.set("Selected Portal", ""));

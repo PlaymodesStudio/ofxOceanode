@@ -92,6 +92,8 @@ class ofxOceanodeNodeMacro : public ofxOceanodeNodeModel{
 public:
 	ofxOceanodeNodeMacro();
 	~ofxOceanodeNodeMacro();
+	// A macro is live through its cables or a hard sink inside it, never by shape.
+	bool isSink() const override { return false; }
 	// The node colour is cosmetic: a different saved colour must not stop a
 	// MacroMixer morph from reusing the running Macro. A library Macro's title
 	// comes from the library, so its Local Name is unused and cosmetic too.

@@ -62,9 +62,12 @@ with:
 
 ```cpp
 // A sink does useful work on its own: it renders, sends, records, plays,
-// drives hardware or changes global state. Override for models whose
-// sink status is fixed; use the Sink registration flag otherwise.
-virtual bool isSink() const { return declaredSink; }
+// drives hardware or changes global state. Declare one with the Sink
+// registration flag, or override when the status is fixed for the class.
+// The default also applies the shape rule (R2): a node with no output pin
+// (isNodeOutput()) is a sink. A pure model whose output is an ordinary
+// parameter overrides this and returns false.
+virtual bool isSink() const;   // default body in ofxOceanodeNodeModel.h
 void setDeclaredSink(bool sink){ declaredSink = sink; }
 // ...
 bool declaredSink = false;
@@ -99,13 +102,16 @@ bool removeUnusedNodes(const UnusedNodePlan& plan);
 Let N be the nodes of the reviewed container (`getAllModules()`, dynamic and
 persistent). Compute `live ⊆ N` as the least fixed point of:
 
-- **R1 Declared sink.** `node.getNodeModel().isSink()` is true.
-- **R2 Shape sink.** The node has no port parameter carrying
-  `ofxOceanodeParameterFlags_Output`. Inspector parameters are not ports. This
-  errs toward keeping: a node that writes outputs through plain `addParameter`
-  is treated as a sink until its author marks the outputs or declares it pure.
-  R2 does not apply to routers, portals, portal selectors or macros; R5, R6
-  and R7 decide those.
+- **R1 Declared sink.** `node.getNodeModel().isSink()` is true. This covers the
+  `Sink` flag, class overrides, and the shape rule below, because the default
+  `isSink()` implements it.
+- **R2 Shape sink (inside the default `isSink()`).** The node has no port for
+  which `isNodeOutput()` is true: the `Output` flag, or an outlet without an
+  inlet. Inspector parameters are not ports. This errs toward keeping: a node
+  that writes outputs through plain `addParameter` is a sink until its author
+  marks the outputs or overrides `isSink()` to return false. Routers return
+  true, and portals and macros return false, by override, so R5, R6 and R7
+  decide those.
 - **R3 Host sink.** Any port parameter is scoped, timelined, bound by Custom GUI,
   snapshot or Timeline (`collectBoundParameters`, resolved through the root
   container and every macro, exactly as the current `findUnusedNodes` does), or
@@ -188,7 +194,9 @@ Files: `src/Nodes/Default_Nodes/router.h`, `src/Nodes/Default_Nodes/portal.h`,
 - `abstractPortal::isSink() const override { return false; }` (R6).
 - `portalSelectorBase`: add `abstractPortal* getSelectedPortal() const` if no
   accessor exists (WP2 needs it for R6).
-- `ofxOceanodeNodeMacro::isSink()` stays default; R7 is computed by WP2.
+- `ofxOceanodeNodeMacro::isSink() const override { return false; }`; R7 is
+  computed by WP2. Without the override the default shape rule would keep
+  every macro whose pins are not flagged as outputs.
 - Done when `integration_compile.py` passes. No test of its own; WP2's test
   covers the rules.
 
@@ -237,9 +245,14 @@ For every registered core model decide one of: pure (no change), `Sink` flag,
 or `isSink()` override. Write the decision table into
 `docs/unused-node-cleanup.md` (WP6 merges it). Known answers:
 
-- Sink: `presetLoadTrigger`, `globalPitch`, `beatTransport`, `midiClockNode`,
-  `ofxOceanodeMacroMixer`, `globalVariables` if it writes shared state.
-- Pure: every generator and modifier, `curve`, `portalSelector` (R4 decides it).
+- Sink by flag: `midiClockNode` (Drive Transport can change the transport),
+  `ofxOceanodeMacroMixer` (morphs macros).
+- Sink by shape, no change needed: `globalPitch` (no outputs).
+- Pure, no change needed: `beatTransport` and `presetLoadTrigger` (they only
+  publish values), `globalVariables` (a source), every generator and modifier,
+  `curve`, `portalSelector` (R4 decides it).
+- Pure by override: `simpleNumberGenerator` and `simpleNormalizedNumberGenerator`
+  (a plain `Value` parameter is their output).
 - Check each model's `addParameter` calls: a pure model whose written outputs
   lack the Output flag must switch them to `addOutputParameter`, otherwise R2
   keeps it forever. List those changes in the table.

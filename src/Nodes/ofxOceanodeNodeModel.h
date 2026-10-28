@@ -82,10 +82,20 @@ public:
     // completed: the target was reached; otherwise restore the start.
     virtual void morphEnd(bool completed) {}
     // A sink does useful work on its own: it renders, sends, records, plays,
-    // drives hardware or changes global state. Override for models whose
-    // sink status is fixed; use the Sink registration flag otherwise.
-    // Dead-node cleanup keeps sinks and everything that feeds them.
-    virtual bool isSink() const { return declaredSink; }
+    // drives hardware or changes global state. Dead-node cleanup keeps sinks
+    // and everything that feeds them. Declare one with the Sink registration
+    // flag, or override this when the status is fixed for the class.
+    // By default a node that publishes no output pin exists for its effect, so
+    // it is a sink; this errs toward keeping. Override and return false for a
+    // pure model whose only output is an ordinary parameter (a number box).
+    virtual bool isSink() const {
+        if(declaredSink) return true;
+        for(const auto& abstract : parameters){
+            auto* parameter = dynamic_cast<ofxOceanodeAbstractParameter*>(abstract.get());
+            if(parameter != nullptr && parameter->isNodeOutput()) return false;
+        }
+        return true;
+    }
     void setDeclaredSink(bool sink){ declaredSink = sink; }
 
     // Return true when a model renders an Inspector row itself, or hides it.

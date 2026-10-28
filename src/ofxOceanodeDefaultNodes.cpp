@@ -16,7 +16,7 @@ void ofxOceanode::registerDefaultNodes(){
     nodeRegistry->registerModel<chaoticOscillator>("Generators");
     nodeRegistry->registerModel<phasor>("Generators");
 #ifdef OFXOCEANODE_USE_MIDI
-    nodeRegistry->registerModel<midiClockNode>("Generators");
+    nodeRegistry->registerModel<midiClockNode>("Generators", ofxOceanodeNodeRegistrationFlags::Sink); // can drive the transport
 #endif
     nodeRegistry->registerModel<simpleNumberGenerator>("Generators");
     nodeRegistry->registerModel<simpleNormalizedNumberGenerator>("Generators");
@@ -37,5 +37,5 @@ void ofxOceanode::registerDefaultNodes(){
     nodeRegistry->registerModel<presetLoadTrigger>("General");
     nodeRegistry->registerModel<globalPitch>("General");
 
-    nodeRegistry->registerModel<ofxOceanodeMacroMixer>("Experimental");
+    nodeRegistry->registerModel<ofxOceanodeMacroMixer>("Experimental", ofxOceanodeNodeRegistrationFlags::Sink); // morphs macros
 }
