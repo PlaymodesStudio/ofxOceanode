@@ -313,6 +313,42 @@ void ofxOceanodeCanvas::handleParentNavigation(){
     if(findParent(rootContainer)) lastNavigationFrame = ImGui::GetFrameCount();
 }
 
+void ofxOceanodeCanvas::handleNodeNudge(){
+    const auto& io = ImGui::GetIO();
+    // ChildWindows includes this canvas's scrolling region, but not sibling
+    // canvases sharing its docking host. Leave modified arrows to navigation.
+    if(!ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) ||
+       io.KeyCtrl || io.KeySuper || io.KeyAlt || io.KeyShift ||
+       io.WantTextInput || ImGui::IsAnyItemActive() ||
+       ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) ||
+       ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1) || ImGui::IsMouseDown(2) ||
+       isSelecting || isCreatingConnection || GRID_SIZE <= 0) return;
+
+    const int dx = int(ImGui::IsKeyPressed(ImGuiKey_RightArrow, true)) -
+                   int(ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true));
+    const int dy = int(ImGui::IsKeyPressed(ImGuiKey_DownArrow, true)) -
+                   int(ImGui::IsKeyPressed(ImGuiKey_UpArrow, true));
+    if(dx == 0 && dy == 0) return;
+
+    const auto selected = container->getSelectedModules();
+    if(selected.empty()) return;
+    container->beginCanvasEdit();
+    // Always use the next grid line in the requested direction, including for
+    // off-grid nodes and when mouse snapping is disabled. Keep the other axis.
+    const auto nextGridLine = [this](float coordinate, int direction){
+        const float cell = coordinate / float(GRID_SIZE);
+        return (direction > 0 ? std::floor(cell) + 1.0f : std::ceil(cell) - 1.0f) * GRID_SIZE;
+    };
+    for(auto* node : selected){
+        auto& gui = node->getNodeGui();
+        auto position = gui.getPosition();
+        if(dx != 0) position.x = nextGridLine(position.x, dx);
+        if(dy != 0) position.y = nextGridLine(position.y, dy);
+        gui.setPosition(position);
+    }
+    // draw() closes the edit after all canvas mutations, as it does for drags.
+}
+
 void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     // A history step may have replaced nodes from another canvas during update.
     // Drop cached interaction pointers before any of them can be dereferenced.
@@ -880,6 +916,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         }
         
         handleParentNavigation();
+        handleNodeNudge();
         ImGui::SameLine();
         ImGui::BeginGroup();
                 

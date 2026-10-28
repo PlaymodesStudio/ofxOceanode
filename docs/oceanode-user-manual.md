@@ -36,6 +36,8 @@ Oceanode applications often include extra node collections called **addons**. Th
 
 The **canvas** holds your patch. Drag a node to arrange it. Drag an empty part of the canvas to move your view. Use the application's zoom controls or canvas zoom gesture to move between an overview and detailed editing.
 
+With a Canvas or Macro Canvas focused, select one or more nodes and press an arrow key to move them to the next grid line in that direction. Hold the key to repeat. This works even when mouse grid snapping is off, leaves the other axis unchanged, and supports Undo/Redo. Arrow keys keep their normal behavior while editing a control or using a popup.
+
 The **Nodes** window helps you find nodes already present in the patch. The **Inspector** shows settings for the selected node. Some settings live in the Inspector rather than directly on the node.
 
 Drag a window title or tab to rearrange it. Drop it into a docking area to attach it to the workspace. Docked windows can share a tab group; click a tab to bring that window forward.
