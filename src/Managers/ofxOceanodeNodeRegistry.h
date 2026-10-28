@@ -19,7 +19,12 @@ class ofxOceanodeContainer;
 // arguments keep their meaning when passed after the category.
 enum class ofxOceanodeNodeRegistrationFlags : unsigned int {
     None = 0,
-    CanRemoveWhenUnused = 1u << 0
+    // Deprecated. Accepted and ignored so existing registrations compile.
+    // Delete after the sibling-addon audit has landed everywhere.
+    CanRemoveWhenUnused = 1u << 0,
+    // The model does useful work even when nothing consumes its outputs.
+    // Dead-node cleanup never removes a sink or anything that feeds it.
+    Sink = 1u << 1
 };
 
 constexpr ofxOceanodeNodeRegistrationFlags operator|(ofxOceanodeNodeRegistrationFlags a,
@@ -54,14 +59,7 @@ public:
     void registerModel(string const category, ofxOceanodeNodeRegistrationFlags registrationFlags, Args... args){
         static_assert(std::is_base_of<ofxOceanodeNodeModel, ModelType>::value, "Must pass a subclass of ofxOceanodeNodeModel to registerType");
         
-        registryItemCloner cloner = [registrationFlags, args...](){
-            auto model = std::make_unique<ModelType>(args...);
-            if((registrationFlags & ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused) !=
-               ofxOceanodeNodeRegistrationFlags::None){
-                model->setUnusedCleanupSafe(true);
-            }
-            return model;
-        };
+        registryItemCloner cloner = makeCloner<ModelType>(registrationFlags, args...);
         
         const auto prototype = cloner();
         const string name = prototype->nodeName();
@@ -69,6 +67,7 @@ public:
         if (registeredModelCreators.count(name) == 0)
         {
             registeredModelCreators[name] = std::move(cloner);
+            registeredModelFlags[name] = registrationFlags;
             categories.insert(category);
             registeredModelsCategory[name] = category;
             modelDescriptions[name] = prototype->getDescription();
@@ -81,12 +80,12 @@ public:
     template<typename ModelType, typename... Args>
     bool refreshModel(string const category, Args... args){
         static_assert(std::is_base_of<ofxOceanodeNodeModel, ModelType>::value, "Must pass a subclass of ofxOceanodeNodeModel");
-        registryItemCloner cloner = [args...](){ return std::make_unique<ModelType>(args...); };
-        const auto prototype = cloner();
+        const auto prototype = std::make_unique<ModelType>(args...);
         const string name = prototype->nodeName();
         const auto existing = registeredModelsCategory.find(name);
         if(existing != registeredModelsCategory.end() && existing->second != category) return false;
-        registeredModelCreators[name] = std::move(cloner);
+        // A refreshed factory keeps the flags the model was registered with.
+        registeredModelCreators[name] = makeCloner<ModelType>(registeredFlagsFor(name), args...);
         categories.insert(category);
         registeredModelsCategory[name] = category;
         modelDescriptions[name] = prototype->getDescription();
@@ -102,7 +101,7 @@ public:
         static_assert(std::is_base_of<ofxOceanodeNodeModel, ModelType>::value, "Must pass a subclass of ofxOceanodeNodeModel");
         const auto existing = registeredModelsCategory.find(name);
         if(existing != registeredModelsCategory.end() && existing->second != category) return false;
-        registeredModelCreators[name] = [args...](){ return std::make_unique<ModelType>(args...); };
+        registeredModelCreators[name] = makeCloner<ModelType>(registeredFlagsFor(name), args...);
         categories.insert(category);
         registeredModelsCategory[name] = category;
         // Inherited default capabilities need no throwaway model. An override
@@ -135,6 +134,7 @@ public:
         if (registeredModelCreators.count(name) == 1)
         {
             registeredModelCreators.erase(name);
+            registeredModelFlags.erase(name);
             registeredModelsCategory.erase(name);
             modelDescriptions.erase(name);
             macroMixerBlockers.erase(name);
@@ -167,6 +167,21 @@ public:
         if(!description.empty() && registeredModelCreators.count(name)) modelDescriptions[name] = description;
     }
 private:
+    // Builds a factory that applies the registration flags to every new model.
+    template<typename ModelType, typename... Args>
+    static registryItemCloner makeCloner(ofxOceanodeNodeRegistrationFlags flags, Args... args){
+        return [flags, args...](){
+            auto model = std::make_unique<ModelType>(args...);
+            if((flags & ofxOceanodeNodeRegistrationFlags::Sink) != ofxOceanodeNodeRegistrationFlags::None)
+                model->setDeclaredSink(true);
+            return model;
+        };
+    }
+    ofxOceanodeNodeRegistrationFlags registeredFlagsFor(const std::string& name) const {
+        const auto found = registeredModelFlags.find(name);
+        return found == registeredModelFlags.end() ? ofxOceanodeNodeRegistrationFlags::None : found->second;
+    }
+    std::unordered_map<std::string, ofxOceanodeNodeRegistrationFlags> registeredModelFlags;
     std::function<void(const std::string&)> creationGuard, folderLoadGuard;
     std::function<bool(const std::string&, const std::string&)> nodeLoadFilter;
     std::unordered_map<std::string, std::string> macroMixerBlockers;

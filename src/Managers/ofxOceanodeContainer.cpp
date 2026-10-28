@@ -2365,8 +2365,8 @@ ofxOceanodeContainer::UnusedNodePlan ofxOceanodeContainer::findUnusedNodes(){
     std::unordered_map<ofxOceanodeNode*, std::unordered_set<ofxOceanodeAbstractConnection*>> nodeConnections;
     for(auto* node : nodes){
         if(node->getIsPersistent()) protect(node, "persistent node");
-        if(!node->getNodeModel().canRemoveWhenUnused())
-            protect(node, "standalone or unclassified model; review manually", false);
+        // WP0 stub: the liveness analysis (WP2) is pending, so nothing is removable.
+        protect(node, "analysis pending", false);
         for(auto& abstract : node->getParameters()){
             auto* parameter = dynamic_cast<ofxOceanodeAbstractParameter*>(abstract.get());
             if(parameter == nullptr) continue;
@@ -2416,29 +2416,30 @@ ofxOceanodeContainer::UnusedNodePlan ofxOceanodeContainer::findUnusedNodes(){
         }
         std::sort(names.begin(), names.end());
         if(hasUsage){
-            plan.preservedNodes += names.size();
             std::sort(groupReasons.begin(), groupReasons.end());
             groupReasons.erase(std::unique(groupReasons.begin(), groupReasons.end()), groupReasons.end());
-            plan.protectedGroups.push_back({std::move(names), std::move(groupReasons), !hasKnownUsage});
+            for(const auto& name : names) plan.kept.push_back({name, groupReasons});
         }
         else {
-            plan.groups.push_back(std::move(names));
-            plan.connectionCount += links.size();
+            plan.groups.push_back({std::move(names), links.size(), true});
         }
     }
-    std::sort(plan.groups.begin(), plan.groups.end());
-    std::sort(plan.protectedGroups.begin(), plan.protectedGroups.end(),
+    std::sort(plan.groups.begin(), plan.groups.end(),
               [](const auto& a, const auto& b){ return a.nodes < b.nodes; });
+    std::sort(plan.kept.begin(), plan.kept.end(),
+              [](const auto& a, const auto& b){ return a.node < b.node; });
     return plan;
 }
 
 bool ofxOceanodeContainer::removeUnusedNodes(const UnusedNodePlan& plan){
     const auto current = findUnusedNodes();
-    if(current.revision != plan.revision || current.groups != plan.groups ||
-       current.connectionCount != plan.connectionCount) return false;
+    if(current.revision != plan.revision || current.groups.size() != plan.groups.size()) return false;
+    for(size_t i = 0; i < plan.groups.size(); ++i)
+        if(current.groups[i].nodes != plan.groups[i].nodes) return false;
     // Use native deletion so cables, listeners and model resources are released.
     for(const auto& group : plan.groups){
-        for(const auto& name : group){
+        if(!group.selected) continue;
+        for(const auto& name : group.nodes){
             auto found = parameterGroupNodesMap.find(name);
             if(found == parameterGroupNodesMap.end()) continue;
             auto* node = found->second;

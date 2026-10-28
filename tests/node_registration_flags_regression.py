@@ -2,7 +2,7 @@
 """Check real registration overloads and factory metadata without a host app.
 
 Covers old category-only/constructor forms, explicit flags, flag combinations,
-factory copies, duplicate names and model protection overrides under ASan/UBSan.
+factory copies, refresh paths, duplicate names and isSink overrides under ASan/UBSan.
 """
 from pathlib import Path
 import os
@@ -22,15 +22,15 @@ MODEL=r'''
 #include <vector>
 using namespace std;
 class ofxOceanodeNodeModel {
-    string name; bool cleanupSafe=false;
+    string name; bool declaredSink=false;
 public:
     explicit ofxOceanodeNodeModel(string n):name(n){}
     virtual ~ofxOceanodeNodeModel()=default;
     string nodeName(){return name;}
     string getDescription(){return "Description: "+name;}
     virtual string macroMixerBlocker() const{return {};}
-    void setUnusedCleanupSafe(bool b){cleanupSafe=b;}
-    virtual bool canRemoveWhenUnused() const{return cleanupSafe;}
+    void setDeclaredSink(bool b){declaredSink=b;}
+    virtual bool isSink() const{return declaredSink;}
 };
 '''
 CASES=r'''
@@ -43,7 +43,7 @@ public:
     REGISTRATION_WRAPPERS
 };
 struct Plain:ofxOceanodeNodeModel{Plain():ofxOceanodeNodeModel("Plain") {}};
-struct Safe:ofxOceanodeNodeModel{Safe():ofxOceanodeNodeModel("Safe") {}};
+struct Sinker:ofxOceanodeNodeModel{Sinker():ofxOceanodeNodeModel("Sinker") {}};
 struct Integer:ofxOceanodeNodeModel{int value;explicit Integer(int i):ofxOceanodeNodeModel("Integer"),value(i){}};
 struct Boolean:ofxOceanodeNodeModel{bool value;explicit Boolean(bool b):ofxOceanodeNodeModel("Boolean"),value(b){}};
 enum class ConstructorEnum {Value};
@@ -52,9 +52,13 @@ struct Arguments:ofxOceanodeNodeModel{
     int number;bool enabled;
     Arguments(string name,int i,bool b):ofxOceanodeNodeModel(name),number(i),enabled(b){}
 };
-struct Protected:ofxOceanodeNodeModel{
-    Protected():ofxOceanodeNodeModel("Protected"){}
-    bool canRemoveWhenUnused() const override{return false;}
+struct AlwaysSink:ofxOceanodeNodeModel{
+    AlwaysSink():ofxOceanodeNodeModel("AlwaysSink"){}
+    bool isSink() const override{return true;}
+};
+struct NeverSink:ofxOceanodeNodeModel{
+    NeverSink():ofxOceanodeNodeModel("NeverSink"){}
+    bool isSink() const override{return false;}
 };
 struct Counted:ofxOceanodeNodeModel{
     inline static int constructions=0;
@@ -70,38 +74,62 @@ int main(){
     app.registerModel<EnumArgument>("Collection",ConstructorEnum::Value);
     app.registerModel<Arguments,string,int,bool>("Collection","Legacy",9,false);
     auto& registry=*app.nodeRegistry;
-    assert(!registry.create("Plain")->canRemoveWhenUnused());
-    auto i=registry.create("Integer");assert(!i->canRemoveWhenUnused()&&static_cast<Integer&>(*i).value==23);
-    auto b=registry.create("Boolean");assert(!b->canRemoveWhenUnused()&&static_cast<Boolean&>(*b).value);
-    assert(!registry.create("EnumArgument")->canRemoveWhenUnused());
-    auto legacy=registry.create("Legacy");assert(!legacy->canRemoveWhenUnused()&&static_cast<Arguments&>(*legacy).number==9);
-    app.registerModel<Safe>("Collection",Flags::CanRemoveWhenUnused);
-    assert(registry.create("Safe")->canRemoveWhenUnused());
-    app.registerModel<Arguments>("Collection",Flags::None|Flags::CanRemoveWhenUnused,"Flagged",42,true);
-    auto flagged=registry.create("Flagged");assert(flagged->canRemoveWhenUnused());
+    auto sink=[&](const char* name){return registry.create(name)->isSink();};
+    // Legacy forms stay plain models and keep their constructor arguments.
+    assert(!sink("Plain"));
+    auto i=registry.create("Integer");assert(!i->isSink()&&static_cast<Integer&>(*i).value==23);
+    auto b=registry.create("Boolean");assert(!b->isSink()&&static_cast<Boolean&>(*b).value);
+    assert(!sink("EnumArgument"));
+    auto legacy=registry.create("Legacy");assert(!legacy->isSink()&&static_cast<Arguments&>(*legacy).number==9);
+    // Sink sets the declared state, alone and combined, with constructor arguments after it.
+    app.registerModel<Sinker>("Collection",Flags::Sink);
+    assert(sink("Sinker"));
+    app.registerModel<Arguments>("Collection",Flags::None|Flags::Sink,"Flagged",42,true);
+    auto flagged=registry.create("Flagged");assert(flagged->isSink());
     assert(static_cast<Arguments&>(*flagged).number==42&&static_cast<Arguments&>(*flagged).enabled);
     app.registerModel<Arguments>("Collection",Flags::None,"ExplicitNone",7,true);
-    assert(!registry.create("ExplicitNone")->canRemoveWhenUnused());
+    assert(!sink("ExplicitNone"));
+    app.registerModel<Arguments>("Collection",Flags::CanRemoveWhenUnused|Flags::Sink,"Both",5,false);
+    assert(sink("Both"));
+    // The deprecated flag compiles, is ignored, and never makes a sink.
+    app.registerModel<Arguments>("Collection",Flags::CanRemoveWhenUnused,"Deprecated",6,true);
+    assert(!sink("Deprecated")&&static_cast<Arguments&>(*registry.create("Deprecated")).number==6);
     // Direct registry callers get identical overload and constructor behavior.
-    registry.registerModel<Arguments>("Direct",Flags::CanRemoveWhenUnused,"DirectFlagged",12,false);
+    registry.registerModel<Arguments>("Direct",Flags::Sink,"DirectFlagged",12,false);
     registry.registerModel<Arguments>("Direct","DirectLegacy",13,true);
-    assert(registry.create("DirectFlagged")->canRemoveWhenUnused());
-    assert(!registry.create("DirectLegacy")->canRemoveWhenUnused());
-    // Re-registration cannot silently reclassify a protected model or its category.
-    app.registerModel<Plain>("Other",Flags::CanRemoveWhenUnused);
-    assert(!registry.create("Plain")->canRemoveWhenUnused());
+    assert(sink("DirectFlagged")&&!sink("DirectLegacy"));
+    // A model's own isSink override beats the registration flag in both directions.
+    app.registerModel<AlwaysSink>("Collection");
+    assert(sink("AlwaysSink"));
+    app.registerModel<NeverSink>("Collection",Flags::Sink);
+    assert(!sink("NeverSink"));
+    // Re-registration cannot silently reclassify a model or its category.
+    app.registerModel<Plain>("Other",Flags::Sink);
+    assert(!sink("Plain"));
     assert(registry.getRegisteredModelsCategoryAssociation().at("Plain")=="Default");
-    app.registerModel<Safe>("Other");assert(registry.create("Safe")->canRemoveWhenUnused());
-    app.registerModel<Protected>("Collection",Flags::CanRemoveWhenUnused);
-    assert(!registry.create("Protected")->canRemoveWhenUnused());
-    registry.registerModel<Counted>("Collection",Flags::CanRemoveWhenUnused);
+    app.registerModel<Sinker>("Other");assert(sink("Sinker"));
+    // One prototype plus one live model per registration: flags add no constructions.
+    registry.registerModel<Counted>("Collection",Flags::Sink);
     assert(Counted::constructions==1);auto counted=registry.create("Counted");assert(Counted::constructions==2);
-    ofxOceanodeNodeRegistry copy=registry;assert(copy.create("Safe")->canRemoveWhenUnused());
+    assert(counted->isSink());
+    // Copies carry the factories and the flags behind them.
+    ofxOceanodeNodeRegistry copy=registry;
+    assert(copy.create("Sinker")->isSink()&&!copy.create("Plain")->isSink());
+    // Refreshing a factory keeps the registered flags, by both refresh paths.
     assert(registry.refreshModel<Integer>("Collection",99));
-    assert(static_cast<Integer&>(*registry.create("Integer")).value==99);
+    assert(static_cast<Integer&>(*registry.create("Integer")).value==99&&!sink("Integer"));
+    assert(registry.refreshModel<Sinker>("Collection"));
+    assert(sink("Sinker"));
+    assert(registry.refreshModelNamed<Sinker>("Sinker","Collection"));
+    assert(sink("Sinker"));
+    assert(registry.refreshModelNamed<Plain>("Plain","Default"));
+    assert(!sink("Plain"));
+    // Unregistering forgets the flags, so a later registration starts clean.
     registry.unregisterModel<Arguments>("Direct","DirectLegacy",13,true);assert(!registry.create("DirectLegacy"));
-    assert(registry.getModelDescriptions().at("Safe")=="Description: Safe");
-    puts("Registration flags passed: legacy arguments, flagged factories, combinations, defaults, duplicate names, copies and protected overrides.");
+    registry.unregisterModel<Sinker>("Collection");assert(!registry.create("Sinker"));
+    registry.registerModel<Sinker>("Collection");assert(!sink("Sinker"));
+    assert(registry.getModelDescriptions().at("Sinker")=="Description: Sinker");
+    puts("Registration flags passed: legacy arguments, Sink factories, combinations, deprecated flag, overrides, duplicate names, copies, refresh and unregister.");
 }
 '''
 def main():

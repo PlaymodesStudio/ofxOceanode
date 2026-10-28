@@ -81,10 +81,12 @@ public:
     virtual void morphApply(float t, bool switched) {}
     // completed: the target was reached; otherwise restore the start.
     virtual void morphEnd(bool completed) {}
-    // Opt in only for models whose work is represented by cables and host
-    // parameter bindings. Unknown models and external effects stay alive.
-    virtual bool canRemoveWhenUnused() const { return unusedCleanupSafe; }
-    void setUnusedCleanupSafe(bool safe){ unusedCleanupSafe = safe; }
+    // A sink does useful work on its own: it renders, sends, records, plays,
+    // drives hardware or changes global state. Override for models whose
+    // sink status is fixed; use the Sink registration flag otherwise.
+    // Dead-node cleanup keeps sinks and everything that feeds them.
+    virtual bool isSink() const { return declaredSink; }
+    void setDeclaredSink(bool sink){ declaredSink = sink; }
 
     // Return true when a model renders an Inspector row itself, or hides it.
     // Registered parameters still keep their normal preset/undo behavior.
@@ -377,7 +379,7 @@ private:
     ofEventListeners eventListeners;
     ofxOceanodeNodeModelFlags flags;
     bool active;
-    bool unusedCleanupSafe = false;
+    bool declaredSink = false;
 };
 
 #endif /* ofxOceanodeNodeModel_h */

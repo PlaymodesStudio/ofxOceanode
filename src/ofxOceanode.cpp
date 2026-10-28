@@ -249,30 +249,28 @@ void ofxOceanode::drawUnusedNodesWindow(){
             ImGui::EndDisabled();
         };
         size_t nodeCount = 0;
-        for(const auto& group : unusedNodePlan.groups) nodeCount += group.size();
+        size_t connectionCount = 0;
+        for(const auto& group : unusedNodePlan.groups){ nodeCount += group.nodes.size(); connectionCount += group.connections; }
         ImGui::Text("Canvas: %s", target ? target->getCanvasID().c_str() : "(closed)");
         ImGui::Text("Remove %zu nodes in %zu groups and %zu connections.",
-                    nodeCount, unusedNodePlan.groups.size(), unusedNodePlan.connectionCount);
-        ImGui::Text("Keep %zu nodes with usage or protected models.", unusedNodePlan.preservedNodes);
+                    nodeCount, unusedNodePlan.groups.size(), connectionCount);
+        ImGui::Text("Keep %zu nodes.", unusedNodePlan.kept.size());
         ImGui::TextWrapped("Custom GUI, snapshots, Timeline, MIDI, Scope, persistent nodes, "
                            "and models with standalone or unknown effects are protected, together with their connected groups.");
         ImGui::TextWrapped("Click a node to open its canvas, select it and center the view.");
         if(nodeCount == 0) ImGui::TextUnformatted("No removable unused nodes found.");
-        if(nodeCount != 0 || !unusedNodePlan.protectedGroups.empty()){
+        if(nodeCount != 0 || !unusedNodePlan.kept.empty()){
             ImGui::BeginChild("Unused node summary", ImVec2(0, std::max(100.0f, ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 4.0f)), true);
             for(size_t i = 0; i < unusedNodePlan.groups.size(); ++i){
                 ImGui::Text("Remove group %zu", i + 1);
-                for(const auto& name : unusedNodePlan.groups[i]) drawNode(name);
+                for(const auto& name : unusedNodePlan.groups[i].nodes) drawNode(name);
             }
-            for(size_t i = 0; i < unusedNodePlan.protectedGroups.size(); ++i){
-                const auto& group = unusedNodePlan.protectedGroups[i];
+            for(size_t i = 0; i < unusedNodePlan.kept.size(); ++i){
+                const auto& kept = unusedNodePlan.kept[i];
                 ImGui::PushID(static_cast<int>(i));
-                const string title = (group.possiblyUnused ? "Possibly unused, protected: " : "In use, protected: ")
-                    + group.nodes.front() + " (" + ofToString(group.nodes.size()) + " nodes)";
-                ImGui::SetNextItemOpen(group.possiblyUnused, ImGuiCond_Appearing);
-                if(ImGui::TreeNode(title.c_str())){
-                    for(const auto& name : group.nodes) drawNode(name);
-                    for(const auto& reason : group.reasons) ImGui::TextWrapped("%s", reason.c_str());
+                if(ImGui::TreeNode(("Kept: " + kept.node).c_str())){
+                    drawNode(kept.node);
+                    for(const auto& reason : kept.reasons) ImGui::TextWrapped("%s", reason.c_str());
                     ImGui::TreePop();
                 }
                 ImGui::PopID();

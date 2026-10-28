@@ -244,20 +244,26 @@ public:
     
     vector<ofxOceanodeNode*> getSelectedModules();
     vector<ofxOceanodeNode*> getAllModules();
+    // Dead-node review: a plan lists connected groups of nodes that nothing live
+    // consumes, and the live nodes with the reasons they are kept.
     struct UnusedNodePlan {
-        struct ProtectedGroup {
-            vector<string> nodes;
-            vector<string> reasons;
-            bool possiblyUnused = false;
+        struct Group {              // one connected component of dead nodes
+            vector<string> nodes;   // escaped node names, sorted
+            size_t connections = 0; // cables removed with the group
+            bool selected = true;   // the window toggles this; removal honours it
         };
-        std::uint64_t revision = 0;
-        vector<vector<string>> groups;
-        vector<ProtectedGroup> protectedGroups;
-        size_t connectionCount = 0;
-        size_t preservedNodes = 0;
+        struct Kept {
+            string node;            // escaped node name
+            vector<string> reasons; // sorted, unique
+        };
+        std::uint64_t revision = 0; // getNodesRevision() when computed
+        vector<Group> groups;       // sorted by nodes
+        vector<Kept> kept;          // sorted by node
     };
     UnusedNodePlan findUnusedNodes();
-    // Rechecks usage and graph ownership before deleting the reviewed plan.
+    // Removes the selected groups only. Recomputes the plan first and refuses
+    // (returns false) when the revision or the dead set changed. Runs inside one
+    // canvas edit so undo restores everything.
     bool removeUnusedNodes(const UnusedNodePlan& plan);
     // Changes whenever node ownership changes, including bulk preset/teardown clears.
     std::uint64_t getNodesRevision() const { return nodesRevision; }

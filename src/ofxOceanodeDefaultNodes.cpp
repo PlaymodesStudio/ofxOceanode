@@ -12,27 +12,27 @@
 
 void ofxOceanode::registerDefaultNodes(){
     //Register default nodes
-    nodeRegistry->registerModel<oscillator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<chaoticOscillator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<phasor>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<oscillator>("Generators");
+    nodeRegistry->registerModel<chaoticOscillator>("Generators");
+    nodeRegistry->registerModel<phasor>("Generators");
 #ifdef OFXOCEANODE_USE_MIDI
     nodeRegistry->registerModel<midiClockNode>("Generators");
 #endif
-    nodeRegistry->registerModel<simpleNumberGenerator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<simpleNormalizedNumberGenerator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<counter>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<ramp>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<mapper>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<ranger>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<indexer>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<reindexer>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<smoother>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<switcher>("Modifiers", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<simpleNumberGenerator>("Generators");
+    nodeRegistry->registerModel<simpleNormalizedNumberGenerator>("Generators");
+    nodeRegistry->registerModel<counter>("Generators");
+    nodeRegistry->registerModel<ramp>("Generators");
+    nodeRegistry->registerModel<mapper>("Modifiers");
+    nodeRegistry->registerModel<ranger>("Modifiers");
+    nodeRegistry->registerModel<indexer>("Generators");
+    nodeRegistry->registerModel<reindexer>("Modifiers");
+    nodeRegistry->registerModel<smoother>("Modifiers");
+    nodeRegistry->registerModel<switcher>("Modifiers");
     nodeRegistry->registerModel<curve>("Modifiers");
 	//nodeRegistry->registerModel<curve2>("Modifiers");
     nodeRegistry->registerModel<ofxOceanodeNodeMacro>("MACRO");
-    nodeRegistry->registerModel<noise>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
-    nodeRegistry->registerModel<randomGenerator>("Generators", ofxOceanodeNodeRegistrationFlags::CanRemoveWhenUnused);
+    nodeRegistry->registerModel<noise>("Generators");
+    nodeRegistry->registerModel<randomGenerator>("Generators");
     nodeRegistry->registerModel<beatTransport>("Timeline");
     nodeRegistry->registerModel<presetLoadTrigger>("General");
     nodeRegistry->registerModel<globalPitch>("General");
