@@ -16,6 +16,15 @@ The flag goes between the category and any constructor arguments:
 o.registerModel<ildaMask>("ILDA", ofxOceanodeNodeRegistrationFlags::Sink, ildaController);
 ```
 
+## Status
+
+The firm `Sink` flags in the next table, 26 registrations, are applied. Each
+addon has them committed on a local branch named `unused-nodes-sinks`, one
+commit per repo, nothing pushed: ofxOceanodeLights, ofxOceanodeLaser,
+ofxOceanodeTextures, ofxSantiNodes, ofxEloiNodes, ofxOceanodeAstres and
+ofxOceanodeSuperCollider. The judgement calls, the Playmodes output fix and the
+deprecated flag in Collection are not applied.
+
 ## Totals
 
 | Group | Models | Need `Sink` | Output fix | Judgement call |
