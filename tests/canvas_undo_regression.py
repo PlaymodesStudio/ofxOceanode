@@ -250,6 +250,16 @@ int main(){
     assert(c.nodes.size()==2 && c.connections.empty());assert(c.undoCanvasEdit());
     assert(c.connections.size()==2);assert(c.nodes.at("Value_2")->model->custom==17);
     assert(c.redoCanvasEdit());assert(c.undoCanvasEdit());
+    // Removing a whole connected chain in one edit, as the unused-node cleanup does, undoes as one step.
+    {
+        const auto nodesBefore=c.nodes.size(),linksBefore=c.connections.size(),undoBefore=c.canvasUndo.size();
+        c.beginCanvasEdit();
+        for(const char* name:{"Value_1","Value_2","Value_3"})c.nodes.at(name)->deleteSelf();
+        c.endCanvasEdit();
+        assert(c.nodes.empty()&&c.connections.empty()&&c.canvasUndo.size()==undoBefore+1);
+        assert(c.undoCanvasEdit()&&c.nodes.size()==nodesBefore&&c.connections.size()==linksBefore);
+        assert(c.canvasUndo.size()==undoBefore);
+    }
     // Replace an occupied inlet. Disconnect values survive undo/redo.
     c.beginCanvasEdit();c.connections.back()->deleteSelf();c.connect(1,3);c.endCanvasEdit();
     assert(c.undoCanvasEdit());assert(c.nodes.at("Value_3")->parameter.incoming->source->model->id==2);
