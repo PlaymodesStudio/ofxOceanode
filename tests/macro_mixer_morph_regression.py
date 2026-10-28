@@ -57,7 +57,7 @@ public:
 };
 // Keeps its sound outside the parameter group, as SuperCollider nodes do, and
 // blends it itself through the node morph hooks.
-static int blobBegins=0, blobEnds=0, blobCancels=0;
+static int blobBegins=0, blobEnds=0, blobCancels=0, blobRecallsOutsideLoad=0;
 class MorphBlob : public ofxOceanodeNodeModel {
 public:
     MorphBlob():ofxOceanodeNodeModel("Morph Blob") {}
@@ -72,7 +72,13 @@ public:
     ofJson state() const { return {{"level",level},{"mode",mode},{"locked",locked}}; }
     void load(const ofJson& j) { level=j.value("level",0.f); mode=j.value("mode",0); locked=j.value("locked",false); }
     void presetSave(ofJson& j) override { j["blob"]=state(); j["view"]=level; }
-    void presetRecallAfterSettingParameters(ofJson& j) override { if(j.contains("blob")) load(j["blob"]); }
+    // As a synth's saved Snapshot number: outside a preset load, recalling the
+    // saved state also recalls a library slot over it. MacroMixer must load a
+    // saved node as a preset recall, whether natively, added or replaced.
+    void presetRecallAfterSettingParameters(ofJson& j) override {
+        if(j.contains("blob")) load(j["blob"]);
+        if(!ofxOceanodeShared::isPresetLoading()) { ++blobRecallsOutsideLoad; level=99; mode=7; }
+    }
     MorphKeys morphKeys() const override { return {{"blob"},{"view"}}; }
     MorphHint morphHint(const ofxOceanodeAbstractParameter& p) const override {
         return p.getName()=="Voices" ? MorphHint::Structural : p.getName()=="Skipped" ? MorphHint::Skip
@@ -833,7 +839,9 @@ int main(int argc,char** argv) {
         assert(graph->container->getDynamicNodes().at("Morph Blob").size()==2);
         s.finish(); s.update(20); s.update(21); assert(!s.transitioning());
         const auto& blobs=graph->container->getDynamicNodes().at("Morph Blob"); assert(blobs.size()==1&&!blobs.count(1));
-        assert(static_cast<MorphBlob&>(blobs.begin()->second->getNodeModel()).voices==4);
+        auto& replacement=static_cast<MorphBlob&>(blobs.begin()->second->getNodeModel()); assert(replacement.voices==4);
+        // The replacement loaded as a preset recall: its saved sound, not a library slot's.
+        near(replacement.level,6); assert(replacement.mode==3); assert(blobRecallsOutsideLoad==0);
         s.clear();
     }
     // Render the production Source section in an ImGui frame. Its visible text

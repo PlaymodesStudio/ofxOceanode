@@ -1321,25 +1321,34 @@ struct MacroMixerMorphTopology {
         newCables.emplace_back(&container,edge);
     }
     void prepare(ofxOceanodeContainer& host,const MacroMixerMorphPolicies& policies) {
-        for(auto& edit:edits) {
-            auto& c=*edit.container;
-            for(const auto& key:edit.added) {
-                const auto& entry=edit.target.at("nodes").at(key);
-                auto* node=c.createNodeFromName(entry.at("model").get<std::string>(),entry.at("id").get<int>());
-                if(!node) throw std::runtime_error("Cannot create added Macro node");
-                created.emplace_back(&c,key);
-                auto json=entry.at("settings"); auto& model=node->getNodeModel();
-                if(edit.joining.count(key)) json.erase("Value"); // Takes the bus's value.
-                node->presetWillBeLoaded(); model.loadBeforeConnections(json);
-                if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model)) {
-                    if(!entry.contains("graph")) throw std::runtime_error("Added Macro definition is unavailable");
-                    macro->macroLoadFromFolder(json,entry.at("graph").at("folder").get<std::string>());
-                    verifyMorphGraph(*macro->getContainer(),entry.at("graph"));
-                } else model.macroLoad(json,edit.target.at("folder").get<std::string>());
-                node->loadParametersFromJson(json); node->loadInspectorParametersFromJson(json);
-                if(edit.joining.count(key)) if(auto* portal=dynamic_cast<abstractPortal*>(&model)) ofxOceanodeShared::requestPortalUpdate(portal);
+        // Added (and replaced) nodes load their saved settings as a preset
+        // recall, like a native source load: nodes see isPresetLoading() and
+        // skip recall-time side effects, such as a synth's saved Snapshot
+        // number recalling that library slot over the saved sound. The scope
+        // covers only the node loads; the cables and blends in between are
+        // created outside it, so backends (the SC server graph) still react.
+        {
+            ofxOceanodeShared::ScopedNestedPresetLoad nestedLoad;
+            for(auto& edit:edits) {
+                auto& c=*edit.container;
+                for(const auto& key:edit.added) {
+                    const auto& entry=edit.target.at("nodes").at(key);
+                    auto* node=c.createNodeFromName(entry.at("model").get<std::string>(),entry.at("id").get<int>());
+                    if(!node) throw std::runtime_error("Cannot create added Macro node");
+                    created.emplace_back(&c,key);
+                    auto json=entry.at("settings"); auto& model=node->getNodeModel();
+                    if(edit.joining.count(key)) json.erase("Value"); // Takes the bus's value.
+                    node->presetWillBeLoaded(); model.loadBeforeConnections(json);
+                    if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model)) {
+                        if(!entry.contains("graph")) throw std::runtime_error("Added Macro definition is unavailable");
+                        macro->macroLoadFromFolder(json,entry.at("graph").at("folder").get<std::string>());
+                        verifyMorphGraph(*macro->getContainer(),entry.at("graph"));
+                    } else model.macroLoad(json,edit.target.at("folder").get<std::string>());
+                    node->loadParametersFromJson(json); node->loadInspectorParametersFromJson(json);
+                    if(edit.joining.count(key)) if(auto* portal=dynamic_cast<abstractPortal*>(&model)) ofxOceanodeShared::requestPortalUpdate(portal);
+                }
+                if(!edit.added.empty()) c.allNodesCreated.notify(&c);
             }
-            if(!edit.added.empty()) c.allNodesCreated.notify(&c);
         }
         // Blends one changed input: a and b are the origin's and target's
         // cables into it (empty: its value), sunk into plan.sink.
@@ -1397,14 +1406,17 @@ struct MacroMixerMorphTopology {
                 catch(const std::exception& e) { throw std::runtime_error(morphLocation(edit.path,key,name)+": "+e.what()); }
             }
         }
-        for(auto& entry:created) if(auto* node=morphNode(*entry.first,entry.second)) {
-            const auto edit=std::find_if(edits.begin(),edits.end(),[&](const auto& e) { return e.container==entry.first; });
-            auto json=edit->target.at("nodes").at(entry.second).at("settings");
-            if(edit->joining.count(entry.second)) json.erase("Value");
-            auto& model=node->getNodeModel();
-            model.presetRecallBeforeSettingParameters(json); node->loadParametersFromJson(json);
-            node->loadInspectorParametersFromJson(json); model.presetRecallAfterSettingParameters(json);
-            node->activateConnections(); node->presetHasLoaded();
+        {
+            ofxOceanodeShared::ScopedNestedPresetLoad nestedLoad; // The recall itself, as above.
+            for(auto& entry:created) if(auto* node=morphNode(*entry.first,entry.second)) {
+                const auto edit=std::find_if(edits.begin(),edits.end(),[&](const auto& e) { return e.container==entry.first; });
+                auto json=edit->target.at("nodes").at(entry.second).at("settings");
+                if(edit->joining.count(entry.second)) json.erase("Value");
+                auto& model=node->getNodeModel();
+                model.presetRecallBeforeSettingParameters(json); node->loadParametersFromJson(json);
+                node->loadInspectorParametersFromJson(json); model.presetRecallAfterSettingParameters(json);
+                node->activateConnections(); node->presetHasLoaded();
+            }
         }
         for(auto& edit:edits) for(const auto& entry:edit.nodeMorphs) {
             auto* node=morphNode(*edit.container,entry.key);

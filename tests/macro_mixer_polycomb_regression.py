@@ -73,6 +73,19 @@ int main(int argc,char** argv) {
     policyEntryPoints();
     auto transport=std::make_shared<ofxOceanodeTransport>();
     ofxOceanodeContainer parent(registry,types,transport); parent.setCanvasID("PolyCombMorph");
+    // The node's snapshot library (nodeSnapshots/PolyComb under the data
+    // folder): slot 2 is a legacy drone sound. A saved Snapshot number recalls
+    // its slot unless a preset is loading, so a node MacroMixer loads outside
+    // a full preset load must still see a preset recall (as the Bloobs
+    // presets: a PolyComb added by a morph came up droning with the slot's
+    // sound instead of the saved one).
+    {
+        fs::create_directories(scratch+"/nodeSnapshots/PolyComb/banks");
+        ofSaveJson(scratch+"/nodeSnapshots/PolyComb/library.json",ofJson{{"snapshots",1},{"bank",""}});
+        ofJson slot; slot["name"]="Legacy Drone"; slot["controls"]["Env_Mode"]=2; slot["controls"]["Cutoff"]=std::vector<float>{40.f};
+        slot["lfos"]=3; slot["envs"]=0; slot["exts"]=0;
+        ofSaveJson(scratch+"/nodeSnapshots/PolyComb/snapshot_1.json",slot);
+    }
     // Two saved patches with a polyComb whose hidden sound differs, as in the
     // Bloobs presets: numbers glide, modes switch half way, Snapshot stays.
     const auto a=scratch+"/a",b=scratch+"/b",voices=scratch+"/voices";
@@ -147,11 +160,21 @@ int main(int argc,char** argv) {
     const auto channels=scratch+"/channels";
     fs::copy(a,channels,fs::copy_options::recursive);
     auto channelTarget=source; channelTarget["Channels"]=4;
+    channelTarget["polyComb"]["Snapshot"]=2; channelTarget["polyComb"]["Drone"]=false; // Saved from the library's slot 2, then un-droned.
     ofSaveJson(channels+"/SC_polycombBox_1.json",channelTarget);
     MacroMixerRuntime layout(parent); assert(layout.importMacro(a)&&layout.importMacro(channels));
-    layout.request(a,0,0,true); layout.update(0);
+    layout.request(a,0,0,true); layout.update(0); const auto* layoutGraph=layout.origin();
     details=layout.sourceDetails(layout.importedMacro(channels)->id());
     assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"&&d.message.find("(Channels)")!=std::string::npos;}));
+    // The replacement loads as a preset recall: its saved Snapshot number
+    // does not recall the library's legacy drone over the saved sound.
+    layout.request(channels,1000,0,true); layout.update(10); assert(layout.morphingInPlace()&&layout.origin()==layoutGraph);
+    assert(layoutGraph->container->getDynamicNodes().at("SC polycombBox").size()==2);
+    layout.finish(); layout.update(20); layout.update(21); assert(!layout.transitioning());
+    const auto& boxes=layoutGraph->container->getDynamicNodes().at("SC polycombBox"); assert(boxes.size()==1&&!boxes.count(1));
+    auto& replacement=boxes.begin()->second->getNodeModel(); assert(replacement.getParameter<int>("Channels")==4);
+    const auto replaced=saved(replacement).at("polyComb");
+    assert(replaced.at("Drone")==false); near(replaced.at("Cutoff")[0].get<float>(),80); assert(replaced.at("Snapshot")==2);
     layout.clear();
     // A cable remains the authoritative writer of Voices during the sound morph.
     const auto drivenA=scratch+"/driven-a",drivenB=scratch+"/driven-b";
@@ -188,7 +211,7 @@ int main(int argc,char** argv) {
     owned.request(ownedB,1000,0,true);owned.update(10);owned.update(260);
     assert(owned.morphingInPlace()&&ownedModel.getParameter<int>("Voices")==12);
     owned.finish();owned.update(270);assert(ownedModel.getParameter<int>("Voices")==12);owned.clear();
-    std::cout<<"polyComb node morph passed: hidden sound/log glides, count-only Details, early Voices, same-node forward/reverse transitions, cancellation and structural channel layouts.\n";
+    std::cout<<"polyComb node morph passed: hidden sound/log glides, count-only Details, early Voices, same-node forward/reverse transitions, cancellation, structural channel layouts and a replacement keeping its saved sound over its Snapshot slot.\n";
 }
 '''
 

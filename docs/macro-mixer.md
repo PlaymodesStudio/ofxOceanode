@@ -163,6 +163,15 @@ graph keeps morphing in place. Details lists it as **Replaced node**
 with the differing setting. If a blend is impossible (for example a changed
 cable into a Global Portal), the whole graph falls back as described next.
 
+Added and replaced nodes load their saved settings as a preset recall:
+`ofxOceanodeShared::isPresetLoading()` is true while they load, as it is for
+a native source load, so recall-time side effects stay off. A SuperCollider
+box saved with a Snapshot number keeps its saved sound instead of recalling
+that library slot over it (a slot still saved with the old `Env_Mode` would
+otherwise switch the added box to Drone). The cables and blends of the morph
+are created outside that scope, so backends such as the SC server graph
+still react to them.
+
 ### Portal buses
 
 A Portal is a shared bus, not a cable: setting one Portal's Value sets every
@@ -517,7 +526,8 @@ branches listed in `macro-mixer-migration-audit.md`.
   node configuration replaces only that node (nested HeaderPro, a probe with
   blended output) while Router changes still fall back. A mock node that blends
   its own hidden state covers the node morph hooks: ignored keys, Skip, Switch
-  and Structural hints, a refused check and cancellation. Whole local,
+  and Structural hints, a refused check and cancellation; its replacement loads
+  as a preset recall (`isPresetLoading()`), keeping its saved state. Whole local,
   global and empty nested Macro additions/removals cover incoming controls,
   connected live outputs, native destruction, cancellation, failed preparation,
   alias collisions and repeated transitions. Different live sources driving an
@@ -551,9 +561,11 @@ branches listed in `macro-mixer-migration-audit.md`.
   fences (`serverManager::requestMixerRouting`).
 - `python3 tests/macro_mixer_polycomb_regression.py`: production SC polycombBox,
   without a server, morphing its hidden sound on the running node: linear and
-  log glides, a mode switching half way, Snapshot kept, cancellation and a
-  Voices change replacing the node. Needs the SuperCollider, ofxSuperCollider
-  and ofxOsc addons; builds as C++20.
+  log glides, a mode switching half way, Snapshot kept, cancellation, a
+  Channels change replacing the node, and the replacement keeping its saved
+  sound (Drone off) although its Snapshot number names a legacy drone slot of
+  the library. Needs the SuperCollider, ofxSuperCollider and ofxOsc addons;
+  builds as C++20.
 - `python3 tests/macro_mixer_sc_audio_regression.py`: actual offline SuperCollider
   render of the renamed SynthDefs, without opening an audio device.
 
