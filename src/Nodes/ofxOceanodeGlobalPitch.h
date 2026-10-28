@@ -4,8 +4,8 @@
 //
 //  The Global Pitch node's state (Default_Nodes/globalPitch.h): one scale
 //  (pitch classes 0-11, and a low scale for the notes below a split note), a
-//  shift along each scale (degrees, optionally kept inside each note's
-//  octave), one transpose (semitones, optionally wrapped into each note's
+//  shift along each scale (degrees, kept inside each note's octave), one
+//  transpose (semitones, optionally wrapped into each note's
 //  octave) and one random detune per voice (cents), for every node in the
 //  patch that plays or shows pitches. Each feature has its own list of destinations,
 //  ticked in the Global Pitch node's inspector.
@@ -62,29 +62,24 @@ public:
         if(state().scale == degrees && state().scaleOn == on) return;
         state().scale = degrees;
         state().scaleOn = on;
-        state().offsets = offsetsFor(degrees, state().shift, state().shiftWrap);
+        state().offsets = offsetsFor(degrees, state().shift);
         valuesChanged(Scale);
     }
-    // shift: the quantized note moves this many degrees along its scale (the
-    // scale's own notes, so a 5-note scale shifted 5 is an octave up). With
-    // wrap, it stays in its octave instead: the degrees rotate. The low scale
-    // has its own shift.
+    // shift: the quantized note moves this many degrees along its scale and
+    // stays in its octave, so the degrees rotate (a 5-note scale shifted 5 is
+    // unshifted). The low scale has its own shift.
     static int shift() { return state().shift; }
-    static bool shiftWraps() { return state().shiftWrap; }
-    static void setShift(int degrees, bool wrap) {
-        if(state().shift == degrees && state().shiftWrap == wrap) return;
+    static void setShift(int degrees) {
+        if(state().shift == degrees) return;
         state().shift = degrees;
-        state().shiftWrap = wrap;
-        state().offsets = offsetsFor(state().scale, degrees, wrap);
+        state().offsets = offsetsFor(state().scale, degrees);
         valuesChanged(Scale);
     }
     static int lowShift() { return state().lowShift; }
-    static bool lowShiftWraps() { return state().lowShiftWrap; }
-    static void setLowShift(int degrees, bool wrap) {
-        if(state().lowShift == degrees && state().lowShiftWrap == wrap) return;
+    static void setLowShift(int degrees) {
+        if(state().lowShift == degrees) return;
         state().lowShift = degrees;
-        state().lowShiftWrap = wrap;
-        state().lowOffsets = offsetsFor(state().lowScale, degrees, wrap);
+        state().lowOffsets = offsetsFor(state().lowScale, degrees);
         valuesChanged(Scale);
     }
     // each pitch class's offset to its nearest degree of the scale / low scale, shifted
@@ -102,7 +97,7 @@ public:
         state().lowScale = degrees;
         state().split = split;
         state().lowOn = on;
-        state().lowOffsets = offsetsFor(degrees, state().lowShift, state().lowShiftWrap);
+        state().lowOffsets = offsetsFor(degrees, state().lowShift);
         valuesChanged(Scale);
     }
     // modulo 12: a transposed note wraps into its own octave, which starts at base (pitch class 0-11)
@@ -222,13 +217,8 @@ public:
         for(auto& f : followers()) if(f.resend) f.resend();
     }
 
-    // each pitch class's offset to the nearest degree (the lower one on a tie),
-    // then shift degrees further along the scale: into the next octaves, or
-    // wrapped within the note's own octave
-    static std::array<float, 12> offsetsFor(const std::vector<float>& degrees, int shift = 0, bool wrap = false) {
-        std::array<float, 12> out{};
-        if(degrees.empty()) return out;
-        // the scale's degrees once each, in order, within one octave
+    // a scale's degrees once each, in order, within one octave (0-12)
+    static std::vector<float> distinctDegrees(const std::vector<float>& degrees) {
         std::vector<float> sorted;
         for(float d : degrees) {
             const float degree = std::fmod(std::fmod(d, 12.0f) + 12.0f, 12.0f);
@@ -237,6 +227,15 @@ public:
             if(!known) sorted.push_back(degree);
         }
         std::sort(sorted.begin(), sorted.end());
+        return sorted;
+    }
+    // each pitch class's offset to the nearest degree (the lower one on a tie),
+    // then shift degrees further along the scale, wrapped within the note's
+    // own octave
+    static std::array<float, 12> offsetsFor(const std::vector<float>& degrees, int shift = 0) {
+        std::array<float, 12> out{};
+        if(degrees.empty()) return out;
+        const std::vector<float> sorted = distinctDegrees(degrees);
         const int n = (int)sorted.size();
         for(int pc = 0; pc < 12; pc++) {
             float best = 0, bestDistance = 1e9f;
@@ -250,10 +249,8 @@ public:
                 }
             }
             if(shift == 0) { out[pc] = best; continue; }
-            const int d = nearest + shift;
-            const int index = ((d % n) + n) % n;
-            const int octaves = wrap ? 0 : (d - index) / n;
-            out[pc] = sorted[index] + 12.0f * (nearestOctave + octaves) - pc;
+            const int index = (((nearest + shift) % n) + n) % n;
+            out[pc] = sorted[index] + 12.0f * nearestOctave - pc;
         }
         return out;
     }
@@ -272,9 +269,7 @@ private:
         bool wrap = false;
         int wrapBase = 0;
         int shift = 0;
-        bool shiftWrap = false;
         int lowShift = 0;
-        bool lowShiftWrap = false;
         std::array<std::map<std::string, bool>, NumFeatures> overrides;
     };
     static State& state() { static State s; return s; }

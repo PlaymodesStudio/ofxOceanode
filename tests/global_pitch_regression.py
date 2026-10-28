@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify Global Pitch's scale table: quantization, Shift (degrees) and Shift Mod.
+"""Verify Global Pitch's scale table: quantization and Shift (degrees, within the octave).
 
 Compiles the real ofxOceanodeGlobalPitch.h against a stub node model, so no
 openFrameworks app is needed. Requires Python 3 and clang++.
@@ -53,69 +53,59 @@ int main() {
     // No shift: the nearest degree (the lower one on a tie).
     auto plain = GP::offsetsFor(pentatonic);
     near(plain[0], 0); near(plain[2], 1); near(plain[4], -1); near(plain[11], -1); near(plain[8], -1);
-    // Shift +1: every degree to the next one; the top degree climbs into the next octave.
+    // Shift +1: every degree to the next one, staying in the octave: the top
+    // degree wraps to the bottom.
     auto up = GP::offsetsFor(pentatonic, 1);
     near(up[0], 3);   // C  -> Eb
     near(up[3], 2);   // Eb -> F
     near(up[5], 2);   // F  -> G
     near(up[7], 3);   // G  -> Bb
-    near(up[10], 2);  // Bb -> C'
+    near(up[10], -10); // Bb -> C of the same octave
     near(up[2], 3);   // D quantizes to Eb, then -> F
-    // Shift Mod: the top degree wraps to the bottom of the same octave instead.
-    auto wrapped = GP::offsetsFor(pentatonic, 1, true);
-    near(wrapped[0], 3); near(wrapped[10], -10); // Bb -> C
-    // Shift -1, and shifting by the scale's size is an octave (or nothing, wrapped).
-    auto down = GP::offsetsFor(pentatonic, -1);
-    near(down[0], -2);  // C -> Bb below
-    near(down[3], -3);  // Eb -> C
-    near(GP::offsetsFor(pentatonic, -1, true)[0], 10); // C -> Bb above, same octave
+    // Shift -1 is the scale's size - 1; shifting by the size is no shift.
+    near(GP::offsetsFor(pentatonic, -1)[0], 10); // C -> Bb, same octave
+    near(GP::offsetsFor(pentatonic, -1)[3], -3); // Eb -> C
     for(int pc = 0; pc < 12; pc++) {
-        near(GP::offsetsFor(pentatonic, 5)[pc], plain[pc] + 12);
-        near(GP::offsetsFor(pentatonic, -10)[pc], plain[pc] - 24);
-        near(GP::offsetsFor(pentatonic, 5, true)[pc], plain[pc]);
-        near(GP::offsetsFor(pentatonic, 7, true)[pc], GP::offsetsFor(pentatonic, 2, true)[pc]);
+        near(GP::offsetsFor(pentatonic, 5)[pc], plain[pc]);
+        near(GP::offsetsFor(pentatonic, 4)[pc], GP::offsetsFor(pentatonic, -1)[pc]);
+        near(GP::offsetsFor(pentatonic, 7)[pc], GP::offsetsFor(pentatonic, 2)[pc]);
     }
+    assert(GP::distinctDegrees({4, 0, 2, 12, 5, 7, 9, 11}).size() == 7);
     // Degrees given unsorted, repeated or above 11 are one scale.
     auto major = GP::offsetsFor({4, 0, 2, 12, 5, 7, 9, 11}, 2);
-    near(major[0], 4); near(major[11], 3); // C -> E, B -> D'
-    // A one-degree scale: every note is that degree (G: the C above), and a
-    // degree further is the next octave, or the same note wrapped.
-    near(GP::offsetsFor({0}, 1)[7], 17); near(GP::offsetsFor({0}, 1, true)[7], 5);
+    near(major[0], 4); near(major[11], -9); // C -> E, B -> D of the same octave
+    // A one-degree scale: every note is that degree (G: the C above), shifted or not.
+    near(GP::offsetsFor({0}, 1)[7], 5);
 
     // Through apply(): scale, shift, then transpose, for a following node.
     ofxOceanodeNodeModel node;
     GP::follow(&node, true, {});
     GP::setScale(pentatonic, true);
-    GP::setShift(1, false);
+    GP::setShift(1);
     near(GP::apply(&node, 60), 63);  // C4 -> Eb4
     near(GP::apply(&node, 65), 67);  // F4 -> G4
-    near(GP::apply(&node, 70), 72);  // Bb4 -> C5
+    near(GP::apply(&node, 70), 60);  // Bb4 -> C4 (same octave)
     // A fractional note keeps its fraction: quantized by its nearest semitone.
     near(GP::apply(&node, 61.37f), 63.37f); // C#4 (nearest C) -> Eb, +0.37
-    near(GP::apply(&node, 70.5f), 71.5f); // rounds to B (tie: the lower Bb) -> C5, keeping +0.5 of the way
-    GP::setShift(1, true);
-    near(GP::apply(&node, 70), 60);  // Bb4 -> C4
+    near(GP::apply(&node, 70.5f), 59.5f); // rounds to B (tie: the lower Bb) -> C4, keeping +0.5
     GP::setTranspose(2);
     near(GP::apply(&node, 60), 65);  // shifted to Eb, then +2
     GP::setTranspose(0);
     // The low scale has its own shift, along its own degrees, below the split.
     GP::setLowScale({0, 7}, 60, true);
-    GP::setShift(1, false);
     near(GP::apply(&node, 48), 48);  // the main shift leaves the low scale alone
-    GP::setLowShift(1, false);
+    GP::setLowShift(1);
     near(GP::apply(&node, 48), 55);  // C3 -> G3 (low scale: C, G)
-    near(GP::apply(&node, 55), 60);  // G3 -> C4
+    near(GP::apply(&node, 55), 48);  // G3 -> C3 (same octave)
     near(GP::apply(&node, 60), 63);  // at the split: the main scale, its own shift
-    GP::setLowShift(-1, true);
-    near(GP::apply(&node, 48), 55);  // wrapped: C3 -> G3 of the same octave
-    GP::setLowShift(0, false);
+    GP::setLowShift(0);
     // A bypassed scale shifts nothing.
     GP::setScale(pentatonic, false);
     GP::setLowScale({}, 0, false);
     near(GP::apply(&node, 61), 61);
-    GP::setShift(0, false);
+    GP::setShift(0);
     GP::unfollow(&node);
-    std::cout << "Global Pitch passed: nearest degree, Shift up/down/octaves, Shift Mod, low scale, bypass, transpose order.\n";
+    std::cout << "Global Pitch passed: nearest degree, Shift wrapping in the octave, low scale, bypass, transpose order.\n";
 }
 '''
 
