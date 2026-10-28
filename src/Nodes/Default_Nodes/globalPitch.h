@@ -15,7 +15,8 @@
 //    Split Note    the input notes below it (MIDI, 0 = off) move to the nearest
 //    Low Scale     degree of Low Scale instead, e.g. to stay in tune with a
 //                  neighbouring piece in the bass while the rest follows Scale
-//    Low Scale Bypass  turns the low scale off (below Split Note)
+//    Low Bypass    turns the low scale off (below Split Note)
+//    Low Shift, Low Shift Mod  the low scale's own shift
 //    Transpose     semitones, added after the scale (a transpose changes the key)
 //    Mod 12        a transposed note wraps into its own octave, which starts at
 //    Base Note     (C .. B): it never leaves that octave (cf. Fit Notes In Range)
@@ -39,8 +40,8 @@ public:
         description = "Scale, Transpose and Detune for every node in the patch that plays or shows pitches "
                       "(synths, MIDI outputs, piano rolls), without cables. Notes move to the "
                       "nearest degree of Scale (pitch classes 0-11), or of Low Scale "
-                      "when below Split Note (MIDI, 0 = off), move Shift degrees along it (Shift Mod: staying in "
-                      "their octave), then Transpose (semitones) is added (Mod 12: wrapped "
+                      "when below Split Note (MIDI, 0 = off), move Shift (Low Shift below the split) degrees along it (Shift Mod: "
+                      "staying in their octave), then Transpose (semitones) is added (Mod 12: wrapped "
                       "into the note's own octave from Base Note), then each "
                       "voice's own random Detune (within +-cents). The inspector chooses which destinations follow "
                       "each one.";
@@ -54,6 +55,7 @@ public:
         ofxOceanodeGlobalPitch::setScale({}, false);
         ofxOceanodeGlobalPitch::setLowScale({}, 0.0f, false);
         ofxOceanodeGlobalPitch::setShift(0, false);
+        ofxOceanodeGlobalPitch::setLowShift(0, false);
         ofxOceanodeGlobalPitch::setDetune(0.0f);
         for(int f = 0; f < ofxOceanodeGlobalPitch::NumFeatures; f++) ofxOceanodeGlobalPitch::setOverridesText(feature(f), "");
     }
@@ -71,7 +73,9 @@ public:
         addParameter(split.set("Split Note", ofxOceanodeGlobalPitch::split(), 0.0f, 127.0f));
         addParameter(lowScale.set("Low Scale", low.empty() ? std::vector<float>{0} : low,
                                   std::vector<float>(1, 0.0f), std::vector<float>(1, 11.0f)));
-        addParameter(lowBypass.set("Low Scale Bypass", !low.empty() && !ofxOceanodeGlobalPitch::lowScaleEnabled()));
+        addParameter(lowBypass.set("Low Bypass", !low.empty() && !ofxOceanodeGlobalPitch::lowScaleEnabled()));
+        addParameter(lowShift.set("Low Shift", ofxOceanodeGlobalPitch::lowShift(), -24, 24));
+        addParameter(lowShiftWrap.set("Low Shift Mod", ofxOceanodeGlobalPitch::lowShiftWraps()));
         addSeparator("Transpose");
         addParameter(transpose.set("Transpose", ofxOceanodeGlobalPitch::transpose(), -48.0f, 48.0f));
         addParameter(wrap.set("Mod 12", ofxOceanodeGlobalPitch::transposeWraps()));
@@ -116,6 +120,14 @@ public:
         };
         listeners.push(shift.newListener([sendShift](int&){ sendShift(); }));
         listeners.push(shiftWrap.newListener([sendShift](bool&){ sendShift(); }));
+        auto sendLowShift = [this](){
+            const int degrees = lowShift.get();
+            const bool on = lowShiftWrap.get();
+            ofxOceanodeGlobalPitch::setLowShift(degrees, on);
+            share([degrees, on](globalPitch* n){ n->lowShift = degrees; n->lowShiftWrap = on; });
+        };
+        listeners.push(lowShift.newListener([sendLowShift](int&){ sendLowShift(); }));
+        listeners.push(lowShiftWrap.newListener([sendLowShift](bool&){ sendLowShift(); }));
         listeners.push(transpose.newListener([this](float& v){
             ofxOceanodeGlobalPitch::setTranspose(v);
             share([v](globalPitch* n){ n->transpose = v; });
@@ -135,11 +147,17 @@ public:
         sendLowScale();
         sendScale();
         sendShift();
+        sendLowShift();
     }
 
-    // presets from before Low Scale Bypass: Scale Bypass turned both scales off
+    // presets saved as "Low Scale Bypass" (its earlier name), and from before
+    // it existed, when Scale Bypass turned both scales off
     void presetRecallAfterSettingParameters(ofJson& json) override {
-        if(!json.contains(lowBypass.getEscapedName())) lowBypass = bypass.get();
+        if(json.contains(lowBypass.getEscapedName())) return;
+        ofParameter<bool> earlier;
+        earlier.set("Low Scale Bypass", false);
+        const auto key = earlier.getEscapedName();
+        lowBypass = json.contains(key) && json[key].is_boolean() ? json[key].get<bool>() : bypass.get();
     }
 
     // one table for the three destination strings: a row per destination, a tick per feature
@@ -200,8 +218,8 @@ private:
     ofParameter<float> split;
     ofParameter<bool> bypass, lowBypass;
     ofParameter<float> transpose, detune;
-    ofParameter<bool> wrap, shiftWrap;
-    ofParameter<int> wrapBase, shift;
+    ofParameter<bool> wrap, shiftWrap, lowShiftWrap;
+    ofParameter<int> wrapBase, shift, lowShift;
     std::array<ofParameter<std::string>, ofxOceanodeGlobalPitch::NumFeatures> destinations;
     ofEventListeners listeners;
 };

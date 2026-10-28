@@ -4,7 +4,7 @@
 //
 //  The Global Pitch node's state (Default_Nodes/globalPitch.h): one scale
 //  (pitch classes 0-11, and a low scale for the notes below a split note), a
-//  shift along that scale (degrees, optionally kept inside each note's
+//  shift along each scale (degrees, optionally kept inside each note's
 //  octave), one transpose (semitones, optionally wrapped into each note's
 //  octave) and one random detune per voice (cents), for every node in the
 //  patch that plays or shows pitches. Each feature has its own list of destinations,
@@ -67,7 +67,8 @@ public:
     }
     // shift: the quantized note moves this many degrees along its scale (the
     // scale's own notes, so a 5-note scale shifted 5 is an octave up). With
-    // wrap, it stays in its octave instead: the degrees rotate.
+    // wrap, it stays in its octave instead: the degrees rotate. The low scale
+    // has its own shift.
     static int shift() { return state().shift; }
     static bool shiftWraps() { return state().shiftWrap; }
     static void setShift(int degrees, bool wrap) {
@@ -75,6 +76,14 @@ public:
         state().shift = degrees;
         state().shiftWrap = wrap;
         state().offsets = offsetsFor(state().scale, degrees, wrap);
+        valuesChanged(Scale);
+    }
+    static int lowShift() { return state().lowShift; }
+    static bool lowShiftWraps() { return state().lowShiftWrap; }
+    static void setLowShift(int degrees, bool wrap) {
+        if(state().lowShift == degrees && state().lowShiftWrap == wrap) return;
+        state().lowShift = degrees;
+        state().lowShiftWrap = wrap;
         state().lowOffsets = offsetsFor(state().lowScale, degrees, wrap);
         valuesChanged(Scale);
     }
@@ -93,7 +102,7 @@ public:
         state().lowScale = degrees;
         state().split = split;
         state().lowOn = on;
-        state().lowOffsets = offsetsFor(degrees, state().shift, state().shiftWrap);
+        state().lowOffsets = offsetsFor(degrees, state().lowShift, state().lowShiftWrap);
         valuesChanged(Scale);
     }
     // modulo 12: a transposed note wraps into its own octave, which starts at base (pitch class 0-11)
@@ -264,6 +273,8 @@ private:
         int wrapBase = 0;
         int shift = 0;
         bool shiftWrap = false;
+        int lowShift = 0;
+        bool lowShiftWrap = false;
         std::array<std::map<std::string, bool>, NumFeatures> overrides;
     };
     static State& state() { static State s; return s; }

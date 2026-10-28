@@ -98,12 +98,17 @@ int main() {
     GP::setTranspose(2);
     near(GP::apply(&node, 60), 65);  // shifted to Eb, then +2
     GP::setTranspose(0);
-    // The low scale shifts along its own degrees below the split.
+    // The low scale has its own shift, along its own degrees, below the split.
     GP::setLowScale({0, 7}, 60, true);
     GP::setShift(1, false);
+    near(GP::apply(&node, 48), 48);  // the main shift leaves the low scale alone
+    GP::setLowShift(1, false);
     near(GP::apply(&node, 48), 55);  // C3 -> G3 (low scale: C, G)
     near(GP::apply(&node, 55), 60);  // G3 -> C4
-    near(GP::apply(&node, 60), 63);  // at the split: the main scale
+    near(GP::apply(&node, 60), 63);  // at the split: the main scale, its own shift
+    GP::setLowShift(-1, true);
+    near(GP::apply(&node, 48), 55);  // wrapped: C3 -> G3 of the same octave
+    GP::setLowShift(0, false);
     // A bypassed scale shifts nothing.
     GP::setScale(pentatonic, false);
     GP::setLowScale({}, 0, false);
