@@ -953,29 +953,13 @@
     "addon": "ofxSantiNodes"
   },
   "Counter": {
-    "description": "Counts elapsed time since Reset. With Sync To Transport enabled, Out is the transport position in seconds and follows play, pause, seek, loops and frame-stepped rendering.",
+    "description": "Counts elapsed seconds with a vector Speed (1 = normal, 0 = hold). Out has one value per speed; speed changes preserve continuity. Reset restarts all values at zero. With Sync To Transport enabled, the source clock follows play, pause, seek, loops and frame-stepped rendering; local Reset is ignored.",
     "parameters": [
       "RstWPhs",
       "Reset",
+      "Speed",
       "Out",
-      "Sync To Transport",
-      "Trigger",
-      "Trigger_F",
-      "Force Fin",
-      "Ms",
-      "IsRamping",
-      "Finish",
-      "Enable",
-      "Value",
-      "BPM",
-      "Div",
-      "Mult",
-      "Init Ph",
-      "Loop",
-      "Phase",
-      "Multi Trigger",
-      "Audio Rate",
-      "Cycle"
+      "Sync To Transport"
     ],
     "source": "Default_Nodes/Generators/phasor.h",
     "addon": "ofxOceanode"

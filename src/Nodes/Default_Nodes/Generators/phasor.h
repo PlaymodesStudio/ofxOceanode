@@ -32,17 +32,23 @@ private:
 class counter : public timeGenerator{
 public:
     counter() : timeGenerator("Counter"){
-        description = "Counts elapsed time since Reset. With Sync To Transport enabled, "
-                      "Out is the transport position in seconds and follows play, pause, "
-                      "seek, loops and frame-stepped rendering.";
+        description = "Counts elapsed seconds with a vector Speed (1 = normal, 0 = hold). "
+                      "Out has one value per speed; speed changes preserve continuity. "
+                      "Reset restarts all values at zero. With Sync To Transport enabled, "
+                      "the source clock follows play, pause, seek, loops and frame-stepped rendering; "
+                      "local Reset is ignored.";
     }
     void setup() override{
         timeGenerator::setup();
         phaseOffset=0;
+        lastInputTime=0;
+        speedOffsets = {0};
+        previousSpeeds = {1};
 
         addParameter(resetWithPhaseReset.set("RstWPhs",false));
         addParameter(resetCounter.set("Reset"));
-        addOutputParameter(output.set("Out", 0, 0, FLT_MAX));        
+        addParameter(speed.set("Speed", {1}, {0}, {FLT_MAX}));
+        addOutputParameter(output.set("Out", {0}, {0}, {FLT_MAX}));
 
         addInspectorParameter(syncToTransport.set("Sync To Transport", false));
 
@@ -53,10 +59,10 @@ public:
         }));
         listeners.push(syncToTransport.newListener([this](bool &enabled){
             if(enabled) {
-                output = static_cast<float>(getFrameTransportState().current.seconds);
+                updateCounterOutput(getFrameTransportState().current.seconds);
             } else {
-                // Resume the free-running clock without changing the visible value.
-                phaseOffset = getTime() - static_cast<double>(output.get());
+                // Preserve the source position, including each lane's speed/offset.
+                phaseOffset = getTime() - lastInputTime;
             }
         }));
  
@@ -68,31 +74,70 @@ public:
         {
             rstCounter();
         }
+        // Like Mod Time, a global phase reset clears speed compensation even
+        // when RstWPhs leaves the free-running source clock untouched.
+        resetSpeedPhase();
     }
 
     void update(ofEventArgs &a) override
     {
-        if(syncToTransport) {
-            output = static_cast<float>(getFrameTransportState().current.seconds);
-        } else {
-            output = static_cast<float>(getTime()-phaseOffset);
-        }
+        updateCounterOutput(syncToTransport
+            ? getFrameTransportState().current.seconds
+            : getTime() - phaseOffset);
     }
     
     void rstCounter()
     {
         phaseOffset=getTime();
+        lastInputTime=0;
+        resetSpeedPhase();
     }
     
     
 private:
+    void resetSpeedPhase()
+    {
+        previousSpeeds = speed.get();
+        if(previousSpeeds.empty()) previousSpeeds = {1};
+        speedOffsets.assign(previousSpeeds.size(), 0.0);
+    }
+
+    void updateCounterOutput(double inputTime)
+    {
+        const auto &speeds = speed.get();
+        const size_t count = std::max(size_t(1), speeds.size());
+        // New lanes inherit lane zero's phase, just like scalar broadcasting.
+        const double firstOffset = speedOffsets.front();
+        const float firstSpeed = previousSpeeds.front();
+        speedOffsets.resize(count, firstOffset);
+        previousSpeeds.resize(count, firstSpeed);
+        counterValues.resize(count);
+        for(size_t i = 0; i < count; ++i) {
+            const float nextSpeed = speeds.empty() ? 1.0f : speeds[i];
+            // Apply speed edits on the next clock sample, as Mod Time does.
+            // Comparing with the last applied speed also handles several edits
+            // between frames without dropping any of their compensation.
+            speedOffsets[i] -= inputTime *
+                (static_cast<double>(nextSpeed) - previousSpeeds[i]);
+            previousSpeeds[i] = nextSpeed;
+            counterValues[i] = static_cast<float>(inputTime * nextSpeed + speedOffsets[i]);
+        }
+        lastInputTime = inputTime;
+        output = counterValues;
+    }
+
     ofEventListeners listeners;
 
-    ofParameter<float> output;
+    ofParameter<vector<float>> speed;
+    ofParameter<vector<float>> output;
     ofParameter<bool> resetWithPhaseReset;
     ofParameter<void> resetCounter;
     ofParameter<bool> syncToTransport;
     double phaseOffset;
+    double lastInputTime;
+    vector<double> speedOffsets;
+    vector<float> previousSpeeds;
+    vector<float> counterValues;
         
         
 };
