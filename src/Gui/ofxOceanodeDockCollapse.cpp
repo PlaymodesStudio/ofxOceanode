@@ -61,7 +61,7 @@ void ofxOceanodeDockCollapse::prepare(ImGuiID id, ImVec2 pos, ImVec2 size, ImGui
     if(!root) { axes[0] = AxisState(); axes[1] = AxisState(); pending = Request(); return; }
     for(int axis = 0; axis < 2; ++axis) {
         auto& state = axes[axis];
-        if(!state.layout.empty() && !matches(root, state.signature)) state = AxisState();
+        if(!state.layout.empty() && !matches(root, state.signature, true)) state = AxisState();
         if(activeSplitter && activeSplitter->SplitAxis == axis && !state.layout.empty()) {
             // A manual divider drag takes over this axis from the fold policy.
             syncReferences(root, axis); state = AxisState();
@@ -80,7 +80,7 @@ void ofxOceanodeDockCollapse::prepare(ImGuiID id, ImVec2 pos, ImVec2 size, ImGui
                 manualResize(n, axis, pending.firstSize);
                 ImGui::MarkIniSettingsDirty();
             } else {
-                if(state.layout.empty()) { capture(root, axis, state.layout); signature(root, state.signature); }
+                if(state.layout.empty()) { capture(root, axis, state.layout); signature(root, state.signature, true); }
                 std::vector<ImGuiID> targets;
                 collectTargets(root, n, direction(n, root), targets);
                 if(!targets.empty()) {
@@ -114,7 +114,7 @@ void ofxOceanodeDockCollapse::finish() {
     for(int axis = 0; axis < 2; ++axis) {
         auto& state = axes[axis];
         if(state.layout.empty()) continue;
-        if(!matches(root, state.signature)) { state = AxisState(); continue; }
+        if(!matches(root, state.signature, true)) { state = AxisState(); continue; }
         // Windows still receive the folded Size, but ini serialization sees
         // expanded SizeRef. Never change the global WindowMinSize.
         for(const auto& entry : state.layout)
@@ -125,7 +125,7 @@ void ofxOceanodeDockCollapse::finish() {
 void ofxOceanodeDockCollapse::drawHandles() {
     auto* root = ImGui::DockBuilderGetNode(rootID);
     for(auto& state : axes) {
-        if(!state.layout.empty() && matches(root, state.signature))
+        if(!state.layout.empty() && matches(root, state.signature, true))
             for(const auto& entry : state.layout) {
                 auto* n = ImGui::DockBuilderGetNode(entry.id);
                 n->SetLocalFlags((n->LocalFlags & ~tabFlags) | entry.tabFlags);
@@ -157,7 +157,7 @@ void ofxOceanodeDockCollapse::writeSettings(ImGuiTextBuffer& out) const {
         auto* root = ImGui::DockBuilderGetNode(rootID);
         if(!root) return;
         saved.root = rootID;
-        for(int axis = 0; axis < 2; ++axis) if(matches(root, axes[axis].signature))
+        for(int axis = 0; axis < 2; ++axis) if(matches(root, axes[axis].signature, true))
             for(const auto& fold : axes[axis].folds)
                 for(auto target : fold.targets) saved.folds.push_back({axis, fold.id, target});
         saveWindows(root, saved.windows);
@@ -189,7 +189,7 @@ void ofxOceanodeDockCollapse::tryRestore(ImGuiDockNode* root) {
     }
     for(const auto& f : restore.folds) {
         auto& state = axes[f.axis];
-        if(state.layout.empty()) { capture(root, f.axis, state.layout); signature(root, state.signature); }
+        if(state.layout.empty()) { capture(root, f.axis, state.layout); signature(root, state.signature, true); }
         state.folds.push_back({f.split, {f.target}});
     }
     restore = SavedState();
@@ -216,19 +216,24 @@ int ofxOceanodeDockCollapse::direction(ImGuiDockNode* n, ImGuiDockNode* root) {
     return line < center->Pos[axis] + center->Size[axis] * 0.5f ? 0 : 1;
 }
 
-void ofxOceanodeDockCollapse::signature(ImGuiDockNode* n, std::vector<ImGuiID>& out) {
+void ofxOceanodeDockCollapse::signature(ImGuiDockNode* n, std::vector<ImGuiID>& out, bool structureOnly) {
     out.push_back(n->ID); out.push_back(ImGuiID(n->SplitAxis + 1));
-    out.push_back(n->IsVisible); out.push_back(n->Windows.Size);
-    std::vector<ImGuiID> windows;
-    for(auto* w : n->Windows) windows.push_back(w->ID);
-    std::sort(windows.begin(), windows.end());
-    out.insert(out.end(), windows.begin(), windows.end());
-    if(n->IsSplitNode()) { signature(n->ChildNodes[0], out); signature(n->ChildNodes[1], out); }
+    out.push_back(n->IsCentralNode());
+    // Inspector auto-show changes visibility/window membership without replacing
+    // docks. Keep their fold snapshots and expanded dimensions in that case.
+    if(!structureOnly) {
+        out.push_back(n->IsVisible); out.push_back(n->Windows.Size);
+        std::vector<ImGuiID> windows;
+        for(auto* w : n->Windows) windows.push_back(w->ID);
+        std::sort(windows.begin(), windows.end());
+        out.insert(out.end(), windows.begin(), windows.end());
+    }
+    if(n->IsSplitNode()) { signature(n->ChildNodes[0], out, structureOnly); signature(n->ChildNodes[1], out, structureOnly); }
 }
 
-bool ofxOceanodeDockCollapse::matches(ImGuiDockNode* n, const std::vector<ImGuiID>& expected) {
+bool ofxOceanodeDockCollapse::matches(ImGuiDockNode* n, const std::vector<ImGuiID>& expected, bool structureOnly) {
     if(!n) return false;
-    std::vector<ImGuiID> current; signature(n, current); return current == expected;
+    std::vector<ImGuiID> current; signature(n, current, structureOnly); return current == expected;
 }
 
 bool ofxOceanodeDockCollapse::eligible(ImGuiDockNode* n) const {

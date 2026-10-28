@@ -16,6 +16,7 @@ CASES = r'''
 ofxOceanodeProportionalDocking policy;
 ImGuiID rootID, panes[7], farLeft, nearLeft, farRight, nearRight, topSplit, bottomSplit;
 bool build=true, grouped=false, showAll=true, showBottom=true;
+bool showExtraTab=false;
 bool showOverlay=false, overlayAfterHandles=false, overlayClicked=false;
 ImVec2 overlayPos;
 const char* names[]={"Outer left", "Inner left", "Canvas", "Inner right", "Outer right", "Top", "Bottom"};
@@ -62,6 +63,10 @@ void frame() {
     policy.dockSpace(rootID,ImVec2(0,0),ImGuiDockNodeFlags_None);
     ImGui::End();
     for(int i=0;i<7;++i) if((showAll || i!=0) && (showBottom || i!=6)) { ImGui::Begin(names[i]); ImGui::TextUnformatted(names[i]); ImGui::End(); }
+    if(showExtraTab) {
+        ImGui::SetNextWindowDockID(panes[1],ImGuiCond_Always);
+        ImGui::Begin("Inspector tab");ImGui::TextUnformatted("Selection");ImGui::End();
+    }
     if(showOverlay && !overlayAfterHandles) drawOverlay();
     policy.drawDockCollapseHandles();
     if(showOverlay && overlayAfterHandles) drawOverlay();
@@ -208,6 +213,32 @@ int main() {
     checkOcclusion(nearLeft,false);checkOcclusion(bottomSplit,false);
     checkOcclusion(nearLeft,true);checkOcclusion(bottomSplit,true);
     const float minX=ImGui::GetStyle().WindowMinSize.x, minY=ImGui::GetFrameHeight();
+    // Inspector auto-show/hide must not unfold an unrelated bottom instrument.
+    showAll=false;idle();
+    float instrumentHeight=height(6);
+    click(bottomSplit);near(height(6),minY);
+    for(int repeat=0;repeat<3;++repeat) {
+        showAll=true;idle();near(height(6),minY);checkGeometry(node(rootID));
+        showAll=false;idle();near(height(6),minY);checkGeometry(node(rootID));
+    }
+    showAll=true;idle();
+    // Joining/leaving an existing tab group also changes window membership.
+    showExtraTab=true;idle();near(height(6),minY);
+    showExtraTab=false;idle();near(height(6),minY);
+    click(bottomSplit);near(height(6),instrumentHeight);
+    // A folded region can disappear and return without losing its own fold.
+    click(bottomSplit);showBottom=false;idle();showBottom=true;idle();near(height(6),minY);
+    click(bottomSplit);near(height(6),instrumentHeight);
+    // Preserve simultaneous horizontal/vertical folds, including saved state.
+    float innerWidth=width(1);
+    click(nearLeft);click(bottomSplit);
+    showAll=false;idle();near(width(1),minX);near(height(6),minY);
+    showAll=true;idle();near(width(0),minX);near(width(1),minX);near(height(6),minY);
+    std::string visibilityIni=ImGui::SaveIniSettingsToMemory();
+    ImGui::LoadIniSettingsFromMemory(visibilityIni.c_str(),visibilityIni.size());idle(10);
+    near(width(0),minX);near(width(1),minX);near(height(6),minY);
+    click(nearLeft);click(bottomSplit);near(width(1),innerWidth);near(height(6),instrumentHeight);
+    restoreLayout();
     const float globalThreshold=io.MouseDragThreshold;
     io.MouseDragThreshold=0.1f; // Handle clicks must tolerate a sensitive global drag setting.
     const ImVec2 tremors[]={ImVec2(1,0),ImVec2(5,0),ImVec2(8,0),ImVec2(0,8),ImVec2(5,8)};

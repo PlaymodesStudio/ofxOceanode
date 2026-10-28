@@ -51,8 +51,10 @@ private:
     static bool central(ImGuiDockNode* n);
     static ImGuiDockNode* findCentral(ImGuiDockNode* n);
     static int direction(ImGuiDockNode* n, ImGuiDockNode* root);
-    static void signature(ImGuiDockNode* n, std::vector<ImGuiID>& out);
-    static bool matches(ImGuiDockNode* n, const std::vector<ImGuiID>& expected);
+    // Fold snapshots depend on dock structure; pending input also checks windows
+    // and visibility so a click cannot act on a changed set of panes.
+    static void signature(ImGuiDockNode* n, std::vector<ImGuiID>& out, bool structureOnly = false);
+    static bool matches(ImGuiDockNode* n, const std::vector<ImGuiID>& expected, bool structureOnly = false);
     bool eligible(ImGuiDockNode* n) const;
     // Select the entire strip from the divider to the outer edge, including
     // outward siblings outside its immediate subtree. The perpendicular extent
