@@ -146,7 +146,9 @@ Exact prefixes, one reason per line:
 - `sink: declared` (R1), `sink: no outputs` (R2), `sink: router` (R5)
 - `sink: scope <param>`, `sink: timeline <param>`, `sink: binding <param>`,
   `sink: MIDI <param>`, `sink: persistent` (R3)
-- `feeds: <node name>` (R4, first live consumer found), `feeds: outside canvas`
+- `feeds: <node name>` (R4, first live consumer found), `feeds: outside canvas`,
+  `connection: outside canvas` (a cable arrives from another canvas; keeping the
+  node avoids deleting a cable that belongs to that canvas)
 - `portal: <name> used by <node or 'another canvas'>` (R6)
 - `macro: contains <node name>` (R7)
 

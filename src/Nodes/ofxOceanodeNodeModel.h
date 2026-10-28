@@ -88,13 +88,14 @@ public:
     // By default a node that publishes no output pin exists for its effect, so
     // it is a sink; this errs toward keeping. Override and return false for a
     // pure model whose only output is an ordinary parameter (a number box).
-    virtual bool isSink() const {
-        if(declaredSink) return true;
+    virtual bool isSink() const { return declaredSink || !hasOutputPin(); }
+    // True when the node publishes at least one pin it writes.
+    bool hasOutputPin() const {
         for(const auto& abstract : parameters){
             auto* parameter = dynamic_cast<ofxOceanodeAbstractParameter*>(abstract.get());
-            if(parameter != nullptr && parameter->isNodeOutput()) return false;
+            if(parameter != nullptr && parameter->isNodeOutput()) return true;
         }
-        return true;
+        return false;
     }
     void setDeclaredSink(bool sink){ declaredSink = sink; }
 
