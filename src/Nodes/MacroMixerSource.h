@@ -72,7 +72,12 @@ public:
         std::string source, failure, morphFallbackReason;
         bool usesTextures = false;
         ofxOceanodeAbstractParameter& parameter(const std::string& id) const;
+        // A Trigger router reads as the events it fired since clearTriggers().
+        // Watching starts at activation, so loading a graph fires nothing.
         MacroMixerMixing::Value read(const std::string& id) const;
+        void clearTriggers();
+        // Fires a Trigger Input router once, as an outer trigger arrives.
+        void trigger(const std::string& id);
         bool setInputs(const Inputs& inputs, bool publishTextures = true);
         void validateOutputs() const;
         bool update();
@@ -89,6 +94,8 @@ public:
         void cancelMorph();
         void applyMorph(float progress);
     private:
+        struct TriggerLatch { ofParameter<void> port; ofEventListener listener; int count = 0; };
+        mutable std::map<std::string, std::shared_ptr<TriggerLatch>> triggerLatches;
         MorphSnapshot morphStart, morphTarget;
         ofJson liveMorphDefinition; // Saved target expressed in stable runtime node identities.
         std::shared_ptr<MacroMixerMorphTopology> morphTopology;

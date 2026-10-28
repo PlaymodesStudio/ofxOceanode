@@ -80,6 +80,7 @@ private:
     customGuiRegion routerEditor, policyEditor, macroEditor;
     std::map<std::string, std::shared_ptr<ofxOceanodeAbstractParameter>> outputs;
     std::map<std::string, std::array<char, 256>> routerDrafts;
+    std::map<std::string, ofEventListener> triggerInputs; // Trigger Input routers, by router ID.
     std::array<char, 256> newRouterName{};
     uint64_t routerSequence = 0;
     int newRouterType = 0, newRouterDirection = 1;

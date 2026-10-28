@@ -29,6 +29,15 @@ template<typename T> Value object(const std::string& type,const T& value) {
 }
 template<typename T> const T& object(const Value& value) { return std::get<Object>(value).data->cast<T>().get(); }
 constexpr size_t maxVectorSize = 4096;
+// Void ports carry events, not values. A Trigger value is the number of events
+// since the last mix (at most maxTriggers); a policy decides how many pass.
+// Changing progress or wiring never produces an event by itself.
+constexpr const char* triggerType = "Trigger";
+constexpr int maxTriggers = 256;
+Value triggers(int count);
+int triggerCount(const Value& value);
+// The router parameter carrying the signal: "Value", or "Val" on void routers.
+std::string routerPort(const std::string& type);
 template<typename T> const char* typeName();
 template<> inline const char* typeName<float>() { return "Float"; }
 template<> inline const char* typeName<std::vector<float>>() { return "Float Vector"; }

@@ -161,7 +161,7 @@ blends where it arrives with the source's **Morph policies into this source**
 for that type (a ScBus cable through a private SC bridge). The rest of the
 graph keeps morphing in place. Details lists it as **Replaced node**
 with the differing setting. If a blend is impossible (for example a cable
-into a trigger or Portal), the whole graph falls back as described next.
+into a Portal), the whole graph falls back as described next.
 
 A Macro's **Color** is cosmetic: a different saved colour in a nested Macro is
 not a configuration change and never makes a morph replace the Macro or fall
@@ -217,7 +217,7 @@ output shows `Macro fall`. The current implementation falls back for:
   require reconciliation of the existing published interface or shared service;
   routers inside a whole newly added Macro load through its native lifecycle.
 - Genuinely changed cables into read-only/calculated or snapshot-excluded
-  controls, Portal services, triggers, or resource types without an internal
+  controls, Portal services, or resource types without an internal
   connection mixing adapter/backend handoff (such as audio buses and buffer
   references). Changed control cables need compatible native
   source/sink conversions and a saved fixed value for each uncabled endpoint.
@@ -266,7 +266,8 @@ vectors with different lengths switch at halfway through the eased progress.
 Non-finite controls are skipped. Unmatched destination controls retain their own
 values. Changed cable blending supports these same control types, with native
 scalar/vector conversions; registered types use their selected connection policy.
-Triggers and unsupported resource signals require the fallback crossfade.
+Changed cables into void inputs use the Trigger policies (see Triggers below).
+Unsupported resource signals require the fallback crossfade.
 
 During the fallback crossfade the origin keeps its native update/draw and is
 released on completion; the destination keeps its live state. In a compatible live graph, completion
@@ -275,6 +276,48 @@ are never replaced. Missing/invalid sources preserve existing playback. Saving
 during a morph restores a fresh destination, as with ordinary output mixing;
 intermediate control values and elapsed morph time are not embedded. Older saved
 sessions default to ordinary mixing.
+
+## Triggers (void routers)
+
+A router of type **Trigger** selects a void router (`Router v`, port `Val`).
+Triggers are events, not values, so they are never interpolated. During a
+transition each policy decides which events pass:
+
+| Policy | During the transition |
+| --- | --- |
+| **Switch** (default) | A's events below Threshold, B's from Threshold on. Threshold 0 hands over to B at once, 1 keeps A until the end. |
+| **Merge** | Events from A and from B. |
+| **Mute during transition** | None, from the moment B exists until completion. |
+| **Density** | Each A event passes with probability 1 − progress, each B event with probability progress. Deterministic for a given Seed. |
+
+Rules shared by every policy:
+
+- Changing progress, starting, finishing, cancelling, promoting B or rewiring
+  never fires a trigger by itself. Triggers a graph fires while it loads are
+  ignored.
+- A missing graph or cable contributes no events. At rest only the running
+  graph's events pass.
+- Progress is the eased (Bi Pow) progress, as for the other Switch policies.
+  Unlike value policies, the first transition frame already uses the policy, so
+  Mute and Switch at 0 apply as soon as B exists.
+- Events are counted per frame. Merge and Density pass the larger of A's and
+  B's counts, so a beat that reaches both graphs in the same frame (a shared
+  clock, an outer Input trigger) passes once, while either graph alone still
+  passes. Two independent events in the same frame also collapse into one; the
+  mixer cannot tell them apart.
+
+Output routers latch the events their graph fires during update. MacroMixer
+publishes them once, after the frame's mix, on its own void output; events
+fired during draw are published on the next update. A held (failed) frame
+publishes nothing and keeps its events for the next mixed frame. Input
+routers forward an outer trigger to every live graph as it arrives, like a
+native Macro pin.
+
+In Morph mode a changed cable into a void input (an added, removed or
+re-routed trigger source) no longer forces fallback. Its events pass as they
+happen, inside the graph's update, with the source's Trigger policy. The
+policy runs per frame on each side's count, so the result matches the router
+policies above. At completion the native destination cable takes over.
 
 ## Types and addon registration
 
@@ -374,6 +417,11 @@ branches listed in `macro-mixer-migration-audit.md`.
   and their cables are absent from definitions, activation and native reloads,
   the choices persist, a blocked activation resumes once every node is
   answered, and Cancel/Restore behave as described above.
+- `python3 tests/macro_mixer_trigger_regression.py`: Trigger policies and
+  options, Mix-mode void router outputs per frame (Switch thresholds, Merge
+  with shared and distinct beats, Mute), outer Input triggers reaching both
+  graphs once, the node publishing each event once across update/draw, and
+  in-place morphs of a changed void cable without fallback.
 - `python3 tests/macro_mixer_numeric_policies_regression.py`: numeric/Boolean
   policy rounding, endpoints, unequal vector sizes and option validation.
 - `python3 tests/macro_mixer_morph_regression.py`: native nonlinear graph

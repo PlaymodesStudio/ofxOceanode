@@ -70,6 +70,10 @@ public:
     float value(const std::string& routerID) const;
     const std::vector<float>& vectorValue(const std::string& routerID) const;
     MacroMixerMixing::Value outputValue(const std::string& routerID) const;
+    // outputValue, but a Trigger output is consumed: each event publishes once.
+    MacroMixerMixing::Value takeOutput(const std::string& routerID);
+    // Forwards an outer trigger on a Trigger Input router to the live graphs.
+    void triggerInput(const std::string& routerID);
     float progress() const { return mixedProgress; }
     std::string status() const;
     const std::vector<Diagnostic>& diagnostics() const { return errors; }

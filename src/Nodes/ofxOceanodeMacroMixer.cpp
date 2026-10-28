@@ -135,6 +135,7 @@ void drawMixOptions(const std::string& type,const ofJson& options,const std::fun
             : type=="Texture" && option.key()=="softness" ? "Edge softness"
             : type=="Texture" && option.key()=="cells" ? "Noise cells"
             : type=="Texture" && option.key()=="seed" ? "Noise seed"
+            : type==MacroMixerMixing::triggerType && option.key()=="seed" ? "Seed"
             : type=="ScBus" && option.key()=="channels" ? "Channels"
             : type=="ScBus" && option.key()=="smoothing_ms" ? "Gain smoothing (ms)" : option.key().c_str();
         if(value.is_boolean()) { bool v=value.get<bool>(); changed=ImGui::Checkbox(label,&v); value=v; }
@@ -464,6 +465,11 @@ void ofxOceanodeMacroMixer::installOutputs(const MacroMixerContract& contract) {
         if(draft.second) std::snprintf(draft.first->second.data(),256,"%s",router.name.c_str());
         order.push_back(router.name);
     }
+    triggerInputs.clear();
+    for(const auto& router : contract.routers) if(router.direction == "Input" && router.type == MacroMixerMixing::triggerType)
+        triggerInputs[router.id] = outputs.at(router.id)->cast<void>().getParameter().newListener([this, id = router.id] {
+            if(runtime) runtime->triggerInput(id);
+        });
     // OF reorders the existing shared parameter objects, preserving cable pointers.
     getParameterGroup().reorder(order);
     parameterGroupChanged.notify();
@@ -922,7 +928,7 @@ void ofxOceanodeMacroMixer::publish() {
             using T=std::decay_t<decltype(value)>;
             if constexpr(std::is_same_v<T,MacroMixerMixing::Object>) MacroMixerMixing::registry().adapter(value.type).write(*output.second,value);
             else output.second->cast<T>().getParameter()=value;
-        },runtime ? runtime->outputValue(output.first) : MacroMixerMixing::Value(0.f));
+        },runtime ? runtime->takeOutput(output.first) : MacroMixerMixing::Value(0.f));
     }
     progress = runtime ? runtime->progress() : 0.f;
     state = runtime ? runtime->status() : "Empty";

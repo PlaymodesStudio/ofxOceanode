@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <limits>
+#include <cstring>
 #include "ofMain.h"
 
 namespace MacroMixerMixing {
@@ -67,8 +68,27 @@ int rounded(double value) {
     return int(result);
 }
 double blend(double a,double b,float t) { return a+(b-a)*t; }
+ofJson densityOptions(const ofJson& options) {
+    require(options.is_object() && (options.empty() || (options.size()==1 && options.contains("seed"))),"Density accepts only seed");
+    const auto v=options.value("seed",ofJson(0));
+    require(v.is_number_integer() && v.get<double>()>=0 && v.get<double>()<=65535,"Density seed must be an integer in [0,65535]");
+    return {{"seed",v.get<int>()}};
+}
+// How many of a side's first `count` events pass with this probability. The
+// hash of seed, side, event index and progress is fixed within a frame, so
+// one more event never lowers the result and the same frame always agrees.
+int densityPassed(int count,uint32_t side,float t,double probability,int seed) {
+    uint32_t progress; std::memcpy(&progress,&t,sizeof(progress));
+    int passed=0;
+    for(int i=0;i<count;++i) {
+        uint32_t h=uint32_t(seed)*2246822519u^side*3266489917u^uint32_t(i)*668265263u^progress*374761393u;
+        h=(h^(h>>15))*2246822519u; h=(h^(h>>13))*3266489917u; h^=h>>16;
+        passed+=(h&0x00ffffffu)<probability*16777216.0;
+    }
+    return passed;
+}
 std::vector<std::string>& typeNames() {
-    static std::vector<std::string> names{"Float","Float Vector","Integer","Integer Vector","Boolean","Texture"};
+    static std::vector<std::string> names{"Float","Float Vector","Integer","Integer Vector","Boolean","Texture",triggerType};
     return names;
 }
 // Never return a graph's borrowed texture to the host: graph promotion/failure
@@ -194,6 +214,18 @@ public:
     }
 };
 }
+Value triggers(int count) {
+    require(count>=0 && count<=maxTriggers,"Trigger count must be in [0,"+std::to_string(maxTriggers)+"]");
+    return object(triggerType,count);
+}
+int triggerCount(const Value& value) {
+    const auto* boxed=std::get_if<Object>(&value);
+    require(boxed && boxed->type==triggerType && boxed->data && boxed->data->valueType()==typeid(int).name(),"Expected a Trigger");
+    const int count=object<int>(value);
+    require(count>=0 && count<=maxTriggers,"Trigger count must be in [0,"+std::to_string(maxTriggers)+"]");
+    return count;
+}
+std::string routerPort(const std::string& type) { return type==triggerType ? "Val" : "Value"; }
 const std::vector<std::string>& supportedTypes() {
     return typeNames();
 }
@@ -268,6 +300,36 @@ Registry::Registry() {
         };
         add(std::move(p),spec.mode==TextureMode::Crossfade);
     }
+    // Events are latched by the graph that produced them, never read from a port.
+    TypeAdapter trigger; trigger.type=triggerType; trigger.model="Router v"; trigger.description=typeid(void).name();
+    trigger.neutral=[] { return triggers(0); };
+    trigger.read=[](ofxOceanodeAbstractParameter&) { return triggers(0); };
+    trigger.write=[](ofxOceanodeAbstractParameter& p,const Value& value) {
+        require(p.valueType()==typeid(void).name(),"Expected a Trigger port");
+        for(int i=triggerCount(value);i>0;--i) p.cast<void>().getParameter().trigger();
+    };
+    trigger.makePort=[](const std::string& name,const Value&)->std::shared_ptr<ofxOceanodeAbstractParameter> {
+        ofParameter<void> p; p.set(name);
+        auto port=std::make_shared<ofxOceanodeParameter<void>>(); port->bindParameter(p); return port;
+    };
+    trigger.validate=[](const Value& value) { triggerCount(value); };
+    adapters.emplace(trigger.type,std::move(trigger));
+    // Each policy returns how many of this frame's events pass, from A's and
+    // B's counts. Merge and Density take the larger side, so the same beat
+    // reaching both graphs passes once while either graph alone still passes.
+    add({"switch","Switch",triggerType,[](const Value& a,const Value& b,float t,const ofJson& o) {
+        return t<o.at("threshold").get<double>() ? a : b;
+    },switchOptions},true);
+    add({"merge","Merge",triggerType,[](const Value& a,const Value& b,float,const ofJson&) {
+        return triggers(std::max(triggerCount(a),triggerCount(b)));
+    },noOptions},false);
+    add({"mute","Mute during transition",triggerType,[](const Value&,const Value&,float,const ofJson&) {
+        return triggers(0);
+    },noOptions},false);
+    add({"density","Density",triggerType,[](const Value& a,const Value& b,float t,const ofJson& o) {
+        const int seed=o.at("seed").get<int>();
+        return triggers(std::max(densityPassed(triggerCount(a),0,t,1.0-t,seed),densityPassed(triggerCount(b),1,t,t,seed)));
+    },densityOptions},false);
     registerPolicy<float>("linear","Linear",[](float a,float b,float t,const ofJson&){return interpolate(a,b,t);},noOptions,true);
     registerPolicy<float>("switch","Switch",[](float a,float b,float t,const ofJson& o){return t<o.at("threshold").get<double>() ? a : b;},switchOptions);
     registerPolicy<std::vector<float>>("index_zero","Index / zero fill",[](const auto& a,const auto& b,float t,const ofJson&) {
@@ -391,7 +453,9 @@ Value Registry::mix(const std::string& type,const std::string& id,const Value& a
     const auto& p=policy(type,id); const auto settings=p.options(options);
     require(std::isfinite(t) && t>=0 && t<=1,"Mix progress must be in [0,1]"); validateValue(type,a); validateValue(type,b);
     // Endpoints bypass every policy (including resampling and threshold=0/1).
-    Value result=t==0 ? a : t==1 ? b : p.mix(a,b,t,settings); validateValue(type,result); return result;
+    // A transition's events are decided from its first frame: only completion
+    // is fixed, so Mute and a Switch at 0 apply as soon as B exists.
+    Value result=t==0 && type!=triggerType ? a : t==1 ? b : p.mix(a,b,t,settings); validateValue(type,result); return result;
 }
 std::string portType(ofxOceanodeAbstractParameter& port) {
     for(const auto& type:supportedTypes()) {

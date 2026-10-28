@@ -256,6 +256,23 @@ MacroMixerMixing::Value MacroMixerRuntime::outputValue(const std::string& router
     }
     return MacroMixerMixing::neutral(router->type);
 }
+MacroMixerMixing::Value MacroMixerRuntime::takeOutput(const std::string& routerID) {
+    auto value=outputValue(routerID);
+    const auto found=mixedValues.find(routerID);
+    if(found!=mixedValues.end() && MacroMixerMixing::valueType(found->second)==std::string(MacroMixerMixing::triggerType))
+        found->second=MacroMixerMixing::triggers(0);
+    return value;
+}
+void MacroMixerRuntime::triggerInput(const std::string& routerID) {
+    const auto r=std::find_if(interface.routers.begin(),interface.routers.end(),[&](const auto& r) {
+        return r.id==routerID && r.direction=="Input" && r.type==MacroMixerMixing::triggerType;
+    });
+    if(r==interface.routers.end()) return;
+    // Like a native Macro pin: every live graph receives the event as it happens.
+    // A graph morphing in place is both origin and destination; trigger it once.
+    if(current) current->trigger(routerID);
+    if(next && next!=current) next->trigger(routerID);
+}
 bool MacroMixerRuntime::importMacro(const std::string& folder, bool refresh) {
     if(next) {
         errors = {{folder,"Import/Refresh is unavailable during a transition; finish it first"}};
@@ -583,6 +600,8 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
                 } else staged[router.id]=MacroMixerMixing::registry().mix(router.type,router.policy,a,b,progress,router.options);
             }
             mixedValues=std::move(staged); mixedProgress=progress;
+            // Each latched event is mixed once; a held frame keeps them for the next.
+            current->clearTriggers(); if(next) next->clearTriggers();
             const auto first=std::find_if(interface.routers.begin(),interface.routers.end(),[](const auto& r){return r.direction=="Output";});
             lastValue=first==interface.routers.end() ? 0.f : value(first->id);
             if(next && !resourcesReady) { startMs=clock(); mixedProgress=0; if(morphing()) nextMorphReady=false; }
@@ -613,7 +632,7 @@ void MacroMixerRuntime::draw() {
         const auto drawFrame=[&] {
             if(!morphingInPlace() && (!current->setInputs(inputValues) || !current->draw())) throw std::runtime_error(current->failure);
             if(next && (!next->setInputs(inputValues) || !next->draw())) throw std::runtime_error(next->failure);
-            for(const auto& r:interface.routers) if(r.direction=="Output") {
+            for(const auto& r:interface.routers) if(r.direction=="Output" && r.type!=MacroMixerMixing::triggerType) {
                 const auto a=current->read(r.id), b=next ? next->read(r.id) : a;
                 if(r.type!="Texture") {
                     if(MacroMixerMixing::registry().policy(r.type,r.policy).createProcessor) continue;

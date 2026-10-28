@@ -518,10 +518,9 @@ void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 		return;
 	}
 
-	// Generic path for all other router types.
-	// NOTE: createRouterFromType() returns nullptr for router<void> because void
-	// has no typed value to sync. We still register the node for rename/sort
-	// tracking; we just skip creating a macro pin for it.
+	// Generic path for all other router types, router<void> included: its pin
+	// relays triggers both ways. A type without a registered router creator
+	// gets no pin but is still tracked for rename/sort.
 	newCreatedParam = typesRegistry->createRouterFromType(node);
 	if(newCreatedParam != nullptr){
 		string paramName = newCreatedParam->getName();
@@ -531,7 +530,9 @@ void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 
 		// Types the router does not take (an SC audio port into a number
 		// router) go through it to what it feeds inside the macro.
-		auto* routerValue = dynamic_cast<ofxOceanodeAbstractParameter*>(&node->getParameters().get("Value"));
+		// router<void> names its port "Val"; it has nothing to forward.
+		auto* routerValue = node->getParameters().contains("Value")
+			? dynamic_cast<ofxOceanodeAbstractParameter*>(&node->getParameters().get("Value")) : nullptr;
 		if(routerValue != nullptr){
 			routerValue->forwardToOutConnections();
 			pin->setForwardTargets([routerValue](){ return std::vector<ofxOceanodeAbstractParameter*>{routerValue}; });

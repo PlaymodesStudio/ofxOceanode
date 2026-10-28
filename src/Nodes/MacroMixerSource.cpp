@@ -135,7 +135,7 @@ void analyse(ofxOceanodeNodeRegistry& registry, const fs::path& path,
         const auto& router = found->second.front();
         require(router.model == MacroMixerMixing::routerModel(selected.type), folder.string(),
             "Selected router has the wrong type: " + selected.name);
-        if(selected.direction == "Input") require(!driven.count({router.key,"Value"}), folder.string(),
+        if(selected.direction == "Input") require(!driven.count({router.key,MacroMixerMixing::routerPort(selected.type)}), folder.string(),
             "Selected Input router is driven inside the Macro: " + selected.name);
     }
 }
@@ -261,7 +261,7 @@ ofxOceanodeAbstractParameter& MacroMixerSource::Graph::parameter(const std::stri
         if(!router || router->getNameParam().get() != selected->name) continue;
         require(!result && router->nodeName() == MacroMixerMixing::routerModel(selected->type), source,
             "Selected router changed name/type or became ambiguous: " + selected->name);
-        result = dynamic_cast<ofxOceanodeAbstractParameter*>(&router->getParameterGroup().get("Value"));
+        result = dynamic_cast<ofxOceanodeAbstractParameter*>(&router->getParameterGroup().get(MacroMixerMixing::routerPort(selected->type)));
     }
     require(result != nullptr,source,"Selected router is unavailable: " + selected->name);
     if(selected->direction == "Input") require(!result->hasInConnection(),source,"Input router is driven inside the Macro: " + selected->name);
@@ -271,11 +271,31 @@ MacroMixerMixing::Value MacroMixerSource::Graph::read(const std::string& id) con
     auto& p = parameter(id);
     const auto& routers = revision->contract().routers;
     const auto selected = std::find_if(routers.begin(),routers.end(),[&](const auto& r) { return r.id == id; });
+    if(selected->type == MacroMixerMixing::triggerType) {
+        // A replaced router node is watched again from its first event.
+        auto& port = p.cast<void>().getParameter();
+        auto& latch = triggerLatches[id];
+        if(!latch || !latch->port.isReferenceTo(port)) {
+            latch = std::make_shared<TriggerLatch>(); latch->port = port;
+            latch->listener = latch->port.newListener([counter = latch.get()] {
+                counter->count = std::min(counter->count + 1, MacroMixerMixing::maxTriggers);
+            });
+        }
+        return MacroMixerMixing::triggers(latch->count);
+    }
     return std::visit([&](const auto& zero)->MacroMixerMixing::Value {
         using T = std::decay_t<decltype(zero)>;
         if constexpr(std::is_same_v<T,MacroMixerMixing::Object>) return MacroMixerMixing::registry().adapter(selected->type).read(p);
         else return p.cast<T>().getParameter().get();
     },MacroMixerMixing::neutral(selected->type));
+}
+void MacroMixerSource::Graph::clearTriggers() {
+    for(auto& latch : triggerLatches) latch.second->count = 0;
+}
+void MacroMixerSource::Graph::trigger(const std::string& id) {
+    if(!failure.empty()) return;
+    try { parameter(id).cast<void>().getParameter().trigger(); }
+    catch(const std::exception& e) { failure = e.what(); }
 }
 bool MacroMixerSource::Graph::setInputs(const Inputs& inputs, bool publishTextures) {
     if(!failure.empty()) return false;
@@ -906,7 +926,8 @@ MorphCablePlan planMorphCable(ofxOceanodeContainer& c,const ofJson& target,const
                 throw std::runtime_error("Cannot retain origin cable's editable value");
             plan.editable=savedMorphValue(*prototype,editable.at(sink->getEscapedName()));
         }
-    } else if(plan.type!="Texture" && !MacroMixerMixing::registry().policy(plan.type,plan.policy.policy).createProcessor && (a.empty() || b.empty()))
+    } else if(plan.type!="Texture" && plan.type!=MacroMixerMixing::triggerType
+              && !MacroMixerMixing::registry().policy(plan.type,plan.policy.policy).createProcessor && (a.empty() || b.empty()))
         throw std::runtime_error("Changed "+plan.type+" connection needs live sources at both endpoints");
     for(const auto& edge:{a,b}) if(!edge.empty()) {
         auto* source=morphPort(c,edge[0],edge[1]);
@@ -988,6 +1009,37 @@ template<typename T> struct TypedMorphSignal : MorphSignal {
             else sink=value;
         }
     }
+};
+// A changed cable into a void input. Events pass as they happen, inside the
+// graph's own update; the policy decides from this frame's counts per side, so
+// a missing side contributes nothing and the policy never invents an event.
+struct TriggerMorphSignal : MorphSignal {
+    MacroMixerMorphPolicy policy;
+    ofParameter<void> a,b,out;
+    ofxOceanodeParameter<void> inputA,inputB,output;
+    ofEventListeners listeners;
+    int firedA=0, firedB=0, passed=0;
+    float t=0;
+    explicit TriggerMorphSignal(const MacroMixerMorphPolicy& policy):policy(policy) {
+        a.set("Origin"); b.set("Destination"); out.set("Blend");
+        inputA.bindParameter(a); inputB.bindParameter(b); output.bindParameter(out);
+        listeners.push(a.newListener([this] { fire(firedA); }));
+        listeners.push(b.newListener([this] { fire(firedB); }));
+    }
+    ~TriggerMorphSignal() override { disconnect(); }
+    void fire(int& side) {
+        side=std::min(side+1,MacroMixerMixing::maxTriggers);
+        const auto total=MacroMixerMixing::triggerCount(MacroMixerMixing::registry().mix(MacroMixerMixing::triggerType,policy.policy,
+            MacroMixerMixing::triggers(firedA),MacroMixerMixing::triggers(firedB),t,policy.options));
+        while(passed<total) { ++passed; out.trigger(); }
+    }
+    // Called once per frame before the graph updates; counts restart with it.
+    void progress(float value) override { t=value; firedA=firedB=passed=0; }
+    void disconnect() override {
+        listeners.unsubscribeAll();
+        detachMorphProxy(output); detachMorphProxy(inputA); detachMorphProxy(inputB);
+    }
+    void constant(bool,bool) override {} // Rewiring never fires the sink.
 };
 struct PolicyMorphSignal : MorphSignal {
     std::string type; MacroMixerMorphPolicy policy;
@@ -1178,7 +1230,10 @@ struct MacroMixerMorphTopology {
                     const auto plan=planMorphCable(c,edit.target,key,name,a,b,policies);
                     std::shared_ptr<MorphSignal> blend;
                     ofxOceanodeAbstractParameter *inputA=nullptr,*inputB=nullptr,*output=nullptr;
-                    if(!plan.type.empty()) {
+                    if(plan.type==MacroMixerMixing::triggerType) {
+                        auto mixer=std::make_shared<TriggerMorphSignal>(plan.policy);
+                        inputA=&mixer->inputA; inputB=&mixer->inputB; output=&mixer->output; blend=mixer;
+                    } else if(!plan.type.empty()) {
                         auto mixer=std::make_shared<PolicyMorphSignal>(c,key,name,plan);
                         inputA=mixer->inputA.get(); inputB=mixer->inputB.get(); output=mixer->output.get(); blend=mixer;
                     } else std::visit([&](const auto& value) {
