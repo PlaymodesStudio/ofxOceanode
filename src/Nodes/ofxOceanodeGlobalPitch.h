@@ -6,8 +6,8 @@
 //  (pitch classes 0-11, and a low scale for the notes below a split note), a
 //  shift along each scale (degrees, kept inside each note's octave), one
 //  transpose (semitones, optionally wrapped into each note's
-//  octave) and one random detune per voice (cents), for every node in the
-//  patch that plays or shows pitches. Each feature has its own list of destinations,
+//  octave), one random detune per voice (cents) and a glide time, for every
+//  node in the patch that plays or shows pitches. Each feature has its own list of destinations,
 //  ticked in the Global Pitch node's inspector.
 //
 //  A destination registers itself and applies the values to the notes it
@@ -116,6 +116,17 @@ public:
         if(state().detune == cents) return;
         state().detune = cents;
         valuesChanged(Detune);
+    }
+    // seconds a change of transpose, scale or shift takes to reach the notes
+    // still sounding. Only an audio engine that glides its own values (the
+    // SuperCollider synths: scGlobalPitch) can follow it; values applied once
+    // (MIDI notes, apply()) jump.
+    static float glide() { return state().glide; }
+    static void setGlide(float seconds) {
+        seconds = std::max(0.0f, seconds);
+        if(state().glide == seconds) return;
+        state().glide = seconds;
+        for(auto& l : changeListeners()) l();
     }
     // called after any value changes (an audio engine resends what its synths read)
     static void onValuesChanged(std::function<void()> f) { changeListeners().push_back(std::move(f)); }
@@ -270,6 +281,7 @@ private:
         int wrapBase = 0;
         int shift = 0;
         int lowShift = 0;
+        float glide = 0.0f;
         std::array<std::map<std::string, bool>, NumFeatures> overrides;
     };
     static State& state() { static State s; return s; }

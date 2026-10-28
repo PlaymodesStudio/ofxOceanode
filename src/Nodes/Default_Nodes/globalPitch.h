@@ -20,6 +20,8 @@
 //    Mod 12        a transposed note wraps into its own octave, which starts at
 //    Base Note     (C .. B): it never leaves that octave (cf. Fit Notes In Range)
 //    Detune        each voice's own fixed random offset within +-cents, never quantized
+//    Glide         seconds a Transpose, Scale or Shift change takes to reach the
+//                  notes still sounding (SuperCollider synths; MIDI jumps)
 //  The inspector lists the destinations with a tick per feature (SampleBox
 //  and SlicerBox start unticked). Several Global Pitch nodes show one state.
 //
@@ -42,8 +44,8 @@ public:
                       "when below Split Note (MIDI, 0 = off), move Shift (Low Shift below the split) degrees along it, staying "
                       "in their octave, then Transpose (semitones) is added (Mod 12: wrapped "
                       "into the note's own octave from Base Note), then each "
-                      "voice's own random Detune (within +-cents). The inspector chooses which destinations follow "
-                      "each one.";
+                      "voice's own random Detune (within +-cents). Glide: seconds a change takes to reach the sounding "
+                      "notes (SuperCollider synths). The inspector chooses which destinations follow each one.";
     }
     ~globalPitch() {
         auto& all = instances();
@@ -56,6 +58,7 @@ public:
         ofxOceanodeGlobalPitch::setShift(0);
         ofxOceanodeGlobalPitch::setLowShift(0);
         ofxOceanodeGlobalPitch::setDetune(0.0f);
+        ofxOceanodeGlobalPitch::setGlide(0.0f);
         for(int f = 0; f < ofxOceanodeGlobalPitch::NumFeatures; f++) ofxOceanodeGlobalPitch::setOverridesText(feature(f), "");
     }
 
@@ -80,6 +83,8 @@ public:
                              {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"});
         addSeparator("Detune");
         addParameter(detune.set("Detune", ofxOceanodeGlobalPitch::detune(), 0.0f, 100.0f));
+        addSeparator("Glide");
+        addParameter(glide.set("Glide", ofxOceanodeGlobalPitch::glide(), 0.0f, 10.0f));
         // the destinations that differ from their default, one string per feature (ofxOceanodeGlobalPitch::overridesText)
         static const char* names[ofxOceanodeGlobalPitch::NumFeatures] = {"Transpose Destinations", "Scale Destinations", "Detune Destinations"};
         for(int f = 0; f < ofxOceanodeGlobalPitch::NumFeatures; f++) {
@@ -138,6 +143,10 @@ public:
         listeners.push(detune.newListener([this](float& v){
             ofxOceanodeGlobalPitch::setDetune(v);
             share([v](globalPitch* n){ n->detune = v; });
+        }));
+        listeners.push(glide.newListener([this](float& v){
+            ofxOceanodeGlobalPitch::setGlide(v);
+            share([v](globalPitch* n){ n->glide = v; });
         }));
         sendLowScale();
         sendScale();
@@ -222,7 +231,7 @@ private:
     ofParameter<std::vector<float>> scale, lowScale;
     ofParameter<float> split;
     ofParameter<bool> bypass, lowBypass;
-    ofParameter<float> transpose, detune;
+    ofParameter<float> transpose, detune, glide;
     ofParameter<bool> wrap;
     ofParameter<int> wrapBase, shift, lowShift;
     std::array<ofParameter<std::string>, ofxOceanodeGlobalPitch::NumFeatures> destinations;
