@@ -90,6 +90,9 @@ int main() {
     near(GP::apply(&node, 60), 63);  // C4 -> Eb4
     near(GP::apply(&node, 65), 67);  // F4 -> G4
     near(GP::apply(&node, 70), 72);  // Bb4 -> C5
+    // A fractional note keeps its fraction: quantized by its nearest semitone.
+    near(GP::apply(&node, 61.37f), 63.37f); // C#4 (nearest C) -> Eb, +0.37
+    near(GP::apply(&node, 70.5f), 71.5f); // rounds to B (tie: the lower Bb) -> C5, keeping +0.5 of the way
     GP::setShift(1, true);
     near(GP::apply(&node, 70), 60);  // Bb4 -> C4
     GP::setTranspose(2);

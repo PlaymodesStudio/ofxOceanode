@@ -131,12 +131,15 @@ public:
 
     // what a destination sends, plays or shows for a pitch v on a voice / channel;
     // withDetune false for one that cannot play a fraction of a semitone (a MIDI note)
+    // The scale moves a note by its nearest semitone's offset, keeping the
+    // note's fraction (a glide, a detune, a microtonal pitch): 61.37 with a C
+    // major scale is 60.37.
     static float apply(ofxOceanodeNodeModel* node, float v, int channel = 0, bool withDetune = true) {
         if(follows(node, Scale)) {
             const float r = std::round(v);
             const int pc = ((int(r) % 12) + 12) % 12;
             const bool low = splitOn() && r < split();
-            if(low ? lowScaleOn() : scaleOn()) v = r + (low ? state().lowOffsets : state().offsets)[pc];
+            if(low ? lowScaleOn() : scaleOn()) v += (low ? state().lowOffsets : state().offsets)[pc];
         }
         if(follows(node, Transpose)) v = transposed(v);
         if(withDetune && spread(node)) v += detune() * 0.01f * random(node, channel);
