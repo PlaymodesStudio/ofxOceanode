@@ -28,6 +28,16 @@ struct ofxOceanodeTimelineInstrument {
     ofxOceanodeAbstractParameter* velocity = nullptr;
     int voices = 0;
     bool kit = false;
+    // Kit slot names (index = slot / gate component); may be empty or shorter than voices.
+    std::vector<std::string> rowNames;
+    // Kit slot colours (index = slot; may be empty or shorter than voices): a
+    // timeline Drum Grid draws each row in its pad's colour.
+    std::vector<ofColor> rowColors;
+    // Kit only, optional: per-slot decay multiplier of a kit hit (1 = as set).
+    ofxOceanodeAbstractParameter* duration = nullptr;
+    // Kit only, optional: per-slot bipolar step filter, -1 = low-pass fully
+    // closed .. 0 = open .. +1 = high-pass fully closed.
+    ofxOceanodeAbstractParameter* filter = nullptr;
 };
 
 typedef int ofxOceanodeNodeModelFlags;
