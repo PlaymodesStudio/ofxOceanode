@@ -5,6 +5,22 @@
 #include <algorithm>
 
 namespace {
+// Every window a graph's nodes draw themselves, nested Macros included.
+using WindowVisitor = std::function<void(const std::string& key,const std::string& prefix,ofxOceanodeNodeModel&,ofParameter<bool>&)>;
+void forEachWindow(ofxOceanodeContainer& container,const std::string& prefix,const WindowVisitor& visit,int depth=0) {
+    for(auto* node:container.getAllModules()) {
+        auto& model=node->getNodeModel();
+        const auto key=prefix+model.nodeName()+" "+ofToString(model.getNumIdentifier());
+        if(auto* toggle=model.getWindowToggle()) if(!model.getWindowTitle().empty()) visit(key,prefix,model,*toggle);
+        if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model)) if(auto child=macro->getContainer())
+            if(depth<64) forEachWindow(*child,key+" / ",visit,depth+1);
+    }
+}
+// The editor's name without a canvas prefix ("AnalogBox 1").
+std::string windowName(ofxOceanodeNodeModel& model) {
+    const auto title=model.getWindowTitle(); const auto slash=title.rfind('/');
+    return slash==std::string::npos ? title : title.substr(slash+1);
+}
 std::string sourceKey(const std::string& folder) {
     if(folder.empty()) return folder;
     return std::filesystem::weakly_canonical(std::filesystem::absolute(folder)).string();
@@ -71,7 +87,7 @@ bool MacroMixerRuntime::removeMacro(const std::string& id) {
         const auto removedID = it->second->id();
         if(removedID == currentID() || removedID == destinationID() || removedID == queuedID()) clear();
         order.erase(std::remove(order.begin(), order.end(), removedID), order.end());
-        sourcePolicies.erase(removedID); problems.erase(removedID);
+        sourcePolicies.erase(removedID); problems.erase(removedID); windows.erase(removedID);
         imports.erase(it);
         errors.clear(); return true;
     }
@@ -339,6 +355,8 @@ ofJson MacroMixerRuntime::saveState() const {
         ofJson entry{{"id", revision->id()}, {"name", revision->name()}, {"source", savedFolder(revision->source())}};
         const auto& own=sourceMorphPolicies(revision->id());
         if(!own.empty()) entry["morphPolicies"]=policiesJson(own);
+        const auto& open=openWindows(revision->id());
+        if(!open.empty()) entry["windows"]=ofJson(std::vector<std::string>(open.begin(),open.end()));
         entries.push_back(std::move(entry));
     }
     auto keptOutNodes=ofJson::array();
@@ -418,6 +436,14 @@ bool MacroMixerRuntime::restoreState(const ofJson& saved) {
                         errors=staged.diagnostics(); return false;
                     }
             }
+            if(entry.contains("windows")) { // Older states have none.
+                const auto& open=entry.at("windows");
+                require(open.is_array() && open.size()<=4096,"Invalid saved source windows");
+                for(const auto& key:open) {
+                    require(key.is_string() && !key.get<std::string>().empty(),"Invalid saved source window");
+                    staged.windows[reference->id()].insert(key.get<std::string>());
+                }
+            }
         }
         MacroMixerExclusions keptOutNodes; // Older states have none.
         if(saved.contains("keptOutNodes")) {
@@ -441,6 +467,7 @@ bool MacroMixerRuntime::restoreState(const ofJson& saved) {
         inputValues=std::move(staged.inputValues);
         connectionPolicies=std::move(staged.connectionPolicies);
         sourcePolicies=std::move(staged.sourcePolicies); problems.clear();
+        windows=std::move(staged.windows);
         imports = std::move(staged.imports); order = std::move(staged.order);
         pending = std::move(staged.pending);
         *keptOut = std::move(keptOutNodes);
@@ -473,9 +500,76 @@ void MacroMixerRuntime::requestMacro(const std::string& id, float ms, float powe
 
 void MacroMixerRuntime::update() {
     updateWithClock([] { return double(ofGetElapsedTimeMillis()); });
+    enforceWindows();
 }
 void MacroMixerRuntime::update(double nowMs) {
     updateWithClock([nowMs] { return nowMs; });
+    enforceWindows();
+}
+
+bool MacroMixerRuntime::showsWindows(const std::string& id) const {
+    return !id.empty() && (id==currentID() || (next && id==destinationID()));
+}
+const std::set<std::string>& MacroMixerRuntime::openWindows(const std::string& id) const {
+    static const std::set<std::string> none;
+    const auto found=windows.find(id); return found==windows.end() ? none : found->second;
+}
+bool MacroMixerRuntime::setSourceWindow(const std::string& id, const std::string& key, bool open) {
+    if(!macro(id) || key.empty()) { errors={{"macro","Unknown Macro ID or window"}}; return false; }
+    if(open) windows[id].insert(key);
+    else if(auto found=windows.find(id); found!=windows.end()) { found->second.erase(key); if(found->second.empty()) windows.erase(found); }
+    return true;
+}
+std::vector<MacroMixerRuntime::SourceWindow> MacroMixerRuntime::sourceWindows(const std::string& id) const {
+    std::vector<SourceWindow> result;
+    if(!showsWindows(id)) return result;
+    const auto& graph=next && id==destinationID() ? next : current; // In place, the same graph.
+    const auto& open=openWindows(id);
+    forEachWindow(*graph->container,"",[&](const std::string& key,const std::string& prefix,ofxOceanodeNodeModel& model,ofParameter<bool>&) {
+        result.push_back({key,prefix+windowName(model),open.count(key)!=0});
+    });
+    return result;
+}
+void MacroMixerRuntime::forEachSourceWindow(const SourceWindowVisitor& visit) const {
+    // In place, one graph plays both sources until completion: a window
+    // belongs to the destination unless only the origin opened it, so the
+    // windows that stay keep their name when the origin's close.
+    const bool inPlace=next && next==current;
+    for(const auto* graph:{current.get(),next==current ? nullptr : next.get()}) {
+        if(!graph) continue;
+        const auto own=!inPlace && graph==next.get() ? destinationID() : currentID();
+        const auto later=inPlace ? destinationID() : own;
+        const auto& mine=openWindows(own); const auto& kept=openWindows(later);
+        forEachWindow(*graph->container,"",[&](const std::string& key,const std::string& prefix,ofxOceanodeNodeModel& model,ofParameter<bool>& toggle) {
+            const bool toLater=inPlace && (kept.count(key) || !mine.count(key));
+            visit(key,prefix,model,toggle,mine.count(key) || kept.count(key),toLater ? later : own,toLater ? inPlaceTarget : graph->revision);
+        });
+    }
+}
+void MacroMixerRuntime::enforceWindows() {
+    forEachSourceWindow([](const std::string&,const std::string& prefix,ofxOceanodeNodeModel& model,ofParameter<bool>& toggle,
+                           bool want,const std::string&,const Revision& revision) {
+        const auto nested=prefix.empty() ? "" : " / "+prefix.substr(0,prefix.size()-3);
+        model.setWindowHostLabel(windowName(model)+" ("+(revision ? revision->name() : "MacroMixer")+nested+")");
+        if(toggle.get()!=want) toggle=want;
+    });
+}
+void MacroMixerRuntime::adoptWindows() {
+    // Only the node's own window changes its toggle during a draw (its close
+    // button): recalls, morphs and loads write it in update, which enforce undoes.
+    // Closes apply after the visit: an emptied source's set is erased while it reads them.
+    std::vector<std::pair<std::string,std::string>> closed; // (source, key)
+    const bool inPlace=next && next==current;
+    const auto from=currentID(),to=inPlace ? destinationID() : "";
+    forEachSourceWindow([&](const std::string& key,const std::string&,ofxOceanodeNodeModel&,ofParameter<bool>& toggle,
+                            bool want,const std::string& owner,const Revision&) {
+        if(toggle.get()==want || owner.empty()) return;
+        if(toggle.get()) { setSourceWindow(owner,key,true); return; }
+        // Closed: in place, neither source keeps it open; two graphs share no window.
+        for(const auto& id:inPlace ? std::vector<std::string>{from,to} : std::vector<std::string>{owner})
+            if(openWindows(id).count(key)) closed.emplace_back(id,key);
+    });
+    for(const auto& entry:closed) setSourceWindow(entry.first,entry.second,false);
 }
 void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
     bool canPrepare=true;
@@ -627,6 +721,7 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
 
 void MacroMixerRuntime::draw() {
     if(!current) return;
+    enforceWindows();
     const bool textures=current->usesTextures || (next && next->usesTextures);
     try {
         const auto drawFrame=[&] {
@@ -671,6 +766,7 @@ void MacroMixerRuntime::draw() {
         };
         if(textures) MacroMixerMixing::drawIsolated(drawFrame); else drawFrame();
     } catch(const std::exception& e) { errors={{"graph draw",e.what()}}; }
+    adoptWindows();
 }
 
 void MacroMixerRuntime::clear() {

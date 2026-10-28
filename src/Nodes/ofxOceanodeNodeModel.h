@@ -149,6 +149,12 @@ public:
     virtual void showNodeWindow() {
         if(auto* toggle = getWindowToggle()) toggle->set(true);
     }
+    // The ImGui window name to draw that editor under (Begin, FindWindowByName).
+    // A host running the node outside its patch (a MacroMixer source) sets a
+    // label naming the source: the window stays apart from the patch's own and
+    // docks by the same name across sessions. Otherwise the window title.
+    std::string getWindowId() { return windowHostLabel.empty() ? getWindowTitle() : windowHostLabel; }
+    void setWindowHostLabel(const std::string& label) { windowHostLabel = label; }
 
     // Query without changing the node; bind=true may publish its note inputs.
     // Reuse the same instrument/voice metadata for a hardware MIDI keyboard.
@@ -361,6 +367,7 @@ protected:
     ofxOceanodeContainer* hostContainer = nullptr;
     
 private:
+    std::string windowHostLabel;
     std::shared_ptr<oceanodeProfiling::Record> profilingRecord = std::make_shared<oceanodeProfiling::Record>();
     std::vector<std::shared_ptr<oceanodeProfiling::ParameterHook>> inspectorProfilingHooks;
     string nameIdentifier;

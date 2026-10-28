@@ -160,8 +160,38 @@ natively next to it with its incoming cables, and every cable leaving it
 blends where it arrives with the source's **Morph policies into this source**
 for that type (a ScBus cable through a private SC bridge). The rest of the
 graph keeps morphing in place. Details lists it as **Replaced node**
-with the differing setting. If a blend is impossible (for example a cable
-into a Portal), the whole graph falls back as described next.
+with the differing setting. If a blend is impossible (for example a changed
+cable into a Global Portal), the whole graph falls back as described next.
+
+### Portal buses
+
+A Portal is a shared bus, not a cable: setting one Portal's Value sets every
+Portal with the same type, Name and scope. A Local bus the running graph uses
+and the target changes is therefore blended as one signal. Changes include a
+different saved value, a different cable into a Portal, or the cable moving
+to another Portal. One Portal of the bus takes the blend into its Value, as a
+changed cable would, with the source's **Morph policies into this source**
+for the type, and the bus spreads it:
+
+- From the origin's driver (the source of the cable into the bus's Portal),
+  or the live bus value when nothing drives it.
+- To the target's driver, or the target's saved value when nothing drives it
+  (a knob Portal).
+- The origin's cable into the bus is detached for the morph and its source
+  feeds the blend; the target's cable is connected natively at completion.
+  Cancellation reconnects the origin's cable.
+- Added Portals on a live bus load without their saved value and take the
+  bus's, so nothing jumps when they start.
+
+Details lists it as **Portal bus** with both ends (`Bus value`, `Saved
+value` or the driver's port). The planning runs when a morph is requested
+(and once for the cached Details); during the morph each changed bus costs
+one blend, like a changed cable, and nothing at all otherwise. A bus whose
+drivers are unchanged, or whose saved value equals the live value, adds
+nothing. A bus with several cabled Portals is fine while those cables stay
+the same; when they change, the graph falls back (`changes drivers with
+several cabled Portals`), as it does when the target's Portals on one bus were
+saved with different values. Global buses keep the rules below.
 
 A Macro's **Color** is cosmetic: a different saved colour in a nested Macro is
 not a configuration change and never makes a morph replace the Macro or fall
@@ -216,14 +246,17 @@ output shows `Macro fall`. The current implementation falls back for:
 - Unmatched Router additions or removals in an existing container. These
   require reconciliation of the existing published interface; routers inside a
   whole newly added Macro load through its native lifecycle.
-- An added Portal whose bus is live: a running Portal of the same type, Name
-  and scope (Local in the same canvas, or global). Loading it would publish its
-  saved value to that bus at once. Other unmatched Portals morph in place like
-  any node: a removed Portal runs until completion (the bus keeps its last
-  value), and an added one starts with the morph on its own bus, its cables
-  blending where they arrive.
+- An added Global Portal whose bus is live (a running Portal of the same
+  type and Name) when loading it would set that bus: it has an incoming
+  cable, or nothing else in the target drives the bus, so its saved value is
+  the bus's value. An added Global Portal without a cable joins a live bus
+  that the target drives from another, cabled Portal: it loads without its
+  saved value and takes the bus's. Local buses blend instead (Portal buses
+  above). Other unmatched Portals morph in place like any node: a removed
+  Portal runs until completion (the bus keeps its last value), an added one
+  on a free bus starts with the morph, its cables blending where they arrive.
 - Genuinely changed cables into read-only/calculated or snapshot-excluded
-  controls, Portal services, or resource types without an internal
+  controls, Global Portals, or resource types without an internal
   connection mixing adapter/backend handoff (such as audio buses and buffer
   references). Changed control cables need compatible native
   source/sink conversions and a saved fixed value for each uncabled endpoint.
@@ -262,7 +295,8 @@ are not morphed twice. Parameter names and value types must match.
 Only editable node controls saved by the native preset system and without
 incoming connections are included. Calculated outputs, read-only/transient values,
 Inspector settings, triggers and unsupported resource types are skipped. Portal
-values follow the shared Portal service rather than being written by morphing. Router names/bounds remain
+values are not written as controls: a Local bus blends as a whole (Portal
+buses above), and a Global one follows the shared Portal service. Router names/bounds remain
 the destination's; router Values marked Exclude From Snapshots are also skipped.
 Selected outer Input routers and connected nested Macro input pins remain live.
 
@@ -324,6 +358,32 @@ re-routed trigger source) no longer forces fallback. Its events pass as they
 happen, inside the graph's update, with the source's Trigger policy. The
 policy runs per frame on each side's count, so the result matches the router
 policies above. At completion the native destination cable takes over.
+
+## Node windows
+
+Some nodes draw their own window, such as the SC instrument editors
+(`getWindowTitle()`/`getWindowToggle()` on `ofxOceanodeNodeModel`). A source's
+`layout.json` never applies inside MacroMixer, and a source's saved **Show**
+is ignored: every node window in a source graph starts closed.
+
+- Each source lists its windows under **Windows** while it plays; tick one to
+  open it. Choices are kept per source, saved with the mixer state, and
+  survive Clear Playback; removing the source forgets them.
+- Only playing sources show their windows. During a transition, in place or
+  in Mix mode, both sources show the windows ticked for them, so both
+  instruments can be watched while both sound; the origin's close when the
+  transition completes (or the destination's, when it is cancelled). In place
+  the one graph plays both: a window belongs to the destination unless only
+  the origin ticked it, so the windows that stay keep their name. Closing one
+  with its close button during the transition unticks it for its graph's
+  source (in place, for both sources). The window's Show is never morphed.
+- Closing a window with its own close button unticks it. Writes to Show during
+  update (a snapshot recall, a native reload, Mixer Pro's or the timeline's
+  "go to window") are undone, so windows of a source open only from MacroMixer.
+- Inside MacroMixer a window is named after its source ("AnalogBox 1
+  (1--BLODEV_1)", plus the nested Macro path), from `getWindowId()`. It never
+  shares a window with the patch's own node, and docking in the mixer's preset
+  layout finds it again across sessions.
 
 ## Types and addon registration
 
@@ -430,7 +490,16 @@ branches listed in `macro-mixer-migration-audit.md`.
   in-place morphs of a changed void cable without fallback.
 - `python3 tests/macro_mixer_portal_morph_regression.py`: unmatched Portals
   (removed, and added on a free bus) morph in place with their cables blending;
-  an added Portal joining a live bus falls back with its reason.
+  an uncabled Portal joins a driven live bus without publishing its saved
+  value; Local buses blend a knob's saved value, an added knob on a live bus,
+  a changed driver and a driver moved to an added Portal, end at the target's
+  native wiring and cancel back to the origin's cable; several changing
+  drivers fall back.
+- `python3 tests/macro_mixer_windows_regression.py`: node windows start closed
+  despite a saved Show, open per source, show for both sources during a
+  transition in place and in Mix mode until the origin's close at completion,
+  adopt a close from the window but not an update-time write, and persist with
+  the mixer state.
 - `python3 tests/macro_mixer_numeric_policies_regression.py`: numeric/Boolean
   policy rounding, endpoints, unequal vector sizes and option validation.
 - `python3 tests/macro_mixer_morph_regression.py`: native nonlinear graph

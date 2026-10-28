@@ -63,6 +63,7 @@ private:
     // A collapsible bar in the node color with the source's buttons on the right.
     bool drawSourceHeader(const MacroMixerRevision& macro, size_t index, size_t count, bool fading);
     void drawSource(const MacroMixerRevision& macro, bool fading);
+    void drawSourceWindows(const MacroMixerRevision& macro);
     // An empty ID edits the mixer default.
     void drawMorphPolicies(const std::string& id, bool fading);
     void syncSelector();

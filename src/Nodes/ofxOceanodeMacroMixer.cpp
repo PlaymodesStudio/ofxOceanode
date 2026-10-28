@@ -796,6 +796,7 @@ void ofxOceanodeMacroMixer::drawSource(const MacroMixerRevision& macro, bool fad
         drawMorphPolicies(macro.id(), fading);
         ImGui::TreePop();
     }
+    drawSourceWindows(macro);
     if(mode == 1 || runtime->morphMode()) {
         ImGui::Spacing();
         // Red: the whole graph cannot morph and falls back to the router crossfade.
@@ -869,6 +870,35 @@ void ofxOceanodeMacroMixer::drawSource(const MacroMixerRevision& macro, bool fad
             ImGui::TreePop();
         }
     }
+}
+
+void ofxOceanodeMacroMixer::drawSourceWindows(const MacroMixerRevision& macro) {
+    // A playing source lists its node windows (both during a transition);
+    // others keep their choice until they play. Windows never open from what
+    // a source saved.
+    const auto windows = runtime->sourceWindows(macro.id());
+    const auto remembered = runtime->openWindows(macro.id());
+    if(windows.empty() && remembered.empty()) return;
+    ImGui::Spacing();
+    const bool showing = runtime->showsWindows(macro.id());
+    if(!ImGui::TreeNodeEx("##windows", showing ? ImGuiTreeNodeFlags_DefaultOpen : 0, "Windows (%zu open)", remembered.size())) return;
+    for(const auto& window : windows) {
+        ImGui::PushID(window.key.c_str());
+        bool open = window.open;
+        if(ImGui::Checkbox(window.title.c_str(), &open)) runtime->setSourceWindow(macro.id(), window.key, open);
+        if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", window.key.c_str());
+        ImGui::PopID();
+    }
+    if(!showing) {
+        ImGui::TextDisabled("Open while this source plays:");
+        for(const auto& key : remembered) {
+            ImGui::PushID(key.c_str());
+            bool open = true;
+            if(ImGui::Checkbox(key.c_str(), &open)) runtime->setSourceWindow(macro.id(), key, open);
+            ImGui::PopID();
+        }
+    }
+    ImGui::TreePop();
 }
 
 void ofxOceanodeMacroMixer::drawMorphPolicies(const std::string& id, bool fading) {

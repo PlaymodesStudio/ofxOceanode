@@ -44,6 +44,17 @@ public:
     // The default with the source's own policies applied over it.
     MacroMixerMorphPolicies morphPoliciesInto(const std::string& id) const;
     const std::vector<MacroMixerMorphDetail>& sourceDetails(const std::string& id) const;
+    // Windows source nodes draw themselves (SC instrument editors). They start
+    // closed whatever the source saved; the ones opened here are remembered per
+    // source and shown while it plays. During a transition both sources show
+    // theirs; the origin's close when it completes. Keys name the node within
+    // the graph ("Macro 1 / SC analogBox 1").
+    struct SourceWindow { std::string key, title; bool open; };
+    // The windows of a source that shows them now (showsWindows), else none.
+    std::vector<SourceWindow> sourceWindows(const std::string& id) const;
+    bool showsWindows(const std::string& id) const;
+    const std::set<std::string>& openWindows(const std::string& id) const;
+    bool setSourceWindow(const std::string& id, const std::string& key, bool open);
     bool hasTransitionDetails(const std::string& id) const { return transitionDetails.count(id)!=0; }
     const Inputs& inputs() const { return inputValues; }
     bool transitioning() const { return bool(next); }
@@ -115,6 +126,16 @@ private:
     std::map<std::string, MacroMixerMorphPolicies> sourcePolicies; // By Macro ID.
     std::map<std::string, std::string> problems; // By Macro ID.
     void noteProblem(const std::string& id);
+    std::map<std::string, std::set<std::string>> windows; // Open window keys by Macro ID.
+    // Sets every window to its sources' choice; after a draw, adopts the
+    // windows the user opened or closed in that draw.
+    void enforceWindows();
+    void adoptWindows();
+    // Every window of the playing graphs: whether its sources want it open,
+    // and the source keeping it (by ID and revision, for its label).
+    using SourceWindowVisitor = std::function<void(const std::string& key,const std::string& prefix,ofxOceanodeNodeModel&,
+        ofParameter<bool>& toggle,bool want,const std::string& owner,const Revision& revision)>;
+    void forEachSourceWindow(const SourceWindowVisitor& visit) const;
     mutable std::map<std::string,std::vector<MacroMixerMorphDetail>> sourceDetailCache;
     std::map<std::string,std::vector<MacroMixerMorphDetail>> transitionDetails;
     struct Renderer { std::string policy; MacroMixerMixing::Policy::Function function; };

@@ -342,6 +342,8 @@ bool morphEditable(ofxOceanodeNodeModel& model, ofxOceanodeAbstractParameter& p,
     // the shared Portal service. Writing saved values here would feed them back
     // into their senders and compete with the graph's actual controls.
     if(model.nodeName().rfind("Portal ",0)==0) return false;
+    // A node's own window is opened from MacroMixer, never by a source's save.
+    if(auto* toggle=model.getWindowToggle()) if(toggle->getName()==p.getName()) return false;
     // A saved key owned by the node's sound morph must never also receive
     // generic parameter interpolation, even when it has a published port.
     const auto keys=model.morphKeys();
@@ -681,6 +683,9 @@ struct MorphContainerEdit {
     // between the two saved patches.
     struct NodeMorph { std::string key; bool changed; };
     std::vector<NodeMorph> nodeMorphs;
+    // Added Portals joining a live bus: they load without their saved value
+    // and take the bus's, which the bus's own blend or driver then sets.
+    std::set<std::string> joining;
 };
 // A whole nested Macro can be staged through native recall and retired as one
 // unit. Edits to existing published interfaces/shared Portal services still need
@@ -690,18 +695,41 @@ bool morphStageable(const ofJson& entry) {
     return model.rfind("Router ",0)!=0 && model.rfind("Portal ",0)!=0;
 }
 bool morphPortal(const ofJson& entry) { return entry.at("model").get<std::string>().rfind("Portal ",0)==0; }
-// An unmatched Portal runs until completion or starts with the morph like any
-// node, unless it would join a live bus: loading it publishes its saved value
-// to the running patch's matching Portals at once.
-bool morphPortalBusFree(ofxOceanodeContainer& container,const ofJson& entry) {
+// A saved Portal's bus: its type (model), Name and scope.
+struct PortalBus {
+    std::string model,name; bool local;
+    bool operator==(const PortalBus& o) const { return model==o.model && name==o.name && local==o.local; }
+};
+PortalBus portalBus(const ofJson& entry) {
     const auto& settings=entry.at("settings");
     const auto local=settings.value("Local",ofJson(true));
-    const bool isLocal=local.is_string() ? local.get<std::string>()!="0" && local.get<std::string>()!="false" : local!=ofJson(false);
-    const auto name=settings.contains("Name") && settings.at("Name").is_string() ? settings.at("Name").get<std::string>() : entry.at("model").get<std::string>().substr(7);
-    for(auto* portal:ofxOceanodeShared::getPortalsNamed(name))
-        if(portal->nodeName()==entry.at("model").get<std::string>() && portal->isLocal()==isLocal
-           && (!isLocal || portal->getParents()==container.getCanvasID())) return false;
+    const auto model=entry.at("model").get<std::string>();
+    return {model,settings.contains("Name") && settings.at("Name").is_string() ? settings.at("Name").get<std::string>() : model.substr(7),
+            local.is_string() ? local.get<std::string>()!="0" && local.get<std::string>()!="false" : local!=ofJson(false)};
+}
+// An unmatched Portal runs until completion or starts with the morph like any
+// node. Added to a live bus, loading it would publish its saved value to the
+// running patch's matching Portals at once.
+bool morphPortalBusFree(ofxOceanodeContainer& container,const PortalBus& bus) {
+    for(auto* portal:ofxOceanodeShared::getPortalsNamed(bus.name))
+        if(portal->nodeName()==bus.model && portal->isLocal()==bus.local
+           && (!bus.local || portal->getParents()==container.getCanvasID())) return false;
     return true;
+}
+bool morphPortalCabled(const MorphEdges& edges,const std::string& key) {
+    return std::any_of(edges.begin(),edges.end(),[&](const auto& e) { return e[2]==key && e[3]=="Value"; });
+}
+// Why an added Portal on a live bus cannot join it, or empty when it can: with
+// no cable of its own it takes the bus's value, which the target sets from
+// another, cabled Portal anyway. Otherwise its value is the bus's.
+std::string morphPortalJoin(const ofJson& target,const std::string& key) {
+    const auto edges=savedEdges(target.at("connections"));
+    if(morphPortalCabled(edges,key)) return "Added Portal drives a live Portal bus: "+key;
+    const auto bus=portalBus(target.at("nodes").at(key));
+    const auto& nodes=target.at("nodes");
+    for(auto it=nodes.begin();it!=nodes.end();++it)
+        if(it.key()!=key && morphPortal(it.value()) && portalBus(it.value())==bus && morphPortalCabled(edges,it.key())) return {};
+    return "Added Portal sets a live Portal bus's value: "+key;
 }
 
 bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer& container,
@@ -728,7 +756,15 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
     }
     for(auto it=after.begin();it!=after.end();++it) if(!before.contains(it.key())) {
         if(morphPortal(it.value())) {
-            if(!morphPortalBusFree(container,it.value())) throw std::runtime_error("Added Portal joins a live Portal bus: "+it.key());
+            const auto bus=portalBus(it.value());
+            if(!morphPortalBusFree(container,bus)) {
+                // A Local bus is blended by its own plan (planPortalBuses).
+                if(!bus.local) {
+                    const auto reason=morphPortalJoin(target,it.key());
+                    if(!reason.empty()) throw std::runtime_error(reason);
+                }
+                edit.joining.insert(it.key());
+            }
         } else if(!morphStageable(it.value())) throw std::runtime_error("Unmatched interface node added: "+it.key());
         edit.added.push_back(it.key());
     }
@@ -909,13 +945,17 @@ struct MorphCablePlan {
     std::string type;
     MacroMixerMorphPolicy policy;
 };
+// savedKey names the target node holding the saved value when it differs from
+// the sink's: a Portal bus plan previews against a live Portal of the bus.
 MorphCablePlan planMorphCable(ofxOceanodeContainer& c,const ofJson& target,const std::string& key,const std::string& name,
-                             const std::vector<std::string>& a,const std::vector<std::string>& b,const MacroMixerMorphPolicies& policies,bool preview=false) {
+                             const std::vector<std::string>& a,const std::vector<std::string>& b,const MacroMixerMorphPolicies& policies,bool preview=false,
+                             const std::string& savedKey={}) {
     MorphCablePlan plan; auto* sink=plan.sink=morphPort(c,key,name);
     if(!sink || sink->isReadOnly() || (sink->getFlags() & (ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_ReadOnly)))
         throw std::runtime_error("Changed cable targets a protected/calculated parameter");
     if(auto* model=sink->getNodeModel()) {
-        if(model->nodeName().rfind("Portal ",0)==0) throw std::runtime_error("Changed Portal service wiring");
+        // Local Portal buses are planned whole (planPortalBuses).
+        if(model->nodeName().rfind("Portal ",0)==0 && savedKey.empty()) throw std::runtime_error("Changed Portal service wiring");
         if(auto* router=dynamic_cast<abstractRouter*>(model)) if(router->isExcludeFromSnapshot()) throw std::runtime_error("Changed snapshot-excluded router wiring");
     }
     plan.type=MacroMixerMixing::portType(*sink);
@@ -928,7 +968,7 @@ MorphCablePlan planMorphCable(ofxOceanodeContainer& c,const ofJson& target,const
             throw std::runtime_error("Changed "+plan.type+" connection policy lacks backend readiness/retirement support");
     }
     if(prototype) {
-        const auto& settings=target.at("nodes").at(key).at("settings");
+        const auto& settings=target.at("nodes").at(savedKey.empty() ? key : savedKey).at("settings");
         const bool saved=settings.contains(sink->getEscapedName()) && !settings.at(sink->getEscapedName()).is_null();
         if(!saved && (a.empty() || b.empty())) throw std::runtime_error("Changed cable lacks a fixed endpoint value");
         if((sink->getFlags()&ofxOceanodeParameterFlags_DisableSavePreset) && (a.empty() || b.empty()))
@@ -957,6 +997,77 @@ MorphCablePlan planMorphCable(ofxOceanodeContainer& c,const ofJson& target,const
         } else if(MacroMixerMixing::portType(*source)!=plan.type) throw std::runtime_error("Changed cable has incompatible signal types");
     }
     return plan;
+}
+// A Local Portal bus the running graph uses and the target changes. One of its
+// Portals (carrier) takes the blend like a changed cable into its Value, from
+// the origin's driver (or the live bus value) to the target's driver (or its
+// saved value); the bus spreads it to every matching Portal.
+struct PortalBusPlan {
+    std::string name, carrier, live; // live: a running Portal of the bus, for previews
+    std::vector<std::string> a,b;    // driver edges; empty: the value itself
+    std::string reason;              // why the bus cannot blend
+};
+struct PortalBusPlans {
+    std::vector<PortalBusPlan> buses;
+    std::set<std::pair<std::string,std::string>> owned; // Portal Value inputs the plans handle
+};
+PortalBusPlans planPortalBuses(ofxOceanodeContainer& c,const MorphContainerEdit& edit) {
+    struct Bus { std::vector<std::string> before,after; };
+    std::map<std::pair<std::string,std::string>,Bus> buses; // (model, Name)
+    const auto& before=edit.original.at("nodes"); const auto& after=edit.target.at("nodes");
+    for(auto it=before.begin();it!=before.end();++it) if(morphPortal(it.value())) {
+        const auto bus=portalBus(it.value());
+        if(bus.local) buses[{bus.model,bus.name}].before.push_back(it.key());
+    }
+    for(auto it=after.begin();it!=after.end();++it) if(morphPortal(it.value())) {
+        const auto bus=portalBus(it.value());
+        const auto found=buses.find({bus.model,bus.name});
+        if(bus.local && found!=buses.end()) found->second.after.push_back(it.key());
+    }
+    PortalBusPlans result;
+    if(buses.empty()) return result;
+    // Cables into a Value, by sink node; parsed once per container.
+    std::map<std::string,MorphEdges> oldValues,newValues;
+    for(const auto& edge:savedEdges(edit.original.at("connections"))) if(edge[3]=="Value") oldValues[edge[2]].insert(edge);
+    for(const auto& edge:savedEdges(edit.target.at("connections"))) if(edge[3]=="Value") newValues[edge[2]].insert(edge);
+    const auto drivers=[](const std::map<std::string,MorphEdges>& values,const std::vector<std::string>& keys) {
+        MorphEdges result;
+        for(const auto& key:keys) if(const auto found=values.find(key);found!=values.end()) result.insert(found->second.begin(),found->second.end());
+        return result;
+    };
+    for(const auto& entry:buses) {
+        const auto& bus=entry.second; const auto& name=entry.first.second;
+        for(const auto& key:bus.before) result.owned.insert({key,"Value"});
+        for(const auto& key:bus.after) result.owned.insert({key,"Value"});
+        if(bus.after.empty()) continue; // Removed Portals keep the bus until completion.
+        const auto a=drivers(oldValues,bus.before),b=drivers(newValues,bus.after);
+        if(a==b && !a.empty()) continue; // The same cables drive it.
+        PortalBusPlan plan{name};
+        if(a.size()>1 || b.size()>1) {
+            plan.reason="Portal bus "+name+" changes drivers with several cabled Portals";
+            result.buses.push_back(std::move(plan)); continue;
+        }
+        if(!b.empty()) plan.carrier=(*b.begin())[2];
+        else for(const auto& key:bus.after) if(before.contains(key)) { plan.carrier=key; break; }
+        if(plan.carrier.empty()) plan.carrier=bus.after.front();
+        plan.live=before.contains(plan.carrier) ? plan.carrier : bus.before.front();
+        if(!a.empty()) plan.a=*a.begin();
+        if(!b.empty()) plan.b=*b.begin();
+        if(a.empty() && b.empty()) {
+            // A value bus: its Portals set it from their saved value.
+            const auto saved=after.at(plan.carrier).at("settings").value("Value",ofJson());
+            bool agree=true;
+            for(const auto& key:bus.after) agree&=after.at(key).at("settings").value("Value",ofJson())==saved;
+            if(!agree) { plan.reason="Portal bus "+name+" has different saved values"; result.buses.push_back(std::move(plan)); continue; }
+            auto* port=morphPort(c,plan.live,"Value");
+            const auto current=port ? captureMorph(*port) : std::nullopt;
+            if(saved.is_null() || !current) continue; // Triggers and resources hold no value.
+            try { if(savedMorphValue(*current,saved).value==current->value) continue; }
+            catch(const std::exception& e) { plan.reason="Portal bus "+name+": "+e.what(); }
+        }
+        result.buses.push_back(std::move(plan));
+    }
+    return result;
 }
 void writeMorphControl(ofxOceanodeAbstractParameter& p, const MorphValue& control, bool silent) {
     std::visit([&](const auto& value) {
@@ -1218,6 +1329,7 @@ struct MacroMixerMorphTopology {
                 if(!node) throw std::runtime_error("Cannot create added Macro node");
                 created.emplace_back(&c,key);
                 auto json=entry.at("settings"); auto& model=node->getNodeModel();
+                if(edit.joining.count(key)) json.erase("Value"); // Takes the bus's value.
                 node->presetWillBeLoaded(); model.loadBeforeConnections(json);
                 if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model)) {
                     if(!entry.contains("graph")) throw std::runtime_error("Added Macro definition is unavailable");
@@ -1225,11 +1337,42 @@ struct MacroMixerMorphTopology {
                     verifyMorphGraph(*macro->getContainer(),entry.at("graph"));
                 } else model.macroLoad(json,edit.target.at("folder").get<std::string>());
                 node->loadParametersFromJson(json); node->loadInspectorParametersFromJson(json);
+                if(edit.joining.count(key)) if(auto* portal=dynamic_cast<abstractPortal*>(&model)) ofxOceanodeShared::requestPortalUpdate(portal);
             }
             if(!edit.added.empty()) c.allNodesCreated.notify(&c);
         }
+        // Blends one changed input: a and b are the origin's and target's
+        // cables into it (empty: its value), sunk into plan.sink.
+        const auto blendInput=[&](ofxOceanodeContainer& c,const std::string& key,const std::string& name,
+                                  const std::vector<std::string>& a,const std::vector<std::string>& b,const MorphCablePlan& plan) {
+            std::shared_ptr<MorphSignal> blend;
+            ofxOceanodeAbstractParameter *inputA=nullptr,*inputB=nullptr,*output=nullptr;
+            if(plan.type==MacroMixerMixing::triggerType) {
+                auto mixer=std::make_shared<TriggerMorphSignal>(plan.policy);
+                inputA=&mixer->inputA; inputB=&mixer->inputB; output=&mixer->output; blend=mixer;
+            } else if(!plan.type.empty()) {
+                auto mixer=std::make_shared<PolicyMorphSignal>(c,key,name,plan);
+                inputA=mixer->inputA.get(); inputB=mixer->inputB.get(); output=mixer->output.get(); blend=mixer;
+            } else std::visit([&](const auto& value) {
+                using T=std::decay_t<decltype(value)>;
+                auto mixer=std::make_shared<TypedMorphSignal<T>>(*plan.sink,*plan.target);
+                inputA=&mixer->inputA; inputB=&mixer->inputB; output=&mixer->output; blend=mixer;
+            },plan.target->value);
+            signals.push_back({&c,a,b,blend,plan.editable,plan.type});
+            if(!a.empty() && !host.createConnection(*morphPort(c,a[0],a[1]),*inputA)) throw std::runtime_error("Cannot connect origin morph signal");
+            if(!b.empty() && !host.createConnection(*morphPort(c,b[0],b[1]),*inputB)) throw std::runtime_error("Cannot connect destination morph signal");
+            if(!a.empty()) removeMorphCable(morphCable(c,a));
+            if(!host.createConnection(*output,*plan.sink)) throw std::runtime_error("Cannot connect blended morph signal");
+            blend->progress(0); // Publish resource bridges before evaluating backend readiness.
+        };
         for(auto& edit:edits) {
             auto& c=*edit.container;
+            const auto buses=planPortalBuses(c,edit);
+            for(const auto& bus:buses.buses) {
+                if(!bus.reason.empty()) throw std::runtime_error(morphLocation(edit.path,"Portal bus "+bus.name)+": "+bus.reason);
+                try { blendInput(c,bus.carrier,"Value",bus.a,bus.b,planMorphCable(c,edit.target,bus.carrier,"Value",bus.a,bus.b,policies,false,bus.carrier)); }
+                catch(const std::exception& e) { throw std::runtime_error(morphLocation(edit.path,"Portal bus "+bus.name)+": "+e.what()); }
+            }
             const auto before=savedEdges(edit.original.at("connections")),after=savedEdges(edit.target.at("connections"));
             std::map<std::pair<std::string,std::string>,std::vector<std::string>> oldInputs,newInputs;
             for(const auto& edge:before) oldInputs[{edge[2],edge[3]}]=edge;
@@ -1241,34 +1384,23 @@ struct MacroMixerMorphTopology {
                 const std::vector<std::string> a=old==oldInputs.end()?std::vector<std::string>{}:old->second;
                 const std::vector<std::string> b=next==newInputs.end()?std::vector<std::string>{}:next->second;
                 if(a==b || !edit.target.at("nodes").contains(key)) continue;
+                if(buses.owned.count(input.first)) {
+                    // A bus's driver moved to another Portal or left it. Only
+                    // the blended driver (signals) and the cables kept as they
+                    // are reach here without a plan; the rest is the bus's.
+                    if(!a.empty() && !std::any_of(buses.buses.begin(),buses.buses.end(),[&](const auto& bus) { return bus.a==a; }))
+                        throw std::runtime_error(morphLocation(edit.path,key,name)+": Portal bus driver changed without a plan");
+                    continue;
+                }
                 if(!edit.original.at("nodes").contains(key)) { addCable(c,b); continue; }
-                try {
-                    const auto plan=planMorphCable(c,edit.target,key,name,a,b,policies);
-                    std::shared_ptr<MorphSignal> blend;
-                    ofxOceanodeAbstractParameter *inputA=nullptr,*inputB=nullptr,*output=nullptr;
-                    if(plan.type==MacroMixerMixing::triggerType) {
-                        auto mixer=std::make_shared<TriggerMorphSignal>(plan.policy);
-                        inputA=&mixer->inputA; inputB=&mixer->inputB; output=&mixer->output; blend=mixer;
-                    } else if(!plan.type.empty()) {
-                        auto mixer=std::make_shared<PolicyMorphSignal>(c,key,name,plan);
-                        inputA=mixer->inputA.get(); inputB=mixer->inputB.get(); output=mixer->output.get(); blend=mixer;
-                    } else std::visit([&](const auto& value) {
-                        using T=std::decay_t<decltype(value)>;
-                        auto mixer=std::make_shared<TypedMorphSignal<T>>(*plan.sink,*plan.target);
-                        inputA=&mixer->inputA; inputB=&mixer->inputB; output=&mixer->output; blend=mixer;
-                    },plan.target->value);
-                    signals.push_back({&c,a,b,blend,plan.editable,plan.type});
-                    if(!a.empty() && !host.createConnection(*morphPort(c,a[0],a[1]),*inputA)) throw std::runtime_error("Cannot connect origin morph signal");
-                    if(!b.empty() && !host.createConnection(*morphPort(c,b[0],b[1]),*inputB)) throw std::runtime_error("Cannot connect destination morph signal");
-                    if(!a.empty()) removeMorphCable(morphCable(c,a));
-                    if(!host.createConnection(*output,*plan.sink)) throw std::runtime_error("Cannot connect blended morph signal");
-                    blend->progress(0); // Publish resource bridges before evaluating backend readiness.
-                } catch(const std::exception& e) { throw std::runtime_error(morphLocation(edit.path,key,name)+": "+e.what()); }
+                try { blendInput(c,key,name,a,b,planMorphCable(c,edit.target,key,name,a,b,policies)); }
+                catch(const std::exception& e) { throw std::runtime_error(morphLocation(edit.path,key,name)+": "+e.what()); }
             }
         }
         for(auto& entry:created) if(auto* node=morphNode(*entry.first,entry.second)) {
             const auto edit=std::find_if(edits.begin(),edits.end(),[&](const auto& e) { return e.container==entry.first; });
             auto json=edit->target.at("nodes").at(entry.second).at("settings");
+            if(edit->joining.count(entry.second)) json.erase("Value");
             auto& model=node->getNodeModel();
             model.presetRecallBeforeSettingParameters(json); node->loadParametersFromJson(json);
             node->loadInspectorParametersFromJson(json); model.presetRecallAfterSettingParameters(json);
@@ -1342,7 +1474,8 @@ std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revisio
         for(const auto& edit:edits) {
             std::set<std::string> replacements;
             for(const auto& split:splits) if(split.first.first==edit.path) replacements.insert(split.second.replacement);
-            for(const auto& key:edit.added) if(!replacements.count(key)) result.push_back({"added",morphLocation(edit.path,key),"Starts when the morph begins"});
+            for(const auto& key:edit.added) if(!replacements.count(key)) result.push_back({"added",morphLocation(edit.path,key),
+                edit.joining.count(key) ? "Starts when the morph begins, with its Portal bus's value" : "Starts when the morph begins"});
             for(const auto& entry:edit.nodeMorphs) if(entry.changed) result.push_back({"node",morphLocation(edit.path,entry.key),
                 "Blends its own saved state on the running node"});
             for(const auto& key:edit.removed) {
@@ -1350,6 +1483,17 @@ std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revisio
                 if(split==splits.end()) result.push_back({"removed",morphLocation(edit.path,key),"Runs until the morph completes"});
                 else result.push_back({"replaced",morphLocation(edit.path,key),"The "+split->second.reason+", so it cannot morph. "
                     "The running node retires at completion, the saved one starts now and their connections blend."});
+            }
+            const auto buses=planPortalBuses(*edit.container,edit);
+            for(const auto& bus:buses.buses) {
+                const auto location=morphLocation(edit.path,"Portal bus "+bus.name);
+                if(!bus.reason.empty()) { result.push_back({"fallback",location,bus.reason}); continue; }
+                try {
+                    const auto plan=planMorphCable(*edit.container,edit.target,bus.live,"Value",bus.a,bus.b,policies,true,bus.carrier);
+                    const auto from=bus.a.empty() ? std::string("Bus value") : bus.a[0]+" / "+bus.a[1];
+                    const auto to=bus.b.empty() ? std::string("Saved value") : bus.b[0]+" / "+bus.b[1];
+                    result.push_back({"mix",location,from+" -> "+to,plan.type,plan.policy.policy,plan.policy.options});
+                } catch(const std::exception& e) { result.push_back({"fallback",location,e.what()}); }
             }
             std::map<std::pair<std::string,std::string>,std::vector<std::string>> before,after;
             for(const auto& edge:savedEdges(edit.original.at("connections"))) before[{edge[2],edge[3]}]=edge;
@@ -1359,7 +1503,7 @@ std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revisio
                 const auto& key=input.first.first; const auto& name=input.first.second;
                 const auto a=before.count(input.first)?before.at(input.first):std::vector<std::string>{};
                 const auto b=after.count(input.first)?after.at(input.first):std::vector<std::string>{};
-                if(a==b || !edit.original.at("nodes").contains(key) || !edit.target.at("nodes").contains(key)) continue;
+                if(a==b || !edit.original.at("nodes").contains(key) || !edit.target.at("nodes").contains(key) || buses.owned.count(input.first)) continue;
                 const auto location=morphLocation(edit.path,key,name);
                 try {
                     const auto plan=planMorphCable(*edit.container,edit.target,key,name,a,b,policies,true);

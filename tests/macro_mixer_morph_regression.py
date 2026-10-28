@@ -239,8 +239,8 @@ int main(int argc,char** argv) {
         runtime.finish(); runtime.update(620); near(runtime.value(),36); near(replacement,123);
     }
     // Same-graph morphs keep native Buffer histories, HeaderPro readers,
-    // phasors, Portal values and running instances. Target values are read from
-    // files without ever constructing a second graph.
+    // phasors and running instances; a knob Portal bus blends like a control.
+    // Target values are read from files without ever constructing a second graph.
     const auto liveA=scratch+"/live-a",liveB=scratch+"/live-b";
     auto saveLive=[&](const std::string& folder,bool target,bool modulated=false,int textureClock=0,bool freedom=false) {
         ofxOceanodeContainer c(registry,types,transport); c.setCanvasID("LiveSource");
@@ -308,7 +308,8 @@ int main(int argc,char** argv) {
         r.request(liveB,1000,0,true); r.update(10);
         assert(r.morphingInPlace()&&r.origin()==original&&r.destination()==original&&morphSetups==setups);
         assert(r.currentID()==aID&&r.destinationID()==bID); near(r.value(),4); assert(history->getSize()==3); near(phase->getPhasor(),.37f);
-        r.update(510); near(r.value(),16); near(level,4); near(shared,.77f);
+        // A Local knob Portal glides to its saved value (0), as native recall sets it.
+        r.update(510); near(r.value(),16); near(level,4); near(shared,.385f);
         assert(p.gate&&p.label.get()=="target"&&p.count==5);
         assert(p.floats.get()==std::vector<float>({2,4})&&p.ints.get()==std::vector<int>({2,4})); assert(p.color.get()==ofColor(50,70,90,110)); near(p.tint.get().r,.5);
         assert(history->getSize()==4); near(history->getFrame(0).getObjectRef(),10); assert(history->getFrame(0).getTimestamp()==Timestamp(1000));
