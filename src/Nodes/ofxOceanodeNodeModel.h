@@ -38,6 +38,9 @@ struct ofxOceanodeTimelineInstrument {
     // Kit only, optional: per-slot bipolar step filter, -1 = low-pass fully
     // closed .. 0 = open .. +1 = high-pass fully closed.
     ofxOceanodeAbstractParameter* filter = nullptr;
+    // Kit only, optional: per-slot retrigger rate as a MIDI note while the
+    // hit's gate is open; 0 = off.
+    ofxOceanodeAbstractParameter* stutter = nullptr;
 };
 
 typedef int ofxOceanodeNodeModelFlags;
