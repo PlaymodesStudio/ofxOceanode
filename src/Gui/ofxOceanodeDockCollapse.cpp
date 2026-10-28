@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <utility>
 
 ofxOceanodeDockCollapse::~ofxOceanodeDockCollapse() {
     if(!settingsContext) return;
@@ -61,7 +62,7 @@ void ofxOceanodeDockCollapse::prepare(ImGuiID id, ImVec2 pos, ImVec2 size, ImGui
     if(!root) { axes[0] = AxisState(); axes[1] = AxisState(); pending = Request(); return; }
     for(int axis = 0; axis < 2; ++axis) {
         auto& state = axes[axis];
-        if(!state.layout.empty() && !matches(root, state.signature, true)) state = AxisState();
+        if(!state.layout.empty() && !matches(root, state.signature, true)) reconcile(root, axis, state);
         if(activeSplitter && activeSplitter->SplitAxis == axis && !state.layout.empty()) {
             // A manual divider drag takes over this axis from the fold policy.
             syncReferences(root, axis); state = AxisState();
@@ -114,7 +115,13 @@ void ofxOceanodeDockCollapse::finish() {
     for(int axis = 0; axis < 2; ++axis) {
         auto& state = axes[axis];
         if(state.layout.empty()) continue;
-        if(!matches(root, state.signature, true)) { state = AxisState(); continue; }
+        if(!matches(root, state.signature, true)) {
+            reconcile(root, axis, state);
+            if(state.layout.empty()) continue;
+            expanded(root, axis, root->Size[axis], state);
+            preferred(root, axis, state);
+            apply(root, axis, root->Pos[axis], root->Size[axis], state);
+        }
         // Windows still receive the folded Size, but ini serialization sees
         // expanded SizeRef. Never change the global WindowMinSize.
         for(const auto& entry : state.layout)
@@ -124,11 +131,14 @@ void ofxOceanodeDockCollapse::finish() {
 
 void ofxOceanodeDockCollapse::drawHandles() {
     auto* root = ImGui::DockBuilderGetNode(rootID);
-    for(auto& state : axes) {
+    for(int axis = 0; axis < 2; ++axis) {
+        auto& state = axes[axis];
+        if(!state.layout.empty() && !matches(root, state.signature, true)) reconcile(root, axis, state);
         if(!state.layout.empty() && matches(root, state.signature, true))
-            for(const auto& entry : state.layout) {
+            for(auto& entry : state.layout) {
                 auto* n = ImGui::DockBuilderGetNode(entry.id);
                 n->SetLocalFlags((n->LocalFlags & ~tabFlags) | entry.tabFlags);
+                rememberWindows(n, entry);
             }
         if(state.folds.empty()) state = AxisState();
     }
@@ -271,8 +281,81 @@ ofxOceanodeDockCollapse::Layout& ofxOceanodeDockCollapse::entry(AxisState& state
 }
 
 void ofxOceanodeDockCollapse::capture(ImGuiDockNode* n, int axis, std::vector<Layout>& out) {
-    out.push_back({n->ID, n->Size[axis], n->Size[axis], n->Size[axis], n->LocalFlags & tabFlags});
+    out.push_back({n->ID, n->Size[axis], n->Size[axis], n->Size[axis], n->LocalFlags & tabFlags, n->SplitAxis, {}});
+    rememberWindows(n, out.back());
     if(n->IsSplitNode()) { capture(n->ChildNodes[0], axis, out); capture(n->ChildNodes[1], axis, out); }
+}
+
+void ofxOceanodeDockCollapse::rememberWindows(ImGuiDockNode* n, Layout& layout) {
+    // Hidden windows may temporarily leave their dock's window list. Retain
+    // their identity until they return or the dock structure is reconciled.
+    if(n->IsSplitNode() || n->Windows.empty()) return;
+    layout.windows.clear();
+    for(auto* w : n->Windows) layout.windows.push_back(w->ID);
+    std::sort(layout.windows.begin(), layout.windows.end());
+}
+
+void ofxOceanodeDockCollapse::reconcile(ImGuiDockNode* root, int axis, AxisState& state) {
+    if(!root) { state = AxisState(); return; }
+    AxisState previous = std::move(state);
+    state = AxisState();
+    capture(root, axis, state.layout);
+    std::vector<std::pair<ImGuiID, ImGuiID>> leaves;
+    for(const auto& old : previous.layout) {
+        if(old.splitAxis != ImGuiAxis_None) continue;
+        Layout* survivor = nullptr;
+        for(auto& current : state.layout) {
+            if(current.id != old.id || current.splitAxis != ImGuiAxis_None) continue;
+            bool sharedWindow = old.windows.empty() && current.windows.empty();
+            for(auto w : old.windows)
+                if(std::find(current.windows.begin(), current.windows.end(), w) != current.windows.end()) sharedWindow = true;
+            if(sharedWindow) survivor = &current;
+        }
+        // A leaf turned into a split was directly rearranged. Do not transfer
+        // its fold into one of the new sections. A removed leaf, however, may
+        // have been promoted into its parent by ImGui's sibling merge.
+        if(!survivor && !old.windows.empty())
+            for(auto& current : state.layout) {
+                if(current.splitAxis != ImGuiAxis_None || current.windows != old.windows) continue;
+                auto* ancestor = ImGui::DockBuilderGetNode(current.id)->ParentNode;
+                while(ancestor && ancestor->ID != old.id) ancestor = ancestor->ParentNode;
+                // An ancestor with the old ID means the region itself was
+                // split. That ID may also have been recycled elsewhere during
+                // the same drop, which must not invalidate this survivor.
+                if(!ancestor) { survivor = &current; break; }
+            }
+        if(survivor) leaves.push_back({old.id, survivor->id});
+    }
+    for(auto& current : state.layout) {
+        auto* n = ImGui::DockBuilderGetNode(current.id);
+        // New regions use native docking's references, never the compact
+        // rendered size of an existing folded region.
+        current.original = current.expanded = current.preferred = n->SizeRef[axis];
+        ImGuiID oldID = current.id;
+        if(current.splitAxis == ImGuiAxis_None) {
+            auto mapped = std::find_if(leaves.begin(), leaves.end(), [&](const auto& ids) { return ids.second == current.id; });
+            if(mapped == leaves.end()) continue;
+            oldID = mapped->first;
+        }
+        auto old = std::find_if(previous.layout.begin(), previous.layout.end(), [&](const Layout& layout) {
+            return layout.id == oldID && (layout.splitAxis == ImGuiAxis_None) == (current.splitAxis == ImGuiAxis_None);
+        });
+        if(old != previous.layout.end()) {
+            current.original = current.expanded = current.preferred = old->expanded;
+            current.tabFlags = old->tabFlags;
+        }
+    }
+    for(const auto& fold : previous.folds) for(auto target : fold.targets) {
+        auto mapped = std::find_if(leaves.begin(), leaves.end(), [&](const auto& ids) { return ids.first == target; });
+        if(mapped == leaves.end()) continue;
+        auto* leaf = ImGui::DockBuilderGetNode(mapped->second);
+        if(leaf->IsCentralNode()) continue;
+        auto* split = leaf->ParentNode;
+        while(split && split->SplitAxis != axis) split = split->ParentNode;
+        if(split) state.folds.push_back({split->ID, {leaf->ID}});
+    }
+    if(state.folds.empty()) state = AxisState();
+    else signature(root, state.signature, true);
 }
 
 float ofxOceanodeDockCollapse::minimum(ImGuiDockNode* n, int axis, bool compact) {

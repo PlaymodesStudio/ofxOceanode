@@ -239,6 +239,103 @@ int main() {
     near(width(0),minX);near(width(1),minX);near(height(6),minY);
     click(nearLeft);click(bottomSplit);near(width(1),innerWidth);near(height(6),instrumentHeight);
     restoreLayout();
+    // Native tab undocking removes an empty source dock and merges its sibling.
+    // Neither that merge nor a later docking split may open another region.
+    for(int direction=0;direction<5;++direction) {
+        restoreLayout();
+        float instrument=height(6),side=width(4);
+        click(bottomSplit);click(farRight);
+        auto* payload=ImGui::FindWindowByName(names[0]);
+        ImGui::DockContextQueueUndockWindow(GImGui,payload);idle();
+        near(height(6),minY);near(width(4),minX);
+        auto* destination=ImGui::FindWindowByName(names[2]);
+        ImGui::DockContextQueueDock(GImGui,destination,destination->DockNode,payload,ImGuiDir(direction-1),0.3f,false);idle();
+        near(height(6),minY);near(width(4),minX);checkGeometry(node(rootID));
+        click(bottomSplit);near(height(6),instrument);
+        click(farRight);near(width(4),side);
+    }
+    // Exercise an actual tab drag as well as the native queued docking paths.
+    restoreLayout();click(bottomSplit);
+    auto* mousePayload=ImGui::FindWindowByName(names[0]);
+    auto* mouseTabBar=mousePayload->DockNode->TabBar;
+    auto* mouseTab=ImGui::TabBarFindTabByID(mouseTabBar,mousePayload->TabId);assert(mouseTab);
+    io.AddMousePosEvent(mouseTabBar->BarRect.Min.x+mouseTab->Offset+mouseTab->Width*0.5f,mouseTabBar->BarRect.GetCenter().y);idle(2);
+    io.AddMouseButtonEvent(0,true);frame();near(height(6),minY);
+    io.AddMousePosEvent(-100,-100);
+    for(int held=0;held<8;++held) { frame();near(height(6),minY); }
+    assert(!mousePayload->DockNode || ImGui::DockNodeGetRootNode(mousePayload->DockNode)->ID!=rootID);
+    io.AddMouseButtonEvent(0,false);idle();near(height(6),minY);
+    // Dragging one of several tabs keeps the source dock, but a split drop
+    // changes the tree. Check detachment and drop independently.
+    restoreLayout();showExtraTab=true;idle();
+    float instrumentBeforeDrop=height(6);click(bottomSplit);
+    auto* tabPayload=ImGui::FindWindowByName(names[1]);
+    ImGui::DockContextQueueUndockWindow(GImGui,tabPayload);idle();near(height(6),minY);
+    auto* tabTarget=ImGui::FindWindowByName(names[2]);
+    ImGui::DockContextQueueDock(GImGui,tabTarget,tabTarget->DockNode,tabPayload,ImGuiDir_Up,0.3f,false);idle();
+    near(height(6),minY);
+    std::string redockedIni=ImGui::SaveIniSettingsToMemory();
+    ImGui::LoadIniSettingsFromMemory(redockedIni.c_str(),redockedIni.size());idle(10);near(height(6),minY);
+    click(bottomSplit);near(height(6),instrumentBeforeDrop);
+    showExtraTab=false;restoreLayout();
+    // Removing a sibling promotes the folded leaf into its parent, changing ID.
+    grouped=true;restoreLayout();
+    float outerWidth=width(0);click(farLeft);
+    ImGui::DockContextQueueUndockWindow(GImGui,ImGui::FindWindowByName(names[1]));idle();
+    auto* promoted=ImGui::FindWindowByName(names[0])->DockNode;
+    assert(promoted && promoted->ID!=panes[0]);near(promoted->Size.x,minX);
+    // Park the detached window as a canvas tab so it cannot cover the arrow.
+    ImGui::DockBuilderDockWindow(names[1],ImGui::FindWindowByName(names[2])->DockId);idle();
+    std::string promotedIni=ImGui::SaveIniSettingsToMemory();
+    ImGui::LoadIniSettingsFromMemory(promotedIni.c_str(),promotedIni.size());idle(10);
+    promoted=ImGui::FindWindowByName(names[0])->DockNode;near(promoted->Size.x,minX);
+    auto* promotionSplit=promoted->ParentNode;
+    while(promotionSplit && promotionSplit->SplitAxis!=ImGuiAxis_X) promotionSplit=promotionSplit->ParentNode;
+    assert(promotionSplit);click(promotionSplit->ID);near(promoted->Size.x,outerWidth);
+    // Undock and split-drop in one update can recycle the removed leaf ID.
+    for(int repeat=0;repeat<20;++repeat) {
+        restoreLayout();outerWidth=width(0);click(farLeft);click(bottomSplit);
+        auto* payload=ImGui::FindWindowByName(names[1]);
+        auto* destination=ImGui::FindWindowByName(names[2]);
+        ImGui::DockContextQueueUndockWindow(GImGui,payload);
+        ImGui::DockContextQueueDock(GImGui,destination,destination->DockNode,payload,ImGuiDir(repeat%4),0.3f,false);
+        idle();
+        promoted=ImGui::FindWindowByName(names[0])->DockNode;
+        near(promoted->Size.x,minX);near(height(6),minY);checkGeometry(node(rootID));
+        promotionSplit=promoted->ParentNode;
+        while(promotionSplit && promotionSplit->SplitAxis!=ImGuiAxis_X) promotionSplit=promotionSplit->ParentNode;
+        assert(promotionSplit);click(promotionSplit->ID);near(promoted->Size.x,outerWidth);
+    }
+    // Moving the folded window itself discards only its fold. A new dock must
+    // not inherit that fold from a recycled ID, and other folds must survive.
+    restoreLayout();click(farLeft);click(bottomSplit);
+    auto* foldedPayload=ImGui::FindWindowByName(names[6]);
+    ImGui::DockContextQueueUndockWindow(GImGui,foldedPayload);idle();
+    near(ImGui::FindWindowByName(names[0])->DockNode->Size.x,minX);
+    auto* newDestination=ImGui::FindWindowByName(names[2]);
+    ImGui::DockContextQueueDock(GImGui,newDestination,newDestination->DockNode,foldedPayload,ImGuiDir_Up,0.4f,false);idle();
+    assert(foldedPayload->DockNode->Size.y>minY*2);
+    near(ImGui::FindWindowByName(names[0])->DockNode->Size.x,minX);checkGeometry(node(rootID));
+    // Repeated rearrangements must keep both folds through splits/merges on
+    // either axis, including outer docking which wraps the old root's contents.
+    for(int topology=0;topology<2;++topology) {
+        grouped=topology;restoreLayout();click(farLeft);click(bottomSplit);
+        const int movable[]={1,3,4,5};
+        for(int move=0;move<40;++move) {
+            auto* payload=ImGui::FindWindowByName(names[movable[move%4]]);
+            ImGui::DockContextQueueUndockWindow(GImGui,payload);idle();
+            near(ImGui::FindWindowByName(names[0])->DockNode->Size.x,minX);
+            near(ImGui::FindWindowByName(names[6])->DockNode->Size.y,minY);
+            auto* destination=ImGui::FindWindowByName(names[2]);
+            bool outer=move%7==0 && move%5!=0;
+            auto* target=outer?node(rootID):destination->DockNode;
+            ImGui::DockContextQueueDock(GImGui,destination,target,payload,ImGuiDir(move%5-1),0.3f,outer);idle();
+            near(ImGui::FindWindowByName(names[0])->DockNode->Size.x,minX);
+            near(ImGui::FindWindowByName(names[6])->DockNode->Size.y,minY);
+            checkGeometry(node(rootID));
+        }
+    }
+    grouped=false;restoreLayout();
     const float globalThreshold=io.MouseDragThreshold;
     io.MouseDragThreshold=0.1f; // Handle clicks must tolerate a sensitive global drag setting.
     const ImVec2 tremors[]={ImVec2(1,0),ImVec2(5,0),ImVec2(8,0),ImVec2(0,8),ImVec2(5,8)};
@@ -335,7 +432,7 @@ int main() {
         click(nearLeft);click(bottomSplit);
         near(width(0),savedLeft);near(width(1),savedInner);near(height(6),savedBottom);
     }
-    std::printf("PASS: click tremor/release tolerance, axis-only drag threshold, smooth drag start and quick release, floating-window render/input occlusion, shadow-free handles, all four directions, both left-dock topologies, preserved neighbours, nested/independent folds, restore, save/load/restart, late windows, pending-save preservation, layout replacement, handler lifetime, mouse/native drag, host resize, topology changes, disabled splits and hidden tabs.\n");
+    std::printf("PASS: tab mouse drag, split/tab/outer redocking, dock-ID promotion/reuse, 80 repeated rearrangements with simultaneous folds, migrated save/load, click tremor/release tolerance, axis-only drag threshold, smooth drag start and quick release, floating-window render/input occlusion, shadow-free handles, all four directions, both left-dock topologies, preserved neighbours, nested/independent folds, restore, save/load/restart, late windows, pending-save preservation, layout replacement, handler lifetime, mouse/native drag, host resize, topology changes, disabled splits and hidden tabs.\n");
     ImGui::DestroyContext();
     // Removing a policy before its context must also remove its callbacks.
     ImGui::CreateContext();ImGui::GetIO().IniFilename=nullptr;

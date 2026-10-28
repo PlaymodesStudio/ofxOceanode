@@ -24,7 +24,13 @@ public:
 
 private:
     static constexpr ImGuiDockNodeFlags tabFlags = ImGuiDockNodeFlags_HiddenTabBar | ImGuiDockNodeFlags_AutoHideTabBar;
-    struct Layout { ImGuiID id; float original, expanded, preferred; ImGuiDockNodeFlags tabFlags; };
+    struct Layout {
+        ImGuiID id;
+        float original, expanded, preferred;
+        ImGuiDockNodeFlags tabFlags;
+        int splitAxis;
+        std::vector<ImGuiID> windows;
+    };
     struct Fold { ImGuiID id; std::vector<ImGuiID> targets; };
     struct AxisState { std::vector<Layout> layout; std::vector<Fold> folds; std::vector<ImGuiID> signature; };
     struct Request { ImGuiID id = 0; bool toggle = false; float firstSize = 0; std::vector<ImGuiID> signature; };
@@ -47,12 +53,14 @@ private:
     static void saveWindows(ImGuiDockNode* n, std::vector<SavedWindow>& out);
     void writeSettings(ImGuiTextBuffer& out) const;
     void tryRestore(ImGuiDockNode* root);
+    static void rememberWindows(ImGuiDockNode* n, Layout& layout);
+    static void reconcile(ImGuiDockNode* root, int axis, AxisState& state);
 
     static bool central(ImGuiDockNode* n);
     static ImGuiDockNode* findCentral(ImGuiDockNode* n);
     static int direction(ImGuiDockNode* n, ImGuiDockNode* root);
-    // Fold snapshots depend on dock structure; pending input also checks windows
-    // and visibility so a click cannot act on a changed set of panes.
+    // Structure changes trigger fold reconciliation; pending input also checks
+    // windows and visibility so a click cannot act on a changed set of panes.
     static void signature(ImGuiDockNode* n, std::vector<ImGuiID>& out, bool structureOnly = false);
     static bool matches(ImGuiDockNode* n, const std::vector<ImGuiID>& expected, bool structureOnly = false);
     bool eligible(ImGuiDockNode* n) const;
