@@ -190,7 +190,21 @@ public:
     // so the root timeline can reach parameters inside macros. Root-level
     // parameters keep the plain "Node/param" form.
     std::string getTimelineParameterPath(ofxOceanodeAbstractParameter& parameter) const;
+    // The path relative to `base` (a macro's container; the root gives the
+    // absolute path above). Empty when the parameter is not inside base.
+    std::string getTimelineParameterPath(ofxOceanodeAbstractParameter& parameter, const ofxOceanodeContainer& base) const;
+    // Resolves a path relative to this container (the root: absolute paths).
     ofxOceanodeAbstractParameter* findTimelineParameter(const std::string& parameterPath) const;
+    // After `node` moved here: its parameters' old timeline paths (prefix
+    // oldNodePath) -> new ones, and for a macro everything inside it, whose
+    // canvas id was oldMacroCanvas. Handed to the automation extension.
+    void collectMovedTimelinePaths(ofxOceanodeNode& node, const std::string& oldNodePath,
+                                   const std::string& oldMacroCanvas,
+                                   std::map<std::string, std::string>& oldToNew) const;
+    // "<canvas>::" for a node path on that canvas ("" at the root).
+    static std::string timelineCanvasPrefix(const std::string& canvasID);
+    // The canvas id of macro number macroNumber on a parent canvas.
+    static std::string timelineMacroCanvas(const std::string& parentCanvasID, int macroNumber);
 	
 	// Node encapsulation functionality
 	void encapsulateSelectedNodes(const string& macroName = "Encapsulated");
@@ -319,7 +333,7 @@ public:
 	void deselectAllComments();
     
     void setCanvasID(string s){canvasID = s;};
-    string getCanvasID(){return canvasID;};
+    string getCanvasID() const {return canvasID;};
     void setCanvasDisplayPathProvider(std::function<std::string()> provider){canvasDisplayPathProvider = std::move(provider);}
     std::string getCanvasDisplayPath() const {
         return canvasDisplayPathProvider ? canvasDisplayPathProvider() : canvasID;

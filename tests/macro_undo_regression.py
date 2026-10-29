@@ -46,6 +46,21 @@ static void verifyPublications(ofxOceanodeContainer& c){
         const auto slash=v.first.find('/');assert(c.getParameterGroupNodesMap().count(v.first.substr(0,slash)));
     }
 }
+// Records the timeline path repairs the container hands to its automation service.
+struct PathRecorder : ofxOceanodeAutomationExtension {
+    std::vector<std::map<std::string, std::string>> calls;
+    void retargetParameterPaths(const std::map<std::string, std::string>& oldToNew) override { calls.push_back(oldToNew); }
+    void clear() override {} void beginParameterCache() override {} void evaluateAutomation() override {}
+    void applyAutomation() override {} void endParameterCache() override {}
+    bool loadPreset(const std::string&) override { return true; } bool savePreset(const std::string&) const override { return true; }
+    bool getPlayOnPresetLoad() const override { return false; } bool isBpmAutomationEnabled() const override { return false; }
+    bool preservesSecondsOnBpmChange() const override { return false; } void retimeForBpmChange(double, double) override {}
+    double getBeatsPerBar() const override { return 4; } bool didLoopWrapThisFrame() const override { return false; }
+    bool getParameterTrackColor(const ofxOceanodeAbstractParameter&, ofColor&) const override { return false; }
+    void drawParameterMenu(ofxOceanodeAbstractParameter&) override {} void drawNodeMenu(ofxOceanodeNodeModel&) override {}
+    void removeParameterBindings(ofxOceanodeAbstractParameter&) override {}
+    void collectBoundParameters(std::unordered_set<ofxOceanodeAbstractParameter*>&) const override {}
+};
 static CustomGuiWidget widget(string path){CustomGuiWidget w;w.parameterRef.parameterPath=path;return w;}
 static void addPanels(ofxOceanodeContainer& c){
     CustomGuiPanelData a;a.id="inside";a.name="Inside";a.layout.widgets={widget("Probe_2/In"),widget("Probe_3/In")};
@@ -83,8 +98,28 @@ int main(int argc,char** argv){
         assert(c.createConnection(pin(*probe(c,3),"Out"),pin(*fan,"In")));
         source->getNodeModel().getParameter<float>("In")=.25f;
         addPanels(c);
+        auto ownedRecorder=std::make_unique<PathRecorder>();auto* recorder=ownedRecorder.get();
+        c.setAutomationExtension(std::move(ownedRecorder));
         const auto before=c.captureCanvasGraph();const auto beforeAux=c.captureCanvasAuxiliary();
         auto* wrapper=c.encapsulateNodes({probe(c,3),probe(c,2)},"Pair");assert(wrapper);
+        {
+            // Timeline bindings follow the encapsulated nodes, and paths resolve
+            // relative to any container.
+            auto inside=static_cast<ofxOceanodeNodeMacro&>(wrapper->getNodeModel()).getContainer();
+            assert(recorder->calls.size()==1);
+            const auto& moved=recorder->calls.back();
+            const std::string canvas=inside->getCanvasID();
+            assert(canvas=="Test / Macro "+ofToString(wrapper->getNodeModel().getNumIdentifier()));
+            assert(moved.at("Test::Probe_2/In")==canvas+"::Probe_1/In");
+            assert(moved.at("Test::Probe_3/Out")==canvas+"::Probe_2/Out");
+            auto& in=pin(*probe(*inside,1),"In");
+            assert(inside->findTimelineParameter("Probe_1/In")==&in);
+            const std::string fromParent="Macro "+ofToString(wrapper->getNodeModel().getNumIdentifier())+"::Probe_1/In";
+            assert(c.findTimelineParameter(fromParent)==&in);
+            assert(c.getTimelineParameterPath(in,*inside)=="Probe_1/In");
+            assert(c.getTimelineParameterPath(in,c)==fromParent);
+            assert(c.getTimelineParameterPath(pin(*source,"In"),*inside).empty()); // outside that macro
+        }
         assert(c.canvasUndo.size()==1 && c.getAllModules().size()==4);
         auto& macro=static_cast<ofxOceanodeNodeMacro&>(wrapper->getNodeModel());auto child=macro.getContainer();
         assert(child->getAllModules().size()==4); // Two probes and two boundary routers.
@@ -113,7 +148,18 @@ int main(int argc,char** argv){
         assert(!child->canRedoCanvasEdit()); // Moved/recreated child histories are folded into the parent step.
         // Extract with collisions in the destination; keep both router bridges.
         const auto encapsulated=c.captureCanvasGraph();const auto encapsulatedAux=c.captureCanvasAuxiliary();
+        const std::string extractedCanvas=static_cast<ofxOceanodeNodeMacro&>(wrapper->getNodeModel()).getContainer()->getCanvasID();
+        const size_t callsBefore=recorder->calls.size();
         assert(c.extractMacro(*wrapper));
+        {
+            // Extracted nodes' bindings follow them out, onto names that exist here.
+            assert(recorder->calls.size()==callsBefore+1);
+            for(const auto& entry:recorder->calls.back()){
+                assert(entry.first.compare(0,extractedCanvas.size()+2,extractedCanvas+"::")==0);
+                assert(entry.second.compare(0,6,"Test::")==0 && c.findTimelineParameter(entry.second.substr(6))!=nullptr);
+            }
+            assert(recorder->calls.back().count(extractedCanvas+"::Probe_1/In"));
+        }
         assert(!macroNode(c) && c.getAllModules().size()==7 && c.getAllConnections().size()==6);
         verifyPublications(c);assert(c.customGuiPanelsData.size()==3);
         source->getNodeModel().getParameter<float>("In")=.57f;
@@ -302,6 +348,24 @@ def main():
         def production():
             result = base_production()
             source = (native.ROOT / "src/Managers/ofxOceanodeContainer.cpp").read_text()
+            # Encapsulation and extraction hand moved timeline paths over: use
+            # the real path functions instead of the fixture's stub.
+            result = result.replace('std::string ofxOceanodeContainer::getTimelineParameterPath(ofxOceanodeAbstractParameter&) const { assert(false); return {}; }', '')
+            start = source.index('namespace {\nconst char* const kTimelineCanvasSeparator')
+            result += source[start:source.index('std::string ofxOceanodeContainer::getTimelineParameterPath', start)]
+            for signature in ['std::string ofxOceanodeContainer::getTimelineParameterPath(ofxOceanodeAbstractParameter& parameter) const',
+                              'void ofxOceanodeContainer::collectMovedTimelinePaths(',
+                              'std::string ofxOceanodeContainer::timelineCanvasPrefix(',
+                              'std::string ofxOceanodeContainer::timelineMacroCanvas(',
+                              'std::string ofxOceanodeContainer::getTimelineParameterPath(ofxOceanodeAbstractParameter& parameter,\n',
+                              'ofxOceanodeAbstractParameter* ofxOceanodeContainer::findTimelineParameter(',
+                              'ofxOceanodeAbstractParameter* ofxOceanodeContainer::findParameter(',
+                              'ofxOceanodeContainer::ParsedParameterPath ofxOceanodeContainer::parseParameterPath(',
+                              'ofxOceanodeContainer::ResolvedParameter ofxOceanodeContainer::resolveParameterFromPath(',
+                              'ofxOceanodeContainer* ofxOceanodeContainer::getContainerForCanvasID(',
+                              'const ofxOceanodeContainer* ofxOceanodeContainer::getContainerForCanvasID(']:
+                if signature in source and block(source, signature) not in result:
+                    result += block(source, signature) + '\n'
             for signature in [
                 'void ofxOceanodeContainer::encapsulateSelectedNodes(',
                 'ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(',
