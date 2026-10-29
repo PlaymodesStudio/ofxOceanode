@@ -184,16 +184,42 @@ public:
             static const int order[3] = {ofxOceanodeGlobalPitch::Scale, ofxOceanodeGlobalPitch::Transpose, ofxOceanodeGlobalPitch::Detune};
             for(auto& d : list) {
                 const auto k = ofxOceanodeGlobalPitch::key(d.node);
+                const auto parts = d.parts ? d.parts() : std::vector<ofxOceanodeGlobalPitch::Part>{};
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted(k.c_str());
-                if(!d.byDefault && ImGui::IsItemHovered()) ImGui::SetTooltip("Left out by default");
+                if(ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s%s", d.byDefault ? "" : "Left out by default\n",
+                                      parts.empty() ? "" : "Its ticks set every part below; each part can differ");
                 for(int f : order) {
                     ImGui::TableNextColumn();
+                    // a node with parts: ticked when every part follows; a click sets them all
                     bool on = ofxOceanodeGlobalPitch::follows(d.node, feature(f));
+                    if(!parts.empty()) {
+                        on = true;
+                        for(auto& p : parts) on = on && ofxOceanodeGlobalPitch::follows(d.node, p.id, feature(f));
+                    }
                     ImGui::PushID((k + "/" + ofToString(f)).c_str());
-                    if(ImGui::Checkbox("##on", &on)) { ofxOceanodeGlobalPitch::setFollows(d.node, feature(f), on); changed[f] = true; }
+                    if(ImGui::Checkbox("##on", &on)) {
+                        ofxOceanodeGlobalPitch::setFollows(d.node, feature(f), on);
+                        for(auto& p : parts) ofxOceanodeGlobalPitch::setFollows(d.node, p.id, feature(f), on);
+                        changed[f] = true;
+                    }
                     ImGui::PopID();
+                }
+                for(auto& p : parts) {
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::Indent();
+                    ImGui::TextUnformatted(p.label.c_str());
+                    ImGui::Unindent();
+                    for(int f : order) {
+                        ImGui::TableNextColumn();
+                        bool on = ofxOceanodeGlobalPitch::follows(d.node, p.id, feature(f));
+                        ImGui::PushID((ofxOceanodeGlobalPitch::key(d.node, p.id) + "/" + ofToString(f)).c_str());
+                        if(ImGui::Checkbox("##on", &on)) { ofxOceanodeGlobalPitch::setFollows(d.node, p.id, feature(f), on); changed[f] = true; }
+                        ImGui::PopID();
+                    }
                 }
             }
             ImGui::EndTable();

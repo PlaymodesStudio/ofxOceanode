@@ -40,11 +40,15 @@ class ofxOceanodeGlobalPitch {
 public:
     enum Feature { Transpose = 0, Scale = 1, Detune = 2, NumFeatures = 3 };
 
+    // A part of a destination with its own ticks (a drum kit's pad): id is
+    // stable (the overrides are saved under "node/id"), label is what the table shows
+    struct Part { std::string id, label; };
     struct Follower {
         ofxOceanodeNodeModel* node = nullptr;
         bool byDefault = true;
         std::function<void()> resend;
         std::function<void()> valueChanged;   // a node that applies the values itself, else none
+        std::function<std::vector<Part>()> parts;   // none: the node is one destination
     };
 
     // ── the values ──
@@ -133,9 +137,9 @@ public:
 
     // ── the destinations ──
     static void follow(ofxOceanodeNodeModel* node, bool byDefault, std::function<void()> resend,
-                       std::function<void()> valueChanged = {}) {
+                       std::function<void()> valueChanged = {}, std::function<std::vector<Part>()> parts = {}) {
         unfollow(node);
-        followers().push_back({node, byDefault, std::move(resend), std::move(valueChanged)});
+        followers().push_back({node, byDefault, std::move(resend), std::move(valueChanged), std::move(parts)});
     }
     static void unfollow(ofxOceanodeNodeModel* node) {
         auto& f = followers();
@@ -205,6 +209,20 @@ public:
             const auto k = key(node);
             auto& o = state().overrides[feature];
             if(on == f.byDefault) o.erase(k); else o[k] = on;
+            if(f.resend) f.resend();
+        }
+    }
+    // a part of a node ("node/part"): its own tick, else the node's
+    static std::string key(ofxOceanodeNodeModel* node, const std::string& part) { return key(node) + "/" + part; }
+    static bool follows(ofxOceanodeNodeModel* node, const std::string& part, Feature feature) {
+        auto& o = state().overrides[feature];
+        auto it = o.find(key(node, part));
+        return it == o.end() ? follows(node, feature) : it->second;
+    }
+    static void setFollows(ofxOceanodeNodeModel* node, const std::string& part, Feature feature, bool on) {
+        for(auto& f : followers()) if(f.node == node) {
+            auto& o = state().overrides[feature];
+            if(on == follows(node, feature)) o.erase(key(node, part)); else o[key(node, part)] = on;
             if(f.resend) f.resend();
         }
     }
