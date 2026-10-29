@@ -47,6 +47,8 @@ void OceanodeTheme::setup() {
     colors[ImGuiCol_SeparatorActive]        = ImVec4(0.80f, 0.41f, 0.1f,  1.00f);
     colors[ImGuiCol_ResizeGrip]             = ImVec4(0.75f, 0.25f, 0.05f, 0.25f);
     colors[ImGuiCol_ResizeGripHovered]      = ImVec4(0.75f, 0.25f, 0.05f, 0.25f);
+    colors[ImGuiCol_TabText]                = colors[ImGuiCol_TextDisabled];
+    colors[ImGuiCol_TabSelectedText]        = colors[ImGuiCol_Text];
     colors[ImGuiCol_Tab]                    = ImVec4(0.07f, 0.07f, 0.07f, 1.00f);
     colors[ImGuiCol_TabHovered]             = ImVec4(0.80f, 0.41f, 0.1f,  1.00f);
     colors[ImGuiCol_ResizeGripActive]       = colors[ImGuiCol_TabHovered];

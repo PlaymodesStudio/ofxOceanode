@@ -217,6 +217,9 @@ void ofxOceanodeThemeManager::load(const std::string& name){
             }
         }
     }
+    // Older themes inherit tab text from their own palette until explicitly edited.
+    if(!j["colors"].contains("TabText")) colors[ImGuiCol_TabText] = colors[ImGuiCol_TextDisabled];
+    if(!j["colors"].contains("TabSelectedText")) colors[ImGuiCol_TabSelectedText] = colors[ImGuiCol_Text];
     // Old themes may contain a separate PopupBg; WindowBg now controls both.
     colors[ImGuiCol_PopupBg] = colors[ImGuiCol_WindowBg];
     // Load custom Oceanode semantic colours (optional: gracefully absent in old theme files)
@@ -314,6 +317,7 @@ void ofxOceanodeThemeManager::drawThemeEditorWindow(){
 
             if(ImGui::BeginTabItem("ImGui Colors", nullptr, tabFlags(false))){
                 ImGui::TextDisabled("WindowBg also controls popup and modal backgrounds.");
+                ImGui::TextDisabled("TabSelectedText: visible tab. TabText: other tabs.");
                 std::vector<int> colorIndices;
                 for(int i = 0; i < ImGuiCol_COUNT; i++){
                     if(i != ImGuiCol_PopupBg) colorIndices.push_back(i);
