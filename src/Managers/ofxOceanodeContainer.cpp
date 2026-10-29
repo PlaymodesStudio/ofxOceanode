@@ -3193,12 +3193,28 @@ ofxOceanodeContainer::findExclusiveUpstreamSubgraphs(
     return plans;
 }
 
-void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName) {
-	encapsulateNodes(getSelectedModules(), macroName);
+void ofxOceanodeContainer::encapsulateSelectedNodes(const string& macroName, bool moveTimelineIntoMacro) {
+	encapsulateNodes(getSelectedModules(), macroName, moveTimelineIntoMacro);
+}
+
+bool ofxOceanodeContainer::hasAutomatedParameters(const vector<ofxOceanodeNode*>& nodes) const {
+	auto* automation = const_cast<ofxOceanodeContainer*>(this)->getAutomationExtension();
+	if(automation == nullptr) return false;
+	std::unordered_set<ofxOceanodeAbstractParameter*> bound;
+	automation->collectBoundParameters(bound);
+	if(bound.empty()) return false;
+	std::function<bool(ofxOceanodeNode&)> automated = [&](ofxOceanodeNode& node) {
+		for(auto& abstract : node.getParameters())
+			if(auto* parameter = dynamic_cast<ofxOceanodeAbstractParameter*>(abstract.get()); parameter && bound.count(parameter)) return true;
+		if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node.getNodeModel()); macro && macro->getContainer())
+			for(auto* inner : macro->getContainer()->getAllModules()) if(automated(*inner)) return true;
+		return false;
+	};
+	return std::any_of(nodes.begin(), nodes.end(), [&](ofxOceanodeNode* node) { return node != nullptr && automated(*node); });
 }
 
 ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
-    const vector<ofxOceanodeNode*>& nodes, const string& macroName) {
+    const vector<ofxOceanodeNode*>& nodes, const string& macroName, bool moveTimelineIntoMacro) {
 	// 1. Validate and select exactly this precomputed branch. This keeps batch
 	// encapsulation independent from the order in which its plans are applied.
 	auto selectedNodes = nodes;
@@ -3372,8 +3388,11 @@ ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
         }
         if(customGuiExtension && macroContainer->getCustomGuiExtension())
             customGuiExtension->migrateTo(*macroContainer->getCustomGuiExtension(), escapedNodeNameMapping);
-        if(auto* automation = getAutomationExtension(); automation != nullptr && !timelinePaths.empty())
-            automation->retargetParameterPaths(timelinePaths);
+        if(auto* automation = getAutomationExtension(); automation != nullptr && !timelinePaths.empty()) {
+            auto record = automation->encapsulateParameters(*this, *macroContainer, timelinePaths, moveTimelineIntoMacro);
+            pendingCanvasEdit->parameterMoves.push_back({{"paths", timelinePaths},
+                {"macro", macroNode->getParameters().getEscapedName()}, {"record", std::move(record)}});
+        }
 
 	}
 
@@ -4147,7 +4166,8 @@ void ofxOceanodeContainer::endCanvasEdit(){
 
 void ofxOceanodeContainer::measureCanvasEdit(CanvasEdit& edit){
     edit.bytes = edit.before.dump().size() + edit.after.dump().size() +
-                 edit.beforeAux.dump().size() + edit.afterAux.dump().size() + edit.nodeTransfers.dump().size();
+                 edit.beforeAux.dump().size() + edit.afterAux.dump().size() + edit.nodeTransfers.dump().size() +
+                 edit.parameterMoves.dump().size();
     for(const auto& snapshot : edit.snapshots)
         edit.bytes += snapshot.second->values.dump().size() + snapshot.second->midi.dump().size() +
                       snapshot.second->widgets.dump().size();
@@ -4315,6 +4335,23 @@ bool ofxOceanodeContainer::replayCanvasEdit(CanvasEdit& edit, bool backwards){
     if(!edit.beforeAux.is_null())
         restoreCanvasAuxiliary(backwards ? edit.beforeAux : edit.afterAux,
                                backwards ? edit.afterAux : edit.beforeAux);
+    // Automation follows the parameters back (or forward again), latest move
+    // first when undoing.
+    if(auto* automation = getAutomationExtension(); automation != nullptr && !edit.parameterMoves.empty()) {
+        const auto& moves = edit.parameterMoves;
+        for(size_t i = 0; i < moves.size(); ++i) {
+            const auto& move = moves[backwards ? moves.size() - 1 - i : i];
+            ofxOceanodeContainer* macroContainer = nullptr;
+            if(move["macro"].is_string()) {
+                const auto found = parameterGroupNodesMap.find(move["macro"].get<string>());
+                if(found != parameterGroupNodesMap.end())
+                    if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&found->second->getNodeModel()))
+                        macroContainer = macro->getContainer().get();
+            }
+            automation->replayParameterMove(*this, macroContainer,
+                move["paths"].get<std::map<std::string, std::string>>(), move["record"], backwards);
+        }
+    }
     return true;
 }
 
@@ -4590,7 +4627,10 @@ bool ofxOceanodeContainer::extractMacro(ofxOceanodeNode& macroNode){
                 collectMovedTimelinePaths(*found->second, timelineCanvasPrefix(childCanvas) + entry.first + "/",
                                           timelineMacroCanvas(childCanvas, innerNumbers[entry.first]), timelinePaths);
             }
-            if(!timelinePaths.empty()) automation->retargetParameterPaths(timelinePaths);
+            if(!timelinePaths.empty()) {
+                automation->retargetParameterPaths(timelinePaths);
+                operation.parameterMoves.push_back({{"paths", timelinePaths}, {"macro", nullptr}, {"record", nullptr}});
+            }
         }
         operation.afterAux = captureCanvasAuxiliary();
         scope.success = true;
