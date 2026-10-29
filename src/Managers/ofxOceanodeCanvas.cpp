@@ -1293,6 +1293,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         if(ImGui::IsMouseReleased(0)){
             if(isSelecting){
                 isSelecting = false;
+                if(!ImGui::GetIO().KeyShift) deselectAllNodes(true);
                 if(ImGui::GetIO().KeyAlt){
                     newComment = true;
                 }
@@ -1575,7 +1576,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     if(nodeGui.getSelected() && lastSelectedNode == nodeId) lastSelectedNode = "";
                     if(!someDragAppliedToSelection || !nodeGui.getSelected()){
                         if(!ImGui::GetIO().KeyShift){
-                            deselectAllNodes();
+                            deselectAllNodes(true);
                             nodeGui.setSelected(true);
                             ofxOceanodeShared::nodeSelectedInCanvas(node);
 
@@ -2781,8 +2782,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             if(ImGui::IsMouseReleased(0)){
                 if(canvasHasScolled){
                     canvasHasScolled = false;
-                }else if(!isAnyNodeHovered && !someDragAppliedToSelection){
-                    deselectAllNodes();
+                }else if(ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered() &&
+                         !isAnyNodeHovered && !someDragAppliedToSelection){
+                    deselectAllNodes(true);
                 }
                 
                 // Apply snap-to-grid when drag operation ends
@@ -3184,13 +3186,22 @@ glm::mat4 ofxOceanodeCanvas::translateMatrixWithoutScale(const glm::mat4 &m, glm
     return glm::translate(glm::mat4(1.0), translationVector) * m;
 }
 
-void ofxOceanodeCanvas::deselectAllNodes(){
+void ofxOceanodeCanvas::deselectAllNodes(bool allCanvases){
     bool hadSelectedNodes = false;
-    for(auto &n: container->getParameterGroupNodesMap()){
-        hadSelectedNodes |= n.second->getNodeGui().getSelected();
-        n.second->getNodeGui().setSelected(false);
-    }
-    container->deselectAllComments();
+    std::function<void(ofxOceanodeContainer*)> clearSelection = [&](ofxOceanodeContainer* current){
+        for(auto &n : current->getParameterGroupNodesMap()){
+            hadSelectedNodes |= n.second->getNodeGui().getSelected();
+            n.second->getNodeGui().setSelected(false);
+            if(allCanvases){
+                if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&n.second->getNodeModel())){
+                    clearSelection(macro->getContainer().get());
+                }
+            }
+        }
+        current->deselectAllComments();
+    };
+    auto* root = allCanvases ? ofxOceanodeShared::getRootContainer() : nullptr;
+    clearSelection(root ? root : container.get());
     // Hidden canvas tabs call this every frame. Notify only when a node was
     // actually deselected, so an empty canvas cannot repeatedly clear the
     // shared selection or request updates in the navigation controllers.
