@@ -2198,6 +2198,62 @@ std::string ofxOceanodeContainer::getTimelineParameterPath(ofxOceanodeAbstractPa
     return canvasID + kTimelineCanvasSeparator + local;
 }
 
+void ofxOceanodeContainer::collectMovedTimelinePaths(ofxOceanodeNode& node, const std::string& oldNodePath,
+                                                     const std::string& oldMacroCanvas,
+                                                     std::map<std::string, std::string>& oldToNew) const
+{
+    for(auto& abstract : node.getParameters())
+        if(auto* parameter = dynamic_cast<ofxOceanodeAbstractParameter*>(abstract.get()))
+            oldToNew[oldNodePath + parameter->getEscapedName()] = getTimelineParameterPath(*parameter);
+    auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node.getNodeModel());
+    if(macro == nullptr || macro->getContainer() == nullptr || oldMacroCanvas.empty()) return;
+    // Everything inside a moved macro moved with it: swap its canvas id back.
+    const std::string newMacroCanvas = macro->getContainer()->getCanvasID();
+    std::function<void(ofxOceanodeContainer&)> collect = [&](ofxOceanodeContainer& inner) {
+        for(auto* innerNode : inner.getAllModules()) {
+            for(auto& abstract : innerNode->getParameters()) {
+                auto* parameter = dynamic_cast<ofxOceanodeAbstractParameter*>(abstract.get());
+                if(parameter == nullptr) continue;
+                const std::string now = getTimelineParameterPath(*parameter);
+                if(now.compare(0, newMacroCanvas.size(), newMacroCanvas) == 0)
+                    oldToNew[oldMacroCanvas + now.substr(newMacroCanvas.size())] = now;
+            }
+            if(auto* nested = dynamic_cast<ofxOceanodeNodeMacro*>(&innerNode->getNodeModel()))
+                if(nested->getContainer()) collect(*nested->getContainer());
+        }
+    };
+    collect(*macro->getContainer());
+}
+
+std::string ofxOceanodeContainer::timelineCanvasPrefix(const std::string& canvasID)
+{
+    return isRootCanvasID(canvasID) ? std::string() : canvasID + kTimelineCanvasSeparator;
+}
+
+std::string ofxOceanodeContainer::timelineMacroCanvas(const std::string& parentCanvasID, int macroNumber)
+{
+    // A macro's canvas id is "Macro <its number>" under its parent's (see ofxOceanodeNodeMacro::setup).
+    return (isRootCanvasID(parentCanvasID) ? std::string() : parentCanvasID + " / ") + "Macro " + ofToString(macroNumber);
+}
+
+std::string ofxOceanodeContainer::getTimelineParameterPath(ofxOceanodeAbstractParameter& parameter,
+                                                       const ofxOceanodeContainer& base) const
+{
+    const std::string absolute = getTimelineParameterPath(parameter);
+    if(isRootCanvasID(base.getCanvasID())) return absolute;
+    // Canvas ids nest as "Macro 1 / Macro 2": strip the base's own id.
+    const std::string& prefix = base.getCanvasID();
+    const size_t separator = absolute.find(kTimelineCanvasSeparator);
+    if(separator == std::string::npos) return std::string(); // at the root: outside base
+    const std::string canvasID = absolute.substr(0, separator);
+    const std::string local = absolute.substr(separator + std::char_traits<char>::length(kTimelineCanvasSeparator));
+    if(canvasID == prefix) return local;
+    const std::string nested = prefix + " / ";
+    if(canvasID.compare(0, nested.size(), nested) == 0)
+        return canvasID.substr(nested.size()) + kTimelineCanvasSeparator + local;
+    return std::string();
+}
+
 ofxOceanodeAbstractParameter* ofxOceanodeContainer::findTimelineParameter(const std::string& parameterPath) const
 {
     const size_t separator = parameterPath.find(kTimelineCanvasSeparator);
@@ -2208,11 +2264,13 @@ ofxOceanodeAbstractParameter* ofxOceanodeContainer::findTimelineParameter(const 
     // Walk down the macro levels. Unlike getContainerForCanvasID this neither
     // falls back to the root nor logs: a binding to a deleted macro is simply
     // missing (and it is looked up every frame).
+    // Paths are relative to this container: its own canvas id prefixes
+    // every macro below it (nothing for the root).
     const std::vector<std::string> levels = ofSplitString(canvasID, " / ");
     ofxOceanodeContainer* current = const_cast<ofxOceanodeContainer*>(this);
-    std::string accumulated;
+    std::string accumulated = isRootCanvasID(getCanvasID()) ? std::string() : getCanvasID();
     for(size_t i = 0; i < levels.size(); ++i) {
-        accumulated = i == 0 ? levels[i] : accumulated + " / " + levels[i];
+        accumulated = accumulated.empty() ? levels[i] : accumulated + " / " + levels[i];
         ofxOceanodeContainer* next = nullptr;
         for(auto* node : current->getAllModules()) {
             if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel())) {
@@ -3285,8 +3343,13 @@ ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
             nodeNameMapping[original.originalName] = pasted->getParameters().getName();
             escapedNodeNameMapping[original.originalEscapedName] = pasted->getParameters().getEscapedName();
         }
+        // Timeline bindings follow what moved: old path -> new path for every
+        // parameter of a moved node and, for a moved macro, of all inside it.
+        std::map<std::string, std::string> timelinePaths;
         for(const auto& original : originalNodeInfo){
             auto* moved = macroContainer->parameterGroupNodesMap.at(escapedNodeNameMapping.at(original.originalEscapedName));
+            collectMovedTimelinePaths(*moved, timelineCanvasPrefix(canvasID) + original.originalEscapedName + "/",
+                                      timelineMacroCanvas(canvasID, original.identifier), timelinePaths);
             pendingCanvasEdit->nodeTransfers.push_back({
                 {"before", {original.originalEscapedName}},
                 {"after", {macroNode->getParameters().getEscapedName(), moved->getParameters().getEscapedName()}},
@@ -3305,6 +3368,8 @@ ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
         }
         if(customGuiExtension && macroContainer->getCustomGuiExtension())
             customGuiExtension->migrateTo(*macroContainer->getCustomGuiExtension(), escapedNodeNameMapping);
+        if(auto* automation = getAutomationExtension(); automation != nullptr && !timelinePaths.empty())
+            automation->retargetParameterPaths(timelinePaths);
 
 	}
 
@@ -4496,6 +4561,9 @@ bool ofxOceanodeContainer::extractMacro(ofxOceanodeNode& macroNode){
             target["comments"].push_back(comment);
         }
         const auto guiState = child->captureCanvasAuxiliary();
+        const std::string childCanvas = child->getCanvasID(); // gone after the replay
+        std::map<string, int> innerNumbers;
+        for(auto it = inner["nodes"].begin(); it != inner["nodes"].end(); ++it) innerNumbers[it.key()] = it.value()["id"].get<int>();
         operation.after = std::move(target);
         const auto beforeAux = operation.beforeAux;
         operation.beforeAux = ofJson(); // Apply migrated bindings after replay.
@@ -4509,6 +4577,17 @@ bool ofxOceanodeContainer::extractMacro(ofxOceanodeNode& macroNode){
         replayingCanvasEdit = false;
         operation.beforeAux = beforeAux;
         if(customGuiExtension && !guiState.empty()) customGuiExtension->importMovedState(guiState, names);
+        // Timeline bindings follow the extracted nodes (and what is inside extracted macros).
+        if(auto* automation = getAutomationExtension()) {
+            std::map<std::string, std::string> timelinePaths;
+            for(const auto& entry : names) {
+                const auto found = parameterGroupNodesMap.find(entry.second);
+                if(found == parameterGroupNodesMap.end() || found->second == nullptr) continue;
+                collectMovedTimelinePaths(*found->second, timelineCanvasPrefix(childCanvas) + entry.first + "/",
+                                          timelineMacroCanvas(childCanvas, innerNumbers[entry.first]), timelinePaths);
+            }
+            if(!timelinePaths.empty()) automation->retargetParameterPaths(timelinePaths);
+        }
         operation.afterAux = captureCanvasAuxiliary();
         scope.success = true;
         ++canvasHistoryRoot()->canvasHistoryRevision;

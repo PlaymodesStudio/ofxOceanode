@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ofMain.h"
+#include <map>
 #include <unordered_set>
 
 class ofxOceanodeAbstractParameter;
@@ -33,4 +34,7 @@ public:
     virtual void drawNodeMenu(ofxOceanodeNodeModel&) = 0;
     virtual void removeParameterBindings(ofxOceanodeAbstractParameter&) = 0;
     virtual void collectBoundParameters(std::unordered_set<ofxOceanodeAbstractParameter*>&) const = 0;
+    // Nodes moved to another canvas (encapsulated into a macro, ...): their
+    // parameters' timeline paths, old -> new, so bindings follow them.
+    virtual void retargetParameterPaths(const std::map<std::string, std::string>& /*oldToNew*/) {}
 };
