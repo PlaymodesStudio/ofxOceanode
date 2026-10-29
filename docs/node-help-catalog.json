@@ -807,10 +807,14 @@
     "addon": "ofxOceanodeTextures"
   },
   "Color To Vector": {
-    "description": "Converts a color into a vector of channel values.",
+    "description": "Converts a color into an RGB vector and separate Red, Green, Blue and Alpha float outputs limited to 0..1.",
     "parameters": [
       "Color",
-      "Output"
+      "Output",
+      "Red",
+      "Green",
+      "Blue",
+      "Alpha"
     ],
     "source": "colorToVector.h",
     "addon": "ofxSantiNodes"
