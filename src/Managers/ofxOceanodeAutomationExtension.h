@@ -6,6 +6,7 @@
 
 class ofxOceanodeAbstractParameter;
 class ofxOceanodeNodeModel;
+class ofxOceanodeContainer;
 
 // Optional root-owned automation service. Macro containers forward to their host.
 // Implementations are attached explicitly; the core never constructs an addon.
@@ -37,4 +38,8 @@ public:
     // Nodes moved to another canvas (encapsulated into a macro, ...): their
     // parameters' timeline paths, old -> new, so bindings follow them.
     virtual void retargetParameterPaths(const std::map<std::string, std::string>& /*oldToNew*/) {}
+    // A macro's container loaded from / saved to its folder (its own preset,
+    // or its library definition), so the macro's own timeline can travel with it.
+    virtual void loadMacroPreset(ofxOceanodeContainer& /*macroContainer*/, const std::string& /*folder*/) {}
+    virtual bool saveMacroPreset(const ofxOceanodeContainer& /*macroContainer*/, const std::string& /*folder*/) const { return true; }
 };

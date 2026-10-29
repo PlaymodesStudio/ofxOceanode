@@ -568,6 +568,8 @@ bool ofxOceanodeContainer::loadPreset(string presetFolderPath){
     loadPreset_loadNodePreset(presetFolderPath);
 
     if(automationExtension != nullptr) automationExtension->loadPreset(presetFolderPath);
+    else if(timelineHost != nullptr)
+        if(auto* automation = getAutomationExtension()) automation->loadMacroPreset(*this, presetFolderPath);
 #ifdef OFXOCEANODE_USE_MIDI
     if(midiClockSync) {
         const ofJson syncJson = ofLoadJson(presetFolderPath + "/transportSync.json");
@@ -1419,6 +1421,8 @@ bool ofxOceanodeContainer::savePreset(string presetFolderPath){
     else for(const auto& document : unavailableCustomGuiFiles)
         oceanodePresetSave::record(ofBufferToFile(presetFolderPath + "/" + document.first, ofBuffer(document.second.data(), document.second.size())));
 	if(automationExtension != nullptr) oceanodePresetSave::record(automationExtension->savePreset(presetFolderPath));
+    else if(timelineHost != nullptr)
+        if(const auto* automation = getAutomationExtension()) oceanodePresetSave::record(automation->saveMacroPreset(*this, presetFolderPath));
     if(transportOwner){
         ofJson transportJson;
         transportJson["bpm"] = bpm;
