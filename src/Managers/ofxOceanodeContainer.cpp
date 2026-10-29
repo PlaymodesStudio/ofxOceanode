@@ -2242,7 +2242,7 @@ bool ofxOceanodeContainer::showParameterInCanvas(ofxOceanodeAbstractParameter& p
     return showNodeInCanvas(*node);
 }
 
-bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode, const vector<ofxOceanodeNode*>& alsoSelect, bool takeFocus)
+bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode, const vector<ofxOceanodeNode*>& alsoSelect, bool takeFocus, bool fitView)
 {
     auto* rootContainer = ofxOceanodeShared::getRootContainer();
     auto* rootCanvas = ofxOceanodeShared::getRootCanvas();
@@ -2318,7 +2318,7 @@ bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode, const v
     ofxOceanodeShared::setActiveCanvasUniqueID(location.canvas->getUniqueID());
     ofxOceanodeShared::nodeSelectedInCanvas(location.node);
     const int centerDelay = location.macro != nullptr ? 2 : 1;
-    if(selectedNodes.size() == 1){
+    if(selectedNodes.size() == 1 && !fitView){
         location.canvas->requestCenterOnNode(location.node, centerDelay);
     }else{
         // Several nodes: the middle of the box that holds all of them.
@@ -2341,7 +2341,8 @@ bool ofxOceanodeContainer::showNodesInCanvas(const vector<ofxOceanodeNode*>& nod
 {
     if(nodes.empty()) return false;
     const vector<ofxOceanodeNode*> others(nodes.begin() + 1, nodes.end());
-    return showNodeInCanvas(*nodes.front(), others, takeFocus);
+    // A group always fits from 100%, even when it holds a single node.
+    return showNodeInCanvas(*nodes.front(), others, takeFocus, true);
 }
 
 vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules(){

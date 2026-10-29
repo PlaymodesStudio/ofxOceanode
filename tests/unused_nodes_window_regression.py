@@ -231,10 +231,19 @@ int main(){
         a->gui.position={0,0};b->gui.position={0,500};c->gui.position={0,920};
         inner->canvas.zoomLevel=1.0f;select(title);
         assert(abs(inner->canvas.zoomLevel-0.5f)<.001f);centeredAt(inner->canvas,60,500);
-        // A single node never changes the zoom.
-        inner->canvas.zoomLevel=1.0f;inner->container->plan.groups={Group{{"6"},0,true}};
+        // A group of one node still starts from 100%, after a big group zoomed out...
+        inner->canvas.zoomLevel=0.4f;inner->container->plan.groups={Group{{"6"},0,true}};
+        app.open(inner->container);idle();click(pt(rowPoints,"Group 1: 6 (1 nodes, 0 connections)"));idle();
+        assert(abs(inner->canvas.zoomLevel-1.0f)<.001f);centeredAt(inner->canvas,c->gui.position.x+60,c->gui.position.y+40);
+        // ...and also when reached with the arrow keys.
+        inner->canvas.zoomLevel=0.4f;inner->container->plan.groups={Group{{"6"},0,true},Group{{"4","5"},0,true}};
+        app.open(inner->container);idle();
+        {auto& keys=ImGui::GetIO();keys.AddKeyEvent(ImGuiKey_DownArrow,true);frame();keys.AddKeyEvent(ImGuiKey_DownArrow,false);frame();idle();}
+        assert(app.unusedNodesSelectedGroup==0&&abs(inner->canvas.zoomLevel-1.0f)<.001f);
+        // Clicking a single node row never changes the zoom.
+        inner->canvas.zoomLevel=0.5f;inner->container->plan.groups={Group{{"6"},0,true}};
         app.open(inner->container);idle();openGroup(0);click(pt(rowPoints,"6"));idle();
-        assert(abs(inner->canvas.zoomLevel-1.0f)<.001f);
+        assert(abs(inner->canvas.zoomLevel-0.5f)<.001f);
         c->gui.position=a->gui.position=b->gui.position={350,-210};
         inner->canvas.zoomLevel=0.5f;
     }

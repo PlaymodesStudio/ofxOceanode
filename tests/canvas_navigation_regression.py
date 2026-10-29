@@ -83,7 +83,7 @@ struct ofxOceanodeContainer {
         map<int,ofxOceanodeNode*> out;for(auto& p:nodes)out[p.first]=p.second.get();return out;
     }
     void deselectAllComments(){}
-    bool showNodeInCanvas(ofxOceanodeNode& node, const vector<ofxOceanodeNode*>& alsoSelect = {}, bool takeFocus = true);
+    bool showNodeInCanvas(ofxOceanodeNode& node, const vector<ofxOceanodeNode*>& alsoSelect = {}, bool takeFocus = true, bool fitView = false);
     bool showNodesInCanvas(const vector<ofxOceanodeNode*>& nodes, bool takeFocus = true);
 };
 struct ofxOceanodeNodeMacro:Model {
