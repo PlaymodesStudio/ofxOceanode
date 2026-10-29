@@ -310,8 +310,8 @@ void ofxOceanode::drawUnusedNodesWindow(){
                 ImGui::SameLine();
                 const string title = "Group " + ofToString(i + 1) + ": " + group.nodes.front()
                     + " (" + ofToString(group.nodes.size()) + " nodes, " + ofToString(group.connections) + " connections)";
-                // OpenOnArrow: only the arrow folds the group, a click on the label selects it.
-                const ImGuiTreeNodeFlags headerFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnArrow |
+                // Groups start closed. OpenOnArrow: only the arrow folds a group, a click on the label selects it.
+                const ImGuiTreeNodeFlags headerFlags = ImGuiTreeNodeFlags_OpenOnArrow |
                     (unusedNodesSelectedGroup == groupIndex ? ImGuiTreeNodeFlags_Selected : 0);
                 if(unusedNodesOpenGroup == groupIndex){
                     ImGui::SetNextItemOpen(true);

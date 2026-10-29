@@ -65,6 +65,7 @@ static ImVec2 ptAt(map<string,ImVec2>& points,const string& key,int line){
     return found->second;
 }
 #define pt(points,key) ptAt(points,key,__LINE__)
+static size_t pt_count(const string& key){return rowPoints.count(key);}
 static ofxOceanode app;
 static int underlyingClicks=0;
 static ImVec2 underlying;
@@ -96,6 +97,13 @@ static ofxOceanodeNode* add(ofxOceanodeContainer& host,int id,bool isMacro=false
     if(isMacro)node->model=make_unique<ofxOceanodeNodeMacro>();else node->model=make_unique<Model>();
     auto* out=node.get();host.nodes[id]=std::move(node);return out;
 }
+// Groups start closed; this opens group i the way the Left key does.
+static void openGroup(int i){app.unusedNodesOpenGroup=i;idle();}
+static void centeredAt(ofxOceanodeCanvas& c,float x,float y){
+    assert(!c.hasPendingCenterPoint&&!c.pendingCenterNode);
+    assert(abs(c.scrolling.x+x-c.contentRegionSize.x/(2*c.zoomLevel))<.01f);
+    assert(abs(c.scrolling.y+y-c.contentRegionSize.y/(2*c.zoomLevel))<.01f);
+}
 static void centered(ofxOceanodeCanvas& c,ofxOceanodeNode* node){
     assert(!c.pendingCenterNode);
     const auto p=node->getNodeGui().getPosition();
@@ -114,6 +122,7 @@ int main(){
     outer->visible=inner->visible=false;
     ofxOceanodeShared::root=root.get();ofxOceanodeShared::canvas=&rootView;views={&rootView};
     root->plan.groups={Group{{"1"},0,true}};app.open(root);idle();
+    assert(pt_count("1")==0);openGroup(0);
     auto* review=ImGui::FindWindowByName("Remove unused nodes");assert(review);
     assert(!(review->Flags&(ImGuiWindowFlags_Modal|ImGuiWindowFlags_Popup)));
     click(underlying);assert(underlyingClicks==1&&app.showUnusedNodesWindow);
@@ -124,7 +133,7 @@ int main(){
     // The reviewed Macro may have been hidden since opening the review.
     inner->container->plan.groups={Group{{"4"},0,true}};
     inner->container->plan.kept={Kept{"5",{"sink: declared"}}};
-    app.open(inner->container);idle();click(pt(rowPoints,"4"));
+    app.open(inner->container);idle();openGroup(0);click(pt(rowPoints,"4"));
     assert(inner->visible&&inner->activations==1&&ofxOceanodeShared::selected==nested);
     assert(ofxOceanodeShared::active==inner->canvas.uniqueID&&app.showUnusedNodesWindow);
     views={&inner->canvas};idle();centered(inner->canvas,nested);
@@ -172,13 +181,16 @@ int main(){
         app.open(inner->container);views={&inner->canvas};idle();
         const string header="Group 1: 4 (3 nodes, 0 connections)";
         assert(rowPoints.count(header)==1&&app.unusedNodesSelectedGroup==-1);
+        assert(rowPoints.count("4")==0);
         click(pt(rowPoints,header));
         assert(first->gui.selected&&second->gui.selected&&third->gui.selected);
         assert(app.unusedNodesSelectedGroup==0&&app.unusedNodesSelectedNode.empty());
-        assert(ofxOceanodeShared::selected==second&&app.showUnusedNodesWindow);
-        idle();centered(inner->canvas,second);
+        assert(ofxOceanodeShared::selected==first&&app.showUnusedNodesWindow);
+        // Clicking the label selects without opening; the view centers on the middle of all three nodes.
+        assert(rowPoints.count("4")==0);
+        idle();centeredAt(inner->canvas,310,40);
         // Picking one node afterwards replaces the group selection.
-        click(pt(rowPoints,"4"));
+        openGroup(0);click(pt(rowPoints,"4"));
         assert(first->gui.selected&&!second->gui.selected&&!third->gui.selected);
         assert(app.unusedNodesSelectedGroup==-1&&app.unusedNodesSelectedNode=="4");
         // A changed canvas must not navigate: selection stays as it was.
@@ -193,7 +205,7 @@ int main(){
         assert(!first->gui.selected&&!second->gui.selected&&!third->gui.selected&&!app.unusedNodePlan.groups[0].selected);
     }
 
-    // Keyboard: Up/Down walk the list, Left on a group goes to its first node, Right goes back to the group.
+    // Keyboard: Up/Down walk the list, Left on a group opens it on its first node, Right goes back to the group.
     {
         auto press=[&](ImGuiKey key){
             auto& keys=ImGui::GetIO();keys.AddKeyEvent(key,true);frame();keys.AddKeyEvent(key,false);frame();idle();
@@ -208,43 +220,46 @@ int main(){
         app.open(inner->container);views={&inner->canvas};idle();
         const int focusBefore=inner->canvas.focusRequests,topBefore=inner->canvas.topRequests;
         auto* review=ImGui::FindWindowByName("Remove unused nodes");
+        const string arrow0="Group 1: 4 (2 nodes, 0 connections)#arrow";
         assert(where()==""&&GImGui->NavWindow&&GImGui->NavWindow->RootWindow==review);
+        // Both groups start closed, so Up/Down only meet headers and the kept node.
+        assert(rowPoints.count("4")==0&&rowPoints.count("5")==0&&rowPoints.count("6")==0);
         press(ImGuiKey_DownArrow);assert(where()=="group0"&&n4->gui.selected&&n5->gui.selected&&!n6->gui.selected);
-        press(ImGuiKey_DownArrow);assert(where()=="4"&&n4->gui.selected&&!n5->gui.selected);
-        press(ImGuiKey_DownArrow);assert(where()=="5"&&n5->gui.selected&&!n4->gui.selected);
+        press(ImGuiKey_RightArrow);assert(where()=="group0");
         press(ImGuiKey_DownArrow);assert(where()=="group1"&&n6->gui.selected&&!n5->gui.selected);
-        press(ImGuiKey_DownArrow);assert(where()=="6");
         press(ImGuiKey_DownArrow);assert(where()=="7");
         press(ImGuiKey_DownArrow);assert(where()=="7");
-        press(ImGuiKey_UpArrow);assert(where()=="6");
         press(ImGuiKey_UpArrow);assert(where()=="group1");
-        press(ImGuiKey_RightArrow);assert(where()=="group1");
-        press(ImGuiKey_LeftArrow);assert(where()=="6"&&n6->gui.selected);
-        press(ImGuiKey_LeftArrow);assert(where()=="6");
+        press(ImGuiKey_UpArrow);assert(where()=="group0");
+        // Left opens the group and goes to its first node.
+        press(ImGuiKey_LeftArrow);assert(where()=="4"&&n4->gui.selected&&!n5->gui.selected);
+        assert(rowPoints.count("4")==1&&rowPoints.count("5")==1&&rowPoints.count("6")==0);
+        press(ImGuiKey_LeftArrow);assert(where()=="4");
+        press(ImGuiKey_DownArrow);assert(where()=="5"&&n5->gui.selected&&!n4->gui.selected);
+        press(ImGuiKey_DownArrow);assert(where()=="group1");
+        press(ImGuiKey_LeftArrow);assert(where()=="6"&&n6->gui.selected&&rowPoints.count("6")==1);
         press(ImGuiKey_RightArrow);assert(where()=="group1"&&n6->gui.selected);
+        press(ImGuiKey_LeftArrow);press(ImGuiKey_UpArrow);assert(where()=="group1");
         press(ImGuiKey_UpArrow);assert(where()=="5");
         press(ImGuiKey_RightArrow);assert(where()=="group0"&&n4->gui.selected&&n5->gui.selected);
-        press(ImGuiKey_LeftArrow);assert(where()=="4"&&n4->gui.selected&&!n5->gui.selected);
         // Navigating never moved focus to a canvas, so a later arrow cannot nudge its nodes.
         assert(inner->canvas.focusRequests==focusBefore&&inner->canvas.topRequests==topBefore);
         assert(GImGui->NavWindow&&GImGui->NavWindow->RootWindow==review);
         // A folded group is skipped by Up/Down, and Left on it opens it on its first node.
-        press(ImGuiKey_RightArrow);assert(where()=="group0");
-        click(pt(rowPoints,"Group 1: 4 (2 nodes, 0 connections)#arrow"));
+        click(pt(rowPoints,arrow0));
         assert(rowPoints.count("4")==0&&rowPoints.count("5")==0&&where()=="group0");
         press(ImGuiKey_DownArrow);assert(where()=="group1");
         press(ImGuiKey_UpArrow);assert(where()=="group0");
         press(ImGuiKey_LeftArrow);assert(where()=="4"&&rowPoints.count("4")==1&&rowPoints.count("5")==1);
         // A selected node inside a folded group: Up/Down stand on its group header, Right goes to the group.
-        click(pt(rowPoints,"Group 1: 4 (2 nodes, 0 connections)#arrow"));
+        click(pt(rowPoints,arrow0));
         assert(rowPoints.count("4")==0&&where()=="4");
         press(ImGuiKey_DownArrow);assert(where()=="group1");
         press(ImGuiKey_UpArrow);assert(where()=="group0");
         press(ImGuiKey_LeftArrow);assert(where()=="4"&&rowPoints.count("4")==1);
-        click(pt(rowPoints,"Group 1: 4 (2 nodes, 0 connections)#arrow"));
+        click(pt(rowPoints,arrow0));
         assert(rowPoints.count("4")==0&&where()=="4");
         press(ImGuiKey_RightArrow);assert(where()=="group0");
-        click(pt(rowPoints,"Group 1: 4 (2 nodes, 0 connections)#arrow"));
         // Keys do nothing once the canvas changed, or when another window has focus.
         const string before=where();++inner->container->revision;idle();
         press(ImGuiKey_DownArrow);assert(where()==before);
@@ -257,7 +272,7 @@ int main(){
 
     // Expired canvases keep a readable, closable window with disabled actions.
     auto temporary=make_shared<ofxOceanodeContainer>();temporary->plan.groups={Group{{"7"},0,true}};add(*temporary,7);
-    app.open(temporary);idle();temporary.reset();idle();click(pt(rowPoints,"7"));
+    app.open(temporary);idle();openGroup(0);temporary.reset();idle();click(pt(rowPoints,"7"));
     assert(app.showUnusedNodesWindow);click(pt(buttonPoints,"Remove"));assert(app.showUnusedNodesWindow);
     click(pt(buttonPoints,"Close"));assert(!app.showUnusedNodesWindow);
     ImGui::DestroyContext();
@@ -281,7 +296,7 @@ def main():
     container=(ROOT/'src/Managers/ofxOceanodeContainer.cpp').read_text()
     canvas=(ROOT/'src/Managers/ofxOceanodeCanvas.cpp').read_text()
     code=fixture+EXTRA+window+block(container,'bool ofxOceanodeContainer::showNodeInCanvas(')+'\n'+block(container,'bool ofxOceanodeContainer::showNodesInCanvas(')
-    code+='\nvoid ofxOceanodeCanvas::center(){'+block(canvas,'if(pendingCenterNode != nullptr &&\n')+'}\n'+CASES
+    code+='\nvoid ofxOceanodeCanvas::center(){'+block(canvas,'if(pendingCenterNode != nullptr &&\n')+'\n'+block(canvas,'if(hasPendingCenterPoint &&\n')+'}\n'+CASES
     with tempfile.TemporaryDirectory(prefix='oceanode-unused-review-') as directory:
         work=Path(directory);(work/'imconfig.h').write_text('')
         cpp=work/'test.cpp';cpp.write_text(code);binary=work/'test'

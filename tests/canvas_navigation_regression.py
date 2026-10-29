@@ -63,9 +63,11 @@ struct ofxOceanodeCanvas {
     glm::vec2 contentRegionSize{800,600},scrolling;
     float zoomLevel=1;
     ofxOceanodeNode* pendingCenterNode=nullptr; int pendingCenterFrames=0;
+    glm::vec2 pendingCenterPoint; bool hasPendingCenterPoint=false;
     int focusRequests=0,topRequests=0;
     void requestFocus(){focusPending=true;++focusRequests;} void bringOnTop(){onTop=true;++topRequests;}
-    void requestCenterOnNode(ofxOceanodeNode* n,int frames){pendingCenterNode=n;pendingCenterFrames=max(0,frames);}
+    void requestCenterOnNode(ofxOceanodeNode* n,int frames){pendingCenterNode=n;hasPendingCenterPoint=false;pendingCenterFrames=max(0,frames);}
+    void requestCenterOnPoint(glm::vec2 p,int frames){pendingCenterNode=nullptr;pendingCenterPoint=p;hasPendingCenterPoint=true;pendingCenterFrames=max(0,frames);}
     string getUniqueID(){return uniqueID;}
     float getZoomLevel(){return zoomLevel;} glm::vec2 getContentRegionSize(){return contentRegionSize;}
     void setScrolling(glm::vec2 s){scrolling=s;}
@@ -229,7 +231,7 @@ def main():
     navigation = block(canvas, "void ofxOceanodeCanvas::handleParentNavigation()")
     show_node = (block(container, "bool ofxOceanodeContainer::showNodeInCanvas(") + "\n" +
                  block(container, "bool ofxOceanodeContainer::showNodesInCanvas("))
-    center = block(canvas, "if(pendingCenterNode != nullptr &&\n")
+    center = block(canvas, "if(pendingCenterNode != nullptr &&\n") + "\n" + block(canvas, "if(hasPendingCenterPoint &&\n")
     with tempfile.TemporaryDirectory(prefix="oceanode-canvas-navigation-") as directory:
         work = Path(directory)
         (work / "imconfig.h").write_text("// Standalone ImGui without OF adapters.\n")

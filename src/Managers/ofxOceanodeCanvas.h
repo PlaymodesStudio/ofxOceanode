@@ -76,6 +76,15 @@ public:
     void requestFocus(){focusPending = true;};
     void requestCenterOnNode(ofxOceanodeNode* node, int delayFrames = 0){
         pendingCenterNode = node;
+        hasPendingCenterPoint = false;
+        pendingCenterFrames = std::max(0, delayFrames);
+    }
+    // Scroll so a point in canvas coordinates is at the middle of the view. Keeps no
+    // node pointers, so it suits the middle of several nodes.
+    void requestCenterOnPoint(glm::vec2 point, int delayFrames = 0){
+        pendingCenterNode = nullptr;
+        pendingCenterPoint = point;
+        hasPendingCenterPoint = true;
         pendingCenterFrames = std::max(0, delayFrames);
     }
     
@@ -222,6 +231,8 @@ private:
     bool focusPending = false;
     bool forceDockOnNextShow = false;
     ofxOceanodeNode* pendingCenterNode = nullptr;
+    glm::vec2 pendingCenterPoint{0.0f, 0.0f};
+    bool hasPendingCenterPoint = false;
     int pendingCenterFrames = 0;
     bool centerOriginPending = false;
     
