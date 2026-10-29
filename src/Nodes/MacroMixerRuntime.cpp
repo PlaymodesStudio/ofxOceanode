@@ -629,12 +629,12 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
                     durationMs = request->durationMs;
                     biPow = request->biPow;
                     startMs = clock(); // Loading time is outside the fade.
-                    mixedProgress = 0;
+                    mixedProgress = 0; fadeRunning = false;
                 }
             }
         }
     }
-    if(morphing() && nextMorphReady) for(const auto& r:interface.routers) {
+    if(morphing() && nextMorphReady && !fadeRunning) for(const auto& r:interface.routers) {
         const auto processor=processors.find(r.id);
         if(processor==processors.end()) continue;
         const auto& policy=MacroMixerMixing::registry().policy(r.type,r.policy);
@@ -698,16 +698,28 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
             current->clearTriggers(); if(next) next->clearTriggers();
             const auto first=std::find_if(interface.routers.begin(),interface.routers.end(),[](const auto& r){return r.direction=="Output";});
             lastValue=first==interface.routers.end() ? 0.f : value(first->id);
-            if(next && !resourcesReady) { startMs=clock(); mixedProgress=0; if(morphing()) nextMorphReady=false; }
+            // Backend readiness fences the fade. Until it has started, loading
+            // and acknowledgements stay outside the timed interpolation: the
+            // clock restarts once everything is ready. Once it runs, a rebuild
+            // (the destination cables restored at completion, any unrelated
+            // server change) holds the fade where it is: the clock pauses, the
+            // controls keep their values and promotion waits. Restarting here
+            // ran a second, empty pass of the whole duration after every morph
+            // that rewired a resource cable.
+            if(next && !resourcesReady && !fadeRunning) { startMs=clock(); mixedProgress=0; if(morphing()) nextMorphReady=false; }
+            else if(next && !resourcesReady) { // Completed fades hold at 1 and only wait.
+                const double now=clock(); if(t<1) startMs+=now-stallMs; stallMs=now; mixedProgress=t<1 ? heldProgress : progress;
+            }
             else if(morphing() && !nextMorphReady) { nextMorphReady=true; startMs=clock(); mixedProgress=0; }
             else if(next && t>=1) {
-                sourceDetailCache.clear();
+                sourceDetailCache.clear(); fadeRunning=false;
                 current=std::move(next); currentMorph=nextMorph;
                 if(inPlaceTarget) {
                     current->revision=std::move(inPlaceTarget);
                     current->source=current->revision->source();
                 }
             }
+            else if(next) { fadeRunning=true; stallMs=clock(); heldProgress=progress; }
         } catch(const std::exception& e) {
             errors={{"runtime",std::string("Mix failed; holding all last finite router values: ")+e.what()}};
             if(next) next->cancelMorph();
@@ -786,7 +798,7 @@ void MacroMixerRuntime::clear() {
     sourceDetailCache.clear(); transitionDetails.clear();
     finishRequested = false; lastValue = 0; mixedProgress = 0;
     currentMorph = false; nextMorph = false;
-    nextMorphReady = true;
+    nextMorphReady = true; fadeRunning = false;
     mixedValues.clear();
     renderers.clear();
 }

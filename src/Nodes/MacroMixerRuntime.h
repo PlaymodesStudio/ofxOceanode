@@ -152,6 +152,10 @@ private:
     bool preparing = false;
     bool currentMorph = false, nextMorph = false;
     bool nextMorphReady = true;
-    double startMs = 0;
-    float durationMs = 0, biPow = 0, lastValue = 0, mixedProgress = 0;
+    // Set once the timed fade has advanced with every backend ready. Before
+    // that, readiness restarts the clock (loading is outside the fade); after
+    // it, a backend rebuild holds the fade where it is until acknowledged.
+    bool fadeRunning = false;
+    double startMs = 0, stallMs = 0;
+    float durationMs = 0, biPow = 0, lastValue = 0, mixedProgress = 0, heldProgress = 0;
 };

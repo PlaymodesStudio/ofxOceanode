@@ -7,6 +7,16 @@ and Input/Output roles in its Inspector; add Macro source folders; choose Mode
 (finish now) control a fade, and Progress shows it. Each output has its own
 type-specific policy and options.
 
+Backend readiness fences the fade only before it starts. Resource policies
+with a private processor (the SuperCollider ScBus bridge) report ready once
+the backend acknowledges a rewiring; until then loading stays outside the timed
+interpolation and Progress holds at 0. Once the fade runs, a later rebuild (the
+destination cables restored at completion, any SC Output rewired elsewhere in
+the app) holds the fade where it is: the clock pauses, the controls keep their
+values, Progress keeps its value (1 at completion) and promotion waits for the
+acknowledgement. The fade never restarts; a morph that rewires a resource cable
+used to run a second, empty pass of the whole duration after completing.
+
 The node shows Mode, Target, Progress, Duration_ms, Bi Pow, Start!, Stop! and
 Status, then a **Routers** separator above the router ports. The Inspector has
 four sections: **ROUTERS** (the router table with **Load Routers** and **Save
@@ -497,6 +507,11 @@ branches listed in `macro-mixer-migration-audit.md`.
   with shared and distinct beats, Mute), outer Input triggers reaching both
   graphs once, the node publishing each event once across update/draw, and
   in-place morphs of a changed void cable without fallback.
+- `python3 tests/macro_mixer_bus_fence_regression.py`: a mock resource policy
+  with a private bridge that waits for backend acknowledgement: loading fenced
+  before the fade starts, a replaced node's completion holding Progress at 1
+  until the restored cable is acknowledged (no second pass), a rebuild during
+  the fade pausing it, and Stop! during a hold completing on acknowledgement.
 - `python3 tests/macro_mixer_portal_morph_regression.py`: unmatched Portals
   (removed, and added on a free bus) morph in place with their cables blending;
   an uncabled Portal joins a driven live bus without publishing its saved
