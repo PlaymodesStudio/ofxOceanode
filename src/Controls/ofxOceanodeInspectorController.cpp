@@ -57,6 +57,15 @@ void ofxOceanodeInspectorController::draw(){
 
     // Only show inspector when exactly one node is selected
     if(selectedNodes.size() != 1){
+        if(selectedNodes.size() > 1 && ImGui::Button("Clear Selection")){
+            // The Inspector includes selections in every nested macro, even
+            // when its canvas is hidden. Clear that same complete selection.
+            for(auto &selectedNode : selectedNodes){
+                selectedNode.second->getNodeGui().setSelected(false);
+            }
+            selectedNodes.clear();
+            ofxOceanodeShared::nodeSelectedInCanvas(nullptr);
+        }
         if(selectedNodes.size() == 0)
             ImGui::Text("No Nodes Selected", "%s");
         else

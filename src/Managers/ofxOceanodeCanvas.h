@@ -157,7 +157,7 @@ private:
     bool someDragAppliedToSelection = false;
     
     bool canvasHasScolled = false;
-    void deselectAllNodes();
+    void deselectAllNodes(bool allCanvases = false);
     void selectAllNodes();
 
     void rememberInspectorSelectionClick(const string& nodeID);

@@ -40,7 +40,7 @@ struct Container {
     vector<Node*> getSelectedModules(){vector<Node*> out;for(auto& n:nodes)if(n.gui.selected)out.push_back(&n);return out;}
 } containerStorage;
 auto* container=&containerStorage;
-void deselectAllNodes(){for(auto& n:nodes)n.gui.selected=false;}
+void deselectAllNodes(bool allCanvases=false){for(auto& n:nodes)n.gui.selected=false;}
 void rememberInspectorSelectionClick(const string&){++inspectorAnchors;}
 void rememberInspectorSelectionClick(const string& id,Gui&){rememberInspectorSelectionClick(id);}
 vector<int*> getPortalizableOutputs(const vector<Node*>&){return {};}
