@@ -294,7 +294,8 @@ void ofxOceanode::drawUnusedNodesWindow(){
                            "Undo (Cmd/Ctrl+Z) restores a removal.");
         ImGui::TextWrapped("Click a node to select it on its canvas, or a group to select all its nodes. "
                            "Up and Down move through the list, Left on a group goes to its first node, "
-                           "Right goes back to the group. Untick a group to keep it.");
+                           "Right goes back to the group, Space ticks or unticks the selected group. "
+                           "Untick a group to keep it.");
         if(unusedNodePlan.groups.empty()) ImGui::TextUnformatted("No removable unused nodes found.");
         // The rows in the order they are drawn: a group header (node empty), a node
         // inside a group, or a kept node (group -1). Arrow keys walk this list.
@@ -397,6 +398,12 @@ void ofxOceanode::drawUnusedNodesWindow(){
             }else if(ImGui::IsKeyPressed(ImGuiKey_RightArrow, false)){
                 // On a node inside a group: back to the group.
                 if(unusedNodesSelectedGroup < 0 && selectedNodeGroup >= 0) moved = selectGroup(selectedNodeGroup);
+            }else if(ImGui::IsKeyPressed(ImGuiKey_Space, false)){
+                // On a group header: tick or untick the group, like its checkbox.
+                if(unusedNodesSelectedGroup >= 0 && unusedNodesSelectedGroup < groupCountNow){
+                    auto& selectedGroup = unusedNodePlan.groups[unusedNodesSelectedGroup];
+                    selectedGroup.selected = !selectedGroup.selected;
+                }
             }
             if(moved) unusedNodesScrollToSelection = true;
         }

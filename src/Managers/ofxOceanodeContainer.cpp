@@ -2331,7 +2331,8 @@ bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode, const v
             right = std::max(right, position.x + rectangle.getWidth());
             bottom = std::max(bottom, position.y + rectangle.getHeight());
         }
-        location.canvas->requestCenterOnPoint(glm::vec2((left + right) / 2.0f, (top + bottom) / 2.0f), centerDelay);
+        location.canvas->requestCenterOnPoint(glm::vec2((left + right) / 2.0f, (top + bottom) / 2.0f), centerDelay,
+                                              glm::vec2(right - left, bottom - top));
     }
     return true;
 }

@@ -205,6 +205,38 @@ int main(){
         assert(!first->gui.selected&&!second->gui.selected&&!third->gui.selected&&!app.unusedNodePlan.groups[0].selected);
     }
 
+    // Selecting a group zooms out, never in, until all its nodes fit the view; single nodes keep their zoom.
+    {
+        auto* a=inner->container->nodes[4].get();auto* b=inner->container->nodes[5].get();auto* c=inner->container->nodes[6].get();
+        auto select=[&](const string& title){
+            inner->container->plan.groups={Group{{"4","5","6"},0,true}};inner->container->plan.kept.clear();
+            app.open(inner->container);views={&inner->canvas};idle();click(pt(rowPoints,title));idle();
+        };
+        const string title="Group 1: 4 (3 nodes, 0 connections)";
+        // 1,400 wide at zoom 1 in an 800 wide view: needs 0.514, so the next lower step, 0.5.
+        a->gui.position={0,0};b->gui.position={640,0};c->gui.position={1280,0};
+        inner->canvas.zoomLevel=1.0f;select(title);
+        assert(abs(inner->canvas.zoomLevel-0.5f)<.001f);centeredAt(inner->canvas,700,40);
+        // Already fitting: the zoom stays, even when it is lower than needed.
+        a->gui.position={0,0};b->gui.position={100,0};c->gui.position={200,0};
+        inner->canvas.zoomLevel=0.5f;select(title);
+        assert(abs(inner->canvas.zoomLevel-0.5f)<.001f);centeredAt(inner->canvas,160,40);
+        // Too spread out for the zoom limit: stops at the smallest zoom.
+        a->gui.position={0,0};b->gui.position={3000,0};c->gui.position={6000,0};
+        inner->canvas.zoomLevel=1.0f;select(title);
+        assert(abs(inner->canvas.zoomLevel-0.25f)<.001f);centeredAt(inner->canvas,3060,40);
+        // Tall groups fit on the vertical axis too: 1,000 high at zoom 1 in a 600 high view.
+        a->gui.position={0,0};b->gui.position={0,500};c->gui.position={0,920};
+        inner->canvas.zoomLevel=1.0f;select(title);
+        assert(abs(inner->canvas.zoomLevel-0.5f)<.001f);centeredAt(inner->canvas,60,500);
+        // A single node never changes the zoom.
+        inner->canvas.zoomLevel=1.0f;inner->container->plan.groups={Group{{"6"},0,true}};
+        app.open(inner->container);idle();openGroup(0);click(pt(rowPoints,"6"));idle();
+        assert(abs(inner->canvas.zoomLevel-1.0f)<.001f);
+        c->gui.position=a->gui.position=b->gui.position={350,-210};
+        inner->canvas.zoomLevel=0.5f;
+    }
+
     // Keyboard: Up/Down walk the list, Left on a group opens it on its first node, Right goes back to the group.
     {
         auto press=[&](ImGuiKey key){
@@ -226,6 +258,10 @@ int main(){
         assert(rowPoints.count("4")==0&&rowPoints.count("5")==0&&rowPoints.count("6")==0);
         press(ImGuiKey_DownArrow);assert(where()=="group0"&&n4->gui.selected&&n5->gui.selected&&!n6->gui.selected);
         press(ImGuiKey_RightArrow);assert(where()=="group0");
+        // Space ticks and unticks the selected group, like its checkbox.
+        assert(app.unusedNodePlan.groups[0].selected&&app.unusedNodePlan.groups[1].selected);
+        press(ImGuiKey_Space);assert(!app.unusedNodePlan.groups[0].selected&&app.unusedNodePlan.groups[1].selected&&where()=="group0");
+        press(ImGuiKey_Space);assert(app.unusedNodePlan.groups[0].selected&&where()=="group0");
         press(ImGuiKey_DownArrow);assert(where()=="group1"&&n6->gui.selected&&!n5->gui.selected);
         press(ImGuiKey_DownArrow);assert(where()=="7");
         press(ImGuiKey_DownArrow);assert(where()=="7");
@@ -233,6 +269,8 @@ int main(){
         press(ImGuiKey_UpArrow);assert(where()=="group0");
         // Left opens the group and goes to its first node.
         press(ImGuiKey_LeftArrow);assert(where()=="4"&&n4->gui.selected&&!n5->gui.selected);
+        // On a node, Space leaves every group's tick alone.
+        press(ImGuiKey_Space);assert(app.unusedNodePlan.groups[0].selected&&app.unusedNodePlan.groups[1].selected&&where()=="4");
         assert(rowPoints.count("4")==1&&rowPoints.count("5")==1&&rowPoints.count("6")==0);
         press(ImGuiKey_LeftArrow);assert(where()=="4");
         press(ImGuiKey_DownArrow);assert(where()=="5"&&n5->gui.selected&&!n4->gui.selected);
@@ -276,7 +314,7 @@ int main(){
     assert(app.showUnusedNodesWindow);click(pt(buttonPoints,"Remove"));assert(app.showUnusedNodesWindow);
     click(pt(buttonPoints,"Close"));assert(!app.showUnusedNodesWindow);
     ImGui::DestroyContext();
-    puts("Cleanup review passed: non-modal interaction, root/nested/kept navigation, zoom, stale/replaced nodes, refresh, usage revalidation, group ticks, group selection on the canvas, arrow-key navigation, persistent window and expired canvases.");
+    puts("Cleanup review passed: non-modal interaction, root/nested/kept navigation, zoom, stale/replaced nodes, refresh, usage revalidation, group ticks, group selection and zoom-to-fit on the canvas, arrow-key navigation, Space to tick, persistent window and expired canvases.");
 }
 '''
 

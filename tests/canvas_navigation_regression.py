@@ -63,11 +63,12 @@ struct ofxOceanodeCanvas {
     glm::vec2 contentRegionSize{800,600},scrolling;
     float zoomLevel=1;
     ofxOceanodeNode* pendingCenterNode=nullptr; int pendingCenterFrames=0;
-    glm::vec2 pendingCenterPoint; bool hasPendingCenterPoint=false;
+    glm::vec2 pendingCenterPoint,pendingCenterFitSize; bool hasPendingCenterPoint=false;
     int focusRequests=0,topRequests=0;
     void requestFocus(){focusPending=true;++focusRequests;} void bringOnTop(){onTop=true;++topRequests;}
     void requestCenterOnNode(ofxOceanodeNode* n,int frames){pendingCenterNode=n;hasPendingCenterPoint=false;pendingCenterFrames=max(0,frames);}
-    void requestCenterOnPoint(glm::vec2 p,int frames){pendingCenterNode=nullptr;pendingCenterPoint=p;hasPendingCenterPoint=true;pendingCenterFrames=max(0,frames);}
+    void requestCenterOnPoint(glm::vec2 p,int frames,glm::vec2 fit=glm::vec2()){pendingCenterNode=nullptr;pendingCenterPoint=p;pendingCenterFitSize=fit;hasPendingCenterPoint=true;pendingCenterFrames=max(0,frames);}
+    void setZoomLevel(float z){zoomLevel=std::round(min(max(z,0.25f),4.0f)/0.05f)*0.05f;}
     string getUniqueID(){return uniqueID;}
     float getZoomLevel(){return zoomLevel;} glm::vec2 getContentRegionSize(){return contentRegionSize;}
     void setScrolling(glm::vec2 s){scrolling=s;}

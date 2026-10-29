@@ -53,7 +53,9 @@ into a Macro from its parent beyond the rules above.
 - Click any listed node, kept nodes included, to open its canvas, select it and
   center the view. Macro canvases open automatically.
 - Groups start closed. Click a group header to select every node of that group on
-  the canvas. The view centers on the middle of the box that holds all of them. Clicking a single node afterwards
+  the canvas. The view centers on the middle of the box that holds all of them and
+  zooms out, in 0.05 steps down to the canvas' minimum, until the box fits with a
+  margin. It never zooms in, and selecting a single node leaves the zoom alone. Clicking a single node afterwards
   replaces that selection. The header arrow only folds the list.
 - The window keeps keyboard focus when you select from it, so the arrow keys keep
   working. The canvas is selected and centered but not focused; click it to work
@@ -62,6 +64,8 @@ into a Macro from its parent beyond the rules above.
     open group, or a kept node. Folded groups are skipped. The list does not wrap.
   - Left on a group header opens the group and selects its first node.
   - Right on a node inside a group goes back to the group header.
+  - Space on a group header ticks or unticks the group, like its checkbox. On a node
+    it does nothing.
   - Keys do nothing while the canvas has changed (press Refresh) or when another
     window has focus. Shift, Control, Alt and Command with the arrows are ignored.
 
