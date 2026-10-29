@@ -274,7 +274,7 @@ public:
     ofxOceanodeNode* getNodeFromParameter(ofxOceanodeAbstractParameter& param);
     // Selects the node on its canvas and centers on it. alsoSelect adds nodes of the
     // same container to the selection, and the view then centers on the middle of the
-    // box that holds all of them, zooming out if they do not fit. takeFocus false
+    // box that holds all of them, at 100% zoom or the largest zoom that fits them. takeFocus false
     // leaves keyboard focus where it is, for a caller that navigates by keys.
     bool showNodeInCanvas(ofxOceanodeNode& node, const vector<ofxOceanodeNode*>& alsoSelect = {}, bool takeFocus = true);
     // Selects every node on its canvas and centers on the middle of all of them.

@@ -205,7 +205,7 @@ int main(){
         assert(!first->gui.selected&&!second->gui.selected&&!third->gui.selected&&!app.unusedNodePlan.groups[0].selected);
     }
 
-    // Selecting a group zooms out, never in, until all its nodes fit the view; single nodes keep their zoom.
+    // Selecting a group starts from 100% and zooms out only as far as needed; single nodes keep their zoom.
     {
         auto* a=inner->container->nodes[4].get();auto* b=inner->container->nodes[5].get();auto* c=inner->container->nodes[6].get();
         auto select=[&](const string& title){
@@ -217,10 +217,12 @@ int main(){
         a->gui.position={0,0};b->gui.position={640,0};c->gui.position={1280,0};
         inner->canvas.zoomLevel=1.0f;select(title);
         assert(abs(inner->canvas.zoomLevel-0.5f)<.001f);centeredAt(inner->canvas,700,40);
-        // Already fitting: the zoom stays, even when it is lower than needed.
+        // A group that fits at 100% goes back to 100% after a bigger group zoomed out, and a higher zoom comes down to it.
         a->gui.position={0,0};b->gui.position={100,0};c->gui.position={200,0};
-        inner->canvas.zoomLevel=0.5f;select(title);
-        assert(abs(inner->canvas.zoomLevel-0.5f)<.001f);centeredAt(inner->canvas,160,40);
+        select(title);
+        assert(abs(inner->canvas.zoomLevel-1.0f)<.001f);centeredAt(inner->canvas,160,40);
+        inner->canvas.zoomLevel=1.5f;select(title);
+        assert(abs(inner->canvas.zoomLevel-1.0f)<.001f);centeredAt(inner->canvas,160,40);
         // Too spread out for the zoom limit: stops at the smallest zoom.
         a->gui.position={0,0};b->gui.position={3000,0};c->gui.position={6000,0};
         inner->canvas.zoomLevel=1.0f;select(title);
@@ -314,7 +316,7 @@ int main(){
     assert(app.showUnusedNodesWindow);click(pt(buttonPoints,"Remove"));assert(app.showUnusedNodesWindow);
     click(pt(buttonPoints,"Close"));assert(!app.showUnusedNodesWindow);
     ImGui::DestroyContext();
-    puts("Cleanup review passed: non-modal interaction, root/nested/kept navigation, zoom, stale/replaced nodes, refresh, usage revalidation, group ticks, group selection and zoom-to-fit on the canvas, arrow-key navigation, Space to tick, persistent window and expired canvases.");
+    puts("Cleanup review passed: non-modal interaction, root/nested/kept navigation, zoom, stale/replaced nodes, refresh, usage revalidation, group ticks, group selection and zoom-to-fit from 100% on the canvas, arrow-key navigation, Space to tick, persistent window and expired canvases.");
 }
 '''
 

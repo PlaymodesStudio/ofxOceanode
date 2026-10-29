@@ -1270,11 +1270,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                  !isFirstDraw &&
                  contentRegionSize.x > 0.0f &&
                  contentRegionSize.y > 0.0f){
-                  // Zoom out, never in, until the whole box fits with a margin.
-                  float fit = getZoomLevel();
-                  if(pendingCenterFitSize.x > 0.0f) fit = std::min(fit, contentRegionSize.x * 0.9f / pendingCenterFitSize.x);
-                  if(pendingCenterFitSize.y > 0.0f) fit = std::min(fit, contentRegionSize.y * 0.9f / pendingCenterFitSize.y);
-                  if(fit < getZoomLevel()) setZoomLevel(std::floor(fit / 0.05f + 0.0001f) * 0.05f);
+                  // Fit the whole box: start from 100% whatever the zoom was, and zoom out only
+                  // as far as needed to leave a margin around it.
+                  if(pendingCenterFitSize.x > 0.0f || pendingCenterFitSize.y > 0.0f){
+                      float fit = 1.0f;
+                      if(pendingCenterFitSize.x > 0.0f) fit = std::min(fit, contentRegionSize.x * 0.9f / pendingCenterFitSize.x);
+                      if(pendingCenterFitSize.y > 0.0f) fit = std::min(fit, contentRegionSize.y * 0.9f / pendingCenterFitSize.y);
+                      setZoomLevel(std::floor(fit / 0.05f + 0.0001f) * 0.05f);
+                  }
                   glm::vec2 center = getContentRegionSize() / (2.0f * getZoomLevel());
                   setScrolling(-pendingCenterPoint + center);
                   hasPendingCenterPoint = false;

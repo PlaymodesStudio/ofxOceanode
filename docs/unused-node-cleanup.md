@@ -54,8 +54,10 @@ into a Macro from its parent beyond the rules above.
   center the view. Macro canvases open automatically.
 - Groups start closed. Click a group header to select every node of that group on
   the canvas. The view centers on the middle of the box that holds all of them and
-  zooms out, in 0.05 steps down to the canvas' minimum, until the box fits with a
-  margin. It never zooms in, and selecting a single node leaves the zoom alone. Clicking a single node afterwards
+  sets the zoom: 100% when the box fits with a margin, otherwise the largest 0.05 step
+  that does, down to the canvas' minimum. Each selection starts from 100%, so a big
+  group does not leave later groups zoomed out. Selecting a single node leaves the
+  zoom alone. Clicking a single node afterwards
   replaces that selection. The header arrow only folds the list.
 - The window keeps keyboard focus when you select from it, so the arrow keys keep
   working. The canvas is selected and centered but not focused; click it to work

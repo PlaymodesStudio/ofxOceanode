@@ -81,8 +81,8 @@ public:
     }
     // Scroll so a point in canvas coordinates is at the middle of the view. Keeps no
     // node pointers, so it suits the middle of several nodes. A fitSize (the width and
-    // height of the box around that point) also zooms out, never in, until the box fits
-    // the view, down to the canvas' zoom limit.
+    // height of the box around that point) also sets the zoom: 100% when the box fits,
+    // otherwise the largest step that fits it in the view, down to the zoom limit.
     void requestCenterOnPoint(glm::vec2 point, int delayFrames = 0, glm::vec2 fitSize = glm::vec2(0.0f, 0.0f)){
         pendingCenterNode = nullptr;
         pendingCenterPoint = point;
