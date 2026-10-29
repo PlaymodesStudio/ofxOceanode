@@ -244,8 +244,10 @@ void ofxOceanode::drawUnusedNodesWindow(){
             if(ImGui::Selectable(name.c_str(), unusedNodesSelectedNode == name)){
                 const auto& nodes = target->getParameterGroupNodesMap();
                 auto found = nodes.find(name);
-                if(found != nodes.end() && target->showNodeInCanvas(*found->second))
+                if(found != nodes.end() && target->showNodeInCanvas(*found->second)){
                     unusedNodesSelectedNode = name;
+                    unusedNodesSelectedGroup = -1;
+                }
             }
             ImGui::EndDisabled();
         };
@@ -258,6 +260,7 @@ void ofxOceanode::drawUnusedNodesWindow(){
             for(auto& group : unusedNodePlan.groups)
                 if(unticked.count(group.nodes) != 0) group.selected = false;
             unusedNodesSelectedNode.clear();
+            unusedNodesSelectedGroup = -1;
         };
         size_t nodeCount = 0, groupCount = 0, connectionCount = 0;
         for(const auto& group : unusedNodePlan.groups){
@@ -272,7 +275,7 @@ void ofxOceanode::drawUnusedNodesWindow(){
         ImGui::TextWrapped("Sinks, bound parameters and everything feeding them are kept. "
                            "Undo (Cmd/Ctrl+Z) restores a removal.");
         ImGui::TextWrapped("Click a node to open its canvas, select it and center the view. "
-                           "Untick a group to keep it.");
+                           "Click a group to select all its nodes on the canvas. Untick a group to keep it.");
         if(unusedNodePlan.groups.empty()) ImGui::TextUnformatted("No removable unused nodes found.");
         if(!unusedNodePlan.groups.empty() || !unusedNodePlan.kept.empty()){
             ImGui::BeginChild("Unused node summary", ImVec2(0, std::max(100.0f, ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 4.0f)), true);
@@ -283,7 +286,23 @@ void ofxOceanode::drawUnusedNodesWindow(){
                 ImGui::SameLine();
                 const string title = "Group " + ofToString(i + 1) + ": " + group.nodes.front()
                     + " (" + ofToString(group.nodes.size()) + " nodes, " + ofToString(group.connections) + " connections)";
-                if(ImGui::TreeNodeEx(title.c_str(), ImGuiTreeNodeFlags_DefaultOpen)){
+                const ImGuiTreeNodeFlags headerFlags = ImGuiTreeNodeFlags_DefaultOpen |
+                    (unusedNodesSelectedGroup == static_cast<int>(i) ? ImGuiTreeNodeFlags_Selected : 0);
+                const bool groupOpen = ImGui::TreeNodeEx(title.c_str(), headerFlags);
+                // Clicking the header (not its arrow) selects the whole group on the canvas.
+                if(ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen() && target && !targetChanged){
+                    vector<ofxOceanodeNode*> members;
+                    const auto& nodes = target->getParameterGroupNodesMap();
+                    for(const auto& name : group.nodes){
+                        auto found = nodes.find(name);
+                        if(found != nodes.end()) members.push_back(found->second);
+                    }
+                    if(target->showNodesInCanvas(members)){
+                        unusedNodesSelectedGroup = static_cast<int>(i);
+                        unusedNodesSelectedNode.clear();
+                    }
+                }
+                if(groupOpen){
                     for(const auto& name : group.nodes) drawNode(name);
                     ImGui::TreePop();
                 }
@@ -400,6 +419,7 @@ void ofxOceanode::drawMenuBar(){
                 showUnusedNodesWindow = true;
                 focusUnusedNodesWindow = true;
                 unusedNodesSelectedNode.clear();
+                unusedNodesSelectedGroup = -1;
             }
             ImGui::EndMenu();
         }

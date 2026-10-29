@@ -187,6 +187,7 @@ private:
     bool showUnusedNodesWindow = false;
     bool focusUnusedNodesWindow = false;
     std::string unusedNodesSelectedNode;
+    int unusedNodesSelectedGroup = -1;
     void drawUnusedNodesWindow();
     bool unusedNodesPlanChanged = false;
     unique_ptr<ofxOceanodeControls> controls;

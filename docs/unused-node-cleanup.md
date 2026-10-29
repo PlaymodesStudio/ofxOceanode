@@ -52,6 +52,9 @@ into a Macro from its parent beyond the rules above.
 - The window stays open after Remove so you can review the next candidates.
 - Click any listed node, kept nodes included, to open its canvas, select it and
   center the view. Macro canvases open automatically.
+- Click a group header to select every node of that group on the canvas. The view
+  centers on the node nearest the group's middle. Clicking a single node afterwards
+  replaces that selection. The header arrow only folds the list.
 
 ## Writing a node
 

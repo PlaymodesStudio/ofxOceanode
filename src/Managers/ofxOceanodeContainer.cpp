@@ -2242,7 +2242,7 @@ bool ofxOceanodeContainer::showParameterInCanvas(ofxOceanodeAbstractParameter& p
     return showNodeInCanvas(*node);
 }
 
-bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode)
+bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode, const vector<ofxOceanodeNode*>& alsoSelect)
 {
     auto* rootContainer = ofxOceanodeShared::getRootContainer();
     auto* rootCanvas = ofxOceanodeShared::getRootCanvas();
@@ -2280,6 +2280,7 @@ bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode)
     findNode(rootContainer, rootCanvas, nullptr);
     if(location.node == nullptr || location.canvas == nullptr || location.container == nullptr) return false;
 
+    auto* originalMacro = location.macro;
     if(location.macro != nullptr){
         // Instances of a global Macro share one tab: go to the matching node there.
         const auto shown = location.macro->windowTargetFor(location.node);
@@ -2297,6 +2298,11 @@ bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode)
     }
     location.container->deselectAllComments();
     location.node->getNodeGui().setSelected(true);
+    for(auto* other : alsoSelect){
+        // The extra nodes live beside the target, so they map to the same shown Macro.
+        auto* shownNode = originalMacro != nullptr ? originalMacro->windowTargetFor(other).node : other;
+        if(shownNode != nullptr) shownNode->getNodeGui().setSelected(true);
+    }
 
     if(location.macro != nullptr){
         location.macro->activateWindow();
@@ -2311,6 +2317,32 @@ bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode)
     location.canvas->requestCenterOnNode(location.node,
                                          location.macro != nullptr ? 2 : 1);
     return true;
+}
+
+bool ofxOceanodeContainer::showNodesInCanvas(const vector<ofxOceanodeNode*>& nodes)
+{
+    if(nodes.empty()) return false;
+    float sumX = 0, sumY = 0;
+    for(auto* node : nodes){
+        const auto position = node->getNodeGui().getPosition();
+        sumX += position.x;
+        sumY += position.y;
+    }
+    const float middleX = sumX / float(nodes.size()), middleY = sumY / float(nodes.size());
+    ofxOceanodeNode* center = nodes.front();
+    float nearest = FLT_MAX;
+    for(auto* node : nodes){
+        const auto position = node->getNodeGui().getPosition();
+        const float dx = position.x - middleX, dy = position.y - middleY;
+        if(dx * dx + dy * dy < nearest){
+            nearest = dx * dx + dy * dy;
+            center = node;
+        }
+    }
+    vector<ofxOceanodeNode*> others;
+    for(auto* node : nodes)
+        if(node != center) others.push_back(node);
+    return showNodeInCanvas(*center, others);
 }
 
 vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules(){

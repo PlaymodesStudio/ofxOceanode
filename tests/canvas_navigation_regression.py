@@ -78,7 +78,9 @@ struct ofxOceanodeContainer {
     map<int,ofxOceanodeNode*> getParameterGroupNodesMap(){
         map<int,ofxOceanodeNode*> out;for(auto& p:nodes)out[p.first]=p.second.get();return out;
     }
-    void deselectAllComments(){} bool showNodeInCanvas(ofxOceanodeNode& node);
+    void deselectAllComments(){}
+    bool showNodeInCanvas(ofxOceanodeNode& node, const vector<ofxOceanodeNode*>& alsoSelect = {});
+    bool showNodesInCanvas(const vector<ofxOceanodeNode*>& nodes);
 };
 struct ofxOceanodeNodeMacro:Model {
     shared_ptr<ofxOceanodeContainer> container=make_shared<ofxOceanodeContainer>();
@@ -224,7 +226,8 @@ def main():
     canvas = (ROOT / "src/Managers/ofxOceanodeCanvas.cpp").read_text()
     container = (ROOT / "src/Managers/ofxOceanodeContainer.cpp").read_text()
     navigation = block(canvas, "void ofxOceanodeCanvas::handleParentNavigation()")
-    show_node = block(container, "bool ofxOceanodeContainer::showNodeInCanvas(")
+    show_node = (block(container, "bool ofxOceanodeContainer::showNodeInCanvas(") + "\n" +
+                 block(container, "bool ofxOceanodeContainer::showNodesInCanvas("))
     center = block(canvas, "if(pendingCenterNode != nullptr &&\n")
     with tempfile.TemporaryDirectory(prefix="oceanode-canvas-navigation-") as directory:
         work = Path(directory)

@@ -20,11 +20,12 @@ struct ofxOceanode {
     weak_ptr<ofxOceanodeContainer> unusedNodeContainer;
     bool showUnusedNodesWindow=false,focusUnusedNodesWindow=false,unusedNodesPlanChanged=false;
     string unusedNodesSelectedNode;
+    int unusedNodesSelectedGroup=-1;
     void drawUnusedNodesWindow();
     void open(shared_ptr<ofxOceanodeContainer> target){
         unusedNodeContainer=target;unusedNodePlan=target->findUnusedNodes();
         showUnusedNodesWindow=focusUnusedNodesWindow=true;
-        unusedNodesSelectedNode.clear();unusedNodesPlanChanged=false;
+        unusedNodesSelectedNode.clear();unusedNodesSelectedGroup=-1;unusedNodesPlanChanged=false;
     }
 };
 map<string,ImVec2> rowPoints,buttonPoints;
@@ -40,6 +41,11 @@ bool trackedCheckbox(const char* name,bool* value){
 }
 bool trackedTree(const char* name){
     bool open=ImGui::TreeNode(name);
+    auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();
+    rowPoints[name]={a.x+60.f,(a.y+b.y)*.5f};return open;
+}
+bool trackedTreeEx(const char* name,ImGuiTreeNodeFlags flags){
+    bool open=ImGui::TreeNodeEx(name,flags);
     auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();
     rowPoints[name]={a.x+60.f,(a.y+b.y)*.5f};return open;
 }
@@ -151,13 +157,43 @@ int main(){
     click(rowPoints.at("##group0"));assert(app.unusedNodePlan.groups[0].selected);
     click(buttonPoints.at("Refresh"));assert(app.unusedNodePlan.groups[0].selected&&!app.unusedNodePlan.groups[1].selected);
 
+    // Clicking a group header selects all its nodes and centers on the one nearest their middle.
+    {
+        auto* first=inner->container->nodes[4].get();auto* second=inner->container->nodes[5].get();
+        auto* third=add(*inner->container,6);
+        first->gui.position={0,0};second->gui.position={100,0};third->gui.position={500,0};
+        inner->container->plan.groups={Group{{"4","5","6"},0,true}};inner->container->plan.kept.clear();
+        app.open(inner->container);views={&inner->canvas};idle();
+        const string header="Group 1: 4 (3 nodes, 0 connections)";
+        assert(rowPoints.count(header)==1&&app.unusedNodesSelectedGroup==-1);
+        click(rowPoints.at(header));
+        assert(first->gui.selected&&second->gui.selected&&third->gui.selected);
+        assert(app.unusedNodesSelectedGroup==0&&app.unusedNodesSelectedNode.empty());
+        assert(ofxOceanodeShared::selected==second&&app.showUnusedNodesWindow);
+        idle();centered(inner->canvas,second);
+        // Picking one node afterwards replaces the group selection.
+        click(rowPoints.at("4"));
+        assert(first->gui.selected&&!second->gui.selected&&!third->gui.selected);
+        assert(app.unusedNodesSelectedGroup==-1&&app.unusedNodesSelectedNode=="4");
+        // A changed canvas must not navigate: selection stays as it was.
+        first->gui.selected=false;++inner->container->revision;idle();
+        click(rowPoints.at(header));
+        assert(!first->gui.selected&&!second->gui.selected&&!third->gui.selected&&app.unusedNodesSelectedGroup==-1);
+        click(buttonPoints.at("Refresh"));click(rowPoints.at(header));
+        assert(first->gui.selected&&second->gui.selected&&third->gui.selected&&app.unusedNodesSelectedGroup==0);
+        // Unticking a group does not select its nodes.
+        first->gui.selected=second->gui.selected=third->gui.selected=false;
+        click(rowPoints.at("##group0"));
+        assert(!first->gui.selected&&!second->gui.selected&&!third->gui.selected&&!app.unusedNodePlan.groups[0].selected);
+    }
+
     // Expired canvases keep a readable, closable window with disabled actions.
     auto temporary=make_shared<ofxOceanodeContainer>();temporary->plan.groups={Group{{"7"},0,true}};add(*temporary,7);
     app.open(temporary);idle();temporary.reset();idle();click(rowPoints.at("7"));
     assert(app.showUnusedNodesWindow);click(buttonPoints.at("Remove"));assert(app.showUnusedNodesWindow);
     click(buttonPoints.at("Close"));assert(!app.showUnusedNodesWindow);
     ImGui::DestroyContext();
-    puts("Cleanup review passed: non-modal interaction, root/nested/kept navigation, zoom, stale/replaced nodes, refresh, usage revalidation, group ticks, persistent window and expired canvases.");
+    puts("Cleanup review passed: non-modal interaction, root/nested/kept navigation, zoom, stale/replaced nodes, refresh, usage revalidation, group ticks, group selection on the canvas, persistent window and expired canvases.");
 }
 '''
 
@@ -173,10 +209,10 @@ def main():
     fixture=fixture.replace('map<int,ofxOceanodeNode*>','map<string,ofxOceanodeNode*>').replace('out[p.first]=p.second.get()','out[to_string(p.first)]=p.second.get()')
     app=(ROOT/'src/ofxOceanode.cpp').read_text()
     window=block(app,'void ofxOceanode::drawUnusedNodesWindow()')
-    window=window.replace('ImGui::Selectable(', 'trackedSelectable(').replace('ImGui::Button(', 'trackedButton(').replace('ImGui::Checkbox(', 'trackedCheckbox(').replace('ImGui::TreeNode(', 'trackedTree(')
+    window=window.replace('ImGui::Selectable(', 'trackedSelectable(').replace('ImGui::Button(', 'trackedButton(').replace('ImGui::Checkbox(', 'trackedCheckbox(').replace('ImGui::TreeNode(', 'trackedTree(').replace('ImGui::TreeNodeEx(', 'trackedTreeEx(')
     container=(ROOT/'src/Managers/ofxOceanodeContainer.cpp').read_text()
     canvas=(ROOT/'src/Managers/ofxOceanodeCanvas.cpp').read_text()
-    code=fixture+EXTRA+window+block(container,'bool ofxOceanodeContainer::showNodeInCanvas(')
+    code=fixture+EXTRA+window+block(container,'bool ofxOceanodeContainer::showNodeInCanvas(')+'\n'+block(container,'bool ofxOceanodeContainer::showNodesInCanvas(')
     code+='\nvoid ofxOceanodeCanvas::center(){'+block(canvas,'if(pendingCenterNode != nullptr &&\n')+'}\n'+CASES
     with tempfile.TemporaryDirectory(prefix='oceanode-unused-review-') as directory:
         work=Path(directory);(work/'imconfig.h').write_text('')
