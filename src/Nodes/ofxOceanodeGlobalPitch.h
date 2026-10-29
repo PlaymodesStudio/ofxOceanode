@@ -3,8 +3,8 @@
 //  ofxOceanode
 //
 //  The Global Pitch node's state (Default_Nodes/globalPitch.h): one scale
-//  (pitch classes 0-11, and a low scale for the notes below a split note), a
-//  shift along each scale (degrees, kept inside each note's octave), one
+//  (degrees 0-11 above a root, and a low scale for the notes below a split
+//  note), a shift along each scale (degrees, carried into the next octave), one
 //  transpose (semitones, optionally wrapped into each note's
 //  octave), one random detune per voice (cents) and a glide time, for every
 //  node in the patch that plays or shows pitches. Each feature has its own list of destinations,
@@ -61,29 +61,40 @@ public:
     static const std::vector<float>& scale() { return state().scale; }
     // the scale (at and above the split note) quantizes
     static bool scaleOn() { return state().scaleOn && !state().scale.empty(); }
-    // degrees: pitch classes 0-11 (fractions allowed); on: false = bypassed
+    // degrees: semitones 0-11 above the root (fractions allowed); on: false = bypassed
     static void setScale(const std::vector<float>& degrees, bool on) {
         if(state().scale == degrees && state().scaleOn == on) return;
         state().scale = degrees;
         state().scaleOn = on;
-        state().offsets = offsetsFor(degrees, state().shift);
+        state().offsets = offsetsFor(degrees, state().shift, state().root);
         valuesChanged(Scale);
     }
-    // shift: the quantized note moves this many degrees along its scale and
-    // stays in its octave, so the degrees rotate (a 5-note scale shifted 5 is
-    // unshifted). The low scale has its own shift.
+    // root: the pitch class (0 = C .. 11 = B) the degrees of both scales count
+    // from: E Phrygian dominant is root 4 with 0,1,4,5,7,8,10
+    static int scaleRoot() { return state().root; }
+    static void setScaleRoot(int root) {
+        root = ((root % 12) + 12) % 12;
+        if(state().root == root) return;
+        state().root = root;
+        state().offsets = offsetsFor(state().scale, state().shift, root);
+        state().lowOffsets = offsetsFor(state().lowScale, state().lowShift, root);
+        valuesChanged(Scale);
+    }
+    // shift: the quantized note moves this many degrees along its scale (negative
+    // = down), into the next octave past the last degree: a diatonic transpose,
+    // so a melody keeps its contour. The low scale has its own shift.
     static int shift() { return state().shift; }
     static void setShift(int degrees) {
         if(state().shift == degrees) return;
         state().shift = degrees;
-        state().offsets = offsetsFor(state().scale, degrees);
+        state().offsets = offsetsFor(state().scale, degrees, state().root);
         valuesChanged(Scale);
     }
     static int lowShift() { return state().lowShift; }
     static void setLowShift(int degrees) {
         if(state().lowShift == degrees) return;
         state().lowShift = degrees;
-        state().lowOffsets = offsetsFor(state().lowScale, degrees);
+        state().lowOffsets = offsetsFor(state().lowScale, degrees, state().root);
         valuesChanged(Scale);
     }
     // each pitch class's offset to its nearest degree of the scale / low scale, shifted
@@ -101,7 +112,7 @@ public:
         state().lowScale = degrees;
         state().split = split;
         state().lowOn = on;
-        state().lowOffsets = offsetsFor(degrees, state().lowShift);
+        state().lowOffsets = offsetsFor(degrees, state().lowShift, state().root);
         valuesChanged(Scale);
     }
     // modulo 12: a transposed note wraps into its own octave, which starts at base (pitch class 0-11)
@@ -259,12 +270,14 @@ public:
         return sorted;
     }
     // each pitch class's offset to the nearest degree (the lower one on a tie),
-    // then shift degrees further along the scale, wrapped within the note's
-    // own octave
-    static std::array<float, 12> offsetsFor(const std::vector<float>& degrees, int shift = 0) {
+    // then shift degrees further along the scale, carried into the octave above
+    // (or below) past its last (first) degree. The degrees count from root.
+    static std::array<float, 12> offsetsFor(const std::vector<float>& degrees, int shift = 0, int root = 0) {
         std::array<float, 12> out{};
         if(degrees.empty()) return out;
-        const std::vector<float> sorted = distinctDegrees(degrees);
+        std::vector<float> rooted;
+        for(float d : degrees) rooted.push_back(d + root);
+        const std::vector<float> sorted = distinctDegrees(rooted);
         const int n = (int)sorted.size();
         for(int pc = 0; pc < 12; pc++) {
             float best = 0, bestDistance = 1e9f;
@@ -278,8 +291,10 @@ public:
                 }
             }
             if(shift == 0) { out[pc] = best; continue; }
-            const int index = (((nearest + shift) % n) + n) % n;
-            out[pc] = sorted[index] + 12.0f * nearestOctave - pc;
+            const int step = nearest + shift;
+            const int index = ((step % n) + n) % n;
+            const int octaves = (step - index) / n;   // floor(step / n), negative shifts included
+            out[pc] = sorted[index] + 12.0f * (nearestOctave + octaves) - pc;
         }
         return out;
     }
@@ -299,6 +314,7 @@ private:
         int wrapBase = 0;
         int shift = 0;
         int lowShift = 0;
+        int root = 0;
         float glide = 0.0f;
         std::array<std::map<std::string, bool>, NumFeatures> overrides;
     };
