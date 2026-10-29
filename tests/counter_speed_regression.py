@@ -33,6 +33,7 @@ struct ofxOceanodeNodeModel {
     virtual void resetPhase() {}
     virtual void setBpm(float) {}
     virtual void loadBeforeConnections(ofJson&) {}
+    virtual bool isSink() const { return false; }
     template<class T> void addParameter(ofParameter<T>& p) { parameters.add(p); }
     template<class T> void addOutputParameter(ofParameter<T>& p) { parameters.add(p); }
     template<class T> void addInspectorParameter(ofParameter<T>& p) { inspector.add(p); }

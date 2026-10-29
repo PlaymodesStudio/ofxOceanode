@@ -15,6 +15,8 @@ class abstractPortal : public ofxOceanodeNodeModel{
 public:
 	abstractPortal(string typelabel);
 	~abstractPortal();
+	// A portal is live through its cables and its wireless peers, never by itself.
+	bool isSink() const override { return false; }
 
 protected:
 	void notifyWillBeDestroyed();

@@ -63,8 +63,12 @@ struct ofxOceanodeCanvas {
     glm::vec2 contentRegionSize{800,600},scrolling;
     float zoomLevel=1;
     ofxOceanodeNode* pendingCenterNode=nullptr; int pendingCenterFrames=0;
-    void requestFocus(){focusPending=true;} void bringOnTop(){onTop=true;}
-    void requestCenterOnNode(ofxOceanodeNode* n,int frames){pendingCenterNode=n;pendingCenterFrames=max(0,frames);}
+    glm::vec2 pendingCenterPoint,pendingCenterFitSize; bool hasPendingCenterPoint=false;
+    int focusRequests=0,topRequests=0;
+    void requestFocus(){focusPending=true;++focusRequests;} void bringOnTop(){onTop=true;++topRequests;}
+    void requestCenterOnNode(ofxOceanodeNode* n,int frames){pendingCenterNode=n;hasPendingCenterPoint=false;pendingCenterFrames=max(0,frames);}
+    void requestCenterOnPoint(glm::vec2 p,int frames,glm::vec2 fit=glm::vec2()){pendingCenterNode=nullptr;pendingCenterPoint=p;pendingCenterFitSize=fit;hasPendingCenterPoint=true;pendingCenterFrames=max(0,frames);}
+    void setZoomLevel(float z){zoomLevel=std::round(min(max(z,0.25f),4.0f)/0.05f)*0.05f;}
     string getUniqueID(){return uniqueID;}
     float getZoomLevel(){return zoomLevel;} glm::vec2 getContentRegionSize(){return contentRegionSize;}
     void setScrolling(glm::vec2 s){scrolling=s;}
@@ -78,13 +82,15 @@ struct ofxOceanodeContainer {
     map<int,ofxOceanodeNode*> getParameterGroupNodesMap(){
         map<int,ofxOceanodeNode*> out;for(auto& p:nodes)out[p.first]=p.second.get();return out;
     }
-    void deselectAllComments(){} bool showNodeInCanvas(ofxOceanodeNode& node);
+    void deselectAllComments(){}
+    bool showNodeInCanvas(ofxOceanodeNode& node, const vector<ofxOceanodeNode*>& alsoSelect = {}, bool takeFocus = true, bool fitView = false);
+    bool showNodesInCanvas(const vector<ofxOceanodeNode*>& nodes, bool takeFocus = true);
 };
 struct ofxOceanodeNodeMacro:Model {
     shared_ptr<ofxOceanodeContainer> container=make_shared<ofxOceanodeContainer>();
     ofxOceanodeCanvas canvas; int activations=0; bool visible=true;
     auto getContainer(){return container;} auto getCanvas(){return &canvas;}
-    void activateWindow(){visible=true;++activations;canvas.requestFocus();}
+    void activateWindow(bool focus=true){visible=true;++activations;if(focus)canvas.requestFocus();}
     struct WindowTarget {ofxOceanodeNodeMacro* macro; ofxOceanodeNode* node;};
     ofxOceanodeNodeMacro& windowInstance(){return *this;}
     WindowTarget windowTargetFor(ofxOceanodeNode* node){return {this,node};}
@@ -224,8 +230,9 @@ def main():
     canvas = (ROOT / "src/Managers/ofxOceanodeCanvas.cpp").read_text()
     container = (ROOT / "src/Managers/ofxOceanodeContainer.cpp").read_text()
     navigation = block(canvas, "void ofxOceanodeCanvas::handleParentNavigation()")
-    show_node = block(container, "bool ofxOceanodeContainer::showNodeInCanvas(")
-    center = block(canvas, "if(pendingCenterNode != nullptr &&\n")
+    show_node = (block(container, "bool ofxOceanodeContainer::showNodeInCanvas(") + "\n" +
+                 block(container, "bool ofxOceanodeContainer::showNodesInCanvas("))
+    center = block(canvas, "if(pendingCenterNode != nullptr &&\n") + "\n" + block(canvas, "if(hasPendingCenterPoint &&\n")
     with tempfile.TemporaryDirectory(prefix="oceanode-canvas-navigation-") as directory:
         work = Path(directory)
         (work / "imconfig.h").write_text("// Standalone ImGui without OF adapters.\n")

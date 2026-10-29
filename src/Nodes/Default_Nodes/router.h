@@ -21,6 +21,9 @@ public:
     };
     ~abstractRouter(){};
     
+    // A router is the macro's interface pin: removing it changes the parent's pins.
+    bool isSink() const override { return true; }
+    
     ofParameter<string>& getNameParam(){
         return nameParam;
     }

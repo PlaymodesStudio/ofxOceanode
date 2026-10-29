@@ -121,6 +121,8 @@ Copying connected nodes together is a useful way to preserve a small structure. 
 
 **Edit > Auto Layout Selection** and **Auto Layout Canvas** can help arrange a crowded patch. Inspect the result and make the reading order clear.
 
+**Edit > Remove unused nodes** lists the nodes in the current canvas that nothing uses. A node is used when it does something on its own, such as a display or a sender, when a control, snapshot, timeline or MIDI binding points at it, or when it feeds a node that is used. Review the groups, untick any you want to keep, then press Remove. Undo restores everything the command removed.
+
 A **preset** stores a patch state for later recall. Use **Presets > Save Preset As...** for a new named version, then **Save Preset** to update it. A **bank** groups presets. Save a working copy before making a large experiment.
 
 A saved GUI layout and a saved preset serve different purposes. A layout arranges windows. A preset stores patch content and values. Some special parameters are intentionally excluded from preset saving, and external resources may need their own saving or embedding options.

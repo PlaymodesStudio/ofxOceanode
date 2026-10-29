@@ -177,8 +177,8 @@ void ofxOceanodeCanvas::resetViewToOrigin(){
     // Wait for the loaded preset's layout to provide the current canvas size.
     centerOriginPending = true;
     pendingCenterNode = nullptr;
-    pendingCenterFrames = 0;
-    inspectorSelectionClick = {};
+    hasPendingCenterPoint = false;
+    pendingCenterFrames = 0;    inspectorSelectionClick = {};
 }
 
 void ofxOceanodeCanvas::resetForNewPreset(){
@@ -202,8 +202,8 @@ void ofxOceanodeCanvas::resetForNewPreset(){
     portalizeNameBuffer[0] = '\0';
     pendingPortalAlignments.clear();
     pendingCenterNode = nullptr;
-    pendingCenterFrames = 0;
-    inspectorSelectionClick = {};
+    hasPendingCenterPoint = false;
+    pendingCenterFrames = 0;    inspectorSelectionClick = {};
     portalizeSelectionRequested = false;
     autoLayoutSelectionRequested = false;
     autoLayoutCanvasRequested = false;
@@ -361,6 +361,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         isCreatingConnection = false;
         customGuiContextNode = nullptr;
         pendingCenterNode = nullptr;
+        hasPendingCenterPoint = false;
         portalizeSourceParameter = nullptr;
         encapsulateSinkParameter = nullptr;
         pendingPortalAlignments.clear();
@@ -373,7 +374,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     // Save the previous shared zoom level so nested canvas draws (e.g. macros)
     // restore the parent's value when they finish.
     float previousSharedZoom = ofxOceanodeShared::getZoomLevel();
-    if(pendingCenterNode != nullptr && pendingCenterFrames > 0){
+    if((pendingCenterNode != nullptr || hasPendingCenterPoint) && pendingCenterFrames > 0){
         pendingCenterFrames--;
     }
 
@@ -439,6 +440,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             isCreatingConnection = false;
             customGuiContextNode = nullptr;
             pendingCenterNode = nullptr;
+            hasPendingCenterPoint = false;
             portalizeSourceParameter = nullptr;
             encapsulateSinkParameter = nullptr;
             pendingPortalAlignments.clear();
@@ -1262,6 +1264,23 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                   glm::vec2 center = getContentRegionSize() / (2.0f * zoom);
                   setScrolling(-nodePos - nodeSize / 2.0f + center);
                   pendingCenterNode = nullptr;
+              }
+              if(hasPendingCenterPoint &&
+                 pendingCenterFrames <= 0 &&
+                 !isFirstDraw &&
+                 contentRegionSize.x > 0.0f &&
+                 contentRegionSize.y > 0.0f){
+                  // Fit the whole box: start from 100% whatever the zoom was, and zoom out only
+                  // as far as needed to leave a margin around it.
+                  if(pendingCenterFitSize.x > 0.0f || pendingCenterFitSize.y > 0.0f){
+                      float fit = 1.0f;
+                      if(pendingCenterFitSize.x > 0.0f) fit = std::min(fit, contentRegionSize.x * 0.9f / pendingCenterFitSize.x);
+                      if(pendingCenterFitSize.y > 0.0f) fit = std::min(fit, contentRegionSize.y * 0.9f / pendingCenterFitSize.y);
+                      setZoomLevel(std::floor(fit / 0.05f + 0.0001f) * 0.05f);
+                  }
+                  glm::vec2 center = getContentRegionSize() / (2.0f * getZoomLevel());
+                  setScrolling(-pendingCenterPoint + center);
+                  hasPendingCenterPoint = false;
               }
 		      ImVec2 offset = ImVec2(canvasOrigin.x + scrolling.x * zoomLevel,
 		                             canvasOrigin.y + scrolling.y * zoomLevel);

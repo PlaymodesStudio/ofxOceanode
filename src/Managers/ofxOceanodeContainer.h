@@ -244,20 +244,26 @@ public:
     
     vector<ofxOceanodeNode*> getSelectedModules();
     vector<ofxOceanodeNode*> getAllModules();
+    // Dead-node review: a plan lists connected groups of nodes that nothing live
+    // consumes, and the live nodes with the reasons they are kept.
     struct UnusedNodePlan {
-        struct ProtectedGroup {
-            vector<string> nodes;
-            vector<string> reasons;
-            bool possiblyUnused = false;
+        struct Group {              // one connected component of dead nodes
+            vector<string> nodes;   // escaped node names, sorted
+            size_t connections = 0; // cables removed with the group
+            bool selected = true;   // the window toggles this; removal honours it
         };
-        std::uint64_t revision = 0;
-        vector<vector<string>> groups;
-        vector<ProtectedGroup> protectedGroups;
-        size_t connectionCount = 0;
-        size_t preservedNodes = 0;
+        struct Kept {
+            string node;            // escaped node name
+            vector<string> reasons; // sorted, unique
+        };
+        std::uint64_t revision = 0; // getNodesRevision() when computed
+        vector<Group> groups;       // sorted by nodes
+        vector<Kept> kept;          // sorted by node
     };
     UnusedNodePlan findUnusedNodes();
-    // Rechecks usage and graph ownership before deleting the reviewed plan.
+    // Removes the selected groups only. Recomputes the plan first and refuses
+    // (returns false) when the revision or the dead set changed. Runs inside one
+    // canvas edit so undo restores everything.
     bool removeUnusedNodes(const UnusedNodePlan& plan);
     // Changes whenever node ownership changes, including bulk preset/teardown clears.
     std::uint64_t getNodesRevision() const { return nodesRevision; }
@@ -266,7 +272,15 @@ public:
     ofxOceanodeAbstractParameter* findParameter(const std::string& parameterPath) const;
     bool customGuiContainsParameterAnywhere(ofxOceanodeAbstractParameter& parameter) const;
     ofxOceanodeNode* getNodeFromParameter(ofxOceanodeAbstractParameter& param);
-    bool showNodeInCanvas(ofxOceanodeNode& node);
+    // Selects the node on its canvas and centers on it. alsoSelect adds nodes of the
+    // same container to the selection, and the view then centers on the middle of the
+    // box that holds all of them, at 100% zoom or the largest zoom that fits them. fitView
+    // does the same for a group of one node; a lone node otherwise keeps the zoom. takeFocus false
+    // leaves keyboard focus where it is, for a caller that navigates by keys.
+    bool showNodeInCanvas(ofxOceanodeNode& node, const vector<ofxOceanodeNode*>& alsoSelect = {}, bool takeFocus = true,
+                          bool fitView = false);
+    // Selects every node on its canvas and centers on the middle of all of them.
+    bool showNodesInCanvas(const vector<ofxOceanodeNode*>& nodes, bool takeFocus = true);
     bool showParameterInCanvas(ofxOceanodeAbstractParameter& parameter);
     ofxOceanodeContainer* getContainerForCanvasID(const std::string& canvasID);
     const ofxOceanodeContainer* getContainerForCanvasID(const std::string& canvasID) const;

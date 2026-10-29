@@ -260,6 +260,8 @@ public:
         color = ofColor::red;
         description = "Sends a value every frame";
     };
+    // The value is an ordinary parameter, not a flagged output pin, but the node is pure.
+    bool isSink() const override { return false; }
     ~simpleNumberGenerator(){};
     
     void setup(){
@@ -282,6 +284,8 @@ public:
         color = ofColor::red;
         description = "Sends a normalized [0..1] value every frame";
     };
+    // The value is an ordinary parameter, not a flagged output pin, but the node is pure.
+    bool isSink() const override { return false; }
     ~simpleNormalizedNumberGenerator(){};
     
     void setup(){

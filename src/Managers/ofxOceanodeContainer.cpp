@@ -18,6 +18,7 @@
 #include "Nodes/MacroSnapshotSystem.h"
 #include "Nodes/MacroRouterValueDispatch.h"
 #include "portal.h"
+#include "portalSelector.h"
 #include "imgui.h"
 #include <cmath>
 #include <cfloat>
@@ -2241,7 +2242,7 @@ bool ofxOceanodeContainer::showParameterInCanvas(ofxOceanodeAbstractParameter& p
     return showNodeInCanvas(*node);
 }
 
-bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode)
+bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode, const vector<ofxOceanodeNode*>& alsoSelect, bool takeFocus, bool fitView)
 {
     auto* rootContainer = ofxOceanodeShared::getRootContainer();
     auto* rootCanvas = ofxOceanodeShared::getRootCanvas();
@@ -2279,13 +2280,14 @@ bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode)
     findNode(rootContainer, rootCanvas, nullptr);
     if(location.node == nullptr || location.canvas == nullptr || location.container == nullptr) return false;
 
+    auto* originalMacro = location.macro;
     if(location.macro != nullptr){
         // Instances of a global Macro share one tab: go to the matching node there.
         const auto shown = location.macro->windowTargetFor(location.node);
         location.macro = shown.macro;
         location.container = shown.macro->getContainer().get();
         if(shown.node == nullptr){
-            shown.macro->activateWindow();
+            shown.macro->activateWindow(takeFocus);
             return true;
         }
         location.node = shown.node;
@@ -2296,20 +2298,51 @@ bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode)
     }
     location.container->deselectAllComments();
     location.node->getNodeGui().setSelected(true);
+    vector<ofxOceanodeNode*> selectedNodes{location.node};
+    for(auto* other : alsoSelect){
+        // The extra nodes live beside the target, so they map to the same shown Macro.
+        auto* shownNode = originalMacro != nullptr ? originalMacro->windowTargetFor(other).node : other;
+        if(shownNode == nullptr) continue;
+        shownNode->getNodeGui().setSelected(true);
+        selectedNodes.push_back(shownNode);
+    }
 
     if(location.macro != nullptr){
-        location.macro->activateWindow();
+        location.macro->activateWindow(takeFocus);
         location.canvas = location.macro->getCanvas();
-    }else{
+    }else if(takeFocus){
         location.canvas->requestFocus();
     }
 
-    location.canvas->bringOnTop();
+    if(takeFocus) location.canvas->bringOnTop();
     ofxOceanodeShared::setActiveCanvasUniqueID(location.canvas->getUniqueID());
     ofxOceanodeShared::nodeSelectedInCanvas(location.node);
-    location.canvas->requestCenterOnNode(location.node,
-                                         location.macro != nullptr ? 2 : 1);
+    const int centerDelay = location.macro != nullptr ? 2 : 1;
+    if(selectedNodes.size() == 1 && !fitView){
+        location.canvas->requestCenterOnNode(location.node, centerDelay);
+    }else{
+        // Several nodes: the middle of the box that holds all of them.
+        float left = FLT_MAX, top = FLT_MAX, right = -FLT_MAX, bottom = -FLT_MAX;
+        for(auto* member : selectedNodes){
+            const auto position = member->getNodeGui().getPosition();
+            auto rectangle = member->getNodeGui().getRectangle();
+            left = std::min(left, position.x);
+            top = std::min(top, position.y);
+            right = std::max(right, position.x + rectangle.getWidth());
+            bottom = std::max(bottom, position.y + rectangle.getHeight());
+        }
+        location.canvas->requestCenterOnPoint(glm::vec2((left + right) / 2.0f, (top + bottom) / 2.0f), centerDelay,
+                                              glm::vec2(right - left, bottom - top));
+    }
     return true;
+}
+
+bool ofxOceanodeContainer::showNodesInCanvas(const vector<ofxOceanodeNode*>& nodes, bool takeFocus)
+{
+    if(nodes.empty()) return false;
+    const vector<ofxOceanodeNode*> others(nodes.begin() + 1, nodes.end());
+    // A group always fits from 100%, even when it holds a single node.
+    return showNodeInCanvas(*nodes.front(), others, takeFocus, true);
 }
 
 vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules(){
@@ -2332,113 +2365,227 @@ vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules(){
 }
 
 ofxOceanodeContainer::UnusedNodePlan ofxOceanodeContainer::findUnusedNodes(){
+    // A node is live when it is a sink, or when something live consumes it
+    // through a cable or a wireless link. Everything else is dead. See
+    // docs/unused-node-cleanup.md for the rules; plans hold names, never pointers.
     UnusedNodePlan plan;
     plan.revision = nodesRevision;
     const auto nodes = getAllModules();
     std::unordered_map<ofxOceanodeNodeModel*, ofxOceanodeNode*> owners;
     for(auto* node : nodes) owners[&node->getNodeModel()] = node;
+    const auto nameOf = [](ofxOceanodeNode* node){ return node->getParameters().getEscapedName(); };
+    const auto abstractParameters = [](ofxOceanodeNode* node){
+        vector<ofxOceanodeAbstractParameter*> result;
+        for(auto& abstract : node->getParameters())
+            if(auto* parameter = dynamic_cast<ofxOceanodeAbstractParameter*>(abstract.get())) result.push_back(parameter);
+        return result;
+    };
+    const auto hasInConnection = [&](ofxOceanodeNodeModel* model){
+        for(auto& abstract : model->getParameterGroup()){
+            auto* parameter = dynamic_cast<ofxOceanodeAbstractParameter*>(abstract.get());
+            if(parameter != nullptr && !parameter->getInConnections().empty()) return true;
+        }
+        return false;
+    };
+    const auto hasOutConnection = [&](ofxOceanodeNodeModel* model){
+        for(auto& abstract : model->getParameterGroup()){
+            auto* parameter = dynamic_cast<ofxOceanodeAbstractParameter*>(abstract.get());
+            if(parameter != nullptr && !parameter->getOutConnections().empty()) return true;
+        }
+        return false;
+    };
 
     // Bindings may live in a different canvas (including a closed Custom GUI).
-    // Resolve their actual targets, rather than guessing from node names.
+    // Resolve their actual targets, rather than guessing from node names. The same
+    // walk finds portal selectors elsewhere, which keep their portal in use.
     std::unordered_set<ofxOceanodeAbstractParameter*> published;
+    std::unordered_set<const abstractPortal*> outsideSelected;
     auto* root = this;
     while(root->timelineHost != nullptr) root = root->timelineHost;
-    std::function<void(ofxOceanodeContainer*)> collectBindings = [&](ofxOceanodeContainer* current){
+    std::function<void(ofxOceanodeContainer*)> walk = [&](ofxOceanodeContainer* current){
         if(auto* extension = current->getCustomGuiExtension()) extension->collectBoundParameters(published);
         for(auto* node : current->getAllModules()){
+            if(current != this){
+                if(auto* selector = dynamic_cast<portalSelectorBase*>(&node->getNodeModel()))
+                    if(selector->getSelectedPortal() != nullptr) outsideSelected.insert(selector->getSelectedPortal());
+            }
             if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel()))
-                collectBindings(macro->getContainer().get());
+                walk(macro->getContainer().get());
         }
     };
-    collectBindings(root);
+    walk(root);
     if(auto* extension = root->getAutomationExtension()) extension->collectBoundParameters(published);
 
-    std::unordered_map<ofxOceanodeNode*, vector<ofxOceanodeNode*>> neighbors;
-    std::unordered_set<ofxOceanodeNode*> used;
-    std::unordered_set<ofxOceanodeNode*> knownUsage;
-    std::unordered_map<ofxOceanodeNode*, vector<string>> reasons;
-    auto protect = [&](ofxOceanodeNode* node, const string& reason, bool known = true){
-        used.insert(node);
-        if(known) knownUsage.insert(node);
-        reasons[node].push_back(node->getParameters().getEscapedName() + ": " + reason);
-    };
-    std::unordered_map<ofxOceanodeNode*, std::unordered_set<ofxOceanodeAbstractConnection*>> nodeConnections;
-    for(auto* node : nodes){
-        if(node->getIsPersistent()) protect(node, "persistent node");
-        if(!node->getNodeModel().canRemoveWhenUnused())
-            protect(node, "standalone or unclassified model; review manually", false);
-        for(auto& abstract : node->getParameters()){
-            auto* parameter = dynamic_cast<ofxOceanodeAbstractParameter*>(abstract.get());
-            if(parameter == nullptr) continue;
-            if(parameter->isScoped()) protect(node, "Scope: " + parameter->getName());
-            if(parameter->isTimelined()) protect(node, "Timeline: " + parameter->getName());
-            if(published.count(parameter)) protect(node, "Custom GUI, snapshot or Timeline binding: " + parameter->getName());
+    // Host bindings make a node a sink: its work is represented outside the graph.
+    const auto hostSinkReasons = [&](ofxOceanodeContainer& owner, ofxOceanodeNode* node){
+        vector<string> found;
+        if(node->getIsPersistent()) found.push_back("sink: persistent");
+        for(auto* parameter : abstractParameters(node)){
+            const string name = parameter->getName();
+            if(parameter->isScoped()) found.push_back("sink: scope " + name);
+            if(parameter->isTimelined()) found.push_back("sink: timeline " + name);
+            if(published.count(parameter)) found.push_back("sink: binding " + name);
 #ifdef OFXOCEANODE_USE_MIDI
             const string key = parameter->getGroupHierarchyNames()[0] + "-|-" + parameter->getEscapedName();
-            const auto midi = midiBindings.find(key);
-            const auto persistentMidi = persistentMidiBindings.find(key);
-            if((midi != midiBindings.end() && !midi->second.empty()) ||
-               (persistentMidi != persistentMidiBindings.end() && !persistentMidi->second.empty()))
-                protect(node, "MIDI binding: " + parameter->getName());
+            const auto midi = owner.midiBindings.find(key);
+            const auto persistentMidi = owner.persistentMidiBindings.find(key);
+            if((midi != owner.midiBindings.end() && !midi->second.empty()) ||
+               (persistentMidi != owner.persistentMidiBindings.end() && !persistentMidi->second.empty()))
+                found.push_back("sink: MIDI " + name);
 #endif
-            auto links = parameter->getOutConnections();
-            for(auto* incoming : parameter->getInConnections()) links.push_back(incoming);
-            for(auto* link : links){
+        }
+        return found;
+    };
+
+    // The first node inside a Macro that does useful work whatever its pins
+    // connect to; empty when there is none. Router pins never count.
+    std::function<string(ofxOceanodeContainer&, int)> hardSinkInside = [&](ofxOceanodeContainer& inner, int depth) -> string {
+        if(depth > 32) return {};
+        const auto members = inner.getAllModules();
+        std::unordered_set<const ofxOceanodeNodeModel*> insideModels;
+        for(auto* member : members) insideModels.insert(&member->getNodeModel());
+        for(auto* member : members){
+            auto& model = member->getNodeModel();
+            if(dynamic_cast<abstractRouter*>(&model) != nullptr) continue;
+            if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&model)){
+                if(!hardSinkInside(*macro->getContainer(), depth + 1).empty()) return nameOf(member);
+            }
+            if(model.isSink() || !hostSinkReasons(inner, member).empty()) return nameOf(member);
+            if(auto* portal = dynamic_cast<abstractPortal*>(&model)){
+                if(!hasInConnection(portal)) continue;
+                for(auto* peer : ofxOceanodeShared::getPortalsNamed(portal->getName()))
+                    if(peer != portal && portal->isMatching(peer) && insideModels.count(peer) == 0) return nameOf(member);
+            }
+        }
+        return {};
+    };
+
+    std::unordered_map<ofxOceanodeNode*, vector<ofxOceanodeNode*>> feeders, neighbors;
+    std::unordered_map<ofxOceanodeNode*, std::unordered_set<ofxOceanodeAbstractConnection*>> nodeConnections;
+    std::unordered_set<ofxOceanodeNode*> feedsOutside, fedFromOutside;
+    for(auto* node : nodes){
+        for(auto* parameter : abstractParameters(node)){
+            for(auto* link : parameter->getOutConnections()){
                 nodeConnections[node].insert(link);
-                auto* source = link->getSourceParameter().getNodeModel();
-                auto* sink = link->getSinkParameter().getNodeModel();
-                auto other = owners.find(source == &node->getNodeModel() ? sink : source);
-                if(other == owners.end()) protect(node, "connection outside this canvas");
-                else neighbors[node].push_back(other->second);
+                auto other = owners.find(link->getSinkParameter().getNodeModel());
+                if(other == owners.end()){ feedsOutside.insert(node); continue; }
+                feeders[other->second].push_back(node);
+                neighbors[node].push_back(other->second);
+                neighbors[other->second].push_back(node);
+            }
+            for(auto* link : parameter->getInConnections()){
+                nodeConnections[node].insert(link);
+                if(owners.find(link->getSourceParameter().getNodeModel()) == owners.end()) fedFromOutside.insert(node);
             }
         }
     }
 
+    std::unordered_map<ofxOceanodeNode*, vector<string>> reasons;
+    std::unordered_set<ofxOceanodeNode*> live;
+    std::deque<ofxOceanodeNode*> queue;
+    const auto markLive = [&](ofxOceanodeNode* node, string reason){
+        reasons[node].push_back(std::move(reason));
+        if(live.insert(node).second) queue.push_back(node);
+    };
+    // A portal another canvas reads, or a selector there uses, is consumed.
+    const auto consumedOutside = [&](abstractPortal* peer){
+        return outsideSelected.count(peer) != 0 || hasOutConnection(peer);
+    };
+
+    for(auto* node : nodes){
+        auto& model = node->getNodeModel();
+        if(model.isSink()){
+            if(dynamic_cast<abstractRouter*>(&model) != nullptr) markLive(node, "sink: router");
+            else if(!model.hasOutputPin()) markLive(node, "sink: no outputs");
+            else markLive(node, "sink: declared");
+        }
+        for(auto& reason : hostSinkReasons(*this, node)) markLive(node, reason);
+        if(feedsOutside.count(node)) markLive(node, "feeds: outside canvas");
+        if(fedFromOutside.count(node)) markLive(node, "connection: outside canvas");
+        if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&model)){
+            const string inside = hardSinkInside(*macro->getContainer(), 0);
+            if(!inside.empty()) markLive(node, "macro: contains " + inside);
+        }
+        if(auto* portal = dynamic_cast<abstractPortal*>(&model)){
+            if(!hasInConnection(portal)) continue;
+            for(auto* peer : ofxOceanodeShared::getPortalsNamed(portal->getName())){
+                if(peer == portal || !portal->isMatching(peer) || owners.count(peer) != 0) continue;
+                if(consumedOutside(peer)){
+                    markLive(node, "portal: " + portal->getName() + " used by another canvas");
+                    break;
+                }
+            }
+        }
+    }
+
+    while(!queue.empty()){
+        auto* node = queue.front();
+        queue.pop_front();
+        const string name = nameOf(node);
+        for(auto* feeder : feeders[node]) markLive(feeder, "feeds: " + name);
+        auto& model = node->getNodeModel();
+        if(auto* portal = dynamic_cast<abstractPortal*>(&model)){
+            // A live portal keeps the writers that send to it.
+            for(auto* peer : ofxOceanodeShared::getPortalsNamed(portal->getName())){
+                if(peer == portal || !portal->isMatching(peer)) continue;
+                auto found = owners.find(peer);
+                if(found != owners.end() && hasInConnection(peer))
+                    markLive(found->second, "portal: " + portal->getName() + " used by " + name);
+            }
+        }
+        if(auto* selector = dynamic_cast<portalSelectorBase*>(&model)){
+            if(auto* selected = selector->getSelectedPortal()){
+                auto found = owners.find(selected);
+                if(found != owners.end()) markLive(found->second, "portal: " + selected->getName() + " used by " + name);
+            }
+        }
+    }
+
+    for(auto* node : nodes){
+        if(live.count(node) == 0) continue;
+        auto& found = reasons[node];
+        std::sort(found.begin(), found.end());
+        found.erase(std::unique(found.begin(), found.end()), found.end());
+        plan.kept.push_back({nameOf(node), found});
+    }
+
+    // Dead nodes form groups wherever cables join them.
     std::unordered_set<ofxOceanodeNode*> visited;
     for(auto* node : nodes){
-        if(!visited.insert(node).second) continue;
+        if(live.count(node) != 0 || !visited.insert(node).second) continue;
         vector<ofxOceanodeNode*> component{node};
         vector<string> names;
         std::unordered_set<ofxOceanodeAbstractConnection*> links;
-        bool hasUsage = false;
-        bool hasKnownUsage = false;
-        vector<string> groupReasons;
         for(size_t i = 0; i < component.size(); ++i){
             auto* member = component[i];
-            hasUsage |= used.count(member) != 0;
-            hasKnownUsage |= knownUsage.count(member) != 0;
-            groupReasons.insert(groupReasons.end(), reasons[member].begin(), reasons[member].end());
-            names.push_back(member->getParameters().getEscapedName());
+            names.push_back(nameOf(member));
             links.insert(nodeConnections[member].begin(), nodeConnections[member].end());
-            for(auto* neighbor : neighbors[member]){
-                if(visited.insert(neighbor).second) component.push_back(neighbor);
-            }
+            for(auto* neighbor : neighbors[member])
+                if(live.count(neighbor) == 0 && visited.insert(neighbor).second) component.push_back(neighbor);
         }
         std::sort(names.begin(), names.end());
-        if(hasUsage){
-            plan.preservedNodes += names.size();
-            std::sort(groupReasons.begin(), groupReasons.end());
-            groupReasons.erase(std::unique(groupReasons.begin(), groupReasons.end()), groupReasons.end());
-            plan.protectedGroups.push_back({std::move(names), std::move(groupReasons), !hasKnownUsage});
-        }
-        else {
-            plan.groups.push_back(std::move(names));
-            plan.connectionCount += links.size();
-        }
+        plan.groups.push_back({std::move(names), links.size(), true});
     }
-    std::sort(plan.groups.begin(), plan.groups.end());
-    std::sort(plan.protectedGroups.begin(), plan.protectedGroups.end(),
+    std::sort(plan.groups.begin(), plan.groups.end(),
               [](const auto& a, const auto& b){ return a.nodes < b.nodes; });
+    std::sort(plan.kept.begin(), plan.kept.end(),
+              [](const auto& a, const auto& b){ return a.node < b.node; });
     return plan;
 }
 
 bool ofxOceanodeContainer::removeUnusedNodes(const UnusedNodePlan& plan){
     const auto current = findUnusedNodes();
-    if(current.revision != plan.revision || current.groups != plan.groups ||
-       current.connectionCount != plan.connectionCount) return false;
+    if(current.revision != plan.revision || current.groups.size() != plan.groups.size()) return false;
+    for(size_t i = 0; i < plan.groups.size(); ++i)
+        if(current.groups[i].nodes != plan.groups[i].nodes) return false;
+    // One canvas edit, so a single undo restores every removed group. Join an
+    // edit already in progress rather than closing it early.
+    const bool standalone = !pendingCanvasEdit;
+    beginCanvasEdit();
     // Use native deletion so cables, listeners and model resources are released.
     for(const auto& group : plan.groups){
-        for(const auto& name : group){
+        if(!group.selected) continue;
+        for(const auto& name : group.nodes){
             auto found = parameterGroupNodesMap.find(name);
             if(found == parameterGroupNodesMap.end()) continue;
             auto* node = found->second;
@@ -2448,6 +2595,7 @@ bool ofxOceanodeContainer::removeUnusedNodes(const UnusedNodePlan& plan){
             node->deleteSelf();
         }
     }
+    if(standalone) endCanvasEdit();
     return true;
 }
 

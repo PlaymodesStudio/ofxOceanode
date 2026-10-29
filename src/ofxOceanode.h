@@ -187,6 +187,9 @@ private:
     bool showUnusedNodesWindow = false;
     bool focusUnusedNodesWindow = false;
     std::string unusedNodesSelectedNode;
+    int unusedNodesSelectedGroup = -1;
+    int unusedNodesOpenGroup = -1;            // fold state to open on the next frame
+    bool unusedNodesScrollToSelection = false; // keep a key-selected row in view
     void drawUnusedNodesWindow();
     bool unusedNodesPlanChanged = false;
     unique_ptr<ofxOceanodeControls> controls;
