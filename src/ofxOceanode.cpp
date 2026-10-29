@@ -237,18 +237,36 @@ void ofxOceanode::drawUnusedNodesWindow(){
     if(ImGui::Begin("Remove unused nodes", &showUnusedNodesWindow, ImGuiWindowFlags_NoDocking)){
         auto target = unusedNodeContainer.lock();
         const bool targetChanged = target && target->getNodesRevision() != unusedNodePlan.revision;
-        auto drawNode = [&](const string& name){
-            // Resolve by name only while the reviewed graph still owns the same nodes.
-            // Never retain node pointers across frames: edits and preset loads can delete them.
-            ImGui::BeginDisabled(!target || targetChanged);
-            if(ImGui::Selectable(name.c_str(), unusedNodesSelectedNode == name)){
-                const auto& nodes = target->getParameterGroupNodesMap();
+        // Selecting from here never takes focus: this window stays the one the arrow
+        // keys go to, and the canvas does not start nudging the nodes just selected.
+        // Resolve by name only while the reviewed graph still owns the same nodes.
+        // Never retain node pointers across frames: edits and preset loads can delete them.
+        auto selectNode = [&](const string& name){
+            if(!target || targetChanged) return false;
+            const auto& nodes = target->getParameterGroupNodesMap();
+            auto found = nodes.find(name);
+            if(found == nodes.end() || !target->showNodeInCanvas(*found->second, {}, false)) return false;
+            unusedNodesSelectedNode = name;
+            unusedNodesSelectedGroup = -1;
+            return true;
+        };
+        auto selectGroup = [&](int index){
+            if(!target || targetChanged || index < 0 || index >= static_cast<int>(unusedNodePlan.groups.size())) return false;
+            vector<ofxOceanodeNode*> members;
+            const auto& nodes = target->getParameterGroupNodesMap();
+            for(const auto& name : unusedNodePlan.groups[index].nodes){
                 auto found = nodes.find(name);
-                if(found != nodes.end() && target->showNodeInCanvas(*found->second)){
-                    unusedNodesSelectedNode = name;
-                    unusedNodesSelectedGroup = -1;
-                }
+                if(found != nodes.end()) members.push_back(found->second);
             }
+            if(!target->showNodesInCanvas(members, false)) return false;
+            unusedNodesSelectedGroup = index;
+            unusedNodesSelectedNode.clear();
+            return true;
+        };
+        auto drawNode = [&](const string& name){
+            ImGui::BeginDisabled(!target || targetChanged);
+            if(ImGui::Selectable(name.c_str(), unusedNodesSelectedNode == name)) selectNode(name);
+            if(unusedNodesScrollToSelection && unusedNodesSelectedNode == name) ImGui::SetScrollHereY(0.5f);
             ImGui::EndDisabled();
         };
         // Recompute the plan, keeping groups the user unticked while they stay the same.
@@ -274,36 +292,41 @@ void ofxOceanode::drawUnusedNodesWindow(){
                     nodeCount, groupCount, connectionCount, unusedNodePlan.kept.size());
         ImGui::TextWrapped("Sinks, bound parameters and everything feeding them are kept. "
                            "Undo (Cmd/Ctrl+Z) restores a removal.");
-        ImGui::TextWrapped("Click a node to open its canvas, select it and center the view. "
-                           "Click a group to select all its nodes on the canvas. Untick a group to keep it.");
+        ImGui::TextWrapped("Click a node to select it on its canvas, or a group to select all its nodes. "
+                           "Up and Down move through the list, Left on a group goes to its first node, "
+                           "Right goes back to the group. Untick a group to keep it.");
         if(unusedNodePlan.groups.empty()) ImGui::TextUnformatted("No removable unused nodes found.");
+        // The rows in the order they are drawn: a group header (node empty), a node
+        // inside a group, or a kept node (group -1). Arrow keys walk this list.
+        struct NavItem { int group; string node; };
+        vector<NavItem> navItems;
         if(!unusedNodePlan.groups.empty() || !unusedNodePlan.kept.empty()){
             ImGui::BeginChild("Unused node summary", ImVec2(0, std::max(100.0f, ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 4.0f)), true);
             for(size_t i = 0; i < unusedNodePlan.groups.size(); ++i){
                 auto& group = unusedNodePlan.groups[i];
-                ImGui::PushID(static_cast<int>(i));
+                const int groupIndex = static_cast<int>(i);
+                ImGui::PushID(groupIndex);
                 ImGui::Checkbox(("##group" + ofToString(i)).c_str(), &group.selected);
                 ImGui::SameLine();
                 const string title = "Group " + ofToString(i + 1) + ": " + group.nodes.front()
                     + " (" + ofToString(group.nodes.size()) + " nodes, " + ofToString(group.connections) + " connections)";
-                const ImGuiTreeNodeFlags headerFlags = ImGuiTreeNodeFlags_DefaultOpen |
-                    (unusedNodesSelectedGroup == static_cast<int>(i) ? ImGuiTreeNodeFlags_Selected : 0);
-                const bool groupOpen = ImGui::TreeNodeEx(title.c_str(), headerFlags);
-                // Clicking the header (not its arrow) selects the whole group on the canvas.
-                if(ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen() && target && !targetChanged){
-                    vector<ofxOceanodeNode*> members;
-                    const auto& nodes = target->getParameterGroupNodesMap();
-                    for(const auto& name : group.nodes){
-                        auto found = nodes.find(name);
-                        if(found != nodes.end()) members.push_back(found->second);
-                    }
-                    if(target->showNodesInCanvas(members)){
-                        unusedNodesSelectedGroup = static_cast<int>(i);
-                        unusedNodesSelectedNode.clear();
-                    }
+                // OpenOnArrow: only the arrow folds the group, a click on the label selects it.
+                const ImGuiTreeNodeFlags headerFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnArrow |
+                    (unusedNodesSelectedGroup == groupIndex ? ImGuiTreeNodeFlags_Selected : 0);
+                if(unusedNodesOpenGroup == groupIndex){
+                    ImGui::SetNextItemOpen(true);
+                    unusedNodesOpenGroup = -1;
                 }
+                const bool groupOpen = ImGui::TreeNodeEx(title.c_str(), headerFlags);
+                navItems.push_back({groupIndex, ""});
+                if(unusedNodesScrollToSelection && unusedNodesSelectedGroup == groupIndex) ImGui::SetScrollHereY(0.5f);
+                // Clicking the header (not its arrow) selects the whole group on the canvas.
+                if(ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen()) selectGroup(groupIndex);
                 if(groupOpen){
-                    for(const auto& name : group.nodes) drawNode(name);
+                    for(const auto& name : group.nodes){
+                        drawNode(name);
+                        navItems.push_back({groupIndex, name});
+                    }
                     ImGui::TreePop();
                 }
                 ImGui::PopID();
@@ -315,7 +338,11 @@ void ofxOceanode::drawUnusedNodesWindow(){
             for(size_t i = 0; i < unusedNodePlan.kept.size(); ++i){
                 const auto& kept = unusedNodePlan.kept[i];
                 ImGui::PushID(static_cast<int>(i));
-                if(ImGui::TreeNode(("Kept: " + kept.node).c_str())){
+                const ImGuiTreeNodeFlags keptFlags = unusedNodesSelectedNode == kept.node ? ImGuiTreeNodeFlags_Selected : 0;
+                const bool keptOpen = ImGui::TreeNodeEx(("Kept: " + kept.node).c_str(), keptFlags);
+                navItems.push_back({-1, kept.node});
+                if(unusedNodesScrollToSelection && unusedNodesSelectedNode == kept.node) ImGui::SetScrollHereY(0.5f);
+                if(keptOpen){
                     drawNode(kept.node);
                     for(const auto& reason : kept.reasons) ImGui::TextWrapped("%s", reason.c_str());
                     ImGui::TreePop();
@@ -324,6 +351,56 @@ void ofxOceanode::drawUnusedNodesWindow(){
             }
             ImGui::EndChild();
         }
+        unusedNodesScrollToSelection = false;
+
+        // Keyboard: only while this window has focus and nothing is being typed or dragged.
+        const ImGuiIO& io = ImGui::GetIO();
+        if(target && !targetChanged && !navItems.empty() &&
+           ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+           !io.KeyCtrl && !io.KeySuper && !io.KeyAlt && !io.KeyShift &&
+           !io.WantTextInput && !ImGui::IsAnyItemActive()){
+            const int groupCountNow = static_cast<int>(unusedNodePlan.groups.size());
+            // The group a selected node belongs to, or -1 for a kept node.
+            int selectedNodeGroup = -1;
+            for(int g = 0; g < groupCountNow && !unusedNodesSelectedNode.empty(); ++g){
+                const auto& names = unusedNodePlan.groups[g].nodes;
+                if(std::find(names.begin(), names.end(), unusedNodesSelectedNode) != names.end()) selectedNodeGroup = g;
+            }
+            // Where the selection sits in this frame's list. A node inside a folded
+            // group is not listed, so stand on its group header instead.
+            int current = -1;
+            for(int i = 0; i < static_cast<int>(navItems.size()) && current < 0; ++i){
+                const auto& item = navItems[i];
+                if(unusedNodesSelectedGroup >= 0 && item.group == unusedNodesSelectedGroup && item.node.empty()) current = i;
+                else if(unusedNodesSelectedGroup < 0 && !unusedNodesSelectedNode.empty() && item.node == unusedNodesSelectedNode) current = i;
+            }
+            if(current < 0 && selectedNodeGroup >= 0){
+                for(int i = 0; i < static_cast<int>(navItems.size()) && current < 0; ++i)
+                    if(navItems[i].group == selectedNodeGroup && navItems[i].node.empty()) current = i;
+            }
+            const int step = int(ImGui::IsKeyPressed(ImGuiKey_DownArrow, true)) - int(ImGui::IsKeyPressed(ImGuiKey_UpArrow, true));
+            bool moved = false;
+            if(step != 0){
+                const int next = current < 0 ? 0 : std::clamp(current + step, 0, static_cast<int>(navItems.size()) - 1);
+                if(next != current){
+                    const auto& item = navItems[next];
+                    moved = item.node.empty() ? selectGroup(item.group) : selectNode(item.node);
+                }
+            }else if(ImGui::IsKeyPressed(ImGuiKey_LeftArrow, false)){
+                // On a group header: open the group and go to its first node.
+                if(unusedNodesSelectedGroup >= 0 && unusedNodesSelectedGroup < groupCountNow &&
+                   !unusedNodePlan.groups[unusedNodesSelectedGroup].nodes.empty()){
+                    const int groupIndex = unusedNodesSelectedGroup;
+                    moved = selectNode(unusedNodePlan.groups[groupIndex].nodes.front());
+                    if(moved) unusedNodesOpenGroup = groupIndex;
+                }
+            }else if(ImGui::IsKeyPressed(ImGuiKey_RightArrow, false)){
+                // On a node inside a group: back to the group.
+                if(unusedNodesSelectedGroup < 0 && selectedNodeGroup >= 0) moved = selectGroup(selectedNodeGroup);
+            }
+            if(moved) unusedNodesScrollToSelection = true;
+        }
+
         if(unusedNodesPlanChanged) ImGui::TextWrapped("Usage changed. The summary has been refreshed; review it before removing.");
         if(!target) ImGui::TextWrapped("The reviewed canvas is closed. Reopen this window from Edit to review another canvas.");
         if(targetChanged) ImGui::TextWrapped("The canvas changed. Refresh the summary before removing.");

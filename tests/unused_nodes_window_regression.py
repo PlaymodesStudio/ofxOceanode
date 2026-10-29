@@ -20,7 +20,7 @@ struct ofxOceanode {
     weak_ptr<ofxOceanodeContainer> unusedNodeContainer;
     bool showUnusedNodesWindow=false,focusUnusedNodesWindow=false,unusedNodesPlanChanged=false;
     string unusedNodesSelectedNode;
-    int unusedNodesSelectedGroup=-1;
+    int unusedNodesSelectedGroup=-1,unusedNodesOpenGroup=-1;bool unusedNodesScrollToSelection=false;
     void drawUnusedNodesWindow();
     void open(shared_ptr<ofxOceanodeContainer> target){
         unusedNodeContainer=target;unusedNodePlan=target->findUnusedNodes();
@@ -47,7 +47,7 @@ bool trackedTree(const char* name){
 bool trackedTreeEx(const char* name,ImGuiTreeNodeFlags flags){
     bool open=ImGui::TreeNodeEx(name,flags);
     auto a=ImGui::GetItemRectMin(),b=ImGui::GetItemRectMax();
-    rowPoints[name]={a.x+60.f,(a.y+b.y)*.5f};return open;
+    rowPoints[name]={a.x+60.f,(a.y+b.y)*.5f};rowPoints[string(name)+"#arrow"]={a.x+9.f,(a.y+b.y)*.5f};return open;
 }
 bool trackedButton(const char* name,ImVec2 size){
     bool clicked=ImGui::Button(name,size);
@@ -59,6 +59,12 @@ bool trackedButton(const char* name,ImVec2 size){
 CASES = r'''
 using Group=ofxOceanodeContainer::UnusedNodePlan::Group;
 using Kept=ofxOceanodeContainer::UnusedNodePlan::Kept;
+static ImVec2 ptAt(map<string,ImVec2>& points,const string& key,int line){
+    auto found=points.find(key);
+    if(found==points.end()){fprintf(stderr,"Line %d: no widget named '%s' on screen\n",line,key.c_str());abort();}
+    return found->second;
+}
+#define pt(points,key) ptAt(points,key,__LINE__)
 static ofxOceanode app;
 static int underlyingClicks=0;
 static ImVec2 underlying;
@@ -111,36 +117,36 @@ int main(){
     auto* review=ImGui::FindWindowByName("Remove unused nodes");assert(review);
     assert(!(review->Flags&(ImGuiWindowFlags_Modal|ImGuiWindowFlags_Popup)));
     click(underlying);assert(underlyingClicks==1&&app.showUnusedNodesWindow);
-    click(rowPoints.at("1"));
+    click(pt(rowPoints,"1"));
     assert(ofxOceanodeShared::selected==candidate&&candidate->gui.selected);
     assert(app.unusedNodesSelectedNode=="1"&&app.showUnusedNodesWindow);centered(rootView,candidate);
 
     // The reviewed Macro may have been hidden since opening the review.
     inner->container->plan.groups={Group{{"4"},0,true}};
     inner->container->plan.kept={Kept{"5",{"sink: declared"}}};
-    app.open(inner->container);idle();click(rowPoints.at("4"));
+    app.open(inner->container);idle();click(pt(rowPoints,"4"));
     assert(inner->visible&&inner->activations==1&&ofxOceanodeShared::selected==nested);
     assert(ofxOceanodeShared::active==inner->canvas.uniqueID&&app.showUnusedNodesWindow);
     views={&inner->canvas};idle();centered(inner->canvas,nested);
     // Kept nodes start collapsed; opening one shows its row for navigation.
     assert(rowPoints.count("5")==0&&rowPoints.count("Kept: 5")==1);
-    click(rowPoints.at("Kept: 5"));assert(rowPoints.count("5")==1);
-    click(rowPoints.at("5"));
+    click(pt(rowPoints,"Kept: 5"));assert(rowPoints.count("5")==1);
+    click(pt(rowPoints,"5"));
     assert(protectedNode->gui.selected&&!nested->gui.selected&&app.unusedNodesSelectedNode=="5");
     centered(inner->canvas,protectedNode);
 
     // Graph changes must not navigate to replacement nodes with the same name.
     inner->container->nodes.erase(4);add(*inner->container,4);++inner->container->revision;
-    auto* selected=ofxOceanodeShared::selected;idle();click(rowPoints.at("4"));
+    auto* selected=ofxOceanodeShared::selected;idle();click(pt(rowPoints,"4"));
     assert(ofxOceanodeShared::selected==selected);
-    click(buttonPoints.at("Remove"));assert(inner->container->removals==0&&app.showUnusedNodesWindow);
-    click(buttonPoints.at("Refresh"));assert(app.unusedNodePlan.revision==inner->container->revision);
-    click(rowPoints.at("4"));assert(ofxOceanodeShared::selected==inner->container->nodes[4].get());
+    click(pt(buttonPoints,"Remove"));assert(inner->container->removals==0&&app.showUnusedNodesWindow);
+    click(pt(buttonPoints,"Refresh"));assert(app.unusedNodePlan.revision==inner->container->revision);
+    click(pt(rowPoints,"4"));assert(ofxOceanodeShared::selected==inner->container->nodes[4].get());
 
     // Usage-only changes are revalidated on Remove; the revised proposal stays open.
-    inner->container->removalAllowed=false;click(buttonPoints.at("Remove"));
+    inner->container->removalAllowed=false;click(pt(buttonPoints,"Remove"));
     assert(app.showUnusedNodesWindow&&app.unusedNodesPlanChanged&&inner->container->removals==1);
-    inner->container->removalAllowed=true;click(buttonPoints.at("Remove"));
+    inner->container->removalAllowed=true;click(pt(buttonPoints,"Remove"));
     assert(app.showUnusedNodesWindow&&!app.unusedNodesPlanChanged&&inner->container->removals==2);
 
     // Ticks: only ticked groups reach removal, Remove needs one, and ticks survive the refresh after it.
@@ -148,14 +154,14 @@ int main(){
     inner->container->plan.kept.clear();inner->container->lastSelected.clear();
     app.open(inner->container);idle();
     assert(rowPoints.count("##group0")==1&&rowPoints.count("##group1")==1);
-    click(rowPoints.at("##group1"));assert(app.unusedNodePlan.groups[0].selected&&!app.unusedNodePlan.groups[1].selected);
-    click(buttonPoints.at("Remove"));
+    click(pt(rowPoints,"##group1"));assert(app.unusedNodePlan.groups[0].selected&&!app.unusedNodePlan.groups[1].selected);
+    click(pt(buttonPoints,"Remove"));
     assert(inner->container->removals==3&&inner->container->lastSelected==vector<bool>({true,false}));
     assert(app.showUnusedNodesWindow&&!app.unusedNodePlan.groups[1].selected&&app.unusedNodePlan.groups[0].selected);
-    click(rowPoints.at("##group0"));assert(!app.unusedNodePlan.groups[0].selected);
-    click(buttonPoints.at("Remove"));assert(inner->container->removals==3);
-    click(rowPoints.at("##group0"));assert(app.unusedNodePlan.groups[0].selected);
-    click(buttonPoints.at("Refresh"));assert(app.unusedNodePlan.groups[0].selected&&!app.unusedNodePlan.groups[1].selected);
+    click(pt(rowPoints,"##group0"));assert(!app.unusedNodePlan.groups[0].selected);
+    click(pt(buttonPoints,"Remove"));assert(inner->container->removals==3);
+    click(pt(rowPoints,"##group0"));assert(app.unusedNodePlan.groups[0].selected);
+    click(pt(buttonPoints,"Refresh"));assert(app.unusedNodePlan.groups[0].selected&&!app.unusedNodePlan.groups[1].selected);
 
     // Clicking a group header selects all its nodes and centers on the one nearest their middle.
     {
@@ -166,34 +172,96 @@ int main(){
         app.open(inner->container);views={&inner->canvas};idle();
         const string header="Group 1: 4 (3 nodes, 0 connections)";
         assert(rowPoints.count(header)==1&&app.unusedNodesSelectedGroup==-1);
-        click(rowPoints.at(header));
+        click(pt(rowPoints,header));
         assert(first->gui.selected&&second->gui.selected&&third->gui.selected);
         assert(app.unusedNodesSelectedGroup==0&&app.unusedNodesSelectedNode.empty());
         assert(ofxOceanodeShared::selected==second&&app.showUnusedNodesWindow);
         idle();centered(inner->canvas,second);
         // Picking one node afterwards replaces the group selection.
-        click(rowPoints.at("4"));
+        click(pt(rowPoints,"4"));
         assert(first->gui.selected&&!second->gui.selected&&!third->gui.selected);
         assert(app.unusedNodesSelectedGroup==-1&&app.unusedNodesSelectedNode=="4");
         // A changed canvas must not navigate: selection stays as it was.
         first->gui.selected=false;++inner->container->revision;idle();
-        click(rowPoints.at(header));
+        click(pt(rowPoints,header));
         assert(!first->gui.selected&&!second->gui.selected&&!third->gui.selected&&app.unusedNodesSelectedGroup==-1);
-        click(buttonPoints.at("Refresh"));click(rowPoints.at(header));
+        click(pt(buttonPoints,"Refresh"));click(pt(rowPoints,header));
         assert(first->gui.selected&&second->gui.selected&&third->gui.selected&&app.unusedNodesSelectedGroup==0);
         // Unticking a group does not select its nodes.
         first->gui.selected=second->gui.selected=third->gui.selected=false;
-        click(rowPoints.at("##group0"));
+        click(pt(rowPoints,"##group0"));
         assert(!first->gui.selected&&!second->gui.selected&&!third->gui.selected&&!app.unusedNodePlan.groups[0].selected);
+    }
+
+    // Keyboard: Up/Down walk the list, Left on a group goes to its first node, Right goes back to the group.
+    {
+        auto press=[&](ImGuiKey key){
+            auto& keys=ImGui::GetIO();keys.AddKeyEvent(key,true);frame();keys.AddKeyEvent(key,false);frame();idle();
+        };
+        auto where=[&]()->string{
+            return app.unusedNodesSelectedGroup>=0?"group"+to_string(app.unusedNodesSelectedGroup):app.unusedNodesSelectedNode;
+        };
+        auto* n4=inner->container->nodes[4].get();auto* n5=inner->container->nodes[5].get();
+        auto* n6=inner->container->nodes[6].get();add(*inner->container,7);
+        inner->container->plan.groups={Group{{"4","5"},0,true},Group{{"6"},0,true}};
+        inner->container->plan.kept={Kept{"7",{"sink: declared"}}};
+        app.open(inner->container);views={&inner->canvas};idle();
+        const int focusBefore=inner->canvas.focusRequests,topBefore=inner->canvas.topRequests;
+        auto* review=ImGui::FindWindowByName("Remove unused nodes");
+        assert(where()==""&&GImGui->NavWindow&&GImGui->NavWindow->RootWindow==review);
+        press(ImGuiKey_DownArrow);assert(where()=="group0"&&n4->gui.selected&&n5->gui.selected&&!n6->gui.selected);
+        press(ImGuiKey_DownArrow);assert(where()=="4"&&n4->gui.selected&&!n5->gui.selected);
+        press(ImGuiKey_DownArrow);assert(where()=="5"&&n5->gui.selected&&!n4->gui.selected);
+        press(ImGuiKey_DownArrow);assert(where()=="group1"&&n6->gui.selected&&!n5->gui.selected);
+        press(ImGuiKey_DownArrow);assert(where()=="6");
+        press(ImGuiKey_DownArrow);assert(where()=="7");
+        press(ImGuiKey_DownArrow);assert(where()=="7");
+        press(ImGuiKey_UpArrow);assert(where()=="6");
+        press(ImGuiKey_UpArrow);assert(where()=="group1");
+        press(ImGuiKey_RightArrow);assert(where()=="group1");
+        press(ImGuiKey_LeftArrow);assert(where()=="6"&&n6->gui.selected);
+        press(ImGuiKey_LeftArrow);assert(where()=="6");
+        press(ImGuiKey_RightArrow);assert(where()=="group1"&&n6->gui.selected);
+        press(ImGuiKey_UpArrow);assert(where()=="5");
+        press(ImGuiKey_RightArrow);assert(where()=="group0"&&n4->gui.selected&&n5->gui.selected);
+        press(ImGuiKey_LeftArrow);assert(where()=="4"&&n4->gui.selected&&!n5->gui.selected);
+        // Navigating never moved focus to a canvas, so a later arrow cannot nudge its nodes.
+        assert(inner->canvas.focusRequests==focusBefore&&inner->canvas.topRequests==topBefore);
+        assert(GImGui->NavWindow&&GImGui->NavWindow->RootWindow==review);
+        // A folded group is skipped by Up/Down, and Left on it opens it on its first node.
+        press(ImGuiKey_RightArrow);assert(where()=="group0");
+        click(pt(rowPoints,"Group 1: 4 (2 nodes, 0 connections)#arrow"));
+        assert(rowPoints.count("4")==0&&rowPoints.count("5")==0&&where()=="group0");
+        press(ImGuiKey_DownArrow);assert(where()=="group1");
+        press(ImGuiKey_UpArrow);assert(where()=="group0");
+        press(ImGuiKey_LeftArrow);assert(where()=="4"&&rowPoints.count("4")==1&&rowPoints.count("5")==1);
+        // A selected node inside a folded group: Up/Down stand on its group header, Right goes to the group.
+        click(pt(rowPoints,"Group 1: 4 (2 nodes, 0 connections)#arrow"));
+        assert(rowPoints.count("4")==0&&where()=="4");
+        press(ImGuiKey_DownArrow);assert(where()=="group1");
+        press(ImGuiKey_UpArrow);assert(where()=="group0");
+        press(ImGuiKey_LeftArrow);assert(where()=="4"&&rowPoints.count("4")==1);
+        click(pt(rowPoints,"Group 1: 4 (2 nodes, 0 connections)#arrow"));
+        assert(rowPoints.count("4")==0&&where()=="4");
+        press(ImGuiKey_RightArrow);assert(where()=="group0");
+        click(pt(rowPoints,"Group 1: 4 (2 nodes, 0 connections)#arrow"));
+        // Keys do nothing once the canvas changed, or when another window has focus.
+        const string before=where();++inner->container->revision;idle();
+        press(ImGuiKey_DownArrow);assert(where()==before);
+        click(pt(buttonPoints,"Refresh"));
+        assert(where()=="");
+        press(ImGuiKey_DownArrow);assert(where()=="group0");
+        const string settled=where();
+        click(underlying);press(ImGuiKey_DownArrow);assert(where()==settled);
     }
 
     // Expired canvases keep a readable, closable window with disabled actions.
     auto temporary=make_shared<ofxOceanodeContainer>();temporary->plan.groups={Group{{"7"},0,true}};add(*temporary,7);
-    app.open(temporary);idle();temporary.reset();idle();click(rowPoints.at("7"));
-    assert(app.showUnusedNodesWindow);click(buttonPoints.at("Remove"));assert(app.showUnusedNodesWindow);
-    click(buttonPoints.at("Close"));assert(!app.showUnusedNodesWindow);
+    app.open(temporary);idle();temporary.reset();idle();click(pt(rowPoints,"7"));
+    assert(app.showUnusedNodesWindow);click(pt(buttonPoints,"Remove"));assert(app.showUnusedNodesWindow);
+    click(pt(buttonPoints,"Close"));assert(!app.showUnusedNodesWindow);
     ImGui::DestroyContext();
-    puts("Cleanup review passed: non-modal interaction, root/nested/kept navigation, zoom, stale/replaced nodes, refresh, usage revalidation, group ticks, group selection on the canvas, persistent window and expired canvases.");
+    puts("Cleanup review passed: non-modal interaction, root/nested/kept navigation, zoom, stale/replaced nodes, refresh, usage revalidation, group ticks, group selection on the canvas, arrow-key navigation, persistent window and expired canvases.");
 }
 '''
 
@@ -217,6 +285,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='oceanode-unused-review-') as directory:
         work=Path(directory);(work/'imconfig.h').write_text('')
         cpp=work/'test.cpp';cpp.write_text(code);binary=work/'test'
+        if os.environ.get('OCEANODE_KEEP_TEST_SOURCE'): Path(os.environ['OCEANODE_KEEP_TEST_SOURCE']).write_text(code)
         subprocess.run([os.environ.get('CXX','clang++'),'-std=c++17','-O1','-g','-fsanitize=address,undefined',
                         '-I',str(IMGUI),'-I',str(work),str(cpp),*[str(IMGUI/name) for name in
                         ('imgui.cpp','imgui_draw.cpp','imgui_widgets.cpp','imgui_tables.cpp')],'-o',str(binary)],check=True)

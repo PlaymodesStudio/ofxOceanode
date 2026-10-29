@@ -984,11 +984,11 @@ ofxOceanodeNodeMacro::WindowTarget ofxOceanodeNodeMacro::windowTargetFor(ofxOcea
 	return {&window, nullptr};
 }
 
-void ofxOceanodeNodeMacro::activateWindow(){
+void ofxOceanodeNodeMacro::activateWindow(bool focus){
 	auto& window = windowInstance();
 	window.showWindow = true;
 	window.canvas.forceDockWindow();
-	window.canvas.requestFocus();
+	if(focus) window.canvas.requestFocus();
 }
 
 void ofxOceanodeNodeMacro::hideSharedWindow(){

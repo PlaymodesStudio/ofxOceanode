@@ -63,7 +63,8 @@ struct ofxOceanodeCanvas {
     glm::vec2 contentRegionSize{800,600},scrolling;
     float zoomLevel=1;
     ofxOceanodeNode* pendingCenterNode=nullptr; int pendingCenterFrames=0;
-    void requestFocus(){focusPending=true;} void bringOnTop(){onTop=true;}
+    int focusRequests=0,topRequests=0;
+    void requestFocus(){focusPending=true;++focusRequests;} void bringOnTop(){onTop=true;++topRequests;}
     void requestCenterOnNode(ofxOceanodeNode* n,int frames){pendingCenterNode=n;pendingCenterFrames=max(0,frames);}
     string getUniqueID(){return uniqueID;}
     float getZoomLevel(){return zoomLevel;} glm::vec2 getContentRegionSize(){return contentRegionSize;}
@@ -79,14 +80,14 @@ struct ofxOceanodeContainer {
         map<int,ofxOceanodeNode*> out;for(auto& p:nodes)out[p.first]=p.second.get();return out;
     }
     void deselectAllComments(){}
-    bool showNodeInCanvas(ofxOceanodeNode& node, const vector<ofxOceanodeNode*>& alsoSelect = {});
-    bool showNodesInCanvas(const vector<ofxOceanodeNode*>& nodes);
+    bool showNodeInCanvas(ofxOceanodeNode& node, const vector<ofxOceanodeNode*>& alsoSelect = {}, bool takeFocus = true);
+    bool showNodesInCanvas(const vector<ofxOceanodeNode*>& nodes, bool takeFocus = true);
 };
 struct ofxOceanodeNodeMacro:Model {
     shared_ptr<ofxOceanodeContainer> container=make_shared<ofxOceanodeContainer>();
     ofxOceanodeCanvas canvas; int activations=0; bool visible=true;
     auto getContainer(){return container;} auto getCanvas(){return &canvas;}
-    void activateWindow(){visible=true;++activations;canvas.requestFocus();}
+    void activateWindow(bool focus=true){visible=true;++activations;if(focus)canvas.requestFocus();}
     struct WindowTarget {ofxOceanodeNodeMacro* macro; ofxOceanodeNode* node;};
     ofxOceanodeNodeMacro& windowInstance(){return *this;}
     WindowTarget windowTargetFor(ofxOceanodeNode* node){return {this,node};}

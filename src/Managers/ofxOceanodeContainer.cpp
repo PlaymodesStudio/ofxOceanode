@@ -2242,7 +2242,7 @@ bool ofxOceanodeContainer::showParameterInCanvas(ofxOceanodeAbstractParameter& p
     return showNodeInCanvas(*node);
 }
 
-bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode, const vector<ofxOceanodeNode*>& alsoSelect)
+bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode, const vector<ofxOceanodeNode*>& alsoSelect, bool takeFocus)
 {
     auto* rootContainer = ofxOceanodeShared::getRootContainer();
     auto* rootCanvas = ofxOceanodeShared::getRootCanvas();
@@ -2287,7 +2287,7 @@ bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode, const v
         location.macro = shown.macro;
         location.container = shown.macro->getContainer().get();
         if(shown.node == nullptr){
-            shown.macro->activateWindow();
+            shown.macro->activateWindow(takeFocus);
             return true;
         }
         location.node = shown.node;
@@ -2305,13 +2305,13 @@ bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode, const v
     }
 
     if(location.macro != nullptr){
-        location.macro->activateWindow();
+        location.macro->activateWindow(takeFocus);
         location.canvas = location.macro->getCanvas();
-    }else{
+    }else if(takeFocus){
         location.canvas->requestFocus();
     }
 
-    location.canvas->bringOnTop();
+    if(takeFocus) location.canvas->bringOnTop();
     ofxOceanodeShared::setActiveCanvasUniqueID(location.canvas->getUniqueID());
     ofxOceanodeShared::nodeSelectedInCanvas(location.node);
     location.canvas->requestCenterOnNode(location.node,
@@ -2319,7 +2319,7 @@ bool ofxOceanodeContainer::showNodeInCanvas(ofxOceanodeNode& targetNode, const v
     return true;
 }
 
-bool ofxOceanodeContainer::showNodesInCanvas(const vector<ofxOceanodeNode*>& nodes)
+bool ofxOceanodeContainer::showNodesInCanvas(const vector<ofxOceanodeNode*>& nodes, bool takeFocus)
 {
     if(nodes.empty()) return false;
     float sumX = 0, sumY = 0;
@@ -2342,7 +2342,7 @@ bool ofxOceanodeContainer::showNodesInCanvas(const vector<ofxOceanodeNode*>& nod
     vector<ofxOceanodeNode*> others;
     for(auto* node : nodes)
         if(node != center) others.push_back(node);
-    return showNodeInCanvas(*center, others);
+    return showNodeInCanvas(*center, others, takeFocus);
 }
 
 vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules(){

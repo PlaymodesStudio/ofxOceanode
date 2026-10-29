@@ -210,7 +210,7 @@ public:
 	struct WindowTarget { ofxOceanodeNodeMacro* macro; ofxOceanodeNode* node; };
 	WindowTarget windowTargetFor(ofxOceanodeNode* node);
 	// Opens and focuses the window instance's tab.
-	void activateWindow();
+	void activateWindow(bool focus = true);
 	void hideSharedWindow();
 	// This instance's own tab, as saved in layouts.
 	bool isWindowVisible() const { return showWindow; }

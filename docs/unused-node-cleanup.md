@@ -55,6 +55,15 @@ into a Macro from its parent beyond the rules above.
 - Click a group header to select every node of that group on the canvas. The view
   centers on the node nearest the group's middle. Clicking a single node afterwards
   replaces that selection. The header arrow only folds the list.
+- The window keeps keyboard focus when you select from it, so the arrow keys keep
+  working. The canvas is selected and centered but not focused; click it to work
+  there. With the review window focused:
+  - Up and Down move to the previous or next row: a group header, a node inside an
+    open group, or a kept node. Folded groups are skipped. The list does not wrap.
+  - Left on a group header opens the group and selects its first node.
+  - Right on a node inside a group goes back to the group header.
+  - Keys do nothing while the canvas has changed (press Refresh) or when another
+    window has focus. Shift, Control, Alt and Command with the arrows are ignored.
 
 ## Writing a node
 

@@ -273,10 +273,11 @@ public:
     bool customGuiContainsParameterAnywhere(ofxOceanodeAbstractParameter& parameter) const;
     ofxOceanodeNode* getNodeFromParameter(ofxOceanodeAbstractParameter& param);
     // Selects the node on its canvas and centers on it. alsoSelect adds nodes of the
-    // same container to the selection without moving the view.
-    bool showNodeInCanvas(ofxOceanodeNode& node, const vector<ofxOceanodeNode*>& alsoSelect = {});
+    // same container to the selection without moving the view. takeFocus false
+    // leaves keyboard focus where it is, for a caller that navigates by keys.
+    bool showNodeInCanvas(ofxOceanodeNode& node, const vector<ofxOceanodeNode*>& alsoSelect = {}, bool takeFocus = true);
     // Selects every node on its canvas and centers on the one nearest their middle.
-    bool showNodesInCanvas(const vector<ofxOceanodeNode*>& nodes);
+    bool showNodesInCanvas(const vector<ofxOceanodeNode*>& nodes, bool takeFocus = true);
     bool showParameterInCanvas(ofxOceanodeAbstractParameter& parameter);
     ofxOceanodeContainer* getContainerForCanvasID(const std::string& canvasID);
     const ofxOceanodeContainer* getContainerForCanvasID(const std::string& canvasID) const;
