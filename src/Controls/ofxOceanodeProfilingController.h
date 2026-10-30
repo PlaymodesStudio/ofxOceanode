@@ -23,11 +23,13 @@ private:
         double peakMs = 0, selfMs = 0, inclusiveMs = 0, callsPerFrame = 0;
         double outputsPerFrame = 0, outputsPerSecond = -1, outputIntervalMs = -1;
         bool expanded = false;
+        bool selected = false;
         std::vector<OutputRow> outputs;
     };
     void refresh();
     bool locate(const std::shared_ptr<oceanodeProfiling::Record>& record);
     void sortRows(const ImGuiTableSortSpecs* specs);
+    std::string csvContents() const;
 
     std::shared_ptr<ofxOceanodeContainer> container;
     ofxOceanodeCanvas* canvas;
@@ -37,4 +39,5 @@ private:
     double nextRefresh = 0, measuredMs = 0;
     std::size_t displayedFrames = 0, pendingWindow = 120;
     bool needsSort = true, locateFailed = false;
+    std::string exportMessage;
 };

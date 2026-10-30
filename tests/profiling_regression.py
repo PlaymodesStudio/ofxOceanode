@@ -5,6 +5,7 @@ Uses a deterministic clock and ASan/UBSan. Controller drawing/accounting are
 production code; canvas navigation is excluded. Does not launch a windowed host.
 """
 from pathlib import Path
+import csv
 import os
 import subprocess
 import sys
@@ -22,6 +23,22 @@ PREFIX = r'''
 #include <iostream>
 #include <thread>
 #include <unordered_set>
+#include <iomanip>
+#include <locale>
+#include <sstream>
+// Exercise export buttons without changing the real clipboard or opening UI.
+namespace ofxOceanodeClipboard {
+    static std::string contents;
+    inline bool setText(const std::string& text){ contents = text; return true; }
+}
+static ofFileDialogResult saveResult;
+static int saveDialogs = 0;
+static ofFileDialogResult profileSaveDialog(std::string name, std::string message){
+    assert(name == "Oceanode-Profiling.csv");
+    ++saveDialogs;
+    return saveResult;
+}
+#define ofSystemSaveDialog profileSaveDialog
 // Expose snapshots to assert their preservation after graph changes.
 #define private public
 #include "Controls/ofxOceanodeProfilingController.h"
@@ -64,6 +81,31 @@ static void equal(double actual, double expected) {
 '''
 
 CASES = r'''
+static void csvChecks(){
+    auto root = std::make_shared<ofxOceanodeContainer>(); root->session = std::make_shared<Session>(now);
+    ofxOceanodeCanvas canvas; ofxOceanodeProfilingController panel(root, &canvas);
+    ofxOceanodeProfilingController::Row row;
+    row.name = "Node, \"quoted\"\nnext"; row.path = "Root / Màcro";
+    row.selfMs = 1.25; row.inclusiveMs = 2.5; row.peakMs = 3.75;
+    row.total.phases[0].selfNs = 2500000;
+    row.callsPerFrame = 4; row.outputsPerFrame = 1; row.outputsPerSecond = 60;
+    row.expanded = true;
+    PublicationStats stats; stats.perFrame = 1; stats.perSecond = 60; stats.intervalMs = 16.6666667;
+    row.outputs.push_back({"Out,\"pin\"\r\nvalue", false, stats});
+    panel.rows.push_back(row); panel.measuredMs = 2.5; panel.displayedFrames = 2;
+    const auto csv = panel.csvContents();
+    assert(csv.find("\"Node, \"\"quoted\"\"\nnext\",\"Root / Màcro\",1.25,50,2.5,3.75,1.25,0,0,0,4,1,60,,,\r\n") != std::string::npos);
+    assert(csv.find("\"Node, \"\"quoted\"\"\nnext\",\"Root / Màcro\",,,,,,,,,,1,60,16.6666667,\"Out,\"\"pin\"\"\r\nvalue\",\"Output pin\"\r\n") != std::string::npos);
+    // CSV always uses decimal points, regardless of the user's locale.
+    struct Comma : std::numpunct<char> { char do_decimal_point() const override { return ','; } };
+    const auto previous = std::locale(); std::locale::global(std::locale(previous, new Comma));
+    assert(panel.csvContents() == csv); std::locale::global(previous);
+    panel.rows[0].expanded = false;
+    assert(panel.csvContents().find("Output pin\"\r\n") == std::string::npos);
+    panel.filter.InputBuf[0] = 'Z'; panel.filter.InputBuf[1] = 0; panel.filter.Build();
+    assert(panel.csvContents() == csv.substr(0, csv.find("\r\n") + 2));
+}
+
 static void publicationChecks() {
     constexpr int frameNs = 16666667;
     auto session = std::make_shared<Session>(now);
@@ -165,6 +207,7 @@ static void publicationChecks() {
 }
 
 int main() {
+    csvChecks();
     publicationChecks();
     auto session = std::make_shared<Session>(now);
     auto a = makeRecord(session, "A"), b = makeRecord(session, "B"), c = makeRecord(session, "C");
@@ -306,6 +349,36 @@ int main() {
     assert(panel.rows.front().name == "B");
     for(auto& row : panel.rows) row.expanded = true;
     frame(); // Expanded output rows use the same clipper height as node rows.
+    panel.rows.front().selected = true;
+    const auto selectedRecord = panel.rows.front().record.lock();
+    panel.refresh(); frame();
+    assert(panel.rows.front().record.lock() == selectedRecord && panel.rows.front().selected);
+    // Full-width highlight must extend beyond the name column and include pins.
+    const auto highlight = ImGui::GetColorU32(ImGuiCol_Header);
+    float minX = 1e6f, maxX = -1e6f, minY = 1e6f, maxY = -1e6f;
+    for(const auto* list : ImGui::GetDrawData()->CmdLists) for(const auto& v : list->VtxBuffer) if(v.col == highlight){
+        minX = std::min(minX, v.pos.x); maxX = std::max(maxX, v.pos.x);
+        minY = std::min(minY, v.pos.y); maxY = std::max(maxY, v.pos.y);
+    }
+    assert(maxX - minX > 1000 && maxY - minY > 2 * ImGui::GetFrameHeight());
+    // Click a metric column to select the whole node row, then use its arrow
+    // without losing selection. Navigation is stubbed and reports locateFailed.
+    for(auto& row : panel.rows) row.selected = false;
+    auto clickPoint = [&](float x, float y){
+        io.AddMousePosEvent(x, y); frame();
+        io.AddMouseButtonEvent(0, true); frame();
+        io.AddMouseButtonEvent(0, false); frame();
+    };
+    clickPoint(1000, minY + 8);
+    assert(panel.rows.front().selected && panel.locateFailed);
+    frame();
+    minY = 1e6f;
+    for(const auto* list : ImGui::GetDrawData()->CmdLists) for(const auto& v : list->VtxBuffer)
+        if(v.col == highlight) minY = std::min(minY, v.pos.y);
+    clickPoint(minX + 8, minY + 8);
+    assert(!panel.rows.front().expanded && panel.rows.front().selected);
+    clickPoint(minX + 8, minY + 8);
+    assert(panel.rows.front().expanded && panel.rows.front().selected);
     click(); assert(!session->isRecording());
     const auto panelTotal = panel.measuredMs; const auto savedName = panel.rows.front().name;
     b->identity = [](){return Record::Identity{"Renamed", "Changed path"};};
@@ -313,12 +386,36 @@ int main() {
     equal(panel.measuredMs, panelTotal); assert(panel.rows.front().name == savedName);
     assert(!panel.rows.front().outputs.empty());
     const auto savedRate = panel.rows.front().outputs.front().stats.perSecond;
+    // Buttons follow the capture status on one line. Click Copy and Save using
+    // their actual ImGui layout widths; the save dialog is substituted above.
+    const auto profileButton = button;
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float padding = 2 * ImGui::GetStyle().FramePadding.x;
+    const float statusWidth = ImGui::CalcTextSize("Stopped - last capture").x;
+    const float saveWidth = ImGui::CalcTextSize("Save").x + padding;
+    const float captureWidth = ImGui::CalcTextSize("Profile!").x + padding;
+    const float saveX = profileButton.x - 10 + captureWidth + statusWidth + 2 * spacing;
+    auto clickAt = [&](float x){
+        io.AddMousePosEvent(x, profileButton.y); frame();
+        io.AddMouseButtonEvent(0, true); frame();
+        io.AddMouseButtonEvent(0, false); frame();
+    };
+    clickAt(saveX + saveWidth + spacing + 5);
+    assert(ofxOceanodeClipboard::contents == panel.csvContents());
+    clickAt(saveX + 5); assert(saveDialogs == 1); // Cancel leaves the capture intact.
+    equal(panel.measuredMs, panelTotal);
+    saveResult.bSuccess = true; saveResult.filePath = std::getenv("OCEANODE_PROFILE_TEST_CSV");
+    clickAt(saveX + 5); assert(saveDialogs == 2);
+    assert(ofBufferFromFile(saveResult.filePath + ".csv", true).getText() == ofxOceanodeClipboard::contents);
+    saveResult.filePath += ".CSV";
+    clickAt(saveX + 5); assert(saveDialogs == 3);
+    assert(ofBufferFromFile(saveResult.filePath, true).getText() == ofxOceanodeClipboard::contents);
     panelWidth = 280; frame();
     panel.filter.InputBuf[0] = 'Z'; panel.filter.InputBuf[1] = 0; panel.filter.Build(); frame();
     assert(!session->isRecording());
     equal(panel.rows.front().outputs.front().stats.perSecond, savedRate);
     ImGui::DestroyContext();
-    std::cout << "Profiling regression passed: disabled capture, nested CPU accounting, output publication rates/intervals, idle frames, bursts, direction flags, copies/fanout, workers, discarded frames, owner moves, capture buttons, frozen results and expanded ImGui rows.\n";
+    std::cout << "Profiling regression passed: CPU accounting, output publication metrics, capture controls, frozen results, CSV escaping/locale/filtering, matching save/copy contents, save cancellation, and full-row selection with expanded outputs.\n";
 }
 '''
 
@@ -340,7 +437,8 @@ def main():
         "ofxOceanodeProfilingController::ofxOceanodeProfilingController(",
         "ofxOceanodeProfilingController::~ofxOceanodeProfilingController()",
         "void ofxOceanodeProfilingController::update()", "void ofxOceanodeProfilingController::refresh()",
-        "void ofxOceanodeProfilingController::sortRows(", "void ofxOceanodeProfilingController::draw()"))
+        "void ofxOceanodeProfilingController::sortRows(", "std::string ofxOceanodeProfilingController::csvContents()",
+        "void ofxOceanodeProfilingController::draw()"))
     with tempfile.TemporaryDirectory(prefix="oceanode-profiling-") as folder:
         folder = Path(folder)
         cpp = folder / "regression.cpp"; cpp.write_text(PREFIX + production + CASES)
@@ -354,7 +452,13 @@ def main():
                    str(libdir / "openFrameworks.a"), *libraries, "-Wl,-dead_strip"]
         for framework in frameworks: command += ["-framework", framework]
         subprocess.run(command + ["-o", str(binary)], check=True)
-        subprocess.run([str(binary)], check=True, env={**os.environ, "UBSAN_OPTIONS": "halt_on_error=1"})
+        subprocess.run([str(binary)], check=True, env={**os.environ, "UBSAN_OPTIONS": "halt_on_error=1",
+                       "OCEANODE_PROFILE_TEST_CSV": str(folder / "profile export")})
+        with (folder / "profile export.csv").open(newline="") as exported:
+            table = list(csv.reader(exported, strict=True))
+        assert len(table) > 4 and all(len(row) == 16 for row in table)
+        assert table[0][-2:] == ["Output pin", "Pin type"]
+        assert table[1][0] == "B"  # Current descending self-time order.
 
 NATIVE_CASES = r'''
 class ProfileProbe : public ofxOceanodeNodeModel {

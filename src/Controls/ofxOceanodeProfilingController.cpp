@@ -4,8 +4,12 @@
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeGlDiagnostics.h"
+#include "ofxOceanodeClipboard.h"
 #include <algorithm>
 #include <functional>
+#include <iomanip>
+#include <locale>
+#include <sstream>
 #include <unordered_set>
 
 using namespace oceanodeProfiling;
@@ -27,7 +31,9 @@ void ofxOceanodeProfilingController::update(){
 
 void ofxOceanodeProfilingController::refresh(){
     std::unordered_set<const Record*> expanded;
+    std::unordered_set<const Record*> selected;
     for(const auto& row : rows) if(row.expanded) if(auto record = row.record.lock()) expanded.insert(record.get());
+    for(const auto& row : rows) if(row.selected) if(auto record = row.record.lock()) selected.insert(record.get());
     rows.clear();
     measuredMs = 0;
     displayedFrames = session->sampleFrames();
@@ -40,6 +46,7 @@ void ofxOceanodeProfilingController::refresh(){
         row.path = identity.path;
         row.total = record->total;
         row.expanded = expanded.count(record.get()) != 0;
+        row.selected = selected.count(record.get()) != 0;
         row.selfMs = row.total.selfNs() / denominator / 1e6;
         row.inclusiveMs = row.total.inclusiveNs() / denominator / 1e6;
         row.peakMs = record->peakSelfNs() / 1e6;
@@ -91,6 +98,40 @@ void ofxOceanodeProfilingController::sortRows(const ImGuiTableSortSpecs* specs){
         return a.name < b.name;
     });
     needsSort = false;
+}
+
+std::string ofxOceanodeProfilingController::csvContents() const{
+    std::ostringstream csv;
+    csv.imbue(std::locale::classic());
+    csv << std::setprecision(9);
+    csv << "Node,Canvas / Macro path,Self ms/frame,Share %,Inclusive ms/frame,Peak self ms/frame,"
+           "Update ms,Draw ms,Listeners ms,GUI ms,Calls/frame,Out events/frame,Out events/s,Out interval ms,Output pin,Pin type\r\n";
+    auto text = [&](const std::string& value){
+        csv << '"';
+        for(char c : value){ if(c == '"') csv << '"'; csv << c; }
+        csv << '"';
+    };
+    auto metric = [&](double value){ if(value >= 0) csv << value; };
+    for(const auto& row : rows){
+        if(!filter.PassFilter((row.name + " " + row.path).c_str())) continue;
+        text(row.name); csv << ','; text(row.path);
+        csv << ',' << row.selfMs << ',' << (measuredMs > 0 ? 100 * row.selfMs / measuredMs : 0)
+            << ',' << row.inclusiveMs << ',' << row.peakMs;
+        for(const auto& phase : row.total.phases)
+            csv << ',' << phase.selfNs / std::max<std::size_t>(1, displayedFrames) / 1e6;
+        csv << ',' << row.callsPerFrame << ',' << row.outputsPerFrame << ',';
+        metric(row.outputsPerSecond); csv << ','; metric(row.outputIntervalMs);
+        csv << ",,\r\n";
+        if(row.expanded) for(const auto& output : row.outputs){
+            text(row.name); csv << ','; text(row.path);
+            // The nine CPU columns are empty for pin rows, as in the table.
+            for(int column = 2; column <= 11; ++column) csv << ',';
+            csv << output.stats.perFrame << ','; metric(output.stats.perSecond);
+            csv << ','; metric(output.stats.intervalMs); csv << ','; text(output.name);
+            csv << ','; text(output.bidirectional ? "I/O pin" : "Output pin"); csv << "\r\n";
+        }
+    }
+    return csv.str();
 }
 
 bool ofxOceanodeProfilingController::locate(const std::shared_ptr<Record>& record){
@@ -150,9 +191,15 @@ void ofxOceanodeProfilingController::draw(){
         refresh(); nextRefresh = 0; locateFailed = false;
     }
     const char* status = session->isRecording() ? "Recording CPU times" : (displayedFrames ? "Stopped - last capture" : "Off");
-    if(ImGui::GetContentRegionAvail().x >= ImGui::GetItemRectSize().x + ImGui::CalcTextSize(status).x + ImGui::GetStyle().ItemSpacing.x)
-        ImGui::SameLine();
+    ImGui::SameLine();
     ImGui::TextUnformatted(status);
+    ImGui::SameLine();
+    ImGui::BeginDisabled(rows.empty());
+    const bool saveCsv = ImGui::Button("Save");
+    ImGui::SameLine();
+    const bool copyCsv = ImGui::Button("Copy");
+    ImGui::EndDisabled();
+    if(!exportMessage.empty()) ImGui::TextWrapped("%s", exportMessage.c_str());
     ImGui::SetNextItemWidth(140);
     const int windows[] = {60, 120, 300};
     const char* labels[] = {"60 frames", "120 frames", "300 frames"};
@@ -218,6 +265,7 @@ void ofxOceanodeProfilingController::draw(){
             ImGui::PushID(i);
             // Expanded pin rows have the same height as node rows for clipping.
             ImGui::TableNextRow(0, ImGui::GetFrameHeight());
+            if(row.selected) ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImGuiCol_Header));
             ImGui::TableSetColumnIndex(0);
             if(const auto* output = visible[i].output){
                 ImGui::Indent(ImGui::GetFrameHeight());
@@ -238,7 +286,10 @@ void ofxOceanodeProfilingController::draw(){
                 if(toggle) row.expanded = !row.expanded;
                 ImGui::SameLine();
             }
-            if(ImGui::Selectable(row.name.c_str())){
+            if(ImGui::Selectable(row.name.c_str(), false, ImGuiSelectableFlags_SpanAllColumns)){
+                for(auto& other : rows) other.selected = false;
+                row.selected = true;
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImGuiCol_Header));
                 clicked = row.record.lock();
                 if(!clicked) locateFailed = true;
             }
@@ -262,4 +313,18 @@ void ofxOceanodeProfilingController::draw(){
         ImGui::EndTable();
     }
     if(clicked) locateFailed = !locate(clicked);
+    // Serialize after the table applies sorting. Both actions use the same
+    // displayed snapshot, even if a native save dialog runs the event loop.
+    if(saveCsv || copyCsv){
+        const auto csv = csvContents();
+        if(copyCsv) exportMessage = ofxOceanodeClipboard::setText(csv) ? "CSV copied to clipboard." : "Could not copy CSV to clipboard.";
+        if(saveCsv){
+            const auto result = ofSystemSaveDialog("Oceanode-Profiling.csv", "Save profiling CSV");
+            if(result.bSuccess){
+                auto path = result.filePath;
+                if(ofToLower(ofFilePath::getFileExt(path)) != "csv") path += ".csv";
+                exportMessage = ofBufferToFile(path, ofBuffer(csv.data(), csv.size()), true) ? "CSV saved to " + path : "Could not save CSV to " + path;
+            }
+        }
+    }
 }

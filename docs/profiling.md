@@ -15,6 +15,17 @@ The default ranking is descending **Self ms/frame**. Click any column heading
 to sort, or filter by node name or canvas/Macro path. Click a row to select and
 center the live node. Deleted nodes and private MacroMixer source graphs can
 still have captured results, but cannot be located on a visible canvas.
+The selected node's entire row and its expanded output rows stay highlighted,
+including while sorting, filtering or refreshing a live capture.
+
+**Save** opens a native save dialog for a CSV file; **Copy** puts the same CSV
+text on the system clipboard. Both export the current snapshot in table order,
+respecting the node/path filter and including output rows for expanded nodes.
+The CSV includes all table metrics, with additional **Output pin** and **Pin
+type** columns. Output rows repeat their owning node's name and canvas path;
+their CPU fields are empty. Unavailable rates/intervals are empty cells rather
+than `--`. Numbers use decimal points with extra precision for analysis, and
+names containing commas, quotes or newlines are escaped as CSV text.
 
 | Column | Meaning |
 | --- | --- |
@@ -106,6 +117,11 @@ Publication coverage includes 60 Hz and 30 Hz signals, idle-window eviction,
 same-value assignments, multiple pins/fanout, bursts, missing intervals,
 direction flags, void triggers, discarded frames, worker exclusion, copied
 wrappers, node totals, expanded rows and frozen rates.
+Export checks cover CSV escaping, decimal-point formatting, filtered/expanded
+rows, matching saved/copied contents, cancellation and filename extensions.
+Selection checks cover clicking across the row, full-width backgrounds,
+expanded output backgrounds and selection surviving live refreshes. Native
+dialogs and clipboard writes are substituted in this headless harness.
 
 `python3 tests/profiling_regression.py --native` reuses the native Macro fixture
 to exercise production node creation, lifecycle dispatch, typed/type-erased
