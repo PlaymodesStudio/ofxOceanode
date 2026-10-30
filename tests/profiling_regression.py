@@ -402,6 +402,7 @@ int main() {
     const float padding = 2 * ImGui::GetStyle().FramePadding.x;
     const float statusWidth = ImGui::CalcTextSize("Stopped - last capture").x;
     const float saveWidth = ImGui::CalcTextSize("Save").x + padding;
+    const float helpWidth = ImGui::CalcTextSize("[?]").x + padding;
     const float captureWidth = ImGui::CalcTextSize("Profile!").x + padding;
     const float saveX = profileButton.x - 10 + captureWidth + statusWidth + 2 * spacing;
     auto clickAt = [&](float x){
@@ -409,7 +410,7 @@ int main() {
         io.AddMouseButtonEvent(0, true); frame();
         io.AddMouseButtonEvent(0, false); frame();
     };
-    clickAt(saveX + saveWidth + spacing + 5);
+    clickAt(saveX + saveWidth + helpWidth + 2 * spacing + 5);
     assert(ofxOceanodeClipboard::contents == panel.csvContents());
     clickAt(saveX + 5); assert(saveDialogs == 1); // Cancel leaves the capture intact.
     equal(panel.measuredMs, panelTotal);

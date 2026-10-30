@@ -196,7 +196,20 @@ void ofxOceanodeProfilingController::draw(){
     ImGui::SameLine();
     ImGui::BeginDisabled(rows.empty());
     const bool saveCsv = ImGui::Button("Save");
+    ImGui::EndDisabled();
     ImGui::SameLine();
+    ImGui::Button("[?]");
+    if(ImGui::IsItemHovered()){
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+        ImGui::TextUnformatted("Self excludes nested nodes. Inclusive includes downstream work. Share is a percentage of measured node time. All times include CPU GUI work.");
+        ImGui::Spacing();
+        ImGui::TextUnformatted("Output counts sum output-capable pins. Expand a node for each pin's rate and interval. I/O pins can also forward incoming values; unchanged-value notifications count.");
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(rows.empty());
     const bool copyCsv = ImGui::Button("Copy");
     ImGui::EndDisabled();
     if(!exportMessage.empty()) ImGui::TextWrapped("%s", exportMessage.c_str());
@@ -213,8 +226,6 @@ void ofxOceanodeProfilingController::draw(){
     if(ImGui::InputTextWithHint("##profile_filter", "Filter nodes / paths", filter.InputBuf, sizeof(filter.InputBuf)))
         filter.Build();
     ImGui::Text("Measured nodes: %.3f ms/frame | %zu sampled frames", measuredMs, displayedFrames);
-    ImGui::TextWrapped("Self excludes nested nodes. Inclusive includes downstream work. Share is a percentage of measured node time. All times include CPU GUI work.");
-    ImGui::TextWrapped("Output counts sum output-capable pins. Expand a node for each pin's rate and interval. I/O pins can also forward incoming values; unchanged-value notifications count.");
     if(session->incompleteSpans()) ImGui::TextWrapped("%llu incomplete timing scopes; affected frames were discarded.",
         static_cast<unsigned long long>(session->incompleteSpans()));
     if(locateFailed) ImGui::TextWrapped("This node is no longer on a visible canvas, or belongs to a private MacroMixer graph.");
