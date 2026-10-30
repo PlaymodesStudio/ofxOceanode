@@ -116,6 +116,8 @@ struct OceanodeColors {
 
     // ── Docking ──────────────────────────────────────────────────────────────
     inline static ImVec4 DockGutter            = {0.07f, 0.07f, 0.07f, 1.00f};  // gap between neighbouring docked windows
+    inline static ImVec4 TabText               = {0.55f, 0.55f, 0.55f, 1.00f};  // unselected tab label
+    inline static ImVec4 TabSelectedText       = {0.85f, 0.85f, 0.85f, 1.00f};  // visible tab label, regardless of focus
 
     // ─────────────────────────────────────────────────────────────────────────
     // Helpers
@@ -198,6 +200,8 @@ struct OceanodeColors {
         FloatingWindowShadow  = {0.50f, 0.50f, 0.50f, 0.45f};
 
         DockGutter            = {0.07f, 0.07f, 0.07f, 1.00f};
+        TabText               = {0.55f, 0.55f, 0.55f, 1.00f};
+        TabSelectedText       = {0.85f, 0.85f, 0.85f, 1.00f};
     }
 
     /// Returns all named colour fields for use by the theme editor / save / load.
@@ -276,6 +280,8 @@ struct OceanodeColors {
             { "OC_FloatingWindowShadow",  &FloatingWindowShadow  },
             // Docking
             { "OC_DockGutter",            &DockGutter            },
+            { "OC_TabText",               &TabText               },
+            { "OC_TabSelectedText",       &TabSelectedText       },
         };
     }
 };

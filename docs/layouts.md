@@ -88,14 +88,17 @@ All paths are relative to the data folder. Each JSON file has an integer
 | `config/themes.json` | ThemeManager | `{version, default}`: the theme loaded at startup |
 | `config/config.json` | AppConfig | Version 2: the Config menu's Rendering and Editor settings |
 
-In Theme Editor > ImGui Colors, `TabSelectedText` controls the label of the tab
-whose contents are visible; `TabText` controls the other tab labels. Selection
+In Theme Editor > Oceanode Colors, `OC_TabSelectedText` controls the label of the tab
+whose contents are visible; `OC_TabText` controls the other tab labels. Selection
 is independent of window focus. These apply to docked panels and regular tab
 bars, are saved with themes, and reset to `Text` / `TextDisabled` respectively.
 Older themes without these entries inherit their own `Text` / `TextDisabled`
-palette when loaded. This requires the matching ofxImGui extension that adds
-`ImGuiCol_TabSelectedText` and `ImGuiCol_TabText` to its bundled ImGui sources;
-rebuild the host application and ofxImGui together after updating.
+palette when loaded. Themes saved with the former ImGui `TabText` and
+`TabSelectedText` entries migrate automatically; explicit Oceanode entries take
+precedence. Oceanode recolors the existing tab-label glyphs at the end of each
+frame, using ImGui's tab bounds and draw lists. No ofxImGui modifications are
+required. This preserves label clipping and leaves tab backgrounds, close
+icons, window content and docking drag previews alone.
 
 `layout.json` is written whole on Save Preset, Save As, every change to the
 collection, the Scopes autosave and exit. It is never written for an unsaved

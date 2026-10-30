@@ -1,6 +1,7 @@
 #include "ofxOceanodeThemeManager.h"
 #include "ofxOceanodeTheme.h"
 #include "ofxOceanodeFloatingWindowDecor.h"
+#include "ofxOceanodeTabText.h"
 #include "ofxOceanodeColors.h"
 #include "ofxOceanodeCanvas.h"
 #include "ofxOceanodeMenu.h"
@@ -11,6 +12,7 @@
 #include <cstring>
 #include <functional>
 #include <map>
+#include <utility>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_SFNT_NAMES_H
@@ -56,6 +58,7 @@ std::string themeFontFamilyName(FT_Face face){
 
 void ofxOceanodeThemeManager::setup(ofxOceanodeCanvas& canvasRef){
     canvas = &canvasRef;
+    ofxOceanodeTabText::install();
     refreshThemeFonts();
     const auto path = ofToDataPath(themesFile, true);
     if(ofFile(path).exists()){
@@ -217,9 +220,18 @@ void ofxOceanodeThemeManager::load(const std::string& name){
             }
         }
     }
-    // Older themes inherit tab text from their own palette until explicitly edited.
-    if(!j["colors"].contains("TabText")) colors[ImGuiCol_TabText] = colors[ImGuiCol_TextDisabled];
-    if(!j["colors"].contains("TabSelectedText")) colors[ImGuiCol_TabSelectedText] = colors[ImGuiCol_Text];
+    // Migrate themes saved with the former ofxImGui extension. Explicit Oceanode
+    // entries below take precedence; older themes inherit their own text palette.
+    OceanodeColors::TabText = colors[ImGuiCol_TextDisabled];
+    OceanodeColors::TabSelectedText = colors[ImGuiCol_Text];
+    for(const auto& legacy : {std::make_pair("TabText", &OceanodeColors::TabText),
+                             std::make_pair("TabSelectedText", &OceanodeColors::TabSelectedText)}){
+        if(j["colors"].contains(legacy.first)){
+            const auto& arr = j["colors"][legacy.first];
+            if(arr.is_array() && arr.size() == 4)
+                *legacy.second = ImVec4(arr[0].get<float>(), arr[1].get<float>(), arr[2].get<float>(), arr[3].get<float>());
+        }
+    }
     // Old themes may contain a separate PopupBg; WindowBg now controls both.
     colors[ImGuiCol_PopupBg] = colors[ImGuiCol_WindowBg];
     // Load custom Oceanode semantic colours (optional: gracefully absent in old theme files)
@@ -317,7 +329,6 @@ void ofxOceanodeThemeManager::drawThemeEditorWindow(){
 
             if(ImGui::BeginTabItem("ImGui Colors", nullptr, tabFlags(false))){
                 ImGui::TextDisabled("WindowBg also controls popup and modal backgrounds.");
-                ImGui::TextDisabled("TabSelectedText: visible tab. TabText: other tabs.");
                 std::vector<int> colorIndices;
                 for(int i = 0; i < ImGuiCol_COUNT; i++){
                     if(i != ImGuiCol_PopupBg) colorIndices.push_back(i);
@@ -351,6 +362,7 @@ void ofxOceanodeThemeManager::drawThemeEditorWindow(){
             }
 
             if(ImGui::BeginTabItem("Oceanode Colors", nullptr, tabFlags(true))){
+                ImGui::TextDisabled("OC_TabSelectedText: visible tab. OC_TabText: other tabs.");
                 ImGui::BeginChild("##colorscroll_oc", ImVec2(0, 0), false);
                 if(colorFilterChanged || ImGui::IsWindowAppearing()) ImGui::SetScrollY(0.0f);
                 // Shared window/popup decoration sizes (colours: OC_FloatingWindow* below)
