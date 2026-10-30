@@ -4269,6 +4269,7 @@ bool ofxOceanodeContainer::replayCanvasEdit(CanvasEdit& edit, bool backwards){
         // Connection constructors must see the original editable sink value,
         // rather than setup defaults, when they retain their disconnect value.
         node.loadParametersFromJson(values, false);
+        node.loadNodeSettings(values);
     }
     if(!restoring.empty()) allNodesCreated.notify(this);
     std::set<std::string> existingCables;

@@ -440,19 +440,10 @@ void ofxOceanodeInspectorController::draw(){
 		drawParameterSettings(*node);
 	}
 
-	if(node->getNodeModel().getDescription() != ""){
-		ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 21.0f);
-		ImGui::SetNextItemOpen(false, ImGuiCond_Appearing);
-		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
-		bool descOpen = ImGui::TreeNode("Description");
-		ImGui::PopStyleColor(); // always pop header colour right after TreeNode
-		if(descOpen){
-			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-			ImGui::TextWrapped(node->getNodeModel().getDescription().c_str(), "%s");
-			ImGui::PopStyleColor();
-			ImGui::TreePop();
-		}
-		ImGui::PopStyleVar();
+	if(node->getNodeModel().getDescription() != "" && ImGui::CollapsingHeader("Description")){
+		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+		ImGui::TextWrapped("%s", node->getNodeModel().getDescription().c_str());
+		ImGui::PopStyleColor();
 	}
 
     ImGui::PopStyleVar();
@@ -541,13 +532,11 @@ void ofxOceanodeInspectorController::drawNodeSnapshots(ofxOceanodeNode& node){
 }
 
 void ofxOceanodeInspectorController::drawParameterSettings(ofxOceanodeNode& node){
-    const bool snapshotsAvailable = node.supportsSnapshots();
-    ImGui::TextDisabled("Show: row in the node. Snap: kept in Snapshots. Scope: shown when folded.");
+    ImGui::TextDisabled("Show: row in the node. Scope: shown when folded.");
     const ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingFixedFit;
-    if(!ImGui::BeginTable("##parameterSettings", 4, flags)) return;
+    if(!ImGui::BeginTable("##parameterSettings", 3, flags)) return;
     ImGui::TableSetupColumn("Parameter", ImGuiTableColumnFlags_WidthStretch);
     ImGui::TableSetupColumn("Show");
-    ImGui::TableSetupColumn("Snap");
     ImGui::TableSetupColumn("Scope");
     ImGui::TableHeadersRow();
 
@@ -576,12 +565,6 @@ void ofxOceanodeInspectorController::drawParameterSettings(ofxOceanodeNode& node
         if(!shown && node.isParameterShownInGui(p) && ImGui::IsItemHovered()){
             ImGui::SetTooltip("Shown while it has cables");
         }
-
-        ImGui::TableNextColumn();
-        if(snapshotsAvailable && ofxOceanodeNode::canSnapshotParameter(p)){
-            bool included = node.isParameterInSnapshots(p);
-            if(ImGui::Checkbox("##snap", &included)) node.setParameterInSnapshots(p, included);
-        }else unavailable();
 
         ImGui::TableNextColumn();
         if(ofxOceanodeScope::getInstance()->canScope(&p)){

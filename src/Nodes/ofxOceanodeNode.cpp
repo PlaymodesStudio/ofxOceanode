@@ -54,6 +54,7 @@ void ofxOceanodeNode::update(ofEventArgs &e){
         const auto path = record->identity ? record->identity().path : nodeModel->getParents();
         return path + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier());
     };
+    syncSnapshotSelector();
     updateSnapshotGlide();
     {
         oceanodeGlDiagnostics::Scope glErrors(identity, "update");
@@ -194,6 +195,8 @@ void ofxOceanodeNode::loadPresetBeforeConnections(string presetFolderPath){
     
     nodeModel->loadBeforeConnections(json);
 	nodeModel->macroLoad(json, presetFolderPath);
+    // The snapshot selector's pin must exist before cables are restored.
+    loadNodeSettings(json);
 }
 
 bool ofxOceanodeNode::loadConfig(string filename, bool persistentPreset){
@@ -419,17 +422,6 @@ bool ofxOceanodeNode::canSnapshotParameter(ofxOceanodeAbstractParameter& p){
            type == typeid(ofColor).name() || type == typeid(ofFloatColor).name();
 }
 
-bool ofxOceanodeNode::isParameterInSnapshots(ofxOceanodeAbstractParameter& p) const{
-    if(!canSnapshotParameter(p)) return false;
-    auto it = snapshotOverrides.find(p.getEscapedName());
-    return it == snapshotOverrides.end() ? true : it->second;
-}
-
-void ofxOceanodeNode::setParameterInSnapshots(ofxOceanodeAbstractParameter& p, bool included){
-    if(included) snapshotOverrides.erase(p.getEscapedName());
-    else snapshotOverrides[p.getEscapedName()] = false;
-}
-
 bool ofxOceanodeNode::isParameterScopedWhenFolded(ofxOceanodeAbstractParameter& p) const{
     auto it = scopeOverrides.find(p.getEscapedName());
     if(it != scopeOverrides.end()) return it->second;
@@ -552,7 +544,7 @@ void ofxOceanodeNode::storeSnapshot(int slot){
     ofJson values = ofJson::object();
     for(int i = 0; i < getParameters().size(); i++){
         auto& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
-        if(isParameterInSnapshots(p)) saveParameterToJson(values, p);
+        if(canSnapshotParameter(p)) saveParameterToJson(values, p);
     }
     snapshots->slots[slot].values = values;
     snapshots->currentSlot = slot;
@@ -570,7 +562,7 @@ void ofxOceanodeNode::recallSnapshot(int slot){
     for(int i = 0; i < getParameters().size(); i++){
         auto& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
         const string key = p.getEscapedName();
-        if(!isParameterInSnapshots(p) || !target.contains(key) || p.hasInConnection()) continue;
+        if(!canSnapshotParameter(p) || !target.contains(key) || p.hasInConnection()) continue;
         const GlideKind kind = glide ? glideKind(p) : GlideKind::None;
         ofxOceanodeNodeSnapshots::GlideTrack track;
         track.parameter = key;
@@ -639,18 +631,17 @@ const std::vector<std::string>& ofxOceanodeNode::nodeSettingsKeys(){
 
 void ofxOceanodeNode::saveNodeSettings(ofJson& json){
     if(!snapshots->isDefault()) json["__NodeSnapshots"] = snapshots->toJson();
-    if(hiddenParameters.empty() && snapshotOverrides.empty() && scopeOverrides.empty()) return;
+    if(hiddenParameters.empty() && scopeOverrides.empty()) return;
     ofJson settings = ofJson::object();
     if(!hiddenParameters.empty()) settings["Hidden"] = std::vector<std::string>(hiddenParameters.begin(), hiddenParameters.end());
-    if(!snapshotOverrides.empty()) settings["Snapshot"] = snapshotOverrides;
     if(!scopeOverrides.empty()) settings["Scope"] = scopeOverrides;
     json["__ParameterSettings"] = settings;
 }
 
 void ofxOceanodeNode::loadNodeSettings(const ofJson& json){
     snapshots->fromJson(json.contains("__NodeSnapshots") ? json["__NodeSnapshots"] : ofJson());
+    syncSnapshotSelector();
     hiddenParameters.clear();
-    snapshotOverrides.clear();
     scopeOverrides.clear();
     if(!json.contains("__ParameterSettings") || !json["__ParameterSettings"].is_object()) return;
     const auto& settings = json["__ParameterSettings"];
@@ -663,6 +654,69 @@ void ofxOceanodeNode::loadNodeSettings(const ofJson& json){
     if(settings.contains("Hidden") && settings["Hidden"].is_array()){
         for(const auto& name : settings["Hidden"]) if(name.is_string()) hiddenParameters.insert(name.get<std::string>());
     }
-    readFlags("Snapshot", snapshotOverrides);
     readFlags("Scope", scopeOverrides);
+}
+
+// ── Snapshot selector ────────────────────────────────────────────────────────
+
+void ofxOceanodeNode::syncSnapshotSelector(){
+    const bool wanted = snapshots->showSelectorInNode && supportsSnapshots();
+    if(!wanted){
+        if(!snapshotSelector) return;
+        const string name = snapshotSelector->getName();
+        if(getParameters().contains(name)){
+            static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(name)).removeAllConnections();
+            nodeModel->removeParameter(name);
+        }
+        snapshotSelectorListener.unsubscribe();
+        snapshotSelector.reset();
+        snapshotSelectorOptions.clear();
+        nodeModel->parameterGroupChanged.notify();
+        return;
+    }
+
+    std::vector<std::string> options(ofxOceanodeNodeSnapshots::numSlots);
+    for(int i = 0; i < ofxOceanodeNodeSnapshots::numSlots; i++){
+        auto slot = snapshots->slots.find(i);
+        if(slot == snapshots->slots.end()) options[i] = ofToString(i) + " -";
+        else if(slot->second.name.empty()) options[i] = ofToString(i);
+        else options[i] = ofToString(i) + ": " + slot->second.name;
+    }
+
+    if(!snapshotSelector){
+        // A model parameter may already be called Snapshot.
+        const string name = getParameters().contains("Snapshot") ? "Node Snapshot" : "Snapshot";
+        snapshotSelector = std::make_shared<ofParameter<int>>();
+        snapshotSelector->set(name, std::max(snapshots->currentSlot, 0), 0, ofxOceanodeNodeSnapshots::numSlots - 1);
+        // Not saved: the slot is recalled by the snapshot settings, and a
+        // saved value would recall it again on load.
+        auto parameter = nodeModel->addParameter(snapshotSelector,
+            ofxOceanodeParameterFlags_DisableSavePreset | ofxOceanodeParameterFlags_DisableSaveProject);
+        parameter->setDropdownOptions(options);
+        snapshotSelectorOptions = options;
+        // An int at the inlet (or the dropdown) recalls a stored slot when it
+        // changes to it.
+        snapshotSelectorListener = snapshotSelector->newListener([this](int& slot){
+            if(settingSnapshotSelector || slot == snapshots->currentSlot) return;
+            if(snapshots->hasSlot(slot)) recallSnapshot(slot);
+        });
+        // First in the node, under the header.
+        vector<string> order = {name};
+        for(int i = 0; i < getParameters().size(); i++){
+            const string other = getParameters().get(i).getName();
+            if(other != name) order.push_back(other);
+        }
+        getParameters().reorder(order);
+        nodeModel->parameterGroupChanged.notify();
+    }else if(options != snapshotSelectorOptions){
+        static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(snapshotSelector->getName()))
+            .cast<int>().setDropdownOptions(options);
+        snapshotSelectorOptions = options;
+    }
+
+    if(snapshots->currentSlot >= 0 && snapshotSelector->get() != snapshots->currentSlot){
+        settingSnapshotSelector = true;
+        snapshotSelector->set(snapshots->currentSlot);
+        settingSnapshotSelector = false;
+    }
 }

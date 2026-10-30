@@ -83,10 +83,9 @@ public:
     bool isParameterHidden(ofxOceanodeAbstractParameter& p) const;
     bool isParameterShownInGui(ofxOceanodeAbstractParameter& p) const;
     void setParameterHidden(ofxOceanodeAbstractParameter& p, bool hidden);
-    // Whether a value of this type can be stored in a Node Snapshot.
+    // Whether the parameter is stored in Node Snapshots: settable inputs
+    // of a value type a snapshot can hold.
     static bool canSnapshotParameter(ofxOceanodeAbstractParameter& p);
-    bool isParameterInSnapshots(ofxOceanodeAbstractParameter& p) const;
-    void setParameterInSnapshots(ofxOceanodeAbstractParameter& p, bool included);
     // Shown as a scope when the node is folded (and in the Inspector).
     bool isParameterScopedWhenFolded(ofxOceanodeAbstractParameter& p) const;
     void setParameterScopedWhenFolded(ofxOceanodeAbstractParameter& p, bool scoped);
@@ -106,6 +105,9 @@ public:
 
 private:
     void updateSnapshotGlide();
+    // Adds or removes the selector parameter ("Selector in node"), and keeps
+    // its options and value in step with the slots.
+    void syncSnapshotSelector();
 
     friend class ofxOceanodeContainer;
     // Declared before the model so local-macro backing files survive teardown.
@@ -116,9 +118,12 @@ private:
     ofEventListeners nodeModelListeners;
 
     std::set<std::string> hiddenParameters;
-    std::map<std::string, bool> snapshotOverrides;
     std::map<std::string, bool> scopeOverrides;
     std::unique_ptr<ofxOceanodeNodeSnapshots> snapshots;
+    std::shared_ptr<ofParameter<int>> snapshotSelector;
+    std::vector<std::string> snapshotSelectorOptions;
+    ofEventListener snapshotSelectorListener;
+    bool settingSnapshotSelector = false;
     
     bool isPersistent;
     bool active;

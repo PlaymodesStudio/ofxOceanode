@@ -184,26 +184,6 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         
         if(renderGui){
 
-        auto& snapshots = node.getSnapshots();
-        if(snapshots.showSelectorInNode && node.supportsSnapshots()){
-            ImGui::PushID("##nodeSnapshots");
-            ImGui::SetNextItemWidth(nodeWidthText + nodeWidthWidget);
-            const string preview = snapshots.currentSlot >= 0 ? snapshots.slotLabel(snapshots.currentSlot) : "Snapshot";
-            if(ImGui::BeginCombo("##snapshotSelector", preview.c_str())){
-                if(snapshots.slots.empty()) ImGui::TextDisabled("No snapshots stored");
-                for(const auto& slot : snapshots.slots){
-                    const bool isCurrent = slot.first == snapshots.currentSlot;
-                    const string label = ofToString(slot.first) + ": " + snapshots.slotLabel(slot.first);
-                    if(ImGui::Selectable(label.c_str(), isCurrent)){
-                        node.recallSnapshot(slot.first);
-                        break;
-                    }
-                    if(isCurrent) ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-            ImGui::PopID();
-        }
         
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
