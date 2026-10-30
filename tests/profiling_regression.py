@@ -34,7 +34,16 @@ namespace ofxOceanodeClipboard {
 static ofFileDialogResult saveResult;
 static int saveDialogs = 0;
 static ofFileDialogResult profileSaveDialog(std::string name, std::string message){
-    assert(name == "Oceanode-Profiling.csv");
+    // Suggested filenames include local date/time to the second, with no
+    // characters forbidden in filenames on Windows.
+    const std::string prefix = "Oceanode-Profiling-";
+    const std::string format = "0000-00-00_00-00-00";
+    assert(name.size() == prefix.size() + format.size() + 4);
+    assert(name.substr(0, prefix.size()) == prefix && name.substr(name.size() - 4) == ".csv");
+    for(std::size_t i = 0; i < format.size(); ++i){
+        const char c = name[prefix.size() + i];
+        assert(format[i] == '0' ? c >= '0' && c <= '9' : c == format[i]);
+    }
     ++saveDialogs;
     return saveResult;
 }

@@ -319,7 +319,7 @@ void ofxOceanodeProfilingController::draw(){
         const auto csv = csvContents();
         if(copyCsv) exportMessage = ofxOceanodeClipboard::setText(csv) ? "CSV copied to clipboard." : "Could not copy CSV to clipboard.";
         if(saveCsv){
-            const auto result = ofSystemSaveDialog("Oceanode-Profiling.csv", "Save profiling CSV");
+            const auto result = ofSystemSaveDialog("Oceanode-Profiling-" + ofGetTimestampString("%Y-%m-%d_%H-%M-%S") + ".csv", "Save profiling CSV");
             if(result.bSuccess){
                 auto path = result.filePath;
                 if(ofToLower(ofFilePath::getFileExt(path)) != "csv") path += ".csv";
