@@ -107,7 +107,7 @@ public:
     
     template<typename Tsource, typename Tsink>
     ofxOceanodeAbstractConnection* connectConnection(ofxOceanodeParameter<Tsource>& source, ofxOceanodeParameter<Tsink>& sink, bool active = true){
-        connections.push_back(move(make_unique<ofxOceanodeConnection<Tsource, Tsink>>(source, sink, active)));
+        connections.push_back(std::move(make_unique<ofxOceanodeConnection<Tsource, Tsink>>(source, sink, active)));
         auto connectionRef = connections.back().get();
         destroyConnectionListeners.push(connectionRef->destroyConnection.newListener([this, connectionRef](){
             connections.erase(std::find_if(connections.begin(), connections.end(), [connectionRef](std::unique_ptr<ofxOceanodeAbstractConnection> const &c){return c.get() == connectionRef;}));
@@ -118,7 +118,7 @@ public:
     template<typename T>
     ofxOceanodeAbstractConnection* connectCustomConnection(ofxOceanodeParameter<T>& source, ofxOceanodeAbstractParameter &sink, bool active = true){
         if(!sink.receiveParameter(&source.getParameter())) return nullptr;
-        connections.push_back(move(make_unique<ofxOceanodeCustomConnection<T>>(source, sink, active)));
+        connections.push_back(std::move(make_unique<ofxOceanodeCustomConnection<T>>(source, sink, active)));
         auto connectionRef = connections.back().get();
         destroyConnectionListeners.push(connectionRef->destroyConnection.newListener([this, connectionRef](){
             connections.erase(std::find_if(connections.begin(), connections.end(), [connectionRef](std::unique_ptr<ofxOceanodeAbstractConnection> const &c){return c.get() == connectionRef;}));

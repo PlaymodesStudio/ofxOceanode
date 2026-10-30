@@ -141,7 +141,7 @@ public:
 		addParameter(value.set("Value", val), ofxOceanodeParameterFlags_DisplayMinimized);
 	}
 	
-	void setup(){
+	void setup() override {
 		listener = value.newListener([this](std::vector<T> &t){
 			portalUpdated();
 		});
@@ -164,7 +164,7 @@ public:
 		}
 	}
 	
-	bool match(abstractPortal* p){
+	bool match(abstractPortal* p) override {
 		// getName() == p->getName() is guaranteed by the map-based registry in ofxOceanodeShared
 		if(type() == p->type() && checkLocal(p) && p != this){
 	           settingViaMatch = true;
@@ -189,7 +189,7 @@ public:
 		addParameter(value.set("Value"), ofxOceanodeParameterFlags_DisplayMinimized);
 	}
 	
-	void setup(){
+	void setup() override {
 		listener = value.newListener([this](){
 			portalUpdated();
 		});
@@ -207,7 +207,7 @@ public:
 		}
 	}
 
-	bool match(abstractPortal* p){
+	bool match(abstractPortal* p) override {
 		// getName() == p->getName() is guaranteed by the map-based registry in ofxOceanodeShared
 		if(type() == p->type() && checkLocal(p) && p != this){
 	           settingViaMatch = true;
