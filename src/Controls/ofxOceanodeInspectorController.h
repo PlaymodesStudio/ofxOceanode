@@ -11,6 +11,8 @@
 #include "ofxOceanodeBaseController.h"
 #include "ofxOceanodeParameter.h"
 
+class ofxOceanodeNode;
+
 class ofxOceanodeInspectorController: public ofxOceanodeBaseController{
 public:
 
@@ -26,6 +28,9 @@ public:
 	
     
 private:
+    void drawNodeSnapshots(ofxOceanodeNode& node);
+    void drawParameterSettings(ofxOceanodeNode& node);
+
 	static std::map<std::string, std::vector<std::string>> inspectorDropdownOptions;
 
     shared_ptr<ofxOceanodeContainer> container;

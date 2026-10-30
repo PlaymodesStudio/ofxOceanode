@@ -134,6 +134,13 @@ public:
     }
     void setDeclaredSink(bool sink){ declaredSink = sink; }
 
+    // Node Snapshots: the Inspector stores and recalls this node's parameter
+    // values, gliding between them. Off for nodes with nothing worth recalling
+    // or their own snapshot system: override, call setNodeSnapshotsDisabled,
+    // or register with the NoNodeSnapshots flag.
+    virtual bool supportsNodeSnapshots() const { return !nodeSnapshotsDisabled; }
+    void setNodeSnapshotsDisabled(bool disabled){ nodeSnapshotsDisabled = disabled; }
+
     // Return true when a model renders an Inspector row itself, or hides it.
     // Registered parameters still keep their normal preset/undo behavior.
     virtual bool drawInspectorParameter(ofAbstractParameter &parameter){ return false; }
@@ -426,6 +433,7 @@ private:
     ofxOceanodeNodeModelFlags flags;
     bool active;
     bool declaredSink = false;
+    bool nodeSnapshotsDisabled = false;
 };
 
 #endif /* ofxOceanodeNodeModel_h */

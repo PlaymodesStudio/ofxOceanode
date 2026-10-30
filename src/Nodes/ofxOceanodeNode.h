@@ -10,6 +10,7 @@
 #define ofxOceanodeNode_h
 
 #include "ofMain.h"
+#include "ofxOceanodeNodeSnapshots.h"
 
 class ofxOceanodeNodeGui;
 class ofxOceanodeNodeModel;
@@ -77,7 +78,35 @@ public:
     ofParameterGroup& getParameters();
     ofParameterGroup& getInspectorParameters();
 
+    // Per-parameter choices made in the Inspector. Hidden rows stay drawn
+    // while connected, so no cable loses its pin.
+    bool isParameterHidden(ofxOceanodeAbstractParameter& p) const;
+    bool isParameterShownInGui(ofxOceanodeAbstractParameter& p) const;
+    void setParameterHidden(ofxOceanodeAbstractParameter& p, bool hidden);
+    // Whether a value of this type can be stored in a Node Snapshot.
+    static bool canSnapshotParameter(ofxOceanodeAbstractParameter& p);
+    bool isParameterInSnapshots(ofxOceanodeAbstractParameter& p) const;
+    void setParameterInSnapshots(ofxOceanodeAbstractParameter& p, bool included);
+    // Shown as a scope when the node is folded (and in the Inspector).
+    bool isParameterScopedWhenFolded(ofxOceanodeAbstractParameter& p) const;
+    void setParameterScopedWhenFolded(ofxOceanodeAbstractParameter& p, bool scoped);
+
+    // Node Snapshots: stored parameter values, recalled with a glide.
+    bool supportsSnapshots();
+    ofxOceanodeNodeSnapshots& getSnapshots(){return *snapshots;}
+    void storeSnapshot(int slot);
+    void recallSnapshot(int slot);
+    void removeSnapshot(int slot);
+
+    // Settings saved beside the parameter values: snapshots and the
+    // per-parameter choices. A missing key restores the defaults.
+    void saveNodeSettings(ofJson& json);
+    void loadNodeSettings(const ofJson& json);
+    static const std::vector<std::string>& nodeSettingsKeys();
+
 private:
+    void updateSnapshotGlide();
+
     friend class ofxOceanodeContainer;
     // Declared before the model so local-macro backing files survive teardown.
     std::shared_ptr<void> canvasHistoryStorage;
@@ -85,6 +114,11 @@ private:
     std::unique_ptr<ofxOceanodeNodeGui> nodeGui;
 	
     ofEventListeners nodeModelListeners;
+
+    std::set<std::string> hiddenParameters;
+    std::map<std::string, bool> snapshotOverrides;
+    std::map<std::string, bool> scopeOverrides;
+    std::unique_ptr<ofxOceanodeNodeSnapshots> snapshots;
     
     bool isPersistent;
     bool active;

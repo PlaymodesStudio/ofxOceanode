@@ -13,6 +13,7 @@ public:
             "Analysis rejects external outputs recursively. Source folders must be available when activating or reloading.";
     }
     ~ofxOceanodeMacroMixer();
+    bool supportsNodeSnapshots() const override { return false; }
     void setup() override;
     bool drawInspectorParameter(ofAbstractParameter& parameter) override;
     bool drawNodeParameter(ofxOceanodeAbstractParameter& parameter, float labelWidth, float widgetWidth) override;

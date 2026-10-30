@@ -1611,6 +1611,7 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
             node->saveInspectorParametersToJson(state);
             node->getNodeModel().presetSave(state);
             macro->saveCanvasUndoState(state, presetFolderPath.string());
+            node->saveNodeSettings(state);
             state["expanded"] = node->getNodeGui().getExpanded();
             string type = node->getNodeModel().nodeName();
             ofStringReplace(type, " ", "_");
@@ -4091,6 +4092,7 @@ ofxOceanodeContainer::captureCanvasNode(ofxOceanodeNode& node){
     snapshot->values = node.saveParametersToJson(false, true);
     node.saveInspectorParametersToJson(snapshot->values);
     node.getNodeModel().presetSave(snapshot->values);
+    node.saveNodeSettings(snapshot->values);
     snapshot->values["expanded"] = node.getNodeGui().getExpanded();
     if(customGuiExtension) snapshot->widgets = customGuiExtension->captureNodeBindings(node.getParameters().getEscapedName() + "/");
 #ifdef OFXOCEANODE_USE_MIDI
@@ -4296,6 +4298,7 @@ bool ofxOceanodeContainer::replayCanvasEdit(CanvasEdit& edit, bool backwards){
         node->loadParametersFromJson(values, false);
         node->loadInspectorParametersFromJson(values);
         node->getNodeModel().presetRecallAfterSettingParameters(values);
+        node->loadNodeSettings(values);
         node->getNodeGui().setExpanded(values.value("expanded", true));
         node->getNodeGui().setSelected(true);
 #ifdef OFXOCEANODE_USE_MIDI

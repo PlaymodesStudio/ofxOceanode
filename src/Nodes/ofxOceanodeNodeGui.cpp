@@ -75,6 +75,11 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         for(int i = 0; i < getParameters().size(); ++i){
             auto& parameter = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
             if(!isHeaderToggle(parameter)) continue;
+            if(!node.isParameterShownInGui(parameter)){
+                const float pinY = ImGui::GetItemRectMin().y + ImGui::GetItemRectSize().y * 0.5f;
+                inputPositions[i] = outputPositions[i] = glm::vec2(0, pinY);
+                continue;
+            }
             ImGui::PushID(i);
             ofJson before;
             const bool trackEdit = !parameter.hasInConnection() &&
@@ -178,10 +183,36 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         float cursorYBefore = ImGui::GetCursorPosY();
         
         if(renderGui){
+
+        auto& snapshots = node.getSnapshots();
+        if(snapshots.showSelectorInNode && node.supportsSnapshots()){
+            ImGui::PushID("##nodeSnapshots");
+            ImGui::SetNextItemWidth(nodeWidthText + nodeWidthWidget);
+            const string preview = snapshots.currentSlot >= 0 ? snapshots.slotLabel(snapshots.currentSlot) : "Snapshot";
+            if(ImGui::BeginCombo("##snapshotSelector", preview.c_str())){
+                if(snapshots.slots.empty()) ImGui::TextDisabled("No snapshots stored");
+                for(const auto& slot : snapshots.slots){
+                    const bool isCurrent = slot.first == snapshots.currentSlot;
+                    const string label = ofToString(slot.first) + ": " + snapshots.slotLabel(slot.first);
+                    if(ImGui::Selectable(label.c_str(), isCurrent)){
+                        node.recallSnapshot(slot.first);
+                        break;
+                    }
+                    if(isCurrent) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::PopID();
+        }
         
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
             if(isHeaderToggle(absParam)) continue;
+            if(!node.isParameterShownInGui(absParam)){
+                // Hidden in the Inspector: no row, and no pin (it has no cables).
+                inputPositions[i] = outputPositions[i] = glm::vec2(0, ImGui::GetCursorScreenPos().y);
+                continue;
+            }
             ofJson valueBefore;
             const bool trackUserValue = !(absParam.getFlags() & (ofxOceanodeParameterFlags_DisableSavePreset |
                                                                  ofxOceanodeParameterFlags_ReadOnly)) &&
@@ -726,7 +757,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 		for(int i=0 ; i<getParameters().size(); i++)
 		{
 			ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
-			if((absParam.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized))
+			if(node.isParameterScopedWhenFolded(absParam))
 			{
 				ImVec2 size;
 				if(absParam.valueType() == typeid(ofTexture*).name())
@@ -760,7 +791,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
 		for(int i=0 ; i<getParameters().size(); i++)
 		{
 			ofxOceanodeAbstractParameter &absParam2 = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
-			if((absParam2.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized))
+			if(node.isParameterScopedWhenFolded(absParam2))
 			{
 				// Style setup for minimized parameters
 				ImGui::PushStyleColor(ImGuiCol_SliderGrab,ImVec4(node.getColor()*0.5f));

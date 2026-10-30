@@ -37,6 +37,8 @@ public:
                       "Reset restarts all values at zero. With Sync To Transport enabled, "
                       "the source clock follows play, pause, seek, loops and frame-stepped rendering; "
                       "local Reset is ignored.";
+        // Its state is the running count, not settings worth recalling.
+        setNodeSnapshotsDisabled(true);
     }
     void setup() override{
         timeGenerator::setup();

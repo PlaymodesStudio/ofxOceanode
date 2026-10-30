@@ -378,7 +378,7 @@ void ofxOceanodeInspectorController::draw(){
         vector<int> scopeIndices;
         for(int i = 0; i < nodeGui.getParameters().size(); i++){
             ofxOceanodeAbstractParameter &p = static_cast<ofxOceanodeAbstractParameter&>(nodeGui.getParameters().get(i));
-            if(p.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized){
+            if(node->isParameterScopedWhenFolded(p)){
                 scopeIndices.push_back(i);
             }
         }
@@ -433,6 +433,13 @@ void ofxOceanodeInspectorController::draw(){
 	
 	ImGui::Separator();
 
+	if(node->supportsSnapshots() && ImGui::CollapsingHeader("Snapshots")){
+		drawNodeSnapshots(*node);
+	}
+	if(ImGui::CollapsingHeader("Parameters")){
+		drawParameterSettings(*node);
+	}
+
 	if(node->getNodeModel().getDescription() != ""){
 		ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 21.0f);
 		ImGui::SetNextItemOpen(false, ImGuiCond_Appearing);
@@ -449,4 +456,140 @@ void ofxOceanodeInspectorController::draw(){
 	}
 
     ImGui::PopStyleVar();
+}
+
+void ofxOceanodeInspectorController::drawNodeSnapshots(ofxOceanodeNode& node){
+    auto& snapshots = node.getSnapshots();
+    ImGui::PushID("NodeSnapshots");
+
+    // Slot grid, as in Macros: click recalls (an empty slot stores),
+    // Shift+click stores, right-click opens the slot's menu.
+    const int columns = 8;
+    const float spacing = 2.0f;
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing, spacing));
+    const float buttonWidth = (ImGui::GetContentRegionAvail().x - spacing * (columns - 1)) / columns;
+    for(int slot = 0; slot < ofxOceanodeNodeSnapshots::numSlots; slot++){
+        if(slot % columns != 0) ImGui::SameLine();
+        ImGui::PushID(slot);
+        const bool hasData = snapshots.hasSlot(slot);
+        const bool isCurrent = slot == snapshots.currentSlot;
+        if(isCurrent){
+            ImGui::PushStyleColor(ImGuiCol_Button, OceanodeColors::SnapshotActive);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, OceanodeColors::SnapshotActiveHovered);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, OceanodeColors::SnapshotActivePressed);
+        }else if(hasData){
+            ImGui::PushStyleColor(ImGuiCol_Button, OceanodeColors::SnapshotFilled);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, OceanodeColors::SnapshotFilledHovered);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, OceanodeColors::SnapshotFilledPressed);
+        }else{
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_Button));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        }
+        if(ImGui::Button(ofToString(slot).c_str(), ImVec2(buttonWidth, ImGui::GetFrameHeight()))){
+            if(ImGui::GetIO().KeyShift || !hasData) node.storeSnapshot(slot);
+            else node.recallSnapshot(slot);
+        }
+        ImGui::PopStyleColor(3);
+        if(ImGui::IsItemHovered()){
+            if(hasData) ImGui::SetTooltip("%s\nClick: recall  Shift+Click: store", snapshots.slotLabel(slot).c_str());
+            else ImGui::SetTooltip("Empty\nClick: store");
+        }
+        if(ImGui::BeginPopupContextItem("##slotMenu")){
+            if(ImGui::Selectable("Store")) node.storeSnapshot(slot);
+            if(hasData && ImGui::Selectable("Recall")) node.recallSnapshot(slot);
+            if(hasData && ImGui::Selectable("Clear")) node.removeSnapshot(slot);
+            ImGui::EndPopup();
+        }
+        ImGui::PopID();
+    }
+    ImGui::PopStyleVar();
+
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    ImGui::SliderFloat("##morphMs", &snapshots.morphMs, 0.f, 10000.f, "Morph: %.0f ms");
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    ImGui::SliderFloat("##morphBiPow", &snapshots.morphBiPow, -1.f, 1.f, "BiPow: %.2f");
+    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, OceanodeColors::MorphProgressBar);
+    const float progress = snapshots.gliding ? snapshots.progress : (snapshots.currentSlot >= 0 ? 1.f : 0.f);
+    ImGui::ProgressBar(progress, ImVec2(-FLT_MIN, 6.0f), "");
+    ImGui::PopStyleColor();
+    ImGui::Checkbox("Selector in node", &snapshots.showSelectorInNode);
+
+    // Stored slots: name, overwrite, clear.
+    int slotToClear = -1;
+    for(auto& slot : snapshots.slots){
+        ImGui::PushID(slot.first);
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("%2d", slot.first);
+        ImGui::SameLine();
+        char name[256];
+        std::snprintf(name, sizeof(name), "%s", slot.second.name.c_str());
+        const float buttonsWidth = ImGui::CalcTextSize("Store").x + ImGui::CalcTextSize("X").x +
+            ImGui::GetStyle().FramePadding.x * 4 + ImGui::GetStyle().ItemSpacing.x * 2;
+        ImGui::SetNextItemWidth(std::max(40.0f, ImGui::GetContentRegionAvail().x - buttonsWidth));
+        if(ImGui::InputTextWithHint("##name", ofToString(slot.first).c_str(), name, sizeof(name))){
+            slot.second.name = name;
+        }
+        ImGui::SameLine();
+        if(ImGui::Button("Store")) node.storeSnapshot(slot.first);
+        ImGui::SameLine();
+        if(ImGui::Button("X")) slotToClear = slot.first;
+        ImGui::PopID();
+    }
+    if(slotToClear >= 0) node.removeSnapshot(slotToClear);
+    ImGui::PopID();
+}
+
+void ofxOceanodeInspectorController::drawParameterSettings(ofxOceanodeNode& node){
+    const bool snapshotsAvailable = node.supportsSnapshots();
+    ImGui::TextDisabled("Show: row in the node. Snap: kept in Snapshots. Scope: shown when folded.");
+    const ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingFixedFit;
+    if(!ImGui::BeginTable("##parameterSettings", 4, flags)) return;
+    ImGui::TableSetupColumn("Parameter", ImGuiTableColumnFlags_WidthStretch);
+    ImGui::TableSetupColumn("Show");
+    ImGui::TableSetupColumn("Snap");
+    ImGui::TableSetupColumn("Scope");
+    ImGui::TableHeadersRow();
+
+    auto unavailable = [](){
+        ImGui::TextDisabled("-");
+    };
+    auto& parameters = node.getParameters();
+    for(int i = 0; i < parameters.size(); i++){
+        auto& p = static_cast<ofxOceanodeAbstractParameter&>(parameters.get(i));
+        string label = p.getName();
+        if(label.find("SEPARATOR:|") == 0){
+            const auto parts = ofSplitString(label, "|");
+            label = "-- " + (parts.size() > 1 && !parts[1].empty() ? parts[1] : string("separator")) + " --";
+        }
+        ImGui::PushID(i);
+        ImGui::TableNextRow();
+
+        ImGui::TableNextColumn();
+        ImGui::AlignTextToFramePadding();
+        if(node.isParameterHidden(p)) ImGui::TextDisabled("%s", label.c_str());
+        else ImGui::TextUnformatted(label.c_str());
+
+        ImGui::TableNextColumn();
+        bool shown = !node.isParameterHidden(p);
+        if(ImGui::Checkbox("##show", &shown)) node.setParameterHidden(p, !shown);
+        if(!shown && node.isParameterShownInGui(p) && ImGui::IsItemHovered()){
+            ImGui::SetTooltip("Shown while it has cables");
+        }
+
+        ImGui::TableNextColumn();
+        if(snapshotsAvailable && ofxOceanodeNode::canSnapshotParameter(p)){
+            bool included = node.isParameterInSnapshots(p);
+            if(ImGui::Checkbox("##snap", &included)) node.setParameterInSnapshots(p, included);
+        }else unavailable();
+
+        ImGui::TableNextColumn();
+        if(ofxOceanodeScope::getInstance()->canScope(&p)){
+            bool scoped = node.isParameterScopedWhenFolded(p);
+            if(ImGui::Checkbox("##scope", &scoped)) node.setParameterScopedWhenFolded(p, scoped);
+        }else unavailable();
+
+        ImGui::PopID();
+    }
+    ImGui::EndTable();
 }

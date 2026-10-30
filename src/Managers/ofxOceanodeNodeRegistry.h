@@ -24,7 +24,10 @@ enum class ofxOceanodeNodeRegistrationFlags : unsigned int {
     CanRemoveWhenUnused = 1u << 0,
     // The model does useful work even when nothing consumes its outputs.
     // Dead-node cleanup never removes a sink or anything that feeds it.
-    Sink = 1u << 1
+    Sink = 1u << 1,
+    // The model has no state worth recalling (or recalls it its own way):
+    // the Inspector offers no Node Snapshots for it.
+    NoNodeSnapshots = 1u << 2
 };
 
 constexpr ofxOceanodeNodeRegistrationFlags operator|(ofxOceanodeNodeRegistrationFlags a,
@@ -174,6 +177,8 @@ private:
             auto model = std::make_unique<ModelType>(args...);
             if((flags & ofxOceanodeNodeRegistrationFlags::Sink) != ofxOceanodeNodeRegistrationFlags::None)
                 model->setDeclaredSink(true);
+            if((flags & ofxOceanodeNodeRegistrationFlags::NoNodeSnapshots) != ofxOceanodeNodeRegistrationFlags::None)
+                model->setNodeSnapshotsDisabled(true);
             return model;
         };
     }

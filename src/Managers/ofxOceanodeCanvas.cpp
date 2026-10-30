@@ -1626,6 +1626,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     for (auto &absParam : node->getParameters()){
                         auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
                         if(!nodeGui.getExpanded() && !(param->getFlags() & ofxOceanodeParameterFlags_HeaderToggle)) continue;
+                        if(!node->isParameterShownInGui(*param)) continue;
                         if(!(param->getFlags() & ofxOceanodeParameterFlags_DisableInConnection)){
                             auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                             auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
@@ -1690,6 +1691,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     for (auto &absParam : node->getParameters()){
                         auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
                         if(!nodeGui.getExpanded() && !(param->getFlags() & ofxOceanodeParameterFlags_HeaderToggle)) continue;
+                        if(!node->isParameterShownInGui(*param)) continue;
                         if(!(param->getFlags() & ofxOceanodeParameterFlags_DisableOutConnection)){
                             auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                             auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
@@ -3314,7 +3316,7 @@ void ofxOceanodeCanvas::drawNodePreview(ofxOceanodeNode& node){
     const auto bulletColor = nodeGui.drawFrame(glm::vec2(origin.x, origin.y), glm::vec2(origin.x, origin.y) + size, 1.0f, false);
     for(auto& parameter : node.getParameters()){
         auto* pin = dynamic_cast<ofxOceanodeAbstractParameter*>(parameter.get());
-        if(!pin || !nodeGui.hasConnectionPosition(*pin)) continue;
+        if(!pin || !nodeGui.hasConnectionPosition(*pin) || !node.isParameterShownInGui(*pin)) continue;
         if(!(pin->getFlags() & ofxOceanodeParameterFlags_DisableInConnection)){
             const auto pos = nodeGui.getSinkConnectionPositionFromParameter(*pin) - glm::vec2(NODE_WINDOW_PADDING.x, 0);
             draw->AddCircleFilled(ImVec2(pos.x, pos.y), 3.0f, bulletColor);

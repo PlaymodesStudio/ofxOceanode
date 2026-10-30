@@ -15,6 +15,8 @@
 #include "ofxOceanodeNodeGui.h"
 #include "PresetSaveCleanup.h"
 #include "ofxOceanodeGlDiagnostics.h"
+#include "ofxOceanodeScope.h"
+#include "MacroMorphEngine.h"
 
 namespace {
 std::atomic<std::uint64_t> graphGenerationCounter{0};
@@ -24,7 +26,7 @@ std::uint64_t ofxOceanodeNode::graphGeneration(){
     return graphGenerationCounter.load(std::memory_order_relaxed);
 }
 
-ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)){
+ofxOceanodeNode::ofxOceanodeNode(unique_ptr<ofxOceanodeNodeModel> && _nodeModel) : nodeModel(move(_nodeModel)), snapshots(std::make_unique<ofxOceanodeNodeSnapshots>()){
     graphGenerationCounter.fetch_add(1, std::memory_order_relaxed);
     nodeModelListeners.push(nodeModel->deleteModule.newListener([this](){
         deleteSelf();
@@ -52,6 +54,7 @@ void ofxOceanodeNode::update(ofEventArgs &e){
         const auto path = record->identity ? record->identity().path : nodeModel->getParents();
         return path + "/" + nodeModel->nodeName() + "_" + ofToString(nodeModel->getNumIdentifier());
     };
+    updateSnapshotGlide();
     {
         oceanodeGlDiagnostics::Scope glErrors(identity, "update");
         oceanodeProfiling::Scope timing(nodeModel->getProfilingRecord(), oceanodeProfiling::Phase::Update);
@@ -111,6 +114,7 @@ bool ofxOceanodeNode::loadPreset(string presetFolderPath){
 	loadParametersFromJson(json, false);
 	loadInspectorParametersFromJson(json);
 	nodeModel->presetRecallAfterSettingParameters(json);
+	loadNodeSettings(json);
     if(json.count("expanded") == 1){
         nodeGui->setExpanded(json["expanded"]);
     }
@@ -126,6 +130,7 @@ void ofxOceanodeNode::savePreset(string presetFolderPath, bool saveBeforeConnect
     saveInspectorParametersToJson(json);
     nodeModel->presetSave(json);
 	nodeModel->macroSave(json, presetFolderPath);
+    saveNodeSettings(json);
     json["expanded"] = nodeGui->getExpanded();
     oceanodePresetSave::saveJson(filename, json);
     save.finish();
@@ -144,6 +149,7 @@ bool ofxOceanodeNode::loadPersistentPreset(string presetFolderPath){
 	loadParametersFromJson(json, true);
 	loadInspectorParametersFromJson(json);
 	nodeModel->presetRecallAfterSettingParameters(json);
+	loadNodeSettings(json);
 	return true;
 }
 
@@ -156,6 +162,7 @@ void ofxOceanodeNode::savePersistentPreset(string presetFolderPath){
     saveInspectorParametersToJson(json);
     nodeModel->presetSave(json);
 	nodeModel->macroSave(json, presetFolderPath);
+    saveNodeSettings(json);
     oceanodePresetSave::saveJson(filename, json);
     save.finish();
 }
@@ -385,4 +392,277 @@ void ofxOceanodeNode::setActive(bool act){
     }else{
         nodeGui->disable();
     }
+}
+
+// ── Per-parameter settings ───────────────────────────────────────────────────
+
+bool ofxOceanodeNode::isParameterHidden(ofxOceanodeAbstractParameter& p) const{
+    return hiddenParameters.count(p.getEscapedName()) != 0;
+}
+
+bool ofxOceanodeNode::isParameterShownInGui(ofxOceanodeAbstractParameter& p) const{
+    return !isParameterHidden(p) || p.hasInConnection() || p.hasOutConnections();
+}
+
+void ofxOceanodeNode::setParameterHidden(ofxOceanodeAbstractParameter& p, bool hidden){
+    if(hidden) hiddenParameters.insert(p.getEscapedName());
+    else hiddenParameters.erase(p.getEscapedName());
+}
+
+bool ofxOceanodeNode::canSnapshotParameter(ofxOceanodeAbstractParameter& p){
+    if(p.isNodeOutput()) return false;
+    if(p.getFlags() & (ofxOceanodeParameterFlags_DisableSavePreset | ofxOceanodeParameterFlags_ReadOnly)) return false;
+    const auto type = p.valueType();
+    return type == typeid(float).name() || type == typeid(int).name() || type == typeid(bool).name() ||
+           type == typeid(int64_t).name() || type == typeid(std::string).name() ||
+           type == typeid(vector<float>).name() || type == typeid(vector<int>).name() ||
+           type == typeid(ofColor).name() || type == typeid(ofFloatColor).name();
+}
+
+bool ofxOceanodeNode::isParameterInSnapshots(ofxOceanodeAbstractParameter& p) const{
+    if(!canSnapshotParameter(p)) return false;
+    auto it = snapshotOverrides.find(p.getEscapedName());
+    return it == snapshotOverrides.end() ? true : it->second;
+}
+
+void ofxOceanodeNode::setParameterInSnapshots(ofxOceanodeAbstractParameter& p, bool included){
+    if(included) snapshotOverrides.erase(p.getEscapedName());
+    else snapshotOverrides[p.getEscapedName()] = false;
+}
+
+bool ofxOceanodeNode::isParameterScopedWhenFolded(ofxOceanodeAbstractParameter& p) const{
+    auto it = scopeOverrides.find(p.getEscapedName());
+    if(it != scopeOverrides.end()) return it->second;
+    return p.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized;
+}
+
+void ofxOceanodeNode::setParameterScopedWhenFolded(ofxOceanodeAbstractParameter& p, bool scoped){
+    const bool byDefault = p.getFlags() & ofxOceanodeParameterFlags_DisplayMinimized;
+    if(scoped == byDefault) scopeOverrides.erase(p.getEscapedName());
+    else scopeOverrides[p.getEscapedName()] = scoped;
+}
+
+// ── Node Snapshots ───────────────────────────────────────────────────────────
+
+namespace {
+enum class GlideKind { None, Float, Int, FloatVector, IntVector, Color, FloatColor };
+
+// Dropdowns, sizes that change and non-numeric values switch at once.
+GlideKind glideKind(ofxOceanodeAbstractParameter& p){
+    const auto type = p.valueType();
+    if(type == typeid(float).name()) return p.cast<float>().getDropdownOptions().empty() ? GlideKind::Float : GlideKind::None;
+    if(type == typeid(int).name()) return p.cast<int>().getDropdownOptions().empty() ? GlideKind::Int : GlideKind::None;
+    if(type == typeid(vector<float>).name()) return p.cast<vector<float>>().getDropdownOptions().empty() ? GlideKind::FloatVector : GlideKind::None;
+    if(type == typeid(vector<int>).name()) return p.cast<vector<int>>().getDropdownOptions().empty() ? GlideKind::IntVector : GlideKind::None;
+    if(type == typeid(ofColor).name()) return GlideKind::Color;
+    if(type == typeid(ofFloatColor).name()) return GlideKind::FloatColor;
+    return GlideKind::None;
+}
+
+std::vector<float> currentGlideValue(ofxOceanodeAbstractParameter& p, GlideKind kind){
+    switch(kind){
+        case GlideKind::Float: return {p.cast<float>().getParameter().get()};
+        case GlideKind::Int: return {float(p.cast<int>().getParameter().get())};
+        case GlideKind::FloatVector: return p.cast<vector<float>>().getParameter().get();
+        case GlideKind::IntVector: {
+            const auto& values = p.cast<vector<int>>().getParameter().get();
+            return std::vector<float>(values.begin(), values.end());
+        }
+        case GlideKind::Color: {
+            const ofColor c = p.cast<ofColor>().getParameter().get();
+            return {float(c.r), float(c.g), float(c.b), float(c.a)};
+        }
+        case GlideKind::FloatColor: {
+            const ofFloatColor c = p.cast<ofFloatColor>().getParameter().get();
+            return {c.r, c.g, c.b, c.a};
+        }
+        default: return {};
+    }
+}
+
+// Reads a value as saveParameterToJson wrote it; false if it cannot glide.
+bool savedGlideValue(const ofJson& value, GlideKind kind, std::vector<float>& out){
+    out.clear();
+    switch(kind){
+        case GlideKind::Float:
+        case GlideKind::Int:
+            if(!value.is_number()) return false;
+            out.push_back(value.get<float>());
+            return true;
+        case GlideKind::FloatVector:
+        case GlideKind::IntVector:
+            if(value.is_number()){ out.push_back(value.get<float>()); return true; }
+            if(!value.is_array()) return false;
+            for(const auto& v : value){
+                if(!v.is_number()) return false;
+                out.push_back(v.get<float>());
+            }
+            return true;
+        case GlideKind::Color: {
+            if(!value.is_string()) return false;
+            const ofColor c = ofFromString<ofColor>(value.get<std::string>());
+            out = {float(c.r), float(c.g), float(c.b), float(c.a)};
+            return true;
+        }
+        case GlideKind::FloatColor: {
+            if(!value.is_string()) return false;
+            const ofFloatColor c = ofFromString<ofFloatColor>(value.get<std::string>());
+            out = {c.r, c.g, c.b, c.a};
+            return true;
+        }
+        default: return false;
+    }
+}
+
+void setGlideValue(ofxOceanodeAbstractParameter& p, GlideKind kind, const std::vector<float>& values){
+    switch(kind){
+        case GlideKind::Float: p.cast<float>().getParameter() = values[0]; break;
+        case GlideKind::Int: p.cast<int>().getParameter() = int(std::round(values[0])); break;
+        case GlideKind::FloatVector: p.cast<vector<float>>().getParameter() = values; break;
+        case GlideKind::IntVector: {
+            vector<int> rounded(values.size());
+            for(size_t i = 0; i < values.size(); i++) rounded[i] = int(std::round(values[i]));
+            p.cast<vector<int>>().getParameter() = rounded;
+            break;
+        }
+        case GlideKind::Color: {
+            auto channel = [&](size_t i){ return (unsigned char)ofClamp(std::round(values[i]), 0, 255); };
+            p.cast<ofColor>().getParameter() = ofColor(channel(0), channel(1), channel(2), channel(3));
+            break;
+        }
+        case GlideKind::FloatColor:
+            p.cast<ofFloatColor>().getParameter() = ofFloatColor(values[0], values[1], values[2], values[3]);
+            break;
+        default: break;
+    }
+}
+}
+
+bool ofxOceanodeNode::supportsSnapshots(){
+    if(!nodeModel->supportsNodeSnapshots()) return false;
+    for(auto& abstract : getParameters()){
+        auto* p = dynamic_cast<ofxOceanodeAbstractParameter*>(abstract.get());
+        if(p != nullptr && canSnapshotParameter(*p)) return true;
+    }
+    return false;
+}
+
+void ofxOceanodeNode::storeSnapshot(int slot){
+    if(slot < 0 || slot >= ofxOceanodeNodeSnapshots::numSlots) return;
+    ofJson values = ofJson::object();
+    for(int i = 0; i < getParameters().size(); i++){
+        auto& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
+        if(isParameterInSnapshots(p)) saveParameterToJson(values, p);
+    }
+    snapshots->slots[slot].values = values;
+    snapshots->currentSlot = slot;
+}
+
+void ofxOceanodeNode::recallSnapshot(int slot){
+    auto found = snapshots->slots.find(slot);
+    if(found == snapshots->slots.end()) return;
+    ofJson target = found->second.values;
+    snapshots->currentSlot = slot;
+    snapshots->glideTracks.clear();
+    snapshots->gliding = false;
+    snapshots->progress = 1.f;
+    const bool glide = snapshots->morphMs > 0.f;
+    for(int i = 0; i < getParameters().size(); i++){
+        auto& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
+        const string key = p.getEscapedName();
+        if(!isParameterInSnapshots(p) || !target.contains(key) || p.hasInConnection()) continue;
+        const GlideKind kind = glide ? glideKind(p) : GlideKind::None;
+        ofxOceanodeNodeSnapshots::GlideTrack track;
+        track.parameter = key;
+        track.from = currentGlideValue(p, kind);
+        if(kind != GlideKind::None && savedGlideValue(target[key], kind, track.to) &&
+           !track.to.empty() && track.from.size() == track.to.size()){
+            snapshots->glideTracks.push_back(std::move(track));
+        }else{
+            deserializeParameter(target, p);
+        }
+    }
+    if(snapshots->glideTracks.empty()) return;
+    snapshots->gliding = true;
+    snapshots->glideStartMs = ofGetElapsedTimeMillis();
+    snapshots->glideMs = snapshots->morphMs;
+    snapshots->glideBiPow = snapshots->morphBiPow;
+    snapshots->progress = 0.f;
+}
+
+void ofxOceanodeNode::removeSnapshot(int slot){
+    snapshots->slots.erase(slot);
+    if(snapshots->currentSlot == slot){
+        snapshots->currentSlot = -1;
+        snapshots->gliding = false;
+        snapshots->glideTracks.clear();
+    }
+}
+
+void ofxOceanodeNode::updateSnapshotGlide(){
+    auto& s = *snapshots;
+    if(!s.gliding) return;
+    const float elapsed = float(ofGetElapsedTimeMillis() - s.glideStartMs);
+    const float t = ofClamp(elapsed / std::max(s.glideMs, 1.f), 0.f, 1.f);
+    float mapped = t;
+    if(s.glideBiPow != 0.f){
+        mapped = mapped * 2.f - 1.f;
+        MacroMorphEngine::customPow(mapped, s.glideBiPow);
+        mapped = (mapped + 1.f) * 0.5f;
+    }
+    if(t >= 1.f) mapped = 1.f;
+    s.progress = mapped;
+    std::vector<float> values;
+    for(const auto& track : s.glideTracks){
+        if(!getParameters().contains(track.parameter)) continue;
+        auto& p = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(track.parameter));
+        // A cable connected during the glide takes over.
+        if(p.hasInConnection()) continue;
+        const GlideKind kind = glideKind(p);
+        if(currentGlideValue(p, kind).size() != track.from.size()) continue;
+        values.resize(track.from.size());
+        for(size_t i = 0; i < values.size(); i++) values[i] = track.from[i] + (track.to[i] - track.from[i]) * mapped;
+        setGlideValue(p, kind, values);
+    }
+    if(t >= 1.f){
+        s.gliding = false;
+        s.glideTracks.clear();
+    }
+}
+
+// ── Saved settings ───────────────────────────────────────────────────────────
+
+const std::vector<std::string>& ofxOceanodeNode::nodeSettingsKeys(){
+    static const std::vector<std::string> keys = {"__NodeSnapshots", "__ParameterSettings"};
+    return keys;
+}
+
+void ofxOceanodeNode::saveNodeSettings(ofJson& json){
+    if(!snapshots->isDefault()) json["__NodeSnapshots"] = snapshots->toJson();
+    if(hiddenParameters.empty() && snapshotOverrides.empty() && scopeOverrides.empty()) return;
+    ofJson settings = ofJson::object();
+    if(!hiddenParameters.empty()) settings["Hidden"] = std::vector<std::string>(hiddenParameters.begin(), hiddenParameters.end());
+    if(!snapshotOverrides.empty()) settings["Snapshot"] = snapshotOverrides;
+    if(!scopeOverrides.empty()) settings["Scope"] = scopeOverrides;
+    json["__ParameterSettings"] = settings;
+}
+
+void ofxOceanodeNode::loadNodeSettings(const ofJson& json){
+    snapshots->fromJson(json.contains("__NodeSnapshots") ? json["__NodeSnapshots"] : ofJson());
+    hiddenParameters.clear();
+    snapshotOverrides.clear();
+    scopeOverrides.clear();
+    if(!json.contains("__ParameterSettings") || !json["__ParameterSettings"].is_object()) return;
+    const auto& settings = json["__ParameterSettings"];
+    auto readFlags = [&](const char* key, std::map<std::string, bool>& out){
+        if(!settings.contains(key) || !settings[key].is_object()) return;
+        for(auto it = settings[key].begin(); it != settings[key].end(); ++it){
+            if(it.value().is_boolean()) out[it.key()] = it.value().get<bool>();
+        }
+    };
+    if(settings.contains("Hidden") && settings["Hidden"].is_array()){
+        for(const auto& name : settings["Hidden"]) if(name.is_string()) hiddenParameters.insert(name.get<std::string>());
+    }
+    readFlags("Snapshot", snapshotOverrides);
+    readFlags("Scope", scopeOverrides);
 }

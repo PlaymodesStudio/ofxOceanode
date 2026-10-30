@@ -809,6 +809,7 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
             oldConfig.erase(inspector->getEscapedName()); newConfig.erase(inspector->getEscapedName());
         }
         oldConfig.erase("expanded"); newConfig.erase("expanded");
+        for(const auto& name:ofxOceanodeNode::nodeSettingsKeys()) { oldConfig.erase(name); newConfig.erase(name); }
         // Saved state the node blends itself, and saved keys without sound.
         for(const auto& name:morphKeys.ignored) { oldConfig.erase(name); newConfig.erase(name); }
         bool blendedChanged=false;
