@@ -41,7 +41,29 @@ struct ofxOceanodeTimelineInstrument {
     // Kit only, optional: per-slot retrigger rate as a MIDI note while the
     // hit's gate is open; 0 = off.
     ofxOceanodeAbstractParameter* stutter = nullptr;
+    // Kit only, optional: the sound each slot plays, so a timeline Drum Grid
+    // can draw its hits as waveforms (index = slot; may be empty or shorter
+    // than voices). With these, a hit's Duration is varispeed: x2 plays the
+    // sound twice as long and an octave lower, like tape.
+    struct RowWaveform {
+        // 0..1 magnitudes over what one hit plays, in playing order (region
+        // and reverse applied). Null: nothing loaded.
+        std::shared_ptr<const std::vector<float>> peaks;
+        // How long one pass sounds at pitch 60 and duration 1. 0 = unknown.
+        double seconds = 0.0;
+        // Plays on, repeating, while its gate is open.
+        bool loops = false;
+        // Stops when its gate closes (else it runs to its end).
+        bool gated = false;
+        // A new hit on the same slot cuts the one still sounding.
+        bool mono = false;
+        // Pitch also changes the speed (resampling). False: time-stretched,
+        // the length stays.
+        bool pitchChangesLength = true;
+    };
+    std::vector<RowWaveform> rowWaveforms;
 };
+#define OFXOCEANODE_HAS_TIMELINE_ROW_WAVEFORMS 1
 
 typedef int ofxOceanodeNodeModelFlags;
 
