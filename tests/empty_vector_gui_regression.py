@@ -48,10 +48,46 @@ template<class T> struct AbstractParameter {
     void applySpeedDrag(float) {}
     void applyNormalDrag(float) {}
 };
+// Stands in for the ofxOceanodeNodeGui member the widgets read.
+bool selected = true;
 '''
 CASES = r'''
+template<class T, class Draw> int drawVertices(Draw draw, AbstractParameter<T>& absParam) {
+    ImGui::NewFrame();
+    ImGui::SetNextWindowPos({0,0});
+    ImGui::SetNextWindowSize({400,200});
+    ImGui::Begin("Node");
+    ImGui::SetNextItemWidth(150);
+    draw(absParam);
+    ImGui::End();
+    ImGui::Render();
+    int count=0;
+    for(const ImDrawList* list : ImGui::GetDrawData()->CmdLists) count += list->VtxBuffer.Size;
+    return count;
+}
 template<class T, class Draw> void check(Draw draw) {
     AbstractParameter<T> absParam;
+    // An unselected node draws a large vector with fewer bars than its pixel
+    // width; the selected node keeps the full plot.
+    vector<T> large(1000);
+    for(size_t i = 0; i < large.size(); ++i) large[i] = T(int(i % 5) - 2);
+    for(bool bounded : {false, true}) {
+        absParam.parameter.state->minimum = {bounded ? T(-2) : numeric_limits<T>::lowest()};
+        absParam.parameter.state->maximum = {bounded ? T(2) : numeric_limits<T>::max()};
+        absParam.parameter = large;
+        selected = true;
+        const int full = drawVertices<T>(draw, absParam);
+        selected = false;
+        const int reduced = drawVertices<T>(draw, absParam);
+        assert(reduced < full);
+        // Up to the bin count the plot is unchanged whatever the selection.
+        absParam.parameter = vector<T>(large.begin(), large.begin() + kReducedPlotBins);
+        const int smallUnselected = drawVertices<T>(draw, absParam);
+        selected = true;
+        assert(drawVertices<T>(draw, absParam) == smallUnselected);
+    }
+    for(bool full : {true, false}) {
+    selected = full;
     for(bool bounded : {false, true}) {
         absParam.parameter.state->minimum = {bounded ? T(-1) : numeric_limits<T>::lowest()};
         absParam.parameter.state->maximum = {bounded ? T(1) : numeric_limits<T>::max()};
@@ -75,6 +111,7 @@ template<class T, class Draw> void check(Draw draw) {
                 }
         }
     }
+    }
     // Empty values with no range metadata must not index either limits vector.
     absParam.parameter = vector<T>{};
     absParam.parameter.state->minimum.clear();
@@ -96,7 +133,23 @@ int main() {
     check<float>(drawFloat);
     check<int>(drawInt);
     ImGui::DestroyContext();
-    cout << "Empty vector GUI regression passed: float/int, bounded/unbounded, empty/populated transitions.\n";
+    // Each reduced bar keeps the largest-magnitude value of its bucket, so a
+    // -1 separator and a lone peak both survive, and the range is exact.
+    {
+        vector<float> spikes(200, 0.f);
+        spikes[100] = -1.f;
+        spikes[150] = 0.5f;
+        float bins[kReducedPlotBins], minimum, maximum;
+        reduceVectorPlot(spikes, bins, minimum, maximum);
+        assert(minimum == -1.f && maximum == 0.5f);
+        for(int bin = 0; bin < kReducedPlotBins; ++bin)
+            assert(bins[bin] == (bin == 32 ? -1.f : bin == 48 ? 0.5f : 0.f));
+        vector<int> ints(130, 3);
+        ints[129] = -7;
+        reduceVectorPlot(ints, bins, minimum, maximum);
+        assert(bins[0] == 3.f && bins[kReducedPlotBins - 1] == -7.f && minimum == -7.f && maximum == 3.f);
+    }
+    cout << "Empty vector GUI regression passed: float/int, bounded/unbounded, empty/populated transitions, reduced plots.\n";
 }
 '''
 
@@ -111,9 +164,20 @@ def widget(source, value_type):
     return source[start:end]
 
 
+def helpers(source):
+    """The file-local plot helpers the vector widgets call."""
+    marker = 'namespace { // vector pin plots'
+    start = source.index(marker)
+    end, depth = source.index('{', start) + 1, 1
+    while depth:
+        depth += (source[end] == '{') - (source[end] == '}')
+        end += 1
+    return source[start:end]
+
+
 def main():
     source = (ROOT / 'src/Nodes/ofxOceanodeNodeGui.cpp').read_text()
-    fixture = PREFIX
+    fixture = PREFIX + helpers(source) + '\n'
     for value_type, name in [('float', 'drawFloat'), ('int', 'drawInt')]:
         fixture += f'void {name}(AbstractParameter<{value_type}>& absParam) {{\n'
         fixture += 'float drag=0; bool resetValue=false, isItemEditableByText=false; string hiddenUniqueId="##value";\n'

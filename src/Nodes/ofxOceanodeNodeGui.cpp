@@ -17,6 +17,66 @@
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeColors.h"
 #include <algorithm>
+#include <cmath>
+#include <type_traits>
+
+namespace { // vector pin plots
+// ImGui draws one histogram bar per pixel column, so a node with several
+// large vector pins spends most of its GUI time on bars. While the node is
+// not selected, a vector longer than this is drawn with this many bars; the
+// selected node keeps the full plot.
+constexpr int kReducedPlotBins = 64;
+
+// Each bar takes the value of largest magnitude in its bucket, so the tallest
+// bar of the full plot survives the reduction. The vector's own range comes
+// out of the same pass, for pins without bounds.
+template<typename T>
+void reduceVectorPlot(const std::vector<T>& values, float (&bins)[kReducedPlotBins], float& minimum, float& maximum){
+    const size_t count = values.size();
+    minimum = maximum = float(values[0]);
+    for(int bin = 0; bin < kReducedPlotBins; ++bin){
+        const size_t begin = count * bin / kReducedPlotBins;
+        const size_t end = count * (bin + 1) / kReducedPlotBins;
+        float pick = float(values[begin]);
+        for(size_t i = begin; i < end; ++i){
+            const float value = float(values[i]);
+            if(std::abs(value) > std::abs(pick)) pick = value;
+            minimum = std::min(minimum, value);
+            maximum = std::max(maximum, value);
+        }
+        bins[bin] = pick;
+    }
+}
+
+// A multi-value vector pin. With fullDetail ImGui gets every value and
+// samples one per pixel column; otherwise a large vector is reduced first.
+template<typename T>
+void plotVectorPin(const char* id, const std::vector<T>& values, bool unboundedRange,
+                   T rangeMin, T rangeMax, bool fullDetail){
+    if(!fullDetail && values.size() > size_t(kReducedPlotBins)){
+        float bins[kReducedPlotBins], minimum, maximum;
+        reduceVectorPlot(values, bins, minimum, maximum);
+        ImGui::PlotHistogram(id, bins, kReducedPlotBins, 0, NULL,
+                             unboundedRange ? minimum : float(rangeMin),
+                             unboundedRange ? maximum : float(rangeMax));
+        return;
+    }
+    std::vector<float> converted;
+    const float* data;
+    if constexpr(std::is_same<T, float>::value){
+        data = values.data();
+    }else{
+        converted.assign(values.begin(), values.end());
+        data = converted.data();
+    }
+    float minimum = float(rangeMin), maximum = float(rangeMax);
+    if(unboundedRange){
+        minimum = float(*std::min_element(values.begin(), values.end()));
+        maximum = float(*std::max_element(values.begin(), values.end()));
+    }
+    ImGui::PlotHistogram(id, data, int(values.size()), 0, NULL, minimum, maximum);
+}
+}
 
 ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOceanodeNode& _node) : container(_container), node(_node){
     guiRect = ofRectangle(10, 10, 0, 0);
@@ -451,11 +511,8 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                                 tempCast = tempCast;
                         }
                     }else{
-                        if(tempCast.getMin()[0] == std::numeric_limits<float>::lowest() || tempCast.getMax()[0] == std::numeric_limits<float>::max()){
-                            ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, *std::min_element(tempCast->begin(), tempCast->end()), *std::max_element(tempCast->begin(), tempCast->end()));
-                        }else{
-                            ImGui::PlotHistogram(hiddenUniqueId.c_str(), tempCast->data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
-                        }
+                        const bool unbounded = tempCast.getMin()[0] == std::numeric_limits<float>::lowest() || tempCast.getMax()[0] == std::numeric_limits<float>::max();
+                        plotVectorPin(hiddenUniqueId.c_str(), tempCast.get(), unbounded, tempCast.getMin()[0], tempCast.getMax()[0], selected);
                     }
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space))){
                         tempCast = tempCast;
@@ -561,12 +618,8 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                         }
                     }
                     else{
-                        std::vector<float> floatVec(tempCast.get().begin(), tempCast.get().end());
-                        if(tempCast.getMin()[0] == std::numeric_limits<int>::lowest() || tempCast.getMax()[0] == std::numeric_limits<int>::max()){
-                            ImGui::PlotHistogram(hiddenUniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, *std::min_element(tempCast->begin(), tempCast->end()), *std::max_element(tempCast->begin(), tempCast->end()));
-                        }else{
-                            ImGui::PlotHistogram(hiddenUniqueId.c_str(), floatVec.data(), tempCast->size(), 0, NULL, tempCast.getMin()[0], tempCast.getMax()[0]);
-                        }
+                        const bool unbounded = tempCast.getMin()[0] == std::numeric_limits<int>::lowest() || tempCast.getMax()[0] == std::numeric_limits<int>::max();
+                        plotVectorPin(hiddenUniqueId.c_str(), tempCast.get(), unbounded, tempCast.getMin()[0], tempCast.getMax()[0], selected);
                     }
                     if(ImGui::IsItemHovered() && ImGui::IsKeyPressed((ImGuiKey_Space)))
                         tempCast = tempCast;
