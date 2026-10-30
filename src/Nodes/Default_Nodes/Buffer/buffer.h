@@ -24,6 +24,14 @@
 // and the buffer tracks whether they are in order so a lookup can binary
 // search; after a transport seek they may not be, and the original linear scan
 // is used instead with identical results.
+//
+// In transport-indexed mode (setTransportIndexed) the same slots hold a sparse
+// timeline instead of a recording order: samples are keyed by transport time,
+// recording replaces whatever was stored over the span just played, reads are
+// anchored at the playhead and ignore samples ahead of it, and a full buffer
+// evicts samples ahead of the playhead first, then the oldest. Replaying a
+// loop or scrubbing back over played material therefore refreshes slots in
+// place and never grows the buffer.
 template <typename T1, typename T2 = T1>
 class buffer {
 public:
@@ -42,6 +50,14 @@ public:
 
     // Logical position 0 is the oldest frame; fromTail counts from the newest.
     Frame &getFrame(int position, bool fromTail = false){
+        if(transportIndexed){
+            const size_t count = viewEnd();
+            if(position >= 0 && static_cast<size_t>(position) < count){
+                return frames[order[fromTail ? count - 1 - static_cast<size_t>(position)
+                                             : static_cast<size_t>(position)]];
+            }
+            return frames[order.empty() ? 0 : order[0]];
+        }
         if(position >= 0 && static_cast<size_t>(position) < getSize()){
             if(fromTail){
                 return frameAt(getSize()-1-static_cast<size_t>(position));
@@ -58,6 +74,10 @@ public:
 
     Frame &getClosestFrame(Timestamp timestamp){
         const int64_t targetUs = timestamp.epochMicrosecondsSigned();
+        if(transportIndexed){
+            if(order.empty()) return frames[0];
+            return frames[order[nearestInOrder(order.size(), targetUs)]];
+        }
         if(isOrdered()) return frameAt(nearestOrdered(targetUs));
         // Recording order and timestamp order can differ after a transport seek.
         // Search newest first so identical timestamps prefer the latest sample.
@@ -75,6 +95,7 @@ public:
 
     Frame &getClosestFrameDelayMs(float ms, bool relative, bool* overflow = nullptr){
         if(overflow) *overflow = false;
+        if(transportIndexed) return closestTransportDelay(ms, overflow);
         if(relative){
             const size_t newest = getSize() - 1;
             if(ms <= 0.0f) return frameAt(newest);
@@ -133,11 +154,13 @@ public:
 
     Timestamp   getFirstFrameTimestamp(){
         if(getSize() == 0) return Timestamp();
+        if(transportIndexed) return frames[order[viewEnd() - 1]].getTimestamp();
         return frameAt(getSize()-1).getTimestamp();
     }
 
     Timestamp   getLastFrameTimestamp(){
         if(getSize() == 0) return Timestamp();
+        if(transportIndexed) return frames[order[0]].getTimestamp();
         return frameAt(0).getTimestamp();
     }
 
@@ -148,6 +171,10 @@ public:
 
     void addFrame(T1 _object, Timestamp _timestamp){
         const int64_t stampUs = _timestamp.epochMicrosecondsSigned();
+        if(transportIndexed){
+            addTransportFrame(_object, stampUs, stampUs - 1);
+            return;
+        }
         const size_t size = frames.size();
         if(size >= maxSize){
             // Full: the oldest slot becomes the newest sample.
@@ -166,9 +193,33 @@ public:
         ofNotifyEvent(frameAdded);
     }
 
+    // Transport-indexed recording: stores the sample at its transport time and
+    // replaces every sample stored in (replaceFromExclusive, timestamp], plus
+    // any at exactly that time. Continuous playback passes the previous
+    // sample's time; after a seek, stop or loop wrap the caller passes a time
+    // one frame earlier so only the frame at the new position is replaced.
+    // Outside transport-indexed mode the span is ignored.
+    void addFrame(T1 _object, Timestamp _timestamp, Timestamp replaceFromExclusive){
+        if(!transportIndexed){
+            addFrame(_object, _timestamp);
+            return;
+        }
+        addTransportFrame(_object, _timestamp.epochMicrosecondsSigned(),
+                          replaceFromExclusive.epochMicrosecondsSigned());
+    }
+
     void setMaxSize(int _maxSize){
         const size_t newMaxSize = static_cast<size_t>(std::max(1, _maxSize));
         if(newMaxSize == maxSize) return;
+        if(transportIndexed){
+            const int64_t anchorUs = hasPlayhead ? playheadUs
+                : (order.empty() ? 0 : stampsUs[order.back()]);
+            while(order.size() > newMaxSize) freeSlots.push_back(evictTransportSlot(anchorUs));
+            if(frames.size() > newMaxSize) compactTransport();
+            maxSize = newMaxSize;
+            ++revisionCount;
+            return;
+        }
         linearize();
         if(frames.size() > newMaxSize){
             const size_t drop = frames.size() - newMaxSize;
@@ -180,11 +231,14 @@ public:
         ++revisionCount;
     }
 
+    // Transport-indexed: the samples at or before the playhead.
     size_t getSize(){
+        if(transportIndexed) return viewEnd();
         return frames.size();
     }
 
     float getAvailableHistoryMs(){
+        if(transportIndexed) return transportHistoryMs();
         if(frames.empty()) return 0.0f;
         const int64_t newestUs = stampAt(getSize() - 1);
         int64_t maximumAgeUs = 0;
@@ -206,8 +260,42 @@ public:
     void clear(){
         frames.clear();
         stampsUs.clear();
+        order.clear();
+        freeSlots.clear();
         head = 0;
         inversions = 0;
+        ++revisionCount;
+    }
+
+    // ---- Transport-indexed mode ----
+
+    // Switching modes empties the history: wall-clock and transport stamps
+    // do not share a time base.
+    void setTransportIndexed(bool enabled){
+        if(enabled == transportIndexed) return;
+        clear();
+        transportIndexed = enabled;
+        hasPlayhead = false;
+    }
+    bool isTransportIndexed() const { return transportIndexed; }
+
+    // The transport position reads are anchored at. Samples ahead of it are
+    // hidden from getSize, getFrame and the delay reads.
+    void setPlayhead(Timestamp playhead){
+        const int64_t us = playhead.epochMicrosecondsSigned();
+        if(hasPlayhead && us == playheadUs) return;
+        hasPlayhead = true;
+        playheadUs = us;
+        ++revisionCount;
+    }
+
+    // Largest distance between a requested transport time and the nearest
+    // stored sample that still counts as a hit; beyond it a read overflows,
+    // and a larger gap between consecutive samples ends the available history.
+    void setGapToleranceMs(float ms){
+        const int64_t us = static_cast<int64_t>(std::round(std::max(0.0, static_cast<double>(ms)) * 1000.0));
+        if(us == gapToleranceUs) return;
+        gapToleranceUs = us;
         ++revisionCount;
     }
 
@@ -216,7 +304,7 @@ public:
     uint64_t revision() const { return revisionCount; }
 
     // True while stored timestamps never decrease in recording order.
-    bool isOrdered() const { return inversions == 0; }
+    bool isOrdered() const { return transportIndexed || inversions == 0; }
 
 private:
     size_t physical(size_t logical) const {
@@ -275,6 +363,120 @@ private:
         return aboveDistance <= belowDistance ? above : below;
     }
 
+    // ---- Transport-indexed helpers. `order` lists occupied physical slots
+    // sorted by stamp; equal stamps keep the later-recorded one last.
+
+    size_t firstSlotAbove(int64_t value) const { // first order index with stamp > value
+        return static_cast<size_t>(std::upper_bound(order.begin(), order.end(), value,
+            [this](int64_t v, uint32_t slot){ return v < stampsUs[slot]; }) - order.begin());
+    }
+    size_t firstSlotAtLeast(int64_t value) const { // first order index with stamp >= value
+        return static_cast<size_t>(std::lower_bound(order.begin(), order.end(), value,
+            [this](uint32_t slot, int64_t v){ return stampsUs[slot] < v; }) - order.begin());
+    }
+    // Number of ordered samples at or before the playhead.
+    size_t viewEnd() const {
+        if(!hasPlayhead) return order.size();
+        return firstSlotAbove(playheadUs);
+    }
+    // Order index of the sample nearest to targetUs among the first `count`;
+    // equal distances prefer the later sample. count must be > 0.
+    size_t nearestInOrder(size_t count, int64_t targetUs) const {
+        const size_t above = std::min(count, firstSlotAbove(targetUs));
+        if(above == 0) return 0;
+        if(above == count) return count - 1;
+        const int64_t belowDistance = targetUs - stampsUs[order[above - 1]];
+        const int64_t aboveDistance = stampsUs[order[above]] - targetUs;
+        return aboveDistance <= belowDistance ? above : above - 1;
+    }
+    // Frees one occupied slot for a sample at anchorUs: a sample ahead of the
+    // anchor if any (the farthest first), otherwise the oldest.
+    uint32_t evictTransportSlot(int64_t anchorUs){
+        const bool ahead = stampsUs[order.back()] > anchorUs;
+        const uint32_t slot = ahead ? order.back() : order.front();
+        order.erase(ahead ? order.end() - 1 : order.begin());
+        return slot;
+    }
+    void addTransportFrame(T1 &_object, int64_t stampUs, int64_t fromExclusiveUs){
+        // Replace what the transport just played over, and anything at this time.
+        const int64_t lowerExclusiveUs = std::min(fromExclusiveUs, stampUs - 1);
+        const size_t first = firstSlotAbove(lowerExclusiveUs);
+        const size_t last = firstSlotAbove(stampUs);
+        for(size_t i = first; i < last; ++i) freeSlots.push_back(order[i]);
+        order.erase(order.begin() + first, order.begin() + last);
+
+        const Timestamp timestamp(stampUs);
+        uint32_t slot;
+        if(!freeSlots.empty()){
+            slot = freeSlots.back();
+            freeSlots.pop_back();
+            frames[slot].update(_object, timestamp);
+        }else if(frames.size() < maxSize){
+            slot = static_cast<uint32_t>(frames.size());
+            frames.emplace_back(functions.get(), _object, timestamp);
+            stampsUs.push_back(stampUs);
+        }else{
+            slot = evictTransportSlot(stampUs);
+            frames[slot].update(_object, timestamp);
+        }
+        stampsUs[slot] = stampUs;
+        order.insert(order.begin() + firstSlotAbove(stampUs), slot);
+        ++revisionCount;
+        ofNotifyEvent(frameAdded);
+    }
+    // Drops free slots so the physical storage matches the occupied samples.
+    void compactTransport(){
+        std::deque<Frame> kept;
+        std::vector<int64_t> keptStamps;
+        keptStamps.reserve(order.size());
+        for(uint32_t slot : order){
+            kept.emplace_back(std::move(frames[slot]));
+            keptStamps.push_back(stampsUs[slot]);
+        }
+        frames.swap(kept);
+        stampsUs.swap(keptStamps);
+        for(size_t i = 0; i < order.size(); ++i) order[i] = static_cast<uint32_t>(i);
+        freeSlots.clear();
+    }
+    Frame &closestTransportDelay(float ms, bool* overflow){
+        const size_t count = viewEnd();
+        if(count == 0){
+            if(overflow) *overflow = true;
+            return frames[order.empty() ? 0 : order[0]];
+        }
+        const int64_t anchorUs = hasPlayhead ? playheadUs : stampsUs[order[count - 1]];
+        // Timestamps have microsecond resolution; NaN and negative delays read
+        // the playhead.
+        long double delayUs = std::round(static_cast<long double>(ms) * 1000.0L);
+        if(!(delayUs > 0.0L)) delayUs = 0.0L;
+        const long double oldestUs = static_cast<long double>(stampsUs[order[0]]);
+        const long double targetUs = static_cast<long double>(anchorUs) - delayUs;
+        size_t index;
+        if(targetUs < oldestUs){
+            index = 0;
+        }else{
+            index = nearestInOrder(count, static_cast<int64_t>(targetUs));
+        }
+        const long double distance = std::fabs(static_cast<long double>(stampsUs[order[index]]) - targetUs);
+        if(overflow) *overflow = distance > static_cast<long double>(gapToleranceUs);
+        return frames[order[index]];
+    }
+    // Span, in ms, from the playhead back over consecutive samples no farther
+    // apart than the gap tolerance. Zero when nothing is stored near the playhead.
+    float transportHistoryMs(){
+        if(historyCacheRevision == revisionCount) return historyCacheMs;
+        historyCacheRevision = revisionCount;
+        historyCacheMs = 0.0f;
+        const size_t count = viewEnd();
+        if(count == 0) return historyCacheMs;
+        const int64_t anchorUs = hasPlayhead ? playheadUs : stampsUs[order[count - 1]];
+        if(anchorUs - stampsUs[order[count - 1]] > gapToleranceUs) return historyCacheMs;
+        size_t oldest = count - 1;
+        while(oldest > 0 && stampsUs[order[oldest]] - stampsUs[order[oldest - 1]] <= gapToleranceUs) --oldest;
+        historyCacheMs = static_cast<float>(static_cast<long double>(anchorUs - stampsUs[order[oldest]]) / 1000.0L);
+        return historyCacheMs;
+    }
+
     size_t maxSize;
     size_t head = 0;           // Physical index of the oldest frame.
     size_t inversions = 0;     // Adjacent pairs recorded out of timestamp order.
@@ -285,6 +487,16 @@ private:
 
     std::deque<Frame> frames;      // Stable addresses: frames never move on insert.
     std::vector<int64_t> stampsUs; // Same physical layout as frames.
+
+    // Transport-indexed mode only.
+    bool transportIndexed = false;
+    bool hasPlayhead = false;
+    int64_t playheadUs = 0;
+    int64_t gapToleranceUs = 100000;
+    std::vector<uint32_t> order;     // Occupied slots sorted by stamp.
+    std::vector<uint32_t> freeSlots; // Slots whose sample was replaced.
+    uint64_t historyCacheRevision = std::numeric_limits<uint64_t>::max();
+    float historyCacheMs = 0.0f;
 };
 
 

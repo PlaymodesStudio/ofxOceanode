@@ -399,7 +399,7 @@
     "addon": "ofxEloiNodes"
   },
   "Buffer ": {
-    "description": "Stores a bounded history of Input values for a Header or HeaderPro of the same type. A new sample is recorded when Input changes while Rec is on. Input changes during preset loading are not recorded, so temporary initialization values do not enter the history.\n\nRec -> Enables recording.\nTimestamp -> If connected, supplies each sample's timestamp; otherwise the current wall clock time is used.\nMax Size -> Maximum number of stored samples. Older samples are discarded as new ones arrive.\nClear -> Empties the history.\nOutput -> The Buffer connection for a Header or HeaderPro; it is not the latest sample value.\nInspector: Last Frame Ms -> Available time span in milliseconds backward from the newest sample, updated when Input changes.",
+    "description": "Stores a bounded history of Input values for a Header or HeaderPro of the same type. A new sample is recorded when Input changes while Rec is on. Input changes during preset loading are not recorded, so temporary initialization values do not enter the history.\n\nRec -> Enables recording.\nTimestamp -> If connected, supplies each sample's timestamp; otherwise the current wall clock time is used.\nMax Size -> Maximum number of stored samples. Older samples are discarded as new ones arrive.\nClear -> Empties the history.\nOutput -> The Buffer connection for a Header or HeaderPro; it is not the latest sample value.\nInspector: Last Frame Ms -> Available time span in milliseconds backward from the newest sample, updated when Input changes.\nInspector: Sync To Transport -> Off: samples are stamped with the wall clock, or the Timestamp input, in recording order. On: the history is indexed by transport time. A sample is recorded every frame while the transport plays and whenever Input changes; the Timestamp input is ignored. Recording replaces what was stored over the time just played, so loops and scrubbing refresh samples in place and never grow the buffer. Header reads are anchored at the playhead: after a seek into material played before they return the samples recorded for that time, samples ahead of the playhead are ignored, and a read with no sample within two frames of its time sets Overflow. A full buffer discards samples ahead of the playhead first, then the oldest. Switching this option empties the history.",
     "parameters": [
       "Input",
       "Rec",
@@ -407,7 +407,8 @@
       "Timestamp",
       "Max Size",
       "Output",
-      "Last Frame Ms"
+      "Last Frame Ms",
+      "Sync To Transport"
     ],
     "source": "Default_Nodes/Buffer/bufferNode.h",
     "addon": "ofxOceanode"

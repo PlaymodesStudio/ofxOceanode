@@ -46,6 +46,49 @@ performance design so later changes keep it.
 - With `Calculate On Update` off, parameter listeners still recompute at once,
   as before.
 
+## Transport-indexed mode
+
+`buffer::setTransportIndexed(true)` turns the same slots into a sparse
+timeline keyed by transport time. The Buffer node enables it with the
+`Sync To Transport` inspector option.
+
+- `order` lists the occupied physical slots sorted by stamp (equal stamps keep
+  the later-recorded one last); `freeSlots` holds slots whose sample was
+  replaced. The ring's `head` and inversion count are unused in this mode, and
+  `isOrdered()` is true.
+- `addFrame(value, stamp, replaceFromExclusive)` frees every sample stamped in
+  `(replaceFromExclusive, stamp]`, plus any at exactly `stamp`, then stores
+  the sample in a freed slot, a new slot while under `Max Size`, or a slot
+  taken from a sample ahead of `stamp` (the farthest first) and otherwise from
+  the oldest. Continuous playback passes the previous sample's stamp, so a
+  second pass over a loop or a scrub refreshes slots in place; after a seek,
+  stop or loop wrap the node passes one frame earlier so only the frame at the
+  new position is replaced. The memory cost is therefore the same as the ring:
+  `Max Size` frames, whatever is played.
+- `setPlayhead(stamp)` anchors the reads. `getSize`, `getFrame(i, fromTail)`,
+  `getClosestFrameDelayMs` and `getAvailableHistoryMs` see only samples at or
+  before the playhead; a delay read targets `playhead - delay` and returns the
+  nearest sample. The playhead bumps `revision()`, so Header and HeaderPro
+  recompute as it moves.
+- `setGapToleranceMs` (the node uses two frames of transport time) decides
+  overflow: a read whose nearest sample is farther than that from its target
+  sets it, and consecutive samples farther apart than that end the available
+  history. So a seek into unplayed material reads the nearest sample with
+  Overflow on, and `Fit Available History` compresses to what is contiguous
+  behind the playhead.
+- `setMaxSize` evicts by the same rule relative to the playhead and compacts
+  the physical storage; switching the mode, or `clear`, empties the history.
+- `bufferTransportClock` (`bufferNode.h`) derives the stamp and the replaced
+  span from the frame-latched transport state: `seconds` as microseconds, with
+  `generation` and `loopCount` marking discontinuities, and the last positive
+  per-frame advance as the frame estimate. The node records on every Input
+  change and once per frame while the transport plays; the Timestamp input is
+  ignored.
+- `tests/buffer_transport_regression.py` checks these rules on the buffer,
+  compares random play/seek/loop sessions with a `std::map` model of them, and
+  drives the Buffer node and HeaderPro through play, pause, seek, loop wraps,
+  Rec and preset loading.
+
 ## Measuring
 
 `python3 tests/buffer_benchmark.py` builds the production headers with the

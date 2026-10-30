@@ -385,6 +385,8 @@ If a parameter is also receiving a cable or being changed by another tool, sever
 
 For musical synchronization, inspect **Sync To Transport** on timing nodes that offer it. Test play, pause, reset and a jump to a different position. Decide whether the pattern should follow those actions or continue independently.
 
+A **Buffer** node also offers **Sync To Transport**. Normally a Buffer records whatever arrives, stamped with the clock on the wall, so after a jump it still holds what was played before the jump. With the option on, the Buffer keeps its history by transport time: it records every frame while the transport plays, playing a loop again or scrubbing back refreshes the stored samples in place, and a Header or HeaderPro reads the samples that belong to the current position. After a jump into a part that was played before, the reads are the same as the first time. In a part that has not been played yet, the Header's Overflow turns on until the transport has played through it. The Buffer keeps at most Max Size samples, so a long timeline is covered only as far as that window reaches.
+
 A wave track can work with audio when the appropriate addon and playback provider are present. Numerical animation alone does not require an audio setup.
 
 # 17. Macros, routers and portals

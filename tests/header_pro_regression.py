@@ -51,9 +51,21 @@ struct FrameEvent {
 struct Timestamp {
     inline static double nowMs = 0;
     double ms = nowMs;
+    Timestamp() = default;
+    // Production constructs stamps from int64_t microseconds; the fixtures
+    // below write every other number in milliseconds.
+    template<typename N, typename = enable_if_t<is_arithmetic<N>::value>>
+    Timestamp(N value) : ms(is_same<N, int64_t>::value ? value / 1000.0 : value) {}
     int64_t epochMicrosecondsSigned() const { return static_cast<int64_t>(std::round(ms * 1000)); }
     void update() { ms = nowMs; }
 };
+struct ofxOceanodeTransportState {
+    bool isPlaying = false;
+    double seconds = 0;
+    uint64_t generation = 0;
+    uint64_t loopCount = 0;
+};
+struct ofxOceanodeFrameTransportState { ofxOceanodeTransportState previous, current; };
 template<typename T> using ofEvent = FrameEvent;
 void ofNotifyEvent(ofEvent<void> &event) { event.notify(); }
 #include "buffer.h"
@@ -105,8 +117,10 @@ constexpr int ofxOceanodeParameterFlags_DisplayMinimized = 1;
 struct ofxOceanodeNodeModel {
     string nameIdentifier, description;
     bool timestampConnected = false;
+    ofxOceanodeFrameTransportState frameTransport;
     unordered_map<string, void*> parameters, inspectorParameters;
     ofxOceanodeNodeModel(string name) : nameIdentifier(name) {}
+    ofxOceanodeFrameTransportState getFrameTransportState() const { return frameTransport; }
     virtual ~ofxOceanodeNodeModel() = default;
     virtual void setup() {}
     virtual void update(ofEventArgs &) {}
