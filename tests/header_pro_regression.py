@@ -23,7 +23,7 @@ SOURCE = r'''
 #include <vector>
 using namespace std;
 
-#define frame_h
+#define ofxOceanodeTime_h // frame.h compiles against this mock Timestamp.
 #define ofxOceanodeNodeModel_h
 struct ofEventArgs {};
 struct ofEventListener {
@@ -53,16 +53,6 @@ struct Timestamp {
     double ms = nowMs;
     int64_t epochMicrosecondsSigned() const { return static_cast<int64_t>(std::round(ms * 1000)); }
     void update() { ms = nowMs; }
-};
-template<typename T1, typename T2 = T1> struct bufferFrame {
-    T1 value;
-    Timestamp timestamp;
-    using Assign = function<void(T1&, T2&)>;
-    using Return = function<T1(T2&)>;
-    bufferFrame(T1 item, Timestamp time, Assign, Return) : value(item), timestamp(time) {}
-    void update(T1 item, Timestamp time) { value = item; timestamp = time; }
-    T1 getObjectRef() { return value; }
-    Timestamp getTimestamp() { return timestamp; }
 };
 template<typename T> using ofEvent = FrameEvent;
 void ofNotifyEvent(ofEvent<void> &event) { event.notify(); }

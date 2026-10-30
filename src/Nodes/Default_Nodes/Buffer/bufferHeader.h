@@ -10,6 +10,7 @@
 
 #include "buffer.h"
 #include "ofxOceanodeNodeModel.h"
+#include <cstdint>
 
 template <typename T1, typename T2 = T1>
 class bufferHeader: public ofxOceanodeNodeModel
@@ -47,18 +48,12 @@ public:
     ~bufferHeader(){}
 
     void setup() override{
-        listeners.push(numCopies.newListener([this](int &){
-            if(!calcOnUpdate) recalculate();
-        }));
-        listeners.push(offset.newListener([this](vector<float> &){
-            if(!calcOnUpdate) recalculate();
-        }));
-        listeners.push(offsetAsPosition.newListener([this](bool &){
-            if(!calcOnUpdate) recalculate();
-        }));
+        listeners.push(numCopies.newListener([this](int &){ parametersChanged(); }));
+        listeners.push(offset.newListener([this](vector<float> &){ parametersChanged(); }));
+        listeners.push(offsetAsPosition.newListener([this](bool &){ parametersChanged(); }));
         listeners.push(bufferInput.newListener([this](buffer<T1, T2>* &_buffer){
             subscribeToBuffer(_buffer);
-            if(!calcOnUpdate) recalculate();
+            parametersChanged();
         }));
 
         subscribeToBuffer(bufferInput.get());
@@ -71,56 +66,81 @@ public:
         }
     }
     
+    // Publishes the samples for the current Buffer and parameters. The reads
+    // are recomputed only when a parameter or the Buffer history changed, so
+    // the per-update refresh and the Buffer's frame notification in the same
+    // tick cost one computation; the Output is still sent each time.
     void recalculate(){
         if(isRecalculating) return;
-        if(bufferInput.get() != nullptr && bufferInput.get()->getSize() > 0){
-            isRecalculating = true;
-            if((offset->size() != static_cast<size_t>(numCopies.get()))&&(numCopies>0)){
-                vector<float> vf(numCopies);
-                for(int i = 0; i < numCopies; i++)
-                {
-                    if(offset->size() == 1){
-                        vf[i] = (i * offset->at(0));
-                    }
-                }
-                multixDelaysInMs = vf;
-            }else{
-                multixDelaysInMs = offset.get();
-            }
-            
-            std::vector<T1> temp;
-            
-            overflow=false;
-            for(int i = numCopies-1; i >=0; i--)
-            {
-                if(multixDelaysInMs[numCopies-1-i] >= 0)
-                {
-                    if(offsetAsPosition)
-                    {
-                        const float position = multixDelaysInMs[numCopies-1-i];
-                        const bool outside = position >= bufferInput.get()->getSize();
-                        const int frameToGet = outside
-                            ? static_cast<int>(bufferInput.get()->getSize() - 1)
-                            : static_cast<int>(floor(position));
-                        temp.push_back(bufferInput.get()->getFrame(frameToGet, true).getObjectRef());
-                        // check for buffer overflow
-                        if(outside) overflow=true;
-                    }
-                    else
-                    {
-                        float frameDelayToGet = multixDelaysInMs[numCopies-1-i];
-                        bool delayOverflow = false;
-                        temp.push_back(bufferInput.get()->getClosestFrameDelayMs(frameDelayToGet, true, &delayOverflow).getObjectRef());
-                        if(delayOverflow) overflow = true;
-                            
-                    }
-                }
-            }
-            output = temp;
-            isRecalculating = false;
+        auto *source = bufferInput.get();
+        const uint64_t revision = source != nullptr ? source->revision() : 0;
+        if(dirty || source != cachedSource || revision != cachedRevision){
+            computeSamples(source);
+            dirty = false;
+            cachedSource = source;
+            cachedRevision = revision;
         }
+        if(!hasResult) return;
+        isRecalculating = true;
+        overflow = hasOverflow;
+        output = samples;
+        isRecalculating = false;
     }
     
+private:
+
+    void parametersChanged(){
+        dirty = true;
+        if(!calcOnUpdate) recalculate();
+    }
+
+    void computeSamples(buffer<T1, T2> *source){
+        hasResult = false;
+        if(source == nullptr || source->getSize() == 0) return;
+        if((offset->size() != static_cast<size_t>(numCopies.get()))&&(numCopies>0)){
+            vector<float> vf(numCopies);
+            for(int i = 0; i < numCopies; i++)
+            {
+                if(offset->size() == 1){
+                    vf[i] = (i * offset->at(0));
+                }
+            }
+            multixDelaysInMs = vf;
+        }else{
+            multixDelaysInMs = offset.get();
+        }
+        
+        samples.clear();
+        samples.reserve(numCopies.get());
+        hasOverflow = false;
+        for(int i = numCopies-1; i >=0; i--)
+        {
+            if(multixDelaysInMs[numCopies-1-i] >= 0)
+            {
+                if(offsetAsPosition)
+                {
+                    const float position = multixDelaysInMs[numCopies-1-i];
+                    const bool outside = position >= source->getSize();
+                    const int frameToGet = outside
+                        ? static_cast<int>(source->getSize() - 1)
+                        : static_cast<int>(floor(position));
+                    samples.push_back(source->getFrame(frameToGet, true).getObjectRef());
+                    // check for buffer overflow
+                    if(outside) hasOverflow = true;
+                }
+                else
+                {
+                    float frameDelayToGet = multixDelaysInMs[numCopies-1-i];
+                    bool delayOverflow = false;
+                    samples.push_back(source->getClosestFrameDelayMs(frameDelayToGet, true, &delayOverflow).getObjectRef());
+                    if(delayOverflow) hasOverflow = true;
+                        
+                }
+            }
+        }
+        hasResult = true;
+    }
+
 private:
 
     void subscribeToBuffer(buffer<T1, T2>* source){
@@ -146,6 +166,12 @@ private:
     buffer<T1, T2>* myBuffer;
     ofEventListener frameAddedListener;
     bool isRecalculating = false;
+    bool dirty = true;
+    buffer<T1, T2> *cachedSource = nullptr;
+    uint64_t cachedRevision = 0;
+    std::vector<T1> samples;
+    bool hasOverflow = false;
+    bool hasResult = false;
 
     template <typename T>
     T getValueForPosition(const vector<T> &param, int index){

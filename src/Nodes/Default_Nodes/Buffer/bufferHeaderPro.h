@@ -8,6 +8,7 @@
 #include <cfloat>
 #include <climits>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 
 template <typename T1, typename T2 = T1>
@@ -46,13 +47,13 @@ public:
     }
 
     void setup() override{
-        listeners.push(numCopies.newListener([this](int &){ if(!calcOnUpdate) recalculate(); }));
-        listeners.push(offsetMode.newListener([this](int &){ if(!calcOnUpdate) recalculate(); }));
-        listeners.push(offset.newListener([this](vector<float> &){ if(!calcOnUpdate) recalculate(); }));
-        listeners.push(fitAvailableHistory.newListener([this](bool &){ if(!calcOnUpdate) recalculate(); }));
+        listeners.push(numCopies.newListener([this](int &){ parametersChanged(); }));
+        listeners.push(offsetMode.newListener([this](int &){ parametersChanged(); }));
+        listeners.push(offset.newListener([this](vector<float> &){ parametersChanged(); }));
+        listeners.push(fitAvailableHistory.newListener([this](bool &){ parametersChanged(); }));
         listeners.push(bufferInput.newListener([this](buffer<T1, T2>* &source){
             subscribeToBuffer(source);
-            if(!calcOnUpdate) recalculate();
+            parametersChanged();
         }));
         subscribeToBuffer(bufferInput.get());
         recalculate();
@@ -74,16 +75,40 @@ private:
         }
     }
 
+    void parametersChanged(){
+        dirty = true;
+        if(!calcOnUpdate) recalculate();
+    }
+
+    // Publishes the samples for the current Buffer and parameters. The reads
+    // are recomputed only when a parameter or the Buffer history changed, so
+    // the per-update refresh and the Buffer's frame notification in the same
+    // tick cost one computation; the Output is still sent each time.
     void recalculate(){
         if(isRecalculating) return;
         auto *source = bufferInput.get();
+        const uint64_t revision = source != nullptr ? source->revision() : 0;
+        if(dirty || source != cachedSource || revision != cachedRevision){
+            computeSamples(source);
+            dirty = false;
+            cachedSource = source;
+            cachedRevision = revision;
+        }
+        if(!hasResult) return;
+        isRecalculating = true;
+        overflow = hasOverflow;
+        output = samples;
+        isRecalculating = false;
+    }
+
+    void computeSamples(buffer<T1, T2> *source){
+        hasResult = false;
         const bool fitMs = fitAvailableHistory && offsetMode == Ms;
         if(source == nullptr || source->getSize() == 0){
             if(fitMs){
-                isRecalculating = true;
-                overflow = true;
-                output = std::vector<T1>();
-                isRecalculating = false;
+                samples.clear();
+                hasOverflow = true;
+                hasResult = true;
             }
             return;
         }
@@ -112,11 +137,9 @@ private:
             if(requestedOverflow) delayScale = static_cast<double>(availableMs) / maximumDelay;
         }
 
-        isRecalculating = true;
-
-        std::vector<T1> samples;
+        samples.clear();
         samples.reserve(numCopies.get());
-        bool hasOverflow = requestedOverflow;
+        hasOverflow = requestedOverflow;
         for(int i = 0; i < numCopies.get(); ++i){
             const float position = positionForCopy(i);
             if(!(position >= 0.0f)) continue;
@@ -140,9 +163,7 @@ private:
                 if(outside) hasOverflow = true;
             }
         }
-        overflow = hasOverflow;
-        output = samples;
-        isRecalculating = false;
+        hasResult = true;
     }
 
     ofParameter<buffer<T1, T2>*> bufferInput;
@@ -155,6 +176,12 @@ private:
     ofParameter<bool> fitAvailableHistory;
     ofEventListener frameAddedListener;
     bool isRecalculating = false;
+    bool dirty = true;
+    buffer<T1, T2> *cachedSource = nullptr;
+    uint64_t cachedRevision = 0;
+    std::vector<T1> samples;
+    bool hasOverflow = false;
+    bool hasResult = false;
     ofEventListeners listeners;
 };
 

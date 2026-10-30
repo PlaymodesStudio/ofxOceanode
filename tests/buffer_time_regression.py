@@ -18,23 +18,13 @@ SOURCE = r'''
 #include <vector>
 using namespace std;
 
-#define frame_h
+#define ofxOceanodeTime_h // frame.h compiles against this mock Timestamp.
 struct Timestamp {
     int64_t us = 0;
     Timestamp() = default;
     explicit Timestamp(int64_t value) : us(value) {}
     int64_t epochMicrosecondsSigned() const { return us; }
     void update() {}
-};
-template<typename T1, typename T2 = T1> struct bufferFrame {
-    T1 value;
-    Timestamp timestamp;
-    using Assign = function<void(T1&, T2&)>;
-    using Return = function<T1(T2&)>;
-    bufferFrame(T1 item, Timestamp time, Assign, Return) : value(item), timestamp(time) {}
-    void update(T1 item, Timestamp time) { value = item; timestamp = time; }
-    T1 getObjectRef() { return value; }
-    Timestamp getTimestamp() { return timestamp; }
 };
 template<typename T> struct ofEvent;
 template<> struct ofEvent<void> {
@@ -126,6 +116,7 @@ def main():
             "clang++", "-std=c++17", "-Wall", "-Wextra", "-Werror",
             "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
             "-I" + str(ROOT / "src/Nodes/Default_Nodes/Buffer"),
+            "-I" + str(ROOT / "src"),
             str(source), "-o", str(binary),
         ], check=True)
         subprocess.run([str(binary)], check=True)
