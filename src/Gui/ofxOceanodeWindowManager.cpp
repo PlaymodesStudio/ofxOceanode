@@ -8,6 +8,7 @@
 #include "ofxOceanodeCustomGuiExtension.h"
 #include "ofxOceanodeProportionalDocking.h"
 #include "ofxOceanodeFloatingWindowDecor.h"
+#include "ofxOceanodeDockingIni.h"
 #include "ofxOceanodeColors.h"
 #include "ofxOceanodeMenu.h"
 #include "imgui_internal.h"
@@ -238,7 +239,9 @@ void ofxOceanodeWindowManager::drawShowModeWindow(){
     ImGui::PopStyleColor();
 }
 
-void ofxOceanodeWindowManager::applyIni(const std::string& data){
+void ofxOceanodeWindowManager::applyIni(const std::string& rawData){
+    // A window docked into a node this layout splits would assert in ImGui.
+    const std::string data = ofxOceanodeDropStaleDockIds(rawData);
     proportionalDocking->reset();
     loadedGUILayoutLeftDockId = 0;
     loadedGUILayoutData = data;
@@ -298,7 +301,7 @@ void ofxOceanodeWindowManager::clearIni(){
 std::string ofxOceanodeWindowManager::captureIni() const{
     size_t size = 0;
     const char* ini = ImGui::SaveIniSettingsToMemory(&size);
-    return std::string(ini, size);
+    return ofxOceanodeDropStaleDockIds(std::string(ini, size));
 }
 
 ImGuiID ofxOceanodeWindowManager::resolveControllerDockID() const{
