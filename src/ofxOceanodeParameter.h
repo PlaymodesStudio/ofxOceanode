@@ -279,20 +279,20 @@ public:
     };
 	
 	//Overrided
-	std::string getName() const { return parameter->getName();}
-	bool setName(const std::string& name ) { return parameter->setName(name); }
-	std::string toString() const { return parameter->toString();}
-	void fromString(const std::string& str) { return parameter->fromString(str);}
-    std::string type() const {return parameter->type(); }
-    std::string getEscapedName() const {return parameter->getEscapedName(); }
-	std::string valueType() const { return parameter->valueType(); };
-    bool isInit() const { return parameter->isInit(); }
-	void setParent(ofParameterGroup &_parent) { parameter->setParent(_parent);}
-	bool isSerializable() const { return parameter->isSerializable();}
-	bool isReadOnly() const { return parameter->isReadOnly();}
-	std::shared_ptr<ofAbstractParameter> newReference() const { return std::make_shared<ofxOceanodeParameter<ParameterType>>(*this);}
-    bool isReferenceTo(const ofAbstractParameter & other) const { return parameter->isReferenceTo(other);}
-    ofEvent<std::string>& nameChangedEvent() {return parameter->nameChangedEvent();}
+	std::string getName() const override { return parameter->getName();}
+	bool setName(const std::string& name ) override { return parameter->setName(name); }
+	std::string toString() const override { return parameter->toString();}
+	void fromString(const std::string& str) override { return parameter->fromString(str);}
+    std::string type() const override {return parameter->type(); }
+    std::string getEscapedName() const override {return parameter->getEscapedName(); }
+	std::string valueType() const override { return parameter->valueType(); };
+    bool isInit() const override { return parameter->isInit(); }
+	void setParent(ofParameterGroup &_parent) override { parameter->setParent(_parent);}
+	bool isSerializable() const override { return parameter->isSerializable();}
+	bool isReadOnly() const override { return parameter->isReadOnly();}
+	std::shared_ptr<ofAbstractParameter> newReference() const override { return std::make_shared<ofxOceanodeParameter<ParameterType>>(*this);}
+    bool isReferenceTo(const ofAbstractParameter & other) const override { return parameter->isReferenceTo(other);}
+    ofEvent<std::string>& nameChangedEvent() override {return parameter->nameChangedEvent();}
 	
 	//Custom
 	void bindParameter(ofParameter<ParameterType> &p){
@@ -339,10 +339,10 @@ public:
 	void applySpeedDrag(int drag){speedDrag(*parameter.get(), drag);};
 	
 protected:
-	const ofParameterGroup getFirstParent() const { return parameter->getFirstParent();}
-	void setSerializable(bool serializable) { parameter->setSerializable(serializable);}
-    std::string escape(const std::string & str) const { return "";}
-	const void* getInternalObject() const { return parameter->getInternalObject();}
+	const ofParameterGroup getFirstParent() const override { return parameter->getFirstParent();}
+	void setSerializable(bool serializable) override { parameter->setSerializable(serializable);}
+    std::string escape(const std::string & str) const override { return "";}
+	const void* getInternalObject() const override { return parameter->getInternalObject();}
 	
 private:
 	std::shared_ptr<ofParameter<ParameterType>> parameter;

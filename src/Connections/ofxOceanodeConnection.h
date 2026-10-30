@@ -115,12 +115,12 @@ public:
     };
     
 private:
-    void passValueFunc(){
+    void passValueFunc() override {
         if(active){
             sinkParameter->receiveParameter(&sourceParameter);
         }
     }
-    void restoreValue(){
+    void restoreValue() override {
         sinkParameter->disconnectedParameter();
     }
     ofParameter<T>& sourceParameter;
@@ -145,12 +145,12 @@ public:
     };
     
 private:
-    void passValueFunc(){
+    void passValueFunc() override {
         if(active){
             sinkParameter->receiveParameter(&sourceParameter);
         }
     }
-    void restoreValue(){
+    void restoreValue() override {
         sinkParameter->disconnectedParameter();
     }
     ofParameter<void>& sourceParameter;
@@ -178,12 +178,12 @@ public:
     }
     
 private:
-    void passValueFunc(){
+    void passValueFunc() override {
         if(active && !ofxOceanodeAbstractConnection::sinkParameter->refreshCombinedInput()){
             sinkParameter = sourceParameter;
         }
     }
-    void restoreValue(){
+    void restoreValue() override {
         sinkParameter.set(beforeConnectionValue);
     }
     ofEventListener parameterEventListener;
@@ -213,12 +213,12 @@ public:
     }
     
 private:
-    void passValueFunc(){
+    void passValueFunc() override {
         if(active){
             sinkParameter = vector<_Tsink>(sourceParameter->begin(), sourceParameter->end());
         }
     }
-    void restoreValue(){
+    void restoreValue() override {
         sinkParameter.set(beforeConnectionValue);
     }
     ofEventListener parameterEventListener;
@@ -254,12 +254,12 @@ public:
     }
     
 private:
-    void passValueFunc(){
+    void passValueFunc() override {
         if(active){
             sinkParameter = vector<_Tsink>(1, sourceParameter);
         }
     }
-    void restoreValue(){
+    void restoreValue() override {
         sinkParameter.set(beforeConnectionValue);
     }
     ofEventListener parameterEventListener;
@@ -289,12 +289,12 @@ public:
     }
     
 private:
-    void passValueFunc(){
+    void passValueFunc() override {
         if(active && sourceParameter->size() > 0){
             sinkParameter = sourceParameter.get()[0];
         }
     }
-    void restoreValue(){
+    void restoreValue() override {
         sinkParameter.set(beforeConnectionValue);
     }
     ofEventListener parameterEventListener;
@@ -316,12 +316,12 @@ public:
     ~ofxOceanodeConnection(){};
     
 private:
-    void passValueFunc(){
+    void passValueFunc() override {
         if(active){
             sinkParameter = sinkParameter;
         }
     }
-    void restoreValue(){
+    void restoreValue() override {
     }
     ofEventListener parameterEventListener;
     ofParameter<void>& sourceParameter;
@@ -340,12 +340,12 @@ public:
     ~ofxOceanodeConnection(){};
     
 private:
-    void passValueFunc(){
+    void passValueFunc() override {
         if(active){
             sinkParameter.trigger();
         }
     }
-    void restoreValue(){
+    void restoreValue() override {
     }
     ofEventListener parameterEventListener;
     ofParameter<void>& sourceParameter;
@@ -364,12 +364,12 @@ public:
     ~ofxOceanodeConnection(){};
     
 private:
-    void passValueFunc(){
+    void passValueFunc() override {
         if(active){
             sinkParameter = !sinkParameter;
         }
     }
-    void restoreValue(){
+    void restoreValue() override {
     }
     ofEventListener parameterEventListener;
     ofParameter<void>& sourceParameter;
@@ -388,13 +388,13 @@ public:
     ~ofxOceanodeConnection(){};
     
 private:
-    void passValueFunc(){
+    void passValueFunc() override {
         if(active){
             bool newValue = (sourceParameter > 0.00f) ? true : false;
             if(newValue != sinkParameter) sinkParameter = newValue;
         }
     }
-    void restoreValue(){
+    void restoreValue() override {
     }
     ofEventListener parameterEventListener;
     ofParameter<float>& sourceParameter;
@@ -413,7 +413,7 @@ public:
     ~ofxOceanodeConnection(){};
     
 private:
-    void passValueFunc(){
+    void passValueFunc() override {
         if(active){
             if(sourceParameter->size() > 0){
                 bool newValue = (sourceParameter->at(0) > 0.00f) ? true : false;
@@ -421,7 +421,7 @@ private:
             }
         }
     }
-    void restoreValue(){
+    void restoreValue() override {
     }
     ofEventListener parameterEventListener;
     ofParameter<vector<float>>& sourceParameter;
