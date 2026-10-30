@@ -443,7 +443,21 @@ void ofxOceanode::drawMenuBar(){
         const ImVec4 fpsColor = fps >= 60.0f ? OceanodeColors::FpsGood
                              : fps > 30.0f ? OceanodeColors::FpsWarning
                                            : OceanodeColors::FpsBad;
-        ImGui::TextColored(fpsColor, "[ %d ]", static_cast<int>(fps));
+        // Reserve a fixed, font-scaled slot so FPS digit changes cannot move the menus.
+        float fpsDigitWidth = 0.0f;
+        for(char digit = '0'; digit <= '9'; ++digit){
+            fpsDigitWidth = std::max(fpsDigitWidth, ImGui::CalcTextSize(&digit, &digit + 1).x);
+        }
+        const ImVec2 fpsSize(ImGui::CalcTextSize("[  ]").x + 4.0f * fpsDigitWidth,
+                             ImGui::GetTextLineHeight());
+        const ImVec2 fpsPos = ImGui::GetCursorScreenPos();
+        char fpsText[32];
+        std::snprintf(fpsText, sizeof(fpsText), "[ %d ]", static_cast<int>(fps));
+        ImGui::Dummy(fpsSize);
+        ImGui::PushStyleColor(ImGuiCol_Text, fpsColor);
+        ImGui::RenderTextClipped(fpsPos, ImVec2(fpsPos.x + fpsSize.x, fpsPos.y + fpsSize.y),
+                                 fpsText, nullptr, nullptr);
+        ImGui::PopStyleColor();
 
         auto beginTopLevelMenu = [](const char* label){
             const ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
