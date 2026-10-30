@@ -153,6 +153,11 @@ struct ofxOceanodeContainer {
         void restoreNodeBindings(const ofJson&);
     };
     unique_ptr<GuiExtension> customGuiExtension=make_unique<GuiExtension>(*this);
+    // No automation attached: recorded parameter moves have nothing to replay.
+    struct AutomationExtension {
+        void replayParameterMove(ofxOceanodeContainer&,ofxOceanodeContainer*,const std::map<std::string,std::string>&,const ofJson&,bool){}
+    };
+    AutomationExtension* getAutomationExtension(){return nullptr;}
     bool rejectCable=false;
     ~ofxOceanodeContainer(){connections.clear();nodes.clear();}
     static bool isClearingContainers(){return false;}

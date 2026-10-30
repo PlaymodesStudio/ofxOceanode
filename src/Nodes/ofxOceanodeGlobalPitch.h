@@ -115,6 +115,35 @@ public:
         state().lowOffsets = offsetsFor(degrees, state().lowShift, state().root);
         valuesChanged(Scale);
     }
+    // negative harmony (Jacob Collier): after the scale, each note is mirrored
+    // around the axis between key's minor and major third (C: between Eb and E,
+    // so C <-> G, E <-> Eb, D <-> F, B <-> Ab), to the mirror nearest the note
+    // so it keeps its register: C major turns into C minor, G7 into Fm6.
+    // Part of the Scale feature: its destinations follow it.
+    static bool negativeOn() { return state().negative; }
+    static int negativeKey() { return state().negativeKey; }
+    static void setNegative(bool on, int key) {
+        key = ((key % 12) + 12) % 12;
+        if(state().negative == on && state().negativeKey == key) return;
+        state().negative = on;
+        state().negativeKey = key;
+        valuesChanged(Scale);
+    }
+    // what a destination following Scale does to a note: the scale (or low
+    // scale, below the split note) quantizes it, negative harmony mirrors it
+    static bool harmonyOn(bool low) { return (low ? lowScaleOn() : scaleOn()) || negativeOn(); }
+    // each pitch class's offset to its note after the scale and negative harmony
+    static std::array<float, 12> harmonyOffsets(bool low) {
+        std::array<float, 12> out{};
+        if(low ? lowScaleOn() : scaleOn()) out = low ? state().lowOffsets : state().offsets;
+        if(!negativeOn()) return out;
+        const float axis2 = 2.0f * state().negativeKey + 7.0f;   // twice the axis: key + 3.5
+        for(int pc = 0; pc < 12; pc++) {
+            const float x = pc + out[pc], m = axis2 - x;
+            out[pc] = m + 12.0f * std::round((x - m) / 12.0f) - pc;   // the mirror nearest the note
+        }
+        return out;
+    }
     // modulo 12: a transposed note wraps into its own octave, which starts at base (pitch class 0-11)
     static bool transposeWraps() { return state().wrap; }
     static int transposeBase() { return state().wrapBase; }
@@ -169,7 +198,7 @@ public:
             const float r = std::round(v);
             const int pc = ((int(r) % 12) + 12) % 12;
             const bool low = splitOn() && r < split();
-            if(low ? lowScaleOn() : scaleOn()) v += (low ? state().lowOffsets : state().offsets)[pc];
+            if(harmonyOn(low)) v += harmonyOffsets(low)[pc];
         }
         if(follows(node, Transpose)) v = transposed(v);
         if(withDetune && spread(node)) v += detune() * 0.01f * random(node, channel);
@@ -315,6 +344,8 @@ private:
         int shift = 0;
         int lowShift = 0;
         int root = 0;
+        bool negative = false;
+        int negativeKey = 0;
         float glide = 0.0f;
         std::array<std::map<std::string, bool>, NumFeatures> overrides;
     };

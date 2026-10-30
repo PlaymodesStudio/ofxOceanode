@@ -218,6 +218,15 @@ private:
     ofxOceanodeNode* customGuiContextNode = nullptr;
     ofxOceanodeAbstractParameter* portalizeSourceParameter = nullptr;
     ofxOceanodeAbstractParameter* encapsulateSinkParameter = nullptr;
+    // An encapsulation waiting for the timeline prompt (automated parameters
+    // inside): the selection (mixerAction -1) or a mixer input's subgraphs.
+    struct PendingEncapsulation {
+        int mixerAction = -1;
+        std::string sinkNode, sinkParameter; // by name: nothing dangles while the prompt is open
+    };
+    std::unique_ptr<PendingEncapsulation> pendingEncapsulation;
+    bool openEncapsulationPrompt = false;
+    int encapsulationChoice = -1; // 0 keep on the timeline, 1 move into the macro
     char portalizeNameBuffer[256] = {};
     struct PendingPortalAlignment {
         ofxOceanodeContainer* container;

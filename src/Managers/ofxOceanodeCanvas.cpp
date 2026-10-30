@@ -199,6 +199,9 @@ void ofxOceanodeCanvas::resetForNewPreset(){
     customGuiContextNode = nullptr;
     portalizeSourceParameter = nullptr;
     encapsulateSinkParameter = nullptr;
+    pendingEncapsulation.reset();
+    openEncapsulationPrompt = false;
+    encapsulationChoice = -1;
     portalizeNameBuffer[0] = '\0';
     pendingPortalAlignments.clear();
     pendingCenterNode = nullptr;
@@ -839,11 +842,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             return true;
         };
 
-        auto encapsulateMixerSubgraphs = [&](ofxOceanodeAbstractParameter* clickedSink,
-                                             bool allInputs, bool withPortals){
-            if(clickedSink == nullptr || !clickedSink->hasInConnection()) return;
+        auto mixerPlans = [&](ofxOceanodeAbstractParameter* clickedSink, bool allInputs) {
+            vector<ofxOceanodeContainer::UpstreamSubgraph> plans;
+            if(clickedSink == nullptr || !clickedSink->hasInConnection()) return plans;
             auto* sinkNode = container->getNodeFromParameter(*clickedSink);
-            if(sinkNode == nullptr) return;
+            if(sinkNode == nullptr) return plans;
 
             vector<ofxOceanodeAbstractParameter*> sinks;
             if(allInputs) {
@@ -860,7 +863,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             // Every branch is planned against the same unmodified graph. This
             // is what keeps a generator shared by two mixer inputs outside both
             // macros instead of letting the first operation capture it.
-            auto plans = container->findExclusiveUpstreamSubgraphs(sinks);
+            return container->findExclusiveUpstreamSubgraphs(sinks);
+        };
+        auto encapsulateMixerSubgraphs = [&](ofxOceanodeAbstractParameter* clickedSink,
+                                             bool allInputs, bool withPortals, bool moveTimeline){
+            auto plans = mixerPlans(clickedSink, allInputs);
             int created = 0;
             for(auto& plan : plans) {
                 if(plan.sink == nullptr || plan.nodes.empty()) {
@@ -869,7 +876,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     continue;
                 }
                 const string macroName = plan.sink->getName() + " Graph";
-                auto* macroNode = container->encapsulateNodes(plan.nodes, macroName);
+                auto* macroNode = container->encapsulateNodes(plan.nodes, macroName, moveTimeline);
                 if(macroNode == nullptr) continue;
                 created++;
 
@@ -2137,6 +2144,30 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             if(ImGui::Selectable("Encapsulate All Subgraphs with Portals")) mixerEncapsulationAction = 3;
             ImGui::EndPopup();
         }
+        if(openEncapsulationPrompt){
+            openEncapsulationPrompt = false;
+            ImGui::OpenPopup("Timeline Tracks##encapsulation");
+        }
+        if(ImGui::BeginPopupModal("Timeline Tracks##encapsulation", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+            ImGui::TextUnformatted("These nodes are driven by the timeline.");
+            ImGui::TextUnformatted("Where should their timeline tracks go?");
+            ImGui::Spacing();
+            if(ImGui::Button("Keep on the timeline")){ encapsulationChoice = 0; ImGui::CloseCurrentPopup(); }
+            if(ImGui::IsItemHovered())
+                ImGui::SetTooltip("The tracks stay where they are and follow the nodes into the macro.");
+            ImGui::SameLine();
+            if(ImGui::Button("Move into the macro")){ encapsulationChoice = 1; ImGui::CloseCurrentPopup(); }
+            if(ImGui::IsItemHovered())
+                ImGui::SetTooltip("Tracks driving only these nodes move into the macro's own timeline;\n"
+                                  "a macro track with one clip plays it in their place.\n"
+                                  "Tracks also driving other nodes stay on the timeline.");
+            ImGui::SameLine();
+            if(ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)){
+                pendingEncapsulation.reset();
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
         if(open_portalize_name_popup){
             ImGui::OpenPopup("Portalize Output");
         }
@@ -2830,6 +2861,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     if(ImGui::GetIO().KeyShift){
                         const auto selected = container->getSelectedModules();
                         if(selected.size() == 1) macroExtractionKey = selected.front()->getParameters().getEscapedName();
+                    }else if(container->hasAutomatedParameters(container->getSelectedModules())){
+                        // Ask where their timeline tracks go first.
+                        pendingEncapsulation = std::make_unique<PendingEncapsulation>();
+                        openEncapsulationPrompt = true;
                     }else container->encapsulateSelectedNodes();
                 }
             }
@@ -2895,8 +2930,34 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         if(mixerEncapsulationAction >= 0) {
             auto* sink = encapsulateSinkParameter;
             encapsulateSinkParameter = nullptr;
-            encapsulateMixerSubgraphs(sink, mixerEncapsulationAction >= 2,
-                                      (mixerEncapsulationAction & 1) != 0);
+            bool automated = false;
+            for(const auto& plan : mixerPlans(sink, mixerEncapsulationAction >= 2))
+                automated = automated || container->hasAutomatedParameters(plan.nodes);
+            if(automated && sink != nullptr && sink->getNodeModel() != nullptr) {
+                // Ask where their timeline tracks go first.
+                pendingEncapsulation = std::make_unique<PendingEncapsulation>();
+                pendingEncapsulation->mixerAction = mixerEncapsulationAction;
+                pendingEncapsulation->sinkNode = sink->getNodeModel()->getParameterGroup().getEscapedName();
+                pendingEncapsulation->sinkParameter = sink->getName();
+                openEncapsulationPrompt = true;
+            } else {
+                encapsulateMixerSubgraphs(sink, mixerEncapsulationAction >= 2,
+                                          (mixerEncapsulationAction & 1) != 0, false);
+            }
+        }
+        if(pendingEncapsulation && encapsulationChoice >= 0) {
+            const auto pending = std::move(pendingEncapsulation);
+            const bool moveTimeline = encapsulationChoice == 1;
+            encapsulationChoice = -1;
+            if(pending->mixerAction < 0) container->encapsulateSelectedNodes("Encapsulated", moveTimeline);
+            else {
+                const auto& nodes = container->getParameterGroupNodesMap();
+                const auto found = nodes.find(pending->sinkNode);
+                ofxOceanodeAbstractParameter* sink = nullptr;
+                if(found != nodes.end() && found->second->getParameters().contains(pending->sinkParameter))
+                    sink = dynamic_cast<ofxOceanodeAbstractParameter*>(&found->second->getParameters().get(pending->sinkParameter));
+                encapsulateMixerSubgraphs(sink, pending->mixerAction >= 2, (pending->mixerAction & 1) != 0, moveTimeline);
+            }
         }
 
         // Center only after the node pass has refreshed every GUI rectangle.

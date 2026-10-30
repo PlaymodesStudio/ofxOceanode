@@ -207,7 +207,7 @@ public:
     static std::string timelineMacroCanvas(const std::string& parentCanvasID, int macroNumber);
 	
 	// Node encapsulation functionality
-	void encapsulateSelectedNodes(const string& macroName = "Encapsulated");
+	void encapsulateSelectedNodes(const string& macroName = "Encapsulated", bool moveTimelineIntoMacro = false);
 	struct UpstreamSubgraph {
 		ofxOceanodeAbstractParameter* sink = nullptr;
 		vector<ofxOceanodeNode*> nodes;
@@ -216,8 +216,13 @@ public:
 	// or with any output outside their branch, stay outside all macros.
 	vector<UpstreamSubgraph> findExclusiveUpstreamSubgraphs(
 		const vector<ofxOceanodeAbstractParameter*>& sinks);
+	// moveTimelineIntoMacro: automation driving only these nodes moves into
+	// the new macro's own timeline (see ofxOceanodeAutomationExtension).
 	ofxOceanodeNode* encapsulateNodes(const vector<ofxOceanodeNode*>& nodes,
-	                                  const string& macroName = "Encapsulated");
+	                                  const string& macroName = "Encapsulated",
+	                                  bool moveTimelineIntoMacro = false);
+	// Whether any parameter of these nodes (or inside them) is driven by automation.
+	bool hasAutomatedParameters(const vector<ofxOceanodeNode*>& nodes) const;
     // Move the complete contents (including boundary routers) into this canvas.
     bool extractMacro(ofxOceanodeNode& macroNode);
     bool extractSelectedMacro();
@@ -380,6 +385,9 @@ private:
         ofJson after;
         ofJson beforeAux, afterAux;
         ofJson nodeTransfers = ofJson::array();
+        // Parameter moves the automation followed, in order:
+        // {"paths": {old: new}, "macro": macro node key, "record": extension's}.
+        ofJson parameterMoves = ofJson::array();
         std::uint64_t sequence = 0;
         std::map<std::uint64_t, std::shared_ptr<CanvasNodeSnapshot>> snapshots;
         size_t bytes = 0;

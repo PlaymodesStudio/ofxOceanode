@@ -18,6 +18,10 @@
 //                  neighbouring piece in the bass while the rest follows Scale
 //    Low Bypass    turns the low scale off (below Split Note)
 //    Low Shift     the same along Low Scale, below Split Note
+//    Negative      negative harmony (Jacob Collier): after the scales, every
+//    Negative Key  note mirrors around the axis between the key's minor and
+//                  major third (C <-> G, E <-> Eb), staying in its register.
+//                  Follows the Scale ticks
 //    Transpose     semitones, added after the scale (a transpose changes the key)
 //    Mod 12        a transposed note wraps into its own octave, which starts at
 //    Base Note     (C .. B): it never leaves that octave (cf. Fit Notes In Range)
@@ -44,7 +48,8 @@ public:
                       "(synths, MIDI outputs, piano rolls), without cables. Notes move to the "
                       "nearest degree of Scale (semitones 0-11 above Scale Root), or of Low Scale "
                       "when below Split Note (MIDI, 0 = off), move Shift (Low Shift below the split) degrees along it, "
-                      "carried into the next octave, then Transpose (semitones) is added (Mod 12: wrapped "
+                      "carried into the next octave, mirrored by Negative harmony around Negative Key "
+                      "(the axis between its minor and major third), then Transpose (semitones) is added (Mod 12: wrapped "
                       "into the note's own octave from Base Note), then each "
                       "voice's own random Detune (within +-cents). Glide: seconds a change takes to reach the sounding "
                       "notes (SuperCollider synths). The inspector chooses which destinations follow each one.";
@@ -60,6 +65,7 @@ public:
         ofxOceanodeGlobalPitch::setLowScale({}, 0.0f, false);
         ofxOceanodeGlobalPitch::setShift(0);
         ofxOceanodeGlobalPitch::setLowShift(0);
+        ofxOceanodeGlobalPitch::setNegative(false, 0);
         ofxOceanodeGlobalPitch::setDetune(0.0f);
         ofxOceanodeGlobalPitch::setGlide(0.0f);
         for(int f = 0; f < ofxOceanodeGlobalPitch::NumFeatures; f++) ofxOceanodeGlobalPitch::setOverridesText(feature(f), "");
@@ -80,6 +86,9 @@ public:
                                   std::vector<float>(1, 0.0f), std::vector<float>(1, 11.0f)));
         addParameter(lowBypass.set("Low Bypass", !low.empty() && !ofxOceanodeGlobalPitch::lowScaleEnabled()));
         addParameter(lowShift.set("Low Shift", ofxOceanodeGlobalPitch::lowShift(), -size(lowScale.get()), size(lowScale.get())));
+        addSeparator("Negative Harmony");
+        addParameter(negative.set("Negative", ofxOceanodeGlobalPitch::negativeOn()));
+        addParameterDropdown(negativeKey, "Negative Key", ofxOceanodeGlobalPitch::negativeKey(), noteNames());
         addSeparator("Transpose");
         addParameter(transpose.set("Transpose", ofxOceanodeGlobalPitch::transpose(), -48.0f, 48.0f));
         addParameter(wrap.set("Mod 12", ofxOceanodeGlobalPitch::transposeWraps()));
@@ -135,6 +144,14 @@ public:
             share([degrees](globalPitch* n){ n->lowShift = degrees; });
         };
         listeners.push(lowShift.newListener([sendLowShift](int&){ sendLowShift(); }));
+        auto sendNegative = [this](){
+            const bool on = negative.get();
+            const int key = negativeKey.get();
+            ofxOceanodeGlobalPitch::setNegative(on, key);
+            share([on, key](globalPitch* n){ n->negative = on; n->negativeKey = key; });
+        };
+        listeners.push(negative.newListener([sendNegative](bool&){ sendNegative(); }));
+        listeners.push(negativeKey.newListener([sendNegative](int&){ sendNegative(); }));
         listeners.push(transpose.newListener([this](float& v){
             ofxOceanodeGlobalPitch::setTranspose(v);
             share([v](globalPitch* n){ n->transpose = v; });
@@ -166,6 +183,7 @@ public:
     // it existed, when Scale Bypass turned both scales off
     void presetRecallAfterSettingParameters(ofJson& json) override {
         if(!json.contains(root.getEscapedName())) root = 0;   // from before Scale Root: degrees counted from C
+        if(!json.contains(negative.getEscapedName())) negative = false;   // from before Negative Harmony
         if(json.contains(lowBypass.getEscapedName())) return;
         ofParameter<bool> earlier;
         earlier.set("Low Scale Bypass", false);
@@ -268,8 +286,8 @@ private:
     ofParameter<float> split;
     ofParameter<bool> bypass, lowBypass;
     ofParameter<float> transpose, detune, glide;
-    ofParameter<bool> wrap;
-    ofParameter<int> root, wrapBase, shift, lowShift;
+    ofParameter<bool> wrap, negative;
+    ofParameter<int> root, wrapBase, negativeKey, shift, lowShift;
     std::array<ofParameter<std::string>, ofxOceanodeGlobalPitch::NumFeatures> destinations;
     ofEventListeners listeners;
 };

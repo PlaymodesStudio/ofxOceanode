@@ -38,6 +38,26 @@ public:
     // Nodes moved to another canvas (encapsulated into a macro, ...): their
     // parameters' timeline paths, old -> new, so bindings follow them.
     virtual void retargetParameterPaths(const std::map<std::string, std::string>& /*oldToNew*/) {}
+    // Nodes of `canvas` were encapsulated into the macro owning macroContainer
+    // (paths old -> new). moveIntoMacro: automation driving only those nodes
+    // moves into the macro itself. Returns what undo and redo need to reverse
+    // or repeat it; the default follows the paths only.
+    virtual ofJson encapsulateParameters(ofxOceanodeContainer& /*canvas*/, ofxOceanodeContainer& /*macroContainer*/,
+                                         const std::map<std::string, std::string>& oldToNew, bool /*moveIntoMacro*/) {
+        retargetParameterPaths(oldToNew);
+        return ofJson();
+    }
+    // Undo (backwards) or redo of a recorded move of parameters (an
+    // encapsulation, with its record, or an extraction), after the canvas's
+    // nodes are back. macroContainer: the macro involved, nullptr when gone.
+    virtual void replayParameterMove(ofxOceanodeContainer& /*canvas*/, ofxOceanodeContainer* /*macroContainer*/,
+                                     const std::map<std::string, std::string>& oldToNew, const ofJson& /*record*/,
+                                     bool backwards) {
+        if(!backwards) { retargetParameterPaths(oldToNew); return; }
+        std::map<std::string, std::string> newToOld;
+        for(const auto& entry : oldToNew) newToOld[entry.second] = entry.first;
+        retargetParameterPaths(newToOld);
+    }
     // A macro's container loaded from / saved to its folder (its own preset,
     // or its library definition), so the macro's own timeline can travel with it.
     virtual void loadMacroPreset(ofxOceanodeContainer& /*macroContainer*/, const std::string& /*folder*/) {}
