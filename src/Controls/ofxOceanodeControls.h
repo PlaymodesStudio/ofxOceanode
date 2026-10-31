@@ -26,6 +26,8 @@ public:
     void drawMenu(const std::string& controllerName);
     void drawMenus(const std::string& excludedControllerName = "");
     void drawPopups();
+    // The controllers' status readouts, right-aligned in the menu bar.
+    void drawMenuBarStatus();
     void update();
     
     template<class T>

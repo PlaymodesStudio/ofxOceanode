@@ -575,6 +575,7 @@ void ofxOceanode::drawMenuBar(){
             }
             ImGui::EndMenu();
         }
+        controls->drawMenuBarStatus();
         ImGui::EndMenuBar();
     }
     ImGui::PopStyleVar(2);
