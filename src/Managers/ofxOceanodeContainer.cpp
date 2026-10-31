@@ -1891,17 +1891,19 @@ void ofxOceanodeContainer::resetPhase(bool notifyTransport){
 }
 
 ofxOceanodeTransportState ofxOceanodeContainer::getTransportState() const{
-    if(transport == nullptr){
+    const auto playing = getTransport();
+    if(playing == nullptr){
         return {};
     }
-    return transport->getState();
+    return playing->getState();
 }
 
 ofxOceanodeFrameTransportState ofxOceanodeContainer::getFrameTransportState() const{
-    if(transport == nullptr){
+    const auto playing = getTransport();
+    if(playing == nullptr){
         return {};
     }
-    return transport->getFrameState();
+    return playing->getFrameState();
 }
 
 #ifdef OFXOCEANODE_USE_OSC

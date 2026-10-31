@@ -53,6 +53,7 @@ public:
         addOutputParameter(output.set("Out", {0}, {0}, {FLT_MAX}));
 
         addInspectorParameter(syncToTransport.set("Sync To Transport", false));
+        addTimeSourceParameter(syncToTransport);
 
         listeners.push(resetCounter.newListener([this](){
             if(!syncToTransport) {
@@ -165,6 +166,7 @@ public:
         addOutputParameter(isRampFinish.set("Finish",false));
         addParameter(enable.set("Enable", true));
         addInspectorParameter(syncToTransport.set("Sync To Transport", false));
+        addTimeSourceParameter(syncToTransport);
         rampStartTime = 0;
         isRamping = false;
         isRampFinish = false;

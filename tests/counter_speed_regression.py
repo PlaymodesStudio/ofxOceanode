@@ -37,6 +37,8 @@ struct ofxOceanodeNodeModel {
     template<class T> void addParameter(ofParameter<T>& p) { parameters.add(p); }
     template<class T> void addOutputParameter(ofParameter<T>& p) { parameters.add(p); }
     template<class T> void addInspectorParameter(ofParameter<T>& p) { inspector.add(p); }
+    void addTimeSourceParameter(ofParameter<bool>&) {}
+    void setNodeSnapshotsDisabled(bool) {}
     ofxOceanodeFrameTransportState getFrameTransportState() const { return transport.getFrameState(); }
     struct GlobalFrame { struct State { double time = 0; } current; };
     GlobalFrame getFrameGlobalTimeState() const { return {}; }

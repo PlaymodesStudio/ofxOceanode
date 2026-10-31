@@ -94,7 +94,16 @@ def production():
                 'string ofxOceanodeNodeModel::getDescription()', 'string ofxOceanodeNodeModel::getParents()',
                 'void ofxOceanodeNodeModel::setNumIdentifier(', 'void ofxOceanodeNodeModel::setContainer(',
                 'void ofxOceanodeNodeModel::deserializeParameter(',
-                'ofxOceanodeFrameTransportState ofxOceanodeNodeModel::getFrameTransportState()']:
+                'ofxOceanodeFrameTransportState ofxOceanodeNodeModel::getFrameTransportState()',
+                'std::shared_ptr<ofxOceanodeTransport> ofxOceanodeNodeModel::getTransport()',
+                'ofxOceanodeTransportState ofxOceanodeNodeModel::missingTimeSourceState(',
+                'void ofxOceanodeNodeModel::addTimeSourceParameter(ofParameter<bool>& syncToggle)',
+                'void ofxOceanodeNodeModel::addTimeSourceParameter()',
+                'bool ofxOceanodeNodeModel::isTimeSourceParameter(',
+                'bool ofxOceanodeNodeModel::isTimeSourceSyncToggle(',
+                'std::string ofxOceanodeNodeModel::getTimeSourceId()',
+                'void ofxOceanodeNodeModel::setTimeSourceId(',
+                'bool ofxOceanodeNodeModel::isTimeSourceMissing()']:
         result+=block(m,sig)+'\n'
     gui=(ROOT/'src/Nodes/ofxOceanodeNodeGui.cpp').read_text()
     for sig in ['ofxOceanodeNodeGui::ofxOceanodeNodeGui(', 'ofxOceanodeNodeGui::~ofxOceanodeNodeGui()',

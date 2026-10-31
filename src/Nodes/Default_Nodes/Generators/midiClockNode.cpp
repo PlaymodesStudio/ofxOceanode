@@ -88,7 +88,8 @@ void midiClockNode::applyPort() {
 }
 
 void midiClockNode::applyDrive() {
-    clock->setDriveTransport(getTransport(), enable && driveTransport);
+    // The clock belongs to the root transport, whichever timeline this canvas plays.
+    clock->setDriveTransport(hostContainer != nullptr ? hostContainer->getRootTransport() : nullptr, enable && driveTransport);
 }
 
 void midiClockNode::update(ofEventArgs &a) {

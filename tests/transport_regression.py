@@ -21,7 +21,11 @@ CASES = r'''
 #include <thread>
 // Scheduling only uses a parameter's identity, so no OF fixture is needed.
 class ofxOceanodeAbstractParameter {};
-static void near(double actual, double expected) { assert(std::abs(actual - expected) < 1e-7); }
+static void nearAt(double actual, double expected, int line) {
+    if(std::abs(actual - expected) >= 1e-7) std::cerr << "line " << line << ": " << actual << " != " << expected << "\n";
+    assert(std::abs(actual - expected) < 1e-7);
+}
+#define near(actual, expected) nearAt((actual), (expected), __LINE__)
 int main() {
     ofxOceanodeTransport transport;
     transport.setDriverMode(TransportDriverMode::FrameStep);
@@ -136,7 +140,107 @@ int main() {
         independent.join();
     }
     assert(!isBackendSendSuppressed());
-    std::cout << "Transport regression passed: play/pause/stop, seek, tempo, loops, snapshots, external clock, MIDI, random replay, scheduling.\n";
+    // ---- Derived transports: one clock, independent players ----
+    {
+        auto rootTransport = std::make_shared<ofxOceanodeTransport>();
+        rootTransport->setDriverMode(TransportDriverMode::FrameStep);
+        auto a = ofxOceanodeTransport::makeDerived(rootTransport);
+        auto b = ofxOceanodeTransport::makeDerived(rootTransport);
+        assert(a->isDerived() && a->getRoot() == rootTransport.get());
+        b->setBpm(90.0f);
+        // (Real time ran from construction until frame stepping began.)
+        const double c0 = rootTransport->getState().clockSeconds;
+        // The clock runs while the root is stopped.
+        rootTransport->advanceFrameStep(1.0);
+        near(rootTransport->getState().clockSeconds, c0 + 1.0);
+        near(rootTransport->getState().beatPosition, 0.0);
+        near(a->getState().clockSeconds, c0 + 1.0);
+        // Timestamped starts land exactly at their instant, between frames.
+        a->playAt(c0 + 1.5, 0.0);
+        b->playAt(c0 + 1.5, 0.0);
+        rootTransport->advanceFrameStep(1.0);
+        near(a->getState().beatPosition, 1.0);   // 0.5 s at 120 BPM
+        near(b->getState().beatPosition, 0.75);  // 0.5 s at 90 BPM
+        near(a->getState().seconds, 0.5);
+        assert(a->getState().isPlaying && !rootTransport->getState().isPlaying);
+        // No drift: positions stay a function of clock time.
+        for(int i = 0; i < 100000; ++i) rootTransport->advanceFrameStep(1.0 / 60.0);
+        const double clock = rootTransport->getState().clockSeconds;
+        assert(std::abs(a->getState().beatPosition - (clock - c0 - 1.5) * 2.0) < 1e-6);
+        assert(std::abs(b->getState().beatPosition - (clock - c0 - 1.5) * 1.5) < 1e-6);
+        // Stopping one leaves the other untouched.
+        const auto bGeneration = b->getState().generation;
+        a->stop();
+        rootTransport->advanceFrameStep(0.5);
+        near(a->getState().beatPosition, 0.0);
+        assert(!a->getState().isPlaying && b->getState().generation == bGeneration && b->getState().isPlaying);
+        // Loops wrap at the exact crossing instant and keep the overshoot.
+        a->setLoop(true, 0.0, 4.0);
+        a->play();
+        rootTransport->advanceFrameStep(2.25); // 4.5 beats
+        near(a->getState().beatPosition, 0.5);
+        assert(a->getState().loopCount == 1);
+        // Frame snapshots latch with the root.
+        rootTransport->latchFrameState();
+        rootTransport->advanceFrameStep(0.25);
+        rootTransport->latchFrameState();
+        near(a->getFrameState().previous.beatPosition, 0.5);
+        near(a->getFrameState().current.beatPosition, 1.0);
+        // Tempo changes re-anchor without a jump.
+        a->setLoop(false, 0.0, 0.0);
+        a->setBpm(60.0f);
+        rootTransport->advanceFrameStep(1.0);
+        near(a->getState().beatPosition, 2.0);
+        // The next bar boundary on a transport's grid, in clock seconds
+        // (frame-stepped, so "now" is the last step).
+        const double nowClock = a->getState().clockSeconds;
+        near(a->nextGridClockSeconds(4.0), nowClock + 2.0);
+        near(a->nextGridClockSeconds(1.0, 0.25), nowClock + 1.0);
+        // stopAt / seekAt.
+        a->seekAt(nowClock + 0.5, 10.0);
+        a->stopAt(nowClock + 1.0);
+        double pendingClock = 0.0; bool startsPlaying = true;
+        assert(a->nextPendingAction(pendingClock, startsPlaying) && !startsPlaying);
+        near(pendingClock, nowClock + 0.5);
+        rootTransport->advanceFrameStep(2.0);
+        near(a->getState().beatPosition, 10.5);
+        assert(!a->getState().isPlaying);
+        // The Clock source plays whenever the clock runs, at the root's tempo.
+        auto clockSource = rootTransport->getClockTransport();
+        assert(clockSource != nullptr && clockSource == b->getClockTransport());
+        rootTransport->setBpm(60.0f);
+        rootTransport->advanceFrameStep(1.0);
+        const double clockBeat = clockSource->getState().beatPosition;
+        rootTransport->advanceFrameStep(1.0);
+        near(clockSource->getState().beatPosition, clockBeat + 1.0);
+        assert(clockSource->getState().isPlaying);
+        // Time sources: registered by id, found while alive and selectable.
+        const auto revision = rootTransport->getTimeSourcesRevision();
+        a->registerTimeSource({"canvas/a", "A", "Canvas", true, ""}, a);
+        rootTransport->registerTimeSource({"canvas/c", "C", "Canvas", false, "only plays as clips"}, nullptr);
+        assert(rootTransport->getTimeSourcesRevision() > revision);
+        assert(rootTransport->findTimeSource("canvas/a") == a);
+        assert(rootTransport->findTimeSource("canvas/c") == nullptr);
+        assert(rootTransport->getTimeSources().size() == 2);
+        rootTransport->unregisterTimeSource("canvas/a");
+        assert(rootTransport->findTimeSource("canvas/a") == nullptr);
+        // External clocks are taken by the root; derived transports forward.
+        int owner = 0;
+        b->claimExternalClock(&owner);
+        assert(rootTransport->hasExternalClock() && b->hasExternalClock());
+        b->releaseExternalClock(&owner);
+        assert(!rootTransport->hasExternalClock());
+        // Children expire with their owners.
+        a.reset();
+        rootTransport->advanceFrameStep(0.1);
+        // Steady time and clock time convert both ways.
+        rootTransport->setDriverMode(TransportDriverMode::RealTime);
+        rootTransport->syncRealTime();
+        const auto now = ofxOceanodeTransport::steadyNowUs();
+        const double atNow = rootTransport->clockSecondsAt(now);
+        assert(std::llabs(static_cast<long long>(rootTransport->steadyUsAtClock(atNow)) - static_cast<long long>(now)) <= 1);
+    }
+    std::cout << "Transport regression passed: play/pause/stop, seek, tempo, loops, snapshots, external clock, MIDI, random replay, scheduling, derived transports.\n";
 }
 '''
 

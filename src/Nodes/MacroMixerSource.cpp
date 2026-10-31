@@ -236,7 +236,7 @@ std::unique_ptr<MacroMixerSource::Graph> MacroMixerSource::instantiate(ofxOceano
             const auto path = fs::canonical(folder,error);
             return excluded->count({error ? folder : path.string(),node}) != 0;
         });
-        graph->host = std::make_shared<ofxOceanodeContainer>(registry,parent.getTypesRegistry(),parent.getTransport());
+        graph->host = std::make_shared<ofxOceanodeContainer>(registry,parent.getTypesRegistry(),parent.getRootTransport());
         static std::atomic<uint64_t> hosts{0};
         graph->host->setCanvasID("MacroMixer/" + std::to_string(++hosts));
         graph->host->setTimelineHost(&parent);

@@ -127,21 +127,86 @@ std::shared_ptr<ofxOceanodeTransport> ofxOceanodeNodeModel::getTransport() const
     if(hostContainer == nullptr){
         return nullptr;
     }
-    return hostContainer->getTransport();
+    auto canvasTransport = hostContainer->getTransport();
+    if(!timeSourceEnabled || canvasTransport == nullptr) return canvasTransport;
+    const std::string& id = timeSourceIdParameter.get();
+    if(id.empty() || id == TimeSourceAuto || id == TimeSourceFree) return canvasTransport;
+    if(id == TimeSourceClock) return canvasTransport->getClockTransport();
+    return canvasTransport->findTimeSource(id);
+}
+
+// What a node following a missing time source sees: stopped at the start,
+// on the root's clock.
+ofxOceanodeTransportState ofxOceanodeNodeModel::missingTimeSourceState(const ofxOceanodeContainer* container){
+    ofxOceanodeTransportState state;
+    if(container != nullptr && container->getRootTransport() != nullptr){
+        const auto rootState = container->getRootTransport()->getState();
+        state.steadyTimeUs = rootState.steadyTimeUs;
+        state.clockSeconds = rootState.clockSeconds;
+        state.driverMode = rootState.driverMode;
+        state.bpm = rootState.bpm;
+    }
+    state.isPlaying = false;
+    return state;
 }
 
 ofxOceanodeTransportState ofxOceanodeNodeModel::getTransportState() const{
     if(hostContainer == nullptr){
         return {};
     }
-    return hostContainer->getTransportState();
+    if(auto transport = getTransport()) return transport->getState();
+    return missingTimeSourceState(hostContainer);
 }
 
 ofxOceanodeFrameTransportState ofxOceanodeNodeModel::getFrameTransportState() const{
     if(hostContainer == nullptr){
         return {};
     }
-    return hostContainer->getFrameTransportState();
+    if(auto transport = getTransport()) return transport->getFrameState();
+    const auto state = missingTimeSourceState(hostContainer);
+    return {state, state};
+}
+
+void ofxOceanodeNodeModel::addTimeSourceParameter(ofParameter<bool>& syncToggle){
+    timeSourceSync = &syncToggle;
+    addTimeSourceParameter();
+}
+
+void ofxOceanodeNodeModel::addTimeSourceParameter(){
+    if(timeSourceEnabled) return;
+    timeSourceEnabled = true;
+    addInspectorParameter(timeSourceIdParameter.set("Time Source", TimeSourceAuto));
+}
+
+bool ofxOceanodeNodeModel::isTimeSourceParameter(const ofAbstractParameter& p) const{
+    return timeSourceEnabled && p.getName() == timeSourceIdParameter.getName() &&
+        p.valueType() == timeSourceIdParameter.valueType();
+}
+
+bool ofxOceanodeNodeModel::isTimeSourceSyncToggle(const ofAbstractParameter& p) const{
+    return timeSourceSync != nullptr && p.getName() == timeSourceSync->getName() && p.valueType() == timeSourceSync->valueType();
+}
+
+std::string ofxOceanodeNodeModel::getTimeSourceId() const{
+    if(timeSourceSync != nullptr && !timeSourceSync->get()) return TimeSourceFree;
+    const std::string& id = timeSourceIdParameter.get();
+    return id.empty() || id == TimeSourceFree ? std::string(TimeSourceAuto) : id;
+}
+
+void ofxOceanodeNodeModel::setTimeSourceId(const std::string& id){
+    if(id == TimeSourceFree){
+        if(timeSourceSync != nullptr && timeSourceSync->get()) *timeSourceSync = false;
+        return;
+    }
+    if(timeSourceIdParameter.get() != id) timeSourceIdParameter = id;
+    if(timeSourceSync != nullptr && !timeSourceSync->get()) *timeSourceSync = true;
+}
+
+bool ofxOceanodeNodeModel::isTimeSourceMissing() const{
+    if(!timeSourceEnabled || hostContainer == nullptr) return false;
+    const std::string id = getTimeSourceId();
+    if(id == TimeSourceFree || id == TimeSourceAuto || id == TimeSourceClock) return false;
+    return getTransport() == nullptr;
 }
 
 ofxOceanodeTimeState ofxOceanodeNodeModel::getGlobalTimeState() const{

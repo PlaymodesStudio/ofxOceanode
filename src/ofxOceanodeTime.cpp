@@ -237,10 +237,13 @@ void ofxOceanodeTime::update(){
             if(targetFR == 0) targetFR = 60;
             const double deltaSeconds = 1.0 / targetFR;
             advanceGlobalTimeFrameStep(deltaSeconds);
+            // The clock steps whether or not the root timeline plays, so
+            // timelines playing independently keep running.
+            if(transport != nullptr){
+                transport->advanceFrameStep(deltaSeconds);
+            }
             if(isPlaying){
-                if(transport != nullptr){
-                    transport->advanceFrameStep(deltaSeconds);
-                }else{
+                if(transport == nullptr){
                     time += deltaSeconds;
                 }
                 for(auto p : phasors){
@@ -250,12 +253,10 @@ void ofxOceanodeTime::update(){
         }
     }else{
         syncGlobalTimeRealTime();
-        if(isPlaying || desiredDriverMode == TransportDriverMode::External){
-            if(transport != nullptr){
-                transport->syncRealTime();
-            }else{
-                time = std::chrono::duration<double>(ofGetCurrentTime() - startTime).count();
-            }
+        if(transport != nullptr){
+            transport->syncRealTime(); // the clock runs while stopped too
+        }else if(isPlaying){
+            time = std::chrono::duration<double>(ofGetCurrentTime() - startTime).count();
         }
     }
 

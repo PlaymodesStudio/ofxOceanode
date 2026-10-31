@@ -165,7 +165,18 @@ public:
     // timeline already matches the saved tempo).
     void setBpm(float _bpm, bool retimeTimeline = true);
     void resetPhase(bool notifyTransport = true);
-    std::shared_ptr<ofxOceanodeTransport> getTransport() const { return transport; }
+    // The transport this canvas plays to: its own override (a timeline
+    // playing independently here), else its host canvas's, else the root's.
+    std::shared_ptr<ofxOceanodeTransport> getTransport() const {
+        if(transportOverride != nullptr) return transportOverride;
+        if(timelineHost != nullptr && !transportOwner) return timelineHost->getTransport();
+        return transport;
+    }
+    // The root transport (owner of the clock), whatever this canvas follows.
+    std::shared_ptr<ofxOceanodeTransport> getRootTransport() const { return transport; }
+    // A transport for this canvas and the canvases inside it (nullptr: follow the host).
+    void setTransportOverride(std::shared_ptr<ofxOceanodeTransport> override){ transportOverride = std::move(override); }
+    std::shared_ptr<ofxOceanodeTransport> getTransportOverride() const { return transportOverride; }
     // The root container creates the shared transport.
     bool isTransportOwner() const { return transportOwner; }
     ofxOceanodeTransportState getTransportState() const;
@@ -455,6 +466,7 @@ private:
     float phase;
     bool transportOwner = false;
     std::shared_ptr<ofxOceanodeTransport> transport;
+    std::shared_ptr<ofxOceanodeTransport> transportOverride;
     std::unique_ptr<ofxOceanodeAutomationExtension> automationExtension;
     ofxOceanodeContainer* timelineHost = nullptr;
     

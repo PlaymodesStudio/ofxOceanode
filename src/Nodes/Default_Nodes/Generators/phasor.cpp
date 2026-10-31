@@ -63,6 +63,7 @@ void phasor::setup(){
     addInspectorParameter(multiTrigger_Param.set("Multi Trigger", false));
     addInspectorParameter(audioRate_Param.set("Audio Rate", false));
     addInspectorParameter(syncToTransport_Param.set("Sync To Transport", false));
+    addTimeSourceParameter(syncToTransport_Param);
     
     resetPhaseListener = resetPhase_Param.newListener([&](){
         if(!selfTrigger && !syncToTransport_Param)
