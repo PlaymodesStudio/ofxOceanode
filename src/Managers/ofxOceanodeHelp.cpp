@@ -2,6 +2,7 @@
 #include "ofxOceanodeHelpPlan.h"
 #include "ofxOceanodeHelpPrompt.h"
 #include "ofxOceanodeNodeHelpCatalog.h"
+#include "ofxOceanodeDescription.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeNodeGui.h"
 #include "ofxOceanodeShared.h"
@@ -249,7 +250,8 @@ void ofxOceanodeHelp::draw() {
                         ImGui::TextUnformatted(name.c_str());
                         ImGui::SameLine();
                         ImGui::TextDisabled("(%s)", category.c_str());
-                        ImGui::TextWrapped("%s", description.empty() ? "No description supplied by this addon." : description.c_str());
+                        ofxOceanodeDescription::draw(description.empty() ? "No description supplied by this addon." : description,
+                            ofxOceanodeShared::getDefaultBoldFont());
                         ImGui::Separator();
                     }
                     if(!matches) ImGui::TextDisabled("No matching nodes. Try fewer keywords.");
@@ -261,7 +263,7 @@ void ofxOceanodeHelp::draw() {
                 if(ImGui::Button("Ask or build a patch...")) openAssistant = true;
                 ImGui::TextWrapped("Uses the same Requesty credentials as Formula and DynGen. Sends your question, installed node descriptions and pin schemas.");
                 ImGui::Separator();
-                if(!answer.empty()) ImGui::TextWrapped("%s", answer.c_str());
+                if(!answer.empty()) ofxOceanodeDescription::draw(answer, ofxOceanodeShared::getDefaultBoldFont());
                 if(!assistant.getStatus().empty()) ImGui::TextWrapped("%s", assistant.getStatus().c_str());
                 if(!proposal.is_null() && !proposal["nodes"].empty()) {
                     ImGui::Separator();

@@ -71,6 +71,7 @@ struct ofxOceanodeNode {
     std::vector<std::shared_ptr<Parameter>> pins{std::make_shared<ofxOceanodeAbstractParameter>()};
     auto& getNodeGui(){return gui;}
     auto& getParameters(){return pins;}
+    bool isParameterShownInGui(const ofxOceanodeAbstractParameter&) const {return true;}
 };
 struct ofxOceanodeCanvas {
     inline static ImFont* zoomFonts[9]={};

@@ -15,6 +15,7 @@
 #include "ofxOceanodeShared.h"
 #include "imgui.h"
 #include "ofxOceanodeColors.h"
+#include "ofxOceanodeDescription.h"
 
 std::map<std::string, std::vector<std::string>> ofxOceanodeInspectorController::inspectorDropdownOptions;
 
@@ -453,9 +454,7 @@ void ofxOceanodeInspectorController::draw(){
 	}
 
 	if(node->getNodeModel().getDescription() != "" && sectionHeader("Description")){
-		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-		ImGui::TextWrapped("%s", node->getNodeModel().getDescription().c_str());
-		ImGui::PopStyleColor();
+		ofxOceanodeDescription::draw(node->getNodeModel().getDescription(), ofxOceanodeShared::getDefaultBoldFont());
 	}
 
     ImGui::PopStyleVar();

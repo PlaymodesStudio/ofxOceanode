@@ -2188,7 +2188,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         ImGui::BeginGroup();
                         ImGui::TextUnformatted("Color");
                         ImGui::SetNextItemWidth(380);
-                        ImGui::ColorEdit3("##EncapsulateColor", pending.color, ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_DisplayRGB);
+                        ImGui::ColorEdit3("##EncapsulateColor", pending.color, ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_DisplayRGB);
                         ImGui::EndGroup();
                         rows.end();
                         if(pending.automated){

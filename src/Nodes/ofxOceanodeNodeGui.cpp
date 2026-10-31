@@ -1032,9 +1032,8 @@ unsigned int ofxOceanodeNodeGui::drawFrame(glm::vec2 minimum, glm::vec2 maximum,
     // Check if this node should be rendered transparently
     bool isTransparent = (node.getNodeModel().getFlags() & ofxOceanodeNodeModelFlags_TransparentNode);
 
-    // Macros draw their header and port bullets in the header color, made
-    // opaque by blending it over the default node background so it looks the same
-    // on top of their tinted body.
+    // Macro headers are made opaque by blending over the default node background.
+    // Their port bullets use a darker version of the tinted body color.
     bool isMacro = dynamic_cast<ofxOceanodeNodeMacro*>(&node.getNodeModel()) != nullptr;
     ImU32 node_bullet_color = OceanodeColors::U32(OceanodeColors::ConnectionBullet);
     ImU32 node_body_color = node_bg_color;
@@ -1046,10 +1045,16 @@ unsigned int ofxOceanodeNodeGui::drawFrame(glm::vec2 minimum, glm::vec2 maximum,
                      (bg.z + (hd.z - bg.z) * hd.w) * brightness, 1.0f));
         };
         node_hd_color = headerOverBackground(ImGui::ColorConvertU32ToFloat4(node_hd_color), 1.0f);
-        node_bullet_color = node_hd_color;
         // The body is the unselected header color, 25% darker.
         node_body_color = headerOverBackground(ImGui::ColorConvertU32ToFloat4(
             IM_COL32(node.getColor().r, node.getColor().g, node.getColor().b, nodeHeaderAlpha)), 0.75f);
+        // Keep pins 50% darker than the body, preserving its hue and alpha.
+        constexpr float macroPinBrightness = 0.5f;
+        ImVec4 pinColor = ImGui::ColorConvertU32ToFloat4(node_body_color);
+        pinColor.x *= macroPinBrightness;
+        pinColor.y *= macroPinBrightness;
+        pinColor.z *= macroPinBrightness;
+        node_bullet_color = OceanodeColors::U32(pinColor);
     }
 
     if (!isTransparent) {
