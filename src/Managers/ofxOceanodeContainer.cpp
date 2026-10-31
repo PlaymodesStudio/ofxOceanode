@@ -1316,9 +1316,11 @@ void ofxOceanodeContainer::loadPreset_loadComments(string presetFolderPath){
             c.color.r = json["Comments"][i]["Color"]["R"];
             c.color.g = json["Comments"][i]["Color"]["G"];
             c.color.b = json["Comments"][i]["Color"]["B"];
+            c.color.a = json["Comments"][i]["Color"].value("A", 1.0f);
             c.textColor.r = json["Comments"][i]["TextColor"]["R"];
             c.textColor.g = json["Comments"][i]["TextColor"]["G"];
             c.textColor.b = json["Comments"][i]["TextColor"]["B"];
+            c.textColor.a = json["Comments"][i]["TextColor"].value("A", 1.0f);
         }
     }
 }
@@ -1409,9 +1411,11 @@ bool ofxOceanodeContainer::savePreset(string presetFolderPath){
 		json["Comments"][i]["Color"]["R"] = c.color.r;
 		json["Comments"][i]["Color"]["G"] = c.color.g;
 		json["Comments"][i]["Color"]["B"] = c.color.b;
+		json["Comments"][i]["Color"]["A"] = c.color.a;
 		json["Comments"][i]["TextColor"]["R"] = c.textColor.r;
 		json["Comments"][i]["TextColor"]["G"] = c.textColor.g;
 		json["Comments"][i]["TextColor"]["B"] = c.textColor.b;
+		json["Comments"][i]["TextColor"]["A"] = c.textColor.a;
 	}
 	oceanodePresetSave::saveJson(presetFolderPath + "/comments.json", json);
 	

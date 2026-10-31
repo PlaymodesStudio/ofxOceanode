@@ -286,12 +286,12 @@ void ofxOceanodeMiniMapController::renderMinimap(
             (int)(c.color.r * 255),
             (int)(c.color.g * 255),
             (int)(c.color.b * 255),
-            80);
+            (int)(c.color.a * 80));
         ImU32 borderCol = IM_COL32(
             (int)(c.color.r * 255),
             (int)(c.color.g * 255),
             (int)(c.color.b * 255),
-            180);
+            (int)(c.color.a * 180));
         draw_list->AddRectFilled(p1, p2, fillCol, 1.0f);
         draw_list->AddRect(p1, p2, borderCol);
     }

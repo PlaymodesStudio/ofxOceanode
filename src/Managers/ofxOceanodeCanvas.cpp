@@ -1824,6 +1824,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 
         draw_list->ChannelsSetCurrent(0);
         int removeIndex = -1;
+        bool removeNodesToo = false;
+        // "Remove nodes too" deletes the nodes at the end of the frame, after
+        // nodesVisibleInThisFrame has been consumed by connection drawing.
+        vector<string> commentNodesToDelete;
         for(int i = 0; i < container->getComments().size(); i++){
             auto &c = container->getComments()[i];
             ImGui::PushID(("Comment " + ofToString(i)).c_str());
@@ -1849,7 +1853,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             glm::vec2 currentPosition = worldToScreen(c.position);
             glm::vec2 screenSize = c.size * zoomLevel;
             float headerH = 15.0f * zoomLevel;
-            draw_list->AddRectFilled(currentPosition, currentPosition + glm::vec2(screenSize.x, headerH), IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 255));
+            draw_list->AddRectFilled(currentPosition, currentPosition + glm::vec2(screenSize.x, headerH), IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, c.color.a*255));
             // Don't draw comment text at 45% zoom or below
 
             if(zoomLevel > ofxOceanodeShared::MIN_DETAIL_ZOOM){
@@ -1857,15 +1861,15 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 float commentFontSize = ZOOM_FONT_SIZES[3] * zoomLevel;  // base font size scaled by zoom
                 if(commentFont) {
                     draw_list->AddText(commentFont, commentFontSize, currentPosition,
-                                       IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255),
+                                       IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, c.textColor.a*255),
                                        c.text.c_str());
                 } else {
                     draw_list->AddText(currentPosition,
-                                       IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, 255),
+                                       IM_COL32(c.textColor.r*255, c.textColor.g*255, c.textColor.b*255, c.textColor.a*255),
                                        c.text.c_str());
                 }
             }
-            draw_list->AddRectFilled(currentPosition + glm::vec2(0, headerH), currentPosition + screenSize, IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, 100));
+            draw_list->AddRectFilled(currentPosition + glm::vec2(0, headerH), currentPosition + screenSize, IM_COL32(c.color.r*255, c.color.g*255, c.color.b*255, c.color.a*100));
             
             // Draw selection border if selected
             if(isSelectedOrSelecting){
@@ -2038,28 +2042,75 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
 
             if(ImGui::BeginPopup("Comment")){
+                // Label column on the left, fields aligned in one column on the right.
+                const ImGuiStyle& style = ImGui::GetStyle();
+                const float labelColumn = ImGui::CalcTextSize("Text Color").x + style.ItemSpacing.x * 2.0f;
+                const float letterWidth = ImGui::CalcTextSize("W").x;
+                const float letterGap = 3.0f;
+                const float channelWidth = 38.0f;
+                const float swatchWidth = ImGui::GetFrameHeight();
+                const float fieldsWidth = swatchWidth
+                    + 4.0f * (style.ItemSpacing.x + letterWidth + letterGap + channelWidth);
+                auto rowLabel = [&](const char* label){
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextUnformatted(label);
+                    ImGui::SameLine(labelColumn);
+                };
+                auto letterLabel = [&](const char* letter){
+                    ImGui::TextUnformatted(letter);
+                    ImGui::SameLine(0, letterGap);
+                };
+
+                rowLabel("Text");
                 char * cString = new char[1024];
                 strcpy(cString, c.text.c_str());
-                if (ImGui::InputText("Text", cString, 1024, ImGuiInputTextFlags_EnterReturnsTrue))
+                ImGui::SetNextItemWidth(fieldsWidth);
+                if (ImGui::InputText("##text", cString, 1024, ImGuiInputTextFlags_EnterReturnsTrue))
                 {
                     c.text = cString;
                 }
                 delete[] cString;
-                ImGui::ColorEdit3("Color", &c.color.r);
-                ImGui::ColorEdit3("TextColor", &c.textColor.r);
+
+                // Swatch opens the colour picker; R G B A are 0-255 integer drags.
+                auto colorRow = [&](const char* label, ofFloatColor& col){
+                    ImGui::PushID(label);
+                    rowLabel(label);
+                    ImGui::ColorEdit4("##swatch", &col.r, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel
+                                      | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf);
+                    float* channels[] = {&col.r, &col.g, &col.b, &col.a};
+                    const char* names[] = {"R", "G", "B", "A"};
+                    for(int ch = 0; ch < 4; ++ch){
+                        ImGui::SameLine();
+                        letterLabel(names[ch]);
+                        ImGui::SetNextItemWidth(channelWidth);
+                        int v = (int)std::round(*channels[ch] * 255.0f);
+                        ImGui::PushID(ch);
+                        if(ImGui::DragInt("##v", &v, 1.0f, 0, 255, "%d", ImGuiSliderFlags_AlwaysClamp)){
+                            *channels[ch] = v / 255.0f;
+                        }
+                        ImGui::PopID();
+                    }
+                    ImGui::PopID();
+                };
+                colorRow("Color", c.color);
+                colorRow("Text Color", c.textColor);
+
                 float* geometryValues[] = {&c.position.x, &c.position.y, &c.size.x, &c.size.y};
                 const char* geometryIDs[] = {"##originX", "##originY", "##width", "##height"};
-                const char* geometryFormats[] = {"X: %.1f", "Y: %.1f", "Width: %.1f", "Height: %.1f"};
+                const char* geometryLetters[] = {"X", "Y", "W", "H"};
+                const char* geometryRows[] = {"Position", "Size"};
                 const float minimumSizes[] = {32.0f, 15.0f};
                 const float geometryFieldWidth = std::max(1.0f,
-                    (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f);
+                    (fieldsWidth - style.ItemSpacing.x) * 0.5f - letterWidth - letterGap);
                 for(int field = 0; field < 4; ++field){
-                    if(field % 2 == 1) ImGui::SameLine();
+                    if(field % 2 == 0) rowLabel(geometryRows[field / 2]);
+                    else ImGui::SameLine();
+                    letterLabel(geometryLetters[field]);
                     ImGui::SetNextItemWidth(geometryFieldWidth);
-                    bool changed = ImGui::DragFloat(geometryIDs[field], geometryValues[field], 1.0f,
-                                                   0.0f, 0.0f, geometryFormats[field]);
-                    if(changed && field >= 2){
-                        *geometryValues[field] = std::max(*geometryValues[field], minimumSizes[field - 2]);
+                    int value = (int)std::round(*geometryValues[field]);
+                    if(ImGui::DragInt(geometryIDs[field], &value, 1.0f, 0, 0, "%d")){
+                        *geometryValues[field] = (float)value;
+                        if(field >= 2) *geometryValues[field] = std::max(*geometryValues[field], minimumSizes[field - 2]);
                     }
                     // Snap on commit so small mouse movements can accumulate during a drag.
                     if(ImGui::IsItemDeactivated() && snap_to_grid){
@@ -2070,8 +2121,20 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         }
                     }
                 }
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+                // Close explicitly: the popup ID is index-based, so leaving it open
+                // would hand it to the comment that shifts into this index.
                 if(ImGui::Button("[Remove]")){
                     removeIndex = i;
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::SameLine();
+                if(ImGui::Button("[Remove nodes too]")){
+                    removeIndex = i;
+                    removeNodesToo = true;
+                    ImGui::CloseCurrentPopup();
                 }
                 ImGui::EndPopup();
             }
@@ -2081,6 +2144,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             ImGui::PopID();
         }
         if(removeIndex != -1){
+            if(removeNodesToo){
+                ofRectangle removeRect = container->getComments()[removeIndex].getRectangle();
+                for(auto &nodePair : nodesInThisFrame){
+                    if(removeRect.inside(nodePair.second->getNodeGui().getRectangle())){
+                        commentNodesToDelete.push_back(nodePair.first);
+                    }
+                }
+            }
             // Before deleting the comment, handle keyboard slot cleanup properly
             // to maintain stable assignments for remaining comments
             
@@ -3018,6 +3089,12 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             const auto found = nodes.find(macroExtractionKey);
             if(found != nodes.end()) container->extractMacro(*found->second);
             customGuiContextNode = nullptr;
+        }
+
+        for(const auto& nodeId : commentNodesToDelete){
+            const auto& nodes = container->getParameterGroupNodesMap();
+            const auto found = nodes.find(nodeId);
+            if(found != nodes.end()) found->second->deleteSelf();
         }
 
         // Encapsulation deletes and recreates nodes. Run it only after this
