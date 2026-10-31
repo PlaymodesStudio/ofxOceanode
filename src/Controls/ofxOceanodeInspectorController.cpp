@@ -433,14 +433,26 @@ void ofxOceanodeInspectorController::draw(){
 	
 	ImGui::Separator();
 
-	if(node->supportsSnapshots() && ImGui::CollapsingHeader("Snapshots")){
+	// Section headers: 50% darker than the node-name background (node colour * 0.5).
+	// The tint is scoped to the header row only, so section bodies keep the theme colours.
+	auto sectionHeader = [&](const char* label){
+		ofColor nodeColor = node->getColor();
+		ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(nodeColor*.25));
+		ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(nodeColor*.3));
+		ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(nodeColor*.35));
+		bool open = ImGui::CollapsingHeader(label);
+		ImGui::PopStyleColor(3);
+		return open;
+	};
+
+	if(node->supportsSnapshots() && sectionHeader("Snapshots")){
 		drawNodeSnapshots(*node);
 	}
-	if(ImGui::CollapsingHeader("Parameters")){
+	if(sectionHeader("Parameters")){
 		drawParameterSettings(*node);
 	}
 
-	if(node->getNodeModel().getDescription() != "" && ImGui::CollapsingHeader("Description")){
+	if(node->getNodeModel().getDescription() != "" && sectionHeader("Description")){
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 		ImGui::TextWrapped("%s", node->getNodeModel().getDescription().c_str());
 		ImGui::PopStyleColor();
