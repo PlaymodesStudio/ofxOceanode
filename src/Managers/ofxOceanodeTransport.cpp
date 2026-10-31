@@ -440,8 +440,40 @@ void ofxOceanodeTransport::advanceDerivedLocked(double toClock) {
     advanceDerivedLinearLocked(toClock);
 }
 
+void ofxOceanodeTransport::setDrivenState(double beat, float bpm, bool playing, bool restart) {
+    if(root == nullptr) return;
+    std::lock_guard<std::mutex> lock(mutex);
+    driven = true;
+    pending.clear();
+    const double before = state.beatPosition;
+    state.bpm = std::max(0.0f, bpm);
+    if(restart) {
+        setPositionLocked(std::max(0.0, beat));
+        state.generation++;
+    } else {
+        const double beatsPerSecond = bpmToBeatsPerSecond(state.bpm);
+        if(playing && beat > before && beatsPerSecond > 0.0) state.seconds += (beat - before) / beatsPerSecond;
+        state.beatPosition = std::max(0.0, beat);
+    }
+    state.isPlaying = playing;
+    reanchorLocked();
+}
+
+bool ofxOceanodeTransport::isDriven() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return driven;
+}
+
 void ofxOceanodeTransport::followRoot(const ofxOceanodeTransportState& rootState) {
     std::lock_guard<std::mutex> lock(mutex);
+    if(driven) {
+        // Its owner moves it; only the shared instant and clock follow the root.
+        lastClock = std::max(lastClock, rootState.clockSeconds);
+        state.clockSeconds = lastClock;
+        state.steadyTimeUs = rootState.steadyTimeUs;
+        state.driverMode = rootState.driverMode;
+        return;
+    }
     advanceDerivedLocked(rootState.clockSeconds);
     state.steadyTimeUs = rootState.steadyTimeUs;
     state.driverMode = rootState.driverMode;

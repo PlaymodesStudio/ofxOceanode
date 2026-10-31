@@ -90,6 +90,13 @@ public:
     void stopAt(double clockSeconds, bool rewind = false);
     void seekAt(double clockSeconds, double beat);
     void cancelPendingActions();
+    // ---- Driven (derived only) ----
+    // Its owner sets position, tempo and play state each frame instead of it
+    // following the clock (e.g. the playhead of the clip placing a timeline).
+    // restart starts it again from `beat` (a discontinuity: bumps the
+    // generation); otherwise it moves on continuously.
+    void setDrivenState(double beat, float bpm, bool playing, bool restart);
+    bool isDriven() const;
     // The earliest pending action (false when none).
     bool nextPendingAction(double& clockSeconds, bool& startsPlaying) const;
     // Clock time at a steady-clock instant and back (linear in real time).
@@ -207,6 +214,7 @@ private:
     double anchorBeat = 0.0;
     double lastClock = 0.0;
     bool followRootTempo = false; // the Clock time source
+    bool driven = false;          // set by its owner each frame (setDrivenState)
 
     // Root: derived transports to advance, and the selectable time sources.
     mutable std::mutex childrenMutex;

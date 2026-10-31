@@ -230,6 +230,18 @@ int main() {
         assert(rootTransport->hasExternalClock() && b->hasExternalClock());
         b->releaseExternalClock(&owner);
         assert(!rootTransport->hasExternalClock());
+        // Driven: its owner sets it; the clock advancing does not move it.
+        auto clipTransport = ofxOceanodeTransport::makeDerived(rootTransport);
+        clipTransport->setDrivenState(1.5, 90.0f, true, true);
+        const auto drivenGeneration = clipTransport->getState().generation;
+        rootTransport->advanceFrameStep(1.0);
+        near(clipTransport->getState().beatPosition, 1.5);
+        assert(clipTransport->isDriven() && clipTransport->getState().isPlaying);
+        clipTransport->setDrivenState(2.0, 90.0f, true, false);
+        assert(clipTransport->getState().generation == drivenGeneration);
+        clipTransport->setDrivenState(0.0, 90.0f, true, true);
+        assert(clipTransport->getState().generation == drivenGeneration + 1);
+        near(clipTransport->getState().clockSeconds, rootTransport->getState().clockSeconds);
         // Children expire with their owners.
         a.reset();
         rootTransport->advanceFrameStep(0.1);
