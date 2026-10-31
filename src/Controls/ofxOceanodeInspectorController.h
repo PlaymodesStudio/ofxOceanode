@@ -12,6 +12,7 @@
 #include "ofxOceanodeParameter.h"
 
 class ofxOceanodeNode;
+class ofxOceanodeNodeModel;
 
 class ofxOceanodeInspectorController: public ofxOceanodeBaseController{
 public:
@@ -29,6 +30,7 @@ public:
     
 private:
     void drawNodeSnapshots(ofxOceanodeNode& node);
+    void drawTimeSource(ofxOceanodeNodeModel& model);
     void drawParameterSettings(ofxOceanodeNode& node);
 
 	static std::map<std::string, std::vector<std::string>> inspectorDropdownOptions;

@@ -230,10 +230,35 @@ public:
     virtual bool receiveOscMessage(ofxOscMessage &m){return false;};
 	virtual void setContainer(ofxOceanodeContainer* container);
     ofxOceanodeContainer* getHostContainer() const { return hostContainer; }
+    // The transport this node follows: its Time Source when it has one
+    // (nullptr while that source is missing), else its canvas's.
     std::shared_ptr<ofxOceanodeTransport> getTransport() const;
     ofxOceanodeTransportState getTransportState() const;
     ofxOceanodeFrameTransportState getFrameTransportState() const;
     ofxOceanodeTimeState getGlobalTimeState() const;
+
+    // ---- Time Source ----
+    // A node synced to the transport offers which timeline it follows as a
+    // "Time Source" inspector entry: Auto (the timeline its canvas plays),
+    // Clock (always running at the root tempo) or any timeline registered as
+    // a time source, saved by id. Given its sync toggle, the entry also
+    // offers "Free", which turns the toggle off; the toggle is still saved
+    // (old patches load sync off as Free and sync on as Auto) but the
+    // inspector shows it as part of this entry. Call after adding the toggle.
+    void addTimeSourceParameter(ofParameter<bool>& syncToggle);
+    void addTimeSourceParameter();
+    bool hasTimeSource() const { return timeSourceEnabled; }
+    bool hasTimeSourceFreeOption() const { return timeSourceSync != nullptr; }
+    bool isTimeSourceParameter(const ofAbstractParameter& p) const;
+    bool isTimeSourceSyncToggle(const ofAbstractParameter& p) const;
+    // "free" (sync off), "auto", "clock" or a registered id.
+    std::string getTimeSourceId() const;
+    void setTimeSourceId(const std::string& id);
+    // True while the chosen source is a registered id that is gone.
+    bool isTimeSourceMissing() const;
+    static constexpr const char* TimeSourceFree = "free";
+    static constexpr const char* TimeSourceAuto = "auto";
+    static constexpr const char* TimeSourceClock = "clock";
     ofxOceanodeFrameTimeState getFrameGlobalTimeState() const;
     
     void addInspectorParameter(ofAbstractParameter& p){
@@ -434,6 +459,10 @@ private:
     bool active;
     bool declaredSink = false;
     bool nodeSnapshotsDisabled = false;
+    static ofxOceanodeTransportState missingTimeSourceState(const ofxOceanodeContainer* container);
+    bool timeSourceEnabled = false;
+    ofParameter<std::string> timeSourceIdParameter;
+    ofParameter<bool>* timeSourceSync = nullptr;
 };
 
 #endif /* ofxOceanodeNodeModel_h */

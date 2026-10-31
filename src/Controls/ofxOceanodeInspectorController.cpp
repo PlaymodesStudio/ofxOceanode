@@ -16,6 +16,7 @@
 #include "imgui.h"
 #include "ofxOceanodeColors.h"
 #include "ofxOceanodeDescription.h"
+#include <algorithm>
 
 std::map<std::string, std::vector<std::string>> ofxOceanodeInspectorController::inspectorDropdownOptions;
 
@@ -34,6 +35,56 @@ bool ofxOceanodeInspectorController::hasAnySelectedNode(){
     // Selection is counted as it changes; rebuilding node lists recursively
     // with dynamic_casts every frame was costing a twelfth of each frame.
     return ofxOceanodeNodeGui::selectedCount() > 0;
+}
+
+// Which timeline a synced node follows: Free (when it has a sync toggle),
+// Auto, Clock, then the registered timelines, those of the node's own canvas
+// first. Timelines that cannot be followed are listed greyed out.
+void ofxOceanodeInspectorController::drawTimeSource(ofxOceanodeNodeModel& model){
+    auto* host = model.getHostContainer();
+    auto transport = host != nullptr ? host->getTransport() : nullptr;
+    auto sources = transport != nullptr ? transport->getTimeSources() : std::vector<ofxOceanodeTransport::TimeSourceInfo>{};
+    const std::string ownGroup = model.getParents();
+    std::stable_sort(sources.begin(), sources.end(), [&](const auto& a, const auto& b){
+        return (a.group == ownGroup) > (b.group == ownGroup);
+    });
+    const std::string current = model.getTimeSourceId();
+    std::string preview;
+    if(current == ofxOceanodeNodeModel::TimeSourceFree) preview = "Free";
+    else if(current == ofxOceanodeNodeModel::TimeSourceAuto) preview = "Auto";
+    else if(current == ofxOceanodeNodeModel::TimeSourceClock) preview = "Clock";
+    else {
+        for(const auto& source : sources)
+            if(source.id == current) preview = source.group.empty() ? source.label : source.group + " / " + source.label;
+        if(preview.empty() || model.isTimeSourceMissing()) preview = (preview.empty() ? current : preview) + " (missing)";
+    }
+    ImGui::Text("Time Source");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-1);
+    if(ImGui::BeginCombo("##timeSource", preview.c_str())){
+        auto entry = [&](const char* label, const std::string& id, const char* tip){
+            if(ImGui::Selectable(label, current == id)) model.setTimeSourceId(id);
+            if(tip != nullptr && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tip);
+        };
+        if(model.hasTimeSourceFreeOption()) entry("Free", ofxOceanodeNodeModel::TimeSourceFree, "Not synced: runs on its own.");
+        entry("Auto", ofxOceanodeNodeModel::TimeSourceAuto, "The timeline this canvas plays.");
+        entry("Clock", ofxOceanodeNodeModel::TimeSourceClock, "The shared clock: always running, at the root tempo.");
+        std::string group = "\x01";
+        for(const auto& source : sources){
+            if(source.group != group){
+                group = source.group;
+                ImGui::Separator();
+                ImGui::TextDisabled("%s", group == ownGroup ? "This canvas" : group.c_str());
+            }
+            if(!source.selectable) ImGui::BeginDisabled();
+            if(ImGui::Selectable((source.label + "##" + source.id).c_str(), current == source.id)) model.setTimeSourceId(source.id);
+            if(!source.selectable){
+                ImGui::EndDisabled();
+                if(!source.note.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", source.note.c_str());
+            }
+        }
+        ImGui::EndCombo();
+    }
 }
 
 void ofxOceanodeInspectorController::draw(){
@@ -167,7 +218,11 @@ void ofxOceanodeInspectorController::draw(){
             string uniqueId = absParam.getName();
             ImGui::PushID(uniqueId.c_str());
 
-            if(node->getNodeModel().drawInspectorParameter(absParam)){
+            if(node->getNodeModel().isTimeSourceSyncToggle(absParam)){
+                // Shown as the "Free" entry of the Time Source row.
+            }else if(node->getNodeModel().isTimeSourceParameter(absParam)){
+                drawTimeSource(node->getNodeModel());
+            }else if(node->getNodeModel().drawInspectorParameter(absParam)){
                 // The model supplied the row presentation (possibly hidden).
             }else if(absParam.valueType() == typeid(std::function<void()>).name()){
                 // Check if this is a separator by looking at the parameter name

@@ -22,14 +22,11 @@ void beatTransport::update(ofEventArgs &) {
     bpmOut = current.bpm;
     playingOut = current.isPlaying ? 1 : 0;
 
-    double beatsPerBar = 4.0;
+    // The meter of the followed timeline (its owner keeps it on the transport).
+    const double beatsPerBar = std::max(0.25, current.beatsPerBar);
     const bool loopEnabled = current.loopEnabled;
     const double loopStart = current.loopStartBeat;
     const double loopEnd = current.loopEndBeat;
-    if(auto* container = getHostContainer()) {
-        if(auto* extension = container->getAutomationExtension())
-            beatsPerBar = std::max(0.25, extension->getBeatsPerBar());
-    }
 
     const double nonNegativeBeat = std::max(0.0, current.beatPosition);
     barOut = static_cast<int>(std::min<double>(INT_MAX, std::floor(nonNegativeBeat / beatsPerBar) + 1.0));
@@ -56,4 +53,28 @@ void beatTransport::update(ofEventArgs &) {
     }
 
     if(current.loopCount != previous.loopCount) loopResetOut.trigger();
+}
+
+void beatTransport::act(Action action) {
+    auto transport = getTransport();
+    if(transport == nullptr) return;
+    const int grid = quantize.get();
+    if(grid == 0) {
+        if(action == Action::Play) transport->play();
+        else if(action == Action::Stop) transport->pause();
+        else transport->seekToBeat(seekIn.get());
+        return;
+    }
+    // Quantized to the root timeline's grid while it plays, else the clock's,
+    // so independently launched timelines start in phase.
+    auto* rootTransport = transport->getRoot();
+    auto reference = rootTransport->getState().isPlaying ? std::shared_ptr<ofxOceanodeTransport>(transport, rootTransport)
+                                                         : transport->getClockTransport();
+    if(reference == nullptr) reference = transport;
+    const auto referenceState = reference->getState();
+    const double gridBeats = grid == 1 ? 1.0 : std::max(0.25, referenceState.beatsPerBar);
+    const double at = reference->nextGridClockSeconds(gridBeats);
+    if(action == Action::Play) transport->playAt(at);
+    else if(action == Action::Stop) transport->stopAt(at);
+    else transport->seekAt(at, seekIn.get());
 }
