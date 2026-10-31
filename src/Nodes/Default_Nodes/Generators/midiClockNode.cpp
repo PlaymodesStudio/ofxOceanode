@@ -8,6 +8,7 @@
 #ifdef OFXOCEANODE_USE_MIDI
 
 #include "ofxOceanodeMidiClock.h"
+#include "ofxOceanodeContainer.h"
 
 midiClockNode::midiClockNode() : ofxOceanodeNodeModel("MIDI Clock") {
     clock = std::make_unique<ofxOceanodeMidiClock>();
