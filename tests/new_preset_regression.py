@@ -144,6 +144,8 @@ struct ofxOceanodeCanvas {
     vector<int> nodesDrawingOrder{1},pendingPortalAlignments{1},keyboardSlots{1},commentToSlot{1},filteredSearchResults{1};
     vector<bool> commentCheckboxStates{true};
     bool centerOriginPending=false,recenterCanvas=true,focused=false;
+    bool hasPendingCenterPoint=true,openEncapsulationPrompt=true; int encapsulationChoice=1;
+    unique_ptr<int> pendingEncapsulation=make_unique<int>(1);
     string getUniqueID(){return "Canvas";}
     void requestFocus(){focused=true;}
     void resetForNewPreset(); void resetViewToOrigin(); void center();
@@ -253,7 +255,8 @@ int main(){
     assert(app.defaultLayoutQueued==1); // New starts from the default global layout
     assert(ofxOceanodeShared::active=="Canvas" && app.canvas.focused);
     assert(!app.canvas.pendingCenterNode && !app.canvas.tempSourceParameter && !app.canvas.customGuiContextNode);
-    assert(app.canvas.inspectorSelectionClick.nodeID.empty());
+    assert(app.canvas.inspectorSelectionClick.nodeID.empty() && !app.canvas.hasPendingCenterPoint);
+    assert(!app.canvas.pendingEncapsulation && !app.canvas.openEncapsulationPrompt && app.canvas.encapsulationChoice==-1);
     assert(!app.canvas.isSelecting && !app.canvas.isCreatingConnection && app.canvas.keyboardSlots.empty());
     app.canvas.contentRegionSize={0,0}; app.canvas.center(); assert(app.canvas.centerOriginPending);
     app.canvas.contentRegionSize={800,600}; app.canvas.center();
@@ -266,7 +269,7 @@ int main(){
             view.zoomLevel=zoom; view.scrolling={-400,700};
             view.resetViewToOrigin();
             assert(view.centerOriginPending && !view.returnToOldScrolling);
-            assert(!view.pendingCenterNode && view.pendingCenterFrames==0 && view.inspectorSelectionClick.nodeID.empty());
+            assert(!view.pendingCenterNode && !view.hasPendingCenterPoint && view.pendingCenterFrames==0 && view.inspectorSelectionClick.nodeID.empty());
             view.contentRegionSize={0,0}; view.center(); assert(view.centerOriginPending);
             view.contentRegionSize=viewport; view.center();
             assert(!view.centerOriginPending && view.zoomLevel==zoom);

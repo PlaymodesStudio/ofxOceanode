@@ -26,7 +26,7 @@ struct vec2 {
 struct ofxOceanodeCanvas {
     glm::vec2 scrolling{-700,900},contentRegionSize{0,0};float zoomLevel=1;
     bool returnToOldScrolling=true,centerOriginPending=false,recenterCanvas=false;
-    void* pendingCenterNode=this;int pendingCenterFrames=5;
+    void* pendingCenterNode=this;int pendingCenterFrames=5;bool hasPendingCenterPoint=true;
     struct {string nodeID;} inspectorSelectionClick{"Old selection"};
     void resetViewToOrigin();void center();
 };
@@ -69,7 +69,7 @@ int main(){
         ofxOceanodeShared::type=ofxOceanodePresetLoadType_FullPreset;app.loaded();
         assert(app.presetCanvasCenterPending);
         for(auto* view:views){
-            assert(view->centerOriginPending&&!view->pendingCenterNode&&view->inspectorSelectionClick.nodeID.empty());
+            assert(view->centerOriginPending&&!view->pendingCenterNode&&!view->hasPendingCenterPoint&&view->inspectorSelectionClick.nodeID.empty());
             assert(!view->returnToOldScrolling);
         }
         centered(app.canvas,{400,300});centered(outer.canvas,{500,320});

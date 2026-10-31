@@ -7,6 +7,7 @@ mixer.PRELUDE += r'''
 #include "scNode.h"
 #include "scOutput.h"
 #include "serverManager.h"
+#include "scGlobalPitch.h"
 #include "MacroMixerSCBus.h"
 #include "ofxOceanodeSuperColliderConfig.h"
 class TestTone : public scNode {

@@ -143,6 +143,7 @@ struct ofxOceanodeNode {
     Model* nodeModel=&model;Gui* nodeGui=&gui;
     ParameterGroup& getParameters(){return group;}
     void saveInspectorParametersToJson(ofJson&){}
+    void saveNodeSettings(ofJson&){}
     void savePreset(string,bool=false);
     ofJson saveParametersToJson(bool=false,bool=false);
     void saveParameterToJson(ofJson&,ofxOceanodeAbstractParameter&,bool=false,bool=false);

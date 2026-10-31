@@ -89,6 +89,7 @@ struct ofxOceanodeNode {
     void saveInspectorParametersToJson(ofJson& j){j["inspector"]=9;}
     void loadInspectorParametersFromJson(ofJson& j){assert(j.at("inspector")==9);}
     void loadParametersFromJson(ofJson j,bool=false){if(!parameter.incoming)parameter.value=j.at("Value");}
+    void saveNodeSettings(ofJson&){} void loadNodeSettings(const ofJson&){}
     void presetWillBeLoaded(){} void presetHasLoaded(){} void deleteSelf();
 };
 struct ofxOceanodeAbstractConnection {

@@ -22,7 +22,7 @@ MODEL=r'''
 #include <vector>
 using namespace std;
 class ofxOceanodeNodeModel {
-    string name; bool declaredSink=false;
+    string name; bool declaredSink=false, nodeSnapshotsDisabled=false;
 public:
     explicit ofxOceanodeNodeModel(string n):name(n){}
     virtual ~ofxOceanodeNodeModel()=default;
@@ -30,6 +30,8 @@ public:
     string getDescription(){return "Description: "+name;}
     virtual string macroMixerBlocker() const{return {};}
     void setDeclaredSink(bool b){declaredSink=b;}
+    void setNodeSnapshotsDisabled(bool b){nodeSnapshotsDisabled=b;}
+    bool supportsNodeSnapshots() const{return !nodeSnapshotsDisabled;}
     virtual bool isSink() const{return declaredSink;}
 };
 '''
@@ -94,6 +96,12 @@ int main(){
     // The deprecated flag compiles, is ignored, and never makes a sink.
     app.registerModel<Arguments>("Collection",Flags::CanRemoveWhenUnused,"Deprecated",6,true);
     assert(!sink("Deprecated")&&static_cast<Arguments&>(*registry.create("Deprecated")).number==6);
+    // NoNodeSnapshots turns node snapshots off without making a sink.
+    app.registerModel<Arguments>("Collection",Flags::NoNodeSnapshots,"NoSnapshots",8,true);
+    assert(!registry.create("NoSnapshots")->supportsNodeSnapshots()&&!sink("NoSnapshots"));
+    app.registerModel<Arguments>("Collection",Flags::NoNodeSnapshots|Flags::Sink,"NoSnapshotsSink",8,true);
+    assert(!registry.create("NoSnapshotsSink")->supportsNodeSnapshots()&&sink("NoSnapshotsSink"));
+    assert(registry.create("Flagged")->supportsNodeSnapshots());
     // Direct registry callers get identical overload and constructor behavior.
     registry.registerModel<Arguments>("Direct",Flags::Sink,"DirectFlagged",12,false);
     registry.registerModel<Arguments>("Direct","DirectLegacy",13,true);
@@ -129,7 +137,7 @@ int main(){
     registry.unregisterModel<Sinker>("Collection");assert(!registry.create("Sinker"));
     registry.registerModel<Sinker>("Collection");assert(!sink("Sinker"));
     assert(registry.getModelDescriptions().at("Sinker")=="Description: Sinker");
-    puts("Registration flags passed: legacy arguments, Sink factories, combinations, deprecated flag, overrides, duplicate names, copies, refresh and unregister.");
+    puts("Registration flags passed: legacy arguments, Sink factories, combinations, deprecated flag, NoNodeSnapshots, overrides, duplicate names, copies, refresh and unregister.");
 }
 '''
 def main():
