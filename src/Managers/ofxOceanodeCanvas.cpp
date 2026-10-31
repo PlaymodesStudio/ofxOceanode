@@ -26,6 +26,7 @@
 #include "ofxOceanodeColors.h"
 #include "ofAppGLFWWindow.h"
 #include "ofxOceanodeNodeMacro.h"
+#include "MacroDialogAppearance.h"
 #include "portal.h"
 #include "ofxOceanodeAutoLayout.h"
 #include "ofxOceanodeConnectionDrawing.h"
@@ -2152,6 +2153,67 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             if(ImGui::Selectable("Encapsulate All Subgraphs with Portals")) mixerEncapsulationAction = 3;
             ImGui::EndPopup();
         }
+        if(openEncapsulateDialog){
+            openEncapsulateDialog = false;
+            ImGui::OpenPopup("Encapsulate Macro");
+        }
+        ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
+        {
+            MacroDialogAppearance::Style appearance;
+            if(ImGui::BeginPopupModal("Encapsulate Macro", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+                if(!pendingEncapsulation){
+                    ImGui::CloseCurrentPopup();
+                } else {
+                    auto& pending = *pendingEncapsulation;
+                    ImGui::TextDisabled("Encapsulate selection as a Macro");
+                    ImGui::Separator();
+                    {
+                        MacroDialogAppearance::Rows rows;
+                        rows.begin();
+                        ImGui::BeginGroup();
+                        ImGui::TextUnformatted("Name");
+                        ImGui::SetNextItemWidth(380);
+                        if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+                        ImGui::InputText("##EncapsulateName", pending.name, sizeof(pending.name));
+                        ImGui::EndGroup();
+                        rows.end();
+                        rows.begin();
+                        ImGui::BeginGroup();
+                        ImGui::TextUnformatted("Description");
+                        ImGui::InputTextMultiline("##EncapsulateDescription", pending.description.data(), pending.description.size(),
+                                                  ImVec2(380, ImGui::GetTextLineHeight() * 5));
+                        ImGui::EndGroup();
+                        rows.end();
+                        rows.begin();
+                        ImGui::BeginGroup();
+                        ImGui::TextUnformatted("Color");
+                        ImGui::SetNextItemWidth(380);
+                        ImGui::ColorEdit3("##EncapsulateColor", pending.color, ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_DisplayRGB);
+                        ImGui::EndGroup();
+                        rows.end();
+                        if(pending.automated){
+                            rows.begin();
+                            ImGui::BeginGroup();
+                            ImGui::Checkbox("Move timeline tracks into the macro", &encapsulationMoveTimeline);
+                            ImGui::EndGroup();
+                            rows.end();
+                        }
+                    }
+                    ImGui::Separator();
+                    const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter);
+                    if(ImGui::Button("Encapsulate") || (enter && !ImGui::IsAnyItemActive())){
+                        encapsulationChoice = encapsulationMoveTimeline ? 1 : 0;
+                        ImGui::CloseCurrentPopup();
+                    }
+                    ImGui::SameLine();
+                    if(ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)){
+                        pendingEncapsulation.reset();
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                ImGui::EndPopup();
+            }
+        }
         if(openEncapsulationPrompt){
             openEncapsulationPrompt = false;
             ImGui::OpenPopup("Timeline Tracks##encapsulation");
@@ -2696,7 +2758,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         if((colorConnections || selectedConnection) && sourceGui){
                             // Both incoming and outgoing wires inherit their origin node's color.
                             // With colored connections on, a selected node's wires are highlighted at full alpha.
-                            ImVec4 sourceColor(sourceGui->getColor(), (colorConnections && selectedConnection) ? 1.0f : 0.5f);
+                            ImVec4 sourceColor(sourceGui->getColor(), (colorConnections && selectedConnection) ? 1.0f : 0.75f);
                             sourceColor.x *= 0.5f;
                             sourceColor.y *= 0.5f;
                             sourceColor.z *= 0.5f;
@@ -2869,11 +2931,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     if(ImGui::GetIO().KeyShift){
                         const auto selected = container->getSelectedModules();
                         if(selected.size() == 1) macroExtractionKey = selected.front()->getParameters().getEscapedName();
-                    }else if(container->hasAutomatedParameters(container->getSelectedModules())){
-                        // Ask where their timeline tracks go first.
+                    }else if(!container->getSelectedModules().empty()){
+                        // Ask for the macro's name, description and colour (and,
+                        // when automated nodes are inside, where their tracks go).
                         pendingEncapsulation = std::make_unique<PendingEncapsulation>();
-                        openEncapsulationPrompt = true;
-                    }else container->encapsulateSelectedNodes();
+                        pendingEncapsulation->automated = container->hasAutomatedParameters(container->getSelectedModules());
+                        encapsulationMoveTimeline = false;
+                        openEncapsulateDialog = true;
+                    }
                 }else if(ImGui::IsKeyPressed(ImGuiKey_G, false) && !ImGui::IsAnyItemActive()){
                     // Cmd+G: wrap the selected nodes in a new comment that fits them all,
                     // with one grid cell of margin on every side.
@@ -2981,7 +3046,21 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             const auto pending = std::move(pendingEncapsulation);
             const bool moveTimeline = encapsulationChoice == 1;
             encapsulationChoice = -1;
-            if(pending->mixerAction < 0) container->encapsulateSelectedNodes("Encapsulated", moveTimeline);
+            if(pending->mixerAction < 0) {
+                string macroName = ofTrim(string(pending->name));
+                if(macroName.empty()) macroName = "Encapsulated";
+                auto* macroNode = container->encapsulateNodes(container->getSelectedModules(), macroName, moveTimeline);
+                if(macroNode != nullptr){
+                    if(auto* macroModel = dynamic_cast<ofxOceanodeNodeMacro*>(&macroNode->getNodeModel())){
+                        auto& inspector = macroModel->getInspectorParameterGroup();
+                        if(inspector.contains("Description"))
+                            macroModel->getInspectorParameter<string>("Description").set(string(pending->description.data()));
+                        if(inspector.contains("Color"))
+                            macroModel->getInspectorParameter<ofColor>("Color").set(
+                                ofColor(pending->color[0] * 255.f, pending->color[1] * 255.f, pending->color[2] * 255.f));
+                    }
+                }
+            }
             else {
                 const auto& nodes = container->getParameterGroupNodesMap();
                 const auto found = nodes.find(pending->sinkNode);
