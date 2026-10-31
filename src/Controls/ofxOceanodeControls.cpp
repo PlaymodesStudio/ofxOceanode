@@ -206,6 +206,31 @@ void ofxOceanodeControls::drawMenus(const std::string& excludedControllerName){
     }
 }
 
+void ofxOceanodeControls::drawMenuBarStatus(){
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    float total = 0.0f;
+    std::vector<std::pair<ofxOceanodeBaseController*, float>> items;
+    for(auto &c : controllers){
+        const float w = c->menuBarStatusWidth();
+        if(w <= 0.0f) continue;
+        items.push_back({c.get(), w});
+        total += w + (items.size() > 1 ? spacing : 0.0f);
+    }
+    if(items.empty()) return;
+    const float right = ImGui::GetWindowContentRegionMax().x - ImGui::GetStyle().WindowPadding.x;
+    const float x = right - total;
+    if(x <= ImGui::GetCursorPosX()) return;   // no room left by the menus
+    ImGui::SetCursorPosX(x);
+    for(size_t i = 0; i < items.size(); i++){
+        if(i > 0) ImGui::SameLine(0.0f, spacing);
+        ImGui::PushID(items[i].first);
+        ImGui::BeginGroup();
+        items[i].first->drawMenuBarStatus();
+        ImGui::EndGroup();
+        ImGui::PopID();
+    }
+}
+
 void ofxOceanodeControls::drawPopups(){
     for(auto &c : controllers){
         ImGui::PushID(c.get());
