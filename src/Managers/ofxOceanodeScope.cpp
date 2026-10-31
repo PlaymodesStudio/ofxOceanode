@@ -298,6 +298,7 @@ bool ofxOceanodeScope::drawParameter(
 ) const
 {
     if(p == nullptr) return false;
+    if(ImGui::IsRectVisible(size)) p->markUsedByView();
 
     if(cachedRenderer != nullptr && cachedRenderer->draw)
     {
