@@ -2,6 +2,8 @@
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeNodeGui.h"
 #include "ofxOceanodeNodeHelpCatalog.h"
+#include "ofxOceanodeDescription.h"
+#include "ofxOceanodeShared.h"
 #include "imgui.h"
 #include <algorithm>
 #include <cfloat>
@@ -231,10 +233,11 @@ void ofxOceanodeNodePool::drawTab(bool macro) {
             description = macro ? descriptionForMacro(selected->path) : descriptionFor(registry, selected->name);
             const char* text = description.empty() ? "No description available." : description.c_str();
             const auto space = ImGui::GetContentRegionAvail();
-            const float textHeight = ImGui::CalcTextSize(text, nullptr, false, std::max(1.0f, space.x - 16)).y;
+            const float textHeight = ofxOceanodeDescription::measure(text,
+                std::max(1.0f, space.x - 16), ofxOceanodeShared::getDefaultBoldFont()).y;
             const float descriptionHeight = std::max(1.0f, std::min(textHeight + 8, space.y * 0.28f));
             if(ImGui::BeginChild("##description", ImVec2(0, descriptionHeight)))
-                ImGui::TextWrapped("%s", text);
+                ofxOceanodeDescription::draw(text, ofxOceanodeShared::getDefaultBoldFont());
             ImGui::EndChild();
             ImGui::Spacing();
             drawPreview(*selected, macro);

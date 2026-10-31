@@ -93,7 +93,7 @@ def main():
         (work / 'ofJson.h').write_text('#pragma once\n#include "ofMain.h"\n')
         (work / 'ofxOceanodeNodeModel.h').write_text('#pragma once\n#include "ofMain.h"\n'
             'class ofxOceanodeNodeModel { public: virtual ~ofxOceanodeNodeModel() = default; '
-            'virtual string macroMixerBlocker() const { return {}; } void setDeclaredSink(bool) {} string nodeName() { return "SC Imported"; } string getDescription() { return "Node description"; } };\n')
+            'virtual string macroMixerBlocker() const { return {}; } void setDeclaredSink(bool) {} void setNodeSnapshotsDisabled(bool) {} string nodeName() { return "SC Imported"; } string getDescription() { return "Node description"; } };\n')
         source = work / 'test.cpp'
         source.write_text(CASES)
         command = [os.environ.get('CXX', 'clang++'), '-std=c++17', '-Wall', '-Wextra',

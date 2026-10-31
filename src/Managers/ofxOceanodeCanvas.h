@@ -223,9 +223,16 @@ private:
     struct PendingEncapsulation {
         int mixerAction = -1;
         std::string sinkNode, sinkParameter; // by name: nothing dangles while the prompt is open
+        // Cmd+E dialog (mixerAction -1): the new macro's identity.
+        bool automated = false;
+        char name[256] = "Encapsulated";
+        std::array<char, 1024> description{};
+        float color[3] = {0.f, 129.f / 255.f, 1.f};
     };
     std::unique_ptr<PendingEncapsulation> pendingEncapsulation;
     bool openEncapsulationPrompt = false;
+    bool openEncapsulateDialog = false;
+    bool encapsulationMoveTimeline = false;
     int encapsulationChoice = -1; // 0 keep on the timeline, 1 move into the macro
     char portalizeNameBuffer[256] = {};
     struct PendingPortalAlignment {

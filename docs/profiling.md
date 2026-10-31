@@ -21,6 +21,8 @@ including while sorting, filtering or refreshing a live capture.
 **Save** opens a native save dialog for a CSV file; **Copy** puts the same CSV
 text on the system clipboard. Both export the current snapshot in table order,
 respecting the node/path filter and including output rows for expanded nodes.
+The suggested filename includes the local date and time when Save is clicked,
+for example `Oceanode-Profiling-2026-10-30_15-42-08.csv`.
 The CSV includes all table metrics, with additional **Output pin** and **Pin
 type** columns. Output rows repeat their owning node's name and canvas path;
 their CPU fields are empty. Unavailable rates/intervals are empty cells rather

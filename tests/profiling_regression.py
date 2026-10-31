@@ -34,7 +34,16 @@ namespace ofxOceanodeClipboard {
 static ofFileDialogResult saveResult;
 static int saveDialogs = 0;
 static ofFileDialogResult profileSaveDialog(std::string name, std::string message){
-    assert(name == "Oceanode-Profiling.csv");
+    // Suggested filenames include local date/time to the second, with no
+    // characters forbidden in filenames on Windows.
+    const std::string prefix = "Oceanode-Profiling-";
+    const std::string format = "0000-00-00_00-00-00";
+    assert(name.size() == prefix.size() + format.size() + 4);
+    assert(name.substr(0, prefix.size()) == prefix && name.substr(name.size() - 4) == ".csv");
+    for(std::size_t i = 0; i < format.size(); ++i){
+        const char c = name[prefix.size() + i];
+        assert(format[i] == '0' ? c >= '0' && c <= '9' : c == format[i]);
+    }
     ++saveDialogs;
     return saveResult;
 }
@@ -393,6 +402,7 @@ int main() {
     const float padding = 2 * ImGui::GetStyle().FramePadding.x;
     const float statusWidth = ImGui::CalcTextSize("Stopped - last capture").x;
     const float saveWidth = ImGui::CalcTextSize("Save").x + padding;
+    const float helpWidth = ImGui::CalcTextSize("[?]").x + padding;
     const float captureWidth = ImGui::CalcTextSize("Profile!").x + padding;
     const float saveX = profileButton.x - 10 + captureWidth + statusWidth + 2 * spacing;
     auto clickAt = [&](float x){
@@ -400,7 +410,7 @@ int main() {
         io.AddMouseButtonEvent(0, true); frame();
         io.AddMouseButtonEvent(0, false); frame();
     };
-    clickAt(saveX + saveWidth + spacing + 5);
+    clickAt(saveX + saveWidth + helpWidth + 2 * spacing + 5);
     assert(ofxOceanodeClipboard::contents == panel.csvContents());
     clickAt(saveX + 5); assert(saveDialogs == 1); // Cancel leaves the capture intact.
     equal(panel.measuredMs, panelTotal);

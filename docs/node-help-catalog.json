@@ -4336,7 +4336,7 @@
     "addon": "ofxSantiNodes"
   },
   "Polyline Info": {
-    "description": "Provides information about input polylines.",
+    "description": "Counts vertices, segments and separate polylines in a set of 2D paths.\n\n**Inputs**\n\n**[ In.X]**: X coordinate vector. A -1 separates polylines.\n\n**[ In.Y]**: Y coordinate vector. A -1 separates polylines.\n\n**Outputs**\n\n**[ Total Points]**: Total number of vertices, excluding separators.\n\n**[ Total Segments]**: Total number of connections between consecutive vertices within each polyline.\n\n**[ Num Polylines]**: Number of non-empty paths.\n\n**[ Segments Per Polyline]**: One segment count for each path, in input order.\n\n**[ Vertices Per Polyline]**: One vertex count for each path, in input order.\n\n**Notes**\n\nA -1 in either coordinate ends the current path. If the input lengths differ, only their shared portion is read. A path with N vertices has N-1 segments.",
     "parameters": [
       "In.X",
       "In.Y",

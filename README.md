@@ -72,6 +72,8 @@ with `euclideanGenerator` as the class, and `"Generators"` as the category name.
   clear it. History inside a moved/recreated macro is folded into that macro's
   structural step. Parameter changes and playback are excluded; current values
   travel with moved nodes, and text fields keep their own undo.
+- **Cmd+G** wraps the selected nodes in a new comment sized to their bounding box
+  plus one grid cell of margin on every side. Alt+drag on the canvas draws a free comment.
 - **Cmd+E** encapsulates the selection. **Cmd+Shift+E** extracts a selected active
   Macro into its parent canvas; **Extract Macro** is also in its header menu.
   Extraction keeps boundary routers to preserve conversions and disconnect values.

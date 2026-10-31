@@ -135,11 +135,31 @@ can be deleted together. An MCP server is not needed for this in-process helper.
 Maintaining the reference
 ------------------------
 
+Descriptions in Inspector, Node Pool and Help support `**bold text**` and
+paragraph breaks (`\n\n` in C++ strings). A bold bracketed parameter name,
+such as `**[ In.X]**`, also gets a background highlight from the theme's Header
+color. Use one entry per parameter, even when explanations are similar:
+
+    **Inputs**
+
+    **[ In.X]**: X coordinate vector. A -1 separates polylines.
+
+    **[ In.Y]**: Y coordinate vector. A -1 separates polylines.
+
+The shared renderer in `src/Gui/ofxOceanodeDescription.h` wraps mixed regular
+and bold text using the actual font metrics and preserves blank lines. Other
+Markdown syntax is displayed literally; unmatched bold markers remain visible.
+It uses the theme's default bold font, falling back to regular when that face
+is unavailable. Inspector descriptions use normal body-text contrast.
+Define local descriptions in constructors so the registry can show them before
+any instance is set up, and keep the corresponding catalog entry synchronized.
+
 Edit node-help-catalog.json and oceanode-assistant.md in this directory, then run:
 
     python3 scripts/generate_node_help.py
     python3 scripts/audit_node_help.py
     python3 tests/help_regression.py
+    python3 tests/description_regression.py
 
 The generated headers embed the catalog and guide, so host applications do not
 need to copy documentation into their data folder. The audit checks statically

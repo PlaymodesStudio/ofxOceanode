@@ -9,6 +9,7 @@
 #define ofxOceanodeParameter_h
 
 #include "ofParameter.h"
+#include "ofUtils.h"
 #include "Profiling/ofxOceanodeParameterProfiling.h"
 
 class ofxOceanodeAbstractConnection;
@@ -156,6 +157,14 @@ public:
     
     bool hasOutConnections(){return outConnections.size() != 0;};
     std::vector<ofxOceanodeAbstractConnection*> getOutConnections(){return outConnections;};
+
+    // Views read parameters directly, without a graph connection. A draw keeps
+    // an on-demand producer active through the next update (which precedes draw).
+    void markUsedByView(){lastViewFrame = ofGetFrameNum(); hasViewFrame = true;}
+    bool wasUsedByView() const {
+        const uint64_t frame = ofGetFrameNum();
+        return hasViewFrame && frame >= lastViewFrame && frame - lastViewFrame <= 1;
+    }
     
     void setInConnection(ofxOceanodeAbstractConnection* c){inConnections.push_back(c); touchDropdownGraph();};
     void addOutConnection(ofxOceanodeAbstractConnection* c){outConnections.push_back(c); touchDropdownGraph();};
@@ -243,6 +252,8 @@ protected:
 	virtual const void* getInternalObject() const = 0;
 	
 private:
+    uint64_t lastViewFrame = 0;
+    bool hasViewFrame = false;
     static uint64_t& dropdownGraphRevision(){static uint64_t revision = 1; return revision;}
     bool dropdownRelay = false;
     bool dropdownSourceAvailable = true;
