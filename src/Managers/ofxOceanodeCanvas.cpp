@@ -354,6 +354,42 @@ void ofxOceanodeCanvas::handleNodeNudge(){
     // draw() closes the edit after all canvas mutations, as it does for drags.
 }
 
+// Name / Description / Color rows shared by the Macro creation dialogs.
+static void drawMacroIdentityFields(char* name, size_t nameSize, char* description, size_t descriptionSize, float* color){
+    MacroDialogAppearance::Rows rows;
+    rows.begin();
+    ImGui::BeginGroup();
+    ImGui::TextUnformatted("Name");
+    ImGui::SetNextItemWidth(380);
+    if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+    ImGui::InputText("##MacroName", name, nameSize);
+    ImGui::EndGroup();
+    rows.end();
+    rows.begin();
+    ImGui::BeginGroup();
+    ImGui::TextUnformatted("Description");
+    ImGui::InputTextMultiline("##MacroDescription", description, descriptionSize, ImVec2(380, ImGui::GetTextLineHeight() * 5));
+    ImGui::EndGroup();
+    rows.end();
+    rows.begin();
+    ImGui::BeginGroup();
+    ImGui::TextUnformatted("Color");
+    ImGui::SetNextItemWidth(380);
+    ImGui::ColorEdit3("##MacroColor", color, ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_DisplayRGB);
+    ImGui::EndGroup();
+    rows.end();
+}
+
+static void applyMacroIdentity(ofxOceanodeNode* macroNode, const char* description, const float* color){
+    auto* macroModel = macroNode ? dynamic_cast<ofxOceanodeNodeMacro*>(&macroNode->getNodeModel()) : nullptr;
+    if(macroModel == nullptr) return;
+    auto& inspector = macroModel->getInspectorParameterGroup();
+    if(inspector.contains("Description"))
+        macroModel->getInspectorParameter<string>("Description").set(string(description));
+    if(inspector.contains("Color"))
+        macroModel->getInspectorParameter<ofColor>("Color").set(ofColor(color[0] * 255.f, color[1] * 255.f, color[2] * 255.f));
+}
+
 void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     // A history step may have replaced nodes from another canvas during update.
     // Drop cached interaction pointers before any of them can be dereferenced.
@@ -2224,6 +2260,35 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             if(ImGui::Selectable("Encapsulate All Subgraphs with Portals")) mixerEncapsulationAction = 3;
             ImGui::EndPopup();
         }
+        if(openNewMacroDialog){
+            openNewMacroDialog = false;
+            ImGui::OpenPopup("New Macro");
+        }
+        ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
+        {
+            MacroDialogAppearance::Style appearance;
+            if(ImGui::BeginPopupModal("New Macro", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+                if(!pendingNewMacro){
+                    ImGui::CloseCurrentPopup();
+                } else {
+                    auto& pending = *pendingNewMacro;
+                    ImGui::TextDisabled("Create a new Macro");
+                    ImGui::Separator();
+                    drawMacroIdentityFields(pending.name, sizeof(pending.name), pending.description.data(), pending.description.size(), pending.color);
+                    ImGui::Separator();
+                    if(ImGui::Button("Create") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && !ImGui::IsAnyItemActive())){
+                        newMacroConfirmed = true;
+                        ImGui::CloseCurrentPopup();
+                    }
+                    ImGui::SameLine();
+                    if(ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)){
+                        pendingNewMacro.reset();
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                ImGui::EndPopup();
+            }
+        }
         if(openEncapsulateDialog){
             openEncapsulateDialog = false;
             ImGui::OpenPopup("Encapsulate Macro");
@@ -2239,29 +2304,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     ImGui::TextDisabled("Encapsulate selection as a Macro");
                     ImGui::Separator();
                     {
+                        drawMacroIdentityFields(pending.name, sizeof(pending.name), pending.description.data(), pending.description.size(), pending.color);
                         MacroDialogAppearance::Rows rows;
-                        rows.begin();
-                        ImGui::BeginGroup();
-                        ImGui::TextUnformatted("Name");
-                        ImGui::SetNextItemWidth(380);
-                        if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
-                        ImGui::InputText("##EncapsulateName", pending.name, sizeof(pending.name));
-                        ImGui::EndGroup();
-                        rows.end();
-                        rows.begin();
-                        ImGui::BeginGroup();
-                        ImGui::TextUnformatted("Description");
-                        ImGui::InputTextMultiline("##EncapsulateDescription", pending.description.data(), pending.description.size(),
-                                                  ImVec2(380, ImGui::GetTextLineHeight() * 5));
-                        ImGui::EndGroup();
-                        rows.end();
-                        rows.begin();
-                        ImGui::BeginGroup();
-                        ImGui::TextUnformatted("Color");
-                        ImGui::SetNextItemWidth(380);
-                        ImGui::ColorEdit3("##EncapsulateColor", pending.color, ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_DisplayRGB);
-                        ImGui::EndGroup();
-                        rows.end();
                         if(pending.automated){
                             rows.begin();
                             ImGui::BeginGroup();
@@ -2560,7 +2604,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     }
                     
                     if(itemActivated) {
-                        if(result.type == "node") {
+                        if(result.type == "node" && requestNewMacroDialog(result.name)) {
+                        } else if(result.type == "node") {
                             unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(result.name);
                             if (type) {
                                 auto &node = container->createNode(std::move(type));
@@ -2595,7 +2640,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 // Handle Enter key when no specific item is selected (fallback to first result)
                 if(isEnterPressed && selectedSearchResultIndex == -1 && !filteredSearchResults.empty()) {
                     const auto& firstResult = filteredSearchResults[0];
-                    if(firstResult.type == "node") {
+                    if(firstResult.type == "node" && requestNewMacroDialog(firstResult.name)) {
+                    } else if(firstResult.type == "node") {
                         unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(firstResult.name);
                         if (type) {
                             auto &node = container->createNode(std::move(type));
@@ -2651,7 +2697,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
                             if( ImGui::MenuItem(op.c_str()) || (ImGui::IsItemFocused() && isEnterPressed))
                             {
-                                unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create(op);
+                                unique_ptr<ofxOceanodeNodeModel> type = requestNewMacroDialog(op) ? nullptr : container->getRegistry()->create(op);
                                 if (type)
                                 {
                                     auto &node = container->createNode(std::move(type));
@@ -3119,6 +3165,19 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                           (mixerEncapsulationAction & 1) != 0, false);
             }
         }
+        if(pendingNewMacro && newMacroConfirmed){
+            const auto pending = std::move(pendingNewMacro);
+            newMacroConfirmed = false;
+            if(auto type = container->getRegistry()->create("Macro")){
+                auto& node = container->createNode(std::move(type));
+                node.getNodeGui().setPosition(pending->position);
+                const string macroName = ofTrim(string(pending->name));
+                if(auto* macroModel = dynamic_cast<ofxOceanodeNodeMacro*>(&node.getNodeModel());
+                   macroModel && !macroName.empty() && macroModel->getInspectorParameterGroup().contains("Local Name"))
+                    macroModel->getInspectorParameter<string>("Local Name").set(macroName);
+                applyMacroIdentity(&node, pending->description.data(), pending->color);
+            }
+        }
         if(pendingEncapsulation && encapsulationChoice >= 0) {
             const auto pending = std::move(pendingEncapsulation);
             const bool moveTimeline = encapsulationChoice == 1;
@@ -3127,16 +3186,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 string macroName = ofTrim(string(pending->name));
                 if(macroName.empty()) macroName = "Encapsulated";
                 auto* macroNode = container->encapsulateNodes(container->getSelectedModules(), macroName, moveTimeline);
-                if(macroNode != nullptr){
-                    if(auto* macroModel = dynamic_cast<ofxOceanodeNodeMacro*>(&macroNode->getNodeModel())){
-                        auto& inspector = macroModel->getInspectorParameterGroup();
-                        if(inspector.contains("Description"))
-                            macroModel->getInspectorParameter<string>("Description").set(string(pending->description.data()));
-                        if(inspector.contains("Color"))
-                            macroModel->getInspectorParameter<ofColor>("Color").set(
-                                ofColor(pending->color[0] * 255.f, pending->color[1] * 255.f, pending->color[2] * 255.f));
-                    }
-                }
+                applyMacroIdentity(macroNode, pending->description.data(), pending->color);
             }
             else {
                 const auto& nodes = container->getParameterGroupNodesMap();
@@ -3466,6 +3516,16 @@ void ofxOceanodeCanvas::selectAllNodes(){
     for(auto &c: container->getComments()){
         c.selected = true;
     }
+}
+
+bool ofxOceanodeCanvas::requestNewMacroDialog(const std::string& typeName){
+    if(typeName != "Macro") return false;
+    pendingNewMacro = std::make_unique<PendingNewMacro>();
+    glm::vec2 position = screenToWorld(glm::vec2(newNodeClickPos));
+    if(snap_to_grid) position = snapToGrid(position);
+    pendingNewMacro->position = position;
+    openNewMacroDialog = true;
+    return true;
 }
 
 void ofxOceanodeCanvas::drawNodePreview(ofxOceanodeNode& node){

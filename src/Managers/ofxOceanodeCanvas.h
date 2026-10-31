@@ -232,6 +232,19 @@ private:
     std::unique_ptr<PendingEncapsulation> pendingEncapsulation;
     bool openEncapsulationPrompt = false;
     bool openEncapsulateDialog = false;
+    // A blank Macro requested from the New Node menu, waiting for its name,
+    // description and colour.
+    struct PendingNewMacro {
+        glm::vec2 position;
+        char name[256] = "";
+        std::array<char, 1024> description{};
+        float color[3] = {0.f, 129.f / 255.f, 1.f};
+    };
+    std::unique_ptr<PendingNewMacro> pendingNewMacro;
+    bool openNewMacroDialog = false;
+    bool newMacroConfirmed = false;
+    // True (and queues the dialog) when `typeName` is the blank Macro.
+    bool requestNewMacroDialog(const std::string& typeName);
     bool encapsulationMoveTimeline = false;
     int encapsulationChoice = -1; // 0 keep on the timeline, 1 move into the macro
     char portalizeNameBuffer[256] = {};
