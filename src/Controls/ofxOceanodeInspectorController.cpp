@@ -126,6 +126,7 @@ void ofxOceanodeInspectorController::draw(){
     }
 
     auto &node = selectedNodes[0].second;
+    const ImU32 nodeTitleBackground = ImGui::ColorConvertFloat4ToU32(node->getColor() * .5);
     oceanodeProfiling::Scope timing(node->getNodeModel().getProfilingRecord(), oceanodeProfiling::Phase::Gui);
     auto* owningContainer = container->getContainerForCanvasID(node->getNodeModel().getParents());
     if(owningContainer == nullptr) owningContainer = node->getNodeModel().getHostContainer();
@@ -143,7 +144,7 @@ void ofxOceanodeInspectorController::draw(){
 		ImGui::GetWindowDrawList()->AddRectFilled(
 			cursorPos,
 			ImVec2(cursorPos.x + availWidth, cursorPos.y + textSize.y + padding * 2),
-			ImGui::ColorConvertFloat4ToU32(node->getColor()*.5)
+			nodeTitleBackground
 		);
 		
 		// Draw white text on top
@@ -509,7 +510,8 @@ void ofxOceanodeInspectorController::draw(){
 	}
 
 	if(node->getNodeModel().getDescription() != "" && sectionHeader("Description")){
-		ofxOceanodeDescription::draw(node->getNodeModel().getDescription(), ofxOceanodeShared::getDefaultBoldFont());
+		ofxOceanodeDescription::draw(node->getNodeModel().getDescription(),
+            ofxOceanodeShared::getDefaultBoldFont());
 	}
 
     ImGui::PopStyleVar();

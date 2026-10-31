@@ -137,14 +137,14 @@ Maintaining the reference
 
 Descriptions in Inspector, Node Pool and Help support `**bold text**` and
 paragraph breaks (`\n\n` in C++ strings). A bold bracketed parameter name,
-such as `**[ In.X]**`, also gets a background highlight from the theme's Header
-color. Use one entry per parameter, even when explanations are similar:
+such as `**[ In.X]**`, uses bold text without a background highlight or a colon
+after the label. Use one entry per parameter, even when explanations are similar:
 
     **Inputs**
 
-    **[ In.X]**: X coordinate vector. A -1 separates polylines.
+    **[ In.X]** X coordinate vector. A -1 separates polylines.
 
-    **[ In.Y]**: Y coordinate vector. A -1 separates polylines.
+    **[ In.Y]** Y coordinate vector. A -1 separates polylines.
 
 The shared renderer in `src/Gui/ofxOceanodeDescription.h` wraps mixed regular
 and bold text using the actual font metrics and preserves blank lines. Other
@@ -153,6 +153,18 @@ It uses the theme's default bold font, falling back to regular when that face
 is unavailable. Inspector descriptions use normal body-text contrast.
 Define local descriptions in constructors so the registry can show them before
 any instance is set up, and keep the corresponding catalog entry synchronized.
+EloiNodes is the formatting test bed: all 40 registered node types have local
+constructor descriptions, with separate entries for coordinate axes, inherited
+3D controls and individual pose joints. Indexed dynamic pin families use `n`
+as a zero-based placeholder. Its source audit is:
+
+    python3 ../ofxEloiNodes/src/tests/descriptions_regression.py
+
+The audit checks constructor availability, paragraph separation, parameter
+coverage and catalog synchronization. EloiNodes' Remove -1 shares its name with
+a different VectorGraphics node: its local description remains authoritative,
+and the catalog keeps the neutral VectorGraphics fallback with both pin sets
+included in search hints.
 
 Edit node-help-catalog.json and oceanode-assistant.md in this directory, then run:
 

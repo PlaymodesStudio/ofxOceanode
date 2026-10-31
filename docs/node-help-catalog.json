@@ -1,8 +1,7 @@
 {
   "3D Light": {
-    "description": "Creates a 3D light with position, color, range, falloff and intensity controls.",
+    "description": "Provides a point-light configuration to the Equirectangular Pipeline.\n\n**Position and appearance**\n\n**[ Light Pos X]** Light position along the scene X axis.\n\n**[ Light Pos Y]** Light position along the scene Y axis.\n\n**[ Light Pos Z]** Light position along the scene Z axis.\n\n**[ Light Color]** Light color used by the pipeline's diffuse and specular shading.\n\n**[ Light Near Dist]** Distance at which attenuation starts. Inside this distance the light has full strength.\n\n**[ Light Far Dist]** Distance at which light falls to zero. 0 disables attenuation for unlimited range.\n\n**[ Light Falloff]** Exponent shaping the attenuation curve between the near and far distances.\n\n**[ Light Intensity]** Multiplier for the light's diffuse and specular contribution.\n\n**Output**\n\n**[ Light Out]** Reference to this light. Connect it to a Light input of the Equirectangular Pipeline.\n\n**Notes**\n\nThis node supplies data and does not draw by itself. Use scene units for position and distances. When attenuation is enabled, keep Light Far Dist greater than Light Near Dist.",
     "parameters": [
-      "Light Out",
       "Light Pos X",
       "Light Pos Y",
       "Light Pos Z",
@@ -10,7 +9,8 @@
       "Light Near Dist",
       "Light Far Dist",
       "Light Falloff",
-      "Light Intensity"
+      "Light Intensity",
+      "Light Out"
     ],
     "source": "lightNode.h",
     "addon": "ofxEloiNodes"
@@ -277,12 +277,18 @@
     "addon": "ofxSantiNodes"
   },
   "Black Holes": {
-    "description": "Simulates motion influenced by two gravitational attractors with mass, energy loss and integration controls.",
+    "description": "Simulates two mutually attracting bodies and derives position, speed, distance and proximity-based temperature signals.\n\n**Simulation controls**\n\n**[ G]** Strength of gravitational attraction.\n\n**[ Energy Loss]** Velocity retained after each frame: 1 keeps all velocity; smaller values add damping.\n\n**[ Mass BH1]** Mass of body 1, applied during simulation.\n\n**[ Mass BH2]** Mass of body 2, applied during simulation.\n\n**[ Time Factor]** Multiplier for the number of integration iterations per update.\n\n**[ RK4 Steps Base]** Base iteration count. Iterations per update are rounded Time Factor times this count, with a minimum of one.\n\n**[ Min Distance]** Minimum separation used in the force denominator, in simulation units; limits close-range acceleration.\n\n**[ Zoom In]** Magnifies output positions about the current center of mass.\n\n**[ Reset]** Restarts the simulation using the current initial-position and initial-velocity controls; clears merge and temperature state.\n\n**[ Merge!]** Freezes the simulation on the next update, centers both position outputs at 0.5 and sets speeds to 0 until Reset.\n\n**Initial conditions**\n\n**[ Pos X BH1]** Initial normalized X position of body 1. Applied on Reset.\n\n**[ Pos Y BH1]** Initial normalized Y position of body 1. Applied on Reset.\n\n**[ Pos X BH2]** Initial normalized X position of body 2. Applied on Reset.\n\n**[ Pos Y BH2]** Initial normalized Y position of body 2. Applied on Reset.\n\n**[ BH1 X iniVel]** Initial horizontal velocity of body 1. Applied on Reset.\n\n**[ BH1 Y iniVel]** Initial vertical velocity of body 1. Applied on Reset.\n\n**[ BH2 X iniVel]** Initial horizontal velocity of body 2. Applied on Reset.\n\n**[ BH2 Y iniVel]** Initial vertical velocity of body 2. Applied on Reset.\n\n**Temperature controls**\n\n**[ Temp Response]** Balances response rates. Below 0.5 slows cooling; above 0.5 slows heating.\n\n**[ Temp Sensitivity]** Distance scale for the temperature target. Larger values keep temperature higher at the same separation.\n\n**[ Temperature Threshold]** Reserved control. The current implementation does not use it to trigger merging or change the outputs.\n\n**Outputs**\n\n**[ BH1 X]** Body-1 X position relative to the center of mass, zoomed, centered at 0.5 and clamped to 0-1.\n\n**[ BH1 Y]** Body-1 Y position relative to the center of mass, zoomed, centered at 0.5 and clamped to 0-1.\n\n**[ BH2 X]** Body-2 X position relative to the center of mass, zoomed, centered at 0.5 and clamped to 0-1.\n\n**[ BH2 Y]** Body-2 Y position relative to the center of mass, zoomed, centered at 0.5 and clamped to 0-1.\n\n**[ BH1 Speed]** Magnitude of body-1 velocity in simulation units.\n\n**[ BH2 Speed]** Magnitude of body-2 velocity in simulation units.\n\n**[ Temperature]** Smoothed 0-1 proximity signal. Closer bodies give a higher target temperature.\n\n**[ Distance]** Body separation divided by 1000 and clamped to 0-1.\n\n**Notes**\n\nUses fixed 0.01 integration steps and advances on node updates rather than elapsed real time. Increasing the iteration count also advances more simulated time. Merge! is a manual input trigger, not an automatic merge notification.",
     "parameters": [
       "G",
       "Energy Loss",
       "Mass BH1",
       "Mass BH2",
+      "Time Factor",
+      "RK4 Steps Base",
+      "Min Distance",
+      "Zoom In",
+      "Reset",
+      "Merge!",
       "Pos X BH1",
       "Pos Y BH1",
       "Pos X BH2",
@@ -291,11 +297,6 @@
       "BH1 Y iniVel",
       "BH2 X iniVel",
       "BH2 Y iniVel",
-      "Time Factor",
-      "Min Distance",
-      "RK4 Steps Base",
-      "Zoom In",
-      "Reset",
       "Temp Response",
       "Temp Sensitivity",
       "Temperature Threshold",
@@ -306,8 +307,7 @@
       "BH1 Speed",
       "BH2 Speed",
       "Temperature",
-      "Distance",
-      "Merge!"
+      "Distance"
     ],
     "source": "blackHoles.h",
     "addon": "ofxEloiNodes"
@@ -344,7 +344,7 @@
     "addon": "ofxOceanodeVectorGraphics"
   },
   "Bounding Box Aspect Ratio": {
-    "description": "Calculates a point set bounding box, dimensions and aspect ratio, optionally rotating the points.",
+    "description": "Finds the bounding rectangle of paired 2D points and reports its size, aspect ratio and corners.\n\n**Inputs and control**\n\n**[ X]** X coordinates of the points. Paired with Y by index.\n\n**[ Y]** Y coordinates of the points. Paired with X by index.\n\n**[ DoRotate]** Off finds an axis-aligned rectangle. On finds a minimum-area oriented rectangle using the convex hull; input points are not rotated.\n\n**Outputs**\n\n**[ AspectRatio]** Width divided by Height. Zero height with nonzero width gives FLT_MAX; a single location gives 1.\n\n**[ Width]** Rectangle width in input coordinate units.\n\n**[ Height]** Rectangle height in input coordinate units.\n\n**[ AR_X]** Copy of the rectangle width, useful as an X scaling factor.\n\n**[ AR_Y]** Copy of the rectangle height, useful as a Y scaling factor.\n\n**[ BoxX]** Five X corner values, repeating the first corner to close the rectangle.\n\n**[ BoxY]** Five Y corner values, repeating the first corner to close the rectangle.\n\n**Notes**\n\nUses the shared input length and ignores pairs containing non-finite values. -1 is treated as a coordinate, not a separator. No valid points gives zero dimensions and corners, with aspect ratio 1. Recalculates on X or DoRotate changes; publish Y before X.",
     "parameters": [
       "X",
       "Y",
@@ -361,7 +361,7 @@
     "addon": "ofxEloiNodes"
   },
   "Box Custom Renderer": {
-    "description": "Creates a box mesh with configurable dimensions, subdivisions and face controls.",
+    "description": "Creates a box with per-face visibility and independent texture rotation on every face.\n\n**Geometry**\n\n**[ Box.Width]** Box size along X.\n\n**[ Box.Height]** Box size along Y.\n\n**[ Box.Depth]** Box size along Z.\n\n**[ Box.Height.Segments]** Vertical subdivision count for generated face grids.\n\n**[ Box.Width.Segments]** Horizontal subdivision count for generated face grids.\n\n**[ Face.North]** Includes the north face, unless a six-element Face.Visibility.Vector overrides the face toggles.\n\n**[ Face.South]** Includes the south face, unless a six-element Face.Visibility.Vector overrides the face toggles.\n\n**[ Face.East]** Includes the east face, unless a six-element Face.Visibility.Vector overrides the face toggles.\n\n**[ Face.West]** Includes the west face, unless a six-element Face.Visibility.Vector overrides the face toggles.\n\n**[ Face.Top]** Includes the top face, unless a six-element Face.Visibility.Vector overrides the face toggles.\n\n**[ Face.Bottom]** Includes the bottom face, unless a six-element Face.Visibility.Vector overrides the face toggles.\n\n**[ Face.Visibility.Vector]** Exactly six values override the face toggles in North, South, East, West, Top, Bottom order. 0 hides a face; nonzero shows it. Other vector lengths leave the toggles in control.\n\n**[ UV.Rot.North]** Texture-coordinate rotation for the north face, in degrees.\n\n**[ UV.Rot.South]** Texture-coordinate rotation for the south face, in degrees.\n\n**[ UV.Rot.East]** Texture-coordinate rotation for the east face, in degrees.\n\n**[ UV.Rot.West]** Texture-coordinate rotation for the west face, in degrees.\n\n**[ UV.Rot.Top]** Texture-coordinate rotation for the top face, in degrees.\n\n**[ UV.Rot.Bottom]** Texture-coordinate rotation for the bottom face, in degrees.\n\n**Texture and transform**\n\n**[ Tex.In]** Optional surface texture. Connect Mesh Out to an Equirectangular Pipeline mesh input to render it.\n\n**[ PosX]** Mesh translation along the scene X axis.\n\n**[ PosY]** Mesh translation along the scene Y axis.\n\n**[ PosZ]** Mesh translation along the scene Z axis.\n\n**[ ScaleX]** Scale multiplier along the mesh X axis.\n\n**[ ScaleY]** Scale multiplier along the mesh Y axis.\n\n**[ ScaleZ]** Scale multiplier along the mesh Z axis.\n\n**[ RotX]** Rotation about the X axis, in degrees.\n\n**[ RotY]** Rotation about the Y axis, in degrees.\n\n**[ RotZ]** Rotation about the Z axis, in degrees.\n\n**[ FlipX]** Mirrors texture coordinates horizontally. Does not mirror the geometry.\n\n**[ FlipY]** Mirrors texture coordinates vertically. Does not mirror the geometry.\n\n**Output**\n\n**[ Mesh Out]** Reference to this mesh for an Equirectangular Pipeline Mesh input. This is a mesh object, not an image texture.\n\n**Notes**\n\nGeometry and transforms use scene units rather than normalized 0-1 coordinates. This node supplies mesh data; the connected pipeline performs rendering.",
     "parameters": [
       "Box.Width",
       "Box.Height",
@@ -380,20 +380,46 @@
       "UV.Rot.East",
       "UV.Rot.West",
       "UV.Rot.Top",
-      "UV.Rot.Bottom"
+      "UV.Rot.Bottom",
+      "Tex.In",
+      "PosX",
+      "PosY",
+      "PosZ",
+      "ScaleX",
+      "ScaleY",
+      "ScaleZ",
+      "RotX",
+      "RotY",
+      "RotZ",
+      "FlipX",
+      "FlipY",
+      "Mesh Out"
     ],
     "source": "boxCustomRenderer.h",
     "addon": "ofxEloiNodes"
   },
   "Box Renderer": {
-    "description": "Creates a box mesh with configurable dimensions and resolution.",
+    "description": "Creates a textured box with separate tessellation controls for its three dimensions.\n\n**Geometry**\n\n**[ Box.Width]** Box size along X.\n\n**[ Box.Height]** Box size along Y.\n\n**[ Box.Depth]** Box size along Z.\n\n**[ Box.Res.Width]** Mesh resolution along the box width.\n\n**[ Box.Res.Height]** Mesh resolution along the box height.\n\n**[ Box.Res.Depth]** Mesh resolution along the box depth.\n\n**Texture and transform**\n\n**[ Tex.In]** Optional surface texture. Connect Mesh Out to an Equirectangular Pipeline mesh input to render it.\n\n**[ PosX]** Mesh translation along the scene X axis.\n\n**[ PosY]** Mesh translation along the scene Y axis.\n\n**[ PosZ]** Mesh translation along the scene Z axis.\n\n**[ ScaleX]** Scale multiplier along the mesh X axis.\n\n**[ ScaleY]** Scale multiplier along the mesh Y axis.\n\n**[ ScaleZ]** Scale multiplier along the mesh Z axis.\n\n**[ RotX]** Rotation about the X axis, in degrees.\n\n**[ RotY]** Rotation about the Y axis, in degrees.\n\n**[ RotZ]** Rotation about the Z axis, in degrees.\n\n**[ FlipX]** Mirrors texture coordinates horizontally. Does not mirror the geometry.\n\n**[ FlipY]** Mirrors texture coordinates vertically. Does not mirror the geometry.\n\n**Output**\n\n**[ Mesh Out]** Reference to this mesh for an Equirectangular Pipeline Mesh input. This is a mesh object, not an image texture.\n\n**Notes**\n\nGeometry and transforms use scene units rather than normalized 0-1 coordinates. This node supplies mesh data; the connected pipeline performs rendering.",
     "parameters": [
       "Box.Width",
       "Box.Height",
       "Box.Depth",
       "Box.Res.Width",
       "Box.Res.Height",
-      "Box.Res.Depth"
+      "Box.Res.Depth",
+      "Tex.In",
+      "PosX",
+      "PosY",
+      "PosZ",
+      "ScaleX",
+      "ScaleY",
+      "ScaleZ",
+      "RotX",
+      "RotY",
+      "RotZ",
+      "FlipX",
+      "FlipY",
+      "Mesh Out"
     ],
     "source": "boxRenderer.h",
     "addon": "ofxEloiNodes"
@@ -595,7 +621,7 @@
     "addon": "ofxSantiNodes"
   },
   "Chaotic Attractor": {
-    "description": "Generates XY trajectories from chaotic attractor equations with initial conditions and integration controls.",
+    "description": "Generates a rolling history of a 3D chaotic trajectory and projects it to two coordinate vectors.\n\n**Equation controls**\n\n**[ Type]** Selects one of 17 built-in attractors. Changing it resets coefficients, recommended step size and trajectory.\n\n**[ Use Preset IC]** Uses the selected attractor's stored initial conditions on Reset; off uses randomized initial conditions.\n\n**[ Param 1]** First equation coefficient. Its visible name changes with Type: for example Sigma for Lorenz, alpha for Chua, or a for several other systems.\n\n**[ Param 2]** Second equation coefficient. Its visible name changes with Type: for example Rho for Lorenz, beta for Chua, or b for several other systems.\n\n**[ Param 3]** Third equation coefficient. Its visible name changes with Type: for example Beta for Lorenz, m0 for Chua, or c for several other systems. A slot labeled Unused has no adjustable role for that type.\n\n**Simulation controls**\n\n**[ Step Size]** Numerical integration step. Larger values advance more per step but can destabilize the trajectory. Type changes load a recommended value.\n\n**[ Speed]** Integration work per update. 0 holds the trajectory. Fractional settings perform ceil(Speed) full steps plus one fractional step.\n\n**[ Size]** Maximum number of trajectory samples retained in the output history.\n\n**[ Reset]** Restarts from preset or random initial conditions, performs burn-in and clears trajectory history.\n\n**Projection controls**\n\n**[ Projection]** Selects the XY, XZ or YZ plane for the two outputs.\n\n**[ Scale]** Magnifies coordinates around each attractor's statistical mean before clamping.\n\n**[ Offset X]** Offset added to the normalized 3D X coordinate before projection.\n\n**[ Offset Y]** Offset added to the normalized 3D Y coordinate before projection.\n\n**[ Offset Z]** Offset added to the normalized 3D Z coordinate before projection.\n\n**Outputs**\n\n**[ Output X]** First coordinate of the selected projection, oldest to newest, clamped to 0-1.\n\n**[ Output Y]** Second coordinate of the selected projection, oldest to newest, clamped to 0-1.\n\n**Notes**\n\nCoefficient entries describe the three physical control slots; their on-screen labels and ranges depend on Type. Size is a history limit, so outputs can be shorter while filling. Simulation speed depends on node update rate.",
     "parameters": [
       "Type",
       "Use Preset IC",
@@ -612,7 +638,26 @@
       "Offset Y",
       "Offset Z",
       "Output X",
-      "Output Y"
+      "Output Y",
+      "Sigma",
+      "Rho",
+      "Beta",
+      "a",
+      "b",
+      "c",
+      "Unused",
+      "alpha",
+      "beta",
+      "m0",
+      "g",
+      "p",
+      "r",
+      "e",
+      "mu",
+      "eps",
+      "d",
+      "k",
+      "q"
     ],
     "source": "chaoticAttractor.h",
     "addon": "ofxEloiNodes"
@@ -821,26 +866,39 @@
     "addon": "ofxSantiNodes"
   },
   "Compact Polylines": {
-    "description": "Input is a collection of 2D points, split in X and Y, with -1 as separators for different polylines.\nThe output compacts the polylines. Compacting means that if we have several segments separated by -1, but they are sequential (the last point of a segment equals the initial vertex of the next segment) the result is compacted into a single polyline. Somehow it gets rid of -1 when the segments are sequential.\n It also outputs 2 helpers: numPL is the number of resulting polylines. numV is a vector with the number of vertices on each polyline compacted.",
+    "description": "Joins adjacent polyline strips when their touching endpoints are exactly equal. Removes consecutive duplicate vertices.\n\n**Inputs**\n\n**[ In.X]** X coordinates of the paths. A -1 separates strips.\n\n**[ In.Y]** Y coordinates of the paths. A -1 separates strips.\n\n**Outputs**\n\n**[ Out.X]** X coordinates after joining strips and removing duplicate vertices.\n\n**[ Out.Y]** Y coordinates after joining strips and removing duplicate vertices.\n\n**[ num.PL]** Reported number of resulting polyline strips.\n\n**[ num.V]** Number of vertices in each resulting strip, in input order.\n\n**Notes**\n\nInput vectors must have equal lengths. A separator in either coordinate ends a strip. Joining uses exact coordinate equality, without a tolerance. Recalculates when In.X changes; changing only In.Y does not refresh the result.",
     "parameters": [
       "In.X",
       "In.Y",
-      "num.PL",
-      "num.V",
       "Out.X",
-      "Out.Y"
+      "Out.Y",
+      "num.PL",
+      "num.V"
     ],
     "source": "compactPolylines.h",
     "addon": "ofxEloiNodes"
   },
   "Cone Renderer": {
-    "description": "Creates a cone mesh with configurable radius, height and segment counts.",
+    "description": "Creates a textured cone with configurable body and cap subdivisions.\n\n**Geometry**\n\n**[ Cone.Radius]** Radius of the cone base in scene units.\n\n**[ Cone.Height]** Cone height along its local Y axis.\n\n**[ Cone.Rad.Segments]** Number of segments around the circumference.\n\n**[ Cone.Height.Segments]** Number of subdivisions along the cone height.\n\n**[ Cone.Cap.Segments]** Number of radial subdivisions across the base cap.\n\n**Texture and transform**\n\n**[ Tex.In]** Optional surface texture. Connect Mesh Out to an Equirectangular Pipeline mesh input to render it.\n\n**[ PosX]** Mesh translation along the scene X axis.\n\n**[ PosY]** Mesh translation along the scene Y axis.\n\n**[ PosZ]** Mesh translation along the scene Z axis.\n\n**[ ScaleX]** Scale multiplier along the mesh X axis.\n\n**[ ScaleY]** Scale multiplier along the mesh Y axis.\n\n**[ ScaleZ]** Scale multiplier along the mesh Z axis.\n\n**[ RotX]** Rotation about the X axis, in degrees.\n\n**[ RotY]** Rotation about the Y axis, in degrees.\n\n**[ RotZ]** Rotation about the Z axis, in degrees.\n\n**[ FlipX]** Mirrors texture coordinates horizontally. Does not mirror the geometry.\n\n**[ FlipY]** Mirrors texture coordinates vertically. Does not mirror the geometry.\n\n**Output**\n\n**[ Mesh Out]** Reference to this mesh for an Equirectangular Pipeline Mesh input. This is a mesh object, not an image texture.\n\n**Notes**\n\nGeometry and transforms use scene units rather than normalized 0-1 coordinates. This node supplies mesh data; the connected pipeline performs rendering.",
     "parameters": [
       "Cone.Radius",
       "Cone.Height",
       "Cone.Rad.Segments",
       "Cone.Height.Segments",
-      "Cone.Cap.Segments"
+      "Cone.Cap.Segments",
+      "Tex.In",
+      "PosX",
+      "PosY",
+      "PosZ",
+      "ScaleX",
+      "ScaleY",
+      "ScaleZ",
+      "RotX",
+      "RotY",
+      "RotZ",
+      "FlipX",
+      "FlipY",
+      "Mesh Out"
     ],
     "source": "coneRenderer.h",
     "addon": "ofxEloiNodes"
@@ -1059,7 +1117,7 @@
     "addon": "ofxSantiNodes"
   },
   "Cylinder Custom Renderer": {
-    "description": "Creates a cylinder mesh with configurable body and cap geometry.",
+    "description": "Creates a cylinder with independently visible body and caps, and adjustable texture-height allocation.\n\n**Geometry**\n\n**[ Cyl.Radius]** Cylinder radius in scene units.\n\n**[ Cyl.Height]** Cylinder height along its local Y axis.\n\n**[ Cyl.Rad.Segments]** Number of segments around the circumference.\n\n**[ Cyl.Height.Segments]** Number of subdivisions along the body height.\n\n**[ Cyl.Body]** Includes the curved cylinder body in the mesh.\n\n**[ Cyl.Top.Cap]** Includes the top cap in the mesh.\n\n**[ Cyl.Bottom.Cap]** Includes the bottom cap in the mesh.\n\n**[ Cyl.Cap.Top.V]** Relative share of the texture V range allocated to the top cap.\n\n**[ Cyl.Body.V]** Relative share of the texture V range allocated to the body.\n\n**[ Cyl.Cap.Bot.V]** Relative share of the texture V range allocated to the bottom cap.\n\n**Texture and transform**\n\n**[ Tex.In]** Optional surface texture. Connect Mesh Out to an Equirectangular Pipeline mesh input to render it.\n\n**[ PosX]** Mesh translation along the scene X axis.\n\n**[ PosY]** Mesh translation along the scene Y axis.\n\n**[ PosZ]** Mesh translation along the scene Z axis.\n\n**[ ScaleX]** Scale multiplier along the mesh X axis.\n\n**[ ScaleY]** Scale multiplier along the mesh Y axis.\n\n**[ ScaleZ]** Scale multiplier along the mesh Z axis.\n\n**[ RotX]** Rotation about the X axis, in degrees.\n\n**[ RotY]** Rotation about the Y axis, in degrees.\n\n**[ RotZ]** Rotation about the Z axis, in degrees.\n\n**[ FlipX]** Mirrors texture coordinates horizontally. Does not mirror the geometry.\n\n**[ FlipY]** Mirrors texture coordinates vertically. Does not mirror the geometry.\n\n**Output**\n\n**[ Mesh Out]** Reference to this mesh for an Equirectangular Pipeline Mesh input. This is a mesh object, not an image texture.\n\n**Notes**\n\nGeometry and transforms use scene units rather than normalized 0-1 coordinates. This node supplies mesh data; the connected pipeline performs rendering.",
     "parameters": [
       "Cyl.Radius",
       "Cyl.Height",
@@ -1070,19 +1128,45 @@
       "Cyl.Bottom.Cap",
       "Cyl.Cap.Top.V",
       "Cyl.Body.V",
-      "Cyl.Cap.Bot.V"
+      "Cyl.Cap.Bot.V",
+      "Tex.In",
+      "PosX",
+      "PosY",
+      "PosZ",
+      "ScaleX",
+      "ScaleY",
+      "ScaleZ",
+      "RotX",
+      "RotY",
+      "RotZ",
+      "FlipX",
+      "FlipY",
+      "Mesh Out"
     ],
     "source": "cylinderCustomRenderer.h",
     "addon": "ofxEloiNodes"
   },
   "Cylinder Renderer": {
-    "description": "Creates a cylinder mesh with configurable radius, height and segment counts.",
+    "description": "Creates a textured cylinder with body and cap tessellation controls.\n\n**Geometry**\n\n**[ Cyl.Radius]** Cylinder radius in scene units.\n\n**[ Cyl.Height]** Cylinder height along its local Y axis.\n\n**[ Cyl.Rad.Segments]** Number of segments around the circumference.\n\n**[ Cyl.Height.Segments]** Number of subdivisions along the body height.\n\n**[ Cyl.Cap.Segments]** Number of radial subdivisions across the caps.\n\n**Texture and transform**\n\n**[ Tex.In]** Optional surface texture. Connect Mesh Out to an Equirectangular Pipeline mesh input to render it.\n\n**[ PosX]** Mesh translation along the scene X axis.\n\n**[ PosY]** Mesh translation along the scene Y axis.\n\n**[ PosZ]** Mesh translation along the scene Z axis.\n\n**[ ScaleX]** Scale multiplier along the mesh X axis.\n\n**[ ScaleY]** Scale multiplier along the mesh Y axis.\n\n**[ ScaleZ]** Scale multiplier along the mesh Z axis.\n\n**[ RotX]** Rotation about the X axis, in degrees.\n\n**[ RotY]** Rotation about the Y axis, in degrees.\n\n**[ RotZ]** Rotation about the Z axis, in degrees.\n\n**[ FlipX]** Mirrors texture coordinates horizontally. Does not mirror the geometry.\n\n**[ FlipY]** Mirrors texture coordinates vertically. Does not mirror the geometry.\n\n**Output**\n\n**[ Mesh Out]** Reference to this mesh for an Equirectangular Pipeline Mesh input. This is a mesh object, not an image texture.\n\n**Notes**\n\nGeometry and transforms use scene units rather than normalized 0-1 coordinates. This node supplies mesh data; the connected pipeline performs rendering.",
     "parameters": [
       "Cyl.Radius",
       "Cyl.Height",
       "Cyl.Rad.Segments",
       "Cyl.Height.Segments",
-      "Cyl.Cap.Segments"
+      "Cyl.Cap.Segments",
+      "Tex.In",
+      "PosX",
+      "PosY",
+      "PosZ",
+      "ScaleX",
+      "ScaleY",
+      "ScaleZ",
+      "RotX",
+      "RotY",
+      "RotZ",
+      "FlipX",
+      "FlipY",
+      "Mesh Out"
     ],
     "source": "cylinderRenderer.h",
     "addon": "ofxEloiNodes"
@@ -1352,11 +1436,8 @@
     "addon": "ofxSantiNodes"
   },
   "Equirectangular Pipeline": {
-    "description": "Renders meshes and lights into an equirectangular texture with material, fog and render-order controls.",
+    "description": "Renders connected 3D meshes and lights into a 360-degree equirectangular texture viewed from the scene origin.\n\n**Render controls**\n\n**[ Resolution]** Output size selector: 0 = 2048 x 1024; 1 = 4096 x 2048; 2 = 8192 x 4096; 3 = 16384 x 8192. Larger sizes use substantially more GPU memory.\n\n**[ BackColor]** Background color of the rendered scene.\n\n**[ Wireframe?]** Enables wireframe overlays for every connected mesh.\n\n**[ Ambient Light]** Strength of the ambient material contribution.\n\n**[ Specular]** Strength of specular highlights.\n\n**[ Shininess]** Specular exponent. Higher values make highlights tighter.\n\n**Fog**\n\n**[ Enable Fog]** Enables distance-based fog measured from the scene origin.\n\n**[ Fog Color]** Color blended into distant geometry.\n\n**[ Fog Near]** Scene distance where fog starts.\n\n**[ Fog Far]** Scene distance where fog reaches full strength. Keep greater than Fog Near.\n\n**[ Fog Power]** Exponent shaping fog progression between the near and far distances.\n\n**Mesh slot parameters**\n\n**[ Mesh_n]** Mesh reference for slot n, for example Mesh_0. Connect a primitive renderer's Mesh Out here.\n\n**[ Opacity_n]** Opacity of mesh slot n, from 0 to 1.\n\n**[ DepthW_ n]** Allows slot n to write to the depth buffer. Initial slots include a space after the underscore; added slots use DepthW_n.\n\n**[ RenderOrd_ n]** Draw-order value for slot n. Lower values draw first. Initial slots include a space after the underscore; added slots use RenderOrd_n.\n\n**[ CapQApex_n]** Projective texture-coordinate weight at a cap or pole center for slot n. Adjusts how cap textures converge.\n\n**[ CapMaxRadius_n]** Radius used to normalize cap texture mapping for slot n, in scene units.\n\n**[ SelfIllum_n]** Bypasses lighting for slot n so its base texture color is used directly; fog can still apply.\n\n**[ Wireframe_n]** Enables a wireframe overlay for mesh slot n, independently of the global toggle.\n\n**[ WirefColor_n]** Wireframe overlay color for mesh slot n.\n\n**Light slot parameter**\n\n**[ Light_n]** Light reference for slot n, for example Light_0. Connect a 3D Light node's Light Out here.\n\n**Output**\n\n**[ Tex.Out]** Rendered 2:1 equirectangular texture, with longitude across its width and latitude across its height.\n\n**Inspector**\n\n**[ Num Meshes]** Number of independently configured mesh slots.\n\n**[ Num Lights]** Number of light input slots; can be 0.\n\n**Notes**\n\nn denotes one zero-based slot index, not a vector control. Each slot gets its own separately named parameters. Resolution controls the six cubemap faces used for capture as well as the final output. Transparent layers may need deliberate render order and depth-write settings.",
     "parameters": [
-      "Num Meshes",
-      "Num Lights",
-      "Tex.Out",
       "Resolution",
       "BackColor",
       "Wireframe?",
@@ -1368,18 +1449,41 @@
       "Fog Near",
       "Fog Far",
       "Fog Power",
-      "Mesh_",
-      "Opacity_",
-      "DepthW_ ",
-      "RenderOrd_ ",
-      "CapQApex_",
-      "CapMaxRadius_",
-      "SelfIllum_",
-      "Wireframe_",
-      "WirefColor_",
-      "Light_",
-      "DepthW_",
-      "RenderOrd_"
+      "Mesh_n",
+      "Opacity_n",
+      "DepthW_ n",
+      "RenderOrd_ n",
+      "CapQApex_n",
+      "CapMaxRadius_n",
+      "SelfIllum_n",
+      "Wireframe_n",
+      "WirefColor_n",
+      "Light_n",
+      "Tex.Out",
+      "Num Meshes",
+      "Num Lights",
+      "Resolutio0",
+      "Resolutio0",
+      "Mesh_0",
+      "Mesh_0",
+      "Opacity_0",
+      "Opacity_0",
+      "DepthW_ 0",
+      "DepthW_0",
+      "RenderOrd_ 0",
+      "RenderOrd_0",
+      "CapQApex_0",
+      "CapQApex_0",
+      "CapMaxRadius_0",
+      "CapMaxRadius_0",
+      "SelfIllum_0",
+      "SelfIllum_0",
+      "Wireframe_0",
+      "Wireframe_0",
+      "WirefColor_0",
+      "WirefColor_0",
+      "Light_0",
+      "Light_0"
     ],
     "source": "equirectPipeline.h",
     "addon": "ofxEloiNodes"
@@ -1686,7 +1790,7 @@
     "addon": "ofxSantiNodes"
   },
   "Flocking": {
-    "description": "Simulates boid flocking with follow position, strength, speed and force controls and outputs XY positions.",
+    "description": "Moves a collection of boids toward a shared target and outputs their positions in a wrapping 0-1 square.\n\n**Controls**\n\n**[ Num Boids]** Number of moving points. Changing it regenerates all positions and velocities.\n\n**[ Follow X]** Target X coordinate, from 0 to 1.\n\n**[ Follow Y]** Target Y coordinate, from 0 to 1.\n\n**[ Follow Strength]** Magnitude of the steering force toward the target before Max Force is applied.\n\n**[ Max Speed]** Maximum movement distance per node update.\n\n**[ Max Force]** Maximum steering acceleration per node update.\n\n**Outputs**\n\n**[ Out X]** One normalized X position per boid, in boid order.\n\n**[ Out Y]** One normalized Y position per boid, in boid order.\n\n**Notes**\n\nThe current implementation steers each boid toward the target independently; it does not calculate neighbor separation, alignment or cohesion. Motion is update-rate dependent. Points crossing an edge wrap to the opposite edge.",
     "parameters": [
       "Num Boids",
       "Follow X",
@@ -2823,11 +2927,11 @@
     "addon": "ofxOceanodeSuperCollider"
   },
   "Load Vectors From File": {
-    "description": "Load multiple vector<float> from a CSV file, each row becomes an output parameter",
+    "description": "Loads numeric CSV data and creates a separate float-vector outlet for each non-empty numeric row.\n\n**Control**\n\n**[ Open File]** Opens a file chooser. The selected CSV is read on the next update.\n\n**Outputs**\n\n**[ File Path]** Selected file path. Files inside the application data folder are stored with a relative path.\n\n**[ row_ n]** One outlet for CSV row n, starting at 0. The visible name contains a space after the underscore, for example row_ 0.\n\n**Notes**\n\nNumeric cells are parsed as floats. Invalid or out-of-range cells are skipped; rows containing no parsed numbers are omitted. Output count follows the loaded rows, so it is not known before loading a file. Relative paths resolve against the application data folder.",
     "parameters": [
       "Open File",
       "File Path",
-      "row_ "
+      "row_ n"
     ],
     "source": "LoadVectorsFromFile.h",
     "addon": "ofxEloiNodes"
@@ -2878,7 +2982,7 @@
     "addon": "ofxPlaymodes"
   },
   "MF34 Liceu": {
-    "description": "Accumulates incoming key codes into a number and emits a number trigger.",
+    "description": "Turns MagicForce MF34 keypad events into numbered cues. Connect USB Keyboard's Key Code output to Key Code In.\n\n**Input**\n\n**[ Key Code In]** USB HID code. Keypad digits accumulate a number; code 58 confirms it, 41 clears typing, and 80 steps back one cue.\n\n**Outputs**\n\n**[ Accum.]** Digits currently being typed, as text. Clears after confirmation, clear or step-back.\n\n**[ Number Out]** Last confirmed cue number. Confirm with no digits advances it by one; step-back subtracts one.\n\n**[ Number Trigger]** Fires whenever a cue is confirmed, advanced or stepped back, including repeated cue numbers.\n\n**Notes**\n\nUses the project-specific keyboard mapping: confirmation is HID code 58, not the standard Return code. Keypad codes 89-97 map to 1-9; code 98 maps to 0.",
     "parameters": [
       "Key Code In",
       "Accum.",
@@ -3002,7 +3106,7 @@
     "addon": "ofxOceanode"
   },
   "Macro Active?": {
-    "description": "Reports macro activation and emits a void event when activated.",
+    "description": "Reports node activation and sends a trigger after activation, useful inside macros.\n\n**Outputs**\n\n**[ Activated?]** True after activate() and false after deactivate(). Reflects the node lifecycle, rather than checking a macro name.\n\n**[ Trigger Void]** Fires once on the next update after activation. Deactivation cancels a pending event.\n\n**Notes**\n\nOutputs are not stored in presets. Place the node inside a macro to react to that macro's activation lifecycle.",
     "parameters": [
       "Activated?",
       "Trigger Void"
@@ -3181,16 +3285,54 @@
     "source": "mergeVoid.h",
     "addon": "ofxSantiNodes"
   },
-  "Metaballs": {
-    "description": "Generates metaball contours from circles using marching squares. Produces organic, fluid-like blending with -1 separators for multiple blobs.",
+  "Metab Points": {
+    "description": "Generates an organism-like point cloud from delayed copies of a moving capital point, with per-point noise, vector offsets and radii.\n\n**Point count and orbit**\n\n**[ Num Points]** Number of delayed position samples to output, from 1 to 64.\n\n**[ Circle Ph.]** Orbit phase in turns. Animate this input to move around the circle.\n\n**[ Do Circles]** Orbit diameter; its radius is half this value.\n\n**[ Offset]** Phase offset added to Circle Ph., in turns.\n\n**Freedom movement**\n\n**[ Freedom]** Amplitude of the capital point's seeded noise walk around 0.5.\n\n**[ Freed. Speed]** Speed of the freedom noise clock. 0 holds its time.\n\n**[ Freed. Quant]** Number of delay groups distributed across the output points.\n\n**[ Seed X]** Seed coordinate used by both the freedom walk and per-point X noise.\n\n**[ Seed Y]** Seed coordinate used by both the freedom walk and per-point Y noise.\n\n**[ Reset Free.]** Restarts the freedom clock's counter. Its accumulated speed-continuity offset is retained.\n\n**Per-point noise**\n\n**[ Noise]** Amplitude of the independent noise added to each delayed point.\n\n**[ Noise Scale]** Spread of noise coordinates across point indices; changes how similar adjacent points move.\n\n**[ Noise Speed]** Speed of the per-point noise clock, also scaled by Noise Time Scale.\n\n**[ Reset Noise]** Restarts the per-point noise counter. Its accumulated speed-continuity offset is retained.\n\n**Position and delay**\n\n**[ Pos X]** Horizontal offset of the capital point before multiplying by Pos Amount.\n\n**[ Pos Y]** Vertical offset of the capital point before multiplying by Pos Amount.\n\n**[ Pos Amount]** Amount of the Pos X and Pos Y offsets applied to the capital point.\n\n**[ VecPos X]** Additional X offset for each output point, scaled by VPos Amount.\n\n**[ VecPos Y]** Additional Y offset for each output point, scaled by VPos Amount.\n\n**[ VPos Amount]** Multiplier for the per-point vector offsets.\n\n**[ Delay Ms]** Scale of the point-delay ramp in milliseconds. Early points read older positions; late points read newer positions.\n\n**Radius controls**\n\n**[ Radius Min]** Radius assigned to a distribution value of 0.\n\n**[ Radius Max]** Radius assigned to a distribution value of 1.\n\n**[ Radius Distr.]** Values mapped from 0-1 into the radius range. A single value broadcasts to Num Points; a longer vector keeps its own length.\n\n**Outputs**\n\n**[ Cap 1 X]** Current X coordinate of the capital point before delay and per-point additions.\n\n**[ Cap 1 Y]** Current Y coordinate of the capital point before delay and per-point additions.\n\n**[ Pos X Out]** Generated X positions, one per point.\n\n**[ Pos Y Out]** Generated Y positions, one per point.\n\n**[ Radius Out]** Mapped radii for use by a metaball or circle generator.\n\n**Inspector**\n\n**[ Buffer Max Size]** Maximum history samples retained per coordinate delay line. One sample is recorded per update.\n\n**[ Noise Time Scale]** Internal multiplier for the per-point noise clock. The macro-compatible default is 0.1.\n\n**Notes**\n\nPorted from METAB_POINTS_4. Uses Oceanode time. Delays exceeding available history are compressed proportionally; readings use the nearest recorded sample. Short VecPos inputs fall back to their first value, and empty inputs contribute 0. Outputs can extend beyond the 0-1 domain.",
     "parameters": [
-      "Num Circles",
+      "Num Points",
+      "Circle Ph.",
+      "Do Circles",
+      "Offset",
+      "Freedom",
+      "Freed. Speed",
+      "Freed. Quant",
+      "Seed X",
+      "Seed Y",
+      "Reset Free.",
+      "Noise",
+      "Noise Scale",
+      "Noise Speed",
+      "Reset Noise",
+      "Pos X",
+      "Pos Y",
+      "Pos Amount",
+      "VecPos X",
+      "VecPos Y",
+      "VPos Amount",
+      "Delay Ms",
+      "Radius Min",
+      "Radius Max",
+      "Radius Distr.",
+      "Cap 1 X",
+      "Cap 1 Y",
+      "Pos X Out",
+      "Pos Y Out",
+      "Radius Out",
+      "Buffer Max Size",
+      "Noise Time Scale"
+    ],
+    "source": "metabPoints.h",
+    "addon": "ofxEloiNodes"
+  },
+  "Metaballs": {
+    "description": "Blends circular influence fields and traces their boundaries using marching squares.\n\n**Inputs**\n\n**[ Positions X]** X coordinate of each circle center in the normalized 0-1 domain.\n\n**[ Positions Y]** Y coordinate of each circle center in the normalized 0-1 domain.\n\n**[ Radii]** Radius of each circle in normalized coordinate units.\n\n**Controls**\n\n**[ Threshold]** Field value traced as the contour. Increasing it usually shrinks the visible blobs.\n\n**[ Grid Resolution]** Number of grid samples per axis. Higher values improve contour detail and increase calculation cost.\n\n**[ Smoothing]** Strength of contour smoothing. 0 leaves the traced vertices unchanged.\n\n**Outputs**\n\n**[ Num Circles]** Number of circle centers in Positions X. This is a reported count, not an input that creates circles.\n\n**[ Contours X]** X coordinates of the resulting contour strips, separated by -1.\n\n**[ Contours Y]** Y coordinates of the resulting contour strips, separated by -1.\n\n**Notes**\n\nUse matching coordinate and radius vector lengths; calculation uses their shared length. Setup extends short Y and radius vectors once, using their last value or a default, but later edits do not repeat this resize. A change to Positions Y alone does not recalculate; publish Y before X. Contours use paired -1 separators.",
+    "parameters": [
       "Positions X",
       "Positions Y",
       "Radii",
       "Threshold",
       "Grid Resolution",
       "Smoothing",
+      "Num Circles",
       "Contours X",
       "Contours Y"
     ],
@@ -3198,7 +3340,7 @@
     "addon": "ofxEloiNodes"
   },
   "MetaballsV2": {
-    "description": "Generates metaball contours from circles using marching squares. Produces organic, fluid-like blending with -1 separators for multiple blobs.",
+    "description": "Traces connected metaball contours with optional smoothing, loop closure and deliberate breaks across large vertex gaps.\n\n**Inputs**\n\n**[ Positions X]** X coordinate of each circle center in the normalized 0-1 domain.\n\n**[ Positions Y]** Y coordinate of each circle center in the normalized 0-1 domain.\n\n**[ Radii]** Radius of each circle in normalized coordinate units.\n\n**Controls**\n\n**[ Threshold]** Field value traced as the contour. Increasing it usually shrinks the visible blobs.\n\n**[ Grid Resolution]** Number of grid samples per axis. Higher values improve contour detail and increase calculation cost.\n\n**[ Smoothing]** Strength of contour smoothing. 0 leaves the traced vertices unchanged.\n\n**[ Max Vertex Step]** Maximum allowed distance between consecutive output vertices. Larger gaps start a new strip; 0 disables this limit.\n\n**[ Max Close Step]** Maximum allowed distance for the closing edge of a loop. 0 disables this limit.\n\n**[ Close?]** Repeats the first vertex at the end of a genuine closed loop when its closing gap is allowed. Boundary-clipped contours remain open.\n\n**Outputs**\n\n**[ Contours X]** X coordinates of the resulting contour strips, separated by -1.\n\n**[ Contours Y]** Y coordinates of the resulting contour strips, separated by -1.\n\n**Notes**\n\nOnly the shared length of Positions X, Positions Y and Radii is used; this version does not broadcast short vectors. Inputs and controls recalculate on change. -1 in both contour outputs separates strips.",
     "parameters": [
       "Positions X",
       "Positions Y",
@@ -3213,6 +3355,28 @@
       "Contours Y"
     ],
     "source": "metaballsV2.h",
+    "addon": "ofxEloiNodes"
+  },
+  "MetaballsV3": {
+    "description": "Builds circular metaball contours using either additive fields or smooth unions of signed-distance shapes.\n\n**Inputs**\n\n**[ Positions X]** X coordinate of each circle center in the normalized 0-1 domain.\n\n**[ Positions Y]** Y coordinate of each circle center in the normalized 0-1 domain.\n\n**[ Radii]** Radius of each circle in normalized coordinate units.\n\n**[ Strength]** Per-source amount: positive adds material, 0 disables the source, and negative carves it away. In SDF mode its absolute value scales radius.\n\n**Mode and shape controls**\n\n**[ Mode]** Additive sums influence fields. SDF Smooth Union joins circle distance fields.\n\n**[ Falloff Power]** Rate at which a source's influence fades with distance. Applies in Additive mode.\n\n**[ Threshold]** Field level traced in Additive mode. Higher values generally shrink the contours.\n\n**[ Accumulation]** Additive overlap behavior: 0 uses the strongest source; 1 sums sources; intermediate values blend between them.\n\n**[ Blend Distance]** Smooth-union blend width in SDF mode. Larger values make joins softer.\n\n**[ SDF Offset]** Distance offset in SDF mode, used to expand or contract the shape.\n\n**[ Border Margin]** Keeps the contours this far inside the normalized 0-1 square. A positive value closes contours at the border region.\n\n**[ Border Feather]** Softens the shape near the domain edge. A positive value closes contours at the border region.\n\n**[ Grid Resolution]** Sampling resolution per axis. Higher settings improve detail and increase computation cost.\n\n**Outputs**\n\n**[ Contours X]** X coordinates of the resulting contour strips, separated by -1.\n\n**[ Contours Y]** Y coordinates of the resulting contour strips, separated by -1.\n\n**Notes**\n\nSingle-value source vectors broadcast; longer mismatched vectors truncate to their shared length. Changes are batched and calculated once on update. Genuine loops close automatically; boundary-clipped contours stay open when border controls are zero. Use Wave It downstream for contour deformation.",
+    "parameters": [
+      "Positions X",
+      "Positions Y",
+      "Radii",
+      "Strength",
+      "Mode",
+      "Falloff Power",
+      "Threshold",
+      "Accumulation",
+      "Blend Distance",
+      "SDF Offset",
+      "Border Margin",
+      "Border Feather",
+      "Grid Resolution",
+      "Contours X",
+      "Contours Y"
+    ],
+    "source": "metaballsV3.h",
     "addon": "ofxEloiNodes"
   },
   "Mirror Renderer": {
@@ -3287,15 +3451,15 @@
     "addon": "ofxOceanodeSuperCollider"
   },
   "Morse Generator": {
-    "description": "Generates morse code signal from text at play.",
+    "description": "Plays text as timed Morse pulses. Trigger Play to encode the current text and begin from the start.\n\n**Inputs and controls**\n\n**[ Text]** Message to encode. Supported letters are case-insensitive; the built-in table also contains digits and punctuation.\n\n**[ Unit Ms]** Duration of one timing unit in milliseconds. Dots last one unit and dashes three.\n\n**[ Play]** Starts or restarts the current message.\n\n**[ Reset]** Stops playback, clears Finished? and returns the message index to the start.\n\n**Outputs**\n\n**[ Output]** 1 during a dot or dash and 0 during gaps or after normal completion.\n\n**[ Playing?]** True while the encoded message is being played.\n\n**[ Finished?]** Becomes true after normal completion. Play or Reset clears it.\n\n**Notes**\n\nUses Oceanode time and advances on node updates, so timing resolution depends on the update rate. Reset does not explicitly force Output to 0; stopping mid-pulse may leave its last value.",
     "parameters": [
+      "Text",
+      "Unit Ms",
       "Play",
       "Reset",
+      "Output",
       "Playing?",
-      "Finished?",
-      "Unit Ms",
-      "Text",
-      "Output"
+      "Finished?"
     ],
     "source": "morseCodeGenerator.h",
     "addon": "ofxEloiNodes"
@@ -4131,12 +4295,25 @@
     "addon": "ofxSantiNodes"
   },
   "Plane Renderer": {
-    "description": "Creates a plane mesh with configurable dimensions, rows and columns.",
+    "description": "Creates a textured plane for use in the Equirectangular Pipeline.\n\n**Geometry**\n\n**[ Plane.Width]** Plane width in scene units.\n\n**[ Plane.Height]** Plane height in scene units.\n\n**[ Plane.Columns]** Mesh resolution across the width.\n\n**[ Plane.Rows]** Mesh resolution across the height.\n\n**Texture and transform**\n\n**[ Tex.In]** Optional surface texture. Connect Mesh Out to an Equirectangular Pipeline mesh input to render it.\n\n**[ PosX]** Mesh translation along the scene X axis.\n\n**[ PosY]** Mesh translation along the scene Y axis.\n\n**[ PosZ]** Mesh translation along the scene Z axis.\n\n**[ ScaleX]** Scale multiplier along the mesh X axis.\n\n**[ ScaleY]** Scale multiplier along the mesh Y axis.\n\n**[ ScaleZ]** Scale multiplier along the mesh Z axis.\n\n**[ RotX]** Rotation about the X axis, in degrees.\n\n**[ RotY]** Rotation about the Y axis, in degrees.\n\n**[ RotZ]** Rotation about the Z axis, in degrees.\n\n**[ FlipX]** Mirrors texture coordinates horizontally. Does not mirror the geometry.\n\n**[ FlipY]** Mirrors texture coordinates vertically. Does not mirror the geometry.\n\n**Output**\n\n**[ Mesh Out]** Reference to this mesh for an Equirectangular Pipeline Mesh input. This is a mesh object, not an image texture.\n\n**Notes**\n\nGeometry and transforms use scene units rather than normalized 0-1 coordinates. This node supplies mesh data; the connected pipeline performs rendering.",
     "parameters": [
       "Plane.Width",
       "Plane.Height",
       "Plane.Columns",
-      "Plane.Rows"
+      "Plane.Rows",
+      "Tex.In",
+      "PosX",
+      "PosY",
+      "PosZ",
+      "ScaleX",
+      "ScaleY",
+      "ScaleZ",
+      "RotX",
+      "RotY",
+      "RotZ",
+      "FlipX",
+      "FlipY",
+      "Mesh Out"
     ],
     "source": "planeRenderer.h",
     "addon": "ofxEloiNodes"
@@ -4165,7 +4342,7 @@
     "addon": "ofxOceanodeVectorGraphics"
   },
   "Point Is Present": {
-    "description": "Checks whether comparison points occur in an XY point set and outputs matching positions.",
+    "description": "Keeps entire polyline groups whose coordinates are present in comparison vectors.\n\n**Inputs**\n\n**[ X.In]** X coordinates to check. A -1 splits the input into polyline groups.\n\n**[ Y.In]** Y coordinates to check, paired by index with X.In.\n\n**[ X.Comp]** Reference X values to search for using exact equality.\n\n**[ Y.Comp]** Reference Y values to search for using exact equality.\n\n**Outputs**\n\n**[ X.Out]** X coordinates of groups for which every vertex passes the coordinate tests.\n\n**[ Y.Out]** Y coordinates of the accepted groups.\n\n**[ Found]** One 1 or 0 per input vertex, excluding separators. Every vertex in a group receives the same group result.\n\n**Notes**\n\nX and Y membership are tested independently: matching values may occur at different reference indices. This is not a paired-point or nearest-distance test. Input coordinate lengths must match and contain more than one element; otherwise the previous outputs remain. Evaluates every update.",
     "parameters": [
       "X.In",
       "Y.In",
@@ -4190,20 +4367,25 @@
     "addon": "ofxOceanodeVectorGraphics"
   },
   "Points Distance": {
-    "description": "Calculates distances and angles between input XY point sets with interpolation controls.",
+    "description": "Finds nearest distances and directions between two 2D point sets, with an output entry for every point on each side.\n\n**Coordinate inputs**\n\n**[ x0]** X coordinates of point set 0.\n\n**[ y0]** Y coordinates of point set 0.\n\n**[ x1]** X coordinates of point set 1.\n\n**[ y1]** Y coordinates of point set 1.\n\n**Controls**\n\n**[ Width]** Scale applied to X differences for both distance outputs.\n\n**[ Height]** Scale applied to Y differences for both distance outputs.\n\n**[ Angle Mode]** Blended combines directions from all valid opposite points. Nearest uses only the closest match and is faster.\n\n**[ Interp]** Direction weighting in Blended mode. -1 favors nearby points; +1 approaches equal weighting. Does not change nearest distances or indices.\n\n**Outputs**\n\n**[ Dist0]** Nearest scaled distance for every point in set 0. -1 means no match.\n\n**[ Ang0]** Direction from set 1 toward each point in set 0, in turns: 0 is +X and 0.25 is +Y.\n\n**[ Index0]** Zero-based index of each set-0 point's nearest match in set 1. -1 means no match.\n\n**[ Dist1]** Nearest scaled distance for every point in set 1. -1 means no match.\n\n**[ Ang1]** Direction from set 0 toward each point in set 1, in turns: 0 is +X and 0.25 is +Y.\n\n**[ Index1]** Zero-based index of each set-1 point's nearest match in set 0. -1 means no match.\n\n**Inspector**\n\n**[ Scaled Angles]** Applies Width and Height to direction calculations as well as distances.\n\n**[ Intercalate]** Reverses direction contributions from odd indices in the opposite point set.\n\n**[ Exclude Same Index]** Skips matches with the same index on both sides, useful when comparing a point set with itself.\n\n**Notes**\n\nWithin a set, a single X or Y value broadcasts to the other coordinate length. Other length mismatches make that set empty. Non-finite points keep their output slots but cannot match. Missing, coincident or cancelling directions give angle 0. Evaluates on update and reuses unchanged results.",
     "parameters": [
-      "Width",
-      "Height",
-      "Interp",
       "x0",
       "y0",
       "x1",
       "y1",
+      "Width",
+      "Height",
+      "Angle Mode",
+      "Interp",
       "Dist0",
       "Ang0",
+      "Index0",
       "Dist1",
       "Ang1",
-      "Intercalate"
+      "Index1",
+      "Scaled Angles",
+      "Intercalate",
+      "Exclude Same Index"
     ],
     "source": "pointsDistance.h",
     "addon": "ofxEloiNodes"
@@ -4336,7 +4518,7 @@
     "addon": "ofxSantiNodes"
   },
   "Polyline Info": {
-    "description": "Counts vertices, segments and separate polylines in a set of 2D paths.\n\n**Inputs**\n\n**[ In.X]**: X coordinate vector. A -1 separates polylines.\n\n**[ In.Y]**: Y coordinate vector. A -1 separates polylines.\n\n**Outputs**\n\n**[ Total Points]**: Total number of vertices, excluding separators.\n\n**[ Total Segments]**: Total number of connections between consecutive vertices within each polyline.\n\n**[ Num Polylines]**: Number of non-empty paths.\n\n**[ Segments Per Polyline]**: One segment count for each path, in input order.\n\n**[ Vertices Per Polyline]**: One vertex count for each path, in input order.\n\n**Notes**\n\nA -1 in either coordinate ends the current path. If the input lengths differ, only their shared portion is read. A path with N vertices has N-1 segments.",
+    "description": "Counts vertices, segments and separate polylines in a set of 2D paths.\n\n**Inputs**\n\n**[ In.X]** X coordinate vector. A -1 separates polylines.\n\n**[ In.Y]** Y coordinate vector. A -1 separates polylines.\n\n**Outputs**\n\n**[ Total Points]** Total number of vertices, excluding separators.\n\n**[ Total Segments]** Total number of connections between consecutive vertices within each polyline.\n\n**[ Num Polylines]** Number of non-empty paths.\n\n**[ Segments Per Polyline]** One segment count for each path, in input order.\n\n**[ Vertices Per Polyline]** One vertex count for each path, in input order.\n\n**Notes**\n\nA -1 in either coordinate ends the current path. If the input lengths differ, only their shared portion is read. A path with N vertices has N-1 segments.",
     "parameters": [
       "In.X",
       "In.Y",
@@ -4633,13 +4815,12 @@
     "addon": "ofxOceanode"
   },
   "Post-It Note": {
-    "description": "A post-it note: coloured rectangle with editable text. Click to select, drag to move, double-click to edit, Escape to confirm. Drag bottom-right corner to resize.",
+    "description": "Places a colored annotation directly on the canvas. Click to select, drag to move, and double-click the body to edit text.\n\n**Inspector**\n\n**[ Text]** Note contents. Editing the note updates this value.\n\n**[ Backgr.Color]** Note background color, including alpha.\n\n**[ Text.Color]** Note text color, including alpha.\n\n**[ Font Size]** Text size at normal canvas zoom; scales with the canvas.\n\n**Notes**\n\nEscape or clicking outside ends text editing. Drag the bottom-right corner to resize; the size is saved with the preset. Text is hidden at low zoom while the note remains visible. Corner Radius is currently fixed internally and is not an exposed parameter.",
     "parameters": [
       "Text",
       "Backgr.Color",
       "Text.Color",
-      "Font Size",
-      "Corner Radius"
+      "Font Size"
     ],
     "source": "postItNote.h",
     "addon": "ofxEloiNodes"
@@ -4932,7 +5113,7 @@
     "addon": "ofxSantiNodes"
   },
   "Random Element Selector": {
-    "description": "Selects N elements from the input vector when triggered. Can enforce no repetitions or allow repetitions based on weights.",
+    "description": "Draws a new weighted random selection from a vector whenever Trigger fires.\n\n**Inputs and controls**\n\n**[ Input]** Source values to sample. Selection operates on indices, so equal values at different indices can both be selected.\n\n**[ Weights]** Relative probability per input index. Short vectors repeat their last weight; an empty vector uses 1. Supply no more weights than input elements.\n\n**[ Num Elements]** Requested output size. With Unrepeated enabled, it is capped to the input length.\n\n**[ Unrepeated]** Prevents selecting the same index twice within a draw. Indices used in the previous draw get one tenth of their normal weight, but can still reappear.\n\n**[ Trigger]** Creates a new selection using the current inputs and controls.\n\n**Output**\n\n**[ Output]** Selected values in draw order. With Unrepeated disabled, the same input index can appear multiple times.\n\n**Notes**\n\nInput or control edits do not select again until Trigger fires. Previous-draw avoidance is a preference, not a guarantee.",
     "parameters": [
       "Input",
       "Weights",
@@ -5125,7 +5306,7 @@
     "addon": "ofxSantiNodes"
   },
   "ReaperOSC": {
-    "description": "Exposes REAPER OSC data for a selected identifier.",
+    "description": "Reads the latest stored value for one REAPER OSC channel from the shared ReaperOSC controller.\n\n**Control**\n\n**[ Id]** Channel identifier to read, from 1 to 512.\n\n**Output**\n\n**[ Out]** Most recently received float for the selected channel, published on each update. The controller initializes channels to -1 before data arrives.\n\n**Notes**\n\nThe shared controller listens on UDP port 12349. Configure the sender to match the controller's REAPER OSC address layout; this node does not send OSC.",
     "parameters": [
       "Id",
       "Out"
@@ -5150,7 +5331,12 @@
     "description": "Removes separator values of -1 from input point or value vectors.",
     "parameters": [
       "Input",
-      "Output"
+      "Output",
+      "In.X",
+      "In.y",
+      "Out.x",
+      "Out.y",
+      "N"
     ],
     "source": "remove-1.h",
     "addon": "ofxOceanodeVectorGraphics"
@@ -6762,14 +6948,19 @@
     "addon": "ofxSantiNodes"
   },
   "Save Vectors To File": {
-    "description": "Save multiple vector<float> inputs to a CSV file, each vector as a separate row",
+    "description": "Writes several float vectors to a CSV file, with one input vector per file row.\n\n**Controls**\n\n**[ Choose Folder]** Opens a folder chooser to select the destination directory.\n\n**[ Filename]** Name of the file to write, including its extension.\n\n**[ Save To File]** Writes the current row inputs. An existing file at the same destination is overwritten.\n\n**Row inputs**\n\n**[ row_0]** Float vector written as CSV row 1. Values are separated by commas.\n\n**[ row_1]** Float vector written as CSV row 2. Values are separated by commas.\n\n**[ row_2]** Float vector written as CSV row 3. Values are separated by commas.\n\n**[ row_3]** Float vector written as CSV row 4. Values are separated by commas.\n\n**[ row_4]** Float vector written as CSV row 5. Values are separated by commas.\n\n**[ row_n]** Additional float-vector row created by increasing Num Rows. n is the zero-based row index.\n\n**Output**\n\n**[ Folder Path]** Path of the directory selected with Choose Folder; reports the selection rather than selecting a folder itself.\n\n**Inspector**\n\n**[ Num Rows]** Number of row inputs. Increasing it adds rows; decreasing it removes rows from the end.\n\n**Notes**\n\nChoose a folder and provide a non-empty filename before saving. Row lengths can differ. Saving happens only when Save To File fires, not on every input edit.",
     "parameters": [
-      "Num Rows",
       "Choose Folder",
-      "Folder Path",
       "Filename",
       "Save To File",
-      "row_"
+      "row_0",
+      "row_1",
+      "row_2",
+      "row_3",
+      "row_4",
+      "row_n",
+      "Folder Path",
+      "Num Rows"
     ],
     "source": "saveVectorsToFile.h",
     "addon": "ofxEloiNodes"
@@ -7018,7 +7209,7 @@
     "addon": "ofxSantiNodes"
   },
   "Signes Manual Drawer": {
-    "description": "Creates a matrix of cells with 8 different states, outputting angle values",
+    "description": "Edits a grid of eight cell states and converts it to angle and state-mask vectors. Stores 32 independent drawing slots.\n\n**Grid and display controls**\n\n**[ Grid X]** Column counts. One value applies to every row; a vector sets each row separately, repeating its last value for later rows.\n\n**[ Grid Y]** Number of grid rows.\n\n**[ w]** Width of the entire grid in canvas units.\n\n**[ h]** Height of each grid row in canvas units.\n\n**[ Slot]** Drawing slot to display and output, indexed from 0 to 31.\n\n**[ Reset Slot]** Clears every cell in the current slot to state 0.\n\n**[ Reset All]** Clears every cell in all drawing slots to state 0.\n\n**[ Open]** Opens a saved JSON drawing collection.\n\n**[ Save]** Saves the drawing collection as JSON.\n\n**Outputs**\n\n**[ Curr.File]** Filename of the current external drawing collection.\n\n**[ Angle out]** One angle per cell in turns: state times 0.125, from 0 to 0.875.\n\n**[ O1]** 1 where a cell is state 1 (blue), otherwise 0.\n\n**[ O2]** 1 where a cell is state 2 (green), otherwise 0.\n\n**[ O3]** 1 where a cell is state 3 (yellow), otherwise 0.\n\n**[ O4]** 1 where a cell is state 4 (orange), otherwise 0.\n\n**[ O5]** 1 where a cell is state 5 (red), otherwise 0.\n\n**[ O6]** 1 where a cell is state 6 (magenta), otherwise 0.\n\n**[ O7]** 1 where a cell is state 7 (cyan), otherwise 0.\n\n**[ O8]** 1 where a cell is state 0 (empty), otherwise 0.\n\n**Notes**\n\nClick a cell to advance its state; Shift-click moves backward. Drag paints other cells with the state selected by the first click. Outputs follow reading order, left to right and then top to bottom. Grid resizing preserves overlapping cells in every slot.",
     "parameters": [
       "Grid X",
       "Grid Y",
@@ -7027,9 +7218,9 @@
       "Slot",
       "Reset Slot",
       "Reset All",
-      "Curr.File",
       "Open",
       "Save",
+      "Curr.File",
       "Angle out",
       "O1",
       "O2",
@@ -7044,7 +7235,7 @@
     "addon": "ofxEloiNodes"
   },
   "Skull Illusion": {
-    "description": "Skull illusion: converts an input texture into a grid of complementary half-hexagon tiles. Mode 0=CPU vectorial, 1=CPU lineal, 2=GPU shader.",
+    "description": "Converts a texture into a grid of complementary half-hexagon tiles, producing the Skull Illusion pattern.\n\n**Input**\n\n**[ Input Texture]** Source texture used to choose the tile pattern from sampled brightness.\n\n**Controls**\n\n**[ Threshold]** Brightness cutoff used to select the two tile states.\n\n**[ Divisions]** Number of grid cells along each axis. Higher values give smaller, more detailed tiles.\n\n**[ Draw Mode]** 0 uses CPU vectorial shapes; 1 uses CPU lineal shapes; 2 uses the GPU shader.\n\n**[ Invert]** Reverses the brightness classification used for the pattern.\n\n**[ Dark Color]** Color used for the dark parts of the pattern.\n\n**[ Light Color]** Color used for the light parts and background of the pattern.\n\n**[ Out Width]** Output texture width in pixels.\n\n**[ Out Height]** Output texture height in pixels.\n\n**[ Save]** Exports CPU vectorial and lineal versions as SVG and the GPU version as PNG into a timestamped data/skullIllusionRenders folder.\n\n**Output**\n\n**[ Output Texture]** Rendered pattern texture at the selected output dimensions.\n\n**Notes**\n\nGPU mode renders every update to follow live texture contents. CPU modes recompute when their input or controls report changes. Save exports all three versions and then restores the selected draw mode.",
     "parameters": [
       "Input Texture",
       "Threshold",
@@ -7055,8 +7246,8 @@
       "Light Color",
       "Out Width",
       "Out Height",
-      "Output Texture",
-      "Save"
+      "Save",
+      "Output Texture"
     ],
     "source": "skullIllusion.h",
     "addon": "ofxEloiNodes"
@@ -7180,10 +7371,23 @@
     "addon": "ofxSantiNodes"
   },
   "Sphere Renderer": {
-    "description": "Creates a sphere mesh with configurable radius and resolution.",
+    "description": "Creates a textured sphere for rendering in the Equirectangular Pipeline.\n\n**Geometry**\n\n**[ Sph.Radius]** Sphere radius in scene units.\n\n**[ Sph.Resolution]** Sphere tessellation resolution. Higher values produce more vertices and a smoother surface.\n\n**Texture and transform**\n\n**[ Tex.In]** Optional surface texture. Connect Mesh Out to an Equirectangular Pipeline mesh input to render it.\n\n**[ PosX]** Mesh translation along the scene X axis.\n\n**[ PosY]** Mesh translation along the scene Y axis.\n\n**[ PosZ]** Mesh translation along the scene Z axis.\n\n**[ ScaleX]** Scale multiplier along the mesh X axis.\n\n**[ ScaleY]** Scale multiplier along the mesh Y axis.\n\n**[ ScaleZ]** Scale multiplier along the mesh Z axis.\n\n**[ RotX]** Rotation about the X axis, in degrees.\n\n**[ RotY]** Rotation about the Y axis, in degrees.\n\n**[ RotZ]** Rotation about the Z axis, in degrees.\n\n**[ FlipX]** Mirrors texture coordinates horizontally. Does not mirror the geometry.\n\n**[ FlipY]** Mirrors texture coordinates vertically. Does not mirror the geometry.\n\n**Output**\n\n**[ Mesh Out]** Reference to this mesh for an Equirectangular Pipeline Mesh input. This is a mesh object, not an image texture.\n\n**Notes**\n\nGeometry and transforms use scene units rather than normalized 0-1 coordinates. This node supplies mesh data; the connected pipeline performs rendering.",
     "parameters": [
       "Sph.Radius",
-      "Sph.Resolution"
+      "Sph.Resolution",
+      "Tex.In",
+      "PosX",
+      "PosY",
+      "PosZ",
+      "ScaleX",
+      "ScaleY",
+      "ScaleZ",
+      "RotX",
+      "RotY",
+      "RotZ",
+      "FlipX",
+      "FlipY",
+      "Mesh Out"
     ],
     "source": "sphereRenderer.h",
     "addon": "ofxEloiNodes"
@@ -7620,15 +7824,15 @@
     "addon": "ofxOceanodePlaymodes"
   },
   "Text Box": {
-    "description": "A text box with both editing capability and automatic text wrapping",
+    "description": "Displays an editable text panel inside the node, with automatic wrapping in display mode.\n\n**Control**\n\n**[ Edit]** Enables multiline text editing in the panel. Turn it off to show the wrapped display view.\n\n**Inspector**\n\n**[ Text]** Text to display or edit. Changes made in the panel are written back here.\n\n**[ w]** Panel width in canvas units. Also adjustable by dragging the bottom-right resize handle.\n\n**[ h]** Panel height in canvas units. Also adjustable by dragging the bottom-right resize handle.\n\n**[ Backgr.Color]** Panel background color, including alpha.\n\n**[ Text.Color]** Displayed text color, including alpha.\n\n**[ Font Size]** Text size at normal canvas zoom; scales with the canvas.\n\n**Notes**\n\nDisplay text is clipped to the panel bounds. The panel stores plain text; the bold-description syntax belongs to the help views and is not interpreted by this node.",
     "parameters": [
+      "Edit",
       "Text",
       "w",
       "h",
       "Backgr.Color",
       "Text.Color",
-      "Font Size",
-      "Edit"
+      "Font Size"
     ],
     "source": "textBox.h",
     "addon": "ofxEloiNodes"
@@ -7949,7 +8153,7 @@
     "addon": "ofxOceanodeCollection"
   },
   "Time Passed": {
-    "description": "Measures elapsed time between input events.",
+    "description": "Measures the elapsed time between changes to an input vector.\n\n**Inputs and controls**\n\n**[ Input]** A vector change marks a new event; its values do not affect the timing calculation.\n\n**[ Verbose]** Logs each input event, its values and the elapsed interval to the console.\n\n**Output**\n\n**[ Output]** Seconds since the preceding input event. The console shows the interval in milliseconds.\n\n**Notes**\n\nOnly intervals after the first event have a defined previous-event reference. Uses application elapsed time rather than Oceanode transport time.",
     "parameters": [
       "Input",
       "Verbose",
@@ -8057,7 +8261,7 @@
     "addon": "ofxOceanodeVectorGraphics"
   },
   "Trim Path": {
-    "description": "Trims polylines based on normalized start and end parameters. Start and End parameters could have size 1, size=NumberOfPolylines, size=TotalNumberOfSegments. When Keep Order is true, segments are only processed when Start > End, otherwise they are voided.",
+    "description": "Trims each straight segment of input polylines between normalized start and end positions.\n\n**Inputs**\n\n**[ In.X]** X coordinates of the paths. A -1 separates paths.\n\n**[ In.Y]** Y coordinates of the paths. A -1 separates paths.\n\n**[ Start]** Start fraction along each segment: 0 is its first vertex and 1 its second vertex.\n\n**[ End]** End fraction along each segment: 0 is its first vertex and 1 its second vertex.\n\n**[ Keep Order]** When enabled, Start greater than End removes the segment. When disabled, the smaller fraction is used as the start.\n\n**Outputs**\n\n**[ Out.X]** X coordinates of retained segment endpoints, with -1 separators.\n\n**[ Out.Y]** Y coordinates of retained segment endpoints, with -1 separators.\n\n**[ Completeness]** Retained fraction for each original segment; 0 means removed.\n\n**[ FullSegment.X]** Fixed-slot X output: start, end, -1 for each original segment. Removed segments use 0, 0, -1.\n\n**[ FullSegment.Y]** Fixed-slot Y output: start, end, -1 for each original segment. Removed segments use 0, 0, -1.\n\n**Notes**\n\nStart and End must both contain either one value, one value per polyline, or one value per original segment. These fractions apply within each segment, not to the total arc length of a path. Recalculates on In.X changes; other edits take effect on the next In.X update.",
     "parameters": [
       "In.X",
       "In.Y",
@@ -8092,7 +8296,7 @@
     "addon": "ofxOceanodeVectorGraphics"
   },
   "USB Keyboard": {
-    "description": "Reads key codes and connection information from a USB keyboard.",
+    "description": "Captures USB HID key events from the configured MagicForce MF34 keyboard on macOS.\n\n**Outputs**\n\n**[ Key Code]** USB HID usage code for the latest key press. Releases are ignored, so it retains its last value between presses.\n\n**[ Connected]** Read-only indication that the matching device is connected.\n\n**[ Device Name]** Read-only product name reported by the connected device.\n\n**Notes**\n\nRequires macOS Input Monitoring permission. Device matching uses the vendor and product IDs compiled into this node; other keyboards require changing those IDs. Key codes are HID usages, not typed characters.",
     "parameters": [
       "Key Code",
       "Connected",
@@ -8186,7 +8390,7 @@
     "addon": "ofxOceanodeCollection"
   },
   "Value Remover": {
-    "description": "Removes input values matching a target within a configurable tolerance.",
+    "description": "Filters a float vector by removing values close to a chosen target.\n\n**Input and controls**\n\n**[ Input]** Vector to filter. The order of retained elements is preserved.\n\n**[ Value]** Target value to remove.\n\n**[ Thresh.]** Inclusive tolerance around Value. Elements with absolute difference less than or equal to this value are removed.\n\n**Output**\n\n**[ Output]** Remaining values, with removed elements compacted out of the vector.\n\n**Notes**\n\nRecalculates when Input or Value changes. A change to Thresh. takes effect on the next such recalculation.",
     "parameters": [
       "Input",
       "Value",
@@ -9016,7 +9220,7 @@
     "addon": "ofxSantiNodes"
   },
   "Void Gate": {
-    "description": "Passes void trigger events only while a gate is enabled.",
+    "description": "Passes incoming trigger events only while Gate is enabled.\n\n**Inputs**\n\n**[ Void In]** Trigger events to filter.\n\n**[ Gate]** 0 blocks events; 1 passes events immediately.\n\n**Output**\n\n**[ Void Out]** Emits one event for each accepted input trigger.\n\n**Notes**\n\nChanging Gate does not emit an event or replay previously blocked triggers.",
     "parameters": [
       "Void In",
       "Gate",
@@ -9026,11 +9230,15 @@
     "addon": "ofxEloiNodes"
   },
   "Void OR": {
-    "description": "Combines multiple void trigger inputs into a single trigger output.",
+    "description": "Combines several trigger inputs into one output. Every incoming event is forwarded immediately.\n\n**Inputs**\n\n**[ In 0]** Trigger input 0. Every event on this input fires Void Out.\n\n**[ In 1]** Trigger input 1. Every event on this input fires Void Out.\n\n**[ In 2]** Trigger input 2. Every event on this input fires Void Out.\n\n**[ In 3]** Trigger input 3. Every event on this input fires Void Out.\n\n**[ In n]** Additional trigger input created when Inputs is increased. n is the zero-based input index.\n\n**Output**\n\n**[ Void Out]** Combined trigger stream. Multiple inputs firing in the same frame produce multiple events; they are not deduplicated.\n\n**Inspector**\n\n**[ Inputs]** Number of trigger inputs. The default is four; reducing it removes inputs from the end.",
     "parameters": [
-      "Inputs",
+      "In 0",
+      "In 1",
+      "In 2",
+      "In 3",
+      "In n",
       "Void Out",
-      "In "
+      "Inputs"
     ],
     "source": "voidOr.h",
     "addon": "ofxEloiNodes"
@@ -9084,11 +9292,45 @@
     "addon": "ofxOceanodeSuperCollider"
   },
   "YOLO Pose": {
-    "description": "Single-person YOLO pose from texture events. Joint X/Y are normalized, top-left origin; missing joints hold their last valid position. -1 means no valid position yet. Models live in data/yolo/models. Show displays the analyzed frame and its skeleton.",
+    "description": "Estimates one person's pose from incoming texture events and outputs separate X and Y coordinates for all 17 joints.\n\n**Input and controls**\n\n**[ Input.Tex]** Texture to analyze. New parameter events submit frames; changing pixels without publishing an event does not request inference.\n\n**[ Smooth]** Temporal smoothing for valid joints. 0 follows results immediately; larger values give a slower response, with up to a one-second time constant.\n\n**[ Show]** Opens the analyzed-frame preview with optional pose overlays.\n\n**Joint outputs**\n\n**[ nose X]** Normalized horizontal position of the nose. 0 is the left edge; 1 is the right edge.\n\n**[ nose Y]** Normalized vertical position of the nose. 0 is the top edge; 1 is the bottom edge.\n\n**[ left eye X]** Normalized horizontal position of the left eye. 0 is the left edge; 1 is the right edge.\n\n**[ left eye Y]** Normalized vertical position of the left eye. 0 is the top edge; 1 is the bottom edge.\n\n**[ right eye X]** Normalized horizontal position of the right eye. 0 is the left edge; 1 is the right edge.\n\n**[ right eye Y]** Normalized vertical position of the right eye. 0 is the top edge; 1 is the bottom edge.\n\n**[ left ear X]** Normalized horizontal position of the left ear. 0 is the left edge; 1 is the right edge.\n\n**[ left ear Y]** Normalized vertical position of the left ear. 0 is the top edge; 1 is the bottom edge.\n\n**[ right ear X]** Normalized horizontal position of the right ear. 0 is the left edge; 1 is the right edge.\n\n**[ right ear Y]** Normalized vertical position of the right ear. 0 is the top edge; 1 is the bottom edge.\n\n**[ left shoulder X]** Normalized horizontal position of the left shoulder. 0 is the left edge; 1 is the right edge.\n\n**[ left shoulder Y]** Normalized vertical position of the left shoulder. 0 is the top edge; 1 is the bottom edge.\n\n**[ right shoulder X]** Normalized horizontal position of the right shoulder. 0 is the left edge; 1 is the right edge.\n\n**[ right shoulder Y]** Normalized vertical position of the right shoulder. 0 is the top edge; 1 is the bottom edge.\n\n**[ left elbow X]** Normalized horizontal position of the left elbow. 0 is the left edge; 1 is the right edge.\n\n**[ left elbow Y]** Normalized vertical position of the left elbow. 0 is the top edge; 1 is the bottom edge.\n\n**[ right elbow X]** Normalized horizontal position of the right elbow. 0 is the left edge; 1 is the right edge.\n\n**[ right elbow Y]** Normalized vertical position of the right elbow. 0 is the top edge; 1 is the bottom edge.\n\n**[ left wrist X]** Normalized horizontal position of the left wrist. 0 is the left edge; 1 is the right edge.\n\n**[ left wrist Y]** Normalized vertical position of the left wrist. 0 is the top edge; 1 is the bottom edge.\n\n**[ right wrist X]** Normalized horizontal position of the right wrist. 0 is the left edge; 1 is the right edge.\n\n**[ right wrist Y]** Normalized vertical position of the right wrist. 0 is the top edge; 1 is the bottom edge.\n\n**[ left hip X]** Normalized horizontal position of the left hip. 0 is the left edge; 1 is the right edge.\n\n**[ left hip Y]** Normalized vertical position of the left hip. 0 is the top edge; 1 is the bottom edge.\n\n**[ right hip X]** Normalized horizontal position of the right hip. 0 is the left edge; 1 is the right edge.\n\n**[ right hip Y]** Normalized vertical position of the right hip. 0 is the top edge; 1 is the bottom edge.\n\n**[ left knee X]** Normalized horizontal position of the left knee. 0 is the left edge; 1 is the right edge.\n\n**[ left knee Y]** Normalized vertical position of the left knee. 0 is the top edge; 1 is the bottom edge.\n\n**[ right knee X]** Normalized horizontal position of the right knee. 0 is the left edge; 1 is the right edge.\n\n**[ right knee Y]** Normalized vertical position of the right knee. 0 is the top edge; 1 is the bottom edge.\n\n**[ left ankle X]** Normalized horizontal position of the left ankle. 0 is the left edge; 1 is the right edge.\n\n**[ left ankle Y]** Normalized vertical position of the left ankle. 0 is the top edge; 1 is the bottom edge.\n\n**[ right ankle X]** Normalized horizontal position of the right ankle. 0 is the left edge; 1 is the right edge.\n\n**[ right ankle Y]** Normalized vertical position of the right ankle. 0 is the top edge; 1 is the bottom edge.\n\n**Inspector: model and inference**\n\n**[ Model path]** Path to a compiled Core ML pose model, normally inside data/yolo/models.\n\n**[ Available models]** Model chooser listing models found in data/yolo/models.\n\n**[ Rescan models]** Refreshes the model list after adding or removing model files.\n\n**[ Compute (0 All 1 GPU 2 ANE 3 CPU)]** Core ML compute selection: 0 permits all units; 1 requests CPU/GPU; 2 requests CPU/Neural Engine; 3 uses CPU.\n\n**[ Apply model / compute]** Loads the selected model and compute configuration on the next update.\n\n**[ Frames (0 Latest 1 Drop busy)]** 0 keeps the latest pending frame; 1 rejects incoming frames while inference is busy.\n\n**[ Person confidence]** Minimum confidence for person detection.\n\n**[ Inference limit (0 unlimited)]** Maximum accepted inference frame rate. 0 removes the limit.\n\n**[ Letterbox gray]** Padding brightness, from 0 to 255, used when resizing a frame to the model input.\n\n**[ Pause inference]** Stops submitting new frames. An already running inference may still complete.\n\n**Inspector: preview and joints**\n\n**[ Show texture]** Shows the analyzed image behind the overlays.\n\n**[ Mirror view]** Mirrors only the preview horizontally. Published coordinates keep the source orientation.\n\n**[ Skeleton]** Draws bones between valid joints in the preview.\n\n**[ Joints]** Draws markers at valid joint positions.\n\n**[ Boxes]** Draws the detected person's bounding box.\n\n**[ Person scores]** Shows the detected person's confidence score.\n\n**[ Joint names]** Shows joint-name labels beside valid joint markers.\n\n**[ Joint scores]** Shows confidence values beside valid joint markers.\n\n**[ Joint confidence]** Minimum confidence for a joint to update its coordinate outputs and appear in overlays.\n\n**[ Joint radius]** Joint-marker radius in source-image pixels, scaled with the preview.\n\n**[ Line width]** Skeleton line width used by the preview.\n\n**[ Status]** Read-only model, processing-time and frame-submission diagnostics.\n\n**Notes**\n\nRequires the optional ofxYOLOPose addon on Apple Silicon macOS. Coordinates use the source image with a top-left origin. Missing or low-confidence joints hold their last valid position; -1 means no valid position has been published. Invalid input, model reload, deactivation or a source-size reset can clear outputs. Preview styling does not change published coordinates.",
     "parameters": [
       "Input.Tex",
       "Smooth",
       "Show",
+      "nose X",
+      "nose Y",
+      "left eye X",
+      "left eye Y",
+      "right eye X",
+      "right eye Y",
+      "left ear X",
+      "left ear Y",
+      "right ear X",
+      "right ear Y",
+      "left shoulder X",
+      "left shoulder Y",
+      "right shoulder X",
+      "right shoulder Y",
+      "left elbow X",
+      "left elbow Y",
+      "right elbow X",
+      "right elbow Y",
+      "left wrist X",
+      "left wrist Y",
+      "right wrist X",
+      "right wrist Y",
+      "left hip X",
+      "left hip Y",
+      "right hip X",
+      "right hip Y",
+      "left knee X",
+      "left knee Y",
+      "right knee X",
+      "right knee Y",
+      "left ankle X",
+      "left ankle Y",
+      "right ankle X",
+      "right ankle Y",
       "Model path",
       "Available models",
       "Rescan models",
