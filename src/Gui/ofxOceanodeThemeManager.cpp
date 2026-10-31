@@ -517,12 +517,10 @@ void ofxOceanodeThemeManager::drawThemeColorPickLayers(bool selectable){
 
 void ofxOceanodeThemeManager::drawMenuSection(){
     ofxOceanodeMenu::section("Theme");
-    if(ImGui::MenuItem("Edit Theme", nullptr, &showThemeEditor)){}
-    ImGui::Separator();
     if(!currentThemeName.empty()){
         ImGui::TextDisabled("Current: %s", currentThemeName.c_str());
-        ImGui::Separator();
     }
+    if(ImGui::MenuItem("Edit Theme", nullptr, &showThemeEditor)){}
     if(ImGui::MenuItem("Save Theme...")){
         memset(themeNameBuf, 0, sizeof(themeNameBuf));
         if(!currentThemeName.empty()){
@@ -571,7 +569,6 @@ void ofxOceanodeThemeManager::drawMenuSection(){
         }
         ImGui::EndMenu();
     }
-    ImGui::Separator();
     if(ImGui::MenuItem("Reset to Built-in Theme")){
         OceanodeTheme base;
         base.setup();

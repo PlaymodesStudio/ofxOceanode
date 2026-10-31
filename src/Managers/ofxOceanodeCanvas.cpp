@@ -8,6 +8,7 @@
 
 #include "ofxOceanodeCanvas.h"
 #include <cmath>
+#include <limits>
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeNode.h"
@@ -461,7 +462,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ImGui::IsKeyPressed(ImGuiKey_Backspace, false) ||
                 (editModifier && (ImGui::IsKeyPressed(ImGuiKey_V, false) ||
                  ImGui::IsKeyPressed(ImGuiKey_D, false) || ImGui::IsKeyPressed(ImGuiKey_X, false) ||
-                 ImGui::IsKeyPressed(ImGuiKey_E, false)));
+                 ImGui::IsKeyPressed(ImGuiKey_E, false) || ImGui::IsKeyPressed(ImGuiKey_G, false)));
             if(!layoutPendingOnEntry && (ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1) || editKey))
                 container->beginCanvasEdit();
         }
@@ -1881,7 +1882,12 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 			}
             ImGui::InvisibleButton("Inv Button", ImVec2(c.size.x * zoomLevel, 15.0f * zoomLevel));
             
-            if(ImGui::IsItemActive()){
+            // While space is held the canvas pans with the mouse (see the scrolling block),
+            // so the comment must not also apply the delta or it would move at double speed.
+            // This mirrors node dragging, where moveSelectedModulesWithDrag stays zero while panning.
+            const bool panningWithSpace = ImGui::IsKeyDown(ImGuiKey_Space);
+            
+            if(ImGui::IsItemActive() && !panningWithSpace){
                 ofRectangle rect(c.position, c.size.x, c.size.y);
                 glm::vec2 dragDelta = glm::vec2(ImGui::GetIO().MouseDelta) / zoomLevel;
                 
@@ -1999,7 +2005,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNWSE);
             }
             
-            if(ImGui::IsItemActive()){
+            if(ImGui::IsItemActive() && !panningWithSpace){
                 glm::vec2 dragDelta = glm::vec2(ImGui::GetIO().MouseDelta) / zoomLevel;
                 c.size += dragDelta;
                 // Enforce minimum size
@@ -2868,6 +2874,30 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         pendingEncapsulation = std::make_unique<PendingEncapsulation>();
                         openEncapsulationPrompt = true;
                     }else container->encapsulateSelectedNodes();
+                }else if(ImGui::IsKeyPressed(ImGuiKey_G, false) && !ImGui::IsAnyItemActive()){
+                    // Cmd+G: wrap the selected nodes in a new comment that fits them all,
+                    // with one grid cell of margin on every side.
+                    const auto selected = container->getSelectedModules();
+                    if(!selected.empty()){
+                        glm::vec2 minCorner(std::numeric_limits<float>::max());
+                        glm::vec2 maxCorner(std::numeric_limits<float>::lowest());
+                        for(auto* node : selected){
+                            const ofRectangle rect = node->getNodeGui().getRectangle();
+                            minCorner = glm::min(minCorner, glm::vec2(rect.getMinX(), rect.getMinY()));
+                            maxCorner = glm::max(maxCorner, glm::vec2(rect.getMaxX(), rect.getMaxY()));
+                        }
+                        const float margin = GRID_SIZE > 0 ? float(GRID_SIZE) : 20.0f;
+                        glm::vec2 topLeft = minCorner - glm::vec2(margin);
+                        glm::vec2 bottomRight = maxCorner + glm::vec2(margin);
+                        if(snap_to_grid){
+                            // Grow outwards to the grid so the margin never shrinks below one cell.
+                            topLeft = glm::floor(topLeft / float(GRID_SIZE)) * float(GRID_SIZE);
+                            bottomRight = glm::ceil(bottomRight / float(GRID_SIZE)) * float(GRID_SIZE);
+                        }
+                        auto &comment = container->getComments().emplace_back(topLeft, bottomRight - topLeft);
+                        deselectAllNodes();
+                        comment.selected = true;
+                    }
                 }
             }
             else if(ImGui::IsKeyPressed((ImGuiKey_Backspace)) && !ImGui::IsAnyItemActive()){
