@@ -9,6 +9,7 @@ from pathlib import Path
 import os
 import subprocess
 import tempfile
+from of_environment import container_source
 
 ROOT = Path(__file__).resolve().parents[1]
 IMGUI = Path(os.environ.get("OCEANODE_TEST_IMGUI_SRC", str(ROOT.parent / "ofxImGui/libs/imgui/src")))
@@ -228,7 +229,7 @@ int main(){
 
 def main():
     canvas = (ROOT / "src/Managers/ofxOceanodeCanvas.cpp").read_text()
-    container = (ROOT / "src/Managers/ofxOceanodeContainer.cpp").read_text()
+    container = container_source()
     navigation = block(canvas, "void ofxOceanodeCanvas::handleParentNavigation()")
     show_node = (block(container, "bool ofxOceanodeContainer::showNodeInCanvas(") + "\n" +
                  block(container, "bool ofxOceanodeContainer::showNodesInCanvas("))

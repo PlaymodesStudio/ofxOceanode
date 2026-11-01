@@ -2,6 +2,7 @@
 from pathlib import Path
 import os
 from new_preset_regression import block
+from of_environment import container_source
 
 
 def enable_custom_gui(native, graph_helpers=True):
@@ -18,7 +19,7 @@ bool ofxOceanodeContainer::showParameterInCanvas(ofxOceanodeAbstractParameter&) 
 bool ofxOceanodeScope::canScope(const ofxOceanodeAbstractParameter*) const { return false; }
 bool ofxOceanodeScope::drawParameter(ofxOceanodeAbstractParameter*, ImVec2) const { assert(false); return false; }
 '''
-    source = (native.ROOT/'src/Managers/ofxOceanodeContainer.cpp').read_text()
+    source = container_source()
     signatures = [
         'ofxOceanodeAbstractParameter* ofxOceanodeContainer::findParameter(',
         'ofxOceanodeContainer::ResolvedParameter ofxOceanodeContainer::resolveParameterFromPath(',

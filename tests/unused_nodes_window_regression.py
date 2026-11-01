@@ -11,6 +11,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 from canvas_navigation_regression import ROOT, IMGUI, FIXTURE, block
+from of_environment import container_source
 
 EXTRA = r'''
 #include <set>
@@ -342,7 +343,7 @@ def main():
     app=(ROOT/'src/ofxOceanode.cpp').read_text()
     window=block(app,'void ofxOceanode::drawUnusedNodesWindow()')
     window=window.replace('ImGui::Selectable(', 'trackedSelectable(').replace('ImGui::Button(', 'trackedButton(').replace('ImGui::Checkbox(', 'trackedCheckbox(').replace('ImGui::TreeNode(', 'trackedTree(').replace('ImGui::TreeNodeEx(', 'trackedTreeEx(')
-    container=(ROOT/'src/Managers/ofxOceanodeContainer.cpp').read_text()
+    container=container_source()
     canvas=(ROOT/'src/Managers/ofxOceanodeCanvas.cpp').read_text()
     code=fixture+EXTRA+window+block(container,'bool ofxOceanodeContainer::showNodeInCanvas(')+'\n'+block(container,'bool ofxOceanodeContainer::showNodesInCanvas(')
     code+='\nvoid ofxOceanodeCanvas::center(){'+block(canvas,'if(pendingCenterNode != nullptr &&\n')+'\n'+block(canvas,'if(hasPendingCenterPoint &&\n')+'}\n'+CASES

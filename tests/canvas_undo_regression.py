@@ -10,6 +10,7 @@ import os
 import subprocess
 import tempfile
 from new_preset_regression import block
+from of_environment import container_source
 
 ROOT = Path(__file__).resolve().parents[1]
 JSON_INCLUDE = ROOT.parent.parent / "libs/json/include"
@@ -350,7 +351,7 @@ int main(){
 def main():
     header = (ROOT / "src/Managers/ofxOceanodeContainer.h").read_text()
     types = header[header.index("    struct CanvasNodeSnapshot {"):header.index("    //NodeModel;")]
-    source = (ROOT / "src/Managers/ofxOceanodeContainer.cpp").read_text()
+    source = container_source()
     functions = source[source.index("ofxOceanodeContainer::CanvasNodeSnapshot::~CanvasNodeSnapshot()") :source.index("bool ofxOceanodeContainer::extractSelectedMacro()")]
     for signature in ['ofJson ofxOceanodeContainer::captureCanvasAuxiliary() const',
                       'void ofxOceanodeContainer::restoreCanvasAuxiliary(']:

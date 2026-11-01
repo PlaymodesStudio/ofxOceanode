@@ -9,6 +9,7 @@ from pathlib import Path
 import os
 import subprocess
 import tempfile
+from of_environment import container_source
 
 ROOT = Path(__file__).resolve().parents[1]
 JSON_INCLUDE = ROOT.parent.parent / "libs/json/include"
@@ -269,7 +270,7 @@ def main():
         "template<typename T>\nstatic bool oceanodeJsonToVector(",
         "void ofxOceanodeNode::deserializeParameter(",
     ])
-    container = (ROOT / "src/Managers/ofxOceanodeContainer.cpp").read_text()
+    container = container_source()
     clipboard_save = function(container, "void ofxOceanodeContainer::saveClipboardModulesAndConnections(")
     assert "node->savePreset(presetFolderPath, true);" in clipboard_save
     with tempfile.TemporaryDirectory(prefix="oceanode-clipboard-") as tmp:

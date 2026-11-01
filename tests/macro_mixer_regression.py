@@ -8,7 +8,7 @@ This does not verify the windowed host, audio devices or external hardware.
 """
 from pathlib import Path
 import concurrent.futures, os, subprocess, tempfile, contextlib, json
-from of_environment import ROOT, of_root
+from of_environment import ROOT, of_root, container_source
 from new_preset_regression import block
 
 PRELUDE = r'''
@@ -59,7 +59,7 @@ void ofxOceanodeContainer::scheduleScopeSave(const std::string&) { assert(false)
 '''
 
 def history_adapters():
-    c=(ROOT/'src/Managers/ofxOceanodeContainer.cpp').read_text()
+    c=container_source()
     return (block(c, 'ofxOceanodeContainer::CanvasNodeSnapshot::~CanvasNodeSnapshot()') + '\n' +
             block(c, 'void ofxOceanodeContainer::clearCanvasHistory()') + '\n' +
             'void ofxOceanodeContainer::captureDeletedCanvasNode(ofxOceanodeNode&) { assert(!pendingCanvasEdit); clearCanvasHistory(); }\n' +
@@ -67,7 +67,7 @@ def history_adapters():
 
 
 def production():
-    c=(ROOT/'src/Managers/ofxOceanodeContainer.cpp').read_text()
+    c=container_source()
     guard=c[c.index('    thread_local unsigned int containerClearDepth'):c.index('    struct ConnectionFailureInfo')]
     result=PRELUDE+'\nnamespace {\n'+guard+'}\n'
     for sig in ['ofxOceanodeContainer::ofxOceanodeContainer(', 'ofxOceanodeContainer::~ofxOceanodeContainer()',
@@ -117,9 +117,12 @@ def production():
 
 def native_production():
     result=production().replace(history_adapters(), '')+'\n'+SUPPORT+'\n'
-    c=(ROOT/'src/Managers/ofxOceanodeContainer.cpp').read_text()
+    c=container_source()
     declarations=c[c.index('    struct ConnectionFailureInfo'):c.index('    void drawConnectionErrorDialogContents')]
-    result+='namespace {\n'+declarations+'}\n'
+    for signature in ['std::string savedNodeKey(', 'void removeSkippedNodes(', 'void removeSkippedConnections(']:
+        declarations+=block(c,signature)+'\n'
+    result+='#include "ofxOceanodeContainerInternal.h"\nnamespace {\n'+declarations+'}\n'
+    result+=block(c,'void ofxOceanodeContainerInternal::queueConnectionErrorDialog(')+'\n'
     result += c[c.index('ofxOceanodeContainer::CanvasNodeSnapshot::~CanvasNodeSnapshot()'):]
     for signature in ['vector<ofxOceanodeNode*> ofxOceanodeContainer::getSelectedModules()']:
         result += block(c, signature) + '\n'

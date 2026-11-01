@@ -12,6 +12,7 @@ import os
 import subprocess
 import tempfile
 from new_preset_regression import block
+from of_environment import container_source
 from window_manager_regression import MOCKS as WINDOW_MOCKS
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -462,7 +463,7 @@ int main(){
 
 
 def main():
-    container = (ROOT / 'src/Managers/ofxOceanodeContainer.cpp').read_text()
+    container = container_source()
     production = block(container, 'void ofxOceanodeContainer::flushPendingScopeSave()')
     with tempfile.TemporaryDirectory(prefix='oceanode-layouts-') as work:
         work = Path(work)

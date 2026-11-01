@@ -12,6 +12,7 @@ import os
 import tempfile
 import macro_mixer_regression as native
 from new_preset_regression import block
+from of_environment import container_source
 
 CASES = r'''
 class Probe : public ofxOceanodeNodeModel {
@@ -347,7 +348,7 @@ def main():
 
         def production():
             result = base_production()
-            source = (native.ROOT / "src/Managers/ofxOceanodeContainer.cpp").read_text()
+            source = container_source()
             # Encapsulation and extraction hand moved timeline paths over: use
             # the real path functions instead of the fixture's stub.
             result = result.replace('std::string ofxOceanodeContainer::getTimelineParameterPath(ofxOceanodeAbstractParameter&) const { assert(false); return {}; }', '')

@@ -9,6 +9,7 @@ from pathlib import Path
 import os
 import subprocess
 import tempfile
+from of_environment import container_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -306,7 +307,7 @@ int main(){
 
 
 def main():
-    container = (ROOT / "src/Managers/ofxOceanodeContainer.cpp").read_text()
+    container = container_source()
     presets = (ROOT / "src/Controls/ofxOceanodePresetsController.cpp").read_text()
     canvas = (ROOT / "src/Managers/ofxOceanodeCanvas.cpp").read_text()
     app = (ROOT / "src/ofxOceanode.cpp").read_text()

@@ -4,6 +4,21 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# ofxOceanodeContainer's implementation is split by concern. Tests that anchor on
+# its text read this concatenation: core first and history last, so the slices
+# "[containerClearDepth, ConnectionFailureInfo)", "[ConnectionFailureInfo,
+# drawConnectionErrorDialogContents)" and "[~CanvasNodeSnapshot(), EOF)" keep
+# their meaning.
+CONTAINER_SOURCES = ("ofxOceanodeContainer.cpp", "ofxOceanodeContainerPresets.cpp",
+                     "ofxOceanodeContainerPaths.cpp", "ofxOceanodeContainerClipboard.cpp",
+                     "ofxOceanodeContainerEncapsulate.cpp", "ofxOceanodeContainerUnused.cpp",
+                     "ofxOceanodeContainerMidiOsc.cpp", "ofxOceanodeContainerHistory.cpp")
+
+
+def container_source():
+    """Every ofxOceanodeContainer*.cpp as one string, in a fixed order."""
+    return "\n".join((ROOT / "src/Managers" / name).read_text() for name in CONTAINER_SOURCES)
+
 def of_root():
     if os.environ.get("OCEANODE_TEST_OF_ROOT"):
         return Path(os.environ["OCEANODE_TEST_OF_ROOT"])

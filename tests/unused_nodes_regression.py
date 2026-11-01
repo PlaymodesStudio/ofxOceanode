@@ -11,6 +11,7 @@ import os
 import subprocess
 import tempfile
 from new_preset_regression import block
+from of_environment import container_source
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = r'''
@@ -425,7 +426,7 @@ int main(){
 '''
 
 def main():
-    source = (ROOT / 'src/Managers/ofxOceanodeContainer.cpp').read_text()
+    source = container_source()
     header = (ROOT / 'src/Managers/ofxOceanodeContainer.h').read_text()
     model = (ROOT / 'src/Nodes/ofxOceanodeNodeModel.h').read_text()
     # The mock's default must stay the real one: same line, and the real helper spliced in.

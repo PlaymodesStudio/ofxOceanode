@@ -8,6 +8,7 @@ from pathlib import Path
 import tempfile
 import macro_mixer_regression as native
 from new_preset_regression import block
+from of_environment import container_source
 
 CASES = r'''
 static void write(const std::string& path, const ofJson& value){ std::ofstream(path) << value; }
@@ -186,7 +187,7 @@ if __name__ == "__main__":
         access.write_text((native.ROOT / "src/Nodes/ofxOceanodeNodeMacro.h").read_text().replace("private:", "public:"))
         native.PRELUDE = '#include "' + str(access) + '"\n' + native.PRELUDE
         native.PRELUDE += '#include "Controls/PresetFileCleanupReview.h"\n'
-        source = (native.ROOT / "src/Managers/ofxOceanodeContainer.cpp").read_text()
+        source = container_source()
         native.SUPPORT += block(source, 'bool ofxOceanodeContainer::savePersistent(') + '\n'
         native.CASES = CASES
         native.main()
