@@ -2786,6 +2786,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             
             ImGui::Separator();
             if(auto* extension = container->getCustomGuiExtension()) extension->drawCanvasMenu();
+            if(auto* extension = container->getAutomationExtension()) extension->drawCanvasMenu(*container);
             
             ImGui::EndPopup();
         }

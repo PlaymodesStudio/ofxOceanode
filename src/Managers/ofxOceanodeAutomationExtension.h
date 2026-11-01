@@ -33,6 +33,9 @@ public:
     // Draw inside the active parameter/node popup. No calls when unattached.
     virtual void drawParameterMenu(ofxOceanodeAbstractParameter&) = 0;
     virtual void drawNodeMenu(ofxOceanodeNodeModel&) = 0;
+    // Draw inside a canvas's right-click menu: the root canvas's, or a
+    // macro's canvas at any depth.
+    virtual void drawCanvasMenu(ofxOceanodeContainer& /*canvas*/) {}
     virtual void removeParameterBindings(ofxOceanodeAbstractParameter&) = 0;
     virtual void collectBoundParameters(std::unordered_set<ofxOceanodeAbstractParameter*>&) const = 0;
     // Nodes moved to another canvas (encapsulated into a macro, ...): their
