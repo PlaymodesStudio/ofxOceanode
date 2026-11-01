@@ -530,16 +530,13 @@ void ofxOceanodeThemeManager::drawMenuSection(){
         openSaveThemePopup = true;
     }
     if(ImGui::BeginMenu("Load Theme...")){
-        ofDirectory themeDir(ofToDataPath("config/themes", true));
-        themeDir.allowExt("json");
-        themeDir.listDir();
-        if(themeDir.size() == 0){
+        const auto& names = listThemeNames();
+        if(names.empty()){
             ImGui::BeginDisabled();
             ImGui::MenuItem("(no themes saved)");
             ImGui::EndDisabled();
         } else {
-            for(int i = 0; i < (int)themeDir.size(); i++){
-                std::string name = themeDir.getFile(i).getBaseName();
+            for(const std::string& name : names){
                 bool isCurrent = (name == currentThemeName);
                 if(isCurrent) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::ActiveItemHighlight);
                 if(ImGui::MenuItem(name.c_str())){
@@ -551,15 +548,11 @@ void ofxOceanodeThemeManager::drawMenuSection(){
         ImGui::EndMenu();
     }
     if(ImGui::BeginMenu("Set default theme")){
-        ofDirectory dir(ofToDataPath("config/themes", true));
-        dir.allowExt("json");
-        dir.listDir();
-
-        if(dir.size() == 0){
+        const auto& names = listThemeNames();
+        if(names.empty()){
             ImGui::TextDisabled("No themes saved yet");
         }
-        for(int i = 0; i < (int)dir.size(); i++){
-            std::string name = dir.getFile(i).getBaseName();
+        for(const std::string& name : names){
             bool isDefault = (name == defaultThemeName);
             if(isDefault) ImGui::PushStyleColor(ImGuiCol_Text, OceanodeColors::ActiveItemHighlight);
             if(ImGui::MenuItem(name.c_str())){
@@ -576,6 +569,20 @@ void ofxOceanodeThemeManager::drawMenuSection(){
         pendingThemeFontChange = true;
         currentThemeName = "OceanodeTheme (built-in)";
     }
+}
+
+const std::vector<std::string>& ofxOceanodeThemeManager::listThemeNames(){
+    // A disk listing per frame while the menu is open; refresh a few times a second.
+    const int frame = ImGui::GetFrameCount();
+    if(themeNamesFrame < 0 || frame - themeNamesFrame >= 30){
+        themeNamesFrame = frame;
+        themeNames.clear();
+        ofDirectory dir(ofToDataPath("config/themes", true));
+        dir.allowExt("json");
+        if(dir.exists()) dir.listDir();
+        for(int i = 0; i < (int)dir.size(); i++) themeNames.push_back(dir.getFile(i).getBaseName());
+    }
+    return themeNames;
 }
 
 void ofxOceanodeThemeManager::drawPopups(){

@@ -19,9 +19,12 @@ class Scope {
 public:
     using Identity = std::function<std::string()>;
 
-    Scope(Identity identity, const char* phase)
-        : identity(std::move(identity)), phase(phase), tracing(enabled()) {
+    // The identity callable is only kept (and its std::function built) while
+    // tracing is on: every node constructs four scopes per frame.
+    template<typename Fn>
+    Scope(Fn&& identity, const char* phase) : phase(phase), tracing(enabled()) {
         if(!tracing) return;
+        this->identity = std::forward<Fn>(identity);
         previous = current();
         // A Macro can enter a child before returning. Attribute pending parent
         // errors to the parent, rather than blaming the child about to run.

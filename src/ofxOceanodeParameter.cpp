@@ -65,6 +65,7 @@ void ofxOceanodeAbstractParameter::forwardToOutConnections(){
 }
 
 bool ofxOceanodeAbstractParameter::refreshCombinedInput(){
+    if(!allowsMultipleInputs()) return false;
     const auto combine = inputCombiners().find(valueType());
     if(combine == inputCombiners().end()) return false;
     std::vector<ofxOceanodeAbstractParameter*> sources;

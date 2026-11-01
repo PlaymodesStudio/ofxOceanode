@@ -201,7 +201,8 @@ private:
         vector<timeGenerator*> timeGenerators;
         vector<std::pair<ofxOceanodeMacroMixer*, bool>> mixers; // morphing state when scanned
     } graphScan;
-    void rescanGraphIfChanged();
+    // True when the lists below were rebuilt.
+    bool rescanGraphIfChanged();
 
     vector<std::shared_ptr<basePhasor>> phasorsInThread2;
     ofThreadChannel<vector<std::shared_ptr<basePhasor>>> phasorChannel2;

@@ -54,6 +54,10 @@ private:
 
     // Theme save/load state
     std::string currentThemeName;
+    // Names in config/themes, listed while the Theme menu is open.
+    std::vector<std::string> themeNames;
+    int themeNamesFrame = -1;
+    const std::vector<std::string>& listThemeNames();
     std::string defaultThemeName;          // config/themes.json
     bool openSaveThemePopup = false;
     char themeNameBuf[128] = {};

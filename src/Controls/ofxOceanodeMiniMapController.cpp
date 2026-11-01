@@ -113,15 +113,20 @@ void ofxOceanodeMiniMapController::buildScopeList(
 // ---------------------------------------------------------------------------
 void ofxOceanodeMiniMapController::draw()
 {
-    // Rebuild scope list to get up-to-date container/canvas pairs
-    scopeList.clear();
-    buildScopeList(
-        rootContainer.get(), rootCanvas,
-        /*path=*/"", /*label=*/"Root",
-        /*macroNode=*/nullptr, /*parentNode=*/nullptr,
-        /*parentContainer=*/nullptr, /*parentCanvas=*/nullptr,
-        /*depth=*/0, /*parentIndex=*/-1,
-        scopeList);
+    // Rebuild the scope list (container/canvas pairs) when nodes appeared or
+    // vanished anywhere; the walk casts every node of every macro.
+    const std::uint64_t generation = ofxOceanodeNode::graphGeneration();
+    if(scopeListGeneration != generation || scopeList.empty()){
+        scopeListGeneration = generation;
+        scopeList.clear();
+        buildScopeList(
+            rootContainer.get(), rootCanvas,
+            /*path=*/"", /*label=*/"Root",
+            /*macroNode=*/nullptr, /*parentNode=*/nullptr,
+            /*parentContainer=*/nullptr, /*parentCanvas=*/nullptr,
+            /*depth=*/0, /*parentIndex=*/-1,
+            scopeList);
+    }
 
     // Only accept the new UID if it maps to a known canvas
     for (auto& entry : scopeList) {

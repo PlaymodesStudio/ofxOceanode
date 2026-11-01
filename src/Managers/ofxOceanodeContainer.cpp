@@ -272,6 +272,7 @@ void ofxOceanodeContainer::clearContainer(){
     dynamicNodes.clear();
     persistentNodes.clear();
     parameterGroupNodesMap.clear();
+    nodesByModel.clear();
     toDelete.clear(); // Destroy nested macros while the teardown guard is active.
     destroyNodeListeners.unsubscribeAll();
     canvasLiveNodes.clear();
@@ -488,12 +489,14 @@ ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeMode
     collection[nodeToBeCreatedName][toBeCreatedId] = std::move(node);
     ++nodesRevision;
     parameterGroupNodesMap[nodePtr->getParameters().getEscapedName()] = nodePtr;
+    nodesByModel[&nodePtr->getNodeModel()] = nodePtr;
     canvasLiveNodes[nodePtr->getParameters().getEscapedName()] = {++nextCanvasNodeIdentity, additionalInfo};
     
     //Interaction listeners
     destroyNodeListeners.push(nodePtr->deleteModule.newListener([this, nodePtr, nodeToBeCreatedName, toBeCreatedId, isPersistent](){
         captureDeletedCanvasNode(*nodePtr);
         canvasLiveNodes.erase(nodePtr->getParameters().getEscapedName());
+        nodesByModel.erase(&nodePtr->getNodeModel());
         ++nodesRevision;
         // Defer until the canvas operation is complete, including macro remaps.
         if(customGuiExtension && !isClearingContainers()) customGuiExtension->nodesChanged();
@@ -1980,7 +1983,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                 int range = castedParam.getMax() - castedParam.getMin();
                 castedParam += ofMap(m.getArgAsFloat(0), -1, 1, -range, range, false);
             }else{
-                castedParam += (castedParam+m.getArgAsInt(0));
+                castedParam += m.getArgAsInt(0);
             }
         }else if(absParam.valueType() == typeid(bool).name()){
             absParam.cast<bool>().getParameter() = !absParam.cast<bool>().getParameter();
@@ -2110,7 +2113,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
                 if(!validOSC){
                     string moduleName = splitAddress[0];
                     string moduleId = ofSplitString(moduleName, "_").back();
-                    moduleName.erase(moduleName.find(moduleId)-1);
+                    moduleName.erase(moduleName.rfind(moduleId)-1);
                     ofStringReplace(moduleName, "_", " ");
                     if(dynamicNodes.count(moduleName) == 1){
                         if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
@@ -2174,7 +2177,7 @@ void ofxOceanodeContainer::receiveOscMessage(ofxOscMessage &m){
         }else{
             string moduleName = splitAddress[0];
             string moduleId = ofSplitString(moduleName, "_").back();
-            moduleName.erase(moduleName.find(moduleId)-1);
+            moduleName.erase(moduleName.rfind(moduleId)-1);
             ofStringReplace(moduleName, "_", " ");
             if(dynamicNodes.count(moduleName) == 1){
                 if(dynamicNodes[moduleName].count(ofToInt(moduleId))){
@@ -2685,22 +2688,8 @@ vector<ofxOceanodeNode*> ofxOceanodeContainer::getAllModules(){
 }
 
 ofxOceanodeNodeGui* ofxOceanodeContainer::getGuiFromModel(ofxOceanodeNodeModel* model){
-    for(auto &nodeTypeMap : dynamicNodes){
-        for(auto &node : nodeTypeMap.second)
-        {
-            if(&node.second->getNodeModel() == model){
-                return &node.second->getNodeGui();
-            }
-        }
-    }
-    for(auto &nodeTypeMap : persistentNodes){
-        for(auto &node : nodeTypeMap.second){
-            if(&node.second->getNodeModel() == model){
-                return &node.second->getNodeGui();
-            }
-        }
-    }
-    return nullptr;
+    const auto found = nodesByModel.find(model);
+    return found != nodesByModel.end() ? &found->second->getNodeGui() : nullptr;
 }
 
 

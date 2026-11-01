@@ -171,16 +171,23 @@ void ofxOceanodeHierarchyController::buildHierarchy(
 void ofxOceanodeHierarchyController::draw()
 {
     // -----------------------------------------------------------------------
-    // Rebuild hierarchy each frame
+    // Rebuild the hierarchy when nodes appeared or vanished (the entries hold
+    // node pointers), and every few frames so renamed macros show up.
     // -----------------------------------------------------------------------
-    entries.clear();
-    buildHierarchy(
-        rootContainer.get(), rootCanvas,
-        /*macroNode=*/nullptr, /*nodeWrapper=*/nullptr,
-        /*hostContainer=*/nullptr, /*hostCanvas=*/nullptr, /*hostMacro=*/nullptr,
-        "Canvas",
-        0, -1,
-        entries);
+    const std::uint64_t generation = ofxOceanodeNode::graphGeneration();
+    const int frame = ImGui::GetFrameCount();
+    if(entriesGeneration != generation || entriesFrame < 0 || frame - entriesFrame >= 15){
+        entriesGeneration = generation;
+        entriesFrame = frame;
+        entries.clear();
+        buildHierarchy(
+            rootContainer.get(), rootCanvas,
+            /*macroNode=*/nullptr, /*nodeWrapper=*/nullptr,
+            /*hostContainer=*/nullptr, /*hostCanvas=*/nullptr, /*hostMacro=*/nullptr,
+            "Canvas",
+            0, -1,
+            entries);
+    }
 
     // -----------------------------------------------------------------------
     // Execute deferred centering from previous frame
@@ -467,6 +474,8 @@ void ofxOceanodeHierarchyController::draw()
     }
 
     // --- Deferred single-click execution ---
+    // The entries can have been rebuilt (shorter) since the click was recorded.
+    if (pendingClickIndex >= static_cast<int>(entries.size())) pendingClickIndex = -1;
     if (pendingClickIndex >= 0) {
         float elapsed = ImGui::GetTime() - pendingClickTime;
         if (elapsed > ImGui::GetIO().MouseDoubleClickTime) {

@@ -255,13 +255,22 @@ ofxOceanodeAbstractParameter& MacroMixerSource::Graph::parameter(const std::stri
     const auto& routers = revision->contract().routers;
     const auto selected = std::find_if(routers.begin(),routers.end(),[&](const auto& r) { return r.id == id; });
     require(selected != routers.end(),source,"Unknown selected router: " + id);
+    auto& cached = resolvedRouters[id];
     ofxOceanodeAbstractParameter* result = nullptr;
-    for(auto* node : container->getAllModules()) {
-        auto* router = dynamic_cast<abstractRouter*>(&node->getNodeModel());
-        if(!router || router->getNameParam().get() != selected->name) continue;
-        require(!result && router->nodeName() == MacroMixerMixing::routerModel(selected->type), source,
-            "Selected router changed name/type or became ambiguous: " + selected->name);
-        result = dynamic_cast<ofxOceanodeAbstractParameter*>(&router->getParameterGroup().get(MacroMixerMixing::routerPort(selected->type)));
+    if(cached.parameter && cached.nodesRevision == container->getNodesRevision() &&
+       cached.router->getNameParam().get() == selected->name) {
+        result = cached.parameter;
+    } else {
+        abstractRouter* found = nullptr;
+        for(auto* node : container->getAllModules()) {
+            auto* router = dynamic_cast<abstractRouter*>(&node->getNodeModel());
+            if(!router || router->getNameParam().get() != selected->name) continue;
+            require(!result && router->nodeName() == MacroMixerMixing::routerModel(selected->type), source,
+                "Selected router changed name/type or became ambiguous: " + selected->name);
+            found = router;
+            result = dynamic_cast<ofxOceanodeAbstractParameter*>(&router->getParameterGroup().get(MacroMixerMixing::routerPort(selected->type)));
+        }
+        cached = {container->getNodesRevision(), found, result};
     }
     require(result != nullptr,source,"Selected router is unavailable: " + selected->name);
     if(selected->direction == "Input") require(!result->hasInConnection(),source,"Input router is driven inside the Macro: " + selected->name);

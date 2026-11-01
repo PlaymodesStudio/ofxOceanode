@@ -158,7 +158,7 @@ void ofxOceanodeTime::shutdown(const std::shared_ptr<ofxOceanodeContainer>& owne
     container.reset();
 }
 
-void ofxOceanodeTime::rescanGraphIfChanged(){
+bool ofxOceanodeTime::rescanGraphIfChanged(){
     // Walking every node with dynamic_casts cost a tenth of each frame in large
     // patches. Nodes only appear or vanish through ofxOceanodeNode, and a
     // MacroMixer only changes which graphs take part when a morph starts or ends.
@@ -171,7 +171,7 @@ void ofxOceanodeTime::rescanGraphIfChanged(){
             if(morphing != mixer.second){ rescan = true; break; }
         }
     }
-    if(!rescan) return;
+    if(!rescan) return false;
     graphScan.phasors.clear();
     graphScan.timeGenerators.clear();
     graphScan.mixers.clear();
@@ -208,16 +208,21 @@ void ofxOceanodeTime::rescanGraphIfChanged(){
     getPhasorsFromContainer(container.get());
     graphScan.generation = generation;
     graphScan.valid = true;
+    return true;
 }
 
 void ofxOceanodeTime::update(){
-    rescanGraphIfChanged();
+    const bool graphChanged = rescanGraphIfChanged();
     const bool forceFrameMode = graphScan.forceFrameMode;
     const auto& phasors = graphScan.phasors;
     const auto& timeGenerators = graphScan.timeGenerators;
-    vector<shared_ptr<basePhasor>> oldPhasors;
-    while(phasorChannel2.tryReceive(oldPhasors));
-    phasorChannel2.send(phasors);
+    if(graphChanged){
+        // The audio thread keeps the last list it received, so a copy only
+        // crosses the channel when the set of phasors changes.
+        vector<shared_ptr<basePhasor>> oldPhasors;
+        while(phasorChannel2.tryReceive(oldPhasors));
+        phasorChannel2.send(phasors);
+    }
     
     const TransportDriverMode desiredDriverMode = getDesiredDriverMode(forceFrameMode);
     if(transport != nullptr){

@@ -50,7 +50,7 @@ public:
                         return container.connectConnection(source.cast<std::vector<T>>(), sink.cast<std::vector<T>>(), active);
                     }
                     else{
-                        return container.connectCustomConnection(source.cast<T>(), sink, active);
+                        return container.connectCustomConnection(source.cast<std::vector<T>>(), sink, active);
                     }
                 }
                 return nullptr;

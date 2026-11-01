@@ -2,7 +2,10 @@
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "MacroMixerMixing.h"
+#include <cstdint>
+#include <map>
 #include <set>
+class abstractRouter;
 
 // A nonempty node names a saved node whose macroMixerBlocker() stops the load;
 // file is then its canonical folder. Such nodes can be kept out of the graph.
@@ -99,6 +102,15 @@ public:
         MorphSnapshot morphStart, morphTarget;
         ofJson liveMorphDefinition; // Saved target expressed in stable runtime node identities.
         std::shared_ptr<MacroMixerMorphTopology> morphTopology;
+        // Router id -> its port, kept while the container's nodes and the
+        // router's name are unchanged. parameter() is asked several times per
+        // router per frame.
+        struct ResolvedRouter {
+            std::uint64_t nodesRevision = 0;
+            abstractRouter* router = nullptr;
+            ofxOceanodeAbstractParameter* parameter = nullptr;
+        };
+        mutable std::map<std::string, ResolvedRouter> resolvedRouters;
     };
     // Analysis never constructs source nodes or prunes a user's graph. Every
     // blocked node is reported; excluded nodes and their cables are left out.

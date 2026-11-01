@@ -15,6 +15,8 @@ class ofxOceanodeAbstractParameter;
 #include "ofEvents.h"
 #include "ofParameter.h"
 #include "ofAppBaseWindow.h"
+#include <algorithm>
+#include <vector>
 
 using namespace std;
 
@@ -50,11 +52,20 @@ public:
     void setSelected(bool b){
         if(b == selected) return;
         selected = b;
-        selectedCount() += b ? 1 : -1;
+        auto& guis = selectedGuis();
+        if(b) guis.push_back(this);
+        else guis.erase(std::remove(guis.begin(), guis.end(), this), guis.end());
     }
     // Selected node GUIs across every container, so the Inspector can tell
-    // whether anything is selected without walking the graph each frame.
-    static int& selectedCount(){ static int count = 0; return count; }
+    // what is selected without walking the graph each frame.
+    static std::vector<ofxOceanodeNodeGui*>& selectedGuis(){ static std::vector<ofxOceanodeNodeGui*> guis; return guis; }
+    static int selectedCount(){ return static_cast<int>(selectedGuis().size()); }
+    ofxOceanodeNode& getNode(){ return node; }
+    // False when no mouse button, wheel, key or active item could have edited a
+    // widget this frame. Edit tracking serialises every editable parameter
+    // before and after its widget, which it then only has to do while input
+    // is possible. Computed once per frame.
+    static bool userInputPossibleThisFrame();
     bool getSelected(){return selected;};
     bool isHeaderControlHovered() const { return headerControlHovered; }
     

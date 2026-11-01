@@ -59,5 +59,7 @@ private:
     string               activeCanvasUID;
     string               lastValidCanvasUID;
     ofEventListener      activeCanvasListener;
+    // Graph generation the scope list was built from (0: never built).
+    std::uint64_t        scopeListGeneration = 0;
 };
 #endif /* ofxOceanodeMiniMapController_h */

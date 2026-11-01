@@ -439,6 +439,8 @@ private:
     std::unordered_map<string, nodeContainerWithId> persistentNodes;
     
     std::unordered_map<string, ofxOceanodeNode*> parameterGroupNodesMap; //Maps nodes to parameterGroup.getName() reference, used in canvas
+    // The node owning each model: the canvas resolves both ends of every cable each frame.
+    std::unordered_map<const ofxOceanodeNodeModel*, ofxOceanodeNode*> nodesByModel;
 
     std::unique_ptr<ofxOceanodeCustomGuiExtension> customGuiExtension;
     std::string presetStoragePath;

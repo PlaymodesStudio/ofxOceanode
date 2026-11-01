@@ -22,21 +22,25 @@ public:
     }
     ~ofxOceanodeLogController(){};
     
-    void draw(){
-        // 1. Drain incoming messages from the thread channel
+    // Messages arrive from any thread. The buffer is bounded here, every
+    // frame, so a hidden Log window does not let the channel grow for the
+    // length of a show. The count of lines dropped from the front is kept for
+    // draw(), which compensates the scroll position with it.
+    void update(){
         std::string message;
         while(messageChannel.tryReceive(message)){
             messagesBuffer.push_back(message);
         }
-        
-        // 2. Trim buffer BEFORE rendering. Count how many lines were dropped from the
-        //    front so we can compensate the scroll position to keep the user's view
-        //    anchored on the same logical content (not on absolute pixel position).
-        int trimmedFromFront = 0;
         while(messagesBuffer.size() > MAX_MESSAGES){
             messagesBuffer.pop_front();
-            ++trimmedFromFront;
+            ++pendingTrimmedFromFront;
         }
+    }
+
+    void draw(){
+        update();
+        int trimmedFromFront = pendingTrimmedFromFront;
+        pendingTrimmedFromFront = 0;
         
         // 3. Clear button — also resets scroll intent so auto-scroll resumes
         if(ImGui::Button("[Clear]")){
@@ -166,6 +170,7 @@ public:
     }
     
 private:
+    int pendingTrimmedFromFront = 0;
     std::string getLogText() const{
         std::string text;
         for(const auto &message : messagesBuffer){

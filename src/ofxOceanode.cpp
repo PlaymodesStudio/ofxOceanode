@@ -675,5 +675,5 @@ void ofxOceanode::disableRenderAll(){
 }
 
 void ofxOceanode::disableRenderHistograms(){
-    ofxOceanodeShared::setConfigurationFlags(ofxOceanodeShared::getConfigurationFlags() | ofxOceanodeConfigurationFlags_DisableRenderAll);
+    ofxOceanodeShared::setConfigurationFlags(ofxOceanodeShared::getConfigurationFlags() | ofxOceanodeConfigurationFlags_DisableHistograms);
 }

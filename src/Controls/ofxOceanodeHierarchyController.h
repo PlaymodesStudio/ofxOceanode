@@ -78,6 +78,11 @@ private:
     ofEventListener activeCanvasListener;
     ofEventListener nodeSelectedListener;
 
+    // Graph generation and frame the entries were built on; renames do not
+    // bump the generation, so the list is also refreshed a few times a second.
+    std::uint64_t entriesGeneration = 0;
+    int entriesFrame = -1;
+
     // Pending centering (deferred to next frame so canvas layout is valid)
     bool pendingCenter = false;
     ofxOceanodeNode* pendingCenterNode = nullptr;

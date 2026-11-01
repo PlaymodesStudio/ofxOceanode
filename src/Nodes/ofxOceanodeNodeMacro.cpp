@@ -513,6 +513,7 @@ void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 				sortOrder.getOrder().erase(
 					remove(sortOrder.getOrder().begin(), sortOrder.getOrder().end(), *currentName),
 					sortOrder.getOrder().end());
+				routerManager.removeRouter(*currentName);
 			}));
 		}
 		return;
@@ -575,6 +576,7 @@ void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 			sortOrder.getOrder().erase(
 				remove(sortOrder.getOrder().begin(), sortOrder.getOrder().end(), *currentName),
 				sortOrder.getOrder().end());
+			routerManager.removeRouter(*currentName);
 		}));
 	}
 }

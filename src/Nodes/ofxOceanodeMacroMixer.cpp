@@ -961,18 +961,20 @@ void ofxOceanodeMacroMixer::publish() {
         },runtime ? runtime->takeOutput(output.first) : MacroMixerMixing::Value(0.f));
     }
     progress = runtime ? runtime->progress() : 0.f;
-    state = runtime ? runtime->status() : "Empty";
+    std::string status = runtime ? runtime->status() : "Empty";
     if(runtime) {
-        if(auto entry = runtime->macro(runtime->currentID())) state = state.get() + " | Running: " + entry->name();
-        if(auto entry = runtime->macro(runtime->destinationID())) state = state.get() + " | Destination: " + entry->name();
-        if(auto entry = runtime->macro(runtime->queuedID())) state = state.get() + " | Queued: " + entry->name();
+        if(auto entry = runtime->macro(runtime->currentID())) status += " | Running: " + entry->name();
+        if(auto entry = runtime->macro(runtime->destinationID())) status += " | Destination: " + entry->name();
+        if(auto entry = runtime->macro(runtime->queuedID())) status += " | Queued: " + entry->name();
         const auto entries = runtime->macros();
         const auto passed = std::count_if(entries.begin(), entries.end(), [&](const auto& e) {
             return e->analysed() && runtime->sourceProblem(e->id()).empty();
         });
-        if(!entries.empty()) state = state.get() + " | Sources: " + std::to_string(passed) + "/" + std::to_string(entries.size()) + " ok";
+        if(!entries.empty()) status += " | Sources: " + std::to_string(passed) + "/" + std::to_string(entries.size()) + " ok";
     }
-    if(!inspectorError.empty()) state = state.get() + "\n" + inspectorError;
+    if(!inspectorError.empty()) status += "\n" + inspectorError;
+    // Parameters notify on every set(): publish runs every update and draw.
+    if(state.get() != status) state = status;
     const auto text = shortStatus();
     if(summary.get() != text) summary = text;
 }

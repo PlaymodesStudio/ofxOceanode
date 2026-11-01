@@ -10,6 +10,7 @@
 
 #include "ofParameter.h"
 #include "ofUtils.h"
+#include <cstdint>
 #include "Profiling/ofxOceanodeParameterProfiling.h"
 
 class ofxOceanodeAbstractConnection;
@@ -148,15 +149,26 @@ public:
         const std::vector<ofxOceanodeAbstractParameter*>&, std::shared_ptr<void>&)>;
     static void registerInputCombiner(const std::string& type, InputCombiner combine){
         inputCombiners()[type] = std::move(combine);
+        ++inputCombinerRevision();
     }
-    bool allowsMultipleInputs() const {return inputCombiners().count(valueType()) != 0;}
+    // Asked for every value a connection passes. valueType() builds a string,
+    // so the answer is kept until another combiner is registered.
+    bool allowsMultipleInputs() const {
+        const std::uint64_t revision = inputCombinerRevision();
+        if(combinerLookupRevision != revision){
+            combinerLookupRevision = revision;
+            hasInputCombiner = !inputCombiners().empty() && inputCombiners().count(valueType()) != 0;
+        }
+        return hasInputCombiner;
+    }
     bool acceptsMultipleInputFrom(const ofxOceanodeAbstractParameter& source) const {
         return allowsMultipleInputs() && source.valueType() == valueType();
     }
     bool refreshCombinedInput();
     
     bool hasOutConnections(){return outConnections.size() != 0;};
-    std::vector<ofxOceanodeAbstractConnection*> getOutConnections(){return outConnections;};
+    // By value on purpose: callers delete connections while iterating the result.
+    std::vector<ofxOceanodeAbstractConnection*> getOutConnections() const {return outConnections;};
 
     // Views read parameters directly, without a graph connection. A draw keeps
     // an on-demand producer active through the next update (which precedes draw).
@@ -262,6 +274,9 @@ private:
         static std::map<std::string, InputCombiner> combiners;
         return combiners;
     }
+    static std::uint64_t& inputCombinerRevision(){static std::uint64_t revision = 1; return revision;}
+    mutable std::uint64_t combinerLookupRevision = 0;
+    mutable bool hasInputCombiner = false;
     std::shared_ptr<void> combinedInputState;
     std::vector<ofxOceanodeAbstractConnection*> inConnections;
     std::vector<ofxOceanodeAbstractConnection*> outConnections;

@@ -235,7 +235,7 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
         auto bankPos = std::find(banks.begin(), banks.end(), bankName);
         if(bankPos != banks.end()){
             currentBank = bankPos - banks.begin();
-            if(bankPresets[bankName].size() >= presetNum){
+            if(presetNum >= 1 && static_cast<int>(bankPresets[bankName].size()) >= presetNum){
                 loadPreset(bankPresets[bankName][presetNum-1], bankName);
                 currentPreset[bankName] = bankPresets[bankName][presetNum-1];
             }

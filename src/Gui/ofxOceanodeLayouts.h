@@ -4,6 +4,7 @@
 #include "ofEvents.h"
 #include <map>
 #include <string>
+#include <vector>
 
 class ofxOceanodeWindowManager;
 
@@ -68,6 +69,9 @@ private:
     // Global layouts: config/guiLayouts/<name>.json ({version, ini, view}),
     // default in config/guiLayouts.json.
     std::string globalLayoutName;
+    // Names in config/guiLayouts, listed while the menu is open.
+    std::vector<std::string> globalLayoutNames;
+    int globalLayoutNamesFrame = -1;
     std::string globalDefault;
     bool openSaveGlobalLayoutPopup = false;
     char globalName[256] = {};

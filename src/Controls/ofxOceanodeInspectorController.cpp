@@ -9,6 +9,7 @@
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeScope.h"
 #include "ofxOceanodeNode.h"
+#include "ofxOceanodeNodeGui.h"
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeNodeRegistry.h"
@@ -88,44 +89,24 @@ void ofxOceanodeInspectorController::drawTimeSource(ofxOceanodeNodeModel& model)
 }
 
 void ofxOceanodeInspectorController::draw(){
-    vector<pair<string, ofxOceanodeNode*>> nodesInThisFrame = vector<pair<string, ofxOceanodeNode*>>(container->getParameterGroupNodesMap().begin(), container->getParameterGroupNodesMap().end());
-    
-    vector<pair<string, ofxOceanodeNode*>> selectedNodes;
-	
-	std::function<void(vector<pair<string, ofxOceanodeNode*>>)> getSelectedModules = [&selectedNodes, &getSelectedModules](vector<pair<string, ofxOceanodeNode*>> nodes){
-		for(auto nodePair : nodes)
-		{
-			auto &nodeGui = nodePair.second->getNodeGui();
-			if(nodeGui.getSelected()){
-				selectedNodes.push_back(nodePair);
-			}
-			if (ofxOceanodeNodeMacro* m = dynamic_cast<ofxOceanodeNodeMacro*>(&nodePair.second->getNodeModel())) {
-				getSelectedModules(vector<pair<string, ofxOceanodeNode*>>(m->getContainer()->getParameterGroupNodesMap().begin(), m->getContainer()->getParameterGroupNodesMap().end()));
-			}
-		}
-	};
-	
-	getSelectedModules(nodesInThisFrame);
+    // The selection registry covers every nested macro, including hidden
+    // canvases, without walking the graph each frame.
+    const auto selectedGuis = ofxOceanodeNodeGui::selectedGuis();
 
     // Only show inspector when exactly one node is selected
-    if(selectedNodes.size() != 1){
-        if(selectedNodes.size() > 1 && ImGui::Button("Clear Selection")){
-            // The Inspector includes selections in every nested macro, even
-            // when its canvas is hidden. Clear that same complete selection.
-            for(auto &selectedNode : selectedNodes){
-                selectedNode.second->getNodeGui().setSelected(false);
-            }
-            selectedNodes.clear();
+    if(selectedGuis.size() != 1){
+        if(selectedGuis.size() > 1 && ImGui::Button("Clear Selection")){
+            for(auto* gui : selectedGuis) gui->setSelected(false);
             ofxOceanodeShared::nodeSelectedInCanvas(nullptr);
         }
-        if(selectedNodes.size() == 0)
-            ImGui::Text("No Nodes Selected", "%s");
+        if(selectedGuis.empty())
+            ImGui::TextUnformatted("No Nodes Selected");
         else
-            ImGui::Text("Multiple Nodes Selected", "%s");
+            ImGui::TextUnformatted("Multiple Nodes Selected");
         return;
     }
 
-    auto &node = selectedNodes[0].second;
+    ofxOceanodeNode* node = &selectedGuis[0]->getNode();
     const ImU32 nodeTitleBackground = ImGui::ColorConvertFloat4ToU32(node->getColor() * .5);
     oceanodeProfiling::Scope timing(node->getNodeModel().getProfilingRecord(), oceanodeProfiling::Phase::Gui);
     auto* owningContainer = container->getContainerForCanvasID(node->getNodeModel().getParents());
@@ -135,7 +116,8 @@ void ofxOceanodeInspectorController::draw(){
 
 	// Node name with colored background
 	{
-		ImVec2 textSize = ImGui::CalcTextSize(selectedNodes[0].first.c_str());
+		const std::string nodeTitle = node->getParameters().getEscapedName();
+		ImVec2 textSize = ImGui::CalcTextSize(nodeTitle.c_str());
 		float padding = ImGui::GetStyle().FramePadding.y;
 		ImVec2 cursorPos = ImGui::GetCursorScreenPos();
 		float availWidth = ImGui::GetContentRegionAvail().x;
@@ -150,7 +132,7 @@ void ofxOceanodeInspectorController::draw(){
 		// Draw white text on top
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + padding);
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
-		ImGui::Text("%s", selectedNodes[0].first.c_str());
+		ImGui::Text("%s", nodeTitle.c_str());
 		ImGui::PopStyleColor();
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + padding);
 	}
@@ -212,7 +194,8 @@ void ofxOceanodeInspectorController::draw(){
     {
         for(int i = 0; i < node->getInspectorParameters().size(); i++){
             ofAbstractParameter &absParam = node->getInspectorParameters().get(i);
-            const bool trackUserValue = absParam.valueType() != typeid(std::function<void()>).name();
+            const bool trackUserValue = ofxOceanodeNodeGui::userInputPossibleThisFrame() &&
+                                        absParam.valueType() != typeid(std::function<void()>).name();
             ofJson valueBefore;
             if(trackUserValue) ofSerialize(valueBefore, absParam);
             string uniqueId = absParam.getName();

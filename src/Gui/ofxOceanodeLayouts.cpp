@@ -282,17 +282,23 @@ void ofxOceanodeLayouts::drawMenu(){
     ofxOceanodeMenu::section("Preset layouts");
     drawPresetLayoutsMenu();
     ofxOceanodeMenu::section("Global layouts");
-    ofDirectory dir(ofToDataPath(globalLayoutsFolder, true));
-    dir.allowExt("json");
-    if(dir.exists()) dir.listDir();
+    // Listing the folder every frame while the menu is open is a disk read per frame.
+    const int frame = ImGui::GetFrameCount();
+    if(globalLayoutNamesFrame < 0 || frame - globalLayoutNamesFrame >= 30){
+        globalLayoutNamesFrame = frame;
+        globalLayoutNames.clear();
+        ofDirectory dir(ofToDataPath(globalLayoutsFolder, true));
+        dir.allowExt("json");
+        if(dir.exists()) dir.listDir();
+        for(int i = 0; i < (int)dir.size(); i++) globalLayoutNames.push_back(dir.getFile(i).getBaseName());
+    }
     if(ImGui::BeginMenu("Load global layout")){
-        if(dir.size() == 0){
+        if(globalLayoutNames.empty()){
             ImGui::BeginDisabled();
             ImGui::MenuItem("(no layouts saved)");
             ImGui::EndDisabled();
         } else {
-            for(int i = 0; i < (int)dir.size(); i++){
-                const std::string name = dir.getFile(i).getBaseName();
+            for(const std::string& name : globalLayoutNames){
                 bool isCurrent = collection.active.empty() && (name == globalLayoutName);
                 if(ImGui::MenuItem(name.c_str(), nullptr, isCurrent)){
                     queueGlobalLayout(name);
@@ -310,13 +316,12 @@ void ofxOceanodeLayouts::drawMenu(){
     }
 
     if(ImGui::BeginMenu("Set default global layout")){
-        if(dir.size() == 0){
+        if(globalLayoutNames.empty()){
             ImGui::BeginDisabled();
             ImGui::MenuItem("(no layouts saved)");
             ImGui::EndDisabled();
         } else {
-            for(int i = 0; i < (int)dir.size(); i++){
-                const std::string name = dir.getFile(i).getBaseName();
+            for(const std::string& name : globalLayoutNames){
                 if(ImGui::MenuItem(name.c_str(), nullptr, name == globalDefault)){
                     setGlobalDefault(name);
                 }

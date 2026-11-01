@@ -76,6 +76,7 @@ struct ofxOceanodeContainer {
     using Nodes=unordered_map<string,unordered_map<int,shared_ptr<ofxOceanodeNode>>>;
     Nodes dynamicNodes,persistentNodes;
     unordered_map<string,ofxOceanodeNode*> parameterGroupNodesMap;
+    unordered_map<const void*,ofxOceanodeNode*> nodesByModel;
     vector<unique_ptr<Connection>> connections;
     Listeners destroyConnectionListeners,destroyNodeListeners,midiUnregisterlisteners,midiSenderListeners;
     map<string,vector<shared_ptr<MidiBinding>>> midiBindings,persistentMidiBindings;

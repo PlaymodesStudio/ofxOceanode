@@ -92,7 +92,23 @@ ofxOceanodeNodeGui::ofxOceanodeNodeGui(ofxOceanodeContainer& _container, ofxOcea
 }
 
 ofxOceanodeNodeGui::~ofxOceanodeNodeGui(){
-    if(selected) --selectedCount();
+    if(selected){
+        auto& guis = selectedGuis();
+        guis.erase(std::remove(guis.begin(), guis.end(), this), guis.end());
+    }
+}
+
+bool ofxOceanodeNodeGui::userInputPossibleThisFrame(){
+    static int frame = -1;
+    static bool possible = true;
+    if(frame == ImGui::GetFrameCount()) return possible;
+    frame = ImGui::GetFrameCount();
+    const ImGuiIO& io = ImGui::GetIO();
+    possible = ImGui::IsAnyItemActive() || ImGui::IsAnyMouseDown() || io.MouseWheel != 0.0f || io.MouseWheelH != 0.0f ||
+               io.WantTextInput || io.InputQueueCharacters.Size > 0;
+    for(int button = 0; !possible && button < ImGuiMouseButton_COUNT; button++) possible = ImGui::IsMouseReleased(button);
+    for(int key = ImGuiKey_NamedKey_BEGIN; !possible && key < ImGuiKey_NamedKey_END; key++) possible = ImGui::IsKeyDown(static_cast<ImGuiKey>(key));
+    return possible;
 }
 
 ofColor ofxOceanodeNodeGui::getColor(){
@@ -142,7 +158,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
             }
             ImGui::PushID(i);
             ofJson before;
-            const bool trackEdit = !parameter.hasInConnection() &&
+            const bool trackEdit = !parameter.hasInConnection() && userInputPossibleThisFrame() &&
                 !(parameter.getFlags() & (ofxOceanodeParameterFlags_DisableSavePreset | ofxOceanodeParameterFlags_ReadOnly));
             if(trackEdit) node.saveParameterToJson(before, parameter);
             auto value = parameter.cast<bool>().getParameter();
@@ -256,7 +272,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
             ofJson valueBefore;
             const bool trackUserValue = !(absParam.getFlags() & (ofxOceanodeParameterFlags_DisableSavePreset |
                                                                  ofxOceanodeParameterFlags_ReadOnly)) &&
-                                        !absParam.hasInConnection();
+                                        !absParam.hasInConnection() && userInputPossibleThisFrame();
             if(trackUserValue) node.saveParameterToJson(valueBefore, absParam);
             string uniqueId = absParam.getName();
             const bool publishedInCustomGui = container.customGuiContainsParameterAnywhere(absParam);

@@ -1382,8 +1382,10 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         currentNodeCenter = allNodes[i]->getNodeGui().getPosition() + currentNodeRectangle/2.0f  ;
                         centerOfMass = centerOfMass + currentNodeCenter;
                     }
-                    scrolling.x = (ImGui::GetContentRegionAvail().x / (2.0f * zoomLevel)) - (centerOfMass.x/allNodes.size());
-                    scrolling.y = (ImGui::GetContentRegionAvail().y / (2.0f * zoomLevel)) - (centerOfMass.y/allNodes.size());
+                    if(!allNodes.empty()){
+                        scrolling.x = (ImGui::GetContentRegionAvail().x / (2.0f * zoomLevel)) - (centerOfMass.x/allNodes.size());
+                        scrolling.y = (ImGui::GetContentRegionAvail().y / (2.0f * zoomLevel)) - (centerOfMass.y/allNodes.size());
+                    }
                 }
             }
 
@@ -1481,9 +1483,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         }
         
         //reorder nodesInThisFrame, so they are in correct drawing order, for the interaction to work properly
-        std::sort(nodesVisibleInThisFrame.begin(), nodesVisibleInThisFrame.end(), [this](std::pair<std::string, ofxOceanodeNode*> a, std::pair<std::string, ofxOceanodeNode*> b){
-//            if (nodesDrawingOrder.count(a.first) == 0) nodesDrawingOrder[a.first] = nodesDrawingOrder.size();
-//            if (nodesDrawingOrder.count(b.first) == 0) nodesDrawingOrder[b.first] = nodesDrawingOrder.size();
+        std::sort(nodesVisibleInThisFrame.begin(), nodesVisibleInThisFrame.end(),
+                  [this](const std::pair<std::string, ofxOceanodeNode*>& a, const std::pair<std::string, ofxOceanodeNode*>& b){
             return nodesDrawingOrder[a.first] > nodesDrawingOrder[b.first];
         });
 		
