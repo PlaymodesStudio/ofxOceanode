@@ -451,12 +451,13 @@ void ofxOceanodeGlobalVariablesController::drawGroupTable(const std::shared_ptr<
     }
     const ImGuiTableFlags flags = ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg |
         ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings;
-    if(!ImGui::BeginTable("##variables", 4, flags)) return;
+    if(!ImGui::BeginTable("##variables", 5, flags)) return;
     const float fontSize = ImGui::GetFontSize();
+    ImGui::TableSetupColumn("##order", ImGuiTableColumnFlags_WidthFixed);
     ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, fontSize * 10.0f);
     ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, fontSize * 7.0f);
     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, fontSize * 12.0f);
-    ImGui::TableSetupColumn("##order", ImGuiTableColumnFlags_WidthFixed);
+    ImGui::TableSetupColumn("##remove", ImGuiTableColumnFlags_WidthFixed);
     ImGui::TableHeadersRow();
 
     const int rowCount = int(group->parameters.size());
@@ -466,6 +467,17 @@ void ofxOceanodeGlobalVariablesController::drawGroupTable(const std::shared_ptr<
         const std::string parameterName = absParam.getName();
         ImGui::PushID(parameter.get());
         ImGui::TableNextRow();
+
+        // Order.
+        ImGui::TableNextColumn();
+        PendingEdit move{PendingEdit::Move, group->name, parameterName};
+        ImGui::BeginDisabled(row == 0);
+        if(ImGui::ArrowButton("##up", ImGuiDir_Up)){ move.index = row - 1; pendingEdits.push_back(move); }
+        ImGui::EndDisabled();
+        ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+        ImGui::BeginDisabled(row + 1 == rowCount);
+        if(ImGui::ArrowButton("##down", ImGuiDir_Down)){ move.index = row + 1; pendingEdits.push_back(move); }
+        ImGui::EndDisabled();
 
         // Name: edited in place, applied when the field is left.
         ImGui::TableNextColumn();
@@ -558,18 +570,7 @@ void ofxOceanodeGlobalVariablesController::drawGroupTable(const std::shared_ptr<
         }
         if(edited) unsavedChanges = true;
 
-        // Order and removal.
         ImGui::TableNextColumn();
-        const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
-        PendingEdit move{PendingEdit::Move, group->name, parameterName};
-        ImGui::BeginDisabled(row == 0);
-        if(ImGui::ArrowButton("##up", ImGuiDir_Up)){ move.index = row - 1; pendingEdits.push_back(move); }
-        ImGui::EndDisabled();
-        ImGui::SameLine(0, gap);
-        ImGui::BeginDisabled(row + 1 == rowCount);
-        if(ImGui::ArrowButton("##down", ImGuiDir_Down)){ move.index = row + 1; pendingEdits.push_back(move); }
-        ImGui::EndDisabled();
-        ImGui::SameLine(0, gap);
         if(ImGui::Button("[-]")) pendingEdits.push_back({PendingEdit::Remove, group->name, parameterName});
         ImGui::PopID();
     }
