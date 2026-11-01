@@ -458,7 +458,10 @@ void ofxOceanodeGlobalVariablesController::drawGroupTable(const std::shared_ptr<
     ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, fontSize * 7.0f);
     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, fontSize * 12.0f);
     ImGui::TableSetupColumn("##remove", ImGuiTableColumnFlags_WidthFixed);
+    // Headers take the theme's title colour.
+    ImGui::PushStyleColor(ImGuiCol_TableHeaderBg, ImGui::GetStyleColorVec4(ImGuiCol_TitleBg));
     ImGui::TableHeadersRow();
+    ImGui::PopStyleColor();
 
     const int rowCount = int(group->parameters.size());
     for(int row = 0; row < rowCount; row++){
