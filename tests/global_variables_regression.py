@@ -3,7 +3,8 @@
 
 The group methods, type conversion and the Globals node are spliced out of
 src/ and run with ASan/UBSan against a small node-model, parameter-wrapper and
-connection adapter. Covers table order, rename, retype and name validation.
+connection adapter. Covers table order, rename, retype, reordering and name
+validation.
 No GUI or container is launched.
 """
 import os
@@ -37,6 +38,7 @@ def production():
         "int globalVariableTypeOf(const ofAbstractParameter& parameter)",
         "std::shared_ptr<ofAbstractParameter> createGlobalVariable(int type",
         "void globalVariables::replaceVariable(",
+        "void globalVariables::sortVariables(",
         "void globalVariablesGroup::addNode(",
         "void globalVariablesGroup::removeNode(",
         "void globalVariablesGroup::addParameter(",
@@ -50,6 +52,7 @@ def production():
         "bool globalVariablesGroup::isParameterNameAvailable(",
         "bool globalVariablesGroup::renameParameter(",
         "bool globalVariablesGroup::setParameterType(",
+        "bool globalVariablesGroup::moveParameter(",
     ):
         parts.append(block(CONTROLLER, signature))
     return "\n\n".join(parts)
@@ -257,7 +260,30 @@ int main(){
     group->parameters[1]->cast<float>() = 3.0f;
     expect(value<float>(late, "Rate") == 3.0f, "remaining variables still forward");
 
-    cout << "Global Variables regression passed: table order, ofFloatColor, rename, retype, conversion, validation and removal.\n";
+    // Moving a row reorders every node's pins and keeps their connections.
+    host.createConnection(pin(node, "Rate"), sink);
+    expect(group->moveParameter("My Var", 0), "move last row to the top");
+    expect(rows(*group) == vector<string>({"My Var", "Tint", "Rate", "Wash"}), "row moved up");
+    expect(pins(node) == rows(*group) && pins(late) == rows(*group), "pins follow moved row");
+    expect(group->moveParameter("Tint", 2), "move a row down");
+    expect(rows(*group) == vector<string>({"My Var", "Rate", "Tint", "Wash"}), "row moved down");
+    expect(pins(node) == rows(*group) && pins(late) == rows(*group), "pins follow row moved down");
+    expect(!group->moveParameter("Tint", 2), "moving to the same row changes nothing");
+    expect(group->moveParameter("My Var", 99), "index past the end moves to the last row");
+    expect(rows(*group) == vector<string>({"Rate", "Tint", "Wash", "My Var"}), "row moved to the end");
+    expect(pins(node) == rows(*group), "pins follow row moved to the end");
+    expect(!group->moveParameter("Missing", 0), "unknown variable not moved");
+    expect(pin(node, "Rate").getOutConnections().size() == 1, "moved pin keeps connection");
+    group->parameters[0]->cast<float>() = 4.0f;
+    expect(value<float>(node, "Rate") == 4.0f && value<float>(late, "Rate") == 4.0f, "moved variable still forwards");
+    expect(group->setParameterType("Wash", globalVariableType_FloatColor), "retype after a move");
+    expect(pins(node) == rows(*group), "retype after a move keeps the order");
+    globalVariables third("Scene", group);
+    third.host = &host;
+    third.setup();
+    expect(pins(third) == rows(*group), "node created after a move uses the new order");
+
+    cout << "Global Variables regression passed: table order, ofFloatColor, rename, retype, reorder, conversion, validation and removal.\n";
 }
 '''
 

@@ -17,6 +17,7 @@
 #include <climits>
 #include <cmath>
 #include <cstring>
+#include <set>
 
 namespace {
 const char* const variableTypeNames[globalVariableType_Count] = {"Float", "Int", "Bool", "String", "ofColor", "ofFloatColor"};
@@ -134,6 +135,30 @@ void globalVariables::replaceVariable(const ofAbstractParameter* oldGroupParamet
     parameterGroupChanged.notify();
 }
 
+void globalVariables::sortVariables(const std::vector<std::shared_ptr<ofAbstractParameter>>& groupParameters){
+    auto row = [&](const Variable& variable){
+        return std::find(groupParameters.begin(), groupParameters.end(), variable.groupParameter) - groupParameters.begin();
+    };
+    std::stable_sort(variables.begin(), variables.end(), [&](const Variable& a, const Variable& b){ return row(a) < row(b); });
+
+    // Refill the slots the variable pins hold, so any other pin stays put.
+    std::set<std::string> variablePins;
+    for(const auto& variable : variables) variablePins.insert(variable.localParameter->getEscapedName());
+    std::vector<std::string> order;
+    size_t next = 0;
+    auto& nodeParameters = getParameterGroup();
+    for(int i = 0; i < nodeParameters.size(); i++){
+        auto& parameter = nodeParameters.get(i);
+        if(variablePins.count(parameter.getEscapedName()) != 0 && next < variables.size()){
+            order.push_back(variables[next++].localParameter->getName());
+        }else{
+            order.push_back(parameter.getName());
+        }
+    }
+    nodeParameters.reorder(order);
+    parameterGroupChanged.notify();
+}
+
 globalVariablesGroup::globalVariablesGroup(){
 
 }
@@ -244,6 +269,21 @@ bool globalVariablesGroup::setParameterType(const std::string& parameterName, in
     return true;
 }
 
+bool globalVariablesGroup::moveParameter(const std::string& parameterName, int newIndex){
+    auto it = std::find_if(parameters.begin(), parameters.end(), [&](const auto &parameter){return parameter->getName() == parameterName;});
+    if(it == parameters.end()) return false;
+    const int from = int(it - parameters.begin());
+    const int to = std::clamp(newIndex, 0, int(parameters.size()) - 1);
+    if(from == to) return false;
+    auto parameter = *it;
+    parameters.erase(it);
+    parameters.insert(parameters.begin() + to, parameter);
+    for(auto &node : nodes){
+        node->sortVariables(parameters);
+    }
+    return true;
+}
+
 bool globalVariablesGroup::rename(const std::string& newName){
     if(newName.empty() || newName == name) return false;
     auto registry = container->getRegistry();
@@ -341,7 +381,9 @@ void ofxOceanodeGlobalVariablesController::draw(){
     if(ImGui::MenuItem("Save Global Variables", unsavedChanges ? "unsaved" : nullptr)) save();
     if(ImGui::MenuItem("Load Global Variables")) load();
     ofxOceanodeMenu::section("Groups");
+    ImGui::PushItemFlag(ImGuiItemFlags_AutoClosePopups, false);
     if(ImGui::MenuItem("New Group...")) newGroupRequested = true;
+    ImGui::PopItemFlag();
 
     string groupToDelete;
     for(const auto& group : groups){
@@ -380,6 +422,9 @@ void ofxOceanodeGlobalVariablesController::draw(){
                 if(group->setParameterType(edit.parameter, edit.type)) unsavedChanges = true;
                 renamingParameter = nullptr;
                 break;
+            case PendingEdit::Move:
+                if(group->moveParameter(edit.parameter, edit.index)) unsavedChanges = true;
+                break;
             case PendingEdit::Remove:
                 group->removeParameter(edit.parameter);
                 renamingParameter = nullptr;
@@ -395,6 +440,8 @@ void ofxOceanodeGlobalVariablesController::draw(){
         }), groups.end());
         unsavedChanges = true;
     }
+
+    drawDialogs();
 }
 
 void ofxOceanodeGlobalVariablesController::drawGroupTable(const std::shared_ptr<globalVariablesGroup>& group){
@@ -409,10 +456,12 @@ void ofxOceanodeGlobalVariablesController::drawGroupTable(const std::shared_ptr<
     ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, fontSize * 10.0f);
     ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, fontSize * 7.0f);
     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, fontSize * 12.0f);
-    ImGui::TableSetupColumn("##remove", ImGuiTableColumnFlags_WidthFixed);
+    ImGui::TableSetupColumn("##order", ImGuiTableColumnFlags_WidthFixed);
     ImGui::TableHeadersRow();
 
-    for(const auto& parameter : group->parameters){
+    const int rowCount = int(group->parameters.size());
+    for(int row = 0; row < rowCount; row++){
+        const auto& parameter = group->parameters[row];
         ofAbstractParameter& absParam = *parameter;
         const std::string parameterName = absParam.getName();
         ImGui::PushID(parameter.get());
@@ -509,14 +558,25 @@ void ofxOceanodeGlobalVariablesController::drawGroupTable(const std::shared_ptr<
         }
         if(edited) unsavedChanges = true;
 
+        // Order and removal.
         ImGui::TableNextColumn();
-        if(ImGui::SmallButton("[-]")) pendingEdits.push_back({PendingEdit::Remove, group->name, parameterName});
+        const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
+        PendingEdit move{PendingEdit::Move, group->name, parameterName};
+        ImGui::BeginDisabled(row == 0);
+        if(ImGui::ArrowButton("##up", ImGuiDir_Up)){ move.index = row - 1; pendingEdits.push_back(move); }
+        ImGui::EndDisabled();
+        ImGui::SameLine(0, gap);
+        ImGui::BeginDisabled(row + 1 == rowCount);
+        if(ImGui::ArrowButton("##down", ImGuiDir_Down)){ move.index = row + 1; pendingEdits.push_back(move); }
+        ImGui::EndDisabled();
+        ImGui::SameLine(0, gap);
+        if(ImGui::Button("[-]")) pendingEdits.push_back({PendingEdit::Remove, group->name, parameterName});
         ImGui::PopID();
     }
     ImGui::EndTable();
 }
 
-void ofxOceanodeGlobalVariablesController::drawPopups(){
+void ofxOceanodeGlobalVariablesController::drawDialogs(){
     if(newGroupRequested){
         newGroupName[0] = '\0';
         ImGui::OpenPopup("New Global Variables Group");

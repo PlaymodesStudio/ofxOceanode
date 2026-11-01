@@ -58,6 +58,8 @@ struct globalVariablesGroup : std::enable_shared_from_this<globalVariablesGroup>
     // Keeps the variable's place in every Globals node and the connections
     // the new type still accepts.
     bool setParameterType(const std::string& parameterName, int type);
+    // Moves a variable to another row; every Globals node follows the new order.
+    bool moveParameter(const std::string& parameterName, int newIndex);
 
     // Registers the group as "Globals <newName>" and replaces each node of
     // the old type, keeping its place, state and connections.
@@ -76,7 +78,6 @@ public:
     ~ofxOceanodeGlobalVariablesController(){};
 
     void draw() override;
-    void drawPopups() override;
     bool isMenuController() const override { return true; }
 
     void save();
@@ -84,6 +85,8 @@ public:
 
 private:
     void drawGroupTable(const std::shared_ptr<globalVariablesGroup>& group);
+    // Drawn from inside the menu, so the menu stays open behind them.
+    void drawDialogs();
     std::shared_ptr<globalVariablesGroup> findGroup(const std::string& groupName) const;
     bool isGroupNameAvailable(const std::string& groupName, const globalVariablesGroup* ignore = nullptr) const;
 
@@ -107,11 +110,12 @@ private:
 
     // Edits gathered while drawing, applied once the tables are done.
     struct PendingEdit {
-        enum Kind { Rename, Retype, Remove } kind;
+        enum Kind { Rename, Retype, Move, Remove } kind;
         std::string group;
         std::string parameter;
         std::string newName;
         int type = 0;
+        int index = 0;
     };
     std::vector<PendingEdit> pendingEdits;
 };

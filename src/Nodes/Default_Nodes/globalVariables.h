@@ -58,6 +58,9 @@ public:
     // whatever the new type can still feed.
     void replaceVariable(const ofAbstractParameter* oldGroupParameter, const std::shared_ptr<ofAbstractParameter>& newGroupParameter);
 
+    // Puts the pins in the group's row order.
+    void sortVariables(const std::vector<std::shared_ptr<ofAbstractParameter>>& groupParameters);
+
 private:
     struct Variable {
         std::shared_ptr<ofAbstractParameter> groupParameter;
