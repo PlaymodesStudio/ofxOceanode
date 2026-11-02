@@ -222,8 +222,9 @@
     "addon": "ofxSantiNodes"
   },
   "Beat Transport": {
-    "description": "Read-only status from Oceanode's shared transport and current timeline.",
+    "description": "Status of the transport chosen in Transport (the global transport by default, or any timeline's), and Play, Stop and Seek for it, optionally quantized to the next beat or bar.",
     "parameters": [
+      "Transport",
       "Beat Transport",
       "Prev Beat",
       "Delta Beat",
@@ -236,7 +237,11 @@
       "Loop Beat",
       "Loop Phase",
       "Reset",
-      "Loop Reset"
+      "Loop Reset",
+      "Play",
+      "Stop",
+      "Seek",
+      "Quantize"
     ],
     "source": "Default_Nodes/beatTransport.h",
     "addon": "ofxOceanode"
