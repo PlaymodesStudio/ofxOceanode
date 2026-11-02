@@ -7,12 +7,35 @@
 
 #include "ofxOceanodeNodeModelExternalWindow.h"
 
+namespace {
+// Creating, resizing or toggling fullscreen on the external window makes its
+// GL context current (ofAppGLFWWindow::setup, and the GLFW resize callbacks
+// that fire synchronously from setWindowShape on macOS). FBOs and VAOs are not
+// shared between contexts, so anything the rest of the frame allocates after
+// that (a preset load, nodes drawn later in the same frame) would live in the
+// external context and render black in the main one. Restore whatever window
+// was current when the scope ends.
+struct ScopedCurrentWindow {
+    std::shared_ptr<ofAppBaseWindow> previous;
+    ScopedCurrentWindow() : previous(ofGetCurrentWindow()) {}
+    ~ScopedCurrentWindow(){
+        if(previous == nullptr) return;
+        auto mainLoop = ofGetMainLoop();
+        if(mainLoop) mainLoop->setCurrentWindow(previous);
+        previous->makeCurrent();
+    }
+};
+}
+
 ofxOceanodeNodeModelExternalWindow::ofxOceanodeNodeModelExternalWindow(string name)  : ofxOceanodeNodeModel(name){
 	addParameter(showWindow.set("Show.Win", false), ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisableOutConnection);
     addParameter(fullscreenWindow.set("Fullscr.", false), ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisableOutConnection | ofxOceanodeParameterFlags_DisableSavePreset);
     windowListenerEvents.push(showWindow.newListener(this, &ofxOceanodeNodeModelExternalWindow::showExternalWindow));
     windowListenerEvents.push(fullscreenWindow.newListener([this](bool &b){
-        if(externalWindow != nullptr) externalWindow->setFullscreen(b);
+        if(externalWindow != nullptr){
+            ScopedCurrentWindow keepCurrent;
+            externalWindow->setFullscreen(b);
+        }
     }));
     externalWindowRect.setPosition(-1, -1);
     externalWindow = nullptr;
@@ -28,23 +51,35 @@ ofxOceanodeNodeModelExternalWindow::~ofxOceanodeNodeModelExternalWindow(){
 
 void ofxOceanodeNodeModelExternalWindow::setExternalWindowPosition(int px, int py)
 {
-    if(externalWindow != nullptr) externalWindow->setWindowPosition(px,py);
+    if(externalWindow != nullptr){
+        ScopedCurrentWindow keepCurrent;
+        externalWindow->setWindowPosition(px,py);
+    }
     else externalWindowRect.setPosition(px, py);
 }
 
 void ofxOceanodeNodeModelExternalWindow::setExternalWindowShape(int w, int h)
 {
-    if(externalWindow != nullptr) externalWindow->setWindowShape(w,h);
+    if(externalWindow != nullptr){
+        ScopedCurrentWindow keepCurrent;
+        externalWindow->setWindowShape(w,h);
+    }
     else externalWindowRect.setSize(w, h);
 }
 void ofxOceanodeNodeModelExternalWindow::setExternalWindowFullScreen(bool b)
 {
-    if((externalWindow != nullptr)) externalWindow->setFullscreen(b);
+    if(externalWindow != nullptr){
+        ScopedCurrentWindow keepCurrent;
+        externalWindow->setFullscreen(b);
+    }
 }
 
 void ofxOceanodeNodeModelExternalWindow::toggleFullscreen()
 {
-    if(externalWindow != nullptr) externalWindow->toggleFullscreen();
+    if(externalWindow != nullptr){
+        ScopedCurrentWindow keepCurrent;
+        externalWindow->toggleFullscreen();
+    }
 }
 
 
@@ -52,6 +87,9 @@ void ofxOceanodeNodeModelExternalWindow::toggleFullscreen()
 
 void ofxOceanodeNodeModelExternalWindow::showExternalWindow(bool &b){
     if(b && externalWindow == nullptr){
+        // ofCreateWindow leaves the new context current; setVerticalSync and
+        // setupForExternalWindow below need it, the caller's frame does not.
+        ScopedCurrentWindow keepCurrent;
         ofGLFWWindowSettings prevSettings;
         if(externalWindowRect.getPosition() == glm::vec3(-1, -1, 0)){
             prevSettings.setSize(1024, 1024);
