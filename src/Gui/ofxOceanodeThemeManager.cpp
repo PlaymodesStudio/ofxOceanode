@@ -1,4 +1,5 @@
 #include "ofxOceanodeThemeManager.h"
+#include "ofxOceanodeFonts.h"
 #include "ofxOceanodeTheme.h"
 #include "ofxOceanodeFloatingWindowDecor.h"
 #include "ofxOceanodeTabText.h"
@@ -107,8 +108,12 @@ void ofxOceanodeThemeManager::refreshThemeFonts(){
         int boldScore = INT_MAX;
     };
     std::map<std::string, Candidate> families;
-    std::function<void(const std::string&)> scan = [&](const std::string& relativeDir){
-        ofDirectory dir(ofToDataPath(relativeDir, true));
+    // Directories are relative to data, or absolute for the system font folder.
+    auto absolute = [](const std::string& path){
+        return ofFilePath::isAbsolute(path) ? path : ofToDataPath(path, true);
+    };
+    std::function<void(const std::string&, bool)> scan = [&](const std::string& relativeDir, bool system){
+        ofDirectory dir(absolute(relativeDir));
         if(!dir.exists()) return;
         dir.listDir();
         dir.sort();
@@ -117,13 +122,13 @@ void ofxOceanodeThemeManager::refreshThemeFonts(){
             if(file.isLink()) continue;
             const std::string path = relativeDir + "/" + file.getFileName();
             if(file.isDirectory()){
-                scan(path);
+                scan(path, system);
                 continue;
             }
             const std::string ext = ofToLower(file.getExtension());
             if(ext != "ttf" && ext != "otf") continue;
             FT_Face face = nullptr;
-            if(FT_New_Face(library, ofToDataPath(path, true).c_str(), 0, &face) != 0) continue;
+            if(FT_New_Face(library, absolute(path).c_str(), 0, &face) != 0) continue;
             const std::string familyName = themeFontFamilyName(face);
             if(FT_IS_SCALABLE(face) && !familyName.empty()){
                 auto& candidate = families[familyName];
@@ -139,6 +144,7 @@ void ofxOceanodeThemeManager::refreshThemeFonts(){
                 if(regularScore < candidate.regularScore){
                     candidate.regularScore = regularScore;
                     candidate.family.regularPath = path;
+                    candidate.family.system = system;
                 }
                 const int boldScore = penalty + std::abs(weight - 700);
                 if(!italic && weight >= 600 && boldScore < candidate.boldScore){
@@ -149,7 +155,9 @@ void ofxOceanodeThemeManager::refreshThemeFonts(){
             FT_Done_Face(face);
         }
     };
-    scan("config/font");
+    scan("config/font", false);
+    const std::string systemDir = ofxOceanodeFonts::systemFontDirectory();
+    if(!systemDir.empty()) scan(systemDir, true);
     FT_Done_FreeType(library);
     for(const auto& entry : families) themeFontFamilies.push_back(entry.second.family);
     pendingThemeFontChange = true;
@@ -161,7 +169,7 @@ void ofxOceanodeThemeManager::applyThemeFont(){
     themeFontWarning.clear();
     if(!themeFontFamily.empty()){
         for(const auto& family : themeFontFamilies){
-            if(family.name == themeFontFamily && ofFile(ofToDataPath(family.regularPath, true)).exists()){
+            if(family.name == themeFontFamily && ofFile(family.regularPath, ofFile::Reference).exists()){
                 canvas->setupFonts(family.regularPath, family.boldPath);
                 return;
             }
@@ -397,19 +405,24 @@ void ofxOceanodeThemeManager::drawThemeEditorWindow(){
 
             if(ImGui::BeginTabItem("Font")){
                 ImGui::TextUnformatted("Default font family");
-                ImGui::TextDisabled("Fonts from bin/data/config/font (including subfolders)");
+                if(ofxOceanodeFonts::systemFontDirectory().empty())
+                    ImGui::TextDisabled("Fonts from bin/data/config/font (including subfolders)");
+                else
+                    ImGui::TextDisabled("Fonts from bin/data/config/font (including subfolders) and SF Mono from macOS");
                 if(ImGui::Button("Refresh font list")) refreshThemeFonts();
                 ImGui::TextWrapped("Choose a family to preview it throughout the app. Use Theme > Save Theme to keep your choice.");
                 if(!themeFontWarning.empty()) ImGui::TextWrapped("%s", themeFontWarning.c_str());
                 ImGui::Separator();
                 ImGui::BeginChild("##fontfamilies", ImVec2(0, 0), false);
-                if(ImGui::Selectable("Built-in default (JetBrains Mono)", themeFontFamily.empty())){
+                const std::string builtinLabel = "Built-in default (" + ofxOceanodeFonts::builtinDescription() + ")";
+                if(ImGui::Selectable(builtinLabel.c_str(), themeFontFamily.empty())){
                     themeFontFamily.clear();
                     pendingThemeFontChange = true;
                 }
                 for(const auto& family : themeFontFamilies){
                     ImGui::PushID(family.name.c_str());
-                    if(ImGui::Selectable(family.name.c_str(), themeFontFamily == family.name)){
+                    const std::string label = family.system ? family.name + "  (macOS)" : family.name;
+                    if(ImGui::Selectable(label.c_str(), themeFontFamily == family.name)){
                         themeFontFamily = family.name;
                         pendingThemeFontChange = true;
                     }

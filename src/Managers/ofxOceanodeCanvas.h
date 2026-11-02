@@ -65,9 +65,10 @@ public:
     int getCeilingFontIndex() const;
     bool shouldRenderText() const;
 
-    // Call after gui.setup(), outside an ImGui frame. Paths are relative to data.
-    void setupFonts(const std::string& regularPath = "config/font/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Medium.ttf",
-                    const std::string& boldPath = "config/font/JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-ExtraBold.ttf");
+    // Call after gui.setup(), outside an ImGui frame. Paths are relative to data
+    // unless absolute. An empty or missing regular path selects the built-in font
+    // (ofxOceanodeFonts: SF Mono from macOS, else the embedded JetBrains Mono).
+    void setupFonts(const std::string& regularPath = "", const std::string& boldPath = "");
 
     void bringOnTop(){onTop = true;};
     // Request focus on this canvas window. The canvas will apply the focus

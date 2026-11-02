@@ -7,6 +7,7 @@
 //
 
 #include "ofxOceanodeCanvas.h"
+#include "ofxOceanodeFonts.h"
 #include <cmath>
 #include <limits>
 #include "ofxOceanodeNodeRegistry.h"
@@ -85,16 +86,62 @@ ImFont* ofxOceanodeCanvas::getZoomFont() const {
     return nullptr; // fallback to current font
 }
 
+namespace {
+// Where a canvas font comes from: a file on disk or a face compiled into the addon.
+struct CanvasFontSource {
+    std::string file;                        // absolute path, or empty
+    ofxOceanodeFonts::Embedded embedded;     // used when file is empty
+    std::string key;                         // identity for the atlas cache
+    bool valid() const { return !file.empty() || embedded.data != nullptr; }
+    ImFont* add(ImFontAtlas* atlas, float size, const ImFontConfig* cfg) const {
+        if(!file.empty()) return atlas->AddFontFromFileTTF(file.c_str(), size, cfg);
+        if(embedded.data) return atlas->AddFontFromMemoryCompressedTTF(embedded.data, (int)embedded.size, size, cfg);
+        return nullptr;
+    }
+};
+
+// The absolute path of an existing font file, or empty.
+std::string resolveFontFile(const std::string& path){
+    if(path.empty()) return "";
+    const std::string full = ofFilePath::isAbsolute(path) ? path : ofToDataPath(path, true);
+    return ofFile(full, ofFile::Reference).exists() ? full : "";
+}
+
+CanvasFontSource builtinFontSource(bool bold){
+    CanvasFontSource source;
+    source.file = bold ? ofxOceanodeFonts::systemBoldPath() : ofxOceanodeFonts::systemRegularPath();
+    if(!source.file.empty()){
+        source.key = source.file;
+    }else{
+        source.embedded = bold ? ofxOceanodeFonts::embeddedBold() : ofxOceanodeFonts::embeddedRegular();
+        source.key = bold ? "<embedded bold>" : "<embedded regular>";
+    }
+    return source;
+}
+}
+
 void ofxOceanodeCanvas::setupFonts(const std::string& regularPath, const std::string& boldPath) {
     ImGuiIO& io = ImGui::GetIO();
     IM_ASSERT(!ImGui::GetCurrentContext()->WithinFrameScope);
-    const std::string fontPath = ofToDataPath(regularPath, true);
-    const std::string boldFontPath = ofToDataPath(boldPath, true);
-    const bool hasRegular = !regularPath.empty() && ofFile(fontPath).exists();
-    const bool hasBold = !boldPath.empty() && ofFile(boldFontPath).exists();
-    // Missing files have a separate cache entry so Refresh can discover a
-    // newly installed regular/bold face without reusing the fallback fonts.
-    const auto key = std::make_pair(hasRegular ? regularPath : "", hasBold ? boldPath : "");
+    // Explicit paths come from the Theme Editor. An empty or missing regular face
+    // selects the built-in font; a family without a bold face keeps bold text in
+    // its regular face (null bold font).
+    CanvasFontSource regular;
+    regular.file = resolveFontFile(regularPath);
+    regular.key = regular.file;
+    if(!regularPath.empty() && regular.file.empty()) {
+        ofLogWarning("ofxOceanodeCanvas") << "Font not found: " << regularPath
+            << "; using the built-in font";
+    }
+    const bool builtin = regular.file.empty();
+    if(builtin) regular = builtinFontSource(false);
+    CanvasFontSource bold;
+    bold.file = resolveFontFile(boldPath);
+    bold.key = bold.file;
+    if(builtin && bold.file.empty()) bold = builtinFontSource(true);
+    // Resolved sources key the cache, so Refresh discovers a newly installed
+    // regular/bold face instead of reusing the built-in fonts.
+    const auto key = std::make_pair(regular.key, bold.key);
     auto cached = fontCache.find(key);
     if(cached != fontCache.end()) {
         for(int i = 0; i < 9; ++i) {
@@ -102,11 +149,6 @@ void ofxOceanodeCanvas::setupFonts(const std::string& regularPath, const std::st
             zoomFontsBold[i] = cached->second[i + 9];
         }
     } else {
-        if(!hasRegular) {
-            ofLogWarning("ofxOceanodeCanvas") << "Font not found: " << fontPath
-                << "; using the built-in ImGui font";
-        }
-
         // Keep logical sizes: scaling the atlas size breaks InputText layout
         // and cursor calculations. Canvas zoom continues to use the same sizes.
         ImFontConfig cfg;
@@ -114,17 +156,13 @@ void ofxOceanodeCanvas::setupFonts(const std::string& regularPath, const std::st
         cfg.OversampleV = 2;
         std::array<ImFont*, 18> fonts{};
         for(int i = 0; i < 9; ++i) {
-            zoomFonts[i] = hasRegular
-                ? io.Fonts->AddFontFromFileTTF(fontPath.c_str(), ZOOM_FONT_SIZES[i], &cfg)
-                : nullptr;
+            zoomFonts[i] = regular.add(io.Fonts, ZOOM_FONT_SIZES[i], &cfg);
             if(!zoomFonts[i]) {
                 ImFontConfig fallbackCfg = cfg;
                 fallbackCfg.SizePixels = ZOOM_FONT_SIZES[i];
                 zoomFonts[i] = io.Fonts->AddFontDefault(&fallbackCfg);
             }
-            zoomFontsBold[i] = hasBold
-                ? io.Fonts->AddFontFromFileTTF(boldFontPath.c_str(), ZOOM_FONT_SIZES[i], &cfg)
-                : nullptr;
+            zoomFontsBold[i] = bold.valid() ? bold.add(io.Fonts, ZOOM_FONT_SIZES[i], &cfg) : nullptr;
             fonts[i] = zoomFonts[i];
             fonts[i + 9] = zoomFontsBold[i];
         }

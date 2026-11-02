@@ -42,11 +42,12 @@ private:
     void drawThemeColorPickLayers(bool selectable);
     struct ThemeFontFamily {
         std::string name;
-        std::string regularPath;
+        std::string regularPath; // relative to data, or absolute for system fonts
         std::string boldPath;
+        bool system = false;     // found in ofxOceanodeFonts::systemFontDirectory()
     };
     std::vector<ThemeFontFamily> themeFontFamilies;
-    std::string themeFontFamily; // Empty selects the built-in JetBrains Mono pair.
+    std::string themeFontFamily; // Empty selects the built-in default (ofxOceanodeFonts).
     std::string themeFontWarning;
     bool pendingThemeFontChange = true;
     void refreshThemeFonts();
