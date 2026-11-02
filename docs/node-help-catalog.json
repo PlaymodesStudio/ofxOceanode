@@ -344,7 +344,7 @@
     "addon": "ofxOceanodeVectorGraphics"
   },
   "Bounding Box Aspect Ratio": {
-    "description": "Finds the bounding rectangle of paired 2D points and reports its size, aspect ratio and corners.\n\n**Inputs and control**\n\n**[ X]** X coordinates of the points. Paired with Y by index.\n\n**[ Y]** Y coordinates of the points. Paired with X by index.\n\n**[ DoRotate]** Off finds an axis-aligned rectangle. On finds a minimum-area oriented rectangle using the convex hull; input points are not rotated.\n\n**Outputs**\n\n**[ AspectRatio]** Width divided by Height. Zero height with nonzero width gives FLT_MAX; a single location gives 1.\n\n**[ Width]** Rectangle width in input coordinate units.\n\n**[ Height]** Rectangle height in input coordinate units.\n\n**[ AR_X]** Copy of the rectangle width, useful as an X scaling factor.\n\n**[ AR_Y]** Copy of the rectangle height, useful as a Y scaling factor.\n\n**[ BoxX]** Five X corner values, repeating the first corner to close the rectangle.\n\n**[ BoxY]** Five Y corner values, repeating the first corner to close the rectangle.\n\n**Notes**\n\nUses the shared input length and ignores pairs containing non-finite values. -1 is treated as a coordinate, not a separator. No valid points gives zero dimensions and corners, with aspect ratio 1. Recalculates on X or DoRotate changes; publish Y before X.",
+    "description": "Finds the bounding rectangle of paired 2D points and reports its size, aspect ratio, orientation and corners. Width is always the longer side, so the outputs do not swap while a shape rotates.\n\n**Inputs and control**\n\n**[ X]** X coordinates of the points. Paired with Y by index.\n\n**[ Y]** Y coordinates of the points. Paired with X by index.\n\n**[ DoRotate]** Off finds an axis-aligned rectangle. On finds a minimum-area oriented rectangle using the convex hull; input points are not rotated.\n\n**Outputs**\n\n**[ AspectRatio]** Width divided by Height, so 1 or more. Zero height with nonzero width gives FLT_MAX; a single location gives 1.\n\n**[ Width]** Longer side of the rectangle in input coordinate units.\n\n**[ Height]** Shorter side of the rectangle in input coordinate units.\n\n**[ Angle]** Direction of the Width side in degrees, from -90 up to 90, measured from the X axis towards positive Y. A rectangle looks the same after a half turn, so the value wraps every 180 degrees. Axis-aligned boxes give 0 or 90.\n\n**[ BoxX]** Five X corner values, repeating the first corner to close the rectangle. The first edge runs along the Width side.\n\n**[ BoxY]** Five Y corner values, repeating the first corner to close the rectangle.\n\n**Notes**\n\nUses the shared input length and ignores pairs containing non-finite values. -1 is treated as a coordinate, not a separator. No valid points gives zero dimensions and corners, with aspect ratio 1 and angle 0. Recalculates on X or DoRotate changes; publish Y before X.",
     "parameters": [
       "X",
       "Y",
@@ -352,8 +352,7 @@
       "AspectRatio",
       "Width",
       "Height",
-      "AR_X",
-      "AR_Y",
+      "Angle",
       "BoxX",
       "BoxY"
     ],
