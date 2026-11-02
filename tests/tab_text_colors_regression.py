@@ -137,8 +137,9 @@ int main(){
     for(const auto& hook : GImGui->Hooks) if(hook.Owner == ImHashStr("OceanodeTabText")) ++hooks;
     assert(hooks == 1);
     OceanodeTheme theme; theme.setup();
-    assert(OceanodeColors::TabText.x == colors[ImGuiCol_TextDisabled].x);
-    assert(OceanodeColors::TabSelectedText.x == colors[ImGuiCol_Text].x);
+    // Built-in values baked from remake_darkie_2 (see scripts/bake_theme.py).
+    assert(OceanodeColors::TabText.x == 0.482f && colors[ImGuiCol_TextDisabled].x == 0.476f);
+    assert(OceanodeColors::TabSelectedText.x == 0.859f && colors[ImGuiCol_Text].x == 0.675f);
     OceanodeColors::TabSelectedText = ImVec4(0.13f, 0.91f, 0.23f, 0.8f);
     OceanodeColors::TabText = ImVec4(0.89f, 0.17f, 0.71f, 0.6f);
     frame(0); frame(0); frame(0); checkDock(); checkRegular(0);
@@ -198,7 +199,7 @@ int main(){
     ofSavePrettyJson("config/themes/mixed.json", old); manager.load("mixed");
     assert(OceanodeColors::TabText.x == 0.1f && OceanodeColors::TabSelectedText.x == 0.9f);
     theme.setup();
-    assert(OceanodeColors::TabText.x == 0.55f && OceanodeColors::TabSelectedText.x == 0.85f);
+    assert(OceanodeColors::TabText.x == 0.482f && OceanodeColors::TabSelectedText.x == 0.859f);
     ImGui::DestroyContext();
     puts("PASS: regular/docking tab colors, selection, unfocused groups, hover, alpha, balanced style, picker, theme save/load, old and partial themes.");
 }
