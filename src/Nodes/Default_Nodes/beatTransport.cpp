@@ -9,7 +9,50 @@
 #include <algorithm>
 #include <cmath>
 
+void beatTransport::refreshTransportList() {
+    auto* host = getHostContainer();
+    auto root = host != nullptr ? host->getRootTransport() : nullptr;
+    if(root == nullptr) return;
+    const uint64_t revision = root->getTimeSourcesRevision();
+    const std::string current = getTimeSourceId();
+    if(revision == listedRevision && current == listedId) return;
+    listedRevision = revision;
+    listedId = current;
+    std::vector<std::string> options{"Global Transport"};
+    std::vector<std::string> ids{TimeSourceGlobal};
+    // Every timeline that has a transport, this canvas's first.
+    auto sources = root->getTimeSources();
+    const std::string ownGroup = getParents();
+    std::stable_sort(sources.begin(), sources.end(), [&](const auto& a, const auto& b){
+        return (a.group == ownGroup) > (b.group == ownGroup);
+    });
+    for(const auto& source : sources) {
+        if(!source.selectable) continue;
+        const bool own = source.group == ownGroup || source.group.empty();
+        options.push_back((own ? std::string() : source.group + " / ") + source.label);
+        ids.push_back(source.id);
+    }
+    // A choice not listed: an older patch's (Auto, Clock), or a timeline not
+    // there (yet, or deleted).
+    if(std::find(ids.begin(), ids.end(), current) == ids.end()) {
+        options.push_back(current == TimeSourceAuto ? "Auto (this canvas)"
+                          : current == TimeSourceClock ? "Clock" : "Missing transport");
+        ids.push_back(current);
+    }
+    updatingSelector = true;
+    if(options != transportOptions) {
+        transportOptions = options;
+        transportSelector.setMax(static_cast<int>(transportOptions.size()) - 1);
+        if(transportSelectorParam) transportSelectorParam->setDropdownOptions(transportOptions);
+    }
+    transportIds = std::move(ids);
+    const int index = static_cast<int>(std::find(transportIds.begin(), transportIds.end(), current) - transportIds.begin());
+    if(transportSelector.get() != index) transportSelector = index;
+    updatingSelector = false;
+}
+
 void beatTransport::update(ofEventArgs &) {
+    refreshTransportList();
     const auto frameState = getFrameTransportState();
     const auto &previous = frameState.previous;
     const auto &current = frameState.current;

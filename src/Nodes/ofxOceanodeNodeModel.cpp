@@ -132,6 +132,7 @@ std::shared_ptr<ofxOceanodeTransport> ofxOceanodeNodeModel::getTransport() const
     const std::string& id = timeSourceIdParameter.get();
     if(id.empty() || id == TimeSourceAuto || id == TimeSourceFree) return canvasTransport;
     if(id == TimeSourceClock) return canvasTransport->getClockTransport();
+    if(id == TimeSourceGlobal) return hostContainer->getRootTransport();
     return canvasTransport->findTimeSource(id);
 }
 
@@ -205,7 +206,7 @@ void ofxOceanodeNodeModel::setTimeSourceId(const std::string& id){
 bool ofxOceanodeNodeModel::isTimeSourceMissing() const{
     if(!timeSourceEnabled || hostContainer == nullptr) return false;
     const std::string id = getTimeSourceId();
-    if(id == TimeSourceFree || id == TimeSourceAuto || id == TimeSourceClock) return false;
+    if(id == TimeSourceFree || id == TimeSourceAuto || id == TimeSourceClock || id == TimeSourceGlobal) return false;
     return getTransport() == nullptr;
 }
 
