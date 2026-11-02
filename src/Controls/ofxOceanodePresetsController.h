@@ -35,6 +35,9 @@ private:
     void finishSavePreset();
     void drawGlobalMacroSaveReview();
     void deletePreset(string name, string bank);
+    // Absolute folder of a listed preset: Presets/<bank>/<index>--<name>.
+    // Empty when the bank or preset is not listed.
+    string presetFolderPath(const string& presetName, const string& bankName) const;
     
     map<string, vector<string>> bankPresets;
     map<string, string> currentPreset;

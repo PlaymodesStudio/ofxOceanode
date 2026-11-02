@@ -43,6 +43,10 @@ public:
     ofxOceanode();
     ~ofxOceanode();
     
+    // Opens a file or folder with the system's default application
+    // (Finder for a folder on macOS).
+    static void openWithDefaultApp(const std::string& path);
+
     void setup();
     
     void update();
@@ -213,7 +217,6 @@ private:
     bool windowTitleCaptured = false;
 #endif
     static std::string userManualPath();
-    static void openWithDefaultApp(const std::string& path);
     void showHelpPopUp();
     void drawMenuBar();
     bool showMetrics = false;

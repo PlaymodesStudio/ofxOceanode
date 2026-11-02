@@ -12,6 +12,7 @@
 #include "ofxOceanodeNode.h"
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeNodeGui.h"
+#include "ofxOceanode.h"
 #include <filesystem>
 #include <map>
 #include <set>
@@ -421,6 +422,20 @@ void ofxOceanodePresetsController::drawPresetList(){
                         currentBank = b;
                         loadPreset(presets[n], bankName);
                         currentPreset[bankName] = presets[n];
+                    }
+                    if(ImGui::BeginPopupContextItem()){
+#ifdef TARGET_OSX
+                        const char* revealLabel = "Open in Finder";
+#elif defined(TARGET_WIN32)
+                        const char* revealLabel = "Show in Explorer";
+#else
+                        const char* revealLabel = "Open Folder";
+#endif
+                        if(ImGui::MenuItem(revealLabel)){
+                            const string folder = presetFolderPath(presets[n], bankName);
+                            if(!folder.empty()) ofxOceanode::openWithDefaultApp(folder);
+                        }
+                        ImGui::EndPopup();
                     }
                     ImGui::PopID();
                 }
@@ -891,9 +906,8 @@ void ofxOceanodePresetsController::deletePreset(string presetName, string bankNa
     if(presetIt == presets.end()) return;
     const int index = distance(presets.begin(), presetIt);
 
-    ofDirectory bankDirectory("./Presets/" + bankName);
-    const string bankPath = bankDirectory.getAbsolutePath();
-    const string presetPath = bankPath + "/" + ofToString(index + 1) + "--" + presetName;
+    const string bankPath = ofDirectory("./Presets/" + bankName).getAbsolutePath();
+    const string presetPath = presetFolderPath(presetName, bankName);
     if(std::filesystem::remove_all(presetPath)){
         presets.erase(presetIt);
         if(currentPreset[bankName] == presetName) currentPreset[bankName].clear();
@@ -903,6 +917,16 @@ void ofxOceanodePresetsController::deletePreset(string presetName, string bankNa
             std::filesystem::rename(bankPath + "/" + oldName, bankPath + "/" + newName);
         }
     }
+}
+
+string ofxOceanodePresetsController::presetFolderPath(const string& presetName, const string& bankName) const {
+    auto bankIt = bankPresets.find(bankName);
+    if(bankIt == bankPresets.end()) return "";
+    const auto& presets = bankIt->second;
+    auto presetIt = find(presets.begin(), presets.end(), presetName);
+    if(presetIt == presets.end()) return "";
+    const int index = distance(presets.begin(), presetIt);
+    return ofDirectory("./Presets/" + bankName).getAbsolutePath() + "/" + ofToString(index + 1) + "--" + presetName;
 }
 
 // Global macro review compares live saveable state with the macro folder.
