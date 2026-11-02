@@ -4813,7 +4813,7 @@
     "source": "Default_Nodes/portalSelector.h",
     "addon": "ofxOceanode"
   },
-  "Post-It Note": {
+  "PostIt Note": {
     "description": "Places a colored annotation directly on the canvas. Click to select, drag to move, and double-click the body to edit text.\n\n**Inspector**\n\n**[ Text]** Note contents. Editing the note updates this value.\n\n**[ Backgr.Color]** Note background color, including alpha.\n\n**[ Text.Color]** Note text color, including alpha.\n\n**[ Font Size]** Text size at normal canvas zoom; scales with the canvas.\n\n**Notes**\n\nEscape or clicking outside ends text editing. Drag the bottom-right corner to resize; the size is saved with the preset. Text is hidden at low zoom while the note remains visible. Corner Radius is currently fixed internally and is not an exposed parameter.",
     "parameters": [
       "Text",
