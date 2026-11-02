@@ -54,6 +54,7 @@ void ofxOceanodeInspectorController::drawTimeSource(ofxOceanodeNodeModel& model)
     if(current == ofxOceanodeNodeModel::TimeSourceFree) preview = "Free";
     else if(current == ofxOceanodeNodeModel::TimeSourceAuto) preview = "Auto";
     else if(current == ofxOceanodeNodeModel::TimeSourceClock) preview = "Clock";
+    else if(current == ofxOceanodeNodeModel::TimeSourceGlobal) preview = "Global transport";
     else {
         for(const auto& source : sources)
             if(source.id == current) preview = source.group.empty() ? source.label : source.group + " / " + source.label;
@@ -68,6 +69,7 @@ void ofxOceanodeInspectorController::drawTimeSource(ofxOceanodeNodeModel& model)
             if(tip != nullptr && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tip);
         };
         if(model.hasTimeSourceFreeOption()) entry("Free", ofxOceanodeNodeModel::TimeSourceFree, "Not synced: runs on its own.");
+        entry("Global transport", ofxOceanodeNodeModel::TimeSourceGlobal, "The global transport, wherever this node is.");
         entry("Auto", ofxOceanodeNodeModel::TimeSourceAuto, "The timeline this canvas plays.");
         entry("Clock", ofxOceanodeNodeModel::TimeSourceClock, "The shared clock: always running, at the root tempo.");
         std::string group = "\x01";

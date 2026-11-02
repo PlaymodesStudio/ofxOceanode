@@ -259,6 +259,8 @@ public:
     static constexpr const char* TimeSourceFree = "free";
     static constexpr const char* TimeSourceAuto = "auto";
     static constexpr const char* TimeSourceClock = "clock";
+    // The global transport (the root's), wherever the node is.
+    static constexpr const char* TimeSourceGlobal = "global";
     ofxOceanodeFrameTimeState getFrameGlobalTimeState() const;
     
     void addInspectorParameter(ofAbstractParameter& p){
