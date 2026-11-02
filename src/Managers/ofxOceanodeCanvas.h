@@ -67,7 +67,7 @@ public:
 
     // Call after gui.setup(), outside an ImGui frame. Paths are relative to data
     // unless absolute. An empty or missing regular path selects the built-in font
-    // (ofxOceanodeFonts: SF Mono from macOS, else the embedded JetBrains Mono).
+    // (ofxOceanodeFonts: the embedded JetBrains Mono).
     void setupFonts(const std::string& regularPath = "", const std::string& boldPath = "");
 
     void bringOnTop(){onTop = true;};

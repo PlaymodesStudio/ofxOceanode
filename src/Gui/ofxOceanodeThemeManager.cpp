@@ -408,7 +408,7 @@ void ofxOceanodeThemeManager::drawThemeEditorWindow(){
                 if(ofxOceanodeFonts::systemFontDirectory().empty())
                     ImGui::TextDisabled("Fonts from bin/data/config/font (including subfolders)");
                 else
-                    ImGui::TextDisabled("Fonts from bin/data/config/font (including subfolders) and SF Mono from macOS");
+                    ImGui::TextDisabled("Fonts from bin/data/config/font (including subfolders), plus SF Mono from macOS");
                 if(ImGui::Button("Refresh font list")) refreshThemeFonts();
                 ImGui::TextWrapped("Choose a family to preview it throughout the app. Use Theme > Save Theme to keep your choice.");
                 if(!themeFontWarning.empty()) ImGui::TextWrapped("%s", themeFontWarning.c_str());

@@ -31,7 +31,7 @@ Run all of them with `for t in tests/*_regression.py; do python3 "$t" || echo "F
 ## Generated files and docs
 
 - `src/ofxOceanodeNodeHelpCatalog.h` is generated; don't edit it by hand. Edit `docs/node-help-catalog.json` or `docs/oceanode-assistant.md`, then run `python3 scripts/generate_node_help.py`. `scripts/audit_node_help.py` checks catalog coverage.
-- `src/Gui/ofxOceanodeEmbeddedFontData.cpp` is generated: the built-in JetBrains Mono faces compressed for ImGui. Regenerate with `python3 scripts/embed_fonts.py <JetBrainsMono release folder>`; `tests/embedded_fonts_regression.py` checks it decodes. `scripts/bake_theme.py <theme.json>` rewrites the built-in colours in `ofxOceanodeTheme.cpp` and `ofxOceanodeColors.h` from a saved theme.
+- `src/Gui/ofxOceanodeEmbeddedFontData.cpp` is generated: the built-in JetBrains Mono faces compressed for ImGui, used whenever no theme names a font (macOS SF Mono is only a selectable family). Regenerate with `python3 scripts/embed_fonts.py <JetBrainsMono release folder>`; `tests/embedded_fonts_regression.py` checks it decodes. `scripts/bake_theme.py <theme.json>` rewrites the built-in colours in `ofxOceanodeTheme.cpp` and `ofxOceanodeColors.h` from a saved theme.
 - The user manual PDF (`output/pdf/`) is built from `docs/oceanode-user-manual.md` by `scripts/build_user_manual.py`, which needs reportlab.
 - `docs/` holds design notes and specs for features such as layouts, workspaces, macro mixer, custom GUI and profiling. Read the matching doc before changing one of those features.
 

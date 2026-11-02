@@ -28,7 +28,7 @@ std::string ofxOceanodeFonts::systemRegularPath(){ return systemFace("SF-Mono-Re
 std::string ofxOceanodeFonts::systemBoldPath(){ return systemFace("SF-Mono-Bold.otf"); }
 
 std::string ofxOceanodeFonts::builtinDescription(){
-    return systemRegularPath().empty() ? "JetBrains Mono, embedded" : "SF Mono, from macOS";
+    return "JetBrains Mono, embedded";
 }
 
 ofxOceanodeFonts::Embedded ofxOceanodeFonts::embeddedRegular(){

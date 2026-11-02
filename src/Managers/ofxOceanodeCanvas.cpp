@@ -107,15 +107,13 @@ std::string resolveFontFile(const std::string& path){
     return ofFile(full, ofFile::Reference).exists() ? full : "";
 }
 
+// The built-in default is always the embedded JetBrains Mono, so every app looks
+// the same without a theme. The macOS SF Mono faces are only offered as a
+// selectable family by the Theme Editor.
 CanvasFontSource builtinFontSource(bool bold){
     CanvasFontSource source;
-    source.file = bold ? ofxOceanodeFonts::systemBoldPath() : ofxOceanodeFonts::systemRegularPath();
-    if(!source.file.empty()){
-        source.key = source.file;
-    }else{
-        source.embedded = bold ? ofxOceanodeFonts::embeddedBold() : ofxOceanodeFonts::embeddedRegular();
-        source.key = bold ? "<embedded bold>" : "<embedded regular>";
-    }
+    source.embedded = bold ? ofxOceanodeFonts::embeddedBold() : ofxOceanodeFonts::embeddedRegular();
+    source.key = bold ? "<embedded bold>" : "<embedded regular>";
     return source;
 }
 }
