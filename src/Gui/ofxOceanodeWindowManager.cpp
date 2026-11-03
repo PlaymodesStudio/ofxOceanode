@@ -144,8 +144,17 @@ void ofxOceanodeWindowManager::beforeFrame(bool mainWindowFullscreen){
         viewportsRead = true;
     }
     if(!viewportsWanted) return;
-    if(mainWindowFullscreen) io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
-    else io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    if(mainWindowFullscreen){
+        io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
+    }else if(!(io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)){
+        // ofxImGui skips UpdatePlatformWindows() while viewports are off, and
+        // NewFrame() asserts it ran after the previous frame. With viewports
+        // still off for that frame the call only records that it ran.
+        ImGuiContext& g = *ImGui::GetCurrentContext();
+        if(g.FrameCount > 0 && g.FrameCountEnded == g.FrameCount && g.FrameCountPlatformEnded < g.FrameCount)
+            ImGui::UpdatePlatformWindows();
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    }
 }
 
 void ofxOceanodeWindowManager::beginHostWindow(){
