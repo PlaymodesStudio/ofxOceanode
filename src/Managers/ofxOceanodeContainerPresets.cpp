@@ -522,8 +522,10 @@ void ofxOceanodeContainer::loadPreset_activateConnections(){
         }
     }
     
+    // A Macro preset can load while the Macro is off: its connections then
+    // stay off until activate().
     for(auto &connection : connections){
-        connection->setActive(true);
+        connection->setActive(connectionsActive);
     }
 }
 

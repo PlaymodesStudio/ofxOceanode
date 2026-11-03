@@ -135,6 +135,13 @@ public:
 		static void snapshotUpdated(const string& macroPath) {
 			ofNotifyEvent(getSnapshotUpdatedEvent(), const_cast<string&>(macroPath));
 		}
+
+    // Addons can append ImGui controls to each canvas toolbar after Stop.
+    // Listeners draw inline (starting with SameLine) in the active canvas.
+    static ofEvent<void>& getCanvasToolbarDrawEvent(){
+        static ofEvent<void> event;
+        return event;
+    }
 	
 	static void addPortal(abstractPortal* _portal){
 		getInstance().portalsMap[_portal->getName()].push_back(_portal);

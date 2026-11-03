@@ -118,9 +118,11 @@ CanvasFontSource builtinFontSource(bool bold){
 }
 }
 
-void ofxOceanodeCanvas::setupFonts(const std::string& regularPath, const std::string& boldPath) {
+void ofxOceanodeCanvas::setupFonts(const std::string& regularPath, const std::string& boldPath, float tracking) {
     ImGuiIO& io = ImGui::GetIO();
     IM_ASSERT(!ImGui::GetCurrentContext()->WithinFrameScope);
+    tracking = std::isfinite(tracking)
+        ? ofClamp(tracking, ofxOceanodeFonts::TrackingMin, ofxOceanodeFonts::TrackingMax) : 0.0f;
     // Explicit paths come from the Theme Editor. An empty or missing regular face
     // selects the built-in font; a family without a bold face keeps bold text in
     // its regular face (null bold font).
@@ -141,10 +143,30 @@ void ofxOceanodeCanvas::setupFonts(const std::string& regularPath, const std::st
     // regular/bold face instead of reusing the built-in fonts.
     const auto key = std::make_pair(regular.key, bold.key);
     auto cached = fontCache.find(key);
+    bool rebuildAtlas = false;
     if(cached != fontCache.end()) {
         for(int i = 0; i < 9; ++i) {
             zoomFonts[i] = cached->second[i];
             zoomFontsBold[i] = cached->second[i + 9];
+            // Reuse the same font objects while dragging tracking: caching every
+            // spacing value would continuously grow the atlas. In ImGui 1.92,
+            // extra advance is unscaled, so scale it for each canvas font size.
+            const float advance = tracking * ZOOM_FONT_SIZES[i] / ZOOM_FONT_SIZES[3];
+            for(ImFont* font : {zoomFonts[i], zoomFontsBold[i]}) {
+                if(!font) continue;
+                bool changed = false;
+                for(ImFontConfig* source : font->Sources) {
+                    if(source->GlyphExtraAdvanceX == advance) continue;
+                    source->GlyphExtraAdvanceX = advance;
+                    changed = true;
+                }
+                if(changed) {
+                    // Drop glyph metrics and bitmaps together so rendering,
+                    // measurement, wrapping and InputText agree next frame.
+                    ImFontAtlasFontDiscardBakes(io.Fonts, font, 0);
+                    rebuildAtlas = true;
+                }
+            }
         }
     } else {
         // Keep logical sizes: scaling the atlas size breaks InputText layout
@@ -152,8 +174,12 @@ void ofxOceanodeCanvas::setupFonts(const std::string& regularPath, const std::st
         ImFontConfig cfg;
         cfg.OversampleH = 2;
         cfg.OversampleV = 2;
+        // Keep the nine explicit raster sizes: ImGui 1.92 otherwise bakes a
+        // different size during window scaling without scaling extra advance.
+        cfg.Flags |= ImFontFlags_LockBakedSizes;
         std::array<ImFont*, 18> fonts{};
         for(int i = 0; i < 9; ++i) {
+            cfg.GlyphExtraAdvanceX = tracking * ZOOM_FONT_SIZES[i] / ZOOM_FONT_SIZES[3];
             zoomFonts[i] = regular.add(io.Fonts, ZOOM_FONT_SIZES[i], &cfg);
             if(!zoomFonts[i]) {
                 ImFontConfig fallbackCfg = cfg;
@@ -165,6 +191,16 @@ void ofxOceanodeCanvas::setupFonts(const std::string& regularPath, const std::st
             fonts[i + 9] = zoomFontsBold[i];
         }
         fontCache.emplace(key, fonts);
+        rebuildAtlas = true;
+    }
+    if(rebuildAtlas) {
+        // Seed each fixed size before a preview/comment can request a different
+        // size. Rendering and measurement then scale the whole glyph advance,
+        // including tracking, by the same canvas zoom factor.
+        for(int i = 0; i < 9; ++i) {
+            for(ImFont* font : {zoomFonts[i], zoomFontsBold[i]})
+                if(font) font->GetFontBaked(ZOOM_FONT_SIZES[i]);
+        }
         io.Fonts->Build();
 
         // Recreate the GPU font texture using the active renderer.
@@ -1134,6 +1170,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 			ImGui::PopStyleVar();
 		}
 
+        ofxOceanodeShared::getCanvasToolbarDrawEvent().notify();
 
 		// COMMENTS
 		

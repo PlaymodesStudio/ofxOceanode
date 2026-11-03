@@ -9,6 +9,10 @@
 // SF Mono ships inside Terminal.app rather than as an installed font; the Theme
 // Editor lists it as a selectable family, but it is never the default.
 namespace ofxOceanodeFonts {
+    // Extra character advance in logical pixels at the default 14 px UI size.
+    constexpr float TrackingMin = -2.0f;
+    constexpr float TrackingMax = 4.0f;
+
     // Folder holding Apple's SF Mono faces; empty off macOS or when it is missing.
     std::string systemFontDirectory();
     // Absolute paths of the system regular and bold faces; empty when unavailable.
