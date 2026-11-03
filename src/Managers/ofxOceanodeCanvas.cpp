@@ -1470,7 +1470,21 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             }
         }
         
-        // Rebuild the map and update indices
+        for (auto &n : nodesInThisFrame) {
+            if (!nodesDrawingOrder.count(n.first)) {
+                updatedNodes.emplace_back(n.first, std::numeric_limits<int>::max());
+            }
+        }
+        
+        // Rebuild the map and update indices. The map iterates by node id, so sort
+        // by the previous order first; selected nodes always stay above the rest.
+        const auto& nodesMap = container->getParameterGroupNodesMap();
+        std::stable_sort(updatedNodes.begin(), updatedNodes.end(), [&nodesMap](const auto& a, const auto& b){
+            const bool aSelected = nodesMap.at(a.first)->getNodeGui().getSelected();
+            const bool bSelected = nodesMap.at(b.first)->getNodeGui().getSelected();
+            if (aSelected != bSelected) return bSelected;
+            return a.second < b.second;
+        });
         nodesDrawingOrder.clear();
         for (int newIndex = 0; newIndex < updatedNodes.size(); ++newIndex) {
             nodesDrawingOrder[updatedNodes[newIndex].first] = newIndex;
@@ -1480,12 +1494,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 		
 		//Draw List layers
 		draw_list->ChannelsSplit(max(nodesInThisFrame.size(), (size_t)2)*2 + 1 + 1); //We have foreground + background of each node + connections + comments on the background
-		
-		for(auto &n : nodesInThisFrame){
-			if(nodesDrawingOrder.count(n.first) == 0){
-				nodesDrawingOrder[n.first] = nodesDrawingOrder.size();
-			}
-		}
         
         vector<pair<string, ofxOceanodeNode*>> nodesVisibleInThisFrame;
         
