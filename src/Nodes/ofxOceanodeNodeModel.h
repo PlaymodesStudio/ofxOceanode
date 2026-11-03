@@ -62,8 +62,14 @@ struct ofxOceanodeTimelineInstrument {
         bool pitchChangesLength = true;
     };
     std::vector<RowWaveform> rowWaveforms;
+    // A chord bank (HarmonyBox): gate component k plays chord k, one chord at
+    // a time (the last opened wins), its value the gate level; pitch is null.
+    // voices = the chord count, rowNames / rowColors the chords. The timeline
+    // writes it with a Chords lane: one row per chord, held gate blocks.
+    bool chords = false;
 };
 #define OFXOCEANODE_HAS_TIMELINE_ROW_WAVEFORMS 1
+#define OFXOCEANODE_HAS_TIMELINE_CHORDS 1
 
 typedef int ofxOceanodeNodeModelFlags;
 
