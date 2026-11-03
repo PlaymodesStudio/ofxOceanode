@@ -132,6 +132,22 @@ bool ofxOceanodeWindowManager::isWindowToggle(const std::string& parameterName){
         key == "showall" || key == "showsplit";
 }
 
+void ofxOceanodeWindowManager::beforeFrame(bool mainWindowFullscreen){
+    // A macOS fullscreen window lives in its own Space. Every popup or floating
+    // window that ImGui gives its own OS window opens on another Space, so macOS
+    // switches away from the patch, and presenting those windows during the
+    // transition can crash in the GL driver. Keep everything in the main window
+    // while fullscreen; ImGui destroys the unused OS windows itself.
+    ImGuiIO& io = ImGui::GetIO();
+    if(!viewportsRead){
+        viewportsWanted = (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) != 0;
+        viewportsRead = true;
+    }
+    if(!viewportsWanted) return;
+    if(mainWindowFullscreen) io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
+    else io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+}
+
 void ofxOceanodeWindowManager::beginHostWindow(){
     // DockBuilder operations are expected before the DockSpace is submitted.
     // This only affects registered controllers absent from the loaded file;

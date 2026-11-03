@@ -20,6 +20,7 @@ public:
     void installImGuiHandlers();          // after gui.setup(): DockCollapse settings handler + FloatingWindowDecor::install()
 
     // Frame. The caller draws the menu bar and popups between begin/endHostWindow.
+    void beforeFrame(bool mainWindowFullscreen); // before gui.begin(): ImGui viewports off while fullscreen
     void beginHostWindow();               // reconcile pending controller docking, Begin("DockSpace") with menu bar,
                                           // proportional DockSpace, default left split if missing, setDockspaceID
     void endHostWindow();                 // ImGui::End() of the host, then refresh left/central dock IDs in Shared
@@ -51,6 +52,8 @@ private:
     std::unique_ptr<ofxOceanodeProportionalDocking> proportionalDocking;
     bool showMode = false;
     bool hostOpen = true;
+    bool viewportsWanted = false;         // ViewportsEnable as set up, restored when leaving fullscreen
+    bool viewportsRead = false;
 
     // Metadata for the most recently loaded ImGui layout. ImGui restores only
     // windows present in the ini text, so controllers introduced after the

@@ -32,8 +32,26 @@
 #ifdef TARGET_WIN32
 #include <shellapi.h>
 #endif
+#if defined(TARGET_OSX)
+#include <objc/message.h>
+#include <objc/runtime.h>
+#endif
 
 namespace {
+bool mainWindowIsFullscreen(){
+    if(ofGetWindowMode() == OF_FULLSCREEN) return true;
+#if defined(TARGET_OSX)
+    // The green button enters native fullscreen, which ofGetWindowMode() does not report.
+    auto window = static_cast<id>(ofGetCocoaWindow());
+    if(window == nullptr) return false;
+    constexpr unsigned long fullScreenMask = 1ul << 14; // NSWindowStyleMaskFullScreen
+    const auto styleMask = reinterpret_cast<unsigned long(*)(id, SEL)>(objc_msgSend)(window, sel_registerName("styleMask"));
+    return (styleMask & fullScreenMask) != 0;
+#else
+    return false;
+#endif
+}
+
 void resetPresetCanvasViews(ofxOceanodeContainer* current, ofxOceanodeCanvas* currentCanvas){
     currentCanvas->resetViewToOrigin();
     for(auto* node : current->getAllModules()){
@@ -159,6 +177,7 @@ void ofxOceanode::update(){
 void ofxOceanode::draw(){
     theme->beforeFrame();
     layouts->beforeFrame();
+    windows->beforeFrame(mainWindowIsFullscreen());
     if(presetCanvasCenterPending){
         resetPresetCanvasViews(container.get(), &canvas);
         presetCanvasCenterPending = false;
