@@ -86,8 +86,12 @@ public:
     }
     static void drawPendingConnectionErrorDialog();
     
+    // A Macro switched off deactivates its container: nodes stop updating and
+    // the container's connections stop relaying values, so listener-driven
+    // nodes go quiet too. Connections made while inactive start inactive.
     void activate();
     void deactivate();
+    bool isActive() const { return connectionsActive; }
 
     
     ofxOceanodeNode* createNodeFromName(string name, int identifier = -1, bool isPersistent = false);
@@ -467,6 +471,7 @@ private:
     float bpm;
     float phase;
     bool transportOwner = false;
+    bool connectionsActive = true;
     std::shared_ptr<ofxOceanodeTransport> transport;
     std::shared_ptr<ofxOceanodeTransport> transportOverride;
     std::unique_ptr<ofxOceanodeAutomationExtension> automationExtension;

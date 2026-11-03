@@ -320,6 +320,7 @@ void ofxOceanodeContainer::drawPendingConnectionErrorDialog()
 }
 
 void ofxOceanodeContainer::activate(){
+    connectionsActive = true;
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->setActive(true);
@@ -330,10 +331,16 @@ void ofxOceanodeContainer::activate(){
         for(auto &node : nodeTypeMap.second){
             node.second->setActive(true);
         }
+    }
+    // Reactivating a connection re-sends its source value, so the graph
+    // catches up with what changed while it was off.
+    for(auto &connection : connections){
+        connection->setActive(true);
     }
 }
 
 void ofxOceanodeContainer::deactivate(){
+    connectionsActive = false;
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             node.second->setActive(false);
@@ -344,6 +351,9 @@ void ofxOceanodeContainer::deactivate(){
         for(auto &node : nodeTypeMap.second){
             node.second->setActive(false);
         }
+    }
+    for(auto &connection : connections){
+        connection->setActive(false);
     }
 }
 
@@ -690,6 +700,9 @@ ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnectionFromInfo(st
 }
 
 ofxOceanodeAbstractConnection* ofxOceanodeContainer::createConnection(ofxOceanodeAbstractParameter &source, ofxOceanodeAbstractParameter &sink, bool active){
+    // Inside a deactivated Macro a new connection must not relay until the
+    // Macro is active again; activate() switches it on with the rest.
+    active = active && connectionsActive;
     if(sink.acceptsMultipleInputFrom(source)){
         for(auto* existing : sink.getInConnections())
             if(&existing->getSourceParameter() == &source) return existing;
