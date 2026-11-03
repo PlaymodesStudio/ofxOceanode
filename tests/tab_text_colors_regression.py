@@ -17,10 +17,13 @@ CASES = r'''
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "ofxOceanodeTheme.h"
+#include "ofxOceanodeFonts.h"
 #include "ofxOceanodeThemeColorPicker.h"
 #include "ofxOceanodeTabText.h"
 #include <nlohmann/json.hpp>
 #include <cassert>
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -36,6 +39,7 @@ Log ofLogNotice(const char*){ return {}; } Log ofLogWarning(const char*){ return
 const char* themesFolder = "config/themes/";
 struct ThemeHarness {
     string themeFontFamily, currentThemeName;
+    float themeFontTracking = 0.0f;
     bool pendingThemeFontChange = false;
     void save(const string& name);
     void load(const string& name);
@@ -174,17 +178,24 @@ int main(){
     // JSON persistence executes the real ThemeManager methods.
     const ImU32 selected = ImGui::ColorConvertFloat4ToU32(OceanodeColors::TabSelectedText);
     const ImU32 unselected = ImGui::ColorConvertFloat4ToU32(OceanodeColors::TabText);
-    ThemeHarness manager; manager.save("tabs");
+    ThemeHarness manager;
+    manager.themeFontTracking = -0.35f;
+    manager.save("tabs");
+    manager.themeFontTracking = 1.0f;
     theme.setup(); manager.load("tabs");
+    assert(manager.themeFontTracking == -0.35f);
     assert(ImGui::ColorConvertFloat4ToU32(OceanodeColors::TabSelectedText) == selected);
     assert(ImGui::ColorConvertFloat4ToU32(OceanodeColors::TabText) == unselected);
     auto old = ofLoadJson("config/themes/tabs.json");
+    assert(old["fontTracking"].get<float>() == -0.35f);
+    old.erase("fontTracking");
     assert(!old["colors"].contains("TabText") && !old["colors"].contains("TabSelectedText"));
     assert(old["oceanodeColors"].contains("OC_TabText") && old["oceanodeColors"].contains("OC_TabSelectedText"));
     old["oceanodeColors"].erase("OC_TabText"); old["oceanodeColors"].erase("OC_TabSelectedText");
     old["colors"]["Text"] = {0.7f, 0.6f, 0.5f, 1.0f};
     old["colors"]["TextDisabled"] = {0.4f, 0.3f, 0.2f, 1.0f};
     ofSavePrettyJson("config/themes/old.json", old); manager.load("old");
+    assert(manager.themeFontTracking == 0.0f);
     assert(OceanodeColors::TabSelectedText.x == 0.7f && OceanodeColors::TabText.x == 0.4f);
     // Partially updated themes retain explicit colors and derive only the missing one.
     old["colors"]["TabText"] = {0.2f, 0.8f, 0.9f, 0.5f};

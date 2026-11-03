@@ -68,7 +68,8 @@ public:
     // Call after gui.setup(), outside an ImGui frame. Paths are relative to data
     // unless absolute. An empty or missing regular path selects the built-in font
     // (ofxOceanodeFonts: the embedded JetBrains Mono).
-    void setupFonts(const std::string& regularPath = "", const std::string& boldPath = "");
+    // Tracking is extra character spacing at the normal UI size; scales with zoom.
+    void setupFonts(const std::string& regularPath = "", const std::string& boldPath = "", float tracking = 0.0f);
 
     void bringOnTop(){onTop = true;};
     // Request focus on this canvas window. The canvas will apply the focus

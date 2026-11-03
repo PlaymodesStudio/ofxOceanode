@@ -7,7 +7,7 @@
 
 class ofxOceanodeCanvas;
 
-// Owns the theme: colours, the font family, the Theme Editor with its Alt+hover
+// Owns the theme: colours, font family and tracking, the Theme Editor with its Alt+hover
 // colour lookup, and config/themes/<name>.json with the default in config/themes.json.
 class ofxOceanodeThemeManager {
 public:
@@ -48,6 +48,7 @@ private:
     };
     std::vector<ThemeFontFamily> themeFontFamilies;
     std::string themeFontFamily; // Empty selects the built-in default (ofxOceanodeFonts).
+    float themeFontTracking = 0.0f; // Extra character spacing at the normal UI size.
     std::string themeFontWarning;
     bool pendingThemeFontChange = true;
     void refreshThemeFonts();

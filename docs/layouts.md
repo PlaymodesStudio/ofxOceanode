@@ -84,9 +84,17 @@ All paths are relative to the data folder. Each JSON file has an integer
 | `<preset>/layout.json` | Layouts | `current` (`ini`: the ImGui docking text, `view`: visibility from the last preset save, or null), `layouts` (named snapshots, each `{ini, view}`), `active`, `default` |
 | `config/guiLayouts/<name>.json` | Layouts | One global layout: `{version, ini, view}`; `view` may be null (docking only) |
 | `config/guiLayouts.json` | Layouts | `{version, default}`: the global startup layout |
-| `config/themes/<name>.json` | ThemeManager | One theme: `fontFamily`, `colors`, `oceanodeColors` |
+| `config/themes/<name>.json` | ThemeManager | One theme: `fontFamily`, `fontTracking`, `colors`, `oceanodeColors` |
 | `config/themes.json` | ThemeManager | `{version, default}`: the theme loaded at startup |
 | `config/config.json` | AppConfig | Version 2: the Config menu's Rendering and Editor settings |
+
+In Theme Editor > Font, **Tracking** adjusts character spacing throughout the
+interface, including regular and bold text and all canvas zoom levels. Values
+are extra logical pixels at the normal UI size (14 px), from -2 to +4; negative
+values tighten text and positive values spread it out. Changes preview on the
+next frame. Use **Theme > Save Theme** to persist them. The tracking Reset button
+returns spacing to zero; both built-in theme reset actions also reset tracking.
+Older themes without `fontTracking` load with zero extra spacing.
 
 In Theme Editor > Oceanode Colors, `OC_TabSelectedText` controls the label of the tab
 whose contents are visible; `OC_TabText` controls the other tab labels. Selection

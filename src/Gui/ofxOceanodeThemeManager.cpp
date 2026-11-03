@@ -10,6 +10,7 @@
 #include "ofMain.h"
 #include <algorithm>
 #include <climits>
+#include <cmath>
 #include <cstring>
 #include <functional>
 #include <map>
@@ -170,20 +171,21 @@ void ofxOceanodeThemeManager::applyThemeFont(){
     if(!themeFontFamily.empty()){
         for(const auto& family : themeFontFamilies){
             if(family.name == themeFontFamily && ofFile(family.regularPath, ofFile::Reference).exists()){
-                canvas->setupFonts(family.regularPath, family.boldPath);
+                canvas->setupFonts(family.regularPath, family.boldPath, themeFontTracking);
                 return;
             }
         }
         themeFontWarning = "Font family '" + themeFontFamily + "' is unavailable. Using the built-in default.";
         ofLogWarning("ofxOceanodeThemeManager") << themeFontWarning;
     }
-    canvas->setupFonts();
+    canvas->setupFonts("", "", themeFontTracking);
 }
 
 void ofxOceanodeThemeManager::save(const std::string& name){
     ofDirectory::createDirectory(ofToDataPath(themesFolder, true), true, true);
     ofJson j;
     j["fontFamily"] = themeFontFamily;
+    j["fontTracking"] = themeFontTracking;
     ImVec4* colors = ImGui::GetStyle().Colors;
     colors[ImGuiCol_PopupBg] = colors[ImGuiCol_WindowBg];
     for(int i = 0; i < ImGuiCol_COUNT; i++){
@@ -215,6 +217,13 @@ void ofxOceanodeThemeManager::load(const std::string& name){
     base.setup();
     themeFontFamily = j.contains("fontFamily") && j["fontFamily"].is_string()
         ? j["fontFamily"].get<std::string>() : "";
+    themeFontTracking = 0.0f;
+    if(j.contains("fontTracking") && j["fontTracking"].is_number()){
+        const double tracking = j["fontTracking"].get<double>();
+        if(std::isfinite(tracking))
+            themeFontTracking = static_cast<float>(std::clamp(tracking,
+                double(ofxOceanodeFonts::TrackingMin), double(ofxOceanodeFonts::TrackingMax)));
+    }
     pendingThemeFontChange = true;
 
     ImVec4* colors = ImGui::GetStyle().Colors;
@@ -283,6 +292,7 @@ void ofxOceanodeThemeManager::drawThemeEditorWindow(){
             OceanodeTheme defaultTheme;
             defaultTheme.setup();
             themeFontFamily.clear();
+            themeFontTracking = 0.0f;
             pendingThemeFontChange = true;
             currentThemeName = "OceanodeTheme (built-in)";
         }
@@ -404,6 +414,20 @@ void ofxOceanodeThemeManager::drawThemeEditorWindow(){
             }
 
             if(ImGui::BeginTabItem("Font")){
+                ImGui::SetNextItemWidth(180.0f);
+                if(ImGui::DragFloat("Tracking", &themeFontTracking, 0.01f,
+                                   ofxOceanodeFonts::TrackingMin, ofxOceanodeFonts::TrackingMax,
+                                   "%.2f px", ImGuiSliderFlags_AlwaysClamp))
+                    pendingThemeFontChange = true;
+                if(ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Extra character spacing throughout the interface.\nNegative tightens; positive spreads. Scales with canvas zoom.");
+                ImGui::SameLine();
+                if(ImGui::Button("Reset##tracking")){
+                    themeFontTracking = 0.0f;
+                    pendingThemeFontChange = true;
+                }
+                ImGui::TextWrapped("Use Theme > Save Theme to keep font and tracking changes.");
+                ImGui::Separator();
                 ImGui::TextUnformatted("Default font family");
                 if(ofxOceanodeFonts::systemFontDirectory().empty())
                     ImGui::TextDisabled("Fonts from bin/data/config/font (including subfolders)");
@@ -579,6 +603,7 @@ void ofxOceanodeThemeManager::drawMenuSection(){
         OceanodeTheme base;
         base.setup();
         themeFontFamily.clear();
+        themeFontTracking = 0.0f;
         pendingThemeFontChange = true;
         currentThemeName = "OceanodeTheme (built-in)";
     }
