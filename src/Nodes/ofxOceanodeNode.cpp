@@ -404,7 +404,11 @@ bool ofxOceanodeNode::isParameterHidden(ofxOceanodeAbstractParameter& p) const{
 }
 
 bool ofxOceanodeNode::isParameterShownInGui(ofxOceanodeAbstractParameter& p) const{
-    return !isParameterHidden(p) || p.hasInConnection() || p.hasOutConnections();
+    // Hidden in the Inspector, or a parameter without a widget (NoGuiWidget,
+    // e.g. a window control published only for the timeline): no row and no
+    // pin, unless a cable uses it
+    const bool widgetless = p.getFlags() & ofxOceanodeParameterFlags_NoGuiWidget;
+    return (!isParameterHidden(p) && !widgetless) || p.hasInConnection() || p.hasOutConnections();
 }
 
 void ofxOceanodeNode::setParameterHidden(ofxOceanodeAbstractParameter& p, bool hidden){
