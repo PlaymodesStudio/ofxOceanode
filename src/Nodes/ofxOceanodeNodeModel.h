@@ -67,9 +67,20 @@ struct ofxOceanodeTimelineInstrument {
     // voices = the chord count, rowNames / rowColors the chords. The timeline
     // writes it with a Chords lane: one row per chord, held gate blocks.
     bool chords = false;
+    // Chord bank only, optional: which chords are locked (index = row).
+    std::vector<bool> rowLocked;
+    // Chord bank only, optional, drawn by the node with ImGui: the menu items
+    // for chord `row` inside the timeline's popup on it ("change this chord"),
+    // and the panel of a lane tab named panelLabel (generate, style...).
+    // Neither may change the number or order of the chords: the lane's blocks
+    // stay in their rows.
+    std::function<void(int row)> rowMenu;
+    std::function<void()> panel;
+    std::string panelLabel;
 };
 #define OFXOCEANODE_HAS_TIMELINE_ROW_WAVEFORMS 1
 #define OFXOCEANODE_HAS_TIMELINE_CHORDS 1
+#define OFXOCEANODE_HAS_TIMELINE_CHORD_MENUS 1
 
 typedef int ofxOceanodeNodeModelFlags;
 
