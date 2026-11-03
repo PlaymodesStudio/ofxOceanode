@@ -1170,6 +1170,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 			ImGui::PopStyleVar();
 		}
 
+        ofxOceanodeShared::getCanvasToolbarDrawEvent().notify();
 
 		// COMMENTS
 		
