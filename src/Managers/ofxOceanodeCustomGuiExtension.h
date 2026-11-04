@@ -36,4 +36,14 @@ public:
     virtual void restoreNodeBindings(const ofJson&) = 0;
     virtual void migrateTo(ofxOceanodeCustomGuiExtension&, const std::map<std::string,std::string>&) = 0;
     virtual void importMovedState(const ofJson&, const std::map<std::string,std::string>&) = 0;
+    // This canvas's panel windows, for a host that opens and closes them (a
+    // MacroMixer, for its source graphs). setPanelOpen changes the window
+    // only: nothing is marked to save and design mode stays as it is.
+    struct PanelWindow { std::string id, name; bool open; };
+    virtual std::vector<PanelWindow> panelWindows() const { return {}; }
+    virtual void setPanelOpen(const std::string& /*id*/, bool /*open*/) {}
+    // Names this canvas's panel windows after their host ("BLOOBS (source)")
+    // and keys their ImGui ids on it, so docking finds them again across
+    // activations. Empty: named after the canvas, as usual.
+    virtual void setWindowHostLabel(const std::string& /*label*/) {}
 };

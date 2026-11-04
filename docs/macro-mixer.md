@@ -396,7 +396,9 @@ preset load.
 
 The Timeline window lists these canvases with the others, named after the
 source, so a running source's timeline can be watched or edited while it
-plays; edits are not written back to the source folder.
+plays; edits are not written back to the source folder. Tick a timeline under
+the source's **Windows** to open it in a window of its own whenever the source
+plays (see Source windows).
 
 ## Triggers (void routers)
 
@@ -440,12 +442,23 @@ happen, inside the graph's update, with the source's Trigger policy. The
 policy runs per frame on each side's count, so the result matches the router
 policies above. At completion the native destination cable takes over.
 
-## Node windows
+## Source windows
 
-Some nodes draw their own window, such as the SC instrument editors
-(`getWindowTitle()`/`getWindowToggle()` on `ofxOceanodeNodeModel`). A source's
-`layout.json` never applies inside MacroMixer, and a source's saved **Show**
-is ignored: every node window in a source graph starts closed.
+A source's **Windows** list holds three kinds of window, nested Macros'
+included:
+
+- **Node windows**: nodes that draw their own window, such as the SC
+  instrument editors (`getWindowTitle()`/`getWindowToggle()` on
+  `ofxOceanodeNodeModel`), listed by node name.
+- **Custom GUI panels** (`Custom GUI: BLOOBS`): the panels saved in the
+  source's `custom_guis.json` (and its nested Macros'), listed by panel name.
+  Two panels with one name in one canvas open and close together.
+- **Timelines** (`Timeline: Timeline 1`): each timeline of the source (see
+  Timelines in sources), opened as a window of the host's Timeline.
+
+A source's `layout.json` never applies inside MacroMixer, and what the source
+saved is ignored: a node's **Show** and a panel's open state alike, so every
+window of a source graph starts closed.
 
 - Each source lists its windows under **Windows** while it plays; tick one to
   open it. Choices are kept per source, saved with the mixer state, and
@@ -455,16 +468,26 @@ is ignored: every node window in a source graph starts closed.
   instruments can be watched while both sound; the origin's close when the
   transition completes (or the destination's, when it is cancelled). In place
   the one graph plays both: a window belongs to the destination unless only
-  the origin ticked it, so the windows that stay keep their name. Closing one
-  with its close button during the transition unticks it for its graph's
-  source (in place, for both sources). The window's Show is never morphed.
+  the origin ticked it, so the windows that stay keep their name. A morph in
+  place loads the destination's panels and timelines as it begins (the
+  origin's come back if it rolls back). Closing one with its close button
+  during the transition unticks it for its graph's source (in place, for both
+  sources). The window's Show is never morphed.
 - Closing a window with its own close button unticks it. Writes to Show during
   update (a snapshot recall, a native reload, Mixer Pro's or the timeline's
   "go to window") are undone, so windows of a source open only from MacroMixer.
-- Inside MacroMixer a window is named after its source ("AnalogBox 1
-  (1--BLODEV_1)", plus the nested Macro path), from `getWindowId()`. It never
-  shares a window with the patch's own node, and docking in the mixer's preset
-  layout finds it again across sessions.
+  Opening a source's timeline from the Timeline window itself does not tick it:
+  the next frame closes it again.
+- Inside MacroMixer a window is named after its source, plus the nested Macro
+  path: "AnalogBox 1 (1--BLODEV_1)", "BLOOBS (2--BLOOBS_Symetric)",
+  "Timeline: Timeline 1 (2--BLOOBS_Symetric)". Its ImGui id is keyed on that
+  name, never on the graph's canvas id, so it never shares a window with the
+  patch's own and docking in the mixer's preset layout finds it again across
+  activations and sessions. A source's timeline windows are never saved in the
+  host preset's `timeline.json`; the mixer opens them again.
+- The windows go with their graph: when it is released at the end of a
+  transition, on Clear Playback, when the source is removed or the node is
+  deactivated or deleted.
 
 ## Types and addon registration
 

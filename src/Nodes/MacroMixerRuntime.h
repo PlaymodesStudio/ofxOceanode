@@ -61,11 +61,13 @@ public:
     // Morphs into this source, by origin ID, and the worst of them.
     const std::map<std::string, Check>& checksInto(const std::string& id) const;
     Compatibility worstInto(const std::string& id) const;
-    // Windows source nodes draw themselves (SC instrument editors). They start
-    // closed whatever the source saved; the ones opened here are remembered per
-    // source and shown while it plays. During a transition both sources show
-    // theirs; the origin's close when it completes. Keys name the node within
-    // the graph ("Macro 1 / SC analogBox 1").
+    // A source's windows: those its nodes draw themselves (SC instrument
+    // editors), its Custom GUI panels and its timelines (each a window of the
+    // host's Timeline), nested Macros' included. They start closed whatever
+    // the source saved; the ones opened here are remembered per source and
+    // shown while it plays. During a transition both sources show theirs; the
+    // origin's close when it completes. Keys name the window within the graph
+    // ("Macro 1 / SC analogBox 1", "Custom GUI BLOOBS", "Macro 1 / Timeline main").
     struct SourceWindow { std::string key, title; bool open; };
     // The windows of a source that shows them now (showsWindows), else none.
     std::vector<SourceWindow> sourceWindows(const std::string& id) const;
@@ -148,11 +150,27 @@ private:
     // windows the user opened or closed in that draw.
     void enforceWindows();
     void adoptWindows();
+    // One window of a graph, read and set the same way whatever its kind.
+    // prefix: the nested Macro path ("Macro 1 / "), empty in the source itself.
+    struct LiveWindow {
+        std::string key, title, prefix;
+        std::function<bool()> isOpen;
+        std::function<void(bool)> setOpen;
+        // Names it after its source and nested path ("2--BLOOBS_Symetric / Macro 1").
+        std::function<void(const std::string&)> setHost;
+        // A timeline window (canvas, timeline): its close button is in the
+        // Timeline window, drawn outside the mixer's draw.
+        std::pair<std::string,std::string> timeline;
+    };
+    static void collectWindows(ofxOceanodeContainer& container,const std::string& prefix,std::vector<LiveWindow>& out,int depth=0);
     // Every window of the playing graphs: whether its sources want it open,
     // and the source keeping it (by ID and revision, for its label).
-    using SourceWindowVisitor = std::function<void(const std::string& key,const std::string& prefix,ofxOceanodeNodeModel&,
-        ofParameter<bool>& toggle,bool want,const std::string& owner,const Revision& revision)>;
+    using SourceWindowVisitor = std::function<void(LiveWindow& window,bool want,const std::string& owner,const Revision& revision)>;
     void forEachSourceWindow(const SourceWindowVisitor& visit) const;
+    // Timeline windows this mixer opened, (canvas, timeline): closed once their
+    // graph (or the timeline) is gone, on Clear Playback and on destruction.
+    std::set<std::pair<std::string,std::string>> hostedTimelines;
+    void closeHostedTimelines();
     mutable std::map<std::string,std::vector<MacroMixerMorphDetail>> sourceDetailCache;
     std::map<std::string,std::vector<MacroMixerMorphDetail>> transitionDetails;
     std::map<std::string,std::map<std::string,Check>> checks; // Target ID -> origin ID -> result.

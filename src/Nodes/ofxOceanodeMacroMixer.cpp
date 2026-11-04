@@ -944,15 +944,18 @@ void ofxOceanodeMacroMixer::drawSourceChecks(const MacroMixerRevision& macro) {
 }
 
 void ofxOceanodeMacroMixer::drawSourceWindows(const MacroMixerRevision& macro) {
-    // A playing source lists its node windows (both during a transition);
-    // others keep their choice until they play. Windows never open from what
-    // a source saved.
+    // A playing source lists its windows (both during a transition): its
+    // nodes' own, its Custom GUI panels and its timelines. Others keep their
+    // choice until they play. Windows never open from what a source saved.
     const auto windows = runtime->sourceWindows(macro.id());
     const auto remembered = runtime->openWindows(macro.id());
     if(windows.empty() && remembered.empty()) return;
     ImGui::Spacing();
     const bool showing = runtime->showsWindows(macro.id());
-    if(!ImGui::TreeNodeEx("##windows", showing ? ImGuiTreeNodeFlags_DefaultOpen : 0, "Windows (%zu open)", remembered.size())) return;
+    const bool expanded = ImGui::TreeNodeEx("##windows", showing ? ImGuiTreeNodeFlags_DefaultOpen : 0, "Windows (%zu open)", remembered.size());
+    if(ImGui::IsItemHovered())
+        ImGui::SetTooltip("Node windows, Custom GUI panels and timelines of this source.\nTicked ones open while it plays.");
+    if(!expanded) return;
     for(const auto& window : windows) {
         ImGui::PushID(window.key.c_str());
         bool open = window.open;

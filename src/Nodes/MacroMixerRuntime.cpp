@@ -5,22 +5,51 @@
 #include <algorithm>
 
 namespace {
-// Every window a graph's nodes draw themselves, nested Macros included.
-using WindowVisitor = std::function<void(const std::string& key,const std::string& prefix,ofxOceanodeNodeModel&,ofParameter<bool>&)>;
-void forEachWindow(ofxOceanodeContainer& container,const std::string& prefix,const WindowVisitor& visit,int depth=0) {
-    for(auto* node:container.getAllModules()) {
-        auto& model=node->getNodeModel();
-        const auto key=prefix+model.nodeName()+" "+ofToString(model.getNumIdentifier());
-        if(auto* toggle=model.getWindowToggle()) if(!model.getWindowTitle().empty()) visit(key,prefix,model,*toggle);
-        if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model)) if(auto child=macro->getContainer())
-            if(depth<64) forEachWindow(*child,key+" / ",visit,depth+1);
-    }
-}
 // The editor's name without a canvas prefix ("AnalogBox 1").
 std::string windowName(ofxOceanodeNodeModel& model) {
     const auto title=model.getWindowTitle(); const auto slash=title.rfind('/');
     return slash==std::string::npos ? title : title.substr(slash+1);
 }
+}
+
+// Every window of a graph container, nested Macros included: the windows its
+// nodes draw themselves, its Custom GUI panels and its timelines. A panel or
+// timeline window's state is read when collected; windows are collected anew
+// for every pass.
+void MacroMixerRuntime::collectWindows(ofxOceanodeContainer& container,const std::string& prefix,std::vector<LiveWindow>& out,int depth) {
+    for(auto* node:container.getAllModules()) {
+        auto& model=node->getNodeModel();
+        const auto key=prefix+model.nodeName()+" "+ofToString(model.getNumIdentifier());
+        if(auto* toggle=model.getWindowToggle()) if(!model.getWindowTitle().empty()) {
+            auto* named=&model;
+            out.push_back({key,prefix+windowName(model),prefix,
+                [toggle] { return toggle->get(); },
+                [toggle](bool open) { *toggle=open; },
+                [named](const std::string& host) { named->setWindowHostLabel(windowName(*named)+" ("+host+")"); },{}});
+        }
+        if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model)) if(auto child=macro->getContainer())
+            if(depth<64) collectWindows(*child,key+" / ",out,depth+1);
+    }
+    // Panels by name: the name is what the list shows, and what a source
+    // keeps while it is not playing. Two panels with one name open together.
+    if(auto* gui=container.getCustomGuiExtension()) for(const auto& panel:gui->panelWindows()) {
+        const auto id=panel.id; const bool open=panel.open;
+        out.push_back({prefix+"Custom GUI "+panel.name,prefix+"Custom GUI: "+panel.name,prefix,
+            [open] { return open; },
+            [gui,id](bool show) { gui->setPanelOpen(id,show); },
+            [gui](const std::string& host) { gui->setWindowHostLabel(host); },{}});
+    }
+    if(auto* automation=container.getAutomationExtension()) for(const auto& timeline:automation->canvasTimelines(container)) {
+        const auto host=std::make_shared<std::string>();
+        const auto canvas=timeline.canvas,id=timeline.timeline; const bool open=timeline.open;
+        out.push_back({prefix+"Timeline "+(id.empty() ? std::string("main") : id),prefix+"Timeline: "+timeline.name,prefix,
+            [open] { return open; },
+            [automation,canvas,id,host](bool show) { automation->setTimelineWindowOpen(canvas,id,show,*host); },
+            [host](const std::string& label) { *host=label; },{canvas,id}});
+    }
+}
+
+namespace {
 std::string sourceKey(const std::string& folder) {
     if(folder.empty()) return folder;
     return std::filesystem::weakly_canonical(std::filesystem::absolute(folder)).string();
@@ -618,9 +647,8 @@ std::vector<MacroMixerRuntime::SourceWindow> MacroMixerRuntime::sourceWindows(co
     if(!showsWindows(id)) return result;
     const auto& graph=next && id==destinationID() ? next : current; // In place, the same graph.
     const auto& open=openWindows(id);
-    forEachWindow(*graph->container,"",[&](const std::string& key,const std::string& prefix,ofxOceanodeNodeModel& model,ofParameter<bool>&) {
-        result.push_back({key,prefix+windowName(model),open.count(key)!=0});
-    });
+    std::vector<LiveWindow> live; collectWindows(*graph->container,"",live);
+    for(const auto& window:live) result.push_back({window.key,window.title,open.count(window.key)!=0});
     return result;
 }
 void MacroMixerRuntime::forEachSourceWindow(const SourceWindowVisitor& visit) const {
@@ -633,34 +661,65 @@ void MacroMixerRuntime::forEachSourceWindow(const SourceWindowVisitor& visit) co
         const auto own=!inPlace && graph==next.get() ? destinationID() : currentID();
         const auto later=inPlace ? destinationID() : own;
         const auto& mine=openWindows(own); const auto& kept=openWindows(later);
-        forEachWindow(*graph->container,"",[&](const std::string& key,const std::string& prefix,ofxOceanodeNodeModel& model,ofParameter<bool>& toggle) {
-            const bool toLater=inPlace && (kept.count(key) || !mine.count(key));
-            visit(key,prefix,model,toggle,mine.count(key) || kept.count(key),toLater ? later : own,toLater ? inPlaceTarget : graph->revision);
-        });
+        std::vector<LiveWindow> live; collectWindows(*graph->container,"",live);
+        for(auto& window:live) {
+            const bool toLater=inPlace && (kept.count(window.key) || !mine.count(window.key));
+            visit(window,mine.count(window.key) || kept.count(window.key),toLater ? later : own,toLater ? inPlaceTarget : graph->revision);
+        }
     }
 }
 void MacroMixerRuntime::enforceWindows() {
-    forEachSourceWindow([](const std::string&,const std::string& prefix,ofxOceanodeNodeModel& model,ofParameter<bool>& toggle,
-                           bool want,const std::string&,const Revision& revision) {
-        const auto nested=prefix.empty() ? "" : " / "+prefix.substr(0,prefix.size()-3);
-        model.setWindowHostLabel(windowName(model)+" ("+(revision ? revision->name() : "MacroMixer")+nested+")");
-        if(toggle.get()!=want) toggle=want;
+    // Closes apply after the visit: an emptied source's set is erased while it reads them.
+    std::vector<std::pair<std::string,std::string>> closed; // (source, key)
+    std::set<std::pair<std::string,std::string>> live; // Timelines of the playing graphs.
+    const bool inPlace=next && next==current;
+    const auto from=currentID(),to=inPlace ? destinationID() : "";
+    forEachSourceWindow([&](LiveWindow& window,bool want,const std::string& owner,const Revision& revision) {
+        const auto nested=window.prefix.empty() ? "" : " / "+window.prefix.substr(0,window.prefix.size()-3);
+        window.setHost((revision ? revision->name() : "MacroMixer")+nested);
+        if(!window.timeline.first.empty()) {
+            live.insert(window.timeline);
+            // Closed with its own button, in the Timeline window (drawn outside
+            // the mixer's draw): one this mixer opened that is gone unticks.
+            if(want && !window.isOpen() && hostedTimelines.count(window.timeline)) {
+                hostedTimelines.erase(window.timeline);
+                for(const auto& id:inPlace ? std::vector<std::string>{from,to} : std::vector<std::string>{owner})
+                    if(openWindows(id).count(window.key)) closed.emplace_back(id,window.key);
+                return;
+            }
+            if(want) hostedTimelines.insert(window.timeline); else hostedTimelines.erase(window.timeline);
+        }
+        if(window.isOpen()!=want) window.setOpen(want);
     });
+    for(const auto& entry:closed) setSourceWindow(entry.first,entry.second,false);
+    // A graph released, or a timeline gone from a graph (a morph in place into
+    // a source without it): its window goes too.
+    auto* automation=parent.getAutomationExtension();
+    for(auto it=hostedTimelines.begin();it!=hostedTimelines.end();) {
+        if(live.count(*it)) { ++it; continue; }
+        if(automation) automation->setTimelineWindowOpen(it->first,it->second,false,"");
+        it=hostedTimelines.erase(it);
+    }
+}
+void MacroMixerRuntime::closeHostedTimelines() {
+    auto* automation=parent.getAutomationExtension();
+    if(automation) for(const auto& timeline:hostedTimelines) automation->setTimelineWindowOpen(timeline.first,timeline.second,false,"");
+    hostedTimelines.clear();
 }
 void MacroMixerRuntime::adoptWindows() {
-    // Only the node's own window changes its toggle during a draw (its close
-    // button): recalls, morphs and loads write it in update, which enforce undoes.
+    // Only a node's own window or a panel changes during a draw (its close
+    // button): recalls, morphs and loads write it in update, which enforce
+    // undoes. Timeline windows close outside this draw: enforce adopts those.
     // Closes apply after the visit: an emptied source's set is erased while it reads them.
     std::vector<std::pair<std::string,std::string>> closed; // (source, key)
     const bool inPlace=next && next==current;
     const auto from=currentID(),to=inPlace ? destinationID() : "";
-    forEachSourceWindow([&](const std::string& key,const std::string&,ofxOceanodeNodeModel&,ofParameter<bool>& toggle,
-                            bool want,const std::string& owner,const Revision&) {
-        if(toggle.get()==want || owner.empty()) return;
-        if(toggle.get()) { setSourceWindow(owner,key,true); return; }
+    forEachSourceWindow([&](LiveWindow& window,bool want,const std::string& owner,const Revision&) {
+        if(!window.timeline.first.empty() || window.isOpen()==want || owner.empty()) return;
+        if(window.isOpen()) { setSourceWindow(owner,window.key,true); return; }
         // Closed: in place, neither source keeps it open; two graphs share no window.
         for(const auto& id:inPlace ? std::vector<std::string>{from,to} : std::vector<std::string>{owner})
-            if(openWindows(id).count(key)) closed.emplace_back(id,key);
+            if(openWindows(id).count(window.key)) closed.emplace_back(id,window.key);
     });
     for(const auto& entry:closed) setSourceWindow(entry.first,entry.second,false);
 }
@@ -886,6 +945,7 @@ void MacroMixerRuntime::clear() {
         catch(...) {} // Destruction must still release the owned containers.
     }
     processors.clear();
+    closeHostedTimelines(); // Before their canvases go.
     pending.reset(); next.reset(); current.reset(); inPlaceTarget.reset(); errors.clear();
     cancelBlocked();
     sourceDetailCache.clear(); transitionDetails.clear();

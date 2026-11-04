@@ -65,4 +65,12 @@ public:
     // or its library definition), so the macro's own timeline can travel with it.
     virtual void loadMacroPreset(ofxOceanodeContainer& /*macroContainer*/, const std::string& /*folder*/) {}
     virtual bool saveMacroPreset(const ofxOceanodeContainer& /*macroContainer*/, const std::string& /*folder*/) const { return true; }
+    // The timelines a canvas has (its default one, once made, and its further
+    // ones), for a host that opens a window on them (a MacroMixer, for its
+    // source graphs). A host's window is named "(label)" after it and is never
+    // saved with the preset.
+    struct CanvasTimeline { std::string canvas, timeline, name; bool open = false; };
+    virtual std::vector<CanvasTimeline> canvasTimelines(const ofxOceanodeContainer& /*canvas*/) { return {}; }
+    virtual void setTimelineWindowOpen(const std::string& /*canvas*/, const std::string& /*timeline*/, bool /*open*/,
+                                       const std::string& /*label*/) {}
 };
