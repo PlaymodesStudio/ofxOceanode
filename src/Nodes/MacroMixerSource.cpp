@@ -1485,16 +1485,18 @@ void MacroMixerSource::Graph::prepareMorph(const MorphSnapshot& captured, const 
         morphStart.emplace(entry.first,start->second); morphTarget.emplace(entry.first,entry.second);
     }
 }
-// The timelines of each edited container's saved folder (the source's, in
-// timeline.json; a nested Macro's, in sequence.json) travel with an in-place
-// morph like its nodes: the destination's load as the morph begins, the
-// origin's come back when it rolls back.
+// The timelines and Custom GUI panels of each edited container's saved folder
+// (the source's timeline.json, a nested Macro's sequence.json, either one's
+// custom_guis.json) travel with an in-place morph like its nodes: the
+// destination's load as the morph begins, the origin's come back when it
+// rolls back. The mixer then opens or closes their windows for the source.
 static void loadMorphTimelines(const std::vector<MorphContainerEdit>& edits,bool target) {
     for(const auto& edit:edits) {
-        auto* automation=edit.container ? edit.container->getAutomationExtension() : nullptr;
         const auto& definition=target ? edit.target : edit.original;
-        if(automation && definition.is_object() && definition.contains("folder"))
-            automation->loadMacroPreset(*edit.container,definition.at("folder").get<std::string>());
+        if(!edit.container || !definition.is_object() || !definition.contains("folder")) continue;
+        const auto folder=definition.at("folder").get<std::string>();
+        if(auto* automation=edit.container->getAutomationExtension()) automation->loadMacroPreset(*edit.container,folder);
+        if(auto* gui=edit.container->getCustomGuiExtension()) gui->loadPreset(folder);
     }
 }
 bool MacroMixerSource::Graph::prepareMorphInPlace(Revision target,const MacroMixerMorphPolicies& policies) {
