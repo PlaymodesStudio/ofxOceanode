@@ -67,7 +67,13 @@ namespace {
         if(pendingConnectionErrorDialogs.empty()) return;
 
         constexpr const char* popupId = "Connection error##ofxOceanodeConnectionError";
-        if(!ImGui::IsPopupOpen(popupId)) ImGui::OpenPopup(popupId);
+        if(!ImGui::IsPopupOpen(popupId)){
+            // Wait for other dialogs, such as the SynthDef compile prompt raised
+            // by the same load. Two modals reopening over each other every frame
+            // are both kept hidden while ImGui measures them, yet block all input.
+            if(ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return;
+            ImGui::OpenPopup(popupId);
+        }
 
         ImGui::SetNextWindowSizeConstraints(ImVec2(760.0f, 0.0f), ImVec2(760.0f, FLT_MAX));
         if(ImGui::BeginPopupModal(popupId, nullptr,
