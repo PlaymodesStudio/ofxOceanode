@@ -352,9 +352,10 @@ buses above), and a Global one follows the shared Portal service. Router names/b
 the destination's; router Values marked Exclude From Snapshots are also skipped.
 Selected outer Input routers and connected nested Macro input pins remain live.
 
-Floats, integers, equally sized numeric vectors and colors interpolate; integer
-values round to the nearest integer. Booleans, strings, dropdown controls and
-vectors with different lengths switch at halfway through the eased progress.
+Floats, integers and colors interpolate; integer values round to the nearest
+integer. Numeric vectors blend by their type's Mix/Morph policy (by default
+Resample / changing length, so vectors of different lengths glide too).
+Booleans, strings and dropdown controls switch at halfway through the eased progress.
 Non-finite controls are skipped. Unmatched destination controls retain their own
 values. Changed cable blending supports these same control types, with native
 scalar/vector conversions; registered types use their selected connection policy.
@@ -441,10 +442,11 @@ is ignored: every node window in a source graph starts closed.
 
 Built-ins retain Float, Float Vector, Integer, Integer Vector, Boolean and Texture
 policies, including vector resampling, whole-value Switch, and the existing GPU
-transition modes. The default vector policy, Index / zero fill, blends index by
-index; a 1-value vector counts as that value at every index, as nodes read it, so
-a change to or from a single value approaches it smoothly instead of fading the
-other indices to zero and snapping at completion. Only missing indices of longer
+transition modes. The default vector policy, Resample / changing length, blends
+the length too: both ends are resampled to a length that moves from the origin's
+to the destination's, so a vector that grows or shrinks glides instead of
+switching. Index / zero fill blends index by index; a 1-value vector counts as
+that value at every index, as nodes read it, and only missing indices of longer
 vectors are filled with zero. `registerType<T>(name, defaultValue, MacroMixerMixing::Definition<T>)`
 adds a custom value adapter and default policy at the existing type registration.
 Additional policies use `MacroMixerMixing::registry()`; nodes need no extra list.

@@ -336,7 +336,7 @@ Registry::Registry() {
         std::vector<float> result(std::max(a.size(),b.size()));
         for(size_t i=0;i<result.size();++i) result[i]=interpolate(indexed(a,i),indexed(b,i),t);
         return result;
-    },noOptions,true);
+    },noOptions);
     registerPolicy<std::vector<float>>("resample","Resample",[](const auto& a,const auto& b,float t,const ofJson& o) {
         const auto size=o.at("size").get<size_t>();
         std::vector<float> result(size ? size : std::max(a.size(),b.size()));
@@ -350,7 +350,7 @@ Registry::Registry() {
         std::vector<float> result(size);
         for(size_t i=0;i<result.size();++i) result[i]=interpolate(sample(a,i,size),sample(b,i,size),t);
         return result;
-    },noOptions);
+    },noOptions,true);
     registerPolicy<std::vector<float>>("switch","Switch whole vector",[](const auto& a,const auto& b,float t,const ofJson& o) {
         return t<o.at("threshold").template get<double>() ? a : b;
     },switchOptions);
@@ -367,7 +367,7 @@ Registry::Registry() {
         std::vector<int> result(std::max(a.size(),b.size()));
         for(size_t i=0;i<result.size();++i) result[i]=rounded(blend(indexed(a,i),indexed(b,i),t));
         return result;
-    },noOptions,true);
+    },noOptions);
     registerPolicy<std::vector<int>>("resample","Resample / round",[](const auto& a,const auto& b,float t,const ofJson& o) {
         const auto size=o.at("size").get<size_t>();
         std::vector<int> result(size ? size : std::max(a.size(),b.size()));
@@ -379,7 +379,7 @@ Registry::Registry() {
         std::vector<int> result(size);
         for(size_t i=0;i<size;++i) result[i]=rounded(blend(sample(a,i,size),sample(b,i,size),t));
         return result;
-    },noOptions);
+    },noOptions,true);
     registerPolicy<std::vector<int>>("switch","Switch whole vector",[](const auto& a,const auto& b,float t,const ofJson& o) {
         return t<o.at("threshold").template get<double>() ? a : b;
     },switchOptions);

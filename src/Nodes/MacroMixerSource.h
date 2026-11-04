@@ -86,7 +86,7 @@ public:
         bool update();
         bool draw();
         MorphSnapshot captureMorphValues() const;
-        void prepareMorph(const MorphSnapshot& origin, const Graph* originGraph = nullptr);
+        void prepareMorph(const MorphSnapshot& origin, const Graph* originGraph = nullptr, const MacroMixerMorphPolicies& policies = {});
         // Read saved controls and reconcile compatible native nodes. Changed
         // connections mix live signals with registered router policies; added
         // and removed nodes coexist until completion.
@@ -100,6 +100,7 @@ public:
         struct TriggerLatch { ofParameter<void> port; ofEventListener listener; int count = 0; };
         mutable std::map<std::string, std::shared_ptr<TriggerLatch>> triggerLatches;
         MorphSnapshot morphStart, morphTarget;
+        MacroMixerMorphPolicies morphPolicies; // Vector controls blend by their type's policy.
         ofJson liveMorphDefinition; // Saved target expressed in stable runtime node identities.
         std::shared_ptr<MacroMixerMorphTopology> morphTopology;
         // Router id -> its port, kept while the container's nodes and the

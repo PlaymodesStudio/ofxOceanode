@@ -712,7 +712,7 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
                     currentMorph = request->morph;
                     mixedProgress = 1;
                 } else {
-                    if(request->morph && !reuse) candidate->prepareMorph(morphStart,current.get());
+                    if(request->morph && !reuse) candidate->prepareMorph(morphStart,current.get(),morphPoliciesInto(revision->id()));
                     next = std::move(candidate);
                     inPlaceTarget=reuse ? revision : nullptr;
                     nextMorph = request->morph;

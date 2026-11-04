@@ -175,7 +175,8 @@ int main(int argc,char** argv) {
         runtime.update(510); near(runtime.value(),16); near(destinationValue(),25); // Graph evaluates 5*5, not a blend of 16 and 36.
         auto& p=probe(runtime.destination()); near(p.x,5); assert(p.count==5 && p.mode==3 && p.gate && p.label.get()=="b");
         assert(p.floats.get()==std::vector<float>({2,4}) && p.ints.get()==std::vector<int>({2,4}));
-        assert(p.unequal.get()==std::vector<float>({3,4})); assert(p.color.get()==ofColor(50,70,90,110)); near(p.tint.get().r,.5);
+        // {1} -> {3,4} resamples with a gliding length (the default vector policy).
+        assert(p.unequal.get()==std::vector<float>({2,2.5f})); assert(p.color.get()==ofColor(50,70,90,110)); near(p.tint.get().r,.5);
         near(p.transientValue,17); near(p.readOnly,19); near(p.driven,26.5f);
         runtime.draw(); near(runtime.value(),16); assert(probe(origin).draws==1 && p.draws==1);
         assert(runtime.destination()->parameter("value").getName()=="Value");

@@ -47,7 +47,7 @@ int main(int argc,char** argv) {
     for(float value:floats(std::vector<float>(24,0),{1},.999f)) assert(value>.998f);
     assert(floats(std::vector<float>(24,0),{1},1)==std::vector<float>({1}));
     assert(floats({},{1,.5f},.5)==std::vector<float>({.5f,.25f}));
-    assert(policies.policy("Float Vector").id=="index_zero");
+    assert(policies.policy("Float Vector").id=="resample_length");
     assert(std::get<int>(policies.mix("Integer","switch",2,10,.25,{{"threshold",.25}}))==10);
     auto gate=[&](bool a,bool b,float t,double threshold=.5) {
         return std::get<bool>(policies.mix("Boolean","switch",a,b,t,{{"threshold",threshold}}));
@@ -62,7 +62,7 @@ int main(int argc,char** argv) {
     reject([&]{vector("index_zero",Vec(4097,0),{},.5);});
     reject([&]{vector("resample",{1},{2},.5,{{"size",4097}});});
     reject([&]{gate(false,true,.5,2);});
-    assert(policies.policy("Integer").id=="linear" && policies.policy("Integer Vector").id=="index_zero");
+    assert(policies.policy("Integer").id=="linear" && policies.policy("Integer Vector").id=="resample_length");
     assert(policies.policy("Boolean").id=="switch");
 
     std::cout<<"Numeric mixing policies passed.\n";

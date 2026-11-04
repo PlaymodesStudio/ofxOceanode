@@ -954,6 +954,20 @@ MacroMixerMorphPolicy resolveMorphPolicy(const std::string& type,const MacroMixe
     const auto& policy=MacroMixerMixing::registry().policy(type,found!=policies.end() ? found->second.policy : discrete ? "switch" : type=="Texture" ? "crossfade" : "");
     return {policy.id,policy.options(found==policies.end() ? ofJson::object() : found->second.options)};
 }
+// A saved vector control blends by its type's Mix/Morph policy (by default
+// Resample / changing length), so vectors of different lengths glide too.
+template<typename T> T morphControl(const T& a,const T& b,float t,bool discrete,const MacroMixerMorphPolicies& policies) {
+    if constexpr(std::is_same_v<T,std::vector<float>> || std::is_same_v<T,std::vector<int>>) {
+        if(!discrete && t>0 && t<1) {
+            const std::string type=std::is_same_v<T,std::vector<float>> ? "Float Vector" : "Integer Vector";
+            try {
+                const auto policy=resolveMorphPolicy(type,policies);
+                return std::get<T>(MacroMixerMixing::registry().mix(type,policy.policy,a,b,t,policy.options));
+            } catch(const std::exception&) {} // Beyond the policies' limits: native interpolation.
+        }
+    }
+    return morphValue(a,b,t,discrete);
+}
 struct MorphCablePlan {
     ofxOceanodeAbstractParameter* sink=nullptr;
     std::optional<MorphValue> target,editable;
@@ -1448,8 +1462,8 @@ MacroMixerSource::MorphSnapshot MacroMixerSource::Graph::captureMorphValues() co
     captureMorphContainer(*this,*container,*macro,{},values);
     return values;
 }
-void MacroMixerSource::Graph::prepareMorph(const MorphSnapshot& captured, const Graph* originGraph) {
-    morphStart.clear(); morphTarget.clear();
+void MacroMixerSource::Graph::prepareMorph(const MorphSnapshot& captured, const Graph* originGraph, const MacroMixerMorphPolicies& policies) {
+    morphStart.clear(); morphTarget.clear(); morphPolicies=policies;
     MorphSnapshot aligned;
     if(originGraph) alignMorphValues(originGraph->liveMorphDefinition.is_null() ? originGraph->revision->sourceDefinition() : originGraph->liveMorphDefinition,
         revision->sourceDefinition(),captured,{},{},aligned);
@@ -1556,7 +1570,7 @@ void MacroMixerSource::Graph::applyMorph(float progress) {
         std::visit([&](const auto& target) {
             using T = std::decay_t<decltype(target)>;
             if(p->valueType() != typeid(T).name()) return;
-            auto value = morphValue(std::get<T>(start.value),target,progress,start.discrete || entry.second.discrete);
+            auto value = morphControl(std::get<T>(start.value),target,progress,start.discrete || entry.second.discrete,morphPolicies);
             // Keep the underlying value alive even if its listener deletes the
             // port or reloads its owning nested Macro during this assignment.
             auto parameter = p->cast<T>().getParameter();
