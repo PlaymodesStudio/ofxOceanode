@@ -193,18 +193,39 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
                 vector<string> presets(bankFolder.size());
 
                 for(size_t p = 0; p < bankFolder.size(); p++){
-                    vector<string> parts = ofSplitString(bankFolder.getName(p), "--");
-                    int index = parts.size() > 1 ? ofToInt(parts[0]) - 1 : -1;
+                    const string folderName = bankFolder.getName(p);
+                    const size_t separator = folderName.find("--");
+                    const int index = separator == string::npos ? -1 : ofToInt(folderName.substr(0, separator)) - 1;
                     if(index < 0){
-                        ofLogWarning("ofxOceanodePresetsController") << "Skipping " << bankName << "/" << bankFolder.getName(p) << ": not named <number>--<name>";
+                        ofLogWarning("ofxOceanodePresetsController") << "Skipping " << bankName << "/" << folderName << ": not named <number>--<name>";
                         continue;
                     }
+                    // The name keeps any further "--" of its own.
+                    const string name = folderName.substr(separator + 2);
                     if(index >= static_cast<int>(presets.size())) presets.resize(index + 1);
-                    presets[index] = parts[1];
+                    if(!presets[index].empty()){
+                        ofLogWarning("ofxOceanodePresetsController") << "Bank " << bankName << " has two folders numbered " << index + 1
+                                                                      << ": using " << folderName << " instead of " << index + 1 << "--" << presets[index];
+                    }
+                    presets[index] = name;
                 }
+                // Same-named presets are legal (they are told apart by number)
+                // but easy to mix up, so say so once.
+                map<string, int> firstIndexOfName;
+                for(size_t p = 0; p < presets.size(); p++){
+                    if(presets[p].empty()) continue;
+                    auto inserted = firstIndexOfName.emplace(presets[p], static_cast<int>(p));
+                    if(!inserted.second){
+                        ofLogWarning("ofxOceanodePresetsController") << "Bank " << bankName << " has two presets named " << presets[p]
+                                                                      << " (numbers " << inserted.first->second + 1 << " and " << p + 1 << ")";
+                    }
+                }
+                // Skipped folders were counted in the size; a new preset
+                // takes the number after the last listed one.
+                while(!presets.empty() && presets.back().empty()) presets.pop_back();
                 banks.push_back(bankName);
                 bankPresets[bankName] = presets;
-                currentPreset[bankName] = "";
+                currentPreset[bankName] = -1;
             }
         }catch(const std::exception& e){
             ofLogError("ofxOceanodePresetsController") << "Cannot read bank " << dir.getName(b) << ": " << e.what();
@@ -222,9 +243,10 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
         auto bankPos = std::find(banks.begin(), banks.end(), bankName);
         if(bankPos != banks.end()){
             currentBank = bankPos - banks.begin();
-            if(std::find(bankPresets[bankName].begin(), bankPresets[bankName].end(), presetName) != bankPresets[bankName].end()){
-                loadPreset(presetName, bankName);
-                currentPreset[bankName] = presetName;
+            const auto& presets = bankPresets[bankName];
+            auto presetIt = std::find(presets.begin(), presets.end(), presetName);
+            if(presetIt != presets.end()){
+                loadPreset(static_cast<int>(std::distance(presets.begin(), presetIt)), bankName);
             }
         }
     });
@@ -237,8 +259,7 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
         if(bankPos != banks.end()){
             currentBank = bankPos - banks.begin();
             if(presetNum >= 1 && static_cast<int>(bankPresets[bankName].size()) >= presetNum){
-                loadPreset(bankPresets[bankName][presetNum-1], bankName);
-                currentPreset[bankName] = bankPresets[bankName][presetNum-1];
+                loadPreset(presetNum - 1, bankName);
             }
         }
     });
@@ -259,7 +280,8 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
 void ofxOceanodePresetsController::draw(){
     const bool hasBank = currentBank >= 0 && currentBank < static_cast<int>(banks.size());
     const string bankName = hasBank ? banks[currentBank] : "";
-    const string presetName = hasBank ? currentPreset[bankName] : "";
+    const int presetIndex = hasBank ? currentPreset[bankName] : -1;
+    const string presetName = presetNameAt(presetIndex, bankName);
 
     if(ImGui::MenuItem("New Preset")){
         // Tear down outside the ImGui draw pass, after the menu has closed.
@@ -269,7 +291,7 @@ void ofxOceanodePresetsController::draw(){
         popupRequest = PopupRequest::NewBank;
     }
     if(ImGui::MenuItem("Save Preset", nullptr, false, !presetName.empty())){
-        savePreset(presetName, bankName);
+        savePreset(presetIndex, bankName);
     }
     if(ImGui::MenuItem("Save Preset As")){
         popupRequest = PopupRequest::SaveAs;
@@ -277,6 +299,7 @@ void ofxOceanodePresetsController::draw(){
     if(ImGui::MenuItem("Delete Preset", nullptr, false, !presetName.empty())){
         deleteBankName = bankName;
         deletePresetName = presetName;
+        deletePresetIndex = presetIndex;
         popupRequest = PopupRequest::Delete;
     }
     drawPresetList();
@@ -317,7 +340,7 @@ void ofxOceanodePresetsController::drawPopups(){
             banks.push_back(requestedName);
             sort(banks.begin(), banks.end());
             currentBank = distance(banks.begin(), find(banks.begin(), banks.end(), requestedName));
-            currentPreset[requestedName] = "";
+            currentPreset[requestedName] = -1;
             bankPresets[requestedName];
             ImGui::CloseCurrentPopup();
         }
@@ -353,7 +376,7 @@ void ofxOceanodePresetsController::drawPopups(){
         const bool save = ImGui::Button("Save");
         ImGui::EndDisabled();
         if(canSave && (enter || save)){
-            beginSavePreset(requestedName, banks[saveAsBank], true);
+            beginSavePreset(requestedName, banks[saveAsBank], -1);
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
@@ -367,7 +390,7 @@ void ofxOceanodePresetsController::drawPopups(){
         ImGui::Separator();
         const bool confirmWithEnter = !ImGui::IsWindowAppearing() && ImGui::IsKeyPressed(ImGuiKey_Enter, false);
         if(ImGui::Button("Delete", ImVec2(120, 0)) || confirmWithEnter){
-            deletePreset(deletePresetName, deleteBankName);
+            deletePreset(deletePresetIndex, deleteBankName);
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
@@ -391,7 +414,7 @@ void ofxOceanodePresetsController::drawPresetList(){
     ofxOceanodeMenu::section("Load Preset");
     const bool hasBank = currentBank >= 0 && currentBank < static_cast<int>(banks.size());
     const string bankName = hasBank ? banks[currentBank] : "";
-    const string presetName = hasBank ? currentPreset[bankName] : "";
+    const string presetName = hasBank ? presetNameAt(currentPreset[bankName], bankName) : "";
     ImGui::TextUnformatted("Bank:");
     ImGui::SameLine();
     ImGui::TextColored(bankTextColor, "%s", hasBank ? bankName.c_str() : "-");
@@ -416,12 +439,10 @@ void ofxOceanodePresetsController::drawPresetList(){
             while(clipper.Step()){
                 for(int n = clipper.DisplayStart; n < clipper.DisplayEnd; ++n){
                     const string label = ofToString(n + 1) + " | " + presets[n];
-                    const bool selected = b == currentBank && presets[n] == currentPreset[bankName];
+                    const bool selected = b == currentBank && n == currentPreset[bankName];
                     ImGui::PushID(n);
                     if(ImGui::Selectable(label.c_str(), selected, ImGuiSelectableFlags_NoAutoClosePopups)){
-                        currentBank = b;
-                        loadPreset(presets[n], bankName);
-                        currentPreset[bankName] = presets[n];
+                        loadPreset(n, bankName);
                     }
                     if(ImGui::BeginPopupContextItem()){
 #ifdef TARGET_OSX
@@ -432,7 +453,7 @@ void ofxOceanodePresetsController::drawPresetList(){
                         const char* revealLabel = "Open Folder";
 #endif
                         if(ImGui::MenuItem(revealLabel)){
-                            const string folder = presetFolderPath(presets[n], bankName);
+                            const string folder = presetFolderPath(n, bankName);
                             if(!folder.empty()) ofxOceanode::openWithDefaultApp(folder);
                         }
                         ImGui::EndPopup();
@@ -455,13 +476,10 @@ void ofxOceanodePresetsController::update(){
     //TODO: Test functionality
     if(loadPresetInNextUpdate != 0){
         int toLoad = loadPresetInNextUpdate;
-        string itemToLoad;
         if(currentBank >= 0 && currentBank < static_cast<int>(banks.size()) &&
-           toLoad >= 0 && toLoad < bankPresets[banks[currentBank]].size())
+           toLoad >= 0 && toLoad < static_cast<int>(bankPresets[banks[currentBank]].size()))
         {
-            itemToLoad = bankPresets[banks[currentBank]][toLoad];
-            loadPreset(itemToLoad, banks[currentBank]);
-            currentPreset[banks[currentBank]] = itemToLoad;
+            loadPreset(toLoad, banks[currentBank]);
         }
         loadPresetInNextUpdate = 0;
     }
@@ -474,6 +492,7 @@ void ofxOceanodePresetsController::newPreset(){
     saveResultText.clear();
     deleteBankName.clear();
     deletePresetName.clear();
+    deletePresetIndex = -1;
     newPresetCreated = false;
 
     ofxOceanodeShared::startedLoadingPreset();
@@ -484,7 +503,7 @@ void ofxOceanodePresetsController::newPreset(){
 #endif
     container->resetPhase();
 
-    for(auto& preset : currentPreset) preset.second.clear();
+    for(auto& preset : currentPreset) preset.second = -1;
     currentBank = -1;
     ofxOceanodeShared::setCurrentPresetPath("");
     ofxOceanodeShared::setCurrentBankName("");
@@ -498,27 +517,23 @@ void ofxOceanodePresetsController::loadPresetFromNumber(int num){
     loadPresetInNextUpdate = num;
 }
 
-void ofxOceanodePresetsController::loadPreset(string name, string bank){
-    auto bankIt = bankPresets.find(bank);
-    if(bankIt == bankPresets.end()){
-        ofLogWarning("ofxOceanodePresetsController") << "Cannot load preset from unknown bank: " << bank;
+void ofxOceanodePresetsController::loadPreset(int index, const string& bank){
+    const string name = presetNameAt(index, bank);
+    if(name.empty()){
+        ofLogWarning("ofxOceanodePresetsController") << "Cannot load preset number " << index + 1
+                                                     << " from bank '" << bank << "': not listed";
         return;
     }
 
-    const auto &presets = bankIt->second;
-    auto presetIt = find(presets.begin(), presets.end(), name);
-    if(presetIt == presets.end()){
-        ofLogWarning("ofxOceanodePresetsController") << "Cannot load unknown preset '" << name
-                                                     << "' from bank '" << bank << "'";
-        return;
-    }
-
-    int presetIndex = distance(presets.begin(), presetIt);
-    string myPath = "./Presets/" + bank + "/" + ofToString(presetIndex+1) +  "--" + name;
+    string myPath = "./Presets/" + bank + "/" + ofToString(index + 1) +  "--" + name;
     if(!ofDirectory::doesDirectoryExist(myPath)){
         ofLogWarning("ofxOceanodePresetsController") << "Preset folder does not exist: " << myPath;
         return;
     }
+
+    auto bankPos = std::find(banks.begin(), banks.end(), bank);
+    if(bankPos != banks.end()) currentBank = static_cast<int>(std::distance(banks.begin(), bankPos));
+    currentPreset[bank] = index;
 
     ofxOceanodeShared::startedLoadingPreset();
 	ofxOceanodeShared::setCurrentPresetPath(myPath);
@@ -532,34 +547,33 @@ void ofxOceanodePresetsController::loadPreset(string name, string bank){
 	
 }
 
-void ofxOceanodePresetsController::savePreset(string name, string bank)
+void ofxOceanodePresetsController::savePreset(int index, const string& bank)
 {
-    auto bankIt = bankPresets.find(bank);
-    if(bankIt == bankPresets.end()){
-        ofLogWarning("ofxOceanodePresetsController") << "Cannot save preset to unknown bank: " << bank;
+    if(presetNameAt(index, bank).empty()){
+        ofLogWarning("ofxOceanodePresetsController") << "Cannot save preset number " << index + 1
+                                                     << " in bank '" << bank << "': not listed";
         return;
     }
-
-    const auto &presets = bankIt->second;
-    auto presetIt = find(presets.begin(), presets.end(), name);
-    if(presetIt == presets.end()){
-        ofLogWarning("ofxOceanodePresetsController") << "Cannot save unknown preset '" << name
-                                                     << "' in bank '" << bank << "'";
-        return;
-    }
-
-    beginSavePreset(name, bank, false);
+    beginSavePreset("", bank, index);
 }
 
-void ofxOceanodePresetsController::beginSavePreset(string name, string bank, bool createNew){
-    name = sanitizePresetName(name);
-    if(name.empty() || bankPresets.find(bank) == bankPresets.end()) return;
-    if(createNew && presetNameExists(bankPresets[bank], name)) return;
+void ofxOceanodePresetsController::beginSavePreset(string name, string bank, int index){
+    if(bankPresets.find(bank) == bankPresets.end()) return;
+    const bool createNew = index < 0;
+    if(createNew){
+        name = sanitizePresetName(name);
+        if(name.empty() || presetNameExists(bankPresets[bank], name)) return;
+    }else{
+        // Keep the listed name as it is, even when it contains spaces.
+        name = presetNameAt(index, bank);
+        if(name.empty()) return;
+    }
 
     auto request = std::make_unique<PendingSave>();
     request->name = std::move(name);
     request->bank = std::move(bank);
     request->createNew = createNew;
+    request->index = index;
     request->reviews = collapseEquivalentReviews(collectGlobalMacroSaveReviews(*container));
     request->saveChoices.resize(request->reviews.size(), MacroSaveChoice::Skip);
     request->saveAsPaths.resize(request->reviews.size());
@@ -831,8 +845,7 @@ void ofxOceanodePresetsController::finishSavePreset(){
 
     const size_t presetIndex = request.createNew
         ? bankPresets[request.bank].size()
-        : std::distance(bankPresets[request.bank].begin(),
-                        std::find(bankPresets[request.bank].begin(), bankPresets[request.bank].end(), request.name));
+        : static_cast<size_t>(request.index);
     const string presetPath = "./Presets/" + request.bank + "/" +
                               ofToString(presetIndex + 1) + "--" + request.name;
 
@@ -878,7 +891,7 @@ void ofxOceanodePresetsController::finishSavePreset(){
     }
     auto bankPosition = std::find(banks.begin(), banks.end(), request.bank);
     if(bankPosition != banks.end()) currentBank = std::distance(banks.begin(), bankPosition);
-    currentPreset[request.bank] = request.name;
+    currentPreset[request.bank] = static_cast<int>(presetIndex);
     lastPresetName = request.name;
     ofxOceanodeShared::presetWasSaved();
 
@@ -895,38 +908,49 @@ void ofxOceanodePresetsController::finishSavePreset(){
     }
     pendingSave.reset();
 }
-void ofxOceanodePresetsController::deletePreset(string presetName, string bankName)
+void ofxOceanodePresetsController::deletePreset(int index, const string& bankName)
 {
     // The confirmation dialog holds its own target: external preset loads may
     // change the current bank while the dialog is open.
     auto bankIt = bankPresets.find(bankName);
     if(bankIt == bankPresets.end()) return;
     auto& presets = bankIt->second;
-    auto presetIt = find(presets.begin(), presets.end(), presetName);
-    if(presetIt == presets.end()) return;
-    const int index = distance(presets.begin(), presetIt);
+    const string presetPath = presetFolderPath(index, bankName);
+    if(presetPath.empty()) return;
 
     const string bankPath = ofDirectory("./Presets/" + bankName).getAbsolutePath();
-    const string presetPath = presetFolderPath(presetName, bankName);
     if(std::filesystem::remove_all(presetPath)){
-        presets.erase(presetIt);
-        if(currentPreset[bankName] == presetName) currentPreset[bankName].clear();
+        presets.erase(presets.begin() + index);
         for(int i = index; i < presets.size(); ++i){
             const string oldName = ofToString(i + 2) + "--" + presets[i];
             const string newName = ofToString(i + 1) + "--" + presets[i];
             std::filesystem::rename(bankPath + "/" + oldName, bankPath + "/" + newName);
         }
+        // The presets after it move down one number, the current one included.
+        int& current = currentPreset[bankName];
+        if(current == index){
+            current = -1;
+        }else if(current > index){
+            --current;
+            if(ofxOceanodeShared::getCurrentBankName() == bankName){
+                ofxOceanodeShared::setCurrentPresetPath("./Presets/" + bankName + "/" + ofToString(current + 1) + "--" + presets[current]);
+            }
+        }
     }
 }
 
-string ofxOceanodePresetsController::presetFolderPath(const string& presetName, const string& bankName) const {
+string ofxOceanodePresetsController::presetFolderPath(int index, const string& bankName) const {
+    const string presetName = presetNameAt(index, bankName);
+    if(presetName.empty()) return "";
+    return ofDirectory("./Presets/" + bankName).getAbsolutePath() + "/" + ofToString(index + 1) + "--" + presetName;
+}
+
+string ofxOceanodePresetsController::presetNameAt(int index, const string& bankName) const {
     auto bankIt = bankPresets.find(bankName);
     if(bankIt == bankPresets.end()) return "";
     const auto& presets = bankIt->second;
-    auto presetIt = find(presets.begin(), presets.end(), presetName);
-    if(presetIt == presets.end()) return "";
-    const int index = distance(presets.begin(), presetIt);
-    return ofDirectory("./Presets/" + bankName).getAbsolutePath() + "/" + ofToString(index + 1) + "--" + presetName;
+    if(index < 0 || index >= static_cast<int>(presets.size())) return "";
+    return presets[index];
 }
 
 // Global macro review compares live saveable state with the macro folder.

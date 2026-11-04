@@ -29,18 +29,25 @@ private:
     void newPreset();
     void drawPresetList();
     
-    void loadPreset(string name, string bank);
-    void savePreset(string name, string bank);
-    void beginSavePreset(string name, string bank, bool createNew);
+    // Presets are addressed by their position in bankPresets[bank], which is
+    // the number in the folder name. Two presets may share a name.
+    void loadPreset(int index, const string& bank);
+    void savePreset(int index, const string& bank);
+    // A negative index creates a new preset called name; otherwise the
+    // preset at index is overwritten and name is ignored.
+    void beginSavePreset(string name, string bank, int index);
     void finishSavePreset();
     void drawGlobalMacroSaveReview();
-    void deletePreset(string name, string bank);
+    void deletePreset(int index, const string& bank);
     // Absolute folder of a listed preset: Presets/<bank>/<index>--<name>.
     // Empty when the bank or preset is not listed.
-    string presetFolderPath(const string& presetName, const string& bankName) const;
+    string presetFolderPath(int index, const string& bankName) const;
+    // Empty when the bank or preset is not listed.
+    string presetNameAt(int index, const string& bankName) const;
     
     map<string, vector<string>> bankPresets;
-    map<string, string> currentPreset;
+    // Index of the current preset of each bank, -1 for none.
+    map<string, int> currentPreset;
     vector<string> banks;
     int currentBank;
 
@@ -54,6 +61,7 @@ private:
     int saveAsBank = 0;
     string deleteBankName;
     string deletePresetName;
+    int deletePresetIndex = -1;
     // Save As writes the macro to a new library folder and points that
     // instance at it, leaving the original folder and other instances alone.
     enum class MacroSaveChoice { Skip, Save, SaveAs };
@@ -61,6 +69,7 @@ private:
         string name;
         string bank;
         bool createNew = false;
+        int index = -1; // Position in bankPresets[bank] when overwriting.
         bool writing = false;
         size_t reviewIndex = 0;
         size_t nextWriteIndex = 0;
