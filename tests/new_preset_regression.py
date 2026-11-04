@@ -197,13 +197,14 @@ namespace ofxOceanodeMenu { void section(const char*){} }
 struct ofxOceanodePresetsController {
     shared_ptr<ofxOceanodeContainer> container;
     bool newPresetRequested=false,newPresetCreated=true; int loadPresetInNextUpdate=1,currentBank=0,loads=0;
-    map<string,string> currentPreset{{"Bank","Saved"}}; vector<string> banks{"Bank"};
+    map<string,int> currentPreset{{"Bank",0}}; vector<string> banks{"Bank"};
     map<string,vector<string>> bankPresets{{"Bank",{"Saved","Other"}}};
     enum class PopupRequest{None,SaveAs,Delete,NewBank}; PopupRequest popupRequest=PopupRequest::SaveAs;
     unique_ptr<int> pendingSave=make_unique<int>(1);
-    string saveResultText="Old",deleteBankName="Bank",deletePresetName="Saved";
-    void savePreset(string,string){} void drawPresetList(){}
-    void loadPreset(string,string){++loads;}
+    string saveResultText="Old",deleteBankName="Bank",deletePresetName="Saved"; int deletePresetIndex=0;
+    void savePreset(int,const string&){} void drawPresetList(){}
+    void loadPreset(int,const string&){++loads;}
+    string presetNameAt(int i,const string& b) const{auto it=bankPresets.find(b);return it!=bankPresets.end()&&i>=0&&i<(int)it->second.size()?it->second[i]:"";}
     void draw(); void update(); void newPreset();
 };
 '''
@@ -248,7 +249,7 @@ int main(){
     assert(!c.destroyNodeListeners.count && !c.destroyConnectionListeners.count);
     assert(c.scopeSaves==1 && !ofxOceanodeScope::getInstance()->callback && ofxOceanodeScope::getInstance()->parameters.empty());
     assert(!ofxOceanodeContainer::isClearingContainers() && !ofxOceanodeShared::loading);
-    assert(presets.currentBank==-1 && presets.currentPreset["Bank"].empty() && !presets.pendingSave);
+    assert(presets.currentBank==-1 && presets.currentPreset["Bank"]==-1 && presets.deletePresetIndex==-1 && !presets.pendingSave);
     assert(presets.loads==0 && presets.loadPresetInNextUpdate==0);
     assert(presets.banks==vector<string>{"Bank"} && presets.bankPresets["Bank"]==vector<string>({"Saved","Other"}));
     assert(ofxOceanodeShared::path.empty() && ofxOceanodeShared::name.empty() && ofxOceanodeShared::bank.empty());
