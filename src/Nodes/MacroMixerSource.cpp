@@ -1,4 +1,5 @@
 #include "MacroMixerSource.h"
+#include "ofxOceanodeAutomationExtension.h"
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeShared.h"
 #include "router.h"
@@ -238,8 +239,16 @@ std::unique_ptr<MacroMixerSource::Graph> MacroMixerSource::instantiate(ofxOceano
         });
         graph->host = std::make_shared<ofxOceanodeContainer>(registry,parent.getTypesRegistry(),parent.getRootTransport());
         static std::atomic<uint64_t> hosts{0};
-        graph->host->setCanvasID("MacroMixer/" + std::to_string(++hosts));
+        // Nested under the mixer's canvas, so the timeline reaches the graph's
+        // nodes by path ("Macro 2 / MacroMixer/7 / Macro 1 / node / param").
+        const auto parentCanvas = parent.getCanvasID();
+        const bool parentIsRoot = parentCanvas.empty() || parentCanvas == "Canvas" || parentCanvas == "0";
+        graph->host->setCanvasID((parentIsRoot ? std::string() : parentCanvas + " / ") + "MacroMixer/" + std::to_string(++hosts));
         graph->host->setTimelineHost(&parent);
+        // The source's timelines (its own and its nested Macros') load and play
+        // through the mixer's timeline, as a Macro's do: the timeline walks
+        // into the graph as a guest of the mixer's canvas.
+        parent.addTimelineGuest(graph->host);
         auto& node = graph->host->createNode(std::make_unique<ofxOceanodeNodeMacro>(),1);
         graph->macro = static_cast<ofxOceanodeNodeMacro*>(&node.getNodeModel());
         require(graph->macro->loadMacroSource(revision->source()),revision->source(),"Native Macro load failed");
@@ -1476,11 +1485,23 @@ void MacroMixerSource::Graph::prepareMorph(const MorphSnapshot& captured, const 
         morphStart.emplace(entry.first,start->second); morphTarget.emplace(entry.first,entry.second);
     }
 }
+// The timelines of each edited container's saved folder (the source's, in
+// timeline.json; a nested Macro's, in sequence.json) travel with an in-place
+// morph like its nodes: the destination's load as the morph begins, the
+// origin's come back when it rolls back.
+static void loadMorphTimelines(const std::vector<MorphContainerEdit>& edits,bool target) {
+    for(const auto& edit:edits) {
+        auto* automation=edit.container ? edit.container->getAutomationExtension() : nullptr;
+        const auto& definition=target ? edit.target : edit.original;
+        if(automation && definition.is_object() && definition.contains("folder"))
+            automation->loadMacroPreset(*edit.container,definition.at("folder").get<std::string>());
+    }
+}
 bool MacroMixerSource::Graph::prepareMorphInPlace(Revision target,const MacroMixerMorphPolicies& policies) {
     MorphSnapshot destination;
     auto topology=std::make_shared<MacroMixerMorphTopology>();
     topology->hostLease=host;
-    morphFallbackReason.clear();
+    morphFallbackReason.clear(); morphPolicies=policies;
     try {
         if(!target) throw std::runtime_error("No target Macro definition");
         const auto& original=liveMorphDefinition.is_null() ? revision->sourceDefinition() : liveMorphDefinition;
@@ -1497,6 +1518,9 @@ bool MacroMixerSource::Graph::prepareMorphInPlace(Revision target,const MacroMix
         }
     }
     morphStart=std::move(from); morphTarget=std::move(to); morphTopology=std::move(topology);
+    // The destination's timelines start as the morph begins, like its added
+    // nodes; what they drive follows them, not the control morph (applyMorph).
+    loadMorphTimelines(morphTopology->edits,true);
     return true;
 }
 void MacroMixerSource::Graph::drawMorphConnections() {
@@ -1558,6 +1582,8 @@ std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revisio
     return result;
 }
 void MacroMixerSource::Graph::cancelMorph() {
+    // The staged edits roll back with the topology: the origin's timelines too.
+    if(morphTopology && !morphTopology->complete) loadMorphTimelines(morphTopology->edits,false);
     morphTopology.reset(); morphStart.clear(); morphTarget.clear();
 }
 void MacroMixerSource::Graph::applyMorph(float progress) {
@@ -1565,7 +1591,9 @@ void MacroMixerSource::Graph::applyMorph(float progress) {
     // Macro. Do not retain node/parameter pointers across listener callbacks.
     for(const auto& entry : morphTarget) {
         auto* p = findMorphParameter(*this,entry.first);
-        if(!p) continue;
+        // A control the destination's timeline drives follows that timeline:
+        // the timeline re-asserts its value after every node update anyway.
+        if(!p || p->isTimelined()) continue;
         const auto& start = morphStart.at(entry.first);
         std::visit([&](const auto& target) {
             using T = std::decay_t<decltype(target)>;

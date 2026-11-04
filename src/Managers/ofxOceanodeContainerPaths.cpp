@@ -138,6 +138,10 @@ ofxOceanodeAbstractParameter* ofxOceanodeContainer::findTimelineParameter(const 
                 }
             }
         }
+        // A level may be a timeline guest's canvas (a MacroMixer's graph).
+        if(next == nullptr)
+            for(const auto& guest : current->getTimelineGuests())
+                if(guest->getCanvasID() == accumulated) { next = guest.get(); break; }
         if(next == nullptr) return nullptr;
         current = next;
     }
@@ -245,6 +249,10 @@ const ofxOceanodeContainer* ofxOceanodeContainer::getContainerForCanvasID(const 
                 }
             }
         }
+        // A level may be a timeline guest's canvas (a MacroMixer's graph).
+        if(!levelFound)
+            for(const auto& guest : currentContainer->getTimelineGuests())
+                if(guest->getCanvasID() == accumulatedPath) { currentContainer = guest.get(); levelFound = true; break; }
 
         if(!levelFound) {
             ofLogWarning("ofxOceanodeContainer") << "Could not find macro with path: " << accumulatedPath

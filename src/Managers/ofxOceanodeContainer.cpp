@@ -161,6 +161,9 @@ ofxOceanodeContainer::ofxOceanodeContainer(shared_ptr<ofxOceanodeNodeRegistry> _
 }
 
 ofxOceanodeContainer::~ofxOceanodeContainer(){
+    // A guest outliving this (a leased mixer graph) must not reach a dead host.
+    for(auto& guest : timelineGuests)
+        if(auto held = guest.lock()) if(held->timelineHost == this) held->timelineHost = nullptr;
     clearContainer();
 }
 

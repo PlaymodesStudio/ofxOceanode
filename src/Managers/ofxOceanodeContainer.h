@@ -190,6 +190,23 @@ public:
     ofxOceanodeTimelineManager& getTimelineManager();
     const ofxOceanodeTimelineManager& getTimelineManager() const;
     void setTimelineHost(ofxOceanodeContainer* host){ timelineHost = host; }
+    // A container that plays its timelines through this one without being a
+    // Macro node's here: a MacroMixer's graph host. The timeline walks into
+    // guests as it walks into Macros; a guest's canvas id nests under this
+    // one's. Gone when released (its host pointer is cleared with this).
+    void addTimelineGuest(const std::shared_ptr<ofxOceanodeContainer>& guest){
+        if(guest == nullptr || guest.get() == this) return;
+        for(const auto& existing : timelineGuests) if(existing.lock() == guest) return;
+        timelineGuests.push_back(guest);
+    }
+    std::vector<std::shared_ptr<ofxOceanodeContainer>> getTimelineGuests() const{
+        std::vector<std::shared_ptr<ofxOceanodeContainer>> guests;
+        for(auto it = timelineGuests.begin(); it != timelineGuests.end();){
+            if(auto held = it->lock()) { guests.push_back(std::move(held)); ++it; }
+            else it = timelineGuests.erase(it);
+        }
+        return guests;
+    }
     ofxOceanodeContainer& getAutomationHost() {
         return timelineHost ? timelineHost->getAutomationHost() : *this;
     }
@@ -476,6 +493,7 @@ private:
     std::shared_ptr<ofxOceanodeTransport> transportOverride;
     std::unique_ptr<ofxOceanodeAutomationExtension> automationExtension;
     ofxOceanodeContainer* timelineHost = nullptr;
+    mutable std::vector<std::weak_ptr<ofxOceanodeContainer>> timelineGuests;
     
 #ifdef OFXOCEANODE_USE_MIDI
     std::unique_ptr<ofxOceanodeMidiClock> midiClockSync;

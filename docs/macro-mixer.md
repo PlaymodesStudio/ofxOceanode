@@ -370,6 +370,34 @@ during a morph restores a fresh destination, as with ordinary output mixing;
 intermediate control values and elapsed morph time are not embedded. Older saved
 sessions default to ordinary mixing.
 
+## Timelines in sources
+
+A source's timelines play inside the mixer as they do in the preset itself.
+Each graph is a guest of the mixer's canvas for the timeline: its canvas id
+nests under the mixer's (`MacroMixer/7 / Macro 1`, or `Macro 2 / MacroMixer/7
+/ Macro 1` inside a Macro), and the host's timeline walks into it as into any
+Macro. Activating a source loads its preset's own timelines (`timeline.json`:
+the root canvas's become the source Macro's) and, recursively, those of the
+Macros inside it (each one's `sequence.json`), through the ordinary Macro
+preset load.
+
+- A **free** timeline set to **Play on load** starts from its beginning when
+  its graph starts: at activation, and for a morph destination when the morph
+  begins (the fallback crossfade loads a second graph; a morph in place loads
+  the destination's timelines into the running graph at that moment, and the
+  origin's come back if the morph rolls back). One without Play on load is
+  loaded stopped, as after a preset load.
+- A timeline **linked to the global transport** follows the global transport
+  of the preset hosting the mixer: it plays, stops and seeks with it.
+- A control the destination's timeline drives follows that timeline rather
+  than the control morph, from the first frame it is driven.
+- The timelines stop with their graph: when it is released at the end of a
+  transition, on Clear Playback or when the source is removed.
+
+The Timeline window lists these canvases with the others, named after the
+source, so a running source's timeline can be watched or edited while it
+plays; edits are not written back to the source folder.
+
 ## Triggers (void routers)
 
 A router of type **Trigger** selects a void router (`Router v`, port `Val`).
