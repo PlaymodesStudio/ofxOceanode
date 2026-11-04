@@ -1574,3 +1574,15 @@ void MacroMixerSource::Graph::applyMorph(float progress) {
 MacroMixerMorphPolicy MacroMixerSource::connectionPolicy(const std::string& type,const MacroMixerMorphPolicies& policies,bool discrete) {
     return resolveMorphPolicy(type,policies,discrete);
 }
+std::string MacroMixerSource::globalPortal(const ofJson& definition) {
+    if(!definition.is_object() || !definition.contains("nodes")) return {};
+    const auto& nodes=definition.at("nodes");
+    for(auto it=nodes.begin();it!=nodes.end();++it) {
+        if(morphPortal(it.value()) && !portalBus(it.value()).local) return it.key();
+        if(it.value().contains("graph")) {
+            const auto nested=globalPortal(it.value().at("graph"));
+            if(!nested.empty()) return it.key()+" / "+nested;
+        }
+    }
+    return {};
+}

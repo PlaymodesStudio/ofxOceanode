@@ -131,10 +131,38 @@ Paths start at the data folder; hover for the full path.
   added/removed/replaced nodes, the receiving node/parameter and both endpoints of every
   changed connection with its policy, and every fallback reason, including mixes
   skipped because another incompatibility forced fallback.
+- **Morphs from other sources**: the source check's result for each other
+  source morphing into this one (*morphs in place*, *node replaced*, *graph
+  fallback* or *not checked*), with every fallback and replacement reason.
 - **Kept out**: the source's kept-out nodes, each with **Restore** (only when there are any).
 
 Previewing does not construct nodes or alter the running graph. Refresh rereads
 edited source files.
+
+### Source check
+
+Every source is checked against every other, so a morph that would fall back
+shows before it is played. Each source in turn is loaded as an origin graph
+from its saved files, previewed morphing into every other source (as Details
+previews the running graph) and released; it is never updated or drawn and
+playback is untouched. Each load stalls a frame, so the check never runs while
+any source plays or is requested: it waits for **Clear Playback**. Only three
+things request it: loading a preset with the node, adding or removing a source,
+and **Check Status** (next to Clear Playback, disabled while a source plays).
+Each checks whatever results are missing; Check Status checks everything again. Then
+one origin is checked per frame; **Checking sources: N to go** shows the origins
+still to load, or **Check waits for Clear Playback** while a source plays.
+
+Changing a source's files (Refresh, or the read every activation makes), a
+kept-out choice, the routers or a policy drops the results it affects without
+checking again; press **Check Status** to
+refresh them. An activation that reads unchanged files keeps the results.
+
+A source's name in the list takes the colour of the worst morph *into* it:
+orange when a node is replaced, red when the graph falls back or the source
+fails to read. Hover the name to see which origins cause it. A source with a
+Global Portal is not checked as an origin, since loading it would publish its
+saved value to the running patch.
 
 Changed connections blend with a policy per signal type, with the same option
 controls as the Routers section. **Default Mix/Morph policies** sets

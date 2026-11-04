@@ -876,6 +876,38 @@ int main(int argc,char** argv) {
         parent.clearContainer();
     }
     assert(triggers==0 && liveGui==0);
+    {
+        // The source check previews every source into every other, one origin
+        // graph per call, and never touches playback. a and b differ in a
+        // router bound (whole-graph fallback); twin is a's copy.
+        using C=MacroMixerRuntime::Compatibility;
+        const auto twin=scratch+"/twin"; save(twin,false);
+        MacroMixerRuntime checker(parent); assert(checker.setContract(contract));
+        assert(checker.importMacro(a)&&checker.importMacro(b)&&checker.importMacro(twin));
+        const auto aID=checker.importedMacro(a)->id(),bID=checker.importedMacro(b)->id(),twinID=checker.importedMacro(twin)->id();
+        assert(checker.originsToCheck()==3 && checker.worstInto(bID)==C::Unchecked);
+        assert(checker.checkNextOrigin() && checker.originsToCheck()==2);
+        while(checker.checkNextOrigin()) {}
+        assert(checker.originsToCheck()==0 && !checker.origin());
+        assert(checker.checksInto(twinID).at(aID).level==C::Ok && checker.checksInto(aID).at(twinID).level==C::Ok);
+        assert(checker.worstInto(bID)==C::GraphFallback && !checker.checksInto(bID).at(aID).problems.empty());
+        assert(checker.worstInto(aID)==C::GraphFallback && checker.checksInto(aID).size()==2);
+        // Removing a source drops its results. A policy into a source drops
+        // them too, without checking again until Check Status asks.
+        assert(checker.removeMacro(bID) && checker.originsToCheck()==0 && checker.worstInto(aID)==C::Ok);
+        assert(checker.setSourceMorphPolicy(aID,"Float","switch") && checker.originsToCheck()==0 && checker.checksInto(aID).empty());
+        assert(!checker.checkNextOrigin());
+        checker.requestChecks(); assert(checker.originsToCheck()==2);
+        while(checker.checkNextOrigin()) {}
+        assert(checker.worstInto(aID)==C::Ok && checker.worstInto(twinID)==C::Ok);
+        // Never while a source is requested or playing; activating keeps the
+        // results of an unchanged source; Clear Playback lets it run.
+        assert(checker.importMacro(b) && checker.originsToCheck()==3);
+        checker.request(a,0,0); assert(!checker.checkNextOrigin());
+        checker.update(0); assert(checker.origin() && !checker.checkNextOrigin() && checker.originsToCheck()==3);
+        assert(checker.worstInto(twinID)==C::Ok);
+        checker.clear(); assert(checker.checkNextOrigin());
+    }
     std::cout<<"MacroMixer graph morphs passed: nonlinear controls, shared buffers/clocks, added/removed modulation, live cable replacement, rollback/port removal, resource fallbacks, queues and persistence.\n";
 }
 '''

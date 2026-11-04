@@ -44,6 +44,23 @@ public:
     // The default with the source's own policies applied over it.
     MacroMixerMorphPolicies morphPoliciesInto(const std::string& id) const;
     const std::vector<MacroMixerMorphDetail>& sourceDetails(const std::string& id) const;
+    // Every source checked against every other: a morph preview from each
+    // origin's saved state into each target, as Details shows for the running
+    // source. A check is requested by adding or removing a source, restoring a
+    // preset or requestChecks (Check Status); results are dropped when a source's
+    // files, kept-out choices, routers or policies change. checkNextOrigin builds
+    // one origin graph (never updated or drawn), inspects it against the targets
+    // it lacks and releases it. It never runs while any source plays or is
+    // requested, nor during a blocked-node question.
+    enum class Compatibility { Unchecked, Ok, NodeFallback, GraphFallback };
+    struct Check { Compatibility level = Compatibility::Unchecked; std::vector<MacroMixerMorphDetail> problems; };
+    void requestChecks();
+    bool checkNextOrigin();
+    // Origins a requested check still has to load; zero without a request.
+    size_t originsToCheck() const;
+    // Morphs into this source, by origin ID, and the worst of them.
+    const std::map<std::string, Check>& checksInto(const std::string& id) const;
+    Compatibility worstInto(const std::string& id) const;
     // Windows source nodes draw themselves (SC instrument editors). They start
     // closed whatever the source saved; the ones opened here are remembered per
     // source and shown while it plays. During a transition both sources show
@@ -138,6 +155,12 @@ private:
     void forEachSourceWindow(const SourceWindowVisitor& visit) const;
     mutable std::map<std::string,std::vector<MacroMixerMorphDetail>> sourceDetailCache;
     std::map<std::string,std::vector<MacroMixerMorphDetail>> transitionDetails;
+    std::map<std::string,std::map<std::string,Check>> checks; // Target ID -> origin ID -> result.
+    std::map<std::string,Revision> checkTargets; // Sources as the current checks read them.
+    bool checkRequested = false;
+    // Drops the results involving this source, or all of them; request also
+    // asks for the missing ones to be checked.
+    void invalidateChecks(const std::string& id = "", bool request = false);
     struct Renderer { std::string policy; MacroMixerMixing::Policy::Function function; };
     std::map<std::string,Renderer> renderers;
     std::map<std::string,Renderer> processors;

@@ -126,6 +126,9 @@ public:
     // Policy a changed connection of this type uses, given configured policies.
     // Discrete controls default to Switch and textures to Crossfade.
     static MacroMixerMorphPolicy connectionPolicy(const std::string& type, const MacroMixerMorphPolicies& policies, bool discrete = false);
+    // The first Global Portal in a source definition (nested Macros included),
+    // or empty. Loading one publishes its saved value to the running patch.
+    static std::string globalPortal(const ofJson& definition);
     // Display only: shortens a source path to start at the data folder
     // (data/Presets/...). Paths outside it are returned unchanged.
     static std::string displayPath(const std::string& path);

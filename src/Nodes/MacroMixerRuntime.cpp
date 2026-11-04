@@ -117,7 +117,7 @@ size_t MacroMixerRuntime::checkSources() {
         if(revision) { entry->second = revision; ++passed; }
         noteProblem(id);
     }
-    errors = saved; sourceDetailCache.clear();
+    errors = saved; sourceDetailCache.clear(); invalidateChecks("",true); // As after a preset load.
     return passed;
 }
 void MacroMixerRuntime::noteProblem(const std::string& id) {
@@ -194,7 +194,7 @@ bool MacroMixerRuntime::setContract(const MacroMixerContract& contract) {
     }
     for(auto it=renderers.begin();it!=renderers.end();)
         if(!ids.count(it->first)) it=renderers.erase(it); else ++it;
-    sourceDetailCache.clear(); transitionDetails.clear();
+    sourceDetailCache.clear(); transitionDetails.clear(); invalidateChecks();
     inputValues=std::move(inputs); interface = resolved;
     for(auto it = mixedValues.begin(); it != mixedValues.end();)
         if(!ids.count(it->first)) it = mixedValues.erase(it); else ++it;
@@ -207,7 +207,7 @@ bool MacroMixerRuntime::setMorphPolicy(const std::string& type,const std::string
     try {
         const auto& policy=MacroMixerMixing::registry().policy(type,id);
         connectionPolicies[type]={policy.id,policy.options(options)};
-        sourceDetailCache.clear(); errors.clear(); return true;
+        sourceDetailCache.clear(); invalidateChecks(); errors.clear(); return true;
     } catch(const std::exception& e) { errors={{"Morph connections",e.what()}}; return false; }
 }
 bool MacroMixerRuntime::setSourceMorphPolicy(const std::string& id,const std::string& type,const std::string& policyID,const ofJson& options) {
@@ -216,14 +216,14 @@ bool MacroMixerRuntime::setSourceMorphPolicy(const std::string& id,const std::st
     try {
         const auto& policy=MacroMixerMixing::registry().policy(type,policyID);
         sourcePolicies[id][type]={policy.id,policy.options(options)};
-        sourceDetailCache.clear(); errors.clear(); return true;
+        sourceDetailCache.clear(); invalidateChecks(id); errors.clear(); return true;
     } catch(const std::exception& e) { errors={{"Morph connections",e.what()}}; return false; }
 }
 bool MacroMixerRuntime::clearSourceMorphPolicy(const std::string& id,const std::string& type) {
     if(next) { errors={{"Morph connections","Finish the transition before editing connection policies"}}; return false; }
     const auto found=sourcePolicies.find(id);
     if(found!=sourcePolicies.end() && found->second.erase(type) && found->second.empty()) sourcePolicies.erase(found);
-    sourceDetailCache.clear(); errors.clear(); return true;
+    sourceDetailCache.clear(); invalidateChecks(id); errors.clear(); return true;
 }
 const MacroMixerMorphPolicies& MacroMixerRuntime::sourceMorphPolicies(const std::string& id) const {
     static const MacroMixerMorphPolicies none;
@@ -254,6 +254,78 @@ const std::vector<MacroMixerMorphDetail>& MacroMixerRuntime::sourceDetails(const
             error.node.empty() ? error.message : error.message+" Transition asks whether to keep it out of the graph."});
     }
     return sourceDetailCache.emplace(id,std::move(result)).first->second;
+}
+void MacroMixerRuntime::invalidateChecks(const std::string& id, bool request) {
+    if(id.empty()) { checks.clear(); checkTargets.clear(); }
+    else {
+        checks.erase(id); checkTargets.erase(id);
+        for(auto& into:checks) into.second.erase(id);
+    }
+    // Only a preset load, an added or removed source and Check Status ask for
+    // a check; a request with nothing missing ends at once.
+    if(request) { checkRequested=true; checkRequested=originsToCheck()>0; }
+}
+void MacroMixerRuntime::requestChecks() { invalidateChecks("",true); }
+size_t MacroMixerRuntime::originsToCheck() const {
+    if(!checkRequested) return 0;
+    size_t count=0;
+    for(const auto& origin:order) for(const auto& target:order) {
+        const auto into=checks.find(target);
+        if(target!=origin && (into==checks.end() || !into->second.count(origin))) { ++count; break; }
+    }
+    return count;
+}
+bool MacroMixerRuntime::checkNextOrigin() {
+    // Loading an origin graph stalls a frame: never while any source plays.
+    if(!checkRequested || current || next || pending || preparing || !blocked.empty()) return false;
+    for(const auto& originID:order) {
+        std::vector<std::string> targets;
+        for(const auto& id:order) if(id!=originID && !checks[id].count(originID)) targets.push_back(id);
+        if(targets.empty()) continue;
+        const auto unchecked=[&](const std::string& location,const std::string& message) {
+            for(const auto& id:targets) checks[id][originID]={Compatibility::Unchecked,{{"unchecked",location,message}}};
+            return true;
+        };
+        const auto source=macro(originID);
+        std::vector<Diagnostic> diagnostics;
+        auto revision=MacroMixerSource::importFolder(parent,source->source(),interface,diagnostics,originID,keptOut.get());
+        if(!revision) return unchecked(source->name(),diagnostics.empty() ? "Source could not be read" : diagnostics.front().message);
+        checkTargets[originID]=revision;
+        // A Global Portal would publish its saved value to the running patch.
+        const auto global=MacroMixerSource::globalPortal(revision->sourceDefinition());
+        if(!global.empty()) return unchecked(source->name()+" / "+global,"Not checked from here: loading its Global Portal would change the running patch");
+        preparing=true;
+        std::unique_ptr<Graph> graph=MacroMixerSource::instantiate(parent,revision,diagnostics,inputValues,keptOut);
+        preparing=false;
+        if(!graph) return unchecked(source->name(),diagnostics.empty() ? "Source could not be loaded" : diagnostics.front().message);
+        for(const auto& id:targets) {
+            auto& target=checkTargets[id];
+            if(!target) if(const auto saved=macro(id)) target=MacroMixerSource::importFolder(parent,saved->source(),interface,diagnostics,id,keptOut.get());
+            if(!target) { checks[id][originID]={Compatibility::Unchecked,{{"unchecked",macro(id) ? macro(id)->name() : id,"Source could not be read"}}}; continue; }
+            Check result{Compatibility::Ok,{}};
+            for(auto& detail:graph->inspectMorph(target,morphPoliciesInto(id))) {
+                const bool whole=detail.kind=="fallback" || detail.kind=="skipped";
+                if(!whole && detail.kind!="replaced") continue;
+                if(whole) result.level=Compatibility::GraphFallback;
+                else if(result.level==Compatibility::Ok) result.level=Compatibility::NodeFallback;
+                result.problems.push_back(std::move(detail));
+            }
+            checks[id][originID]=std::move(result);
+        }
+        return true;
+    }
+    checkRequested=false; // Every pair is checked.
+    return false;
+}
+const std::map<std::string,MacroMixerRuntime::Check>& MacroMixerRuntime::checksInto(const std::string& id) const {
+    static const std::map<std::string,Check> none;
+    const auto found=checks.find(id);
+    return found==checks.end() ? none : found->second;
+}
+MacroMixerRuntime::Compatibility MacroMixerRuntime::worstInto(const std::string& id) const {
+    auto worst=Compatibility::Unchecked;
+    for(const auto& check:checksInto(id)) worst=std::max(worst,check.second.level);
+    return worst;
 }
 bool MacroMixerRuntime::setInputs(const Inputs& values) {
     try {
@@ -320,6 +392,12 @@ bool MacroMixerRuntime::importMacro(const std::string& folder, bool refresh) {
     sourceDetailCache.clear(); transitionDetails.clear();
     imports[sourceKey(folder)] = revision;
     if(!previous) order.push_back(revision->id());
+    // A new source is checked (once it is in the order, so its pairs count); a
+    // read that changed what the check saw (every activation reads its source
+    // again) only drops the stale results.
+    if(!previous) invalidateChecks(revision->id(),true);
+    else if(const auto read=checkTargets.find(revision->id());read!=checkTargets.end() && read->second->sourceDefinition()!=revision->sourceDefinition())
+        invalidateChecks(revision->id());
     return true;
 }
 
@@ -334,7 +412,7 @@ bool MacroMixerRuntime::keepOutOfGraph(const std::string& folder, const std::str
     if(folder.empty() || node.empty()) return false;
     keptOut->insert({folder,node});
     blocked.erase(std::remove_if(blocked.begin(),blocked.end(),[&](const auto& b) { return b.file==folder && b.node==node; }),blocked.end());
-    sourceDetailCache.clear();
+    sourceDetailCache.clear(); invalidateChecks();
     if(!blocked.empty()) return true;
     errors.clear();
     if(blockedRequest) {
@@ -352,7 +430,7 @@ void MacroMixerRuntime::cancelBlocked() {
 }
 bool MacroMixerRuntime::restoreKeptOutNode(const std::string& folder, const std::string& node) {
     if(!keptOut->erase({folder,node})) return false;
-    sourceDetailCache.clear(); return true;
+    sourceDetailCache.clear(); invalidateChecks(); return true;
 }
 
 ofJson MacroMixerRuntime::saveState() const {
@@ -485,6 +563,7 @@ bool MacroMixerRuntime::restoreState(const ofJson& saved) {
         imports = std::move(staged.imports); order = std::move(staged.order);
         pending = std::move(staged.pending);
         *keptOut = std::move(keptOutNodes);
+        invalidateChecks("",true);
         return true;
     } catch(const std::exception& e) {
         errors = {{"MacroMixer", e.what()}}; return false;

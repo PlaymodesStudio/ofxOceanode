@@ -47,7 +47,7 @@ public:
     enum class Health { Neutral, Ok, NodeFallback, GraphFallback, Error };
 private:
     enum class ActionKind { Import, Refresh, RemoveMacro, MoveMacro, Routers, LoadRouters, SaveRouters, ClearPlayback, MorphPolicy,
-        KeepOut, CancelBlocked, RestoreNode };
+        KeepOut, CancelBlocked, RestoreNode, CheckStatus };
     struct Action {
         ActionKind kind;
         std::string text;
@@ -65,6 +65,8 @@ private:
     bool drawSourceHeader(const MacroMixerRevision& macro, size_t index, size_t count, bool fading);
     void drawSource(const MacroMixerRevision& macro, bool fading);
     void drawSourceWindows(const MacroMixerRevision& macro);
+    // The source check's morphs into this source, one per origin.
+    void drawSourceChecks(const MacroMixerRevision& macro);
     // An empty ID edits the mixer default.
     void drawMorphPolicies(const std::string& id, bool fading);
     void syncSelector();

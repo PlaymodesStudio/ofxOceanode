@@ -708,6 +708,19 @@ void ofxOceanodeMacroMixer::drawMacros() {
     ImGui::SameLine();
     if(ImGui::Button("Clear Playback")) actions.push_back({ActionKind::ClearPlayback, ""});
     if(ImGui::IsItemHovered()) ImGui::SetTooltip("Release running graphs and reset router values. Imported macros remain in the list.");
+    // Loading every source stalls frames, so the check never runs while one plays.
+    const bool playing = !runtime->currentID().empty() || fading;
+    ImGui::SameLine(); ImGui::BeginDisabled(playing || runtime->macros().size() < 2);
+    if(ImGui::Button("Check Status")) actions.push_back({ActionKind::CheckStatus, ""});
+    ImGui::EndDisabled();
+    if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip(playing ? "Clear Playback first: the check loads every source and would stall the running show."
+                                  : "Load each source once and preview it morphing into every other one.");
+    if(const auto left = runtime->originsToCheck()) {
+        ImGui::SameLine();
+        if(playing) ImGui::TextDisabled("Check waits for Clear Playback (%zu to go)", left);
+        else ImGui::TextDisabled("Checking sources: %zu to go", left);
+    }
     const auto entries = runtime->macros();
     for(size_t i = 0; i < entries.size(); ++i) {
         const auto& macro = entries[i];
@@ -741,7 +754,27 @@ bool ofxOceanodeMacroMixer::drawSourceHeader(const MacroMixerRevision& macro, si
     ImGui::GetWindowDrawList()->AddRectFilled(min, ImVec2(min.x + em * .25f, max.y),
         ImGui::ColorConvertFloat4ToU32(ImVec4(color.r, color.g, color.b, 1)));
     ImGui::SameLine(left + em + style.FramePadding.x * 3);
+    // The name takes the colour of the worst morph into this source found by
+    // the source check, as its Details do; red too when the source fails to read.
+    const auto worst = runtime->worstInto(macro.id());
+    const ImVec4* tint = nullptr;
+    static const ImVec4 graphFallback = healthColor(Health::GraphFallback), nodeFallback = healthColor(Health::NodeFallback);
+    if(!runtime->sourceProblem(macro.id()).empty() || worst == MacroMixerRuntime::Compatibility::GraphFallback) tint = &graphFallback;
+    else if(worst == MacroMixerRuntime::Compatibility::NodeFallback) tint = &nodeFallback;
+    if(tint) ImGui::PushStyleColor(ImGuiCol_Text, *tint);
     ImGui::TextUnformatted((std::to_string(index) + ": " + macro.name()).c_str());
+    if(tint) ImGui::PopStyleColor();
+    if(tint && ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        if(!runtime->sourceProblem(macro.id()).empty()) ImGui::TextUnformatted(runtime->sourceProblem(macro.id()).c_str());
+        for(const auto& check : runtime->checksInto(macro.id())) {
+            if(check.second.level != MacroMixerRuntime::Compatibility::GraphFallback && check.second.level != MacroMixerRuntime::Compatibility::NodeFallback) continue;
+            const auto from = runtime->macro(check.first);
+            ImGui::Text("From %s: %s", from ? from->name().c_str() : check.first.c_str(),
+                check.second.level == MacroMixerRuntime::Compatibility::GraphFallback ? "graph fallback" : "node replaced");
+        }
+        ImGui::EndTooltip();
+    }
     if(!badges.empty()) { ImGui::SameLine(); ImGui::TextColored(ImVec4(0, 1, 0, 1), "%s", badges.c_str()); }
     // Refresh, up, down and remove, right-aligned on the header row.
     const float gap = em * .25f, square = ImGui::GetFrameHeight();
@@ -842,6 +875,7 @@ void ofxOceanodeMacroMixer::drawSource(const MacroMixerRevision& macro, bool fad
             ImGui::TreePop();
         }
     }
+    drawSourceChecks(macro);
 
     // Nodes the last analysis left out, plus kept-out nodes inside this folder
     // when it has not been read since a preset was restored.
@@ -870,6 +904,43 @@ void ofxOceanodeMacroMixer::drawSource(const MacroMixerRevision& macro, bool fad
             ImGui::TreePop();
         }
     }
+}
+
+void ofxOceanodeMacroMixer::drawSourceChecks(const MacroMixerRevision& macro) {
+    using Compatibility = MacroMixerRuntime::Compatibility;
+    const auto& checks = runtime->checksInto(macro.id());
+    if(checks.empty()) return;
+    static const ImVec4 graphFallback = healthColor(Health::GraphFallback), nodeFallback = healthColor(Health::NodeFallback);
+    const auto colorOf = [](Compatibility level) -> const ImVec4* {
+        return level == Compatibility::GraphFallback ? &graphFallback : level == Compatibility::NodeFallback ? &nodeFallback : nullptr;
+    };
+    const auto* worst = colorOf(runtime->worstInto(macro.id()));
+    ImGui::Spacing();
+    if(worst) ImGui::PushStyleColor(ImGuiCol_Text, *worst);
+    const bool open = ImGui::TreeNode("##checks", "Morphs from other sources");
+    if(worst) ImGui::PopStyleColor();
+    if(ImGui::IsItemHovered()) ImGui::SetTooltip("Each other source's saved state previewed morphing into this one.\nRed: the whole graph falls back to a crossfade. Orange: a node is replaced.");
+    if(!open) return;
+    for(const auto& check : checks) {
+        ImGui::PushID(check.first.c_str());
+        const auto from = runtime->macro(check.first);
+        const auto name = from ? from->name() : check.first;
+        const auto level = check.second.level;
+        const auto* color = colorOf(level);
+        const auto label = level == Compatibility::GraphFallback ? "graph fallback" : level == Compatibility::NodeFallback ? "node replaced"
+            : level == Compatibility::Ok ? "morphs in place" : "not checked";
+        if(color) ImGui::TextColored(*color, "From %s: %s", name.c_str(), label);
+        else ImGui::TextDisabled("From %s: %s", name.c_str(), label);
+        ImGui::Indent();
+        for(const auto& problem : check.second.problems) {
+            if(color) ImGui::PushStyleColor(ImGuiCol_Text, *color);
+            ImGui::TextWrapped("%s: %s", problem.location.c_str(), problem.message.c_str());
+            if(color) ImGui::PopStyleColor();
+        }
+        ImGui::Unindent();
+        ImGui::PopID();
+    }
+    ImGui::TreePop();
 }
 
 void ofxOceanodeMacroMixer::drawSourceWindows(const MacroMixerRevision& macro) {
@@ -1031,10 +1102,13 @@ void ofxOceanodeMacroMixer::update(ofEventArgs&) {
                 syncSelector(); break;
             case ActionKind::CancelBlocked: runtime->cancelBlocked(); answeredBlocked.clear(); break;
             case ActionKind::RestoreNode: runtime->restoreKeptOutNode(action.text,action.node); break;
+            case ActionKind::CheckStatus: runtime->requestChecks(); break;
         }
     }
     if(syncInputs()) runtime->update();
     publish();
+    // One origin per frame, after the frame's own work and between actions.
+    if(actions.empty()) runtime->checkNextOrigin();
 }
 void ofxOceanodeMacroMixer::deactivate() {
     actions.clear();
