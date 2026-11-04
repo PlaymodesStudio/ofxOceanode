@@ -49,3 +49,12 @@ Run all of them with `for t in tests/*_regression.py; do python3 "$t" || echo "F
 - **Help and AI assistant** (`Managers/ofxOceanodeHelp*`, `ofxOceanodeAIAssistant.h`, `ofxOceanodeRequesty.h`). Node search, the embedded catalog, and an LLM assistant that uses Requesty. It can propose patch plans, which `ofxOceanodeHelpPlan.h` validates.
 
 Everything runs on the OF update/draw thread. Execution order follows the order in which connections were created.
+
+## Testing policy
+
+- The user compiles, runs and tests the app themselves. After making a change, do NOT build, compile, syntax-check or run anything to verify it. Just make the edit, explain what changed and where, and stop.
+- Do NOT run the regression tests (`tests/*_regression.py`, `tests/integration_compile.py` or the full suite) after a change or at the end of a prompt.
+- When asked to commit, first ask the user whether to run the regression tests for the feature being committed. Name the relevant test scripts in the question.
+  - If the user agrees: run those tests, report the results, and commit only if they pass. If any fail, report the failures and stop without committing.
+  - If the user declines: commit directly without running tests.
+- Never build or run tests on your own initiative; if one seems genuinely necessary, ask first.
