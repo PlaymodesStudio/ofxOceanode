@@ -75,7 +75,9 @@ every cable to or from it. The source folder is not modified. The choices are
 saved in `MacroMixerState` as `keptOutNodes`; older states have none and ask
 again. Each source's **Kept out** lists its kept-out nodes, including
 those in nested Macros; **Restore** includes a node again from the next activation, and you are asked about it again while it still
-blocks the mix. The dialog is drawn by `ofxOceanode` with the other
+blocks the mix. Removing a source drops its choices, so adding the folder again
+analyses it afresh and asks again; choices another source still uses (a shared
+global Macro's folder) stay. The dialog is drawn by `ofxOceanode` with the other
 application-level dialogs and waits for any other open popup to close first.
 
 ## Morph mode
@@ -260,8 +262,9 @@ by opacity, ScBus outputs mix through the private SC bridge, textures use their
 texture policy. The Inspector STATUS shows the specific reason and the Status
 output shows `Macro fall`. The current implementation falls back for:
 
-- Changed Router or Portal settings (names, bounds, Inspector settings). These
-  publish the Macro interface or a shared service and cannot run twice.
+- Changed Router settings (names, bounds, Inspector settings) or Portal
+  settings other than the bus (a Portal on another bus is unmatched instead).
+  These publish the Macro interface or a shared service and cannot run twice.
 - Unmatched Router additions or removals in an existing container. These
   require reconciliation of the existing published interface; routers inside a
   whole newly added Macro load through its native lifecycle.
@@ -300,7 +303,9 @@ retain their existing resource nodes and routes.
 Matching is one-to-one and applies to every model type. Named Router/Portal
 interfaces and unique model types anchor matches; matching input/output port
 roles propagate those matches through repeated model types. Saved IDs break ties
-in otherwise unanchored parts of a graph. Ambiguous unmatched ordinary nodes
+in otherwise unanchored parts of a graph. A Portal only ever matches a Portal on
+the same bus (type, Name and scope): a saved ID reused for another bus is a
+removal and an addition, never a renamed Portal. Ambiguous unmatched ordinary nodes
 remain additions/removals rather than being arbitrarily paired by type alone.
 
 Live node IDs are kept private and stable; target definitions are mapped onto

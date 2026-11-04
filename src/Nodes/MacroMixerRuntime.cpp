@@ -88,7 +88,21 @@ bool MacroMixerRuntime::removeMacro(const std::string& id) {
         if(removedID == currentID() || removedID == destinationID() || removedID == queuedID()) clear();
         order.erase(std::remove(order.begin(), order.end(), removedID), order.end());
         sourcePolicies.erase(removedID); problems.erase(removedID); windows.erase(removedID);
+        const auto removed = it->second;
         imports.erase(it);
+        // Kept-out choices leave with their source, so adding it again analyses
+        // it afresh and asks again. Ones another source still uses (a shared
+        // global Macro) stay.
+        const auto uses = [](const MacroMixerRevision& source, const std::pair<std::string, std::string>& node) {
+            const auto relative = std::filesystem::path(node.first).lexically_relative(source.source());
+            return source.keptOut().count(node) || (!relative.empty() && *relative.begin() != "..");
+        };
+        for(auto node = keptOut->begin(); node != keptOut->end();) {
+            if(uses(*removed, *node) && std::none_of(imports.begin(), imports.end(), [&](const auto& e) { return uses(*e.second, *node); }))
+                node = keptOut->erase(node);
+            else ++node;
+        }
+        sourceDetailCache.clear(); invalidateChecks(removedID,true);
         errors.clear(); return true;
     }
     errors = {{"macro", "Unknown Macro ID"}}; return false;

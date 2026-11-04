@@ -75,6 +75,24 @@ int main(int argc,char** argv) {
     // blends .7 -> .1 while the output cable blends 5 -> Portal 8.
     details=morph(busy,with,5,.1f,2.7f);
     assert(has(details,"mix","Portal bus Thr") && has(details,"mix","Bus value -> Saved value"));
+    // Saved IDs reused for other buses (BLOOBS' Portal_i_6..9 "A/B NUM BLOBS"):
+    // two "A" Portals (1) and two "B" Portals (2), the output reading A. The
+    // target swaps which IDs carry which name. Same-ID Portals on different
+    // buses never pair, so there is no Name mismatch and no fallback.
+    auto swapped=[&](const std::string& folder,bool swap) {
+        ofxOceanodeContainer c(registry,types,transport); c.setCanvasID("PortalSource");
+        auto& out=c.createNode(std::make_unique<router<float>>("f",0.f,-100.f,100.f),1).getNodeModel();
+        out.getParameter<std::string>("Name")="Value"; out.getParameter<float>("Value")=5;
+        const std::string first=swap ? "B" : "A",second=swap ? "A" : "B";
+        portalNode(c,6,first,swap ? 2 : 1); portalNode(c,7,first,swap ? 2 : 1);
+        portalNode(c,8,second,swap ? 1 : 2); portalNode(c,9,second,swap ? 1 : 2);
+        assert(c.createConnectionFromInfo(swap ? "Portal_f_9" : "Portal_f_7","Value","Router_f_1","Value"));
+        c.savePreset(folder);
+    };
+    const auto straight=scratch+"/straight",crossed=scratch+"/crossed";
+    swapped(straight,false); swapped(crossed,true);
+    details=morph(straight,crossed,1,1);
+    assert(!has(details,"fallback","Name"));
     // driven: Feed (3) drives "Thr" through a cabled Portal 30; Portal 8
     // passes it to the output. extra 1 adds an uncabled "Thr" Portal saved at
     // 9 (BLODEV_2's leftover VEC_POS_X_1); extra 2 cables Feed into it.

@@ -542,6 +542,20 @@ MorphValue savedMorphValue(const MorphValue& prototype, const ofJson& json) {
     return result;
 }
 
+bool morphPortal(const ofJson& entry) { return entry.at("model").get<std::string>().rfind("Portal ",0)==0; }
+// A saved Portal's bus: its type (model), Name and scope.
+struct PortalBus {
+    std::string model,name; bool local;
+    bool operator==(const PortalBus& o) const { return model==o.model && name==o.name && local==o.local; }
+};
+PortalBus portalBus(const ofJson& entry) {
+    const auto& settings=entry.at("settings");
+    const auto local=settings.value("Local",ofJson(true));
+    const auto model=entry.at("model").get<std::string>();
+    return {model,settings.contains("Name") && settings.at("Name").is_string() ? settings.at("Name").get<std::string>() : model.substr(7),
+            local.is_string() ? local.get<std::string>()!="0" && local.get<std::string>()!="false" : local!=ofJson(false)};
+}
+
 // Match instances before comparing settings. Saved IDs are local labels, not
 // cross-preset identities. Named interfaces and unique model types anchor the
 // correspondence; port roles propagate it through repeated model types.
@@ -550,7 +564,11 @@ MorphMatches matchMorphNodes(const ofJson& original, const ofJson& target) {
     const auto& before=original.at("nodes"); const auto& after=target.at("nodes");
     MorphMatches matches; std::set<std::string> used;
     auto match=[&](const std::string& oldKey,const std::string& newKey) {
-        if(used.count(oldKey) || matches.count(newKey) || before.at(oldKey).at("model")!=after.at(newKey).at("model")) return false;
+        const auto& a=before.at(oldKey); const auto& b=after.at(newKey);
+        if(used.count(oldKey) || matches.count(newKey) || a.at("model")!=b.at("model")) return false;
+        // A Portal is its bus: Portals on different buses are a removal and an
+        // addition, never a renamed Portal, whatever their saved IDs or cables.
+        if(morphPortal(a) && !(portalBus(a)==portalBus(b))) return false;
         used.insert(oldKey); matches.emplace(newKey,oldKey); return true;
     };
     std::map<std::string,std::vector<std::string>> oldTypes,newTypes,oldNames,newNames;
@@ -702,19 +720,6 @@ struct MorphContainerEdit {
 bool morphStageable(const ofJson& entry) {
     const auto model=entry.at("model").get<std::string>();
     return model.rfind("Router ",0)!=0 && model.rfind("Portal ",0)!=0;
-}
-bool morphPortal(const ofJson& entry) { return entry.at("model").get<std::string>().rfind("Portal ",0)==0; }
-// A saved Portal's bus: its type (model), Name and scope.
-struct PortalBus {
-    std::string model,name; bool local;
-    bool operator==(const PortalBus& o) const { return model==o.model && name==o.name && local==o.local; }
-};
-PortalBus portalBus(const ofJson& entry) {
-    const auto& settings=entry.at("settings");
-    const auto local=settings.value("Local",ofJson(true));
-    const auto model=entry.at("model").get<std::string>();
-    return {model,settings.contains("Name") && settings.at("Name").is_string() ? settings.at("Name").get<std::string>() : model.substr(7),
-            local.is_string() ? local.get<std::string>()!="0" && local.get<std::string>()!="false" : local!=ofJson(false)};
 }
 // An unmatched Portal runs until completion or starts with the morph like any
 // node. Added to a live bus, loading it would publish its saved value to the

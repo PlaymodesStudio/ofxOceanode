@@ -365,6 +365,14 @@ int main(int argc,char** argv) {
         assert(mixer.restoreKeptOutNode(canonical,"External_Endpoint_2"));
         assert(!mixer.importMacro(blockedSource,true) && mixer.blockedNodes().size()==1);
         mixer.cancelBlocked();assert(mixer.blockedNodes().empty());mixer.update(10);near(mixer.value(),.35);
+        // Removing a source drops its choices: added again, it asks again.
+        assert(mixer.removeMacro(mixer.importedMacro(blockedSource)->id()) && mixer.keptOutNodes().empty());
+        assert(!mixer.importMacro(blockedSource) && mixer.blockedNodes().size()==2);
+        mixer.cancelBlocked();
+        // Removing another source keeps this folder's choices.
+        const auto other=scratch+"/other";saveSource(other,.5);
+        assert(restored.importMacro(other) && restored.removeMacro(restored.importedMacro(other)->id()));
+        assert(restored.keptOutNodes().size()==2);
     }
     // Global references use the real library resolver; live edits are checked
     // before the native global-Macro update callback can alter running nodes.
