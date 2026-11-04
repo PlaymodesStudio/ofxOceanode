@@ -9,6 +9,7 @@
 #include "ofxOceanodeTheme.h"
 #include "ofxOceanodeColors.h"
 #include "ofxOceanodeMenu.h"
+#include "ofxOceanodeMenuLabel.h"
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeTimeController.h"
 #include "imgui_internal.h"
@@ -454,38 +455,28 @@ void ofxOceanode::drawUnusedNodesWindow(){
 void ofxOceanode::drawMenuBar(){
     if(showMetrics) ImGui::ShowMetricsWindow(&showMetrics);
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f, 6.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12.0f, 6.0f));
+    static float globalMenuWidth = 0.0f;
+    const ImRect menuBarRect = ImGui::GetCurrentWindow()->MenuBarRect();
+    float menuTextY = menuBarRect.Min.y + (menuBarRect.GetHeight() - ImGui::GetTextLineHeight()) * 0.5f;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(9.0f, 6.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6.0f, 6.0f));
     if (ImGui::BeginMenuBar())
     {
-        const float fps = ofGetFrameRate();
-        const ImVec4 fpsColor = fps >= 60.0f ? OceanodeColors::FpsGood
-                             : fps > 30.0f ? OceanodeColors::FpsWarning
-                                           : OceanodeColors::FpsBad;
-        // Reserve a fixed, font-scaled slot so FPS digit changes cannot move the menus.
-        float fpsDigitWidth = 0.0f;
-        for(char digit = '0'; digit <= '9'; ++digit){
-            fpsDigitWidth = std::max(fpsDigitWidth, ImGui::CalcTextSize(&digit, &digit + 1).x);
-        }
-        const ImVec2 fpsSize(ImGui::CalcTextSize("[  ]").x + 4.0f * fpsDigitWidth,
-                             ImGui::GetTextLineHeight());
-        const ImVec2 fpsPos = ImGui::GetCursorScreenPos();
-        char fpsText[32];
-        std::snprintf(fpsText, sizeof(fpsText), "[ %d ]", static_cast<int>(fps));
-        ImGui::Dummy(fpsSize);
-        ImGui::PushStyleColor(ImGuiCol_Text, fpsColor);
-        ImGui::RenderTextClipped(fpsPos, ImVec2(fpsPos.x + fpsSize.x, fpsPos.y + fpsSize.y),
-                                 fpsText, nullptr, nullptr);
-        ImGui::PopStyleColor();
-
-        auto beginTopLevelMenu = [](const char* label){
+        menuTextY = ImGui::GetCursorScreenPos().y + ImGui::GetCurrentWindow()->DC.CurrLineTextBaseOffset;
+        std::vector<std::string> menuLabels = controls->menuControllerNames();
+        for(const char* name : {"Edit", "Config", "Window", "Layouts", "Help"})
+            menuLabels.emplace_back(name);
+        const float available = std::max(0.0f, menuBarRect.Max.x - globalMenuWidth - ImGui::GetCursorScreenPos().x);
+        const float labelWidth = ofxOceanodeMenuLabel::widthLimit(menuLabels, available, ImGui::GetStyle().ItemSpacing.x * 1.5f);
+        auto beginTopLevelMenu = [labelWidth](const char* label){
             const ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing.x * 1.5f, spacing.y));
-            const bool open = ImGui::BeginMenu(label);
+            const std::string visibleLabel = ofxOceanodeMenuLabel::abbreviated(label, labelWidth);
+            const bool open = ImGui::BeginMenu(visibleLabel.c_str());
             ImGui::PopStyleVar();
             return open;
         };
-        controls->drawMenu("Presets");
+        controls->drawMenu("Presets", labelWidth);
 
         if(beginTopLevelMenu("Edit"))
         {
@@ -541,7 +532,7 @@ void ofxOceanode::drawMenuBar(){
             ImGui::EndMenu();
         }
 
-        controls->drawMenus("Presets");
+        controls->drawMenus("Presets", labelWidth);
 		
 		if(beginTopLevelMenu("Config"))
 		{
@@ -594,10 +585,146 @@ void ofxOceanode::drawMenuBar(){
             }
             ImGui::EndMenu();
         }
-        controls->drawMenuBarStatus();
         ImGui::EndMenuBar();
     }
     ImGui::PopStyleVar(2);
+
+    // A separate window owns the whole area, including empty space between controls.
+    // It remains above the menu bar for drawing and mouse hit testing.
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const float height = menuBarRect.GetHeight();
+    const float spacing = 4.0f;
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1.0f, 1.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 0));
+    float digitWidth = 0.0f;
+    for(char digit = '0'; digit <= '9'; ++digit)
+        digitWidth = std::max(digitWidth, ImGui::CalcTextSize(&digit, &digit + 1).x);
+    const float fpsWidth = 4.0f * digitWidth;
+    const float statusWidth = controls->menuBarStatusWidth();
+    const float suffixWidth = controls->menuBarStatusSuffixWidth();
+    const float contentWidth = fpsWidth + 4 * spacing + 144.0f + 2 * (height + 2.0f) + 2.0f
+                             + (statusWidth > 0 ? spacing + statusWidth : 0.0f)
+                             + (suffixWidth > 0 ? spacing + suffixWidth : 0.0f);
+    const float width = std::min(menuBarRect.GetWidth(), contentWidth + 8.0f);
+    globalMenuWidth = width;
+    ImGui::SetNextWindowPos(ImVec2(menuBarRect.Max.x - width, menuBarRect.Min.y));
+    ImGui::SetNextWindowSize(ImVec2(width, height));
+    ImGui::SetNextWindowViewport(viewport->ID);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoNavFocus |
+        ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_HorizontalScrollbar;
+    if(ImGui::Begin("##OceanodeGlobalMenu", nullptr, flags)){
+        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+        // Match the menu labels' text baseline while keeping the overlay and its
+        // hit area confined to the menu bar.
+        const float textOffset = std::max(0.0f, std::min(menuTextY - menuBarRect.Min.y,
+            height - ImGui::GetTextLineHeight()));
+        ImGui::SetCursorPosY(textOffset);
+
+		// TRANSPORT: BPM, beat position, play/pause, stop (the shared global transport)
+		if(auto transport = container->getTransport()) {
+			const auto transportState = transport->getState();
+			const bool externalClock = transport->hasExternalClock();
+			const bool bpmLocked = externalClock || (container->getAutomationExtension() && container->getAutomationExtension()->isBpmAutomationEnabled());
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2,0));
+
+			float globalBpm = transportState.bpm;
+			ImGui::SetNextItemWidth(72);
+			ImGui::BeginDisabled(bpmLocked);
+			if(ImGui::DragFloat("##globalBpm", &globalBpm, 0.1f, 1.0f, 999.0f, "%.1f BPM") && !bpmLocked)
+				container->setBpm(globalBpm);
+			ImGui::EndDisabled();
+			if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+				ImGui::SetTooltip(externalClock ? "Tempo from the external clock" :
+				                  bpmLocked ? "Tempo from the tempo lane" : "Tempo (drag, or double-click to type)");
+
+			ImGui::SameLine();
+			double globalBeat = transportState.beatPosition;
+			const double beatMin = 0.0;
+			ImGui::SetNextItemWidth(72);
+			ImGui::BeginDisabled(externalClock);
+			if(ImGui::DragScalar("##globalBeat", ImGuiDataType_Double, &globalBeat, 0.05f, &beatMin, nullptr, "%.2f") && !externalClock)
+				transport->seekToBeat(std::max(0.0, globalBeat));
+			ImGui::EndDisabled();
+			if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+				ImGui::SetTooltip(externalClock ? "Following an external clock" : "Transport position in beats (drag, or double-click to type)");
+
+			// Square icon buttons drawn like the timeline toolbar's.
+			const float iconSize = ImGui::GetFrameHeight();
+			auto transportButton = [&](const char* id, int icon, bool on, const char* tooltip) {
+				ImGui::SameLine(0.0f, 2.0f);
+				const ImVec2 pos = ImGui::GetCursorScreenPos();
+				const ImVec2 size(iconSize + 2.0f, iconSize);
+				const bool pressed = ImGui::InvisibleButton(id, size) && !externalClock;
+				const bool hovered = ImGui::IsItemHovered() && !externalClock;
+				const bool held = ImGui::IsItemActive() && !externalClock;
+				auto* dl = ImGui::GetWindowDrawList();
+				const ImU32 accent = IM_COL32(90, 205, 125, 255);
+				const ImU32 bg = on ? accent : ImGui::GetColorU32(held ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+				dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), bg, 3.0f);
+				const ImU32 col = externalClock ? IM_COL32(120, 120, 120, 160) : on ? IM_COL32(15, 18, 24, 255) : IM_COL32(225, 228, 235, 255);
+				const ImVec2 c(pos.x + size.x * 0.5f, pos.y + size.y * 0.5f);
+				const float s = size.y * 0.52f;
+				if(icon == 0) { // play
+					dl->AddTriangleFilled(ImVec2(c.x - s * 0.35f, c.y - s * 0.45f), ImVec2(c.x - s * 0.35f, c.y + s * 0.45f),
+					                      ImVec2(c.x + s * 0.45f, c.y), col);
+				} else if(icon == 1) { // pause
+					dl->AddRectFilled(ImVec2(c.x - s * 0.38f, c.y - s * 0.42f), ImVec2(c.x - s * 0.1f, c.y + s * 0.42f), col, 1.0f);
+					dl->AddRectFilled(ImVec2(c.x + s * 0.1f, c.y - s * 0.42f), ImVec2(c.x + s * 0.38f, c.y + s * 0.42f), col, 1.0f);
+				} else { // stop
+					dl->AddRectFilled(ImVec2(c.x - s * 0.36f, c.y - s * 0.36f), ImVec2(c.x + s * 0.36f, c.y + s * 0.36f), col, 1.5f);
+				}
+				if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", externalClock ? "Following an external clock" : tooltip);
+				return pressed;
+			};
+			if(transportButton("##globalPlay", transportState.isPlaying ? 1 : 0, transportState.isPlaying,
+			                   transportState.isPlaying ? "Pause" : "Play"))
+				transport->setIsPlaying(!transportState.isPlaying);
+			if(transportButton("##globalStop", 2, false, "Stop (back to the start)"))
+				transport->stop();
+
+			ImGui::PopStyleVar();
+		}
+
+        if(statusWidth > 0.0f){
+            ImGui::SameLine();
+            controls->drawMenuBarStatus();
+        }
+        if(suffixWidth > 0.0f){
+            ImGui::SameLine();
+            controls->drawMenuBarStatusSuffix();
+        }
+        ImGui::SameLine();
+        const float fps = ofGetFrameRate();
+        const ImVec4 fpsColor = fps >= 60.0f ? OceanodeColors::FpsGood
+                             : fps > 30.0f ? OceanodeColors::FpsWarning
+                                           : OceanodeColors::FpsBad;
+        // Reserve a fixed, font-scaled slot so FPS digit changes cannot move the menus.
+        float fpsDigitWidth = 0.0f;
+        for(char digit = '0'; digit <= '9'; ++digit){
+            fpsDigitWidth = std::max(fpsDigitWidth, ImGui::CalcTextSize(&digit, &digit + 1).x);
+        }
+        const ImVec2 fpsSize(4.0f * fpsDigitWidth,
+                             ImGui::GetTextLineHeight());
+        const ImVec2 fpsPos = ImGui::GetCursorScreenPos();
+        char fpsText[32];
+        std::snprintf(fpsText, sizeof(fpsText), "%d", static_cast<int>(fps));
+        ImGui::Dummy(fpsSize);
+        ImGui::PushStyleColor(ImGuiCol_Text, fpsColor);
+        ImGui::RenderTextClipped(fpsPos, ImVec2(fpsPos.x + fpsSize.x, fpsPos.y + fpsSize.y),
+                                 fpsText, nullptr, nullptr);
+        ImGui::PopStyleColor();
+
+    }
+    ImGui::End();
+    ImGui::PopStyleColor(2);
+    ImGui::PopStyleVar(6);
 }
 
 // The PDF user manual (scripts/build_user_manual.py). A copy in the app's data

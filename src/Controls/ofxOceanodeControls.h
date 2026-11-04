@@ -23,11 +23,15 @@ public:
     
     void draw();
     // Called inside Oceanode's active menu bar.
-    void drawMenu(const std::string& controllerName);
-    void drawMenus(const std::string& excludedControllerName = "");
+    std::vector<std::string> menuControllerNames() const;
+    void drawMenu(const std::string& controllerName, float labelWidth);
+    void drawMenus(const std::string& excludedControllerName, float labelWidth);
     void drawPopups();
     // The controllers' status readouts, right-aligned in the menu bar.
+    float menuBarStatusWidth();
     void drawMenuBarStatus();
+    float menuBarStatusSuffixWidth();
+    void drawMenuBarStatusSuffix();
     void update();
     
     template<class T>

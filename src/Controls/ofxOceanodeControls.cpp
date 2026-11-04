@@ -18,6 +18,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "ofxOceanodeShared.h"
+#include "ofxOceanodeMenuLabel.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -179,12 +180,19 @@ void ofxOceanodeControls::draw(){
     }
 }
 
-void ofxOceanodeControls::drawMenu(const std::string& controllerName){
+std::vector<std::string> ofxOceanodeControls::menuControllerNames() const{
+    std::vector<std::string> names;
+    for(const auto& c : controllers)
+        if(c->isMenuController()) names.push_back(c->getControllerName());
+    return names;
+}
+
+void ofxOceanodeControls::drawMenu(const std::string& controllerName, float labelWidth){
     for(auto &c : controllers){
         if(!c->isMenuController() || c->getControllerName() != controllerName) continue;
         ImGui::PushID(c.get());
         constrainMenuHeightToHostWindow();
-        if(beginTopLevelMenu(c->getControllerName().c_str())){
+        if(beginTopLevelMenu(ofxOceanodeMenuLabel::abbreviated(c->getControllerName(), labelWidth).c_str())){
             c->draw();
             ImGui::EndMenu();
         }
@@ -193,12 +201,12 @@ void ofxOceanodeControls::drawMenu(const std::string& controllerName){
     }
 }
 
-void ofxOceanodeControls::drawMenus(const std::string& excludedControllerName){
+void ofxOceanodeControls::drawMenus(const std::string& excludedControllerName, float labelWidth){
     for(auto &c : controllers){
         if(!c->isMenuController() || c->getControllerName() == excludedControllerName) continue;
         ImGui::PushID(c.get());
         constrainMenuHeightToHostWindow();
-        if(beginTopLevelMenu(c->getControllerName().c_str())){
+        if(beginTopLevelMenu(ofxOceanodeMenuLabel::abbreviated(c->getControllerName(), labelWidth).c_str())){
             c->draw();
             ImGui::EndMenu();
         }
@@ -206,26 +214,51 @@ void ofxOceanodeControls::drawMenus(const std::string& excludedControllerName){
     }
 }
 
-void ofxOceanodeControls::drawMenuBarStatus(){
-    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+float ofxOceanodeControls::menuBarStatusWidth(){
     float total = 0.0f;
-    std::vector<std::pair<ofxOceanodeBaseController*, float>> items;
     for(auto &c : controllers){
-        const float w = c->menuBarStatusWidth();
-        if(w <= 0.0f) continue;
-        items.push_back({c.get(), w});
-        total += w + (items.size() > 1 ? spacing : 0.0f);
+        const float width = c->menuBarStatusWidth();
+        if(width <= 0.0f) continue;
+        if(total > 0.0f) total += ImGui::GetStyle().ItemSpacing.x;
+        total += width;
     }
-    if(items.empty()) return;
-    const float right = ImGui::GetWindowContentRegionMax().x - ImGui::GetStyle().WindowPadding.x;
-    const float x = right - total;
-    if(x <= ImGui::GetCursorPosX()) return;   // no room left by the menus
-    ImGui::SetCursorPosX(x);
-    for(size_t i = 0; i < items.size(); i++){
-        if(i > 0) ImGui::SameLine(0.0f, spacing);
-        ImGui::PushID(items[i].first);
+    return total;
+}
+
+void ofxOceanodeControls::drawMenuBarStatus(){
+    bool first = true;
+    for(auto &c : controllers){
+        if(c->menuBarStatusWidth() <= 0.0f) continue;
+        if(!first) ImGui::SameLine();
+        first = false;
+        ImGui::PushID(c.get());
         ImGui::BeginGroup();
-        items[i].first->drawMenuBarStatus();
+        c->drawMenuBarStatus();
+        ImGui::EndGroup();
+        ImGui::PopID();
+    }
+}
+
+float ofxOceanodeControls::menuBarStatusSuffixWidth(){
+    float total = 0.0f;
+    for(auto &c : controllers){
+        const float width = c->menuBarStatusSuffixWidth();
+        if(width <= 0.0f) continue;
+        if(total > 0.0f) total += ImGui::GetStyle().ItemSpacing.x;
+        total += width;
+    }
+    return total;
+}
+
+void ofxOceanodeControls::drawMenuBarStatusSuffix(){
+    bool first = true;
+    for(auto &c : controllers){
+        if(c->menuBarStatusSuffixWidth() <= 0.0f) continue;
+        if(!first) ImGui::SameLine();
+        first = false;
+        ImGui::PushID(c.get());
+        ImGui::BeginGroup();
+        c->drawMenuBarStatusSuffix();
         ImGui::EndGroup();
         ImGui::PopID();
     }

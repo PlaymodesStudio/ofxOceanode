@@ -40,3 +40,6 @@ protected:
 };
 
 #endif /* ofxOceanodeBaseController_h */
+    // Optional readouts placed before the FPS counter.
+    virtual float menuBarStatusSuffixWidth() { return 0.0f; }
+    virtual void drawMenuBarStatusSuffix() {}
