@@ -603,13 +603,20 @@ void ofxOceanode::drawMenuBar(){
     float digitWidth = 0.0f;
     for(char digit = '0'; digit <= '9'; ++digit)
         digitWidth = std::max(digitWidth, ImGui::CalcTextSize(&digit, &digit + 1).x);
-    const float fpsWidth = 4.0f * digitWidth;
+    const float fps = ofGetFrameRate();
+    char fpsText[32];
+    std::snprintf(fpsText, sizeof(fpsText), "%d", static_cast<int>(fps));
+    const float fpsWidth = std::max(3.0f * digitWidth, ImGui::CalcTextSize(fpsText).x);
     const float statusWidth = controls->menuBarStatusWidth();
     const float suffixWidth = controls->menuBarStatusSuffixWidth();
-    const float contentWidth = fpsWidth + 4 * spacing + 144.0f + 2 * (height + 2.0f) + 2.0f
+    const float rightGap = 8.0f;
+    // Match the actual control widths and SameLine spacing so the FPS slot
+    // stays close to the meters without changing the right edge alignment.
+    const float transportWidth = 144.0f + spacing + 2.0f * (ImGui::GetFrameHeight() + 2.0f) + 4.0f;
+    const float contentWidth = transportWidth + fpsWidth + spacing
                              + (statusWidth > 0 ? spacing + statusWidth : 0.0f)
                              + (suffixWidth > 0 ? spacing + suffixWidth : 0.0f);
-    const float width = std::min(menuBarRect.GetWidth(), contentWidth + 8.0f);
+    const float width = std::min(menuBarRect.GetWidth(), contentWidth + 4.0f + rightGap);
     globalMenuWidth = width;
     ImGui::SetNextWindowPos(ImVec2(menuBarRect.Max.x - width, menuBarRect.Min.y));
     ImGui::SetNextWindowSize(ImVec2(width, height));
@@ -701,24 +708,19 @@ void ofxOceanode::drawMenuBar(){
             controls->drawMenuBarStatusSuffix();
         }
         ImGui::SameLine();
-        const float fps = ofGetFrameRate();
+        // Keep the readout against the right padding even when the estimated
+        // width of the preceding controls leaves unused space in the overlay.
+        const ImVec2 fpsCursor = ImGui::GetCursorScreenPos();
+        ImGui::SetCursorScreenPos(ImVec2(std::max(fpsCursor.x, menuBarRect.Max.x - rightGap - fpsWidth), fpsCursor.y));
         const ImVec4 fpsColor = fps >= 60.0f ? OceanodeColors::FpsGood
                              : fps > 30.0f ? OceanodeColors::FpsWarning
                                            : OceanodeColors::FpsBad;
-        // Reserve a fixed, font-scaled slot so FPS digit changes cannot move the menus.
-        float fpsDigitWidth = 0.0f;
-        for(char digit = '0'; digit <= '9'; ++digit){
-            fpsDigitWidth = std::max(fpsDigitWidth, ImGui::CalcTextSize(&digit, &digit + 1).x);
-        }
-        const ImVec2 fpsSize(4.0f * fpsDigitWidth,
-                             ImGui::GetTextLineHeight());
+        const ImVec2 fpsSize(fpsWidth, ImGui::GetTextLineHeight());
         const ImVec2 fpsPos = ImGui::GetCursorScreenPos();
-        char fpsText[32];
-        std::snprintf(fpsText, sizeof(fpsText), "%d", static_cast<int>(fps));
         ImGui::Dummy(fpsSize);
         ImGui::PushStyleColor(ImGuiCol_Text, fpsColor);
         ImGui::RenderTextClipped(fpsPos, ImVec2(fpsPos.x + fpsSize.x, fpsPos.y + fpsSize.y),
-                                 fpsText, nullptr, nullptr);
+                                 fpsText, nullptr, nullptr, ImVec2(1.0f, 0.0f));
         ImGui::PopStyleColor();
 
     }
