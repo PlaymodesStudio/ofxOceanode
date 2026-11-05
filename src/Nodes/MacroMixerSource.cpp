@@ -1606,6 +1606,78 @@ static void loadMorphTimelines(const std::vector<MorphContainerEdit>& edits,bool
         if(auto* gui=edit.container->getCustomGuiExtension()) gui->loadPreset(folder);
     }
 }
+// A destination timeline would otherwise set what it drives at once: the
+// control morph leaves timelined controls alone, and a cabled one (a timeline
+// over a cable) never was a morph control. Each continuous value the timeline
+// writes blends from the control's value as the morph began instead, so it
+// arrives exactly on the timeline at completion.
+struct MacroMixerMorphAutomation {
+    float progress=0;
+    MacroMixerMorphPolicies policies;
+};
+template<typename T> static void blendMorphAutomation(ofxOceanodeAbstractParameter& p,const T& start,
+                                                      const std::shared_ptr<MacroMixerMorphAutomation>& state) {
+    std::weak_ptr<MacroMixerMorphAutomation> weak=state;
+    p.cast<T>().setAutomationFilter([weak,start](const T& value) {
+        const auto blend=weak.lock();
+        if(!blend || blend->progress>=1) return value;
+        return morphControl(start,value,std::max(0.0f,blend->progress),false,blend->policies);
+    });
+}
+static void clearMorphAutomationFilters(ofxOceanodeContainer& container,size_t depth=0) {
+    if(depth>=64) return;
+    for(auto* node:container.getAllModules()) {
+        auto& model=node->getNodeModel(); auto& params=model.getParameterGroup();
+        for(int i=0;i<params.size();++i)
+            if(auto* p=dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get(i))) p->clearAutomationFilter();
+        if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model))
+            if(auto child=macro->getContainer()) clearMorphAutomationFilters(*child,depth+1);
+    }
+}
+void MacroMixerSource::Graph::clearMorphAutomation() {
+    if(!morphAutomation) return;
+    morphAutomation.reset(); // Any filter left behind now passes values through.
+    if(container) clearMorphAutomationFilters(*container);
+}
+// After the destination's timelines loaded (they first write on a later
+// update), so the start values are the running ones. Only nodes that run on
+// through the morph have a start: added and replaced nodes start on the
+// timeline's own values. Discrete controls (gates, switches, dropdowns) and
+// note lanes follow the timeline at once.
+void MacroMixerSource::Graph::startMorphAutomation() {
+    clearMorphAutomation();
+    if(!morphTopology) return;
+    std::unordered_set<ofxOceanodeAbstractParameter*> bound;
+    std::set<ofxOceanodeAutomationExtension*> asked;
+    for(const auto& edit:morphTopology->edits)
+        if(auto* automation=edit.container ? edit.container->getAutomationExtension() : nullptr)
+            if(asked.insert(automation).second) automation->collectBoundParameters(bound);
+    if(bound.empty()) return;
+    auto state=std::make_shared<MacroMixerMorphAutomation>();
+    state->policies=morphPolicies;
+    bool any=false;
+    for(const auto& edit:morphTopology->edits) {
+        // Only containers whose timelines the morph reloaded: another timeline
+        // keeps playing through the morph and never jumps.
+        if(!edit.container || !edit.target.is_object() || !edit.target.contains("folder")) continue;
+        std::set<std::string> fresh(edit.added.begin(),edit.added.end());
+        fresh.insert(edit.removed.begin(),edit.removed.end());
+        for(auto* node:edit.container->getAllModules()) {
+            auto& model=node->getNodeModel();
+            if(fresh.count(morphNodeKey(model))) continue;
+            auto& params=model.getParameterGroup();
+            for(int i=0;i<params.size();++i) {
+                auto* p=dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get(i));
+                if(!p || !bound.count(p) || model.morphHint(*p)!=ofxOceanodeNodeModel::MorphHint::Interpolate) continue;
+                const auto start=captureMorph(*p);
+                if(!start || start->discrete) continue;
+                std::visit([&](const auto& value) { blendMorphAutomation(*p,value,state); },start->value);
+                any=true;
+            }
+        }
+    }
+    if(any) morphAutomation=std::move(state);
+}
 bool MacroMixerSource::Graph::prepareMorphInPlace(Revision target,const MacroMixerMorphPolicies& policies) {
     MorphSnapshot destination;
     auto topology=std::make_shared<MacroMixerMorphTopology>();
@@ -1628,8 +1700,10 @@ bool MacroMixerSource::Graph::prepareMorphInPlace(Revision target,const MacroMix
     }
     morphStart=std::move(from); morphTarget=std::move(to); morphTopology=std::move(topology);
     // The destination's timelines start as the morph begins, like its added
-    // nodes; what they drive follows them, not the control morph (applyMorph).
+    // nodes; what they drive follows them, not the control morph (applyMorph),
+    // blending from its running value into theirs (startMorphAutomation).
     loadMorphTimelines(morphTopology->edits,true);
+    startMorphAutomation();
     return true;
 }
 void MacroMixerSource::Graph::drawMorphConnections() {
@@ -1707,10 +1781,13 @@ std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revisio
 }
 void MacroMixerSource::Graph::cancelMorph() {
     // The staged edits roll back with the topology: the origin's timelines too.
+    clearMorphAutomation();
     if(morphTopology && !morphTopology->complete) loadMorphTimelines(morphTopology->edits,false);
     morphTopology.reset(); morphStart.clear(); morphTarget.clear();
 }
 void MacroMixerSource::Graph::applyMorph(float progress) {
+    // The destination's timelines read it on their next writes.
+    if(morphAutomation) morphAutomation->progress = progress;
     // Resolve each path anew: assigning a control may rebuild ports or a nested
     // Macro. Do not retain node/parameter pointers across listener callbacks.
     for(const auto& entry : morphTarget) {
@@ -1728,8 +1805,9 @@ void MacroMixerSource::Graph::applyMorph(float progress) {
             continue;
         }
         auto* p = findMorphParameter(*this,entry.first);
-        // A control the destination's timeline drives follows that timeline:
-        // the timeline re-asserts its value after every node update anyway.
+        // A control the destination's timeline drives follows that timeline
+        // (blended in by morphAutomation): the timeline re-asserts its value
+        // after every node update anyway.
         if(!p || p->isTimelined()) continue;
         const auto& start = morphStart.at(entry.first);
         std::visit([&](const auto& target) {
@@ -1744,6 +1822,7 @@ void MacroMixerSource::Graph::applyMorph(float progress) {
     }
     if(morphTopology) morphTopology->progress(progress);
     if(progress >= 1) {
+        clearMorphAutomation(); // At 1 a blend is the timeline's value: no step.
         if(morphTopology) {
             morphTopology->commit(); liveMorphDefinition=std::move(morphTopology->targetDefinition);
         }

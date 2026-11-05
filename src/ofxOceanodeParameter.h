@@ -161,6 +161,8 @@ public:
         static const ofxOceanodeAbstractParameter* target = nullptr;
         return target;
     }
+    // Drops the filter set with ofxOceanodeParameter<T>::setAutomationFilter.
+    virtual void clearAutomationFilter(){}
     ofxOceanodeAbstractConnection* getInConnection(){return inConnections.empty() ? nullptr : inConnections.back();};
     const std::vector<ofxOceanodeAbstractConnection*>& getInConnections() const {return inConnections;}
 
@@ -358,7 +360,15 @@ public:
         setFlags(getFlags());
     }
 	ofParameter<ParameterType> & getParameter(){return *parameter;}
-    
+
+    // Reshapes each continuous value an automation player (a timeline Curve
+    // lane) is about to write, before it is compared and set. A MacroMixer
+    // morph sets one so a destination timeline blends in from where the
+    // control was instead of jumping to its own value.
+    void setAutomationFilter(std::function<ParameterType(const ParameterType&)> filter){automationFilter = std::move(filter);}
+    void clearAutomationFilter() override {automationFilter = nullptr;}
+    ParameterType filterAutomationValue(const ParameterType& value) const {return automationFilter ? automationFilter(value) : value;}
+
     void setDefaultValue(ParameterType v){defaultValue = v;};
 	ParameterType getDefaultValue(){return defaultValue;};
 	
@@ -399,6 +409,7 @@ private:
 	std::function<void(ofParameter<ParameterType> &p, int drag)> normalDrag;
 	std::function<void(ofParameter<ParameterType> &p, int drag)> precisionDrag;
 	std::function<void(ofParameter<ParameterType> &p, int drag)> speedDrag;
+	std::function<ParameterType(const ParameterType&)> automationFilter;
 };
 
 template<>

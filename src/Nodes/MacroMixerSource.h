@@ -51,6 +51,7 @@ struct MacroMixerMorphDetail {
     ofJson options = ofJson::object();
 };
 struct MacroMixerMorphTopology;
+struct MacroMixerMorphAutomation;
 
 class MacroMixerSource {
 public:
@@ -103,6 +104,11 @@ public:
         MacroMixerMorphPolicies morphPolicies; // Vector controls blend by their type's policy.
         ofJson liveMorphDefinition; // Saved target expressed in stable runtime node identities.
         std::shared_ptr<MacroMixerMorphTopology> morphTopology;
+        // Controls the destination's timelines drive: each timeline write
+        // blends from the control's start value by the morph's progress.
+        std::shared_ptr<MacroMixerMorphAutomation> morphAutomation;
+        void startMorphAutomation();
+        void clearMorphAutomation();
         // Router id -> its port, kept while the container's nodes and the
         // router's name are unchanged. parameter() is asked several times per
         // router per frame.

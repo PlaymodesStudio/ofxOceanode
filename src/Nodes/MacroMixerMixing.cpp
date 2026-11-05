@@ -43,7 +43,8 @@ ofJson resampleOptions(const ofJson& options) {
     require(options.is_object() && (options.empty() || (options.size()==1 && options.contains("size"))),"Resample accepts only size");
     const auto v=options.value("size",ofJson(0));
     require(v.is_number_integer(),"Resample size must be an integer");
-    const double n=v.get<double>(); require(n>=0 && n<=maxVectorSize,"Resample size must be 0..4096 (0 uses the larger live length)");
+    const double n=v.get<double>();
+    if(n<0 || n>maxVectorSize) throw std::runtime_error("Resample size must be 0.."+std::to_string(maxVectorSize)+" (0 uses the larger live length)");
     return {{"size",int(n)}};
 }
 float interpolate(float a,float b,double t) { return float(double(a)+(double(b)-a)*t); }
@@ -431,13 +432,15 @@ void Registry::validateValue(const std::string& type,const Value& value) const {
     if(type=="Float") require(std::holds_alternative<float>(value) && std::isfinite(std::get<float>(value)),"Expected a finite Float");
     else if(type=="Float Vector") {
         require(std::holds_alternative<std::vector<float>>(value),"Expected a Float Vector");
-        const auto& v=std::get<std::vector<float>>(value); require(v.size()<=maxVectorSize,"Float Vector exceeds 4096 values");
+        const auto& v=std::get<std::vector<float>>(value);
+        if(v.size()>maxVectorSize) throw std::runtime_error("Float Vector exceeds "+std::to_string(maxVectorSize)+" values ("+std::to_string(v.size())+")");
         for(float item:v) require(std::isfinite(item),"Float Vector contains non-finite values");
     } else if(type=="Integer") require(std::holds_alternative<int>(value),"Expected an Integer");
     else if(type=="Boolean") require(std::holds_alternative<bool>(value),"Expected a Boolean");
     else if(type=="Integer Vector") {
         require(std::holds_alternative<std::vector<int>>(value),"Expected an Integer Vector");
-        require(std::get<std::vector<int>>(value).size()<=maxVectorSize,"Integer Vector exceeds 4096 values");
+        const auto size=std::get<std::vector<int>>(value).size();
+        if(size>maxVectorSize) throw std::runtime_error("Integer Vector exceeds "+std::to_string(maxVectorSize)+" values ("+std::to_string(size)+")");
     } else if(type=="Texture") {
         require(std::holds_alternative<ofTexture*>(value),"Expected a Texture");
         auto* texture=std::get<ofTexture*>(value);

@@ -28,7 +28,9 @@ template<typename T> Value object(const std::string& type,const T& value) {
     return Object{type,std::move(parameter)};
 }
 template<typename T> const T& object(const Value& value) { return std::get<Object>(value).data->cast<T>().get(); }
-constexpr size_t maxVectorSize = 4096;
+// Longest Float/Integer Vector the mixer blends (routers, changed cables,
+// morphed controls). Room for live point streams such as contour outlines.
+constexpr size_t maxVectorSize = 65536;
 // Void ports carry events, not values. A Trigger value is the number of events
 // since the last mix (at most maxTriggers); a policy decides how many pass.
 // Changing progress or wiring never produces an event by itself.

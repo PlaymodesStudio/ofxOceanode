@@ -418,7 +418,22 @@ preset load.
 - A timeline **linked to the global transport** follows the global transport
   of the preset hosting the mixer: it plays, stops and seeks with it.
 - A control the destination's timeline drives follows that timeline rather
-  than the control morph, from the first frame it is driven.
+  than the control morph. During a morph in place, each value the timeline
+  writes blends from the value the control had when the morph began, so the
+  control glides onto the timeline. It lands exactly on the timeline at
+  completion while a clip is still writing it. If the clip ends during the
+  morph, the control holds the partial blend, as any control holds its value
+  between clips. This applies whether or not the control also has a cable (a
+  timeline over a cable). Only continuous writes blend: numbers and numeric
+  vectors from Curve, Number, Multi Value and Multi Slider lanes. Gates,
+  notes, switches, dropdowns and other discrete controls follow the timeline
+  at once, and so do scheduled SuperCollider paths, whose backend already has
+  the timeline's value. Nodes the morph adds or replaces start on the
+  timeline's own values. Only timelines the morph loads take part. A timeline
+  that keeps playing through the morph, such as the host's, is not blended.
+  The parameter carries the blend as an automation filter
+  (`ofxOceanodeParameter<T>::setAutomationFilter`), which the timeline applies
+  before it writes.
 - The timelines stop with their graph: when it is released at the end of a
   transition, on Clear Playback or when the source is removed.
 
@@ -526,7 +541,10 @@ the length too: both ends are resampled to a length that moves from the origin's
 to the destination's, so a vector that grows or shrinks glides instead of
 switching. Index / zero fill blends index by index; a 1-value vector counts as
 that value at every index, as nodes read it, and only missing indices of longer
-vectors are filled with zero. `registerType<T>(name, defaultValue, MacroMixerMixing::Definition<T>)`
+vectors are filled with zero. Float and Integer Vectors blend up to 65536 values
+(`MacroMixerMixing::maxVectorSize`), which leaves room for live point streams
+such as contour outlines. A longer live vector on a router or a changed cable
+stops the transition with an error naming its length. `registerType<T>(name, defaultValue, MacroMixerMixing::Definition<T>)`
 adds a custom value adapter and default policy at the existing type registration.
 Additional policies use `MacroMixerMixing::registry()`; nodes need no extra list.
 
