@@ -27,7 +27,7 @@ void beatTransport::refreshTransportList() {
         return (a.group == ownGroup) > (b.group == ownGroup);
     });
     for(const auto& source : sources) {
-        if(!source.selectable) continue;
+        if(!source.selectable || source.hidden) continue;
         const bool own = source.group == ownGroup || source.group.empty();
         options.push_back((own ? std::string() : source.group + " / ") + source.label);
         ids.push_back(source.id);

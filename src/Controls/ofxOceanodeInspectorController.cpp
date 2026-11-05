@@ -74,6 +74,7 @@ void ofxOceanodeInspectorController::drawTimeSource(ofxOceanodeNodeModel& model)
         entry("Clock", ofxOceanodeNodeModel::TimeSourceClock, "The shared clock: always running, at the root tempo.");
         std::string group = "\x01";
         for(const auto& source : sources){
+            if(source.hidden) continue;
             if(source.group != group){
                 group = source.group;
                 ImGui::Separator();

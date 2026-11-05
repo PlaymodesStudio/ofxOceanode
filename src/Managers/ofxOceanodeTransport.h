@@ -156,6 +156,8 @@ public:
         std::string group;
         bool selectable = true;
         std::string note;
+        // Not offered in lists (an older id a saved node may still follow).
+        bool hidden = false;
     };
     void registerTimeSource(const TimeSourceInfo& info, std::shared_ptr<ofxOceanodeTransport> transport);
     void unregisterTimeSource(const std::string& id);
