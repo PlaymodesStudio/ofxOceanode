@@ -77,7 +77,7 @@ ofxOceanodeControls::ofxOceanodeControls(shared_ptr<ofxOceanodeContainer> _conta
     
     // Initialize window controllers as visible.
     for(auto &c : controllers){
-        if(!c->isMenuController()) controllerVisible[c->getControllerName()] = true;
+        if(!c->isMenuController() && !c->drawsOwnWindows()) controllerVisible[c->getControllerName()] = true;
     }
 }
 
@@ -152,7 +152,7 @@ void ofxOceanodeControls::draw(){
     for(auto &c : controllers) c->drawBeforeWindows();
 
     for(auto &c : controllers){
-        if(c->isMenuController()) continue;
+        if(c->isMenuController() || c->drawsOwnWindows()) continue;
 
         // Determine visibility
         auto it = controllerVisible.find(c->getControllerName());

@@ -433,7 +433,7 @@ ofJson ofxOceanodeWindowManager::captureView(){
     ofJson state = {{"controllers", ofJson::object()}, {"windows", ofJson::object()}};
     const auto& visibility = controls->getControllersVisibility();
     for(const auto& controller : controls->getControllers()){
-        if(controller->isMenuController()) continue;
+        if(controller->isMenuController() || controller->drawsOwnWindows()) continue;
         const auto& name = controller->getControllerName();
         const auto found = visibility.find(name);
         // Optional addon controllers can be drawn before the Window menu has
@@ -450,7 +450,8 @@ void ofxOceanodeWindowManager::restoreView(const ofJson& view){
     auto& visibility = controls->getControllersVisibility();
     for(const auto& controller : controls->getControllers()){
         const auto& key = controller->getControllerName();
-        if(!controller->isMenuController() && state["controllers"].contains(key) && state["controllers"][key].is_boolean())
+        if(!controller->isMenuController() && !controller->drawsOwnWindows() &&
+           state["controllers"].contains(key) && state["controllers"][key].is_boolean())
             visibility[key] = state["controllers"][key].get<bool>();
     }
     windowsState(root.get(), state["windows"], true);
@@ -471,7 +472,7 @@ void ofxOceanodeWindowManager::drawWindowMenu(){
     std::vector<std::string> names;
     for(const auto& controller : controls->getControllers()) {
         const auto& name = controller->getControllerName();
-        if(controller->isMenuController()) {
+        if(controller->isMenuController() || controller->drawsOwnWindows()) {
             visibility.erase(name);
             continue;
         }
@@ -484,6 +485,8 @@ void ofxOceanodeWindowManager::drawWindowMenu(){
         if(name == "Inspector" && ImGui::IsItemHovered())
             ImGui::SetTooltip("Unchecked: always hidden. When enabled, automatic show/hide still follows node selection.");
     }
+    // A controller's own windows (the timelines, each in a window of its own).
+    for(const auto& controller : controls->getControllers()) controller->drawWindowMenuItems();
     using Entry = ofxOceanodeCustomGuiExtension::WindowEntry;
     std::vector<Entry> nodes, macros, panels;
     walkWindows(root.get(), "", nullptr, false,
