@@ -33,6 +33,9 @@ public:
     // Return its width (0: none); it is drawn at the cursor in that width.
     virtual float menuBarStatusWidth() { return 0.0f; }
     virtual void drawMenuBarStatus() {}
+    // Optional readouts placed before the FPS counter.
+    virtual float menuBarStatusSuffixWidth() { return 0.0f; }
+    virtual void drawMenuBarStatusSuffix() {}
     
     string getControllerName(){return controllerName;};
 protected:
@@ -40,6 +43,3 @@ protected:
 };
 
 #endif /* ofxOceanodeBaseController_h */
-    // Optional readouts placed before the FPS counter.
-    virtual float menuBarStatusSuffixWidth() { return 0.0f; }
-    virtual void drawMenuBarStatusSuffix() {}
