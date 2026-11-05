@@ -510,6 +510,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     bool open_inlet_context_menu = false;
     bool open_portalize_name_popup = false;
     string macroExtractionKey;
+    string macroPortalReductionKey;
     string node_hovered_in_list = "";
     string node_hovered_in_scene = "";
     
@@ -2328,6 +2329,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         if(ImGui::IsItemHovered())
                             ImGui::SetTooltip("Lay the nodes out inside the macro.\n"
                                               "Off, they keep the positions they have on this canvas.");
+                        ImGui::SameLine();
+                        ImGui::Checkbox("reduce portals", &pending.reducePortals);
+                        if(ImGui::IsItemHovered())
+                            ImGui::SetTooltip("Inlets fed by instances of the same portal share one router\n"
+                                              "and one portal; the other instances are removed.");
                         ImGui::EndGroup();
                         rows.end();
                         if(pending.automated){
@@ -2439,6 +2445,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         macroExtractionKey = customGuiContextNode->getParameters().getEscapedName();
                         ImGui::CloseCurrentPopup();
                     }
+                    // Inlets fed by instances of one portal collapse to a single inlet.
+                    const int reducible = container->countReducibleMacroPortals(*customGuiContextNode);
+                    if(ImGui::Selectable("Reduce Portals", false, reducible > 0 ? ImGuiSelectableFlags_None : ImGuiSelectableFlags_Disabled)){
+                        macroPortalReductionKey = customGuiContextNode->getParameters().getEscapedName();
+                        ImGui::CloseCurrentPopup();
+                    }
+                    if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                        ImGui::SetTooltip(reducible > 0 ? "Merge %d inlet(s) fed by the same portal into one." : "No inlets share a portal.", reducible);
                 }
 #ifdef OFXOCEANODE_USE_MIDI
                 container->drawMidiKeyboardMenu(customGuiContextNode->getNodeModel());
@@ -3161,6 +3175,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             if(found != nodes.end()) container->extractMacro(*found->second);
             customGuiContextNode = nullptr;
         }
+        // Deletes portals here and routers inside the macro: after the frame
+        // has finished with its node and cable snapshots, like extraction.
+        if(!macroPortalReductionKey.empty()){
+            const auto& nodes = container->getParameterGroupNodesMap();
+            const auto found = nodes.find(macroPortalReductionKey);
+            if(found != nodes.end()) container->reduceMacroPortals(*found->second);
+            customGuiContextNode = nullptr;
+        }
 
         for(const auto& nodeId : commentNodesToDelete){
             const auto& nodes = container->getParameterGroupNodesMap();
@@ -3210,7 +3232,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             if(pending->mixerAction < 0) {
                 string macroName = ofTrim(string(pending->name));
                 if(macroName.empty()) macroName = "Encapsulated";
-                auto* macroNode = container->encapsulateNodes(container->getSelectedModules(), macroName, moveTimeline, pending->autoLayout);
+                auto* macroNode = container->encapsulateNodes(container->getSelectedModules(), macroName, moveTimeline,
+                                                              pending->autoLayout, pending->reducePortals);
                 applyMacroIdentity(macroNode, pending->description.data(), pending->color);
             }
             else {

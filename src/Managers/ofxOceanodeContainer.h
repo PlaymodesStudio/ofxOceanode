@@ -252,10 +252,20 @@ public:
 	// the new macro's own timeline (see ofxOceanodeAutomationExtension).
 	// autoLayout: run the canvas auto-layout on the macro's contents; off, the
 	// moved nodes keep the relative positions they had on this canvas.
+	// reducePortals: inlets fed by the same portal (one node fanning out, or
+	// matching instances) share one router; see reduceMacroPortals.
 	ofxOceanodeNode* encapsulateNodes(const vector<ofxOceanodeNode*>& nodes,
 	                                  const string& macroName = "Encapsulated",
 	                                  bool moveTimelineIntoMacro = false,
-	                                  bool autoLayout = false);
+	                                  bool autoLayout = false,
+	                                  bool reducePortals = false);
+	// Inlets of macroNode fed by the same portal: how many could be merged.
+	int countReducibleMacroPortals(ofxOceanodeNode& macroNode);
+	// Merge them: one router inside, fed by one portal, drives every
+	// destination the removed routers drove. Portal instances left without
+	// cables are deleted. Recorded as two undo steps: the parent canvas (cables
+	// and portals), then the macro canvas (routers and their connections).
+	bool reduceMacroPortals(ofxOceanodeNode& macroNode);
 	// Whether any parameter of these nodes (or inside them) is driven by automation.
 	bool hasAutomatedParameters(const vector<ofxOceanodeNode*>& nodes) const;
     // Move the complete contents (including boundary routers) into this canvas.
@@ -544,6 +554,22 @@ private:
 	void ensureMacroParametersExposed(const vector<ofxOceanodeNode*>& macroNodes);
 
 		string mapParameterTypeToRouterName(const string& paramType);
+		// Portal reduction: pins of one macro whose cables come from the same
+		// portal and whose routers share a type. The first pin stays.
+		struct MacroPortalReduction {
+			struct Duplicate {
+				ofxOceanodeAbstractParameter* pin = nullptr;   // macro pin on this canvas
+				ofxOceanodeNode* portalNode = nullptr;         // its source portal
+				ofxOceanodeNode* router = nullptr;             // its router inside
+			};
+			ofxOceanodeAbstractParameter* keptRouterValue = nullptr;
+			vector<Duplicate> duplicates;
+		};
+		vector<MacroPortalReduction> planMacroPortalReduction(ofxOceanodeNode& macroNode);
+		// Parent side: drop the duplicate pins' cables and the portals left bare.
+		void removeReducedMacroPortals(const vector<MacroPortalReduction>& plan);
+		// Macro side: delete the duplicate routers; their sinks move to the kept one.
+		void mergeReducedMacroRouters(ofxOceanodeContainer& macroContainer, const vector<MacroPortalReduction>& plan);
 		bool isNodeInList(ofxOceanodeNode* node, vector<ofxOceanodeNode*>& nodeList);
 		string getParameterTypeName(ofxOceanodeAbstractParameter& param);
 		ofxOceanodeAbstractParameter* findInternalParameter(const vector<ofxOceanodeNode*>& macroNodes, const InternalConnection& internalConn);
