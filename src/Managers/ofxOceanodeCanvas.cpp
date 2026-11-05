@@ -2322,6 +2322,14 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     {
                         drawMacroIdentityFields(pending.name, sizeof(pending.name), pending.description.data(), pending.description.size(), pending.color);
                         MacroDialogAppearance::Rows rows;
+                        rows.begin();
+                        ImGui::BeginGroup();
+                        ImGui::Checkbox("auto-layout", &pending.autoLayout);
+                        if(ImGui::IsItemHovered())
+                            ImGui::SetTooltip("Lay the nodes out inside the macro.\n"
+                                              "Off, they keep the positions they have on this canvas.");
+                        ImGui::EndGroup();
+                        rows.end();
                         if(pending.automated){
                             rows.begin();
                             ImGui::BeginGroup();
@@ -3202,7 +3210,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             if(pending->mixerAction < 0) {
                 string macroName = ofTrim(string(pending->name));
                 if(macroName.empty()) macroName = "Encapsulated";
-                auto* macroNode = container->encapsulateNodes(container->getSelectedModules(), macroName, moveTimeline);
+                auto* macroNode = container->encapsulateNodes(container->getSelectedModules(), macroName, moveTimeline, pending->autoLayout);
                 applyMacroIdentity(macroNode, pending->description.data(), pending->color);
             }
             else {

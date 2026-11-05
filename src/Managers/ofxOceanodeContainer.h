@@ -250,9 +250,12 @@ public:
 		const vector<ofxOceanodeAbstractParameter*>& sinks);
 	// moveTimelineIntoMacro: automation driving only these nodes moves into
 	// the new macro's own timeline (see ofxOceanodeAutomationExtension).
+	// autoLayout: run the canvas auto-layout on the macro's contents; off, the
+	// moved nodes keep the relative positions they had on this canvas.
 	ofxOceanodeNode* encapsulateNodes(const vector<ofxOceanodeNode*>& nodes,
 	                                  const string& macroName = "Encapsulated",
-	                                  bool moveTimelineIntoMacro = false);
+	                                  bool moveTimelineIntoMacro = false,
+	                                  bool autoLayout = false);
 	// Whether any parameter of these nodes (or inside them) is driven by automation.
 	bool hasAutomatedParameters(const vector<ofxOceanodeNode*>& nodes) const;
     // Move the complete contents (including boundary routers) into this canvas.

@@ -149,7 +149,7 @@ bool ofxOceanodeContainer::hasAutomatedParameters(const vector<ofxOceanodeNode*>
 }
 
 ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
-    const vector<ofxOceanodeNode*>& nodes, const string& macroName, bool moveTimelineIntoMacro) {
+    const vector<ofxOceanodeNode*>& nodes, const string& macroName, bool moveTimelineIntoMacro, bool autoLayout) {
 	// 1. Validate and select exactly this precomputed branch. This keeps batch
 	// encapsulation independent from the order in which its plans are applied.
 	auto selectedNodes = nodes;
@@ -373,11 +373,16 @@ ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
 		createRoutersAndReconnect(macroNode, externalConnections, minPos);
 	}
 
-	// Reuse the canvas auto-layout once the pasted nodes and generated boundary
-	// routers are all present. The request remains pending while the macro is
-	// closed and centers the resulting composition when its canvas is drawn.
-	if(auto* macroCanvas = macroModel->getCanvas())
-		macroCanvas->requestAutoLayoutCanvas(true);
+	// Only on request, reuse the canvas auto-layout once the pasted nodes and
+	// generated boundary routers are all present. The request remains pending
+	// while the macro is closed and centers the resulting composition when its
+	// canvas is drawn. Otherwise the pasted nodes and routers keep the relative
+	// positions they had on this canvas (translated so the selection's top-left
+	// corner sits at the origin), and the macro canvas centers its view on
+	// first draw.
+	if(autoLayout)
+		if(auto* macroCanvas = macroModel->getCanvas())
+			macroCanvas->requestAutoLayoutCanvas(true);
 	
 	ofLogNotice("Encapsulation") << "Encapsulation completed successfully";
     edit.success = true;
@@ -543,11 +548,19 @@ vector<ofxOceanodeContainer::ExternalConnection> ofxOceanodeContainer::analyzeEx
 			if(it != inputRouters.end()) {
 				it->second.internalConnections.push_back({fullInternalNodeName, originalInternalParamName});
 			} else {
+				// An inlet fed by a portal takes the portal's name: that is the
+				// name the value is known by on this canvas. Any other source
+				// names the inlet after the parameter it feeds inside the macro.
+				string inletBaseName = originalInternalParamName;
+				if(auto* sourcePortal = dynamic_cast<abstractPortal*>(&sourceNode->getNodeModel())) {
+					const string portalName = ofTrim(sourcePortal->getName());
+					if(!portalName.empty()) inletBaseName = portalName;
+				}
 				ExternalConnection extConn;
 				extConn.routerType = routerType;
 				extConn.externalParam = externalParam;
 				extConn.isIncoming = true;
-				extConn.routerName = generateRouterName(originalInternalParamName, nameCounters);
+				extConn.routerName = generateRouterName(inletBaseName, nameCounters);
 				extConn.internalConnections.push_back({fullInternalNodeName, originalInternalParamName});
 				
 				inputRouters[inputKey] = extConn;
