@@ -143,6 +143,24 @@ public:
     // True only inside listeners fired by a cable writing this parameter;
     // false for GUI, preset, MIDI/OSC and timeline writes.
     bool isReceivingFromConnection() const;
+    // True only inside listeners fired by an automation player (a timeline
+    // track) writing this parameter; false for cable, GUI, preset and
+    // MIDI/OSC writes. The player marks each write with AutomationWriteScope.
+    bool isReceivingFromAutomation() const {return automationWriteTarget() == this;}
+    // Marks a parameter as written by automation for the scope's lifetime; a
+    // nested write to another parameter restores the outer one when it ends.
+    struct AutomationWriteScope {
+        explicit AutomationWriteScope(const ofxOceanodeAbstractParameter& parameter) : previous(automationWriteTarget()) {automationWriteTarget() = &parameter;}
+        ~AutomationWriteScope(){automationWriteTarget() = previous;}
+        AutomationWriteScope(const AutomationWriteScope&) = delete;
+        AutomationWriteScope& operator=(const AutomationWriteScope&) = delete;
+        const ofxOceanodeAbstractParameter* previous;
+    };
+    // Plain static: automation applies on the OF update thread only.
+    static const ofxOceanodeAbstractParameter*& automationWriteTarget(){
+        static const ofxOceanodeAbstractParameter* target = nullptr;
+        return target;
+    }
     ofxOceanodeAbstractConnection* getInConnection(){return inConnections.empty() ? nullptr : inConnections.back();};
     const std::vector<ofxOceanodeAbstractConnection*>& getInConnections() const {return inConnections;}
 

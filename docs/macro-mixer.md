@@ -7,6 +7,16 @@ and Input/Output roles in its Inspector; add Macro source folders; choose Mode
 (finish now) control a fade, and Progress shows it. Each output has its own
 type-specific policy and options.
 
+A Target value that arrives through a cable or from a timeline track (Dropdown
+or numeric) selects that Macro and starts the transition, as **Start!** would,
+with the current Mode, Duration_ms and Bi Pow. It does not start one while a
+preset loads, while the node is inactive, or when the mixer is already at,
+heading to or queued for that Macro, so a source that resends the same value
+does not restart the fade. Choosing Target in the dropdown, a preset recall
+and MIDI/OSC only select it. The node tells them apart with the parameter's
+`isReceivingFromConnection()` and `isReceivingFromAutomation()`; the timeline
+marks each value it writes with `ofxOceanodeAbstractParameter::AutomationWriteScope`.
+
 Backend readiness fences the fade only before it starts. Resource policies
 with a private processor (the SuperCollider ScBus bridge) report ready once
 the backend acknowledges a rewiring; until then loading stays outside the timed
