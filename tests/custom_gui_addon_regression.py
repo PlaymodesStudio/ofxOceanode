@@ -50,6 +50,12 @@ CORE = r'''
     ofxOceanodeContainer offline(registry,types,transport);offline.setCanvasID("Offline");
     assert(!offline.getCustomGuiExtension() && !registry->getRegisteredModels().count("CustomGui Snapshots"));
     assert(offline.loadPreset("Original"));
+    assert(pendingConnectionErrorDialogs.size()==1);
+    assert(pendingConnectionErrorDialogs.front().missingNodes==vector<string>{"CustomGui Snapshots (IDs: 01)"});
+    assert(pendingConnectionErrorDialogs.front().presetFolderPath=="Original");
+    assert(pendingConnectionErrorDialogs.front().canvasIdPath=="Offline");
+    assert(pendingConnectionErrorDialogs.front().failedConnections.empty());
+    pendingConnectionErrorDialogs.clear();
     assert(offline.getAllModules().size()==1 && offline.getAllConnections().empty());
     auto* loaded=offline.getAllModules().front();
     assert(loaded->getNodeModel().getParameter<float>("Value").get()==.7f);
@@ -66,6 +72,7 @@ CORE = r'''
     registry->setNodeLoadFilter([](const string&,const string& key){return key=="CustomGui_Snapshots_1";});
     ofxOceanodeContainer filteredUnknown(registry,types,transport);filteredUnknown.setCanvasID("Offline");
     assert(filteredUnknown.loadPreset("Original") && filteredUnknown.savePreset("FilteredUnknown"));
+    assert(pendingConnectionErrorDialogs.empty()); // Deliberately excluded nodes do not warn.
     const auto filteredModules=ofLoadJson("FilteredUnknown/modules.json");
     assert(!filteredModules.contains("CustomGui Snapshots") || filteredModules.at("CustomGui Snapshots").empty());
     assert(ofLoadJson("FilteredUnknown/connections.json").empty());
@@ -73,6 +80,10 @@ CORE = r'''
     registry->setNodeLoadFilter([](const string&,const string& key){return key=="Gui_Probe_1";});
     ofxOceanodeContainer filteredSource(registry,types,transport);filteredSource.setCanvasID("Offline");
     assert(filteredSource.loadPreset("Original") && filteredSource.savePreset("FilteredSource"));
+    // The missing node still warns when filtering removed all its cables.
+    assert(pendingConnectionErrorDialogs.size()==1);
+    assert(pendingConnectionErrorDialogs.front().missingNodes==vector<string>{"CustomGui Snapshots (IDs: 01)"});
+    pendingConnectionErrorDialogs.clear();
     assert(filteredSource.getAllModules().empty());
     assert(ofLoadJson("FilteredSource/modules.json").at("CustomGui Snapshots")==modules.at("CustomGui Snapshots"));
     assert(ofLoadJson("FilteredSource/connections.json").empty());
@@ -80,6 +91,7 @@ CORE = r'''
     // A different preset cannot inherit the previous preset's opaque documents.
     ofxOceanodeContainer blank(registry,types,transport);blank.setCanvasID("Offline");assert(blank.savePreset("Blank"));
     assert(offline.loadPreset("Blank") && offline.savePreset("BlankCopy"));
+    assert(pendingConnectionErrorDialogs.empty());
     assert(!fs::exists("BlankCopy/custom_guis.json") && !fs::exists("BlankCopy/CustomGui_Snapshots_1.json"));
     std::cout<<"Core-only Custom GUI compatibility passed: graph execution, unavailable snapshot node/cables, byte-preserving save and Save As, preset isolation.\n";
 }

@@ -449,7 +449,24 @@ void ofxOceanodeContainer::loadPreset_loadConnections(string presetFolderPath){
             }
         }
     }
-    if(notCreatedConnectionInfo.size() != 0){
+    // Unavailable nodes and their cables are preserved above, so they never
+    // reach createConnectionFromInfo. Report them explicitly, including nodes
+    // with no saved cables. Empty groups can remain after registry filtering.
+    std::vector<std::string> missingNodes;
+    if(unavailableModules.is_object()) for(auto model = unavailableModules.begin(); model != unavailableModules.end(); ++model){
+        if(!model.value().is_object() || model.value().empty()) continue;
+        std::string description = model.key() + " (IDs: ";
+        bool first = true;
+        for(auto node = model.value().begin(); node != model.value().end(); ++node){
+            if(!first) description += ", ";
+            description += node.key();
+            first = false;
+        }
+        description += ")";
+        ofLogWarning("Preset load") << presetFolderPath << ": unregistered node type " << description;
+        missingNodes.push_back(std::move(description));
+    }
+    if(!notCreatedConnectionInfo.empty() || !missingNodes.empty()){
         std::string canvasIdPath = getCanvasID();
         std::string canvasNamePath = getCanvasDisplayPath();
         ofStringReplace(canvasIdPath, " / ", " > ");
@@ -457,7 +474,9 @@ void ofxOceanodeContainer::loadPreset_loadConnections(string presetFolderPath){
 
         ofxOceanodeContainerInternal::queueConnectionErrorDialog(canvasIdPath,
                                                                  canvasNamePath,
-                                                                 std::move(notCreatedConnectionInfo));
+                                                                 std::move(notCreatedConnectionInfo),
+                                                                 std::move(missingNodes),
+                                                                 presetFolderPath);
     }
 }
 

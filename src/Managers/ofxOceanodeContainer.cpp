@@ -58,6 +58,8 @@ namespace {
         std::string canvasIdPath;
         std::string canvasNamePath;
         std::vector<ConnectionFailureInfo> failedConnections;
+        std::vector<std::string> missingNodes;
+        std::string presetFolderPath;
     };
 
     std::deque<ConnectionErrorDialogData> pendingConnectionErrorDialogs;
@@ -66,7 +68,7 @@ namespace {
     {
         if(pendingConnectionErrorDialogs.empty()) return;
 
-        constexpr const char* popupId = "Connection error##ofxOceanodeConnectionError";
+        constexpr const char* popupId = "Preset load warning##ofxOceanodeConnectionError";
         if(!ImGui::IsPopupOpen(popupId)){
             // Wait for other dialogs, such as the SynthDef compile prompt raised
             // by the same load. Two modals reopening over each other every frame
@@ -80,8 +82,12 @@ namespace {
                                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)){
             const auto& error = pendingConnectionErrorDialogs.front();
 
-            ImGui::TextUnformatted("Could not create one or more connections");
+            ImGui::TextUnformatted("The preset could not be fully loaded");
             ImGui::Separator();
+
+            ImGui::TextDisabled("PRESET FOLDER");
+            ImGui::TextWrapped("%s", error.presetFolderPath.c_str());
+            ImGui::Spacing();
 
             ImGui::TextDisabled("MACRO IDS");
             ImGui::TextWrapped("%s", error.canvasIdPath.c_str());
@@ -91,7 +97,19 @@ namespace {
             ImGui::TextWrapped("%s", error.canvasNamePath.c_str());
             ImGui::Spacing();
 
-            ImGui::TextDisabled("FAILED CONNECTIONS");
+            if(!error.missingNodes.empty()){
+                ImGui::TextDisabled("UNREGISTERED NODE TYPES");
+                for(const auto& node : error.missingNodes){
+                    ImGui::Bullet();
+                    ImGui::SameLine();
+                    ImGui::TextWrapped("%s", node.c_str());
+                }
+                ImGui::Spacing();
+                ImGui::TextWrapped("These nodes and their connections are inactive. Their saved data is preserved when saving. Register the missing node types and reload the preset to restore them.");
+                ImGui::Spacing();
+            }
+
+            if(!error.failedConnections.empty()) ImGui::TextDisabled("FAILED CONNECTIONS");
             for(const auto& failure : error.failedConnections){
                 ImGui::Bullet();
                 ImGui::SameLine();
@@ -118,8 +136,11 @@ namespace {
 
 
 void ofxOceanodeContainerInternal::queueConnectionErrorDialog(std::string canvasIdPath, std::string canvasNamePath,
-                                                              std::vector<ConnectionFailure> failedConnections){
-    ConnectionErrorDialogData dialog{std::move(canvasIdPath), std::move(canvasNamePath), {}};
+                                                              std::vector<ConnectionFailure> failedConnections,
+                                                              std::vector<std::string> missingNodes,
+                                                              std::string presetFolderPath){
+    ConnectionErrorDialogData dialog{std::move(canvasIdPath), std::move(canvasNamePath), {},
+                                    std::move(missingNodes), std::move(presetFolderPath)};
     dialog.failedConnections.reserve(failedConnections.size());
     for(auto& failure : failedConnections){
         dialog.failedConnections.push_back({std::move(failure.connection), std::move(failure.reason)});

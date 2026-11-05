@@ -19,8 +19,10 @@ struct ConnectionFailure {
 };
 
 // Queues the modal that ofxOceanodeContainer::drawPendingConnectionErrorDialog
-// shows for the connections a preset load could not create.
+// shows for missing node models and connections a preset load could not create.
 void queueConnectionErrorDialog(std::string canvasIdPath, std::string canvasNamePath,
-                                std::vector<ConnectionFailure> failedConnections);
+                                std::vector<ConnectionFailure> failedConnections,
+                                std::vector<std::string> missingNodes,
+                                std::string presetFolderPath);
 
 }
