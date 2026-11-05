@@ -69,6 +69,7 @@ struct ofxOceanodeShared {
     static void setCurrentBankName(string b){ bank = std::move(b); } static string getCurrentBankName(){ return bank; }
     static void setCurrentPresetName(string n){ name = std::move(n); } static string getCurrentPresetName(){ return name; }
     static void presetWasSaved(){ ++saves; }
+    inline static vector<string> broadcasts; static void macroUpdated(string p){ broadcasts.push_back(std::move(p)); }
 };
 struct ofxOceanodeContainer {
     ofEvent<pair<string, string>> loadPresetEvent; ofEvent<pair<string, int>> loadPresetNumEvent;
@@ -77,7 +78,7 @@ struct ofxOceanodeContainer {
     bool savePreset(string p){ fs::create_directories(p); saved.push_back(std::move(p)); return true; }
 };
 struct MacroInstance { bool saveGlobalDefinition(bool){ return true; } };
-struct GlobalMacroSaveReview { string name; MacroInstance* instance = nullptr; };
+struct GlobalMacroSaveReview { string name; string globalPath; MacroInstance* instance = nullptr; };
 vector<GlobalMacroSaveReview> collectGlobalMacroSaveReviews(ofxOceanodeContainer&){ return {}; }
 vector<GlobalMacroSaveReview> collapseEquivalentReviews(vector<GlobalMacroSaveReview> r){ return r; }
 struct ofxOceanodeBaseController { explicit ofxOceanodeBaseController(string){} };
@@ -104,6 +105,12 @@ struct ofxOceanodePresetsController : ofxOceanodeBaseController {
         vector<string> saveAsPaths, savedMacros, savedAsMacros, skippedMacros;
     };
     unique_ptr<PendingSave> pendingSave; string saveResultText;
+    // The spliced tail broadcasts the global macros written before the preset.
+    void broadcastSavedMacros(PendingSave& request){
+        for(size_t i = 0; i < request.nextWriteIndex && i < request.reviews.size(); ++i)
+            if(request.saveChoices[i] == MacroSaveChoice::Save) ofxOceanodeShared::macroUpdated(request.reviews[i].globalPath);
+        request.nextWriteIndex = request.reviews.size();
+    }
     bool newPresetCreated = false, newPresetRequested = false; int loadPresetInNextUpdate = 0;
     ofEventListener presetListener, presetNumListener, saveCurrentPresetListener;
     shared_ptr<ofxOceanodeContainer> container;

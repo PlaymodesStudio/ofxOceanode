@@ -92,6 +92,8 @@ private:
     std::unique_ptr<PendingSave> pendingSave;
     // Returns true once a new macro name and folder are confirmed.
     bool drawGlobalMacroSaveAsForm(PendingSave& request, const GlobalMacroSaveReview& review);
+    // Tells the other instances of each global macro written so far to reload.
+    void broadcastSavedMacros(PendingSave& request);
     string saveResultText;
 
     bool newPresetCreated;

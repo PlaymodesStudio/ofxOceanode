@@ -31,6 +31,9 @@ namespace {
         return error ? absolute.lexically_normal() : resolved;
     }
 
+    // The instance whose save is being broadcast, while the broadcast runs.
+    const ofxOceanodeNodeMacro* definitionSaver = nullptr;
+
     // Every live Macro, so instances of one global Macro can share a tab.
     std::vector<ofxOceanodeNodeMacro*>& liveMacros(){
         static std::vector<ofxOceanodeNodeMacro*> macros;
@@ -396,8 +399,9 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	}
 	
 	snapshotUpdatedListener = ofxOceanodeShared::getSnapshotUpdatedEvent().newListener([this](string &path){
-		
-		if(!presetManager.isLocal() && path == presetManager.getCurrentMacroPath()) {
+		// Instances hold the library path in different forms (relative,
+		// absolute, with ".."), so match them resolved.
+		if(usesLibraryMacro(path)) {
 			snapshotSystem.loadFromPath(presetManager.getCurrentMacroPath());
 			if(!snapshotSystem.isEmpty()) {
 				showSnapshotMatrix = true;
@@ -406,23 +410,39 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 	});
 	
 	macroUpdatedListener = ofxOceanodeShared::getMacroUpdatedEvent().newListener([this](string &s){
-		if(s == presetManager.getCurrentMacroPath() && !presetManager.isLocal()){
-			// Load router sort order from macro folder before reloading
-			{
-				string sortOrderFile = presetManager.getCurrentMacroPath() + "/router_sort_order.json";
-				ofJson sortJson;
-				if(ofFile::doesFileExist(sortOrderFile)) sortJson = ofLoadJson(sortOrderFile);
-				loadRouterSortFromJson(sortJson);
-			}
-			// The saved definition carries the saving instance's router values;
-			// keep this instance's exposed values across the reload.
-			const auto instanceValues = captureInputRouterValues();
-//			if(clearContainerOnLoad) container->clearContainer();
-			container->loadPreset(presetManager.getCurrentMacroPath());
-			restoreInputRouterValues(instanceValues);
-
-			loadGlobalDescription(presetManager.getCurrentMacroPath());
+		// Another instance of this library Macro saved its definition: reload
+		// it in place so new routers appear here at once. Paths are matched
+		// resolved, since instances hold them relative, absolute or with "..".
+		// The saver already is the saved definition; reloading it would only
+		// drop its undo history and the skipped edits of Macros nested in it.
+		if(this == definitionSaver) return;
+		if(!usesLibraryMacro(s) || isLoadingPreset || !presetManager.getNextPresetPath().empty()) return;
+		const string path = presetManager.getCurrentMacroPath();
+		// Load router sort order from macro folder before reloading
+		{
+			string sortOrderFile = path + "/router_sort_order.json";
+			ofJson sortJson;
+			if(ofFile::doesFileExist(sortOrderFile)) sortJson = ofLoadJson(sortOrderFile);
+			loadRouterSortFromJson(sortJson);
 		}
+		// The saved definition carries the saving instance's router values;
+		// keep this instance's exposed values across the reload.
+		const auto instanceValues = captureInputRouterValues();
+		{
+			// Load like every other Macro load: new routers read their saved
+			// name before allNodesCreated() places them in the saved order,
+			// instead of being published under the type label and appended.
+			isLoadingPreset = true;
+			presetManager.setInnerPresetLoadingPath(path);
+			struct LoadingGuard {
+				bool& loading; MacroPresetManager& manager;
+				~LoadingGuard() { loading = false; manager.setInnerPresetLoadingPath(""); }
+			} guard{isLoadingPreset, presetManager};
+			container->loadPreset(path);
+		}
+		restoreInputRouterValues(instanceValues);
+
+		loadGlobalDescription(path);
 	});
 	
 	// Router sort order inspector region
@@ -859,8 +879,16 @@ bool ofxOceanodeNodeMacro::saveGlobalDefinition(bool notifyOtherInstances){
 	const string path = presetManager.getCurrentMacroPath();
 	if(!saveLibraryDefinition(path)) return false;
 	ofxOceanodeShared::snapshotUpdated(path);
-	if(notifyOtherInstances) ofxOceanodeShared::macroUpdated(path);
+	if(notifyOtherInstances) broadcastDefinitionSaved(path, this);
 	return true;
+}
+
+void ofxOceanodeNodeMacro::broadcastDefinitionSaved(const string& path, const ofxOceanodeNodeMacro* saver){
+	// Only compared against `this` by the listeners, never dereferenced.
+	const auto* previous = definitionSaver;
+	definitionSaver = saver;
+	ofxOceanodeShared::macroUpdated(path);
+	definitionSaver = previous;
 }
 
 bool ofxOceanodeNodeMacro::saveGlobalDefinitionAs(const string& path, bool notifyOtherInstances){
@@ -871,7 +899,7 @@ bool ofxOceanodeNodeMacro::saveGlobalDefinitionAs(const string& path, bool notif
 	presetManager.updateCategoryFromPath(path);
 	markMacroReferenceUserEdited();
 	ofxOceanodeShared::snapshotUpdated(path);
-	if(notifyOtherInstances) ofxOceanodeShared::macroUpdated(path);
+	if(notifyOtherInstances) broadcastDefinitionSaved(path, this);
 	return true;
 }
 

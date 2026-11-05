@@ -227,6 +227,8 @@ private:
         std::string sinkNode, sinkParameter; // by name: nothing dangles while the prompt is open
         // Cmd+E dialog (mixerAction -1): the new macro's identity.
         bool automated = false;
+        bool autoLayout = false; // lay the moved nodes out, or keep their positions
+        bool reducePortals = false; // matching portals share one inlet
         char name[256] = "Encapsulated";
         std::array<char, 1024> description{};
         float color[3] = {0.f, 129.f / 255.f, 1.f};

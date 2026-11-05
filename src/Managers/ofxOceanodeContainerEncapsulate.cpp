@@ -149,7 +149,8 @@ bool ofxOceanodeContainer::hasAutomatedParameters(const vector<ofxOceanodeNode*>
 }
 
 ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
-    const vector<ofxOceanodeNode*>& nodes, const string& macroName, bool moveTimelineIntoMacro) {
+    const vector<ofxOceanodeNode*>& nodes, const string& macroName, bool moveTimelineIntoMacro, bool autoLayout,
+    bool reducePortals) {
 	// 1. Validate and select exactly this precomputed branch. This keeps batch
 	// encapsulation independent from the order in which its plans are applied.
 	auto selectedNodes = nodes;
@@ -371,13 +372,28 @@ ofxOceanodeNode* ofxOceanodeContainer::encapsulateNodes(
 
 		// 10. Create routers and reconnect
 		createRoutersAndReconnect(macroNode, externalConnections, minPos);
+
+		// Every portal instance got its own inlet above. On request, matching
+		// instances now share one router and one portal, inside this same edit.
+		if(reducePortals) {
+			const auto plan = planMacroPortalReduction(*macroNode);
+			if(!plan.empty()) {
+				removeReducedMacroPortals(plan);
+				mergeReducedMacroRouters(*macroContainer, plan);
+			}
+		}
 	}
 
-	// Reuse the canvas auto-layout once the pasted nodes and generated boundary
-	// routers are all present. The request remains pending while the macro is
-	// closed and centers the resulting composition when its canvas is drawn.
-	if(auto* macroCanvas = macroModel->getCanvas())
-		macroCanvas->requestAutoLayoutCanvas(true);
+	// Only on request, reuse the canvas auto-layout once the pasted nodes and
+	// generated boundary routers are all present. The request remains pending
+	// while the macro is closed and centers the resulting composition when its
+	// canvas is drawn. Otherwise the pasted nodes and routers keep the relative
+	// positions they had on this canvas (translated so the selection's top-left
+	// corner sits at the origin), and the macro canvas centers its view on
+	// first draw.
+	if(autoLayout)
+		if(auto* macroCanvas = macroModel->getCanvas())
+			macroCanvas->requestAutoLayoutCanvas(true);
 	
 	ofLogNotice("Encapsulation") << "Encapsulation completed successfully";
     edit.success = true;
@@ -543,11 +559,19 @@ vector<ofxOceanodeContainer::ExternalConnection> ofxOceanodeContainer::analyzeEx
 			if(it != inputRouters.end()) {
 				it->second.internalConnections.push_back({fullInternalNodeName, originalInternalParamName});
 			} else {
+				// An inlet fed by a portal takes the portal's name: that is the
+				// name the value is known by on this canvas. Any other source
+				// names the inlet after the parameter it feeds inside the macro.
+				string inletBaseName = originalInternalParamName;
+				if(auto* sourcePortal = dynamic_cast<abstractPortal*>(&sourceNode->getNodeModel())) {
+					const string portalName = ofTrim(sourcePortal->getName());
+					if(!portalName.empty()) inletBaseName = portalName;
+				}
 				ExternalConnection extConn;
 				extConn.routerType = routerType;
 				extConn.externalParam = externalParam;
 				extConn.isIncoming = true;
-				extConn.routerName = generateRouterName(originalInternalParamName, nameCounters);
+				extConn.routerName = generateRouterName(inletBaseName, nameCounters);
 				extConn.internalConnections.push_back({fullInternalNodeName, originalInternalParamName});
 				
 				inputRouters[inputKey] = extConn;
@@ -961,3 +985,142 @@ void ofxOceanodeContainer::ensureMacroParametersExposed(const vector<ofxOceanode
 		}
 	}
 }
+
+///////////////////////PORTAL REDUCTION
+///
+///
+
+vector<ofxOceanodeContainer::MacroPortalReduction> ofxOceanodeContainer::planMacroPortalReduction(ofxOceanodeNode& macroNode) {
+	vector<MacroPortalReduction> plan;
+	auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&macroNode.getNodeModel());
+	if(macro == nullptr || macro->getContainer() == nullptr) return plan;
+	auto& macroContainer = *macro->getContainer();
+
+	// One candidate per inlet fed by a portal. Pin names sort "Speed" before
+	// "Speed_2", so the unsuffixed inlet is the one that stays.
+	struct Candidate {
+		ofxOceanodeAbstractParameter* pin;
+		ofxOceanodeNode* portalNode;
+		abstractPortal* portal;
+		ofxOceanodeNode* router;
+		ofxOceanodeAbstractParameter* routerValue;
+	};
+	vector<Candidate> candidates;
+	auto& pins = macroNode.getParameters();
+	for(const auto& exposed : macro->getExposedRouterParameters()) {
+		auto* routerValue = exposed.second;
+		if(routerValue == nullptr || routerValue->hasInConnection()) continue; // an outlet
+		if(!pins.contains(exposed.first)) continue;
+		auto* pin = dynamic_cast<ofxOceanodeAbstractParameter*>(&pins.get(exposed.first));
+		if(pin == nullptr || !pin->hasInConnection()) continue;
+		auto* portalNode = getNodeFromParameter(pin->getInConnection()->getSourceParameter());
+		auto* portal = portalNode != nullptr ? dynamic_cast<abstractPortal*>(&portalNode->getNodeModel()) : nullptr;
+		auto* router = macroContainer.getNodeFromParameter(*routerValue);
+		if(portal == nullptr || router == nullptr || router->getIsPersistent()) continue;
+		candidates.push_back({pin, portalNode, portal, router, routerValue});
+	}
+
+	// Group by portal identity (a portal matches itself, so one node fanning
+	// out to several inlets groups too) and by router type: merging a float
+	// router into a vector one would change the pin's type.
+	struct Group { Candidate first; MacroPortalReduction reduction; };
+	vector<Group> groups;
+	for(const auto& candidate : candidates) {
+		auto match = std::find_if(groups.begin(), groups.end(), [&](const Group& group) {
+			return group.first.router->getNodeModel().nodeName() == candidate.router->getNodeModel().nodeName() &&
+			       group.first.portal->isMatching(candidate.portal);
+		});
+		if(match == groups.end()) {
+			groups.push_back({candidate, {candidate.routerValue, {}}});
+		} else {
+			match->reduction.duplicates.push_back({candidate.pin, candidate.portalNode, candidate.router});
+		}
+	}
+	for(auto& group : groups)
+		if(!group.reduction.duplicates.empty()) plan.push_back(std::move(group.reduction));
+	return plan;
+}
+
+int ofxOceanodeContainer::countReducibleMacroPortals(ofxOceanodeNode& macroNode) {
+	int count = 0;
+	for(const auto& reduction : planMacroPortalReduction(macroNode)) count += (int)reduction.duplicates.size();
+	return count;
+}
+
+void ofxOceanodeContainer::removeReducedMacroPortals(const vector<MacroPortalReduction>& plan) {
+	// Drop the duplicate pins' cables first; the routers behind those pins go
+	// next (mergeReducedMacroRouters), and nothing on that path clears cables.
+	vector<ofxOceanodeNode*> portals;
+	for(const auto& reduction : plan) {
+		for(const auto& duplicate : reduction.duplicates) {
+			if(auto* cable = duplicate.pin->getInConnection()) cable->deleteSelf();
+			if(std::find(portals.begin(), portals.end(), duplicate.portalNode) == portals.end())
+				portals.push_back(duplicate.portalNode);
+		}
+	}
+	// A portal instance is deleted only once nothing is cabled to it: an inlet
+	// makes it the sender for every portal of its name, and the kept portal
+	// (fan-out) or one feeding other nodes still has outlets in use.
+	for(auto* portalNode : portals) {
+		if(portalNode->getIsPersistent()) continue;
+		bool cabled = false;
+		for(auto& raw : portalNode->getParameters()) {
+			auto parameter = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(raw);
+			if(parameter && (parameter->hasInConnection() || !parameter->getOutConnections().empty())) { cabled = true; break; }
+		}
+		if(!cabled) portalNode->deleteSelf();
+	}
+}
+
+void ofxOceanodeContainer::mergeReducedMacroRouters(ofxOceanodeContainer& macroContainer, const vector<MacroPortalReduction>& plan) {
+	for(const auto& reduction : plan) {
+		for(const auto& duplicate : reduction.duplicates) {
+			// The sinks outlive the router; the cables do not.
+			vector<std::pair<ofxOceanodeAbstractParameter*, bool>> sinks;
+			for(auto& raw : duplicate.router->getParameters()) {
+				auto parameter = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(raw);
+				if(parameter == nullptr) continue;
+				for(auto* cable : parameter->getOutConnections())
+					sinks.push_back({&cable->getSinkParameter(), cable->getActive()});
+			}
+			duplicate.router->deleteSelf();
+			for(const auto& sink : sinks) {
+				if(sink.first->hasInConnection()) continue; // the kept router already feeds it
+				if(macroContainer.createConnection(*reduction.keptRouterValue, *sink.first, sink.second) == nullptr)
+					throw std::runtime_error("Could not move a connection to the kept router " +
+					                         reduction.keptRouterValue->getNodeModel()->getParameterGroup().getName());
+			}
+		}
+	}
+}
+
+bool ofxOceanodeContainer::reduceMacroPortals(ofxOceanodeNode& macroNode) {
+	const auto owned = getAllModules();
+	if(std::find(owned.begin(), owned.end(), &macroNode) == owned.end()) return false;
+	auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&macroNode.getNodeModel());
+	if(macro == nullptr || macro->getContainer() == nullptr) return false;
+	const auto plan = planMacroPortalReduction(macroNode);
+	if(plan.empty()) return false;
+
+	// Two edits, parent first. Undo takes the newest sequence first, so the
+	// macro's routers (and with them the pins) come back before the parent's
+	// cables are reconnected to those pins. The canvas may already hold this
+	// frame's edit open; ending it here gives it the earlier sequence.
+	beginCanvasEdit();
+	removeReducedMacroPortals(plan);
+	endCanvasEdit();
+
+	auto& macroContainer = *macro->getContainer();
+	MacroCanvasEditScope edit(macroContainer);
+	try {
+		mergeReducedMacroRouters(macroContainer, plan);
+		edit.success = true;
+	} catch(const std::exception& error) {
+		ofLogError("Portal reduction") << error.what();
+		return false;
+	}
+	ofEventArgs args;
+	macroNode.update(args);
+	return true;
+}
+

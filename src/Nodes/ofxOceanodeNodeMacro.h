@@ -182,6 +182,9 @@ public:
 	// Writes the current contents to a new library folder and makes this
 	// instance use it. Other instances keep the Macro they had.
 	bool saveGlobalDefinitionAs(const string& path, bool notifyOtherInstances = true);
+	// Tells every other instance of the library Macro at `path` to reload it.
+	// `saver` already holds what was written and keeps its state (and undo).
+	static void broadcastDefinitionSaved(const string& path, const ofxOceanodeNodeMacro* saver);
 
 	bool isActive() const {
 		return active.get();
