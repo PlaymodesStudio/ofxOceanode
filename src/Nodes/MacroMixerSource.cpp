@@ -416,6 +416,41 @@ std::optional<MorphValue> captureMorph(ofxOceanodeAbstractParameter& p) {
     return result;
 }
 
+// Inspector settings are plain OF parameters saved beside the node's ports.
+// Their morph paths mark the name, so they never resolve to a port.
+const std::string inspectorMorphMark = "\x1f" "inspector:";
+std::string inspectorMorphName(const std::string& name) { return inspectorMorphMark + name; }
+bool isInspectorMorphName(const std::string& name) { return name.rfind(inspectorMorphMark,0) == 0; }
+
+template<typename T> bool captureInspectorMorph(const ofAbstractParameter& p, std::optional<MorphValue>& result) {
+    if(p.valueType() != typeid(T).name()) return false;
+    const auto& value = p.cast<T>().get();
+    if(finiteMorph(value)) result = MorphValue{value,false};
+    return true;
+}
+// The setting's value when it morphs, with inspectorMorphHint deciding how;
+// nothing when it stays configuration (Structural, or a type that cannot
+// blend) or is left alone (Skip). Routers, Portals and Macros keep their
+// inspectors as interface and lifecycle configuration.
+std::optional<MorphValue> inspectorMorphValue(ofxOceanodeNodeModel& model, const ofAbstractParameter& p) {
+    if(!p.isSerializable() || p.isReadOnly()) return std::nullopt;
+    if(dynamic_cast<abstractRouter*>(&model) || dynamic_cast<ofxOceanodeNodeMacro*>(&model)
+       || model.nodeName().rfind("Portal ",0) == 0) return std::nullopt;
+    if(auto* toggle = model.getWindowToggle()) if(toggle->getName() == p.getName()) return std::nullopt;
+    const auto keys = model.morphKeys(); const auto name = p.getEscapedName();
+    for(const auto* list : {&keys.blended,&keys.ignored})
+        if(std::find(list->begin(),list->end(),name) != list->end()) return std::nullopt;
+    const auto hint = model.inspectorMorphHint(p);
+    if(hint == ofxOceanodeNodeModel::MorphHint::Skip || hint == ofxOceanodeNodeModel::MorphHint::Structural) return std::nullopt;
+    std::optional<MorphValue> result;
+    (captureInspectorMorph<float>(p,result) || captureInspectorMorph<int>(p,result) || captureInspectorMorph<bool>(p,result) ||
+     captureInspectorMorph<std::string>(p,result) || captureInspectorMorph<std::vector<float>>(p,result) ||
+     captureInspectorMorph<std::vector<int>>(p,result) || captureInspectorMorph<ofColor>(p,result) ||
+     captureInspectorMorph<ofFloatColor>(p,result));
+    if(result) result->discrete = hint == ofxOceanodeNodeModel::MorphHint::Switch;
+    return result;
+}
+
 void captureMorphContainer(const MacroMixerSource::Graph& graph, ofxOceanodeContainer& container,
                            ofxOceanodeNodeMacro& owner, const MorphPath& prefix,
                            MacroMixerSource::MorphSnapshot& values) {
@@ -437,12 +472,20 @@ void captureMorphContainer(const MacroMixerSource::Graph& graph, ofxOceanodeCont
                 auto key = path; key.push_back(p->getName()); values.emplace(std::move(key),std::move(*value));
             }
         }
+        for(auto& inspector : model.getInspectorParameterGroup())
+            if(auto value = inspectorMorphValue(model,*inspector)) {
+                auto key = path; key.push_back(inspectorMorphName(inspector->getName()));
+                values.emplace(std::move(key),std::move(*value));
+            }
     }
 }
 
-ofxOceanodeAbstractParameter* findMorphParameter(const MacroMixerSource::Graph& graph, const MorphPath& path) {
+// The node a morph path names, the Macro that owns it, and whether that is
+// the source's root graph.
+ofxOceanodeNodeModel* findMorphModel(const MacroMixerSource::Graph& graph, const MorphPath& path,
+                                     ofxOceanodeNodeMacro*& owner, bool& root) {
     auto* container = graph.container.get();
-    auto* owner = graph.macro;
+    owner = graph.macro;
     for(size_t i = 0; i + 2 < path.size(); i += 2) {
         ofxOceanodeNodeModel* model = nullptr;
         const auto& nodes = container->getDynamicNodes();
@@ -460,17 +503,35 @@ ofxOceanodeAbstractParameter* findMorphParameter(const MacroMixerSource::Graph& 
             }
         }
         if(!model) return nullptr;
-        if(i + 3 == path.size()) {
-            auto& group = model->getParameterGroup();
-            if(!group.contains(path.back())) return nullptr;
-            auto* p = dynamic_cast<ofxOceanodeAbstractParameter*>(&group.get(path.back()));
-            return p && morphEditable(*model,*p,*owner,graph,i == 0) ? p : nullptr;
-        }
+        if(i + 3 == path.size()) { root = i == 0; return model; }
         owner = dynamic_cast<ofxOceanodeNodeMacro*>(model);
         if(!owner || !owner->getContainer()) return nullptr;
         container = owner->getContainer().get();
     }
     return nullptr;
+}
+
+ofxOceanodeAbstractParameter* findMorphParameter(const MacroMixerSource::Graph& graph, const MorphPath& path) {
+    ofxOceanodeNodeMacro* owner = nullptr; bool root = false;
+    auto* model = path.empty() || isInspectorMorphName(path.back()) ? nullptr : findMorphModel(graph,path,owner,root);
+    if(!model || !owner) return nullptr;
+    auto& group = model->getParameterGroup();
+    if(!group.contains(path.back())) return nullptr;
+    auto* p = dynamic_cast<ofxOceanodeAbstractParameter*>(&group.get(path.back()));
+    return p && morphEditable(*model,*p,*owner,graph,root) ? p : nullptr;
+}
+
+// A reference sharing the inspector setting's value: it stays valid even if a
+// listener rebuilds the node's inspector during the assignment.
+std::shared_ptr<ofAbstractParameter> findMorphInspector(const MacroMixerSource::Graph& graph, const MorphPath& path) {
+    if(path.empty() || !isInspectorMorphName(path.back())) return nullptr;
+    ofxOceanodeNodeMacro* owner = nullptr; bool root = false;
+    auto* model = findMorphModel(graph,path,owner,root);
+    if(!model) return nullptr;
+    const auto name = path.back().substr(inspectorMorphMark.size());
+    auto& group = model->getInspectorParameterGroup();
+    if(!group.contains(name)) return nullptr;
+    return group.get(name).newReference();
 }
 
 template<typename T> T morphNumber(T a, T b, float t) {
@@ -719,6 +780,8 @@ struct MorphContainerEdit {
     // between the two saved patches.
     struct NodeMorph { std::string key; bool changed; };
     std::vector<NodeMorph> nodeMorphs;
+    // Matched nodes whose published pins differ (morphPins).
+    std::vector<std::string> pinMorphs;
     // Added Portals joining a live bus: they load without their saved value
     // and take the bus's, which the bus's own blend or driver then sets.
     std::set<std::string> joining;
@@ -827,14 +890,25 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
             oldConfig.erase(p.getEscapedName()); newConfig.erase(p.getEscapedName());
         }
         // Ignore stale saved readouts when a node now correctly declares them
-        // transient. Actual Inspector configuration still requires native recall.
-        for(auto& inspector:model.getInspectorParameterGroup()) if(!inspector->isSerializable() || inspector->isReadOnly()) {
+        // transient, settings that morph (inspectorMorphValue) and ones the
+        // node drives itself (Skip). The rest, Structural ones and types that
+        // cannot blend, are configuration and still require native recall.
+        for(auto& inspector:model.getInspectorParameterGroup()) {
+            const bool transient=!inspector->isSerializable() || inspector->isReadOnly();
+            if(!transient && !inspectorMorphValue(model,*inspector)
+               && model.inspectorMorphHint(*inspector)!=ofxOceanodeNodeModel::MorphHint::Skip) continue;
             oldConfig.erase(inspector->getEscapedName()); newConfig.erase(inspector->getEscapedName());
         }
         oldConfig.erase("expanded"); newConfig.erase("expanded");
         for(const auto& name:ofxOceanodeNode::nodeSettingsKeys()) { oldConfig.erase(name); newConfig.erase(name); }
         // Saved state the node blends itself, and saved keys without sound.
         for(const auto& name:morphKeys.ignored) { oldConfig.erase(name); newConfig.erase(name); }
+        // Pins that follow the saved state compare as sets: a different set is
+        // published and removed around the morph (morphPinsBegin/End) instead
+        // of replacing the node. Their saved values belong to its own blend.
+        const auto pinsA=model.morphPins(a.at("settings")),pinsB=model.morphPins(b.at("settings"));
+        for(const auto* pins:{&pinsA,&pinsB}) for(const auto& name:*pins) { oldConfig.erase(name); newConfig.erase(name); }
+        const bool pinsChanged=std::set<std::string>(pinsA.begin(),pinsA.end())!=std::set<std::string>(pinsB.begin(),pinsB.end());
         bool blendedChanged=false;
         for(const auto& name:morphKeys.blended) {
             blendedChanged|=oldConfig.value(name,ofJson())!=newConfig.value(name,ofJson());
@@ -860,6 +934,7 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
             }
             edits[editIndex].nodeMorphs.push_back({key,blendedChanged});
         }
+        if(pinsChanged) edits[editIndex].pinMorphs.push_back(key);
         if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model)) {
             if(!a.contains("graph") || !b.contains("graph") || !macro->getContainer()) return false;
             if(!readMorphTarget(graph,*macro->getContainer(),*macro,a.at("graph"),b.at("graph"),&b.at("settings"),path,values,edits)) return false;
@@ -881,6 +956,15 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
                 prototype->discrete|=model.morphHint(*p)==ofxOceanodeNodeModel::MorphHint::Switch;
                 auto control=path; control.push_back(p->getName());
                 values.emplace(std::move(control),savedMorphValue(*prototype,saved->at(name)));
+            }
+        }
+        const auto& settings=b.at("settings");
+        for(auto& inspector:model.getInspectorParameterGroup()) {
+            const auto name=inspector->getEscapedName();
+            if(!settings.contains(name) || settings.at(name).is_null()) continue;
+            if(auto prototype=inspectorMorphValue(model,*inspector)) {
+                auto control=path; control.push_back(inspectorMorphName(inspector->getName()));
+                values.emplace(std::move(control),savedMorphValue(*prototype,settings.at(name)));
             }
         }
     }
@@ -1007,11 +1091,17 @@ MorphCablePlan planMorphCable(ofxOceanodeContainer& c,const ofJson& target,const
     }
     if(prototype) {
         const auto& settings=target.at("nodes").at(savedKey.empty() ? key : savedKey).at("settings");
-        const bool saved=settings.contains(sink->getEscapedName()) && !settings.at(sink->getEscapedName()).is_null();
+        // A pin the target does not publish ends on its control's saved value.
+        ofJson savedValue=settings.value(sink->getEscapedName(),ofJson());
+        if(savedValue.is_null()) if(auto* model=sink->getNodeModel()) {
+            ofJson pinValue;
+            if(model->morphPinValue(settings,sink->getEscapedName(),pinValue)) savedValue=pinValue;
+        }
+        const bool saved=!savedValue.is_null();
         if(!saved && (a.empty() || b.empty())) throw std::runtime_error("Changed cable lacks a fixed endpoint value");
         if((sink->getFlags()&ofxOceanodeParameterFlags_DisableSavePreset) && (a.empty() || b.empty()))
             throw std::runtime_error("Transient input needs live sources at both endpoints");
-        plan.target=saved ? savedMorphValue(*prototype,settings.at(sink->getEscapedName())) : *prototype;
+        plan.target=saved ? savedMorphValue(*prototype,savedValue) : *prototype;
         if(!saved) std::visit([&](auto& value) { using T=std::decay_t<decltype(value)>; value=sink->cast<T>().getDefaultValue(); },plan.target->value);
         plan.editable=*prototype;
         if(!a.empty()) {
@@ -1295,6 +1385,14 @@ struct MacroMixerMorphTopology {
             if(auto* node=morphNode(*it->first,it->second)) node->getNodeModel().morphEnd(completed);
         nodeMorphs.clear();
     }
+    // Nodes that published their target's pins (morphPinsBegin). Ended last,
+    // once the blends no longer feed those pins.
+    std::vector<std::pair<ofxOceanodeContainer*,std::string>> pinMorphs;
+    void endPinMorphs(bool completed) {
+        for(auto it=pinMorphs.rbegin();it!=pinMorphs.rend();++it)
+            if(auto* node=morphNode(*it->first,it->second)) node->getNodeModel().morphPinsEnd(completed);
+        pinMorphs.clear();
+    }
     ofJson targetDefinition;
     std::shared_ptr<ofxOceanodeContainer> hostLease;
     bool complete=false;
@@ -1332,6 +1430,7 @@ struct MacroMixerMorphTopology {
         }
         for(auto it=created.rbegin();it!=created.rend();++it) removeMorphNode(*it->first,it->second);
         for(auto& signal:signals) signal.blend->retire(lease);
+        endPinMorphs(false);
         complete=true;
     }
     bool ready() const { for(auto& signal:signals) if(!signal.blend->ready()) return false; return true; }
@@ -1351,6 +1450,7 @@ struct MacroMixerMorphTopology {
         }
         for(auto& edit:edits) for(const auto& key:edit.removed) removeMorphNode(*edit.container,key);
         for(auto& signal:signals) signal.blend->retire(lease);
+        endPinMorphs(true);
         complete=true;
     }
     void addCable(ofxOceanodeContainer& container, const std::vector<std::string>& edge) {
@@ -1387,6 +1487,13 @@ struct MacroMixerMorphTopology {
                 }
                 if(!edit.added.empty()) c.allNodesCreated.notify(&c);
             }
+        }
+        // The target's pins exist before its cables into them are planned.
+        for(auto& edit:edits) for(const auto& key:edit.pinMorphs) {
+            auto* node=morphNode(*edit.container,key);
+            if(!node) throw std::runtime_error(morphLocation(edit.path,key)+": node is unavailable");
+            pinMorphs.emplace_back(edit.container,key);
+            node->getNodeModel().morphPinsBegin(edit.target.at("nodes").at(key).at("settings"));
         }
         // Blends one changed input: a and b are the origin's and target's
         // cables into it (empty: its value), sunk into plan.sink.
@@ -1545,6 +1652,8 @@ std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revisio
                 edit.joining.count(key) ? "Starts when the morph begins, with its Portal bus's value" : "Starts when the morph begins"});
             for(const auto& entry:edit.nodeMorphs) if(entry.changed) result.push_back({"node",morphLocation(edit.path,entry.key),
                 "Blends its own saved state on the running node"});
+            for(const auto& key:edit.pinMorphs) result.push_back({"node",morphLocation(edit.path,key),
+                "Publishes the saved state's pins when the morph begins and removes the ones it lacks at completion"});
             for(const auto& key:edit.removed) {
                 const auto split=splits.find({edit.path,key});
                 if(split==splits.end()) result.push_back({"removed",morphLocation(edit.path,key),"Runs until the morph completes"});
@@ -1572,6 +1681,19 @@ std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revisio
                 const auto b=after.count(input.first)?after.at(input.first):std::vector<std::string>{};
                 if(a==b || !edit.original.at("nodes").contains(key) || !edit.target.at("nodes").contains(key) || buses.owned.count(input.first)) continue;
                 const auto location=morphLocation(edit.path,key,name);
+                // A pin published when the morph begins cannot be planned yet.
+                if(!morphPort(*edit.container,key,name) && std::count(edit.pinMorphs.begin(),edit.pinMorphs.end(),key)) {
+                    ofParameter<float> pin; pin.setName(name);
+                    if(auto* node=morphNode(*edit.container,key)) {
+                        const auto pins=node->getNodeModel().morphPins(edit.target.at("nodes").at(key).at("settings"));
+                        if(std::count(pins.begin(),pins.end(),pin.getEscapedName())) {
+                            const auto from=a.empty() ? std::string("Fixed value") : a[0]+" / "+a[1];
+                            const auto to=b.empty() ? std::string("Fixed value") : b[0]+" / "+b[1];
+                            result.push_back({"node",location,from+" -> "+to+", into the pin published when the morph begins"});
+                            continue;
+                        }
+                    }
+                }
                 try {
                     const auto plan=planMorphCable(*edit.container,edit.target,key,name,a,b,policies,true);
                     const auto endpoint=[&plan](const std::vector<std::string>& edge) { return edge.empty()?std::string(plan.type=="ScBus"?"Silence":"Fixed value"):edge[0]+" / "+edge[1]; };
@@ -1592,6 +1714,19 @@ void MacroMixerSource::Graph::applyMorph(float progress) {
     // Resolve each path anew: assigning a control may rebuild ports or a nested
     // Macro. Do not retain node/parameter pointers across listener callbacks.
     for(const auto& entry : morphTarget) {
+        if(isInspectorMorphName(entry.first.back())) {
+            auto inspector = findMorphInspector(*this,entry.first);
+            if(!inspector) continue;
+            const auto& start = morphStart.at(entry.first);
+            std::visit([&](const auto& target) {
+                using T = std::decay_t<decltype(target)>;
+                if(inspector->valueType() != typeid(T).name()) return;
+                auto value = morphControl(std::get<T>(start.value),target,progress,start.discrete || entry.second.discrete,morphPolicies);
+                auto& parameter = inspector->cast<T>();
+                if(parameter.get() != value) parameter = value;
+            },entry.second.value);
+            continue;
+        }
         auto* p = findMorphParameter(*this,entry.first);
         // A control the destination's timeline drives follows that timeline:
         // the timeline re-asserts its value after every node update anyway.

@@ -125,6 +125,31 @@ public:
     enum class MorphHint { Interpolate, Switch, Skip, Structural };
     virtual MorphKeys morphKeys() const { return {}; }
     virtual MorphHint morphHint(const ofxOceanodeAbstractParameter&) const { return MorphHint::Interpolate; }
+    // Inspector settings morph too. By default floats, float vectors and colours
+    // glide; ints, bools and strings switch half way, since inspector ints are
+    // often sizes or counts and are rebuilt once instead of on every step.
+    // Return Interpolate to glide an int, Skip when the node drives the
+    // setting, Structural when a different value must replace the node.
+    virtual MorphHint inspectorMorphHint(const ofAbstractParameter& p) const {
+        const std::string type = p.valueType();
+        if(type == typeid(int).name() || type == typeid(bool).name() || type == typeid(std::string).name()
+           || type == typeid(std::vector<int>).name()) return MorphHint::Switch;
+        return MorphHint::Interpolate;
+    }
+    // Ports that follow the saved state, as SC boxes publish sound controls as
+    // ports. morphPins: the escaped names a saved state publishes. MacroMixer
+    // compares them as a set, so a different set morphs instead of replacing
+    // the node (list the saved key holding them in morphKeys().ignored).
+    // morphPinValue: a control's value, in its saved form, from a saved state
+    // that does not publish it; a cable leaving that pin ends on it.
+    // morphPinsBegin publishes the target's missing pins before the morph
+    // plans its cables. morphPinsEnd runs once no morph cable feeds them:
+    // completed, it removes the pins the target lacks; cancelled, the ones
+    // begin added.
+    virtual std::vector<std::string> morphPins(const ofJson& saved) const { return {}; }
+    virtual bool morphPinValue(const ofJson& saved, const std::string& name, ofJson& value) const { return false; }
+    virtual void morphPinsBegin(const ofJson& target) {}
+    virtual void morphPinsEnd(bool completed) {}
     // Whether the node can blend into these saved settings, without side effects.
     virtual bool morphCheck(const ofJson& target, std::string& reason) const { return true; }
     // Captures the current state as the start. Called once, before morphApply.

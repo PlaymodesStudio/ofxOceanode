@@ -48,6 +48,10 @@ public:
     }
     void update(ofEventArgs&) override { output=x.get()*x.get(); updates=updates.get()+1; }
     void draw(ofEventArgs&) override { draws=draws.get()+1; }
+    // Inspector settings morph by default; this one stays configuration.
+    MorphHint inspectorMorphHint(const ofAbstractParameter& p) const override {
+        return p.getName()=="Configuration" ? MorphHint::Structural : ofxOceanodeNodeModel::inspectorMorphHint(p);
+    }
 };
 class MorphPhaseSink : public ofxOceanodeNodeModel {
 public:
@@ -326,14 +330,20 @@ int main(int argc,char** argv) {
         r.finish(); r.update(520); assert(r.origin()==original&&!r.destination()&&r.currentID()==bID&&!r.morphingInPlace()); near(level,6); near(r.value(),36); assert(history->getSize()==5);
         r.request(liveA,1000,0,true); r.update(530); assert(r.morphingInPlace()&&r.origin()==original&&morphSetups==setups+1); // Only the explicit copy constructed a probe.
         r.finish(); r.update(540); near(level,2); near(r.value(),4); assert(history->getSize()==6);
-        // An Inspector/unknown native configuration change replaces only that
-        // node: it is loaded natively next to the retiring one, while the rest
-        // of the graph (including the Buffer feeding it) keeps morphing in place.
+        // An Inspector bool switches half way: the node morphs, not replaced.
+        const auto inspectorChanged=scratch+"/changed-inspector"; fs::copy(liveB,inspectorChanged,fs::copy_options::recursive);
+        auto json=ofLoadJson(inspectorChanged+"/Macro_1/HeaderPro_f_1.json"); json["Calculate_On_Update"]="0"; ofSaveJson(inspectorChanged+"/Macro_1/HeaderPro_f_1.json",json);
+        assert(r.importMacro(inspectorChanged));
+        const auto inspectorDetails=r.sourceDetails(r.importedMacro(inspectorChanged)->id());
+        assert(std::none_of(inspectorDetails.begin(),inspectorDetails.end(),[](const auto& d){return d.kind=="replaced"||d.kind=="fallback";}));
+        // An unknown native configuration change replaces only that node: it
+        // is loaded natively next to the retiring one, while the rest of the
+        // graph (including the Buffer feeding it) keeps morphing in place.
         const auto changed=scratch+"/changed-config"; fs::copy(liveB,changed,fs::copy_options::recursive);
-        auto json=ofLoadJson(changed+"/Macro_1/HeaderPro_f_1.json"); json["Calculate_On_Update"]="0"; ofSaveJson(changed+"/Macro_1/HeaderPro_f_1.json",json);
+        json=ofLoadJson(changed+"/Macro_1/HeaderPro_f_1.json"); json["Unknown_Setting"]="1"; ofSaveJson(changed+"/Macro_1/HeaderPro_f_1.json",json);
         assert(r.importMacro(changed)); const auto changedID=r.importedMacro(changed)->id();
         const auto details=r.sourceDetails(changedID);
-        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"&&d.location=="Macro 1 / HeaderPro_f_1"&&d.message.find("Calculate_On_Update")!=std::string::npos;}));
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"&&d.location=="Macro 1 / HeaderPro_f_1"&&d.message.find("Unknown_Setting")!=std::string::npos;}));
         assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback"||d.kind=="added"||d.kind=="removed";}));
         r.request(changed,1000,0,true); r.update(550); assert(r.morphingInPlace()&&r.origin()==original&&r.destination()==original);
         assert(child->getDynamicNodes().at("HeaderPro f").size()==2&&child->getDynamicNodes().at("Buffer f").size()==1);

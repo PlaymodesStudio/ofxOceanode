@@ -202,7 +202,25 @@ other node do. Empty nested Macros saved by the native saver are also accepted.
 Existing native update order still applies: a node that calculates during update
 can observe an upstream node's value on the following frame.
 
-A node whose saved configuration cannot morph (changed Inspector settings,
+Inspector settings morph like the node's ports. By default floats, float
+vectors and colours glide, while ints, bools and strings switch half way
+(inspector ints are often sizes or counts, rebuilt once rather than on every
+step). A node changes this per setting with `inspectorMorphHint`: Interpolate
+to glide an int, Skip when the node drives it, Structural to keep it as
+configuration. Router, Portal and Macro inspectors, and setting types that
+cannot blend, stay configuration.
+
+A node whose ports follow its saved state (SuperCollider boxes publish sound
+controls as pins) declares them with `morphPins`, and a different set of pins
+morphs instead of replacing the node. Before the cables are planned,
+`morphPinsBegin` publishes the target's missing pins, so cables into them blend
+like any other changed cable. Once no morph cable feeds them, `morphPinsEnd`
+removes the pins the target lacks, or, when the morph is cancelled, the ones it
+added. A cable leaving a pin the target does not publish ends on the value
+`morphPinValue` reads from the target's saved state. Details shows these as
+**Node morph**.
+
+A node whose saved configuration cannot morph (Structural Inspector settings,
 Macro lifecycle/reference settings or unknown custom-save data, such as a
 SuperCollider node's own sound block) is replaced on its own. The running
 instance keeps going and retires at completion; the saved one is loaded
