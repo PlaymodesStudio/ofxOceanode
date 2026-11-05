@@ -661,6 +661,7 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
         }
         ImGui::SameLine();
         if(ImGui::Button("Stop saving")){
+            broadcastSavedMacros(request);
             const bool savingAs = request.saveChoices[request.reviewIndex] == MacroSaveChoice::SaveAs;
             saveResultText = "Preset was not saved. A global macro save failed and may have changed files in " +
                              (savingAs ? macroLibraryLabel(request.saveAsPaths[request.reviewIndex]) : review.globalPath) + ".";
@@ -789,6 +790,18 @@ bool ofxOceanodePresetsController::drawGlobalMacroSaveAsForm(PendingSave& reques
     return true;
 }
 
+void ofxOceanodePresetsController::broadcastSavedMacros(PendingSave& request){
+    // Macros written so far: the loop stops at a failed index without advancing.
+    // A reload may destroy a later review's instance; the saver pointer is
+    // only compared by the listeners, never dereferenced here.
+    for(size_t i = 0; i < request.nextWriteIndex && i < request.reviews.size(); ++i){
+        if(request.saveChoices[i] != MacroSaveChoice::Save) continue;
+        const string path = request.reviews[i].globalPath;
+        if(!path.empty()) ofxOceanodeNodeMacro::broadcastDefinitionSaved(path, request.reviews[i].instance);
+    }
+    request.nextWriteIndex = request.reviews.size();
+}
+
 void ofxOceanodePresetsController::finishSavePreset(){
     if(!pendingSave) return;
     auto& request = *pendingSave;
@@ -865,6 +878,9 @@ void ofxOceanodePresetsController::finishSavePreset(){
         request.savedMacros.push_back(review.name);
         request.nextWriteIndex = i + 1;
     }
+    // Every write is done, so a reload can no longer destroy an instance still
+    // waiting to be saved: now let the other instances pick up the new definitions.
+    broadcastSavedMacros(request);
 
     // Embedded sample writers need the destination context during Save As.
     const auto previousPath = ofxOceanodeShared::getCurrentPresetPath();
