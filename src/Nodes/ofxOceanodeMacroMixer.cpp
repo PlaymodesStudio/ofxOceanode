@@ -246,6 +246,18 @@ void ofxOceanodeMacroMixer::setup() {
         if(!runtime) return;
         const auto entries = runtime->macros();
         selectedID = index >= 0 && size_t(index) < entries.size() ? entries[index]->id() : "";
+        // A cable value both selects and starts the transition; dropdown,
+        // preset, MIDI/OSC and timeline writes only select. Skip during a
+        // preset load (the recalled selection wins afterwards) and when the
+        // mixer is already at, heading to or queued for that Macro, so an
+        // upstream that resends the same value does not restart the fade.
+        if(!getOceanodeParameter(target).isReceivingFromConnection()) return;
+        if(recallPrepared || !getActive() || selectedID.empty()) return;
+        const auto queued = runtime->queuedID(), destination = runtime->destinationID();
+        const auto heading = !queued.empty() ? queued : !destination.empty() ? destination : runtime->currentID();
+        if(selectedID == heading) return;
+        inspectorError.clear();
+        runtime->requestMacro(selectedID, duration, biPow, mode == 1);
     }));
     listeners.push(transition.newListener([this] {
         if(!runtime || !getActive()) return;

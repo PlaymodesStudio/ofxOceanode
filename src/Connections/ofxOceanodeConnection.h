@@ -21,8 +21,19 @@ public:
         active = _active;
         sourceParameter->addOutConnection(this);
         sinkParameter->setInConnection(this);
-        if(auto* forwarded = sourceParameter->getForwardedSource()) sinkParameter->receiveParameter(forwarded);
+        if(auto* forwarded = sourceParameter->getForwardedSource()){
+            DeliveryScope delivering(sinkParameter);
+            sinkParameter->receiveParameter(forwarded);
+        }
     };
+
+    // True while a cable is writing this parameter, i.e. inside the listeners
+    // that write triggers. Lets a node tell cable input from GUI, preset,
+    // MIDI/OSC or timeline writes. A disconnect restoring the value from
+    // before the cable is not a delivery and is not marked.
+    static bool isDeliveringTo(const ofxOceanodeAbstractParameter& parameter){
+        return deliveryTarget() == &parameter;
+    }
 
     virtual ~ofxOceanodeAbstractConnection(){
         if(restoreOnDestruction && sourceParameter->getForwardedSource()) sinkParameter->disconnectedParameter();
@@ -38,7 +49,7 @@ public:
         if(sinkParameter->refreshCombinedInput()) return;
         if(active)
         {
-            if(dynamic_cast<ofxOceanodeParameter<void>*>(sourceParameter)==nullptr) passValueFunc();
+            if(dynamic_cast<ofxOceanodeParameter<void>*>(sourceParameter)==nullptr) passValue();
         }
     }
     
@@ -87,6 +98,26 @@ protected:
     bool active;
     bool restoreOnDestruction = true;
     
+    // Marks the sink for the duration of a delivery; nested deliveries further
+    // down the graph restore the outer sink when they end.
+    struct DeliveryScope {
+        explicit DeliveryScope(const ofxOceanodeAbstractParameter* sink) : previous(deliveryTarget()) {deliveryTarget() = sink;}
+        ~DeliveryScope(){deliveryTarget() = previous;}
+        DeliveryScope(const DeliveryScope&) = delete;
+        DeliveryScope& operator=(const DeliveryScope&) = delete;
+        const ofxOceanodeAbstractParameter* previous;
+    };
+    // Plain static: graph work runs on the OF update/draw thread only.
+    static const ofxOceanodeAbstractParameter*& deliveryTarget(){
+        static const ofxOceanodeAbstractParameter* target = nullptr;
+        return target;
+    }
+
+    // Every cable delivery goes through here so the sink is marked.
+    void passValue(){
+        DeliveryScope delivering(sinkParameter);
+        passValueFunc();
+    }
     virtual void passValueFunc() = 0;
     virtual void restoreValue() = 0;
     
@@ -103,10 +134,10 @@ public:
     ofxOceanodeCustomConnection(ofxOceanodeParameter<T>& pSource, ofxOceanodeAbstractParameter& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()){
         parameterEventListener = pSource.getParameter().newListener([&](T &p){
             if(ofxOceanodeScheduling::isScheduledSendActive()) return;
-            passValueFunc();
+            passValue();
         });
         sinkParameter->connectedParameter();
-        passValueFunc();
+        passValue();
     }
     
     ~ofxOceanodeCustomConnection(){
@@ -133,10 +164,10 @@ public:
     ofxOceanodeCustomConnection(ofxOceanodeParameter<void>& pSource, ofxOceanodeAbstractParameter& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()){
         parameterEventListener = pSource.getParameter().newListener([&](){
             if(ofxOceanodeScheduling::isScheduledSendActive()) return;
-            passValueFunc();
+            passValue();
         });
         sinkParameter->connectedParameter();
-        passValueFunc();
+        passValue();
     }
     
     ~ofxOceanodeCustomConnection(){
@@ -164,9 +195,9 @@ public:
         beforeConnectionValue = sinkParameter.get();
         parameterEventListener = sourceParameter.newListener([&](Tsource &p){
             if(ofxOceanodeScheduling::isScheduledSendActive()) return;
-            passValueFunc();
+            passValue();
         });
-        passValueFunc();
+        passValue();
     }
     ~ofxOceanodeConnection(){
         parameterEventListener.unsubscribe();
@@ -199,9 +230,9 @@ public:
         beforeConnectionValue = sinkParameter.get();
         parameterEventListener = sourceParameter.newListener([&](vector<_Tsource> &vf){
             if(ofxOceanodeScheduling::isScheduledSendActive()) return;
-            passValueFunc();
+            passValue();
         });
-        passValueFunc();
+        passValue();
     }
     ~ofxOceanodeConnection(){
         parameterEventListener.unsubscribe();
@@ -240,9 +271,9 @@ public:
         beforeConnectionValue = sinkParameter.get();
         parameterEventListener = sourceParameter.newListener([&](_Tsource &f){
             if(ofxOceanodeScheduling::isScheduledSendActive()) return;
-            passValueFunc();
+            passValue();
         });
-        passValueFunc();
+        passValue();
     }
     ~ofxOceanodeConnection(){
         parameterEventListener.unsubscribe();
@@ -275,9 +306,9 @@ public:
         beforeConnectionValue = sinkParameter.get();
         parameterEventListener = sourceParameter.newListener([&](vector<_Tsource> &vf){
             if(ofxOceanodeScheduling::isScheduledSendActive()) return;
-            passValueFunc();
+            passValue();
         });
-        passValueFunc();
+        passValue();
     }
     ~ofxOceanodeConnection(){
         parameterEventListener.unsubscribe();
@@ -310,7 +341,7 @@ public:
     ofxOceanodeConnection(ofxOceanodeParameter<void>& pSource, ofxOceanodeParameter<T>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()), sinkParameter(pSink.getParameter()){
         parameterEventListener = sourceParameter.newListener([&](){
             if(ofxOceanodeScheduling::isScheduledSendActive()) return;
-            passValueFunc();
+            passValue();
         });
     }
     ~ofxOceanodeConnection(){};
@@ -334,7 +365,7 @@ public:
     ofxOceanodeConnection(ofxOceanodeParameter<void>& pSource, ofxOceanodeParameter<void>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()), sinkParameter(pSink.getParameter()){
         parameterEventListener = sourceParameter.newListener([&](){
             if(ofxOceanodeScheduling::isScheduledSendActive()) return;
-            passValueFunc();
+            passValue();
         });
     }
     ~ofxOceanodeConnection(){};
@@ -358,7 +389,7 @@ public:
     ofxOceanodeConnection(ofxOceanodeParameter<void>& pSource, ofxOceanodeParameter<bool>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()), sinkParameter(pSink.getParameter()){
         parameterEventListener = sourceParameter.newListener([&](){
             if(ofxOceanodeScheduling::isScheduledSendActive()) return;
-            passValueFunc();
+            passValue();
         });
     }
     ~ofxOceanodeConnection(){};
@@ -382,7 +413,7 @@ public:
     ofxOceanodeConnection(ofxOceanodeParameter<float>& pSource, ofxOceanodeParameter<bool>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()), sinkParameter(pSink.getParameter()){
         parameterEventListener = sourceParameter.newListener([&](float &f){
             if(ofxOceanodeScheduling::isScheduledSendActive()) return;
-            passValueFunc();
+            passValue();
         });
     }
     ~ofxOceanodeConnection(){};
@@ -407,7 +438,7 @@ public:
     ofxOceanodeConnection(ofxOceanodeParameter<vector<float>>& pSource, ofxOceanodeParameter<bool>& pSink, bool _active) : ofxOceanodeAbstractConnection(pSource, pSink, _active), sourceParameter(pSource.getParameter()), sinkParameter(pSink.getParameter()){
         parameterEventListener = sourceParameter.newListener([&](vector<float> &f){
             if(ofxOceanodeScheduling::isScheduledSendActive()) return;
-            passValueFunc();
+            passValue();
         });
     }
     ~ofxOceanodeConnection(){};

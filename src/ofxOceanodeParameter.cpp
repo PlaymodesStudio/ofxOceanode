@@ -11,6 +11,10 @@
 #include "ofxOceanodeScope.h"
 #include "ofxOceanodeNodeModel.h"
 
+bool ofxOceanodeAbstractParameter::isReceivingFromConnection() const {
+    return ofxOceanodeAbstractConnection::isDeliveringTo(*this);
+}
+
 ofxOceanodeAbstractParameter::~ofxOceanodeAbstractParameter(){
     for(auto* peer : dropdownPeers){
         auto& peers = peer->dropdownPeers;

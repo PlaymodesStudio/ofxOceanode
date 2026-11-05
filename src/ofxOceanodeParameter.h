@@ -140,6 +140,9 @@ public:
     };
     
     bool hasInConnection(){return !inConnections.empty();};
+    // True only inside listeners fired by a cable writing this parameter;
+    // false for GUI, preset, MIDI/OSC and timeline writes.
+    bool isReceivingFromConnection() const;
     ofxOceanodeAbstractConnection* getInConnection(){return inConnections.empty() ? nullptr : inConnections.back();};
     const std::vector<ofxOceanodeAbstractConnection*>& getInConnections() const {return inConnections;}
 
