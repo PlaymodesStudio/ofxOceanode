@@ -76,6 +76,11 @@ public:
         Revision revision;
         std::string source, failure, morphFallbackReason;
         bool usesTextures = false;
+        // Where its resources run on a backend with several instances (the SC
+        // server playing its audio). Stamped on the resource values read from
+        // it and moved with it; an in-place morph moves `incoming` into
+        // `instance` when it completes.
+        std::shared_ptr<MacroMixerMixing::Placement> placement = std::make_shared<MacroMixerMixing::Placement>();
         ofxOceanodeAbstractParameter& parameter(const std::string& id) const;
         // A Trigger router reads as the events it fired since clearTriggers().
         // Watching starts at activation, so loading a graph fires nothing.

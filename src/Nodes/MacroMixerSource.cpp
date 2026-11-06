@@ -196,6 +196,13 @@ MacroMixerSource::Revision MacroMixerSource::importFolder(ofxOceanodeContainer& 
         Analysis analysis{excluded};
         analyse(*parent.getRegistry(), source, &contract, ancestors, analysis, &definition);
         if(!analysis.blocked.empty()) { errors = analysis.blocked; return nullptr; }
+        // A server that is not playing may never have loaded what this source
+        // needs: backends with several instances prepare all of them now, so
+        // a transition onto a free server does not wait for its SynthDefs.
+        std::set<std::string> preloaded;
+        for(const auto& r : contract.routers)
+            if(const auto* hooks = MacroMixerMixing::registry().placement(r.type))
+                if(hooks->preload && preloaded.insert(r.type).second) hooks->preload(definition);
         static std::atomic<uint64_t> sequence{0};
         auto revision = std::make_shared<MacroMixerRevision>();
         revision->macroID = existingID.empty() ? "macro-" + std::to_string(ofGetSystemTimeMicros()) + "-" + std::to_string(++sequence) : existingID;
@@ -1290,6 +1297,72 @@ void detachMorphProxy(ofxOceanodeAbstractParameter& p) {
     for(auto* cable:p.getOutConnections()) cable->prepareForDestruction();
     p.removeAllConnections();
 }
+// Whether a saved node carries a placement type's signals: the model itself
+// (an SC node), or a nested Macro holding one.
+bool morphCarries(const ofJson& entry,const MacroMixerMixing::PlacementHooks& hooks,int depth=0) {
+    if(depth>64 || !entry.is_object() || !entry.contains("model") || !entry.at("model").is_string()) return false;
+    if(hooks.carries(entry.at("model").get<std::string>())) return true;
+    if(!entry.contains("graph") || !entry.at("graph").is_object() || !entry.at("graph").contains("nodes")) return false;
+    const auto& nodes=entry.at("graph").at("nodes");
+    for(auto it=nodes.begin();it!=nodes.end();++it) if(morphCarries(it.value(),hooks,depth+1)) return true;
+    return false;
+}
+// Why a changed cable of a placement type (ScBus) cannot start its new side on
+// another backend instance, or empty when its island is replaced wholesale:
+// the cable feeds a top-level Router with nothing after it, every audio node
+// upstream of its new side is added and every one upstream of its old side is
+// removed. A node kept on both sides would have to run on both servers at once
+// and be built again at completion. Control cables (Rangers, Portals, an
+// envelope into a Gate) are followed no further: they never pull audio nodes.
+std::string morphIslandReason(const MorphContainerEdit& edit,const std::string& key,const std::vector<std::string>& a,
+                              const std::vector<std::string>& b,const MacroMixerMixing::PlacementHooks& hooks) {
+    if(!edit.path.empty()) return morphLocation(edit.path,key)+" is inside a nested Macro";
+    const auto& sink=edit.target.at("nodes").at(key);
+    if(sink.at("model").get<std::string>().rfind("Router ",0)!=0) return key+" plays both sides";
+    for(const auto* definition:{&edit.original,&edit.target})
+        for(const auto& edge:savedEdges(definition->at("connections"))) if(edge[0]==key) return key+" feeds other nodes";
+    const auto side=[&](const std::vector<std::string>& edge,const ofJson& definition,const std::vector<std::string>& moving) -> std::string {
+        if(edge.empty()) return {};
+        const std::set<std::string> island(moving.begin(),moving.end());
+        const auto edges=savedEdges(definition.at("connections"));
+        const auto& nodes=definition.at("nodes");
+        std::set<std::string> seen; std::vector<std::string> stack{edge[0]};
+        while(!stack.empty()) {
+            const auto node=stack.back(); stack.pop_back();
+            if(!seen.insert(node).second) continue;
+            if(!island.count(node)) return node+" is shared by both sides";
+            for(const auto& e:edges) if(e[2]==node && nodes.contains(e[0]) && morphCarries(nodes.at(e[0]),hooks)) stack.push_back(e[0]);
+        }
+        return {};
+    };
+    auto reason=side(a,edit.original,edit.removed);
+    if(reason.empty()) reason=side(b,edit.target,edit.added);
+    return reason;
+}
+// The morph's changed cables of a placement type: how many there are and, when
+// one cannot move its island to another instance, why (empty: all can).
+std::string morphIslandsReason(const std::vector<MorphContainerEdit>& edits,size_t& count) {
+    count=0; std::string reason;
+    for(const auto& edit:edits) {
+        std::map<std::pair<std::string,std::string>,std::vector<std::string>> before,after;
+        for(const auto& edge:savedEdges(edit.original.at("connections"))) before[{edge[2],edge[3]}]=edge;
+        for(const auto& edge:savedEdges(edit.target.at("connections"))) after[{edge[2],edge[3]}]=edge;
+        auto inputs=before; for(const auto& item:after) inputs.emplace(item.first,item.second);
+        for(const auto& input:inputs) {
+            const auto& key=input.first.first;
+            const auto a=before.count(input.first)?before.at(input.first):std::vector<std::string>{};
+            const auto b=after.count(input.first)?after.at(input.first):std::vector<std::string>{};
+            if(a==b || !edit.original.at("nodes").contains(key) || !edit.target.at("nodes").contains(key)) continue;
+            auto* sink=morphPort(*edit.container,key,input.first.second);
+            if(!sink) continue;
+            const auto* hooks=MacroMixerMixing::registry().placement(MacroMixerMixing::portType(*sink));
+            if(!hooks) continue;
+            ++count;
+            if(reason.empty()) reason=morphIslandReason(edit,key,a,b,*hooks);
+        }
+    }
+    return reason;
+}
 struct MorphSignal {
     virtual ~MorphSignal() = default;
     virtual void progress(float t)=0;
@@ -1384,6 +1457,10 @@ struct PolicyMorphSignal : MorphSignal {
     MacroMixerMixing::Value saved;
     float t=0; bool publishing=false;
     std::string failure;
+    // The graph's placement when the morph moves its new audio island to
+    // another instance: stamped on both sides, so the processor places the
+    // origin's side on the graph's instance and the target's on `incoming`.
+    std::shared_ptr<MacroMixerMixing::Placement> placement;
     PolicyMorphSignal(ofxOceanodeContainer& container,const std::string& key,const std::string& name,const MorphCablePlan& plan)
     :type(plan.type),policy(plan.policy),saved(MacroMixerMixing::neutral(type)) {
         auto a=MacroMixerMixing::readPort(type,*plan.sink);
@@ -1410,6 +1487,7 @@ struct PolicyMorphSignal : MorphSignal {
         try {
             auto a=MacroMixerMixing::readPort(type,*inputA),b=MacroMixerMixing::readPort(type,*inputB);
             MacroMixerMixing::Registry::validate(type,a); MacroMixerMixing::Registry::validate(type,b);
+            if(placement && processor) { MacroMixerMixing::place(a,placement); MacroMixerMixing::place(b,placement); }
             auto result=renderer ? renderer(a,b,t,policy.options) : processor ? processor(a,b,t,policy.options) : MacroMixerMixing::registry().mix(type,policy.policy,a,b,t,policy.options);
             MacroMixerMixing::Registry::validate(type,result);
             MacroMixerMixing::writePort(type,*output,result); failure.clear();
@@ -1445,6 +1523,11 @@ struct PolicyMorphSignal : MorphSignal {
 // Destruction rolls back topology before Graph destroys its native containers.
 struct MacroMixerMorphTopology {
     float logBlend=1; // The mixer's Log Blend for this morph's cable blends.
+    // The graph's placement. spread: this morph starts its new audio island
+    // on another instance (Audio Servers: Alternate and every changed audio
+    // cable swaps an island wholesale, morphIslandsReason).
+    std::shared_ptr<MacroMixerMixing::Placement> placement;
+    bool spread=false;
     struct Signal {
         ofxOceanodeContainer* container;
         std::vector<std::string> before,after;
@@ -1510,6 +1593,7 @@ struct MacroMixerMorphTopology {
         for(auto it=created.rbegin();it!=created.rend();++it) removeMorphNode(*it->first,it->second);
         for(auto& signal:signals) signal.blend->retire(lease);
         endPinMorphs(false);
+        if(placement) placement->incoming=nullptr; // The origin stays where it is.
         complete=true;
     }
     bool ready() const { for(auto& signal:signals) if(!signal.blend->ready()) return false; return true; }
@@ -1521,6 +1605,11 @@ struct MacroMixerMorphTopology {
     void draw() { for(auto& signal:signals) signal.blend->draw(); }
     void commit() {
         endNodeMorphs(true);
+        // The new island stays on its server: the graph moves there before the
+        // native cable is restored, so the router bridge re-scopes to it in the
+        // same frame and the origin's server never builds the island (graph
+        // rebuilds are coalesced to the next update).
+        if(placement && placement->incoming) { placement->instance=placement->incoming; placement->incoming=nullptr; }
         auto lease=retirementLease();
         for(auto& signal:signals) signal.blend->disconnect();
         for(auto& signal:signals) {
@@ -1585,6 +1674,7 @@ struct MacroMixerMorphTopology {
                 inputA=&mixer->inputA; inputB=&mixer->inputB; output=&mixer->output; blend=mixer;
             } else if(!plan.type.empty()) {
                 auto mixer=std::make_shared<PolicyMorphSignal>(c,key,name,plan);
+                if(spread && MacroMixerMixing::registry().placement(plan.type)) mixer->placement=placement;
                 inputA=mixer->inputA.get(); inputB=mixer->inputB.get(); output=mixer->output.get(); blend=mixer;
             } else std::visit([&](const auto& value) {
                 using T=std::decay_t<decltype(value)>;
@@ -1598,6 +1688,15 @@ struct MacroMixerMorphTopology {
             if(!host.createConnection(*output,*plan.sink)) throw std::runtime_error("Cannot connect blended morph signal");
             blend->progress(0); // Publish resource bridges before evaluating backend readiness.
         };
+        // A new audio island starts on another server only when every changed
+        // audio cable swaps one wholesale; otherwise the whole morph keeps
+        // today's single server, with the reason in the transition's Details.
+        if(placement && placement->spread) {
+            size_t islands=0; std::string reason;
+            try { reason=morphIslandsReason(edits,islands); } catch(const std::exception& e) { reason=e.what(); }
+            spread=islands>0 && reason.empty();
+            if(!spread) { placement->spread=false; placement->reason=islands==0 ? "the morph changes no audio connection" : reason; }
+        }
         for(auto& edit:edits) {
             auto& c=*edit.container;
             const auto buses=planPortalBuses(c,edit);
@@ -1764,7 +1863,7 @@ bool MacroMixerSource::Graph::prepareMorphInPlace(Revision target,const MacroMix
                                                   std::vector<MacroMixerMorphDetail>* details,float logBlend) {
     MorphSnapshot destination;
     auto topology=std::make_shared<MacroMixerMorphTopology>();
-    topology->hostLease=host; topology->logBlend=logBlend;
+    topology->hostLease=host; topology->logBlend=logBlend; topology->placement=placement;
     morphFallbackReason.clear(); morphPolicies=policies; morphLogBlend=logBlend;
     try {
         if(!target) throw std::runtime_error("No target Macro definition");
@@ -1864,6 +1963,14 @@ void appendMorphEditDetails(std::vector<MacroMixerMorphDetail>& result,const std
             } catch(const std::exception& e) { result.push_back({"fallback",location,e.what()}); }
         }
     }
+    // Whether the morph's new audio can start on another server (Audio
+    // Servers: Alternate, with an SC Output on each server); the transition
+    // adds where it went ("audio: server 0 -> 1").
+    size_t islands=0; std::string island;
+    try { island=morphIslandsReason(edits,islands); } catch(const std::exception& e) { island=e.what(); }
+    if(islands>0) result.push_back({"audio","Audio servers",island.empty()
+        ? "The destination's audio island is replaced wholesale: with Audio Servers on Alternate it starts on a server that is not playing, when one has an SC Output fed by the mixer"
+        : "The destination's audio stays on the origin's server: "+island});
     if(result.empty()) result.push_back({"live","Graph","Matching graph controls morph on the running nodes"});
 }
 std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revision target,const MacroMixerMorphPolicies& policies) const {

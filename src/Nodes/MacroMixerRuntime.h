@@ -47,6 +47,16 @@ public:
     // geometrically (1) rather than linearly (0). Read when a morph is prepared.
     void setMorphLogBlend(float amount) { morphLogBlend = amount < 0 ? 0.f : amount > 1 ? 1.f : amount; }
     float getMorphLogBlend() const { return morphLogBlend; }
+    // The mixer's Audio Servers. Alternate: on a backend with several instances
+    // (SuperCollider servers, each with an SC Output playing the mixer) the
+    // incoming side of a transition starts on an instance that is not playing
+    // and the sides crossfade across instances. Single (the default here; the
+    // node defaults to Alternate): every graph stays on one instance, exactly
+    // as with one server. Read when a transition is requested.
+    void setAlternateServers(bool alternate) { alternateServers = alternate; }
+    bool usesAlternateServers() const { return alternateServers; }
+    // "audio: server 0 -> 1" while a transition moves its audio; empty otherwise.
+    const std::string& audioPlacement() const { return audioMove; }
     const std::vector<MacroMixerMorphDetail>& sourceDetails(const std::string& id) const;
     // Every source checked against every other: a morph preview from each
     // origin's saved state into each target, as Details shows for the running
@@ -204,4 +214,17 @@ private:
     double startMs = 0, stallMs = 0;
     float durationMs = 0, biPow = 0, lastValue = 0, mixedProgress = 0, heldProgress = 0;
     float morphLogBlend = 1;
+    bool alternateServers = false;
+    // Whether resource values carry their graph's placement: Alternate, or a
+    // graph placed earlier (Single then keeps it where it is).
+    bool placing() const;
+    // What fixes a source's instance (placement hooks of the routers' types).
+    MacroMixerMixing::PlacementPin placementPin(const Revision& revision) const;
+    // Sets the incoming side's spread, pin and reason before a transition.
+    void preparePlacement(MacroMixerMixing::Placement& placement, const Revision& origin, const Revision& target, bool inPlace) const;
+    // Records the transition's server move in its Details once it is known.
+    void notePlacement();
+    std::string audioMove;
+    bool audioNoted = false;
+    std::string audioDetailsID; // The source whose Details this transition's Start frame wrote.
 };

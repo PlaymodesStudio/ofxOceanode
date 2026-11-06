@@ -81,6 +81,7 @@ private:
     ofParameter<float> duration, biPow, logBlend, progress;
     ofParameter<void> transition, finish;
     ofParameter<int> mode; // 0 Mix, 1 Morph.
+    ofParameter<int> audioServers; // 0 Single, 1 Alternate (MacroMixerRuntime::setAlternateServers).
     customGuiRegion routerEditor, policyEditor, macroEditor;
     std::map<std::string, std::shared_ptr<ofxOceanodeAbstractParameter>> outputs;
     std::map<std::string, std::array<char, 256>> routerDrafts;

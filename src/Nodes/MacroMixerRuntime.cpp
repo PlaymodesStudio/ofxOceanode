@@ -730,7 +730,7 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
         if(processor==processors.end()) continue;
         const auto& policy=MacroMixerMixing::registry().policy(r.type,r.policy);
         auto value=current->read(r.id);
-        if(auto* object=std::get_if<MacroMixerMixing::Object>(&value)) object->owner=current;
+        if(auto* object=std::get_if<MacroMixerMixing::Object>(&value)) { object->owner=current; if(placing()) object->placement=current->placement; }
         try {
             auto result=processor->second.function(value,value,1,policy.options(r.options));
             if(policy.ready && !policy.ready(result)) canPrepare=false;
@@ -755,6 +755,9 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
             // The preparation reports the transition's Details from the one
             // alignment it makes; a second full pass only ran on this frame.
             std::vector<MacroMixerMorphDetail> details;
+            audioMove.clear(); audioNoted=false; audioDetailsID.clear();
+            // A morph in place may start its new audio island on another server.
+            if(request->morph && current) preparePlacement(*current->placement,current->revision,revision,true);
             const bool reuse=request->morph && current && current->prepareMorphInPlace(revision,morphPoliciesInto(revision->id()),&details,morphLogBlend);
             if(request->morph && current) {
                 if(details.empty()) details=current->inspectMorph(revision,morphPoliciesInto(revision->id())); // Failed before any edit was read.
@@ -766,11 +769,14 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
             }
             std::shared_ptr<Graph> candidate = reuse ? current : MacroMixerSource::instantiate(parent, revision, errors, inputValues, keptOut);
             preparing = false;
+            // A second graph may start on another server (the router bridge chooses it).
+            if(candidate && current && !reuse) preparePlacement(*candidate->placement,current->revision,revision,false);
             if(request->morph && current) {
                 const int preparedMs = int(clock()-preparationStart+.5);
                 details.insert(details.begin(),{"context",revision->name(),"From "+current->revision->name()+" to "+revision->name()
                     +", prepared in "+std::to_string(preparedMs)+" ms"});
                 transitionDetails[revision->id()]=std::move(details);
+                audioDetailsID=revision->id();
             }
             if(candidate) {
                 if(!current) {
@@ -839,8 +845,9 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
                 auto b=next ? next->read(router.id) : a;
                 if(policy.createProcessor) {
                     MacroMixerMixing::Registry::validate(router.type,a); MacroMixerMixing::Registry::validate(router.type,b);
-                    if(auto* object=std::get_if<MacroMixerMixing::Object>(&a)) object->owner=graph;
-                    if(auto* object=std::get_if<MacroMixerMixing::Object>(&b)) object->owner=next ? next : current;
+                    const auto& bGraph=next ? next : current;
+                    if(auto* object=std::get_if<MacroMixerMixing::Object>(&a)) { object->owner=graph; if(placing()) object->placement=graph->placement; }
+                    if(auto* object=std::get_if<MacroMixerMixing::Object>(&b)) { object->owner=bGraph; if(placing()) object->placement=bGraph->placement; }
                     auto& processor=processors[router.id];
                     if(processor.policy!=policy.id || !processor.function) processor={policy.id,policy.createProcessor()};
                     // Resource bridges retain graph leases and backend readiness.
@@ -853,6 +860,7 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
                 } else staged[router.id]=MacroMixerMixing::registry().mix(router.type,router.policy,a,b,progress,router.options);
             }
             mixedValues=std::move(staged); mixedProgress=progress;
+            notePlacement(); // The processors placed the incoming side by now.
             // Each latched event is mixed once; a held frame keeps them for the next.
             current->clearTriggers(); if(next) next->clearTriggers();
             const auto first=std::find_if(interface.routers.begin(),interface.routers.end(),[](const auto& r){return r.direction=="Output";});
@@ -973,8 +981,58 @@ std::string MacroMixerRuntime::status() const {
     if(morphingInPlace()) label = "Morphing live graph";
     else if(morphing()) label = "Crossfading router outputs; graph morph fell back: " + (current && !current->morphFallbackReason.empty()
         ? current->morphFallbackReason : "incompatible structure or configuration");
+    if(next && !audioMove.empty()) label += " (" + audioMove + ")";
     if(pending) label += " (request queued)";
     if(!blocked.empty()) label += " (" + std::to_string(blocked.size()) + " blocked node(s) await a decision)";
     if(!errors.empty()) label += ": " + errors.front().file + ": " + errors.front().message;
     return label;
+}
+bool MacroMixerRuntime::placing() const {
+    return alternateServers || (current && current->placement->instance);
+}
+MacroMixerMixing::PlacementPin MacroMixerRuntime::placementPin(const Revision& revision) const {
+    MacroMixerMixing::PlacementPin result;
+    for(const auto& r:interface.routers) {
+        const auto* hooks=MacroMixerMixing::registry().placement(r.type);
+        if(!hooks) continue;
+        // An outer input reaches both graphs: its source would run on both servers.
+        if(r.direction=="Input") { result={-1,true,"the "+r.name+" Input router feeds both graphs"}; return result; }
+        if(!revision) continue;
+        auto pin=hooks->pin(revision->sourceDefinition());
+        if(pin.single) return pin;
+        if(pin.index>=0 && result.index<0) result=pin;
+    }
+    return result;
+}
+void MacroMixerRuntime::preparePlacement(MacroMixerMixing::Placement& placement,const Revision& origin,const Revision& target,bool inPlace) const {
+    placement.spread=false; placement.pin=-1; placement.reason.clear(); placement.note.clear(); placement.incoming=nullptr;
+    if(!alternateServers) { placement.reason="Audio Servers is Single"; return; }
+    const auto to=placementPin(target);
+    if(to.single) { placement.reason=to.reason; return; }
+    // In place, the origin's shared resources run on through the morph.
+    if(inPlace) { const auto from=placementPin(origin); if(from.single) { placement.reason=from.reason; return; } }
+    placement.spread=true; placement.pin=to.index; placement.reason=to.reason;
+}
+void MacroMixerRuntime::notePlacement() {
+    if(!next || audioNoted || !placing()) return;
+    const MacroMixerMixing::PlacementHooks* hooks=nullptr;
+    for(const auto& r:interface.routers)
+        if(r.direction=="Output" && MacroMixerMixing::registry().placement(r.type)) { hooks=MacroMixerMixing::registry().placement(r.type); break; }
+    if(!hooks) { audioNoted=true; return; }
+    // In place the one graph carries both sides; a second graph has its own.
+    const auto& from=*current->placement;
+    const auto& to=morphingInPlace() ? from : *next->placement;
+    const void* origin=from.instance;
+    const void* destination=morphingInPlace() ? (from.incoming ? from.incoming : from.instance) : to.instance;
+    if(!origin || !destination) return; // Not on a server yet: its first walk places it.
+    audioNoted=true;
+    audioMove="audio: server "+hooks->name(origin);
+    if(destination!=origin) audioMove+=" -> "+hooks->name(destination);
+    if(!to.reason.empty()) audioMove+=destination==origin && !to.spread ? ", stays: "+to.reason : ", "+to.reason;
+    else if(destination==origin) audioMove+=", stays: no other server has an SC Output playing the mixer";
+    if(!to.note.empty()) audioMove+=" ("+to.note+")";
+    // This morph's Details (Mix mode keeps it in Status only; an older
+    // transition's Details into the same source are not this one's).
+    const auto found=audioDetailsID.empty() ? transitionDetails.end() : transitionDetails.find(audioDetailsID);
+    if(found!=transitionDetails.end()) found->second.push_back({"audio","Audio servers",audioMove});
 }

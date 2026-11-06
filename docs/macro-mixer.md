@@ -5,7 +5,9 @@ It is registered under **Experimental → MacroMixer**. Declare router names, ty
 and Input/Output roles in its Inspector; add Macro source folders; choose Mode
 (Mix or Morph) and Target and press **Start!**. Duration_ms, Bi Pow, Log Blend and **Stop!**
 (finish now) control a fade, and Progress shows it. Each output has its own
-type-specific policy and options.
+type-specific policy and options. **Audio Servers** (Single or Alternate)
+decides which SuperCollider servers a transition's audio runs on (see
+*SuperCollider servers* below).
 
 A Target value that arrives through a cable or from a timeline track (Dropdown
 or numeric) selects that Macro and starts the transition, as **Start!** would,
@@ -27,7 +29,7 @@ values, Progress keeps its value (1 at completion) and promotion waits for the
 acknowledgement. The fade never restarts; a morph that rewires a resource cable
 used to run a second, empty pass of the whole duration after completing.
 
-The node shows Mode, Target, Progress, Duration_ms, Bi Pow, Log Blend, Start!, Stop! and
+The node shows Mode, Target, Progress, Duration_ms, Bi Pow, Log Blend, Audio Servers, Start!, Stop! and
 Status, then a **Routers** separator above the router ports. The Inspector has
 four sections: **ROUTERS** (the router table with **Load Routers** and **Save
 Routers**), **MIX/MORPH POLICIES** (**Default Mix/Morph policies**), **MACROS**
@@ -144,7 +146,11 @@ Paths start at the data folder; hover for the full path.
   Details open with a context line, "From A to B, prepared in N ms": the time
   the Start frame spent aligning and planning the target, staging its added
   nodes and loading its timelines, all before the fade clock starts. A long
-  preparation shows as a one-frame stall of the running graph.
+  preparation shows as a one-frame stall of the running graph. When the
+  routers carry ScBus audio, **Audio servers** says where the audio goes:
+  in a preview, whether the destination's audio island can start on a free
+  server (or why it stays); in a transition, "audio: server 0 -> 1", or
+  "audio: server 0, stays: ..." with the reason (see SuperCollider servers).
 - **Morphs from other sources**: the source check's result for each other
   source morphing into this one (*morphs in place*, *node replaced*, *graph
   fallback* or *not checked*), with every fallback and replacement reason.
@@ -570,8 +576,9 @@ Additional policies use `MacroMixerMixing::registry()`; nodes need no extra list
 
 VectorGraphics registers Fatline Vector opacity and Switch policies.
 SuperCollider registers ScBus policies with a private bridge per output. Its final
-SC Output stays outside the source Macro and determines server placement. The
-bridge retains the existing SynthDef loading/rebuild acknowledgements and graph
+SC Outputs stay outside the source Macro and decide which servers can play the
+mixer; with several, **Audio Servers** places each graph on one of them (see
+SuperCollider servers below). The bridge retains the existing SynthDef loading/rebuild acknowledgements and graph
 leases. Internal ScBus morphs wait for required SynthDefs and the routing
 `/synced` before starting their timed interpolation. Matching synths and their
 buses remain in place. Completion restores the native destination cables;
@@ -580,6 +587,120 @@ remain owned until every involved server acknowledges that final routing. A
 resource-allocation failure restores the origin wiring and reports the failure.
 Renamed helpers live in the addon's `data/Supercollider/Synthdefs/Defaults/macromixer`
 and can be rebuilt with `synthdefs/macromixer/build.scd`.
+
+### SuperCollider servers
+
+The SuperCollider controller boots up to three scsynth servers, all playing
+into the same audio device. A server's graph is whatever its SC Output nodes
+pull upstream. With one server, every transition builds the destination's
+audio on the server that is playing the origin: it allocates buses, loads
+SynthDefs, creates and orders the new synths and runs both graphs until the
+fade completes, which glitches the playing audio. **Audio Servers** (saved
+with the node; Single or Alternate, default Alternate) puts the incoming
+audio on a server that is not playing instead.
+
+**The patch needs one SC Output per server**, each fed by the mixer's ScBus
+output (Server 0, Server 1, and Server 2 if it is booted). A server without
+one never plays the mixer, and Alternate behaves as Single while only one
+server plays it. An SC Output whose server has no graph assigned only runs
+the mixer's bridge with silent inputs, which costs nothing.
+
+How it plays:
+
+- At rest the graph runs on one server: the first server whose graph walk
+  reaches the mixer's bridge takes it, and the others run only the bridge.
+  (Without Audio Servers, two SC Outputs fed by the mixer each ran the whole
+  graph, doubling it.) If that server's SC Output is disconnected or moved,
+  the next server to walk the bridge takes the graph.
+- During a transition the bridge gives each of its inputs a server: the
+  origin (input A) stays on its server, the destination (input B) gets the
+  allocated one. Each server builds only its side. The bridge synth runs on
+  both, with the other input on the silent bus, and applies its own side's
+  gain; the device sums the two, so Linear, Equal Power, FadeOut and Switch
+  keep their meaning. Nothing is routed between scsynth processes (that
+  would need a loopback device): only gains change. The playing server
+  rewires its bridge but never builds the destination's synths.
+- At completion the origin's server frees its graph, since its nodes left
+  the walk, and is free again. The destination's server is the mixer's
+  audio server now, so the next transition alternates.
+
+Allocation (`MacroMixerServerAllocator` in the SuperCollider addon), in order:
+
+1. The origin keeps its server; a playing graph never moves.
+2. The destination gets a server whose SC Output plays the mixer and that
+   runs no graph (only mixer bridges and Outputs), preferring one that has
+   finished loading its SynthDefs, then the lowest average CPU
+   (`ofxSCServer::getAvgCPU()`).
+3. Otherwise the busy server with the lowest average CPU, other than the
+   origin's.
+4. With Audio Servers on Single, a single-server source (below) or no other
+   server playing the mixer, the destination joins the origin's server, as
+   with one server.
+
+**Morph in place.** A changed ScBus cable blends through a bridge inside the
+running graph. Its new side starts on another server only when every changed
+ScBus cable of the morph replaces its audio island wholesale: the cable feeds
+a top-level Router with nothing after it, every audio node upstream of the
+target's side is added and every audio node upstream of the origin's side is
+removed. Audio nodes are SC nodes, the ScBus Router and Portal, and nested
+Macros holding one; control cables (a Ranger, a Portal, an envelope into a
+Gate) are not followed, since they never pull audio. BLOOBS Init to
+2_CELLS_AUDIO qualifies: the SC analogBox is removed and the Macro holding
+the audio engines is added. The playing server then only inserts the
+internal bridge in front of its analogBox; the added nodes are built on the
+other server. At completion the graph moves to that server before the
+native cable is restored (the rebuilds are coalesced to the next update), so
+the playing server never builds the island and the island's synths stay
+where they are. A node kept on both sides would have to run on two servers
+and be rebuilt at completion, so then the morph keeps one server, as before,
+with the reason in Details ("SC_Tone_1 is shared by both sides").
+
+What stays on one server:
+
+- A mixer with an ScBus **Input** router: its outer source would run on both
+  servers.
+- A source holding an ScBus Portal (it shares audio with the rest of the
+  patch), or an SC Mixer Pro (its tracks name their servers, and each `Out
+  Sn` carries one server's mix) unless that Mixer Pro has **Follow Graph
+  Server** on (Inspector) with every strip on one server. With it on, its
+  strips play on whichever server builds the graph, writing the output of
+  their own server index (`Out S1` for strips on S1), so the source moves
+  like any other; keep the cable on that output. BLOOBS 2_CELLS_AUDIO
+  (`Macro_12`) and 2_GHOSTS_BIONIC_AUDIO (`Macro_7`) need it switched on
+  and saved to alternate.
+- A source whose SC nodes are saved with a **Server** (SC FFT HD, Buffer
+  Allocator, A2k and the other analysis nodes) is placed on that server, if
+  an SC Output there plays the mixer; nodes naming two servers keep it
+  single. The reason shows in Details.
+- Trigger and Texture policies are unaffected; a MacroMixer inside a source
+  is reached only on its graph's server, so it stays where its graph is.
+- With Single, a graph that was never placed runs exactly as before; a
+  graph placed while Alternate was on stays on its server.
+
+**SynthDefs.** A free server may never have loaded what the destination
+needs, and its first rebuild would wait for `/d_loadDir` and `/sync` with the
+fade held at 0. Importing a source therefore loads, on every server, the
+SynthDef folders of its saved SC SynthDef nodes (`SC <name>*`). With *Load
+Synthdefs On Preset* off (the default) every data-folder SynthDef is loaded
+on every server at boot anyway. SampleBox and DrumKitBox choose their folder
+from their settings and still load it when first built. When the chosen
+server is still loading, the transition says "loading SynthDefs on server N"
+and the fade waits as before.
+
+**Clock.** All servers open the same CoreAudio device, so they run on one
+hardware clock: no drift, and at most one hardware buffer of constant offset
+between them. The crossfade stays coherent for an equal-power sum; nothing
+compensates for it. An NRT render already runs every server as its own
+scsynth job and sums the files.
+
+Core never includes SuperCollider headers. Every graph owns a
+`MacroMixerMixing::Placement` (its server, the incoming island's server during
+a morph in place, and what the runtime decided for the incoming side), which
+the runtime stamps on the ScBus values it reads and which moves with the
+graph. The addon registers `MacroMixerMixing::PlacementHooks` for ScBus
+(`carries`, `pin`, `preload`, `name`); its bridge reads the placements,
+allocates the server and scopes its inputs per server, as SC Mixer Pro scopes
+its tracks.
 
 ## Persistence and editing
 
@@ -608,8 +729,9 @@ describes that morph; otherwise, in Morph mode, the next morph into Target.
 | `No sources` | grey | No Macro folders added |
 
 The Inspector **STATUS** section starts with the same word, then the full text:
-what runs, the destination and queue, how many sources passed their last check,
-and any error.
+what runs, the destination and queue, the server move of a transition
+("audio: server 0 -> 1"), how many sources passed their last check, and any
+error.
 
 Save/clipboard stores `MacroMixerState` version 1: router definitions, policies,
 inputs, ordered Macro source references, selection, destination and optional
@@ -724,8 +846,16 @@ branches listed in `macro-mixer-migration-audit.md`.
   stale acknowledgements, two-server retirement, offline-capture cleanup,
   return to ordinary output mixing, replacing a single SC node whose saved
   settings differ, and the fallback crossfade of a morph that cannot reuse the
-  running graph. It needs a SuperCollider addon with the MacroMixer routing
-  fences (`serverManager::requestMixerRouting`).
+  running graph. Audio Servers: the allocator rules and placement hooks
+  (pins, single sources, SC Mixer Pro with and without Follow Graph Server,
+  string-saved Server values), a graph at rest on one of two servers, a morph in
+  place building its new audio island on the free server only (the origin's
+  synths and buses untouched, each bridge copy hearing one side) and keeping
+  it there at completion, alternating back, a shared node keeping the morph
+  on one server with its reason, and fallback/Mix crossfades across servers
+  that free the origin's server at completion and alternate. It needs a
+  SuperCollider addon with the MacroMixer routing fences
+  (`serverManager::requestMixerRouting`) and the server allocator.
 - `python3 tests/macro_mixer_polycomb_regression.py`: production SC polycombBox,
   without a server, morphing its hidden sound on the running node: linear and
   log glides, a mode switching half way, Snapshot kept, cancellation, a
@@ -734,7 +864,9 @@ branches listed in `macro-mixer-migration-audit.md`.
   the library. Needs the SuperCollider, ofxSuperCollider and ofxOsc addons;
   builds as C++20.
 - `python3 tests/macro_mixer_sc_audio_regression.py`: actual offline SuperCollider
-  render of the renamed SynthDefs, without opening an audio device.
+  render of the renamed SynthDefs, without opening an audio device. Two
+  separate renders, one per server, each hearing one side of the bridge,
+  must sum to the single-server crossfade.
 
 The C++ tests need the sibling openFrameworks and addon sources/libraries. Native
 windowed-host interaction, actual Syphon publishers, DAC/MIDI hardware, live audio

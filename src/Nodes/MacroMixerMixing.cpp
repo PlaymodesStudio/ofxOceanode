@@ -395,6 +395,14 @@ void Registry::add(Policy policy,bool makeDefault) {
     entries.emplace(key,std::move(policy));
 }
 void Registry::registerPolicy(Policy policy,bool makeDefault) { add(std::move(policy),makeDefault); }
+void Registry::registerPlacement(const std::string& type,PlacementHooks hooks) {
+    require(!type.empty() && bool(hooks.carries) && bool(hooks.pin) && bool(hooks.name),"Incomplete placement hooks");
+    placements.emplace(type,std::move(hooks));
+}
+const PlacementHooks* Registry::placement(const std::string& type) const {
+    const auto found=placements.find(type);
+    return found==placements.end() ? nullptr : &found->second;
+}
 void Registry::registerSwitchPolicy(const std::string& type) {
     add({"switch","Switch",type,[](const Value& a,const Value& b,float progress,const ofJson& options) {
         return progress<options.at("threshold").get<double>() ? a : b;

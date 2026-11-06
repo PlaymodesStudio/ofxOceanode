@@ -489,6 +489,13 @@ int main(int argc,char** argv) {
         auto& m=static_cast<ofxOceanodeMacroMixer&>(parent.createNode(std::make_unique<ofxOceanodeMacroMixer>(),1).getNodeModel());
         MacroMixerContract c; c.routers.push_back({"input","Unselected","Float","",ofJson::object(),"Input"});
         assert(m.setRouterContract(c) && m.importMacroFolder(a));
+        // Audio Servers defaults to Alternate on the node (Single in a bare
+        // runtime), reaches the runtime and reserves its name.
+        assert(m.getParameter<int>("Audio Servers")==1 && m.mixerRuntime()->usesAlternateServers());
+        m.getParameter<int>("Audio Servers")=0; assert(!m.mixerRuntime()->usesAlternateServers());
+        m.getParameter<int>("Audio Servers")=1; assert(m.mixerRuntime()->usesAlternateServers());
+        { auto reserved=c; reserved.routers[0].name="Audio Servers"; assert(!m.setRouterContract(reserved)); }
+        { MacroMixerRuntime bare(parent); assert(!bare.usesAlternateServers()); }
         m.getParameter<float>("Duration_ms")=0; m.getParameter<void>("Start!").trigger(); parent.update();
         auto& source=floating(parent,7); auto& sink=floating(parent,8); floating(parent,9);
         assert(parent.createConnectionFromInfo("Router_f_7","Value","MacroMixer_1","Unselected"));

@@ -85,7 +85,7 @@ bool validOutputNames(const MacroMixerContract& contract, std::string& error) {
     // Current control names, plus older ones that saved presets may still use.
     static const auto reserved = [] {
         std::set<std::string> names;
-        for(const auto* name : {"Mode", "Target", "Progress", "Duration_ms", "Bi Pow", "Log Blend", "Start!", "Stop!", "Status", "Status Details",
+        for(const auto* name : {"Mode", "Target", "Progress", "Duration_ms", "Bi Pow", "Log Blend", "Audio Servers", "Start!", "Stop!", "Status", "Status Details",
                                 "Duration Ms", "Transition", "Finish Transition", "Mixer Status", "Output Routers", "Routers",
                                 "Policies", "Macros", "MacroMixerState", "Morph macros"})
             names.insert(escapedName(name));
@@ -237,6 +237,11 @@ void ofxOceanodeMacroMixer::setup() {
     // Strength, Metab Points radii) glide geometrically: 1 keeps their product
     // monotonic, 0 is the plain linear glide. Read when a morph starts.
     addParameter(logBlend.set("Log Blend", 1, 0, 1));
+    // With an SC Output per SuperCollider server, Alternate starts each
+    // transition's incoming audio on a server that is not playing and
+    // crossfades across servers; Single keeps everything on one server.
+    // Alternate acts as Single while only one server plays the mixer.
+    addParameterDropdown(audioServers, "Audio Servers", 1, {"Single", "Alternate"});
     addParameter(transition.set("Start!"));
     addParameter(finish.set("Stop!"));
     addOutputParameter(summary.set("Status", "No sources"), transient);
@@ -244,6 +249,7 @@ void ofxOceanodeMacroMixer::setup() {
     if(hostContainer) {
         runtime = std::make_unique<MacroMixerRuntime>(*hostContainer);
         MacroMixerContract empty; empty.routers.clear(); runtime->setContract(empty);
+        runtime->setAlternateServers(audioServers == 1);
         if(std::find(liveMixers.begin(),liveMixers.end(),this) == liveMixers.end()) liveMixers.push_back(this);
     }
     listeners.push(target.newListener([this](int& index) {
@@ -263,14 +269,19 @@ void ofxOceanodeMacroMixer::setup() {
         if(selectedID == heading) return;
         inspectorError.clear();
         runtime->setMorphLogBlend(logBlend);
+        runtime->setAlternateServers(audioServers == 1);
         runtime->requestMacro(selectedID, duration, biPow, mode == 1);
     }));
     listeners.push(transition.newListener([this] {
         if(!runtime || !getActive()) return;
         inspectorError.clear();
         runtime->setMorphLogBlend(logBlend);
+        runtime->setAlternateServers(audioServers == 1);
         runtime->requestMacro(selectedID, duration, biPow, mode == 1);
     }));
+    // Also at rest: Alternate keeps the running graph on one server even when
+    // SC Outputs on several servers play the mixer.
+    listeners.push(audioServers.newListener([this](int& value) { if(runtime) runtime->setAlternateServers(value == 1); }));
     listeners.push(finish.newListener([this] { if(runtime && getActive()) runtime->finish(); }));
 }
 
@@ -444,7 +455,7 @@ void ofxOceanodeMacroMixer::installOutputs(const MacroMixerContract& contract) {
             it = outputs.erase(it);
         } else ++it;
     }
-    std::vector<std::string> order{"Mode", "Target", "Progress", "Duration_ms", "Bi Pow", "Log Blend", "Start!", "Stop!", "Status"};
+    std::vector<std::string> order{"Mode", "Target", "Progress", "Duration_ms", "Bi Pow", "Log Blend", "Audio Servers", "Start!", "Stop!", "Status"};
     // The node's "Routers" separator stays between the controls and the routers.
     for(int i = 0; i < getParameterGroup().size(); ++i)
         if(getParameterGroup().get(i).getName().rfind("SEPARATOR:|Routers|", 0) == 0) order.push_back(getParameterGroup().get(i).getName());
@@ -874,7 +885,7 @@ void ofxOceanodeMacroMixer::drawSource(const MacroMixerRevision& macro, bool fad
                 const auto kind = detail.kind == "fallback" ? "Graph fallback" : detail.kind == "mix" ? "Connection mix"
                     : detail.kind == "added" ? "Added node" : detail.kind == "removed" ? "Removed node"
                     : detail.kind == "replaced" ? "Replaced node" : detail.kind == "node" ? "Node morph"
-                    : detail.kind == "skipped" ? "Skipped connection mix" : "Live graph";
+                    : detail.kind == "skipped" ? "Skipped connection mix" : detail.kind == "audio" ? "Audio servers" : "Live graph";
                 ImGui::Spacing();
                 if(const auto* color = colorOf(detail.kind)) {
                     ImGui::PushStyleColor(ImGuiCol_Text, *color);
@@ -1164,6 +1175,7 @@ void ofxOceanodeMacroMixer::loadBeforeConnections(ofJson& json) {
         // Release both old graphs before staging to retain the two-graph cap.
         if(runtime->transitioning()) runtime->clear();
         auto candidate = std::make_unique<MacroMixerRuntime>(*hostContainer);
+        candidate->setAlternateServers(audioServers == 1); // Its listener follows a later recall of the control.
         if(!candidate->restoreState(saved)) {
             inspectorError = "Cannot restore MacroMixer";
             for(const auto& e : candidate->diagnostics()) inspectorError += "\n" + e.file + ": " + e.message;

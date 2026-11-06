@@ -25,6 +25,8 @@ public:
     std::set<int> buses;
     int busLimit=32,allocations=0,frees=0,synthFrees=0;
     bool latency=false;
+    float avgCPU=0; // Read by the MacroMixer server allocator.
+    float getAvgCPU() const { return avgCPU; }
     ofEvent<ofxOscMessage> newFeedbackMessage;
     std::vector<int> syncs;
     int syncSequence=100000;
