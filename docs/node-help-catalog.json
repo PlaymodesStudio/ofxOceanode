@@ -2494,8 +2494,10 @@
     "addon": "ofxSantiNodes"
   },
   "ILDA Debugger": {
-    "description": "Displays laser point coordinates and RGB channels for inspecting ILDA data.",
+    "description": "Outputs the final laser points of one laser, or of all lasers in turn, as x/y coordinates, RGB channels and point count (Size). Laser picks the projector; All Lasers, the default, sums every laser.",
     "parameters": [
+      "On?",
+      "Laser",
       "x",
       "y",
       "r",
@@ -2503,7 +2505,7 @@
       "b",
       "Size"
     ],
-    "source": "ofxOceanodeLaser.h",
+    "source": "ildaDebugger.h",
     "addon": "ofxOceanodeLaser"
   },
   "ILDA Projector": {
