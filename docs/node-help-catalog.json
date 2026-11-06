@@ -1591,6 +1591,23 @@
     "source": "eventCounter.h",
     "addon": "ofxSantiNodes"
   },
+  "Event Counter 2": {
+    "description": "Counts input events, measures their interval in milliseconds and shows their values over time.\n\n**Inputs and controls**\n\n**[ Input]** Each notification is one event, including repeated values and empty vectors. All elements share one counter and timer.\n\n**[ Vec]** Repeats Count to match the input length; off outputs one integer.\n\n**[ Reset]** Clears count and timing immediately and cancels Reset Next. No Tick is emitted.\n\n**[ Reset Next]** The next event starts at count zero and IntervalMs zero, and emits Tick.\n\n**[ Verbose]** Logs count, interval in ms, FPS and the complete input vector.\n\n**[ Show]** Opens the Datagram window. Sample freezes or resumes graph recording; counting, timing and logging continue. Sampling starts enabled and continues while hidden.\n\n**Outputs**\n\n**[ Count]** Event count; the first event after creation or Reset is one.\n\n**[ IntervalMs]** Milliseconds between the latest two events, held until the next event.\n\n**[ FPS]** Event rate, 1000 / IntervalMs. First events and zero intervals output zero.\n\n**[ Tick]** One trigger per event, after all numerical outputs are updated.\n\n**Datagram**\n\nShows the latest 1000 sampled events at their actual times in ms, with one colored trace per vector element and automatic value scaling. Dense traces are reduced for display while preserving peaks; dots appear for sparse data. All sampled events remain in history. Pauses in sampling leave time gaps. Reset preserves the graph. Preset recall starts a fresh count, timing reference and graph without emitting Tick. Uses real elapsed time independently of transport playback.",
+    "parameters": [
+      "Input",
+      "Vec",
+      "Reset",
+      "Reset Next",
+      "Verbose",
+      "Show",
+      "Count",
+      "IntervalMs",
+      "FPS",
+      "Tick"
+    ],
+    "source": "eventCounter2.h",
+    "addon": "ofxSantiNodes"
+  },
   "Event Gate": {
     "description": "Generates a one-frame vector trigger (1 → 0) when Input changes.",
     "parameters": [
