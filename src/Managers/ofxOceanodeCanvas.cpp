@@ -390,6 +390,113 @@ void ofxOceanodeCanvas::handleParentNavigation(){
     if(findParent(rootContainer)) lastNavigationFrame = ImGui::GetFrameCount();
 }
 
+void ofxOceanodeCanvas::handleInstanceNavigation(){
+    const auto& io = ImGui::GetIO();
+    if(!parentID.empty() || !io.KeyAlt || io.WantTextInput || ImGui::IsAnyItemActive() ||
+       ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel)) return;
+
+    const bool left = ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true);
+    const bool right = ImGui::IsKeyPressed(ImGuiKey_RightArrow, true);
+    if(!left && !right) return;
+    static int lastNavigationFrame = -1;
+    if(lastNavigationFrame == ImGui::GetFrameCount()) return;
+    lastNavigationFrame = ImGui::GetFrameCount();
+
+    auto* root = ofxOceanodeShared::getRootContainer();
+    auto* rootCanvas = ofxOceanodeShared::getRootCanvas();
+    if(root == nullptr || rootCanvas == nullptr) return;
+
+    struct Location {
+        ofxOceanodeNode* node = nullptr;
+        ofxOceanodeCanvas* canvas = nullptr;
+        ofxOceanodeNodeMacro* macro = nullptr; // containing Macro; null at root
+        ofxOceanodeContainer* container = nullptr;
+        const string* id = nullptr; // borrowed only for this synchronous shortcut
+        float x = 0;
+    };
+    const auto& activeCanvas = ofxOceanodeShared::getActiveCanvasUniqueID();
+    Location selected;
+    // Prefer the active canvas when other tabs retain selections. Walk only
+    // the displayed instance of shared Macro tabs, as with Portal navigation.
+    const auto findSelected = [&](const auto& self, ofxOceanodeContainer* c,
+                                  ofxOceanodeCanvas* cv, ofxOceanodeNodeMacro* owner) -> bool {
+        for(const auto& entry : c->getParameterGroupNodesMap()){
+            auto* node = entry.second;
+            if(node->getNodeGui().getSelected()){
+                if(selected.node == nullptr || cv->uniqueID == activeCanvas)
+                    selected = {node, cv, owner, c, &entry.first, node->getNodeGui().getPosition().x};
+                if(cv->uniqueID == activeCanvas) return true;
+            }
+            auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel());
+            if(macro != nullptr && &macro->windowInstance() == macro &&
+               self(self, macro->getContainer().get(), macro->getCanvas(), macro)) return true;
+        }
+        return false;
+    };
+    findSelected(findSelected, root, rootCanvas, nullptr);
+    if(selected.node == nullptr) return;
+
+    auto* selectedPortal = dynamic_cast<abstractPortal*>(&selected.node->getNodeModel());
+    auto* selectedMacro = dynamic_cast<ofxOceanodeNodeMacro*>(&selected.node->getNodeModel());
+    const string selectedType = selected.node->getNodeModel().nodeName();
+    // Same left-to-right ordering across canvases; equal positions use stable
+    // canvas/node IDs so unordered-map iteration cannot change the cycle.
+    const auto before = [](const Location& a, const Location& b){
+        if(a.x != b.x) return a.x < b.x;
+        if(a.canvas->uniqueID != b.canvas->uniqueID) return a.canvas->uniqueID < b.canvas->uniqueID;
+        return *a.id < *b.id;
+    };
+    Location next, wrap;
+    // Find the adjacent match and wrap endpoint in one linear pass. Borrow
+    // each container's node map: no per-canvas vectors, match list, or sorting.
+    const auto collect = [&](const auto& self, ofxOceanodeContainer* c,
+                             ofxOceanodeCanvas* cv, ofxOceanodeNodeMacro* owner) -> void {
+        for(const auto& entry : c->getParameterGroupNodesMap()){
+            auto* node = entry.second;
+            auto& model = node->getNodeModel();
+            auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&model);
+            bool matching;
+            if(selectedPortal != nullptr){
+                auto* portal = dynamic_cast<abstractPortal*>(&model);
+                matching = portal != nullptr && portal->isMatching(selectedPortal);
+            }else if(selectedMacro != nullptr){
+                matching = macro != nullptr && (selectedMacro->isLocal() ? macro->isLocal() :
+                    (macro == selectedMacro || selectedMacro->sharesGlobalMacroWith(*macro)));
+            }else{
+                matching = model.nodeName() == selectedType;
+            }
+            if(matching && node != selected.node){
+                const Location candidate{node, cv, owner, c, &entry.first, node->getNodeGui().getPosition().x};
+                if(wrap.node == nullptr || (right ? before(candidate, wrap) : before(wrap, candidate)))
+                    wrap = candidate;
+                if((right ? before(selected, candidate) : before(candidate, selected)) &&
+                   (next.node == nullptr || (right ? before(candidate, next) : before(next, candidate))))
+                    next = candidate;
+            }
+            if(macro != nullptr && &macro->windowInstance() == macro)
+                self(self, macro->getContainer().get(), macro->getCanvas(), macro);
+        }
+    };
+    collect(collect, root, rootCanvas, nullptr);
+    const auto& target = next.node != nullptr ? next : wrap;
+    if(target.node == nullptr) return;
+
+    // Avoid an intermediate deselection event that would flicker the Inspector.
+    selected.node->getNodeGui().setSelected(false);
+    selected.canvas->lastSelectedNode.clear();
+    for(const auto& entry : target.container->getParameterGroupNodesMap())
+        entry.second->getNodeGui().setSelected(entry.second == target.node);
+    target.container->deselectAllComments();
+    if(target.macro != nullptr) target.macro->activateWindow();
+    target.canvas->requestFocus();
+    target.canvas->bringOnTop();
+    target.canvas->lastSelectedNode = *target.id;
+    ofxOceanodeShared::setActiveCanvasUniqueID(target.canvas->uniqueID);
+    // Wait for newly opened windows and node rectangles to be laid out.
+    target.canvas->requestCenterOnNode(target.node, target.macro != nullptr ? 2 : 1);
+    ofxOceanodeShared::nodeSelectedInCanvas(target.node);
+}
+
 void ofxOceanodeCanvas::handleNodeNudge(){
     const auto& io = ImGui::GetIO();
     // ChildWindows includes this canvas's scrolling region, but not sibling
@@ -3289,184 +3396,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
     if(!ImGui::IsMouseDown(0) && !ImGui::IsMouseDown(1) && !isCreatingConnection)
         container->endCanvasEdit();
 
-    // ──────────────────────────────────────────────────────────────────────
-    // Alt+Left/Right: cycle through matching portal instances across the whole patch,
-    // or through the instances of the selected global Macro.
-    //
-    // This handler is intentionally placed OUTSIDE the per-window Begin/End block
-    // and gated to run only for the ROOT canvas (parentID == "") so that:
-    //   1. Exactly one canvas instance processes the key per frame.
-    //   2. It runs regardless of which canvas window currently has ImGui focus —
-    //      this is essential because after the first jump the focus moves to a
-    //      different canvas (possibly inside a macro), and we need the handler
-    //      to keep firing so the user can keep cycling.
-    //
-    // ImGui key state (IsKeyPressed / KeyAlt) is global, so we do not need any
-    // particular window to be the "current" one when querying it.
-    // ──────────────────────────────────────────────────────────────────────
-    if(parentID == "" && ImGui::GetIO().KeyAlt && !ImGui::IsAnyItemActive()){
-        static int lastFrameJumped = -1;
-        bool leftPressed  = ImGui::IsKeyPressed(ImGuiKey_LeftArrow,  true);
-        bool rightPressed = ImGui::IsKeyPressed(ImGuiKey_RightArrow, true);
-
-        if((leftPressed || rightPressed) && lastFrameJumped != ImGui::GetFrameCount()){
-            lastFrameJumped = ImGui::GetFrameCount();
-
-            auto rootContainer = ofxOceanodeShared::getRootContainer();
-            auto rootCanvas    = ofxOceanodeShared::getRootCanvas();
-
-            if(rootContainer && rootCanvas){
-                // Recursively walk the WHOLE patch (root + all nested macros) to find the
-                // currently selected portal. The selected portal can live in any canvas,
-                // so we never assume it is in `this` canvas.
-                struct PortalLocation {
-                    abstractPortal*       portal      = nullptr;
-                    ofxOceanodeNodeMacro* globalMacro = nullptr; // set instead of portal
-                    ofxOceanodeNode*      node        = nullptr;
-                    ofxOceanodeCanvas*    canvas      = nullptr;
-                    ofxOceanodeNodeMacro* macro       = nullptr; // null for root
-                };
-
-                std::function<void(ofxOceanodeContainer*, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*, PortalLocation&)> findSelectedPortal =
-                [&](ofxOceanodeContainer* c, ofxOceanodeCanvas* cv, ofxOceanodeNodeMacro* m, PortalLocation& out){
-                    if(out.node != nullptr) return;
-                    for(auto* node : c->getAllModules()){
-                        if(out.node != nullptr) return;
-                        auto* nestedMacro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel());
-                        if(node->getNodeGui().getSelected()){
-                            auto* p = dynamic_cast<abstractPortal*>(&node->getNodeModel());
-                            if(p != nullptr || (nestedMacro != nullptr && !nestedMacro->isLocal())){
-                                out.portal      = p;
-                                out.globalMacro = p ? nullptr : nestedMacro;
-                                out.node        = node;
-                                out.canvas      = cv;
-                                out.macro       = m;
-                                return;
-                            }
-                        }
-                        // Other instances of a global Macro are never shown in a tab.
-                        if(nestedMacro != nullptr && &nestedMacro->windowInstance() == nestedMacro){
-                            findSelectedPortal(nestedMacro->getContainer().get(), nestedMacro->getCanvas(), nestedMacro, out);
-                        }
-                    }
-                };
-
-                PortalLocation selected;
-                findSelectedPortal(rootContainer, rootCanvas, nullptr, selected);
-
-                if(selected.node != nullptr){
-                    struct PortalMatch {
-                        ofxOceanodeNode*      node;
-                        ofxOceanodeCanvas*    canvas;
-                        ofxOceanodeNodeMacro* macro;
-                        float                 x;
-                    };
-                    vector<PortalMatch> matches;
-
-                    std::function<void(ofxOceanodeContainer*, ofxOceanodeCanvas*, ofxOceanodeNodeMacro*)> collectMatches =
-                    [&](ofxOceanodeContainer* c, ofxOceanodeCanvas* cv, ofxOceanodeNodeMacro* mm){
-                        for(auto* node : c->getAllModules()){
-                            auto* nestedMacro = dynamic_cast<ofxOceanodeNodeMacro*>(&node->getNodeModel());
-                            bool matching = false;
-                            if(selected.portal != nullptr){
-                                auto* p = dynamic_cast<abstractPortal*>(&node->getNodeModel());
-                                matching = p != nullptr && p->isMatching(selected.portal);
-                            }else if(nestedMacro != nullptr){
-                                matching = nestedMacro == selected.globalMacro ||
-                                           selected.globalMacro->sharesGlobalMacroWith(*nestedMacro);
-                            }
-                            if(matching){
-                                matches.push_back({node, cv, mm, node->getNodeGui().getPosition().x});
-                            }
-                            if(nestedMacro != nullptr){
-                                // Other instances of a global Macro are never shown in a tab.
-                                if(&nestedMacro->windowInstance() == nestedMacro)
-                                    collectMatches(nestedMacro->getContainer().get(), nestedMacro->getCanvas(), nestedMacro);
-                            }
-                        }
-                    };
-
-                    collectMatches(rootContainer, rootCanvas, nullptr);
-
-                    if(matches.size() > 1){
-                        // Stable ordering by x position so cycling is predictable
-                        std::sort(matches.begin(), matches.end(), [](const PortalMatch& a, const PortalMatch& b){
-                            return a.x < b.x;
-                        });
-
-                        int currentIdx = -1;
-                        for(int i = 0; i < (int)matches.size(); i++){
-                            if(matches[i].node == selected.node){
-                                currentIdx = i;
-                                break;
-                            }
-                        }
-
-                        if(currentIdx != -1){
-                            int nextIdx = currentIdx;
-                            if(rightPressed) nextIdx = (currentIdx + 1) % (int)matches.size();
-                            else             nextIdx = (currentIdx - 1 + (int)matches.size()) % (int)matches.size();
-
-                            auto& target = matches[nextIdx];
-
-                            // 1) Deselect the previously selected portal in its own canvas.
-                            //    We intentionally avoid calling selected.canvas->deselectAllNodes()
-                            //    because that would fire nodeSelectedInCanvas(nullptr), which would
-                            //    be immediately overwritten by step 6 below — but the spurious
-                            //    nullptr event would still cause the NodesController to flicker.
-                            selected.node->getNodeGui().setSelected(false);
-                            if(selected.canvas != nullptr){
-                                selected.canvas->lastSelectedNode = "";
-                            }
-
-                            // 2) Ensure no other nodes remain selected in the target canvas,
-                            //    then mark the target as the single selection.
-                            auto targetContainer = (target.macro != nullptr) ? target.macro->getContainer().get() : rootContainer;
-                            string targetNodeId = "";
-                            for(auto& pair : targetContainer->getParameterGroupNodesMap()){
-                                if(pair.second != target.node){
-                                    pair.second->getNodeGui().setSelected(false);
-                                }
-                                if(pair.second == target.node){
-                                    targetNodeId = pair.first;
-                                }
-                            }
-                            target.node->getNodeGui().setSelected(true);
-
-                            // 3) Focus the target canvas window. For a macro that has never
-                            //    been opened, activateWindow() also creates/shows the window.
-                            if(target.macro != nullptr){
-                                target.macro->activateWindow();
-                                target.canvas = target.macro->getCanvas();
-                            }
-                            if(target.canvas != nullptr){
-                                target.canvas->requestFocus();
-                                target.canvas->bringOnTop();
-                                target.canvas->lastSelectedNode = targetNodeId;
-
-                                ofxOceanodeShared::setActiveCanvasUniqueID(target.canvas->getUniqueID());
-
-                                // 4) Centre viewport on the target node
-                                float zoom = target.canvas->getZoomLevel();
-                                glm::vec2 nodeSize = glm::vec2(target.node->getNodeGui().getRectangle().getWidth(),
-                                                               target.node->getNodeGui().getRectangle().getHeight());
-                                glm::vec2 nodePos  = target.node->getNodeGui().getPosition();
-                                glm::vec2 center   = target.canvas->getContentRegionSize() / (2.0f * zoom);
-                                target.canvas->setScrolling(-nodePos - nodeSize / 2.0f + center);
-
-                            }
-
-                            // 5) Notify the NodesController (and any other listeners) so
-                            //    the tree view highlights the new node and scrolls to it.
-                            //    This MUST be called every jump — that's the fix for the
-                            //    "highlight does not follow Alt+Arrow" bug.
-                            ofxOceanodeShared::nodeSelectedInCanvas(target.node);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // Run once from the root, after drawing, even when a nested canvas has focus.
+    handleInstanceNavigation();
 
     //TODO: Find better way to to this, when macro created, recoverr focus on canvas, should be its parent. something like. container->getParentCanvas? Or set a id in canvas as "Parent Canvas".
     if(isFirstDraw && parentID != "" && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel)){

@@ -131,6 +131,7 @@ private:
     std::uint64_t observedCanvasHistoryRevision = 0;
     void handleParentNavigation();
     void handleNodeNudge();
+    void handleInstanceNavigation();
     glm::vec3 getMatrixScale(const glm::mat4 &m);
     glm::mat4 translateMatrixWithoutScale(const glm::mat4 &m, glm::vec3 translationVector);
     

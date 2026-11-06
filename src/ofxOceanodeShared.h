@@ -491,7 +491,7 @@ public:
 	}
 
 	// Root container / canvas — used for whole-patch operations such as
-	// Alt+Arrow portal navigation that need to traverse all nodes across
+	// Alt+Arrow instance navigation that need to traverse all nodes across
 	// the main graph and every macro.
 	static void setRootContainer(ofxOceanodeContainer* c){ getInstance().rootContainer = c; }
 	static ofxOceanodeContainer* getRootContainer(){ return getInstance().rootContainer; }
