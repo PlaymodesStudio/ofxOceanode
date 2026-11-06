@@ -359,10 +359,17 @@ retain their existing resource nodes and routes.
 Matching is one-to-one and applies to every model type. Named Router/Portal
 interfaces and unique model types anchor matches; matching input/output port
 roles propagate those matches through repeated model types. Saved IDs break ties
-in otherwise unanchored parts of a graph. A Portal only ever matches a Portal on
-the same bus (type, Name and scope): a saved ID reused for another bus is a
-removal and an addition, never a renamed Portal. Ambiguous unmatched ordinary nodes
-remain additions/removals rather than being arbitrarily paired by type alone.
+in otherwise unanchored parts of a graph, but only with evidence: an ordinary
+node keeps its same-ID counterpart when at least one of its cables leads to a
+matched node on the same ports on both sides, or when neither node has any
+cable. A same-ID node whose every neighbour differs (BLOOBS' `Ranger_2`, a
+Wave In driver in one preset and a dead-end modulator in another) is a removal
+and an addition, so its saved ranges never sweep through the new cables. A
+Portal only ever matches a Portal on the same bus (type, Name and scope): a
+saved ID reused for another bus is a removal and an addition, never a renamed
+Portal, and a same-bus Portal keeps its ID pair even when its driver changes.
+Ambiguous unmatched ordinary nodes remain additions/removals rather than being
+arbitrarily paired by type alone.
 
 Live node IDs are kept private and stable; target definitions are mapped onto
 those instances. A phasor feeding the same oscillator input keeps its native

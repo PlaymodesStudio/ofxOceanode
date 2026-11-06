@@ -523,6 +523,40 @@ int main(int argc,char** argv) {
         r.request(a,1000,0,true); r.update(530); assert(r.morphingInPlace()); r.finish(); r.update(540);
         near(probe(original,1).x,2); near(probe(original,2).x,4);
     }
+    // BLOOBS' Ranger_2: a same-ID node whose every neighbour differs is an
+    // unrelated node reusing the ID, not a rewired one. It is a removal and an
+    // addition, so the new cable blends from the fixed value to the added
+    // node's output instead of sweeping through the old node's saved ranges.
+    // One shared neighbour role (the same driver into the same port) keeps
+    // the pair even though its output moved.
+    {
+        auto saveReuse=[&](const std::string& folder,int kind) { // 0: source, 1: disjoint target, 2: target sharing the driver
+            ofxOceanodeContainer c(registry,types,transport); c.setCanvasID("IDReuse");
+            auto& out=floating(c,1); out.getParameter<std::string>("Name")="Value";
+            c.createNode(std::make_unique<MorphProbe>(),1);
+            assert(c.createConnectionFromInfo("Morph_Probe_1","Output","Router_f_1","Value"));
+            auto& range=c.createNode(std::make_unique<ranger>(),2).getNodeModel();
+            range.getParameter<std::vector<float>>("Min Out")={kind?10.f:-10.f}; range.getParameter<std::vector<float>>("Max Out")={kind?10.f:-10.f};
+            if(kind==1) { c.createNode(std::make_unique<oscillator>(),1); assert(c.createConnectionFromInfo("Oscillator_1","Output","Ranger_2","Input")); }
+            else { c.createNode(std::make_unique<phasor>(),1); assert(c.createConnectionFromInfo("Phasor_1","Phase","Ranger_2","Input")); }
+            if(kind) assert(c.createConnectionFromInfo("Ranger_2","Output","Morph_Probe_1","Driven"));
+            else { c.createNode(std::make_unique<MorphPhaseSink>(),1); assert(c.createConnectionFromInfo("Ranger_2","Output","Morph_Phase_Sink_1","Phase")); }
+            c.savePreset(folder);
+        };
+        const auto from=scratch+"/reuse-a",to=scratch+"/reuse-b",shared=scratch+"/reuse-shared";
+        saveReuse(from,0); saveReuse(to,1); saveReuse(shared,2);
+        MacroMixerRuntime r(parent); assert(r.importMacro(from)&&r.importMacro(to)&&r.importMacro(shared)); r.request(from,0,0,true); r.update(0);
+        const auto* original=r.origin();
+        const auto details=r.sourceDetails(r.importedMacro(to)->id());
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="removed"&&d.location=="Ranger_2";}));
+        assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="added"&&d.location.rfind("Ranger_",0)==0;}));
+        const auto kept=r.sourceDetails(r.importedMacro(shared)->id());
+        assert(std::none_of(kept.begin(),kept.end(),[](const auto& d){return (d.kind=="removed"||d.kind=="added")&&d.location.rfind("Ranger_",0)==0;}));
+        r.request(to,1000,0,true); r.update(10); assert(r.morphingInPlace()&&r.destination()==original);
+        r.update(510); near(probe(original).driven,5); // Fixed 0 -> the added Ranger's 10, never 0 from a -10..10 sweep.
+        r.finish(); r.update(520); near(probe(original).driven,10);
+        const auto& rangers=original->container->getDynamicNodes().at("Ranger"); assert(rangers.size()==1&&!rangers.count(2));
+    }
     // The user's 2/3/4 layout: the texture clock is 3, 2 or 4, while the same
     // IDs can instead drive newly added modulation chains. Its live connection
     // and phase must survive every direction; an unsaved Phase is never blended.

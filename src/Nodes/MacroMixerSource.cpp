@@ -687,10 +687,39 @@ MorphMatches matchMorphNodes(const ofJson& original, const ofJson& target) {
         return changed;
     };
     while(propagate()) {}
-    // Preserve established identities for unanchored parts of the graph. Port
-    // roles above take precedence when an ID was reused for a different role.
-    for(auto it=after.begin();it!=after.end();++it) if(before.contains(it.key())) match(it.key(),it.key());
-    while(propagate()) {}
+    // A saved ID is a tie-break for unanchored parts of the graph, never an
+    // identity: a same-ID pair is kept only when its cables agree on at least
+    // one neighbour role (a matched node on the same ports on both sides), or
+    // when neither node has any cable. A node whose every neighbour differs
+    // is an unrelated node reusing the ID (BLOOBS' Ranger_2, a shape driver in
+    // one preset and a dead-end modulator in another): it stays a removal and
+    // an addition, so its saved ranges never sweep through the new cables. A
+    // Portal's bus and a Router's Name are their identity, checked in match().
+    auto supported=[&](const std::string& key) {
+        const auto model=after.at(key).at("model").get<std::string>();
+        if(model.rfind("Router ",0)==0 || model.rfind("Portal ",0)==0) return true;
+        std::vector<std::vector<std::string>> oldEdges,newEdges;
+        for(const auto& e:a) if(e[0]==key || e[2]==key) oldEdges.push_back(e);
+        for(const auto& e:b) if(e[0]==key || e[2]==key) newEdges.push_back(e);
+        if(oldEdges.empty() && newEdges.empty()) return true;
+        for(const auto& n:newEdges) for(const auto& o:oldEdges) {
+            if(n[1]!=o[1] || n[3]!=o[3]) continue;
+            const bool input=n[2]==key && o[2]==key, output=n[0]==key && o[0]==key;
+            if(!input && !output) continue;
+            const auto neighbour=matches.find(input ? n[0] : n[2]);
+            if(neighbour!=matches.end() && neighbour->second==(input ? o[0] : o[2])) return true;
+        }
+        return false;
+    };
+    // Port roles above take precedence when an ID was reused for a different
+    // role. Each kept pair can anchor further roles, which can support more IDs.
+    for(bool changed=true;changed;) {
+        changed=false;
+        for(auto it=after.begin();it!=after.end();++it)
+            if(before.contains(it.key()) && !matches.count(it.key()) && !used.count(it.key()) && supported(it.key()))
+                changed=match(it.key(),it.key()) || changed;
+        if(changed) while(propagate()) {}
+    }
     return matches;
 }
 
