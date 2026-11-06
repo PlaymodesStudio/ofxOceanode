@@ -21,7 +21,8 @@ static int triggers=0, morphSetups=0;
 class MorphProbe : public ofxOceanodeNodeModel {
 public:
     MorphProbe():ofxOceanodeNodeModel("Morph Probe") {}
-    ofParameter<float> x,driven,output,transientValue,readOnly;
+    ofParameter<float> x,driven,output,transientValue,readOnly,gain;
+    ofParameter<std::vector<float>> gains;
     ofParameter<int> count,mode,updates,draws,configuration;
     ofParameter<bool> gate;
     ofParameter<std::string> label;
@@ -39,6 +40,7 @@ public:
         addParameter(gate.set("Gate",false)); addParameter(label.set("Label","a"));
         addParameter(floats.set("Floats",{0,2})); addParameter(ints.set("Ints",{0,2}));
         addParameter(unequal.set("Unequal",{1}));
+        addParameter(gain.set("Gain",1,0,10000)); addParameter(gains.set("Gains",{1,1}));
         addParameter(color.set("Color",ofColor(0,20,40,60)));
         addParameter(tint.set("Tint",ofFloatColor(0,.2,.4,.6)));
         addParameter(trigger.set("Trigger")); listener=trigger.newListener([] { ++triggers; });
@@ -51,6 +53,10 @@ public:
     // Inspector settings morph by default; this one stays configuration.
     MorphHint inspectorMorphHint(const ofAbstractParameter& p) const override {
         return p.getName()=="Configuration" ? MorphHint::Structural : ofxOceanodeNodeModel::inspectorMorphHint(p);
+    }
+    // Gains glide geometrically; a zero endpoint falls back to a linear glide.
+    MorphHint morphHint(const ofxOceanodeAbstractParameter& p) const override {
+        return p.getName()=="Gain" || p.getName()=="Gains" ? MorphHint::Log : MorphHint::Interpolate;
     }
 };
 class MorphPhaseSink : public ofxOceanodeNodeModel {
@@ -141,7 +147,7 @@ int main(int argc,char** argv) {
         // so these sources exercise the whole-graph fallback crossfade.
         input.getParameter<float>("Max")=target?101:100;
         auto& p=static_cast<MorphProbe&>(c.createNode(std::make_unique<MorphProbe>(),1).getNodeModel());
-        p.x=target?6:2; p.count=target?10:0; p.mode=target?3:0; p.gate=target; p.label=target?"b":"a";
+        p.x=target?6:2; p.count=target?10:0; p.mode=target?3:0; p.gate=target; p.label=target?"b":"a"; p.gain=target?100:0;
         p.floats=target?std::vector<float>{4,6}:std::vector<float>{0,2}; p.ints=target?std::vector<int>{4,6}:std::vector<int>{0,2};
         p.unequal=target?std::vector<float>{3,4}:std::vector<float>{1};
         p.color=target?ofColor(100,120,140,160):ofColor(0,20,40,60);
@@ -178,6 +184,7 @@ int main(int argc,char** argv) {
         runtime.update(260); near(runtime.value(),16); near(destinationValue(),20.25); assert(probe(runtime.destination()).mode==0);
         runtime.update(510); near(runtime.value(),16); near(destinationValue(),25); // Graph evaluates 5*5, not a blend of 16 and 36.
         auto& p=probe(runtime.destination()); near(p.x,5); assert(p.count==5 && p.mode==3 && p.gate && p.label.get()=="b");
+        near(p.gain,50); // Log hint with a zero endpoint: linear.
         assert(p.floats.get()==std::vector<float>({2,4}) && p.ints.get()==std::vector<int>({2,4}));
         // {1} -> {3,4} resamples with a gliding length (the default vector policy).
         assert(p.unequal.get()==std::vector<float>({2,2.5f})); assert(p.color.get()==ofColor(50,70,90,110)); near(p.tint.get().r,.5);
@@ -258,6 +265,7 @@ int main(int argc,char** argv) {
         auto& out=floating(c); out.getParameter<std::string>("Name")="Value";
         auto& p=static_cast<MorphProbe&>(c.createNode(std::make_unique<MorphProbe>(),1).getNodeModel());
         p.x=target?6:2; p.gate=target; p.label=target?"target":"source"; p.count=target?10:0;
+        p.gain=target?100:1; p.gains=target?std::vector<float>{100,10000}:std::vector<float>{1,1};
         p.floats=target?std::vector<float>{4,6}:std::vector<float>{0,2};
         p.ints=target?std::vector<int>{4,6}:std::vector<int>{0,2};
         p.color=target?ofColor(100,120,140,160):ofColor(0,20,40,60);
@@ -321,6 +329,9 @@ int main(int argc,char** argv) {
         assert(r.currentID()==aID&&r.destinationID()==bID); near(r.value(),4); assert(history->getSize()==3); near(phase->getPhasor(),.37f);
         // A Local knob Portal glides to its saved value (0), as native recall sets it.
         r.update(510); near(r.value(),16); near(level,4); near(shared,.385f);
+        // Log hint: half way is the geometric mean, for a float and through the
+        // vector policy alike.
+        near(p.gain,10); assert(p.gains.get().size()==2); near(p.gains.get()[0],10); near(p.gains.get()[1],100);
         assert(p.gate&&p.label.get()=="target"&&p.count==5);
         assert(p.floats.get()==std::vector<float>({2,4})&&p.ints.get()==std::vector<int>({2,4})); assert(p.color.get()==ofColor(50,70,90,110)); near(p.tint.get().r,.5);
         assert(history->getSize()==4); near(history->getFrame(0).getObjectRef(),10); assert(history->getFrame(0).getTimestamp()==Timestamp(1000));
@@ -350,6 +361,19 @@ int main(int argc,char** argv) {
         r.finish(); r.update(560); assert(!r.transitioning()&&r.origin()==original&&r.currentID()==changedID);
         const auto& headers=child->getDynamicNodes().at("HeaderPro f"); assert(headers.size()==1&&!headers.count(1));
         assert(child->getDynamicNodes().at("Buffer f").at(1)->getNodeModel().getParameter<buffer<float>*>("Output").get()==history);
+    }
+    // Log Blend scales the Log hint: 0 is the linear glide, .5 half way to the
+    // geometric one. The transition's Details come from the single preparation
+    // pass and open with the context line, which reports the preparation time.
+    for(float amount:{0.f,.5f}) {
+        MacroMixerRuntime r(parent); assert(r.importMacro(liveA)&&r.importMacro(liveB)); r.setMorphLogBlend(amount);
+        r.request(liveA,0,0,true); r.update(0); r.request(liveB,1000,0,true); r.update(10); assert(r.morphingInPlace());
+        const auto& details=r.sourceDetails(r.importedMacro(liveB)->id());
+        assert(!details.empty()&&details.front().kind=="context"&&details.front().message.find(", prepared in ")!=std::string::npos
+               &&details.front().message.find(" ms")!=std::string::npos);
+        assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback";}));
+        r.update(510); near(probe(r.origin()).gain,amount==0 ? 50.5f : 30.25f);
+        r.finish(); r.update(520); near(probe(r.origin()).gain,100);
     }
     // Added/removed live modulation: Phasor -> Oscillator -> Ranger -> Macro
     // input. Both directions retain the common nested Buffer and clock. The

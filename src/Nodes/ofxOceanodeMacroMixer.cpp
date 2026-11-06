@@ -85,7 +85,7 @@ bool validOutputNames(const MacroMixerContract& contract, std::string& error) {
     // Current control names, plus older ones that saved presets may still use.
     static const auto reserved = [] {
         std::set<std::string> names;
-        for(const auto* name : {"Mode", "Target", "Progress", "Duration_ms", "Bi Pow", "Start!", "Stop!", "Status", "Status Details",
+        for(const auto* name : {"Mode", "Target", "Progress", "Duration_ms", "Bi Pow", "Log Blend", "Start!", "Stop!", "Status", "Status Details",
                                 "Duration Ms", "Transition", "Finish Transition", "Mixer Status", "Output Routers", "Routers",
                                 "Policies", "Macros", "MacroMixerState", "Morph macros"})
             names.insert(escapedName(name));
@@ -233,6 +233,10 @@ void ofxOceanodeMacroMixer::setup() {
     addOutputParameter(progress.set("Progress", 0, 0, 1), transient);
     addParameter(duration.set("Duration_ms", 1000, 0, FLT_MAX));
     addParameter(biPow.set("Bi Pow", 0, -1, 1));
+    // How far controls whose node declares a Log morph hint (MetaballsV3
+    // Strength, Metab Points radii) glide geometrically: 1 keeps their product
+    // monotonic, 0 is the plain linear glide. Read when a morph starts.
+    addParameter(logBlend.set("Log Blend", 1, 0, 1));
     addParameter(transition.set("Start!"));
     addParameter(finish.set("Stop!"));
     addOutputParameter(summary.set("Status", "No sources"), transient);
@@ -258,11 +262,13 @@ void ofxOceanodeMacroMixer::setup() {
         const auto heading = !queued.empty() ? queued : !destination.empty() ? destination : runtime->currentID();
         if(selectedID == heading) return;
         inspectorError.clear();
+        runtime->setMorphLogBlend(logBlend);
         runtime->requestMacro(selectedID, duration, biPow, mode == 1);
     }));
     listeners.push(transition.newListener([this] {
         if(!runtime || !getActive()) return;
         inspectorError.clear();
+        runtime->setMorphLogBlend(logBlend);
         runtime->requestMacro(selectedID, duration, biPow, mode == 1);
     }));
     listeners.push(finish.newListener([this] { if(runtime && getActive()) runtime->finish(); }));
@@ -438,7 +444,7 @@ void ofxOceanodeMacroMixer::installOutputs(const MacroMixerContract& contract) {
             it = outputs.erase(it);
         } else ++it;
     }
-    std::vector<std::string> order{"Mode", "Target", "Progress", "Duration_ms", "Bi Pow", "Start!", "Stop!", "Status"};
+    std::vector<std::string> order{"Mode", "Target", "Progress", "Duration_ms", "Bi Pow", "Log Blend", "Start!", "Stop!", "Status"};
     // The node's "Routers" separator stays between the controls and the routers.
     for(int i = 0; i < getParameterGroup().size(); ++i)
         if(getParameterGroup().get(i).getName().rfind("SEPARATOR:|Routers|", 0) == 0) order.push_back(getParameterGroup().get(i).getName());

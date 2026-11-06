@@ -447,7 +447,10 @@ std::optional<MorphValue> inspectorMorphValue(ofxOceanodeNodeModel& model, const
      captureInspectorMorph<std::string>(p,result) || captureInspectorMorph<std::vector<float>>(p,result) ||
      captureInspectorMorph<std::vector<int>>(p,result) || captureInspectorMorph<ofColor>(p,result) ||
      captureInspectorMorph<ofFloatColor>(p,result));
-    if(result) result->discrete = hint == ofxOceanodeNodeModel::MorphHint::Switch;
+    if(result) {
+        result->discrete = hint == ofxOceanodeNodeModel::MorphHint::Switch;
+        result->logarithmic = hint == ofxOceanodeNodeModel::MorphHint::Log;
+    }
     return result;
 }
 
@@ -468,7 +471,9 @@ void captureMorphContainer(const MacroMixerSource::Graph& graph, ofxOceanodeCont
             auto* p = dynamic_cast<ofxOceanodeAbstractParameter*>(&parameters.get(i));
             if(!p || !morphEditable(model,*p,owner,graph,prefix.empty())) continue;
             if(auto value = captureMorph(*p)) {
-                value->discrete |= model.morphHint(*p)==ofxOceanodeNodeModel::MorphHint::Switch;
+                const auto hint = model.morphHint(*p);
+                value->discrete |= hint==ofxOceanodeNodeModel::MorphHint::Switch;
+                value->logarithmic |= hint==ofxOceanodeNodeModel::MorphHint::Log;
                 auto key = path; key.push_back(p->getName()); values.emplace(std::move(key),std::move(*value));
             }
         }
@@ -540,10 +545,42 @@ template<typename T> T morphNumber(T a, T b, float t) {
         double(std::numeric_limits<T>::lowest()),double(std::numeric_limits<T>::max())));
     else return T(value);
 }
-template<typename T> T morphValue(const T& a, const T& b, float t, bool discrete) {
+// A Log hint blends floats and float vectors geometrically: equal ratios per
+// step, so compensating controls (a strength rising while a radius shrinks)
+// keep their product monotonic instead of peaking half way. Only when every
+// endpoint value is positive; otherwise the control glides linearly.
+template<typename T> bool morphPositive(const T& value) {
+    if constexpr(std::is_same_v<T,float>) return value > 0;
+    else if constexpr(std::is_same_v<T,std::vector<float>>) {
+        return !value.empty() && std::all_of(value.begin(),value.end(),[](float v) { return v > 0; });
+    } else return false;
+}
+template<typename T> T morphLogDomain(T value, bool forward) {
+    if constexpr(std::is_same_v<T,float>) return forward ? std::log(value) : std::exp(value);
+    else if constexpr(std::is_same_v<T,std::vector<float>>) {
+        for(auto& v : value) v = forward ? std::log(v) : std::exp(v);
+        return value;
+    } else return value;
+}
+// Log Blend (the mixer's control) scales a Log hint: 1 is the geometric
+// glide, 0 the linear one, between them a mix of the two values.
+template<typename T> T morphTowards(const T& linear, const T& geometric, float amount) {
+    if constexpr(std::is_same_v<T,float>) return linear + (geometric - linear) * amount;
+    else if constexpr(std::is_same_v<T,std::vector<float>>) {
+        T value = linear;
+        for(size_t i = 0; i < value.size() && i < geometric.size(); ++i) value[i] += (geometric[i] - value[i]) * amount;
+        return value;
+    } else return linear;
+}
+template<typename T> T morphValue(const T& a, const T& b, float t, bool discrete, bool logarithmic = false, float logBlend = 1) {
     if(t <= 0) return a;
     if(t >= 1) return b;
     if(discrete) return t < .5f ? a : b;
+    if(logarithmic && logBlend > 0 && morphPositive(a) && morphPositive(b)) {
+        auto geometric = morphLogDomain(morphValue(morphLogDomain(a,true),morphLogDomain(b,true),t,false,false),false);
+        if(logBlend >= 1) return geometric;
+        return morphTowards(morphValue(a,b,t,false,false),geometric,logBlend);
+    }
     if constexpr(std::is_same_v<T,float> || std::is_same_v<T,int>) return morphNumber(a,b,t);
     else if constexpr(std::is_same_v<T,std::vector<float>> || std::is_same_v<T,std::vector<int>>) {
         if(a.size() != b.size()) return t < .5f ? a : b;
@@ -982,7 +1019,9 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
             }
             if(!saved->contains(name) || saved->at(name).is_null()) continue;
             if(auto prototype=captureMorph(*p)) {
-                prototype->discrete|=model.morphHint(*p)==ofxOceanodeNodeModel::MorphHint::Switch;
+                const auto hint=model.morphHint(*p);
+                prototype->discrete|=hint==ofxOceanodeNodeModel::MorphHint::Switch;
+                prototype->logarithmic|=hint==ofxOceanodeNodeModel::MorphHint::Log;
                 auto control=path; control.push_back(p->getName());
                 values.emplace(std::move(control),savedMorphValue(*prototype,saved->at(name)));
             }
@@ -1078,17 +1117,26 @@ MacroMixerMorphPolicy resolveMorphPolicy(const std::string& type,const MacroMixe
 }
 // A saved vector control blends by its type's Mix/Morph policy (by default
 // Resample / changing length), so vectors of different lengths glide too.
-template<typename T> T morphControl(const T& a,const T& b,float t,bool discrete,const MacroMixerMorphPolicies& policies) {
+template<typename T> T morphControl(const T& a,const T& b,float t,bool discrete,const MacroMixerMorphPolicies& policies,bool logarithmic=false,float logBlend=1) {
     if constexpr(std::is_same_v<T,std::vector<float>> || std::is_same_v<T,std::vector<int>>) {
         if(!discrete && t>0 && t<1) {
             const std::string type=std::is_same_v<T,std::vector<float>> ? "Float Vector" : "Integer Vector";
+            // A Log hint runs the policy on logarithms too, so a resampled
+            // vector still glides geometrically, scaled by Log Blend.
+            const bool log=logarithmic && logBlend>0 && morphPositive(a) && morphPositive(b);
             try {
                 const auto policy=resolveMorphPolicy(type,policies);
-                return std::get<T>(MacroMixerMixing::registry().mix(type,policy.policy,a,b,t,policy.options));
+                auto value=std::get<T>(MacroMixerMixing::registry().mix(type,policy.policy,a,b,t,policy.options));
+                if(log) {
+                    auto geometric=morphLogDomain(std::get<T>(MacroMixerMixing::registry().mix(type,policy.policy,
+                        morphLogDomain(a,true),morphLogDomain(b,true),t,policy.options)),false);
+                    value=logBlend>=1 ? std::move(geometric) : morphTowards(value,geometric,logBlend);
+                }
+                return value;
             } catch(const std::exception&) {} // Beyond the policies' limits: native interpolation.
         }
     }
-    return morphValue(a,b,t,discrete);
+    return morphValue(a,b,t,discrete,logarithmic,logBlend);
 }
 struct MorphCablePlan {
     ofxOceanodeAbstractParameter* sink=nullptr;
@@ -1257,9 +1305,10 @@ template<typename T> struct TypedMorphSignal : MorphSignal {
     ofEventListeners listeners;
     T saved;
     float t=0;
-    bool discrete=false, valid=true, publishing=false;
+    bool discrete=false, logarithmic=false, valid=true, publishing=false;
+    float logBlend=1;
     TypedMorphSignal(ofxOceanodeAbstractParameter& p, const MorphValue& target)
-    :sink(p.cast<T>().getParameter()),saved(std::get<T>(target.value)),discrete(target.discrete) {
+    :sink(p.cast<T>().getParameter()),saved(std::get<T>(target.value)),discrete(target.discrete),logarithmic(target.logarithmic) {
         a.set("Origin",sink.get()); b.set("Destination",saved); out.set("Blend",sink.get());
         inputA.bindParameter(a); inputB.bindParameter(b); output.bindParameter(out);
         listeners.push(a.newListener([this](T&) { refresh(); }));
@@ -1270,7 +1319,7 @@ template<typename T> struct TypedMorphSignal : MorphSignal {
         // Feedback cables can return to this input while it publishes. Native
         // ofParameter suppresses recursive events too; retain the same boundary.
         if(publishing) return;
-        const auto value=morphValue(a.get(),b.get(),t,discrete);
+        const auto value=morphValue(a.get(),b.get(),t,discrete,logarithmic,logBlend);
         valid=finiteMorph(value);
         if(valid && out.get()!=value) {
             publishing=true;
@@ -1395,6 +1444,7 @@ struct PolicyMorphSignal : MorphSignal {
 // the blend output drives the ordinary sink (including mirrored Macro pins).
 // Destruction rolls back topology before Graph destroys its native containers.
 struct MacroMixerMorphTopology {
+    float logBlend=1; // The mixer's Log Blend for this morph's cable blends.
     struct Signal {
         ofxOceanodeContainer* container;
         std::vector<std::string> before,after;
@@ -1538,7 +1588,7 @@ struct MacroMixerMorphTopology {
                 inputA=mixer->inputA.get(); inputB=mixer->inputB.get(); output=mixer->output.get(); blend=mixer;
             } else std::visit([&](const auto& value) {
                 using T=std::decay_t<decltype(value)>;
-                auto mixer=std::make_shared<TypedMorphSignal<T>>(*plan.sink,*plan.target);
+                auto mixer=std::make_shared<TypedMorphSignal<T>>(*plan.sink,*plan.target); mixer->logBlend=logBlend;
                 inputA=&mixer->inputA; inputB=&mixer->inputB; output=&mixer->output; blend=mixer;
             },plan.target->value);
             signals.push_back({&c,a,b,blend,plan.editable,plan.type});
@@ -1607,8 +1657,8 @@ MacroMixerSource::MorphSnapshot MacroMixerSource::Graph::captureMorphValues() co
     captureMorphContainer(*this,*container,*macro,{},values);
     return values;
 }
-void MacroMixerSource::Graph::prepareMorph(const MorphSnapshot& captured, const Graph* originGraph, const MacroMixerMorphPolicies& policies) {
-    morphStart.clear(); morphTarget.clear(); morphPolicies=policies;
+void MacroMixerSource::Graph::prepareMorph(const MorphSnapshot& captured, const Graph* originGraph, const MacroMixerMorphPolicies& policies, float logBlend) {
+    morphStart.clear(); morphTarget.clear(); morphPolicies=policies; morphLogBlend=logBlend;
     MorphSnapshot aligned;
     if(originGraph) alignMorphValues(originGraph->liveMorphDefinition.is_null() ? originGraph->revision->sourceDefinition() : originGraph->liveMorphDefinition,
         revision->sourceDefinition(),captured,{},{},aligned);
@@ -1697,7 +1747,8 @@ void MacroMixerSource::Graph::startMorphAutomation() {
             auto& params=model.getParameterGroup();
             for(int i=0;i<params.size();++i) {
                 auto* p=dynamic_cast<ofxOceanodeAbstractParameter*>(&params.get(i));
-                if(!p || !bound.count(p) || model.morphHint(*p)!=ofxOceanodeNodeModel::MorphHint::Interpolate) continue;
+                const auto hint=p ? model.morphHint(*p) : ofxOceanodeNodeModel::MorphHint::Skip;
+                if(!p || !bound.count(p) || (hint!=ofxOceanodeNodeModel::MorphHint::Interpolate && hint!=ofxOceanodeNodeModel::MorphHint::Log)) continue;
                 const auto start=captureMorph(*p);
                 if(!start || start->discrete) continue;
                 std::visit([&](const auto& value) { blendMorphAutomation(*p,value,state); },start->value);
@@ -1710,11 +1761,11 @@ void MacroMixerSource::Graph::startMorphAutomation() {
 void appendMorphEditDetails(std::vector<MacroMixerMorphDetail>& result,const std::vector<MorphContainerEdit>& edits,
                             const MorphSplits& splits,const MacroMixerMorphPolicies& policies);
 bool MacroMixerSource::Graph::prepareMorphInPlace(Revision target,const MacroMixerMorphPolicies& policies,
-                                                  std::vector<MacroMixerMorphDetail>* details) {
+                                                  std::vector<MacroMixerMorphDetail>* details,float logBlend) {
     MorphSnapshot destination;
     auto topology=std::make_shared<MacroMixerMorphTopology>();
-    topology->hostLease=host;
-    morphFallbackReason.clear(); morphPolicies=policies;
+    topology->hostLease=host; topology->logBlend=logBlend;
+    morphFallbackReason.clear(); morphPolicies=policies; morphLogBlend=logBlend;
     try {
         if(!target) throw std::runtime_error("No target Macro definition");
         const auto& original=liveMorphDefinition.is_null() ? revision->sourceDefinition() : liveMorphDefinition;
@@ -1845,7 +1896,8 @@ void MacroMixerSource::Graph::applyMorph(float progress) {
             std::visit([&](const auto& target) {
                 using T = std::decay_t<decltype(target)>;
                 if(inspector->valueType() != typeid(T).name()) return;
-                auto value = morphControl(std::get<T>(start.value),target,progress,start.discrete || entry.second.discrete,morphPolicies);
+                auto value = morphControl(std::get<T>(start.value),target,progress,start.discrete || entry.second.discrete,morphPolicies,
+                                          start.logarithmic || entry.second.logarithmic,morphLogBlend);
                 auto& parameter = inspector->cast<T>();
                 if(parameter.get() != value) parameter = value;
             },entry.second.value);
@@ -1860,7 +1912,8 @@ void MacroMixerSource::Graph::applyMorph(float progress) {
         std::visit([&](const auto& target) {
             using T = std::decay_t<decltype(target)>;
             if(p->valueType() != typeid(T).name()) return;
-            auto value = morphControl(std::get<T>(start.value),target,progress,start.discrete || entry.second.discrete,morphPolicies);
+            auto value = morphControl(std::get<T>(start.value),target,progress,start.discrete || entry.second.discrete,morphPolicies,
+                                      start.logarithmic || entry.second.logarithmic,morphLogBlend);
             // Keep the underlying value alive even if its listener deletes the
             // port or reloads its owning nested Macro during this assignment.
             auto parameter = p->cast<T>().getParameter();

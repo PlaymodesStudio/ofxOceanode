@@ -3,7 +3,7 @@
 MacroMixer normally runs two ordinary Macro instances and mixes their selected Routers.
 It is registered under **Experimental → MacroMixer**. Declare router names, types
 and Input/Output roles in its Inspector; add Macro source folders; choose Mode
-(Mix or Morph) and Target and press **Start!**. Duration_ms, Bi Pow and **Stop!**
+(Mix or Morph) and Target and press **Start!**. Duration_ms, Bi Pow, Log Blend and **Stop!**
 (finish now) control a fade, and Progress shows it. Each output has its own
 type-specific policy and options.
 
@@ -27,7 +27,7 @@ values, Progress keeps its value (1 at completion) and promotion waits for the
 acknowledgement. The fade never restarts; a morph that rewires a resource cable
 used to run a second, empty pass of the whole duration after completing.
 
-The node shows Mode, Target, Progress, Duration_ms, Bi Pow, Start!, Stop! and
+The node shows Mode, Target, Progress, Duration_ms, Bi Pow, Log Blend, Start!, Stop! and
 Status, then a **Routers** separator above the router ports. The Inspector has
 four sections: **ROUTERS** (the router table with **Load Routers** and **Save
 Routers**), **MIX/MORPH POLICIES** (**Default Mix/Morph policies**), **MACROS**
@@ -290,9 +290,18 @@ block (SuperCollider nodes such as SC polycombBox). They can opt in through
   saved keys without sound (view sizes, tabs, browser folders). Neither counts
   as a configuration change.
 - `morphHint(parameter)` for parameters in the group: `Interpolate` (default),
-  `Switch` (jumps half way), `Skip` (the node drives it, or it is not sound) or
-  `Structural` (a different saved value replaces the node, for example a voice
-  or channel count).
+  `Log` (a float or float vector glides geometrically, equal ratios per step,
+  for gains, strengths, radii and rates; a non-positive endpoint glides
+  linearly instead), `Switch` (jumps half way), `Skip` (the node drives it, or
+  it is not sound) or `Structural` (a different saved value replaces the node,
+  for example a voice or channel count). `Log` matters when two controls
+  compensate each other: MetaballsV3 `Strength` and Metab Points `Radius
+  Min/Max` morph in log space, so the field level (strength times radius
+  squared) stays monotonic between a weak field with large radii and a strong
+  one with small radii (BLOOBS Init to GEOMETRIC), instead of peaking half way.
+  The mixer's **Log Blend** (0 to 1, default 1) scales every `Log` hint for the
+  morphs it starts: 1 is the geometric glide, 0 the linear one, and a value
+  between them mixes the two, so a show can tune how early the shapes settle.
 - `morphCheck(target, reason)`: whether the node can blend into those saved
   settings, without side effects. A refusal replaces just that node, with the
   reason in Details.
@@ -391,8 +400,8 @@ buses above), and a Global one follows the shared Portal service. Router names/b
 the destination's; router Values marked Exclude From Snapshots are also skipped.
 Selected outer Input routers and connected nested Macro input pins remain live.
 
-Floats, integers and colors interpolate; integer values round to the nearest
-integer. Numeric vectors blend by their type's Mix/Morph policy (by default
+Floats, integers and colors interpolate (floats and float vectors with a `Log`
+hint in log space); integer values round to the nearest integer. Numeric vectors blend by their type's Mix/Morph policy (by default
 Resample / changing length, so vectors of different lengths glide too).
 Booleans, strings and dropdown controls switch at halfway through the eased progress.
 Non-finite controls are skipped. Unmatched destination controls retain their own

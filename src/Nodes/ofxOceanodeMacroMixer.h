@@ -78,7 +78,7 @@ private:
     std::string routerEditBlocker(const std::string& id) const;
     ofParameter<std::string> state, summary;
     ofParameter<int> target;
-    ofParameter<float> duration, biPow, progress;
+    ofParameter<float> duration, biPow, logBlend, progress;
     ofParameter<void> transition, finish;
     ofParameter<int> mode; // 0 Mix, 1 Morph.
     customGuiRegion routerEditor, policyEditor, macroEditor;

@@ -43,6 +43,10 @@ public:
     const MacroMixerMorphPolicies& sourceMorphPolicies(const std::string& id) const;
     // The default with the source's own policies applied over it.
     MacroMixerMorphPolicies morphPoliciesInto(const std::string& id) const;
+    // The mixer's Log Blend: how far controls with a Log morph hint glide
+    // geometrically (1) rather than linearly (0). Read when a morph is prepared.
+    void setMorphLogBlend(float amount) { morphLogBlend = amount < 0 ? 0.f : amount > 1 ? 1.f : amount; }
+    float getMorphLogBlend() const { return morphLogBlend; }
     const std::vector<MacroMixerMorphDetail>& sourceDetails(const std::string& id) const;
     // Every source checked against every other: a morph preview from each
     // origin's saved state into each target, as Details shows for the running
@@ -199,4 +203,5 @@ private:
     bool fadeRunning = false;
     double startMs = 0, stallMs = 0;
     float durationMs = 0, biPow = 0, lastValue = 0, mixedProgress = 0, heldProgress = 0;
+    float morphLogBlend = 1;
 };

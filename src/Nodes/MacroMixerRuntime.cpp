@@ -755,7 +755,7 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
             // The preparation reports the transition's Details from the one
             // alignment it makes; a second full pass only ran on this frame.
             std::vector<MacroMixerMorphDetail> details;
-            const bool reuse=request->morph && current && current->prepareMorphInPlace(revision,morphPoliciesInto(revision->id()),&details);
+            const bool reuse=request->morph && current && current->prepareMorphInPlace(revision,morphPoliciesInto(revision->id()),&details,morphLogBlend);
             if(request->morph && current) {
                 if(details.empty()) details=current->inspectMorph(revision,morphPoliciesInto(revision->id())); // Failed before any edit was read.
                 if(!reuse) {
@@ -778,7 +778,7 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
                     currentMorph = request->morph;
                     mixedProgress = 1;
                 } else {
-                    if(request->morph && !reuse) candidate->prepareMorph(morphStart,current.get(),morphPoliciesInto(revision->id()));
+                    if(request->morph && !reuse) candidate->prepareMorph(morphStart,current.get(),morphPoliciesInto(revision->id()),morphLogBlend);
                     next = std::move(candidate);
                     inPlaceTarget=reuse ? revision : nullptr;
                     nextMorph = request->morph;

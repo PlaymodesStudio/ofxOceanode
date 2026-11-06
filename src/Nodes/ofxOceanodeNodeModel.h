@@ -122,7 +122,10 @@ public:
     struct MorphKeys { std::vector<std::string> blended, ignored; };
     // Interpolate: the default. Switch: jumps half way. Skip: the node drives
     // it (or it is not sound). Structural: a different value replaces the node.
-    enum class MorphHint { Interpolate, Switch, Skip, Structural };
+    // Log: a float or float vector glides geometrically (equal ratios per
+    // step), for gains, strengths, radii, rates and other multiplicative
+    // controls; a non-positive endpoint falls back to Interpolate.
+    enum class MorphHint { Interpolate, Switch, Skip, Structural, Log };
     virtual MorphKeys morphKeys() const { return {}; }
     virtual MorphHint morphHint(const ofxOceanodeAbstractParameter&) const { return MorphHint::Interpolate; }
     // Inspector settings morph too. By default floats, float vectors and colours

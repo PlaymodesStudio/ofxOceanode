@@ -60,7 +60,8 @@ public:
     struct MorphValue {
         using Value = std::variant<float, int, bool, std::string, std::vector<float>, std::vector<int>, ofColor, ofFloatColor>;
         Value value;
-        bool discrete = false;
+        bool discrete = false;    // Switches half way.
+        bool logarithmic = false; // Glides in log space when both ends are positive.
     };
     // Alternating model/ID components, followed by the parameter name. Separate
     // components avoid collisions with names containing slashes or underscores.
@@ -87,14 +88,15 @@ public:
         bool update();
         bool draw();
         MorphSnapshot captureMorphValues() const;
-        void prepareMorph(const MorphSnapshot& origin, const Graph* originGraph = nullptr, const MacroMixerMorphPolicies& policies = {});
+        // logBlend: the mixer's Log Blend, scaling every Log morph hint (1 geometric, 0 linear).
+        void prepareMorph(const MorphSnapshot& origin, const Graph* originGraph = nullptr, const MacroMixerMorphPolicies& policies = {}, float logBlend = 1);
         // Read saved controls and reconcile compatible native nodes. Changed
         // connections mix live signals with registered router policies; added
         // and removed nodes coexist until completion.
         // details, when given, receives the transition's Details as inspectMorph
         // would read them, from the same alignment, so Start plans the target once.
         bool prepareMorphInPlace(Revision target, const MacroMixerMorphPolicies& policies = {},
-                                 std::vector<MacroMixerMorphDetail>* details = nullptr);
+                                 std::vector<MacroMixerMorphDetail>* details = nullptr, float logBlend = 1);
         std::vector<MacroMixerMorphDetail> inspectMorph(Revision target, const MacroMixerMorphPolicies& policies = {}) const;
         void drawMorphConnections();
         bool morphConnectionsReady() const;
@@ -105,6 +107,7 @@ public:
         mutable std::map<std::string, std::shared_ptr<TriggerLatch>> triggerLatches;
         MorphSnapshot morphStart, morphTarget;
         MacroMixerMorphPolicies morphPolicies; // Vector controls blend by their type's policy.
+        float morphLogBlend = 1; // Log Blend of the running morph.
         ofJson liveMorphDefinition; // Saved target expressed in stable runtime node identities.
         std::shared_ptr<MacroMixerMorphTopology> morphTopology;
         // Controls the destination's timelines drive: each timeline write
