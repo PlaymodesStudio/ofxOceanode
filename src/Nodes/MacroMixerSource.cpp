@@ -1707,7 +1707,10 @@ void MacroMixerSource::Graph::startMorphAutomation() {
     }
     if(any) morphAutomation=std::move(state);
 }
-bool MacroMixerSource::Graph::prepareMorphInPlace(Revision target,const MacroMixerMorphPolicies& policies) {
+void appendMorphEditDetails(std::vector<MacroMixerMorphDetail>& result,const std::vector<MorphContainerEdit>& edits,
+                            const MorphSplits& splits,const MacroMixerMorphPolicies& policies);
+bool MacroMixerSource::Graph::prepareMorphInPlace(Revision target,const MacroMixerMorphPolicies& policies,
+                                                  std::vector<MacroMixerMorphDetail>* details) {
     MorphSnapshot destination;
     auto topology=std::make_shared<MacroMixerMorphTopology>();
     topology->hostLease=host;
@@ -1717,6 +1720,13 @@ bool MacroMixerSource::Graph::prepareMorphInPlace(Revision target,const MacroMix
         const auto& original=liveMorphDefinition.is_null() ? revision->sourceDefinition() : liveMorphDefinition;
         MorphSplits splits;
         topology->targetDefinition=readSplitMorphTarget(*this,original,target->sourceDefinition(),destination,topology->edits,splits);
+        // The transition's Details come from these edits (as inspectMorph
+        // reads them), before staging changes the graph they describe.
+        if(details) {
+            details->clear();
+            try { appendMorphEditDetails(*details,topology->edits,splits,policies); }
+            catch(const std::exception& e) { details->push_back({"fallback","Graph",e.what()}); }
+        }
         topology->prepare(*host,policies);
     } catch(const std::exception& e) { morphFallbackReason=e.what(); return false; } // Staged edits roll back before fallback.
     const auto start=captureMorphValues();
@@ -1741,6 +1751,70 @@ void MacroMixerSource::Graph::drawMorphConnections() {
 bool MacroMixerSource::Graph::morphConnectionsReady() const {
     return !morphTopology || morphTopology->ready();
 }
+// The Details of a morph, read from its edits before the graph is staged:
+// added, replaced and removed nodes, node morphs, Portal buses and every
+// changed cable with its planned policy. The preparation reports them from
+// the edits it already computed, so Start aligns and plans the target once.
+void appendMorphEditDetails(std::vector<MacroMixerMorphDetail>& result,const std::vector<MorphContainerEdit>& edits,
+                            const MorphSplits& splits,const MacroMixerMorphPolicies& policies) {
+    for(const auto& edit:edits) {
+        std::set<std::string> replacements;
+        for(const auto& split:splits) if(split.first.first==edit.path) replacements.insert(split.second.replacement);
+        for(const auto& key:edit.added) if(!replacements.count(key)) result.push_back({"added",morphLocation(edit.path,key),
+            edit.joining.count(key) ? "Starts when the morph begins, with its Portal bus's value" : "Starts when the morph begins"});
+        for(const auto& entry:edit.nodeMorphs) if(entry.changed) result.push_back({"node",morphLocation(edit.path,entry.key),
+            "Blends its own saved state on the running node"});
+        for(const auto& key:edit.pinMorphs) result.push_back({"node",morphLocation(edit.path,key),
+            "Publishes the saved state's pins when the morph begins and removes the ones it lacks at completion"});
+        for(const auto& key:edit.removed) {
+            const auto split=splits.find({edit.path,key});
+            if(split==splits.end()) result.push_back({"removed",morphLocation(edit.path,key),"Runs until the morph completes"});
+            else result.push_back({"replaced",morphLocation(edit.path,key),"The "+split->second.reason+", so it cannot morph. "
+                "The running node retires at completion, the saved one starts now and their connections blend."});
+        }
+        const auto buses=planPortalBuses(*edit.container,edit);
+        for(const auto& bus:buses.buses) {
+            const auto location=morphLocation(edit.path,"Portal bus "+bus.name);
+            if(!bus.reason.empty()) { result.push_back({"fallback",location,bus.reason}); continue; }
+            try {
+                const auto plan=planMorphCable(*edit.container,edit.target,bus.live,"Value",bus.a,bus.b,policies,true,bus.carrier);
+                const auto from=bus.a.empty() ? std::string("Bus value") : bus.a[0]+" / "+bus.a[1];
+                const auto to=bus.b.empty() ? std::string("Saved value") : bus.b[0]+" / "+bus.b[1];
+                result.push_back({"mix",location,from+" -> "+to,plan.type,plan.policy.policy,plan.policy.options});
+            } catch(const std::exception& e) { result.push_back({"fallback",location,e.what()}); }
+        }
+        std::map<std::pair<std::string,std::string>,std::vector<std::string>> before,after;
+        for(const auto& edge:savedEdges(edit.original.at("connections"))) before[{edge[2],edge[3]}]=edge;
+        for(const auto& edge:savedEdges(edit.target.at("connections"))) after[{edge[2],edge[3]}]=edge;
+        auto inputs=before; for(const auto& item:after) inputs.emplace(item.first,item.second);
+        for(const auto& input:inputs) {
+            const auto& key=input.first.first; const auto& name=input.first.second;
+            const auto a=before.count(input.first)?before.at(input.first):std::vector<std::string>{};
+            const auto b=after.count(input.first)?after.at(input.first):std::vector<std::string>{};
+            if(a==b || !edit.original.at("nodes").contains(key) || !edit.target.at("nodes").contains(key) || buses.owned.count(input.first)) continue;
+            const auto location=morphLocation(edit.path,key,name);
+            // A pin published when the morph begins cannot be planned yet.
+            if(!morphPort(*edit.container,key,name) && std::count(edit.pinMorphs.begin(),edit.pinMorphs.end(),key)) {
+                ofParameter<float> pin; pin.setName(name);
+                if(auto* node=morphNode(*edit.container,key)) {
+                    const auto pins=node->getNodeModel().morphPins(edit.target.at("nodes").at(key).at("settings"));
+                    if(std::count(pins.begin(),pins.end(),pin.getEscapedName())) {
+                        const auto from=a.empty() ? std::string("Fixed value") : a[0]+" / "+a[1];
+                        const auto to=b.empty() ? std::string("Fixed value") : b[0]+" / "+b[1];
+                        result.push_back({"node",location,from+" -> "+to+", into the pin published when the morph begins"});
+                        continue;
+                    }
+                }
+            }
+            try {
+                const auto plan=planMorphCable(*edit.container,edit.target,key,name,a,b,policies,true);
+                const auto endpoint=[&plan](const std::vector<std::string>& edge) { return edge.empty()?std::string(plan.type=="ScBus"?"Silence":"Fixed value"):edge[0]+" / "+edge[1]; };
+                result.push_back({"mix",location,endpoint(a)+" -> "+endpoint(b),plan.type,plan.policy.policy,plan.policy.options});
+            } catch(const std::exception& e) { result.push_back({"fallback",location,e.what()}); }
+        }
+    }
+    if(result.empty()) result.push_back({"live","Graph","Matching graph controls morph on the running nodes"});
+}
 std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revision target,const MacroMixerMorphPolicies& policies) const {
     std::vector<MacroMixerMorphDetail> result;
     try {
@@ -1748,63 +1822,7 @@ std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revisio
         const auto& original=liveMorphDefinition.is_null() ? revision->sourceDefinition() : liveMorphDefinition;
         MorphSnapshot values; std::vector<MorphContainerEdit> edits; MorphSplits splits;
         readSplitMorphTarget(*this,original,target->sourceDefinition(),values,edits,splits);
-        for(const auto& edit:edits) {
-            std::set<std::string> replacements;
-            for(const auto& split:splits) if(split.first.first==edit.path) replacements.insert(split.second.replacement);
-            for(const auto& key:edit.added) if(!replacements.count(key)) result.push_back({"added",morphLocation(edit.path,key),
-                edit.joining.count(key) ? "Starts when the morph begins, with its Portal bus's value" : "Starts when the morph begins"});
-            for(const auto& entry:edit.nodeMorphs) if(entry.changed) result.push_back({"node",morphLocation(edit.path,entry.key),
-                "Blends its own saved state on the running node"});
-            for(const auto& key:edit.pinMorphs) result.push_back({"node",morphLocation(edit.path,key),
-                "Publishes the saved state's pins when the morph begins and removes the ones it lacks at completion"});
-            for(const auto& key:edit.removed) {
-                const auto split=splits.find({edit.path,key});
-                if(split==splits.end()) result.push_back({"removed",morphLocation(edit.path,key),"Runs until the morph completes"});
-                else result.push_back({"replaced",morphLocation(edit.path,key),"The "+split->second.reason+", so it cannot morph. "
-                    "The running node retires at completion, the saved one starts now and their connections blend."});
-            }
-            const auto buses=planPortalBuses(*edit.container,edit);
-            for(const auto& bus:buses.buses) {
-                const auto location=morphLocation(edit.path,"Portal bus "+bus.name);
-                if(!bus.reason.empty()) { result.push_back({"fallback",location,bus.reason}); continue; }
-                try {
-                    const auto plan=planMorphCable(*edit.container,edit.target,bus.live,"Value",bus.a,bus.b,policies,true,bus.carrier);
-                    const auto from=bus.a.empty() ? std::string("Bus value") : bus.a[0]+" / "+bus.a[1];
-                    const auto to=bus.b.empty() ? std::string("Saved value") : bus.b[0]+" / "+bus.b[1];
-                    result.push_back({"mix",location,from+" -> "+to,plan.type,plan.policy.policy,plan.policy.options});
-                } catch(const std::exception& e) { result.push_back({"fallback",location,e.what()}); }
-            }
-            std::map<std::pair<std::string,std::string>,std::vector<std::string>> before,after;
-            for(const auto& edge:savedEdges(edit.original.at("connections"))) before[{edge[2],edge[3]}]=edge;
-            for(const auto& edge:savedEdges(edit.target.at("connections"))) after[{edge[2],edge[3]}]=edge;
-            auto inputs=before; for(const auto& item:after) inputs.emplace(item.first,item.second);
-            for(const auto& input:inputs) {
-                const auto& key=input.first.first; const auto& name=input.first.second;
-                const auto a=before.count(input.first)?before.at(input.first):std::vector<std::string>{};
-                const auto b=after.count(input.first)?after.at(input.first):std::vector<std::string>{};
-                if(a==b || !edit.original.at("nodes").contains(key) || !edit.target.at("nodes").contains(key) || buses.owned.count(input.first)) continue;
-                const auto location=morphLocation(edit.path,key,name);
-                // A pin published when the morph begins cannot be planned yet.
-                if(!morphPort(*edit.container,key,name) && std::count(edit.pinMorphs.begin(),edit.pinMorphs.end(),key)) {
-                    ofParameter<float> pin; pin.setName(name);
-                    if(auto* node=morphNode(*edit.container,key)) {
-                        const auto pins=node->getNodeModel().morphPins(edit.target.at("nodes").at(key).at("settings"));
-                        if(std::count(pins.begin(),pins.end(),pin.getEscapedName())) {
-                            const auto from=a.empty() ? std::string("Fixed value") : a[0]+" / "+a[1];
-                            const auto to=b.empty() ? std::string("Fixed value") : b[0]+" / "+b[1];
-                            result.push_back({"node",location,from+" -> "+to+", into the pin published when the morph begins"});
-                            continue;
-                        }
-                    }
-                }
-                try {
-                    const auto plan=planMorphCable(*edit.container,edit.target,key,name,a,b,policies,true);
-                    const auto endpoint=[&plan](const std::vector<std::string>& edge) { return edge.empty()?std::string(plan.type=="ScBus"?"Silence":"Fixed value"):edge[0]+" / "+edge[1]; };
-                    result.push_back({"mix",location,endpoint(a)+" -> "+endpoint(b),plan.type,plan.policy.policy,plan.policy.options});
-                } catch(const std::exception& e) { result.push_back({"fallback",location,e.what()}); }
-            }
-        }
-        if(result.empty()) result.push_back({"live","Graph","Matching graph controls morph on the running nodes"});
+        appendMorphEditDetails(result,edits,splits,policies);
     } catch(const std::exception& e) { result.push_back({"fallback","Graph",e.what()}); }
     return result;
 }

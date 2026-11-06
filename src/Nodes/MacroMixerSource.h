@@ -91,7 +91,10 @@ public:
         // Read saved controls and reconcile compatible native nodes. Changed
         // connections mix live signals with registered router policies; added
         // and removed nodes coexist until completion.
-        bool prepareMorphInPlace(Revision target, const MacroMixerMorphPolicies& policies = {});
+        // details, when given, receives the transition's Details as inspectMorph
+        // would read them, from the same alignment, so Start plans the target once.
+        bool prepareMorphInPlace(Revision target, const MacroMixerMorphPolicies& policies = {},
+                                 std::vector<MacroMixerMorphDetail>* details = nullptr);
         std::vector<MacroMixerMorphDetail> inspectMorph(Revision target, const MacroMixerMorphPolicies& policies = {}) const;
         void drawMorphConnections();
         bool morphConnectionsReady() const;

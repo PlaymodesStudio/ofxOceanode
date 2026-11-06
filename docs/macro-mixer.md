@@ -140,7 +140,11 @@ Paths start at the data folder; hover for the full path.
   title is orange when a node is replaced and red when the graph falls back. It lists
   added/removed/replaced nodes, the receiving node/parameter and both endpoints of every
   changed connection with its policy, and every fallback reason, including mixes
-  skipped because another incompatibility forced fallback.
+  skipped because another incompatibility forced fallback. A transition's
+  Details open with a context line, "From A to B, prepared in N ms": the time
+  the Start frame spent aligning and planning the target, staging its added
+  nodes and loading its timelines, all before the fade clock starts. A long
+  preparation shows as a one-frame stall of the running graph.
 - **Morphs from other sources**: the source check's result for each other
   source morphing into this one (*morphs in place*, *node replaced*, *graph
   fallback* or *not checked*), with every fallback and replacement reason.

@@ -749,22 +749,29 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
         }
         if(revision) {
             preparing = true;
+            const double preparationStart = clock(); // Reported in the transition's Details.
             const auto morphStart = request->morph && current ? current->captureMorphValues() : MacroMixerSource::MorphSnapshot{};
             sourceDetailCache.clear();
+            // The preparation reports the transition's Details from the one
+            // alignment it makes; a second full pass only ran on this frame.
+            std::vector<MacroMixerMorphDetail> details;
+            const bool reuse=request->morph && current && current->prepareMorphInPlace(revision,morphPoliciesInto(revision->id()),&details);
             if(request->morph && current) {
-                auto details=current->inspectMorph(revision,morphPoliciesInto(revision->id()));
-                details.insert(details.begin(),{"context",revision->name(),"From "+current->revision->name()+" to "+revision->name()});
-                transitionDetails[revision->id()]=std::move(details);
-            }
-            const bool reuse=request->morph && current && current->prepareMorphInPlace(revision,morphPoliciesInto(revision->id()));
-            if(request->morph && current && !reuse) {
-                auto& details=transitionDetails[revision->id()];
-                if(std::none_of(details.begin(),details.end(),[](const auto& d) {return d.kind=="fallback";}))
-                    details.push_back({"fallback","Graph",current->morphFallbackReason});
-                for(auto& detail:details) if(detail.kind=="mix") { detail.kind="skipped"; detail.message="Connection mix skipped: the router outputs crossfade instead. "+detail.message; }
+                if(details.empty()) details=current->inspectMorph(revision,morphPoliciesInto(revision->id())); // Failed before any edit was read.
+                if(!reuse) {
+                    if(std::none_of(details.begin(),details.end(),[](const auto& d) {return d.kind=="fallback";}))
+                        details.push_back({"fallback","Graph",current->morphFallbackReason});
+                    for(auto& detail:details) if(detail.kind=="mix") { detail.kind="skipped"; detail.message="Connection mix skipped: the router outputs crossfade instead. "+detail.message; }
+                }
             }
             std::shared_ptr<Graph> candidate = reuse ? current : MacroMixerSource::instantiate(parent, revision, errors, inputValues, keptOut);
             preparing = false;
+            if(request->morph && current) {
+                const int preparedMs = int(clock()-preparationStart+.5);
+                details.insert(details.begin(),{"context",revision->name(),"From "+current->revision->name()+" to "+revision->name()
+                    +", prepared in "+std::to_string(preparedMs)+" ms"});
+                transitionDetails[revision->id()]=std::move(details);
+            }
             if(candidate) {
                 if(!current) {
                     current = std::move(candidate);
