@@ -26,6 +26,8 @@ public:
     std::vector<std::string> menuControllerNames() const;
     void drawMenu(const std::string& controllerName, float labelWidth);
     void drawMenus(const std::string& excludedControllerName, float labelWidth);
+    // Called inside Edit; variable controllers keep their complete menus.
+    void drawVariablesMenus();
     void drawPopups();
     // The controllers' status readouts, right-aligned in the menu bar.
     float menuBarStatusWidth();

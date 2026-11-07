@@ -529,6 +529,8 @@ void ofxOceanode::drawMenuBar(){
                 unusedNodesSelectedNode.clear();
                 unusedNodesSelectedGroup = -1;
             }
+            ofxOceanodeMenu::section("Variables");
+            controls->drawVariablesMenus();
             ImGui::EndMenu();
         }
 

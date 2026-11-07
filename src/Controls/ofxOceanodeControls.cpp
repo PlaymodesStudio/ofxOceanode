@@ -24,6 +24,10 @@
 #include <cfloat>
 
 namespace {
+bool isVariablesMenu(const std::string& name){
+    return name == "Global Variables" || name == "OSC Variables";
+}
+
 void constrainMenuHeightToHostWindow(){
     const float windowBottom = ImGui::GetWindowPos().y + ImGui::GetWindowSize().y;
     const float menuBottom = ImGui::GetCursorScreenPos().y + ImGui::GetFrameHeight();
@@ -183,7 +187,8 @@ void ofxOceanodeControls::draw(){
 std::vector<std::string> ofxOceanodeControls::menuControllerNames() const{
     std::vector<std::string> names;
     for(const auto& c : controllers)
-        if(c->isMenuController()) names.push_back(c->getControllerName());
+        if(c->isMenuController() && !isVariablesMenu(c->getControllerName()))
+            names.push_back(c->getControllerName());
     return names;
 }
 
@@ -203,10 +208,23 @@ void ofxOceanodeControls::drawMenu(const std::string& controllerName, float labe
 
 void ofxOceanodeControls::drawMenus(const std::string& excludedControllerName, float labelWidth){
     for(auto &c : controllers){
-        if(!c->isMenuController() || c->getControllerName() == excludedControllerName) continue;
+        if(!c->isMenuController() || c->getControllerName() == excludedControllerName ||
+           isVariablesMenu(c->getControllerName())) continue;
         ImGui::PushID(c.get());
         constrainMenuHeightToHostWindow();
         if(beginTopLevelMenu(ofxOceanodeMenuLabel::abbreviated(c->getControllerName(), labelWidth).c_str())){
+            c->draw();
+            ImGui::EndMenu();
+        }
+        ImGui::PopID();
+    }
+}
+
+void ofxOceanodeControls::drawVariablesMenus(){
+    for(auto &c : controllers){
+        if(!c->isMenuController() || !isVariablesMenu(c->getControllerName())) continue;
+        ImGui::PushID(c.get());
+        if(ImGui::BeginMenu(c->getControllerName().c_str())){
             c->draw();
             ImGui::EndMenu();
         }
