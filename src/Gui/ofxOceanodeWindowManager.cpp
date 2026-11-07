@@ -501,6 +501,8 @@ void ofxOceanodeWindowManager::drawWindowMenu(){
                 }});
             }
             for(const auto& entry : visit.toggles) {
+                // Macro snapshots belong to the Macro UI, not the window list.
+                if(visit.macro && entry.name == "Show Snapshot?") continue;
                 auto* toggle = entry.toggle;
                 const auto title = visit.label + " / " + entry.name;
                 nodes.push_back({title, [toggle,title](){
