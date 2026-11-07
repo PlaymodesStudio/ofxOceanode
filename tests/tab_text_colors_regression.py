@@ -20,6 +20,7 @@ CASES = r'''
 #include "ofxOceanodeFonts.h"
 #include "ofxOceanodeThemeColorPicker.h"
 #include "ofxOceanodeTabText.h"
+#include "ofxOceanodeDockTabSpacing.h"
 #include <nlohmann/json.hpp>
 #include <cassert>
 #include <algorithm>
@@ -53,11 +54,18 @@ bool probeGeometry = false;
 int probeBegin = 0, probeEnd = 0;
 std::vector<ImDrawVert> probeVertices;
 void frame(int selectRegular = -1){
-    ImGui::NewFrame();
+    const float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
+    {
+        ofxOceanodeDockTabSpacing tabSpacing;
+        ImGui::NewFrame();
+    }
     ImGui::SetNextWindowPos(ImVec2(0, 0)); ImGui::SetNextWindowSize(ImVec2(600, 380));
     ImGui::Begin("DockHost", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
     dockID = ImGui::GetID("Dock");
-    ImGui::DockSpace(dockID);
+    {
+        ofxOceanodeDockTabSpacing tabSpacing;
+        ImGui::DockSpace(dockID);
+    }
     ImGui::End();
     for(const char* name : {"Panel A", "Panel B"}){
         ImGui::SetNextWindowDockID(dockID, ImGuiCond_Always);
@@ -91,6 +99,7 @@ void frame(int selectRegular = -1){
     ImGui::End();
     ImGui::Render();
     assert(GImGui->ColorStack.empty());
+    assert(ImGui::GetStyle().ItemInnerSpacing.x == spacing);
 }
 
 int countColor(const ImDrawList* list, const ImRect& rect, ImU32 color){
@@ -148,6 +157,10 @@ int main(){
     OceanodeColors::TabText = ImVec4(0.89f, 0.17f, 0.71f, 0.6f);
     frame(0); frame(0); frame(0); checkDock(); checkRegular(0);
     auto* node = ImGui::DockBuilderGetNode(dockID);
+    const auto& tabs = node->TabBar->Tabs;
+    assert(tabs.Size == 2);
+    assert(abs(tabs[1].Offset - tabs[0].Offset - tabs[0].Width - 2 * ImGui::GetStyle().ItemInnerSpacing.x) < 0.01f);
+    assert(abs(regularBar->Tabs[1].Offset - regularBar->Tabs[0].Offset - regularBar->Tabs[0].Width - ImGui::GetStyle().ItemInnerSpacing.x) < 0.01f);
     auto* panelA = ImGui::FindWindowByName("Panel A");
     auto* panelB = ImGui::FindWindowByName("Panel B");
     node->TabBar->NextSelectedTabId = panelA->TabId;
@@ -211,8 +224,29 @@ int main(){
     assert(OceanodeColors::TabText.x == 0.1f && OceanodeColors::TabSelectedText.x == 0.9f);
     theme.setup();
     assert(OceanodeColors::TabText.x == 0.482f && OceanodeColors::TabSelectedText.x == 0.859f);
+    // Floating dock groups lay out their tab bars inside NewFrame instead.
+    const ImGuiID floatingID = ImHashStr("FloatingTabs");
+    ImGui::DockBuilderAddNode(floatingID);
+    ImGui::DockBuilderSetNodePos(floatingID, ImVec2(20, 20));
+    ImGui::DockBuilderSetNodeSize(floatingID, ImVec2(500, 300));
+    ImGui::DockBuilderDockWindow("Floating A", floatingID);
+    ImGui::DockBuilderDockWindow("Floating B", floatingID);
+    ImGui::DockBuilderFinish(floatingID);
+    for(int i = 0; i < 3; ++i){
+        {
+            ofxOceanodeDockTabSpacing tabSpacing;
+            ImGui::NewFrame();
+        }
+        for(const char* name : {"Floating A", "Floating B"}){
+            ImGui::Begin(name); ImGui::TextUnformatted("Content"); ImGui::End();
+        }
+        ImGui::Render();
+    }
+    const auto& floatingTabs = ImGui::DockBuilderGetNode(floatingID)->TabBar->Tabs;
+    assert(floatingTabs.Size == 2);
+    assert(abs(floatingTabs[1].Offset - floatingTabs[0].Offset - floatingTabs[0].Width - 2 * ImGui::GetStyle().ItemInnerSpacing.x) < 0.01f);
     ImGui::DestroyContext();
-    puts("PASS: regular/docking tab colors, selection, unfocused groups, hover, alpha, balanced style, picker, theme save/load, old and partial themes.");
+    puts("PASS: doubled hosted/floating dock tab gaps, regular/docking tab colors, selection, unfocused groups, hover, alpha, balanced style, picker, theme save/load, old and partial themes.");
 }
 '''
 

@@ -15,6 +15,7 @@
 #include "imgui_internal.h"
 #include "ofxOceanodeClipboard.h"
 #include "ofxOceanodeWindowManager.h"
+#include "ofxOceanodeDockTabSpacing.h"
 #include "ofxOceanodeHelp.h"
 #include "ofxOceanodeNodePool.h"
 #include "ofxOceanodeNodeMacro.h"
@@ -183,7 +184,10 @@ void ofxOceanode::draw(){
         resetPresetCanvasViews(container.get(), &canvas);
         presetCanvasCenterPending = false;
     }
-    gui.begin();
+    {
+        ofxOceanodeDockTabSpacing tabSpacing;
+        gui.begin();
+    }
     // ImGui uses PopupBg for menus and modals; derive it from WindowBg each frame.
     ImGuiStyle& style = ImGui::GetStyle();
     style.Colors[ImGuiCol_PopupBg] = style.Colors[ImGuiCol_WindowBg];

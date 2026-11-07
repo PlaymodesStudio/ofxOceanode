@@ -1,4 +1,5 @@
 #include "ofxOceanodeWindowManager.h"
+#include "ofxOceanodeDockTabSpacing.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeControls.h"
 #include "ofxOceanodeNodeMacro.h"
@@ -208,7 +209,10 @@ void ofxOceanodeWindowManager::beginHostWindow(){
         // gaps between docked windows read as a distinct gutter. Docked windows
         // draw their own backgrounds later, after the pop.
         ImGui::PushStyleColor(ImGuiCol_WindowBg, OceanodeColors::DockGutter);
-        proportionalDocking->dockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+        {
+            ofxOceanodeDockTabSpacing tabSpacing;
+            proportionalDocking->dockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+        }
         ImGui::PopStyleColor();
         ofxOceanodeShared::setDockspaceID(dockspace_id);
         if(!ImGui::DockBuilderGetNode(dockspace_id)->IsSplitNode()){ //We dont have a split node;

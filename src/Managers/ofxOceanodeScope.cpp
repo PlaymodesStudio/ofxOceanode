@@ -6,6 +6,7 @@
 //
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "ofxOceanodeScope.h"
+#include "ofxOceanodeDockTabSpacing.h"
 #include <algorithm>
 #include <limits>
 #include "imgui.h"
@@ -474,7 +475,10 @@ void ofxOceanodeScope::draw(){
     lastWindowConfig.width = currentSize.x;
     lastWindowConfig.height = currentSize.y;
 
-    ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None, &window_class);
+    {
+        ofxOceanodeDockTabSpacing tabSpacing;
+        ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None, &window_class);
+    }
     dockProportions->finish();
     ImGui::End();
 
