@@ -686,7 +686,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         auto prepareNewNodeModal = [&](){
             searchField = "";
             lastSearchField = "";
-            numTimesPopup = 0;
             selectedSearchResultIndex = -1;
             filteredSearchResults.clear();
 
@@ -2594,11 +2593,13 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         // Draw New Node menu
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
-        bool popop_close_button = true;
-        if (ImGui::BeginPopupModal("New Node", &popop_close_button, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
+        // Close the whole modal on Escape, even while Search or a submenu owns focus.
+        bool newNodeOpen = !ImGui::IsKeyPressed(ImGuiKey_Escape, false);
+        if (ImGui::BeginPopupModal("New Node", &newNodeOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
         {
-            char * cString = new char[256];
-            strcpy(cString, searchField.c_str());
+            char cString[256] = {};
+            searchField.copy(cString, sizeof(cString) - 1);
+            if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
             
             if(ImGui::InputText("Search", cString, 256)){
                 searchField = cString;
@@ -2607,13 +2608,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     selectedSearchResultIndex = -1;
                     lastSearchField = searchField;
                 }
-            }
-            
-            if(numTimesPopup == 1){//!(!ImGui::IsItemClicked() && ImGui::IsMouseDown(0)) && searchField == ""){
-                ImGui::SetKeyboardFocusHere(-1);
-                numTimesPopup++;
-            }else{
-                numTimesPopup++;
             }
             
             bool isEnterPressed = ImGui::IsKeyDown((ImGuiKey_Enter)); //Select first option if enter is pressed

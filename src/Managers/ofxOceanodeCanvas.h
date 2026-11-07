@@ -178,7 +178,6 @@ private:
     vector<vector<string>> options;
     string searchField = "";
     string lastSearchField = "";
-    int numTimesPopup = 0;
     
     // Search result navigation
     struct SearchResultItem {
