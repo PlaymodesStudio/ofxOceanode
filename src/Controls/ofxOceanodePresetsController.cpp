@@ -167,7 +167,13 @@ void drawMacroLibraryFolders(const shared_ptr<macroCategory>& category, const st
 }
 }
 
-ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("Presets"){
+void ofxOceanodePresetsController::reloadPresetList(){
+    const string previousBank = currentBank >= 0 && currentBank < static_cast<int>(banks.size()) ? banks[currentBank] : "";
+    const auto previousPresets = std::move(bankPresets);
+    const auto previousSelection = std::move(currentPreset);
+    bankPresets.clear();
+    currentPreset.clear();
+    banks.clear();
     //Preset Control
     ofDirectory dir;
     dir.open("Presets");
@@ -225,7 +231,12 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
                 while(!presets.empty() && presets.back().empty()) presets.pop_back();
                 banks.push_back(bankName);
                 bankPresets[bankName] = presets;
-                currentPreset[bankName] = -1;
+                const auto prior = previousPresets.find(bankName);
+                const int index = previousSelection.count(bankName) ? previousSelection.at(bankName) : -1;
+                // Keep the selection only if the same numbered folder remains.
+                currentPreset[bankName] = prior != previousPresets.end() && index >= 0 &&
+                    index < static_cast<int>(prior->second.size()) && index < static_cast<int>(presets.size()) &&
+                    prior->second[index] == presets[index] ? index : -1;
             }
         }catch(const std::exception& e){
             ofLogError("ofxOceanodePresetsController") << "Cannot read bank " << dir.getName(b) << ": " << e.what();
@@ -235,7 +246,13 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
         banks.push_back("Initial_Bank");
     }
     sort(banks.begin(), banks.end());
-    currentBank = -1; // No bank selected until a preset is loaded/saved or a bank is created.
+    const auto bank = std::find(banks.begin(), banks.end(), previousBank);
+    currentBank = bank == banks.end() ? -1 : static_cast<int>(bank - banks.begin());
+
+}
+
+ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanodeContainer> _container) : container(_container), ofxOceanodeBaseController("Presets"){
+    reloadPresetList();
 
     presetListener = container->loadPresetEvent.newListener([this](pair<string, string> presetInfo){
         string bankName = presetInfo.first;
@@ -301,6 +318,10 @@ void ofxOceanodePresetsController::draw(){
         deletePresetName = presetName;
         deletePresetIndex = presetIndex;
         popupRequest = PopupRequest::Delete;
+    }
+    if(ImGui::MenuItem("Reload Presets and Macros")){
+        reloadPresetList();
+        ofxOceanodeShared::updateMacrosStructure();
     }
     drawPresetList();
 }

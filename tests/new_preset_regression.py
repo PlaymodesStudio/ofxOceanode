@@ -161,7 +161,8 @@ struct ofxOceanodeShared {
     static void setCurrentPresetPath(string s){path=s;} static string getCurrentPresetPath(){return path;}
     static void setCurrentBankName(string s){bank=s;} static void setCurrentPresetName(string s){name=s;}
     static void setActiveCanvasUniqueID(string s){active=s;}
-    static void updateMacrosStructure(){}
+    inline static int macroRefreshes=0;
+    static void updateMacrosStructure(){++macroRefreshes;}
     struct DockingSaveEvent {vector<string> fired; void notify(const string& path){fired.push_back(path);}};
     static DockingSaveEvent& getDockingSaveRequestEvent(){static DockingSaveEvent event; return event;}
 };
@@ -187,8 +188,8 @@ struct App {
     void onLoaded(); void onLayoutLoaded(); void onSaved(); void saveDocking(const string&);
 };
 namespace ImGui {
-vector<string> items; bool clickNew=true;
-bool MenuItem(const char* name,const char* =nullptr,bool=false,bool=true){items.push_back(name);return string(name)=="New Preset" && exchange(clickNew,false);}
+vector<string> items; bool clickNew=true,clickReload=false;
+bool MenuItem(const char* name,const char* =nullptr,bool=false,bool=true){items.push_back(name);return (string(name)=="New Preset" && exchange(clickNew,false)) || (string(name)=="Reload Presets and Macros" && exchange(clickReload,false));}
 void Separator(){} void TextUnformatted(const char*){} void SameLine(){}
 template<class... Args> void TextColored(Args...){}
 }
@@ -203,6 +204,7 @@ struct ofxOceanodePresetsController {
     unique_ptr<int> pendingSave=make_unique<int>(1);
     string saveResultText="Old",deleteBankName="Bank",deletePresetName="Saved"; int deletePresetIndex=0;
     void savePreset(int,const string&){} void drawPresetList(){}
+    int presetRefreshes=0; void reloadPresetList(){++presetRefreshes;}
     void loadPreset(int,const string&){++loads;}
     string presetNameAt(int i,const string& b) const{auto it=bankPresets.find(b);return it!=bankPresets.end()&&i>=0&&i<(int)it->second.size()?it->second[i]:"";}
     void draw(); void update(); void newPreset();
@@ -237,6 +239,12 @@ int main(){
     presets.draw();
     assert(ImGui::items.front()=="New Preset" && presets.newPresetRequested);
     assert(destroyedNodes==0 && !c.dynamicNodes.empty()); // no mutation inside menu draw
+    const auto deleteItem=find(ImGui::items.begin(),ImGui::items.end(),"Delete Preset");
+    assert(deleteItem!=ImGui::items.end() && next(deleteItem)!=ImGui::items.end() && *next(deleteItem)=="Reload Presets and Macros");
+    const int macroRefreshes=ofxOceanodeShared::macroRefreshes;
+    ImGui::clickReload=true; presets.draw();
+    assert(presets.presetRefreshes==1 && ofxOceanodeShared::macroRefreshes==macroRefreshes+1);
+    assert(destroyedNodes==0 && !c.dynamicNodes.empty());
     presets.update();
     assert(destroyedNodes==6 && notifiedNodes==6 && destroyedConnections==6);
 #ifdef OFXOCEANODE_USE_MIDI

@@ -27,6 +27,7 @@ public:
     
 private:
     void newPreset();
+    void reloadPresetList();
     void drawPresetList();
     
     // Presets are addressed by their position in bankPresets[bank], which is
@@ -49,7 +50,7 @@ private:
     // Index of the current preset of each bank, -1 for none.
     map<string, int> currentPreset;
     vector<string> banks;
-    int currentBank;
+    int currentBank = -1;
 
     enum class PopupRequest { None, NewBank, SaveAs, Delete, ReviewSave, SaveResult };
     PopupRequest popupRequest = PopupRequest::None;

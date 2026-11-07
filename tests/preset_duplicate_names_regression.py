@@ -87,6 +87,7 @@ PRODUCTION_HELPERS
 
 struct ofxOceanodePresetsController : ofxOceanodeBaseController {
     ofxOceanodePresetsController(shared_ptr<ofxOceanodeContainer> _container);
+    void reloadPresetList();
     void loadPreset(int index, const string& bank);
     void savePreset(int index, const string& bank);
     void beginSavePreset(string name, string bank, int index);
@@ -94,7 +95,7 @@ struct ofxOceanodePresetsController : ofxOceanodeBaseController {
     void deletePreset(int index, const string& bank);
     string presetFolderPath(int index, const string& bankName) const;
     string presetNameAt(int index, const string& bankName) const;
-    map<string, vector<string>> bankPresets; map<string, int> currentPreset; vector<string> banks; int currentBank;
+    map<string, vector<string>> bankPresets; map<string, int> currentPreset; vector<string> banks; int currentBank = -1;
     enum class PopupRequest { None, NewBank, SaveAs, Delete, ReviewSave, SaveResult }; PopupRequest popupRequest = PopupRequest::None;
     string lastPresetName;
     enum class MacroSaveChoice { Skip, Save, SaveAs };
@@ -190,6 +191,29 @@ int main(){
     presets.deletePreset(5, "Bank"); presets.deletePreset(0, "Nope");
     assert(list.size() == 3);
 
+    // Disk refresh discovers new banks/presets and preserves a selected folder
+    // even when sorting inserts a bank before it. It never loads the graph.
+    presets.loadPreset(1, "Bank");
+    const auto loadedBeforeRefresh = container->loaded;
+    const string pathBeforeRefresh = ofxOceanodeShared::path;
+    fs::create_directories("Presets/A_New_Bank/1--Added");
+    fs::create_directories("Presets/Bank/4--External");
+    presets.reloadPresetList();
+    assert((presets.banks == vector<string>{"A_New_Bank", "Bank"}));
+    assert(presets.currentBank == 1 && presets.currentPreset["Bank"] == 1);
+    assert(presets.bankPresets["Bank"].back() == "External");
+    assert(container->loaded == loadedBeforeRefresh && ofxOceanodeShared::path == pathBeforeRefresh);
+    // A renamed selected folder must not leave Save pointing at another preset.
+    fs::rename("Presets/Bank/2--My--Preset", "Presets/Bank/2--Renamed");
+    presets.reloadPresetList();
+    assert(presets.currentBank == 1 && presets.currentPreset["Bank"] == -1);
+    assert(presets.bankPresets["Bank"][1] == "Renamed");
+    fs::remove_all("Presets/Bank");
+    presets.reloadPresetList();
+    assert(presets.currentBank == -1 && !presets.bankPresets.count("Bank"));
+    assert(container->loaded == loadedBeforeRefresh);
+    assert(container->loadPresetEvent.listeners.size() == 1 && container->loadPresetNumEvent.listeners.size() == 1);
+
     puts("PASS: same-named presets load, save, delete and reveal by number; names keep '--'; duplicates warned.");
 }
 '''
@@ -200,6 +224,7 @@ def main():
     helpers = block(source, "string sanitizePresetName(string name)") + "\n" + block(source, "bool presetNameExists(")
     methods = ""
     for signature in ("ofxOceanodePresetsController::ofxOceanodePresetsController(",
+                      "void ofxOceanodePresetsController::reloadPresetList(",
                       "void ofxOceanodePresetsController::loadPreset(",
                       "void ofxOceanodePresetsController::savePreset(",
                       "void ofxOceanodePresetsController::beginSavePreset(",
