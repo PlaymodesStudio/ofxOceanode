@@ -162,6 +162,7 @@ private:
     bool canvasHasScolled = false;
     void deselectAllNodes(bool allCanvases = false);
     void selectAllNodes();
+    void selectNewlyCreatedNode(ofxOceanodeNode& node);
 
     void rememberInspectorSelectionClick(const string& nodeID);
     void recenterSelectionAfterInspectorLayout();

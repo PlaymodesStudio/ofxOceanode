@@ -2757,6 +2757,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                 glm::vec2 nodePosition = screenToWorld(glm::vec2(newNodeClickPos));
                                 if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
                                 node.getNodeGui().setPosition(nodePosition);
+                                selectNewlyCreatedNode(node);
                             }
                         } else if(result.type == "macro") {
                             unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
@@ -2765,6 +2766,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                 glm::vec2 nodePosition = screenToWorld(glm::vec2(newNodeClickPos));
                                 if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
                                 node.getNodeGui().setPosition(nodePosition);
+                                selectNewlyCreatedNode(node);
                             }
                         }
                         ImGui::PopStyleColor();
@@ -2793,6 +2795,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             glm::vec2 nodePosition = screenToWorld(glm::vec2(newNodeClickPos));
                             if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
                             node.getNodeGui().setPosition(nodePosition);
+                            selectNewlyCreatedNode(node);
                         }
                     } else if(firstResult.type == "macro") {
                         unique_ptr<ofxOceanodeNodeModel> type = container->getRegistry()->create("Macro");
@@ -2801,6 +2804,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             glm::vec2 nodePosition = screenToWorld(glm::vec2(newNodeClickPos));
                             if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
                             node.getNodeGui().setPosition(nodePosition);
+                            selectNewlyCreatedNode(node);
                         }
                     }
                     ImGui::CloseCurrentPopup();
@@ -2849,6 +2853,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                                     glm::vec2 nodePosition = screenToWorld(glm::vec2(newNodeClickPos));
                                     if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
                                     node.getNodeGui().setPosition(nodePosition);
+                                    selectNewlyCreatedNode(node);
                                 }
                                 ImGui::PopStyleColor();
                                 selectedModule = true;
@@ -2893,6 +2898,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 									glm::vec2 nodePosition = screenToWorld(glm::vec2(newNodeClickPos));
 									if(snap_to_grid) nodePosition = snapToGrid(nodePosition);
 									node.getNodeGui().setPosition(nodePosition);
+									selectNewlyCreatedNode(node);
 							}
 						}
 					}
@@ -3330,6 +3336,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                    macroModel && !macroName.empty() && macroModel->getInspectorParameterGroup().contains("Local Name"))
                     macroModel->getInspectorParameter<string>("Local Name").set(macroName);
                 applyMacroIdentity(&node, pending->description.data(), pending->color);
+                selectNewlyCreatedNode(node);
             }
         }
         if(pendingEncapsulation && encapsulationChoice >= 0) {
@@ -3486,6 +3493,12 @@ void ofxOceanodeCanvas::deselectAllNodes(bool allCanvases){
     if(hadSelectedNodes){
         ofxOceanodeShared::nodeSelectedInCanvas(nullptr);
     }
+}
+
+void ofxOceanodeCanvas::selectNewlyCreatedNode(ofxOceanodeNode& node){
+    deselectAllNodes(true);
+    node.getNodeGui().setSelected(true);
+    ofxOceanodeShared::nodeSelectedInCanvas(&node);
 }
 
 void ofxOceanodeCanvas::selectAllNodes(){
