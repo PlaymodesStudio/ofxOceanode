@@ -59,6 +59,21 @@ void plotVectorPin(const char* id, const std::vector<T>& values, bool unboundedR
         ImGui::PlotHistogram(id, bins, kReducedPlotBins, 0, NULL,
                              unboundedRange ? minimum : float(rangeMin),
                              unboundedRange ? maximum : float(rangeMax));
+        // Drawing uses reduced bins, but inspection uses the original vector.
+        // Match PlotHistogram's padded plot area, index mapping and formatting.
+        if(ImGui::IsItemHovered()){
+            const ImVec2 padding = ImGui::GetStyle().FramePadding;
+            const ImVec2 frameMin = ImGui::GetItemRectMin();
+            const ImVec2 frameMax = ImGui::GetItemRectMax();
+            const ImVec2 mouse = ImGui::GetIO().MousePos;
+            const float left = frameMin.x + padding.x, right = frameMax.x - padding.x;
+            if(mouse.x >= left && mouse.x < right &&
+               mouse.y >= frameMin.y + padding.y && mouse.y < frameMax.y - padding.y){
+                const float t = std::clamp((mouse.x - left) / (right - left), 0.0f, 0.9999f);
+                const int index = int(t * int(values.size()));
+                ImGui::SetTooltip("%d: %8.4g", index, float(values[index]));
+            }
+        }
         return;
     }
     std::vector<float> converted;

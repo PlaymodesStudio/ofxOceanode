@@ -14,9 +14,11 @@ IMGUI = Path(os.environ.get("OCEANODE_TEST_IMGUI_SRC", ROOT.parent / "ofxImGui/l
 
 PREFIX = r'''
 #include "imgui.h"
+#include "imgui_internal.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstdio>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -52,6 +54,77 @@ template<class T> struct AbstractParameter {
 bool selected = true;
 '''
 CASES = r'''
+template<class T, class Draw> string hoverTooltip(Draw draw, AbstractParameter<T>& absParam, float position, int* hoveredIndex = nullptr) {
+    ImVec2 minimum, maximum;
+    string logged;
+    // Warm up the window and obtain the same padded plot area as ImGui.
+    for(int frame = 0; frame < 2; ++frame) {
+        if(frame) {
+            const ImVec2 padding = ImGui::GetStyle().FramePadding;
+            ImGui::GetIO().AddMousePosEvent(
+                minimum.x + padding.x + position * (maximum.x - minimum.x - 2 * padding.x),
+                (minimum.y + maximum.y) * 0.5f);
+        }
+        ImGui::NewFrame();
+        if(frame && hoveredIndex) {
+            // ImGui rounds backend mouse events to pixels in NewFrame().
+            const float left = minimum.x + ImGui::GetStyle().FramePadding.x;
+            const float width = maximum.x - minimum.x - 2 * ImGui::GetStyle().FramePadding.x;
+            const float t = std::clamp((ImGui::GetIO().MousePos.x - left) / width, 0.f, 0.9999f);
+            *hoveredIndex = int(t * int(absParam.parameter.get().size()));
+        }
+        ImGui::SetNextWindowPos({0,0});
+        ImGui::SetNextWindowSize({400,200});
+        ImGui::Begin("Node");
+        ImGui::SetNextItemWidth(150);
+        ImGui::LogToBuffer();
+        draw(absParam);
+        minimum = ImGui::GetItemRectMin();
+        maximum = ImGui::GetItemRectMax();
+        logged = GImGui->LogBuffer.c_str();
+        ImGui::LogFinish();
+        ImGui::End();
+        ImGui::Render();
+    }
+    // Reduced plots replace ImGui's bin tooltip. ImGui logging can put both
+    // tooltip windows on one line, so find the final index/value pair.
+    const auto end = logged.find_last_not_of("\r\n");
+    if(end == string::npos) return "";
+    logged.resize(end + 1);
+    auto start = logged.rfind(':');
+    assert(start != string::npos);
+    while(start > 0 && logged[start - 1] >= '0' && logged[start - 1] <= '9') --start;
+    return logged.substr(start);
+}
+template<class T, class Draw> void checkHover(Draw draw) {
+    AbstractParameter<T> absParam;
+    for(int count : {2, 64, 65, 1000}) {
+        vector<T> values(count);
+        for(int i = 0; i < count; ++i) values[i] = T(i - count / 2);
+        absParam.parameter = values;
+        for(bool bounded : {false, true}) {
+            absParam.parameter.state->minimum = {bounded ? T(-1000) : numeric_limits<T>::lowest()};
+            absParam.parameter.state->maximum = {bounded ? T(1000) : numeric_limits<T>::max()};
+            for(float position : {0.f, 0.123f, 0.5f, 0.999f}) {
+                for(bool full : {true, false}) {
+                    selected = full;
+                    int index;
+                    const string tooltip = hoverTooltip(draw, absParam, position, &index);
+                    char expected[80];
+                    snprintf(expected, sizeof(expected), "%d: %8.4g", index, float(values[index]));
+                    if(tooltip != expected)
+                        cerr << "count=" << count << " position=" << position << " selected=" << full
+                             << " expected=[" << expected << "] actual=[" << tooltip << "]\n";
+                    assert(tooltip == expected);
+                }
+            }
+            // Frame padding does not represent a vector element.
+            assert(hoverTooltip(draw, absParam, -0.01f).empty());
+            assert(hoverTooltip(draw, absParam, 1.01f).empty());
+        }
+    }
+    ImGui::GetIO().AddMousePosEvent(-100, -100);
+}
 template<class T, class Draw> int drawVertices(Draw draw, AbstractParameter<T>& absParam) {
     ImGui::NewFrame();
     ImGui::SetNextWindowPos({0,0});
@@ -132,6 +205,8 @@ int main() {
     io.Fonts->GetTexDataAsRGBA32(&pixels,&width,&height);
     check<float>(drawFloat);
     check<int>(drawInt);
+    checkHover<float>(drawFloat);
+    checkHover<int>(drawInt);
     ImGui::DestroyContext();
     // Each reduced bar keeps the largest-magnitude value of its bucket, so a
     // -1 separator and a lone peak both survive, and the range is exact.
@@ -149,7 +224,7 @@ int main() {
         reduceVectorPlot(ints, bins, minimum, maximum);
         assert(bins[0] == 3.f && bins[kReducedPlotBins - 1] == -7.f && minimum == -7.f && maximum == 3.f);
     }
-    cout << "Empty vector GUI regression passed: float/int, bounded/unbounded, empty/populated transitions, reduced plots.\n";
+    cout << "Empty vector GUI regression passed: float/int, bounded/unbounded, empty/populated transitions, reduced plots, full-vector hover tooltips.\n";
 }
 '''
 
