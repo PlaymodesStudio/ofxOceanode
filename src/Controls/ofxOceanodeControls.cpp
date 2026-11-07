@@ -34,14 +34,6 @@ void constrainMenuHeightToHostWindow(){
     const float maxHeight = std::max(1.0f, windowBottom - menuBottom - ImGui::GetStyle().WindowPadding.y);
     ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, maxHeight));
 }
-
-bool beginTopLevelMenu(const char* label){
-    const ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing.x * 1.5f, spacing.y));
-    const bool open = ImGui::BeginMenu(label);
-    ImGui::PopStyleVar();
-    return open;
-}
 }
 
 #ifdef OFXOCEANODE_USE_OSC
@@ -197,7 +189,8 @@ void ofxOceanodeControls::drawMenu(const std::string& controllerName, float labe
         if(!c->isMenuController() || c->getControllerName() != controllerName) continue;
         ImGui::PushID(c.get());
         constrainMenuHeightToHostWindow();
-        if(beginTopLevelMenu(ofxOceanodeMenuLabel::abbreviated(c->getControllerName(), labelWidth).c_str())){
+        if(ofxOceanodeMenuLabel::begin(c->getControllerName().c_str(),
+                                      ofxOceanodeShared::getDefaultBoldFont(), labelWidth)){
             c->draw();
             ImGui::EndMenu();
         }
@@ -212,7 +205,8 @@ void ofxOceanodeControls::drawMenus(const std::string& excludedControllerName, f
            isVariablesMenu(c->getControllerName())) continue;
         ImGui::PushID(c.get());
         constrainMenuHeightToHostWindow();
-        if(beginTopLevelMenu(ofxOceanodeMenuLabel::abbreviated(c->getControllerName(), labelWidth).c_str())){
+        if(ofxOceanodeMenuLabel::begin(c->getControllerName().c_str(),
+                                      ofxOceanodeShared::getDefaultBoldFont(), labelWidth)){
             c->draw();
             ImGui::EndMenu();
         }

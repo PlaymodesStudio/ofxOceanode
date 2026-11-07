@@ -455,8 +455,38 @@ void ofxOceanode::drawUnusedNodesWindow(){
 void ofxOceanode::drawMenuBar(){
     if(showMetrics) ImGui::ShowMetricsWindow(&showMetrics);
 
-    static float globalMenuWidth = 0.0f;
     const ImRect menuBarRect = ImGui::GetCurrentWindow()->MenuBarRect();
+    // Reserve the Global Menu's current width before laying out the labels.
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const float height = menuBarRect.GetHeight();
+    const float spacing = 4.0f;
+    auto pushGlobalMenuStyle = [spacing](){
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing, 0));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4, 0));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1.0f, 1.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 0));
+    };
+    pushGlobalMenuStyle();
+    float digitWidth = 0.0f;
+    for(char digit = '0'; digit <= '9'; ++digit)
+        digitWidth = std::max(digitWidth, ImGui::CalcTextSize(&digit, &digit + 1).x);
+    const float fps = ofGetFrameRate();
+    char fpsText[32];
+    std::snprintf(fpsText, sizeof(fpsText), "%d", static_cast<int>(fps));
+    const float fpsWidth = std::max(3.0f * digitWidth, ImGui::CalcTextSize(fpsText).x);
+    const float statusWidth = controls->menuBarStatusWidth();
+    const float suffixWidth = controls->menuBarStatusSuffixWidth();
+    const float rightGap = 8.0f;
+    // Match the actual control widths and SameLine spacing so the FPS slot
+    // stays close to the meters without changing the right edge alignment.
+    const float transportWidth = 144.0f + spacing + 2.0f * (ImGui::GetFrameHeight() + 2.0f) + 4.0f;
+    const float contentWidth = transportWidth + fpsWidth + spacing
+                             + (statusWidth > 0 ? spacing + statusWidth : 0.0f)
+                             + (suffixWidth > 0 ? spacing + suffixWidth : 0.0f);
+    const float width = std::min(menuBarRect.GetWidth(), contentWidth + 4.0f + rightGap);
+    ImGui::PopStyleVar(6);
     float menuTextY = menuBarRect.Min.y + (menuBarRect.GetHeight() - ImGui::GetTextLineHeight()) * 0.5f;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(9.0f, 6.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6.0f, 6.0f));
@@ -464,17 +494,14 @@ void ofxOceanode::drawMenuBar(){
     {
         menuTextY = ImGui::GetCursorScreenPos().y + ImGui::GetCurrentWindow()->DC.CurrLineTextBaseOffset;
         std::vector<std::string> menuLabels = controls->menuControllerNames();
-        for(const char* name : {"Edit", "Config", "Window", "Layouts", "Help"})
+        for(const char* name : {"Edit", "Window", "Layouts", "Config", "Help"})
             menuLabels.emplace_back(name);
-        const float available = std::max(0.0f, menuBarRect.Max.x - globalMenuWidth - ImGui::GetCursorScreenPos().x);
-        const float labelWidth = ofxOceanodeMenuLabel::widthLimit(menuLabels, available, ImGui::GetStyle().ItemSpacing.x * 1.5f);
-        auto beginTopLevelMenu = [labelWidth](const char* label){
-            const ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing.x * 1.5f, spacing.y));
-            const std::string visibleLabel = ofxOceanodeMenuLabel::abbreviated(label, labelWidth);
-            const bool open = ImGui::BeginMenu(visibleLabel.c_str());
-            ImGui::PopStyleVar();
-            return open;
+        const float available = std::max(0.0f, menuBarRect.Max.x - width - ImGui::GetCursorScreenPos().x - 4.0f);
+        ImFont* menuFont = ofxOceanodeShared::getDefaultBoldFont();
+        const float labelWidth = ofxOceanodeMenuLabel::widthLimit(menuLabels, available, menuFont,
+                                                                ImGui::GetStyle().ItemSpacing.x * 1.5f);
+        auto beginTopLevelMenu = [menuFont, labelWidth](const char* label){
+            return ofxOceanodeMenuLabel::begin(label, menuFont, labelWidth);
         };
         controls->drawMenu("Presets", labelWidth);
 
@@ -536,6 +563,19 @@ void ofxOceanode::drawMenuBar(){
 
         controls->drawMenus("Presets", labelWidth);
 		
+        if(beginTopLevelMenu("Window"))
+        {
+            nodePool->drawMenu();
+            ImGui::Separator();
+            windows->drawWindowMenu();
+            ImGui::EndMenu();
+        }
+
+        if(beginTopLevelMenu("Layouts")){
+            layouts->drawMenu();
+            ImGui::EndMenu();
+        }
+
 		if(beginTopLevelMenu("Config"))
 		{
             if(!configMenuItems.empty()) ofxOceanodeMenu::section("Extensions");
@@ -551,19 +591,6 @@ void ofxOceanode::drawMenuBar(){
 
 			ImGui::EndMenu();
 		}
-
-        if(beginTopLevelMenu("Window"))
-        {
-            nodePool->drawMenu();
-            ImGui::Separator();
-            windows->drawWindowMenu();
-            ImGui::EndMenu();
-        }
-
-        if(beginTopLevelMenu("Layouts")){
-            layouts->drawMenu();
-            ImGui::EndMenu();
-        }
 
         if(beginTopLevelMenu("Help"))
         {
@@ -593,33 +620,7 @@ void ofxOceanode::drawMenuBar(){
 
     // A separate window owns the whole area, including empty space between controls.
     // It remains above the menu bar for drawing and mouse hit testing.
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
-    const float height = menuBarRect.GetHeight();
-    const float spacing = 4.0f;
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing, 0));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4, 0));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1.0f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 0));
-    float digitWidth = 0.0f;
-    for(char digit = '0'; digit <= '9'; ++digit)
-        digitWidth = std::max(digitWidth, ImGui::CalcTextSize(&digit, &digit + 1).x);
-    const float fps = ofGetFrameRate();
-    char fpsText[32];
-    std::snprintf(fpsText, sizeof(fpsText), "%d", static_cast<int>(fps));
-    const float fpsWidth = std::max(3.0f * digitWidth, ImGui::CalcTextSize(fpsText).x);
-    const float statusWidth = controls->menuBarStatusWidth();
-    const float suffixWidth = controls->menuBarStatusSuffixWidth();
-    const float rightGap = 8.0f;
-    // Match the actual control widths and SameLine spacing so the FPS slot
-    // stays close to the meters without changing the right edge alignment.
-    const float transportWidth = 144.0f + spacing + 2.0f * (ImGui::GetFrameHeight() + 2.0f) + 4.0f;
-    const float contentWidth = transportWidth + fpsWidth + spacing
-                             + (statusWidth > 0 ? spacing + statusWidth : 0.0f)
-                             + (suffixWidth > 0 ? spacing + suffixWidth : 0.0f);
-    const float width = std::min(menuBarRect.GetWidth(), contentWidth + 4.0f + rightGap);
-    globalMenuWidth = width;
+    pushGlobalMenuStyle();
     ImGui::SetNextWindowPos(ImVec2(menuBarRect.Max.x - width, menuBarRect.Min.y));
     ImGui::SetNextWindowSize(ImVec2(width, height));
     ImGui::SetNextWindowViewport(viewport->ID);
