@@ -142,7 +142,8 @@ Paths start at the data folder; hover for the full path.
   title is orange when a node is replaced and red when the graph falls back. It lists
   added/removed/replaced nodes, the receiving node/parameter and both endpoints of every
   changed connection with its policy, and every fallback reason, including mixes
-  skipped because another incompatibility forced fallback. A transition's
+  skipped because another incompatibility forced fallback. Red entries come
+  first, then orange, then the rest in plan order. A transition's
   Details open with a context line, "From A to B, prepared in N ms": the time
   the Start frame spent aligning and planning the target, staging its added
   nodes and loading its timelines, all before the fade clock starts. A long

@@ -875,7 +875,16 @@ void ofxOceanodeMacroMixer::drawSource(const MacroMixerRevision& macro, bool fad
         const bool open = ImGui::TreeNode("Details");
         if(worst) ImGui::PopStyleColor();
         if(open) {
-            for(size_t n = 0; n < details.size(); ++n) {
+            // Issues first: graph fallbacks, then replaced nodes, then the rest in
+            // plan order. The context line stays on top as the list's title.
+            std::vector<size_t> order;
+            for(size_t n = 0; n < details.size(); ++n) order.push_back(n);
+            const auto rank = [&](size_t n) {
+                const auto& kind = details[n].kind;
+                return kind == "context" ? 0 : kind == "fallback" || kind == "skipped" ? 1 : kind == "replaced" ? 2 : 3;
+            };
+            std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return rank(a) < rank(b); });
+            for(const auto n : order) {
                 const auto& detail = details[n];
                 ImGui::PushID(int(n));
                 if(detail.kind == "context") {
