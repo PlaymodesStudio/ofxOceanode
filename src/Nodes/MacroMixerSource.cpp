@@ -1010,7 +1010,18 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
         if(pinsChanged) edits[editIndex].pinMorphs.push_back(key);
         if(auto* macro=dynamic_cast<ofxOceanodeNodeMacro*>(&model)) {
             if(!a.contains("graph") || !b.contains("graph") || !macro->getContainer()) return false;
-            if(!readMorphTarget(graph,*macro->getContainer(),*macro,a.at("graph"),b.at("graph"),&b.at("settings"),path,values,edits)) return false;
+            try {
+                if(!readMorphTarget(graph,*macro->getContainer(),*macro,a.at("graph"),b.at("graph"),&b.at("settings"),path,values,edits)) return false;
+            } catch(const MorphNodeMismatch&) {
+                throw; // A node inside is split on its own.
+            } catch(const std::runtime_error& e) {
+                // The nested graph cannot morph in place (a Router added or
+                // removed changes the Macro's pins, say): the whole Macro is
+                // replaced, as it is when its saved pins differ, instead of
+                // the whole graph falling back. The mixer's own interface
+                // (the top level) still falls back.
+                throw MorphNodeMismatch(morphLocation(prefix,key),"nested graph cannot morph in place ("+std::string(e.what())+")",prefix,key);
+            }
             continue;
         }
         for(int i=0;i<params.size();++i) {

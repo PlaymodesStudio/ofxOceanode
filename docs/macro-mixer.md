@@ -343,9 +343,11 @@ output shows `Macro fall`. The current implementation falls back for:
 - Changed Router settings (names, bounds, Inspector settings) or Portal
   settings other than the bus (a Portal on another bus is unmatched instead).
   These publish the Macro interface or a shared service and cannot run twice.
-- Unmatched Router additions or removals in an existing container. These
-  require reconciliation of the existing published interface; routers inside a
-  whole newly added Macro load through its native lifecycle.
+- Unmatched Router additions or removals in the source's own container. These
+  require reconciliation of the mixer's published interface; routers inside a
+  whole newly added Macro load through its native lifecycle, and a Router
+  added or removed inside a running nested Macro replaces that Macro (its
+  pins change), as a different saved pin does.
 - An added Global Portal whose bus is live (a running Portal of the same
   type and Name) when loading it would set that bus: it has an incoming
   cable, or nothing else in the target drives the bus, so its saved value is

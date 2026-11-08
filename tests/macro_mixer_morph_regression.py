@@ -728,6 +728,26 @@ int main(int argc,char** argv) {
         const auto details=r.sourceDetails(r.importedMacro(sorted)->id());
         assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"||d.kind=="fallback";}));
     }
+    {
+        // A Router removed (or added) inside a nested Macro changes that
+        // Macro's pins: the Macro is replaced, in both directions, instead of
+        // the whole graph falling back.
+        const auto trimmed=scratch+"/nested-trimmed"; fs::copy(nestedTargets[2],trimmed,fs::copy_options::recursive);
+        auto modules=ofLoadJson(trimmed+"/Macro_2/modules.json"); modules["Router f"].erase("02"); ofSaveJson(trimmed+"/Macro_2/modules.json",modules);
+        fs::remove(trimmed+"/Macro_2/Router_f_2.json");
+        auto cables=ofLoadJson(trimmed+"/Macro_2/connections.json"); cables["Ranger_1"]["Output"].erase("Router_f_2"); ofSaveJson(trimmed+"/Macro_2/connections.json",cables);
+        auto macro=ofLoadJson(trimmed+"/Macro_2.json"); macro.erase("Signal"); ofSaveJson(trimmed+"/Macro_2.json",macro);
+        for(const auto& pair:std::vector<std::pair<std::string,std::string>>{{nestedTargets[2],trimmed},{trimmed,nestedTargets[2]}}) {
+            MacroMixerRuntime r(parent); assert(r.importMacro(pair.first)&&r.importMacro(pair.second));
+            r.request(pair.first,0,0,true); r.update(0); const auto* original=r.origin();
+            const auto details=r.sourceDetails(r.importedMacro(pair.second)->id());
+            assert(std::any_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"&&d.location=="Macro_2";}));
+            assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback";}));
+            r.request(pair.second,1000,0,true); r.update(10); assert(r.morphingInPlace()&&r.origin()==original);
+            r.finish(); r.update(20); assert(!r.transitioning()&&r.origin()==original);
+            assert(original->container->getDynamicNodes().at("Macro").size()==2);
+        }
+    }
     // Rollback cleans a fully loaded nested graph and all boundary cables.
     {
         std::vector<MacroMixerDiagnostic> errors;
