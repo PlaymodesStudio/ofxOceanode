@@ -102,7 +102,9 @@ public:
         // would read them, from the same alignment, so Start plans the target once.
         bool prepareMorphInPlace(Revision target, const MacroMixerMorphPolicies& policies = {},
                                  std::vector<MacroMixerMorphDetail>* details = nullptr, float logBlend = 1);
-        std::vector<MacroMixerMorphDetail> inspectMorph(Revision target, const MacroMixerMorphPolicies& policies = {}) const;
+        // swapSharedAudio: as the runtime would prepare it with Audio Servers
+        // on Alternate (a kept node sharing the audio island is replaced).
+        std::vector<MacroMixerMorphDetail> inspectMorph(Revision target, const MacroMixerMorphPolicies& policies = {}, bool swapSharedAudio = false) const;
         void drawMorphConnections();
         bool morphConnectionsReady() const;
         void cancelMorph();

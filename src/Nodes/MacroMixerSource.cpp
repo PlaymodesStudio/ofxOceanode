@@ -1056,16 +1056,30 @@ bool readMorphTarget(const MacroMixerSource::Graph& graph, ofxOceanodeContainer&
     }
     return true;
 }
+// A kept node at the top level that shares the audio island between the two
+// sides of a changed audio cable, or empty (morphSharedIslandNode below).
+std::string morphSharedIslandNode(const std::vector<MorphContainerEdit>& edits,std::string& reason);
 // Aligns the target with the running graph and reads its controls. Each node
 // whose configuration cannot morph is split off and the reading repeated.
+// swapSharedAudio (Audio Servers: Alternate, swap shared): a kept node that
+// would keep the audio island on the playing server is split off too, so the
+// island is replaced wholesale and the incoming audio can start on a free
+// server.
 ofJson readSplitMorphTarget(const MacroMixerSource::Graph& graph,const ofJson& original,const ofJson& target,
-                            MacroMixerSource::MorphSnapshot& values,std::vector<MorphContainerEdit>& edits,MorphSplits& splits) {
+                            MacroMixerSource::MorphSnapshot& values,std::vector<MorphContainerEdit>& edits,MorphSplits& splits,
+                            bool swapSharedAudio=false) {
     for(;;) {
         auto aligned=alignMorphDefinition(original,target,0,&splits);
         values.clear(); edits.clear();
         try {
             if(!readMorphTarget(graph,*graph.container,*graph.macro,original,aligned,nullptr,{},values,edits))
                 throw std::runtime_error("Incompatible live graph or saved configuration");
+            if(swapSharedAudio) {
+                std::string reason;
+                const auto key=morphSharedIslandNode(edits,reason);
+                if(!key.empty()) throw MorphNodeMismatch(morphLocation({},key),
+                    "audio island is shared by both sides ("+reason+") and Audio Servers swaps shared audio, so it is swapped wholesale to start the incoming audio on a free server",{},key);
+            }
             return aligned;
         } catch(const MorphNodeMismatch& mismatch) {
             // Each node is split once; a repeat means the split did not apply.
@@ -1326,7 +1340,7 @@ bool morphCarries(const ofJson& entry,const MacroMixerMixing::PlacementHooks& ho
 // and be built again at completion. Control cables (Rangers, Portals, an
 // envelope into a Gate) are followed no further: they never pull audio nodes.
 std::string morphIslandReason(const MorphContainerEdit& edit,const std::string& key,const std::vector<std::string>& a,
-                              const std::vector<std::string>& b,const MacroMixerMixing::PlacementHooks& hooks) {
+                              const std::vector<std::string>& b,const MacroMixerMixing::PlacementHooks& hooks,std::string* sharedKey=nullptr) {
     if(!edit.path.empty()) return morphLocation(edit.path,key)+" is inside a nested Macro";
     const auto& sink=edit.target.at("nodes").at(key);
     if(sink.at("model").get<std::string>().rfind("Router ",0)!=0) return key+" plays both sides";
@@ -1341,7 +1355,7 @@ std::string morphIslandReason(const MorphContainerEdit& edit,const std::string& 
         while(!stack.empty()) {
             const auto node=stack.back(); stack.pop_back();
             if(!seen.insert(node).second) continue;
-            if(!island.count(node)) return node+" is shared by both sides";
+            if(!island.count(node)) { if(sharedKey) *sharedKey=node; return node+" is shared by both sides"; }
             for(const auto& e:edges) if(e[2]==node && nodes.contains(e[0]) && morphCarries(nodes.at(e[0]),hooks)) stack.push_back(e[0]);
         }
         return {};
@@ -1352,6 +1366,32 @@ std::string morphIslandReason(const MorphContainerEdit& edit,const std::string& 
 }
 // The morph's changed cables of a placement type: how many there are and, when
 // one cannot move its island to another instance, why (empty: all can).
+std::string morphSharedIslandNode(const std::vector<MorphContainerEdit>& edits,std::string& reason) {
+    for(const auto& edit:edits) {
+        if(!edit.path.empty()) continue;
+        std::map<std::pair<std::string,std::string>,std::vector<std::string>> before,after;
+        for(const auto& edge:savedEdges(edit.original.at("connections"))) before[{edge[2],edge[3]}]=edge;
+        for(const auto& edge:savedEdges(edit.target.at("connections"))) after[{edge[2],edge[3]}]=edge;
+        auto inputs=before; for(const auto& item:after) inputs.emplace(item.first,item.second);
+        for(const auto& input:inputs) {
+            const auto& key=input.first.first;
+            const auto a=before.count(input.first)?before.at(input.first):std::vector<std::string>{};
+            const auto b=after.count(input.first)?after.at(input.first):std::vector<std::string>{};
+            if(a==b || !edit.original.at("nodes").contains(key) || !edit.target.at("nodes").contains(key)) continue;
+            auto* sink=morphPort(*edit.container,key,input.first.second);
+            if(!sink) continue;
+            const auto* hooks=MacroMixerMixing::registry().placement(MacroMixerMixing::portType(*sink));
+            if(!hooks) continue;
+            std::string shared;
+            const auto why=morphIslandReason(edit,key,a,b,*hooks,&shared);
+            // Only a node kept on both sides that the morph can replace on its own.
+            if(shared.empty() || !edit.original.at("nodes").contains(shared) || !edit.target.at("nodes").contains(shared)
+               || !morphStageable(edit.target.at("nodes").at(shared))) continue;
+            reason=why; return shared;
+        }
+    }
+    return {};
+}
 std::string morphIslandsReason(const std::vector<MorphContainerEdit>& edits,size_t& count) {
     count=0; std::string reason;
     for(const auto& edit:edits) {
@@ -1707,6 +1747,13 @@ struct MacroMixerMorphTopology {
             try { reason=morphIslandsReason(edits,islands); } catch(const std::exception& e) { reason=e.what(); }
             spread=islands>0 && reason.empty();
             if(!spread) { placement->spread=false; placement->reason=islands==0 ? "the morph changes no audio connection" : reason; }
+            // The target's audio can play only on its pinned server, but the
+            // morph has to stay with the running graph on another one: in
+            // place it would be silent, so the graph falls back and the
+            // second graph starts on the pinned server.
+            if(!spread && placement->pinInstance && placement->instance && placement->pinInstance!=placement->instance)
+                throw std::runtime_error("the destination's audio plays only on server "+std::to_string(placement->pin)
+                    +" while the running graph plays on another server, and "+placement->reason);
         }
         for(auto& edit:edits) {
             auto& c=*edit.container;
@@ -1880,7 +1927,8 @@ bool MacroMixerSource::Graph::prepareMorphInPlace(Revision target,const MacroMix
         if(!target) throw std::runtime_error("No target Macro definition");
         const auto& original=liveMorphDefinition.is_null() ? revision->sourceDefinition() : liveMorphDefinition;
         MorphSplits splits;
-        topology->targetDefinition=readSplitMorphTarget(*this,original,target->sourceDefinition(),destination,topology->edits,splits);
+        topology->targetDefinition=readSplitMorphTarget(*this,original,target->sourceDefinition(),destination,topology->edits,splits,
+                                                        placement && placement->swap);
         // The transition's Details come from these edits (as inspectMorph
         // reads them), before staging changes the graph they describe.
         if(details) {
@@ -1984,13 +2032,13 @@ void appendMorphEditDetails(std::vector<MacroMixerMorphDetail>& result,const std
         : "The destination's audio stays on the origin's server: "+island});
     if(result.empty()) result.push_back({"live","Graph","Matching graph controls morph on the running nodes"});
 }
-std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revision target,const MacroMixerMorphPolicies& policies) const {
+std::vector<MacroMixerMorphDetail> MacroMixerSource::Graph::inspectMorph(Revision target,const MacroMixerMorphPolicies& policies,bool swapSharedAudio) const {
     std::vector<MacroMixerMorphDetail> result;
     try {
         if(!target) throw std::runtime_error("No target Macro definition");
         const auto& original=liveMorphDefinition.is_null() ? revision->sourceDefinition() : liveMorphDefinition;
         MorphSnapshot values; std::vector<MorphContainerEdit> edits; MorphSplits splits;
-        readSplitMorphTarget(*this,original,target->sourceDefinition(),values,edits,splits);
+        readSplitMorphTarget(*this,original,target->sourceDefinition(),values,edits,splits,swapSharedAudio);
         appendMorphEditDetails(result,edits,splits,policies);
     } catch(const std::exception& e) { result.push_back({"fallback","Graph",e.what()}); }
     return result;

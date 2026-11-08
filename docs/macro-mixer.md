@@ -5,7 +5,7 @@ It is registered under **Experimental → MacroMixer**. Declare router names, ty
 and Input/Output roles in its Inspector; add Macro source folders; choose Mode
 (Mix or Morph) and Target and press **Start!**. Duration_ms, Bi Pow, Log Blend and **Stop!**
 (finish now) control a fade, and Progress shows it. Each output has its own
-type-specific policy and options. **Audio Servers** (Single or Alternate)
+type-specific policy and options. **Audio Servers** (Single, Alternate or Alternate, swap shared)
 decides which SuperCollider servers a transition's audio runs on (see
 *SuperCollider servers* below).
 
@@ -601,8 +601,11 @@ pull upstream. With one server, every transition builds the destination's
 audio on the server that is playing the origin: it allocates buses, loads
 SynthDefs, creates and orders the new synths and runs both graphs until the
 fade completes, which glitches the playing audio. **Audio Servers** (saved
-with the node; Single or Alternate, default Alternate) puts the incoming
-audio on a server that is not playing instead.
+with the node; Single, Alternate or Alternate, swap shared; default Alternate) puts the incoming
+audio on a server that is not playing instead. A morph in place that keeps
+audio nodes (two presets sharing their engines) stays on its server and
+morphs their sound; a third choice, **Alternate, swap shared**, replaces such
+kept nodes so the island always moves (see *Morph in place* below).
 
 **The patch needs one SC Output per server**, each fed by the mixer's ScBus
 output (Server 0, Server 1, and Server 2 if it is booted). A server without
@@ -657,8 +660,19 @@ other server. At completion the graph moves to that server before the
 native cable is restored (the rebuilds are coalesced to the next update), so
 the playing server never builds the island and the island's synths stay
 where they are. A node kept on both sides would have to run on two servers
-and be rebuilt at completion, so then the morph keeps one server, as before,
-with the reason in Details ("SC_Tone_1 is shared by both sides").
+and be rebuilt at completion, so then the morph keeps one server, with the
+reason in Details ("SC_Tone_1 is shared by both sides"), and the kept
+nodes morph their sound there. This is the sound-morph case: in BLOOBS
+2_CELLS_AUDIO ↔ 2_GHOSTS_BIONIC_AUDIO the engines, the Mixer Pro and the
+audio Macro match, so only the box that differs runs twice during the fade.
+Keep what matches really matching (the same Macro kind, Follow Graph Server
+on in both), since every replaced node runs twice on that server. With
+**Alternate, swap shared** such a kept node is replaced instead (Details:
+"audio island is shared by both sides … swapped wholesale"), so the island
+always moves to a free server and the audio crossfades between the two
+islands rather than morphing: the choice when a preset alone loads a server
+heavily. A shared node the morph cannot replace on its own (inside a nested
+Macro, a Router feeding other nodes) keeps one server either way.
 
 What stays on one server:
 
@@ -675,7 +689,12 @@ What stays on one server:
   The incoming side goes to the pinned server when an SC Output there plays
   the mixer, even with Audio Servers on Single (the running graph may sit on
   another server after an earlier Alternate transition); nodes naming two
-  servers keep the source single. The reason shows in Details.
+  servers keep the source single. The reason shows in Details. When a morph
+  in place cannot move its audio island (a kept SC node) and the running
+  graph plays on another server than the pin, the morph would be silent
+  there, so the graph falls back and the second graph starts on the pinned
+  server ("plays only on server 0 while the running graph plays on another
+  server").
 - With Follow Graph Server on and every strip on one server, a Mixer Pro's
   strips play on whichever server builds the graph, writing the output of
   their own server index (`Out S1` for strips on S1), so the source moves

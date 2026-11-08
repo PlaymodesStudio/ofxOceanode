@@ -239,9 +239,13 @@ void ofxOceanodeMacroMixer::setup() {
     addParameter(logBlend.set("Log Blend", 1, 0, 1));
     // With an SC Output per SuperCollider server, Alternate starts each
     // transition's incoming audio on a server that is not playing and
-    // crossfades across servers; Single keeps everything on one server.
-    // Alternate acts as Single while only one server plays the mixer.
-    addParameterDropdown(audioServers, "Audio Servers", 1, {"Single", "Alternate"});
+    // crossfades across servers; a morph in place that keeps SC nodes (the
+    // engines both presets share) stays on its server, morphing their
+    // sound. "Alternate, swap shared" replaces such kept nodes instead, so
+    // the island always moves, at the price of the sound morph. Single keeps
+    // everything on one server. Alternate acts as Single while only one
+    // server plays the mixer.
+    addParameterDropdown(audioServers, "Audio Servers", 1, {"Single", "Alternate", "Alternate, swap shared"});
     addParameter(transition.set("Start!"));
     addParameter(finish.set("Stop!"));
     addOutputParameter(summary.set("Status", "No sources"), transient);
@@ -249,7 +253,7 @@ void ofxOceanodeMacroMixer::setup() {
     if(hostContainer) {
         runtime = std::make_unique<MacroMixerRuntime>(*hostContainer);
         MacroMixerContract empty; empty.routers.clear(); runtime->setContract(empty);
-        runtime->setAlternateServers(audioServers == 1);
+        runtime->setAlternateServers(audioServers >= 1); runtime->setSwapSharedAudio(audioServers == 2);
         if(std::find(liveMixers.begin(),liveMixers.end(),this) == liveMixers.end()) liveMixers.push_back(this);
     }
     listeners.push(target.newListener([this](int& index) {
@@ -269,19 +273,19 @@ void ofxOceanodeMacroMixer::setup() {
         if(selectedID == heading) return;
         inspectorError.clear();
         runtime->setMorphLogBlend(logBlend);
-        runtime->setAlternateServers(audioServers == 1);
+        runtime->setAlternateServers(audioServers >= 1); runtime->setSwapSharedAudio(audioServers == 2);
         runtime->requestMacro(selectedID, duration, biPow, mode == 1);
     }));
     listeners.push(transition.newListener([this] {
         if(!runtime || !getActive()) return;
         inspectorError.clear();
         runtime->setMorphLogBlend(logBlend);
-        runtime->setAlternateServers(audioServers == 1);
+        runtime->setAlternateServers(audioServers >= 1); runtime->setSwapSharedAudio(audioServers == 2);
         runtime->requestMacro(selectedID, duration, biPow, mode == 1);
     }));
     // Also at rest: Alternate keeps the running graph on one server even when
     // SC Outputs on several servers play the mixer.
-    listeners.push(audioServers.newListener([this](int& value) { if(runtime) runtime->setAlternateServers(value == 1); }));
+    listeners.push(audioServers.newListener([this](int& value) { if(runtime) { runtime->setAlternateServers(value >= 1); runtime->setSwapSharedAudio(value == 2); } }));
     listeners.push(finish.newListener([this] { if(runtime && getActive()) runtime->finish(); }));
 }
 
@@ -1205,7 +1209,7 @@ void ofxOceanodeMacroMixer::loadBeforeConnections(ofJson& json) {
         // Release both old graphs before staging to retain the two-graph cap.
         if(runtime->transitioning()) runtime->clear();
         auto candidate = std::make_unique<MacroMixerRuntime>(*hostContainer);
-        candidate->setAlternateServers(audioServers == 1); // Its listener follows a later recall of the control.
+        candidate->setAlternateServers(audioServers >= 1); candidate->setSwapSharedAudio(audioServers == 2); // Its listener follows a later recall of the control.
         if(!candidate->restoreState(saved)) {
             inspectorError = "Cannot restore MacroMixer";
             for(const auto& e : candidate->diagnostics()) inspectorError += "\n" + e.file + ": " + e.message;

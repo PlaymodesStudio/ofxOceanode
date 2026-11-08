@@ -276,7 +276,7 @@ const std::vector<MacroMixerMorphDetail>& MacroMixerRuntime::sourceDetails(const
         auto target=macro(id); std::vector<Diagnostic> diagnostics;
         if(target) target=MacroMixerSource::importFolder(parent,target->source(),interface,diagnostics,id,keptOut.get());
         if(target) {
-            result=current->inspectMorph(target,morphPoliciesInto(id));
+            result=current->inspectMorph(target,morphPoliciesInto(id),wouldSwapShared(current->revision,target));
             result.insert(result.begin(),{"context",target->name(),"From "+current->revision->name()+" to "+target->name()});
         }
         else for(const auto& error:diagnostics) result.push_back({"fallback",error.node.empty() ? error.file : error.file+" / "+error.node,
@@ -332,7 +332,7 @@ bool MacroMixerRuntime::checkNextOrigin() {
             if(!target) if(const auto saved=macro(id)) target=MacroMixerSource::importFolder(parent,saved->source(),interface,diagnostics,id,keptOut.get());
             if(!target) { checks[id][originID]={Compatibility::Unchecked,{{"unchecked",macro(id) ? macro(id)->name() : id,"Source could not be read"}}}; continue; }
             Check result{Compatibility::Ok,{}};
-            for(auto& detail:graph->inspectMorph(target,morphPoliciesInto(id))) {
+            for(auto& detail:graph->inspectMorph(target,morphPoliciesInto(id),wouldSwapShared(graph->revision,target))) {
                 const bool whole=detail.kind=="fallback" || detail.kind=="skipped";
                 if(!whole && detail.kind!="replaced") continue;
                 if(whole) result.level=Compatibility::GraphFallback;
@@ -760,7 +760,7 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
             if(request->morph && current) preparePlacement(*current->placement,current->revision,revision,true);
             const bool reuse=request->morph && current && current->prepareMorphInPlace(revision,morphPoliciesInto(revision->id()),&details,morphLogBlend);
             if(request->morph && current) {
-                if(details.empty()) details=current->inspectMorph(revision,morphPoliciesInto(revision->id())); // Failed before any edit was read.
+                if(details.empty()) details=current->inspectMorph(revision,morphPoliciesInto(revision->id()),current->placement->swap); // Failed before any edit was read.
                 if(!reuse) {
                     if(std::none_of(details.begin(),details.end(),[](const auto& d) {return d.kind=="fallback";}))
                         details.push_back({"fallback","Graph",current->morphFallbackReason});
@@ -1005,8 +1005,10 @@ MacroMixerMixing::PlacementPin MacroMixerRuntime::placementPin(const Revision& r
     return result;
 }
 void MacroMixerRuntime::preparePlacement(MacroMixerMixing::Placement& placement,const Revision& origin,const Revision& target,bool inPlace) const {
-    placement.spread=false; placement.pin=-1; placement.reason.clear(); placement.note.clear(); placement.incoming=nullptr;
+    placement.spread=false; placement.swap=false; placement.pin=-1; placement.pinInstance=nullptr; placement.reason.clear(); placement.note.clear(); placement.incoming=nullptr;
     const auto to=placementPin(target);
+    if(to.index>=0) for(const auto& r:interface.routers)
+        if(const auto* hooks=MacroMixerMixing::registry().placement(r.type)) if(hooks->instance) { placement.pinInstance=hooks->instance(to.index); break; }
     // A pin is where the target's nodes can play at all, so it is honoured
     // with Audio Servers on Single too: the running graph may sit on another
     // server after an earlier Alternate transition.
@@ -1015,6 +1017,7 @@ void MacroMixerRuntime::preparePlacement(MacroMixerMixing::Placement& placement,
     // In place, the origin's shared resources run on through the morph.
     if(inPlace) { const auto from=placementPin(origin); if(from.single) { placement.reason=from.reason; return; } }
     placement.spread=true; placement.pin=to.index; placement.reason=to.reason;
+    placement.swap=alternateServers && swapSharedAudio;
 }
 void MacroMixerRuntime::notePlacement() {
     if(!next || audioNoted || !placing()) return;
